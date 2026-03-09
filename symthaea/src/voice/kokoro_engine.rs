@@ -147,8 +147,10 @@ impl KokoroEngine {
         let input_ids: Vec<i64> = phoneme_ids.iter().map(|&id| id as i64).collect();
         let style: Vec<f32> = voice_embed.clone();
 
-        let input_ids_tensor = ort::value::Tensor::from_array((vec![1i64, seq_len as i64], input_ids)).ok()?;
-        let style_tensor = ort::value::Tensor::from_array((vec![1i64, voice_embed.len() as i64], style)).ok()?;
+        let input_ids_tensor =
+            ort::value::Tensor::from_array((vec![1i64, seq_len as i64], input_ids)).ok()?;
+        let style_tensor =
+            ort::value::Tensor::from_array((vec![1i64, voice_embed.len() as i64], style)).ok()?;
         let speed_tensor = ort::value::Tensor::from_array((vec![1i64], vec![1.0f32])).ok()?;
 
         let outputs = match self.session.run(ort::inputs![
