@@ -292,7 +292,6 @@ fn validate_update_escrow(_action: Update, escrow: Escrow) -> ExternResult<Valid
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hdi::prelude::*;
 
     // ========================================================================
     // Factory Functions
