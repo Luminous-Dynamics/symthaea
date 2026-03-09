@@ -2,6 +2,7 @@
 name = "symthaea-phi-oracle"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
 description = "Integration Spectrometer — measure structural coherence of external systems via spectral MIP analysis and CfC temporal probes"
 
 [features]
