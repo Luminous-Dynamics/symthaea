@@ -1440,7 +1440,7 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("ChangeBlindness") => "detection_with_disruption",
         b if b.contains("ProprioceptiveDrift") => "drift_difference",
         b if b.contains("PhonemeDiscrimination") => "categorical_perception_index",
-        b if b.contains("SubstrateTransfer") => "transfer_fidelity",
+        b if b.contains("Substrate") && b.contains("Transfer") => "transfer_fidelity",
         _ => "overall_accuracy",
     }
 }
