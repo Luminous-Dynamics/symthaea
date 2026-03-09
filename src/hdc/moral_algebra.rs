@@ -594,7 +594,8 @@ impl MoralAlgebra {
             rule_hv: self.encode_obligation("do no harm"),
             violation_actions: vec![
                 "harm", "harmed", "hurt", "injure", "injured", "attack", "attacked", "abuse",
-                "abused",
+                "abused", "kill", "killed", "murder", "murdered", "slay", "slaughter",
+                "to death", "to their death", "pushing a person",
             ]
             .into_iter()
             .map(|s| s.to_string())
@@ -1178,12 +1179,24 @@ impl MoralAlgebra {
             .max_by(|a, b| a.1.total_cmp(b.1))
             .unwrap_or((&"neutral", &0.0));
 
-        let final_verdict = match *winner {
+        let mut final_verdict = match *winner {
             "good" => MoralVerdict::Good,
             "bad" => MoralVerdict::Bad,
             "consent_violation" => MoralVerdict::ConsentViolation,
             _ => MoralVerdict::Neutral,
         };
+
+        // Perfect duty override: if a perfect duty violation is detected,
+        // it cannot be overridden by good intent alone. This is the core
+        // deontological principle — "do not kill" is not negated by "to save
+        // others". The verdict is capped at Neutral (not forced to Bad,
+        // since moral dilemmas deserve nuance).
+        if final_verdict == MoralVerdict::Good {
+            let has_perfect_duty_violation = deonto.violations.iter().any(|v| v.is_perfect_duty);
+            if has_perfect_duty_violation {
+                final_verdict = MoralVerdict::Neutral;
+            }
+        }
 
         // Calculate confidence (how decisive was the vote)
         let total_votes: f32 = votes.values().sum();

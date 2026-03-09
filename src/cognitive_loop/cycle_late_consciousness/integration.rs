@@ -501,7 +501,7 @@ impl CognitiveLoopService {
             }
 
             // Integrate all subsystems into unified living state
-            let free_energy = self.fep.fep_agent.current_free_energy();
+            let free_energy = self.fep.agent.current_free_energy();
             let unified_state = self.unified_living_mind.integrate(
                 &self.autopoietic,
                 &self.enactive,
