@@ -129,6 +129,10 @@ pub struct Episode {
     /// Eich (1980) — mood-dependent retrieval.
     #[serde(default)]
     pub bath_state_at_encoding: Option<[f32; 9]>,
+
+    /// Semantic embedding from neural encoder (for embedding-based retrieval).
+    #[serde(default)]
+    pub semantic_embedding: Option<Vec<f32>>,
 }
 
 impl Episode {
@@ -147,6 +151,7 @@ impl Episode {
             retrieval_count: 0,
             dopamine_at_encoding: None,
             bath_state_at_encoding: None,
+            semantic_embedding: None,
         }
     }
 
@@ -173,7 +178,14 @@ impl Episode {
             retrieval_count: 0,
             dopamine_at_encoding: None,
             bath_state_at_encoding: None,
+            semantic_embedding: None,
         }
+    }
+
+    /// Set semantic embedding for embedding-based retrieval.
+    pub fn with_semantic_embedding(mut self, embedding: Vec<f32>) -> Self {
+        self.semantic_embedding = Some(embedding);
+        self
     }
 
     /// Set dopamine level at encoding for DA-tagged replay prioritization.
@@ -468,6 +480,40 @@ impl EpisodicMemory {
             demand_replay_triggered: false,
             demand_replay_count: 0,
         }
+    }
+
+    /// Retrieve episodes by semantic embedding similarity (cosine).
+    ///
+    /// Returns episodes whose semantic embeddings have cosine similarity above
+    /// the threshold, sorted by similarity (highest first).
+    pub fn retrieve_by_embedding_similarity(
+        &mut self,
+        query: &[f32],
+        top_k: usize,
+    ) -> Vec<&Episode> {
+        let mut scored: Vec<(f32, &PrioritizedEpisode)> = self
+            .episodes
+            .iter()
+            .filter_map(|ep| {
+                let emb = ep.episode.semantic_embedding.as_ref()?;
+                if emb.len() != query.len() || query.is_empty() {
+                    return None;
+                }
+                let dot: f32 = emb.iter().zip(query).map(|(a, b)| a * b).sum();
+                let norm_a: f32 = emb.iter().map(|x| x * x).sum::<f32>().sqrt();
+                let norm_b: f32 = query.iter().map(|x| x * x).sum::<f32>().sqrt();
+                if norm_a < 1e-9 || norm_b < 1e-9 {
+                    return None;
+                }
+                Some((dot / (norm_a * norm_b), ep))
+            })
+            .collect();
+        scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+        scored
+            .into_iter()
+            .take(top_k)
+            .map(|(_, ep)| &ep.episode)
+            .collect()
     }
 
     /// Store an episode if its Phi exceeds the threshold
