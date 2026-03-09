@@ -1028,8 +1028,8 @@ fn main() -> Result<()> {
             canaries_passed: last.metadata.integrity.canaries_passed,
             anomaly_count: last.metadata.integrity.anomaly_count,
             has_critical: last.metadata.integrity.has_critical,
-            canary_count: 6,       // 6 built-in canaries
-            attestation_count: 3,  // safety thresholds + consciousness weights + receptor sensitivities
+            canary_count: 6,      // 6 built-in canaries
+            attestation_count: 3, // safety thresholds + consciousness weights + receptor sensitivities
         },
     };
 

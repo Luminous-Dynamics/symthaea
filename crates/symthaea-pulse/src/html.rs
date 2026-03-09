@@ -1875,7 +1875,9 @@ fn write_integrity_pane(html: &mut String, integrity: &IntegrityInfo) {
         ("VERIFIED", "#2ecc71")
     };
 
-    let _ = write!(html, r##"<div class="pane">
+    let _ = write!(
+        html,
+        r##"<div class="pane">
 <h2>Integrity Shield</h2>
 <div style="text-align:center;margin-bottom:12px">
   <span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:{color};box-shadow:0 0 12px {color};margin-right:8px;vertical-align:middle"></span>
@@ -1890,18 +1892,35 @@ fn write_integrity_pane(html: &mut String, integrity: &IntegrityInfo) {
 "##,
         color = status_color,
         label = status_label,
-        attest = if integrity.attestation_passed { "&#x2705;" } else { "&#x274C;" },
-        temporal = if integrity.temporal_passed { "&#x2705;" } else { "&#x274C;" },
-        canaries = if integrity.canaries_passed { "&#x2705;" } else { "&#x274C;" },
+        attest = if integrity.attestation_passed {
+            "&#x2705;"
+        } else {
+            "&#x274C;"
+        },
+        temporal = if integrity.temporal_passed {
+            "&#x2705;"
+        } else {
+            "&#x274C;"
+        },
+        canaries = if integrity.canaries_passed {
+            "&#x2705;"
+        } else {
+            "&#x274C;"
+        },
         att_count = integrity.attestation_count,
         can_count = integrity.canary_count,
     );
 
     if integrity.anomaly_count > 0 {
-        let _ = write!(html,
+        let _ = write!(
+            html,
             r#"<p style="color:#e74c3c;font-size:0.85em;margin-top:8px">{} anomal{} detected</p>"#,
             integrity.anomaly_count,
-            if integrity.anomaly_count == 1 { "y" } else { "ies" },
+            if integrity.anomaly_count == 1 {
+                "y"
+            } else {
+                "ies"
+            },
         );
     }
 

@@ -447,10 +447,16 @@ mod tests {
     #[test]
     fn test_mean_activation() {
         let mut wm = WorkingMemory::with_capacity(7);
-        assert!((wm.mean_activation() - 0.0).abs() < 1e-6, "Empty WM mean = 0");
+        assert!(
+            (wm.mean_activation() - 0.0).abs() < 1e-6,
+            "Empty WM mean = 0"
+        );
 
         wm.push(make_hv(1), MemorySource::UserInput, "a".into());
-        assert!((wm.mean_activation() - 1.0).abs() < 1e-6, "Single item at 1.0");
+        assert!(
+            (wm.mean_activation() - 1.0).abs() < 1e-6,
+            "Single item at 1.0"
+        );
 
         // Second push decays first to DECAY_RATE, new item is 1.0
         wm.push(make_hv(2), MemorySource::UserInput, "b".into());

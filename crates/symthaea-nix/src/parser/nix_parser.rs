@@ -1084,10 +1084,7 @@ mod tests {
 
     #[test]
     fn test_as_string() {
-        assert_eq!(
-            NixValue::String("hello".into()).as_string(),
-            Some("hello")
-        );
+        assert_eq!(NixValue::String("hello".into()).as_string(), Some("hello"));
         assert_eq!(
             NixValue::Path("/etc/nixos".into()).as_string(),
             Some("/etc/nixos")
