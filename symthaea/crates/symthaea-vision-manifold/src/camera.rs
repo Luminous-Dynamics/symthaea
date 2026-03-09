@@ -45,8 +45,17 @@ mod real_camera {
     use v4l::FourCC;
 
     /// Live camera source backed by V4L2 (Video4Linux2).
+    ///
+    /// Stores the `Device` to keep the file descriptor alive alongside the
+    /// mmap `Stream`. The stream's internal buffers are memory-mapped and do
+    /// not actually borrow from `Device`, but Rust's type system ties the
+    /// `Stream` lifetime to the `Device` reference used during construction.
+    /// We keep `_device` alive for soundness and use a `'static` lifetime on
+    /// the stream (the mmap'd buffers are valid until explicitly unmapped in
+    /// `Stream::drop`).
     pub struct CameraSource {
-        stream: Stream,
+        _device: Device,
+        stream: Stream<'static>,
         width: u32,
         height: u32,
         frame_count: u64,
@@ -76,7 +85,17 @@ mod real_camera {
             let stream = Stream::with_buffers(&dev, Type::VideoCapture, 4)
                 .map_err(|e| format!("Failed to create stream: {e}"))?;
 
+            // SAFETY: The mmap'd buffers inside Stream are backed by kernel memory-mapped
+            // regions (via mmap syscall) that remain valid until Stream::drop calls munmap.
+            // The Stream internally holds an Arc<Handle> (cloned from Device), so it does
+            // not actually borrow from Device. We keep _device alive as an extra guarantee.
+            // The 'a lifetime on Stream<'a> comes from Arena<'a> which holds the mmap'd
+            // slices — these are effectively 'static since they're kernel-managed.
+            #[allow(unsafe_code)]
+            let stream: Stream<'static> = unsafe { std::mem::transmute(stream) };
+
             Ok(Self {
+                _device: dev,
                 stream,
                 width: actual.width,
                 height: actual.height,
