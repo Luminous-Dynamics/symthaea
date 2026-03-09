@@ -2,10 +2,7 @@
 # https://embarkstudios.github.io/cargo-deny/
 
 [advisories]
-vulnerability = "deny"
-unmaintained = "allow"
-yanked = "allow"
-notice = "allow"
+# cargo-deny v2 simplified format
 ignore = [
     # Marvin Attack timing sidechannel in rsa crate (indirect dep, no direct exposure)
     "RUSTSEC-2023-0071",
