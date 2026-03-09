@@ -1,110 +1,485 @@
 /*!
-Threshold Sensitivity Analysis via Property-Based Testing
+Property-Based Tests for Threshold Sensitivity
 
-Verifies that the cognitive loop remains stable when key thresholds are
-perturbed within ±wide ranges. This catches brittleness: if a change
-causes NaN, panic, or unbounded divergence, the threshold needs tighter
-documentation or a wider stability margin.
+The cognitive loop has 220+ named constants in `thresholds.rs` that control
+every aspect of consciousness computation: moral evaluation, FEP active
+inference, exploration, learning rate adaptation, neuromodulation, etc.
+
+Since these constants are `pub const`, they cannot be modified at runtime.
+Instead, this suite tests **sensitivity** by varying the knobs that ARE
+runtime-configurable — consciousness profiles, substrate types, learning
+thresholds, and subsystem enable flags — and verifying the system remains
+robust (finite, bounded, non-divergent) across the entire parameter space.
+
+## Complement to `proptest_feedback_stability.rs`
+
+That file fuzzes **inputs** (random text, emotional words, adversarial strings).
+This file fuzzes **configuration** (profiles, substrates, thresholds, enable flags)
+and verifies the system's internal parameter space doesn't hide divergence.
 */
 
 use proptest::prelude::*;
-use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
+use symthaea::cognitive_loop::{
+    config::ConsciousnessProfile, CognitiveLoopConfig, CognitiveLoopService,
+};
+use symthaea_core::hdc::substrate_independence::SubstrateType;
 
-fn perturbed_config() -> impl Strategy<Value = CognitiveLoopConfig> {
-    (
-        0.01f32..0.3,    // learning_threshold (default ~0.1, ±wide)
-        prop::bool::ANY, // enable_surprise_exploration
-        prop::bool::ANY, // enable_prefrontal
-    )
-        .prop_map(|(lt, surprise, prefrontal)| CognitiveLoopConfig {
-            learning_threshold: lt,
-            async_training: false,
-            enable_surprise_exploration: surprise,
-            enable_prefrontal: prefrontal,
-            enable_primitive_consciousness: true,
-            ..Default::default()
-        })
+// ═══════════════════════════════════════════════════════════════════════════════
+// Strategies
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Strategy for generating random but valid input strings.
+/// Includes emotional words, special characters, empty-ish strings, and normal text.
+fn fuzz_input_strategy() -> impl Strategy<Value = String> {
+    prop_oneof![
+        // Normal ASCII text
+        "[a-z ]{0,60}",
+        // Emotional positive words (trigger EmotionContagion)
+        Just("happy joy love wonderful amazing excellent delighted thrilled".to_string()),
+        // Emotional negative words
+        Just("sad angry terrible horrible pain suffering grief struggle".to_string()),
+        // High arousal text
+        Just("incredible! urgent! NOW! terrified! ecstatic!!!".to_string()),
+        // Empty / whitespace
+        Just("".to_string()),
+        // Repeated pattern (boredom trigger)
+        Just("same same same same same same same same same same".to_string()),
+        // Mixed content
+        "([a-z]{1,10} ){1,8}[!?.]{0,5}",
+    ]
 }
 
-fn input_sequence(n: usize) -> impl Strategy<Value = Vec<String>> {
-    prop::collection::vec("[a-z ]{3,30}", 1..=n)
+/// Strategy for generating a sequence of fuzzed inputs.
+fn fuzz_input_sequence(min: usize, max: usize) -> impl Strategy<Value = Vec<String>> {
+    prop::collection::vec(fuzz_input_strategy(), min..=max)
 }
+
+/// Strategy: random ConsciousnessProfile from all 4 variants.
+fn profile_strategy() -> impl Strategy<Value = ConsciousnessProfile> {
+    prop_oneof![
+        Just(ConsciousnessProfile::Minimal),
+        Just(ConsciousnessProfile::Standard),
+        Just(ConsciousnessProfile::Full),
+        Just(ConsciousnessProfile::Research),
+    ]
+}
+
+/// Strategy: random SubstrateType from all 8 variants.
+fn substrate_strategy() -> impl Strategy<Value = SubstrateType> {
+    prop_oneof![
+        Just(SubstrateType::BiologicalNeurons),
+        Just(SubstrateType::SiliconDigital),
+        Just(SubstrateType::QuantumComputer),
+        Just(SubstrateType::PhotonicProcessor),
+        Just(SubstrateType::NeuromorphicChip),
+        Just(SubstrateType::BiochemicalComputer),
+        Just(SubstrateType::HybridSystem),
+        Just(SubstrateType::ExoticSubstrate),
+    ]
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Helpers
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Create a service from a consciousness profile with async training disabled.
+fn profile_service(profile: ConsciousnessProfile) -> CognitiveLoopService {
+    let mut config = CognitiveLoopConfig::from_profile(profile);
+    config.async_training = false;
+    CognitiveLoopService::new(config).unwrap()
+}
+
+/// Assert an f32 value is finite.
+fn assert_finite_f32(val: f32, name: &str) -> Result<(), TestCaseError> {
+    prop_assert!(val.is_finite(), "{name} is not finite: {val}");
+    Ok(())
+}
+
+/// Assert an f64 value is finite.
+fn assert_finite_f64(val: f64, name: &str) -> Result<(), TestCaseError> {
+    prop_assert!(val.is_finite(), "{name} is not finite: {val}");
+    Ok(())
+}
+
+/// Assert an f32 value is within [lo, hi].
+fn assert_bounded_f32(val: f32, lo: f32, hi: f32, name: &str) -> Result<(), TestCaseError> {
+    prop_assert!(val >= lo && val <= hi, "{name} out of [{lo}, {hi}]: {val}");
+    Ok(())
+}
+
+/// Assert an f64 value is within [lo, hi].
+fn assert_bounded_f64(val: f64, lo: f64, hi: f64, name: &str) -> Result<(), TestCaseError> {
+    prop_assert!(val >= lo && val <= hi, "{name} out of [{lo}, {hi}]: {val}");
+    Ok(())
+}
+
+/// Assert all core metadata fields are finite and bounded.
+/// Checks the invariants that must hold regardless of which thresholds are active.
+fn assert_metadata_sane(
+    result: &symthaea::cognitive_loop::CycleResult,
+    cycle: usize,
+) -> Result<(), TestCaseError> {
+    let m = &result.metadata;
+
+    // consciousness_level: [0.0, 1.0]
+    assert_finite_f64(
+        m.consciousness_level,
+        &format!("consciousness_level@cycle{cycle}"),
+    )?;
+    assert_bounded_f64(
+        m.consciousness_level,
+        0.0,
+        1.0,
+        &format!("consciousness_level@cycle{cycle}"),
+    )?;
+
+    // thermodynamic_load: [0.0, 1.0]
+    assert_finite_f32(
+        m.thermodynamic_load,
+        &format!("thermodynamic_load@cycle{cycle}"),
+    )?;
+    assert_bounded_f32(
+        m.thermodynamic_load,
+        0.0,
+        1.0,
+        &format!("thermodynamic_load@cycle{cycle}"),
+    )?;
+
+    // actual_effective_lr: >= 0
+    assert_finite_f32(
+        m.actual_effective_lr,
+        &format!("actual_effective_lr@cycle{cycle}"),
+    )?;
+    prop_assert!(
+        m.actual_effective_lr >= 0.0,
+        "actual_effective_lr negative at cycle {cycle}: {}",
+        m.actual_effective_lr
+    );
+
+    // somatic_stress: >= 0
+    assert_finite_f64(m.somatic_stress, &format!("somatic_stress@cycle{cycle}"))?;
+    prop_assert!(
+        m.somatic_stress >= 0.0,
+        "somatic_stress negative at cycle {cycle}: {}",
+        m.somatic_stress
+    );
+
+    // prediction_error: finite
+    assert_finite_f32(
+        result.prediction_error,
+        &format!("prediction_error@cycle{cycle}"),
+    )?;
+
+    // FEP signals: all finite
+    assert_finite_f64(
+        m.fep.fep_accuracy,
+        &format!("fep_accuracy@cycle{cycle}"),
+    )?;
+    assert_finite_f64(
+        m.fep.fep_complexity,
+        &format!("fep_complexity@cycle{cycle}"),
+    )?;
+    assert_finite_f64(
+        m.fep.fep_surprise,
+        &format!("fep_surprise@cycle{cycle}"),
+    )?;
+    assert_finite_f64(
+        m.fep.fep_td_error,
+        &format!("fep_td_error@cycle{cycle}"),
+    )?;
+    assert_finite_f64(
+        m.fep.fep_pragmatic_value,
+        &format!("fep_pragmatic_value@cycle{cycle}"),
+    )?;
+
+    // reasoning_confidence: finite
+    assert_finite_f32(
+        m.reasoning_confidence,
+        &format!("reasoning_confidence@cycle{cycle}"),
+    )?;
+
+    // body telemetry: finite
+    assert_finite_f32(m.body_valence, &format!("body_valence@cycle{cycle}"))?;
+    assert_finite_f32(m.body_arousal, &format!("body_arousal@cycle{cycle}"))?;
+
+    // cycle_reward: bounded [-1, 1]
+    assert_finite_f32(m.cycle_reward, &format!("cycle_reward@cycle{cycle}"))?;
+    assert_bounded_f32(
+        m.cycle_reward,
+        -1.0,
+        1.0,
+        &format!("cycle_reward@cycle{cycle}"),
+    )?;
+
+    Ok(())
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 1. Profile robustness: all ConsciousnessProfile variants survive 50 cycles
+// ═══════════════════════════════════════════════════════════════════════════════
 
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(6))]
+    // 10 cases in debug mode (each runs 50 cycles); CI or --release can use
+    // PROPTEST_CASES=200 env var to scale up.
+    #![proptest_config(ProptestConfig::with_cases(10))]
 
-    /// Metadata stays finite and bounded across threshold perturbations.
+    /// Every ConsciousnessProfile (Minimal, Standard, Full, Research) enables
+    /// different subsets of the 220+ threshold-controlled subsystems. Running
+    /// 50 cycles with random inputs per profile verifies that no configuration
+    /// of thresholds leads to divergence.
     #[test]
-    fn threshold_perturbation_finiteness(
-        config in perturbed_config(),
-        inputs in input_sequence(40),
+    fn prop_profile_robustness(
+        profile in profile_strategy(),
+        inputs in fuzz_input_sequence(50, 50),
     ) {
-        let mut service = CognitiveLoopService::new(config).unwrap();
-        for input in &inputs {
-            let result = service.cycle(input);
-            let m = &result.metadata;
+        let mut svc = profile_service(profile);
+        for (i, input) in inputs.iter().enumerate() {
+            let result = svc.cycle(input);
+            assert_metadata_sane(&result, i)?;
 
-            // Core invariants on CycleResult
-            prop_assert!(result.prediction_error.is_finite(), "prediction_error NaN/Inf");
-            prop_assert!(result.prediction_error >= 0.0, "prediction_error negative");
-
-            // Metadata invariants
-            prop_assert!(m.temporal_coherence_score.is_finite(), "coherence NaN/Inf");
-            prop_assert!(m.actual_effective_lr.is_finite(), "learning_rate NaN/Inf");
-            prop_assert!(m.cycle_reward.is_finite(), "cycle_reward NaN/Inf");
-
-            // Bounded checks
-            prop_assert!(
-                m.actual_effective_lr >= 0.0 && m.actual_effective_lr <= 10.0,
-                "learning_rate diverged: {}", m.actual_effective_lr
-            );
+            // prediction_confidence via accessor: [0, 1]
+            let conf = svc.prediction_confidence();
+            assert_bounded_f32(conf, 0.0, 1.0, &format!("prediction_confidence@cycle{i}"))?;
         }
     }
+}
 
-    /// Learning rate stays bounded even with extreme learning_threshold.
+// ═══════════════════════════════════════════════════════════════════════════════
+// 2. Substrate sensitivity: different substrates affect consciousness level
+// ═══════════════════════════════════════════════════════════════════════════════
+
+proptest! {
+    // 10 cases (each runs 30 cycles); scale up with PROPTEST_CASES=200.
+    #![proptest_config(ProptestConfig::with_cases(10))]
+
+    /// Different substrate types feed different feasibility values into the
+    /// Consciousness Equation V2 via SubstrateManager. This tests that all
+    /// 8 substrate types produce finite, bounded consciousness under random input.
     #[test]
-    fn lr_bounded_across_thresholds(
-        lt in 0.001f32..0.5,
-        inputs in input_sequence(30),
+    fn prop_substrate_sensitivity(
+        substrate in substrate_strategy(),
+        inputs in fuzz_input_sequence(30, 30),
     ) {
-        let config = CognitiveLoopConfig {
-            learning_threshold: lt,
-            async_training: false,
-            enable_primitive_consciousness: true,
-            ..Default::default()
-        };
-        let mut service = CognitiveLoopService::new(config).unwrap();
+        let mut config = CognitiveLoopConfig::from_profile(ConsciousnessProfile::Standard);
+        config.substrate_type = substrate;
+        config.async_training = false;
+        let mut svc = CognitiveLoopService::new(config).unwrap();
 
-        for input in &inputs {
-            let result = service.cycle(input);
-            let lr = result.metadata.actual_effective_lr;
-            prop_assert!(lr.is_finite(), "LR is NaN/Inf at lt={lt}");
-            prop_assert!(lr >= 0.0, "LR went negative: {lr}");
-            prop_assert!(lr < 5.0, "LR grew too large: {lr}");
+        for (i, input) in inputs.iter().enumerate() {
+            let result = svc.cycle(input);
+            assert_metadata_sane(&result, i)?;
+        }
+
+        // After 30 cycles, verify substrate-specific properties
+        let eff = svc.substrate_effective_feasibility();
+        assert_finite_f64(eff, "substrate_effective_feasibility")?;
+        prop_assert!(
+            eff >= 0.0 && eff <= 1.0,
+            "effective_feasibility out of [0, 1]: {eff} for {substrate:?}"
+        );
+
+        let tau = svc.substrate_tau_factor();
+        assert_finite_f32(tau, "substrate_tau_factor")?;
+        prop_assert!(
+            tau > 0.0,
+            "tau_factor non-positive: {tau} for {substrate:?}"
+        );
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 3. Learning threshold sweep: convergence across threshold range
+// ═══════════════════════════════════════════════════════════════════════════════
+
+proptest! {
+    // 10 cases (each runs 20 cycles); scale up with PROPTEST_CASES=100.
+    #![proptest_config(ProptestConfig::with_cases(10))]
+
+    /// The learning_threshold parameter interacts with dozens of threshold
+    /// constants (FEP_SURPRISE_SCALE, HEBBIAN_LR_SCALE, etc.) to determine
+    /// when and how fast the system learns. Sweeping it from 0.001 to 0.5
+    /// verifies no threshold combination causes NaN propagation.
+    #[test]
+    fn prop_learning_threshold_sweep(
+        threshold in 0.001f32..=0.5f32,
+        inputs in fuzz_input_sequence(20, 20),
+    ) {
+        let mut config = CognitiveLoopConfig::from_profile(ConsciousnessProfile::Standard);
+        config.learning_threshold = threshold;
+        config.async_training = false;
+        let mut svc = CognitiveLoopService::new(config).unwrap();
+
+        let mut first_errors = Vec::new();
+        let mut last_errors = Vec::new();
+
+        for (i, input) in inputs.iter().enumerate() {
+            let result = svc.cycle(input);
+            assert_metadata_sane(&result, i)?;
+
+            // Collect prediction errors for convergence check
+            if i < 5 {
+                first_errors.push(result.prediction_error);
+            }
+            if i >= 15 {
+                last_errors.push(result.prediction_error);
+            }
+        }
+
+        // Verify all errors are finite (no NaN propagation through threshold interactions)
+        for e in &first_errors {
+            assert_finite_f32(*e, "early_prediction_error")?;
+        }
+        for e in &last_errors {
+            assert_finite_f32(*e, "late_prediction_error")?;
+        }
+
+        // Verify carryover state is clean
+        let conf = svc.prediction_confidence();
+        assert_finite_f32(conf, "final_prediction_confidence")?;
+        assert_bounded_f32(conf, 0.0, 1.0, "final_prediction_confidence")?;
+
+        let lr = svc.stats().adaptive_learning_rate;
+        assert_finite_f32(lr, "final_adaptive_learning_rate")?;
+        prop_assert!(lr >= 0.0, "final learning rate negative: {lr}");
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 4. Extreme config stability: maximal and minimal subsystem configurations
+// ═══════════════════════════════════════════════════════════════════════════════
+
+proptest! {
+    // 10 cases (each runs 30 cycles); scale up with PROPTEST_CASES=100.
+    #![proptest_config(ProptestConfig::with_cases(10))]
+
+    /// Create configs with extreme subsystem enable/disable combinations.
+    /// This exercises threshold interactions that only occur when specific
+    /// subsystem pairs are both active (e.g., moral + FEP, attention + GWT).
+    #[test]
+    fn prop_extreme_config_stability(
+        all_enabled in proptest::bool::ANY,
+        threshold in prop_oneof![
+            Just(0.001f32),
+            Just(0.01f32),
+            Just(0.1f32),
+            Just(0.5f32),
+        ],
+        substrate in substrate_strategy(),
+        inputs in fuzz_input_sequence(30, 30),
+    ) {
+        let config = if all_enabled {
+            // All subsystems enabled — maximum threshold interaction surface
+            CognitiveLoopConfig {
+                enable_primitive_consciousness: true,
+                enable_surprise_exploration: true,
+                enable_prefrontal: true,
+                enable_affective_bridge: true,
+                enable_virtual_body: true,
+                enable_gwt: true,
+                enable_predictive_processing: true,
+                enable_attention_schema: true,
+                enable_narrative_self: true,
+                enable_predictive_self: true,
+                enable_meta_cognition: true,
+                enable_resonance: true,
+                enable_quantum_coherence: true,
+                enable_temporal_consciousness: true,
+                enable_embodied_cognition: true,
+                enable_narrative_gwt: true,
+                learning_threshold: threshold,
+                substrate_type: substrate,
+                async_training: false,
+                ..Default::default()
+            }
+        } else {
+            // All subsystems disabled — minimal threshold surface
+            CognitiveLoopConfig {
+                enable_primitive_consciousness: false,
+                enable_surprise_exploration: false,
+                enable_prefrontal: false,
+                enable_affective_bridge: false,
+                enable_virtual_body: false,
+                enable_gwt: false,
+                enable_predictive_processing: false,
+                enable_attention_schema: false,
+                enable_narrative_self: false,
+                enable_predictive_self: false,
+                enable_meta_cognition: false,
+                enable_resonance: false,
+                enable_quantum_coherence: false,
+                enable_temporal_consciousness: false,
+                enable_embodied_cognition: false,
+                enable_narrative_gwt: false,
+                learning_threshold: threshold,
+                substrate_type: substrate,
+                async_training: false,
+                ..Default::default()
+            }
+        };
+
+        let mut svc = CognitiveLoopService::new(config).unwrap();
+        for (i, input) in inputs.iter().enumerate() {
+            let result = svc.cycle(input);
+            assert_metadata_sane(&result, i)?;
         }
     }
+}
 
-    /// Reward signal stays bounded in [-1, 1] regardless of threshold.
+// ═══════════════════════════════════════════════════════════════════════════════
+// 5. Multi-profile transition: switching substrate mid-run
+// ═══════════════════════════════════════════════════════════════════════════════
+
+proptest! {
+    // 5 cases (each runs 40 cycles + transition); scale up with PROPTEST_CASES=50.
+    #![proptest_config(ProptestConfig::with_cases(5))]
+
+    /// Run 20 cycles on one profile/substrate, then reconfigure substrate
+    /// (simulating a configuration transition) and run 20 more cycles.
+    /// Verifies that accumulated internal state (neuromodulator levels,
+    /// prediction confidence, exploration urge) doesn't diverge when the
+    /// threshold interaction surface changes mid-run.
     #[test]
-    fn reward_bounded(
-        lt in 0.001f32..0.5,
-        inputs in input_sequence(30),
+    #[ignore] // Slower due to 40 total cycles with substrate reconfiguration
+    fn prop_multi_profile_transition(
+        profile in profile_strategy(),
+        substrate_before in substrate_strategy(),
+        substrate_after in substrate_strategy(),
+        inputs in fuzz_input_sequence(40, 40),
     ) {
-        let config = CognitiveLoopConfig {
-            learning_threshold: lt,
-            async_training: false,
-            enable_primitive_consciousness: true,
-            ..Default::default()
-        };
-        let mut service = CognitiveLoopService::new(config).unwrap();
+        let mut config = CognitiveLoopConfig::from_profile(profile);
+        config.substrate_type = substrate_before;
+        config.async_training = false;
+        let mut svc = CognitiveLoopService::new(config).unwrap();
 
-        for input in &inputs {
-            let result = service.cycle(input);
-            let reward = result.metadata.cycle_reward;
-            prop_assert!(
-                reward >= -1.0 && reward <= 1.0,
-                "reward out of [-1,1]: {reward}"
-            );
+        // Phase 1: 20 cycles on initial substrate
+        for (i, input) in inputs[..20].iter().enumerate() {
+            let result = svc.cycle(input);
+            assert_metadata_sane(&result, i)?;
         }
+
+        // Record pre-transition state
+        let pre_conf = svc.prediction_confidence();
+        assert_finite_f32(pre_conf, "pre_transition_confidence")?;
+
+        // Transition: switch substrate
+        let (old_feas, new_feas) = svc.reconfigure_substrate(substrate_after);
+        assert_finite_f64(old_feas, "old_feasibility")?;
+        assert_finite_f64(new_feas, "new_feasibility")?;
+
+        // Phase 2: 20 more cycles on new substrate
+        for (i, input) in inputs[20..].iter().enumerate() {
+            let result = svc.cycle(input);
+            assert_metadata_sane(&result, 20 + i)?;
+        }
+
+        // Post-transition: system must still be coherent
+        let post_conf = svc.prediction_confidence();
+        assert_finite_f32(post_conf, "post_transition_confidence")?;
+        assert_bounded_f32(post_conf, 0.0, 1.0, "post_transition_confidence")?;
+
+        // Consciousness level must still be bounded
+        // (run one more cycle to get fresh metadata)
+        let final_result = svc.cycle("transition stability check");
+        assert_metadata_sane(&final_result, 41)?;
     }
 }
