@@ -33,10 +33,7 @@ pub enum DkgError {
 
     /// Share verification failed
     #[error("Share verification failed for participant {participant} from dealer {dealer}")]
-    ShareVerificationFailed {
-        participant: u32,
-        dealer: u32,
-    },
+    ShareVerificationFailed { participant: u32, dealer: u32 },
 
     /// Commitment verification failed
     #[error("Commitment verification failed")]
@@ -44,10 +41,7 @@ pub enum DkgError {
 
     /// Not enough participants
     #[error("Not enough participants: need {required}, have {actual}")]
-    NotEnoughParticipants {
-        required: usize,
-        actual: usize,
-    },
+    NotEnoughParticipants { required: usize, actual: usize },
 
     /// Missing deal from participant
     #[error("Missing deal from participant {0}")]
@@ -55,10 +49,7 @@ pub enum DkgError {
 
     /// Ceremony in wrong phase
     #[error("Ceremony in wrong phase: expected {expected}, actual {actual}")]
-    WrongPhase {
-        expected: String,
-        actual: String,
-    },
+    WrongPhase { expected: String, actual: String },
 
     /// Invalid share index
     #[error("Invalid share index: {0}")]
@@ -106,8 +97,5 @@ pub enum DkgError {
 
     /// Violation report
     #[error("Protocol violation by participant {participant}: {violation}")]
-    ProtocolViolation {
-        participant: u32,
-        violation: String,
-    },
+    ProtocolViolation { participant: u32, violation: String },
 }

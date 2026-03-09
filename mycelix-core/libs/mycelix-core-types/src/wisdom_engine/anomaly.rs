@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 
 use std::collections::HashMap;
 
-use super::{PatternId, SymthaeaId, DomainId};
+use super::{DomainId, PatternId, SymthaeaId};
 
 // ==============================================================================
 // COMPONENT 19: ANOMALY DETECTION SYSTEM
@@ -357,7 +357,13 @@ impl Anomaly {
             "{} {} [{}]: {}",
             self.severity.indicator(),
             self.anomaly_type.name(),
-            if self.resolved { "RESOLVED" } else if self.acknowledged { "ACK" } else { "NEW" },
+            if self.resolved {
+                "RESOLVED"
+            } else if self.acknowledged {
+                "ACK"
+            } else {
+                "NEW"
+            },
             self.description
         )
     }
@@ -368,7 +374,11 @@ impl Anomaly {
 
         report.push_str(&format!("=== Anomaly #{} ===\n", self.anomaly_id));
         report.push_str(&format!("Type: {}\n", self.anomaly_type.name()));
-        report.push_str(&format!("Severity: {:?} {}\n", self.severity, self.severity.indicator()));
+        report.push_str(&format!(
+            "Severity: {:?} {}\n",
+            self.severity,
+            self.severity.indicator()
+        ));
         report.push_str(&format!("Magnitude: {:.2}\n", self.magnitude));
         report.push_str(&format!("Detected: {}\n", self.detected_at));
         if let Some(started) = self.started_at {
@@ -377,7 +387,10 @@ impl Anomaly {
         report.push_str(&format!("\nDescription: {}\n", self.description));
 
         if !self.affected_patterns.is_empty() {
-            report.push_str(&format!("\nAffected Patterns: {:?}\n", self.affected_patterns));
+            report.push_str(&format!(
+                "\nAffected Patterns: {:?}\n",
+                self.affected_patterns
+            ));
         }
         if !self.involved_agents.is_empty() {
             report.push_str(&format!("Involved Agents: {:?}\n", self.involved_agents));
@@ -516,17 +529,22 @@ impl AnomalyConfig {
 
     /// Check if a detection type is enabled
     pub fn is_enabled(&self, detection_type: &str) -> bool {
-        self.enabled_detections.get(detection_type).copied().unwrap_or(true)
+        self.enabled_detections
+            .get(detection_type)
+            .copied()
+            .unwrap_or(true)
     }
 
     /// Enable a detection type
     pub fn enable(&mut self, detection_type: &str) {
-        self.enabled_detections.insert(detection_type.to_string(), true);
+        self.enabled_detections
+            .insert(detection_type.to_string(), true);
     }
 
     /// Disable a detection type
     pub fn disable(&mut self, detection_type: &str) {
-        self.enabled_detections.insert(detection_type.to_string(), false);
+        self.enabled_detections
+            .insert(detection_type.to_string(), false);
     }
 }
 
@@ -608,7 +626,12 @@ impl TimeSeries {
         let n = self.points.len() as f32;
         let sum_x: f32 = (0..self.points.len()).map(|i| i as f32).sum();
         let sum_y: f32 = self.points.iter().map(|p| p.value).sum();
-        let sum_xy: f32 = self.points.iter().enumerate().map(|(i, p)| i as f32 * p.value).sum();
+        let sum_xy: f32 = self
+            .points
+            .iter()
+            .enumerate()
+            .map(|(i, p)| i as f32 * p.value)
+            .sum();
         let sum_xx: f32 = (0..self.points.len()).map(|i| (i as f32).powi(2)).sum();
 
         let denominator = n * sum_xx - sum_x.powi(2);
@@ -626,9 +649,12 @@ impl TimeSeries {
             return None;
         }
 
-        let variance = self.points.iter()
+        let variance = self
+            .points
+            .iter()
             .map(|p| (p.value - avg).powi(2))
-            .sum::<f32>() / (self.points.len() - 1) as f32;
+            .sum::<f32>()
+            / (self.points.len() - 1) as f32;
 
         Some(variance.sqrt())
     }
@@ -643,7 +669,8 @@ impl TimeSeries {
         let previous_avg = self.points[..self.points.len() - 1]
             .iter()
             .map(|p| p.value)
-            .sum::<f32>() / (self.points.len() - 1) as f32;
+            .sum::<f32>()
+            / (self.points.len() - 1) as f32;
 
         let change = (recent - previous_avg).abs();
         if change > threshold {
@@ -655,7 +682,8 @@ impl TimeSeries {
 
     /// Get points within a time window
     pub fn in_window(&self, start: u64, end: u64) -> Vec<&DataPoint> {
-        self.points.iter()
+        self.points
+            .iter()
             .filter(|p| p.timestamp >= start && p.timestamp <= end)
             .collect()
     }
@@ -939,16 +967,16 @@ impl AnomalyDetector {
                         self.next_anomaly_id,
                         AnomalyType::CalibrationDrift,
                         severity,
-                        &format!(
-                            "System calibration declining (trend: {:.3})",
-                            trend
-                        ),
+                        &format!("System calibration declining (trend: {:.3})", trend),
                         timestamp,
                     )
                     .with_magnitude(magnitude)
                     .with_evidence(vec![
                         format!("Trend: {:.3}", trend),
-                        format!("Current accuracy: {:.2}", self.calibration_history.latest().unwrap_or(0.0)),
+                        format!(
+                            "Current accuracy: {:.2}",
+                            self.calibration_history.latest().unwrap_or(0.0)
+                        ),
                     ])
                     .with_actions(vec![
                         "Review prediction accuracy".to_string(),
@@ -983,16 +1011,16 @@ impl AnomalyDetector {
                         self.next_anomaly_id,
                         AnomalyType::SystemHealthDecline,
                         severity,
-                        &format!(
-                            "System health declining (trend: {:.3})",
-                            trend
-                        ),
+                        &format!("System health declining (trend: {:.3})", trend),
                         timestamp,
                     )
                     .with_magnitude(magnitude)
                     .with_evidence(vec![
                         format!("Trend: {:.3}", trend),
-                        format!("Current health: {:.2}", self.system_health_history.latest().unwrap_or(0.0)),
+                        format!(
+                            "Current health: {:.2}",
+                            self.system_health_history.latest().unwrap_or(0.0)
+                        ),
                     ])
                     .with_actions(vec![
                         "Run comprehensive health diagnostics".to_string(),
@@ -1130,10 +1158,14 @@ impl AnomalyDetector {
     pub fn add_anomaly(&mut self, anomaly: Anomaly) {
         // Update stats
         self.stats.total_detected += 1;
-        *self.stats.by_type
+        *self
+            .stats
+            .by_type
             .entry(anomaly.anomaly_type.name().to_string())
             .or_insert(0) += 1;
-        *self.stats.by_severity
+        *self
+            .stats
+            .by_severity
             .entry(format!("{:?}", anomaly.severity))
             .or_insert(0) += 1;
 
@@ -1181,7 +1213,9 @@ impl AnomalyDetector {
 
     /// Get mutable anomaly by ID
     pub fn get_anomaly_mut(&mut self, anomaly_id: u64) -> Option<&mut Anomaly> {
-        self.anomalies.iter_mut().find(|a| a.anomaly_id == anomaly_id)
+        self.anomalies
+            .iter_mut()
+            .find(|a| a.anomaly_id == anomaly_id)
     }
 
     /// Acknowledge an anomaly
@@ -1256,9 +1290,15 @@ mod tests {
     fn test_anomaly_severity_from_magnitude() {
         assert_eq!(AnomalySeverity::from_magnitude(0.05), AnomalySeverity::Info);
         assert_eq!(AnomalySeverity::from_magnitude(0.15), AnomalySeverity::Low);
-        assert_eq!(AnomalySeverity::from_magnitude(0.35), AnomalySeverity::Medium);
+        assert_eq!(
+            AnomalySeverity::from_magnitude(0.35),
+            AnomalySeverity::Medium
+        );
         assert_eq!(AnomalySeverity::from_magnitude(0.6), AnomalySeverity::High);
-        assert_eq!(AnomalySeverity::from_magnitude(0.9), AnomalySeverity::Critical);
+        assert_eq!(
+            AnomalySeverity::from_magnitude(0.9),
+            AnomalySeverity::Critical
+        );
     }
 
     #[test]
@@ -1300,7 +1340,10 @@ mod tests {
         anomaly.resolve("Fixed the issue");
         assert!(anomaly.resolved);
         assert!(!anomaly.is_active());
-        assert_eq!(anomaly.resolution_notes, Some("Fixed the issue".to_string()));
+        assert_eq!(
+            anomaly.resolution_notes,
+            Some("Fixed the issue".to_string())
+        );
     }
 
     #[test]

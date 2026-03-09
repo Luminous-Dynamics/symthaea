@@ -363,10 +363,7 @@ mod tests {
 
     #[test]
     fn test_builder() {
-        let k = KVectorBuilder::new()
-            .reputation(0.8)
-            .integrity(0.9)
-            .build();
+        let k = KVectorBuilder::new().reputation(0.8).integrity(0.9).build();
 
         assert!((k.k_r - 0.8).abs() < 0.001);
         assert!((k.k_i - 0.9).abs() < 0.001);

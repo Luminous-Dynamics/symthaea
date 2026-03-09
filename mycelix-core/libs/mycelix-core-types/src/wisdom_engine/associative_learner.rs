@@ -58,7 +58,11 @@ impl std::fmt::Debug for BinaryHV {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let ones = self.popcount();
         let density = ones as f32 / self.dim as f32;
-        write!(f, "BinaryHV(dim={}, ones={}, density={:.2})", self.dim, ones, density)
+        write!(
+            f,
+            "BinaryHV(dim={}, ones={}, density={:.2})",
+            self.dim, ones, density
+        )
     }
 }
 
@@ -140,13 +144,17 @@ impl BinaryHV {
     pub fn bind(&self, other: &Self) -> Self {
         assert_eq!(self.dim, other.dim, "Dimension mismatch");
 
-        let bits: Vec<u64> = self.bits
+        let bits: Vec<u64> = self
+            .bits
             .iter()
             .zip(other.bits.iter())
             .map(|(a, b)| a ^ b)
             .collect();
 
-        Self { bits, dim: self.dim }
+        Self {
+            bits,
+            dim: self.dim,
+        }
     }
 
     /// Unbind operation (same as bind for XOR)
@@ -175,7 +183,8 @@ impl BinaryHV {
             let word_idx = bit_pos / 64;
             let bit_idx = bit_pos % 64;
 
-            let count: usize = hvs.iter()
+            let count: usize = hvs
+                .iter()
                 .filter(|hv| (hv.bits[word_idx] >> bit_idx) & 1 == 1)
                 .count();
 
@@ -202,11 +211,16 @@ impl BinaryHV {
             let word_idx = bit_pos / 64;
             let bit_idx = bit_pos % 64;
 
-            let weighted_sum: i32 = hvs.iter()
+            let weighted_sum: i32 = hvs
+                .iter()
                 .zip(weights.iter())
                 .map(|(hv, &w)| {
                     let bit_set = (hv.bits[word_idx] >> bit_idx) & 1 == 1;
-                    if bit_set { w } else { -w }
+                    if bit_set {
+                        w
+                    } else {
+                        -w
+                    }
                 })
                 .sum();
 
@@ -264,7 +278,11 @@ impl BinaryHV {
         let values: Vec<f32> = (0..self.dim)
             .map(|i| {
                 let bit = self.get_bit(i);
-                if bit { weight } else { -weight }
+                if bit {
+                    weight
+                } else {
+                    -weight
+                }
             })
             .collect();
         ContinuousHV::from_vec(values)
@@ -291,7 +309,9 @@ impl ContinuousHV {
 
     /// Create zero vector
     pub fn zero(dim: usize) -> Self {
-        Self { values: vec![0.0; dim] }
+        Self {
+            values: vec![0.0; dim],
+        }
     }
 
     /// Create random vector
@@ -317,7 +337,8 @@ impl ContinuousHV {
 
     /// Add another vector
     pub fn add(&self, other: &Self) -> Self {
-        let values: Vec<f32> = self.values
+        let values: Vec<f32> = self
+            .values
             .iter()
             .zip(other.values.iter())
             .map(|(a, b)| a + b)
@@ -333,7 +354,8 @@ impl ContinuousHV {
 
     /// Binding (element-wise multiplication)
     pub fn bind(&self, other: &Self) -> Self {
-        let values: Vec<f32> = self.values
+        let values: Vec<f32> = self
+            .values
             .iter()
             .zip(other.values.iter())
             .map(|(a, b)| a * b)
@@ -358,7 +380,12 @@ impl ContinuousHV {
 
     /// Cosine similarity
     pub fn similarity(&self, other: &Self) -> f32 {
-        let dot: f32 = self.values.iter().zip(other.values.iter()).map(|(a, b)| a * b).sum();
+        let dot: f32 = self
+            .values
+            .iter()
+            .zip(other.values.iter())
+            .map(|(a, b)| a * b)
+            .sum();
         let norm_a: f32 = self.values.iter().map(|v| v * v).sum::<f32>().sqrt();
         let norm_b: f32 = other.values.iter().map(|v| v * v).sum::<f32>().sqrt();
 
@@ -446,10 +473,8 @@ impl SparseProjector {
 
     /// Encode a context (set of key-value pairs)
     pub fn encode_context(&mut self, pairs: &[(&str, &str)]) -> BinaryHV {
-        let bound_pairs: Vec<BinaryHV> = pairs
-            .iter()
-            .map(|(k, v)| self.encode_pair(k, v))
-            .collect();
+        let bound_pairs: Vec<BinaryHV> =
+            pairs.iter().map(|(k, v)| self.encode_pair(k, v)).collect();
 
         BinaryHV::bundle(&bound_pairs)
     }
@@ -548,7 +573,8 @@ impl ActionRegistry {
 
         let hv = self.projector.encode_symbol(action_name);
         self.actions.insert(action_name.to_string(), hv.clone());
-        self.reverse_index.push((action_name.to_string(), hv.clone()));
+        self.reverse_index
+            .push((action_name.to_string(), hv.clone()));
         hv
     }
 
@@ -559,7 +585,8 @@ impl ActionRegistry {
 
     /// Find nearest action to a query vector
     pub fn find_nearest(&self, query: &BinaryHV) -> Vec<(String, f32)> {
-        let mut results: Vec<(String, f32)> = self.reverse_index
+        let mut results: Vec<(String, f32)> = self
+            .reverse_index
             .iter()
             .map(|(name, hv)| (name.clone(), query.similarity(hv)))
             .collect();
@@ -695,13 +722,7 @@ impl AssociativeLearner {
     ///
     /// Encodes the context-action pair and bundles it into memory,
     /// weighted by the outcome.
-    pub fn learn(
-        &mut self,
-        context: &[(&str, &str)],
-        action: &str,
-        outcome: f32,
-        timestamp: u64,
-    ) {
+    pub fn learn(&mut self, context: &[(&str, &str)], action: &str, outcome: f32, timestamp: u64) {
         // 1. Encode context
         let context_hv = self.projector.encode_context(context);
 
@@ -732,7 +753,8 @@ impl AssociativeLearner {
         }
 
         // 7. Store recent experience
-        let context_desc = context.iter()
+        let context_desc = context
+            .iter()
             .map(|(k, v)| format!("{}:{}", k, v))
             .collect::<Vec<_>>()
             .join(", ");
@@ -804,7 +826,11 @@ impl AssociativeLearner {
             .collect();
 
         // 6. Sort by confidence
-        predictions.sort_by(|a, b| b.confidence.partial_cmp(&a.confidence).unwrap_or(std::cmp::Ordering::Equal));
+        predictions.sort_by(|a, b| {
+            b.confidence
+                .partial_cmp(&a.confidence)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         predictions
     }
@@ -857,7 +883,12 @@ impl AssociativeLearner {
     }
 
     /// Encode a pattern for HDC operations
-    pub fn encode_pattern(&mut self, pattern_id: PatternId, domain: u64, solution: &str) -> BinaryHV {
+    pub fn encode_pattern(
+        &mut self,
+        pattern_id: PatternId,
+        domain: u64,
+        solution: &str,
+    ) -> BinaryHV {
         self.projector.encode_context(&[
             ("pattern", &pattern_id.to_string()),
             ("domain", &domain.to_string()),
@@ -867,9 +898,9 @@ impl AssociativeLearner {
 
     fn hash_solution(&self, solution: &str) -> String {
         // Simple hash for solution text
-        let hash: u64 = solution.bytes().fold(0u64, |acc, b| {
-            acc.wrapping_mul(31).wrapping_add(b as u64)
-        });
+        let hash: u64 = solution
+            .bytes()
+            .fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
         format!("{:x}", hash & 0xFFFFFF) // Keep it short
     }
 }
@@ -973,13 +1004,15 @@ impl WisdomContext {
 
     /// Add domain
     pub fn with_domain(mut self, domain_id: u64) -> Self {
-        self.pairs.push(("domain".to_string(), domain_id.to_string()));
+        self.pairs
+            .push(("domain".to_string(), domain_id.to_string()));
         self
     }
 
     /// Add anomaly type
     pub fn with_anomaly(mut self, anomaly_type: &str) -> Self {
-        self.pairs.push(("anomaly".to_string(), anomaly_type.to_string()));
+        self.pairs
+            .push(("anomaly".to_string(), anomaly_type.to_string()));
         self
     }
 
@@ -1003,7 +1036,10 @@ impl WisdomContext {
 
     /// Build context pairs
     pub fn build(&self) -> Vec<(&str, &str)> {
-        self.pairs.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect()
+        self.pairs
+            .iter()
+            .map(|(k, v)| (k.as_str(), v.as_str()))
+            .collect()
     }
 }
 

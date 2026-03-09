@@ -28,38 +28,40 @@
 //! let public_key = ceremony.finalize()?;
 //! ```
 
-pub mod error;
-pub mod scalar;
-pub mod polynomial;
-pub mod commitment;
-pub mod share;
-pub mod dealer;
-pub mod participant;
 pub mod ceremony;
+pub mod commitment;
+pub mod dealer;
 pub mod encrypted_deal;
+pub mod error;
 pub mod hash_commitment;
+pub mod participant;
+pub mod polynomial;
 #[cfg(feature = "ml-kem-768")]
 pub mod pq_kem;
 #[cfg(feature = "ml-dsa-65")]
 pub mod pq_sig;
 pub mod refresh;
+pub mod scalar;
+pub mod share;
 pub mod violation;
 
-pub use error::{DkgError, DkgResult};
-pub use scalar::Scalar;
-pub use polynomial::Polynomial;
+pub use ceremony::{CeremonyPhase, DkgCeremony, DkgConfig};
 pub use commitment::{Commitment, CommitmentSet};
-pub use share::{Share, ShareSet};
 pub use dealer::Dealer;
+pub use encrypted_deal::{EncryptResult, EncryptedDeal, EncryptedSharePayload};
+pub use error::{DkgError, DkgResult};
+pub use hash_commitment::{
+    CommitmentSalt, CommitmentScheme, HashCommitment, HashCommitmentSet, HashReveal,
+};
 pub use participant::{Participant, ParticipantId};
-pub use ceremony::{DkgCeremony, DkgConfig, CeremonyPhase};
-pub use encrypted_deal::{EncryptedDeal, EncryptedSharePayload, EncryptResult};
-pub use hash_commitment::{HashCommitment, HashCommitmentSet, HashReveal, CommitmentSalt, CommitmentScheme};
-pub use refresh::{RefreshDeal, RefreshRound, EpochShare};
-pub use violation::{Violation, ViolationTracker, ViolationType, ViolationSeverity};
+pub use polynomial::Polynomial;
+pub use refresh::{EpochShare, RefreshDeal, RefreshRound};
+pub use scalar::Scalar;
+pub use share::{Share, ShareSet};
+pub use violation::{Violation, ViolationSeverity, ViolationTracker, ViolationType};
 
 /// Re-export curve types for convenience
-pub use k256::{ProjectivePoint, AffinePoint};
+pub use k256::{AffinePoint, ProjectivePoint};
 
 /// The generator point G for secp256k1
 pub fn generator() -> ProjectivePoint {
@@ -84,7 +86,9 @@ mod tests {
 
         // Add participants
         for i in 1..=3 {
-            ceremony.add_participant(ParticipantId(i as u32), 0).unwrap();
+            ceremony
+                .add_participant(ParticipantId(i as u32), 0)
+                .unwrap();
         }
 
         // Each participant deals
@@ -97,7 +101,9 @@ mod tests {
 
         // Submit deals to ceremony
         for (i, deal) in deals.iter().enumerate() {
-            ceremony.submit_deal(ParticipantId((i + 1) as u32), deal.clone(), 0).unwrap();
+            ceremony
+                .submit_deal(ParticipantId((i + 1) as u32), deal.clone(), 0)
+                .unwrap();
         }
 
         // Finalize

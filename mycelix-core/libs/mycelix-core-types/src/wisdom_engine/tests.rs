@@ -1,12 +1,11 @@
-
 use super::*;
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::epistemic::{
-        EmpiricalLevel, MaterialityLevel, EpistemicContext, EpistemicClassification,
-        TestimonialQuality, NormativeLevel,
+        EmpiricalLevel, EpistemicClassification, EpistemicContext, MaterialityLevel,
+        NormativeLevel, TestimonialQuality,
     };
     use crate::KVector;
 
@@ -49,7 +48,8 @@ mod tests {
         assert!(applied);
 
         // Historically silenced should get larger boost
-        let (score_silenced, _) = manager.adjust(0.5, StructuralPosition::HistoricallySilenced, 0.5);
+        let (score_silenced, _) =
+            manager.adjust(0.5, StructuralPosition::HistoricallySilenced, 0.5);
         let (score_marginalized, _) = manager.adjust(0.5, StructuralPosition::Marginalized, 0.5);
         assert!(score_silenced > score_marginalized);
     }
@@ -130,10 +130,7 @@ mod tests {
     #[test]
     fn test_epistemology_defaults() {
         let western = Epistemology::WesternScientific;
-        assert_eq!(
-            western.recommended_context(),
-            EpistemicContext::Scientific
-        );
+        assert_eq!(western.recommended_context(), EpistemicContext::Scientific);
 
         let indigenous = Epistemology::IndigenousRelational;
         assert_eq!(
@@ -204,13 +201,13 @@ mod tests {
 
         // Create a prediction
         let pred_id = graph.predict(
-            1,                              // source claim
-            100,                            // community
+            1,   // source claim
+            100, // community
             "test_outcome",
-            0.7,                            // predicted value
-            0.8,                            // confidence
-            1000,                           // timestamp
-            2000,                           // expected observation time
+            0.7,  // predicted value
+            0.8,  // confidence
+            1000, // timestamp
+            2000, // expected observation time
             EpistemicContext::Standard,
             HarmonicWeights::default_weights(),
         );
@@ -266,8 +263,8 @@ mod tests {
             1,
             100,
             "big_error_test",
-            0.9,    // Predicted high
-            0.9,    // High confidence
+            0.9, // Predicted high
+            0.9, // High confidence
             1000,
             2000,
             EpistemicContext::Standard,
@@ -284,7 +281,10 @@ mod tests {
         let adj = adjustment.unwrap();
 
         // Over-predicted, so weights should be reduced
-        assert!(adj.weight_deltas[0] < 0.0, "RC delta should be negative for over-prediction");
+        assert!(
+            adj.weight_deltas[0] < 0.0,
+            "RC delta should be negative for over-prediction"
+        );
         assert!(adj.error_magnitude > 0.4);
         assert!(adj.explanation.contains("Over-predicted"));
     }
@@ -344,8 +344,8 @@ mod tests {
         let c = graph.add_node("community_health", "Overall community health");
 
         // Link them
-        graph.add_causal_link(a, b, 0.7);  // Trust influences participation
-        graph.add_causal_link(b, c, 0.8);  // Participation influences health
+        graph.add_causal_link(a, b, 0.7); // Trust influences participation
+        graph.add_causal_link(b, c, 0.8); // Participation influences health
 
         // Check structure
         let node_a = graph.get_node(a).unwrap();
@@ -433,7 +433,12 @@ mod tests {
         engine.register_community(profile);
 
         // Get initial weights
-        let initial_weights = engine.wisdom.get_community(1).unwrap().harmonic_weights.clone();
+        let initial_weights = engine
+            .wisdom
+            .get_community(1)
+            .unwrap()
+            .harmonic_weights
+            .clone();
 
         // Make a claim that will be over-valued
         let claim = Claim {
@@ -472,15 +477,24 @@ mod tests {
         }
 
         // The system is now better calibrated for future predictions
-        println!("Prediction accuracy: {:.1}%", engine.prediction_accuracy() * 100.0);
+        println!(
+            "Prediction accuracy: {:.1}%",
+            engine.prediction_accuracy() * 100.0
+        );
     }
 
     #[test]
     fn test_oracle_verification_levels() {
         assert_eq!(OracleVerificationLevel::Testimonial.trust_multiplier(), 0.6);
         assert_eq!(OracleVerificationLevel::Audited.trust_multiplier(), 0.8);
-        assert_eq!(OracleVerificationLevel::Cryptographic.trust_multiplier(), 0.95);
-        assert_eq!(OracleVerificationLevel::PubliclyReproducible.trust_multiplier(), 1.0);
+        assert_eq!(
+            OracleVerificationLevel::Cryptographic.trust_multiplier(),
+            0.95
+        );
+        assert_eq!(
+            OracleVerificationLevel::PubliclyReproducible.trust_multiplier(),
+            1.0
+        );
     }
 
     #[test]
@@ -494,7 +508,10 @@ mod tests {
 
         // Trend should be positive
         let trend = node.trend(5);
-        assert!(trend > 0.0, "Trend should be positive for increasing values");
+        assert!(
+            trend > 0.0,
+            "Trend should be positive for increasing values"
+        );
     }
 
     #[test]
@@ -591,7 +608,10 @@ mod tests {
         let after_usage = pattern.confidence_adjusted_success_rate();
 
         // Confidence should increase with more usage
-        assert!(after_usage > initial, "Confidence should increase with successful usage");
+        assert!(
+            after_usage > initial,
+            "Confidence should increase with successful usage"
+        );
     }
 
     #[test]
@@ -621,7 +641,12 @@ mod tests {
         // Record some usages
         oracle.record_usage(true, 1000, "test context", OracleVerificationLevel::Audited);
         oracle.record_usage(true, 2000, "test context", OracleVerificationLevel::Audited);
-        oracle.record_usage(false, 3000, "test context", OracleVerificationLevel::Testimonial);
+        oracle.record_usage(
+            false,
+            3000,
+            "test context",
+            OracleVerificationLevel::Testimonial,
+        );
 
         let obs = oracle.consensus_observation().unwrap();
         assert!((obs.value - 0.667).abs() < 0.01); // 2/3 success rate
@@ -664,7 +689,10 @@ mod tests {
         // Φ-weighted consensus should favor the high-Φ instances
         let consensus = oracle.phi_weighted_consensus().unwrap();
         // Instance 3 (Φ=0.9) has the most influence
-        assert!(consensus > 0.7, "High-Φ instances should dominate consensus");
+        assert!(
+            consensus > 0.7,
+            "High-Φ instances should dominate consensus"
+        );
     }
 
     #[test]
@@ -680,14 +708,8 @@ mod tests {
     fn test_bridge_pattern_learning() {
         let mut bridge = SymthaeaCausalBridge::new();
 
-        let pattern = SymthaeaPattern::new(
-            1,
-            "concurrency_issues",
-            "use_message_passing",
-            0.6,
-            1000,
-            1,
-        );
+        let pattern =
+            SymthaeaPattern::new(1, "concurrency_issues", "use_message_passing", 0.6, 1000, 1);
 
         let pattern_id = bridge.on_pattern_learned(pattern);
 
@@ -718,8 +740,20 @@ mod tests {
         // Step 2: Pattern is used multiple times with varying success
         bridge.on_pattern_used(1, true, 2000, "Project A", OracleVerificationLevel::Audited);
         bridge.on_pattern_used(1, true, 3000, "Project B", OracleVerificationLevel::Audited);
-        bridge.on_pattern_used(1, false, 4000, "Project C", OracleVerificationLevel::Testimonial);
-        bridge.on_pattern_used(1, true, 5000, "Project D", OracleVerificationLevel::PubliclyReproducible);
+        bridge.on_pattern_used(
+            1,
+            false,
+            4000,
+            "Project C",
+            OracleVerificationLevel::Testimonial,
+        );
+        bridge.on_pattern_used(
+            1,
+            true,
+            5000,
+            "Project D",
+            OracleVerificationLevel::PubliclyReproducible,
+        );
 
         // Step 3: Check pattern stats
         let pattern = bridge.patterns.get(&1).unwrap();
@@ -752,7 +786,13 @@ mod tests {
 
         // Reality: pattern actually fails a lot
         for i in 0..5 {
-            bridge.on_pattern_used(1, false, 2000 + i, "failure", OracleVerificationLevel::Audited);
+            bridge.on_pattern_used(
+                1,
+                false,
+                2000 + i,
+                "failure",
+                OracleVerificationLevel::Audited,
+            );
         }
 
         // Generate guidance - should recommend downgrade
@@ -815,19 +855,43 @@ mod tests {
         println!("Step 2: EXPERIMENT - Testing hypothesis on real projects");
 
         // Project A: Success
-        bridge.on_pattern_used(1, true, 2000, "Project A: Embedded system", OracleVerificationLevel::Audited);
+        bridge.on_pattern_used(
+            1,
+            true,
+            2000,
+            "Project A: Embedded system",
+            OracleVerificationLevel::Audited,
+        );
         println!("  - Project A (Embedded): SUCCESS ✓");
 
         // Project B: Success
-        bridge.on_pattern_used(1, true, 3000, "Project B: Web backend", OracleVerificationLevel::PubliclyReproducible);
+        bridge.on_pattern_used(
+            1,
+            true,
+            3000,
+            "Project B: Web backend",
+            OracleVerificationLevel::PubliclyReproducible,
+        );
         println!("  - Project B (Web backend): SUCCESS ✓");
 
         // Project C: Failure (maybe the team didn't know Rust well)
-        bridge.on_pattern_used(1, false, 4000, "Project C: Legacy integration", OracleVerificationLevel::Testimonial);
+        bridge.on_pattern_used(
+            1,
+            false,
+            4000,
+            "Project C: Legacy integration",
+            OracleVerificationLevel::Testimonial,
+        );
         println!("  - Project C (Legacy integration): FAILURE ✗");
 
         // Project D: Success
-        bridge.on_pattern_used(1, true, 5000, "Project D: CLI tool", OracleVerificationLevel::Audited);
+        bridge.on_pattern_used(
+            1,
+            true,
+            5000,
+            "Project D: CLI tool",
+            OracleVerificationLevel::Audited,
+        );
         println!("  - Project D (CLI tool): SUCCESS ✓\n");
 
         // Step 3: OBSERVATION - Analyze results
@@ -835,13 +899,22 @@ mod tests {
         println!("Step 3: OBSERVATION");
         println!("  - Total uses: {}", pattern.usage_count);
         println!("  - Successes: {}", pattern.success_count);
-        println!("  - Observed success rate: {:.1}%\n", pattern.success_rate * 100.0);
+        println!(
+            "  - Observed success rate: {:.1}%\n",
+            pattern.success_rate * 100.0
+        );
 
         // Step 4: UPDATE - Generate learning guidance
         let guidance = bridge.generate_guidance();
         println!("Step 4: UPDATE - Learning from evidence");
-        println!("  - Favor high-Φ patterns: {}", guidance.favor_high_phi_patterns);
-        println!("  - Learning rate multiplier: {:.2}", guidance.learning_rate_multiplier);
+        println!(
+            "  - Favor high-Φ patterns: {}",
+            guidance.favor_high_phi_patterns
+        );
+        println!(
+            "  - Learning rate multiplier: {:.2}",
+            guidance.learning_rate_multiplier
+        );
         if !guidance.explanation.is_empty() {
             println!("  - Insight: {}", guidance.explanation);
         }
@@ -851,7 +924,10 @@ mod tests {
         println!("\nStep 5: WISDOM - System health");
         println!("  - Total patterns: {}", health.total_patterns);
         println!("  - Patterns validated: {}", health.patterns_validated);
-        println!("  - Average success rate: {:.1}%", health.average_pattern_success * 100.0);
+        println!(
+            "  - Average success rate: {:.1}%",
+            health.average_pattern_success * 100.0
+        );
         println!("\n=== END SCIENTIFIC METHOD ===\n");
 
         // Verify the pattern was validated and has reasonable metrics
@@ -954,8 +1030,8 @@ mod tests {
         let threshold = 0.15;
 
         // Record some predictions using the correct method
-        bucket.add(0.75, 0.8, threshold);  // predicted 0.75, actual 0.8
-        bucket.add(0.72, 0.3, threshold);  // predicted 0.72, actual 0.3
+        bucket.add(0.75, 0.8, threshold); // predicted 0.75, actual 0.8
+        bucket.add(0.72, 0.3, threshold); // predicted 0.72, actual 0.3
         bucket.add(0.78, 0.85, threshold); // predicted 0.78, actual 0.85
 
         assert_eq!(bucket.count, 3);
@@ -995,7 +1071,10 @@ mod tests {
         }
 
         // Should detect overconfidence (predicting high but performing low)
-        assert!(curve.overconfidence_bias.abs() > 0.1, "Should detect overconfidence");
+        assert!(
+            curve.overconfidence_bias.abs() > 0.1,
+            "Should detect overconfidence"
+        );
     }
 
     // ---- Enhancement 3: Counterfactual Reasoning Tests ----
@@ -1049,18 +1128,16 @@ mod tests {
             actual_pattern_id: 1,
             actual_outcome: 0.4,
             context: "test".into(),
-            alternatives: vec![
-                CounterfactualAlternative {
-                    pattern_id: 2,
-                    estimated_outcome: 0.8,
-                    confidence: 0.9,
-                    estimation_method: EstimationMethod::HistoricalAverage,
-                    would_have_been_better: true,
-                },
-            ],
+            alternatives: vec![CounterfactualAlternative {
+                pattern_id: 2,
+                estimated_outcome: 0.8,
+                confidence: 0.9,
+                estimation_method: EstimationMethod::HistoricalAverage,
+                would_have_been_better: true,
+            }],
             best_alternative: Some(2),
-            opportunity_cost: 0.4,  // 0.8 - 0.4
-            regret: 0.36,           // 0.4 * 0.9 (opportunity_cost * confidence)
+            opportunity_cost: 0.4, // 0.8 - 0.4
+            regret: 0.36,          // 0.4 * 0.9 (opportunity_cost * confidence)
             timestamp: 1000,
         };
 
@@ -1138,11 +1215,11 @@ mod tests {
 
         let completed = planner.complete_experiment(
             id,
-            true,   // hypothesis_supported
-            0.85,   // observed_outcome
-            0.9,    // confidence
+            true, // hypothesis_supported
+            0.85, // observed_outcome
+            0.9,  // confidence
             "The pattern worked well",
-            2000,   // timestamp
+            2000, // timestamp
         );
         assert!(completed);
         assert!(planner.pending_experiments.is_empty());
@@ -1157,7 +1234,7 @@ mod tests {
         // Learn a pattern with uncertain performance
         let mut p = SymthaeaPattern::new(1, "uncertain", "solution", 0.7, 0, 1);
         p.success_rate = 0.5; // Uncertain
-        p.usage_count = 2;    // Low usage
+        p.usage_count = 2; // Low usage
         bridge.on_pattern_learned(p);
 
         let mut planner = ExperimentPlanner::new();
@@ -1312,13 +1389,8 @@ mod tests {
         let _ = planner.plan_experiment(1, "Test", "Context", 0.5, RiskLevel::Low, 1000);
 
         // Generate enhanced health report
-        let report = bridge.enhanced_health_report(
-            1000,
-            &decay_config,
-            &calibration,
-            &discovery,
-            &planner,
-        );
+        let report =
+            bridge.enhanced_health_report(1000, &decay_config, &calibration, &discovery, &planner);
 
         // Basic report should be included
         assert_eq!(report.basic.total_patterns, 1);
@@ -1378,32 +1450,39 @@ mod tests {
 
         // 4. COUNTERFACTUAL: What if we'd used different patterns?
         let counterfactual = bridge.analyze_counterfactual(2, 0.6, "build context", 400);
-        println!("Step 4: COUNTERFACTUAL - Opportunity cost: {:.2}", counterfactual.opportunity_cost);
+        println!(
+            "Step 4: COUNTERFACTUAL - Opportunity cost: {:.2}",
+            counterfactual.opportunity_cost
+        );
 
         // 5. EXPERIMENTATION: Suggest next experiments
         planner.min_information_gain = 0.05;
         let _ = bridge.suggest_experiments(&mut planner, 500);
-        println!("Step 5: EXPERIMENTATION - {} experiments planned", planner.pending_experiments.len());
+        println!(
+            "Step 5: EXPERIMENTATION - {} experiments planned",
+            planner.pending_experiments.len()
+        );
 
         // 6. DECAY CHECK: Ensure patterns stay fresh
         let stale = bridge.patterns_needing_revalidation(6000, &decay_config);
-        println!("Step 6: TEMPORAL DECAY - {} patterns need revalidation", stale.len());
+        println!(
+            "Step 6: TEMPORAL DECAY - {} patterns need revalidation",
+            stale.len()
+        );
 
         // Final report
-        let report = bridge.enhanced_health_report(
-            6000,
-            &decay_config,
-            &calibration,
-            &discovery,
-            &planner,
-        );
+        let report =
+            bridge.enhanced_health_report(6000, &decay_config, &calibration, &discovery, &planner);
 
         println!("\n--- Enhanced Health Report ---");
         println!("  Patterns: {}", report.basic.total_patterns);
         println!("  Calibration quality: {:.2}", report.calibration_quality);
         println!("  Brier score: {:.3}", report.brier_score);
         println!("  Overconfidence bias: {:.3}", report.overconfidence_bias);
-        println!("  Dependencies discovered: {}", report.discovered_dependencies);
+        println!(
+            "  Dependencies discovered: {}",
+            report.discovered_dependencies
+        );
         println!("  Pending experiments: {}", report.pending_experiments);
         println!("  Stale patterns: {}", report.stale_pattern_count);
         println!("\n=== END ENHANCED SCIENTIFIC METHOD ===\n");
@@ -1481,8 +1560,14 @@ mod tests {
         assert!(report.calibration_quality >= 0.0);
 
         println!("\n=== on_pattern_used Integration Test ===");
-        println!("Calibration tracked: {} predictions", bridge.calibration.total_predictions);
-        println!("Causal discovery history: {} usages", bridge.causal_discovery.session_history().len());
+        println!(
+            "Calibration tracked: {} predictions",
+            bridge.calibration.total_predictions
+        );
+        println!(
+            "Causal discovery history: {} usages",
+            bridge.causal_discovery.session_history().len()
+        );
         println!("Calibration quality: {:.2}", report.calibration_quality);
         println!("=== END ===\n");
     }
@@ -1563,7 +1648,12 @@ mod tests {
         let mut registry = DomainRegistry::new();
 
         // Register some domains
-        let eng_id = registry.register("engineering", Some(registry.root_id), "Engineering root", 1000);
+        let eng_id = registry.register(
+            "engineering",
+            Some(registry.root_id),
+            "Engineering root",
+            1000,
+        );
         let web_id = registry.register("web_dev", Some(eng_id), "Web development", 1001);
         let frontend_id = registry.register("frontend", Some(web_id), "Frontend development", 1002);
 
@@ -1694,9 +1784,7 @@ mod tests {
 
     #[test]
     fn test_domain_path_push() {
-        let path = DomainPath::new("engineering")
-            .push("web")
-            .push("frontend");
+        let path = DomainPath::new("engineering").push("web").push("frontend");
 
         assert_eq!(path.to_string(), "engineering/web/frontend");
         assert_eq!(path.segments().len(), 3);
@@ -1736,7 +1824,10 @@ mod tests {
         // Verify hierarchy was created
         let eng_id = bridge.domain_registry.find_by_name("engineering").unwrap();
         assert!(bridge.domain_registry.children_of(eng_id).contains(&web_id));
-        assert!(bridge.domain_registry.children_of(eng_id).contains(&backend_id));
+        assert!(bridge
+            .domain_registry
+            .children_of(eng_id)
+            .contains(&backend_id));
     }
 
     #[test]
@@ -1904,7 +1995,10 @@ mod tests {
         let bridge = SymthaeaCausalBridge::new();
 
         // Bridge should have domain registry initialized
-        assert!(bridge.domain_registry.get(bridge.domain_registry.root_id).is_some());
+        assert!(bridge
+            .domain_registry
+            .get(bridge.domain_registry.root_id)
+            .is_some());
 
         // Cross-domain threshold should have reasonable default
         assert!(bridge.cross_domain_threshold > 0.0);
@@ -1963,7 +2057,10 @@ mod tests {
         assert_eq!(composite.id, 1);
         assert_eq!(composite.name, "caching_with_indexing");
         assert_eq!(composite.pattern_ids.len(), 2);
-        assert!(matches!(composite.composition_type, CompositionType::Parallel));
+        assert!(matches!(
+            composite.composition_type,
+            CompositionType::Parallel
+        ));
         assert_eq!(composite.synergy_score, 1.0); // Neutral until data
         assert!(!composite.auto_discovered);
     }
@@ -2005,17 +2102,20 @@ mod tests {
     #[test]
     fn test_composition_type_expected_rates() {
         // Test Sequential (all must succeed: multiply)
-        let mut sequential = PatternComposite::new(1, "seq", vec![1, 2], CompositionType::Sequential, 0, 0);
+        let mut sequential =
+            PatternComposite::new(1, "seq", vec![1, 2], CompositionType::Sequential, 0, 0);
         sequential.calculate_expected_rate(&[0.8, 0.8]);
         assert!((sequential.expected_success_rate - 0.64).abs() < 0.01); // 0.8 * 0.8
 
         // Test Fallback (any succeeds: 1 - P(all fail))
-        let mut fallback = PatternComposite::new(2, "fallback", vec![1, 2], CompositionType::Fallback, 0, 0);
+        let mut fallback =
+            PatternComposite::new(2, "fallback", vec![1, 2], CompositionType::Fallback, 0, 0);
         fallback.calculate_expected_rate(&[0.8, 0.8]);
         assert!((fallback.expected_success_rate - 0.96).abs() < 0.01); // 1 - (0.2 * 0.2)
 
         // Test Parallel (average)
-        let mut parallel = PatternComposite::new(3, "parallel", vec![1, 2], CompositionType::Parallel, 0, 0);
+        let mut parallel =
+            PatternComposite::new(3, "parallel", vec![1, 2], CompositionType::Parallel, 0, 0);
         parallel.calculate_expected_rate(&[0.6, 0.8]);
         assert!((parallel.expected_success_rate - 0.7).abs() < 0.01); // (0.6 + 0.8) / 2
     }
@@ -2031,9 +2131,9 @@ mod tests {
 
         // Check stats
         let stats = tracker.get_stats(1, 2).unwrap();
-        assert_eq!(stats.0, 6);  // count
-        assert_eq!(stats.1, 5);  // successes
-        assert!((stats.2 - 0.833).abs() < 0.01);  // rate
+        assert_eq!(stats.0, 6); // count
+        assert_eq!(stats.1, 5); // successes
+        assert!((stats.2 - 0.833).abs() < 0.01); // rate
 
         // Should find as synergy candidate (>= 5 uses, >= 60% success)
         let candidates = tracker.find_synergy_candidates();
@@ -2079,10 +2179,18 @@ mod tests {
         // Create patterns with some success history
         let mut p1 = SymthaeaPattern::new(1, "web", "cache", 0.8, 1000, 1);
         let mut p2 = SymthaeaPattern::new(2, "web", "index", 0.8, 1000, 1);
-        for _ in 0..8 { p1.record_outcome(true, 1000); }
-        for _ in 0..2 { p1.record_outcome(false, 1000); }
-        for _ in 0..7 { p2.record_outcome(true, 1000); }
-        for _ in 0..3 { p2.record_outcome(false, 1000); }
+        for _ in 0..8 {
+            p1.record_outcome(true, 1000);
+        }
+        for _ in 0..2 {
+            p1.record_outcome(false, 1000);
+        }
+        for _ in 0..7 {
+            p2.record_outcome(true, 1000);
+        }
+        for _ in 0..3 {
+            p2.record_outcome(false, 1000);
+        }
         bridge.on_pattern_learned(p1);
         bridge.on_pattern_learned(p2);
 
@@ -2152,10 +2260,18 @@ mod tests {
         let mut p1 = SymthaeaPattern::new(1, "web", "cache", 0.8, 1000, 1);
         let mut p2 = SymthaeaPattern::new(2, "web", "index", 0.8, 1000, 1);
         // Give patterns a 70% success rate
-        for _ in 0..7 { p1.record_outcome(true, 1000); }
-        for _ in 0..3 { p1.record_outcome(false, 1000); }
-        for _ in 0..7 { p2.record_outcome(true, 1000); }
-        for _ in 0..3 { p2.record_outcome(false, 1000); }
+        for _ in 0..7 {
+            p1.record_outcome(true, 1000);
+        }
+        for _ in 0..3 {
+            p1.record_outcome(false, 1000);
+        }
+        for _ in 0..7 {
+            p2.record_outcome(true, 1000);
+        }
+        for _ in 0..3 {
+            p2.record_outcome(false, 1000);
+        }
         bridge.on_pattern_learned(p1);
         bridge.on_pattern_learned(p2);
 
@@ -2168,12 +2284,21 @@ mod tests {
         // Verify candidates exist first
         let candidates = bridge.discover_synergies();
         assert!(!candidates.is_empty(), "Should have synergy candidates");
-        assert!(candidates[0].estimated_synergy > 1.1, "Synergy should be > 1.1");
-        assert!(candidates[0].confidence >= 0.5, "Confidence should be >= 0.5");
+        assert!(
+            candidates[0].estimated_synergy > 1.1,
+            "Synergy should be > 1.1"
+        );
+        assert!(
+            candidates[0].confidence >= 0.5,
+            "Confidence should be >= 0.5"
+        );
 
         // Auto-create composites
         let created = bridge.auto_create_composites(2000, 1);
-        assert!(!created.is_empty(), "Should auto-create at least one composite");
+        assert!(
+            !created.is_empty(),
+            "Should auto-create at least one composite"
+        );
 
         // Verify the composite was created with auto_discovered flag
         let composite = bridge.get_composite(created[0]).unwrap();
@@ -2214,9 +2339,27 @@ mod tests {
         bridge.on_pattern_learned(SymthaeaPattern::new(3, "web", "compress", 0.8, 1000, 1));
 
         // Create composites
-        bridge.create_composite("cache_index", vec![1, 2], CompositionType::Parallel, 2000, 1);
-        bridge.create_composite("cache_compress", vec![1, 3], CompositionType::Sequential, 2000, 1);
-        bridge.create_composite("index_compress", vec![2, 3], CompositionType::Parallel, 2000, 1);
+        bridge.create_composite(
+            "cache_index",
+            vec![1, 2],
+            CompositionType::Parallel,
+            2000,
+            1,
+        );
+        bridge.create_composite(
+            "cache_compress",
+            vec![1, 3],
+            CompositionType::Sequential,
+            2000,
+            1,
+        );
+        bridge.create_composite(
+            "index_compress",
+            vec![2, 3],
+            CompositionType::Parallel,
+            2000,
+            1,
+        );
 
         // Pattern 1 should be in 2 composites
         let containing_1 = bridge.composites_containing(1);
@@ -2253,12 +2396,15 @@ mod tests {
         bridge.on_pattern_learned(p3);
 
         // Create composites - they inherit domains from patterns
-        let cid1 = bridge.create_composite(
-            "web_combo", vec![1, 2], CompositionType::Parallel, 2000, 1,
-        );
+        let cid1 =
+            bridge.create_composite("web_combo", vec![1, 2], CompositionType::Parallel, 2000, 1);
         // This composite has patterns from both web (p2) and devops (p3)
         let cid2 = bridge.create_composite(
-            "cross_domain", vec![2, 3], CompositionType::Sequential, 2000, 1,
+            "cross_domain",
+            vec![2, 3],
+            CompositionType::Sequential,
+            2000,
+            1,
         );
 
         // Explicitly set domain for testing (override inherited)
@@ -2511,11 +2657,25 @@ mod tests {
 
         // High trust for agent 100
         let high_trust = KVector {
-            k_r: 0.9, k_a: 0.9, k_i: 0.9, k_p: 0.9, k_m: 0.9, k_s: 0.9, k_h: 0.9, k_topo: 0.9,
+            k_r: 0.9,
+            k_a: 0.9,
+            k_i: 0.9,
+            k_p: 0.9,
+            k_m: 0.9,
+            k_s: 0.9,
+            k_h: 0.9,
+            k_topo: 0.9,
         };
         // Low trust for agent 101
         let low_trust = KVector {
-            k_r: 0.2, k_a: 0.2, k_i: 0.2, k_p: 0.2, k_m: 0.2, k_s: 0.2, k_h: 0.2, k_topo: 0.2,
+            k_r: 0.2,
+            k_a: 0.2,
+            k_i: 0.2,
+            k_p: 0.2,
+            k_m: 0.2,
+            k_s: 0.2,
+            k_h: 0.2,
+            k_topo: 0.2,
         };
 
         bridge.register_agent_trust(100, high_trust, 1000);
@@ -2579,10 +2739,24 @@ mod tests {
         bridge.on_pattern_learned(p2);
 
         let high_trust = KVector {
-            k_r: 0.9, k_a: 0.9, k_i: 0.9, k_p: 0.9, k_m: 0.9, k_s: 0.9, k_h: 0.9, k_topo: 0.9,
+            k_r: 0.9,
+            k_a: 0.9,
+            k_i: 0.9,
+            k_p: 0.9,
+            k_m: 0.9,
+            k_s: 0.9,
+            k_h: 0.9,
+            k_topo: 0.9,
         };
         let low_trust = KVector {
-            k_r: 0.2, k_a: 0.2, k_i: 0.2, k_p: 0.2, k_m: 0.2, k_s: 0.2, k_h: 0.2, k_topo: 0.2,
+            k_r: 0.2,
+            k_a: 0.2,
+            k_i: 0.2,
+            k_p: 0.2,
+            k_m: 0.2,
+            k_s: 0.2,
+            k_h: 0.2,
+            k_topo: 0.2,
         };
 
         bridge.register_agent_trust(100, high_trust, 1000);
@@ -2599,11 +2773,25 @@ mod tests {
 
         // Add some agents with different trust levels
         let high = KVector {
-            k_r: 0.9, k_a: 0.9, k_i: 0.9, k_p: 0.9, k_m: 0.9, k_s: 0.9, k_h: 0.9, k_topo: 0.9,
+            k_r: 0.9,
+            k_a: 0.9,
+            k_i: 0.9,
+            k_p: 0.9,
+            k_m: 0.9,
+            k_s: 0.9,
+            k_h: 0.9,
+            k_topo: 0.9,
         };
         let med = KVector::neutral();
         let low = KVector {
-            k_r: 0.2, k_a: 0.2, k_i: 0.2, k_p: 0.2, k_m: 0.2, k_s: 0.2, k_h: 0.2, k_topo: 0.2,
+            k_r: 0.2,
+            k_a: 0.2,
+            k_i: 0.2,
+            k_p: 0.2,
+            k_m: 0.2,
+            k_s: 0.2,
+            k_h: 0.2,
+            k_topo: 0.2,
         };
 
         bridge.register_agent_trust(1, high, 1000);
@@ -2650,13 +2838,27 @@ mod tests {
 
         // High integrity (>0.8) should get bonus
         let high_integrity = KVector {
-            k_r: 0.5, k_a: 0.5, k_i: 0.9, k_p: 0.5, k_m: 0.5, k_s: 0.5, k_h: 0.5, k_topo: 0.5,
+            k_r: 0.5,
+            k_a: 0.5,
+            k_i: 0.9,
+            k_p: 0.5,
+            k_m: 0.5,
+            k_s: 0.5,
+            k_h: 0.5,
+            k_topo: 0.5,
         };
         let high_trust = high_integrity.trust_score();
 
         // Low integrity shouldn't get bonus
         let low_integrity = KVector {
-            k_r: 0.5, k_a: 0.5, k_i: 0.5, k_p: 0.5, k_m: 0.5, k_s: 0.5, k_h: 0.5, k_topo: 0.5,
+            k_r: 0.5,
+            k_a: 0.5,
+            k_i: 0.5,
+            k_p: 0.5,
+            k_m: 0.5,
+            k_s: 0.5,
+            k_h: 0.5,
+            k_topo: 0.5,
         };
         let low_trust = low_integrity.trust_score();
 
@@ -2678,7 +2880,14 @@ mod tests {
 
         // Low performance (<0.3) should get penalty
         let low_perf = KVector {
-            k_r: 0.5, k_a: 0.5, k_i: 0.5, k_p: 0.2, k_m: 0.5, k_s: 0.5, k_h: 0.5, k_topo: 0.5,
+            k_r: 0.5,
+            k_a: 0.5,
+            k_i: 0.5,
+            k_p: 0.2,
+            k_m: 0.5,
+            k_s: 0.5,
+            k_h: 0.5,
+            k_topo: 0.5,
         };
 
         // Normal performance shouldn't get penalty
@@ -2713,11 +2922,25 @@ mod tests {
 
         // Different trust levels
         let very_high = KVector {
-            k_r: 0.95, k_a: 0.9, k_i: 0.9, k_p: 0.9, k_m: 0.9, k_s: 0.9, k_h: 0.9, k_topo: 0.9,
+            k_r: 0.95,
+            k_a: 0.9,
+            k_i: 0.9,
+            k_p: 0.9,
+            k_m: 0.9,
+            k_s: 0.9,
+            k_h: 0.9,
+            k_topo: 0.9,
         };
         let neutral = KVector::neutral();
         let low = KVector {
-            k_r: 0.25, k_a: 0.25, k_i: 0.25, k_p: 0.25, k_m: 0.25, k_s: 0.25, k_h: 0.25, k_topo: 0.25,
+            k_r: 0.25,
+            k_a: 0.25,
+            k_i: 0.25,
+            k_p: 0.25,
+            k_m: 0.25,
+            k_s: 0.25,
+            k_h: 0.25,
+            k_topo: 0.25,
         };
 
         bridge.register_agent_trust(100, very_high, 1000);
@@ -2739,7 +2962,14 @@ mod tests {
 
         // Add agents
         let high_trust = KVector {
-            k_r: 0.9, k_a: 0.9, k_i: 0.9, k_p: 0.9, k_m: 0.9, k_s: 0.9, k_h: 0.9, k_topo: 0.9,
+            k_r: 0.9,
+            k_a: 0.9,
+            k_i: 0.9,
+            k_p: 0.9,
+            k_m: 0.9,
+            k_s: 0.9,
+            k_h: 0.9,
+            k_topo: 0.9,
         };
         bridge.register_agent_trust(1, high_trust, 1000);
 
@@ -2847,7 +3077,7 @@ mod tests {
         registry.register_pattern(1, 1000);
 
         // Record tension-resolving usage (tension decreases by more than threshold)
-        registry.record_tension_change(1, 0.8, 0.3, 2000);  // 0.5 reduction
+        registry.record_tension_change(1, 0.8, 0.3, 2000); // 0.5 reduction
 
         let ctx = registry.get(1).unwrap();
         assert!(ctx.tension_resolutions > 0);
@@ -2861,7 +3091,7 @@ mod tests {
         registry.register_pattern(1, 1000);
 
         // Record tension-increasing usage
-        registry.record_tension_change(1, 0.3, 0.8, 2000);  // 0.5 increase
+        registry.record_tension_change(1, 0.3, 0.8, 2000); // 0.5 increase
 
         let ctx = registry.get(1).unwrap();
         assert!(ctx.tension_increases > 0);
@@ -3213,7 +3443,11 @@ mod tests {
             threshold: 5,
         };
 
-        if let LifecycleTransitionReason::LowUsage { usage_count, threshold } = reason {
+        if let LifecycleTransitionReason::LowUsage {
+            usage_count,
+            threshold,
+        } = reason
+        {
             assert_eq!(usage_count, 2);
             assert_eq!(threshold, 5);
         } else {
@@ -3228,7 +3462,11 @@ mod tests {
             threshold: 90.0,
         };
 
-        if let LifecycleTransitionReason::Stale { days_since_use, threshold } = reason {
+        if let LifecycleTransitionReason::Stale {
+            days_since_use,
+            threshold,
+        } = reason
+        {
             assert!((days_since_use - 120.0).abs() < 0.01);
             assert!((threshold - 90.0).abs() < 0.01);
         } else {
@@ -3720,13 +3958,7 @@ mod tests {
         );
 
         // Rollback to v1.0.0
-        let result = registry.rollback(
-            1,
-            PatternVersion::initial(),
-            "v3 had issues",
-            4000,
-            "dev",
-        );
+        let result = registry.rollback(1, PatternVersion::initial(), "v3 had issues", 4000, "dev");
         assert!(result.is_ok());
 
         // Current version should be patch bump from v1.0.2
@@ -3905,24 +4137,28 @@ mod tests {
         bridge.register_pattern_version(1, 1000, "creator").unwrap();
 
         // Evolve twice
-        bridge.evolve_pattern(
-            1,
-            PatternEvolutionReason::BugFix {
-                issue_description: "fix1".to_string(),
-            },
-            "s2",
-            2000,
-            "dev",
-        ).unwrap();
-        bridge.evolve_pattern(
-            1,
-            PatternEvolutionReason::BugFix {
-                issue_description: "fix2".to_string(),
-            },
-            "s3",
-            3000,
-            "dev",
-        ).unwrap();
+        bridge
+            .evolve_pattern(
+                1,
+                PatternEvolutionReason::BugFix {
+                    issue_description: "fix1".to_string(),
+                },
+                "s2",
+                2000,
+                "dev",
+            )
+            .unwrap();
+        bridge
+            .evolve_pattern(
+                1,
+                PatternEvolutionReason::BugFix {
+                    issue_description: "fix2".to_string(),
+                },
+                "s3",
+                3000,
+                "dev",
+            )
+            .unwrap();
 
         // Get lineage
         let lineage = bridge.pattern_version_lineage(1);
@@ -3960,15 +4196,17 @@ mod tests {
         bridge.register_pattern_version(2, 1001, "c").unwrap();
 
         // Evolve p1
-        bridge.evolve_pattern(
-            1,
-            PatternEvolutionReason::BugFix {
-                issue_description: "f".to_string(),
-            },
-            "s1v2",
-            2000,
-            "d",
-        ).unwrap();
+        bridge
+            .evolve_pattern(
+                1,
+                PatternEvolutionReason::BugFix {
+                    issue_description: "f".to_string(),
+                },
+                "s1v2",
+                2000,
+                "d",
+            )
+            .unwrap();
 
         let stats = bridge.versioning_stats();
         assert_eq!(stats.total_patterns, 2);
@@ -4019,24 +4257,28 @@ mod tests {
         bridge.register_pattern_version(1, 1000, "creator").unwrap();
 
         // Evolve twice
-        bridge.evolve_pattern(
-            1,
-            PatternEvolutionReason::BugFix {
-                issue_description: "fix".to_string(),
-            },
-            "v2_solution",
-            2000,
-            "dev",
-        ).unwrap();
-        bridge.evolve_pattern(
-            1,
-            PatternEvolutionReason::BugFix {
-                issue_description: "fix2".to_string(),
-            },
-            "v3_solution",
-            3000,
-            "dev",
-        ).unwrap();
+        bridge
+            .evolve_pattern(
+                1,
+                PatternEvolutionReason::BugFix {
+                    issue_description: "fix".to_string(),
+                },
+                "v2_solution",
+                2000,
+                "dev",
+            )
+            .unwrap();
+        bridge
+            .evolve_pattern(
+                1,
+                PatternEvolutionReason::BugFix {
+                    issue_description: "fix2".to_string(),
+                },
+                "v3_solution",
+                3000,
+                "dev",
+            )
+            .unwrap();
 
         // Rollback to v1.0.0
         let result = bridge.rollback_pattern_version(
@@ -4062,30 +4304,34 @@ mod tests {
         bridge.on_pattern_learned(p1);
         bridge.register_pattern_version(1, 1000, "c").unwrap();
         for i in 0..4 {
-            bridge.evolve_pattern(
-                1,
-                PatternEvolutionReason::BugFix {
-                    issue_description: format!("fix{}", i),
-                },
-                format!("s1v{}", i + 2),
-                2000 + i as u64,
-                "d",
-            ).unwrap();
+            bridge
+                .evolve_pattern(
+                    1,
+                    PatternEvolutionReason::BugFix {
+                        issue_description: format!("fix{}", i),
+                    },
+                    format!("s1v{}", i + 2),
+                    2000 + i as u64,
+                    "d",
+                )
+                .unwrap();
         }
 
         // Setup pattern 2 with 2 versions
         let p2 = SymthaeaPattern::new(2, "d2", "s2", 0.9, 200, 1);
         bridge.on_pattern_learned(p2);
         bridge.register_pattern_version(2, 1001, "c").unwrap();
-        bridge.evolve_pattern(
-            2,
-            PatternEvolutionReason::BugFix {
-                issue_description: "fix".to_string(),
-            },
-            "s2v2",
-            3000,
-            "d",
-        ).unwrap();
+        bridge
+            .evolve_pattern(
+                2,
+                PatternEvolutionReason::BugFix {
+                    issue_description: "fix".to_string(),
+                },
+                "s2v2",
+                3000,
+                "d",
+            )
+            .unwrap();
 
         // Get patterns with >= 4 versions
         let many = bridge.patterns_with_many_versions(4);
@@ -4140,16 +4386,12 @@ mod tests {
 
     #[test]
     fn test_pattern_dependency_discovered() {
-        let dep = PatternDependency::discovered(
-            1,
-            2,
-            PatternRelationType::EnhancedBy,
-            0.85,
-            1000,
-        );
+        let dep = PatternDependency::discovered(1, 2, PatternRelationType::EnhancedBy, 0.85, 1000);
 
         assert!(dep.is_discovered);
-        assert!(matches!(dep.strength, DependencyStrength::Discovered { confidence } if (confidence - 0.85).abs() < 0.01));
+        assert!(
+            matches!(dep.strength, DependencyStrength::Discovered { confidence } if (confidence - 0.85).abs() < 0.01)
+        );
     }
 
     #[test]
@@ -4177,15 +4419,30 @@ mod tests {
 
         // Pattern 1 requires 2
         registry.add_dependency(PatternDependency::new(
-            1, 2, PatternRelationType::Requires, DependencyStrength::Required, 1000, "test",
+            1,
+            2,
+            PatternRelationType::Requires,
+            DependencyStrength::Required,
+            1000,
+            "test",
         ));
         // Pattern 1 also has 3 as prerequisite
         registry.add_dependency(PatternDependency::new(
-            1, 3, PatternRelationType::Prerequisite, DependencyStrength::Strong, 1000, "test",
+            1,
+            3,
+            PatternRelationType::Prerequisite,
+            DependencyStrength::Strong,
+            1000,
+            "test",
         ));
         // Pattern 1 conflicts with 4
         registry.add_dependency(PatternDependency::new(
-            1, 4, PatternRelationType::ConflictsWith, DependencyStrength::Required, 1000, "test",
+            1,
+            4,
+            PatternRelationType::ConflictsWith,
+            DependencyStrength::Required,
+            1000,
+            "test",
         ));
 
         let deps_from = registry.dependencies_from(1);
@@ -4207,14 +4464,29 @@ mod tests {
 
         // 3 requires 2, 2 requires 1 (transitive chain: 3 -> 2 -> 1)
         registry.add_dependency(PatternDependency::new(
-            3, 2, PatternRelationType::Requires, DependencyStrength::Required, 1000, "test",
+            3,
+            2,
+            PatternRelationType::Requires,
+            DependencyStrength::Required,
+            1000,
+            "test",
         ));
         registry.add_dependency(PatternDependency::new(
-            2, 1, PatternRelationType::Requires, DependencyStrength::Required, 1000, "test",
+            2,
+            1,
+            PatternRelationType::Requires,
+            DependencyStrength::Required,
+            1000,
+            "test",
         ));
         // 3 conflicts with 4
         registry.add_dependency(PatternDependency::new(
-            3, 4, PatternRelationType::ConflictsWith, DependencyStrength::Required, 1000, "test",
+            3,
+            4,
+            PatternRelationType::ConflictsWith,
+            DependencyStrength::Required,
+            1000,
+            "test",
         ));
 
         let resolution = registry.resolve(3, &[]);
@@ -4230,13 +4502,28 @@ mod tests {
 
         // Create circular: 1 -> 2 -> 3 -> 1
         registry.add_dependency(PatternDependency::new(
-            1, 2, PatternRelationType::Requires, DependencyStrength::Required, 1000, "test",
+            1,
+            2,
+            PatternRelationType::Requires,
+            DependencyStrength::Required,
+            1000,
+            "test",
         ));
         registry.add_dependency(PatternDependency::new(
-            2, 3, PatternRelationType::Requires, DependencyStrength::Required, 1000, "test",
+            2,
+            3,
+            PatternRelationType::Requires,
+            DependencyStrength::Required,
+            1000,
+            "test",
         ));
         registry.add_dependency(PatternDependency::new(
-            3, 1, PatternRelationType::Requires, DependencyStrength::Required, 1000, "test",
+            3,
+            1,
+            PatternRelationType::Requires,
+            DependencyStrength::Required,
+            1000,
+            "test",
         ));
 
         assert!(registry.has_circular_dependency(1));
@@ -4250,10 +4537,20 @@ mod tests {
 
         // Linear chain: 1 -> 2 -> 3 (no cycle)
         registry.add_dependency(PatternDependency::new(
-            1, 2, PatternRelationType::Requires, DependencyStrength::Required, 1000, "test",
+            1,
+            2,
+            PatternRelationType::Requires,
+            DependencyStrength::Required,
+            1000,
+            "test",
         ));
         registry.add_dependency(PatternDependency::new(
-            2, 3, PatternRelationType::Requires, DependencyStrength::Required, 1000, "test",
+            2,
+            3,
+            PatternRelationType::Requires,
+            DependencyStrength::Required,
+            1000,
+            "test",
         ));
 
         assert!(!registry.has_circular_dependency(1));
@@ -4267,22 +4564,54 @@ mod tests {
 
         // Add various dependencies
         registry.add_dependency(PatternDependency::new(
-            1, 2, PatternRelationType::Requires, DependencyStrength::Required, 1000, "test",
+            1,
+            2,
+            PatternRelationType::Requires,
+            DependencyStrength::Required,
+            1000,
+            "test",
         ));
         registry.add_dependency(PatternDependency::new(
-            1, 3, PatternRelationType::Prerequisite, DependencyStrength::Strong, 1000, "test",
+            1,
+            3,
+            PatternRelationType::Prerequisite,
+            DependencyStrength::Strong,
+            1000,
+            "test",
         ));
         registry.add_dependency(PatternDependency::discovered(
-            2, 3, PatternRelationType::EnhancedBy, 0.8, 1000,
+            2,
+            3,
+            PatternRelationType::EnhancedBy,
+            0.8,
+            1000,
         ));
 
         let stats = registry.stats();
         assert_eq!(stats.total_dependencies, 3);
         assert_eq!(stats.manual_dependencies, 2);
         assert_eq!(stats.discovered_dependencies, 1);
-        assert_eq!(*stats.relation_counts.get(&PatternRelationType::Requires).unwrap_or(&0), 1);
-        assert_eq!(*stats.relation_counts.get(&PatternRelationType::Prerequisite).unwrap_or(&0), 1);
-        assert_eq!(*stats.relation_counts.get(&PatternRelationType::EnhancedBy).unwrap_or(&0), 1);
+        assert_eq!(
+            *stats
+                .relation_counts
+                .get(&PatternRelationType::Requires)
+                .unwrap_or(&0),
+            1
+        );
+        assert_eq!(
+            *stats
+                .relation_counts
+                .get(&PatternRelationType::Prerequisite)
+                .unwrap_or(&0),
+            1
+        );
+        assert_eq!(
+            *stats
+                .relation_counts
+                .get(&PatternRelationType::EnhancedBy)
+                .unwrap_or(&0),
+            1
+        );
     }
 
     #[test]
@@ -4291,13 +4620,28 @@ mod tests {
 
         // Multiple patterns depend on pattern 1
         registry.add_dependency(PatternDependency::new(
-            2, 1, PatternRelationType::Requires, DependencyStrength::Required, 1000, "test",
+            2,
+            1,
+            PatternRelationType::Requires,
+            DependencyStrength::Required,
+            1000,
+            "test",
         ));
         registry.add_dependency(PatternDependency::new(
-            3, 1, PatternRelationType::Requires, DependencyStrength::Required, 1000, "test",
+            3,
+            1,
+            PatternRelationType::Requires,
+            DependencyStrength::Required,
+            1000,
+            "test",
         ));
         registry.add_dependency(PatternDependency::new(
-            4, 2, PatternRelationType::Requires, DependencyStrength::Required, 1000, "test",
+            4,
+            2,
+            PatternRelationType::Requires,
+            DependencyStrength::Required,
+            1000,
+            "test",
         ));
 
         let impact = registry.deprecation_impact(1);
@@ -4552,11 +4896,26 @@ mod tests {
     fn test_explanation_factor_type_display_names() {
         use super::explainability::ExplanationFactorType;
 
-        assert_eq!(ExplanationFactorType::SuccessRate.display_name(), "Success Rate");
-        assert_eq!(ExplanationFactorType::TrustScore.display_name(), "Source Trust");
-        assert_eq!(ExplanationFactorType::LifecycleState.display_name(), "Lifecycle State");
-        assert_eq!(ExplanationFactorType::DomainFit.display_name(), "Domain Fit");
-        assert_eq!(ExplanationFactorType::CollectiveSignal.display_name(), "Collective Signal");
+        assert_eq!(
+            ExplanationFactorType::SuccessRate.display_name(),
+            "Success Rate"
+        );
+        assert_eq!(
+            ExplanationFactorType::TrustScore.display_name(),
+            "Source Trust"
+        );
+        assert_eq!(
+            ExplanationFactorType::LifecycleState.display_name(),
+            "Lifecycle State"
+        );
+        assert_eq!(
+            ExplanationFactorType::DomainFit.display_name(),
+            "Domain Fit"
+        );
+        assert_eq!(
+            ExplanationFactorType::CollectiveSignal.display_name(),
+            "Collective Signal"
+        );
     }
 
     #[test]
@@ -4577,8 +4936,14 @@ mod tests {
         assert_eq!(Recommendation::from_score(0.3), Recommendation::Caution);
         assert_eq!(Recommendation::from_score(0.5), Recommendation::Neutral);
         assert_eq!(Recommendation::from_score(0.7), Recommendation::Recommend);
-        assert_eq!(Recommendation::from_score(0.9), Recommendation::StronglyRecommend);
-        assert_eq!(Recommendation::from_score(1.0), Recommendation::StronglyRecommend);
+        assert_eq!(
+            Recommendation::from_score(0.9),
+            Recommendation::StronglyRecommend
+        );
+        assert_eq!(
+            Recommendation::from_score(1.0),
+            Recommendation::StronglyRecommend
+        );
     }
 
     #[test]
@@ -4618,7 +4983,8 @@ mod tests {
             FactorImpact::Positive,
             0.7,
             "Well-tested pattern",
-        ).with_evidence("Used 100 times");
+        )
+        .with_evidence("Used 100 times");
 
         assert!(factor.evidence.is_some());
         assert_eq!(factor.evidence.unwrap(), "Used 100 times");
@@ -4650,7 +5016,7 @@ mod tests {
     #[test]
     fn test_pattern_explanation_positive_negative_factors() {
         use super::explainability::{
-            PatternExplanation, ExplanationFactor, ExplanationFactorType, FactorImpact
+            ExplanationFactor, ExplanationFactorType, FactorImpact, PatternExplanation,
         };
 
         let mut explanation = PatternExplanation::new(1, 1000);
@@ -4688,7 +5054,7 @@ mod tests {
     #[test]
     fn test_pattern_explanation_sort_and_limit() {
         use super::explainability::{
-            PatternExplanation, ExplanationFactor, ExplanationFactorType, FactorImpact
+            ExplanationFactor, ExplanationFactorType, FactorImpact, PatternExplanation,
         };
 
         let mut explanation = PatternExplanation::new(1, 1000);
@@ -4735,7 +5101,7 @@ mod tests {
 
     #[test]
     fn test_explainability_registry_with_config() {
-        use super::explainability::{ExplainabilityRegistry, ExplainabilityConfig};
+        use super::explainability::{ExplainabilityConfig, ExplainabilityRegistry};
 
         let mut config = ExplainabilityConfig::default();
         config.max_factors = 5;
@@ -4794,14 +5160,7 @@ mod tests {
     fn test_bridge_why_pattern_recommended() {
         let mut bridge = SymthaeaCausalBridge::new();
 
-        let pattern = SymthaeaPattern::new(
-            1,
-            "testing",
-            "Write unit tests",
-            0.9,
-            1000,
-            1,
-        );
+        let pattern = SymthaeaPattern::new(1, "testing", "Write unit tests", 0.9, 1000, 1);
         bridge.on_pattern_learned(pattern);
 
         let why = bridge.why_pattern_recommended(1, 1000);
@@ -4817,25 +5176,11 @@ mod tests {
         let mut bridge = SymthaeaCausalBridge::new();
 
         // Pattern 1: Good pattern
-        let pattern1 = SymthaeaPattern::new(
-            1,
-            "error-handling",
-            "Use Result<T, E>",
-            0.9,
-            1000,
-            1,
-        );
+        let pattern1 = SymthaeaPattern::new(1, "error-handling", "Use Result<T, E>", 0.9, 1000, 1);
         bridge.on_pattern_learned(pattern1);
 
         // Pattern 2: Less good pattern
-        let pattern2 = SymthaeaPattern::new(
-            2,
-            "error-handling",
-            "Use panic!",
-            0.3,
-            1000,
-            1,
-        );
+        let pattern2 = SymthaeaPattern::new(2, "error-handling", "Use panic!", 0.3, 1000, 1);
         bridge.on_pattern_learned(pattern2);
 
         // Record outcomes
@@ -4910,7 +5255,8 @@ mod tests {
     #[test]
     fn test_explanation_format_full() {
         use super::explainability::{
-            PatternExplanation, ExplanationFactor, ExplanationFactorType, FactorImpact, Recommendation
+            ExplanationFactor, ExplanationFactorType, FactorImpact, PatternExplanation,
+            Recommendation,
         };
 
         let mut explanation = PatternExplanation::new(42, 1000);
@@ -4967,13 +5313,8 @@ mod tests {
     fn test_counterfactual_factor_creation() {
         use super::explainability::{CounterfactualFactor, ExplanationFactorType};
 
-        let cf = CounterfactualFactor::new(
-            ExplanationFactorType::SuccessRate,
-            "45%",
-            "75%+",
-            0.3,
-            0.2,
-        );
+        let cf =
+            CounterfactualFactor::new(ExplanationFactorType::SuccessRate, "45%", "75%+", 0.3, 0.2);
 
         assert_eq!(cf.factor_type, ExplanationFactorType::SuccessRate);
         assert_eq!(cf.current_value, "45%");
@@ -4993,7 +5334,8 @@ mod tests {
             "100+ uses",
             0.95,
             0.15,
-        ).with_description("Need more testing to validate pattern");
+        )
+        .with_description("Need more testing to validate pattern");
 
         assert_eq!(cf.description, "Need more testing to validate pattern");
     }
@@ -5013,7 +5355,7 @@ mod tests {
 
     #[test]
     fn test_action_suggestion_creation() {
-        use super::explainability::{ActionSuggestion, ActionEffortLevel, ExplanationFactorType};
+        use super::explainability::{ActionEffortLevel, ActionSuggestion, ExplanationFactorType};
 
         let action = ActionSuggestion::new(
             "Fix failing tests",
@@ -5033,7 +5375,7 @@ mod tests {
 
     #[test]
     fn test_action_suggestion_with_rationale() {
-        use super::explainability::{ActionSuggestion, ActionEffortLevel, ExplanationFactorType};
+        use super::explainability::{ActionEffortLevel, ActionSuggestion, ExplanationFactorType};
 
         let action = ActionSuggestion::new(
             "Add production validation",
@@ -5041,7 +5383,8 @@ mod tests {
             0.15,
             ActionEffortLevel::Medium,
             ExplanationFactorType::ProductionValidated,
-        ).with_rationale("Production validation increases confidence significantly");
+        )
+        .with_rationale("Production validation increases confidence significantly");
 
         assert!(action.rationale.is_some());
         assert!(action.rationale.unwrap().contains("confidence"));
@@ -5049,7 +5392,7 @@ mod tests {
 
     #[test]
     fn test_action_suggestion_roi_score() {
-        use super::explainability::{ActionSuggestion, ActionEffortLevel, ExplanationFactorType};
+        use super::explainability::{ActionEffortLevel, ActionSuggestion, ExplanationFactorType};
 
         // Easy action: should have highest ROI multiplier
         let easy_action = ActionSuggestion::new(
@@ -5121,13 +5464,16 @@ mod tests {
 
     #[test]
     fn test_improvement_plan_creation() {
-        use super::explainability::{ImprovementPlan, Recommendation, PlanFeasibility};
+        use super::explainability::{ImprovementPlan, PlanFeasibility, Recommendation};
 
         let plan = ImprovementPlan::new(42, Recommendation::Caution, 0.35, 1000);
 
         assert_eq!(plan.pattern_id, 42);
         assert_eq!(plan.current_recommendation, Recommendation::Caution);
-        assert_eq!(plan.target_recommendation, Recommendation::StronglyRecommend);
+        assert_eq!(
+            plan.target_recommendation,
+            Recommendation::StronglyRecommend
+        );
         assert!((plan.current_score - 0.35).abs() < 0.001);
         assert!(plan.counterfactuals.is_empty());
         assert!(plan.actions.is_empty());
@@ -5137,18 +5483,13 @@ mod tests {
     #[test]
     fn test_improvement_plan_add_counterfactual() {
         use super::explainability::{
-            ImprovementPlan, Recommendation, CounterfactualFactor, ExplanationFactorType
+            CounterfactualFactor, ExplanationFactorType, ImprovementPlan, Recommendation,
         };
 
         let mut plan = ImprovementPlan::new(1, Recommendation::Caution, 0.3, 1000);
 
-        let cf = CounterfactualFactor::new(
-            ExplanationFactorType::SuccessRate,
-            "40%",
-            "75%",
-            0.35,
-            0.2,
-        );
+        let cf =
+            CounterfactualFactor::new(ExplanationFactorType::SuccessRate, "40%", "75%", 0.35, 0.2);
 
         plan.add_counterfactual(cf);
 
@@ -5160,7 +5501,8 @@ mod tests {
     #[test]
     fn test_improvement_plan_add_action() {
         use super::explainability::{
-            ImprovementPlan, Recommendation, ActionSuggestion, ActionEffortLevel, ExplanationFactorType
+            ActionEffortLevel, ActionSuggestion, ExplanationFactorType, ImprovementPlan,
+            Recommendation,
         };
 
         let mut plan = ImprovementPlan::new(1, Recommendation::Neutral, 0.5, 1000);
@@ -5182,7 +5524,8 @@ mod tests {
     #[test]
     fn test_improvement_plan_quick_wins() {
         use super::explainability::{
-            ImprovementPlan, Recommendation, ActionSuggestion, ActionEffortLevel, ExplanationFactorType
+            ActionEffortLevel, ActionSuggestion, ExplanationFactorType, ImprovementPlan,
+            Recommendation,
         };
 
         let mut plan = ImprovementPlan::new(1, Recommendation::Caution, 0.35, 1000);
@@ -5222,7 +5565,8 @@ mod tests {
     #[test]
     fn test_improvement_plan_top_actions() {
         use super::explainability::{
-            ImprovementPlan, Recommendation, ActionSuggestion, ActionEffortLevel, ExplanationFactorType
+            ActionEffortLevel, ActionSuggestion, ExplanationFactorType, ImprovementPlan,
+            Recommendation,
         };
 
         let mut plan = ImprovementPlan::new(1, Recommendation::Caution, 0.35, 1000);
@@ -5261,8 +5605,8 @@ mod tests {
     #[test]
     fn test_improvement_plan_format() {
         use super::explainability::{
-            ImprovementPlan, Recommendation, CounterfactualFactor, ActionSuggestion,
-            ActionEffortLevel, ExplanationFactorType, PlanFeasibility
+            ActionEffortLevel, ActionSuggestion, CounterfactualFactor, ExplanationFactorType,
+            ImprovementPlan, PlanFeasibility, Recommendation,
         };
 
         let mut plan = ImprovementPlan::new(42, Recommendation::Caution, 0.35, 1000);
@@ -5364,14 +5708,7 @@ mod tests {
     fn test_bridge_format_improvement_plan() {
         let mut bridge = SymthaeaCausalBridge::new();
 
-        let pattern = SymthaeaPattern::new(
-            1,
-            "testing",
-            "Test pattern",
-            0.5,
-            20,
-            42,
-        );
+        let pattern = SymthaeaPattern::new(1, "testing", "Test pattern", 0.5, 20, 42);
         bridge.on_pattern_learned(pattern);
 
         let formatted = bridge.format_improvement_plan(1, 1000);
@@ -5419,7 +5756,7 @@ mod tests {
     #[test]
     fn test_improvement_plan_total_potential_improvement() {
         use super::explainability::{
-            ImprovementPlan, Recommendation, CounterfactualFactor, ExplanationFactorType
+            CounterfactualFactor, ExplanationFactorType, ImprovementPlan, Recommendation,
         };
 
         let mut plan = ImprovementPlan::new(1, Recommendation::Caution, 0.3, 1000);
@@ -5447,14 +5784,33 @@ mod tests {
     #[test]
     fn test_improvement_plan_sort_actions_by_priority() {
         use super::explainability::{
-            ImprovementPlan, Recommendation, ActionSuggestion, ActionEffortLevel, ExplanationFactorType
+            ActionEffortLevel, ActionSuggestion, ExplanationFactorType, ImprovementPlan,
+            Recommendation,
         };
 
         let mut plan = ImprovementPlan::new(1, Recommendation::Caution, 0.35, 1000);
 
-        plan.add_action(ActionSuggestion::new("Low priority", 3, 0.1, ActionEffortLevel::Easy, ExplanationFactorType::DomainFit));
-        plan.add_action(ActionSuggestion::new("High priority", 9, 0.1, ActionEffortLevel::Easy, ExplanationFactorType::SuccessRate));
-        plan.add_action(ActionSuggestion::new("Medium priority", 6, 0.1, ActionEffortLevel::Easy, ExplanationFactorType::UsageCount));
+        plan.add_action(ActionSuggestion::new(
+            "Low priority",
+            3,
+            0.1,
+            ActionEffortLevel::Easy,
+            ExplanationFactorType::DomainFit,
+        ));
+        plan.add_action(ActionSuggestion::new(
+            "High priority",
+            9,
+            0.1,
+            ActionEffortLevel::Easy,
+            ExplanationFactorType::SuccessRate,
+        ));
+        plan.add_action(ActionSuggestion::new(
+            "Medium priority",
+            6,
+            0.1,
+            ActionEffortLevel::Easy,
+            ExplanationFactorType::UsageCount,
+        ));
 
         plan.sort_actions_by_priority();
 
@@ -5466,7 +5822,8 @@ mod tests {
     #[test]
     fn test_improvement_plan_format_brief() {
         use super::explainability::{
-            ImprovementPlan, Recommendation, ActionSuggestion, ActionEffortLevel, ExplanationFactorType
+            ActionEffortLevel, ActionSuggestion, ExplanationFactorType, ImprovementPlan,
+            Recommendation,
         };
 
         let mut plan = ImprovementPlan::new(42, Recommendation::Caution, 0.35, 1000);
@@ -5527,8 +5884,8 @@ mod tests {
     #[test]
     fn test_pattern_signals_creation() {
         use super::recommendations::PatternSignals;
-        use super::TrustLevel;
         use super::PatternLifecycleState;
+        use super::TrustLevel;
 
         let signals = PatternSignals {
             success_rate: 0.85,
@@ -5583,10 +5940,10 @@ mod tests {
 
     #[test]
     fn test_recommendation_set_methods() {
-        use super::recommendations::{
-            RecommendationSet, PatternRecommendation, SignalBreakdown, RecommendationContext,
-        };
         use super::explainability::Recommendation;
+        use super::recommendations::{
+            PatternRecommendation, RecommendationContext, RecommendationSet, SignalBreakdown,
+        };
 
         let context = RecommendationContext::for_domain(1, 1000);
         let mut set = RecommendationSet::new(context, 1000);
@@ -5652,12 +6009,15 @@ mod tests {
 
     #[test]
     fn test_anomaly_types() {
-        use super::anomaly::{AnomalyType, AnomalySeverity};
+        use super::anomaly::{AnomalySeverity, AnomalyType};
 
         // Test AnomalyType variants exist
         let anomaly_type = AnomalyType::SuccessRateDrop;
         // Verify we can use the type in a match
-        let is_success_related = matches!(anomaly_type, AnomalyType::SuccessRateDrop | AnomalyType::SuccessRateSpike);
+        let is_success_related = matches!(
+            anomaly_type,
+            AnomalyType::SuccessRateDrop | AnomalyType::SuccessRateSpike
+        );
         assert!(is_success_related);
 
         // Test severity ordering
@@ -5834,14 +6194,17 @@ mod tests {
 
     #[test]
     fn test_declare_succession() {
-        use super::succession::{SuccessionManager, SuccessionReason, SuccessionStatus, SuccessionConfig};
+        use super::succession::{
+            SuccessionConfig, SuccessionManager, SuccessionReason, SuccessionStatus,
+        };
 
         // Use conservative config to test pending status
         let config = SuccessionConfig::conservative();
         let mut manager = SuccessionManager::with_config(config);
 
         // declare_succession takes (predecessor_id, successor_id, reason, declared_by, timestamp)
-        let succession = manager.declare_succession(1, 2, SuccessionReason::BetterPerformance, 1, 1000);
+        let succession =
+            manager.declare_succession(1, 2, SuccessionReason::BetterPerformance, 1, 1000);
         let succession_id = manager.register(succession, 1000);
 
         let s = manager.get_succession(succession_id);
@@ -5916,7 +6279,8 @@ mod tests {
         let mut manager = SuccessionManager::new();
 
         // Create a completed succession
-        let succession = manager.declare_succession(1, 2, SuccessionReason::BetterPerformance, 1, 1000);
+        let succession =
+            manager.declare_succession(1, 2, SuccessionReason::BetterPerformance, 1, 1000);
         let id = manager.register(succession, 1000);
         manager.activate(id, 1100);
         manager.complete(id, 1200);
@@ -5932,7 +6296,8 @@ mod tests {
 
         let mut manager = SuccessionManager::new();
 
-        let succession = manager.declare_succession(1, 2, SuccessionReason::BetterPerformance, 1, 1000);
+        let succession =
+            manager.declare_succession(1, 2, SuccessionReason::BetterPerformance, 1, 1000);
         let id = manager.register(succession, 1000);
         manager.activate(id, 1100);
 
@@ -5972,7 +6337,8 @@ mod tests {
         let mut manager = SuccessionManager::new();
 
         // Create and complete a succession
-        let succession = manager.declare_succession(1, 2, SuccessionReason::BetterPerformance, 1, 1000);
+        let succession =
+            manager.declare_succession(1, 2, SuccessionReason::BetterPerformance, 1, 1000);
         let id = manager.register(succession, 1000);
         manager.activate(id, 1100);
         manager.complete(id, 1200);
@@ -6004,8 +6370,8 @@ mod tests {
 
     #[test]
     fn test_bridge_recommendations() {
-        use super::{SymthaeaCausalBridge, SymthaeaPattern};
         use super::recommendations::RecommendationContext;
+        use super::{SymthaeaCausalBridge, SymthaeaPattern};
 
         let mut bridge = SymthaeaCausalBridge::new();
 
@@ -6059,8 +6425,8 @@ mod tests {
 
     #[test]
     fn test_bridge_succession() {
-        use super::{SymthaeaCausalBridge, SymthaeaPattern};
         use super::SuccessionReason;
+        use super::{SymthaeaCausalBridge, SymthaeaPattern};
 
         let mut bridge = SymthaeaCausalBridge::new();
 
@@ -6097,8 +6463,8 @@ mod tests {
 
     #[test]
     fn test_bridge_complete_succession() {
-        use super::{SymthaeaCausalBridge, SymthaeaPattern};
         use super::SuccessionReason;
+        use super::{SymthaeaCausalBridge, SymthaeaPattern};
 
         let mut bridge = SymthaeaCausalBridge::new();
 
@@ -6109,7 +6475,9 @@ mod tests {
         bridge.on_pattern_learned(successor);
 
         // Declare succession (5 args: predecessor_id, successor_id, reason, explanation, timestamp)
-        let id = bridge.declare_succession(1, 2, SuccessionReason::SecurityFix, "Security fix", 300).unwrap();
+        let id = bridge
+            .declare_succession(1, 2, SuccessionReason::SecurityFix, "Security fix", 300)
+            .unwrap();
 
         // Complete it
         let completed = bridge.complete_succession(id, 400);
@@ -6129,7 +6497,8 @@ mod tests {
 
         // Register patterns
         let pattern1 = SymthaeaPattern::new(1, "cache", "use cache for speed", 0.8, 100, 1);
-        let pattern2 = SymthaeaPattern::new(2, "cache", "use caching to improve speed", 0.85, 150, 1);
+        let pattern2 =
+            SymthaeaPattern::new(2, "cache", "use caching to improve speed", 0.85, 150, 1);
         bridge.on_pattern_learned(pattern1);
         bridge.on_pattern_learned(pattern2);
 
@@ -6415,7 +6784,7 @@ mod tests {
 
     #[test]
     fn test_bridge_enhanced_pattern_used() {
-        use super::{SymthaeaCausalBridge, SymthaeaPattern, OracleVerificationLevel};
+        use super::{OracleVerificationLevel, SymthaeaCausalBridge, SymthaeaPattern};
 
         let mut bridge = SymthaeaCausalBridge::new();
         bridge.use_associative_learning = true;
@@ -6524,7 +6893,8 @@ mod tests {
 
         #[test]
         fn test_serde_symthaea_pattern() {
-            let mut pattern = SymthaeaPattern::new(42, "rust/concurrency", "use Arc<Mutex<T>>", 0.85, 1000, 1);
+            let mut pattern =
+                SymthaeaPattern::new(42, "rust/concurrency", "use Arc<Mutex<T>>", 0.85, 1000, 1);
             pattern.success_rate = 0.92;
             pattern.usage_count = 150;
             pattern.success_count = 138;
@@ -6568,15 +6938,13 @@ mod tests {
                 summary: "High-confidence pattern".to_string(),
                 recommendation: Recommendation::StronglyRecommend,
                 confidence: 0.95,
-                factors: vec![
-                    ExplanationFactor {
-                        factor_type: ExplanationFactorType::SuccessRate,
-                        impact: FactorImpact::Positive,
-                        strength: 0.9,
-                        description: "95% success rate over 500 uses".to_string(),
-                        evidence: Some("500 uses, 475 successes".to_string()),
-                    },
-                ],
+                factors: vec![ExplanationFactor {
+                    factor_type: ExplanationFactorType::SuccessRate,
+                    impact: FactorImpact::Positive,
+                    strength: 0.9,
+                    description: "95% success rate over 500 uses".to_string(),
+                    evidence: Some("500 uses, 475 successes".to_string()),
+                }],
                 generated_at: 1000,
             };
 
@@ -6604,7 +6972,8 @@ mod tests {
             };
 
             let json = serde_json::to_string(&score).expect("serialize");
-            let restored: similarity::SimilarityScore = serde_json::from_str(&json).expect("deserialize");
+            let restored: similarity::SimilarityScore =
+                serde_json::from_str(&json).expect("deserialize");
 
             assert_eq!(restored.pattern_a, 1);
             assert_eq!(restored.pattern_b, 2);
@@ -6664,7 +7033,8 @@ mod tests {
             bridge.on_pattern_used(1, true, 200, "prod", OracleVerificationLevel::Cryptographic);
 
             let json = serde_json::to_string(&bridge).expect("serialize bridge");
-            let restored: SymthaeaCausalBridge = serde_json::from_str(&json).expect("deserialize bridge");
+            let restored: SymthaeaCausalBridge =
+                serde_json::from_str(&json).expect("deserialize bridge");
 
             // Verify state was preserved
             assert!(restored.patterns.contains_key(&1));
@@ -6680,7 +7050,8 @@ mod tests {
             cluster.cohesion = 0.85;
 
             let json = serde_json::to_string(&cluster).expect("serialize");
-            let restored: similarity::PatternCluster = serde_json::from_str(&json).expect("deserialize");
+            let restored: similarity::PatternCluster =
+                serde_json::from_str(&json).expect("deserialize");
 
             assert_eq!(restored.members.len(), 5);
             assert_eq!(restored.centroid_id, Some(3));
@@ -6689,25 +7060,31 @@ mod tests {
         #[test]
         fn test_serde_succession() {
             let mut succession = succession::PatternSuccession::new(
-                1, 10, 20,
+                1,
+                10,
+                20,
                 succession::SuccessionReason::BetterPerformance,
                 99, // declared_by
-                1000
+                1000,
             );
             succession.activate(1100);
 
             let json = serde_json::to_string(&succession).expect("serialize");
-            let restored: succession::PatternSuccession = serde_json::from_str(&json).expect("deserialize");
+            let restored: succession::PatternSuccession =
+                serde_json::from_str(&json).expect("deserialize");
 
             assert_eq!(restored.predecessor_id, 10);
             assert_eq!(restored.successor_id, 20);
-            assert_eq!(restored.reason, succession::SuccessionReason::BetterPerformance);
+            assert_eq!(
+                restored.reason,
+                succession::SuccessionReason::BetterPerformance
+            );
             assert_eq!(restored.status, succession::SuccessionStatus::Active);
         }
 
         #[test]
         fn test_serde_memory_snapshot() {
-            use super::associative_learner::{ContinuousHV, AssociativeLearnerStats};
+            use super::associative_learner::{AssociativeLearnerStats, ContinuousHV};
 
             let snapshot = MemorySnapshot {
                 experience_memory: ContinuousHV::from_vec(vec![0.1, 0.2, 0.3, 0.4]),
@@ -6738,7 +7115,7 @@ mod tests {
     /// Scenario: A software development team learning coding patterns over time
     #[test]
     fn test_scenario_software_team_pattern_learning() {
-        use super::{SymthaeaCausalBridge, SymthaeaPattern, OracleVerificationLevel};
+        use super::{OracleVerificationLevel, SymthaeaCausalBridge, SymthaeaPattern};
 
         let mut bridge = SymthaeaCausalBridge::new();
         bridge.use_associative_learning = true;
@@ -6748,9 +7125,12 @@ mod tests {
 
         // Pattern 1: Result<T, E> for recoverable errors
         let mut p1 = SymthaeaPattern::new(
-            1, "rust/error-handling",
+            1,
+            "rust/error-handling",
             "Use Result<T, E> for recoverable errors",
-            0.7, timestamp, 1
+            0.7,
+            timestamp,
+            1,
         );
         p1.domain_ids = vec![100]; // rust domain
         p1.description = "Prefer Result over panic for errors that callers can handle".to_string();
@@ -6758,18 +7138,24 @@ mod tests {
 
         // Pattern 2: Option<T> for optional values
         let mut p2 = SymthaeaPattern::new(
-            2, "rust/error-handling",
+            2,
+            "rust/error-handling",
             "Use Option<T> for optional values",
-            0.6, timestamp + 10, 1
+            0.6,
+            timestamp + 10,
+            1,
         );
         p2.domain_ids = vec![100];
         bridge.enhanced_on_pattern_learned(p2, timestamp + 10);
 
         // Pattern 3: ? operator for propagation
         let mut p3 = SymthaeaPattern::new(
-            3, "rust/error-handling",
+            3,
+            "rust/error-handling",
             "Use ? operator for error propagation",
-            0.8, timestamp + 20, 1
+            0.8,
+            timestamp + 20,
+            1,
         );
         p3.domain_ids = vec![100];
         bridge.enhanced_on_pattern_learned(p3, timestamp + 20);
@@ -6778,28 +7164,53 @@ mod tests {
 
         // Pattern 1 works well
         for i in 0..50 {
-            bridge.enhanced_on_pattern_used(1, true, "production",
-                OracleVerificationLevel::Cryptographic, timestamp + 100 + i);
+            bridge.enhanced_on_pattern_used(
+                1,
+                true,
+                "production",
+                OracleVerificationLevel::Cryptographic,
+                timestamp + 100 + i,
+            );
         }
         for i in 0..5 {
-            bridge.enhanced_on_pattern_used(1, false, "production",
-                OracleVerificationLevel::Cryptographic, timestamp + 150 + i);
+            bridge.enhanced_on_pattern_used(
+                1,
+                false,
+                "production",
+                OracleVerificationLevel::Cryptographic,
+                timestamp + 150 + i,
+            );
         }
 
         // Pattern 2 works well but less used
         for i in 0..20 {
-            bridge.enhanced_on_pattern_used(2, true, "production",
-                OracleVerificationLevel::Cryptographic, timestamp + 200 + i);
+            bridge.enhanced_on_pattern_used(
+                2,
+                true,
+                "production",
+                OracleVerificationLevel::Cryptographic,
+                timestamp + 200 + i,
+            );
         }
 
         // Pattern 3 works excellently
         for i in 0..80 {
-            bridge.enhanced_on_pattern_used(3, true, "production",
-                OracleVerificationLevel::Cryptographic, timestamp + 300 + i);
+            bridge.enhanced_on_pattern_used(
+                3,
+                true,
+                "production",
+                OracleVerificationLevel::Cryptographic,
+                timestamp + 300 + i,
+            );
         }
         for i in 0..2 {
-            bridge.enhanced_on_pattern_used(3, false, "production",
-                OracleVerificationLevel::Cryptographic, timestamp + 380 + i);
+            bridge.enhanced_on_pattern_used(
+                3,
+                false,
+                "production",
+                OracleVerificationLevel::Cryptographic,
+                timestamp + 380 + i,
+            );
         }
 
         // == Phase 3: Verify learning outcomes ==
@@ -6836,8 +7247,8 @@ mod tests {
     #[test]
     fn test_scenario_pattern_succession() {
         use super::{
-            SymthaeaCausalBridge, SymthaeaPattern, OracleVerificationLevel,
             succession::{SuccessionReason, SuccessionStatus},
+            OracleVerificationLevel, SymthaeaCausalBridge, SymthaeaPattern,
         };
 
         let mut bridge = SymthaeaCausalBridge::new();
@@ -6845,7 +7256,12 @@ mod tests {
 
         // Old pattern: manual memory management
         let mut old_pattern = SymthaeaPattern::new(
-            1, "cpp/memory", "use new/delete for allocation", 0.7, timestamp, 1
+            1,
+            "cpp/memory",
+            "use new/delete for allocation",
+            0.7,
+            timestamp,
+            1,
         );
         old_pattern.domain_ids = vec![200];
         bridge.on_pattern_learned(old_pattern);
@@ -6854,14 +7270,22 @@ mod tests {
         for i in 0..30 {
             let success = i % 5 != 0; // 80% success (memory leaks happen)
             bridge.on_pattern_used(
-                1, success, timestamp + i, "production",
-                OracleVerificationLevel::Audited
+                1,
+                success,
+                timestamp + i,
+                "production",
+                OracleVerificationLevel::Audited,
             );
         }
 
         // New pattern emerges: smart pointers
         let mut new_pattern = SymthaeaPattern::new(
-            2, "cpp/memory", "use unique_ptr/shared_ptr", 0.9, timestamp + 100, 2
+            2,
+            "cpp/memory",
+            "use unique_ptr/shared_ptr",
+            0.9,
+            timestamp + 100,
+            2,
         );
         new_pattern.domain_ids = vec![200];
         bridge.on_pattern_learned(new_pattern);
@@ -6870,19 +7294,25 @@ mod tests {
         for i in 0..50 {
             let success = i % 20 != 0; // 95% success
             bridge.on_pattern_used(
-                2, success, timestamp + 100 + i, "production",
-                OracleVerificationLevel::Cryptographic
+                2,
+                success,
+                timestamp + 100 + i,
+                "production",
+                OracleVerificationLevel::Cryptographic,
             );
         }
 
         // Create succession relationship using declare_succession + register
         let succession = bridge.succession_manager.declare_succession(
-            1, 2,
+            1,
+            2,
             SuccessionReason::BetterPerformance,
             1, // declared_by agent
-            timestamp + 200
+            timestamp + 200,
         );
-        let succession_id = bridge.succession_manager.register(succession, timestamp + 200);
+        let succession_id = bridge
+            .succession_manager
+            .register(succession, timestamp + 200);
 
         // Verify succession was created
         let successions = bridge.succession_manager.successions_from(1);
@@ -6891,7 +7321,9 @@ mod tests {
         assert_eq!(successions[0].reason, SuccessionReason::BetterPerformance);
 
         // Activate succession
-        bridge.succession_manager.activate(succession_id, timestamp + 250);
+        bridge
+            .succession_manager
+            .activate(succession_id, timestamp + 250);
 
         // Check status
         let updated = bridge.succession_manager.get_succession(succession_id);
@@ -6902,42 +7334,69 @@ mod tests {
     /// Scenario: Cross-domain pattern discovery
     #[test]
     fn test_scenario_cross_domain_discovery() {
-        use super::{SymthaeaCausalBridge, SymthaeaPattern, domain::DomainCriticality};
+        use super::{domain::DomainCriticality, SymthaeaCausalBridge, SymthaeaPattern};
 
         let mut bridge = SymthaeaCausalBridge::new();
         let timestamp = 1000u64;
 
         // Register domains using register_with_config
         let software_id = bridge.domain_registry.register_with_config(
-            "software", None, "Software engineering domain",
-            DomainCriticality::High, vec![], timestamp
+            "software",
+            None,
+            "Software engineering domain",
+            DomainCriticality::High,
+            vec![],
+            timestamp,
         );
         let biology_id = bridge.domain_registry.register_with_config(
-            "biology", None, "Biological systems domain",
-            DomainCriticality::High, vec![], timestamp
+            "biology",
+            None,
+            "Biological systems domain",
+            DomainCriticality::High,
+            vec![],
+            timestamp,
         );
         let economics_id = bridge.domain_registry.register_with_config(
-            "economics", None, "Economic systems domain",
-            DomainCriticality::Normal, vec![], timestamp
+            "economics",
+            None,
+            "Economic systems domain",
+            DomainCriticality::Normal,
+            vec![],
+            timestamp,
         );
 
         // Pattern in software: "Use caching to reduce repeated work"
         let mut p1 = SymthaeaPattern::new(
-            1, "software/performance", "cache frequently accessed data", 0.9, timestamp, 1
+            1,
+            "software/performance",
+            "cache frequently accessed data",
+            0.9,
+            timestamp,
+            1,
         );
         p1.domain_ids = vec![software_id];
         bridge.on_pattern_learned(p1);
 
         // Pattern in biology: "Organisms cache nutrients for efficiency"
         let mut p2 = SymthaeaPattern::new(
-            2, "biology/metabolism", "store energy in readily accessible form", 0.85, timestamp, 1
+            2,
+            "biology/metabolism",
+            "store energy in readily accessible form",
+            0.85,
+            timestamp,
+            1,
         );
         p2.domain_ids = vec![biology_id];
         bridge.on_pattern_learned(p2);
 
         // Pattern in economics: "Buffer inventory for demand spikes"
         let mut p3 = SymthaeaPattern::new(
-            3, "economics/operations", "maintain safety stock inventory", 0.8, timestamp, 1
+            3,
+            "economics/operations",
+            "maintain safety stock inventory",
+            0.8,
+            timestamp,
+            1,
         );
         p3.domain_ids = vec![economics_id];
         bridge.on_pattern_learned(p3);
@@ -6966,8 +7425,8 @@ mod tests {
     #[test]
     fn test_scenario_explainable_recommendations() {
         use super::{
-            SymthaeaCausalBridge, SymthaeaPattern, OracleVerificationLevel,
-            Recommendation, ExplanationFactorType, FactorImpact,
+            ExplanationFactorType, FactorImpact, OracleVerificationLevel, Recommendation,
+            SymthaeaCausalBridge, SymthaeaPattern,
         };
 
         let mut bridge = SymthaeaCausalBridge::new();
@@ -6975,7 +7434,12 @@ mod tests {
 
         // Create a well-established pattern
         let mut pattern = SymthaeaPattern::new(
-            1, "api/design", "Use REST for CRUD operations", 0.9, timestamp, 1
+            1,
+            "api/design",
+            "Use REST for CRUD operations",
+            0.9,
+            timestamp,
+            1,
         );
         pattern.domain_ids = vec![10];
         pattern.description = "RESTful APIs provide predictable, cacheable interfaces".to_string();
@@ -6985,8 +7449,11 @@ mod tests {
         for i in 0..200 {
             let success = i % 10 != 0; // 90% success
             bridge.on_pattern_used(
-                1, success, timestamp + i, "production",
-                OracleVerificationLevel::Cryptographic
+                1,
+                success,
+                timestamp + i,
+                "production",
+                OracleVerificationLevel::Cryptographic,
             );
         }
 
@@ -7003,13 +7470,14 @@ mod tests {
 
         // Should have success rate factor
         let has_success_factor = exp.factors.iter().any(|f| {
-            matches!(f.factor_type, ExplanationFactorType::SuccessRate) &&
-            matches!(f.impact, FactorImpact::Positive)
+            matches!(f.factor_type, ExplanationFactorType::SuccessRate)
+                && matches!(f.impact, FactorImpact::Positive)
         });
         assert!(has_success_factor);
 
         // Recommendation should be positive given good track record
-        assert!(matches!(exp.recommendation,
+        assert!(matches!(
+            exp.recommendation,
             Recommendation::StronglyRecommend | Recommendation::Recommend
         ));
     }
@@ -7024,14 +7492,18 @@ mod tests {
         let timestamp = 1000u64;
 
         // Learn patterns in "web development" domain
-        let mut p1 = SymthaeaPattern::new(
-            1, "web/security", "sanitize user input", 0.95, timestamp, 1
-        );
+        let mut p1 =
+            SymthaeaPattern::new(1, "web/security", "sanitize user input", 0.95, timestamp, 1);
         p1.domain_ids = vec![300];
         bridge.enhanced_on_pattern_learned(p1, timestamp);
 
         let mut p2 = SymthaeaPattern::new(
-            2, "web/security", "use HTTPS for all traffic", 0.98, timestamp, 1
+            2,
+            "web/security",
+            "use HTTPS for all traffic",
+            0.98,
+            timestamp,
+            1,
         );
         p2.domain_ids = vec![300];
         bridge.enhanced_on_pattern_learned(p2, timestamp);
@@ -7062,9 +7534,9 @@ mod tests {
     #[test]
     fn test_scenario_complete_knowledge_lifecycle() {
         use super::{
-            SymthaeaCausalBridge, SymthaeaPattern, OracleVerificationLevel,
-            lifecycle::{PatternLifecycleState, LifecycleTransitionReason},
+            lifecycle::{LifecycleTransitionReason, PatternLifecycleState},
             succession::SuccessionReason,
+            OracleVerificationLevel, SymthaeaCausalBridge, SymthaeaPattern,
         };
 
         let mut bridge = SymthaeaCausalBridge::new();
@@ -7073,8 +7545,12 @@ mod tests {
 
         // == Birth: Pattern is discovered ==
         let mut pattern = SymthaeaPattern::new(
-            1, "database/indexing", "create index on frequently queried columns",
-            0.7, timestamp, 1
+            1,
+            "database/indexing",
+            "create index on frequently queried columns",
+            0.7,
+            timestamp,
+            1,
         );
         pattern.domain_ids = vec![400];
         bridge.enhanced_on_pattern_learned(pattern.clone(), timestamp);
@@ -7089,35 +7565,49 @@ mod tests {
         timestamp += 100;
         for i in 0..50 {
             bridge.enhanced_on_pattern_used(
-                1, true, "staging",
+                1,
+                true,
+                "staging",
                 OracleVerificationLevel::Audited,
-                timestamp + i
+                timestamp + i,
             );
         }
 
         // Pattern continues in Active state with good usage
-        assert_eq!(bridge.lifecycle_registry.state(1), PatternLifecycleState::Active);
+        assert_eq!(
+            bridge.lifecycle_registry.state(1),
+            PatternLifecycleState::Active
+        );
 
         // == Maturity: Pattern becomes well-used ==
         timestamp += 200;
         for i in 0..100 {
             bridge.enhanced_on_pattern_used(
-                1, i % 20 != 0, "production",
+                1,
+                i % 20 != 0,
+                "production",
                 OracleVerificationLevel::Cryptographic,
-                timestamp + i
+                timestamp + i,
             );
         }
 
         // Pattern remains Active (no Trusted state exists)
-        assert_eq!(bridge.lifecycle_registry.state(1), PatternLifecycleState::Active);
+        assert_eq!(
+            bridge.lifecycle_registry.state(1),
+            PatternLifecycleState::Active
+        );
 
         // == Decline: Better pattern emerges ==
         timestamp += 500;
 
         // New pattern: more sophisticated indexing
         let mut new_pattern = SymthaeaPattern::new(
-            2, "database/indexing", "use partial indexes with predicates",
-            0.85, timestamp, 2
+            2,
+            "database/indexing",
+            "use partial indexes with predicates",
+            0.85,
+            timestamp,
+            2,
         );
         new_pattern.domain_ids = vec![400];
         bridge.enhanced_on_pattern_learned(new_pattern, timestamp);
@@ -7126,33 +7616,44 @@ mod tests {
 
         // Old pattern starts being deprecated
         bridge.lifecycle_registry.transition(
-            1, PatternLifecycleState::Deprecated,
+            1,
+            PatternLifecycleState::Deprecated,
             LifecycleTransitionReason::Superseded { replacement_id: 2 },
             timestamp + 50,
-            "system" // initiator
+            "system", // initiator
         );
 
         // Create succession using declare_succession + register
         let succession = bridge.succession_manager.declare_succession(
-            1, 2,
+            1,
+            2,
             SuccessionReason::BetterPerformance,
             1, // declared_by agent
-            timestamp + 60
+            timestamp + 60,
         );
-        bridge.succession_manager.register(succession, timestamp + 60);
+        bridge
+            .succession_manager
+            .register(succession, timestamp + 60);
 
         // == Archive: Old pattern retired ==
         timestamp += 1000;
         bridge.lifecycle_registry.transition(
-            1, PatternLifecycleState::Archived,
+            1,
+            PatternLifecycleState::Archived,
             LifecycleTransitionReason::Manual("Pattern archived after succession".to_string()),
             timestamp,
-            "admin" // initiator
+            "admin", // initiator
         );
 
         // Verify final state
-        assert_eq!(bridge.lifecycle_registry.state(1), PatternLifecycleState::Archived);
-        assert_eq!(bridge.lifecycle_registry.state(2), PatternLifecycleState::Active);
+        assert_eq!(
+            bridge.lifecycle_registry.state(1),
+            PatternLifecycleState::Archived
+        );
+        assert_eq!(
+            bridge.lifecycle_registry.state(2),
+            PatternLifecycleState::Active
+        );
 
         // Check lifecycle history using transitions_for
         let transitions = bridge.lifecycle_registry.transitions_for(1);
@@ -7242,43 +7743,68 @@ mod nixos_codex {
         let timestamp = 1577836800u64; // Jan 1, 2020
 
         bridge.domain_registry.register_with_config(
-            "nix/system", None, "NixOS system management",
-            domain::DomainCriticality::Critical, vec!["nixos".to_string()], timestamp
+            "nix/system",
+            None,
+            "NixOS system management",
+            domain::DomainCriticality::Critical,
+            vec!["nixos".to_string()],
+            timestamp,
         );
         bridge.domain_registry.register_with_config(
-            "nix/packages", Some(domains::SYSTEM_MANAGEMENT),
+            "nix/packages",
+            Some(domains::SYSTEM_MANAGEMENT),
             "Package management patterns",
-            domain::DomainCriticality::High, vec!["packages".to_string()], timestamp
+            domain::DomainCriticality::High,
+            vec!["packages".to_string()],
+            timestamp,
         );
         bridge.domain_registry.register_with_config(
-            "nix/development", Some(domains::SYSTEM_MANAGEMENT),
+            "nix/development",
+            Some(domains::SYSTEM_MANAGEMENT),
             "Development environment patterns",
-            domain::DomainCriticality::High, vec!["dev".to_string()], timestamp
+            domain::DomainCriticality::High,
+            vec!["dev".to_string()],
+            timestamp,
         );
         bridge.domain_registry.register_with_config(
-            "nix/hardware/nvidia", Some(domains::SYSTEM_MANAGEMENT),
+            "nix/hardware/nvidia",
+            Some(domains::SYSTEM_MANAGEMENT),
             "NVIDIA GPU configuration",
-            domain::DomainCriticality::Normal, vec!["nvidia".to_string(), "gpu".to_string()], timestamp
+            domain::DomainCriticality::Normal,
+            vec!["nvidia".to_string(), "gpu".to_string()],
+            timestamp,
         );
         bridge.domain_registry.register_with_config(
-            "nix/hardware/amd", Some(domains::SYSTEM_MANAGEMENT),
+            "nix/hardware/amd",
+            Some(domains::SYSTEM_MANAGEMENT),
             "AMD GPU configuration",
-            domain::DomainCriticality::Normal, vec!["amd".to_string(), "gpu".to_string()], timestamp
+            domain::DomainCriticality::Normal,
+            vec!["amd".to_string(), "gpu".to_string()],
+            timestamp,
         );
         bridge.domain_registry.register_with_config(
-            "nix/secrets", Some(domains::SYSTEM_MANAGEMENT),
+            "nix/secrets",
+            Some(domains::SYSTEM_MANAGEMENT),
             "Secrets management patterns",
-            domain::DomainCriticality::Critical, vec!["secrets".to_string(), "security".to_string()], timestamp
+            domain::DomainCriticality::Critical,
+            vec!["secrets".to_string(), "security".to_string()],
+            timestamp,
         );
         bridge.domain_registry.register_with_config(
-            "nix/reproducibility", Some(domains::SYSTEM_MANAGEMENT),
+            "nix/reproducibility",
+            Some(domains::SYSTEM_MANAGEMENT),
             "Reproducibility patterns",
-            domain::DomainCriticality::High, vec!["reproducibility".to_string()], timestamp
+            domain::DomainCriticality::High,
+            vec!["reproducibility".to_string()],
+            timestamp,
         );
         bridge.domain_registry.register_with_config(
-            "nix/flakes", Some(domains::SYSTEM_MANAGEMENT),
+            "nix/flakes",
+            Some(domains::SYSTEM_MANAGEMENT),
             "Nix Flakes patterns",
-            domain::DomainCriticality::High, vec!["flakes".to_string()], timestamp
+            domain::DomainCriticality::High,
+            vec!["flakes".to_string()],
+            timestamp,
         );
 
         bridge
@@ -7333,7 +7859,8 @@ mod nixos_codex {
         );
         nix_channel.domain_ids = vec![domains::SYSTEM_MANAGEMENT, domains::PACKAGE_MANAGEMENT];
         nix_channel.description = "Run 'nix-channel --add' to add package sources, \
-            'nix-channel --update' to refresh. Configure in /etc/nixos/configuration.nix".to_string();
+            'nix-channel --update' to refresh. Configure in /etc/nixos/configuration.nix"
+            .to_string();
         bridge.enhanced_on_pattern_learned(nix_channel, timestamp);
         bridge.register_pattern_lifecycle(patterns::NIX_CHANNEL, timestamp);
 
@@ -7348,7 +7875,8 @@ mod nixos_codex {
         );
         monolithic.domain_ids = vec![domains::SYSTEM_MANAGEMENT];
         monolithic.description = "Keep all system configuration in /etc/nixos/configuration.nix. \
-            Simple and straightforward for single-machine setups.".to_string();
+            Simple and straightforward for single-machine setups."
+            .to_string();
         bridge.enhanced_on_pattern_learned(monolithic, timestamp);
         bridge.register_pattern_lifecycle(patterns::MONOLITHIC_CONFIG, timestamp);
 
@@ -7363,7 +7891,8 @@ mod nixos_codex {
         );
         nix_env.domain_ids = vec![domains::PACKAGE_MANAGEMENT];
         nix_env.description = "Install packages imperatively with 'nix-env -iA nixpkgs.package'. \
-            Quick but not declarative or reproducible.".to_string();
+            Quick but not declarative or reproducible."
+            .to_string();
         bridge.enhanced_on_pattern_learned(nix_env, timestamp);
         bridge.register_pattern_lifecycle(patterns::NIX_ENV_INSTALL, timestamp);
 
@@ -7372,26 +7901,53 @@ mod nixos_codex {
         let mut ts = timestamp + 1000;
 
         // nix-channel: 85% success (occasional "works on my machine" issues)
-        ts = simulate_usage(&mut bridge, patterns::NIX_CHANNEL, 85, 15, "production",
-            OracleVerificationLevel::Audited, ts);
+        ts = simulate_usage(
+            &mut bridge,
+            patterns::NIX_CHANNEL,
+            85,
+            15,
+            "production",
+            OracleVerificationLevel::Audited,
+            ts,
+        );
 
         // monolithic config: 90% success (simple and reliable)
-        ts = simulate_usage(&mut bridge, patterns::MONOLITHIC_CONFIG, 90, 10, "production",
-            OracleVerificationLevel::Audited, ts);
+        ts = simulate_usage(
+            &mut bridge,
+            patterns::MONOLITHIC_CONFIG,
+            90,
+            10,
+            "production",
+            OracleVerificationLevel::Audited,
+            ts,
+        );
 
         // nix-env: 75% success (imperative, often forgotten in rebuilds)
-        let _ts = simulate_usage(&mut bridge, patterns::NIX_ENV_INSTALL, 75, 25, "production",
-            OracleVerificationLevel::Testimonial, ts);
+        let _ts = simulate_usage(
+            &mut bridge,
+            patterns::NIX_ENV_INSTALL,
+            75,
+            25,
+            "production",
+            OracleVerificationLevel::Testimonial,
+            ts,
+        );
 
         // === ASSERTIONS: The Legacy Era baseline ===
 
         // All patterns should be Active
-        assert_eq!(bridge.lifecycle_registry.state(patterns::NIX_CHANNEL),
-            lifecycle::PatternLifecycleState::Active);
-        assert_eq!(bridge.lifecycle_registry.state(patterns::MONOLITHIC_CONFIG),
-            lifecycle::PatternLifecycleState::Active);
-        assert_eq!(bridge.lifecycle_registry.state(patterns::NIX_ENV_INSTALL),
-            lifecycle::PatternLifecycleState::Active);
+        assert_eq!(
+            bridge.lifecycle_registry.state(patterns::NIX_CHANNEL),
+            lifecycle::PatternLifecycleState::Active
+        );
+        assert_eq!(
+            bridge.lifecycle_registry.state(patterns::MONOLITHIC_CONFIG),
+            lifecycle::PatternLifecycleState::Active
+        );
+        assert_eq!(
+            bridge.lifecycle_registry.state(patterns::NIX_ENV_INSTALL),
+            lifecycle::PatternLifecycleState::Active
+        );
 
         // Success rates should reflect our simulation
         let channel_pattern = bridge.patterns.get(&patterns::NIX_CHANNEL).unwrap();
@@ -7438,8 +7994,15 @@ mod nixos_codex {
 
         // Simulate legacy usage
         let mut ts = legacy_ts + 1000;
-        ts = simulate_usage(&mut bridge, patterns::NIX_CHANNEL, 170, 30, "production",
-            OracleVerificationLevel::Audited, ts);
+        ts = simulate_usage(
+            &mut bridge,
+            patterns::NIX_CHANNEL,
+            170,
+            30,
+            "production",
+            OracleVerificationLevel::Audited,
+            ts,
+        );
 
         // === THE FLAKE REVOLUTION (2021) ===
         let flake_ts = 1609459200u64; // Jan 1, 2021
@@ -7453,9 +8016,14 @@ mod nixos_codex {
             flake_ts,
             2, // Different creator - community
         );
-        flakes.domain_ids = vec![domains::SYSTEM_MANAGEMENT, domains::REPRODUCIBILITY, domains::FLAKES];
+        flakes.domain_ids = vec![
+            domains::SYSTEM_MANAGEMENT,
+            domains::REPRODUCIBILITY,
+            domains::FLAKES,
+        ];
         flakes.description = "Define inputs in flake.nix, lock versions in flake.lock. \
-            Provides perfect reproducibility through content-addressed inputs.".to_string();
+            Provides perfect reproducibility through content-addressed inputs."
+            .to_string();
         bridge.enhanced_on_pattern_learned(flakes, flake_ts);
         bridge.register_pattern_lifecycle(patterns::FLAKES, flake_ts);
 
@@ -7470,7 +8038,8 @@ mod nixos_codex {
         );
         flake_lock.domain_ids = vec![domains::REPRODUCIBILITY, domains::FLAKES];
         flake_lock.description = "The flake.lock file captures exact input revisions. \
-            Commit this file to ensure identical builds across machines.".to_string();
+            Commit this file to ensure identical builds across machines."
+            .to_string();
         bridge.enhanced_on_pattern_learned(flake_lock, flake_ts);
         bridge.register_pattern_lifecycle(patterns::FLAKE_LOCK, flake_ts);
 
@@ -7479,23 +8048,58 @@ mod nixos_codex {
 
         // Continue using channels (performance degrades as complexity grows)
         // 80% success -> more reproducibility failures
-        ts = simulate_usage(&mut bridge, patterns::NIX_CHANNEL, 80, 20, "production",
-            OracleVerificationLevel::Audited, ts);
+        ts = simulate_usage(
+            &mut bridge,
+            patterns::NIX_CHANNEL,
+            80,
+            20,
+            "production",
+            OracleVerificationLevel::Audited,
+            ts,
+        );
 
         // Flakes: 100% success (perfect reproducibility)
-        ts = simulate_usage(&mut bridge, patterns::FLAKES, 100, 0, "production",
-            OracleVerificationLevel::Cryptographic, ts);
+        ts = simulate_usage(
+            &mut bridge,
+            patterns::FLAKES,
+            100,
+            0,
+            "production",
+            OracleVerificationLevel::Cryptographic,
+            ts,
+        );
 
-        ts = simulate_usage(&mut bridge, patterns::FLAKE_LOCK, 100, 0, "production",
-            OracleVerificationLevel::Cryptographic, ts);
+        ts = simulate_usage(
+            &mut bridge,
+            patterns::FLAKE_LOCK,
+            100,
+            0,
+            "production",
+            OracleVerificationLevel::Cryptographic,
+            ts,
+        );
 
         // Another round: Channels continue to degrade
-        ts = simulate_usage(&mut bridge, patterns::NIX_CHANNEL, 70, 30, "production",
-            OracleVerificationLevel::Audited, ts);
+        ts = simulate_usage(
+            &mut bridge,
+            patterns::NIX_CHANNEL,
+            70,
+            30,
+            "production",
+            OracleVerificationLevel::Audited,
+            ts,
+        );
 
         // Flakes remain perfect
-        ts = simulate_usage(&mut bridge, patterns::FLAKES, 100, 0, "production",
-            OracleVerificationLevel::Cryptographic, ts);
+        ts = simulate_usage(
+            &mut bridge,
+            patterns::FLAKES,
+            100,
+            0,
+            "production",
+            OracleVerificationLevel::Cryptographic,
+            ts,
+        );
 
         // === THE ENGINE SHOULD RECOGNIZE THE SHIFT ===
 
@@ -7504,13 +8108,19 @@ mod nixos_codex {
         let flake_pattern = bridge.patterns.get(&patterns::FLAKES).unwrap();
 
         // Flakes should now have higher success rate
-        assert!(flake_pattern.success_rate > channel_pattern.success_rate,
+        assert!(
+            flake_pattern.success_rate > channel_pattern.success_rate,
             "Flakes ({:.2}) should outperform channels ({:.2})",
-            flake_pattern.success_rate, channel_pattern.success_rate);
+            flake_pattern.success_rate,
+            channel_pattern.success_rate
+        );
 
         // Flakes should have excellent success rate
-        assert!(flake_pattern.success_rate > 0.95,
-            "Flakes should have >95% success rate, got {:.2}", flake_pattern.success_rate);
+        assert!(
+            flake_pattern.success_rate > 0.95,
+            "Flakes should have >95% success rate, got {:.2}",
+            flake_pattern.success_rate
+        );
 
         // === TRIGGER SUCCESSION ===
 
@@ -7528,7 +8138,9 @@ mod nixos_codex {
         bridge.lifecycle_registry.transition(
             patterns::NIX_CHANNEL,
             lifecycle::PatternLifecycleState::Deprecated,
-            lifecycle::LifecycleTransitionReason::Superseded { replacement_id: patterns::FLAKES },
+            lifecycle::LifecycleTransitionReason::Superseded {
+                replacement_id: patterns::FLAKES,
+            },
             ts + 100,
             "wisdom_engine",
         );
@@ -7539,15 +8151,21 @@ mod nixos_codex {
         // === VERIFY SUCCESSION ===
 
         // Channel should be deprecated
-        assert_eq!(bridge.lifecycle_registry.state(patterns::NIX_CHANNEL),
-            lifecycle::PatternLifecycleState::Deprecated);
+        assert_eq!(
+            bridge.lifecycle_registry.state(patterns::NIX_CHANNEL),
+            lifecycle::PatternLifecycleState::Deprecated
+        );
 
         // Flakes should be active
-        assert_eq!(bridge.lifecycle_registry.state(patterns::FLAKES),
-            lifecycle::PatternLifecycleState::Active);
+        assert_eq!(
+            bridge.lifecycle_registry.state(patterns::FLAKES),
+            lifecycle::PatternLifecycleState::Active
+        );
 
         // Succession should be recorded
-        let successions = bridge.succession_manager.successions_from(patterns::NIX_CHANNEL);
+        let successions = bridge
+            .succession_manager
+            .successions_from(patterns::NIX_CHANNEL);
         assert!(!successions.is_empty());
         assert_eq!(successions[0].successor_id, patterns::FLAKES);
 
@@ -7558,26 +8176,37 @@ mod nixos_codex {
         let recs = bridge.get_recommendations(context);
 
         // Find flakes in recommendations
-        let flakes_rec = recs.recommendations.iter()
+        let flakes_rec = recs
+            .recommendations
+            .iter()
             .find(|r| r.pattern_id == patterns::FLAKES);
-        let channel_rec = recs.recommendations.iter()
+        let channel_rec = recs
+            .recommendations
+            .iter()
             .find(|r| r.pattern_id == patterns::NIX_CHANNEL);
 
         // Flakes should be recommended
-        assert!(flakes_rec.is_some(), "Flakes should appear in recommendations");
+        assert!(
+            flakes_rec.is_some(),
+            "Flakes should appear in recommendations"
+        );
 
         // If channels appear, they should be lower priority (deprecated)
         if let (Some(f), Some(c)) = (flakes_rec, channel_rec) {
-            assert!(f.composite_score > c.composite_score,
-                "Flakes should have higher composite_score than deprecated channels");
+            assert!(
+                f.composite_score > c.composite_score,
+                "Flakes should have higher composite_score than deprecated channels"
+            );
         }
 
         // Explanation should reflect the succession
         if let Some(explanation) = bridge.explain_pattern(patterns::FLAKES, ts + 200) {
             assert!(explanation.confidence > 0.8);
             // Should be strongly recommended given perfect track record
-            assert!(matches!(explanation.recommendation,
-                Recommendation::StronglyRecommend | Recommendation::Recommend));
+            assert!(matches!(
+                explanation.recommendation,
+                Recommendation::StronglyRecommend | Recommendation::Recommend
+            ));
         }
     }
 
@@ -7606,7 +8235,8 @@ mod nixos_codex {
         );
         nvidia_driver.domain_ids = vec![domains::HARDWARE_NVIDIA];
         nvidia_driver.description = "Enable proprietary NVIDIA drivers. Required for CUDA, \
-            gaming, and proper GPU acceleration on NVIDIA hardware.".to_string();
+            gaming, and proper GPU acceleration on NVIDIA hardware."
+            .to_string();
         bridge.enhanced_on_pattern_learned(nvidia_driver, timestamp);
         bridge.register_pattern_lifecycle(patterns::NVIDIA_DRIVER, timestamp);
 
@@ -7620,7 +8250,8 @@ mod nixos_codex {
         );
         nvidia_opengl.domain_ids = vec![domains::HARDWARE_NVIDIA];
         nvidia_opengl.description = "Enable OpenGL support for NVIDIA. Usually required \
-            alongside the NVIDIA driver for 3D acceleration.".to_string();
+            alongside the NVIDIA driver for 3D acceleration."
+            .to_string();
         bridge.enhanced_on_pattern_learned(nvidia_opengl, timestamp);
         bridge.register_pattern_lifecycle(patterns::NVIDIA_OPENGL, timestamp);
 
@@ -7636,7 +8267,8 @@ mod nixos_codex {
         );
         amd_driver.domain_ids = vec![domains::HARDWARE_AMD];
         amd_driver.description = "Enable open-source AMDGPU drivers. Included in kernel, \
-            provides excellent performance for modern AMD GPUs.".to_string();
+            provides excellent performance for modern AMD GPUs."
+            .to_string();
         bridge.enhanced_on_pattern_learned(amd_driver, timestamp);
         bridge.register_pattern_lifecycle(patterns::AMD_DRIVER, timestamp);
 
@@ -7650,7 +8282,8 @@ mod nixos_codex {
         );
         amd_vulkan.domain_ids = vec![domains::HARDWARE_AMD];
         amd_vulkan.description = "Add AMD Vulkan driver for gaming and compute. \
-            Provides Vulkan API support for AMD GPUs.".to_string();
+            Provides Vulkan API support for AMD GPUs."
+            .to_string();
         bridge.enhanced_on_pattern_learned(amd_vulkan, timestamp);
         bridge.register_pattern_lifecycle(patterns::AMD_VULKAN, timestamp);
 
@@ -7658,22 +8291,57 @@ mod nixos_codex {
         let mut ts = timestamp + 1000;
 
         // NVIDIA patterns work on NVIDIA hardware
-        ts = simulate_usage(&mut bridge, patterns::NVIDIA_DRIVER, 95, 5, "nvidia_system",
-            OracleVerificationLevel::Cryptographic, ts);
-        ts = simulate_usage(&mut bridge, patterns::NVIDIA_OPENGL, 98, 2, "nvidia_system",
-            OracleVerificationLevel::Cryptographic, ts);
+        ts = simulate_usage(
+            &mut bridge,
+            patterns::NVIDIA_DRIVER,
+            95,
+            5,
+            "nvidia_system",
+            OracleVerificationLevel::Cryptographic,
+            ts,
+        );
+        ts = simulate_usage(
+            &mut bridge,
+            patterns::NVIDIA_OPENGL,
+            98,
+            2,
+            "nvidia_system",
+            OracleVerificationLevel::Cryptographic,
+            ts,
+        );
 
         // AMD patterns work on AMD hardware
-        ts = simulate_usage(&mut bridge, patterns::AMD_DRIVER, 96, 4, "amd_system",
-            OracleVerificationLevel::Cryptographic, ts);
-        ts = simulate_usage(&mut bridge, patterns::AMD_VULKAN, 90, 10, "amd_system",
-            OracleVerificationLevel::Cryptographic, ts);
+        ts = simulate_usage(
+            &mut bridge,
+            patterns::AMD_DRIVER,
+            96,
+            4,
+            "amd_system",
+            OracleVerificationLevel::Cryptographic,
+            ts,
+        );
+        ts = simulate_usage(
+            &mut bridge,
+            patterns::AMD_VULKAN,
+            90,
+            10,
+            "amd_system",
+            OracleVerificationLevel::Cryptographic,
+            ts,
+        );
 
         // === SIMULATE MISAPPLICATION (NVIDIA on AMD) ===
 
         // Someone tries NVIDIA drivers on AMD hardware - always fails
-        ts = simulate_usage(&mut bridge, patterns::NVIDIA_DRIVER, 0, 20, "amd_system",
-            OracleVerificationLevel::Testimonial, ts);
+        ts = simulate_usage(
+            &mut bridge,
+            patterns::NVIDIA_DRIVER,
+            0,
+            20,
+            "amd_system",
+            OracleVerificationLevel::Testimonial,
+            ts,
+        );
 
         // === VERIFY CONTEXT-AWARE RECOMMENDATIONS ===
 
@@ -7681,36 +8349,55 @@ mod nixos_codex {
         let nvidia_context = RecommendationContext::for_domain(domains::HARDWARE_NVIDIA, ts);
         let nvidia_recs = bridge.get_recommendations(nvidia_context);
 
-        let nvidia_rec = nvidia_recs.recommendations.iter()
+        let nvidia_rec = nvidia_recs
+            .recommendations
+            .iter()
             .find(|r| r.pattern_id == patterns::NVIDIA_DRIVER);
-        let amd_in_nvidia = nvidia_recs.recommendations.iter()
+        let amd_in_nvidia = nvidia_recs
+            .recommendations
+            .iter()
             .find(|r| r.pattern_id == patterns::AMD_DRIVER);
 
-        assert!(nvidia_rec.is_some(), "Should recommend NVIDIA driver for NVIDIA context");
+        assert!(
+            nvidia_rec.is_some(),
+            "Should recommend NVIDIA driver for NVIDIA context"
+        );
 
         // If AMD appears in NVIDIA context, it should have lower score
         if let (Some(nvidia), Some(amd)) = (nvidia_rec, amd_in_nvidia) {
-            assert!(nvidia.composite_score >= amd.composite_score,
-                "NVIDIA should score >= AMD in NVIDIA context");
+            assert!(
+                nvidia.composite_score >= amd.composite_score,
+                "NVIDIA should score >= AMD in NVIDIA context"
+            );
         }
 
         // For AMD context, AMD patterns should rank higher than NVIDIA
         let amd_context = RecommendationContext::for_domain(domains::HARDWARE_AMD, ts);
         let amd_recs = bridge.get_recommendations(amd_context);
 
-        let amd_rec = amd_recs.recommendations.iter()
+        let amd_rec = amd_recs
+            .recommendations
+            .iter()
             .find(|r| r.pattern_id == patterns::AMD_DRIVER);
-        let nvidia_in_amd = amd_recs.recommendations.iter()
+        let nvidia_in_amd = amd_recs
+            .recommendations
+            .iter()
             .find(|r| r.pattern_id == patterns::NVIDIA_DRIVER);
 
-        assert!(amd_rec.is_some(), "Should recommend AMD driver for AMD context");
+        assert!(
+            amd_rec.is_some(),
+            "Should recommend AMD driver for AMD context"
+        );
 
         // If NVIDIA appears in AMD context, it should have lower score
         // (especially given the 0% success rate in amd_system context)
         if let (Some(amd), Some(nvidia)) = (amd_rec, nvidia_in_amd) {
-            assert!(amd.composite_score >= nvidia.composite_score,
+            assert!(
+                amd.composite_score >= nvidia.composite_score,
                 "AMD ({:.2}) should score >= NVIDIA ({:.2}) in AMD context",
-                amd.composite_score, nvidia.composite_score);
+                amd.composite_score,
+                nvidia.composite_score
+            );
         }
 
         // === VERIFY HDC LEARNED CONTEXT ASSOCIATIONS ===
@@ -7725,11 +8412,15 @@ mod nixos_codex {
         bridge.register_pattern_for_similarity(patterns::AMD_DRIVER, ts);
 
         let nvidia_similar = bridge.find_similar_patterns(patterns::NVIDIA_DRIVER, 0.3, ts);
-        let nvidia_partner = nvidia_similar.iter()
+        let nvidia_partner = nvidia_similar
+            .iter()
             .find(|s| s.pattern_b == patterns::NVIDIA_OPENGL);
 
         // NVIDIA patterns should be related (same domain)
-        assert!(nvidia_partner.is_some(), "NVIDIA driver and OpenGL should be detected as related");
+        assert!(
+            nvidia_partner.is_some(),
+            "NVIDIA driver and OpenGL should be detected as related"
+        );
 
         // === VERIFY ANOMALY DETECTION ===
 
@@ -7737,18 +8428,20 @@ mod nixos_codex {
         let anomalies = bridge.detect_anomalies(ts);
 
         // There should be an anomaly for the pattern with sudden failure
-        let nvidia_anomaly = anomalies.iter().find(|a| {
-            a.affected_patterns.contains(&patterns::NVIDIA_DRIVER)
-        });
+        let nvidia_anomaly = anomalies
+            .iter()
+            .find(|a| a.affected_patterns.contains(&patterns::NVIDIA_DRIVER));
 
         // If anomaly detection is working, it should flag the misuse
         // (This depends on the anomaly detection thresholds)
         if nvidia_anomaly.is_some() {
             let a = nvidia_anomaly.unwrap();
-            assert!(matches!(a.severity,
-                anomaly::AnomalySeverity::Medium |
-                anomaly::AnomalySeverity::High |
-                anomaly::AnomalySeverity::Critical));
+            assert!(matches!(
+                a.severity,
+                anomaly::AnomalySeverity::Medium
+                    | anomaly::AnomalySeverity::High
+                    | anomaly::AnomalySeverity::Critical
+            ));
         }
     }
 
@@ -7778,7 +8471,8 @@ mod nixos_codex {
         );
         plaintext.domain_ids = vec![domains::SECRETS_MANAGEMENT];
         plaintext.description = "Store secrets directly in secrets.nix file. \
-            Simple but DANGEROUS: secrets end up in /nix/store readable by all.".to_string();
+            Simple but DANGEROUS: secrets end up in /nix/store readable by all."
+            .to_string();
         bridge.enhanced_on_pattern_learned(plaintext, timestamp);
         bridge.register_pattern_lifecycle(patterns::PLAINTEXT_SECRETS, timestamp);
 
@@ -7798,7 +8492,8 @@ mod nixos_codex {
         );
         agenix.domain_ids = vec![domains::SECRETS_MANAGEMENT];
         agenix.description = "Encrypt secrets with age, decrypt at activation time. \
-            Secrets never appear in /nix/store. Production-safe.".to_string();
+            Secrets never appear in /nix/store. Production-safe."
+            .to_string();
         bridge.enhanced_on_pattern_learned(agenix, timestamp);
         bridge.register_pattern_lifecycle(patterns::AGENIX, timestamp);
 
@@ -7814,7 +8509,8 @@ mod nixos_codex {
         );
         sops.domain_ids = vec![domains::SECRETS_MANAGEMENT];
         sops.description = "Encrypt secrets with SOPS (supports GPG, age, cloud KMS). \
-            Integrates well with existing SOPS workflows. Production-safe.".to_string();
+            Integrates well with existing SOPS workflows. Production-safe."
+            .to_string();
         bridge.enhanced_on_pattern_learned(sops, timestamp);
         bridge.register_pattern_lifecycle(patterns::SOPS_NIX, timestamp);
 
@@ -7823,44 +8519,76 @@ mod nixos_codex {
 
         // Plaintext: High usage (it's easy!) but LOW verification
         // Many people use it in development, but it "works" there
-        ts = simulate_usage(&mut bridge, patterns::PLAINTEXT_SECRETS, 150, 10, "development",
-            OracleVerificationLevel::Testimonial, ts); // Low verification!
+        ts = simulate_usage(
+            &mut bridge,
+            patterns::PLAINTEXT_SECRETS,
+            150,
+            10,
+            "development",
+            OracleVerificationLevel::Testimonial,
+            ts,
+        ); // Low verification!
 
         // agenix: Lower usage but HIGH verification (security audited)
-        ts = simulate_usage(&mut bridge, patterns::AGENIX, 80, 5, "production",
-            OracleVerificationLevel::Cryptographic, ts); // High verification!
+        ts = simulate_usage(
+            &mut bridge,
+            patterns::AGENIX,
+            80,
+            5,
+            "production",
+            OracleVerificationLevel::Cryptographic,
+            ts,
+        ); // High verification!
 
         // sops-nix: Also high verification
-        ts = simulate_usage(&mut bridge, patterns::SOPS_NIX, 60, 3, "production",
-            OracleVerificationLevel::Cryptographic, ts);
+        ts = simulate_usage(
+            &mut bridge,
+            patterns::SOPS_NIX,
+            60,
+            3,
+            "production",
+            OracleVerificationLevel::Cryptographic,
+            ts,
+        );
 
         // === THE TEST: Trust Should Override Raw Usage ===
 
         // For production context requiring high trust, encrypted solutions should win
-        let prod_context = RecommendationContext::for_domain(domains::SECRETS_MANAGEMENT, ts)
-            .production_only(); // Require production validation
+        let prod_context =
+            RecommendationContext::for_domain(domains::SECRETS_MANAGEMENT, ts).production_only(); // Require production validation
 
         let recs = bridge.get_recommendations(prod_context);
 
         // Find our patterns in recommendations
-        let plaintext_rec = recs.recommendations.iter()
+        let plaintext_rec = recs
+            .recommendations
+            .iter()
             .find(|r| r.pattern_id == patterns::PLAINTEXT_SECRETS);
-        let agenix_rec = recs.recommendations.iter()
+        let agenix_rec = recs
+            .recommendations
+            .iter()
             .find(|r| r.pattern_id == patterns::AGENIX);
-        let sops_rec = recs.recommendations.iter()
+        let sops_rec = recs
+            .recommendations
+            .iter()
             .find(|r| r.pattern_id == patterns::SOPS_NIX);
 
         // Encrypted solutions should appear
-        assert!(agenix_rec.is_some() || sops_rec.is_some(),
-            "At least one encrypted secret solution should be recommended");
+        assert!(
+            agenix_rec.is_some() || sops_rec.is_some(),
+            "At least one encrypted secret solution should be recommended"
+        );
 
         // If plaintext appears, it should be lower priority
         if let Some(plain) = plaintext_rec {
             if let Some(secure) = agenix_rec.or(sops_rec) {
-                assert!(secure.composite_score >= plain.composite_score,
+                assert!(
+                    secure.composite_score >= plain.composite_score,
                     "Secure solution should have >= composite_score than plaintext in production \
                      (secure: {:.2}, plain: {:.2})",
-                    secure.composite_score, plain.composite_score);
+                    secure.composite_score,
+                    plain.composite_score
+                );
             }
         }
 
@@ -7868,19 +8596,25 @@ mod nixos_codex {
 
         if let Some(explanation) = bridge.explain_pattern(patterns::AGENIX, ts) {
             // Should have high confidence given good track record + verification
-            assert!(explanation.confidence > 0.7,
-                "agenix should have high confidence: {:.2}", explanation.confidence);
+            assert!(
+                explanation.confidence > 0.7,
+                "agenix should have high confidence: {:.2}",
+                explanation.confidence
+            );
 
             // Check for verification-related factors
             let has_verification_factor = explanation.factors.iter().any(|f| {
-                matches!(f.factor_type, ExplanationFactorType::TrustScore) &&
-                matches!(f.impact, FactorImpact::Positive)
+                matches!(f.factor_type, ExplanationFactorType::TrustScore)
+                    && matches!(f.impact, FactorImpact::Positive)
             });
 
             // The explanation should recognize the trust advantage
             // (depending on what factors are computed)
             if has_verification_factor {
-                assert!(true, "Explanation correctly identifies trust as positive factor");
+                assert!(
+                    true,
+                    "Explanation correctly identifies trust as positive factor"
+                );
             }
         }
 
@@ -7893,10 +8627,10 @@ mod nixos_codex {
             // The exact behavior depends on the recommendation algorithm
 
             // At minimum, it shouldn't be "StronglyRecommend" for a dangerous pattern
-            let is_cautious = matches!(explanation.recommendation,
-                Recommendation::Neutral |
-                Recommendation::Caution |
-                Recommendation::Avoid);
+            let is_cautious = matches!(
+                explanation.recommendation,
+                Recommendation::Neutral | Recommendation::Caution | Recommendation::Avoid
+            );
 
             // This assertion is soft - the engine might still recommend it
             // if raw success rate is the dominant factor
@@ -7922,77 +8656,137 @@ mod nixos_codex {
 
         // Learn legacy patterns
         let mut nix_channel = SymthaeaPattern::new(
-            patterns::NIX_CHANNEL, "nix/system",
-            "Use nix-channel for package sources", 0.75, ts, 1,
+            patterns::NIX_CHANNEL,
+            "nix/system",
+            "Use nix-channel for package sources",
+            0.75,
+            ts,
+            1,
         );
         nix_channel.domain_ids = vec![domains::SYSTEM_MANAGEMENT, domains::REPRODUCIBILITY];
         bridge.enhanced_on_pattern_learned(nix_channel, ts);
         bridge.register_pattern_lifecycle(patterns::NIX_CHANNEL, ts);
 
         let mut mk_shell = SymthaeaPattern::new(
-            patterns::MK_SHELL, "nix/development",
-            "Use mkShell for development environments", 0.85, ts, 1,
+            patterns::MK_SHELL,
+            "nix/development",
+            "Use mkShell for development environments",
+            0.85,
+            ts,
+            1,
         );
         mk_shell.domain_ids = vec![domains::DEVELOPMENT_ENVIRONMENTS];
         bridge.enhanced_on_pattern_learned(mk_shell, ts);
         bridge.register_pattern_lifecycle(patterns::MK_SHELL, ts);
 
         // Use legacy patterns successfully
-        ts = simulate_usage(&mut bridge, patterns::NIX_CHANNEL, 100, 20, "production",
-            OracleVerificationLevel::Audited, ts);
-        ts = simulate_usage(&mut bridge, patterns::MK_SHELL, 120, 10, "development",
-            OracleVerificationLevel::Audited, ts);
+        ts = simulate_usage(
+            &mut bridge,
+            patterns::NIX_CHANNEL,
+            100,
+            20,
+            "production",
+            OracleVerificationLevel::Audited,
+            ts,
+        );
+        ts = simulate_usage(
+            &mut bridge,
+            patterns::MK_SHELL,
+            120,
+            10,
+            "development",
+            OracleVerificationLevel::Audited,
+            ts,
+        );
 
         // === 2021: FLAKES EMERGE ===
         ts = 1609459200u64; // Jan 1, 2021
 
         let mut flakes = SymthaeaPattern::new(
-            patterns::FLAKES, "nix/flakes",
-            "Use flake.nix for reproducible configurations", 0.60, ts, 2,
+            patterns::FLAKES,
+            "nix/flakes",
+            "Use flake.nix for reproducible configurations",
+            0.60,
+            ts,
+            2,
         );
         flakes.domain_ids = vec![domains::FLAKES, domains::REPRODUCIBILITY];
         bridge.enhanced_on_pattern_learned(flakes, ts);
         bridge.register_pattern_lifecycle(patterns::FLAKES, ts);
 
         let mut dev_shell = SymthaeaPattern::new(
-            patterns::DEV_SHELL, "nix/flakes",
-            "Use devShells in flake.nix for development", 0.70, ts, 2,
+            patterns::DEV_SHELL,
+            "nix/flakes",
+            "Use devShells in flake.nix for development",
+            0.70,
+            ts,
+            2,
         );
         dev_shell.domain_ids = vec![domains::FLAKES, domains::DEVELOPMENT_ENVIRONMENTS];
         bridge.enhanced_on_pattern_learned(dev_shell, ts);
         bridge.register_pattern_lifecycle(patterns::DEV_SHELL, ts);
 
         // Flakes prove themselves
-        ts = simulate_usage(&mut bridge, patterns::FLAKES, 100, 0, "production",
-            OracleVerificationLevel::Cryptographic, ts);
-        ts = simulate_usage(&mut bridge, patterns::DEV_SHELL, 80, 2, "development",
-            OracleVerificationLevel::Cryptographic, ts);
+        ts = simulate_usage(
+            &mut bridge,
+            patterns::FLAKES,
+            100,
+            0,
+            "production",
+            OracleVerificationLevel::Cryptographic,
+            ts,
+        );
+        ts = simulate_usage(
+            &mut bridge,
+            patterns::DEV_SHELL,
+            80,
+            2,
+            "development",
+            OracleVerificationLevel::Cryptographic,
+            ts,
+        );
 
         // Channels start failing more
-        ts = simulate_usage(&mut bridge, patterns::NIX_CHANNEL, 60, 40, "production",
-            OracleVerificationLevel::Audited, ts);
+        ts = simulate_usage(
+            &mut bridge,
+            patterns::NIX_CHANNEL,
+            60,
+            40,
+            "production",
+            OracleVerificationLevel::Audited,
+            ts,
+        );
 
         // === 2022: SUCCESSION ===
         ts = 1640995200u64; // Jan 1, 2022
 
         // Flakes supersede channels
         let succession = bridge.succession_manager.declare_succession(
-            patterns::NIX_CHANNEL, patterns::FLAKES,
-            succession::SuccessionReason::BetterPerformance, 1, ts,
+            patterns::NIX_CHANNEL,
+            patterns::FLAKES,
+            succession::SuccessionReason::BetterPerformance,
+            1,
+            ts,
         );
         bridge.succession_manager.register(succession, ts);
 
         bridge.lifecycle_registry.transition(
             patterns::NIX_CHANNEL,
             lifecycle::PatternLifecycleState::Deprecated,
-            lifecycle::LifecycleTransitionReason::Superseded { replacement_id: patterns::FLAKES },
-            ts, "community_consensus",
+            lifecycle::LifecycleTransitionReason::Superseded {
+                replacement_id: patterns::FLAKES,
+            },
+            ts,
+            "community_consensus",
         );
 
         // devShell supersedes mkShell (for flake users)
         let dev_succession = bridge.succession_manager.declare_succession(
-            patterns::MK_SHELL, patterns::DEV_SHELL,
-            succession::SuccessionReason::ContextEvolution, 1, ts,
+            patterns::MK_SHELL,
+            patterns::DEV_SHELL,
+            succession::SuccessionReason::ContextEvolution,
+            1,
+            ts,
         );
         bridge.succession_manager.register(dev_succession, ts);
 
@@ -8003,42 +8797,67 @@ mod nixos_codex {
         bridge.lifecycle_registry.transition(
             patterns::NIX_CHANNEL,
             lifecycle::PatternLifecycleState::Archived,
-            lifecycle::LifecycleTransitionReason::DeprecationExpired { deprecation_days: 365 },
-            ts, "wisdom_engine",
+            lifecycle::LifecycleTransitionReason::DeprecationExpired {
+                deprecation_days: 365,
+            },
+            ts,
+            "wisdom_engine",
         );
 
         // === FINAL VERIFICATION ===
 
         // Lifecycle states should reflect evolution
-        assert_eq!(bridge.lifecycle_registry.state(patterns::NIX_CHANNEL),
-            lifecycle::PatternLifecycleState::Archived);
-        assert_eq!(bridge.lifecycle_registry.state(patterns::FLAKES),
-            lifecycle::PatternLifecycleState::Active);
-        assert_eq!(bridge.lifecycle_registry.state(patterns::MK_SHELL),
-            lifecycle::PatternLifecycleState::Active); // Still usable, just superseded
-        assert_eq!(bridge.lifecycle_registry.state(patterns::DEV_SHELL),
-            lifecycle::PatternLifecycleState::Active);
+        assert_eq!(
+            bridge.lifecycle_registry.state(patterns::NIX_CHANNEL),
+            lifecycle::PatternLifecycleState::Archived
+        );
+        assert_eq!(
+            bridge.lifecycle_registry.state(patterns::FLAKES),
+            lifecycle::PatternLifecycleState::Active
+        );
+        assert_eq!(
+            bridge.lifecycle_registry.state(patterns::MK_SHELL),
+            lifecycle::PatternLifecycleState::Active
+        ); // Still usable, just superseded
+        assert_eq!(
+            bridge.lifecycle_registry.state(patterns::DEV_SHELL),
+            lifecycle::PatternLifecycleState::Active
+        );
 
         // Successions should be recorded
-        let channel_successions = bridge.succession_manager.successions_from(patterns::NIX_CHANNEL);
+        let channel_successions = bridge
+            .succession_manager
+            .successions_from(patterns::NIX_CHANNEL);
         assert!(!channel_successions.is_empty());
 
         // Modern recommendations should prefer flakes
         let context = RecommendationContext::for_domain(domains::REPRODUCIBILITY, ts);
         let recs = bridge.get_recommendations(context);
 
-        let flakes_recommended = recs.recommendations.iter()
+        let flakes_recommended = recs
+            .recommendations
+            .iter()
             .any(|r| r.pattern_id == patterns::FLAKES);
-        assert!(flakes_recommended, "Flakes should be recommended for reproducibility in 2023");
+        assert!(
+            flakes_recommended,
+            "Flakes should be recommended for reproducibility in 2023"
+        );
 
         // Total knowledge should be substantial
         let stats = bridge.associative_learner_stats();
-        assert!(stats.total_experiences > 400,
-            "Should have learned from 400+ experiences, got {}", stats.total_experiences);
+        assert!(
+            stats.total_experiences > 400,
+            "Should have learned from 400+ experiences, got {}",
+            stats.total_experiences
+        );
 
         // Lifecycle history should show evolution
-        let channel_transitions = bridge.lifecycle_registry.transitions_for(patterns::NIX_CHANNEL);
-        assert!(channel_transitions.len() >= 2,
-            "Channel should have 2+ transitions (Active->Deprecated->Archived)");
+        let channel_transitions = bridge
+            .lifecycle_registry
+            .transitions_for(patterns::NIX_CHANNEL);
+        assert!(
+            channel_transitions.len() >= 2,
+            "Channel should have 2+ transitions (Active->Deprecated->Archived)"
+        );
     }
 }

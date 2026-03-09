@@ -14,8 +14,8 @@
 //! assert!(verify(&kp.verifying_key_bytes(), message, &signature).is_ok());
 //! ```
 
-use ml_dsa::{MlDsa65, KeyGen, SigningKey, VerifyingKey, EncodedVerifyingKey};
-use ml_dsa::signature::{Signer, Verifier, SignatureEncoding};
+use ml_dsa::signature::{SignatureEncoding, Signer, Verifier};
+use ml_dsa::{EncodedVerifyingKey, KeyGen, MlDsa65, SigningKey, VerifyingKey};
 
 /// An ML-DSA-65 keypair for post-quantum digital signatures.
 pub struct MlDsaKeyPair {
@@ -69,18 +69,20 @@ pub fn verify(
     message: &[u8],
     signature_bytes: &[u8],
 ) -> Result<(), String> {
-    let vk_enc = EncodedVerifyingKey::<MlDsa65>::try_from(verifying_key_bytes)
-        .map_err(|_| format!(
+    let vk_enc = EncodedVerifyingKey::<MlDsa65>::try_from(verifying_key_bytes).map_err(|_| {
+        format!(
             "Invalid verifying key length: expected 1952 bytes, got {}",
             verifying_key_bytes.len()
-        ))?;
+        )
+    })?;
     let vk = VerifyingKey::<MlDsa65>::decode(&vk_enc);
 
-    let sig = ml_dsa::Signature::<MlDsa65>::try_from(signature_bytes)
-        .map_err(|_| format!(
+    let sig = ml_dsa::Signature::<MlDsa65>::try_from(signature_bytes).map_err(|_| {
+        format!(
             "Invalid signature: expected 3309 bytes, got {}",
             signature_bytes.len()
-        ))?;
+        )
+    })?;
 
     vk.verify(message, &sig)
         .map_err(|e| format!("ML-DSA-65 signature verification failed: {}", e))

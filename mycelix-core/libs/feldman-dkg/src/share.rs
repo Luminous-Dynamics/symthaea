@@ -3,8 +3,8 @@
 use serde::{Deserialize, Serialize};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
-use crate::scalar::Scalar;
 use crate::error::{DkgError, DkgResult};
+use crate::scalar::Scalar;
 
 /// A secret share for a participant
 ///

@@ -82,10 +82,10 @@ impl PatternRelationType {
             PatternRelationType::Prerequisite => None, // Not symmetric
             PatternRelationType::Requires => None,     // Not symmetric
             PatternRelationType::ConflictsWith => Some(PatternRelationType::ConflictsWith),
-            PatternRelationType::EnhancedBy => None,   // Not symmetric
+            PatternRelationType::EnhancedBy => None, // Not symmetric
             PatternRelationType::Specializes => Some(PatternRelationType::Generalizes),
             PatternRelationType::Generalizes => Some(PatternRelationType::Specializes),
-            PatternRelationType::Supersedes => None,   // Not symmetric
+            PatternRelationType::Supersedes => None, // Not symmetric
             PatternRelationType::ComplementaryWith => Some(PatternRelationType::ComplementaryWith),
         }
     }
@@ -506,7 +506,11 @@ impl PatternDependencyRegistry {
     }
 
     /// Resolve all dependencies for a pattern (including transitive)
-    pub fn resolve(&self, pattern_id: PatternId, active_patterns: &[PatternId]) -> DependencyResolution {
+    pub fn resolve(
+        &self,
+        pattern_id: PatternId,
+        active_patterns: &[PatternId],
+    ) -> DependencyResolution {
         let mut resolution = DependencyResolution::new(pattern_id);
         let mut visited = HashSet::new();
         let mut stack = vec![pattern_id];
@@ -836,4 +840,3 @@ pub struct DependencyStats {
     /// Average dependencies per pattern
     pub avg_dependencies_per_pattern: f32,
 }
-

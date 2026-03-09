@@ -59,13 +59,13 @@ impl EpistemicContext {
     /// Get the E/N/M weights for this context
     pub fn weights(&self) -> (f32, f32, f32) {
         match self {
-            Self::Scientific =>     (0.50, 0.30, 0.20),
-            Self::Governance =>     (0.30, 0.45, 0.25),
-            Self::Personal =>       (0.33, 0.33, 0.34),
-            Self::Indigenous =>     (0.25, 0.40, 0.35),
-            Self::Contemplative =>  (0.20, 0.30, 0.50),
-            Self::Emergency =>      (0.60, 0.25, 0.15),
-            Self::Standard =>       (0.40, 0.35, 0.25),
+            Self::Scientific => (0.50, 0.30, 0.20),
+            Self::Governance => (0.30, 0.45, 0.25),
+            Self::Personal => (0.33, 0.33, 0.34),
+            Self::Indigenous => (0.25, 0.40, 0.35),
+            Self::Contemplative => (0.20, 0.30, 0.50),
+            Self::Emergency => (0.60, 0.25, 0.15),
+            Self::Standard => (0.40, 0.35, 0.25),
         }
     }
 
@@ -500,7 +500,11 @@ pub struct EpistemicClassification {
 
 impl EpistemicClassification {
     /// Create a new classification with just E/N/M
-    pub fn new(empirical: EmpiricalLevel, normative: NormativeLevel, materiality: MaterialityLevel) -> Self {
+    pub fn new(
+        empirical: EmpiricalLevel,
+        normative: NormativeLevel,
+        materiality: MaterialityLevel,
+    ) -> Self {
         Self {
             empirical,
             normative,
@@ -768,23 +772,43 @@ mod tests {
 
         // Indigenous context should weight N highest
         let (e, n, m) = EpistemicContext::Indigenous.weights();
-        assert!(n > e, "Indigenous should prioritize normative over empirical");
+        assert!(
+            n > e,
+            "Indigenous should prioritize normative over empirical"
+        );
         assert!((e + n + m - 1.0).abs() < 0.01, "Weights should sum to 1.0");
 
         // Contemplative context should weight M highest
         let (e, n, m) = EpistemicContext::Contemplative.weights();
-        assert!(m > e && m > n, "Contemplative should prioritize materiality");
+        assert!(
+            m > e && m > n,
+            "Contemplative should prioritize materiality"
+        );
         assert!((e + n + m - 1.0).abs() < 0.01, "Weights should sum to 1.0");
     }
 
     #[test]
     fn test_testimonial_quality_scores() {
         // E1.0 < E1.1 < E1.2 < E1.3 < E1.4 < E1.5
-        assert!(TestimonialQuality::SingleAnonymous.score() < TestimonialQuality::SingleIdentified.score());
-        assert!(TestimonialQuality::SingleIdentified.score() < TestimonialQuality::CorroboratedOral.score());
-        assert!(TestimonialQuality::CorroboratedOral.score() < TestimonialQuality::ElderCouncil.score());
-        assert!(TestimonialQuality::ElderCouncil.score() < TestimonialQuality::CollectiveWitness.score());
-        assert!(TestimonialQuality::CollectiveWitness.score() < TestimonialQuality::CorroboratedWitness.score());
+        assert!(
+            TestimonialQuality::SingleAnonymous.score()
+                < TestimonialQuality::SingleIdentified.score()
+        );
+        assert!(
+            TestimonialQuality::SingleIdentified.score()
+                < TestimonialQuality::CorroboratedOral.score()
+        );
+        assert!(
+            TestimonialQuality::CorroboratedOral.score() < TestimonialQuality::ElderCouncil.score()
+        );
+        assert!(
+            TestimonialQuality::ElderCouncil.score()
+                < TestimonialQuality::CollectiveWitness.score()
+        );
+        assert!(
+            TestimonialQuality::CollectiveWitness.score()
+                < TestimonialQuality::CorroboratedWitness.score()
+        );
     }
 
     #[test]
@@ -816,7 +840,8 @@ mod tests {
         assert!(
             indigenous_score > standard_score,
             "Indigenous context should honor grandmother's knowledge more: {} > {}",
-            indigenous_score, standard_score
+            indigenous_score,
+            standard_score
         );
     }
 
@@ -825,8 +850,8 @@ mod tests {
         // Galileo: E4 (reproducible observation) but N0 (only he believes it)
         let galileo = EpistemicClassification::new(
             EmpiricalLevel::CryptographicallyVerifiable, // E4 - publicly verifiable
-            NormativeLevel::Individual,                   // N0 - personal (nobody agrees)
-            MaterialityLevel::Permanent,                  // M3 - fundamental truth
+            NormativeLevel::Individual,                  // N0 - personal (nobody agrees)
+            MaterialityLevel::Permanent,                 // M3 - fundamental truth
         );
 
         // In scientific context, empirical matters most - Galileo should score well
@@ -838,7 +863,8 @@ mod tests {
         assert!(
             science_score > standard_score,
             "Scientific context should vindicate Galileo: {} > {}",
-            science_score, standard_score
+            science_score,
+            standard_score
         );
     }
 
@@ -849,7 +875,8 @@ mod tests {
             EmpiricalLevel::Measurable,
             NormativeLevel::Network,
             MaterialityLevel::Persistent,
-        ).with_contested(6, 4);
+        )
+        .with_contested(6, 4);
 
         assert!(contested.is_contested());
         assert!(contested.requires_scrutiny());
@@ -867,7 +894,8 @@ mod tests {
         assert!(
             contested_score < uncontested_score,
             "Contested claims should score lower: {} < {}",
-            contested_score, uncontested_score
+            contested_score,
+            uncontested_score
         );
     }
 

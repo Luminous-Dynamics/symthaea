@@ -32,12 +32,13 @@
 //! let share = encrypted.decrypt_share(1, ml_kem_decrypt_fn(&kp.dk)).unwrap();
 //! ```
 
-use aes_gcm::{Aes256Gcm, Key, Nonce, aead::{Aead, KeyInit}};
+use aes_gcm::{
+    aead::{Aead, KeyInit},
+    Aes256Gcm, Key, Nonce,
+};
 use ml_kem::{
     kem::{Decapsulate, KeyExport},
-    MlKem768,
-    DecapsulationKey768, EncapsulationKey768,
-    B32,
+    DecapsulationKey768, EncapsulationKey768, MlKem768, B32,
 };
 use sha2::{Digest, Sha256};
 
@@ -170,9 +171,10 @@ pub fn ml_kem_decrypt_fn(
         let nonce = Nonce::from_slice(nonce_bytes);
 
         // Decrypt and authenticate with AES-256-GCM
-        let plaintext = cipher
-            .decrypt(nonce, ciphertext)
-            .map_err(|_| "AES-GCM decryption failed: authentication tag mismatch (tampered or wrong key)".to_string())?;
+        let plaintext = cipher.decrypt(nonce, ciphertext).map_err(|_| {
+            "AES-GCM decryption failed: authentication tag mismatch (tampered or wrong key)"
+                .to_string()
+        })?;
 
         Ok(plaintext)
     }
@@ -212,12 +214,8 @@ mod tests {
         assert_eq!(result.nonce.len(), 12);
 
         let mut decrypt = ml_kem_decrypt_fn(&kp.dk);
-        let recovered = decrypt(
-            &result.encapsulated_key,
-            &result.nonce,
-            &result.ciphertext,
-        )
-        .unwrap();
+        let recovered =
+            decrypt(&result.encapsulated_key, &result.nonce, &result.ciphertext).unwrap();
 
         assert_eq!(recovered, plaintext.to_vec());
     }
@@ -234,14 +232,12 @@ mod tests {
 
         // Decrypt with the wrong key — AES-GCM should reject (auth tag mismatch)
         let mut decrypt_wrong = ml_kem_decrypt_fn(&kp2.dk);
-        let recovered = decrypt_wrong(
-            &result.encapsulated_key,
-            &result.nonce,
-            &result.ciphertext,
-        );
+        let recovered = decrypt_wrong(&result.encapsulated_key, &result.nonce, &result.ciphertext);
 
         assert!(recovered.is_err());
-        assert!(recovered.unwrap_err().contains("authentication tag mismatch"));
+        assert!(recovered
+            .unwrap_err()
+            .contains("authentication tag mismatch"));
     }
 
     #[test]
@@ -258,14 +254,12 @@ mod tests {
 
         // Decryption should fail due to authentication tag mismatch
         let mut decrypt = ml_kem_decrypt_fn(&kp.dk);
-        let recovered = decrypt(
-            &result.encapsulated_key,
-            &result.nonce,
-            &result.ciphertext,
-        );
+        let recovered = decrypt(&result.encapsulated_key, &result.nonce, &result.ciphertext);
 
         assert!(recovered.is_err());
-        assert!(recovered.unwrap_err().contains("authentication tag mismatch"));
+        assert!(recovered
+            .unwrap_err()
+            .contains("authentication tag mismatch"));
     }
 
     #[test]
@@ -285,8 +279,7 @@ mod tests {
             let ek_bytes = kp.encapsulation_key_bytes();
 
             // Encrypt the deal using this recipient's encapsulation key
-            let encrypted =
-                EncryptedDeal::from_deal(&deal, ml_kem_encrypt_fn(&ek_bytes)).unwrap();
+            let encrypted = EncryptedDeal::from_deal(&deal, ml_kem_encrypt_fn(&ek_bytes)).unwrap();
 
             // Decrypt the share for this recipient
             let share = encrypted

@@ -9,31 +9,80 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use super::{
-    PatternId, SymthaeaId, DomainId, CompositeId,
-    CommunityId, PredictionId, CausalNodeId,
-    DomainRegistry,
-    CompositionType, PatternComposite, SynergyCandidate, SynergyReason, CooccurrenceTracker, CompositionStats,
-    TrustWeightedScore, TrustLevel, AgentTrustRegistry, TrustRegistryStats,
-    CollectivePatternRegistry, CollectivePatternStats,
-    PatternLifecycleState, PatternLifecycleRegistry, LifecycleStats,
-    LifecycleTransitionReason, LifecycleTransition,
-    PatternVersion, VersioningConfig, PatternVersionInfo, PatternBranch, PatternVersionRegistry, VersioningStats, PatternEvolutionReason,
-    PatternRelationType, DependencyStrength, PatternDependency, DependencyConfig, DependencyResolution, DependencyIssue, DependencyIssueType, PatternDependencyRegistry, DependencyStats,
-    ExplainabilityRegistry, PatternExplanation, PatternComparison, ExplainabilityStats,
-    ImprovementPlan, ActionSuggestion, PlanFeasibility,
-    // Component 18: Recommendations
-    RecommendationRegistry, RecommendationContext, PatternRecommendation, RecommendationSet, PatternSignals,
+    ActionSuggestion,
+    AgentTrustRegistry,
+    Anomaly,
     // Component 19: Anomaly Detection
-    AnomalyDetector, Anomaly,
-    // Component 20: Succession
-    SuccessionManager, SuccessionReason, MigrationInstruction,
-    // Component 21: Pattern Similarity
-    SimilarityRegistry, SimilarityScore, PatternCluster, DuplicateCandidate,
+    AnomalyDetector,
     // Component 22: Associative Learner
-    AssociativeLearner, WisdomContext,
+    AssociativeLearner,
+    CausalNodeId,
+    CollectivePatternRegistry,
+    CollectivePatternStats,
+    CommunityId,
+    CompositeId,
+    CompositionStats,
+    CompositionType,
+    CooccurrenceTracker,
+    DependencyConfig,
+    DependencyIssue,
+    DependencyIssueType,
+    DependencyResolution,
+    DependencyStats,
+    DependencyStrength,
+    DomainId,
+    DomainRegistry,
+    DuplicateCandidate,
+    ExplainabilityRegistry,
+    ExplainabilityStats,
+    ImprovementPlan,
+    LifecycleStats,
+    LifecycleTransition,
+    LifecycleTransitionReason,
+    MigrationInstruction,
+    PatternBranch,
+    PatternCluster,
+    PatternComparison,
+    PatternComposite,
+    PatternDependency,
+    PatternDependencyRegistry,
+    PatternEvolutionReason,
+    PatternExplanation,
+    PatternId,
+    PatternLifecycleRegistry,
+    PatternLifecycleState,
+    PatternRecommendation,
+    PatternRelationType,
+    PatternSignals,
+    PatternVersion,
+    PatternVersionInfo,
+    PatternVersionRegistry,
+    PlanFeasibility,
+    PredictionId,
+    RecommendationContext,
+    // Component 18: Recommendations
+    RecommendationRegistry,
+    RecommendationSet,
+    // Component 21: Pattern Similarity
+    SimilarityRegistry,
+    SimilarityScore,
+    // Component 20: Succession
+    SuccessionManager,
+    SuccessionReason,
+    SymthaeaId,
+    SynergyCandidate,
+    SynergyReason,
+    TrustLevel,
+    TrustRegistryStats,
+    TrustWeightedScore,
+    VersioningConfig,
+    VersioningStats,
+    WisdomContext,
 };
 // Note: CausalPatternDependency, DependencyType, CausalDiscovery are defined locally in this file
-use super::core::{Oracle, OracleObservation, OracleVerificationLevel, CausalGraph, HarmonicWeights};
+use super::core::{
+    CausalGraph, HarmonicWeights, Oracle, OracleObservation, OracleVerificationLevel,
+};
 use crate::epistemic::EpistemicContext;
 use crate::KVector;
 
@@ -146,7 +195,14 @@ impl SymthaeaPattern {
         timestamp: u64,
         learned_by: SymthaeaId,
     ) -> Self {
-        let mut pattern = Self::new(pattern_id, "", solution, phi_at_learning, timestamp, learned_by);
+        let mut pattern = Self::new(
+            pattern_id,
+            "",
+            solution,
+            phi_at_learning,
+            timestamp,
+            learned_by,
+        );
         pattern.domain_ids = domain_ids;
         pattern
     }
@@ -177,7 +233,11 @@ impl SymthaeaPattern {
     pub fn domain_similarity(&self, other: &SymthaeaPattern, registry: &DomainRegistry) -> f32 {
         if self.domain_ids.is_empty() || other.domain_ids.is_empty() {
             // Fall back to string comparison for legacy patterns
-            return if self.problem_domain == other.problem_domain { 1.0 } else { 0.0 };
+            return if self.problem_domain == other.problem_domain {
+                1.0
+            } else {
+                0.0
+            };
         }
 
         let mut max_similarity = 0.0_f32;
@@ -222,7 +282,11 @@ impl SymthaeaPattern {
     }
 
     /// Convert this pattern to a prediction for the CausalGraph
-    pub fn as_prediction(&self, community_id: CommunityId, expected_observation_time: u64) -> PatternPrediction {
+    pub fn as_prediction(
+        &self,
+        community_id: CommunityId,
+        expected_observation_time: u64,
+    ) -> PatternPrediction {
         PatternPrediction {
             pattern_id: self.pattern_id,
             community_id,
@@ -383,7 +447,13 @@ impl PatternUsageOracle {
     }
 
     /// Record a usage event
-    pub fn record_usage(&mut self, success: bool, timestamp: u64, context: &str, verification: OracleVerificationLevel) {
+    pub fn record_usage(
+        &mut self,
+        success: bool,
+        timestamp: u64,
+        context: &str,
+        verification: OracleVerificationLevel,
+    ) {
         self.usage_events.push(PatternUsageEvent {
             timestamp,
             success,
@@ -411,7 +481,8 @@ impl PatternUsageOracle {
         // Confidence increases with more observations
         let confidence = 1.0 - (1.0 / (total as f32 + 1.0).sqrt());
 
-        let latest_timestamp = self.usage_events
+        let latest_timestamp = self
+            .usage_events
             .iter()
             .map(|e| e.timestamp)
             .max()
@@ -535,7 +606,8 @@ impl SwarmPatternOracle {
             return None;
         }
 
-        let weighted_sum: f32 = self.instance_results
+        let weighted_sum: f32 = self
+            .instance_results
             .values()
             .map(|r| r.success_rate * r.phi_level)
             .sum();
@@ -547,15 +619,21 @@ impl SwarmPatternOracle {
     pub fn consensus_observation(&self) -> Option<OracleObservation> {
         let consensus = self.phi_weighted_consensus()?;
 
-        let latest_timestamp = self.instance_results
+        let latest_timestamp = self
+            .instance_results
             .values()
             .map(|r| r.timestamp)
             .max()
             .unwrap_or(0);
 
         // Confidence increases with more instances and higher Φ
-        let total_phi: f32 = self.instance_results.values().map(|r| r.phi_level).sum::<f32>();
-        let confidence = (self.instance_results.len() as f32 * total_phi.sqrt()).min(1.0) / 10.0 + 0.5;
+        let total_phi: f32 = self
+            .instance_results
+            .values()
+            .map(|r| r.phi_level)
+            .sum::<f32>();
+        let confidence =
+            (self.instance_results.len() as f32 * total_phi.sqrt()).min(1.0) / 10.0 + 0.5;
 
         Some(OracleObservation {
             variable: format!("pattern_{}_success", self.pattern_id),
@@ -595,7 +673,11 @@ impl Oracle for SwarmPatternOracle {
         if self.instance_results.is_empty() {
             return 0.0;
         }
-        let avg_phi: f32 = self.instance_results.values().map(|r| r.phi_level).sum::<f32>()
+        let avg_phi: f32 = self
+            .instance_results
+            .values()
+            .map(|r| r.phi_level)
+            .sum::<f32>()
             / self.instance_results.len() as f32;
         (0.5 + avg_phi * 0.5).min(0.99)
     }
@@ -723,7 +805,6 @@ pub struct SymthaeaCausalBridge {
     // ==========================================================================
     // Component 9: Advanced Learning Enhancements (Integrated)
     // ==========================================================================
-
     /// Temporal decay configuration for pattern staleness tracking
     pub temporal_decay: TemporalDecayConfig,
 
@@ -745,7 +826,6 @@ pub struct SymthaeaCausalBridge {
     // ==========================================================================
     // Component 10: Domain System (Integrated)
     // ==========================================================================
-
     /// Domain registry for hierarchical knowledge organization
     pub domain_registry: DomainRegistry,
 
@@ -755,7 +835,6 @@ pub struct SymthaeaCausalBridge {
     // ==========================================================================
     // Component 11: Pattern Composition (Integrated)
     // ==========================================================================
-
     /// Registered pattern composites
     pub composites: HashMap<CompositeId, PatternComposite>,
 
@@ -774,7 +853,6 @@ pub struct SymthaeaCausalBridge {
     // ==========================================================================
     // Component 12: Trust-Integrated Patterns
     // ==========================================================================
-
     /// Registry for tracking agent trust scores
     pub trust_registry: AgentTrustRegistry,
 
@@ -784,7 +862,6 @@ pub struct SymthaeaCausalBridge {
     // ==========================================================================
     // Component 13: Collective Pattern Integration
     // ==========================================================================
-
     /// Registry for collective pattern observations
     pub collective_registry: CollectivePatternRegistry,
 
@@ -794,7 +871,6 @@ pub struct SymthaeaCausalBridge {
     // ==========================================================================
     // Component 14: Pattern Lifecycle Management
     // ==========================================================================
-
     /// Registry for tracking pattern lifecycle states
     pub lifecycle_registry: PatternLifecycleRegistry,
 
@@ -804,7 +880,6 @@ pub struct SymthaeaCausalBridge {
     // ==========================================================================
     // Component 15: Pattern Versioning & Evolution
     // ==========================================================================
-
     /// Registry for tracking pattern versions and evolution
     pub version_registry: PatternVersionRegistry,
 
@@ -814,7 +889,6 @@ pub struct SymthaeaCausalBridge {
     // ==========================================================================
     // Component 16: Pattern Dependencies & Prerequisites
     // ==========================================================================
-
     /// Registry for tracking pattern dependencies and prerequisites
     pub dependency_registry: PatternDependencyRegistry,
 
@@ -827,35 +901,30 @@ pub struct SymthaeaCausalBridge {
     // ==========================================================================
     // Component 17: Pattern Explainability
     // ==========================================================================
-
     /// Registry for generating human-readable pattern explanations
     pub explainability: ExplainabilityRegistry,
 
     // ==========================================================================
     // Component 18: Pattern Recommendations
     // ==========================================================================
-
     /// Registry for generating pattern recommendations
     pub recommendations: RecommendationRegistry,
 
     // ==========================================================================
     // Component 19: Anomaly Detection
     // ==========================================================================
-
     /// Detector for identifying unusual patterns in the system
     pub anomaly_detector: AnomalyDetector,
 
     // ==========================================================================
     // Component 20: Pattern Succession
     // ==========================================================================
-
     /// Manager for pattern succession and migration
     pub succession_manager: SuccessionManager,
 
     // ==========================================================================
     // Component 21: Pattern Similarity & Clustering
     // ==========================================================================
-
     /// Registry for pattern similarity metrics and clustering
     pub similarity_registry: SimilarityRegistry,
 
@@ -868,7 +937,6 @@ pub struct SymthaeaCausalBridge {
     // ==========================================================================
     // Component 22: HDC-Grounded Associative Learner
     // ==========================================================================
-
     /// Associative learner for zero-shot generalization
     pub associative_learner: AssociativeLearner,
 
@@ -927,7 +995,7 @@ impl SymthaeaCausalBridge {
             // Component 16: Pattern Dependencies & Prerequisites
             dependency_registry: PatternDependencyRegistry::new(),
             auto_discover_dependencies: true, // Auto-discover dependencies from co-occurrence
-            enforce_dependencies: false, // Don't enforce by default (opt-in)
+            enforce_dependencies: false,      // Don't enforce by default (opt-in)
             // Component 17: Pattern Explainability
             explainability: ExplainabilityRegistry::new(),
             // Component 18: Pattern Recommendations
@@ -972,12 +1040,16 @@ impl SymthaeaCausalBridge {
         // Create causal node for this pattern
         let pattern_node = self.causal.add_node(
             &format!("pattern_{}", pattern_id),
-            &format!("Pattern: {} -> {}", pattern.problem_domain, pattern.solution),
+            &format!(
+                "Pattern: {} -> {}",
+                pattern.problem_domain, pattern.solution
+            ),
         );
 
         // Link consciousness to pattern (Φ influences pattern quality)
         if let Some(phi_node) = self.consciousness_node {
-            self.causal.add_causal_link(phi_node, pattern_node, pattern.phi_at_learning);
+            self.causal
+                .add_causal_link(phi_node, pattern_node, pattern.phi_at_learning);
         }
 
         // Create prediction if auto_predict is enabled
@@ -1031,7 +1103,9 @@ impl SymthaeaCausalBridge {
         verification: OracleVerificationLevel,
     ) {
         // Get the pattern's predicted success rate for calibration tracking
-        let predicted_confidence = self.patterns.get(&pattern_id)
+        let predicted_confidence = self
+            .patterns
+            .get(&pattern_id)
             .map(|p| p.success_rate)
             .unwrap_or(0.5);
 
@@ -1054,16 +1128,20 @@ impl SymthaeaCausalBridge {
 
         // Track calibration: compare prediction to actual outcome
         let actual_outcome = if success { 1.0 } else { 0.0 };
-        self.calibration.add_result(predicted_confidence, predicted_confidence, actual_outcome);
+        self.calibration
+            .add_result(predicted_confidence, predicted_confidence, actual_outcome);
 
         // Record co-occurrence for causal discovery
         // (pattern usage in this context)
-        self.causal_discovery.record_usage(pattern_id, success, timestamp);
+        self.causal_discovery
+            .record_usage(pattern_id, success, timestamp);
 
         // Auto-discover pattern dependencies when enough data accumulated
         if self.auto_discover_causality {
             let total_usages: usize = self.patterns.values().map(|p| p.usage_count as usize).sum();
-            if total_usages >= self.discovery_threshold && total_usages % self.discovery_threshold == 0 {
+            if total_usages >= self.discovery_threshold
+                && total_usages % self.discovery_threshold == 0
+            {
                 self.run_causal_discovery();
             }
         }
@@ -1084,7 +1162,9 @@ impl SymthaeaCausalBridge {
     /// Now supports cross-domain discovery using domain similarity (Component 10).
     pub fn run_causal_discovery(&mut self) {
         // Collect pattern IDs and their success rates
-        let patterns: Vec<(PatternId, f32)> = self.patterns.iter()
+        let patterns: Vec<(PatternId, f32)> = self
+            .patterns
+            .iter()
             .map(|(id, p)| (*id, p.success_rate))
             .collect();
 
@@ -1102,9 +1182,13 @@ impl SymthaeaCausalBridge {
                             a.domain_similarity(b, &self.domain_registry)
                         } else {
                             // Fall back to string comparison for legacy patterns
-                            if a.problem_domain == b.problem_domain { 1.0 } else { 0.0 }
+                            if a.problem_domain == b.problem_domain {
+                                1.0
+                            } else {
+                                0.0
+                            }
                         }
-                    },
+                    }
                     _ => continue,
                 };
 
@@ -1121,18 +1205,20 @@ impl SymthaeaCausalBridge {
 
                 if strength >= self.causal_discovery.min_strength {
                     // Determine dependency type based on rates
-                    let dep_type = if (rate_a > 0.7 && rate_b > 0.7) || (rate_a < 0.3 && rate_b < 0.3) {
-                        // Both succeed or both fail together
-                        DependencyType::Synergistic
-                    } else if (rate_a > 0.7 && rate_b < 0.3) || (rate_a < 0.3 && rate_b > 0.7) {
-                        // Opposite success rates suggest conflict
-                        DependencyType::Conflicting
-                    } else {
-                        // One typically follows the other
-                        DependencyType::Sequential
-                    };
+                    let dep_type =
+                        if (rate_a > 0.7 && rate_b > 0.7) || (rate_a < 0.3 && rate_b < 0.3) {
+                            // Both succeed or both fail together
+                            DependencyType::Synergistic
+                        } else if (rate_a > 0.7 && rate_b < 0.3) || (rate_a < 0.3 && rate_b > 0.7) {
+                            // Opposite success rates suggest conflict
+                            DependencyType::Conflicting
+                        } else {
+                            // One typically follows the other
+                            DependencyType::Sequential
+                        };
 
-                    self.causal_discovery.add_dependency(id_a, id_b, strength, dep_type);
+                    self.causal_discovery
+                        .add_dependency(id_a, id_b, strength, dep_type);
                 }
             }
         }
@@ -1145,7 +1231,8 @@ impl SymthaeaCausalBridge {
 
     /// Find patterns in a domain (including related domains)
     pub fn patterns_in_domain(&self, domain_id: DomainId, include_related: bool) -> Vec<PatternId> {
-        self.patterns.iter()
+        self.patterns
+            .iter()
             .filter(|(_, p)| {
                 if include_related {
                     p.related_to_domain(domain_id, &self.domain_registry)
@@ -1222,19 +1309,15 @@ impl SymthaeaCausalBridge {
     }
 
     /// Record that a composite was used
-    pub fn on_composite_used(
-        &mut self,
-        composite_id: CompositeId,
-        success: bool,
-        timestamp: u64,
-    ) {
+    pub fn on_composite_used(&mut self, composite_id: CompositeId, success: bool, timestamp: u64) {
         // Update composite stats
         if let Some(composite) = self.composites.get_mut(&composite_id) {
             composite.record_outcome(success, timestamp);
 
             // Also record co-occurrence for synergy tracking
             let pattern_ids = composite.pattern_ids.clone();
-            self.cooccurrence_tracker.record_cooccurrence(&pattern_ids, success);
+            self.cooccurrence_tracker
+                .record_cooccurrence(&pattern_ids, success);
         }
     }
 
@@ -1245,7 +1328,8 @@ impl SymthaeaCausalBridge {
         success: bool,
         _timestamp: u64,
     ) {
-        self.cooccurrence_tracker.record_cooccurrence(pattern_ids, success);
+        self.cooccurrence_tracker
+            .record_cooccurrence(pattern_ids, success);
     }
 
     /// Get a composite by ID
@@ -1300,9 +1384,7 @@ impl SymthaeaCausalBridge {
         for (a, b, success_rate) in self.cooccurrence_tracker.find_synergy_candidates() {
             // Skip if composite already exists
             let already_exists = self.composites.values().any(|c| {
-                c.pattern_ids.len() == 2
-                    && c.pattern_ids.contains(&a)
-                    && c.pattern_ids.contains(&b)
+                c.pattern_ids.len() == 2 && c.pattern_ids.contains(&a) && c.pattern_ids.contains(&b)
             });
 
             if already_exists {
@@ -1322,19 +1404,23 @@ impl SymthaeaCausalBridge {
             };
 
             // Check if domains are related
-            let domain_a: Vec<DomainId> = self.patterns.get(&a)
+            let domain_a: Vec<DomainId> = self
+                .patterns
+                .get(&a)
                 .map(|p| p.domain_ids.clone())
                 .unwrap_or_default();
-            let domain_b: Vec<DomainId> = self.patterns.get(&b)
+            let domain_b: Vec<DomainId> = self
+                .patterns
+                .get(&b)
                 .map(|p| p.domain_ids.clone())
                 .unwrap_or_default();
 
             let reason = if !domain_a.is_empty() && !domain_b.is_empty() {
                 // Check domain affinity
                 let has_affinity = domain_a.iter().any(|da| {
-                    domain_b.iter().any(|db| {
-                        self.domain_registry.similarity(*da, *db) > 0.5
-                    })
+                    domain_b
+                        .iter()
+                        .any(|db| self.domain_registry.similarity(*da, *db) > 0.5)
                 });
                 if has_affinity {
                     SynergyReason::DomainAffinity
@@ -1346,7 +1432,10 @@ impl SymthaeaCausalBridge {
             };
 
             // Calculate confidence based on co-occurrence count
-            let (count, _, _) = self.cooccurrence_tracker.get_stats(a, b).unwrap_or((0, 0, 0.0));
+            let (count, _, _) = self
+                .cooccurrence_tracker
+                .get_stats(a, b)
+                .unwrap_or((0, 0, 0.0));
             let confidence = (count as f32 / 20.0).min(1.0);
 
             candidates.push(SynergyCandidate {
@@ -1360,34 +1449,41 @@ impl SymthaeaCausalBridge {
 
         // Sort by estimated synergy (highest first)
         candidates.sort_by(|a, b| {
-            b.estimated_synergy.partial_cmp(&a.estimated_synergy).unwrap_or(std::cmp::Ordering::Equal)
+            b.estimated_synergy
+                .partial_cmp(&a.estimated_synergy)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
 
         candidates
     }
 
     /// Auto-create composites from discovered synergies
-    pub fn auto_create_composites(&mut self, timestamp: u64, created_by: SymthaeaId) -> Vec<CompositeId> {
+    pub fn auto_create_composites(
+        &mut self,
+        timestamp: u64,
+        created_by: SymthaeaId,
+    ) -> Vec<CompositeId> {
         let candidates = self.discover_synergies();
         let mut created = Vec::new();
 
         for candidate in candidates {
             if candidate.estimated_synergy > 1.1 && candidate.confidence > 0.5 {
                 // Generate name from pattern names
-                let names: Vec<String> = candidate.pattern_ids
+                let names: Vec<String> = candidate
+                    .pattern_ids
                     .iter()
                     .filter_map(|id| self.patterns.get(id))
                     .map(|p| p.solution.clone())
                     .collect();
-                let name = format!("{} + {}",
+                let name = format!(
+                    "{} + {}",
                     names.get(0).map(|s| s.as_str()).unwrap_or("?"),
                     names.get(1).map(|s| s.as_str()).unwrap_or("?")
                 );
 
                 let rationale = format!(
                     "Auto-discovered: patterns {} (estimated synergy: {:.2})",
-                    candidate.reason,
-                    candidate.estimated_synergy
+                    candidate.reason, candidate.estimated_synergy
                 );
 
                 let id = self.create_composite(
@@ -1419,7 +1515,9 @@ impl SymthaeaCausalBridge {
                 // Prefer high synergy with good confidence
                 let score_a = a.synergy_score * a.synergy_confidence;
                 let score_b = b.synergy_score * b.synergy_confidence;
-                score_a.partial_cmp(&score_b).unwrap_or(std::cmp::Ordering::Equal)
+                score_a
+                    .partial_cmp(&score_b)
+                    .unwrap_or(std::cmp::Ordering::Equal)
             })
     }
 
@@ -1427,8 +1525,16 @@ impl SymthaeaCausalBridge {
     pub fn composition_stats(&self) -> CompositionStats {
         let total = self.composites.len();
         let synergistic = self.composites.values().filter(|c| c.has_synergy()).count();
-        let interfering = self.composites.values().filter(|c| c.has_interference()).count();
-        let auto_discovered = self.composites.values().filter(|c| c.auto_discovered).count();
+        let interfering = self
+            .composites
+            .values()
+            .filter(|c| c.has_interference())
+            .count();
+        let auto_discovered = self
+            .composites
+            .values()
+            .filter(|c| c.auto_discovered)
+            .count();
         let tracked_pairs = self.cooccurrence_tracker.pair_count();
 
         CompositionStats {
@@ -1446,8 +1552,14 @@ impl SymthaeaCausalBridge {
     // ==========================================================================
 
     /// Register an agent with a known K-Vector trust profile
-    pub fn register_agent_trust(&mut self, agent_id: SymthaeaId, k_vector: KVector, timestamp: u64) {
-        self.trust_registry.register_agent(agent_id, k_vector, timestamp);
+    pub fn register_agent_trust(
+        &mut self,
+        agent_id: SymthaeaId,
+        k_vector: KVector,
+        timestamp: u64,
+    ) {
+        self.trust_registry
+            .register_agent(agent_id, k_vector, timestamp);
     }
 
     /// Register a new agent with neutral trust
@@ -1474,7 +1586,10 @@ impl SymthaeaCausalBridge {
     }
 
     /// Get trust-weighted score for a pattern
-    pub fn trust_weighted_pattern_score(&self, pattern_id: PatternId) -> Option<TrustWeightedScore> {
+    pub fn trust_weighted_pattern_score(
+        &self,
+        pattern_id: PatternId,
+    ) -> Option<TrustWeightedScore> {
         let pattern = self.patterns.get(&pattern_id)?;
         Some(self.trust_registry.calculate_weighted_score(
             pattern.success_rate,
@@ -1485,7 +1600,8 @@ impl SymthaeaCausalBridge {
 
     /// Get all patterns sorted by trust-weighted score
     pub fn patterns_by_trust_weighted_score(&self) -> Vec<(PatternId, TrustWeightedScore)> {
-        let mut scored: Vec<_> = self.patterns
+        let mut scored: Vec<_> = self
+            .patterns
             .iter()
             .filter_map(|(id, pattern)| {
                 let score = self.trust_registry.calculate_weighted_score(
@@ -1502,7 +1618,8 @@ impl SymthaeaCausalBridge {
             .collect();
 
         scored.sort_by(|a, b| {
-            b.1.weighted_score.partial_cmp(&a.1.weighted_score)
+            b.1.weighted_score
+                .partial_cmp(&a.1.weighted_score)
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
 
@@ -1530,7 +1647,9 @@ impl SymthaeaCausalBridge {
                 }
 
                 // Apply temporal decay if configured
-                let decay = self.temporal_decay.calculate_decay(pattern.last_used, current_time);
+                let decay = self
+                    .temporal_decay
+                    .calculate_decay(pattern.last_used, current_time);
                 let effective_score = TrustWeightedScore {
                     weighted_score: score.weighted_score * decay,
                     ..score
@@ -1539,16 +1658,23 @@ impl SymthaeaCausalBridge {
                 Some((*id, effective_score))
             })
             .max_by(|a, b| {
-                a.1.weighted_score.partial_cmp(&b.1.weighted_score)
+                a.1.weighted_score
+                    .partial_cmp(&b.1.weighted_score)
                     .unwrap_or(std::cmp::Ordering::Equal)
             })
     }
 
     /// Update agent trust after a pattern outcome
     /// This is called automatically by on_pattern_used if trust weighting is enabled
-    fn update_agent_trust_from_outcome(&mut self, pattern_id: PatternId, success: bool, timestamp: u64) {
+    fn update_agent_trust_from_outcome(
+        &mut self,
+        pattern_id: PatternId,
+        success: bool,
+        timestamp: u64,
+    ) {
         if let Some(pattern) = self.patterns.get(&pattern_id) {
-            self.trust_registry.update_from_outcome(pattern.learned_by, success, timestamp);
+            self.trust_registry
+                .update_from_outcome(pattern.learned_by, success, timestamp);
         }
     }
 
@@ -1572,8 +1698,17 @@ impl SymthaeaCausalBridge {
                 match (min_level, level) {
                     (TrustLevel::VeryHigh, TrustLevel::VeryHigh) => true,
                     (TrustLevel::High, TrustLevel::VeryHigh | TrustLevel::High) => true,
-                    (TrustLevel::Neutral, TrustLevel::VeryHigh | TrustLevel::High | TrustLevel::Neutral) => true,
-                    (TrustLevel::Low, TrustLevel::VeryHigh | TrustLevel::High | TrustLevel::Neutral | TrustLevel::Low) => true,
+                    (
+                        TrustLevel::Neutral,
+                        TrustLevel::VeryHigh | TrustLevel::High | TrustLevel::Neutral,
+                    ) => true,
+                    (
+                        TrustLevel::Low,
+                        TrustLevel::VeryHigh
+                        | TrustLevel::High
+                        | TrustLevel::Neutral
+                        | TrustLevel::Low,
+                    ) => true,
                     (TrustLevel::Untrusted, _) => true, // All patterns pass
                     _ => false,
                 }
@@ -1776,7 +1911,11 @@ impl SymthaeaCausalBridge {
             }
         }
 
-        results.sort_by(|a, b| b.1.abs().partial_cmp(&a.1.abs()).unwrap_or(std::cmp::Ordering::Equal));
+        results.sort_by(|a, b| {
+            b.1.abs()
+                .partial_cmp(&a.1.abs())
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         results
     }
 
@@ -1784,13 +1923,19 @@ impl SymthaeaCausalBridge {
     pub fn health_report(&self) -> BridgeHealthReport {
         let total_patterns = self.patterns.len();
         let patterns_with_usage = self.patterns.values().filter(|p| p.usage_count > 0).count();
-        let patterns_validated = self.patterns.values().filter(|p| p.validated_in_production).count();
+        let patterns_validated = self
+            .patterns
+            .values()
+            .filter(|p| p.validated_in_production)
+            .count();
 
         let avg_success_rate = if patterns_with_usage > 0 {
-            self.patterns.values()
+            self.patterns
+                .values()
                 .filter(|p| p.usage_count > 0)
                 .map(|p| p.success_rate)
-                .sum::<f32>() / patterns_with_usage as f32
+                .sum::<f32>()
+                / patterns_with_usage as f32
         } else {
             0.0
         };
@@ -1802,7 +1947,11 @@ impl SymthaeaCausalBridge {
             prediction_accuracy: self.causal.current_accuracy(),
             average_pattern_success: avg_success_rate,
             guidance_generated: self.guidance_history.len(),
-            swarm_instances: self.swarm_oracle.as_ref().map(|o| o.instance_results.len()).unwrap_or(0),
+            swarm_instances: self
+                .swarm_oracle
+                .as_ref()
+                .map(|o| o.instance_results.len())
+                .unwrap_or(0),
         }
     }
 
@@ -1826,11 +1975,13 @@ impl SymthaeaCausalBridge {
 
         // Ensure pattern has a context
         if !self.collective_registry.has_context(pattern_id) {
-            self.collective_registry.register_pattern(pattern_id, timestamp);
+            self.collective_registry
+                .register_pattern(pattern_id, timestamp);
         }
 
         // Record the discovery
-        self.collective_registry.record_discovery(pattern_id, discoverer, timestamp);
+        self.collective_registry
+            .record_discovery(pattern_id, discoverer, timestamp);
     }
 
     /// Record pattern usage with collective agreement level
@@ -1849,10 +2000,12 @@ impl SymthaeaCausalBridge {
 
         // Ensure pattern has a context
         if !self.collective_registry.has_context(pattern_id) {
-            self.collective_registry.register_pattern(pattern_id, timestamp);
+            self.collective_registry
+                .register_pattern(pattern_id, timestamp);
         }
 
-        self.collective_registry.record_usage_agreement(pattern_id, agreement_level, timestamp);
+        self.collective_registry
+            .record_usage_agreement(pattern_id, agreement_level, timestamp);
     }
 
     /// Record tension change after pattern usage
@@ -1871,7 +2024,8 @@ impl SymthaeaCausalBridge {
 
         // Ensure pattern has a context
         if !self.collective_registry.has_context(pattern_id) {
-            self.collective_registry.register_pattern(pattern_id, timestamp);
+            self.collective_registry
+                .register_pattern(pattern_id, timestamp);
         }
 
         self.collective_registry.record_tension_change(
@@ -1883,16 +2037,23 @@ impl SymthaeaCausalBridge {
     }
 
     /// Mark a pattern as being in the "shadow" (needed but absent from collective)
-    pub fn mark_pattern_in_shadow(&mut self, pattern_id: PatternId, in_shadow: bool, timestamp: u64) {
+    pub fn mark_pattern_in_shadow(
+        &mut self,
+        pattern_id: PatternId,
+        in_shadow: bool,
+        timestamp: u64,
+    ) {
         if !self.use_collective_observation {
             return;
         }
 
         if !self.collective_registry.has_context(pattern_id) {
-            self.collective_registry.register_pattern(pattern_id, timestamp);
+            self.collective_registry
+                .register_pattern(pattern_id, timestamp);
         }
 
-        self.collective_registry.set_shadow_status(pattern_id, in_shadow, timestamp);
+        self.collective_registry
+            .set_shadow_status(pattern_id, in_shadow, timestamp);
     }
 
     /// Get collective-adjusted score for a pattern
@@ -1989,7 +2150,8 @@ impl SymthaeaCausalBridge {
         best_id.map(|id| {
             let pattern = self.patterns.get(&id).unwrap();
             let decay_factor = decay_config.calculate_decay(pattern.last_used, timestamp);
-            let days_since = (timestamp.saturating_sub(pattern.last_used)) as f32 / (24.0 * 60.0 * 60.0);
+            let days_since =
+                (timestamp.saturating_sub(pattern.last_used)) as f32 / (24.0 * 60.0 * 60.0);
             let is_stale = decay_config.is_stale(pattern.last_used, timestamp);
 
             PatternDecayStatus {
@@ -2051,7 +2213,10 @@ impl SymthaeaCausalBridge {
         if !self.patterns.contains_key(&pattern_id) {
             return Err("Pattern not found");
         }
-        if self.lifecycle_registry.deprecate(pattern_id, reason, timestamp, "manual") {
+        if self
+            .lifecycle_registry
+            .deprecate(pattern_id, reason, timestamp, "manual")
+        {
             Ok(())
         } else {
             Err("Failed to deprecate pattern")
@@ -2068,7 +2233,10 @@ impl SymthaeaCausalBridge {
         if !self.patterns.contains_key(&pattern_id) {
             return Err("Pattern not found");
         }
-        if self.lifecycle_registry.archive(pattern_id, reason, timestamp, "manual") {
+        if self
+            .lifecycle_registry
+            .archive(pattern_id, reason, timestamp, "manual")
+        {
             Ok(())
         } else {
             Err("Failed to archive pattern")
@@ -2085,7 +2253,10 @@ impl SymthaeaCausalBridge {
         if !self.patterns.contains_key(&pattern_id) {
             return Err("Pattern not found");
         }
-        if self.lifecycle_registry.retire(pattern_id, reason, timestamp, "manual") {
+        if self
+            .lifecycle_registry
+            .retire(pattern_id, reason, timestamp, "manual")
+        {
             Ok(())
         } else {
             Err("Failed to retire pattern")
@@ -2102,7 +2273,10 @@ impl SymthaeaCausalBridge {
         if !self.patterns.contains_key(&pattern_id) {
             return Err("Pattern not found");
         }
-        if self.lifecycle_registry.resurrect(pattern_id, reason, timestamp, "manual") {
+        if self
+            .lifecycle_registry
+            .resurrect(pattern_id, reason, timestamp, "manual")
+        {
             Ok(())
         } else {
             Err("Failed to resurrect pattern")
@@ -2130,17 +2304,20 @@ impl SymthaeaCausalBridge {
 
     /// Get all active patterns
     pub fn active_patterns(&self) -> Vec<PatternId> {
-        self.lifecycle_registry.patterns_by_state(PatternLifecycleState::Active)
+        self.lifecycle_registry
+            .patterns_by_state(PatternLifecycleState::Active)
     }
 
     /// Get all deprecated patterns
     pub fn deprecated_patterns(&self) -> Vec<PatternId> {
-        self.lifecycle_registry.patterns_by_state(PatternLifecycleState::Deprecated)
+        self.lifecycle_registry
+            .patterns_by_state(PatternLifecycleState::Deprecated)
     }
 
     /// Get all archived patterns
     pub fn archived_patterns(&self) -> Vec<PatternId> {
-        self.lifecycle_registry.patterns_by_state(PatternLifecycleState::Archived)
+        self.lifecycle_registry
+            .patterns_by_state(PatternLifecycleState::Archived)
     }
 
     /// Get lifecycle statistics
@@ -2150,7 +2327,10 @@ impl SymthaeaCausalBridge {
 
     /// Run auto-deprecation check for all patterns
     /// Returns list of patterns that were deprecated
-    pub fn run_auto_deprecation(&mut self, timestamp: u64) -> Vec<(PatternId, LifecycleTransitionReason)> {
+    pub fn run_auto_deprecation(
+        &mut self,
+        timestamp: u64,
+    ) -> Vec<(PatternId, LifecycleTransitionReason)> {
         if !self.auto_lifecycle_management {
             return Vec::new();
         }
@@ -2172,7 +2352,13 @@ impl SymthaeaCausalBridge {
                     p.success_rate
                 };
                 let is_active = self.lifecycle_registry.state(id) == PatternLifecycleState::Active;
-                (id, p.usage_count as u32, p.last_used, trust_score, is_active)
+                (
+                    id,
+                    p.usage_count as u32,
+                    p.last_used,
+                    trust_score,
+                    is_active,
+                )
             })
             .collect();
 
@@ -2189,7 +2375,10 @@ impl SymthaeaCausalBridge {
                 trust_score,
                 timestamp,
             ) {
-                if self.lifecycle_registry.deprecate(pattern_id, reason.clone(), timestamp, "auto") {
+                if self
+                    .lifecycle_registry
+                    .deprecate(pattern_id, reason.clone(), timestamp, "auto")
+                {
                     deprecated.push((pattern_id, reason));
                 }
             }
@@ -2217,7 +2406,8 @@ impl SymthaeaCausalBridge {
             .patterns
             .iter()
             .filter(|(id, p)| {
-                p.problem_domain == domain && self.lifecycle_registry.state(**id) == PatternLifecycleState::Active
+                p.problem_domain == domain
+                    && self.lifecycle_registry.state(**id) == PatternLifecycleState::Active
             })
             .collect();
 
@@ -2277,7 +2467,10 @@ impl SymthaeaCausalBridge {
         let reason = LifecycleTransitionReason::Superseded {
             replacement_id: new_pattern_id,
         };
-        if self.lifecycle_registry.deprecate(old_pattern_id, reason, timestamp, "supersede") {
+        if self
+            .lifecycle_registry
+            .deprecate(old_pattern_id, reason, timestamp, "supersede")
+        {
             Ok(())
         } else {
             Err("Failed to deprecate pattern")
@@ -2307,7 +2500,9 @@ impl SymthaeaCausalBridge {
 
     /// Get the current version of a pattern
     pub fn pattern_version(&self, pattern_id: PatternId) -> Option<PatternVersion> {
-        self.version_registry.current_version(pattern_id).map(|v| v.version)
+        self.version_registry
+            .current_version(pattern_id)
+            .map(|v| v.version)
     }
 
     /// Get full version info for a pattern
@@ -2328,15 +2523,17 @@ impl SymthaeaCausalBridge {
         let success_rate = pattern.success_rate;
         let usage_count = pattern.usage_count as u64;
 
-        self.version_registry.evolve(
-            pattern_id,
-            reason,
-            new_solution.into(),
-            success_rate,
-            usage_count,
-            timestamp,
-            creator,
-        ).ok_or("Failed to evolve pattern - no current version found")
+        self.version_registry
+            .evolve(
+                pattern_id,
+                reason,
+                new_solution.into(),
+                success_rate,
+                usage_count,
+                timestamp,
+                creator,
+            )
+            .ok_or("Failed to evolve pattern - no current version found")
     }
 
     /// Get all versions of a pattern
@@ -2364,7 +2561,8 @@ impl SymthaeaCausalBridge {
         if !self.patterns.contains_key(&pattern_id) {
             return Err("Pattern not found");
         }
-        self.version_registry.create_branch(pattern_id, branch_name, timestamp, creator)
+        self.version_registry
+            .create_branch(pattern_id, branch_name, timestamp, creator)
     }
 
     /// Get active branches for a pattern
@@ -2383,7 +2581,8 @@ impl SymthaeaCausalBridge {
         if !self.patterns.contains_key(&pattern_id) {
             return Err("Pattern not found");
         }
-        self.version_registry.merge_branch(pattern_id, branch_name, timestamp, merger)
+        self.version_registry
+            .merge_branch(pattern_id, branch_name, timestamp, merger)
     }
 
     /// Rollback a pattern to a previous version
@@ -2398,22 +2597,25 @@ impl SymthaeaCausalBridge {
         if !self.patterns.contains_key(&pattern_id) {
             return Err("Pattern not found");
         }
-        self.version_registry.rollback(pattern_id, target_version, reason, timestamp, initiator)
+        self.version_registry
+            .rollback(pattern_id, target_version, reason, timestamp, initiator)
     }
 
     /// Get the version lineage (history) for a pattern
     /// Returns (version, parent_version) pairs
-    pub fn pattern_version_lineage(&self, pattern_id: PatternId) -> Vec<(PatternVersion, Option<PatternVersion>)> {
+    pub fn pattern_version_lineage(
+        &self,
+        pattern_id: PatternId,
+    ) -> Vec<(PatternVersion, Option<PatternVersion>)> {
         self.version_registry.version_lineage(pattern_id)
     }
 
     /// Check if a pattern should be auto-versioned based on performance changes
-    pub fn should_auto_version(
-        &self,
-        pattern_id: PatternId,
-        new_success_rate: f32,
-    ) -> bool {
-        self.auto_versioning && self.version_registry.should_auto_version(pattern_id, new_success_rate)
+    pub fn should_auto_version(&self, pattern_id: PatternId, new_success_rate: f32) -> bool {
+        self.auto_versioning
+            && self
+                .version_registry
+                .should_auto_version(pattern_id, new_success_rate)
     }
 
     /// Auto-evolve a pattern if it meets the threshold
@@ -2428,12 +2630,16 @@ impl SymthaeaCausalBridge {
         }
 
         let pattern = self.patterns.get(&pattern_id)?;
-        let old_success_rate = self.version_registry
+        let old_success_rate = self
+            .version_registry
             .current_version(pattern_id)
             .map(|v| v.success_rate_snapshot)
             .unwrap_or(0.0);
 
-        if !self.version_registry.should_auto_version(pattern_id, new_success_rate) {
+        if !self
+            .version_registry
+            .should_auto_version(pattern_id, new_success_rate)
+        {
             return None;
         }
 
@@ -2456,9 +2662,11 @@ impl SymthaeaCausalBridge {
     /// Prune old versions for all patterns
     pub fn prune_pattern_versions(&mut self, current_time: u64) {
         // Get all pattern IDs first to avoid borrow issues
-        let pattern_ids: Vec<PatternId> = self.version_registry.versions().keys().copied().collect();
+        let pattern_ids: Vec<PatternId> =
+            self.version_registry.versions().keys().copied().collect();
         for pattern_id in pattern_ids {
-            self.version_registry.prune_versions(pattern_id, current_time);
+            self.version_registry
+                .prune_versions(pattern_id, current_time);
         }
     }
 
@@ -2479,7 +2687,8 @@ impl SymthaeaCausalBridge {
 
     /// Get patterns with the most versions (potentially over-evolved)
     pub fn patterns_with_many_versions(&self, threshold: usize) -> Vec<(PatternId, usize)> {
-        self.version_registry.versions()
+        self.version_registry
+            .versions()
             .iter()
             .filter_map(|(id, versions)| {
                 if versions.len() >= threshold {
@@ -2493,7 +2702,8 @@ impl SymthaeaCausalBridge {
 
     /// Get patterns that have branches
     pub fn patterns_with_branches(&self) -> Vec<(PatternId, usize)> {
-        self.version_registry.branches()
+        self.version_registry
+            .branches()
             .iter()
             .filter_map(|(id, branches)| {
                 let active = branches.iter().filter(|b| b.is_active).count();
@@ -2595,13 +2805,21 @@ impl SymthaeaCausalBridge {
     }
 
     /// Check if a specific dependency exists between two patterns
-    pub fn has_dependency(&self, from: PatternId, to: PatternId, relation_type: PatternRelationType) -> bool {
-        self.dependency_registry.has_dependency(from, to, relation_type)
+    pub fn has_dependency(
+        &self,
+        from: PatternId,
+        to: PatternId,
+        relation_type: PatternRelationType,
+    ) -> bool {
+        self.dependency_registry
+            .has_dependency(from, to, relation_type)
     }
 
     /// Check if any dependency exists between two patterns
     pub fn has_any_dependency(&self, from: PatternId, to: PatternId) -> bool {
-        !self.dependency_registry.dependencies_from(from)
+        !self
+            .dependency_registry
+            .dependencies_from(from)
             .iter()
             .filter(|d| d.to_pattern == to)
             .collect::<Vec<_>>()
@@ -2619,8 +2837,13 @@ impl SymthaeaCausalBridge {
     }
 
     /// Get all dependencies of a specific type from a pattern
-    pub fn dependencies_by_type(&self, pattern_id: PatternId, relation_type: PatternRelationType) -> Vec<&PatternDependency> {
-        self.dependency_registry.dependencies_of_type(pattern_id, relation_type)
+    pub fn dependencies_by_type(
+        &self,
+        pattern_id: PatternId,
+        relation_type: PatternRelationType,
+    ) -> Vec<&PatternDependency> {
+        self.dependency_registry
+            .dependencies_of_type(pattern_id, relation_type)
     }
 
     /// Get required patterns for a given pattern
@@ -2639,8 +2862,13 @@ impl SymthaeaCausalBridge {
     }
 
     /// Resolve all dependencies for a pattern (transitive)
-    pub fn resolve_dependencies(&self, pattern_id: PatternId, active_patterns: &[PatternId]) -> DependencyResolution {
-        self.dependency_registry.resolve(pattern_id, active_patterns)
+    pub fn resolve_dependencies(
+        &self,
+        pattern_id: PatternId,
+        active_patterns: &[PatternId],
+    ) -> DependencyResolution {
+        self.dependency_registry
+            .resolve(pattern_id, active_patterns)
     }
 
     /// Resolve dependencies with empty active patterns
@@ -2660,7 +2888,8 @@ impl SymthaeaCausalBridge {
         was_successful: bool,
         timestamp: u64,
     ) {
-        self.dependency_registry.record_usage(patterns_used, was_successful, timestamp);
+        self.dependency_registry
+            .record_usage(patterns_used, was_successful, timestamp);
     }
 
     /// Record two patterns used together
@@ -2671,12 +2900,14 @@ impl SymthaeaCausalBridge {
         was_successful: bool,
         timestamp: u64,
     ) {
-        self.dependency_registry.record_usage(&[first, second], was_successful, timestamp);
+        self.dependency_registry
+            .record_usage(&[first, second], was_successful, timestamp);
     }
 
     /// Get discovered dependencies
     pub fn discovered_dependencies(&self) -> Vec<&PatternDependency> {
-        self.dependency_registry.all_dependencies()
+        self.dependency_registry
+            .all_dependencies()
             .iter()
             .filter(|d| d.is_discovered)
             .collect()
@@ -2723,7 +2954,11 @@ impl SymthaeaCausalBridge {
     }
 
     /// Check if a pattern can be used (all dependencies satisfied)
-    pub fn can_use_pattern(&self, pattern_id: PatternId, used_patterns: &[PatternId]) -> Result<(), Vec<DependencyIssue>> {
+    pub fn can_use_pattern(
+        &self,
+        pattern_id: PatternId,
+        used_patterns: &[PatternId],
+    ) -> Result<(), Vec<DependencyIssue>> {
         if !self.enforce_dependencies {
             return Ok(());
         }
@@ -2734,7 +2969,8 @@ impl SymthaeaCausalBridge {
         let mut issues = resolution.issues;
 
         // Check if all prerequisites have been used
-        let missing_prereqs: Vec<DependencyIssue> = resolution.prerequisites
+        let missing_prereqs: Vec<DependencyIssue> = resolution
+            .prerequisites
             .iter()
             .filter(|p| !used_patterns.contains(p))
             .map(|p| DependencyIssue {
@@ -2746,7 +2982,8 @@ impl SymthaeaCausalBridge {
             .collect();
 
         // Check if any conflicting patterns have been used
-        let conflicts: Vec<DependencyIssue> = resolution.conflicts
+        let conflicts: Vec<DependencyIssue> = resolution
+            .conflicts
             .iter()
             .filter(|c| used_patterns.contains(c))
             .map(|c| DependencyIssue {
@@ -2775,7 +3012,8 @@ impl SymthaeaCausalBridge {
             *counts.entry(dep.from_pattern).or_insert(0) += 1;
         }
 
-        counts.into_iter()
+        counts
+            .into_iter()
             .filter(|(_, count)| *count >= threshold)
             .collect()
     }
@@ -2788,7 +3026,8 @@ impl SymthaeaCausalBridge {
             *counts.entry(dep.to_pattern).or_insert(0) += 1;
         }
 
-        counts.into_iter()
+        counts
+            .into_iter()
             .filter(|(_, count)| *count >= threshold)
             .collect()
     }
@@ -2968,17 +3207,29 @@ impl CalibrationBucket {
 
     /// Get average predicted value in this bucket
     pub fn avg_predicted(&self) -> f32 {
-        if self.count == 0 { 0.0 } else { self.predicted_sum / self.count as f32 }
+        if self.count == 0 {
+            0.0
+        } else {
+            self.predicted_sum / self.count as f32
+        }
     }
 
     /// Get average actual value in this bucket
     pub fn avg_actual(&self) -> f32 {
-        if self.count == 0 { 0.0 } else { self.actual_sum / self.count as f32 }
+        if self.count == 0 {
+            0.0
+        } else {
+            self.actual_sum / self.count as f32
+        }
     }
 
     /// Get calibration error for this bucket
     pub fn calibration_error(&self) -> f32 {
-        if self.count == 0 { 0.0 } else { (self.avg_predicted() - self.avg_actual()).abs() }
+        if self.count == 0 {
+            0.0
+        } else {
+            (self.avg_predicted() - self.avg_actual()).abs()
+        }
     }
 }
 
@@ -3057,7 +3308,9 @@ impl CalibrationCurve {
         }
 
         // Average calibration error across buckets with data
-        let (total_error, count) = self.buckets.iter()
+        let (total_error, count) = self
+            .buckets
+            .iter()
             .filter(|b| b.count > 0)
             .fold((0.0, 0), |(sum, cnt), b| {
                 (sum + b.calibration_error(), cnt + 1)
@@ -3087,7 +3340,8 @@ impl CalibrationCurve {
 
     /// Get reliability diagram data for visualization
     pub fn reliability_diagram(&self) -> Vec<(f32, f32, u32)> {
-        self.buckets.iter()
+        self.buckets
+            .iter()
             .filter(|b| b.count > 0)
             .map(|b| {
                 let midpoint = (b.confidence_min + b.confidence_max) / 2.0;
@@ -3209,11 +3463,15 @@ impl CounterfactualAnalysis {
         }
 
         // Regret = (best possible - actual) / (best possible - worst possible)
-        let best_outcome = self.alternatives.iter()
+        let best_outcome = self
+            .alternatives
+            .iter()
             .map(|a| a.estimated_outcome)
             .fold(self.actual_outcome, f32::max);
 
-        let worst_outcome = self.alternatives.iter()
+        let worst_outcome = self
+            .alternatives
+            .iter()
             .map(|a| a.estimated_outcome)
             .fold(self.actual_outcome, f32::min);
 
@@ -3409,7 +3667,9 @@ impl ExperimentPlanner {
 
         // Sort by priority (highest first)
         self.pending_experiments.sort_by(|a, b| {
-            b.priority.partial_cmp(&a.priority).unwrap_or(std::cmp::Ordering::Equal)
+            b.priority
+                .partial_cmp(&a.priority)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
 
         Some(id)
@@ -3417,7 +3677,9 @@ impl ExperimentPlanner {
 
     /// Get the next experiment to run (respecting max concurrent)
     pub fn next_experiment(&self) -> Option<&ExperimentPlan> {
-        let running = self.pending_experiments.iter()
+        let running = self
+            .pending_experiments
+            .iter()
             .filter(|e| !e.completed)
             .count();
 
@@ -3425,7 +3687,8 @@ impl ExperimentPlanner {
             return None;
         }
 
-        self.pending_experiments.iter()
+        self.pending_experiments
+            .iter()
             .find(|e| !e.completed && self.can_auto_approve(e))
     }
 
@@ -3450,7 +3713,9 @@ impl ExperimentPlanner {
         insights: &str,
         timestamp: u64,
     ) -> bool {
-        let idx = self.pending_experiments.iter()
+        let idx = self
+            .pending_experiments
+            .iter()
             .position(|e| e.id == experiment_id);
 
         if let Some(idx) = idx {
@@ -3483,7 +3748,8 @@ impl ExperimentPlanner {
 
     /// Get experiments for a specific pattern
     pub fn experiments_for_pattern(&self, pattern_id: PatternId) -> Vec<&ExperimentPlan> {
-        self.pending_experiments.iter()
+        self.pending_experiments
+            .iter()
             .chain(self.completed_experiments.iter())
             .filter(|e| e.pattern_id == pattern_id)
             .collect()
@@ -3569,29 +3835,49 @@ impl PatternCooccurrence {
 
     fn a_then_b_rate(&self) -> f32 {
         let total = self.a_then_b_success + self.a_then_b_fail;
-        if total == 0 { 0.5 } else { self.a_then_b_success as f32 / total as f32 }
+        if total == 0 {
+            0.5
+        } else {
+            self.a_then_b_success as f32 / total as f32
+        }
     }
 
     fn b_then_a_rate(&self) -> f32 {
         let total = self.b_then_a_success + self.b_then_a_fail;
-        if total == 0 { 0.5 } else { self.b_then_a_success as f32 / total as f32 }
+        if total == 0 {
+            0.5
+        } else {
+            self.b_then_a_success as f32 / total as f32
+        }
     }
 
     fn a_alone_rate(&self) -> f32 {
         let total = self.a_alone_success + self.a_alone_fail;
-        if total == 0 { 0.5 } else { self.a_alone_success as f32 / total as f32 }
+        if total == 0 {
+            0.5
+        } else {
+            self.a_alone_success as f32 / total as f32
+        }
     }
 
     fn b_alone_rate(&self) -> f32 {
         let total = self.b_alone_success + self.b_alone_fail;
-        if total == 0 { 0.5 } else { self.b_alone_success as f32 / total as f32 }
+        if total == 0 {
+            0.5
+        } else {
+            self.b_alone_success as f32 / total as f32
+        }
     }
 
     fn total_observations(&self) -> u32 {
-        self.a_then_b_success + self.a_then_b_fail +
-        self.b_then_a_success + self.b_then_a_fail +
-        self.a_alone_success + self.a_alone_fail +
-        self.b_alone_success + self.b_alone_fail
+        self.a_then_b_success
+            + self.a_then_b_fail
+            + self.b_then_a_success
+            + self.b_then_a_fail
+            + self.a_alone_success
+            + self.a_alone_fail
+            + self.b_alone_success
+            + self.b_alone_fail
     }
 }
 
@@ -3648,7 +3934,9 @@ impl CausalDiscovery {
     pub fn record_usage(&mut self, pattern_id: PatternId, success: bool, timestamp: u64) {
         // Look for recent patterns (within 1 hour)
         let recent_threshold = timestamp.saturating_sub(3600);
-        let recent_patterns: Vec<(PatternId, bool)> = self.session_history.iter()
+        let recent_patterns: Vec<(PatternId, bool)> = self
+            .session_history
+            .iter()
             .filter(|(_, _, t)| *t > recent_threshold && *t < timestamp)
             .map(|(p, s, _)| (*p, *s))
             .collect();
@@ -3660,19 +3948,26 @@ impl CausalDiscovery {
             }
 
             let key = ((*recent_id).min(pattern_id), (*recent_id).max(pattern_id));
-            let entry = self.cooccurrences
+            let entry = self
+                .cooccurrences
                 .entry(key)
                 .or_insert_with(|| PatternCooccurrence::new(*recent_id, pattern_id));
 
             // Record sequence
             if *recent_id < pattern_id {
                 // A then B
-                if success { entry.a_then_b_success += 1; }
-                else { entry.a_then_b_fail += 1; }
+                if success {
+                    entry.a_then_b_success += 1;
+                } else {
+                    entry.a_then_b_fail += 1;
+                }
             } else {
                 // B then A
-                if success { entry.b_then_a_success += 1; }
-                else { entry.b_then_a_fail += 1; }
+                if success {
+                    entry.b_then_a_success += 1;
+                } else {
+                    entry.b_then_a_fail += 1;
+                }
             }
         }
 
@@ -3681,11 +3976,17 @@ impl CausalDiscovery {
             // Find all patterns this could be "alone" for
             for (key, cooc) in &mut self.cooccurrences {
                 if key.0 == pattern_id {
-                    if success { cooc.a_alone_success += 1; }
-                    else { cooc.a_alone_fail += 1; }
+                    if success {
+                        cooc.a_alone_success += 1;
+                    } else {
+                        cooc.a_alone_fail += 1;
+                    }
                 } else if key.1 == pattern_id {
-                    if success { cooc.b_alone_success += 1; }
-                    else { cooc.b_alone_fail += 1; }
+                    if success {
+                        cooc.b_alone_success += 1;
+                    } else {
+                        cooc.b_alone_fail += 1;
+                    }
                 }
             }
         }
@@ -3732,7 +4033,9 @@ impl CausalDiscovery {
                     };
 
                     // Check if we already have this dependency
-                    let exists = self.dependencies.iter()
+                    let exists = self
+                        .dependencies
+                        .iter()
                         .any(|d| d.prerequisite_id == *a && d.dependent_id == *b);
 
                     if !exists {
@@ -3759,7 +4062,9 @@ impl CausalDiscovery {
                         discovered_at: timestamp,
                     };
 
-                    let exists = self.dependencies.iter()
+                    let exists = self
+                        .dependencies
+                        .iter()
                         .any(|d| d.prerequisite_id == *b && d.dependent_id == *a);
 
                     if !exists {
@@ -3779,14 +4084,14 @@ impl CausalDiscovery {
                     let confidence = 0.7; // Lower confidence for synergy
 
                     // Record as synergistic
-                    let exists = self.dependencies.iter()
-                        .any(|d| {
-                            d.dependency_type == DependencyType::Synergistic &&
-                            ((d.prerequisite_id == *a && d.dependent_id == *b) ||
-                             (d.prerequisite_id == *b && d.dependent_id == *a))
-                        });
+                    let exists = self.dependencies.iter().any(|d| {
+                        d.dependency_type == DependencyType::Synergistic
+                            && ((d.prerequisite_id == *a && d.dependent_id == *b)
+                                || (d.prerequisite_id == *b && d.dependent_id == *a))
+                    });
 
-                    if !exists && strength >= self.min_strength && confidence >= self.min_confidence {
+                    if !exists && strength >= self.min_strength && confidence >= self.min_confidence
+                    {
                         let dep = CausalPatternDependency {
                             prerequisite_id: *a,
                             dependent_id: *b,
@@ -3807,12 +4112,11 @@ impl CausalDiscovery {
                 let strength = alone_rate - combined_rate;
                 let confidence = 0.6;
 
-                let exists = self.dependencies.iter()
-                    .any(|d| {
-                        d.dependency_type == DependencyType::Conflicting &&
-                        ((d.prerequisite_id == *a && d.dependent_id == *b) ||
-                         (d.prerequisite_id == *b && d.dependent_id == *a))
-                    });
+                let exists = self.dependencies.iter().any(|d| {
+                    d.dependency_type == DependencyType::Conflicting
+                        && ((d.prerequisite_id == *a && d.dependent_id == *b)
+                            || (d.prerequisite_id == *b && d.dependent_id == *a))
+                });
 
                 if !exists && strength >= self.min_strength && confidence >= self.min_confidence {
                     let dep = CausalPatternDependency {
@@ -3835,24 +4139,29 @@ impl CausalDiscovery {
 
     /// Get dependencies for a specific pattern
     pub fn dependencies_for(&self, pattern_id: PatternId) -> Vec<&CausalPatternDependency> {
-        self.dependencies.iter()
+        self.dependencies
+            .iter()
             .filter(|d| d.prerequisite_id == pattern_id || d.dependent_id == pattern_id)
             .collect()
     }
 
     /// Get prerequisites for a pattern
     pub fn prerequisites_for(&self, pattern_id: PatternId) -> Vec<&CausalPatternDependency> {
-        self.dependencies.iter()
-            .filter(|d| d.dependent_id == pattern_id && d.dependency_type == DependencyType::Sequential)
+        self.dependencies
+            .iter()
+            .filter(|d| {
+                d.dependent_id == pattern_id && d.dependency_type == DependencyType::Sequential
+            })
             .collect()
     }
 
     /// Get patterns that conflict with a given pattern
     pub fn conflicts_with(&self, pattern_id: PatternId) -> Vec<&CausalPatternDependency> {
-        self.dependencies.iter()
+        self.dependencies
+            .iter()
             .filter(|d| {
-                d.dependency_type == DependencyType::Conflicting &&
-                (d.prerequisite_id == pattern_id || d.dependent_id == pattern_id)
+                d.dependency_type == DependencyType::Conflicting
+                    && (d.prerequisite_id == pattern_id || d.dependent_id == pattern_id)
             })
             .collect()
     }
@@ -3872,8 +4181,10 @@ impl CausalDiscovery {
     ) {
         // Check if we already have this dependency
         let exists = self.dependencies.iter().any(|d| {
-            (d.prerequisite_id == pattern_a && d.dependent_id == pattern_b) ||
-            (d.prerequisite_id == pattern_b && d.dependent_id == pattern_a && dep_type != DependencyType::Sequential)
+            (d.prerequisite_id == pattern_a && d.dependent_id == pattern_b)
+                || (d.prerequisite_id == pattern_b
+                    && d.dependent_id == pattern_a
+                    && dep_type != DependencyType::Sequential)
         });
 
         if !exists {
@@ -3907,7 +4218,8 @@ impl SymthaeaCausalBridge {
 
         let decay_factor = decay_config.calculate_decay(pattern.last_used, current_time);
         let effective_rate = pattern.success_rate * decay_factor;
-        let days_since = (current_time.saturating_sub(pattern.last_used)) as f32 / (24.0 * 60.0 * 60.0);
+        let days_since =
+            (current_time.saturating_sub(pattern.last_used)) as f32 / (24.0 * 60.0 * 60.0);
         let is_stale = decay_config.is_stale(pattern.last_used, current_time);
 
         Some(PatternDecayStatus {
@@ -3927,7 +4239,8 @@ impl SymthaeaCausalBridge {
         current_time: u64,
         decay_config: &TemporalDecayConfig,
     ) -> Vec<PatternDecayStatus> {
-        self.patterns.keys()
+        self.patterns
+            .keys()
             .filter_map(|id| self.get_pattern_with_decay(*id, current_time, decay_config))
             .filter(|status| status.needs_revalidation)
             .collect()
@@ -3941,20 +4254,18 @@ impl SymthaeaCausalBridge {
         context: &str,
         timestamp: u64,
     ) -> CounterfactualAnalysis {
-        let mut analysis = CounterfactualAnalysis::new(
-            used_pattern_id,
-            actual_outcome,
-            context,
-            timestamp,
-        );
+        let mut analysis =
+            CounterfactualAnalysis::new(used_pattern_id, actual_outcome, context, timestamp);
 
         // Find alternative patterns in the same problem domain
         if let Some(used_pattern) = self.patterns.get(&used_pattern_id) {
-            let alternatives: Vec<_> = self.patterns.values()
+            let alternatives: Vec<_> = self
+                .patterns
+                .values()
                 .filter(|p| {
-                    p.pattern_id != used_pattern_id &&
-                    p.problem_domain == used_pattern.problem_domain &&
-                    p.usage_count > 0
+                    p.pattern_id != used_pattern_id
+                        && p.problem_domain == used_pattern.problem_domain
+                        && p.usage_count > 0
                 })
                 .collect();
 
@@ -3998,8 +4309,9 @@ impl SymthaeaCausalBridge {
             }
 
             // Assess risk based on pattern domain
-            let risk = if pattern.problem_domain.contains("critical") ||
-                        pattern.problem_domain.contains("security") {
+            let risk = if pattern.problem_domain.contains("critical")
+                || pattern.problem_domain.contains("security")
+            {
                 RiskLevel::High
             } else if pattern.problem_domain.contains("production") {
                 RiskLevel::Medium
@@ -4077,9 +4389,12 @@ impl SymthaeaCausalBridge {
         domain: &str,
         current_time: u64,
     ) -> Option<PatternDecayStatus> {
-        self.patterns.values()
+        self.patterns
+            .values()
             .filter(|p| p.problem_domain == domain)
-            .filter_map(|p| self.get_pattern_with_decay(p.pattern_id, current_time, &self.temporal_decay))
+            .filter_map(|p| {
+                self.get_pattern_with_decay(p.pattern_id, current_time, &self.temporal_decay)
+            })
             .filter(|status| !status.is_stale)
             .max_by(|a, b| {
                 a.effective_success_rate
@@ -4106,7 +4421,11 @@ impl SymthaeaCausalBridge {
     ///
     /// # Returns
     /// `Some(PatternExplanation)` if the pattern exists, `None` otherwise.
-    pub fn explain_pattern(&mut self, pattern_id: PatternId, timestamp: u64) -> Option<PatternExplanation> {
+    pub fn explain_pattern(
+        &mut self,
+        pattern_id: PatternId,
+        timestamp: u64,
+    ) -> Option<PatternExplanation> {
         let pattern = self.patterns.get(&pattern_id)?.clone();
 
         Some(self.explainability.explain_pattern(
@@ -4128,7 +4447,11 @@ impl SymthaeaCausalBridge {
     ///
     /// # Returns
     /// `Some(String)` with the formatted explanation, or `None` if pattern not found.
-    pub fn explain_recommendation(&mut self, pattern_id: PatternId, timestamp: u64) -> Option<String> {
+    pub fn explain_recommendation(
+        &mut self,
+        pattern_id: PatternId,
+        timestamp: u64,
+    ) -> Option<String> {
         let explanation = self.explain_pattern(pattern_id, timestamp)?;
         Some(self.explainability.explain_recommendation(&explanation))
     }
@@ -4140,7 +4463,11 @@ impl SymthaeaCausalBridge {
     ///
     /// # Returns
     /// `Some(String)` with the user-friendly explanation, or `None` if pattern not found.
-    pub fn why_pattern_recommended(&mut self, pattern_id: PatternId, timestamp: u64) -> Option<String> {
+    pub fn why_pattern_recommended(
+        &mut self,
+        pattern_id: PatternId,
+        timestamp: u64,
+    ) -> Option<String> {
         let explanation = self.explain_pattern(pattern_id, timestamp)?;
         Some(explanation.format_full())
     }
@@ -4227,14 +4554,21 @@ impl SymthaeaCausalBridge {
             timestamp,
         );
 
-        Some(self.explainability.generate_improvement_plan(&pattern, &explanation, timestamp))
+        Some(
+            self.explainability
+                .generate_improvement_plan(&pattern, &explanation, timestamp),
+        )
     }
 
     /// Get quick wins for improving a pattern
     ///
     /// Returns a list of easy, high-impact actions that can be taken
     /// immediately to improve the pattern's recommendation.
-    pub fn get_quick_wins(&mut self, pattern_id: PatternId, timestamp: u64) -> Vec<ActionSuggestion> {
+    pub fn get_quick_wins(
+        &mut self,
+        pattern_id: PatternId,
+        timestamp: u64,
+    ) -> Vec<ActionSuggestion> {
         self.generate_improvement_plan(pattern_id, timestamp)
             .map(|plan| plan.quick_wins().into_iter().cloned().collect())
             .unwrap_or_default()
@@ -4259,7 +4593,11 @@ impl SymthaeaCausalBridge {
     ///
     /// Returns a human-readable string describing what needs to change
     /// and what actions to take to improve the pattern's recommendation.
-    pub fn format_improvement_plan(&mut self, pattern_id: PatternId, timestamp: u64) -> Option<String> {
+    pub fn format_improvement_plan(
+        &mut self,
+        pattern_id: PatternId,
+        timestamp: u64,
+    ) -> Option<String> {
         self.generate_improvement_plan(pattern_id, timestamp)
             .map(|plan| plan.format())
     }
@@ -4285,12 +4623,10 @@ impl SymthaeaCausalBridge {
     ///
     /// Synthesizes signals from all components (trust, lifecycle, collective,
     /// calibration, dependencies, domain relevance) to recommend optimal patterns.
-    pub fn get_recommendations(
-        &mut self,
-        context: RecommendationContext,
-    ) -> RecommendationSet {
+    pub fn get_recommendations(&mut self, context: RecommendationContext) -> RecommendationSet {
         // Build pattern signals from all sources
-        let patterns_with_signals: Vec<(PatternId, PatternSignals)> = self.patterns
+        let patterns_with_signals: Vec<(PatternId, PatternSignals)> = self
+            .patterns
             .iter()
             .map(|(&pattern_id, pattern)| {
                 let signals = self.build_pattern_signals(pattern_id, pattern, &context);
@@ -4298,7 +4634,8 @@ impl SymthaeaCausalBridge {
             })
             .collect();
 
-        self.recommendations.generate_recommendations(&patterns_with_signals, &context)
+        self.recommendations
+            .generate_recommendations(&patterns_with_signals, &context)
     }
 
     /// Build signals for a pattern from all component sources
@@ -4316,35 +4653,47 @@ impl SymthaeaCausalBridge {
         let lifecycle_state = self.lifecycle_registry.state(pattern_id);
 
         // Get collective modifier
-        let collective_modifier = self.collective_registry
+        let collective_modifier = self
+            .collective_registry
             .get(pattern_id)
             .map(|ctx| ctx.collective_modifier)
             .unwrap_or(0.0);
 
         let collective_ctx = self.collective_registry.get(pattern_id);
-        let is_emergent = collective_ctx.map(|c| c.independent_discoveries >= 3).unwrap_or(false);
-        let resolves_tension = collective_ctx.map(|c| c.tension_resolutions > c.tension_increases).unwrap_or(false);
+        let is_emergent = collective_ctx
+            .map(|c| c.independent_discoveries >= 3)
+            .unwrap_or(false);
+        let resolves_tension = collective_ctx
+            .map(|c| c.tension_resolutions > c.tension_increases)
+            .unwrap_or(false);
 
         // Get calibration accuracy
         let calibration_accuracy = self.calibration.calibration_quality();
 
         // Get dependency satisfaction
-        let resolution = self.dependency_registry.resolve(pattern_id, &context.active_patterns);
+        let resolution = self
+            .dependency_registry
+            .resolve(pattern_id, &context.active_patterns);
         let total_deps = resolution.prerequisites.len() + resolution.required.len();
-        let satisfied_deps = resolution.prerequisites.len() + resolution.required.len() - resolution.issues.len();
+        let satisfied_deps =
+            resolution.prerequisites.len() + resolution.required.len() - resolution.issues.len();
         let dependencies_satisfied = if total_deps > 0 {
             satisfied_deps as f32 / total_deps as f32
         } else {
             1.0
         };
-        let has_unmet_requirements = resolution.issues.iter()
+        let has_unmet_requirements = resolution
+            .issues
+            .iter()
             .any(|i| matches!(i.issue_type, DependencyIssueType::MissingRequired));
 
         // Get domain relevance
         let domain_relevance = if context.target_domains.is_empty() {
             0.5 // Neutral if no target domains
         } else {
-            let matches = pattern.domain_ids.iter()
+            let matches = pattern
+                .domain_ids
+                .iter()
                 .filter(|d| context.target_domains.contains(d))
                 .count();
             if pattern.domain_ids.is_empty() {
@@ -4389,7 +4738,10 @@ impl SymthaeaCausalBridge {
     }
 
     /// Get the single best pattern for a context
-    pub fn best_pattern(&mut self, context: RecommendationContext) -> Option<PatternRecommendation> {
+    pub fn best_pattern(
+        &mut self,
+        context: RecommendationContext,
+    ) -> Option<PatternRecommendation> {
         self.get_recommendations(context).top().cloned()
     }
 
@@ -4403,8 +4755,10 @@ impl SymthaeaCausalBridge {
     pub fn record_metrics_for_anomaly_detection(&mut self, timestamp: u64) {
         // Record success rates for all patterns
         for (&pattern_id, pattern) in &self.patterns {
-            self.anomaly_detector.record_success_rate(pattern_id, pattern.success_rate, timestamp);
-            self.anomaly_detector.record_usage(pattern_id, pattern.usage_count, timestamp);
+            self.anomaly_detector
+                .record_success_rate(pattern_id, pattern.success_rate, timestamp);
+            self.anomaly_detector
+                .record_usage(pattern_id, pattern.usage_count, timestamp);
         }
 
         // Record trust scores - we get agents from patterns
@@ -4412,18 +4766,21 @@ impl SymthaeaCausalBridge {
         for pattern in self.patterns.values() {
             if !recorded_agents.contains(&pattern.learned_by) {
                 let trust = self.trust_registry.trust_score(pattern.learned_by);
-                self.anomaly_detector.record_trust(pattern.learned_by, trust, timestamp);
+                self.anomaly_detector
+                    .record_trust(pattern.learned_by, trust, timestamp);
                 recorded_agents.insert(pattern.learned_by);
             }
         }
 
         // Record calibration
-        self.anomaly_detector.record_calibration(self.calibration.calibration_quality(), timestamp);
+        self.anomaly_detector
+            .record_calibration(self.calibration.calibration_quality(), timestamp);
 
         // Record system health
         let health = self.health_report();
         let health_score = health.average_pattern_success.max(0.0).min(1.0);
-        self.anomaly_detector.record_system_health(health_score, timestamp);
+        self.anomaly_detector
+            .record_system_health(health_score, timestamp);
     }
 
     /// Run anomaly detection on all patterns
@@ -4434,7 +4791,10 @@ impl SymthaeaCausalBridge {
 
         // Check each pattern for success rate anomalies
         for &pattern_id in self.patterns.keys() {
-            if let Some(anomaly) = self.anomaly_detector.detect_success_rate_anomaly(pattern_id, timestamp) {
+            if let Some(anomaly) = self
+                .anomaly_detector
+                .detect_success_rate_anomaly(pattern_id, timestamp)
+            {
                 anomalies.push(anomaly);
             }
         }
@@ -4445,7 +4805,10 @@ impl SymthaeaCausalBridge {
         }
 
         // Check for system health decline
-        if let Some(anomaly) = self.anomaly_detector.detect_system_health_decline(timestamp) {
+        if let Some(anomaly) = self
+            .anomaly_detector
+            .detect_system_health_decline(timestamp)
+        {
             anomalies.push(anomaly);
         }
 
@@ -4518,18 +4881,23 @@ impl SymthaeaCausalBridge {
         timestamp: u64,
     ) -> Option<u64> {
         // Validate both patterns exist
-        if !self.patterns.contains_key(&predecessor_id) || !self.patterns.contains_key(&successor_id) {
+        if !self.patterns.contains_key(&predecessor_id)
+            || !self.patterns.contains_key(&successor_id)
+        {
             return None;
         }
 
         let declared_by = self.symthaea_id.unwrap_or(0);
-        let mut succession = self.succession_manager.declare_succession(
-            predecessor_id,
-            successor_id,
-            reason.clone(),
-            declared_by,
-            timestamp,
-        ).with_explanation(explanation);
+        let mut succession = self
+            .succession_manager
+            .declare_succession(
+                predecessor_id,
+                successor_id,
+                reason.clone(),
+                declared_by,
+                timestamp,
+            )
+            .with_explanation(explanation);
 
         // Add affected domains
         if let Some(pattern) = self.patterns.get(&predecessor_id) {
@@ -4541,7 +4909,8 @@ impl SymthaeaCausalBridge {
         // Create migration plan for dependents
         let dependents = self.dependency_registry.dependents(predecessor_id);
         if !dependents.is_empty() {
-            self.succession_manager.create_migration_plan(succession_id, dependents, timestamp);
+            self.succession_manager
+                .create_migration_plan(succession_id, dependents, timestamp);
         }
 
         // Deprecate predecessor if succession is active
@@ -4555,7 +4924,9 @@ impl SymthaeaCausalBridge {
                 };
                 self.lifecycle_registry.deprecate(
                     predecessor_id,
-                    LifecycleTransitionReason::Superseded { replacement_id: successor_id },
+                    LifecycleTransitionReason::Superseded {
+                        replacement_id: successor_id,
+                    },
                     timestamp,
                     initiator,
                 );
@@ -4586,7 +4957,8 @@ impl SymthaeaCausalBridge {
         succession_id: u64,
         pattern_id: PatternId,
     ) -> Option<MigrationInstruction> {
-        self.succession_manager.generate_migration_instruction(succession_id, pattern_id)
+        self.succession_manager
+            .generate_migration_instruction(succession_id, pattern_id)
     }
 
     /// Complete a succession
@@ -4596,7 +4968,9 @@ impl SymthaeaCausalBridge {
             if let Some(succession) = self.succession_manager.get_succession(succession_id) {
                 self.lifecycle_registry.retire(
                     succession.predecessor_id,
-                    LifecycleTransitionReason::Superseded { replacement_id: succession.successor_id },
+                    LifecycleTransitionReason::Superseded {
+                        replacement_id: succession.successor_id,
+                    },
                     timestamp,
                     "Succession completed",
                 );
@@ -4626,7 +5000,8 @@ impl SymthaeaCausalBridge {
     /// Call this when a pattern is learned to enable similarity matching.
     pub fn register_pattern_for_similarity(&mut self, pattern_id: PatternId, timestamp: u64) {
         if let Some(pattern) = self.patterns.get(&pattern_id) {
-            self.similarity_registry.register_pattern(pattern, timestamp);
+            self.similarity_registry
+                .register_pattern(pattern, timestamp);
         }
     }
 
@@ -4639,7 +5014,8 @@ impl SymthaeaCausalBridge {
         min_similarity: f32,
         timestamp: u64,
     ) -> Vec<SimilarityScore> {
-        self.similarity_registry.find_similar(pattern_id, min_similarity, timestamp)
+        self.similarity_registry
+            .find_similar(pattern_id, min_similarity, timestamp)
     }
 
     /// Get similarity between two specific patterns
@@ -4649,7 +5025,8 @@ impl SymthaeaCausalBridge {
         pattern_b: PatternId,
         timestamp: u64,
     ) -> Option<SimilarityScore> {
-        self.similarity_registry.get_similarity(pattern_a, pattern_b, timestamp)
+        self.similarity_registry
+            .get_similarity(pattern_a, pattern_b, timestamp)
     }
 
     /// Detect potential duplicate patterns
@@ -4707,7 +5084,8 @@ impl SymthaeaCausalBridge {
         let action = format!("use_pattern_{}", pattern_id);
         let outcome = if success { 1.0 } else { -0.5 };
 
-        self.associative_learner.learn(&context_pairs, &action, outcome, timestamp);
+        self.associative_learner
+            .learn(&context_pairs, &action, outcome, timestamp);
     }
 
     /// Predict best patterns for a given context using HDC
@@ -4722,8 +5100,7 @@ impl SymthaeaCausalBridge {
             return Vec::new();
         }
 
-        let mut context = WisdomContext::new()
-            .with_domain(domain_id);
+        let mut context = WisdomContext::new().with_domain(domain_id);
 
         if let Some(anomaly) = anomaly_type {
             context = context.with_anomaly(anomaly);
@@ -4733,7 +5110,8 @@ impl SymthaeaCausalBridge {
         let predictions = self.associative_learner.predict(&context_pairs);
 
         // Convert action names back to pattern IDs
-        predictions.into_iter()
+        predictions
+            .into_iter()
             .filter_map(|pred| {
                 // Parse pattern ID from action name "use_pattern_X"
                 pred.action
@@ -4748,10 +5126,10 @@ impl SymthaeaCausalBridge {
     ///
     /// Returns a similarity score where higher = more similar to success cases.
     pub fn context_experience_similarity(&mut self, domain_id: u64) -> f32 {
-        let context = WisdomContext::new()
-            .with_domain(domain_id);
+        let context = WisdomContext::new().with_domain(domain_id);
         let context_pairs = context.build();
-        self.associative_learner.query_experience_similarity(&context_pairs)
+        self.associative_learner
+            .query_experience_similarity(&context_pairs)
     }
 
     /// Register an action type for HDC learning
@@ -4794,7 +5172,11 @@ impl SymthaeaCausalBridge {
     /// 1. Registers for similarity analysis
     /// 2. Checks for duplicates
     /// 3. Prepares HDC learning actions
-    pub fn enhanced_on_pattern_learned(&mut self, pattern: SymthaeaPattern, timestamp: u64) -> PatternId {
+    pub fn enhanced_on_pattern_learned(
+        &mut self,
+        pattern: SymthaeaPattern,
+        timestamp: u64,
+    ) -> PatternId {
         let pattern_id = self.on_pattern_learned(pattern);
 
         // Register for similarity
@@ -4803,8 +5185,7 @@ impl SymthaeaCausalBridge {
         // Check for duplicates if enabled
         if self.auto_detect_duplicates {
             let duplicates = self.similarity_registry.find_similar(
-                pattern_id,
-                0.85, // High threshold for duplicates
+                pattern_id, 0.85, // High threshold for duplicates
                 timestamp,
             );
 
@@ -4868,7 +5249,10 @@ impl SymthaeaCausalBridge {
             success_rate: pattern.success_rate,
             usage_count: pattern.usage_count,
             explanation,
-            similar_patterns: similar.into_iter().map(|s| (s.pattern_b, s.overall)).collect(),
+            similar_patterns: similar
+                .into_iter()
+                .map(|s| (s.pattern_b, s.overall))
+                .collect(),
             cluster_id: cluster.map(|c| c.cluster_id),
             hdc_confidence,
             lifecycle_state: Some(self.lifecycle_registry.state(pattern_id)),
@@ -4936,4 +5320,3 @@ pub struct EnhancedHealthReport {
     /// Number of completed experiments
     pub completed_experiments: usize,
 }
-

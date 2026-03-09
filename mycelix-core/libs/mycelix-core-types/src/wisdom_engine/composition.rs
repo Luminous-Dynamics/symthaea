@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use std::collections::HashMap;
 
-use super::{CompositeId, PatternId, DomainId, SymthaeaId};
+use super::{CompositeId, DomainId, PatternId, SymthaeaId};
 
 // ==============================================================================
 // COMPONENT 11: PATTERN COMPOSITION - Combining Patterns for Synergy
@@ -446,4 +446,3 @@ impl CompositionStats {
         self.auto_discovered_composites as f32 / self.total_composites as f32
     }
 }
-

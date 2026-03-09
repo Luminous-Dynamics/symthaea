@@ -36,21 +36,21 @@
 //! - `similarity` - Pattern similarity metrics and clustering
 //! - `associative_learner` - HDC-grounded associative learning
 
-pub mod core;
-pub mod domain;
-pub mod composition;
-pub mod trust;
-pub mod collective;
-pub mod lifecycle;
-pub mod versioning;
-pub mod dependencies;
-pub mod explainability;
-pub mod symthaea;
-pub mod recommendations;
 pub mod anomaly;
-pub mod succession;
-pub mod similarity;
 pub mod associative_learner;
+pub mod collective;
+pub mod composition;
+pub mod core;
+pub mod dependencies;
+pub mod domain;
+pub mod explainability;
+pub mod lifecycle;
+pub mod recommendations;
+pub mod similarity;
+pub mod succession;
+pub mod symthaea;
+pub mod trust;
+pub mod versioning;
 
 // Python bindings (only compiled when python feature is enabled)
 #[cfg(feature = "python")]
@@ -90,126 +90,142 @@ pub type AgentId = u64;
 
 // Core module
 pub use core::{
-    HarmonicWeights, CommunityProfile, StructuralPosition,
-    EvaluationRecord, DiversityMetrics, PositionCounts, EpistemologyCounts,
-    PositionScores, DiversityAuditor, BiasAlert,
-    ReparationsManager, EpistemicOutcome, OutcomeType,
-    EmergentWeightLearner, WeightAdjustmentSuggestion,
-    Epistemology, Claim, Evaluation, WisdomEngine,
-    Prediction, CausalNode, Oracle, OracleObservation, OracleVerificationLevel,
-    SimpleOracle, CausalAdjustment, CausalGraph,
-    LivingWisdomEngine, EvaluationWithPrediction, SystemHealthReport, SystemHealth,
+    BiasAlert, CausalAdjustment, CausalGraph, CausalNode, Claim, CommunityProfile,
+    DiversityAuditor, DiversityMetrics, EmergentWeightLearner, EpistemicOutcome, Epistemology,
+    EpistemologyCounts, Evaluation, EvaluationRecord, EvaluationWithPrediction, HarmonicWeights,
+    LivingWisdomEngine, Oracle, OracleObservation, OracleVerificationLevel, OutcomeType,
+    PositionCounts, PositionScores, Prediction, ReparationsManager, SimpleOracle,
+    StructuralPosition, SystemHealth, SystemHealthReport, WeightAdjustmentSuggestion, WisdomEngine,
 };
 
 // Domain module
-pub use domain::{
-    DomainCriticality, Domain, DomainRegistry, DomainPath,
-};
+pub use domain::{Domain, DomainCriticality, DomainPath, DomainRegistry};
 
 // Composition module
 pub use composition::{
-    CompositionType, PatternComposite, SynergyCandidate, SynergyReason,
-    CooccurrenceTracker, CompositionStats,
+    CompositionStats, CompositionType, CooccurrenceTracker, PatternComposite, SynergyCandidate,
+    SynergyReason,
 };
 
 // Trust module
 pub use trust::{
-    TrustWeightConfig, AgentTrustContext, TrustWeightedScore, TrustLevel,
-    AgentTrustRegistry, TrustRegistryStats,
+    AgentTrustContext, AgentTrustRegistry, TrustLevel, TrustRegistryStats, TrustWeightConfig,
+    TrustWeightedScore,
 };
 
 // Collective module
 pub use collective::{
-    CollectivePatternConfig, CollectivePatternContext, CollectiveSignal,
-    CollectiveObservation, CollectivePatternRegistry, CollectivePatternStats,
+    CollectiveObservation, CollectivePatternConfig, CollectivePatternContext,
+    CollectivePatternRegistry, CollectivePatternStats, CollectiveSignal,
 };
 
 // Lifecycle module
 pub use lifecycle::{
-    PatternLifecycleState, LifecycleTransitionReason, LifecycleTransition,
-    LifecycleConfig, PatternLifecycleInfo, PatternLifecycleRegistry, LifecycleStats,
+    LifecycleConfig, LifecycleStats, LifecycleTransition, LifecycleTransitionReason,
+    PatternLifecycleInfo, PatternLifecycleRegistry, PatternLifecycleState,
 };
 
 // Versioning module
 pub use versioning::{
-    PatternVersion, PatternEvolutionReason, PatternVersionInfo,
-    VersioningConfig, PatternBranch, PatternVersionRegistry, VersioningStats,
+    PatternBranch, PatternEvolutionReason, PatternVersion, PatternVersionInfo,
+    PatternVersionRegistry, VersioningConfig, VersioningStats,
 };
 
 // Dependencies module
 pub use dependencies::{
-    PatternRelationType, DependencyStrength, PatternDependency,
-    DependencyConfig, DependencyResolution, DependencyIssue, DependencyIssueType,
-    PatternDependencyRegistry, DependencyStats,
+    DependencyConfig, DependencyIssue, DependencyIssueType, DependencyResolution, DependencyStats,
+    DependencyStrength, PatternDependency, PatternDependencyRegistry, PatternRelationType,
 };
 
 // Explainability module
 pub use explainability::{
-    ExplainabilityConfig, ExplanationFactorType, FactorImpact,
-    ExplanationFactor, Recommendation, PatternExplanation, PatternComparison,
-    ExplainabilityRegistry, ExplainabilityStats,
+    ActionEffortLevel,
+    ActionSuggestion,
     // Enhancement: Counterfactual explanations and actionable suggestions
-    CounterfactualFactor, ActionEffortLevel, ActionSuggestion, ImprovementPlan, PlanFeasibility,
+    CounterfactualFactor,
+    ExplainabilityConfig,
+    ExplainabilityRegistry,
+    ExplainabilityStats,
+    ExplanationFactor,
+    ExplanationFactorType,
+    FactorImpact,
+    ImprovementPlan,
+    PatternComparison,
+    PatternExplanation,
+    PlanFeasibility,
+    Recommendation,
 };
 
 // Symthaea module
 pub use symthaea::{
-    SymthaeaPattern, PatternEpistemics, PatternPrediction,
-    PatternUsageOracle, PatternUsageEvent, SwarmPatternOracle, SwarmInstanceResult,
-    LearningGuidance, PatternDowngrade, PatternUpgrade,
-    SymthaeaCausalBridge, BridgeHealthReport,
-    TemporalDecayConfig, PatternDecayStatus,
-    CalibrationBucket, CalibrationCurve,
-    CounterfactualAnalysis, CounterfactualAlternative, EstimationMethod,
-    ExperimentPlan, RiskLevel, ExperimentResult, ExperimentPlanner,
-    EnhancedHealthReport,
+    BridgeHealthReport,
+    CalibrationBucket,
+    CalibrationCurve,
+    CausalDiscovery,
     // Causal discovery types (Component 9 / Enhancement 5)
-    CausalPatternDependency, DependencyType, CausalDiscovery,
+    CausalPatternDependency,
+    CounterfactualAlternative,
+    CounterfactualAnalysis,
+    DependencyType,
+    EnhancedHealthReport,
+    EstimationMethod,
+    ExperimentPlan,
+    ExperimentPlanner,
+    ExperimentResult,
+    LearningGuidance,
+    PatternDecayStatus,
+    PatternDowngrade,
+    PatternEpistemics,
+    PatternPrediction,
+    PatternUpgrade,
+    PatternUsageEvent,
+    PatternUsageOracle,
+    RiskLevel,
+    SwarmInstanceResult,
+    SwarmPatternOracle,
+    SymthaeaCausalBridge,
+    SymthaeaPattern,
+    TemporalDecayConfig,
 };
 
 // Recommendations module (Component 18)
 pub use recommendations::{
-    RecommendationConfig, SignalBreakdown, SignalContribution,
-    RecommendationContext, PatternRecommendation, RecommendationSet,
-    PatternSignals, RecommendationStats, RecommendationRegistry,
+    PatternRecommendation, PatternSignals, RecommendationConfig, RecommendationContext,
+    RecommendationRegistry, RecommendationSet, RecommendationStats, SignalBreakdown,
+    SignalContribution,
 };
 
 // Anomaly module (Component 19)
 pub use anomaly::{
-    AnomalyType, AnomalySeverity, Anomaly, AnomalyConfig,
-    DataPoint, TimeSeries, AnomalyStats, AnomalyDetector,
+    Anomaly, AnomalyConfig, AnomalyDetector, AnomalySeverity, AnomalyStats, AnomalyType, DataPoint,
+    TimeSeries,
 };
 
 // Succession module (Component 20)
 pub use succession::{
-    SuccessionReason, SuccessionStatus, PatternSuccession,
-    MigrationPlan, MigrationEffort, MigrationInstruction,
-    DependencyChange, DependencyChangeType,
-    SuccessionConfig, SuccessionStats, SuccessionManager,
+    DependencyChange, DependencyChangeType, MigrationEffort, MigrationInstruction, MigrationPlan,
+    PatternSuccession, SuccessionConfig, SuccessionManager, SuccessionReason, SuccessionStats,
+    SuccessionStatus,
 };
 
 // Similarity module (Component 21)
 pub use similarity::{
-    SimilarityMetric, SimilarityScore, PatternFeatures,
-    SimilarityCalculator, PatternCluster, DuplicateCandidate,
-    DuplicateSuggestion, DuplicateDecision, MergeSuggestion, MergeSuggestionStatus,
-    SimilarityWeights, SimilarityConfig, SimilarityRegistry, SimilarityStats,
+    DuplicateCandidate, DuplicateDecision, DuplicateSuggestion, MergeSuggestion,
+    MergeSuggestionStatus, PatternCluster, PatternFeatures, SimilarityCalculator, SimilarityConfig,
+    SimilarityMetric, SimilarityRegistry, SimilarityScore, SimilarityStats, SimilarityWeights,
 };
 
 // Associative Learner module (Component 22)
 pub use associative_learner::{
-    HDC_DIMENSION, HDC_BYTES,
-    BinaryHV, ContinuousHV, SparseProjector,
-    ExperienceEncoding, ActionRegistry,
-    AssociativeLearnerConfig, AssociativeLearner, ActionPrediction,
-    MemorySnapshot, AssociativeLearnerStats, WisdomContext,
+    ActionPrediction, ActionRegistry, AssociativeLearner, AssociativeLearnerConfig,
+    AssociativeLearnerStats, BinaryHV, ContinuousHV, ExperienceEncoding, MemorySnapshot,
+    SparseProjector, WisdomContext, HDC_BYTES, HDC_DIMENSION,
 };
 
 // Python bindings (Component 23 - PyO3 Integration)
 #[cfg(feature = "python")]
 pub use python_bindings::{
-    PyWisdomBridge, PyPattern, PyPatternEpistemics, PyActionPrediction,
-    register_wisdom_classes,
+    register_wisdom_classes, PyActionPrediction, PyPattern, PyPatternEpistemics, PyWisdomBridge,
 };
 
 #[cfg(test)]

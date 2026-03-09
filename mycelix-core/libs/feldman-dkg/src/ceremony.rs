@@ -2,11 +2,12 @@
 //!
 //! Manages the full distributed key generation protocol.
 
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 use crate::commitment::{Commitment, CommitmentSet};
 use crate::dealer::Deal;
+use crate::error::{DkgError, DkgResult};
 use crate::hash_commitment::{CommitmentScheme, HashCommitmentSet, HashReveal};
 use crate::participant::{Participant, ParticipantId, ParticipantState};
 use crate::polynomial::lagrange_interpolate_at_zero;
@@ -14,7 +15,6 @@ use crate::refresh::RefreshRound;
 use crate::scalar::Scalar;
 use crate::share::CombinedShare;
 use crate::violation::{ViolationTracker, ViolationType};
-use crate::error::{DkgError, DkgResult};
 
 /// Default phase timeout in seconds (5 minutes)
 pub const DEFAULT_PHASE_TIMEOUT_SECS: u64 = 300;
@@ -227,7 +227,11 @@ impl DkgCeremony {
     ///
     /// This allows the ceremony to proceed even if some participants
     /// fail to submit their deals within the timeout period.
-    pub fn exclude_and_continue(&mut self, excluded: &[ParticipantId], now_secs: u64) -> DkgResult<()> {
+    pub fn exclude_and_continue(
+        &mut self,
+        excluded: &[ParticipantId],
+        now_secs: u64,
+    ) -> DkgResult<()> {
         if self.phase != CeremonyPhase::Dealing {
             return Err(DkgError::WrongPhase {
                 expected: CeremonyPhase::Dealing.to_string(),
@@ -294,7 +298,8 @@ impl DkgCeremony {
             return Err(DkgError::ParticipantExists(id.0));
         }
 
-        let participant = Participant::new(id, self.config.threshold, self.config.num_participants)?;
+        let participant =
+            Participant::new(id, self.config.threshold, self.config.num_participants)?;
         self.participants.insert(id, participant);
 
         // Auto-transition when all participants registered
@@ -336,7 +341,12 @@ impl DkgCeremony {
     }
 
     /// Submit a deal from a participant
-    pub fn submit_deal(&mut self, dealer: ParticipantId, deal: Deal, now_secs: u64) -> DkgResult<()> {
+    pub fn submit_deal(
+        &mut self,
+        dealer: ParticipantId,
+        deal: Deal,
+        now_secs: u64,
+    ) -> DkgResult<()> {
         if self.phase != CeremonyPhase::Dealing {
             return Err(DkgError::WrongPhase {
                 expected: CeremonyPhase::Dealing.to_string(),
@@ -372,7 +382,11 @@ impl DkgCeremony {
     }
 
     /// File a complaint against a dealer
-    pub fn file_complaint(&mut self, complainer: ParticipantId, accused: ParticipantId) -> DkgResult<()> {
+    pub fn file_complaint(
+        &mut self,
+        complainer: ParticipantId,
+        accused: ParticipantId,
+    ) -> DkgResult<()> {
         if self.phase != CeremonyPhase::Verification {
             return Err(DkgError::WrongPhase {
                 expected: CeremonyPhase::Verification.to_string(),
@@ -717,13 +731,14 @@ impl DkgCeremony {
             return Err(DkgError::ParticipantNotFound(accused.0));
         }
 
-        let deal = self.deals.get(&accused).ok_or(
-            DkgError::ParticipantNotFound(accused.0),
-        )?;
+        let deal = self
+            .deals
+            .get(&accused)
+            .ok_or(DkgError::ParticipantNotFound(accused.0))?;
 
-        let share = deal.get_share(share_index).ok_or(
-            DkgError::InvalidShareIndex(share_index as usize),
-        )?;
+        let share = deal
+            .get_share(share_index)
+            .ok_or(DkgError::InvalidShareIndex(share_index as usize))?;
 
         let share_valid = deal.commitments.verify_share(share_index, share.value());
 
@@ -732,7 +747,9 @@ impl DkgCeremony {
             self.complaints.push((complainer, accused));
             self.violation_tracker.record_violation(
                 accused,
-                ViolationType::InvalidShare { recipient: share_index },
+                ViolationType::InvalidShare {
+                    recipient: share_index,
+                },
                 self.epoch,
                 now_secs,
             );
@@ -905,21 +922,33 @@ mod tests {
 
         // MUST work with exactly threshold (3) shares
         let result_3 = ceremony.reconstruct_secret(&shares[0..3]);
-        assert!(result_3.is_ok(), "Reconstruction with threshold shares must succeed");
+        assert!(
+            result_3.is_ok(),
+            "Reconstruction with threshold shares must succeed"
+        );
         assert_eq!(result_3.unwrap(), expected_combined);
 
         // MUST work with more than threshold (4, 5) shares
         let result_4 = ceremony.reconstruct_secret(&shares[0..4]);
-        assert!(result_4.is_ok(), "Reconstruction with 4 shares must succeed");
+        assert!(
+            result_4.is_ok(),
+            "Reconstruction with 4 shares must succeed"
+        );
         assert_eq!(result_4.unwrap(), expected_combined);
 
         let result_5 = ceremony.reconstruct_secret(&shares);
-        assert!(result_5.is_ok(), "Reconstruction with all shares must succeed");
+        assert!(
+            result_5.is_ok(),
+            "Reconstruction with all shares must succeed"
+        );
         assert_eq!(result_5.unwrap(), expected_combined);
 
         // MUST FAIL with fewer than threshold (2) shares
         let result_2 = ceremony.reconstruct_secret(&shares[0..2]);
-        assert!(result_2.is_err(), "Reconstruction with t-1 shares must fail");
+        assert!(
+            result_2.is_err(),
+            "Reconstruction with t-1 shares must fail"
+        );
     }
 
     #[test]
@@ -935,7 +964,8 @@ mod tests {
 
         let deals: Vec<_> = (1..=4)
             .map(|i| {
-                let dealer = crate::dealer::Dealer::new(ParticipantId(i), 2, 4, &mut OsRng).unwrap();
+                let dealer =
+                    crate::dealer::Dealer::new(ParticipantId(i), 2, 4, &mut OsRng).unwrap();
                 (ParticipantId(i as u32), dealer.generate_deal())
             })
             .collect();
@@ -1035,18 +1065,27 @@ mod tests {
         for i in 1..=3 {
             let dealer = crate::dealer::Dealer::new(ParticipantId(i), 2, 3, &mut OsRng).unwrap();
             let deal = dealer.generate_deal();
-            ceremony.submit_deal(ParticipantId(i as u32), deal, 0).unwrap();
+            ceremony
+                .submit_deal(ParticipantId(i as u32), deal, 0)
+                .unwrap();
         }
 
         // File complaints against dealer 3 (need >= complaint_threshold = (t/2)+1 = 2)
         ceremony.phase = CeremonyPhase::Verification; // Force into verification phase
-        ceremony.file_complaint(ParticipantId(1), ParticipantId(3)).unwrap();
-        ceremony.file_complaint(ParticipantId(2), ParticipantId(3)).unwrap();
+        ceremony
+            .file_complaint(ParticipantId(1), ParticipantId(3))
+            .unwrap();
+        ceremony
+            .file_complaint(ParticipantId(2), ParticipantId(3))
+            .unwrap();
 
         // Finalize - dealer 3 should be disqualified
         let result = ceremony.finalize().unwrap();
 
-        assert_eq!(result.qualified_count, 2, "Only 2 dealers should be qualified");
+        assert_eq!(
+            result.qualified_count, 2,
+            "Only 2 dealers should be qualified"
+        );
         assert!(
             result.disqualified.contains(&ParticipantId(3)),
             "Dealer 3 should be disqualified"
@@ -1065,7 +1104,10 @@ mod tests {
 
         // Try to start dealing manually - should fail
         let result = ceremony.start_dealing(0);
-        assert!(result.is_err(), "Starting with insufficient participants must fail");
+        assert!(
+            result.is_err(),
+            "Starting with insufficient participants must fail"
+        );
     }
 
     #[test]
@@ -1096,7 +1138,10 @@ mod tests {
 
         // ID > num_participants is invalid
         let result = ceremony.add_participant(ParticipantId(10), 0);
-        assert!(result.is_err(), "Participant ID > num_participants must be rejected");
+        assert!(
+            result.is_err(),
+            "Participant ID > num_participants must be rejected"
+        );
     }
 
     #[test]
@@ -1133,7 +1178,9 @@ mod tests {
             ceremony1.add_participant(ParticipantId(i), 0).unwrap();
         }
         for (i, deal) in deals.iter().enumerate() {
-            ceremony1.submit_deal(ParticipantId((i + 1) as u32), deal.clone(), 0).unwrap();
+            ceremony1
+                .submit_deal(ParticipantId((i + 1) as u32), deal.clone(), 0)
+                .unwrap();
         }
         let result1 = ceremony1.finalize().unwrap();
 
@@ -1142,9 +1189,15 @@ mod tests {
         for i in 1..=3 {
             ceremony2.add_participant(ParticipantId(i), 0).unwrap();
         }
-        ceremony2.submit_deal(ParticipantId(3), deals[2].clone(), 0).unwrap();
-        ceremony2.submit_deal(ParticipantId(1), deals[0].clone(), 0).unwrap();
-        ceremony2.submit_deal(ParticipantId(2), deals[1].clone(), 0).unwrap();
+        ceremony2
+            .submit_deal(ParticipantId(3), deals[2].clone(), 0)
+            .unwrap();
+        ceremony2
+            .submit_deal(ParticipantId(1), deals[0].clone(), 0)
+            .unwrap();
+        ceremony2
+            .submit_deal(ParticipantId(2), deals[1].clone(), 0)
+            .unwrap();
         let result2 = ceremony2.finalize().unwrap();
 
         // Both should produce the same public key
@@ -1183,7 +1236,9 @@ mod tests {
         for i in 1..=3 {
             let dealer = crate::dealer::Dealer::new(ParticipantId(i), 2, 3, &mut OsRng).unwrap();
             let deal = dealer.generate_deal();
-            ceremony.submit_deal(ParticipantId(i as u32), deal, 0).unwrap();
+            ceremony
+                .submit_deal(ParticipantId(i as u32), deal, 0)
+                .unwrap();
         }
         assert_eq!(ceremony.phase(), CeremonyPhase::Verification);
 
@@ -1197,7 +1252,8 @@ mod tests {
         use crate::hash_commitment::HashCommitmentSet;
 
         // Create a ceremony with hash-based commitments
-        let config = DkgConfig::new(2, 3).unwrap()
+        let config = DkgConfig::new(2, 3)
+            .unwrap()
             .with_commitment_scheme(CommitmentScheme::HashBased);
         let mut ceremony = DkgCeremony::new(config, 0);
 
@@ -1212,7 +1268,8 @@ mod tests {
         // Generate deals and hash commitments
         let deals: Vec<_> = (1..=3)
             .map(|i| {
-                let dealer = crate::dealer::Dealer::new(ParticipantId(i), 2, 3, &mut OsRng).unwrap();
+                let dealer =
+                    crate::dealer::Dealer::new(ParticipantId(i), 2, 3, &mut OsRng).unwrap();
                 dealer.generate_deal()
             })
             .collect();
@@ -1264,16 +1321,25 @@ mod tests {
         for i in 1..=2 {
             let dealer = crate::dealer::Dealer::new(ParticipantId(i), 2, 3, &mut OsRng).unwrap();
             let deal = dealer.generate_deal();
-            ceremony.submit_deal(ParticipantId(i as u32), deal, 0).unwrap();
+            ceremony
+                .submit_deal(ParticipantId(i as u32), deal, 0)
+                .unwrap();
         }
 
         // Exclude participant 3 (they didn't submit)
-        ceremony.exclude_and_continue(&[ParticipantId(3)], 100).unwrap();
+        ceremony
+            .exclude_and_continue(&[ParticipantId(3)], 100)
+            .unwrap();
 
         // Violation should be recorded
-        let violations = ceremony.violation_tracker().violations_for(ParticipantId(3));
+        let violations = ceremony
+            .violation_tracker()
+            .violations_for(ParticipantId(3));
         assert_eq!(violations.len(), 1);
-        assert!(matches!(violations[0].violation_type, ViolationType::DealTimeout));
+        assert!(matches!(
+            violations[0].violation_type,
+            ViolationType::DealTimeout
+        ));
     }
 
     #[test]
@@ -1319,18 +1385,15 @@ mod tests {
 
         // Each participant generates a refresh deal
         for i in 1..=3u32 {
-            let deal = RefreshRound::generate_refresh_deal(
-                ParticipantId(i), 2, 3, 1, &mut OsRng,
-            ).unwrap();
+            let deal =
+                RefreshRound::generate_refresh_deal(ParticipantId(i), 2, 3, 1, &mut OsRng).unwrap();
             refresh.submit_deal(deal).unwrap();
         }
 
         // Apply refresh to each share
         let refreshed_shares: Vec<_> = (1..=3)
             .map(|i| {
-                let delta = refresh
-                    .compute_refresh_delta(i as u32)
-                    .unwrap();
+                let delta = refresh.compute_refresh_delta(i as u32).unwrap();
                 let mut new_value = original_shares[(i - 1) as usize].value.clone();
                 new_value += delta;
                 CombinedShare::new(i as u32, new_value)
@@ -1339,7 +1402,9 @@ mod tests {
 
         // Refreshed shares should reconstruct the same secret
         let original_secret = ceremony.reconstruct_secret(&original_shares[0..2]).unwrap();
-        let refreshed_secret = ceremony.reconstruct_secret(&refreshed_shares[0..2]).unwrap();
+        let refreshed_secret = ceremony
+            .reconstruct_secret(&refreshed_shares[0..2])
+            .unwrap();
         assert_eq!(original_secret, refreshed_secret);
     }
 
@@ -1356,15 +1421,31 @@ mod tests {
         for i in 1..=2 {
             let dealer = crate::dealer::Dealer::new(ParticipantId(i), 2, 4, &mut OsRng).unwrap();
             let deal = dealer.generate_deal();
-            ceremony.submit_deal(ParticipantId(i as u32), deal, 0).unwrap();
+            ceremony
+                .submit_deal(ParticipantId(i as u32), deal, 0)
+                .unwrap();
         }
 
         // Exclude 3 and 4
-        ceremony.exclude_and_continue(&[ParticipantId(3), ParticipantId(4)], 300).unwrap();
+        ceremony
+            .exclude_and_continue(&[ParticipantId(3), ParticipantId(4)], 300)
+            .unwrap();
 
         // Both should have violations
-        assert_eq!(ceremony.violation_tracker().violations_for(ParticipantId(3)).len(), 1);
-        assert_eq!(ceremony.violation_tracker().violations_for(ParticipantId(4)).len(), 1);
+        assert_eq!(
+            ceremony
+                .violation_tracker()
+                .violations_for(ParticipantId(3))
+                .len(),
+            1
+        );
+        assert_eq!(
+            ceremony
+                .violation_tracker()
+                .violations_for(ParticipantId(4))
+                .len(),
+            1
+        );
 
         // Penalty scores should reflect the severity
         assert!(ceremony.violation_tracker().penalty_score(ParticipantId(3)) > 0.0);
@@ -1374,7 +1455,10 @@ mod tests {
     #[test]
     fn test_commitment_scheme_default_is_feldman() {
         let config = DkgConfig::new(2, 3).unwrap();
-        assert!(matches!(config.commitment_scheme, CommitmentScheme::Feldman));
+        assert!(matches!(
+            config.commitment_scheme,
+            CommitmentScheme::Feldman
+        ));
 
         let mut ceremony = DkgCeremony::new(config, 0);
         for i in 1..=3 {
@@ -1386,7 +1470,8 @@ mod tests {
 
     #[test]
     fn test_hybrid_commitment_scheme_transitions() {
-        let config = DkgConfig::new(2, 3).unwrap()
+        let config = DkgConfig::new(2, 3)
+            .unwrap()
             .with_commitment_scheme(CommitmentScheme::Hybrid);
         let mut ceremony = DkgCeremony::new(config, 0);
 
@@ -1401,7 +1486,8 @@ mod tests {
     fn test_hybrid_ceremony_full_flow() {
         use crate::hash_commitment::HashCommitmentSet;
 
-        let config = DkgConfig::new(2, 3).unwrap()
+        let config = DkgConfig::new(2, 3)
+            .unwrap()
             .with_commitment_scheme(CommitmentScheme::Hybrid);
         let mut ceremony = DkgCeremony::new(config, 0);
 
@@ -1413,7 +1499,8 @@ mod tests {
         // Generate deals
         let deals: Vec<_> = (1..=3)
             .map(|i| {
-                let dealer = crate::dealer::Dealer::new(ParticipantId(i), 2, 3, &mut OsRng).unwrap();
+                let dealer =
+                    crate::dealer::Dealer::new(ParticipantId(i), 2, 3, &mut OsRng).unwrap();
                 dealer.generate_deal()
             })
             .collect();
@@ -1422,19 +1509,25 @@ mod tests {
         let mut reveals = Vec::new();
         for (i, deal) in deals.iter().enumerate() {
             let (commitment_set, reveal) = HashCommitmentSet::from_deal(deal, &mut OsRng);
-            ceremony.submit_hash_commitment(ParticipantId((i + 1) as u32), commitment_set, 0).unwrap();
+            ceremony
+                .submit_hash_commitment(ParticipantId((i + 1) as u32), commitment_set, 0)
+                .unwrap();
             reveals.push(reveal);
         }
         assert_eq!(ceremony.phase(), CeremonyPhase::Dealing);
 
         // Phase 2: Submit deals (Feldman commitments verified on-chain)
         for (i, deal) in deals.iter().enumerate() {
-            ceremony.submit_deal(ParticipantId((i + 1) as u32), deal.clone(), 0).unwrap();
+            ceremony
+                .submit_deal(ParticipantId((i + 1) as u32), deal.clone(), 0)
+                .unwrap();
         }
 
         // Phase 3: Submit hash reveals
         for (i, reveal) in reveals.into_iter().enumerate() {
-            ceremony.submit_hash_reveal(ParticipantId((i + 1) as u32), reveal, 0).unwrap();
+            ceremony
+                .submit_hash_reveal(ParticipantId((i + 1) as u32), reveal, 0)
+                .unwrap();
         }
 
         // Phase 4: Verify hash reveals (quantum-resistant verification)
@@ -1447,9 +1540,10 @@ mod tests {
 
     #[test]
     fn test_hybrid_ceremony_wrong_salt_disqualifies() {
-        use crate::hash_commitment::{HashCommitmentSet, HashReveal, CommitmentSalt};
+        use crate::hash_commitment::{CommitmentSalt, HashCommitmentSet, HashReveal};
 
-        let config = DkgConfig::new(2, 3).unwrap()
+        let config = DkgConfig::new(2, 3)
+            .unwrap()
             .with_commitment_scheme(CommitmentScheme::Hybrid);
         let mut ceremony = DkgCeremony::new(config, 0);
 
@@ -1459,7 +1553,8 @@ mod tests {
 
         let deals: Vec<_> = (1..=3)
             .map(|i| {
-                let dealer = crate::dealer::Dealer::new(ParticipantId(i), 2, 3, &mut OsRng).unwrap();
+                let dealer =
+                    crate::dealer::Dealer::new(ParticipantId(i), 2, 3, &mut OsRng).unwrap();
                 dealer.generate_deal()
             })
             .collect();
@@ -1468,36 +1563,56 @@ mod tests {
         let mut reveals = Vec::new();
         for (i, deal) in deals.iter().enumerate() {
             let (commitment_set, reveal) = HashCommitmentSet::from_deal(deal, &mut OsRng);
-            ceremony.submit_hash_commitment(ParticipantId((i + 1) as u32), commitment_set, 0).unwrap();
+            ceremony
+                .submit_hash_commitment(ParticipantId((i + 1) as u32), commitment_set, 0)
+                .unwrap();
             reveals.push(reveal);
         }
 
         // Submit all deals
         for (i, deal) in deals.iter().enumerate() {
-            ceremony.submit_deal(ParticipantId((i + 1) as u32), deal.clone(), 0).unwrap();
+            ceremony
+                .submit_deal(ParticipantId((i + 1) as u32), deal.clone(), 0)
+                .unwrap();
         }
 
         // Participant 3 submits a reveal with WRONG salts
         let honest_reveal_3 = reveals.pop().unwrap();
-        let wrong_salts: Vec<(u32, CommitmentSalt)> = honest_reveal_3.salts.iter()
+        let wrong_salts: Vec<(u32, CommitmentSalt)> = honest_reveal_3
+            .salts
+            .iter()
             .map(|(idx, _)| (*idx, CommitmentSalt::random(&mut OsRng)))
             .collect();
-        let bad_reveal = HashReveal { dealer: ParticipantId(3), salts: wrong_salts };
+        let bad_reveal = HashReveal {
+            dealer: ParticipantId(3),
+            salts: wrong_salts,
+        };
 
         // Submit honest reveals for 1 and 2
         for (i, reveal) in reveals.into_iter().enumerate() {
-            ceremony.submit_hash_reveal(ParticipantId((i + 1) as u32), reveal, 0).unwrap();
+            ceremony
+                .submit_hash_reveal(ParticipantId((i + 1) as u32), reveal, 0)
+                .unwrap();
         }
         // Submit bad reveal for 3
-        ceremony.submit_hash_reveal(ParticipantId(3), bad_reveal, 0).unwrap();
+        ceremony
+            .submit_hash_reveal(ParticipantId(3), bad_reveal, 0)
+            .unwrap();
 
         // Verify — participant 3 should be disqualified
         ceremony.verify_hash_reveals().unwrap();
 
         // Participant 3 should have a CommitRevealMismatch violation
-        let violations = ceremony.violation_tracker().violations_for(ParticipantId(3));
-        assert!(!violations.is_empty(), "participant 3 should have violations");
-        assert!(violations.iter().any(|v| matches!(v.violation_type, ViolationType::CommitRevealMismatch)));
+        let violations = ceremony
+            .violation_tracker()
+            .violations_for(ParticipantId(3));
+        assert!(
+            !violations.is_empty(),
+            "participant 3 should have violations"
+        );
+        assert!(violations
+            .iter()
+            .any(|v| matches!(v.violation_type, ViolationType::CommitRevealMismatch)));
 
         // Ceremony should still finalize with 2 qualified (threshold met)
         let result = ceremony.finalize().unwrap();
@@ -1506,7 +1621,8 @@ mod tests {
 
     #[test]
     fn test_hybrid_ceremony_missing_hash_commitments() {
-        let config = DkgConfig::new(2, 3).unwrap()
+        let config = DkgConfig::new(2, 3)
+            .unwrap()
             .with_commitment_scheme(CommitmentScheme::Hybrid);
         let mut ceremony = DkgCeremony::new(config, 0);
 
@@ -1518,14 +1634,18 @@ mod tests {
         // Only 2 of 3 submit commitments — should NOT transition to Dealing
         let deals: Vec<_> = (1..=2)
             .map(|i| {
-                let dealer = crate::dealer::Dealer::new(ParticipantId(i), 2, 3, &mut OsRng).unwrap();
+                let dealer =
+                    crate::dealer::Dealer::new(ParticipantId(i), 2, 3, &mut OsRng).unwrap();
                 dealer.generate_deal()
             })
             .collect();
 
         for (i, deal) in deals.iter().enumerate() {
-            let (commitment_set, _reveal) = crate::hash_commitment::HashCommitmentSet::from_deal(deal, &mut OsRng);
-            ceremony.submit_hash_commitment(ParticipantId((i + 1) as u32), commitment_set, 0).unwrap();
+            let (commitment_set, _reveal) =
+                crate::hash_commitment::HashCommitmentSet::from_deal(deal, &mut OsRng);
+            ceremony
+                .submit_hash_commitment(ParticipantId((i + 1) as u32), commitment_set, 0)
+                .unwrap();
         }
 
         // Still in CommitmentCollection — waiting for participant 3
@@ -1534,12 +1654,16 @@ mod tests {
         // Cannot submit deals yet
         let dealer3 = crate::dealer::Dealer::new(ParticipantId(3), 2, 3, &mut OsRng).unwrap();
         let result = ceremony.submit_deal(ParticipantId(3), dealer3.generate_deal(), 0);
-        assert!(result.is_err(), "should not accept deals during CommitmentCollection");
+        assert!(
+            result.is_err(),
+            "should not accept deals during CommitmentCollection"
+        );
     }
 
     #[test]
     fn test_hybrid_duplicate_hash_commitment_rejected() {
-        let config = DkgConfig::new(2, 3).unwrap()
+        let config = DkgConfig::new(2, 3)
+            .unwrap()
             .with_commitment_scheme(CommitmentScheme::Hybrid);
         let mut ceremony = DkgCeremony::new(config, 0);
 
@@ -1552,7 +1676,9 @@ mod tests {
         let (cs1, _) = crate::hash_commitment::HashCommitmentSet::from_deal(&deal, &mut OsRng);
         let (cs2, _) = crate::hash_commitment::HashCommitmentSet::from_deal(&deal, &mut OsRng);
 
-        ceremony.submit_hash_commitment(ParticipantId(1), cs1, 0).unwrap();
+        ceremony
+            .submit_hash_commitment(ParticipantId(1), cs1, 0)
+            .unwrap();
         let result = ceremony.submit_hash_commitment(ParticipantId(1), cs2, 0);
         assert!(matches!(result, Err(DkgError::DuplicateShare(1))));
     }
@@ -1570,8 +1696,12 @@ mod tests {
         // Generate legitimate deals for participants 1 and 2
         let dealer1 = crate::dealer::Dealer::new(ParticipantId(1), 2, 3, &mut OsRng).unwrap();
         let dealer2 = crate::dealer::Dealer::new(ParticipantId(2), 2, 3, &mut OsRng).unwrap();
-        ceremony.submit_deal(ParticipantId(1), dealer1.generate_deal(), 0).unwrap();
-        ceremony.submit_deal(ParticipantId(2), dealer2.generate_deal(), 0).unwrap();
+        ceremony
+            .submit_deal(ParticipantId(1), dealer1.generate_deal(), 0)
+            .unwrap();
+        ceremony
+            .submit_deal(ParticipantId(2), dealer2.generate_deal(), 0)
+            .unwrap();
 
         // Generate a tampered deal for participant 3: valid commitments but corrupt one share
         let dealer3 = crate::dealer::Dealer::new(ParticipantId(3), 2, 3, &mut OsRng).unwrap();
@@ -1583,21 +1713,28 @@ mod tests {
         assert_eq!(ceremony.phase(), CeremonyPhase::Verification);
 
         // Participant 1 files a verified complaint against participant 3's share at index 1
-        let result = ceremony.file_verified_complaint(
-            ParticipantId(1),
-            ParticipantId(3),
-            1,  // share_index for participant 1
-            100,
-        ).unwrap();
+        let result = ceremony
+            .file_verified_complaint(
+                ParticipantId(1),
+                ParticipantId(3),
+                1, // share_index for participant 1
+                100,
+            )
+            .unwrap();
 
         // Complaint should be valid (share was bad)
         assert!(result, "complaint should be valid for a bad share");
 
         // Should have recorded an InvalidShare violation against the accused
-        let violations = ceremony.violation_tracker().violations_for(ParticipantId(3));
+        let violations = ceremony
+            .violation_tracker()
+            .violations_for(ParticipantId(3));
         assert!(!violations.is_empty(), "should have violation for accused");
         assert!(
-            violations.iter().any(|v| matches!(v.violation_type, ViolationType::InvalidShare { recipient: 1 })),
+            violations.iter().any(|v| matches!(
+                v.violation_type,
+                ViolationType::InvalidShare { recipient: 1 }
+            )),
             "should record InvalidShare violation"
         );
     }
@@ -1615,32 +1752,45 @@ mod tests {
         // Generate all legitimate deals
         for i in 1..=3 {
             let dealer = crate::dealer::Dealer::new(ParticipantId(i), 2, 3, &mut OsRng).unwrap();
-            ceremony.submit_deal(ParticipantId(i), dealer.generate_deal(), 0).unwrap();
+            ceremony
+                .submit_deal(ParticipantId(i), dealer.generate_deal(), 0)
+                .unwrap();
         }
 
         assert_eq!(ceremony.phase(), CeremonyPhase::Verification);
 
         // Participant 1 files a frivolous complaint against participant 2's share at index 1
-        let result = ceremony.file_verified_complaint(
-            ParticipantId(1),
-            ParticipantId(2),
-            1,  // share_index
-            200,
-        ).unwrap();
+        let result = ceremony
+            .file_verified_complaint(
+                ParticipantId(1),
+                ParticipantId(2),
+                1, // share_index
+                200,
+            )
+            .unwrap();
 
         // Complaint should be frivolous (share is valid)
         assert!(!result, "complaint should be frivolous for a valid share");
 
         // Should have recorded an InvalidCommitment violation against the COMPLAINER
-        let violations = ceremony.violation_tracker().violations_for(ParticipantId(1));
-        assert!(!violations.is_empty(), "should have violation for frivolous complainer");
+        let violations = ceremony
+            .violation_tracker()
+            .violations_for(ParticipantId(1));
         assert!(
-            violations.iter().any(|v| matches!(v.violation_type, ViolationType::InvalidCommitment)),
+            !violations.is_empty(),
+            "should have violation for frivolous complainer"
+        );
+        assert!(
+            violations
+                .iter()
+                .any(|v| matches!(v.violation_type, ViolationType::InvalidCommitment)),
             "should record InvalidCommitment violation against complainer"
         );
 
         // No violations against the accused
-        let accused_violations = ceremony.violation_tracker().violations_for(ParticipantId(2));
+        let accused_violations = ceremony
+            .violation_tracker()
+            .violations_for(ParticipantId(2));
         assert!(
             accused_violations.is_empty(),
             "accused should have no violations for a frivolous complaint"
@@ -1657,12 +1807,7 @@ mod tests {
         }
 
         // Phase is Dealing, not Verification
-        let result = ceremony.file_verified_complaint(
-            ParticipantId(1),
-            ParticipantId(2),
-            1,
-            0,
-        );
+        let result = ceremony.file_verified_complaint(ParticipantId(1), ParticipantId(2), 1, 0);
 
         assert!(result.is_err(), "should fail in wrong phase");
         match result {
@@ -1693,8 +1838,13 @@ mod tests {
         for (i, secret) in secrets.iter().enumerate() {
             let pid = (i + 1) as u32;
             let dealer = crate::dealer::Dealer::with_secret(
-                ParticipantId(pid), secret.clone(), t, n, &mut OsRng,
-            ).unwrap();
+                ParticipantId(pid),
+                secret.clone(),
+                t,
+                n,
+                &mut OsRng,
+            )
+            .unwrap();
             let deal = dealer.generate_deal();
             ceremony.submit_deal(ParticipantId(pid), deal, 0).unwrap();
         }
@@ -1723,9 +1873,9 @@ mod tests {
 
             // All participants generate and submit refresh deals
             for i in 1..=n as u32 {
-                let deal = RefreshRound::generate_refresh_deal(
-                    ParticipantId(i), t, n, epoch, &mut OsRng,
-                ).unwrap();
+                let deal =
+                    RefreshRound::generate_refresh_deal(ParticipantId(i), t, n, epoch, &mut OsRng)
+                        .unwrap();
                 refresh.submit_deal(deal).unwrap();
             }
             assert!(refresh.is_complete());
@@ -1742,16 +1892,29 @@ mod tests {
                 .collect();
 
             // Verify shares actually changed
-            let any_changed = prev_shares.iter().zip(current_shares.iter())
+            let any_changed = prev_shares
+                .iter()
+                .zip(current_shares.iter())
                 .any(|(old, new)| old.value != new.value);
-            assert!(any_changed, "Shares must change after refresh epoch {epoch}");
+            assert!(
+                any_changed,
+                "Shares must change after refresh epoch {epoch}"
+            );
 
             // Verify reconstruction with multiple subsets
             let secret_first = ceremony.reconstruct_secret(&current_shares[0..t]).unwrap();
-            assert_eq!(secret_first, expected_secret, "Subset [0..t] failed at epoch {epoch}");
+            assert_eq!(
+                secret_first, expected_secret,
+                "Subset [0..t] failed at epoch {epoch}"
+            );
 
-            let secret_last = ceremony.reconstruct_secret(&current_shares[(n - t)..n]).unwrap();
-            assert_eq!(secret_last, expected_secret, "Subset [n-t..n] failed at epoch {epoch}");
+            let secret_last = ceremony
+                .reconstruct_secret(&current_shares[(n - t)..n])
+                .unwrap();
+            assert_eq!(
+                secret_last, expected_secret,
+                "Subset [n-t..n] failed at epoch {epoch}"
+            );
 
             // Mixed subset {1, 3, 5}
             let mixed = vec![
@@ -1760,13 +1923,18 @@ mod tests {
                 current_shares[4].clone(),
             ];
             let secret_mixed = ceremony.reconstruct_secret(&mixed).unwrap();
-            assert_eq!(secret_mixed, expected_secret, "Mixed subset failed at epoch {epoch}");
+            assert_eq!(
+                secret_mixed, expected_secret,
+                "Mixed subset failed at epoch {epoch}"
+            );
         }
 
         // Verify public key is unchanged after all refreshes
         let final_result = ceremony.finalize().unwrap();
-        assert_eq!(final_result.public_key, original_public_key,
-            "Public key must be preserved across refresh epochs");
+        assert_eq!(
+            final_result.public_key, original_public_key,
+            "Public key must be preserved across refresh epochs"
+        );
 
         // Verify cross-epoch shares are uncorrelated (shares from epoch 0 can't
         // combine with shares from epoch 3 to reconstruct the secret)
@@ -1786,9 +1954,7 @@ mod tests {
             ceremony.add_participant(ParticipantId(i), 0).unwrap();
         }
         for i in 1..=n as u32 {
-            let dealer = crate::dealer::Dealer::new(
-                ParticipantId(i), t, n, &mut OsRng,
-            ).unwrap();
+            let dealer = crate::dealer::Dealer::new(ParticipantId(i), t, n, &mut OsRng).unwrap();
             let deal = dealer.generate_deal();
             ceremony.submit_deal(ParticipantId(i), deal, 0).unwrap();
         }
@@ -1802,9 +1968,8 @@ mod tests {
         // Only t participants submit refresh deals (the minimum)
         let mut refresh = ceremony.refresh_shares().unwrap();
         for i in 1..=t as u32 {
-            let deal = RefreshRound::generate_refresh_deal(
-                ParticipantId(i), t, n, 1, &mut OsRng,
-            ).unwrap();
+            let deal =
+                RefreshRound::generate_refresh_deal(ParticipantId(i), t, n, 1, &mut OsRng).unwrap();
             refresh.submit_deal(deal).unwrap();
         }
         assert!(refresh.is_complete());
@@ -1820,7 +1985,9 @@ mod tests {
             .collect();
 
         let refreshed_secret = ceremony.reconstruct_secret(&refreshed[0..t]).unwrap();
-        assert_eq!(refreshed_secret, original_secret,
-            "Secret must survive refresh with only t dealers");
+        assert_eq!(
+            refreshed_secret, original_secret,
+            "Secret must survive refresh with only t dealers"
+        );
     }
 }

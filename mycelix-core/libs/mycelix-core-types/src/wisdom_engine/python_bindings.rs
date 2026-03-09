@@ -18,9 +18,8 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use super::{
-    SymthaeaCausalBridge, SymthaeaPattern, PatternEpistemics,
-    OracleVerificationLevel,
-    PatternId, SymthaeaId,
+    OracleVerificationLevel, PatternEpistemics, PatternId, SymthaeaCausalBridge, SymthaeaId,
+    SymthaeaPattern,
 };
 
 // ==============================================================================
@@ -75,9 +74,7 @@ impl PyPatternEpistemics {
     fn __repr__(&self) -> String {
         format!(
             "PyPatternEpistemics(E{}, N{}, M{})",
-            self.inner.e_level,
-            self.inner.n_level,
-            self.inner.m_level
+            self.inner.e_level, self.inner.n_level, self.inner.m_level
         )
     }
 }
@@ -275,12 +272,7 @@ impl PyWisdomBridge {
     ///     success: Whether it succeeded
     ///     context: Optional context string
     #[pyo3(signature = (pattern_id, success, context=None))]
-    pub fn record_outcome(
-        &mut self,
-        pattern_id: u64,
-        success: bool,
-        context: Option<&str>,
-    ) {
+    pub fn record_outcome(&mut self, pattern_id: u64, success: bool, context: Option<&str>) {
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_secs())
@@ -303,9 +295,10 @@ impl PyWisdomBridge {
     /// Returns:
     ///     PyPattern if found, None otherwise
     pub fn get_pattern(&self, pattern_id: u64) -> Option<PyPattern> {
-        self.inner.patterns.get(&pattern_id).map(|p| PyPattern {
-            inner: p.clone(),
-        })
+        self.inner
+            .patterns
+            .get(&pattern_id)
+            .map(|p| PyPattern { inner: p.clone() })
     }
 
     /// List all patterns in a domain
@@ -320,11 +313,7 @@ impl PyWisdomBridge {
         self.inner
             .patterns
             .values()
-            .filter(|p| {
-                domain
-                    .map(|d| p.problem_domain.contains(d))
-                    .unwrap_or(true)
-            })
+            .filter(|p| domain.map(|d| p.problem_domain.contains(d)).unwrap_or(true))
             .map(|p| PyPattern { inner: p.clone() })
             .collect()
     }
@@ -343,11 +332,7 @@ impl PyWisdomBridge {
             .inner
             .patterns
             .values()
-            .filter(|p| {
-                domain
-                    .map(|d| p.problem_domain.contains(d))
-                    .unwrap_or(true)
-            })
+            .filter(|p| domain.map(|d| p.problem_domain.contains(d)).unwrap_or(true))
             .cloned()
             .collect();
 
@@ -418,11 +403,14 @@ impl PyWisdomBridge {
             .unwrap_or(0);
 
         // Convert to borrowed form for the API
-        let ctx: Vec<(&str, &str)> = context.iter()
+        let ctx: Vec<(&str, &str)> = context
+            .iter()
             .map(|(k, v)| (k.as_str(), v.as_str()))
             .collect();
 
-        self.inner.associative_learner.learn(&ctx, action, outcome, timestamp);
+        self.inner
+            .associative_learner
+            .learn(&ctx, action, outcome, timestamp);
     }
 
     /// Predict the best action for a given context using HDC
@@ -434,7 +422,8 @@ impl PyWisdomBridge {
     ///     List of action predictions sorted by confidence
     pub fn hdc_predict(&mut self, context: Vec<(String, String)>) -> Vec<PyActionPrediction> {
         // Convert to borrowed form for the API
-        let ctx: Vec<(&str, &str)> = context.iter()
+        let ctx: Vec<(&str, &str)> = context
+            .iter()
             .map(|(k, v)| (k.as_str(), v.as_str()))
             .collect();
 

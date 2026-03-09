@@ -17,8 +17,8 @@ use std::collections::{HashMap, HashSet};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use super::PatternId;
 use super::symthaea::SymthaeaPattern;
+use super::PatternId;
 
 // =============================================================================
 // Similarity Metrics
@@ -201,7 +201,8 @@ impl PatternFeatures {
     /// Extract features from a SymthaeaPattern
     pub fn from_pattern(pattern: &SymthaeaPattern, timestamp: u64) -> Self {
         // Tokenize solution
-        let solution_tokens: HashSet<String> = pattern.solution
+        let solution_tokens: HashSet<String> = pattern
+            .solution
             .to_lowercase()
             .split_whitespace()
             .filter(|w| w.len() > 2)
@@ -211,16 +212,18 @@ impl PatternFeatures {
 
         // Generate bigrams
         let words: Vec<&str> = pattern.solution.split_whitespace().collect();
-        let solution_ngrams: HashSet<String> = words.windows(2)
+        let solution_ngrams: HashSet<String> = words
+            .windows(2)
             .map(|w| format!("{}_{}", w[0].to_lowercase(), w[1].to_lowercase()))
             .collect();
 
         // Use first structured domain_id if available, otherwise hash problem_domain string
         let domain_id = pattern.domain_ids.first().copied().unwrap_or_else(|| {
             // Simple hash of the problem_domain string
-            pattern.problem_domain.bytes().fold(0u64, |acc, b| {
-                acc.wrapping_mul(31).wrapping_add(b as u64)
-            })
+            pattern
+                .problem_domain
+                .bytes()
+                .fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64))
         });
 
         Self {
@@ -304,11 +307,8 @@ impl SimilarityCalculator {
         features_b: &PatternFeatures,
         timestamp: u64,
     ) -> SimilarityScore {
-        let mut score = SimilarityScore::new(
-            features_a.pattern_id,
-            features_b.pattern_id,
-            timestamp,
-        );
+        let mut score =
+            SimilarityScore::new(features_a.pattern_id, features_b.pattern_id, timestamp);
 
         // Domain similarity (exact match or not for now)
         score.domain_similarity = if features_a.domain_id == features_b.domain_id {
@@ -318,27 +318,18 @@ impl SimilarityCalculator {
         };
 
         // Solution similarity (Jaccard on tokens + ngrams)
-        score.solution_similarity = self.jaccard_similarity(
-            &features_a.solution_tokens,
-            &features_b.solution_tokens,
-        ) * 0.6 + self.jaccard_similarity(
-            &features_a.solution_ngrams,
-            &features_b.solution_ngrams,
-        ) * 0.4;
+        score.solution_similarity =
+            self.jaccard_similarity(&features_a.solution_tokens, &features_b.solution_tokens) * 0.6
+                + self.jaccard_similarity(&features_a.solution_ngrams, &features_b.solution_ngrams)
+                    * 0.4;
 
         // Outcome similarity (success rate closeness)
         let rate_diff = (features_a.success_rate - features_b.success_rate).abs();
         score.outcome_similarity = 1.0 - rate_diff.min(1.0);
 
         // Structural similarity (shared dependencies/dependents)
-        let dep_sim = self.jaccard_similarity(
-            &features_a.dependencies,
-            &features_b.dependencies,
-        );
-        let dependent_sim = self.jaccard_similarity(
-            &features_a.dependents,
-            &features_b.dependents,
-        );
+        let dep_sim = self.jaccard_similarity(&features_a.dependencies, &features_b.dependencies);
+        let dependent_sim = self.jaccard_similarity(&features_a.dependents, &features_b.dependents);
         score.structural_similarity = (dep_sim + dependent_sim) / 2.0;
 
         // Compute overall score
@@ -890,7 +881,11 @@ impl SimilarityRegistry {
         }
 
         // Sort by similarity descending
-        results.sort_by(|a, b| b.overall.partial_cmp(&a.overall).unwrap_or(std::cmp::Ordering::Equal));
+        results.sort_by(|a, b| {
+            b.overall
+                .partial_cmp(&a.overall)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         results
     }
@@ -940,7 +935,12 @@ impl SimilarityRegistry {
     }
 
     /// Review a duplicate candidate
-    pub fn review_duplicate(&mut self, pattern_a: PatternId, pattern_b: PatternId, decision: DuplicateDecision) {
+    pub fn review_duplicate(
+        &mut self,
+        pattern_a: PatternId,
+        pattern_b: PatternId,
+        decision: DuplicateDecision,
+    ) {
         for dup in &mut self.duplicates {
             if (dup.pattern_a == pattern_a && dup.pattern_b == pattern_b)
                 || (dup.pattern_a == pattern_b && dup.pattern_b == pattern_a)
@@ -1044,7 +1044,11 @@ impl SimilarityRegistry {
                         }
                     }
                 }
-                cluster.cohesion = if count > 0 { total_sim / count as f32 } else { 1.0 };
+                cluster.cohesion = if count > 0 {
+                    total_sim / count as f32
+                } else {
+                    1.0
+                };
 
                 self.clusters.insert(cluster.cluster_id, cluster.clone());
                 result.push(cluster);
@@ -1077,10 +1081,8 @@ impl SimilarityRegistry {
             }
 
             if dup.similarity >= 0.9 {
-                let mut suggestion = MergeSuggestion::new(
-                    vec![dup.pattern_a, dup.pattern_b],
-                    timestamp,
-                );
+                let mut suggestion =
+                    MergeSuggestion::new(vec![dup.pattern_a, dup.pattern_b], timestamp);
                 suggestion.confidence = dup.confidence;
                 suggestion.rationale = format!(
                     "Patterns have {:.0}% similarity: {}",
@@ -1109,7 +1111,13 @@ impl SimilarityRegistry {
     pub fn cluster_candidates(&mut self, pattern_id: PatternId, timestamp: u64) -> Vec<PatternId> {
         self.find_similar(pattern_id, self.config.related_threshold, timestamp)
             .into_iter()
-            .map(|s| if s.pattern_a == pattern_id { s.pattern_b } else { s.pattern_a })
+            .map(|s| {
+                if s.pattern_a == pattern_id {
+                    s.pattern_b
+                } else {
+                    s.pattern_a
+                }
+            })
             .collect()
     }
 }
@@ -1177,8 +1185,14 @@ mod tests {
     fn test_jaccard_similarity() {
         let calc = SimilarityCalculator::default();
 
-        let a: HashSet<String> = ["foo", "bar", "baz"].iter().map(|s| s.to_string()).collect();
-        let b: HashSet<String> = ["foo", "bar", "qux"].iter().map(|s| s.to_string()).collect();
+        let a: HashSet<String> = ["foo", "bar", "baz"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        let b: HashSet<String> = ["foo", "bar", "qux"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
 
         let sim = calc.jaccard_similarity(&a, &b);
         assert!((sim - 0.5).abs() < 0.01); // 2 common / 4 total = 0.5
@@ -1260,14 +1274,20 @@ mod tests {
         let features1 = PatternFeatures {
             pattern_id: 1,
             domain_id: 100,
-            solution_tokens: ["use", "cache", "for", "speed"].iter().map(|s| s.to_string()).collect(),
+            solution_tokens: ["use", "cache", "for", "speed"]
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
             ..Default::default()
         };
 
         let features2 = PatternFeatures {
             pattern_id: 2,
             domain_id: 100,
-            solution_tokens: ["use", "cache", "to", "improve", "speed"].iter().map(|s| s.to_string()).collect(),
+            solution_tokens: ["use", "cache", "to", "improve", "speed"]
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
             ..Default::default()
         };
 

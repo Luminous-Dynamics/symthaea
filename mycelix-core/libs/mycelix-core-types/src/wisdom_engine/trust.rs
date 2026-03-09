@@ -56,9 +56,9 @@ impl Default for TrustWeightConfig {
     fn default() -> Self {
         Self {
             min_trust_threshold: 0.1,
-            trust_weight: 0.3,  // 30% trust, 70% pattern performance
+            trust_weight: 0.3, // 30% trust, 70% pattern performance
             enable_trust_decay: true,
-            trust_decay_halflife: 604800,  // 1 week in seconds
+            trust_decay_halflife: 604800, // 1 week in seconds
             integrity_bonus: 1.2,
             low_performance_penalty: 0.7,
         }
@@ -95,7 +95,7 @@ impl AgentTrustContext {
             k_vector,
             last_updated: timestamp,
             patterns_contributed: 0,
-            pattern_success_rate: 0.5,  // Neutral
+            pattern_success_rate: 0.5, // Neutral
             vouched: false,
             vouch_strength: 0.0,
         }
@@ -136,7 +136,9 @@ impl AgentTrustContext {
         let decay_factor = 0.5_f32.powf(elapsed as f32 / halflife as f32);
 
         // Decay toward neutral (0.5) rather than zero
-        self.k_vector = self.k_vector.ema_merge(&KVector::neutral(), 1.0 - decay_factor);
+        self.k_vector = self
+            .k_vector
+            .ema_merge(&KVector::neutral(), 1.0 - decay_factor);
     }
 
     /// Update trust based on pattern outcome
@@ -274,12 +276,14 @@ impl AgentTrustRegistry {
 
     /// Register a new agent with initial K-Vector
     pub fn register_agent(&mut self, agent_id: SymthaeaId, k_vector: KVector, timestamp: u64) {
-        self.agents.insert(agent_id, AgentTrustContext::new(k_vector, timestamp));
+        self.agents
+            .insert(agent_id, AgentTrustContext::new(k_vector, timestamp));
     }
 
     /// Register a new agent with neutral trust
     pub fn register_new_agent(&mut self, agent_id: SymthaeaId, timestamp: u64) {
-        self.agents.insert(agent_id, AgentTrustContext::new_agent(timestamp));
+        self.agents
+            .insert(agent_id, AgentTrustContext::new_agent(timestamp));
     }
 
     /// Get trust context for an agent
@@ -293,8 +297,14 @@ impl AgentTrustRegistry {
     }
 
     /// Get or create trust context for an agent
-    pub fn get_or_create(&mut self, agent_id: SymthaeaId, timestamp: u64) -> &mut AgentTrustContext {
-        self.agents.entry(agent_id).or_insert_with(|| AgentTrustContext::new_agent(timestamp))
+    pub fn get_or_create(
+        &mut self,
+        agent_id: SymthaeaId,
+        timestamp: u64,
+    ) -> &mut AgentTrustContext {
+        self.agents
+            .entry(agent_id)
+            .or_insert_with(|| AgentTrustContext::new_agent(timestamp))
     }
 
     /// Get trust score for an agent (returns neutral 0.5 if unknown)
@@ -382,7 +392,11 @@ impl AgentTrustRegistry {
 
         TrustRegistryStats {
             total_agents: total,
-            average_trust: if total > 0 { sum_trust / total as f32 } else { 0.5 },
+            average_trust: if total > 0 {
+                sum_trust / total as f32
+            } else {
+                0.5
+            },
             high_trust_agents: high_trust,
             low_trust_agents: low_trust,
             vouched_agents: self.agents.values().filter(|c| c.vouched).count(),
@@ -457,4 +471,3 @@ pub struct TrustRegistryStats {
     /// Number of vouched agents
     pub vouched_agents: usize,
 }
-

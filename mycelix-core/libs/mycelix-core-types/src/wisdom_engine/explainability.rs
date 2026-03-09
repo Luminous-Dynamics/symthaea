@@ -10,10 +10,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use super::{
-    PatternId, AgentTrustRegistry, PatternLifecycleRegistry, PatternLifecycleState,
-    PatternDependencyRegistry, DependencyIssueType,
-    DomainRegistry, CollectivePatternRegistry, SymthaeaPattern,
-    CalibrationCurve,
+    AgentTrustRegistry, CalibrationCurve, CollectivePatternRegistry, DependencyIssueType,
+    DomainRegistry, PatternDependencyRegistry, PatternId, PatternLifecycleRegistry,
+    PatternLifecycleState, SymthaeaPattern,
 };
 
 // ==============================================================================
@@ -208,7 +207,12 @@ impl ExplanationFactor {
     /// Format factor for display
     pub fn display(&self) -> String {
         let symbol = self.impact.symbol();
-        format!("  {} {} (strength: {:.0}%)", symbol, self.description, self.strength * 100.0)
+        format!(
+            "  {} {} (strength: {:.0}%)",
+            symbol,
+            self.description,
+            self.strength * 100.0
+        )
     }
 }
 
@@ -295,28 +299,35 @@ impl PatternExplanation {
 
     /// Get positive factors only
     pub fn positive_factors(&self) -> Vec<&ExplanationFactor> {
-        self.factors.iter()
+        self.factors
+            .iter()
             .filter(|f| f.impact == FactorImpact::Positive)
             .collect()
     }
 
     /// Get negative factors only
     pub fn negative_factors(&self) -> Vec<&ExplanationFactor> {
-        self.factors.iter()
+        self.factors
+            .iter()
             .filter(|f| f.impact == FactorImpact::Negative)
             .collect()
     }
 
     /// Get neutral factors only
     pub fn neutral_factors(&self) -> Vec<&ExplanationFactor> {
-        self.factors.iter()
+        self.factors
+            .iter()
             .filter(|f| f.impact == FactorImpact::Neutral)
             .collect()
     }
 
     /// Sort factors by strength (strongest first)
     pub fn sort_by_strength(&mut self) {
-        self.factors.sort_by(|a, b| b.strength.partial_cmp(&a.strength).unwrap_or(std::cmp::Ordering::Equal));
+        self.factors.sort_by(|a, b| {
+            b.strength
+                .partial_cmp(&a.strength)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
     }
 
     /// Limit factors to top N
@@ -329,9 +340,15 @@ impl PatternExplanation {
     pub fn format_full(&self) -> String {
         let mut output = String::new();
 
-        output.push_str(&format!("Pattern #{}: \"{}\"\n\n", self.pattern_id, self.summary));
-        output.push_str(&format!("Recommendation: {} (confidence: {:.0}%)\n\n",
-            self.recommendation.label(), self.confidence * 100.0));
+        output.push_str(&format!(
+            "Pattern #{}: \"{}\"\n\n",
+            self.pattern_id, self.summary
+        ));
+        output.push_str(&format!(
+            "Recommendation: {} (confidence: {:.0}%)\n\n",
+            self.recommendation.label(),
+            self.confidence * 100.0
+        ));
 
         let positive = self.positive_factors();
         if !positive.is_empty() {
@@ -357,7 +374,8 @@ impl PatternExplanation {
 
     /// Format a brief one-liner explanation
     pub fn format_brief(&self) -> String {
-        format!("{}: {} (confidence: {:.0}%)",
+        format!(
+            "{}: {} (confidence: {:.0}%)",
             self.recommendation.label(),
             self.summary,
             self.confidence * 100.0
@@ -387,10 +405,7 @@ pub struct PatternComparison {
 
 impl PatternComparison {
     /// Create a new comparison
-    pub fn new(
-        explanation_a: PatternExplanation,
-        explanation_b: PatternExplanation,
-    ) -> Self {
+    pub fn new(explanation_a: PatternExplanation, explanation_b: PatternExplanation) -> Self {
         let pattern_a_id = explanation_a.pattern_id;
         let pattern_b_id = explanation_b.pattern_id;
 
@@ -401,9 +416,15 @@ impl PatternComparison {
         let (preferred, preference_reason) = if (score_a - score_b).abs() < 0.1 {
             (None, "Both patterns are roughly equivalent".to_string())
         } else if score_a > score_b {
-            (Some(pattern_a_id), format!("Pattern {} has better overall score", pattern_a_id))
+            (
+                Some(pattern_a_id),
+                format!("Pattern {} has better overall score", pattern_a_id),
+            )
         } else {
-            (Some(pattern_b_id), format!("Pattern {} has better overall score", pattern_b_id))
+            (
+                Some(pattern_b_id),
+                format!("Pattern {} has better overall score", pattern_b_id),
+            )
         };
 
         Self {
@@ -590,10 +611,13 @@ impl ExplainabilityRegistry {
 
         // Cache the result
         if self.config.cache_ttl > 0 {
-            self.cache.insert(pattern_id, CachedExplanation {
-                explanation: explanation.clone(),
-                expires_at: timestamp + self.config.cache_ttl,
-            });
+            self.cache.insert(
+                pattern_id,
+                CachedExplanation {
+                    explanation: explanation.clone(),
+                    expires_at: timestamp + self.config.cache_ttl,
+                },
+            );
         }
 
         explanation
@@ -601,7 +625,8 @@ impl ExplainabilityRegistry {
 
     /// Get cached explanation if still valid
     fn get_cached(&self, pattern_id: PatternId, current_time: u64) -> Option<PatternExplanation> {
-        self.cache.get(&pattern_id)
+        self.cache
+            .get(&pattern_id)
             .filter(|cached| cached.expires_at > current_time)
             .map(|cached| cached.explanation.clone())
     }
@@ -620,11 +645,26 @@ impl ExplainabilityRegistry {
     fn generate_success_rate_factor(&self, pattern: &SymthaeaPattern) -> ExplanationFactor {
         let rate = pattern.success_rate;
         let (impact, description) = match rate {
-            r if r >= 0.8 => (FactorImpact::Positive, format!("High success rate ({:.0}%)", r * 100.0)),
-            r if r >= 0.6 => (FactorImpact::Positive, format!("Good success rate ({:.0}%)", r * 100.0)),
-            r if r >= 0.4 => (FactorImpact::Neutral, format!("Moderate success rate ({:.0}%)", r * 100.0)),
-            r if r >= 0.2 => (FactorImpact::Negative, format!("Low success rate ({:.0}%)", r * 100.0)),
-            r => (FactorImpact::Negative, format!("Very low success rate ({:.0}%)", r * 100.0)),
+            r if r >= 0.8 => (
+                FactorImpact::Positive,
+                format!("High success rate ({:.0}%)", r * 100.0),
+            ),
+            r if r >= 0.6 => (
+                FactorImpact::Positive,
+                format!("Good success rate ({:.0}%)", r * 100.0),
+            ),
+            r if r >= 0.4 => (
+                FactorImpact::Neutral,
+                format!("Moderate success rate ({:.0}%)", r * 100.0),
+            ),
+            r if r >= 0.2 => (
+                FactorImpact::Negative,
+                format!("Low success rate ({:.0}%)", r * 100.0),
+            ),
+            r => (
+                FactorImpact::Negative,
+                format!("Very low success rate ({:.0}%)", r * 100.0),
+            ),
         };
 
         let strength = if rate >= 0.5 { rate } else { 1.0 - rate };
@@ -634,17 +674,37 @@ impl ExplainabilityRegistry {
             impact,
             strength,
             description,
-        ).with_evidence(format!("{}/{} successful uses", pattern.success_count, pattern.usage_count))
+        )
+        .with_evidence(format!(
+            "{}/{} successful uses",
+            pattern.success_count, pattern.usage_count
+        ))
     }
 
     /// Generate usage count factor
     fn generate_usage_count_factor(&self, pattern: &SymthaeaPattern) -> ExplanationFactor {
         let count = pattern.usage_count;
         let (impact, description, strength) = match count {
-            c if c >= 100 => (FactorImpact::Positive, format!("Well-tested ({} uses)", c), 0.8),
-            c if c >= 50 => (FactorImpact::Positive, format!("Moderately tested ({} uses)", c), 0.6),
-            c if c >= 10 => (FactorImpact::Neutral, format!("Some testing ({} uses)", c), 0.4),
-            c if c >= 1 => (FactorImpact::Neutral, format!("Limited testing ({} uses)", c), 0.3),
+            c if c >= 100 => (
+                FactorImpact::Positive,
+                format!("Well-tested ({} uses)", c),
+                0.8,
+            ),
+            c if c >= 50 => (
+                FactorImpact::Positive,
+                format!("Moderately tested ({} uses)", c),
+                0.6,
+            ),
+            c if c >= 10 => (
+                FactorImpact::Neutral,
+                format!("Some testing ({} uses)", c),
+                0.4,
+            ),
+            c if c >= 1 => (
+                FactorImpact::Neutral,
+                format!("Limited testing ({} uses)", c),
+                0.3,
+            ),
             _ => (FactorImpact::Negative, "Never used".to_string(), 0.2),
         };
 
@@ -667,11 +727,26 @@ impl ExplainabilityRegistry {
         let trust_score = trust_context.trust_score();
 
         let (impact, description) = match trust_score {
-            t if t >= 0.8 => (FactorImpact::Positive, format!("From highly trusted source (K={:.2})", t)),
-            t if t >= 0.6 => (FactorImpact::Positive, format!("From trusted source (K={:.2})", t)),
-            t if t >= 0.4 => (FactorImpact::Neutral, format!("From moderately trusted source (K={:.2})", t)),
-            t if t >= 0.2 => (FactorImpact::Negative, format!("From low-trust source (K={:.2})", t)),
-            t => (FactorImpact::Negative, format!("From untrusted source (K={:.2})", t)),
+            t if t >= 0.8 => (
+                FactorImpact::Positive,
+                format!("From highly trusted source (K={:.2})", t),
+            ),
+            t if t >= 0.6 => (
+                FactorImpact::Positive,
+                format!("From trusted source (K={:.2})", t),
+            ),
+            t if t >= 0.4 => (
+                FactorImpact::Neutral,
+                format!("From moderately trusted source (K={:.2})", t),
+            ),
+            t if t >= 0.2 => (
+                FactorImpact::Negative,
+                format!("From low-trust source (K={:.2})", t),
+            ),
+            t => (
+                FactorImpact::Negative,
+                format!("From untrusted source (K={:.2})", t),
+            ),
         };
 
         Some(ExplanationFactor::new(
@@ -693,23 +768,44 @@ impl ExplainabilityRegistry {
         let (impact, description, strength) = match info.state {
             PatternLifecycleState::Active => {
                 if info.deprecation_count == 0 {
-                    (FactorImpact::Positive, "Active pattern, never deprecated".to_string(), 0.7)
+                    (
+                        FactorImpact::Positive,
+                        "Active pattern, never deprecated".to_string(),
+                        0.7,
+                    )
                 } else {
-                    (FactorImpact::Neutral, format!("Active pattern (resurrected {} times)", info.resurrection_count), 0.5)
+                    (
+                        FactorImpact::Neutral,
+                        format!(
+                            "Active pattern (resurrected {} times)",
+                            info.resurrection_count
+                        ),
+                        0.5,
+                    )
                 }
             }
             PatternLifecycleState::Deprecated => {
-                let reason = info.deprecation_reason.as_ref()
+                let reason = info
+                    .deprecation_reason
+                    .as_ref()
                     .map(|r| format!("{:?}", r))
                     .unwrap_or_else(|| "unknown reason".to_string());
-                (FactorImpact::Negative, format!("Deprecated: {}", reason), 0.8)
+                (
+                    FactorImpact::Negative,
+                    format!("Deprecated: {}", reason),
+                    0.8,
+                )
             }
-            PatternLifecycleState::Archived => {
-                (FactorImpact::Negative, "Archived pattern (no longer maintained)".to_string(), 0.9)
-            }
-            PatternLifecycleState::Retired => {
-                (FactorImpact::Negative, "Retired pattern (do not use)".to_string(), 1.0)
-            }
+            PatternLifecycleState::Archived => (
+                FactorImpact::Negative,
+                "Archived pattern (no longer maintained)".to_string(),
+                0.9,
+            ),
+            PatternLifecycleState::Retired => (
+                FactorImpact::Negative,
+                "Retired pattern (do not use)".to_string(),
+                1.0,
+            ),
         };
 
         // Check for superseded
@@ -760,10 +856,14 @@ impl ExplainabilityRegistry {
             }
         } else {
             // Some dependencies not satisfied
-            let missing_count = resolution.issues.iter()
+            let missing_count = resolution
+                .issues
+                .iter()
                 .filter(|i| matches!(i.issue_type, DependencyIssueType::MissingRequired))
                 .count();
-            let unmet_count = resolution.issues.iter()
+            let unmet_count = resolution
+                .issues
+                .iter()
                 .filter(|i| matches!(i.issue_type, DependencyIssueType::UnmetPrerequisite))
                 .count();
 
@@ -804,7 +904,9 @@ impl ExplainabilityRegistry {
         }
 
         // Get domain names for display
-        let domain_names: Vec<String> = pattern.domain_ids.iter()
+        let domain_names: Vec<String> = pattern
+            .domain_ids
+            .iter()
             .filter_map(|&id| domain_registry.get(id))
             .map(|d| d.name.clone())
             .collect();
@@ -837,7 +939,10 @@ impl ExplainabilityRegistry {
                 ExplanationFactorType::CollectiveSignal,
                 FactorImpact::Positive,
                 0.8,
-                format!("Emerging pattern ({} independent discoveries)", context.independent_discoveries),
+                format!(
+                    "Emerging pattern ({} independent discoveries)",
+                    context.independent_discoveries
+                ),
             ));
         }
 
@@ -888,9 +993,21 @@ impl ExplainabilityRegistry {
         }
 
         let (impact, description) = match calibration_error {
-            e if e < 0.1 => (FactorImpact::Positive, format!("Predictions well-calibrated (error: {:.1}%)", e * 100.0)),
-            e if e < 0.2 => (FactorImpact::Neutral, format!("Predictions moderately calibrated (error: {:.1}%)", e * 100.0)),
-            e => (FactorImpact::Negative, format!("Predictions poorly calibrated (error: {:.1}%)", e * 100.0)),
+            e if e < 0.1 => (
+                FactorImpact::Positive,
+                format!("Predictions well-calibrated (error: {:.1}%)", e * 100.0),
+            ),
+            e if e < 0.2 => (
+                FactorImpact::Neutral,
+                format!(
+                    "Predictions moderately calibrated (error: {:.1}%)",
+                    e * 100.0
+                ),
+            ),
+            e => (
+                FactorImpact::Negative,
+                format!("Predictions poorly calibrated (error: {:.1}%)", e * 100.0),
+            ),
         };
 
         Some(ExplanationFactor::new(
@@ -902,7 +1019,10 @@ impl ExplainabilityRegistry {
     }
 
     /// Generate production validation factor
-    fn generate_production_validation_factor(&self, pattern: &SymthaeaPattern) -> ExplanationFactor {
+    fn generate_production_validation_factor(
+        &self,
+        pattern: &SymthaeaPattern,
+    ) -> ExplanationFactor {
         if pattern.validated_in_production {
             ExplanationFactor::new(
                 ExplanationFactorType::ProductionValidated,
@@ -925,9 +1045,18 @@ impl ExplainabilityRegistry {
         let phi = pattern.phi_at_learning;
 
         let (impact, description) = match phi {
-            p if p >= 0.8 => (FactorImpact::Positive, format!("Learned at high awareness (Phi={:.2})", p)),
-            p if p >= 0.5 => (FactorImpact::Neutral, format!("Learned at moderate awareness (Phi={:.2})", p)),
-            p => (FactorImpact::Neutral, format!("Learned at low awareness (Phi={:.2})", p)),
+            p if p >= 0.8 => (
+                FactorImpact::Positive,
+                format!("Learned at high awareness (Phi={:.2})", p),
+            ),
+            p if p >= 0.5 => (
+                FactorImpact::Neutral,
+                format!("Learned at moderate awareness (Phi={:.2})", p),
+            ),
+            p => (
+                FactorImpact::Neutral,
+                format!("Learned at low awareness (Phi={:.2})", p),
+            ),
         };
 
         ExplanationFactor::new(
@@ -941,14 +1070,26 @@ impl ExplainabilityRegistry {
     /// Record factor statistics
     fn record_factor_stats(&mut self, factor: &ExplanationFactor) {
         self.stats.total_factors += 1;
-        *self.stats.factor_counts.entry(factor.factor_type).or_insert(0) += 1;
+        *self
+            .stats
+            .factor_counts
+            .entry(factor.factor_type)
+            .or_insert(0) += 1;
 
         match factor.impact {
             FactorImpact::Positive => {
-                *self.stats.positive_factor_counts.entry(factor.factor_type).or_insert(0) += 1;
+                *self
+                    .stats
+                    .positive_factor_counts
+                    .entry(factor.factor_type)
+                    .or_insert(0) += 1;
             }
             FactorImpact::Negative => {
-                *self.stats.negative_factor_counts.entry(factor.factor_type).or_insert(0) += 1;
+                *self
+                    .stats
+                    .negative_factor_counts
+                    .entry(factor.factor_type)
+                    .or_insert(0) += 1;
             }
             FactorImpact::Neutral => {}
         }
@@ -989,7 +1130,11 @@ impl ExplainabilityRegistry {
     }
 
     /// Generate summary text for explanation
-    fn generate_summary(&self, pattern: &SymthaeaPattern, explanation: &PatternExplanation) -> String {
+    fn generate_summary(
+        &self,
+        pattern: &SymthaeaPattern,
+        explanation: &PatternExplanation,
+    ) -> String {
         let recommendation_text = match explanation.recommendation {
             Recommendation::StronglyRecommend => "Highly recommended",
             Recommendation::Recommend => "Recommended",
@@ -1021,15 +1166,25 @@ impl ExplainabilityRegistry {
         timestamp: u64,
     ) -> PatternComparison {
         let explanation_a = self.explain_pattern(
-            pattern_a, trust_registry, lifecycle_registry,
-            dependency_registry, domain_registry, collective_registry,
-            calibration, timestamp,
+            pattern_a,
+            trust_registry,
+            lifecycle_registry,
+            dependency_registry,
+            domain_registry,
+            collective_registry,
+            calibration,
+            timestamp,
         );
 
         let explanation_b = self.explain_pattern(
-            pattern_b, trust_registry, lifecycle_registry,
-            dependency_registry, domain_registry, collective_registry,
-            calibration, timestamp,
+            pattern_b,
+            trust_registry,
+            lifecycle_registry,
+            dependency_registry,
+            domain_registry,
+            collective_registry,
+            calibration,
+            timestamp,
         );
 
         let mut comparison = PatternComparison::new(explanation_a, explanation_b);
@@ -1037,9 +1192,7 @@ impl ExplainabilityRegistry {
         // Find key differentiators
         if pattern_a.success_rate != pattern_b.success_rate {
             let diff = (pattern_a.success_rate - pattern_b.success_rate).abs() * 100.0;
-            comparison.add_differentiator(format!(
-                "Success rate differs by {:.0}%", diff
-            ));
+            comparison.add_differentiator(format!("Success rate differs by {:.0}%", diff));
         }
 
         if pattern_a.usage_count != pattern_b.usage_count {
@@ -1056,7 +1209,10 @@ impl ExplainabilityRegistry {
     pub fn explain_recommendation(&self, explanation: &PatternExplanation) -> String {
         let mut output = String::new();
 
-        output.push_str(&format!("Recommendation: {}\n", explanation.recommendation.label()));
+        output.push_str(&format!(
+            "Recommendation: {}\n",
+            explanation.recommendation.label()
+        ));
         output.push('\n');
 
         let positive = explanation.positive_factors();
@@ -1124,12 +1280,14 @@ impl ExplainabilityRegistry {
         let mut negative_vec: Vec<_> = self.stats.negative_factor_counts.iter().collect();
         negative_vec.sort_by(|a, b| b.1.cmp(a.1));
 
-        let most_common_positive = positive_vec.iter()
+        let most_common_positive = positive_vec
+            .iter()
             .take(5)
             .map(|(&ft, &count)| (ft, count))
             .collect();
 
-        let most_common_negative = negative_vec.iter()
+        let most_common_negative = negative_vec
+            .iter()
             .take(5)
             .map(|(&ft, &count)| (ft, count))
             .collect();
@@ -1205,7 +1363,9 @@ impl ExplainabilityRegistry {
 
         // Calculate feasibility
         let score_gap = 0.8 - explanation.confidence; // Target 80% for StronglyRecommend
-        let hard_count = plan.actions.iter()
+        let hard_count = plan
+            .actions
+            .iter()
             .filter(|a| a.effort == ActionEffortLevel::Hard)
             .count();
         plan.feasibility = PlanFeasibility::from_gap_and_effort(score_gap, hard_count);
@@ -1228,16 +1388,19 @@ impl ExplainabilityRegistry {
                 let current = format!("{:.0}%", pattern.success_rate * 100.0);
                 let target = "75%+".to_string();
                 let gap = (0.75 - pattern.success_rate).max(0.0);
-                Some(CounterfactualFactor::new(
-                    factor.factor_type,
-                    current,
-                    target,
-                    gap,
-                    gap * 0.3, // Success rate has ~30% impact
-                ).with_description(format!(
-                    "Improve success rate from {:.0}% to 75%+ through testing and refinement",
-                    pattern.success_rate * 100.0
-                )))
+                Some(
+                    CounterfactualFactor::new(
+                        factor.factor_type,
+                        current,
+                        target,
+                        gap,
+                        gap * 0.3, // Success rate has ~30% impact
+                    )
+                    .with_description(format!(
+                        "Improve success rate from {:.0}% to 75%+ through testing and refinement",
+                        pattern.success_rate * 100.0
+                    )),
+                )
             }
             ExplanationFactorType::UsageCount => {
                 let current = format!("{} uses", pattern.usage_count);
@@ -1247,72 +1410,74 @@ impl ExplainabilityRegistry {
                 } else {
                     0.0
                 };
-                Some(CounterfactualFactor::new(
-                    factor.factor_type,
-                    current,
-                    target,
-                    gap,
-                    gap * 0.15, // Usage has ~15% impact
-                ).with_description(format!(
-                    "Increase usage from {} to 100+ to build confidence",
-                    pattern.usage_count
-                )))
+                Some(
+                    CounterfactualFactor::new(
+                        factor.factor_type,
+                        current,
+                        target,
+                        gap,
+                        gap * 0.15, // Usage has ~15% impact
+                    )
+                    .with_description(format!(
+                        "Increase usage from {} to 100+ to build confidence",
+                        pattern.usage_count
+                    )),
+                )
             }
-            ExplanationFactorType::TrustScore => {
-                Some(CounterfactualFactor::new(
+            ExplanationFactorType::TrustScore => Some(
+                CounterfactualFactor::new(
                     factor.factor_type,
                     "Low trust",
                     "High trust (K > 0.7)",
                     0.3,
                     0.15,
-                ).with_description(
-                    "Build trust through consistent positive contributions and vouching"
-                ))
-            }
-            ExplanationFactorType::LifecycleState => {
-                Some(CounterfactualFactor::new(
+                )
+                .with_description(
+                    "Build trust through consistent positive contributions and vouching",
+                ),
+            ),
+            ExplanationFactorType::LifecycleState => Some(
+                CounterfactualFactor::new(
                     factor.factor_type,
                     "Deprecated/Archived",
                     "Active",
                     0.5,
                     0.2,
-                ).with_description(
-                    "Resurrect or replace with an active pattern variant"
-                ))
-            }
-            ExplanationFactorType::DependencySatisfied => {
-                Some(CounterfactualFactor::new(
+                )
+                .with_description("Resurrect or replace with an active pattern variant"),
+            ),
+            ExplanationFactorType::DependencySatisfied => Some(
+                CounterfactualFactor::new(
                     factor.factor_type,
                     "Dependencies missing",
                     "All dependencies satisfied",
                     0.4,
                     0.15,
-                ).with_description(
-                    "Resolve missing prerequisites before using this pattern"
-                ))
-            }
-            ExplanationFactorType::ProductionValidated => {
-                Some(CounterfactualFactor::new(
+                )
+                .with_description("Resolve missing prerequisites before using this pattern"),
+            ),
+            ExplanationFactorType::ProductionValidated => Some(
+                CounterfactualFactor::new(
                     factor.factor_type,
                     "Not validated",
                     "Production validated",
                     0.3,
                     0.1,
-                ).with_description(
-                    "Validate pattern in production environment to increase confidence"
-                ))
-            }
-            ExplanationFactorType::CalibrationAccuracy => {
-                Some(CounterfactualFactor::new(
+                )
+                .with_description(
+                    "Validate pattern in production environment to increase confidence",
+                ),
+            ),
+            ExplanationFactorType::CalibrationAccuracy => Some(
+                CounterfactualFactor::new(
                     factor.factor_type,
                     "Poorly calibrated",
                     "Well calibrated (<10% error)",
                     0.3,
                     0.1,
-                ).with_description(
-                    "Improve prediction accuracy through more outcome tracking"
-                ))
-            }
+                )
+                .with_description("Improve prediction accuracy through more outcome tracking"),
+            ),
             _ => None, // Domain fit and collective signals are harder to change
         }
     }
@@ -1326,155 +1491,152 @@ impl ExplainabilityRegistry {
         match factor.factor_type {
             ExplanationFactorType::SuccessRate => {
                 if pattern.success_rate < 0.5 {
-                    Some(ActionSuggestion::new(
-                        "Review and fix failure cases causing low success rate",
-                        9,
-                        0.25,
-                        ActionEffortLevel::Hard,
-                        factor.factor_type,
-                    ).with_rationale(format!(
-                        "Current {:.0}% success rate is below acceptable threshold",
-                        pattern.success_rate * 100.0
-                    )))
+                    Some(
+                        ActionSuggestion::new(
+                            "Review and fix failure cases causing low success rate",
+                            9,
+                            0.25,
+                            ActionEffortLevel::Hard,
+                            factor.factor_type,
+                        )
+                        .with_rationale(format!(
+                            "Current {:.0}% success rate is below acceptable threshold",
+                            pattern.success_rate * 100.0
+                        )),
+                    )
                 } else if pattern.success_rate < 0.75 {
-                    Some(ActionSuggestion::new(
-                        "Analyze edge cases to improve success rate",
-                        7,
-                        0.15,
-                        ActionEffortLevel::Medium,
-                        factor.factor_type,
-                    ).with_rationale(
-                        "Moderate success rate has room for improvement"
-                    ))
+                    Some(
+                        ActionSuggestion::new(
+                            "Analyze edge cases to improve success rate",
+                            7,
+                            0.15,
+                            ActionEffortLevel::Medium,
+                            factor.factor_type,
+                        )
+                        .with_rationale("Moderate success rate has room for improvement"),
+                    )
                 } else {
                     None
                 }
             }
             ExplanationFactorType::UsageCount => {
                 if pattern.usage_count < 10 {
-                    Some(ActionSuggestion::new(
-                        "Increase pattern usage to build statistical confidence",
-                        5,
-                        0.1,
-                        ActionEffortLevel::Easy,
-                        factor.factor_type,
-                    ).with_rationale(
-                        "Low usage count means insufficient data for reliable assessment"
-                    ))
+                    Some(
+                        ActionSuggestion::new(
+                            "Increase pattern usage to build statistical confidence",
+                            5,
+                            0.1,
+                            ActionEffortLevel::Easy,
+                            factor.factor_type,
+                        )
+                        .with_rationale(
+                            "Low usage count means insufficient data for reliable assessment",
+                        ),
+                    )
                 } else {
                     None
                 }
             }
-            ExplanationFactorType::TrustScore => {
-                Some(ActionSuggestion::new(
+            ExplanationFactorType::TrustScore => Some(
+                ActionSuggestion::new(
                     "Request vouching from trusted community members",
                     6,
                     0.12,
                     ActionEffortLevel::Medium,
                     factor.factor_type,
-                ).with_rationale(
-                    "Higher trust score improves pattern credibility"
-                ))
-            }
-            ExplanationFactorType::LifecycleState => {
-                Some(ActionSuggestion::new(
+                )
+                .with_rationale("Higher trust score improves pattern credibility"),
+            ),
+            ExplanationFactorType::LifecycleState => Some(
+                ActionSuggestion::new(
                     "Consider creating an updated version of this pattern",
                     8,
                     0.2,
                     ActionEffortLevel::Hard,
                     factor.factor_type,
-                ).with_rationale(
-                    "Deprecated patterns should be replaced with improved versions"
-                ))
-            }
-            ExplanationFactorType::DependencySatisfied => {
-                Some(ActionSuggestion::new(
+                )
+                .with_rationale("Deprecated patterns should be replaced with improved versions"),
+            ),
+            ExplanationFactorType::DependencySatisfied => Some(
+                ActionSuggestion::new(
                     "Resolve missing pattern dependencies",
                     9,
                     0.18,
                     ActionEffortLevel::Medium,
                     factor.factor_type,
-                ).with_rationale(
-                    "Missing dependencies prevent effective pattern application"
-                ))
-            }
-            ExplanationFactorType::ProductionValidated => {
-                Some(ActionSuggestion::new(
+                )
+                .with_rationale("Missing dependencies prevent effective pattern application"),
+            ),
+            ExplanationFactorType::ProductionValidated => Some(
+                ActionSuggestion::new(
                     "Deploy pattern in production with monitoring",
                     7,
                     0.12,
                     ActionEffortLevel::Medium,
                     factor.factor_type,
-                ).with_rationale(
-                    "Production validation significantly increases confidence"
-                ))
-            }
-            ExplanationFactorType::CalibrationAccuracy => {
-                Some(ActionSuggestion::new(
+                )
+                .with_rationale("Production validation significantly increases confidence"),
+            ),
+            ExplanationFactorType::CalibrationAccuracy => Some(
+                ActionSuggestion::new(
                     "Track more outcomes to improve prediction calibration",
                     4,
                     0.08,
                     ActionEffortLevel::Easy,
                     factor.factor_type,
-                ).with_rationale(
-                    "Better calibration improves prediction reliability"
-                ))
-            }
-            ExplanationFactorType::DomainFit => {
-                Some(ActionSuggestion::new(
+                )
+                .with_rationale("Better calibration improves prediction reliability"),
+            ),
+            ExplanationFactorType::DomainFit => Some(
+                ActionSuggestion::new(
                     "Add domain classification to improve discoverability",
                     3,
                     0.05,
                     ActionEffortLevel::Easy,
                     factor.factor_type,
-                ).with_rationale(
-                    "Proper domain classification helps users find relevant patterns"
-                ))
-            }
-            ExplanationFactorType::CollectiveSignal => {
-                Some(ActionSuggestion::new(
+                )
+                .with_rationale("Proper domain classification helps users find relevant patterns"),
+            ),
+            ExplanationFactorType::CollectiveSignal => Some(
+                ActionSuggestion::new(
                     "Promote pattern in relevant communities",
                     4,
                     0.08,
                     ActionEffortLevel::Medium,
                     factor.factor_type,
-                ).with_rationale(
-                    "Collective adoption signals increase pattern visibility"
-                ))
-            }
-            ExplanationFactorType::RecentTrend => {
-                Some(ActionSuggestion::new(
+                )
+                .with_rationale("Collective adoption signals increase pattern visibility"),
+            ),
+            ExplanationFactorType::RecentTrend => Some(
+                ActionSuggestion::new(
                     "Investigate recent decline and address root causes",
                     8,
                     0.15,
                     ActionEffortLevel::Hard,
                     factor.factor_type,
-                ).with_rationale(
-                    "Declining trends indicate emerging problems"
-                ))
-            }
-            ExplanationFactorType::PhiAtLearning => {
-                Some(ActionSuggestion::new(
+                )
+                .with_rationale("Declining trends indicate emerging problems"),
+            ),
+            ExplanationFactorType::PhiAtLearning => Some(
+                ActionSuggestion::new(
                     "Improve pattern documentation for better initial understanding",
                     3,
                     0.05,
                     ActionEffortLevel::Easy,
                     factor.factor_type,
-                ).with_rationale(
-                    "Better phi (coherence) at learning time improves adoption"
-                ))
-            }
-            ExplanationFactorType::Superseded => {
-                Some(ActionSuggestion::new(
+                )
+                .with_rationale("Better phi (coherence) at learning time improves adoption"),
+            ),
+            ExplanationFactorType::Superseded => Some(
+                ActionSuggestion::new(
                     "Migrate to the superseding pattern or create an improved version",
                     9,
                     0.2,
                     ActionEffortLevel::Hard,
                     factor.factor_type,
-                ).with_rationale(
-                    "This pattern has been superseded by a newer version"
-                ))
-            }
+                )
+                .with_rationale("This pattern has been superseded by a newer version"),
+            ),
         }
     }
 
@@ -1838,7 +2000,9 @@ impl ImprovementPlan {
     /// Sort actions by ROI (best return on investment first)
     pub fn sort_actions_by_roi(&mut self) {
         self.actions.sort_by(|a, b| {
-            b.roi_score().partial_cmp(&a.roi_score()).unwrap_or(std::cmp::Ordering::Equal)
+            b.roi_score()
+                .partial_cmp(&a.roi_score())
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
     }
 
@@ -1851,21 +2015,25 @@ impl ImprovementPlan {
     pub fn top_actions(&self, n: usize) -> Vec<&ActionSuggestion> {
         let mut sorted: Vec<_> = self.actions.iter().collect();
         sorted.sort_by(|a, b| {
-            b.roi_score().partial_cmp(&a.roi_score()).unwrap_or(std::cmp::Ordering::Equal)
+            b.roi_score()
+                .partial_cmp(&a.roi_score())
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
         sorted.into_iter().take(n).collect()
     }
 
     /// Get quick wins (high impact, low effort)
     pub fn quick_wins(&self) -> Vec<&ActionSuggestion> {
-        self.actions.iter()
+        self.actions
+            .iter()
             .filter(|a| a.effort == ActionEffortLevel::Easy && a.estimated_impact >= 0.1)
             .collect()
     }
 
     /// Calculate total potential improvement
     pub fn total_potential_improvement(&self) -> f32 {
-        self.counterfactuals.iter()
+        self.counterfactuals
+            .iter()
             .map(|cf| cf.potential_improvement)
             .sum()
     }
@@ -1928,7 +2096,10 @@ impl ImprovementPlan {
                 "Pattern #{}: {} quick wins available, best: {}",
                 self.pattern_id,
                 quick_wins.len(),
-                quick_wins.first().map(|a| a.action.as_str()).unwrap_or("none")
+                quick_wins
+                    .first()
+                    .map(|a| a.action.as_str())
+                    .unwrap_or("none")
             )
         }
     }

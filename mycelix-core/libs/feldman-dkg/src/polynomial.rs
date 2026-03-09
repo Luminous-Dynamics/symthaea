@@ -6,8 +6,8 @@ use rand_core::CryptoRngCore;
 use serde::{Deserialize, Serialize};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
-use crate::scalar::Scalar;
 use crate::error::{DkgError, DkgResult};
+use crate::scalar::Scalar;
 
 /// A polynomial over the scalar field
 ///
@@ -111,9 +111,7 @@ impl Polynomial {
 ///
 /// Given t points (x_i, y_i), recovers the constant term of the
 /// unique polynomial of degree < t passing through all points.
-pub fn lagrange_interpolate_at_zero(
-    points: &[(Scalar, Scalar)],
-) -> DkgResult<Scalar> {
+pub fn lagrange_interpolate_at_zero(points: &[(Scalar, Scalar)]) -> DkgResult<Scalar> {
     if points.is_empty() {
         return Err(DkgError::InterpolationError("No points provided".into()));
     }
@@ -150,10 +148,7 @@ pub fn lagrange_interpolate_at_zero(
 }
 
 /// Lagrange coefficient for participant i when reconstructing at x=0
-pub fn lagrange_coefficient(
-    i: usize,
-    participant_indices: &[u32],
-) -> DkgResult<Scalar> {
+pub fn lagrange_coefficient(i: usize, participant_indices: &[u32]) -> DkgResult<Scalar> {
     let x_i = Scalar::from_u64(participant_indices[i] as u64);
 
     let mut numerator = Scalar::one();

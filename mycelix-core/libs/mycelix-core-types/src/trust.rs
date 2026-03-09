@@ -190,7 +190,7 @@ impl TCDMState {
     pub fn initial() -> Self {
         Self {
             trust_level: 0.5, // Neutral starting trust
-            confidence: 0.1, // Low confidence initially
+            confidence: 0.1,  // Low confidence initially
             decay_rate: 0.99, // Slow decay
             last_update: 0,
             interaction_count: 0,
@@ -284,7 +284,11 @@ impl AgentTrust {
         self.tcdm.apply_decay(current_time);
 
         // Recalculate MATL score
-        let pogq_score = self.pogq.as_ref().map(|p| p.compute_pogq_score()).unwrap_or(0.5);
+        let pogq_score = self
+            .pogq
+            .as_ref()
+            .map(|p| p.compute_pogq_score())
+            .unwrap_or(0.5);
         let tcdm_score = self.tcdm.compute_tcdm_score();
         let entropy_score = self.calculate_entropy_score();
 
@@ -298,9 +302,15 @@ impl AgentTrust {
         let threshold = 0.45; // Match Byzantine tolerance
         self.trusted = self.matl_score.total >= threshold;
         self.trust_reason = if self.trusted {
-            format!("Trust score {:.2} >= threshold {:.2}", self.matl_score.total, threshold)
+            format!(
+                "Trust score {:.2} >= threshold {:.2}",
+                self.matl_score.total, threshold
+            )
         } else {
-            format!("Trust score {:.2} < threshold {:.2}", self.matl_score.total, threshold)
+            format!(
+                "Trust score {:.2} < threshold {:.2}",
+                self.matl_score.total, threshold
+            )
         };
     }
 

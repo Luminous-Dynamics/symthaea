@@ -2,10 +2,10 @@
 //!
 //! Wraps k256::Scalar with additional operations needed for DKG.
 
-use k256::Scalar as K256Scalar;
 use k256::elliptic_curve::ops::Reduce;
 use k256::elliptic_curve::scalar::FromUintUnchecked;
 use k256::elliptic_curve::subtle::ConstantTimeEq;
+use k256::Scalar as K256Scalar;
 use k256::{ProjectivePoint, U256};
 use rand_core::CryptoRngCore;
 use serde::{Deserialize, Serialize};

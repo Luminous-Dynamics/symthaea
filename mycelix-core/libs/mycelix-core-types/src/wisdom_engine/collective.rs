@@ -48,10 +48,10 @@ pub struct CollectivePatternConfig {
 impl Default for CollectivePatternConfig {
     fn default() -> Self {
         Self {
-            emergence_threshold: 3, // 3+ independent discoveries
-            echo_chamber_threshold: 0.9, // 90%+ agreement is suspicious
+            emergence_threshold: 3,            // 3+ independent discoveries
+            echo_chamber_threshold: 0.9,       // 90%+ agreement is suspicious
             tension_resolution_threshold: 0.2, // 20% tension reduction
-            collective_weight: 0.15, // 15% weight in scoring
+            collective_weight: 0.15,           // 15% weight in scoring
             enabled: true,
         }
     }
@@ -135,8 +135,8 @@ impl CollectivePatternContext {
     ) {
         // Update running average
         let total_usages = self.high_agreement_usages + self.diverse_context_usages + 1;
-        self.avg_agreement_at_usage =
-            (self.avg_agreement_at_usage * (total_usages - 1) as f32 + agreement_level)
+        self.avg_agreement_at_usage = (self.avg_agreement_at_usage * (total_usages - 1) as f32
+            + agreement_level)
             / total_usages as f32;
 
         if agreement_level >= echo_threshold {
@@ -366,7 +366,10 @@ impl CollectivePatternRegistry {
         let emergence_threshold = self.config.emergence_threshold;
         let (is_emergent, discoveries) = {
             let ctx = self.contexts.get(&pattern_id).unwrap();
-            (ctx.is_emergent(emergence_threshold), ctx.independent_discoveries)
+            (
+                ctx.is_emergent(emergence_threshold),
+                ctx.independent_discoveries,
+            )
         };
 
         // Check for emergent discovery (now no borrow conflict)
@@ -484,13 +487,19 @@ impl CollectivePatternRegistry {
     pub fn register_pattern(&mut self, pattern_id: PatternId, timestamp: u64) {
         if !self.contexts.contains_key(&pattern_id) {
             // Use pattern_id as discoverer placeholder (will be updated on first discovery)
-            let ctx = CollectivePatternContext::new(pattern_id, pattern_id as SymthaeaId, timestamp);
+            let ctx =
+                CollectivePatternContext::new(pattern_id, pattern_id as SymthaeaId, timestamp);
             self.contexts.insert(pattern_id, ctx);
         }
     }
 
     /// Record usage with agreement level (simplified interface)
-    pub fn record_usage_agreement(&mut self, pattern_id: PatternId, agreement_level: f32, timestamp: u64) {
+    pub fn record_usage_agreement(
+        &mut self,
+        pattern_id: PatternId,
+        agreement_level: f32,
+        timestamp: u64,
+    ) {
         let echo_threshold = self.config.echo_chamber_threshold;
         if let Some(ctx) = self.contexts.get_mut(&pattern_id) {
             ctx.record_collective_usage(agreement_level, echo_threshold, timestamp);
@@ -583,7 +592,11 @@ impl CollectivePatternRegistry {
     }
 
     /// Get recent observations for a pattern
-    pub fn recent_observations(&self, pattern_id: PatternId, limit: usize) -> Vec<&CollectiveObservation> {
+    pub fn recent_observations(
+        &self,
+        pattern_id: PatternId,
+        limit: usize,
+    ) -> Vec<&CollectiveObservation> {
         self.observations
             .iter()
             .rev()
@@ -656,4 +669,3 @@ impl CollectivePatternStats {
         self.echo_chamber_risk_patterns as f32 / self.total_patterns_observed as f32
     }
 }
-

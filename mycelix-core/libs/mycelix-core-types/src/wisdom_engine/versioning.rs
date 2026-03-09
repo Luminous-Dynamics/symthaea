@@ -43,12 +43,20 @@ pub struct PatternVersion {
 impl PatternVersion {
     /// Create a new version
     pub fn new(major: u16, minor: u16, patch: u16) -> Self {
-        Self { major, minor, patch }
+        Self {
+            major,
+            minor,
+            patch,
+        }
     }
 
     /// Initial version (1.0.0)
     pub fn initial() -> Self {
-        Self { major: 1, minor: 0, patch: 0 }
+        Self {
+            major: 1,
+            minor: 0,
+            patch: 0,
+        }
     }
 
     /// Increment major version (resets minor and patch)
@@ -136,51 +144,33 @@ pub enum PatternEvolutionReason {
         new_success_rate: f32,
     },
     /// Bug fix in the pattern
-    BugFix {
-        issue_description: String,
-    },
+    BugFix { issue_description: String },
     /// Refinement based on usage patterns
-    Refinement {
-        refinement_details: String,
-    },
+    Refinement { refinement_details: String },
     /// Generalization to handle more cases
-    Generalization {
-        new_domains: Vec<String>,
-    },
+    Generalization { new_domains: Vec<String> },
     /// Specialization for specific use case
-    Specialization {
-        target_domain: String,
-    },
+    Specialization { target_domain: String },
     /// Merge of multiple pattern variants
-    Merge {
-        merged_from: Vec<PatternId>,
-    },
+    Merge { merged_from: Vec<PatternId> },
     /// Split from a more general pattern
-    Split {
-        split_from: PatternId,
-    },
+    Split { split_from: PatternId },
     /// Community contribution/suggestion
     CommunityContribution {
         contributor_id: SymthaeaId,
         description: String,
     },
     /// Automatic evolution by the system
-    AutoEvolution {
-        trigger: String,
-    },
+    AutoEvolution { trigger: String },
     /// Rollback to a previous version
     Rollback {
         rolled_back_from: PatternVersion,
         reason: String,
     },
     /// Branch creation for experimentation
-    BranchCreation {
-        branch_name: String,
-    },
+    BranchCreation { branch_name: String },
     /// Branch merge back to main
-    BranchMerge {
-        branch_name: String,
-    },
+    BranchMerge { branch_name: String },
 }
 
 /// Information about a specific version of a pattern
@@ -446,7 +436,12 @@ impl PatternVersionRegistry {
     pub fn all_versions(&self, pattern_id: PatternId) -> Vec<&PatternVersionInfo> {
         self.versions
             .get(&pattern_id)
-            .map(|versions| versions.iter().filter(|v| v.branch_name.is_none()).collect())
+            .map(|versions| {
+                versions
+                    .iter()
+                    .filter(|v| v.branch_name.is_none())
+                    .collect()
+            })
             .unwrap_or_default()
     }
 
@@ -476,7 +471,9 @@ impl PatternVersionRegistry {
         let versions = self.versions.get_mut(&pattern_id)?;
 
         // Find current version
-        let current_idx = versions.iter().position(|v| v.is_current && v.branch_name.is_none())?;
+        let current_idx = versions
+            .iter()
+            .position(|v| v.is_current && v.branch_name.is_none())?;
 
         // Determine new version based on reason (extract data before mutation)
         let current_version = versions[current_idx].version;
@@ -550,7 +547,10 @@ impl PatternVersionRegistry {
         }
 
         // Check if branch name already exists
-        if existing_branches.iter().any(|b| b.name == branch_name && b.is_active) {
+        if existing_branches
+            .iter()
+            .any(|b| b.name == branch_name && b.is_active)
+        {
             return Err("Branch name already exists");
         }
 
@@ -568,9 +568,8 @@ impl PatternVersionRegistry {
         if let Some(versions) = self.versions.get_mut(&pattern_id) {
             let mut branch_version = current_info;
             branch_version.branch_name = Some(branch_name.clone());
-            branch_version.evolution_reason = PatternEvolutionReason::BranchCreation {
-                branch_name,
-            };
+            branch_version.evolution_reason =
+                PatternEvolutionReason::BranchCreation { branch_name };
             branch_version.created_at = timestamp;
             versions.push(branch_version);
         }
@@ -603,7 +602,10 @@ impl PatternVersionRegistry {
         creator: impl Into<String>,
     ) -> Result<PatternVersion, &'static str> {
         // Find the branch
-        let branches = self.branches.get_mut(&pattern_id).ok_or("Pattern not found")?;
+        let branches = self
+            .branches
+            .get_mut(&pattern_id)
+            .ok_or("Pattern not found")?;
         let branch_idx = branches
             .iter()
             .position(|b| b.name == branch_name && b.is_active)
@@ -656,7 +658,9 @@ impl PatternVersionRegistry {
             .ok_or("Target version not found")?
             .clone();
 
-        let current = self.current_version(pattern_id).ok_or("No current version")?;
+        let current = self
+            .current_version(pattern_id)
+            .ok_or("No current version")?;
         let current_version = current.version;
 
         let new_version = self
@@ -678,11 +682,7 @@ impl PatternVersionRegistry {
     }
 
     /// Check if a pattern should be auto-versioned based on changes
-    pub fn should_auto_version(
-        &self,
-        pattern_id: PatternId,
-        new_success_rate: f32,
-    ) -> bool {
+    pub fn should_auto_version(&self, pattern_id: PatternId, new_success_rate: f32) -> bool {
         if !self.config.auto_version {
             return false;
         }
@@ -697,7 +697,9 @@ impl PatternVersionRegistry {
 
     /// Prune old versions according to config
     pub fn prune_versions(&mut self, pattern_id: PatternId, current_time: u64) {
-        if self.config.max_versions_per_pattern == 0 && self.config.prune_versions_older_than_days == 0 {
+        if self.config.max_versions_per_pattern == 0
+            && self.config.prune_versions_older_than_days == 0
+        {
             return; // No pruning configured
         }
 
@@ -762,7 +764,10 @@ impl PatternVersionRegistry {
     }
 
     /// Get version history with lineage
-    pub fn version_lineage(&self, pattern_id: PatternId) -> Vec<(PatternVersion, Option<PatternVersion>)> {
+    pub fn version_lineage(
+        &self,
+        pattern_id: PatternId,
+    ) -> Vec<(PatternVersion, Option<PatternVersion>)> {
         self.versions
             .get(&pattern_id)
             .map(|versions| {
@@ -827,4 +832,3 @@ pub struct VersioningStats {
     /// Average versions per pattern
     pub avg_versions_per_pattern: f32,
 }
-

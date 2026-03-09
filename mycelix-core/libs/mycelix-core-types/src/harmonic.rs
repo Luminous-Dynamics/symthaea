@@ -393,9 +393,7 @@ impl HarmonicIgnorance {
     pub fn harmonic_eig(&self, base_eig: f32, context_relevance: &HarmonicImpact) -> f32 {
         let harmonic_weight: f32 = Harmony::ALL
             .iter()
-            .map(|h| {
-                h.base_weight() * self.harmonic_impact.get(*h) * context_relevance.get(*h)
-            })
+            .map(|h| h.base_weight() * self.harmonic_impact.get(*h) * context_relevance.get(*h))
             .sum();
 
         base_eig * (1.0 + harmonic_weight)
@@ -489,7 +487,10 @@ mod tests {
     #[test]
     fn test_harmony_from_code() {
         assert_eq!(Harmony::from_code("RC"), Some(Harmony::ResonantCoherence));
-        assert_eq!(Harmony::from_code("psf"), Some(Harmony::PanSentientFlourishing));
+        assert_eq!(
+            Harmony::from_code("psf"),
+            Some(Harmony::PanSentientFlourishing)
+        );
         assert_eq!(Harmony::from_code("invalid"), None);
     }
 }

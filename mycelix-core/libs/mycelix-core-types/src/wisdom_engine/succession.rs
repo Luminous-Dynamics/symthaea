@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 
 use std::collections::HashMap;
 
-use super::{PatternId, SymthaeaId, DomainId};
+use super::{DomainId, PatternId, SymthaeaId};
 
 // ==============================================================================
 // COMPONENT 20: PATTERN SUCCESSION AUTOMATION
@@ -354,7 +354,11 @@ impl MigrationPlan {
 
     /// Mark a pattern as migrated
     pub fn mark_migrated(&mut self, pattern_id: PatternId) {
-        if let Some(pos) = self.patterns_to_migrate.iter().position(|&p| p == pattern_id) {
+        if let Some(pos) = self
+            .patterns_to_migrate
+            .iter()
+            .position(|&p| p == pattern_id)
+        {
             self.patterns_to_migrate.remove(pos);
             self.migrated_patterns.push(pattern_id);
             self.update_progress();
@@ -363,7 +367,11 @@ impl MigrationPlan {
 
     /// Mark a pattern as failed
     pub fn mark_failed(&mut self, pattern_id: PatternId, reason: &str) {
-        if let Some(pos) = self.patterns_to_migrate.iter().position(|&p| p == pattern_id) {
+        if let Some(pos) = self
+            .patterns_to_migrate
+            .iter()
+            .position(|&p| p == pattern_id)
+        {
             self.patterns_to_migrate.remove(pos);
             self.failed_patterns.push((pattern_id, reason.to_string()));
             self.update_progress();
@@ -372,7 +380,11 @@ impl MigrationPlan {
 
     /// Exclude a pattern from migration
     pub fn exclude(&mut self, pattern_id: PatternId) {
-        if let Some(pos) = self.patterns_to_migrate.iter().position(|&p| p == pattern_id) {
+        if let Some(pos) = self
+            .patterns_to_migrate
+            .iter()
+            .position(|&p| p == pattern_id)
+        {
             self.patterns_to_migrate.remove(pos);
             self.excluded_patterns.push(pattern_id);
             self.update_progress();
@@ -389,8 +401,8 @@ impl MigrationPlan {
         if total == 0 {
             self.progress = 1.0;
         } else {
-            self.progress = (self.migrated_patterns.len() + self.excluded_patterns.len()) as f32
-                / total as f32;
+            self.progress =
+                (self.migrated_patterns.len() + self.excluded_patterns.len()) as f32 / total as f32;
         }
     }
 
@@ -425,7 +437,9 @@ impl MigrationPlan {
         format!(
             "Migration Plan: {}/{} complete ({:.0}%), {} failed, {} excluded",
             self.migrated_patterns.len(),
-            self.migrated_patterns.len() + self.patterns_to_migrate.len() + self.failed_patterns.len(),
+            self.migrated_patterns.len()
+                + self.patterns_to_migrate.len()
+                + self.failed_patterns.len(),
             self.progress * 100.0,
             self.failed_patterns.len(),
             self.excluded_patterns.len()
@@ -823,12 +837,16 @@ impl SuccessionManager {
 
     /// Get a succession by ID
     pub fn get_succession(&self, succession_id: u64) -> Option<&PatternSuccession> {
-        self.successions.iter().find(|s| s.succession_id == succession_id)
+        self.successions
+            .iter()
+            .find(|s| s.succession_id == succession_id)
     }
 
     /// Get a mutable succession by ID
     pub fn get_succession_mut(&mut self, succession_id: u64) -> Option<&mut PatternSuccession> {
-        self.successions.iter_mut().find(|s| s.succession_id == succession_id)
+        self.successions
+            .iter_mut()
+            .find(|s| s.succession_id == succession_id)
     }
 
     /// Get all successions
@@ -838,7 +856,10 @@ impl SuccessionManager {
 
     /// Get active successions
     pub fn active_successions(&self) -> Vec<&PatternSuccession> {
-        self.successions.iter().filter(|s| s.status.is_in_progress()).collect()
+        self.successions
+            .iter()
+            .filter(|s| s.status.is_in_progress())
+            .collect()
     }
 
     /// Get successions for a predecessor pattern
@@ -869,7 +890,14 @@ impl SuccessionManager {
     pub fn current_successor(&self, pattern_id: PatternId) -> Option<PatternId> {
         self.successions_from(pattern_id)
             .into_iter()
-            .filter(|s| matches!(s.status, SuccessionStatus::Active | SuccessionStatus::GracePeriod | SuccessionStatus::Complete))
+            .filter(|s| {
+                matches!(
+                    s.status,
+                    SuccessionStatus::Active
+                        | SuccessionStatus::GracePeriod
+                        | SuccessionStatus::Complete
+                )
+            })
             .max_by_key(|s| s.declared_at)
             .map(|s| s.successor_id)
     }
@@ -880,7 +908,8 @@ impl SuccessionManager {
         let mut current = pattern_id;
 
         // Find predecessors
-        while let Some(succession) = self.successions_to(current)
+        while let Some(succession) = self
+            .successions_to(current)
             .into_iter()
             .filter(|s| s.status == SuccessionStatus::Complete)
             .max_by_key(|s| s.declared_at)
@@ -959,7 +988,9 @@ impl SuccessionManager {
         ));
 
         if !succession.explanation.is_empty() {
-            instruction.steps.push(format!("Note: {}", succession.explanation));
+            instruction
+                .steps
+                .push(format!("Note: {}", succession.explanation));
         }
 
         instruction.dependency_changes.push(DependencyChange {
@@ -1056,7 +1087,9 @@ impl SuccessionManager {
         stats.active_count = self.active_successions().len();
 
         // Calculate average migration success rate
-        let migration_rates: Vec<f32> = self.migration_plans.values()
+        let migration_rates: Vec<f32> = self
+            .migration_plans
+            .values()
             .filter(|p| p.completed_at.is_some())
             .map(|p| p.success_rate())
             .collect();
@@ -1131,14 +1164,7 @@ mod tests {
 
     #[test]
     fn test_succession_lifecycle() {
-        let mut succession = PatternSuccession::new(
-            1,
-            10,
-            20,
-            SuccessionReason::BugFix,
-            99,
-            1000,
-        );
+        let mut succession = PatternSuccession::new(1, 10, 20, SuccessionReason::BugFix, 99, 1000);
 
         assert_eq!(succession.status, SuccessionStatus::Pending);
 
@@ -1197,12 +1223,8 @@ mod tests {
     fn test_succession_manager_basic() {
         let mut manager = SuccessionManager::new();
 
-        let succession = manager.declare_succession(
-            10, 20,
-            SuccessionReason::BetterPerformance,
-            99,
-            1000,
-        );
+        let succession =
+            manager.declare_succession(10, 20, SuccessionReason::BetterPerformance, 99, 1000);
 
         let id = manager.register(succession, 1000);
         assert_eq!(id, 1);
@@ -1277,7 +1299,8 @@ mod tests {
     fn test_trust_transfer_calculation() {
         let mut manager = SuccessionManager::new();
 
-        let succession = manager.declare_succession(1, 2, SuccessionReason::BugFix, 99, 1000)
+        let succession = manager
+            .declare_succession(1, 2, SuccessionReason::BugFix, 99, 1000)
             .with_trust_transfer(0.75);
         let id = manager.register(succession, 1000);
 

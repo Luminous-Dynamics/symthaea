@@ -19,8 +19,8 @@
 //! Instead, verification requires revealing the share to the recipient, who checks
 //! the hash. This is acceptable because each share is only revealed to its recipient.
 
-use sha2::{Sha256, Digest};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use zeroize::Zeroize;
 
 use crate::dealer::Deal;
@@ -182,14 +182,12 @@ impl HashCommitmentSet {
 
     /// Serialize to bytes
     pub fn to_bytes(&self) -> DkgResult<Vec<u8>> {
-        serde_json::to_vec(self)
-            .map_err(|e| DkgError::SerializationError(e.to_string()))
+        serde_json::to_vec(self).map_err(|e| DkgError::SerializationError(e.to_string()))
     }
 
     /// Deserialize from bytes
     pub fn from_bytes(bytes: &[u8]) -> DkgResult<Self> {
-        serde_json::from_slice(bytes)
-            .map_err(|e| DkgError::SerializationError(e.to_string()))
+        serde_json::from_slice(bytes).map_err(|e| DkgError::SerializationError(e.to_string()))
     }
 }
 
@@ -273,8 +271,14 @@ mod tests {
 
         // Verify each share against its commitment
         for share in &deal.shares {
-            let salt = reveal.salts.iter().find(|(r, _)| *r == share.index).unwrap();
-            let valid = commitment_set.verify_share(share.index, &share.value, &salt.1).unwrap();
+            let salt = reveal
+                .salts
+                .iter()
+                .find(|(r, _)| *r == share.index)
+                .unwrap();
+            let valid = commitment_set
+                .verify_share(share.index, &share.value, &salt.1)
+                .unwrap();
             assert!(valid, "Share {} should verify", share.index);
         }
     }
@@ -300,7 +304,11 @@ mod tests {
 
         let (commitment_set, _) = HashCommitmentSet::from_deal(&deal, &mut OsRng);
 
-        let result = commitment_set.verify_share(99, &Scalar::from_u64(0), &CommitmentSalt::from_bytes([0u8; 32]));
+        let result = commitment_set.verify_share(
+            99,
+            &Scalar::from_u64(0),
+            &CommitmentSalt::from_bytes([0u8; 32]),
+        );
         assert!(matches!(result, Err(DkgError::ParticipantNotFound(99))));
     }
 
@@ -316,7 +324,11 @@ mod tests {
 
         assert_eq!(recovered.dealer, commitment_set.dealer);
         assert_eq!(recovered.len(), commitment_set.len());
-        for (orig, recov) in commitment_set.commitments.iter().zip(recovered.commitments.iter()) {
+        for (orig, recov) in commitment_set
+            .commitments
+            .iter()
+            .zip(recovered.commitments.iter())
+        {
             assert_eq!(orig.hash, recov.hash);
             assert_eq!(orig.recipient, recov.recipient);
         }
@@ -381,8 +393,15 @@ mod tests {
                 let share = deal.get_share(recipient).unwrap();
                 let (ref commitment_set, ref reveal) = commit_data[deal_idx];
                 let salt = reveal.salts.iter().find(|(r, _)| *r == recipient).unwrap();
-                let valid = commitment_set.verify_share(recipient, &share.value, &salt.1).unwrap();
-                assert!(valid, "Recipient {} share from dealer {} should verify", recipient, deal_idx + 1);
+                let valid = commitment_set
+                    .verify_share(recipient, &share.value, &salt.1)
+                    .unwrap();
+                assert!(
+                    valid,
+                    "Recipient {} share from dealer {} should verify",
+                    recipient,
+                    deal_idx + 1
+                );
             }
         }
     }

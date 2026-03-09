@@ -5,9 +5,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::commitment::CommitmentSet;
 use crate::dealer::{Deal, Dealer};
+use crate::error::{DkgError, DkgResult};
 use crate::scalar::Scalar;
 use crate::share::{CombinedShare, ShareSet};
-use crate::error::{DkgError, DkgResult};
 
 /// A participant identifier (1-indexed)
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -112,12 +112,21 @@ impl Participant {
             return Ok(()); // Already initialized
         }
 
-        self.dealer = Some(Dealer::new(self.id, self.threshold, self.num_participants, rng)?);
+        self.dealer = Some(Dealer::new(
+            self.id,
+            self.threshold,
+            self.num_participants,
+            rng,
+        )?);
         Ok(())
     }
 
     /// Initialize this participant as a dealer with a specific secret
-    pub fn init_dealer_with_secret(&mut self, secret: Scalar, rng: &mut impl CryptoRngCore) -> DkgResult<()> {
+    pub fn init_dealer_with_secret(
+        &mut self,
+        secret: Scalar,
+        rng: &mut impl CryptoRngCore,
+    ) -> DkgResult<()> {
         self.dealer = Some(Dealer::with_secret(
             self.id,
             secret,
@@ -153,7 +162,9 @@ impl Participant {
         }
 
         // Get our share from this deal
-        let share = deal.get_share(self.id.0).ok_or(DkgError::ParticipantNotFound(self.id.0))?;
+        let share = deal
+            .get_share(self.id.0)
+            .ok_or(DkgError::ParticipantNotFound(self.id.0))?;
 
         // Verify the share against commitments
         let valid = deal.commitments.verify_share(self.id.0, share.value());
@@ -161,7 +172,8 @@ impl Participant {
         if valid {
             // Store the share and commitments
             self.received_shares.add_share(share.clone())?;
-            self.received_commitments.push((deal.dealer, deal.commitments.clone()));
+            self.received_commitments
+                .push((deal.dealer, deal.commitments.clone()));
             Ok(true)
         } else {
             // Invalid share - would trigger complaint in real protocol

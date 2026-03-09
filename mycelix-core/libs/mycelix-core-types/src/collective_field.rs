@@ -89,42 +89,36 @@ pub struct GroupReflection {
     // =========================================================================
     // TOPOLOGY: The Shape of Agreement
     // =========================================================================
-
     /// How is agreement structured? Hub-and-spoke (fragile) or mesh (resilient)?
     pub topology: TopologyAnalysis,
 
     // =========================================================================
     // SHADOW: What Are We Ignoring?
     // =========================================================================
-
     /// Harmonies that are absent or suppressed in the conversation
     pub shadow: ShadowAnalysis,
 
     // =========================================================================
     // SIGNAL INTEGRITY: Is This Verified or an Echo Chamber?
     // =========================================================================
-
     /// Quality of the epistemic grounding
     pub signal_integrity: SignalIntegrity,
 
     // =========================================================================
     // TRAJECTORY: Where Is The Group Heading?
     // =========================================================================
-
     /// How is the group changing over time?
     pub trajectory: TrajectoryAnalysis,
 
     // =========================================================================
     // VOID: What Are We All Assuming?
     // =========================================================================
-
     /// Shared assumptions that nobody is questioning
     pub void: VoidAnalysis,
 
     // =========================================================================
     // RAW METRICS: Data Without Interpretation
     // =========================================================================
-
     /// Raw agreement level (0.0 - 1.0) - NOT labeled as "coherence" or "wisdom"
     pub agreement_level: f64,
 
@@ -1002,17 +996,39 @@ impl CollectiveMirror {
             }
         }
 
-        let harmony_averages: Vec<f64> = harmony_totals.iter().map(|t| t / count.max(1.0)).collect();
+        let harmony_averages: Vec<f64> =
+            harmony_totals.iter().map(|t| t / count.max(1.0)).collect();
 
         // Find absent harmonies
         let harmonies = [
-            (Harmony::ResonantCoherence, "integration, coherence, bringing things together"),
-            (Harmony::PanSentientFlourishing, "care, wellbeing, considering impact on all beings"),
-            (Harmony::IntegralWisdom, "truth, deep understanding, rigorous inquiry"),
-            (Harmony::InfinitePlay, "creativity, joy, openness to possibility"),
-            (Harmony::UniversalInterconnectedness, "connection, seeing the whole, interdependence"),
-            (Harmony::SacredReciprocity, "fairness, exchange, mutual benefit"),
-            (Harmony::EvolutionaryProgression, "growth, development, long-term flourishing"),
+            (
+                Harmony::ResonantCoherence,
+                "integration, coherence, bringing things together",
+            ),
+            (
+                Harmony::PanSentientFlourishing,
+                "care, wellbeing, considering impact on all beings",
+            ),
+            (
+                Harmony::IntegralWisdom,
+                "truth, deep understanding, rigorous inquiry",
+            ),
+            (
+                Harmony::InfinitePlay,
+                "creativity, joy, openness to possibility",
+            ),
+            (
+                Harmony::UniversalInterconnectedness,
+                "connection, seeing the whole, interdependence",
+            ),
+            (
+                Harmony::SacredReciprocity,
+                "fairness, exchange, mutual benefit",
+            ),
+            (
+                Harmony::EvolutionaryProgression,
+                "growth, development, long-term flourishing",
+            ),
         ];
 
         let absent_harmonies: Vec<AbsentHarmony> = harmonies
@@ -1048,7 +1064,11 @@ impl CollectiveMirror {
     }
 
     /// Analyze signal integrity (echo chamber detection)
-    fn analyze_signal_integrity(&self, participants: &[Participant], _topology: &TopologyAnalysis) -> SignalIntegrity {
+    fn analyze_signal_integrity(
+        &self,
+        participants: &[Participant],
+        _topology: &TopologyAnalysis,
+    ) -> SignalIntegrity {
         // Calculate average epistemic level
         let epistemic_level: f64 = if participants.is_empty() {
             0.0
@@ -1061,21 +1081,25 @@ impl CollectiveMirror {
 
         // Determine echo chamber risk
         let (agreement_threshold, epistemic_threshold) = self.config.echo_chamber_threshold;
-        let echo_chamber_risk = if agreement > agreement_threshold && epistemic_level < epistemic_threshold {
-            EchoChamberRisk::Critical
-        } else if agreement > 0.7 && epistemic_level < 0.4 {
-            EchoChamberRisk::High
-        } else if agreement > 0.6 && epistemic_level < 0.5 {
-            EchoChamberRisk::Moderate
-        } else {
-            EchoChamberRisk::Low
-        };
+        let echo_chamber_risk =
+            if agreement > agreement_threshold && epistemic_level < epistemic_threshold {
+                EchoChamberRisk::Critical
+            } else if agreement > 0.7 && epistemic_level < 0.4 {
+                EchoChamberRisk::High
+            } else if agreement > 0.6 && epistemic_level < 0.5 {
+                EchoChamberRisk::Moderate
+            } else {
+                EchoChamberRisk::Low
+            };
 
         // Source diversity (simplified: based on disagreement presence)
         let source_diversity = if participants.is_empty() {
             0.0
         } else {
-            let with_disagreements = participants.iter().filter(|p| !p.disagreements.is_empty()).count();
+            let with_disagreements = participants
+                .iter()
+                .filter(|p| !p.disagreements.is_empty())
+                .count();
             with_disagreements as f64 / participants.len() as f64
         };
 
@@ -1127,7 +1151,10 @@ impl CollectiveMirror {
     }
 
     /// Calculate attention distribution
-    fn calculate_attention_distribution(&self, participants: &[Participant]) -> HashMap<String, f64> {
+    fn calculate_attention_distribution(
+        &self,
+        participants: &[Participant],
+    ) -> HashMap<String, f64> {
         let mut distribution: HashMap<String, usize> = HashMap::new();
         let mut total = 0;
 
@@ -1152,15 +1179,37 @@ impl CollectiveMirror {
         let mut tensions = Vec::new();
 
         let harmony_pairs = [
-            (Harmony::PanSentientFlourishing, Harmony::InfinitePlay, "Care vs. Freedom"),
-            (Harmony::IntegralWisdom, Harmony::InfinitePlay, "Truth vs. Creativity"),
-            (Harmony::SacredReciprocity, Harmony::UniversalInterconnectedness, "Boundaries vs. Unity"),
-            (Harmony::ResonantCoherence, Harmony::EvolutionaryProgression, "Stability vs. Change"),
+            (
+                Harmony::PanSentientFlourishing,
+                Harmony::InfinitePlay,
+                "Care vs. Freedom",
+            ),
+            (
+                Harmony::IntegralWisdom,
+                Harmony::InfinitePlay,
+                "Truth vs. Creativity",
+            ),
+            (
+                Harmony::SacredReciprocity,
+                Harmony::UniversalInterconnectedness,
+                "Boundaries vs. Unity",
+            ),
+            (
+                Harmony::ResonantCoherence,
+                Harmony::EvolutionaryProgression,
+                "Stability vs. Change",
+            ),
         ];
 
         for (h1, h2, topic) in harmony_pairs {
-            let h1_scores: Vec<f64> = participants.iter().map(|p| p.harmony_emphasis.get(h1)).collect();
-            let h2_scores: Vec<f64> = participants.iter().map(|p| p.harmony_emphasis.get(h2)).collect();
+            let h1_scores: Vec<f64> = participants
+                .iter()
+                .map(|p| p.harmony_emphasis.get(h1))
+                .collect();
+            let h2_scores: Vec<f64> = participants
+                .iter()
+                .map(|p| p.harmony_emphasis.get(h2))
+                .collect();
 
             // Check if there's divergence
             let h1_variance = variance(&h1_scores);
@@ -1197,10 +1246,15 @@ impl CollectiveMirror {
         let agreement_velocity = calculate_trend(&agreement_values);
         let agreement_direction = TrendDirection::from_velocity(agreement_velocity, 0.05);
 
-        let centralization_values: Vec<f64> = recent.iter().map(|r| r.topology.centralization).collect();
-        let centralization_direction = TrendDirection::from_velocity(calculate_trend(&centralization_values), 0.05);
+        let centralization_values: Vec<f64> =
+            recent.iter().map(|r| r.topology.centralization).collect();
+        let centralization_direction =
+            TrendDirection::from_velocity(calculate_trend(&centralization_values), 0.05);
 
-        let epistemic_values: Vec<f64> = recent.iter().map(|r| r.signal_integrity.epistemic_level).collect();
+        let epistemic_values: Vec<f64> = recent
+            .iter()
+            .map(|r| r.signal_integrity.epistemic_level)
+            .collect();
         let epistemic_velocity = calculate_trend(&epistemic_values);
         let epistemic_direction = TrendDirection::from_velocity(epistemic_velocity, 0.05);
 
@@ -1208,19 +1262,26 @@ impl CollectiveMirror {
             && agreement_velocity > 0.1
             && epistemic_direction == TrendDirection::Falling;
 
-        let fragmentation_warning = agreement_direction == TrendDirection::Falling
-            && _current_agreement < 0.4;
+        let fragmentation_warning =
+            agreement_direction == TrendDirection::Falling && _current_agreement < 0.4;
 
         let summary = format!(
             "Agreement {} ({:+.0}%/cycle), Epistemic {} ({:+.0}%/cycle)",
-            agreement_direction.symbol(), agreement_velocity * 100.0,
-            epistemic_direction.symbol(), epistemic_velocity * 100.0
+            agreement_direction.symbol(),
+            agreement_velocity * 100.0,
+            epistemic_direction.symbol(),
+            epistemic_velocity * 100.0
         );
 
         TrajectoryAnalysis {
-            agreement_direction, agreement_velocity, centralization_direction,
-            epistemic_direction, rapid_convergence_warning, fragmentation_warning,
-            sample_size, summary,
+            agreement_direction,
+            agreement_velocity,
+            centralization_direction,
+            epistemic_direction,
+            rapid_convergence_warning,
+            fragmentation_warning,
+            sample_size,
+            summary,
         }
     }
 
@@ -1235,9 +1296,13 @@ impl CollectiveMirror {
         let mut unasked_questions = Vec::new();
         let mut missing_perspectives = Vec::new();
 
-        if matches!(signal_integrity.echo_chamber_risk, EchoChamberRisk::High | EchoChamberRisk::Critical) {
+        if matches!(
+            signal_integrity.echo_chamber_risk,
+            EchoChamberRisk::High | EchoChamberRisk::Critical
+        ) {
             unverified_consensus.push(UnverifiedConsensus {
-                assumption: "The group shares assumptions that haven't been explicitly verified".to_string(),
+                assumption: "The group shares assumptions that haven't been explicitly verified"
+                    .to_string(),
                 holder_count: participants.len(),
                 epistemic_support: signal_integrity.epistemic_level,
                 risk_if_wrong: "Decisions may be based on false premises".to_string(),
@@ -1263,11 +1328,19 @@ impl CollectiveMirror {
         let void_prompt = if unverified_consensus.is_empty() && unasked_questions.is_empty() {
             "The group appears to be questioning assumptions appropriately.".to_string()
         } else {
-            format!("{} unverified consensus points, {} unasked questions",
-                    unverified_consensus.len(), unasked_questions.len())
+            format!(
+                "{} unverified consensus points, {} unasked questions",
+                unverified_consensus.len(),
+                unasked_questions.len()
+            )
         };
 
-        VoidAnalysis { unverified_consensus, unasked_questions, missing_perspectives, void_prompt }
+        VoidAnalysis {
+            unverified_consensus,
+            unasked_questions,
+            missing_perspectives,
+            void_prompt,
+        }
     }
 
     /// Get suggested interventions based on current state
@@ -1277,31 +1350,40 @@ impl CollectiveMirror {
 
         if r.topology.topology_type == TopologyType::HubAndSpoke {
             suggestions.push(InterventionSuggestion {
-                id: "decentralize".to_string(), name: "Breakout Groups".to_string(),
+                id: "decentralize".to_string(),
+                name: "Breakout Groups".to_string(),
                 description: "Split into small groups without the central voices".to_string(),
                 rationale: "Agreement is centralized".to_string(),
                 trigger: InterventionTrigger::HighCentralization,
-                historical_effectiveness: None, effort: EffortLevel::Low,
+                historical_effectiveness: None,
+                effort: EffortLevel::Low,
             });
         }
 
-        if matches!(r.signal_integrity.echo_chamber_risk, EchoChamberRisk::High | EchoChamberRisk::Critical) {
+        if matches!(
+            r.signal_integrity.echo_chamber_risk,
+            EchoChamberRisk::High | EchoChamberRisk::Critical
+        ) {
             suggestions.push(InterventionSuggestion {
-                id: "verify".to_string(), name: "Verification Round".to_string(),
+                id: "verify".to_string(),
+                name: "Verification Round".to_string(),
                 description: "Pause and explicitly seek evidence".to_string(),
                 rationale: "High agreement with low verification".to_string(),
                 trigger: InterventionTrigger::EchoChamber,
-                historical_effectiveness: None, effort: EffortLevel::Medium,
+                historical_effectiveness: None,
+                effort: EffortLevel::Medium,
             });
         }
 
         if r.trajectory.rapid_convergence_warning {
             suggestions.push(InterventionSuggestion {
-                id: "slow-down".to_string(), name: "Structured Disagreement".to_string(),
+                id: "slow-down".to_string(),
+                name: "Structured Disagreement".to_string(),
                 description: "Assign a devil's advocate".to_string(),
                 rationale: "Agreement rising while verification falling".to_string(),
                 trigger: InterventionTrigger::RapidConvergence,
-                historical_effectiveness: None, effort: EffortLevel::Low,
+                historical_effectiveness: None,
+                effort: EffortLevel::Low,
             });
         }
 
@@ -1310,28 +1392,55 @@ impl CollectiveMirror {
 
     /// Analyze outcomes to find patterns (calibration)
     pub fn analyze_calibration(&self) -> Option<CalibrationInsight> {
-        if self.outcomes.len() < 5 { return None; }
+        if self.outcomes.len() < 5 {
+            return None;
+        }
 
-        let positive: Vec<_> = self.outcomes.iter().filter(|o| o.outcome == DecisionOutcome::Positive).collect();
-        let negative: Vec<_> = self.outcomes.iter().filter(|o| o.outcome == DecisionOutcome::Negative).collect();
+        let positive: Vec<_> = self
+            .outcomes
+            .iter()
+            .filter(|o| o.outcome == DecisionOutcome::Positive)
+            .collect();
+        let negative: Vec<_> = self
+            .outcomes
+            .iter()
+            .filter(|o| o.outcome == DecisionOutcome::Negative)
+            .collect();
 
-        if positive.is_empty() || negative.is_empty() { return None; }
+        if positive.is_empty() || negative.is_empty() {
+            return None;
+        }
 
-        let pos_avg = positive.iter().map(|o| o.reflection_at_decision.agreement_level).sum::<f64>() / positive.len() as f64;
-        let neg_avg = negative.iter().map(|o| o.reflection_at_decision.agreement_level).sum::<f64>() / negative.len() as f64;
+        let pos_avg = positive
+            .iter()
+            .map(|o| o.reflection_at_decision.agreement_level)
+            .sum::<f64>()
+            / positive.len() as f64;
+        let neg_avg = negative
+            .iter()
+            .map(|o| o.reflection_at_decision.agreement_level)
+            .sum::<f64>()
+            / negative.len() as f64;
 
         Some(CalibrationInsight {
-            pattern: if pos_avg < neg_avg { "Moderate agreement precedes better outcomes".to_string() }
-                     else { "Higher agreement correlated with better outcomes".to_string() },
+            pattern: if pos_avg < neg_avg {
+                "Moderate agreement precedes better outcomes".to_string()
+            } else {
+                "Higher agreement correlated with better outcomes".to_string()
+            },
             positive_predictors: vec![StatePattern {
                 description: "Positive pattern".to_string(),
                 agreement_range: (pos_avg - 0.1, pos_avg + 0.1),
-                topology: None, echo_chamber_risk: None, occurrence_count: positive.len(),
+                topology: None,
+                echo_chamber_risk: None,
+                occurrence_count: positive.len(),
             }],
             negative_predictors: vec![StatePattern {
                 description: "Negative pattern".to_string(),
                 agreement_range: (neg_avg - 0.1, neg_avg + 0.1),
-                topology: None, echo_chamber_risk: None, occurrence_count: negative.len(),
+                topology: None,
+                echo_chamber_risk: None,
+                occurrence_count: negative.len(),
             }],
             confidence: (self.outcomes.len() as f64 / 20.0).min(1.0),
             sample_size: self.outcomes.len(),
@@ -1339,7 +1448,12 @@ impl CollectiveMirror {
     }
 
     /// Record an outcome for learning
-    pub fn observe_outcome(&mut self, decision_id: String, outcome: DecisionOutcome, observed_at: u64) {
+    pub fn observe_outcome(
+        &mut self,
+        decision_id: String,
+        outcome: DecisionOutcome,
+        observed_at: u64,
+    ) {
         self.outcomes.push(OutcomeObservation {
             decision_id,
             reflection_at_decision: self.reflection.clone(),
@@ -1362,7 +1476,10 @@ impl CollectiveMirror {
         // Echo chamber prompt
         match r.signal_integrity.echo_chamber_risk {
             EchoChamberRisk::Critical => {
-                prompts.push("⚠️ High agreement with low verification. Are we in an echo chamber?".to_string());
+                prompts.push(
+                    "⚠️ High agreement with low verification. Are we in an echo chamber?"
+                        .to_string(),
+                );
             }
             EchoChamberRisk::High => {
                 prompts.push("Strong consensus detected with limited verification. Consider seeking diverse sources.".to_string());
@@ -1404,7 +1521,9 @@ impl CollectiveMirror {
             if r.shadow.absent_harmonies.is_empty() {
                 "None".to_string()
             } else {
-                r.shadow.absent_harmonies.iter()
+                r.shadow
+                    .absent_harmonies
+                    .iter()
                     .map(|a| format!("{:?}", a.harmony))
                     .collect::<Vec<_>>()
                     .join(", ")
@@ -1412,7 +1531,8 @@ impl CollectiveMirror {
             if r.tension_points.is_empty() {
                 "None detected".to_string()
             } else {
-                r.tension_points.iter()
+                r.tension_points
+                    .iter()
                     .map(|t| t.topic.clone())
                     .collect::<Vec<_>>()
                     .join(", ")
@@ -1730,10 +1850,8 @@ impl HolonicMirror {
 
     /// Analyze patterns that emerge across child groups
     fn analyze_cross_scale(&self) -> CrossScaleAnalysis {
-        let child_reflections: Vec<&GroupReflection> = self.children
-            .iter()
-            .map(|c| &c.mirror.reflection)
-            .collect();
+        let child_reflections: Vec<&GroupReflection> =
+            self.children.iter().map(|c| &c.mirror.reflection).collect();
 
         // Inter-child coherence: do children agree with each other?
         let inter_child_coherence = self.calculate_inter_child_coherence(&child_reflections);
@@ -1774,15 +1892,14 @@ impl HolonicMirror {
         }
 
         // Compare agreement levels and harmony distributions across children
-        let agreement_levels: Vec<f64> = reflections.iter()
-            .map(|r| r.agreement_level)
-            .collect();
+        let agreement_levels: Vec<f64> = reflections.iter().map(|r| r.agreement_level).collect();
 
         // Low variance in agreement levels = high inter-child coherence
         let var = variance(&agreement_levels);
 
         // Also consider if children have similar absent harmonies
-        let avg_agreement: f64 = agreement_levels.iter().sum::<f64>() / agreement_levels.len() as f64;
+        let avg_agreement: f64 =
+            agreement_levels.iter().sum::<f64>() / agreement_levels.len() as f64;
 
         // Coherence is high if children are similar
         (1.0 - var.min(1.0)) * avg_agreement
@@ -1802,14 +1919,14 @@ impl HolonicMirror {
         }
 
         // Local diversity: average of (1 - agreement) within each child
-        let local_diversity: f64 = reflections.iter()
+        let local_diversity: f64 = reflections
+            .iter()
             .map(|r| 1.0 - r.agreement_level)
-            .sum::<f64>() / reflections.len() as f64;
+            .sum::<f64>()
+            / reflections.len() as f64;
 
         // Global diversity: variance of agreement levels across children
-        let agreement_levels: Vec<f64> = reflections.iter()
-            .map(|r| r.agreement_level)
-            .collect();
+        let agreement_levels: Vec<f64> = reflections.iter().map(|r| r.agreement_level).collect();
         let global_diversity = variance(&agreement_levels).sqrt(); // std dev
 
         // Illusion ratio: high local diversity + low global diversity = illusion
@@ -1855,20 +1972,27 @@ impl HolonicMirror {
         let mut consensus = Vec::new();
 
         // Check if all children have similar echo chamber risks
-        let all_high_agreement = reflections.iter()
-            .all(|r| r.agreement_level > 0.6);
+        let all_high_agreement = reflections.iter().all(|r| r.agreement_level > 0.6);
 
         if all_high_agreement {
             consensus.push("All groups have high internal agreement".to_string());
         }
 
         // Check if all children are missing the same harmonies
-        let harmony_sets: Vec<HashSet<Harmony>> = reflections.iter()
-            .map(|r| r.shadow.absent_harmonies.iter().map(|a| a.harmony).collect())
+        let harmony_sets: Vec<HashSet<Harmony>> = reflections
+            .iter()
+            .map(|r| {
+                r.shadow
+                    .absent_harmonies
+                    .iter()
+                    .map(|a| a.harmony)
+                    .collect()
+            })
             .collect();
 
         if !harmony_sets.is_empty() {
-            let common_absent: HashSet<Harmony> = harmony_sets[0].iter()
+            let common_absent: HashSet<Harmony> = harmony_sets[0]
+                .iter()
                 .filter(|h| harmony_sets.iter().all(|set| set.contains(h)))
                 .copied()
                 .collect();
@@ -1901,25 +2025,39 @@ impl HolonicMirror {
 
             // Intersect with other children
             for reflection in reflections.iter().skip(1) {
-                let child_absent: HashSet<Harmony> = reflection.shadow.absent_harmonies
+                let child_absent: HashSet<Harmony> = reflection
+                    .shadow
+                    .absent_harmonies
                     .iter()
                     .map(|a| a.harmony)
                     .collect();
-                universally_absent = universally_absent.intersection(&child_absent).copied().collect();
+                universally_absent = universally_absent
+                    .intersection(&child_absent)
+                    .copied()
+                    .collect();
             }
         }
 
         let universally_absent_harmonies: Vec<Harmony> = universally_absent.into_iter().collect();
 
         // Generate unasked questions based on universally absent harmonies
-        let unasked_across_all: Vec<String> = universally_absent_harmonies.iter()
-            .map(|h| format!("No group is asking: How does {:?} apply to our collective work?", h))
+        let unasked_across_all: Vec<String> = universally_absent_harmonies
+            .iter()
+            .map(|h| {
+                format!(
+                    "No group is asking: How does {:?} apply to our collective work?",
+                    h
+                )
+            })
             .collect();
 
         // Find shared assumptions (high agreement + low epistemic in all children)
-        let shared_assumptions: Vec<SharedAssumption> = if reflections.iter()
-            .all(|r| matches!(r.signal_integrity.echo_chamber_risk, EchoChamberRisk::High | EchoChamberRisk::Critical))
-        {
+        let shared_assumptions: Vec<SharedAssumption> = if reflections.iter().all(|r| {
+            matches!(
+                r.signal_integrity.echo_chamber_risk,
+                EchoChamberRisk::High | EchoChamberRisk::Critical
+            )
+        }) {
             vec![SharedAssumption {
                 assumption: "All groups have unverified consensus".to_string(),
                 prevalence: reflections.len(),
@@ -1930,25 +2068,26 @@ impl HolonicMirror {
             Vec::new()
         };
 
-        let void_prompt = if universally_absent_harmonies.is_empty() && shared_assumptions.is_empty() {
-            "No emergent void detected at this scale.".to_string()
-        } else {
-            let mut parts = Vec::new();
-            if !universally_absent_harmonies.is_empty() {
-                parts.push(format!(
-                    "{} harmonies are absent from ALL groups: {:?}",
-                    universally_absent_harmonies.len(),
-                    universally_absent_harmonies
-                ));
-            }
-            if !shared_assumptions.is_empty() {
-                parts.push(format!(
-                    "{} assumptions are shared across all groups without verification",
-                    shared_assumptions.len()
-                ));
-            }
-            parts.join(". ")
-        };
+        let void_prompt =
+            if universally_absent_harmonies.is_empty() && shared_assumptions.is_empty() {
+                "No emergent void detected at this scale.".to_string()
+            } else {
+                let mut parts = Vec::new();
+                if !universally_absent_harmonies.is_empty() {
+                    parts.push(format!(
+                        "{} harmonies are absent from ALL groups: {:?}",
+                        universally_absent_harmonies.len(),
+                        universally_absent_harmonies
+                    ));
+                }
+                if !shared_assumptions.is_empty() {
+                    parts.push(format!(
+                        "{} assumptions are shared across all groups without verification",
+                        shared_assumptions.len()
+                    ));
+                }
+                parts.join(". ")
+            };
 
         EmergentVoid {
             universally_absent_harmonies,
@@ -1972,33 +2111,42 @@ impl HolonicMirror {
         }
 
         // Find dominant groups (those with highest agreement that others might follow)
-        let mut groups_by_agreement: Vec<(&HolonicMirror, f64)> = self.children.iter()
+        let mut groups_by_agreement: Vec<(&HolonicMirror, f64)> = self
+            .children
+            .iter()
             .map(|c| (c, c.mirror.reflection.agreement_level))
             .collect();
-        groups_by_agreement.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        groups_by_agreement
+            .sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
-        let dominant_groups: Vec<String> = groups_by_agreement.iter()
+        let dominant_groups: Vec<String> = groups_by_agreement
+            .iter()
             .take(1)
             .filter(|(_, agreement)| *agreement > 0.7)
             .map(|(g, _)| g.name.clone())
             .collect();
 
         // Find isolated groups (those with fragmented topology)
-        let isolated_groups: Vec<String> = self.children.iter()
+        let isolated_groups: Vec<String> = self
+            .children
+            .iter()
             .filter(|c| c.mirror.reflection.topology.topology_type == TopologyType::Fragmented)
             .map(|c| c.name.clone())
             .collect();
 
         // Determine overall structure
-        let structure = if !dominant_groups.is_empty() && dominant_groups.len() < n / 2 {
-            MetaStructure::Hierarchical
-        } else if isolated_groups.len() > n / 2 {
-            MetaStructure::Fragmented
-        } else if self.children.iter().all(|c| c.mirror.reflection.topology.topology_type == TopologyType::DistributedMesh) {
-            MetaStructure::NetworkedMesh
-        } else {
-            MetaStructure::Federated
-        };
+        let structure =
+            if !dominant_groups.is_empty() && dominant_groups.len() < n / 2 {
+                MetaStructure::Hierarchical
+            } else if isolated_groups.len() > n / 2 {
+                MetaStructure::Fragmented
+            } else if self.children.iter().all(|c| {
+                c.mirror.reflection.topology.topology_type == TopologyType::DistributedMesh
+            }) {
+                MetaStructure::NetworkedMesh
+            } else {
+                MetaStructure::Federated
+            };
 
         MetaTopology {
             dominant_groups,
@@ -2067,11 +2215,14 @@ impl HolonicMirror {
             if cross_scale.diversity_illusion.detected {
                 lines.push(format!("{}  ⚠️ DIVERSITY ILLUSION", indent));
             }
-            if !cross_scale.emergent_void.universally_absent_harmonies.is_empty() {
+            if !cross_scale
+                .emergent_void
+                .universally_absent_harmonies
+                .is_empty()
+            {
                 lines.push(format!(
                     "{}  ⚠️ EMERGENT VOID: {:?}",
-                    indent,
-                    cross_scale.emergent_void.universally_absent_harmonies
+                    indent, cross_scale.emergent_void.universally_absent_harmonies
                 ));
             }
         }
@@ -2089,7 +2240,8 @@ impl HolonicMirror {
         if self.children.is_empty() {
             self.depth
         } else {
-            self.children.iter()
+            self.children
+                .iter()
                 .map(|c| c.max_depth())
                 .max()
                 .unwrap_or(self.depth)
@@ -2098,7 +2250,11 @@ impl HolonicMirror {
 
     /// Count total groups in the tree
     pub fn total_groups(&self) -> usize {
-        1 + self.children.iter().map(|c| c.total_groups()).sum::<usize>()
+        1 + self
+            .children
+            .iter()
+            .map(|c| c.total_groups())
+            .sum::<usize>()
     }
 
     /// Get all groups at a specific depth
@@ -2106,7 +2262,8 @@ impl HolonicMirror {
         if self.depth == target_depth {
             vec![self]
         } else {
-            self.children.iter()
+            self.children
+                .iter()
                 .flat_map(|c| c.groups_at_depth(target_depth))
                 .collect()
         }
@@ -2259,7 +2416,8 @@ impl GovernanceAdapter {
 
         // Detect polarization
         let polarization = if votes.len() > 1 {
-            let choice_variance = (for_count as f64 - against_count as f64).abs() / votes.len() as f64;
+            let choice_variance =
+                (for_count as f64 - against_count as f64).abs() / votes.len() as f64;
             1.0 - choice_variance // High variance = low polarization, low variance = high polarization
         } else {
             0.0
@@ -2304,13 +2462,16 @@ impl GovernanceAdapter {
         let mut prompts = Vec::new();
 
         // High approval with echo chamber risk
-        if approval_ratio > 0.8 && matches!(
-            reflection.signal_integrity.echo_chamber_risk,
-            EchoChamberRisk::High | EchoChamberRisk::Critical
-        ) {
+        if approval_ratio > 0.8
+            && matches!(
+                reflection.signal_integrity.echo_chamber_risk,
+                EchoChamberRisk::High | EchoChamberRisk::Critical
+            )
+        {
             prompts.push(
                 "Strong consensus (>80%) detected with low epistemic verification. \
-                 Consider: Are dissenting voices being heard? Is this groupthink?".to_string()
+                 Consider: Are dissenting voices being heard? Is this groupthink?"
+                    .to_string(),
             );
         }
 
@@ -2318,7 +2479,8 @@ impl GovernanceAdapter {
         if (approval_ratio - 0.5).abs() < 0.1 && reflection.participant_count < 10 {
             prompts.push(
                 "Vote is nearly split (45-55%) with limited participation. \
-                 Consider: Should this decision wait for more voices?".to_string()
+                 Consider: Should this decision wait for more voices?"
+                    .to_string(),
             );
         }
 
@@ -2326,7 +2488,8 @@ impl GovernanceAdapter {
         if polarization > 0.7 {
             prompts.push(
                 "High polarization detected - voters are clustering into opposing camps. \
-                 Consider: Is there a middle ground being overlooked?".to_string()
+                 Consider: Is there a middle ground being overlooked?"
+                    .to_string(),
             );
         }
 
@@ -2334,7 +2497,8 @@ impl GovernanceAdapter {
         if reflection.topology.topology_type == TopologyType::HubAndSpoke {
             prompts.push(
                 "Voting patterns suggest influence is centralized around few voices. \
-                 Consider: Are delegates making independent decisions?".to_string()
+                 Consider: Are delegates making independent decisions?"
+                    .to_string(),
             );
         }
 
@@ -2343,15 +2507,15 @@ impl GovernanceAdapter {
             if matches!(intervention.trigger, InterventionTrigger::RapidConvergence) {
                 prompts.push(
                     "Agreement is rising rapidly. Before finalizing: \
-                     Has someone been assigned to argue the opposing view?".to_string()
+                     Has someone been assigned to argue the opposing view?"
+                        .to_string(),
                 );
             }
         }
 
         if prompts.is_empty() {
-            prompts.push(
-                "The voting appears to have healthy diversity and verification.".to_string()
-            );
+            prompts
+                .push("The voting appears to have healthy diversity and verification.".to_string());
         }
 
         prompts
@@ -2417,7 +2581,8 @@ impl ProposalReflection {
             v.polarization * 100.0,
             self.group_reflection.topology.topology_type,
             self.group_reflection.signal_integrity.echo_chamber_risk,
-            self.governance_prompts.iter()
+            self.governance_prompts
+                .iter()
                 .map(|p| format!("  • {}", p))
                 .collect::<Vec<_>>()
                 .join("\n")
@@ -2529,7 +2694,9 @@ mod tests {
 
         // Should detect missing harmony
         let absent = &mirror.reflection.shadow.absent_harmonies;
-        assert!(absent.iter().any(|a| a.harmony == Harmony::PanSentientFlourishing));
+        assert!(absent
+            .iter()
+            .any(|a| a.harmony == Harmony::PanSentientFlourishing));
     }
 
     #[test]
@@ -2569,7 +2736,10 @@ mod tests {
         // First reflection - no history yet
         mirror.reflect(&participants, 1000);
         assert_eq!(mirror.reflection.trajectory.sample_size, 0);
-        assert_eq!(mirror.reflection.trajectory.agreement_direction, TrendDirection::Unknown);
+        assert_eq!(
+            mirror.reflection.trajectory.agreement_direction,
+            TrendDirection::Unknown
+        );
     }
 
     #[test]
@@ -2682,7 +2852,9 @@ mod tests {
         let interventions = mirror.suggest_interventions();
 
         // Should suggest verification intervention
-        assert!(interventions.iter().any(|i| i.trigger == InterventionTrigger::EchoChamber));
+        assert!(interventions
+            .iter()
+            .any(|i| i.trigger == InterventionTrigger::EchoChamber));
     }
 
     #[test]
@@ -2704,7 +2876,9 @@ mod tests {
         let interventions = mirror.suggest_interventions();
 
         // Should suggest decentralization intervention
-        assert!(interventions.iter().any(|i| i.trigger == InterventionTrigger::HighCentralization));
+        assert!(interventions
+            .iter()
+            .any(|i| i.trigger == InterventionTrigger::HighCentralization));
     }
 
     // =========================================================================
@@ -2744,7 +2918,13 @@ mod tests {
         assert_eq!(depth_1.len(), 2);
     }
 
-    fn create_group_with_participants(id: &str, name: &str, participant_count: usize, epistemic: f64, agreement: f64) -> HolonicMirror {
+    fn create_group_with_participants(
+        id: &str,
+        name: &str,
+        participant_count: usize,
+        epistemic: f64,
+        agreement: f64,
+    ) -> HolonicMirror {
         let mut mirror = HolonicMirror::new(id.into(), name.into());
 
         let mut participants = Vec::new();
@@ -2813,8 +2993,11 @@ mod tests {
         if let Some(cross_scale) = &org.cross_scale {
             // The emergent void should identify that Care is universally absent
             assert!(
-                cross_scale.emergent_void.universally_absent_harmonies.contains(&Harmony::PanSentientFlourishing) ||
-                !cross_scale.emergent_void.unasked_across_all.is_empty()
+                cross_scale
+                    .emergent_void
+                    .universally_absent_harmonies
+                    .contains(&Harmony::PanSentientFlourishing)
+                    || !cross_scale.emergent_void.unasked_across_all.is_empty()
             );
         }
     }
@@ -2864,7 +3047,11 @@ mod tests {
 
         // Record multiple outcomes
         for i in 0..6 {
-            let outcome = if i % 2 == 0 { DecisionOutcome::Positive } else { DecisionOutcome::Negative };
+            let outcome = if i % 2 == 0 {
+                DecisionOutcome::Positive
+            } else {
+                DecisionOutcome::Negative
+            };
             mirror.observe_outcome(format!("decision-{}", i), outcome, 2000 + i * 100);
         }
 
@@ -2897,16 +3084,30 @@ mod tests {
 
     #[test]
     fn test_trend_direction_from_velocity() {
-        assert_eq!(TrendDirection::from_velocity(0.1, 0.05), TrendDirection::Rising);
-        assert_eq!(TrendDirection::from_velocity(-0.1, 0.05), TrendDirection::Falling);
-        assert_eq!(TrendDirection::from_velocity(0.02, 0.05), TrendDirection::Stable);
+        assert_eq!(
+            TrendDirection::from_velocity(0.1, 0.05),
+            TrendDirection::Rising
+        );
+        assert_eq!(
+            TrendDirection::from_velocity(-0.1, 0.05),
+            TrendDirection::Falling
+        );
+        assert_eq!(
+            TrendDirection::from_velocity(0.02, 0.05),
+            TrendDirection::Stable
+        );
     }
 
     // =========================================================================
     // GOVERNANCE ADAPTER TESTS
     // =========================================================================
 
-    fn create_voter(did: &str, phi: f64, k_trust: f64, delegated_to: Option<&str>) -> GovernanceVoter {
+    fn create_voter(
+        did: &str,
+        phi: f64,
+        k_trust: f64,
+        delegated_to: Option<&str>,
+    ) -> GovernanceVoter {
         GovernanceVoter {
             did: did.to_string(),
             phi,
@@ -2962,12 +3163,8 @@ mod tests {
             create_vote("v3", VoteChoice::Against, 0.6),
         ];
 
-        let reflection = GovernanceAdapter::analyze_proposal_voting(
-            &voters,
-            &votes,
-            "MIP-001",
-            1000,
-        );
+        let reflection =
+            GovernanceAdapter::analyze_proposal_voting(&voters, &votes, "MIP-001", 1000);
 
         assert_eq!(reflection.proposal_id, "MIP-001");
         assert_eq!(reflection.vote_summary.for_count, 2);
@@ -2987,19 +3184,18 @@ mod tests {
             .map(|i| create_vote(&format!("v{}", i), VoteChoice::For, 1.0))
             .collect();
 
-        let reflection = GovernanceAdapter::analyze_proposal_voting(
-            &voters,
-            &votes,
-            "MIP-002",
-            1000,
-        );
+        let reflection =
+            GovernanceAdapter::analyze_proposal_voting(&voters, &votes, "MIP-002", 1000);
 
         // Should have high approval ratio
         assert!(reflection.vote_summary.approval_ratio > 0.9);
 
         // Should detect echo chamber risk due to low epistemic levels
         assert!(matches!(
-            reflection.group_reflection.signal_integrity.echo_chamber_risk,
+            reflection
+                .group_reflection
+                .signal_integrity
+                .echo_chamber_risk,
             EchoChamberRisk::High | EchoChamberRisk::Critical
         ));
     }
@@ -3015,12 +3211,8 @@ mod tests {
             .map(|i| create_vote(&format!("v{}", i), VoteChoice::For, 1.0))
             .collect();
 
-        let reflection = GovernanceAdapter::analyze_proposal_voting(
-            &voters,
-            &votes,
-            "MIP-003",
-            1000,
-        );
+        let reflection =
+            GovernanceAdapter::analyze_proposal_voting(&voters, &votes, "MIP-003", 1000);
 
         // Should flag for review due to echo chamber
         assert!(reflection.needs_review());
@@ -3038,12 +3230,8 @@ mod tests {
             create_vote("bob", VoteChoice::Against, 0.8),
         ];
 
-        let reflection = GovernanceAdapter::analyze_proposal_voting(
-            &voters,
-            &votes,
-            "MIP-004",
-            1000,
-        );
+        let reflection =
+            GovernanceAdapter::analyze_proposal_voting(&voters, &votes, "MIP-004", 1000);
 
         let summary = reflection.summary();
 

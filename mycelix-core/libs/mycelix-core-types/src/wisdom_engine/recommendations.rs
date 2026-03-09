@@ -11,11 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use std::collections::HashMap;
 
-use super::{
-    PatternId, DomainId, SymthaeaId,
-    PatternLifecycleState,
-    TrustLevel, Recommendation,
-};
+use super::{DomainId, PatternId, PatternLifecycleState, Recommendation, SymthaeaId, TrustLevel};
 
 // ==============================================================================
 // COMPONENT 18: PATTERN RECOMMENDATIONS ENGINE
@@ -480,8 +476,15 @@ impl PatternRecommendation {
     pub fn summary(&self) -> String {
         format!(
             "#{} Pattern {} (score: {:.2}, confidence: {:.2}): {}",
-            self.rank, self.pattern_id, self.composite_score, self.confidence,
-            if self.reason.is_empty() { "No reason given" } else { &self.reason }
+            self.rank,
+            self.pattern_id,
+            self.composite_score,
+            self.confidence,
+            if self.reason.is_empty() {
+                "No reason given"
+            } else {
+                &self.reason
+            }
         )
     }
 
@@ -558,12 +561,18 @@ impl RecommendationSet {
 
     /// Get strong recommendations only
     pub fn strong_recommendations(&self) -> Vec<&PatternRecommendation> {
-        self.recommendations.iter().filter(|r| r.is_strong()).collect()
+        self.recommendations
+            .iter()
+            .filter(|r| r.is_strong())
+            .collect()
     }
 
     /// Get recommendations with concerns
     pub fn with_concerns(&self) -> Vec<&PatternRecommendation> {
-        self.recommendations.iter().filter(|r| r.has_concerns()).collect()
+        self.recommendations
+            .iter()
+            .filter(|r| r.has_concerns())
+            .collect()
     }
 
     /// Format as human-readable string
@@ -574,12 +583,17 @@ impl RecommendationSet {
             self.recommendations.len(),
             self.patterns_considered
         ));
-        output.push_str(&format!("Set confidence: {:.1}%\n\n", self.set_confidence * 100.0));
+        output.push_str(&format!(
+            "Set confidence: {:.1}%\n\n",
+            self.set_confidence * 100.0
+        ));
 
         for rec in &self.recommendations {
             output.push_str(&format!("#{} Pattern {}\n", rec.rank, rec.pattern_id));
-            output.push_str(&format!("   Score: {:.2} | Confidence: {:.2}\n",
-                rec.composite_score, rec.confidence));
+            output.push_str(&format!(
+                "   Score: {:.2} | Confidence: {:.2}\n",
+                rec.composite_score, rec.confidence
+            ));
             output.push_str(&format!("   Level: {:?}\n", rec.recommendation_level));
             if !rec.reason.is_empty() {
                 output.push_str(&format!("   Why: {}\n", rec.reason));
@@ -757,7 +771,9 @@ impl RecommendationRegistry {
         }
 
         // Check minimum trust level
-        if let (Some(min_level), Some(actual_level)) = (&context.min_trust_level, &signals.trust_level) {
+        if let (Some(min_level), Some(actual_level)) =
+            (&context.min_trust_level, &signals.trust_level)
+        {
             if actual_level < min_level {
                 return None;
             }
@@ -808,7 +824,8 @@ impl RecommendationRegistry {
         }
 
         // Calibration signal
-        breakdown.calibration = SignalContribution::new(signals.calibration_accuracy, config.calibration_weight);
+        breakdown.calibration =
+            SignalContribution::new(signals.calibration_accuracy, config.calibration_weight);
 
         // Dependencies signal
         let dep_score = if signals.has_unmet_requirements {
@@ -956,11 +973,17 @@ impl RecommendationRegistry {
                 set.filtered_count += 1;
                 // Track filter reason
                 if context.excluded_patterns.contains(pattern_id) {
-                    *set.filter_reasons.entry("excluded".to_string()).or_insert(0) += 1;
+                    *set.filter_reasons
+                        .entry("excluded".to_string())
+                        .or_insert(0) += 1;
                 } else if context.require_production_validated && !signals.production_validated {
-                    *set.filter_reasons.entry("not_production_validated".to_string()).or_insert(0) += 1;
+                    *set.filter_reasons
+                        .entry("not_production_validated".to_string())
+                        .or_insert(0) += 1;
                 } else {
-                    *set.filter_reasons.entry("below_threshold".to_string()).or_insert(0) += 1;
+                    *set.filter_reasons
+                        .entry("below_threshold".to_string())
+                        .or_insert(0) += 1;
                 }
             }
         }
@@ -980,7 +1003,10 @@ impl RecommendationRegistry {
         // Assign ranks and limit
         for (i, rec) in recommendations.iter_mut().enumerate() {
             rec.rank = (i + 1) as u32;
-            *self.recommendation_counts.entry(rec.pattern_id).or_insert(0) += 1;
+            *self
+                .recommendation_counts
+                .entry(rec.pattern_id)
+                .or_insert(0) += 1;
         }
 
         // Limit to max recommendations
@@ -1009,9 +1035,11 @@ impl RecommendationRegistry {
         let mut seen_domains: Vec<PatternId> = Vec::new();
 
         for rec in recommendations.iter_mut() {
-            let diversity_penalty = seen_domains.iter()
+            let diversity_penalty = seen_domains
+                .iter()
                 .filter(|&&id| rec.is_alternative_to.contains(&id))
-                .count() as f32 * self.config.diversity_bonus;
+                .count() as f32
+                * self.config.diversity_bonus;
 
             rec.composite_score = (rec.composite_score - diversity_penalty).max(0.0);
             seen_domains.push(rec.pattern_id);
@@ -1186,9 +1214,33 @@ mod tests {
         let context = RecommendationContext::new(1000);
 
         let patterns = vec![
-            (1, PatternSignals { success_rate: 0.9, usage_count: 100, trust_score: 0.8, ..Default::default() }),
-            (2, PatternSignals { success_rate: 0.7, usage_count: 50, trust_score: 0.9, ..Default::default() }),
-            (3, PatternSignals { success_rate: 0.5, usage_count: 10, trust_score: 0.5, ..Default::default() }),
+            (
+                1,
+                PatternSignals {
+                    success_rate: 0.9,
+                    usage_count: 100,
+                    trust_score: 0.8,
+                    ..Default::default()
+                },
+            ),
+            (
+                2,
+                PatternSignals {
+                    success_rate: 0.7,
+                    usage_count: 50,
+                    trust_score: 0.9,
+                    ..Default::default()
+                },
+            ),
+            (
+                3,
+                PatternSignals {
+                    success_rate: 0.5,
+                    usage_count: 10,
+                    trust_score: 0.5,
+                    ..Default::default()
+                },
+            ),
         ];
 
         let set = registry.generate_recommendations(&patterns, &context);
@@ -1199,7 +1251,9 @@ mod tests {
 
         // First recommendation should have highest score
         if set.recommendations.len() > 1 {
-            assert!(set.recommendations[0].composite_score >= set.recommendations[1].composite_score);
+            assert!(
+                set.recommendations[0].composite_score >= set.recommendations[1].composite_score
+            );
         }
     }
 
@@ -1208,9 +1262,14 @@ mod tests {
         let mut registry = RecommendationRegistry::new();
         let context = RecommendationContext::new(1000);
 
-        let patterns = vec![
-            (1, PatternSignals { success_rate: 0.9, usage_count: 100, ..Default::default() }),
-        ];
+        let patterns = vec![(
+            1,
+            PatternSignals {
+                success_rate: 0.9,
+                usage_count: 100,
+                ..Default::default()
+            },
+        )];
 
         let set = registry.generate_recommendations(&patterns, &context);
         let formatted = set.format();

@@ -110,9 +110,10 @@ impl RefreshRound {
     /// Submit a refresh deal
     pub fn submit_deal(&mut self, deal: RefreshDeal) -> DkgResult<()> {
         if deal.epoch != self.epoch {
-            return Err(DkgError::RefreshError(
-                format!("Wrong epoch: expected {}, got {}", self.epoch, deal.epoch),
-            ));
+            return Err(DkgError::RefreshError(format!(
+                "Wrong epoch: expected {}, got {}",
+                self.epoch, deal.epoch
+            )));
         }
 
         if self.submitted.contains(&deal.dealer) {
@@ -124,9 +125,10 @@ impl RefreshRound {
         let secret_commitment = deal.commitments.secret_commitment();
         let identity_commitment = crate::commitment::Commitment::new(&Scalar::zero());
         if *secret_commitment != identity_commitment {
-            return Err(DkgError::RefreshError(
-                format!("Dealer {} submitted non-zero-sharing polynomial", deal.dealer.0),
-            ));
+            return Err(DkgError::RefreshError(format!(
+                "Dealer {} submitted non-zero-sharing polynomial",
+                deal.dealer.0
+            )));
         }
 
         // Verify all shares against commitments
@@ -176,11 +178,7 @@ impl RefreshRound {
     }
 
     /// Apply refresh to an existing share
-    pub fn apply_refresh(
-        &self,
-        participant: u32,
-        current_share: &Scalar,
-    ) -> DkgResult<Scalar> {
+    pub fn apply_refresh(&self, participant: u32, current_share: &Scalar) -> DkgResult<Scalar> {
         let delta = self.compute_refresh_delta(participant)?;
         Ok(current_share.clone() + delta)
     }
@@ -215,9 +213,10 @@ impl EpochShare {
     /// Apply a refresh delta and advance the epoch
     pub fn refresh(&mut self, delta: Scalar, new_epoch: u64) -> DkgResult<()> {
         if new_epoch <= self.epoch {
-            return Err(DkgError::RefreshError(
-                format!("New epoch {} must be greater than current epoch {}", new_epoch, self.epoch),
-            ));
+            return Err(DkgError::RefreshError(format!(
+                "New epoch {} must be greater than current epoch {}",
+                new_epoch, self.epoch
+            )));
         }
 
         self.value = self.value.clone() + delta;
@@ -236,9 +235,8 @@ mod tests {
 
     #[test]
     fn test_refresh_deal_zero_sharing() {
-        let deal = RefreshRound::generate_refresh_deal(
-            ParticipantId(1), 2, 3, 1, &mut OsRng,
-        ).unwrap();
+        let deal =
+            RefreshRound::generate_refresh_deal(ParticipantId(1), 2, 3, 1, &mut OsRng).unwrap();
 
         // Sum of all sub-shares evaluated at 0 should be 0
         // (but individual sub-shares are non-zero)
@@ -256,25 +254,44 @@ mod tests {
             ceremony.add_participant(ParticipantId(i), 0).unwrap();
         }
 
-        let secrets = [Scalar::from_u64(100), Scalar::from_u64(200), Scalar::from_u64(300)];
+        let secrets = [
+            Scalar::from_u64(100),
+            Scalar::from_u64(200),
+            Scalar::from_u64(300),
+        ];
         let expected_secret = Scalar::from_u64(600);
 
         for (i, secret) in secrets.iter().enumerate() {
             let dealer = Dealer::with_secret(
-                ParticipantId((i + 1) as u32), secret.clone(), 2, 3, &mut OsRng,
-            ).unwrap();
+                ParticipantId((i + 1) as u32),
+                secret.clone(),
+                2,
+                3,
+                &mut OsRng,
+            )
+            .unwrap();
             let deal = dealer.generate_deal();
-            ceremony.submit_deal(ParticipantId((i + 1) as u32), deal, 0).unwrap();
+            ceremony
+                .submit_deal(ParticipantId((i + 1) as u32), deal, 0)
+                .unwrap();
         }
         ceremony.finalize().unwrap();
 
         // Get initial combined shares
         let mut shares: Vec<Scalar> = (1..=3)
-            .map(|i| ceremony.get_combined_share(ParticipantId(i)).unwrap().value().clone())
+            .map(|i| {
+                ceremony
+                    .get_combined_share(ParticipantId(i))
+                    .unwrap()
+                    .value()
+                    .clone()
+            })
             .collect();
 
         // Verify initial reconstruction
-        let points: Vec<_> = shares.iter().enumerate()
+        let points: Vec<_> = shares
+            .iter()
+            .enumerate()
             .map(|(i, s)| (Scalar::from_u64((i + 1) as u64), s.clone()))
             .collect();
         let reconstructed = lagrange_interpolate_at_zero(&points).unwrap();
@@ -284,9 +301,8 @@ mod tests {
         let mut refresh = RefreshRound::new(2, 3, 1).unwrap();
 
         for i in 1..=3u32 {
-            let deal = RefreshRound::generate_refresh_deal(
-                ParticipantId(i), 2, 3, 1, &mut OsRng,
-            ).unwrap();
+            let deal =
+                RefreshRound::generate_refresh_deal(ParticipantId(i), 2, 3, 1, &mut OsRng).unwrap();
             refresh.submit_deal(deal).unwrap();
         }
 
@@ -296,11 +312,16 @@ mod tests {
         }
 
         // Verify reconstruction still works with refreshed shares
-        let refreshed_points: Vec<_> = shares.iter().enumerate()
+        let refreshed_points: Vec<_> = shares
+            .iter()
+            .enumerate()
             .map(|(i, s)| (Scalar::from_u64((i + 1) as u64), s.clone()))
             .collect();
         let reconstructed_after = lagrange_interpolate_at_zero(&refreshed_points).unwrap();
-        assert_eq!(reconstructed_after, expected_secret, "Secret must be preserved after refresh");
+        assert_eq!(
+            reconstructed_after, expected_secret,
+            "Secret must be preserved after refresh"
+        );
     }
 
     #[test]
@@ -321,24 +342,35 @@ mod tests {
         ceremony.finalize().unwrap();
 
         let original_shares: Vec<Scalar> = (1..=3)
-            .map(|i| ceremony.get_combined_share(ParticipantId(i)).unwrap().value().clone())
+            .map(|i| {
+                ceremony
+                    .get_combined_share(ParticipantId(i))
+                    .unwrap()
+                    .value()
+                    .clone()
+            })
             .collect();
 
         // Refresh
         let mut refresh = RefreshRound::new(2, 3, 1).unwrap();
         for i in 1..=3u32 {
-            let deal = RefreshRound::generate_refresh_deal(
-                ParticipantId(i), 2, 3, 1, &mut OsRng,
-            ).unwrap();
+            let deal =
+                RefreshRound::generate_refresh_deal(ParticipantId(i), 2, 3, 1, &mut OsRng).unwrap();
             refresh.submit_deal(deal).unwrap();
         }
 
         let refreshed_shares: Vec<Scalar> = (1..=3)
-            .map(|i| refresh.apply_refresh(i, &original_shares[(i - 1) as usize]).unwrap())
+            .map(|i| {
+                refresh
+                    .apply_refresh(i, &original_shares[(i - 1) as usize])
+                    .unwrap()
+            })
             .collect();
 
         // At least one share should have changed (overwhelmingly likely with random polynomials)
-        let any_changed = original_shares.iter().zip(refreshed_shares.iter())
+        let any_changed = original_shares
+            .iter()
+            .zip(refreshed_shares.iter())
             .any(|(orig, refreshed)| orig != refreshed);
         assert!(any_changed, "Refresh should change share values");
     }
@@ -347,9 +379,8 @@ mod tests {
     fn test_refresh_round_reject_wrong_epoch() {
         let mut refresh = RefreshRound::new(2, 3, 5).unwrap();
 
-        let deal = RefreshRound::generate_refresh_deal(
-            ParticipantId(1), 2, 3, 3, &mut OsRng,
-        ).unwrap();
+        let deal =
+            RefreshRound::generate_refresh_deal(ParticipantId(1), 2, 3, 3, &mut OsRng).unwrap();
 
         let result = refresh.submit_deal(deal);
         assert!(matches!(result, Err(DkgError::RefreshError(_))));
@@ -359,12 +390,10 @@ mod tests {
     fn test_refresh_round_reject_duplicate() {
         let mut refresh = RefreshRound::new(2, 3, 1).unwrap();
 
-        let deal1 = RefreshRound::generate_refresh_deal(
-            ParticipantId(1), 2, 3, 1, &mut OsRng,
-        ).unwrap();
-        let deal2 = RefreshRound::generate_refresh_deal(
-            ParticipantId(1), 2, 3, 1, &mut OsRng,
-        ).unwrap();
+        let deal1 =
+            RefreshRound::generate_refresh_deal(ParticipantId(1), 2, 3, 1, &mut OsRng).unwrap();
+        let deal2 =
+            RefreshRound::generate_refresh_deal(ParticipantId(1), 2, 3, 1, &mut OsRng).unwrap();
 
         refresh.submit_deal(deal1).unwrap();
         let result = refresh.submit_deal(deal2);
@@ -414,15 +443,26 @@ mod tests {
             ceremony.add_participant(ParticipantId(i), 0).unwrap();
         }
 
-        let secrets = [Scalar::from_u64(10), Scalar::from_u64(20), Scalar::from_u64(30)];
+        let secrets = [
+            Scalar::from_u64(10),
+            Scalar::from_u64(20),
+            Scalar::from_u64(30),
+        ];
         let expected_secret = Scalar::from_u64(60);
 
         for (i, secret) in secrets.iter().enumerate() {
             let dealer = Dealer::with_secret(
-                ParticipantId((i + 1) as u32), secret.clone(), 2, 3, &mut OsRng,
-            ).unwrap();
+                ParticipantId((i + 1) as u32),
+                secret.clone(),
+                2,
+                3,
+                &mut OsRng,
+            )
+            .unwrap();
             let deal = dealer.generate_deal();
-            ceremony.submit_deal(ParticipantId((i + 1) as u32), deal, 0).unwrap();
+            ceremony
+                .submit_deal(ParticipantId((i + 1) as u32), deal, 0)
+                .unwrap();
         }
         ceremony.finalize().unwrap();
 
@@ -437,9 +477,9 @@ mod tests {
         for epoch in 1..=5 {
             let mut refresh = RefreshRound::new(2, 3, epoch).unwrap();
             for i in 1..=3u32 {
-                let deal = RefreshRound::generate_refresh_deal(
-                    ParticipantId(i), 2, 3, epoch, &mut OsRng,
-                ).unwrap();
+                let deal =
+                    RefreshRound::generate_refresh_deal(ParticipantId(i), 2, 3, epoch, &mut OsRng)
+                        .unwrap();
                 refresh.submit_deal(deal).unwrap();
             }
 
@@ -450,10 +490,14 @@ mod tests {
         }
 
         // Verify reconstruction still works after 5 refreshes
-        let points: Vec<_> = epoch_shares.iter()
+        let points: Vec<_> = epoch_shares
+            .iter()
             .map(|s| (Scalar::from_u64(s.index as u64), s.value.clone()))
             .collect();
         let reconstructed = lagrange_interpolate_at_zero(&points).unwrap();
-        assert_eq!(reconstructed, expected_secret, "Secret must survive 5 refresh epochs");
+        assert_eq!(
+            reconstructed, expected_secret,
+            "Secret must survive 5 refresh epochs"
+        );
     }
 }

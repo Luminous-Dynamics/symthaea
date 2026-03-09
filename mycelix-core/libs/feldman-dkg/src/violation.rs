@@ -197,7 +197,11 @@ impl ViolationTracker {
     /// Weighted by severity: Minor=0.05, Moderate=0.15, Severe=0.40, Critical=1.0
     pub fn penalty_score(&self, participant: ParticipantId) -> f64 {
         let mut score = 0.0f64;
-        for v in self.violations.iter().filter(|v| v.participant == participant) {
+        for v in self
+            .violations
+            .iter()
+            .filter(|v| v.participant == participant)
+        {
             score += match v.severity {
                 ViolationSeverity::Minor => 0.05,
                 ViolationSeverity::Moderate => 0.15,
@@ -238,10 +242,25 @@ mod tests {
 
     #[test]
     fn test_violation_type_default_severity() {
-        assert_eq!(ViolationType::DealTimeout.default_severity(), ViolationSeverity::Minor);
-        assert_eq!(ViolationType::InvalidShare { recipient: 1 }.default_severity(), ViolationSeverity::Moderate);
-        assert_eq!(ViolationType::InvalidCommitment.default_severity(), ViolationSeverity::Severe);
-        assert_eq!(ViolationType::Equivocation { evidence_hash: [0u8; 32] }.default_severity(), ViolationSeverity::Critical);
+        assert_eq!(
+            ViolationType::DealTimeout.default_severity(),
+            ViolationSeverity::Minor
+        );
+        assert_eq!(
+            ViolationType::InvalidShare { recipient: 1 }.default_severity(),
+            ViolationSeverity::Moderate
+        );
+        assert_eq!(
+            ViolationType::InvalidCommitment.default_severity(),
+            ViolationSeverity::Severe
+        );
+        assert_eq!(
+            ViolationType::Equivocation {
+                evidence_hash: [0u8; 32]
+            }
+            .default_severity(),
+            ViolationSeverity::Critical
+        );
     }
 
     #[test]
@@ -249,7 +268,12 @@ mod tests {
         let mut tracker = ViolationTracker::new();
 
         tracker.record_violation(ParticipantId(1), ViolationType::DealTimeout, 0, 100);
-        tracker.record_violation(ParticipantId(1), ViolationType::InvalidShare { recipient: 2 }, 0, 101);
+        tracker.record_violation(
+            ParticipantId(1),
+            ViolationType::InvalidShare { recipient: 2 },
+            0,
+            101,
+        );
         tracker.record_violation(ParticipantId(2), ViolationType::InvalidCommitment, 0, 102);
 
         assert_eq!(tracker.total_count(), 3);
@@ -263,8 +287,20 @@ mod tests {
         let mut tracker = ViolationTracker::new();
 
         tracker.record_violation(ParticipantId(1), ViolationType::DealTimeout, 0, 100);
-        tracker.record_violation(ParticipantId(1), ViolationType::InvalidShare { recipient: 2 }, 0, 101);
-        tracker.record_violation(ParticipantId(2), ViolationType::Equivocation { evidence_hash: [0; 32] }, 0, 102);
+        tracker.record_violation(
+            ParticipantId(1),
+            ViolationType::InvalidShare { recipient: 2 },
+            0,
+            101,
+        );
+        tracker.record_violation(
+            ParticipantId(2),
+            ViolationType::Equivocation {
+                evidence_hash: [0; 32],
+            },
+            0,
+            102,
+        );
 
         let severe_plus = tracker.violations_at_severity(ViolationSeverity::Severe);
         assert_eq!(severe_plus.len(), 1); // Only equivocation
@@ -278,9 +314,17 @@ mod tests {
         let mut tracker = ViolationTracker::new();
 
         tracker.record_violation(ParticipantId(1), ViolationType::DealTimeout, 0, 100);
-        tracker.record_violation(ParticipantId(1), ViolationType::InvalidShare { recipient: 2 }, 0, 101);
+        tracker.record_violation(
+            ParticipantId(1),
+            ViolationType::InvalidShare { recipient: 2 },
+            0,
+            101,
+        );
 
-        assert_eq!(tracker.max_severity_for(ParticipantId(1)), Some(ViolationSeverity::Moderate));
+        assert_eq!(
+            tracker.max_severity_for(ParticipantId(1)),
+            Some(ViolationSeverity::Moderate)
+        );
         assert_eq!(tracker.max_severity_for(ParticipantId(99)), None);
     }
 
@@ -293,11 +337,23 @@ mod tests {
         assert!((tracker.penalty_score(ParticipantId(1)) - 0.05).abs() < 1e-10);
 
         // Add moderate = 0.05 + 0.15 = 0.20
-        tracker.record_violation(ParticipantId(1), ViolationType::InvalidShare { recipient: 2 }, 0, 101);
+        tracker.record_violation(
+            ParticipantId(1),
+            ViolationType::InvalidShare { recipient: 2 },
+            0,
+            101,
+        );
         assert!((tracker.penalty_score(ParticipantId(1)) - 0.20).abs() < 1e-10);
 
         // Critical alone = 1.0
-        tracker.record_violation(ParticipantId(2), ViolationType::Equivocation { evidence_hash: [0; 32] }, 0, 102);
+        tracker.record_violation(
+            ParticipantId(2),
+            ViolationType::Equivocation {
+                evidence_hash: [0; 32],
+            },
+            0,
+            102,
+        );
         assert!((tracker.penalty_score(ParticipantId(2)) - 1.0).abs() < 1e-10);
 
         // No violations = 0.0
@@ -310,7 +366,12 @@ mod tests {
 
         // Many violations should cap at 1.0
         for i in 0..100 {
-            tracker.record_violation(ParticipantId(1), ViolationType::InvalidShare { recipient: i }, 0, i as u64);
+            tracker.record_violation(
+                ParticipantId(1),
+                ViolationType::InvalidShare { recipient: i },
+                0,
+                i as u64,
+            );
         }
         assert!((tracker.penalty_score(ParticipantId(1)) - 1.0).abs() < 1e-10);
     }

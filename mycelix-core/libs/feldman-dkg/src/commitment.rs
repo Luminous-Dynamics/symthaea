@@ -2,13 +2,13 @@
 //!
 //! Commitments allow verification of shares without revealing the secret.
 
-use k256::{ProjectivePoint, AffinePoint};
 use k256::elliptic_curve::group::GroupEncoding;
+use k256::{AffinePoint, ProjectivePoint};
 use serde::{Deserialize, Serialize};
 
+use crate::error::{DkgError, DkgResult};
 use crate::polynomial::Polynomial;
 use crate::scalar::Scalar;
-use crate::error::{DkgError, DkgResult};
 
 /// A Feldman commitment to a polynomial coefficient
 ///
@@ -45,9 +45,10 @@ impl Commitment {
     /// Deserialize from compressed bytes
     pub fn from_bytes(bytes: &[u8]) -> DkgResult<Self> {
         if bytes.len() != 33 {
-            return Err(DkgError::SerializationError(
-                format!("Invalid commitment length: expected 33, got {}", bytes.len()),
-            ));
+            return Err(DkgError::SerializationError(format!(
+                "Invalid commitment length: expected 33, got {}",
+                bytes.len()
+            )));
         }
 
         let mut arr = [0u8; 33];
@@ -119,11 +120,7 @@ pub struct CommitmentSet {
 impl CommitmentSet {
     /// Create commitments from a polynomial
     pub fn from_polynomial(poly: &Polynomial) -> Self {
-        let commitments = poly
-            .coefficients()
-            .iter()
-            .map(Commitment::new)
-            .collect();
+        let commitments = poly.coefficients().iter().map(Commitment::new).collect();
         Self { commitments }
     }
 
@@ -201,12 +198,12 @@ impl CommitmentSet {
 
         let expected_len = 4 + count * 33;
         if bytes.len() != expected_len {
-            return Err(DkgError::SerializationError(
-                format!(
-                    "CommitmentSet length mismatch: expected {} bytes for {} commitments, got {}",
-                    expected_len, count, bytes.len()
-                ),
-            ));
+            return Err(DkgError::SerializationError(format!(
+                "CommitmentSet length mismatch: expected {} bytes for {} commitments, got {}",
+                expected_len,
+                count,
+                bytes.len()
+            )));
         }
 
         let mut commitments = Vec::with_capacity(count);
@@ -225,7 +222,9 @@ impl CommitmentSet {
     /// is the sum of all C_0 commitments.
     pub fn combine(sets: &[&CommitmentSet]) -> DkgResult<Commitment> {
         if sets.is_empty() {
-            return Err(DkgError::CryptoError("No commitment sets to combine".into()));
+            return Err(DkgError::CryptoError(
+                "No commitment sets to combine".into(),
+            ));
         }
 
         let mut combined = ProjectivePoint::IDENTITY;
@@ -309,7 +308,11 @@ mod tests {
         assert_eq!(recovered.len(), commitments.len());
 
         // Verify each commitment matches
-        for (original, recovered) in commitments.commitments().iter().zip(recovered.commitments().iter()) {
+        for (original, recovered) in commitments
+            .commitments()
+            .iter()
+            .zip(recovered.commitments().iter())
+        {
             assert_eq!(original, recovered);
         }
     }

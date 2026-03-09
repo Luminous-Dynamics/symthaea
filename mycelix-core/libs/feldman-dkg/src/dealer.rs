@@ -4,11 +4,11 @@ use rand_core::CryptoRngCore;
 use serde::{Deserialize, Serialize};
 
 use crate::commitment::CommitmentSet;
+use crate::error::{DkgError, DkgResult};
+use crate::participant::ParticipantId;
 use crate::polynomial::Polynomial;
 use crate::scalar::Scalar;
 use crate::share::Share;
-use crate::participant::ParticipantId;
-use crate::error::{DkgError, DkgResult};
 
 /// A deal from a dealer containing shares and commitments
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -35,7 +35,9 @@ impl Deal {
 
     /// Verify that a share is consistent with the commitments
     pub fn verify_share(&self, participant: u32) -> DkgResult<bool> {
-        let share = self.get_share(participant).ok_or(DkgError::ParticipantNotFound(participant))?;
+        let share = self
+            .get_share(participant)
+            .ok_or(DkgError::ParticipantNotFound(participant))?;
         Ok(self.commitments.verify_share(participant, share.value()))
     }
 
@@ -61,7 +63,12 @@ pub struct Dealer {
 
 impl Dealer {
     /// Create a new dealer with a random secret
-    pub fn new(id: ParticipantId, threshold: usize, num_participants: usize, rng: &mut impl CryptoRngCore) -> DkgResult<Self> {
+    pub fn new(
+        id: ParticipantId,
+        threshold: usize,
+        num_participants: usize,
+        rng: &mut impl CryptoRngCore,
+    ) -> DkgResult<Self> {
         if threshold == 0 || threshold > num_participants {
             return Err(DkgError::InvalidThreshold {
                 threshold,
@@ -204,7 +211,8 @@ mod tests {
     #[test]
     fn test_dealer_with_secret() {
         let secret = Scalar::from_u64(42);
-        let dealer = Dealer::with_secret(ParticipantId(1), secret.clone(), 3, 5, &mut OsRng).unwrap();
+        let dealer =
+            Dealer::with_secret(ParticipantId(1), secret.clone(), 3, 5, &mut OsRng).unwrap();
 
         assert_eq!(dealer.secret(), &secret);
     }

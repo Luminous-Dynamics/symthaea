@@ -14,11 +14,11 @@ use serde::{Deserialize, Serialize};
 use crate::epistemic::{
     EpistemicClassification, EpistemicContext, NormativeLevel, TestimonialQuality,
 };
-use crate::harmonic::{Harmony, HarmonicImpact};
+use crate::harmonic::{HarmonicImpact, Harmony};
 
 use std::collections::HashMap;
 
-use super::{CommunityId, PredictionId, CausalNodeId};
+use super::{CausalNodeId, CommunityId, PredictionId};
 
 // ==============================================================================
 // COMPONENT 1: THE LENS - Harmonic Weights Model
@@ -87,8 +87,8 @@ impl HarmonicWeights {
             psf: 0.13,
             iw: 0.08,
             ip: 0.11,
-            ui: 0.23,  // Elevated - interconnectedness
-            sr: 0.18,  // Elevated - reciprocity
+            ui: 0.23, // Elevated - interconnectedness
+            sr: 0.18, // Elevated - reciprocity
             ep: 0.05,
             ss: 0.12,
         }
@@ -98,9 +98,9 @@ impl HarmonicWeights {
     /// Prioritizes: IW (truth/wisdom) and RC (coherence)
     pub fn scientific_profile() -> Self {
         Self {
-            rc: 0.22,  // Elevated - coherence
+            rc: 0.22, // Elevated - coherence
             psf: 0.09,
-            iw: 0.27,  // Elevated - truth/wisdom
+            iw: 0.27, // Elevated - truth/wisdom
             ip: 0.09,
             ui: 0.09,
             sr: 0.07,
@@ -114,9 +114,9 @@ impl HarmonicWeights {
     pub fn artistic_profile() -> Self {
         Self {
             rc: 0.08,
-            psf: 0.22,  // Elevated - flourishing
+            psf: 0.22, // Elevated - flourishing
             iw: 0.07,
-            ip: 0.27,  // Elevated - infinite play
+            ip: 0.27, // Elevated - infinite play
             ui: 0.10,
             sr: 0.08,
             ep: 0.05,
@@ -129,11 +129,11 @@ impl HarmonicWeights {
     pub fn governance_profile() -> Self {
         Self {
             rc: 0.13,
-            psf: 0.22,  // Elevated - care for all
+            psf: 0.22, // Elevated - care for all
             iw: 0.10,
             ip: 0.05,
             ui: 0.12,
-            sr: 0.18,  // Elevated - fair exchange
+            sr: 0.18, // Elevated - fair exchange
             ep: 0.08,
             ss: 0.12,
         }
@@ -143,14 +143,14 @@ impl HarmonicWeights {
     /// Prioritizes: RC (coherence), UI (interconnectedness), and SS (stillness)
     pub fn contemplative_profile() -> Self {
         Self {
-            rc: 0.20,  // Elevated - integration
+            rc: 0.20, // Elevated - integration
             psf: 0.12,
             iw: 0.12,
             ip: 0.08,
-            ui: 0.20,  // Elevated - unity
+            ui: 0.20, // Elevated - unity
             sr: 0.05,
             ep: 0.05,
-            ss: 0.18,  // Elevated - sacred stillness
+            ss: 0.18, // Elevated - sacred stillness
         }
     }
 
@@ -218,7 +218,9 @@ impl HarmonicWeights {
 
     /// Get as array (ordered by Harmony::ALL)
     pub fn to_array(&self) -> [f32; 8] {
-        [self.rc, self.psf, self.iw, self.ip, self.ui, self.sr, self.ep, self.ss]
+        [
+            self.rc, self.psf, self.iw, self.ip, self.ui, self.sr, self.ep, self.ss,
+        ]
     }
 
     /// Create from array
@@ -344,7 +346,8 @@ impl CommunityProfile {
             default_context: EpistemicContext::Contemplative,
             epistemology: Epistemology::BuddhistContemplative,
             consensus_level: NormativeLevel::Group,
-            rationale: "Contemplative knowledge values deep integration and experiential knowing".into(),
+            rationale: "Contemplative knowledge values deep integration and experiential knowing"
+                .into(),
             review_timestamp: None,
             honors_oral_tradition: true,
             min_testimonial_quality: Some(TestimonialQuality::ElderCouncil),
@@ -850,11 +853,17 @@ impl EmergentWeightLearner {
         }
 
         // Calculate success rates for high-score vs low-score claims
-        let high_score_outcomes: Vec<&EpistemicOutcome> =
-            self.outcomes.iter().filter(|o| o.original_score > 0.7).collect();
+        let high_score_outcomes: Vec<&EpistemicOutcome> = self
+            .outcomes
+            .iter()
+            .filter(|o| o.original_score > 0.7)
+            .collect();
 
-        let low_score_outcomes: Vec<&EpistemicOutcome> =
-            self.outcomes.iter().filter(|o| o.original_score < 0.3).collect();
+        let low_score_outcomes: Vec<&EpistemicOutcome> = self
+            .outcomes
+            .iter()
+            .filter(|o| o.original_score < 0.3)
+            .collect();
 
         if high_score_outcomes.is_empty() || low_score_outcomes.is_empty() {
             return None;
@@ -1177,20 +1186,23 @@ impl WisdomEngine {
         let timestamp = claim.timestamp;
 
         // A. Load Profile (The Setting)
-        let (harmonic_weights, context, epistemology): (HarmonicWeights, EpistemicContext, Epistemology) =
-            if let Some(p) = self.communities.get(&community_id) {
-                (
-                    p.harmonic_weights.clone(),
-                    p.default_context,
-                    p.epistemology,
-                )
-            } else {
-                (
-                    self.default_weights.clone(),
-                    EpistemicContext::Standard,
-                    Epistemology::default(),
-                )
-            };
+        let (harmonic_weights, context, epistemology): (
+            HarmonicWeights,
+            EpistemicContext,
+            Epistemology,
+        ) = if let Some(p) = self.communities.get(&community_id) {
+            (
+                p.harmonic_weights.clone(),
+                p.default_context,
+                p.epistemology,
+            )
+        } else {
+            (
+                self.default_weights.clone(),
+                EpistemicContext::Standard,
+                Epistemology::default(),
+            )
+        };
 
         // Calculate base E/N/M score with context-adaptive weights
         let enm_score = claim.classification.quality_score_contextual(context);
@@ -1494,7 +1506,10 @@ impl CausalNode {
             return 0.0;
         }
 
-        let first_value = recent.first().map(|(_, v)| *v).unwrap_or(self.current_value);
+        let first_value = recent
+            .first()
+            .map(|(_, v)| *v)
+            .unwrap_or(self.current_value);
         self.current_value - first_value
     }
 }
@@ -1596,7 +1611,8 @@ impl SimpleOracle {
 
     /// Set an observation value
     pub fn set_observation(&mut self, variable: impl Into<String>, value: f32) {
-        self.observations.insert(variable.into(), value.clamp(0.0, 1.0));
+        self.observations
+            .insert(variable.into(), value.clamp(0.0, 1.0));
     }
 }
 
@@ -1610,14 +1626,16 @@ impl Oracle for SimpleOracle {
     }
 
     fn observe(&self, variable: &str, timestamp: u64) -> Option<OracleObservation> {
-        self.observations.get(variable).map(|&value| OracleObservation {
-            variable: variable.to_string(),
-            value,
-            confidence: self.trust,
-            timestamp,
-            oracle_id: self.id.clone(),
-            metadata: None,
-        })
+        self.observations
+            .get(variable)
+            .map(|&value| OracleObservation {
+                variable: variable.to_string(),
+                value,
+                confidence: self.trust,
+                timestamp,
+                oracle_id: self.id.clone(),
+                metadata: None,
+            })
     }
 
     fn can_observe(&self, variable: &str) -> bool {
@@ -1719,7 +1737,11 @@ impl CausalGraph {
     }
 
     /// Add a causal node
-    pub fn add_node(&mut self, name: impl Into<String>, description: impl Into<String>) -> CausalNodeId {
+    pub fn add_node(
+        &mut self,
+        name: impl Into<String>,
+        description: impl Into<String>,
+    ) -> CausalNodeId {
         let id = self.next_node_id;
         self.next_node_id += 1;
 
@@ -1798,7 +1820,12 @@ impl CausalGraph {
     }
 
     /// Resolve a prediction with an observation
-    pub fn resolve_prediction(&mut self, prediction_id: PredictionId, observed_value: f32, timestamp: u64) -> Option<f32> {
+    pub fn resolve_prediction(
+        &mut self,
+        prediction_id: PredictionId,
+        observed_value: f32,
+        timestamp: u64,
+    ) -> Option<f32> {
         if let Some(prediction) = self.predictions.iter_mut().find(|p| p.id == prediction_id) {
             prediction.resolve(observed_value, timestamp);
             let error = prediction.error_magnitude();
@@ -1823,7 +1850,11 @@ impl CausalGraph {
     }
 
     /// Resolve predictions from an oracle
-    pub fn resolve_from_oracle(&mut self, oracle: &dyn Oracle, timestamp: u64) -> Vec<(PredictionId, f32)> {
+    pub fn resolve_from_oracle(
+        &mut self,
+        oracle: &dyn Oracle,
+        timestamp: u64,
+    ) -> Vec<(PredictionId, f32)> {
         let mut resolved = Vec::new();
 
         for prediction in &mut self.predictions {
@@ -1835,8 +1866,10 @@ impl CausalGraph {
             if oracle.can_observe(&prediction.target_variable) {
                 if let Some(observation) = oracle.observe(&prediction.target_variable, timestamp) {
                     // Weight the observation by oracle trust and verification level
-                    let trust_factor = oracle.trust_level() * oracle.verification_level().trust_multiplier();
-                    let weighted_value = observation.value * trust_factor + prediction.predicted_value * (1.0 - trust_factor);
+                    let trust_factor =
+                        oracle.trust_level() * oracle.verification_level().trust_multiplier();
+                    let weighted_value = observation.value * trust_factor
+                        + prediction.predicted_value * (1.0 - trust_factor);
 
                     // Use the weighted value for high-trust oracles, raw value for lower trust
                     let final_value = if oracle.trust_level() > 0.9 {
@@ -2061,7 +2094,11 @@ impl LivingWisdomEngine {
     }
 
     /// Evaluate a claim and optionally generate a prediction
-    pub fn evaluate(&mut self, claim: &Claim, community_id: CommunityId) -> EvaluationWithPrediction {
+    pub fn evaluate(
+        &mut self,
+        claim: &Claim,
+        community_id: CommunityId,
+    ) -> EvaluationWithPrediction {
         let evaluation = self.wisdom.evaluate(claim, community_id);
 
         // Generate prediction if enabled
@@ -2073,7 +2110,10 @@ impl LivingWisdomEngine {
             let (weights, context) = if let Some(p) = self.wisdom.get_community(community_id) {
                 (p.harmonic_weights.clone(), p.default_context)
             } else {
-                (self.wisdom.default_weights.clone(), EpistemicContext::Standard)
+                (
+                    self.wisdom.default_weights.clone(),
+                    EpistemicContext::Standard,
+                )
             };
 
             let prediction_id = self.causal.predict(
@@ -2125,7 +2165,9 @@ impl LivingWisdomEngine {
 
     /// Apply adjustments with confidence above threshold
     pub fn apply_high_confidence_adjustments(&mut self) {
-        let adjustments: Vec<CausalAdjustment> = self.causal.get_all_adjustments()
+        let adjustments: Vec<CausalAdjustment> = self
+            .causal
+            .get_all_adjustments()
             .into_iter()
             .filter(|a| a.confidence >= self.auto_adjust_threshold)
             .collect();
@@ -2210,9 +2252,16 @@ pub struct SystemHealthReport {
 impl SystemHealthReport {
     /// Get overall health status
     pub fn status(&self) -> SystemHealth {
-        if self.prediction_accuracy > 0.8 && self.accuracy_trend >= 0.0 && !self.bias_detected && self.diversity_index > 0.6 {
+        if self.prediction_accuracy > 0.8
+            && self.accuracy_trend >= 0.0
+            && !self.bias_detected
+            && self.diversity_index > 0.6
+        {
             SystemHealth::Excellent
-        } else if self.prediction_accuracy > 0.6 && self.accuracy_trend > -0.1 && self.diversity_index > 0.4 {
+        } else if self.prediction_accuracy > 0.6
+            && self.accuracy_trend > -0.1
+            && self.diversity_index > 0.4
+        {
             SystemHealth::Good
         } else if self.prediction_accuracy > 0.4 {
             SystemHealth::NeedsAttention
@@ -2235,4 +2284,3 @@ pub enum SystemHealth {
     /// System in critical state
     Critical,
 }
-

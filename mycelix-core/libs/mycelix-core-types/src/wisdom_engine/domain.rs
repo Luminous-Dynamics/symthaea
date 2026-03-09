@@ -172,7 +172,10 @@ impl DomainRegistry {
         let depth = if parent_id == self.root_id {
             1
         } else {
-            self.domains.get(&parent_id).map(|p| p.depth + 1).unwrap_or(1)
+            self.domains
+                .get(&parent_id)
+                .map(|p| p.depth + 1)
+                .unwrap_or(1)
         };
 
         let id = self.next_id;
@@ -365,7 +368,8 @@ impl DomainRegistry {
 
     /// Find all domains matching a tag
     pub fn find_by_tag(&self, tag: &str) -> Vec<DomainId> {
-        self.domains.values()
+        self.domains
+            .values()
             .filter(|d| d.has_tag(tag))
             .map(|d| d.id)
             .collect()
@@ -373,7 +377,8 @@ impl DomainRegistry {
 
     /// Get all domains at a specific depth
     pub fn at_depth(&self, depth: u32) -> Vec<DomainId> {
-        self.domains.values()
+        self.domains
+            .values()
             .filter(|d| d.depth == depth)
             .map(|d| d.id)
             .collect()
@@ -397,7 +402,8 @@ impl DomainRegistry {
 
         for domain in self.domains.values() {
             self.by_name.insert(domain.name.to_lowercase(), domain.id);
-            self.by_path.insert(domain.full_path.to_lowercase(), domain.id);
+            self.by_path
+                .insert(domain.full_path.to_lowercase(), domain.id);
 
             if let Some(parent_id) = domain.parent {
                 self.children.entry(parent_id).or_default().push(domain.id);
@@ -455,7 +461,10 @@ impl DomainPath {
         if self.segments.len() > other.segments.len() {
             return false;
         }
-        self.segments.iter().zip(other.segments.iter()).all(|(a, b)| a == b)
+        self.segments
+            .iter()
+            .zip(other.segments.iter())
+            .all(|(a, b)| a == b)
     }
 }
 
@@ -470,4 +479,3 @@ impl std::fmt::Display for DomainPath {
         write!(f, "{}", self.as_str())
     }
 }
-

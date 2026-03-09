@@ -106,7 +106,9 @@ impl LifecycleTransitionReason {
 
     /// Create a resurrection reason
     pub fn resurrected(reason: impl Into<String>) -> Self {
-        Self::Resurrected { reason: reason.into() }
+        Self::Resurrected {
+            reason: reason.into(),
+        }
     }
 }
 
@@ -320,7 +322,8 @@ impl PatternLifecycleRegistry {
 
     /// Register a new pattern
     pub fn register(&mut self, pattern_id: PatternId, timestamp: u64) {
-        self.lifecycles.insert(pattern_id, PatternLifecycleInfo::new(timestamp));
+        self.lifecycles
+            .insert(pattern_id, PatternLifecycleInfo::new(timestamp));
     }
 
     /// Get lifecycle info for a pattern
@@ -496,7 +499,9 @@ impl PatternLifecycleRegistry {
 
         // Staleness factor
         if days_since_use > self.config.staleness_days {
-            let staleness_factor = ((days_since_use - self.config.staleness_days) / self.config.staleness_days).min(1.0);
+            let staleness_factor = ((days_since_use - self.config.staleness_days)
+                / self.config.staleness_days)
+                .min(1.0);
             score += staleness_factor * self.config.staleness_weight;
             factors.push(format!("stale:{:.0}d", days_since_use));
         }
@@ -508,7 +513,8 @@ impl PatternLifecycleRegistry {
             factors.push(format!("low_trust:{:.2}", trust_score));
         }
 
-        let should_deprecate = self.config.auto_deprecate && score >= self.config.combined_threshold;
+        let should_deprecate =
+            self.config.auto_deprecate && score >= self.config.combined_threshold;
         (should_deprecate, score, factors)
     }
 
@@ -533,7 +539,10 @@ impl PatternLifecycleRegistry {
             .iter()
             .filter(|(_, info)| {
                 info.state == PatternLifecycleState::Deprecated
-                    && info.deprecated_at.map(|t| current_time.saturating_sub(t) >= threshold_secs).unwrap_or(false)
+                    && info
+                        .deprecated_at
+                        .map(|t| current_time.saturating_sub(t) >= threshold_secs)
+                        .unwrap_or(false)
             })
             .map(|(id, _)| *id)
             .collect()
@@ -555,12 +564,14 @@ impl PatternLifecycleRegistry {
 
     /// Get deprecated pattern count
     pub fn deprecated_count(&self) -> usize {
-        self.patterns_by_state(PatternLifecycleState::Deprecated).len()
+        self.patterns_by_state(PatternLifecycleState::Deprecated)
+            .len()
     }
 
     /// Get archived pattern count
     pub fn archived_count(&self) -> usize {
-        self.patterns_by_state(PatternLifecycleState::Archived).len()
+        self.patterns_by_state(PatternLifecycleState::Archived)
+            .len()
     }
 
     /// Add transition to history
@@ -573,7 +584,11 @@ impl PatternLifecycleRegistry {
     }
 
     /// Get recent transitions for a pattern
-    pub fn recent_transitions(&self, pattern_id: PatternId, limit: usize) -> Vec<&LifecycleTransition> {
+    pub fn recent_transitions(
+        &self,
+        pattern_id: PatternId,
+        limit: usize,
+    ) -> Vec<&LifecycleTransition> {
         self.transitions
             .iter()
             .rev()
@@ -626,7 +641,9 @@ impl PatternLifecycleRegistry {
 
         if should_deprecate {
             Some(LifecycleTransitionReason::Combined { score, factors })
-        } else if usage_count < self.config.min_usage_threshold && days_since_use > self.config.staleness_days * 0.5 {
+        } else if usage_count < self.config.min_usage_threshold
+            && days_since_use > self.config.staleness_days * 0.5
+        {
             // Low usage alone might warrant deprecation
             Some(LifecycleTransitionReason::LowUsage {
                 usage_count,
@@ -723,4 +740,3 @@ impl LifecycleStats {
         self.total_resurrections as f32 / self.total_deprecations as f32
     }
 }
-

@@ -143,21 +143,21 @@
 //! - **Tension**: Where are the productive growth edges?
 //! - **Wisdom Density**: Has something profound emerged?
 
-pub mod k_vector;
+pub mod collective_field;
 pub mod epistemic;
 pub mod harmonic;
+pub mod k_vector;
 pub mod moral;
 pub mod trust;
 pub mod wisdom_engine;
-pub mod collective_field;
 
-pub use k_vector::*;
+pub use collective_field::*;
 pub use epistemic::*;
 pub use harmonic::*;
+pub use k_vector::*;
 pub use moral::*;
 pub use trust::*;
 pub use wisdom_engine::*;
-pub use collective_field::*;
 
 /// Mycelix protocol version
 pub const PROTOCOL_VERSION: &str = "2.0";
@@ -193,7 +193,10 @@ fn mycelix_wisdom(m: &Bound<'_, PyModule>) -> PyResult<()> {
     wisdom_engine::python_bindings::register_wisdom_classes(m)?;
 
     // Module metadata
-    m.add("__doc__", "Mycelix WisdomEngine - Pattern intelligence for AI systems")?;
+    m.add(
+        "__doc__",
+        "Mycelix WisdomEngine - Pattern intelligence for AI systems",
+    )?;
     m.add("__version__", PROTOCOL_VERSION)?;
 
     Ok(())

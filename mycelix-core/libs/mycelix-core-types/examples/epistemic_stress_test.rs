@@ -314,7 +314,11 @@ fn main() {
     println!("│ Community               │ E/N/M    │ Harmonic │ Final    │ Reparations │");
     println!("├─────────────────────────┼──────────┼──────────┼──────────┼─────────────┤");
 
-    for (id, name) in [(1, "Lakota Wisdom Keepers"), (2, "Nature Research Labs"), (3, "Zen Buddhist Sangha")] {
+    for (id, name) in [
+        (1, "Lakota Wisdom Keepers"),
+        (2, "Nature Research Labs"),
+        (3, "Zen Buddhist Sangha"),
+    ] {
         let eval = engine.evaluate(&grandmother_claim, id);
         println!(
             "│ {:<23} │   {:.3}  │   {:.3}  │   {:.3}  │ {:^11} │",
@@ -322,7 +326,11 @@ fn main() {
             eval.enm_score,
             eval.harmonic_score,
             eval.final_score,
-            if eval.reparations_applied { "YES" } else { "NO" }
+            if eval.reparations_applied {
+                "YES"
+            } else {
+                "NO"
+            }
         );
     }
 
@@ -344,7 +352,11 @@ fn main() {
     let base_score = 0.50;
     let current_diversity = 0.50; // Medium diversity
 
-    println!("Base Score: {:.3}, Current Diversity Index: {:.1}%", base_score, current_diversity * 100.0);
+    println!(
+        "Base Score: {:.3}, Current Diversity Index: {:.1}%",
+        base_score,
+        current_diversity * 100.0
+    );
     println!();
 
     println!("┌─────────────────────────┬──────────┬─────────────┬────────────┐");
@@ -355,7 +367,10 @@ fn main() {
         ("Dominant", StructuralPosition::Dominant),
         ("Mainstream", StructuralPosition::Mainstream),
         ("Marginalized", StructuralPosition::Marginalized),
-        ("Historically Silenced", StructuralPosition::HistoricallySilenced),
+        (
+            "Historically Silenced",
+            StructuralPosition::HistoricallySilenced,
+        ),
     ] {
         let (adjusted, applied) = manager.adjust(base_score, position, current_diversity);
         let boost = adjusted - base_score;
@@ -388,13 +403,22 @@ fn main() {
     for i in 0..100 {
         let (position, score) = if i % 3 == 0 {
             // Dominant voices: higher scores
-            (StructuralPosition::Dominant, 0.75 + (i as f32 % 10.0) * 0.01)
+            (
+                StructuralPosition::Dominant,
+                0.75 + (i as f32 % 10.0) * 0.01,
+            )
         } else if i % 3 == 1 {
             // Mainstream: medium scores
-            (StructuralPosition::Mainstream, 0.55 + (i as f32 % 10.0) * 0.01)
+            (
+                StructuralPosition::Mainstream,
+                0.55 + (i as f32 % 10.0) * 0.01,
+            )
         } else {
             // Marginalized: lower scores (this is the bias!)
-            (StructuralPosition::Marginalized, 0.45 + (i as f32 % 10.0) * 0.01)
+            (
+                StructuralPosition::Marginalized,
+                0.45 + (i as f32 % 10.0) * 0.01,
+            )
         };
 
         auditor.record(EvaluationRecord {
@@ -415,7 +439,8 @@ fn main() {
     let metrics = &auditor.current_metrics;
     println!("Diversity Metrics:");
     println!("  Total Evaluations: {}", metrics.total_evaluations);
-    println!("  Dominant: {}, Mainstream: {}, Marginalized: {}",
+    println!(
+        "  Dominant: {}, Mainstream: {}, Marginalized: {}",
         metrics.by_position.dominant,
         metrics.by_position.mainstream,
         metrics.by_position.marginalized
@@ -426,8 +451,14 @@ fn main() {
     if let Some(alert) = auditor.detect_bias() {
         println!("⚠️  BIAS ALERT DETECTED!");
         println!("  Score Gap: {:.1}%", alert.gap * 100.0);
-        println!("  Dominant Avg: {:.3}, Marginalized Avg: {:.3}", alert.dominant_avg, alert.marginalized_avg);
-        println!("  Samples: {} dominant, {} marginalized", alert.samples_dominant, alert.samples_marginalized);
+        println!(
+            "  Dominant Avg: {:.3}, Marginalized Avg: {:.3}",
+            alert.dominant_avg, alert.marginalized_avg
+        );
+        println!(
+            "  Samples: {} dominant, {} marginalized",
+            alert.samples_dominant, alert.samples_marginalized
+        );
         println!();
         println!("  Recommendation: {}", alert.recommendation);
     } else {
@@ -514,7 +545,7 @@ fn main() {
     let climate_claim = Claim {
         id: 100,
         classification: EpistemicClassification::new(
-            EmpiricalLevel::Measurable, // E2 - peer-reviewed measurements
+            EmpiricalLevel::Measurable,  // E2 - peer-reviewed measurements
             NormativeLevel::Network,     // N2 - scientific consensus
             MaterialityLevel::Permanent, // M3 - foundational for policy
         ),
@@ -531,10 +562,16 @@ fn main() {
 
     println!("Step 1: Evaluation & Prediction");
     println!("  E/N/M Score: {:.3}", eval_result.evaluation.enm_score);
-    println!("  Harmonic Score: {:.3}", eval_result.evaluation.harmonic_score);
+    println!(
+        "  Harmonic Score: {:.3}",
+        eval_result.evaluation.harmonic_score
+    );
     println!("  Final Score: {:.3}", eval_result.evaluation.final_score);
     println!("  Prediction ID: {}", prediction_id);
-    println!("  → System predicts outcome value: {:.3}", eval_result.evaluation.final_score);
+    println!(
+        "  → System predicts outcome value: {:.3}",
+        eval_result.evaluation.final_score
+    );
     println!();
 
     // Simulate time passing and oracle observing outcome
@@ -553,9 +590,12 @@ fn main() {
     climate_oracle.set_observation(format!("claim_{}_outcome", 100), actual_outcome);
 
     // Resolve from oracle
-    let resolved = living_engine.causal.resolve_from_oracle(&climate_oracle, 2000);
+    let resolved = living_engine
+        .causal
+        .resolve_from_oracle(&climate_oracle, 2000);
 
-    println!("  Oracle: {} (Trust: {:.0}%, Verification: {:?})",
+    println!(
+        "  Oracle: {} (Trust: {:.0}%, Verification: {:?})",
         climate_oracle.description,
         climate_oracle.trust * 100.0,
         climate_oracle.verification
@@ -563,7 +603,8 @@ fn main() {
     println!("  Observed Outcome: {:.3}", actual_outcome);
 
     if !resolved.is_empty() {
-        println!("  Prediction Error: {:.3} ({:.1}%)",
+        println!(
+            "  Prediction Error: {:.3} ({:.1}%)",
             resolved[0].1,
             resolved[0].1 * 100.0
         );
@@ -582,9 +623,14 @@ fn main() {
         println!("  Explanation: {}", adj.explanation);
         println!();
         println!("  Weight Deltas (RC, PSF, IW, IP, UI, SR, EP):");
-        println!("    [{:+.4}, {:+.4}, {:+.4}, {:+.4}, {:+.4}, {:+.4}, {:+.4}]",
-            adj.weight_deltas[0], adj.weight_deltas[1], adj.weight_deltas[2],
-            adj.weight_deltas[3], adj.weight_deltas[4], adj.weight_deltas[5],
+        println!(
+            "    [{:+.4}, {:+.4}, {:+.4}, {:+.4}, {:+.4}, {:+.4}, {:+.4}]",
+            adj.weight_deltas[0],
+            adj.weight_deltas[1],
+            adj.weight_deltas[2],
+            adj.weight_deltas[3],
+            adj.weight_deltas[4],
+            adj.weight_deltas[5],
             adj.weight_deltas[6]
         );
     } else {
@@ -595,12 +641,22 @@ fn main() {
     // System health report
     println!("Step 4: System Health Report");
     let report = living_engine.health_report();
-    println!("  Prediction Accuracy: {:.1}%", report.prediction_accuracy * 100.0);
+    println!(
+        "  Prediction Accuracy: {:.1}%",
+        report.prediction_accuracy * 100.0
+    );
     println!("  Accuracy Trend: {:+.3}", report.accuracy_trend);
     println!("  Total Predictions: {}", report.total_predictions);
     println!("  Pending Predictions: {}", report.pending_predictions);
     println!("  Diversity Index: {:.3}", report.diversity_index);
-    println!("  Bias Detected: {}", if report.bias_detected { "YES ⚠️" } else { "NO ✅" });
+    println!(
+        "  Bias Detected: {}",
+        if report.bias_detected {
+            "YES ⚠️"
+        } else {
+            "NO ✅"
+        }
+    );
     println!("  Adjustments Pending: {}", report.adjustments_pending);
     println!("  Overall Status: {:?}", report.status());
     println!();
@@ -616,12 +672,22 @@ fn main() {
     println!("├─────────────────────────┼──────────────┼──────────────────────────────┤");
 
     for (level, example) in [
-        (OracleVerificationLevel::Testimonial, "Community member reports"),
+        (
+            OracleVerificationLevel::Testimonial,
+            "Community member reports",
+        ),
         (OracleVerificationLevel::Audited, "Audit guild verification"),
-        (OracleVerificationLevel::Cryptographic, "Sensor + ZKP attestation"),
-        (OracleVerificationLevel::PubliclyReproducible, "Open data + reproducible"),
+        (
+            OracleVerificationLevel::Cryptographic,
+            "Sensor + ZKP attestation",
+        ),
+        (
+            OracleVerificationLevel::PubliclyReproducible,
+            "Open data + reproducible",
+        ),
     ] {
-        println!("│ {:<23} │    {:.0}%       │ {:<28} │",
+        println!(
+            "│ {:<23} │    {:.0}%       │ {:<28} │",
             format!("{:?}", level),
             level.trust_multiplier() * 100.0,
             example
@@ -641,7 +707,8 @@ fn main() {
 
     // Create a causal model: Trust → Participation → Health → Outcomes
     let trust = causal_graph.add_node("community_trust", "Level of trust between members");
-    let participation = causal_graph.add_node("participation_rate", "Active engagement in governance");
+    let participation =
+        causal_graph.add_node("participation_rate", "Active engagement in governance");
     let health = causal_graph.add_node("community_health", "Overall community wellbeing");
     let outcomes = causal_graph.add_node("decision_outcomes", "Quality of collective decisions");
 
@@ -662,7 +729,8 @@ fn main() {
 
     println!("Nodes Created: {}", causal_graph.nodes.len());
     for node in causal_graph.nodes.values() {
-        println!("  • {} (parents: {}, children: {})",
+        println!(
+            "  • {} (parents: {}, children: {})",
             node.name,
             node.parents.len(),
             node.children.len()

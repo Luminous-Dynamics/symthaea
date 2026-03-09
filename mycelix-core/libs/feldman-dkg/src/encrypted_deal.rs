@@ -63,8 +63,7 @@ impl EncryptedDeal {
 
         for share in &deal.shares {
             let plaintext = share.value.to_bytes();
-            let result = encrypt_fn(share.index, &plaintext)
-                .map_err(DkgError::EncryptionError)?;
+            let result = encrypt_fn(share.index, &plaintext).map_err(DkgError::EncryptionError)?;
 
             encrypted_shares.push(EncryptedSharePayload {
                 recipient: share.index,
@@ -89,11 +88,7 @@ impl EncryptedDeal {
     /// - `ciphertext`: the AEAD ciphertext
     ///
     /// It must return the decrypted plaintext (32-byte scalar).
-    pub fn decrypt_share<F>(
-        &self,
-        recipient: u32,
-        mut decrypt_fn: F,
-    ) -> DkgResult<Share>
+    pub fn decrypt_share<F>(&self, recipient: u32, mut decrypt_fn: F) -> DkgResult<Share>
     where
         F: FnMut(&[u8], &[u8], &[u8]) -> Result<Vec<u8>, String>,
     {
@@ -133,7 +128,9 @@ impl EncryptedDeal {
 
     /// Check if a share exists for the given recipient
     pub fn has_share_for(&self, recipient: u32) -> bool {
-        self.encrypted_shares.iter().any(|p| p.recipient == recipient)
+        self.encrypted_shares
+            .iter()
+            .any(|p| p.recipient == recipient)
     }
 
     /// Convert back to a plaintext Deal using a decryption callback.
@@ -153,9 +150,9 @@ impl EncryptedDeal {
             .map_err(DkgError::DecryptionError)?;
 
             let arr: [u8; 32] = plaintext.try_into().map_err(|_| {
-            DkgError::DecryptionError("Expected 32 bytes, got different length".to_string())
-        })?;
-        let value = crate::scalar::Scalar::from_bytes(&arr)?;
+                DkgError::DecryptionError("Expected 32 bytes, got different length".to_string())
+            })?;
+            let value = crate::scalar::Scalar::from_bytes(&arr)?;
             shares.push(Share::new(payload.recipient, self.dealer.0, value));
         }
 
@@ -168,14 +165,12 @@ impl EncryptedDeal {
 
     /// Serialize to bytes for transport
     pub fn to_bytes(&self) -> DkgResult<Vec<u8>> {
-        serde_json::to_vec(self)
-            .map_err(|e| DkgError::SerializationError(e.to_string()))
+        serde_json::to_vec(self).map_err(|e| DkgError::SerializationError(e.to_string()))
     }
 
     /// Deserialize from bytes
     pub fn from_bytes(bytes: &[u8]) -> DkgResult<Self> {
-        serde_json::from_slice(bytes)
-            .map_err(|e| DkgError::SerializationError(e.to_string()))
+        serde_json::from_slice(bytes).map_err(|e| DkgError::SerializationError(e.to_string()))
     }
 }
 
@@ -189,7 +184,11 @@ mod tests {
     fn test_encrypt(recipient: u32, plaintext: &[u8]) -> Result<EncryptResult, String> {
         let key = vec![recipient as u8; 32];
         let nonce = vec![0u8; 24];
-        let ciphertext: Vec<u8> = plaintext.iter().zip(key.iter().cycle()).map(|(a, b)| a ^ b).collect();
+        let ciphertext: Vec<u8> = plaintext
+            .iter()
+            .zip(key.iter().cycle())
+            .map(|(a, b)| a ^ b)
+            .collect();
         Ok(EncryptResult {
             encapsulated_key: key,
             nonce,
@@ -198,7 +197,11 @@ mod tests {
     }
 
     /// Corresponding test decryption
-    fn test_decrypt(encapsulated_key: &[u8], _nonce: &[u8], ciphertext: &[u8]) -> Result<Vec<u8>, String> {
+    fn test_decrypt(
+        encapsulated_key: &[u8],
+        _nonce: &[u8],
+        ciphertext: &[u8],
+    ) -> Result<Vec<u8>, String> {
         let plaintext: Vec<u8> = ciphertext
             .iter()
             .zip(encapsulated_key.iter().cycle())
@@ -268,13 +271,20 @@ mod tests {
         let mut encrypted = EncryptedDeal::from_deal(&deal, test_encrypt).unwrap();
 
         // Tamper with ciphertext of share for participant 1
-        if let Some(payload) = encrypted.encrypted_shares.iter_mut().find(|p| p.recipient == 1) {
+        if let Some(payload) = encrypted
+            .encrypted_shares
+            .iter_mut()
+            .find(|p| p.recipient == 1)
+        {
             payload.ciphertext[0] ^= 0xFF;
         }
 
         // Decryption should succeed but share verification should fail
         let result = encrypted.decrypt_share(1, test_decrypt);
-        assert!(matches!(result, Err(DkgError::ShareVerificationFailed { .. })));
+        assert!(matches!(
+            result,
+            Err(DkgError::ShareVerificationFailed { .. })
+        ));
     }
 
     #[test]
@@ -296,9 +306,7 @@ mod tests {
         let dealer = Dealer::new(ParticipantId(1), 2, 3, &mut OsRng).unwrap();
         let deal = dealer.generate_deal();
 
-        let result = EncryptedDeal::from_deal(&deal, |_, _| {
-            Err("KEM failure".to_string())
-        });
+        let result = EncryptedDeal::from_deal(&deal, |_, _| Err("KEM failure".to_string()));
         assert!(matches!(result, Err(DkgError::EncryptionError(_))));
     }
 
@@ -309,9 +317,7 @@ mod tests {
 
         let encrypted = EncryptedDeal::from_deal(&deal, test_encrypt).unwrap();
 
-        let result = encrypted.decrypt_share(1, |_, _, _| {
-            Err("Decapsulation failure".to_string())
-        });
+        let result = encrypted.decrypt_share(1, |_, _, _| Err("Decapsulation failure".to_string()));
         assert!(matches!(result, Err(DkgError::DecryptionError(_))));
     }
 
@@ -324,7 +330,12 @@ mod tests {
 
         // Commitments are public and should be identical
         assert_eq!(encrypted.commitments.len(), deal.commitments.len());
-        for (orig, enc) in deal.commitments.commitments().iter().zip(encrypted.commitments.commitments().iter()) {
+        for (orig, enc) in deal
+            .commitments
+            .commitments()
+            .iter()
+            .zip(encrypted.commitments.commitments().iter())
+        {
             assert_eq!(orig, enc);
         }
     }
@@ -337,13 +348,20 @@ mod tests {
         let mut encrypted = EncryptedDeal::from_deal(&deal, test_encrypt).unwrap();
 
         // Tamper with the encapsulated key (KEM ciphertext) for participant 1
-        if let Some(payload) = encrypted.encrypted_shares.iter_mut().find(|p| p.recipient == 1) {
+        if let Some(payload) = encrypted
+            .encrypted_shares
+            .iter_mut()
+            .find(|p| p.recipient == 1)
+        {
             payload.encapsulated_key[0] ^= 0xFF;
         }
 
         // Decryption with wrong key material should produce wrong plaintext → share verification fails
         let result = encrypted.decrypt_share(1, test_decrypt);
-        assert!(result.is_err(), "tampered encapsulated key should cause decryption/verification failure");
+        assert!(
+            result.is_err(),
+            "tampered encapsulated key should cause decryption/verification failure"
+        );
     }
 
     #[test]
@@ -355,17 +373,24 @@ mod tests {
         let encrypted = EncryptedDeal::from_deal(&deal, test_encrypt).unwrap();
 
         // Create a decrypt function that uses participant 2's key to decrypt participant 1's share
-        let cross_decrypt = |_ek: &[u8], _nonce: &[u8], ciphertext: &[u8]| -> Result<Vec<u8>, String> {
-            // Use recipient 2's key (vec![2u8; 32]) instead of recipient 1's key
-            let wrong_key = vec![2u8; 32];
-            let plaintext: Vec<u8> = ciphertext.iter().zip(wrong_key.iter().cycle()).map(|(a, b)| a ^ b).collect();
-            Ok(plaintext)
-        };
+        let cross_decrypt =
+            |_ek: &[u8], _nonce: &[u8], ciphertext: &[u8]| -> Result<Vec<u8>, String> {
+                // Use recipient 2's key (vec![2u8; 32]) instead of recipient 1's key
+                let wrong_key = vec![2u8; 32];
+                let plaintext: Vec<u8> = ciphertext
+                    .iter()
+                    .zip(wrong_key.iter().cycle())
+                    .map(|(a, b)| a ^ b)
+                    .collect();
+                Ok(plaintext)
+            };
 
         // Should decrypt to wrong value → share verification fails
         let result = encrypted.decrypt_share(1, cross_decrypt);
-        assert!(matches!(result, Err(DkgError::ShareVerificationFailed { .. })),
-            "cross-recipient decryption should fail share verification");
+        assert!(
+            matches!(result, Err(DkgError::ShareVerificationFailed { .. })),
+            "cross-recipient decryption should fail share verification"
+        );
     }
 
     #[test]
@@ -376,7 +401,11 @@ mod tests {
         let mut encrypted = EncryptedDeal::from_deal(&deal, test_encrypt).unwrap();
 
         // Tamper with the nonce for participant 1
-        if let Some(payload) = encrypted.encrypted_shares.iter_mut().find(|p| p.recipient == 1) {
+        if let Some(payload) = encrypted
+            .encrypted_shares
+            .iter_mut()
+            .find(|p| p.recipient == 1)
+        {
             payload.nonce[0] ^= 0xFF;
         }
 
@@ -428,7 +457,9 @@ mod tests {
             // In real protocol, only the ceremony coordinator or each recipient
             // would decrypt their own share. Here we decrypt all for testing.
             let recovered_deal = encrypted.to_deal(test_decrypt).unwrap();
-            ceremony.submit_deal(ParticipantId(i), recovered_deal, 0).unwrap();
+            ceremony
+                .submit_deal(ParticipantId(i), recovered_deal, 0)
+                .unwrap();
         }
 
         let result = ceremony.finalize().unwrap();
