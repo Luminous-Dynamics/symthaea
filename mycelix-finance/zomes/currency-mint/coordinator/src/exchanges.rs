@@ -241,6 +241,33 @@ pub fn confirm_minted_exchange(exchange_id: String) -> ExternResult<MintedExchan
         false,
     )?;
 
+    // Remove from receiver's pending index so it no longer appears in
+    // list_pending_for_receiver after confirmation.
+    let pending_anchor = format!("receiver-pending:{}", exchange.receiver_did);
+    let pending_links = get_links(
+        LinkQuery::try_new(
+            anchor_hash(&pending_anchor)?,
+            LinkTypes::CurrencyToExchanges,
+        )?,
+        GetStrategy::default(),
+    )?;
+    for link in pending_links {
+        if let Some(action_hash) = link.target.clone().into_action_hash() {
+            if let Ok(record) = follow_update_chain(action_hash) {
+                if let Some(ex) = record
+                    .entry()
+                    .to_app_option::<MintedExchange>()
+                    .ok()
+                    .flatten()
+                {
+                    if ex.id == exchange_id {
+                        delete_link(link.create_link_hash, GetOptions::default())?;
+                    }
+                }
+            }
+        }
+    }
+
     // Return the exchange with confirmed status
     Ok(MintedExchange {
         confirmed: true,

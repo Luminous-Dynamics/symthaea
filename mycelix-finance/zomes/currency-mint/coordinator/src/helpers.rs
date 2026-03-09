@@ -66,15 +66,18 @@ pub(crate) fn get_or_create_minted_balance(
 
     if let Some(link) = links.first() {
         if let Some(action_hash) = link.target.clone().into_action_hash() {
-            if let Ok(record) = follow_update_chain(action_hash) {
-                if let Some(bal) = record
-                    .entry()
-                    .to_app_option::<MintedBalance>()
-                    .ok()
-                    .flatten()
-                {
-                    return Ok(bal);
-                }
+            let record = follow_update_chain(action_hash)?;
+            let bal = record
+                .entry()
+                .to_app_option::<MintedBalance>()
+                .map_err(|e| {
+                    wasm_error!(WasmErrorInner::Guest(format!(
+                        "Balance deserialization error for {}:{}: {:?}",
+                        currency_id, member_did, e
+                    )))
+                })?;
+            if let Some(bal) = bal {
+                return Ok(bal);
             }
         }
     }
@@ -136,39 +139,18 @@ pub(crate) fn update_minted_balance(
     hours: f32,
     is_provider: bool,
 ) -> ExternResult<()> {
-    let anchor_key = format!("mbal:{}:{}", currency_id, member_did);
-    let links = get_links(
-        LinkQuery::try_new(
-            anchor_hash(&anchor_key)?,
-            LinkTypes::CurrencyMemberToBalance,
-        )?,
-        GetStrategy::default(),
-    )?;
-
-    if let Some(link) = links.first() {
-        if let Some(link_hash) = link.target.clone().into_action_hash() {
-            if let Ok(record) = follow_update_chain(link_hash) {
-                if let Some(mut bal) = record
-                    .entry()
-                    .to_app_option::<MintedBalance>()
-                    .ok()
-                    .flatten()
-                {
-                    let now = sys_time()?;
-                    if is_provider {
-                        bal.balance += hours.round() as i32;
-                        bal.total_provided += hours;
-                    } else {
-                        bal.balance -= hours.round() as i32;
-                        bal.total_received += hours;
-                    }
-                    bal.exchange_count += 1;
-                    bal.last_activity = now;
-                    update_entry(record.action_address().clone(), &bal)?;
-                }
-            }
+    let now = sys_time()?;
+    mutate_balance(member_did, currency_id, |bal| {
+        if is_provider {
+            bal.balance += hours.round() as i32;
+            bal.total_provided += hours;
+        } else {
+            bal.balance -= hours.round() as i32;
+            bal.total_received += hours;
         }
-    }
+        bal.exchange_count += 1;
+        bal.last_activity = now;
+    })?;
     Ok(())
 }
 
@@ -183,25 +165,39 @@ pub(crate) fn find_minted_exchange(
         GetStrategy::default(),
     )?;
 
-    if let Some(link) = links.first() {
-        if let Some(link_hash) = link.target.clone().into_action_hash() {
-            if let Ok(record) = follow_update_chain(link_hash) {
-                if let Some(ex) = record
-                    .entry()
-                    .to_app_option::<MintedExchange>()
-                    .ok()
-                    .flatten()
-                {
-                    return Ok((ex, record.action_address().clone()));
-                }
-            }
-        }
-    }
+    let link = links
+        .first()
+        .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+            "Exchange {} not found",
+            exchange_id
+        ))))?;
 
-    Err(wasm_error!(WasmErrorInner::Guest(format!(
-        "Exchange {} not found",
-        exchange_id
-    ))))
+    let link_hash =
+        link.target
+            .clone()
+            .into_action_hash()
+            .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+                "Invalid link target for exchange {}",
+                exchange_id
+            ))))?;
+
+    let record = follow_update_chain(link_hash)?;
+
+    let ex = record
+        .entry()
+        .to_app_option::<MintedExchange>()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Exchange {} deserialization error: {:?}",
+                exchange_id, e
+            )))
+        })?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+            "Exchange {} entry missing",
+            exchange_id
+        ))))?;
+
+    Ok((ex, record.action_address().clone()))
 }
 
 pub(crate) fn find_dispute_record(
@@ -382,14 +378,19 @@ pub(crate) fn mutate_balance(
         return Ok(None);
     };
     let record = follow_update_chain(link_hash)?;
-    let Some(mut bal) = record
+    let mut bal = record
         .entry()
         .to_app_option::<MintedBalance>()
-        .ok()
-        .flatten()
-    else {
-        return Ok(None);
-    };
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Balance deserialization error for {}:{}: {:?}",
+                currency_id, member_did, e
+            )))
+        })?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+            "Balance entry missing for {}:{}",
+            currency_id, member_did
+        ))))?;
 
     f(&mut bal);
     update_entry(record.action_address().clone(), &bal)?;

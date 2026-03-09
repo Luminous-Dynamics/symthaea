@@ -23,9 +23,21 @@ use super::common::*;
 use currency_mint_integrity::CurrencyDefinition;
 
 /// Consolidated exchange tests — single conductor setup, 22 scenarios.
-#[tokio::test(flavor = "multi_thread")]
+///
+/// Uses a manual runtime with 8MB worker thread stacks because the consolidated
+/// async state machine (22 scenarios, 1633 lines) exceeds tokio's default 2MB.
+#[test]
 #[ignore]
-async fn test_exchanges_all() {
+fn test_exchanges_all() {
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .thread_stack_size(8 * 1024 * 1024)
+        .build()
+        .unwrap()
+        .block_on(test_exchanges_all_inner());
+}
+
+async fn test_exchanges_all_inner() {
     let (conductor, agents, apps) = setup_finance_conductor(3).await;
 
     let zome_a = apps[0].cells()[0].zome("currency_mint");
@@ -511,6 +523,16 @@ async fn test_exchanges_all() {
             "  - Balances: Alice={}, Bob={}",
             alice_bal2.balance, bob_bal.balance
         );
+
+        // Verify confirmed exchange no longer appears in Bob's pending list
+        let bob_pending_after: Vec<MintedExchange> = conductor
+            .call(&zome_b, "list_pending_for_receiver", bob_did.clone())
+            .await;
+        assert!(
+            !bob_pending_after.iter().any(|e| e.id == exchange.id),
+            "Confirmed exchange must not appear in receiver's pending list"
+        );
+        println!("  - Confirmed exchange removed from pending index");
 
         println!("Test 13.1 PASSED");
     }

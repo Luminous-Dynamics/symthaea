@@ -16,9 +16,18 @@ use super::common::*;
 use currency_mint_integrity::CurrencyDefinition;
 use mycelix_finance_types::CurrencyStatus;
 
-#[tokio::test(flavor = "multi_thread")]
+#[test]
 #[ignore]
-async fn test_lifecycle_all() {
+fn test_lifecycle_all() {
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .thread_stack_size(8 * 1024 * 1024)
+        .build()
+        .unwrap()
+        .block_on(test_lifecycle_all_inner());
+}
+
+async fn test_lifecycle_all_inner() {
     let (conductor, agents, apps) = setup_finance_conductor(2).await;
     let cell_a = &apps[0].cells()[0];
     let zome_a = cell_a.zome("currency_mint");

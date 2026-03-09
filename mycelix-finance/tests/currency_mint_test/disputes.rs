@@ -12,9 +12,21 @@ use currency_mint_integrity::CurrencyDefinition;
 use mycelix_finance_types::CurrencyStatus;
 
 /// Consolidated dispute and amendment tests — single conductor, 3 agents.
-#[tokio::test(flavor = "multi_thread")]
+///
+/// Uses a manual runtime with 8MB worker thread stacks because the consolidated
+/// async state machine (10 scenarios, 748 lines) exceeds tokio's default 2MB.
+#[test]
 #[ignore]
-async fn test_disputes_all() {
+fn test_disputes_all() {
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .thread_stack_size(8 * 1024 * 1024)
+        .build()
+        .unwrap()
+        .block_on(test_disputes_all_inner());
+}
+
+async fn test_disputes_all_inner() {
     let (conductor, agents, apps) = setup_finance_conductor(3).await;
     let cell_a = &apps[0].cells()[0];
     let zome_a = cell_a.zome("currency_mint");

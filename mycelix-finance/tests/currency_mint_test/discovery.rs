@@ -8,9 +8,18 @@ use super::common::*;
 use currency_mint_integrity::CurrencyDefinition;
 
 /// Test 10.1: Active currencies appear in list and search; suspended/retired don't
-#[tokio::test(flavor = "multi_thread")]
+#[test]
 #[ignore]
-async fn test_discovery_active_only() {
+fn test_discovery_active_only() {
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .thread_stack_size(8 * 1024 * 1024)
+        .build()
+        .unwrap()
+        .block_on(test_discovery_active_only_inner());
+}
+
+async fn test_discovery_active_only_inner() {
     println!("Test 10.1: Discovery — Active Only");
 
     let (conductor, _agents, apps) = setup_finance_conductor(1).await;
