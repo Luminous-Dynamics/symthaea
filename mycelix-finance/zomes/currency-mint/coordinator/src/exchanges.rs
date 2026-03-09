@@ -325,8 +325,34 @@ pub fn cancel_expired_exchange(exchange_id: String) -> ExternResult<bool> {
     }
 
     // Exchange is expired — no balance changes needed since balances were
-    // never updated for unconfirmed exchanges. Just return success.
-    // The exchange entry remains on the DHT as an immutable audit record.
+    // never updated for unconfirmed exchanges.
+    // Remove from receiver's pending index so it stops appearing in
+    // list_pending_for_receiver and can't be confirmed after cancellation.
+    let pending_anchor = format!("receiver-pending:{}", exchange.receiver_did);
+    let pending_links = get_links(
+        LinkQuery::try_new(
+            anchor_hash(&pending_anchor)?,
+            LinkTypes::CurrencyToExchanges,
+        )?,
+        GetStrategy::default(),
+    )?;
+    for link in pending_links {
+        if let Some(action_hash) = link.target.clone().into_action_hash() {
+            if let Ok(record) = follow_update_chain(action_hash) {
+                if let Some(ex) = record
+                    .entry()
+                    .to_app_option::<MintedExchange>()
+                    .ok()
+                    .flatten()
+                {
+                    if ex.id == exchange_id {
+                        delete_link(link.create_link_hash, GetOptions::default())?;
+                    }
+                }
+            }
+        }
+    }
+
     Ok(true)
 }
 

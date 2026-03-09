@@ -16,21 +16,22 @@ use crate::{ApplyDemurrageInput, GetMintedBalanceInput, MintedBalanceInfo};
 pub fn get_minted_balance(input: GetMintedBalanceInput) -> ExternResult<MintedBalanceInfo> {
     let (_, def) = get_currency_inner(&input.currency_id)?;
 
-    // Lazy demurrage: apply on read if currency has demurrage
-    let effective_balance =
+    // Lazy demurrage: apply on read if currency has demurrage.
+    // After this block, `bal` holds the latest balance and `effective_balance`
+    // reflects any demurrage deduction — avoiding a redundant DHT read.
+    let (bal, effective_balance) =
         if def.params.demurrage_rate > 0.0 && def.status == CurrencyStatus::Active {
             let result = crate::demurrage::apply_minted_demurrage(ApplyDemurrageInput {
                 currency_id: input.currency_id.clone(),
                 member_did: input.member_did.clone(),
             })?;
-            result.new_balance
+            let bal = get_or_create_minted_balance(input.member_did, input.currency_id)?;
+            (bal, result.new_balance)
         } else {
-            let bal =
-                get_or_create_minted_balance(input.member_did.clone(), input.currency_id.clone())?;
-            bal.balance
+            let bal = get_or_create_minted_balance(input.member_did, input.currency_id)?;
+            let balance = bal.balance;
+            (bal, balance)
         };
-
-    let bal = get_or_create_minted_balance(input.member_did, input.currency_id)?;
 
     Ok(MintedBalanceInfo {
         member_did: bal.member_did,

@@ -1,6 +1,7 @@
 //! Currency statistics, member listing, demurrage reports, and compost balance queries.
 
 use hdk::prelude::*;
+use mycelix_finance_types::compute_minted_demurrage;
 
 use crate::helpers::*;
 use crate::{CompostBalance, CurrencyStats, DemurrageReport, DemurrageReportEntry};
@@ -99,7 +100,7 @@ pub fn get_demurrage_report(currency_id: String) -> ExternResult<DemurrageReport
             .as_micros()
             .saturating_sub(bal.last_activity.as_micros()) as u64
             / 1_000_000;
-        let deduction = compute_demurrage(bal.balance, def.params.demurrage_rate, elapsed);
+        let deduction = compute_minted_demurrage(bal.balance, def.params.demurrage_rate, elapsed);
 
         if deduction > 0 {
             affected += 1;

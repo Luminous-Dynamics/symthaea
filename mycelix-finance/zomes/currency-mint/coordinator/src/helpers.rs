@@ -3,7 +3,6 @@
 use currency_mint_integrity::*;
 use hdk::prelude::*;
 use mycelix_finance_shared::anchor_hash;
-use mycelix_finance_types::compute_minted_demurrage;
 
 pub(crate) fn get_currency_inner(currency_id: &str) -> ExternResult<(Record, CurrencyDefinition)> {
     let links = get_links(
@@ -328,10 +327,6 @@ pub(crate) fn collect_currency_members(
         }
     }
     Ok(member_dids)
-}
-
-pub(crate) fn compute_demurrage(balance: i32, rate: f64, elapsed_secs: u64) -> i32 {
-    compute_minted_demurrage(balance, rate, elapsed_secs)
 }
 
 /// Collect all entries of type `T` reachable via links from an anchor.
