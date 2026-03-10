@@ -193,10 +193,9 @@ impl CognitiveLoopService {
         // Session 15 Item 2: Early warning at 5+ consecutive low-coherence cycles.
         // Mild exploration boost + confidence dampening before the hard Critical at 10.
         // Science: Bar (2009) — moderate incoherence suggests model drift, not failure.
-        let low_coherence_early_warning =
-            self.carryover.urgency.consecutive_low_coherence >= 5
-                && self.carryover.urgency.consecutive_low_coherence
-                    <= super::super::thresholds::LOW_COHERENCE_EXPLORATION_THRESHOLD;
+        let low_coherence_early_warning = self.carryover.urgency.consecutive_low_coherence >= 5
+            && self.carryover.urgency.consecutive_low_coherence
+                <= super::super::thresholds::LOW_COHERENCE_EXPLORATION_THRESHOLD;
         if low_coherence_early_warning {
             self.adjust_exploration("low_coherence_early", 0.02);
             self.scale_confidence("low_coherence_early", 0.98);

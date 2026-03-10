@@ -149,134 +149,194 @@ pub fn build_lesson_bank() -> HashMap<String, Vec<CodeLesson>> {
     bank.insert(
         "codegen_simple_arithmetic".into(),
         vec![
-            lesson("codegen_simple_arithmetic", "add_numbers",
+            lesson(
+                "codegen_simple_arithmetic",
+                "add_numbers",
                 "fn add_numbers(a: i32, b: i32) -> i32",
                 "Add two numbers together",
-                Some(r#"
+                Some(
+                    r#"
     #[test]
     fn test_add() { assert_eq!(add_numbers(2, 3), 5); }
     #[test]
     fn test_add_neg() { assert_eq!(add_numbers(-1, 1), 0); }
-"#)),
-            lesson("codegen_simple_arithmetic", "multiply",
+"#,
+                ),
+            ),
+            lesson(
+                "codegen_simple_arithmetic",
+                "multiply",
                 "fn multiply(a: i32, b: i32) -> i32",
                 "Multiply two numbers",
-                Some(r#"
+                Some(
+                    r#"
     #[test]
     fn test_mul() { assert_eq!(multiply(3, 4), 12); }
     #[test]
     fn test_mul_zero() { assert_eq!(multiply(5, 0), 0); }
-"#)),
-            lesson("codegen_simple_arithmetic", "absolute_value",
+"#,
+                ),
+            ),
+            lesson(
+                "codegen_simple_arithmetic",
+                "absolute_value",
                 "fn absolute_value(x: i32) -> i32",
                 "Return the absolute value of a number",
-                Some(r#"
+                Some(
+                    r#"
     #[test]
     fn test_pos() { assert_eq!(absolute_value(5), 5); }
     #[test]
     fn test_neg() { assert_eq!(absolute_value(-3), 3); }
     #[test]
     fn test_zero() { assert_eq!(absolute_value(0), 0); }
-"#)),
+"#,
+                ),
+            ),
         ],
     );
 
     bank.insert(
         "codegen_string_ops".into(),
         vec![
-            lesson("codegen_string_ops", "reverse_string",
+            lesson(
+                "codegen_string_ops",
+                "reverse_string",
                 "fn reverse_string(s: &str) -> String",
                 "Reverse a string",
-                Some(r#"
+                Some(
+                    r#"
     #[test]
     fn test_rev() { assert_eq!(reverse_string("hello"), "olleh"); }
     #[test]
     fn test_rev_empty() { assert_eq!(reverse_string(""), ""); }
-"#)),
-            lesson("codegen_string_ops", "to_uppercase",
+"#,
+                ),
+            ),
+            lesson(
+                "codegen_string_ops",
+                "to_uppercase",
                 "fn to_uppercase(s: &str) -> String",
                 "Convert a string to uppercase",
-                Some(r#"
+                Some(
+                    r#"
     #[test]
     fn test_upper() { assert_eq!(to_uppercase("hello"), "HELLO"); }
-"#)),
-            lesson("codegen_string_ops", "count_vowels",
+"#,
+                ),
+            ),
+            lesson(
+                "codegen_string_ops",
+                "count_vowels",
                 "fn count_vowels(s: &str) -> usize",
                 "Count the vowels in a string",
-                Some(r#"
+                Some(
+                    r#"
     #[test]
     fn test_vowels() { assert_eq!(count_vowels("hello"), 2); }
     #[test]
     fn test_none() { assert_eq!(count_vowels("xyz"), 0); }
-"#)),
+"#,
+                ),
+            ),
         ],
     );
 
     bank.insert(
         "codegen_boolean_checks".into(),
         vec![
-            lesson("codegen_boolean_checks", "is_even",
+            lesson(
+                "codegen_boolean_checks",
+                "is_even",
                 "fn is_even(n: i32) -> bool",
                 "Check if a number is even",
-                Some(r#"
+                Some(
+                    r#"
     #[test]
     fn test_even() { assert!(is_even(4)); }
     #[test]
     fn test_odd() { assert!(!is_even(3)); }
-"#)),
-            lesson("codegen_boolean_checks", "is_positive",
+"#,
+                ),
+            ),
+            lesson(
+                "codegen_boolean_checks",
+                "is_positive",
                 "fn is_positive(n: i32) -> bool",
                 "Check if a number is positive",
-                Some(r#"
+                Some(
+                    r#"
     #[test]
     fn test_pos() { assert!(is_positive(1)); }
     #[test]
     fn test_neg() { assert!(!is_positive(-1)); }
     #[test]
     fn test_zero() { assert!(!is_positive(0)); }
-"#)),
-            lesson("codegen_boolean_checks", "is_palindrome",
+"#,
+                ),
+            ),
+            lesson(
+                "codegen_boolean_checks",
+                "is_palindrome",
                 "fn is_palindrome(s: &str) -> bool",
                 "Check if a string is a palindrome",
-                Some(r#"
+                Some(
+                    r#"
     #[test]
     fn test_pal() { assert!(is_palindrome("racecar")); }
     #[test]
     fn test_not_pal() { assert!(!is_palindrome("hello")); }
-"#)),
+"#,
+                ),
+            ),
         ],
     );
 
     bank.insert(
         "codegen_basic_collections".into(),
         vec![
-            lesson("codegen_basic_collections", "sum_vec",
+            lesson(
+                "codegen_basic_collections",
+                "sum_vec",
                 "fn sum_vec(nums: &[i32]) -> i32",
                 "Sum all numbers in a slice",
-                Some(r#"
+                Some(
+                    r#"
     #[test]
     fn test_sum() { assert_eq!(sum_vec(&[1, 2, 3]), 6); }
     #[test]
     fn test_empty() { assert_eq!(sum_vec(&[]), 0); }
-"#)),
-            lesson("codegen_basic_collections", "find_max",
+"#,
+                ),
+            ),
+            lesson(
+                "codegen_basic_collections",
+                "find_max",
                 "fn find_max(nums: &[i32]) -> Option<i32>",
                 "Find the maximum value in a slice",
-                Some(r#"
+                Some(
+                    r#"
     #[test]
     fn test_max() { assert_eq!(find_max(&[1, 5, 3]), Some(5)); }
     #[test]
     fn test_empty() { assert_eq!(find_max(&[]), None); }
-"#)),
-            lesson("codegen_basic_collections", "filter_positive",
+"#,
+                ),
+            ),
+            lesson(
+                "codegen_basic_collections",
+                "filter_positive",
                 "fn filter_positive(nums: Vec<i32>) -> Vec<i32>",
                 "Filter a vector to keep only positive numbers",
-                Some(r#"
+                Some(
+                    r#"
     #[test]
     fn test_filter() { assert_eq!(filter_positive(vec![-1, 2, -3, 4]), vec![2, 4]); }
     #[test]
     fn test_all_neg() { assert_eq!(filter_positive(vec![-1, -2]), vec![]); }
-"#)),
+"#,
+                ),
+            ),
         ],
     );
 
@@ -285,32 +345,44 @@ pub fn build_lesson_bank() -> HashMap<String, Vec<CodeLesson>> {
     bank.insert(
         "codegen_composed_chains".into(),
         vec![
-            lesson("codegen_composed_chains", "sum_of_squares",
+            lesson(
+                "codegen_composed_chains",
+                "sum_of_squares",
                 "fn sum_of_squares(nums: Vec<i32>) -> i32",
                 "Compute the sum of squares of all numbers using iterator chains",
-                Some(r#"
+                Some(
+                    r#"
     #[test]
     fn test_sos() { assert_eq!(sum_of_squares(vec![1, 2, 3]), 14); }
     #[test]
     fn test_empty() { assert_eq!(sum_of_squares(vec![]), 0); }
-"#)),
-            lesson("codegen_composed_chains", "unique_sorted",
+"#,
+                ),
+            ),
+            lesson(
+                "codegen_composed_chains",
+                "unique_sorted",
                 "fn unique_sorted(nums: Vec<i32>) -> Vec<i32>",
                 "Deduplicate and sort a vector of numbers",
-                Some(r#"
+                Some(
+                    r#"
     #[test]
     fn test_dedup() { assert_eq!(unique_sorted(vec![3, 1, 2, 1, 3]), vec![1, 2, 3]); }
-"#)),
+"#,
+                ),
+            ),
         ],
     );
 
     bank.insert(
         "codegen_struct_impl".into(),
-        vec![
-            lesson("codegen_struct_impl", "Counter",
-                "struct Counter { count: i32 }",
-                "A simple counter with increment, decrement, and get methods",
-                Some(r#"
+        vec![lesson(
+            "codegen_struct_impl",
+            "Counter",
+            "struct Counter { count: i32 }",
+            "A simple counter with increment, decrement, and get methods",
+            Some(
+                r#"
     #[test]
     fn test_counter() {
         let mut c = Counter { count: 0 };
@@ -320,66 +392,78 @@ pub fn build_lesson_bank() -> HashMap<String, Vec<CodeLesson>> {
         c.decrement();
         assert_eq!(c.get(), 1);
     }
-"#)),
-        ],
+"#,
+            ),
+        )],
     );
 
     bank.insert(
         "codegen_error_handling".into(),
-        vec![
-            lesson("codegen_error_handling", "parse_integer",
-                "fn parse_integer(s: &str) -> Result<i32, String>",
-                "Parse a string to integer, returning Err with a message on failure",
-                Some(r#"
+        vec![lesson(
+            "codegen_error_handling",
+            "parse_integer",
+            "fn parse_integer(s: &str) -> Result<i32, String>",
+            "Parse a string to integer, returning Err with a message on failure",
+            Some(
+                r#"
     #[test]
     fn test_ok() { assert_eq!(parse_integer("42"), Ok(42)); }
     #[test]
     fn test_err() { assert!(parse_integer("abc").is_err()); }
-"#)),
-        ],
+"#,
+            ),
+        )],
     );
 
     bank.insert(
         "codegen_closures_hof".into(),
-        vec![
-            lesson("codegen_closures_hof", "apply_twice",
-                "fn apply_twice(f: impl Fn(i32) -> i32, x: i32) -> i32",
-                "Apply a function to a value twice: f(f(x))",
-                Some(r#"
+        vec![lesson(
+            "codegen_closures_hof",
+            "apply_twice",
+            "fn apply_twice(f: impl Fn(i32) -> i32, x: i32) -> i32",
+            "Apply a function to a value twice: f(f(x))",
+            Some(
+                r#"
     #[test]
     fn test_twice() { assert_eq!(apply_twice(|x| x + 1, 5), 7); }
     #[test]
     fn test_twice_double() { assert_eq!(apply_twice(|x| x * 2, 3), 12); }
-"#)),
-        ],
+"#,
+            ),
+        )],
     );
 
     bank.insert(
         "codegen_test_generation".into(),
-        vec![
-            lesson("codegen_test_generation", "clamp",
-                "fn clamp(value: i32, min: i32, max: i32) -> i32",
-                "Clamp a value between min and max",
-                Some(r#"
+        vec![lesson(
+            "codegen_test_generation",
+            "clamp",
+            "fn clamp(value: i32, min: i32, max: i32) -> i32",
+            "Clamp a value between min and max",
+            Some(
+                r#"
     #[test]
     fn test_below() { assert_eq!(clamp(-5, 0, 10), 0); }
     #[test]
     fn test_above() { assert_eq!(clamp(15, 0, 10), 10); }
     #[test]
     fn test_within() { assert_eq!(clamp(5, 0, 10), 5); }
-"#)),
-        ],
+"#,
+            ),
+        )],
     );
 
     // ── Tier 3: Advanced (these may need LLM fallback) ──────────────────
 
     bank.insert(
         "codegen_algorithm_sorting".into(),
-        vec![
-            lesson("codegen_algorithm_sorting", "bubble_sort",
-                "fn bubble_sort(arr: &mut Vec<i32>)",
-                "Sort a vector in-place using bubble sort",
-                Some(r#"
+        vec![lesson(
+            "codegen_algorithm_sorting",
+            "bubble_sort",
+            "fn bubble_sort(arr: &mut Vec<i32>)",
+            "Sort a vector in-place using bubble sort",
+            Some(
+                r#"
     #[test]
     fn test_sort() {
         let mut v = vec![3, 1, 4, 1, 5];
@@ -392,42 +476,49 @@ pub fn build_lesson_bank() -> HashMap<String, Vec<CodeLesson>> {
         bubble_sort(&mut v);
         assert!(v.is_empty());
     }
-"#)),
-        ],
+"#,
+            ),
+        )],
     );
 
     bank.insert(
         "codegen_algorithm_search".into(),
-        vec![
-            lesson("codegen_algorithm_search", "binary_search",
-                "fn binary_search(arr: &[i32], target: i32) -> Option<usize>",
-                "Find the index of a target value in a sorted slice using binary search",
-                Some(r#"
+        vec![lesson(
+            "codegen_algorithm_search",
+            "binary_search",
+            "fn binary_search(arr: &[i32], target: i32) -> Option<usize>",
+            "Find the index of a target value in a sorted slice using binary search",
+            Some(
+                r#"
     #[test]
     fn test_found() { assert_eq!(binary_search(&[1, 3, 5, 7, 9], 5), Some(2)); }
     #[test]
     fn test_not_found() { assert_eq!(binary_search(&[1, 3, 5, 7, 9], 4), None); }
     #[test]
     fn test_empty() { assert_eq!(binary_search(&[], 1), None); }
-"#)),
-        ],
+"#,
+            ),
+        )],
     );
 
     bank.insert(
         "codegen_algorithm_dp".into(),
-        vec![
-            lesson("codegen_algorithm_dp", "fibonacci",
-                "fn fibonacci(n: u32) -> u64",
-                "Compute the nth Fibonacci number using dynamic programming",
-                Some(r#"
+        vec![lesson(
+            "codegen_algorithm_dp",
+            "fibonacci",
+            "fn fibonacci(n: u32) -> u64",
+            "Compute the nth Fibonacci number using dynamic programming",
+            Some(
+                r#"
     #[test]
     fn test_fib_0() { assert_eq!(fibonacci(0), 0); }
     #[test]
     fn test_fib_1() { assert_eq!(fibonacci(1), 1); }
     #[test]
     fn test_fib_10() { assert_eq!(fibonacci(10), 55); }
-"#)),
-        ],
+"#,
+            ),
+        )],
     );
 
     bank.insert("codegen_code_modification".into(), vec![]);
@@ -453,8 +544,7 @@ fn lesson(
     purpose: &str,
     test_source: Option<&str>,
 ) -> CodeLesson {
-    let spec = CodeSpec::new("rust", name, purpose)
-        .with_signature(signature);
+    let spec = CodeSpec::new("rust", name, purpose).with_signature(signature);
 
     CodeLesson {
         objective_id: objective_id.into(),
@@ -564,11 +654,8 @@ impl CodeLearningEngine {
             if let Some((_, src, quality)) =
                 self.generator.distillation_target(&lesson.spec, &generated)
             {
-                self.distillation_cache.push((
-                    lesson.spec.purpose.clone(),
-                    src,
-                    quality,
-                ));
+                self.distillation_cache
+                    .push((lesson.spec.purpose.clone(), src, quality));
             }
             // Add to past examples (capped at 16)
             if self.past_examples.len() < 16 {

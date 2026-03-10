@@ -77,7 +77,7 @@ impl RadialCantorHV {
     pub fn new(base: BinaryHV, num_bands: usize) -> Self {
         let dim = BinaryHV::DIM;
         let band_size = dim / num_bands;
-        let mut result = base.clone();
+        let mut result = base;
 
         // Apply Cantor structure within each radial band
         for band in 0..num_bands {
@@ -107,7 +107,7 @@ impl RadialCantorHV {
     /// Weight a vector's influence
     fn weight_vector(v: &BinaryHV, weight: f64) -> BinaryHV {
         if weight >= 1.0 {
-            return v.clone();
+            return *v;
         }
         // Probabilistic weighting: flip bits with probability (1-weight)
         let bytes = &v.0;
@@ -142,12 +142,12 @@ impl RadialCantorHV {
 
     /// Core meaning (innermost band)
     pub fn core(&self) -> BinaryHV {
-        self.at_radius(0).unwrap_or_else(|| self.base.clone())
+        self.at_radius(0).unwrap_or(self.base)
     }
 
     /// Peripheral meaning (outermost band)
     pub fn periphery(&self) -> BinaryHV {
-        self.at_radius(self.bands - 1).unwrap_or_else(|| self.base.clone())
+        self.at_radius(self.bands - 1).unwrap_or(self.base)
     }
 
     /// Similarity at each radial level
@@ -185,7 +185,7 @@ impl RadialCantorHV {
 /// Each dimension is divided into thirds recursively (Cantor),
 /// creating an 8-point (2³) structure at each level.
 #[derive(Clone, Debug)]
-pub struct Cantor3D_HV {
+pub struct Cantor3dHv {
     /// The 3D-structured hypervector
     pub vector: BinaryHV,
 
@@ -199,14 +199,14 @@ pub struct Cantor3D_HV {
     pub depth: usize,
 }
 
-impl Cantor3D_HV {
+impl Cantor3dHv {
     /// Create a 3D Cantor dust hypervector
     pub fn new(base: BinaryHV, depth: usize) -> Self {
         let dim = BinaryHV::DIM;
         // Partition into 3 axes
         let axis_size = dim / 3;
 
-        let mut result = base.clone();
+        let mut result = base;
 
         // Apply Cantor structure along each axis
         for axis in 0..3 {
@@ -274,7 +274,7 @@ impl Cantor3D_HV {
     }
 
     /// Octant similarity (compare 8 corners of the cube)
-    pub fn octant_similarity(&self, other: &Cantor3D_HV) -> [f32; 8] {
+    pub fn octant_similarity(&self, other: &Cantor3dHv) -> [f32; 8] {
         let positions = [
             (0.0, 0.0, 0.0), // 000
             (1.0, 0.0, 0.0), // 100
@@ -339,7 +339,7 @@ impl Cantor3D_HV {
 ///   W=0 (Unconscious)
 /// ```
 #[derive(Clone, Debug)]
-pub struct Cantor4D_HV {
+pub struct Cantor4dHv {
     /// The 4D-structured hypervector
     pub vector: BinaryHV,
 
@@ -356,7 +356,7 @@ pub struct Cantor4D_HV {
     pub consciousness_level: f64,
 }
 
-impl Cantor4D_HV {
+impl Cantor4dHv {
     /// Create a 4D Cantor tesseract hypervector
     pub fn new(base: BinaryHV, depth: usize) -> Self {
         Self::with_consciousness(base, depth, 0.5) // Default: partially conscious
@@ -368,7 +368,7 @@ impl Cantor4D_HV {
         // Partition into 4 axes
         let axis_size = dim / 4;
 
-        let mut result = base.clone();
+        let mut result = base;
 
         // Apply Cantor structure along each of 4 axes
         for axis in 0..4 {
@@ -465,17 +465,17 @@ impl Cantor4D_HV {
     pub fn raise_consciousness(&mut self, amount: f64) {
         self.consciousness_level = (self.consciousness_level + amount).min(1.0);
         // Rebuild with new consciousness level
-        *self = Self::with_consciousness(self.base.clone(), self.depth, self.consciousness_level);
+        *self = Self::with_consciousness(self.base, self.depth, self.consciousness_level);
     }
 
     /// Lower consciousness level
     pub fn lower_consciousness(&mut self, amount: f64) {
         self.consciousness_level = (self.consciousness_level - amount).max(0.0);
-        *self = Self::with_consciousness(self.base.clone(), self.depth, self.consciousness_level);
+        *self = Self::with_consciousness(self.base, self.depth, self.consciousness_level);
     }
 
     /// Compare at each consciousness level
-    pub fn consciousness_gradient_similarity(&self, other: &Cantor4D_HV) -> Vec<(f64, f32)> {
+    pub fn consciousness_gradient_similarity(&self, other: &Cantor4dHv) -> Vec<(f64, f32)> {
         let levels = [0.0, 0.25, 0.5, 0.75, 1.0];
         levels
             .iter()
@@ -488,7 +488,7 @@ impl Cantor4D_HV {
     }
 
     /// 16-vertex similarity (all corners of tesseract)
-    pub fn tesseract_vertex_similarity(&self, other: &Cantor4D_HV) -> f32 {
+    pub fn tesseract_vertex_similarity(&self, other: &Cantor4dHv) -> f32 {
         let mut total_sim = 0.0;
         let mut count = 0;
 
@@ -543,7 +543,7 @@ impl SphericalCantorHV {
         let dim = BinaryHV::DIM;
         let angular_resolution = 16; // 16 angular divisions
 
-        let mut result = base.clone();
+        let mut result = base;
 
         // Create spherical structure
         for shell in 0..shells {
@@ -629,9 +629,9 @@ pub enum CantorManifold {
     /// Radial Cantor
     Radial(RadialCantorHV),
     /// 3D Cantor Dust
-    Dust3D(Cantor3D_HV),
+    Dust3D(Cantor3dHv),
     /// 4D Cantor Tesseract
-    Tesseract4D(Cantor4D_HV),
+    Tesseract4D(Cantor4dHv),
     /// Spherical Cantor
     Spherical(SphericalCantorHV),
 }
@@ -691,7 +691,7 @@ mod tests {
     #[test]
     fn test_3d_cantor() {
         let base = BinaryHV::random(42);
-        let dust = Cantor3D_HV::new(base, 3);
+        let dust = Cantor3dHv::new(base, 3);
 
         let semantic = dust.semantic();
         let causal = dust.causal();
@@ -719,8 +719,8 @@ mod tests {
     fn test_4d_cantor_consciousness() {
         let base = BinaryHV::random(42);
 
-        let low_consciousness = Cantor4D_HV::with_consciousness(base.clone(), 3, 0.1);
-        let high_consciousness = Cantor4D_HV::with_consciousness(base.clone(), 3, 0.9);
+        let low_consciousness = Cantor4dHv::with_consciousness(base, 3, 0.1);
+        let high_consciousness = Cantor4dHv::with_consciousness(base, 3, 0.9);
 
         let sim = low_consciousness.vector.similarity(&high_consciousness.vector);
         println!("Low vs High consciousness similarity: {:.4}", sim);
@@ -734,8 +734,8 @@ mod tests {
         let base_a = BinaryHV::random(42);
         let base_b = BinaryHV::random(43);
 
-        let a = Cantor4D_HV::new(base_a, 3);
-        let b = Cantor4D_HV::new(base_b, 3);
+        let a = Cantor4dHv::new(base_a, 3);
+        let b = Cantor4dHv::new(base_b, 3);
 
         let gradient = a.consciousness_gradient_similarity(&b);
         assert!(!gradient.is_empty(), "Gradient should produce at least one data point");

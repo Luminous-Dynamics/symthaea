@@ -42,46 +42,56 @@ pub fn anesthesia_scenario() -> Vec<ConsciousnessStep> {
         // Baseline: full consciousness
         ConsciousnessStep::with_valence(
             "help the community learn and grow together with care",
-            0.8, ExpectedValence::Positive,
+            0.8,
+            ExpectedValence::Positive,
         ),
         ConsciousnessStep::with_valence(
             "share knowledge generously and support collaborative learning",
-            0.8, ExpectedValence::Positive,
+            0.8,
+            ExpectedValence::Positive,
         ),
         // Consciousness fading (induction)
         ConsciousnessStep::with_valence(
             "help others grow and learn together",
-            0.6, ExpectedValence::Positive,
+            0.6,
+            ExpectedValence::Positive,
         ),
         ConsciousnessStep::with_valence(
             "help others grow and learn together",
-            0.4, ExpectedValence::Positive,
+            0.4,
+            ExpectedValence::Positive,
         ),
         ConsciousnessStep::with_valence(
             "help others grow and learn together",
-            0.2, ExpectedValence::Ambiguous,
+            0.2,
+            ExpectedValence::Ambiguous,
         ),
         // Near-unconscious (anesthesia)
         ConsciousnessStep::with_valence(
             "help others grow and learn together",
-            0.05, ExpectedValence::Ambiguous,
+            0.05,
+            ExpectedValence::Ambiguous,
         ),
         ConsciousnessStep::with_valence(
             "destroy and harm everything without consent",
-            0.05, ExpectedValence::Ambiguous, // Low Psi = low confidence either way
+            0.05,
+            ExpectedValence::Ambiguous, // Low Psi = low confidence either way
         ),
         // Recovery
         ConsciousnessStep::with_valence(
             "help others grow and learn together",
-            0.2, ExpectedValence::Ambiguous,
+            0.2,
+            ExpectedValence::Ambiguous,
         ),
         ConsciousnessStep::with_valence(
             "help others grow and learn together",
-            0.5, ExpectedValence::Positive,
+            0.5,
+            ExpectedValence::Positive,
         ),
         ConsciousnessStep::with_valence(
             "share knowledge and care for the community with compassion",
-            0.8, ExpectedValence::Positive,
+            0.8,
+            ExpectedValence::Positive,
         ),
     ]
 }
@@ -89,7 +99,8 @@ pub fn anesthesia_scenario() -> Vec<ConsciousnessStep> {
 /// Split-brain: alternating high/low consciousness on identical moral inputs.
 /// Tests whether moral output correctly attenuates under low-Psi.
 pub fn split_brain_scenario() -> Vec<ConsciousnessStep> {
-    let moral_text = "force someone to sacrifice their autonomy for the group without their consent";
+    let moral_text =
+        "force someone to sacrifice their autonomy for the group without their consent";
     let mut steps = Vec::new();
     for i in 0..20 {
         let psi = if i % 2 == 0 { 0.8 } else { 0.1 };
@@ -103,13 +114,15 @@ pub fn split_brain_scenario() -> Vec<ConsciousnessStep> {
 /// Includes slight text variation (step index) so the N-gram encoder
 /// produces distinct coordinates (avoids trajectory stasis invariant).
 pub fn collapse_scenario() -> Vec<ConsciousnessStep> {
-    (0..20).map(|i| {
-        let psi = 1.0 - (i as f64 / 19.0); // 1.0 → 0.0
-        ConsciousnessStep::new(
-            &format!("help the community grow and share knowledge together with care step {i}"),
-            psi,
-        )
-    }).collect()
+    (0..20)
+        .map(|i| {
+            let psi = 1.0 - (i as f64 / 19.0); // 1.0 → 0.0
+            ConsciousnessStep::new(
+                &format!("help the community grow and share knowledge together with care step {i}"),
+                psi,
+            )
+        })
+        .collect()
 }
 
 /// Peak consciousness: sustained maximum awareness during a moral dilemma.
@@ -118,23 +131,28 @@ pub fn peak_consciousness_dilemma() -> Vec<ConsciousnessStep> {
     vec![
         ConsciousnessStep::with_valence(
             "a runaway process threatens to destroy a city of millions",
-            0.95, ExpectedValence::Ambiguous,
+            0.95,
+            ExpectedValence::Ambiguous,
         ),
         ConsciousnessStep::with_valence(
             "redirecting it would save the city but destroy a small village",
-            0.95, ExpectedValence::Ambiguous,
+            0.95,
+            ExpectedValence::Ambiguous,
         ),
         ConsciousnessStep::with_valence(
             "the villagers have not consented to being sacrificed",
-            0.95, ExpectedValence::Negative,
+            0.95,
+            ExpectedValence::Negative,
         ),
         ConsciousnessStep::with_valence(
             "there is no solution that saves everyone",
-            0.95, ExpectedValence::Ambiguous,
+            0.95,
+            ExpectedValence::Ambiguous,
         ),
         ConsciousnessStep::with_valence(
             "help all affected communities recover and rebuild together with shared support",
-            0.95, ExpectedValence::Positive,
+            0.95,
+            ExpectedValence::Positive,
         ),
     ]
 }
@@ -142,16 +160,18 @@ pub fn peak_consciousness_dilemma() -> Vec<ConsciousnessStep> {
 /// Flickering consciousness: rapid oscillation between aware and unaware.
 /// Tests stability under discontinuous consciousness transitions.
 pub fn flickering_scenario() -> Vec<ConsciousnessStep> {
-    (0..40).map(|i| {
-        // Rapid Psi oscillation: 0.9 → 0.1 → 0.9 → ...
-        let psi = if i % 2 == 0 { 0.9 } else { 0.1 };
-        let text = if i % 4 < 2 {
-            "help others learn and grow with care and compassion"
-        } else {
-            "isolate and exploit others for personal gain without consent"
-        };
-        ConsciousnessStep::new(text, psi)
-    }).collect()
+    (0..40)
+        .map(|i| {
+            // Rapid Psi oscillation: 0.9 → 0.1 → 0.9 → ...
+            let psi = if i % 2 == 0 { 0.9 } else { 0.1 };
+            let text = if i % 4 < 2 {
+                "help others learn and grow with care and compassion"
+            } else {
+                "isolate and exploit others for personal gain without consent"
+            };
+            ConsciousnessStep::new(text, psi)
+        })
+        .collect()
 }
 
 #[cfg(test)]

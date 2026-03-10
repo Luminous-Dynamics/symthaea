@@ -368,6 +368,8 @@ fn seam_telemetry_complete_every_cycle() {
             tool: Some(ToolDescriptor::read_only("nix search")),
             recent_utility: 0.5,
             cycle_id: i as u64,
+            neuromod_exploration_mod: 1.0,
+            epistemic_quality: 0.5,
         };
         engine.reason(&ctx);
     }
@@ -429,6 +431,8 @@ fn seam_telemetry_includes_gate_info() {
         ),
         recent_utility: 0.5,
         cycle_id: 0,
+        neuromod_exploration_mod: 1.0,
+        epistemic_quality: 0.5,
     };
 
     engine.reason(&ctx);
@@ -464,6 +468,8 @@ fn seam_tier0_completes_within_budget() {
         tool: None,
         recent_utility: 0.5,
         cycle_id: 0,
+        neuromod_exploration_mod: 1.0,
+        epistemic_quality: 0.5,
     };
 
     let start = std::time::Instant::now();
@@ -507,6 +513,8 @@ fn seam_engine_composition_e2e() {
         tool: Some(ToolDescriptor::read_only("nix search")),
         recent_utility: 0.5,
         cycle_id: 1,
+        neuromod_exploration_mod: 1.0,
+        epistemic_quality: 0.5,
     };
     let r1 = engine.reason(&ctx1);
     assert!(r1.phi_eff > 0.5, "High consensus should produce high Φ_eff");
@@ -537,6 +545,8 @@ fn seam_engine_composition_e2e() {
         ),
         recent_utility: 0.3,
         cycle_id: 2,
+        neuromod_exploration_mod: 1.0,
+        epistemic_quality: 0.5,
     };
     let r2 = engine.reason(&ctx2);
     assert!(

@@ -78,9 +78,12 @@ pub fn check_trajectory(telemetry: &[CycleTelemetry]) -> Vec<String> {
     //    (would indicate the system is stuck / not responding to input)
     if telemetry.len() >= 10 {
         let first = &telemetry[0].harmony_coordinates;
-        let all_identical = telemetry
-            .iter()
-            .all(|t| t.harmony_coordinates.iter().zip(first).all(|(a, b)| (a - b).abs() < 1e-12));
+        let all_identical = telemetry.iter().all(|t| {
+            t.harmony_coordinates
+                .iter()
+                .zip(first)
+                .all(|(a, b)| (a - b).abs() < 1e-12)
+        });
         if all_identical {
             violations.push(
                 "trajectory: all harmony coordinates identical — system may not be responding to input"
@@ -179,7 +182,10 @@ mod tests {
             })
             .collect();
         let violations = check_trajectory(&telemetry);
-        let static_violations: Vec<_> = violations.iter().filter(|v| v.contains("identical")).collect();
+        let static_violations: Vec<_> = violations
+            .iter()
+            .filter(|v| v.contains("identical"))
+            .collect();
         assert!(static_violations.is_empty());
     }
 }

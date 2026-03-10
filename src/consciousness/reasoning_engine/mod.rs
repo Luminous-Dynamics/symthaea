@@ -186,7 +186,8 @@ impl ConsciousReasoningEngine {
             event.budget_tier = BudgetTier::Tier0;
             event.tier_selected_reason = tier_reason(&budget, r);
             self.emit_event(event);
-            return ReasoningResult::tier0(phi_eff, r, gamma, conflicts, gate, wall_time_us);
+            return ReasoningResult::tier0(phi_eff, r, gamma, conflicts, gate, wall_time_us)
+                .with_internals(phi_eff_raw, epistemic_mod, 0.0);
         }
 
         // ── STEP 3: DECIDE (should simulate?) ──────────────────────────
@@ -267,7 +268,8 @@ impl ConsciousReasoningEngine {
                 gate,
                 wall_time_us,
                 budget.exceeded(),
-            );
+            )
+            .with_internals(phi_eff_raw, epistemic_mod, evs_val);
         }
 
         // ── STEP 6: ANALYZE (counterfactual, Tier 2 only) ──────────────
@@ -316,6 +318,7 @@ impl ConsciousReasoningEngine {
             wall_time_us,
             budget.exceeded(),
         )
+        .with_internals(phi_eff_raw, epistemic_mod, evs_val)
     }
 
     /// Run a counterfactual analysis as part of a reasoning cycle.
@@ -472,6 +475,7 @@ mod tests {
             recent_utility: 0.5,
             cycle_id: 1,
             neuromod_exploration_mod: 1.0,
+            epistemic_quality: 0.5,
         }
     }
 

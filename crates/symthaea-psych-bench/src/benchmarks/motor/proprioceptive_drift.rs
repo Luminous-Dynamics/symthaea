@@ -60,9 +60,9 @@ impl ProprioceptiveDriftBenchmark {
             .collect();
 
         // Noise scaling from difficulty and time pressure
-        let noise_level: f32 = (0.15 + config.time_pressure as f32 * 0.10
-            + config.effective_noise() as f32 * 0.3)
-            * diff_model.signal_multiplier(config.difficulty) as f32;
+        let noise_level: f32 =
+            (0.15 + config.time_pressure as f32 * 0.10 + config.effective_noise() as f32 * 0.3)
+                * diff_model.signal_multiplier(config.difficulty) as f32;
 
         // ── Synchronous condition ──
         // Visual and tactile are temporally aligned → strong multisensory binding
@@ -90,8 +90,7 @@ impl ProprioceptiveDriftBenchmark {
                 );
 
                 // Binding strength: how coherent is the multisensory representation?
-                let binding_strength =
-                    multisensory_bind.similarity(&visual_rubber_hand).max(0.0);
+                let binding_strength = multisensory_bind.similarity(&visual_rubber_hand).max(0.0);
 
                 // Proprioceptive drift: shift toward visual when binding is strong
                 xor_shift(&mut rng);
@@ -145,8 +144,7 @@ impl ProprioceptiveDriftBenchmark {
                 );
 
                 // Binding strength is much lower for asynchronous
-                let binding_strength =
-                    multisensory_bind.similarity(&visual_rubber_hand).max(0.0);
+                let binding_strength = multisensory_bind.similarity(&visual_rubber_hand).max(0.0);
 
                 xor_shift(&mut rng);
                 let noise = (rng % 10000) as f32 / 10000.0 * noise_level;
@@ -173,8 +171,7 @@ impl ProprioceptiveDriftBenchmark {
         let async_drifted_sim = proprio_async.similarity(&visual_rubber_hand);
         let async_drift = (async_drifted_sim - original_sim).max(0.0) as f64;
 
-        let ownership_rate =
-            sync_ownership_count as f64 / sync_sub_trials as f64;
+        let ownership_rate = sync_ownership_count as f64 / sync_sub_trials as f64;
         let drift_difference = (sync_drift - async_drift).max(0.0);
 
         TrialResult {
@@ -219,14 +216,8 @@ impl PsychBenchmark for ProprioceptiveDriftBenchmark {
 
             if config.trial_trace {
                 let mut extra = BTreeMap::new();
-                extra.insert(
-                    "async_drift".to_string(),
-                    r.asynchronous_drift,
-                );
-                extra.insert(
-                    "ownership".to_string(),
-                    r.ownership_rate,
-                );
+                extra.insert("async_drift".to_string(), r.asynchronous_drift);
+                extra.insert("ownership".to_string(), r.ownership_rate);
                 trace.push(TrialOutcome {
                     trial_idx: trial,
                     condition: "proprioceptive_drift".to_string(),
@@ -241,8 +232,14 @@ impl PsychBenchmark for ProprioceptiveDriftBenchmark {
         }
 
         result.insert("synchronous_drift", MetricValue::from_samples(&sync_drifts));
-        result.insert("asynchronous_drift", MetricValue::from_samples(&async_drifts));
-        result.insert("ownership_rate", MetricValue::from_samples(&ownership_rates));
+        result.insert(
+            "asynchronous_drift",
+            MetricValue::from_samples(&async_drifts),
+        );
+        result.insert(
+            "ownership_rate",
+            MetricValue::from_samples(&ownership_rates),
+        );
         result.insert("drift_difference", MetricValue::from_samples(&drift_diffs));
 
         result.conditions = 2; // synchronous vs asynchronous

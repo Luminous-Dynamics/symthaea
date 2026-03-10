@@ -195,11 +195,8 @@ impl EpisodicMemory {
         if self.episodes.len() >= self.max_episodes {
             // Find lowest-priority episode and evict it.
             let current_cycle = episode.cycle;
-            if let Some((worst_idx, _)) = self
-                .episodes
-                .iter()
-                .enumerate()
-                .min_by(|(_, a), (_, b)| {
+            if let Some((worst_idx, _)) =
+                self.episodes.iter().enumerate().min_by(|(_, a), (_, b)| {
                     a.priority_score(current_cycle)
                         .partial_cmp(&b.priority_score(current_cycle))
                         .unwrap_or(core::cmp::Ordering::Equal)
@@ -311,8 +308,7 @@ impl MemoryCoordinator {
         cycle: u64,
     ) {
         // Always store in semantic memory.
-        self.semantic
-            .store(input.to_vec(), prediction_error, cycle);
+        self.semantic.store(input.to_vec(), prediction_error, cycle);
 
         // Conditionally store in episodic memory.
         let episode = Episode {

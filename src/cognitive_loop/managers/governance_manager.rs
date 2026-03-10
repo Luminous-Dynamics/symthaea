@@ -192,8 +192,9 @@ impl GovernanceManager {
     /// Called when casting a vote, recording what we expect to happen.
     pub fn predict_outcome(&mut self, proposal_id: String, predicted_alignment: f64) {
         // Evict stale entries
-        self.predicted_outcomes
-            .retain(|_, (_, cycle)| self.current_cycle.saturating_sub(*cycle) < Self::PREDICTION_TTL_CYCLES);
+        self.predicted_outcomes.retain(|_, (_, cycle)| {
+            self.current_cycle.saturating_sub(*cycle) < Self::PREDICTION_TTL_CYCLES
+        });
         // Hard cap
         while self.predicted_outcomes.len() >= Self::PREDICTION_MAX_ENTRIES {
             // Remove the oldest entry
@@ -230,7 +231,11 @@ impl GovernanceManager {
     }
 
     /// Process a governance outcome for learning signals (Phase 2).
-    fn process_outcome_learning(&mut self, outcome: &GovernanceOutcome, output: &mut SubsystemOutput) {
+    fn process_outcome_learning(
+        &mut self,
+        outcome: &GovernanceOutcome,
+        output: &mut SubsystemOutput,
+    ) {
         // 1. Compute prediction error
         let predicted = self
             .predicted_outcomes
@@ -285,7 +290,8 @@ impl GovernanceManager {
     /// Queue a baseline nudge with floor check.
     fn queue_baseline(&mut self, target: &'static str, nudge: f32) {
         if nudge.abs() >= thresholds::GOV_NEUROMOD_FLOOR {
-            self.pending_baselines.push(PendingBaseline { target, nudge });
+            self.pending_baselines
+                .push(PendingBaseline { target, nudge });
         }
     }
 
@@ -326,10 +332,7 @@ impl GovernanceManager {
             } => {
                 // High collective phi → ECB baseline nudge (group coherence)
                 if *collective_phi > 0.5 {
-                    self.queue_baseline(
-                        "endocannabinoid",
-                        thresholds::GOV_COLLECTIVE_PHI_ECB,
-                    );
+                    self.queue_baseline("endocannabinoid", thresholds::GOV_COLLECTIVE_PHI_ECB);
                 }
 
                 // DA response depends on alignment (computed in outcomes, but
@@ -424,9 +427,7 @@ impl CognitiveSubsystem for GovernanceManager {
                     output.arousal_delta += 0.1;
                     output.flags |= output_flags::ESCALATE_URGENCY;
                 }
-                GovernanceEventKind::TallyCompleted {
-                    collective_phi, ..
-                } => {
+                GovernanceEventKind::TallyCompleted { collective_phi, .. } => {
                     tally_count += 1;
                     // Fragile consensus → boost exploration
                     if *collective_phi < 0.3 {
@@ -457,7 +458,8 @@ impl CognitiveSubsystem for GovernanceManager {
 
         // Multiple tallies in one cycle → governance is active, mild LR boost
         if tally_count > 0 {
-            output.lr_modulation = output.lr_modulation.max(1.0) * (1.0 + (tally_count as f64 * 0.02).min(0.1));
+            output.lr_modulation =
+                output.lr_modulation.max(1.0) * (1.0 + (tally_count as f64 * 0.02).min(0.1));
         }
 
         output
@@ -527,18 +529,8 @@ mod tests {
         assert_eq!(mgr.interval(), 37);
         // Verify co-prime with existing intervals
         for interval in [7u32, 11, 13, 19, 23, 29] {
-            assert_ne!(
-                37 % interval,
-                0,
-                "37 should be co-prime with {}",
-                interval
-            );
-            assert_ne!(
-                interval % 37,
-                0,
-                "{} should be co-prime with 37",
-                interval
-            );
+            assert_ne!(37 % interval, 0, "37 should be co-prime with {}", interval);
+            assert_ne!(interval % 37, 0, "{} should be co-prime with 37", interval);
         }
     }
 
@@ -689,11 +681,15 @@ mod tests {
 
         let baselines = mgr.drain_baselines();
         assert!(
-            baselines.iter().any(|b| b.target == "noradrenaline" && b.nudge > 0.0),
+            baselines
+                .iter()
+                .any(|b| b.target == "noradrenaline" && b.nudge > 0.0),
             "Self-involved dispute should raise NE"
         );
         assert!(
-            baselines.iter().any(|b| b.target == "serotonin" && b.nudge < 0.0),
+            baselines
+                .iter()
+                .any(|b| b.target == "serotonin" && b.nudge < 0.0),
             "Self-involved dispute should lower 5-HT"
         );
     }

@@ -241,10 +241,7 @@ impl ConfigWriter {
     }
 
     /// Validate that content has balanced braces and doesn't remove critical patterns.
-    fn validate_content_structure(
-        original: &str,
-        modified: &str,
-    ) -> Result<(), std::io::Error> {
+    fn validate_content_structure(original: &str, modified: &str) -> Result<(), std::io::Error> {
         // Check balanced braces in modified content
         let open_braces = modified.chars().filter(|&c| c == '{').count();
         let close_braces = modified.chars().filter(|&c| c == '}').count();
@@ -271,11 +268,7 @@ impl ConfigWriter {
         }
 
         // Detect removal of critical NixOS module imports
-        let critical_patterns = [
-            "boot.loader",
-            "fileSystems",
-            "networking.hostName",
-        ];
+        let critical_patterns = ["boot.loader", "fileSystems", "networking.hostName"];
 
         for pattern in &critical_patterns {
             if original.contains(pattern) && !modified.contains(pattern) {
@@ -528,7 +521,10 @@ mod tests {
         let modified = "{ config }: { foo = 1;"; // missing closing brace
         let result = ConfigWriter::validate_content_structure(original, modified);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Unbalanced braces"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Unbalanced braces"));
     }
 
     #[test]
@@ -537,12 +533,10 @@ mod tests {
         let modified = "[ a b c"; // missing closing bracket
         let result = ConfigWriter::validate_content_structure(original, modified);
         assert!(result.is_err());
-        assert!(
-            result
-                .unwrap_err()
-                .to_string()
-                .contains("Unbalanced brackets")
-        );
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Unbalanced brackets"));
     }
 
     #[test]
@@ -560,12 +554,10 @@ mod tests {
         let modified = "{ foo = 1; }";
         let result = ConfigWriter::validate_content_structure(original, modified);
         assert!(result.is_err());
-        assert!(
-            result
-                .unwrap_err()
-                .to_string()
-                .contains("networking.hostName")
-        );
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("networking.hostName"));
     }
 
     #[test]

@@ -1248,12 +1248,18 @@ mod tests {
         for c in 0..150 {
             let input = make_input(c);
             let output = engine.evaluate(&input);
-            assert!(output.moral_score.is_finite(), "moral_score NaN at cycle {c}");
+            assert!(
+                output.moral_score.is_finite(),
+                "moral_score NaN at cycle {c}"
+            );
             assert!(
                 output.moral_confidence.is_finite(),
                 "moral_confidence NaN at cycle {c}"
             );
-            assert!(output.value_score.is_finite(), "value_score NaN at cycle {c}");
+            assert!(
+                output.value_score.is_finite(),
+                "value_score NaN at cycle {c}"
+            );
             assert!(
                 output.unified_confidence.is_finite(),
                 "unified_confidence NaN at cycle {c}"

@@ -57,6 +57,8 @@ fn main() {
         tool: Some(ToolDescriptor::read_only("nix search nixpkgs firefox")),
         recent_utility: 0.5,
         cycle_id: 1,
+        neuromod_exploration_mod: 1.0,
+        epistemic_quality: 0.5,
     };
 
     let r1 = engine.reason(&ctx1);
@@ -118,6 +120,8 @@ fn main() {
         ),
         recent_utility: 0.3,
         cycle_id: 2,
+        neuromod_exploration_mod: 1.0,
+        epistemic_quality: 0.5,
     };
 
     let r2 = engine.reason(&ctx2);
@@ -170,6 +174,8 @@ fn main() {
         tool: None,
         recent_utility: 0.5,
         cycle_id: 3,
+        neuromod_exploration_mod: 1.0,
+        epistemic_quality: 0.5,
     };
 
     let r3 = engine.reason(&ctx3);

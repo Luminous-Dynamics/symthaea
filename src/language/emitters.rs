@@ -440,10 +440,7 @@ fn infer_rust_body(
             let cond = infer_filter_closure(&purpose_lower);
             let iter = iter_method_for_owned(return_type);
             if iter == ".into_iter()" {
-                return format!(
-                    "{}.into_iter().filter(|x| {}).collect()",
-                    params[0].0, cond
-                );
+                return format!("{}.into_iter().filter(|x| {}).collect()", params[0].0, cond);
             } else {
                 return format!(
                     "{}.iter().filter(|x| {}).cloned().collect()",
@@ -783,7 +780,11 @@ fn infer_rust_body(
     {
         if params.len() == 1 && (params[0].1.contains("str") || params[0].1.contains("String")) {
             // Add turbofish if return type is known and concrete
-            let turbofish = if !ret.is_empty() && ret != "()" && !ret.contains("Result") && !ret.contains("Option") {
+            let turbofish = if !ret.is_empty()
+                && ret != "()"
+                && !ret.contains("Result")
+                && !ret.contains("Option")
+            {
                 format!("::<{}>", ret)
             } else {
                 String::new()

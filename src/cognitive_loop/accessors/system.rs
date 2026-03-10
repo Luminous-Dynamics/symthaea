@@ -101,9 +101,7 @@ impl CognitiveLoopService {
     /// Returns a clone of the most recent [`TrajectoryConvergenceReport`] produced
     /// by the ethics engine during cycle execution. Includes severity, matched
     /// hazard template, and per-signal details for all three convergence signals.
-    pub fn convergence_status(
-        &self,
-    ) -> crate::hdc::moral_topology::TrajectoryConvergenceReport {
+    pub fn convergence_status(&self) -> crate::hdc::moral_topology::TrajectoryConvergenceReport {
         self.ethics_engine
             .moral_topology()
             .last_convergence_report()
@@ -113,10 +111,11 @@ impl CognitiveLoopService {
     /// Get a human-readable explanation of the current convergence status.
     ///
     /// Wraps [`TrajectoryConvergenceReport::explain`] with the active anomaly config.
-    pub fn convergence_explanation(
-        &self,
-    ) -> crate::hdc::moral_topology::ConvergenceExplanation {
-        let report = self.ethics_engine.moral_topology().last_convergence_report();
+    pub fn convergence_explanation(&self) -> crate::hdc::moral_topology::ConvergenceExplanation {
+        let report = self
+            .ethics_engine
+            .moral_topology()
+            .last_convergence_report();
         report.explain(self.ethics_engine.moral_topology().anomaly_config())
     }
 
@@ -159,9 +158,7 @@ impl CognitiveLoopService {
     }
 
     /// Get the current escalation level from the topological immune system.
-    pub fn convergence_escalation_level(
-        &self,
-    ) -> crate::hdc::moral_topology::EscalationLevel {
+    pub fn convergence_escalation_level(&self) -> crate::hdc::moral_topology::EscalationLevel {
         self.ethics_engine
             .moral_topology()
             .escalation_policy()
@@ -170,9 +167,7 @@ impl CognitiveLoopService {
 
     /// Get the fingerprint velocity (rate of directional change in harmony space).
     pub fn convergence_fingerprint_velocity(&self) -> f64 {
-        self.ethics_engine
-            .moral_topology()
-            .fingerprint_velocity()
+        self.ethics_engine.moral_topology().fingerprint_velocity()
     }
 
     /// Evaluate temporal prediction horizon accuracy from the vision manifold.

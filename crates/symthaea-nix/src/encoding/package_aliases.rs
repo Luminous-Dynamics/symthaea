@@ -866,9 +866,6 @@ mod tests {
         // "fierfox" is a classic typo for "firefox" — should still be found
         let results = suggest_similar("fierfox", 3);
         assert!(!results.is_empty(), "Should find suggestions for typo");
-        assert_eq!(
-            results[0].0, "firefox",
-            "Top suggestion should be firefox"
-        );
+        assert_eq!(results[0].0, "firefox", "Top suggestion should be firefox");
     }
 }

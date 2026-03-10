@@ -323,6 +323,8 @@ impl CognitiveLoopService {
             // Dynamic consciousness weights
             consciousness_weights: feedback.consciousness.consciousness_weights,
             consciousness_weight_variance: feedback.consciousness.consciousness_weight_variance,
+            consciousness_layer_disagreement: 0.0, // computed below
+            consciousness_weakest_layer: String::new(), // computed below
             module_timings_us: {
                 module_timings.metadata_assembly = _t.elapsed().as_micros() as u64;
                 module_timings.clone()
@@ -470,12 +472,63 @@ impl CognitiveLoopService {
             metadata.user_engagement = state.engagement as f32;
         }
 
+        // ── Reasoning engine internal diagnostics ──
+        metadata.reasoning_engine_telemetry = super::ReasoningEngineTelemetry {
+            phi_eff_raw: dynamics.reasoning.re_phi_eff_raw,
+            phi_eff: dynamics.reasoning.re_phi_eff,
+            epistemic_mod: dynamics.reasoning.re_epistemic_mod,
+            gamma: dynamics.reasoning.re_gamma,
+            reliability: dynamics.reasoning.re_reliability,
+            budget_consumed: dynamics.reasoning.re_budget_consumed,
+            wall_time_us: dynamics.reasoning.re_wall_time_us,
+            steps_taken: dynamics.reasoning.re_steps_taken,
+            tier_reached: dynamics.reasoning.re_tier_reached,
+            gate_checks: dynamics.reasoning.re_gate_checks,
+            budget_exceeded: dynamics.reasoning.re_budget_exceeded,
+            evs: dynamics.reasoning.re_evs,
+            mcts_iterations: dynamics.reasoning.re_mcts_iterations,
+            did_simulate: dynamics.reasoning.re_did_simulate,
+        };
+
         // ── MCE factor telemetry (from consciousness carryover cache) ──
         metadata.mce_bottleneck = self.carryover.consciousness.mce_bottleneck_name.clone();
         metadata.mce_softmin = self.carryover.consciousness.mce_softmin;
         metadata.mce_weighted_sum = self.carryover.consciousness.mce_weighted_sum;
         metadata.mce_narrative = self.carryover.consciousness.mce_narrative;
         metadata.mce_social = self.carryover.consciousness.mce_social;
+
+        // ── Consciousness layer disagreement diagnostics ──
+        {
+            let mut active_layers: Vec<(&str, f64)> = Vec::new();
+            if let Some(phi) = feedback.consciousness.spectral_mip_phi {
+                active_layers.push(("spectral_mip", phi));
+            }
+            let eq_v2 = feedback.consciousness.equation_v2_consciousness;
+            if eq_v2 > 0.0 {
+                active_layers.push(("equation_v2", eq_v2));
+            }
+            let pipeline = feedback.consciousness.pipeline_consciousness;
+            if pipeline > 0.0 {
+                active_layers.push(("pipeline", pipeline));
+            }
+            let multimodal = feedback.consciousness.multimodal_integrated_phi;
+            if multimodal > 0.0 {
+                active_layers.push(("multimodal", multimodal));
+            }
+            if active_layers.len() >= 2 {
+                let max_val = active_layers
+                    .iter()
+                    .map(|(_, v)| *v)
+                    .fold(f64::NEG_INFINITY, f64::max);
+                let (min_name, min_val) = active_layers
+                    .iter()
+                    .copied()
+                    .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
+                    .unwrap();
+                metadata.consciousness_layer_disagreement = max_val - min_val;
+                metadata.consciousness_weakest_layer = min_name.to_string();
+            }
+        }
 
         // ── Session 9: Advanced feedback intelligence telemetry (part 1) ──
         metadata.pe_variance = {
@@ -576,32 +629,25 @@ impl CognitiveLoopService {
             use super::thresholds::{
                 CONSCIOUSNESS_EMA_HIGH_THRESHOLD, CONSCIOUSNESS_EMA_LOW_THRESHOLD,
                 CONSCIOUSNESS_GRADIENT_CAUTION_THRESHOLD, EPISTEMIC_REJECTION_STREAK_THRESHOLD,
-                FULL_DAMPEN_FREEZE_THRESHOLD, MULTI_OBJ_FRONTIER_LARGE,
-                MULTI_OBJ_FRONTIER_SMALL, TEMPORAL_BINDING_DAMPEN_THRESHOLD,
-                TEMPORAL_BINDING_EXPLORE_THRESHOLD,
+                FULL_DAMPEN_FREEZE_THRESHOLD, MULTI_OBJ_FRONTIER_LARGE, MULTI_OBJ_FRONTIER_SMALL,
+                TEMPORAL_BINDING_DAMPEN_THRESHOLD, TEMPORAL_BINDING_EXPLORE_THRESHOLD,
             };
             let tb = perception.encoding.temporal_binding_strength;
             metadata.temporal_binding_feedback = self.stats.total_cycles > 15
                 && (tb < TEMPORAL_BINDING_EXPLORE_THRESHOLD
                     || tb > TEMPORAL_BINDING_DAMPEN_THRESHOLD);
-            metadata.consciousness_gradient_active = feedback
-                .consciousness
-                .consciousness_gradient_magnitude
-                > CONSCIOUSNESS_GRADIENT_CAUTION_THRESHOLD
-                || self.carryover.quality.consecutive_stable_gradient > 20;
-            metadata.startup_exploration_ramped = self.stats.total_cycles
-                <= super::thresholds::STARTUP_WARMUP_CYCLES;
-            metadata.epistemic_rejection_streak_recal = self
-                .carryover
-                .quality
-                .consecutive_epistemic_rejections
-                >= EPISTEMIC_REJECTION_STREAK_THRESHOLD
-                && self.stats.total_cycles > 20;
-            metadata.full_dampen_threshold_freeze = self
-                .carryover
-                .quality
-                .consecutive_full_dampen
-                >= FULL_DAMPEN_FREEZE_THRESHOLD;
+            metadata.consciousness_gradient_active =
+                feedback.consciousness.consciousness_gradient_magnitude
+                    > CONSCIOUSNESS_GRADIENT_CAUTION_THRESHOLD
+                    || self.carryover.quality.consecutive_stable_gradient > 20;
+            metadata.startup_exploration_ramped =
+                self.stats.total_cycles <= super::thresholds::STARTUP_WARMUP_CYCLES;
+            metadata.epistemic_rejection_streak_recal =
+                self.carryover.quality.consecutive_epistemic_rejections
+                    >= EPISTEMIC_REJECTION_STREAK_THRESHOLD
+                    && self.stats.total_cycles > 20;
+            metadata.full_dampen_threshold_freeze =
+                self.carryover.quality.consecutive_full_dampen >= FULL_DAMPEN_FREEZE_THRESHOLD;
             let ema = self.carryover.history.consciousness_ema;
             metadata.consciousness_ema_lr_bias = self.stats.total_cycles > 30
                 && (ema > CONSCIOUSNESS_EMA_HIGH_THRESHOLD
@@ -775,7 +821,12 @@ impl CognitiveLoopService {
                     })
                     .collect(),
                 global_failure_streak: self.integrity_manager.global_failure_streak,
-                confidence_history: self.integrity_manager.confidence_history().iter().copied().collect(),
+                confidence_history: self
+                    .integrity_manager
+                    .confidence_history()
+                    .iter()
+                    .copied()
+                    .collect(),
             };
             // Integrity-aware consciousness gating: if integrity is compromised,
             // discount consciousness scores — the system should distrust its own
@@ -1173,8 +1224,10 @@ impl CognitiveLoopService {
         // below bounds set in cycle_quality.rs. Re-clamp here to guarantee invariants.
         self.adaptive_behavior.exploration_factor =
             self.adaptive_behavior.exploration_factor.clamp(0.1, 3.0);
-        self.adaptive_behavior.learning_rate_multiplier =
-            self.adaptive_behavior.learning_rate_multiplier.clamp(0.1, 2.0);
+        self.adaptive_behavior.learning_rate_multiplier = self
+            .adaptive_behavior
+            .learning_rate_multiplier
+            .clamp(0.1, 2.0);
         self.curiosity_drive.boredom = self.curiosity_drive.boredom.clamp(0.0, 1.5);
 
         CycleResult {

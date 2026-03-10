@@ -513,6 +513,14 @@ pub struct CycleMetadata {
     pub consciousness_weights: [f64; 4],
     /// Weight stability variance (0.0 = stable, >0.01 = oscillating).
     pub consciousness_weight_variance: f64,
+    /// Disagreement between consciousness layers: max(layers) - min(layers).
+    /// High disagreement (>0.3) indicates layer conflict. 0.0 when <2 layers active.
+    #[serde(default)]
+    pub consciousness_layer_disagreement: f64,
+    /// Which consciousness layer reported the lowest value this cycle.
+    /// Empty when not computed or all layers inactive.
+    #[serde(default)]
+    pub consciousness_weakest_layer: String,
 
     // ── Substrate & Convergence Telemetry ──────────────────────────────
     /// Effective substrate feasibility [0,1] used in consciousness equation.
@@ -706,6 +714,11 @@ pub struct CycleMetadata {
     /// Per-manager proposal magnitudes (which managers moved the needle this cycle).
     #[serde(default)]
     pub managers: ManagerTelemetry,
+
+    /// Reasoning engine internal diagnostics (Φ_eff decomposition, budget, tiers).
+    /// All zeros when `reasoning_engine` feature is disabled.
+    #[serde(default)]
+    pub reasoning_engine_telemetry: ReasoningEngineTelemetry,
 
     // ── Nurture Attachment Telemetry ─────────────────────────────────────
     /// Current attachment style (e.g., "Forming", "Secure"). Empty when nurture disabled.
@@ -1597,6 +1610,47 @@ pub struct ManagerTelemetry {
     pub perception_confidence_delta: f32,
     /// Perception manager exploration delta.
     pub perception_exploration_delta: f32,
+}
+
+/// Reasoning engine internal diagnostics — surfaces values computed inside
+/// `ConsciousReasoningEngine::reason()` that are not captured by the top-level
+/// `reasoning_*` fields on CycleMetadata.
+///
+/// All fields default to 0/false so the struct is inert when the
+/// `reasoning_engine` feature is disabled.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ReasoningEngineTelemetry {
+    /// Raw Φ_eff before epistemic quality modulation: Φ × R^γ.
+    pub phi_eff_raw: f32,
+    /// Final Φ_eff after epistemic modulation: phi_eff_raw × epistemic_mod.
+    pub phi_eff: f32,
+    /// Epistemic quality modulation factor (0.5–1.0).
+    /// Floor at 0.5 so even zero-quality claims retain 50% of their Φ_eff.
+    pub epistemic_mod: f32,
+    /// Current γ exponent used in R^γ (self-calibrating).
+    pub gamma: f32,
+    /// Theory reliability R (0.0–1.0) from calibrator.
+    pub reliability: f32,
+    /// Fraction of reasoning budget consumed (0.0–1.0).
+    /// 0.0 when budget tracking is unavailable.
+    pub budget_consumed: f32,
+    /// Wall-clock time of the reasoning cycle (microseconds).
+    pub wall_time_us: u64,
+    /// Number of reasoning steps that executed (1–7 depending on tier).
+    pub steps_taken: u32,
+    /// Highest reasoning tier reached (0 = Tier0, 1 = Tier1, 2 = Tier2).
+    pub tier_reached: u32,
+    /// Number of tool gate evaluations performed (0, 1, or 2).
+    pub gate_checks: u32,
+    /// Whether the budget was exceeded before all steps completed.
+    pub budget_exceeded: bool,
+    /// Expected Value of Simulation (EVS) — decides whether MCTS planning runs.
+    /// 0.0 when Tier 0 only.
+    pub evs: f32,
+    /// MCTS iterations completed (0 when planning did not run).
+    pub mcts_iterations: u32,
+    /// Whether MCTS simulation actually ran.
+    pub did_simulate: bool,
 }
 
 /// Per-module execution timings in microseconds for overhead profiling.

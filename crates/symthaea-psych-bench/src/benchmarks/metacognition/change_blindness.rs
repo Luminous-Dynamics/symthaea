@@ -93,10 +93,7 @@ impl ChangeBlindnessBenchmark {
                     let mut objects = Vec::with_capacity(num_objects);
                     for i in 0..num_objects {
                         xor_shift(&mut rng);
-                        objects.push(ContinuousHV::random(
-                            dim,
-                            rng.wrapping_add(500 + i as u64),
-                        ));
+                        objects.push(ContinuousHV::random(dim, rng.wrapping_add(500 + i as u64)));
                     }
 
                     // Choose which object to change
@@ -156,14 +153,10 @@ impl ChangeBlindnessBenchmark {
                         // changes harder to detect.
                         xor_shift(&mut rng);
                         let blank = ContinuousHV::random(dim, rng.wrapping_add(3000));
-                        let disrupted_pre = ContinuousHV::weighted_bundle(
-                            &[&pre_scene, &blank],
-                            &[0.55, 0.45],
-                        );
-                        let disrupted_post = ContinuousHV::weighted_bundle(
-                            &[&post_scene, &blank],
-                            &[0.55, 0.45],
-                        );
+                        let disrupted_pre =
+                            ContinuousHV::weighted_bundle(&[&pre_scene, &blank], &[0.55, 0.45]);
+                        let disrupted_post =
+                            ContinuousHV::weighted_bundle(&[&post_scene, &blank], &[0.55, 0.45]);
                         disrupted_pre.similarity(&disrupted_post) as f64
                     } else {
                         // No disruption: direct comparison, transient signal strong
@@ -229,7 +222,8 @@ impl ChangeBlindnessBenchmark {
                             // Check if this look attends to the changed object
                             if attended_obj_idx == change_idx {
                                 // Attending to the changed object: compare original vs replacement
-                                let orig_bound = objects[change_idx].bind(&position_hvs[change_idx]);
+                                let orig_bound =
+                                    objects[change_idx].bind(&position_hvs[change_idx]);
                                 let repl_bound = replacement.bind(&position_hvs[change_idx]);
                                 let obj_change = 1.0 - orig_bound.similarity(&repl_bound) as f64;
 
@@ -239,8 +233,7 @@ impl ChangeBlindnessBenchmark {
                                 let look_thr_ev = threshold / (temperature * 0.5);
                                 let max_look = look_ev.max(look_thr_ev);
                                 let p_look = (look_ev - max_look).exp()
-                                    / ((look_ev - max_look).exp()
-                                        + (look_thr_ev - max_look).exp());
+                                    / ((look_ev - max_look).exp() + (look_thr_ev - max_look).exp());
 
                                 xor_shift(&mut rng);
                                 let r_look = (rng % 10000) as f64 / 10000.0;
@@ -359,10 +352,7 @@ impl PsychBenchmark for ChangeBlindnessBenchmark {
             "detection_without_disruption",
             MetricValue::from_samples(&det_without),
         );
-        result.insert(
-            "search_efficiency",
-            MetricValue::from_samples(&search_effs),
-        );
+        result.insert("search_efficiency", MetricValue::from_samples(&search_effs));
         result.insert(
             "attention_benefit",
             MetricValue::from_samples(&att_benefits),

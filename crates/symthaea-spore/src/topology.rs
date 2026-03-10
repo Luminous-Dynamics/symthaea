@@ -493,9 +493,10 @@ impl TopologyAnalyzer {
                         center: self.points[i].dimensions,
                         amplitude,
                         frequency: std::f64::consts::TAU
-                            / (self.points[i].cycle.saturating_sub(
-                                self.points[i.saturating_sub(2)].cycle,
-                            ) as f64)
+                            / (self.points[i]
+                                .cycle
+                                .saturating_sub(self.points[i.saturating_sub(2)].cycle)
+                                as f64)
                                 .max(1.0),
                         width: self.config.edge_threshold,
                         created_cycle: self.points[i].cycle,
@@ -593,7 +594,10 @@ impl TopologyAnalyzer {
             a.interpretation.complexity,
             a.interpretation.fragmentation,
             a.persistence_pairs.len(),
-            a.persistence_pairs.iter().filter(|p| p.death.is_none()).count(),
+            a.persistence_pairs
+                .iter()
+                .filter(|p| p.death.is_none())
+                .count(),
             a.wave_packets.len(),
             a.interference_events.len(),
         )
@@ -654,7 +658,10 @@ mod tests {
         }
         let a = analyzer.analyze();
         assert_eq!(a.betti.beta_0, 1, "identical points → one component");
-        assert_eq!(a.betti.euler_characteristic, 1 - a.betti.beta_1 as i64 + a.betti.beta_2 as i64);
+        assert_eq!(
+            a.betti.euler_characteristic,
+            1 - a.betti.beta_1 as i64 + a.betti.beta_2 as i64
+        );
     }
 
     #[test]
@@ -741,7 +748,11 @@ mod tests {
             analyzer.observe([i as f64 * 0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], i);
         }
         let a = analyzer.analyze();
-        let infinite = a.persistence_pairs.iter().filter(|p| p.death.is_none()).count();
+        let infinite = a
+            .persistence_pairs
+            .iter()
+            .filter(|p| p.death.is_none())
+            .count();
         assert!(infinite >= 1, "at least one infinite persistence feature");
     }
 }

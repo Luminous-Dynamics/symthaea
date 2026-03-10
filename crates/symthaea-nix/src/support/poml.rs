@@ -43,7 +43,10 @@ pub enum PomlError {
     /// A required element (e.g. `<prompt>`) is missing.
     MissingElement { element: String, template: String },
     /// Template file could not be read.
-    IoError { path: String, source: std::io::Error },
+    IoError {
+        path: String,
+        source: std::io::Error,
+    },
     /// Template not found in cache or on disk.
     NotFound(String),
 }
@@ -1456,7 +1459,10 @@ mod tests {
         );
         // Display should include offset info
         let msg = format!("{err}");
-        assert!(msg.contains("byte"), "Error msg should mention byte offset: {msg}");
+        assert!(
+            msg.contains("byte"),
+            "Error msg should mention byte offset: {msg}"
+        );
     }
 
     #[test]

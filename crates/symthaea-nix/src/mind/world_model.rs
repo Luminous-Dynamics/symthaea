@@ -510,7 +510,10 @@ mod tests {
         assert_eq!(format!("{}", ActionCategory::Rebuild), "Rebuild");
         assert_eq!(format!("{}", ActionCategory::Rollback), "Rollback");
         assert_eq!(format!("{}", ActionCategory::Configure), "Configure");
-        assert_eq!(format!("{}", ActionCategory::GarbageCollect), "GarbageCollect");
+        assert_eq!(
+            format!("{}", ActionCategory::GarbageCollect),
+            "GarbageCollect"
+        );
         assert_eq!(format!("{}", ActionCategory::Update), "Update");
         assert_eq!(
             format!("{}", ActionCategory::Custom("reboot".into())),

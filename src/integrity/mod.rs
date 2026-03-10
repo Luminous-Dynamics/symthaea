@@ -60,7 +60,10 @@ pub fn install_panic_hook() {
                     .unwrap_or(0);
                 let path = format!("/tmp/symthaea-integrity-dump-{ts}.bin");
                 if std::fs::write(&path, blob).is_ok() {
-                    eprintln!("[integrity] Crash forensics: dumped {} bytes to {path}", blob.len());
+                    eprintln!(
+                        "[integrity] Crash forensics: dumped {} bytes to {path}",
+                        blob.len()
+                    );
                 }
             }
         }
@@ -238,7 +241,9 @@ impl IntegrityManager {
             return false;
         }
         // Simple deterministic jitter: hash cycle with seed, produce offset in [-10, +10]
-        let h = (cycle as u64).wrapping_mul(self.jitter_seed).wrapping_add(0x9E37_79B9_7F4A_7C15);
+        let h = (cycle as u64)
+            .wrapping_mul(self.jitter_seed)
+            .wrapping_add(0x9E37_79B9_7F4A_7C15);
         let jitter = (h % 21) as isize - 10; // range [-10, +10]
         let interval = (ATTESTATION_INTERVAL as isize + jitter).max(80) as usize;
         cycle % interval == 0
@@ -372,7 +377,13 @@ impl IntegrityManager {
     }
 
     /// Push an event to the ring buffer, evicting the oldest if at capacity.
-    fn log_event(&mut self, cycle: usize, source: &'static str, description: String, severity: AnomalySeverity) {
+    fn log_event(
+        &mut self,
+        cycle: usize,
+        source: &'static str,
+        description: String,
+        severity: AnomalySeverity,
+    ) {
         if self.event_log.len() >= EVENT_LOG_CAPACITY {
             self.event_log.pop_front();
         }
@@ -651,7 +662,9 @@ mod tests {
         let values = [1.0f32, 2.0, 3.0];
         mgr.register_safety_thresholds(&values);
         let live_hash = attestation::blake3_hash_f32_slice(&values);
-        assert!(mgr.verify_live_thresholds("safety_thresholds", live_hash).is_none());
+        assert!(mgr
+            .verify_live_thresholds("safety_thresholds", live_hash)
+            .is_none());
     }
 
     #[test]
@@ -659,7 +672,9 @@ mod tests {
         let mut mgr = IntegrityManager::new();
         mgr.register_safety_thresholds(&[1.0, 2.0, 3.0]);
         let tampered_hash = attestation::blake3_hash_f32_slice(&[1.0, 2.0, 999.0]);
-        assert!(mgr.verify_live_thresholds("safety_thresholds", tampered_hash).is_some());
+        assert!(mgr
+            .verify_live_thresholds("safety_thresholds", tampered_hash)
+            .is_some());
     }
 
     #[test]
@@ -705,7 +720,10 @@ mod tests {
         }
         assert_eq!(mgr.confidence_history.len(), 5);
         // All values should be valid confidence levels (may include 0.5 if temporal fires)
-        assert!(mgr.confidence_history.iter().all(|&c| c == 1.0 || c == 0.5 || c == 0.1));
+        assert!(mgr
+            .confidence_history
+            .iter()
+            .all(|&c| c == 1.0 || c == 0.5 || c == 0.1));
     }
 
     #[test]
@@ -724,6 +742,9 @@ mod tests {
         let fired: Vec<usize> = (80..=120)
             .filter(|&c| mgr.jittered_attestation_due(c))
             .collect();
-        assert!(!fired.is_empty(), "jittered attestation should fire at least once near interval 101");
+        assert!(
+            !fired.is_empty(),
+            "jittered attestation should fire at least once near interval 101"
+        );
     }
 }

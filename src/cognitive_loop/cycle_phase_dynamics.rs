@@ -47,30 +47,32 @@ use super::thresholds::{
     CAUSAL_ATTENTION_STRENGTH_THRESHOLD, CODEBOOK_FAMILIAR_TAU_SCALE, CODEBOOK_FAMILIAR_THRESHOLD,
     CODEBOOK_NOVEL_TAU_SCALE, CODEBOOK_NOVEL_THRESHOLD, COHERENCE_CONFIDENCE_BOOST,
     COHERENCE_HIGH_THRESHOLD, COHERENCE_LOW_DAMPEN_SCALE, COHERENCE_LOW_THRESHOLD,
-    COHERENCE_PREDICTION_EMA, COHERENCE_VELOCITY_TAU_BOOST, COHERENCE_VELOCITY_TAU_DAMPEN,
-    COHERENCE_VELOCITY_TAU_THRESHOLD, CONFIDENCE_CRASH_EXPLORATION_BOOST,
-    CONFIDENCE_CRASH_FREEZE_CYCLES, CONFIDENCE_CRASH_THRESHOLD, DOMINANCE_CONFIDENCE_THRESHOLD,
-    DOMINANCE_CONFIDENT, DOMINANCE_DEFAULT, DOMINANCE_FLOW_BASE, DOMINANCE_FLOW_SCALE,
-    EPISTEMIC_EXPLORE_SCALE, EPISTEMIC_EXPLORE_THRESHOLD, EPISTEMIC_LOW_DAMPEN,
-    EPISTEMIC_LOW_THRESHOLD, EPISTEMIC_OSCILLATION_MULTIPLIER, EPISTEMIC_OSCILLATION_THRESHOLD,
-    EPISTEMIC_SEMANTIC_BOOST_SCALE, EPISTEMIC_SEMANTIC_BOOST_THRESHOLD,
-    EPISTEMIC_SEMANTIC_CAUTION_BASE, EPISTEMIC_SEMANTIC_CAUTION_SCALE,
-    EPISTEMIC_SEMANTIC_CAUTION_THRESHOLD, EPISTEMIC_UNCERTAINTY_DEFAULT,
-    FEP_ACCURACY_CONFIDENCE_THRESHOLD, FEP_COMPLEXITY_THRESHOLD, FEP_LEARNING_PLASTICITY_THRESHOLD,
-    FEP_PRAGMATIC_EXPLOIT_THRESHOLD, FEP_PRAGMATIC_EXPLORE_THRESHOLD, FEP_SURPRISE_TAU_SCALE,
-    FEP_TD_ERROR_DISCOVERY_THRESHOLD, HOMEOSTASIS_AROUSAL_TARGET, HOMEOSTASIS_EFFICIENCY_EMA,
-    HOMEOSTASIS_EFFICIENCY_HIGH, HOMEOSTASIS_EFFICIENCY_LOW, HOMEOSTASIS_PULL_CRITICAL,
+    COHERENCE_PREDICTION_EMA, COHERENCE_VELOCITY_BUDGET_CONTRACT, COHERENCE_VELOCITY_BUDGET_EXPAND,
+    COHERENCE_VELOCITY_BUDGET_THRESHOLD, COHERENCE_VELOCITY_TAU_BOOST,
+    COHERENCE_VELOCITY_TAU_DAMPEN, COHERENCE_VELOCITY_TAU_THRESHOLD,
+    CONFIDENCE_CRASH_EXPLORATION_BOOST, CONFIDENCE_CRASH_FREEZE_CYCLES, CONFIDENCE_CRASH_THRESHOLD,
+    DOMINANCE_CONFIDENCE_THRESHOLD, DOMINANCE_CONFIDENT, DOMINANCE_DEFAULT, DOMINANCE_FLOW_BASE,
+    DOMINANCE_FLOW_SCALE, EPISTEMIC_EXPLORE_SCALE, EPISTEMIC_EXPLORE_THRESHOLD,
+    EPISTEMIC_LOW_DAMPEN, EPISTEMIC_LOW_THRESHOLD, EPISTEMIC_OSCILLATION_MULTIPLIER,
+    EPISTEMIC_OSCILLATION_THRESHOLD, EPISTEMIC_SEMANTIC_BOOST_SCALE,
+    EPISTEMIC_SEMANTIC_BOOST_THRESHOLD, EPISTEMIC_SEMANTIC_CAUTION_BASE,
+    EPISTEMIC_SEMANTIC_CAUTION_SCALE, EPISTEMIC_SEMANTIC_CAUTION_THRESHOLD,
+    EPISTEMIC_UNCERTAINTY_DEFAULT, FEP_ACCURACY_CONFIDENCE_THRESHOLD, FEP_COMPLEXITY_THRESHOLD,
+    FEP_LEARNING_PLASTICITY_THRESHOLD, FEP_PRAGMATIC_EXPLOIT_THRESHOLD,
+    FEP_PRAGMATIC_EXPLORE_THRESHOLD, FEP_SURPRISE_TAU_SCALE, FEP_TD_ERROR_DISCOVERY_THRESHOLD,
+    HOMEOSTASIS_AROUSAL_TARGET, HOMEOSTASIS_EFFICIENCY_EMA, HOMEOSTASIS_EFFICIENCY_HIGH,
+    HOMEOSTASIS_EFFICIENCY_LOW, HOMEOSTASIS_NEUROMOD_STEP, HOMEOSTASIS_PULL_CRITICAL,
     HOMEOSTASIS_PULL_CRUISE, HOMEOSTASIS_PULL_INCREASE, HOMEOSTASIS_PULL_NORMAL,
-    HOMEOSTASIS_PULL_REDUCTION, HORIZON_PE_CONTRACT_RATE, HORIZON_PE_CONTRACT_THRESHOLD,
-    HORIZON_PE_EXPAND_RATE, HORIZON_PE_EXPAND_THRESHOLD, HORIZON_SLOPE_CONTRACT_CAP,
-    HORIZON_SLOPE_CONTRACT_RATE, HORIZON_SLOPE_EXPAND_CAP, HORIZON_SLOPE_EXPAND_RATE,
-    HORIZON_SLOPE_THRESHOLD, MCTS_CONSOLIDATE_CONFIDENCE_SCALE,
-    MCTS_EFFECTIVENESS_CONFIDENCE_SCALE, MCTS_EFFECTIVENESS_EMA, MCTS_EFFECTIVENESS_EXPLORE_SCALE,
-    MCTS_EFFECTIVENESS_HIGH, MCTS_EFFECTIVENESS_LOW, MCTS_EXPLOIT_LR_SCALE, MCTS_EXPLORE_SCALE,
-    MCTS_PLAN_CONFIDENCE_THRESHOLD, MCTS_PLAN_WEIGHT_SCALE, MEMORY_RECALL_TOP_K,
-    PE_VARIANCE_DAMPEN_SCALE, PE_VARIANCE_MAX_EFFECT, PE_VARIANCE_THRESHOLD,
-    POLICY_FULL_AGREEMENT_BOOST, POLICY_MIN_WINDOW, POLICY_SOFT_THRESHOLD, POLICY_TEMP_BASE,
-    POLICY_TEMP_RANGE, POLICY_WINDOW_SIZE, PREDICTION_HORIZON_MAX_SCALE,
+    HOMEOSTASIS_PULL_REDUCTION, HOMEOSTASIS_RECALIBRATE_HIGH, HOMEOSTASIS_RECALIBRATE_LOW,
+    HORIZON_PE_CONTRACT_RATE, HORIZON_PE_CONTRACT_THRESHOLD, HORIZON_PE_EXPAND_RATE,
+    HORIZON_PE_EXPAND_THRESHOLD, HORIZON_SLOPE_CONTRACT_CAP, HORIZON_SLOPE_CONTRACT_RATE,
+    HORIZON_SLOPE_EXPAND_CAP, HORIZON_SLOPE_EXPAND_RATE, HORIZON_SLOPE_THRESHOLD,
+    MCTS_CONSOLIDATE_CONFIDENCE_SCALE, MCTS_EFFECTIVENESS_CONFIDENCE_SCALE, MCTS_EFFECTIVENESS_EMA,
+    MCTS_EFFECTIVENESS_EXPLORE_SCALE, MCTS_EFFECTIVENESS_HIGH, MCTS_EFFECTIVENESS_LOW,
+    MCTS_EXPLOIT_LR_SCALE, MCTS_EXPLORE_SCALE, MCTS_PLAN_CONFIDENCE_THRESHOLD,
+    MCTS_PLAN_WEIGHT_SCALE, MEMORY_RECALL_TOP_K, PE_VARIANCE_DAMPEN_SCALE, PE_VARIANCE_MAX_EFFECT,
+    PE_VARIANCE_THRESHOLD, POLICY_FULL_AGREEMENT_BOOST, POLICY_MIN_WINDOW, POLICY_SOFT_THRESHOLD,
+    POLICY_TEMP_BASE, POLICY_TEMP_RANGE, POLICY_WINDOW_SIZE, PREDICTION_HORIZON_MAX_SCALE,
     PREDICTION_HORIZON_MIN_SCALE, PREDICTIVE_BUDGET_GATING_RATIO, QUANTUM_COHERENCE_BOOST_SCALE,
     QUANTUM_COHERENCE_THRESHOLD, RESONANCE_TAU_CENTER, RESONANCE_TAU_SCALE,
     RESONATOR_CONSOLIDATION_THRESHOLD, RESONATOR_ERROR_CONFIDENCE_DAMPEN,
@@ -86,9 +88,6 @@ use super::thresholds::{
     TRANSITION_COST_MAX_EFFECT, TRANSITION_COST_STRENGTH_SCALE, TRANSITION_COST_THRESHOLD,
     WM_MISMATCH_CONFIDENCE_SCALE, WM_MISMATCH_LR_SCALE, WORLD_MODEL_SPONGINESS_THRESHOLD,
     WORLD_MODEL_SPONGY_LR_SCALE, WORLD_MODEL_STIFFNESS_LR_SCALE, WORLD_MODEL_STIFFNESS_THRESHOLD,
-    COHERENCE_VELOCITY_BUDGET_CONTRACT, COHERENCE_VELOCITY_BUDGET_EXPAND,
-    COHERENCE_VELOCITY_BUDGET_THRESHOLD, HOMEOSTASIS_NEUROMOD_STEP,
-    HOMEOSTASIS_RECALIBRATE_HIGH, HOMEOSTASIS_RECALIBRATE_LOW,
 };
 #[cfg(feature = "vision-manifold")]
 use super::thresholds::{
@@ -392,7 +391,8 @@ impl CognitiveLoopService {
             // If >80% of recent cycles had low error, give an additional confidence nudge.
             // Science: Bar (2009) — consistent prediction accuracy signals reliable model.
             if self.stats.total_cycles > 20
-                && self.stats.resonator_error_exploration_count > (self.stats.total_cycles / 2) as u64
+                && self.stats.resonator_error_exploration_count
+                    > (self.stats.total_cycles / 2) as u64
             {
                 self.adjust_confidence("resonator_sustained_low", 0.005);
             }
@@ -614,13 +614,10 @@ impl CognitiveLoopService {
         // EMA smooth (alpha=0.2), clamped to [0.5, 1.5] to prevent unbounded drift.
         // Session 15 Item 6: Clamp homeostasis efficiency.
         // Science: Cannon (1929) — regulation has bounded operating range.
-        self.carryover.quality.homeostasis_efficiency = (self
-            .carryover
-            .quality
-            .homeostasis_efficiency
-            * (1.0 - HOMEOSTASIS_EFFICIENCY_EMA)
-            + cycle_efficiency * HOMEOSTASIS_EFFICIENCY_EMA)
-            .clamp(0.5, 1.5);
+        self.carryover.quality.homeostasis_efficiency =
+            (self.carryover.quality.homeostasis_efficiency * (1.0 - HOMEOSTASIS_EFFICIENCY_EMA)
+                + cycle_efficiency * HOMEOSTASIS_EFFICIENCY_EMA)
+                .clamp(0.5, 1.5);
 
         // High transition cost → strengthen homeostasis to resist unnecessary mode changes.
         // Kelso (1995): costly transitions increase the system's tendency to stay in current attractor.
@@ -1645,6 +1642,35 @@ impl CognitiveLoopService {
         let mut reasoning_plan_confidence: f32 = 0.0;
         #[allow(unused_mut)]
         let mut reasoning_narrative: Option<String> = None;
+        // Reasoning engine internal diagnostics (populated when feature enabled).
+        #[allow(unused_mut)]
+        let mut re_phi_eff_raw: f32 = 0.0;
+        #[allow(unused_mut)]
+        let mut re_phi_eff: f32 = 0.0;
+        #[allow(unused_mut)]
+        let mut re_epistemic_mod: f32 = 0.0;
+        #[allow(unused_mut)]
+        let mut re_gamma: f32 = 0.0;
+        #[allow(unused_mut)]
+        let mut re_reliability: f32 = 0.0;
+        #[allow(unused_mut)]
+        let mut re_budget_consumed: f32 = 0.0;
+        #[allow(unused_mut)]
+        let mut re_wall_time_us: u64 = 0;
+        #[allow(unused_mut)]
+        let mut re_steps_taken: u32 = 0;
+        #[allow(unused_mut)]
+        let mut re_tier_reached: u32 = 0;
+        #[allow(unused_mut)]
+        let mut re_gate_checks: u32 = 0;
+        #[allow(unused_mut)]
+        let mut re_budget_exceeded: bool = false;
+        #[allow(unused_mut)]
+        let mut re_evs: f32 = 0.0;
+        #[allow(unused_mut)]
+        let mut re_mcts_iterations: u32 = 0;
+        #[allow(unused_mut)]
+        let mut re_did_simulate: bool = false;
         // Used by reasoning_engine gate below; suppress warning when feature is off.
         #[allow(unused_variables)]
         let substrate_degraded = self.substrate_manager.should_degrade_consciousness();
@@ -1726,6 +1752,7 @@ impl CognitiveLoopService {
                     recent_utility: 0.5,
                     cycle_id: self.stats.total_cycles as u64,
                     neuromod_exploration_mod: self.neuromod.bath.mcts_exploration_modulation(),
+                    epistemic_quality: 0.5, // default neutral; wired when epistemic tiers active
                 };
 
                 let reasoning_result = reasoning_engine.reason(&reasoning_ctx);
@@ -1756,14 +1783,51 @@ impl CognitiveLoopService {
 
                 reasoning_narrative = reasoning_result.narrative.clone();
 
+                // Populate internal reasoning engine diagnostics.
+                re_phi_eff_raw = reasoning_result.phi_eff_raw as f32;
+                re_phi_eff = reasoning_result.phi_eff as f32;
+                re_epistemic_mod = reasoning_result.epistemic_mod as f32;
+                re_gamma = reasoning_result.gamma as f32;
+                re_reliability = reasoning_result.reliability as f32;
+                re_wall_time_us = reasoning_result.wall_time_us;
+                re_budget_exceeded = reasoning_result.budget_exceeded;
+                re_gate_checks = reasoning_result.gate_checks;
+                re_evs = reasoning_result.evs as f32;
+                // Derive tier_reached from BudgetTier enum.
+                use crate::consciousness::temporal_planning::types::BudgetTier as BT;
+                re_tier_reached = match reasoning_result.tier {
+                    BT::Tier0 => 0,
+                    BT::Tier1 => 1,
+                    BT::Tier2 => 2,
+                };
+                // Steps: Tier0=2(detect+assess), Tier1=+3(decide+plan+gate), Tier2=+2(analyze+narrative)
+                re_steps_taken = match reasoning_result.tier {
+                    BT::Tier0 => 3, // detect + assess + gate
+                    BT::Tier1 => 5, // + decide + plan
+                    BT::Tier2 => 7, // + analyze + narrative
+                };
+                // Budget consumed: wall_time / available_budget.
+                if available_us > 0 {
+                    re_budget_consumed =
+                        (reasoning_result.wall_time_us as f32 / available_us as f32).min(1.0);
+                }
+                // MCTS iterations from plan.
+                if let Some(ref plan) = reasoning_result.plan {
+                    re_mcts_iterations = plan.iterations;
+                    re_did_simulate = plan.did_plan;
+                }
+
                 tracing::debug!(
                     tier = ?reasoning_result.tier,
                     phi_eff = reasoning_result.phi_eff,
+                    phi_eff_raw = reasoning_result.phi_eff_raw,
+                    epistemic_mod = reasoning_result.epistemic_mod,
                     reliability = reasoning_result.reliability,
                     gate_blocked = reasoning_gate_blocked,
                     plan_confidence = reasoning_plan_confidence,
                     wall_time_us = reasoning_result.wall_time_us,
                     budget_exceeded = reasoning_result.budget_exceeded,
+                    gate_checks = reasoning_result.gate_checks,
                     "Reasoning engine cycle"
                 );
             }
@@ -2404,6 +2468,20 @@ impl CognitiveLoopService {
                 mcts_plan_effectiveness,
                 causal_attention_edges,
                 school_predicted_phi_gain,
+                re_phi_eff_raw,
+                re_phi_eff,
+                re_epistemic_mod,
+                re_gamma,
+                re_reliability,
+                re_budget_consumed,
+                re_wall_time_us,
+                re_steps_taken,
+                re_tier_reached,
+                re_gate_checks,
+                re_budget_exceeded,
+                re_evs,
+                re_mcts_iterations,
+                re_did_simulate,
             },
             attention: DynAttention {
                 attention_budget_exceeded,

@@ -901,9 +901,13 @@ mod tests {
         };
         let mut engine = DreamEngine::<Vec<f32>>::new(config);
         for i in 0..10 {
-            let state: Vec<f32> = (0..64).map(|j| ((i * 7 + j) as f32 / 100.0).sin()).collect();
+            let state: Vec<f32> = (0..64)
+                .map(|j| ((i * 7 + j) as f32 / 100.0).sin())
+                .collect();
             let action: Vec<f32> = (0..32).map(|j| ((i * 3 + j) as f32 / 50.0).cos()).collect();
-            let outcome: Vec<f32> = (0..64).map(|j| ((i * 11 + j) as f32 / 80.0).sin().abs()).collect();
+            let outcome: Vec<f32> = (0..64)
+                .map(|j| ((i * 11 + j) as f32 / 80.0).sin().abs())
+                .collect();
             engine.record(&state, action, &outcome, 0.5 + (i as f32) * 0.05);
         }
         engine.dream_session(5).unwrap();
@@ -941,10 +945,18 @@ mod tests {
         let state = vec![0.5; 64];
         let action = vec![0.2; 32];
         let outcome = engine.simulate_outcome(&state, &action);
-        assert_eq!(outcome.len(), state.len(), "Predicted outcome should match state length");
+        assert_eq!(
+            outcome.len(),
+            state.len(),
+            "Predicted outcome should match state length"
+        );
         // All values should be bounded
         for v in &outcome {
-            assert!(*v >= -1.0 && *v <= 1.0, "Predicted value {} out of bounds", v);
+            assert!(
+                *v >= -1.0 && *v <= 1.0,
+                "Predicted value {} out of bounds",
+                v
+            );
         }
     }
 

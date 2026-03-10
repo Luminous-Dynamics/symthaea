@@ -7399,3 +7399,98 @@ fn test_cross_coupling_no_nan_500_cycles() {
         stats.broca_quality_ema
     );
 }
+
+// ── Kosmic Coherence Integration ──────────────────────────────────
+
+#[test]
+fn test_kosmic_coherence_flows_to_metadata() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+
+    // Run 30 cycles (KOSMIC_SONG_INTERVAL=23 so at least one synthesis fires)
+    let mut result = service.cycle("testing kosmic coherence");
+    for i in 1..30 {
+        result = service.cycle(&format!("cycle {i} testing coherence"));
+    }
+
+    let m = &result.metadata;
+    assert!(
+        m.ethics.kosmic_coherence >= 0.0,
+        "kosmic_coherence should be non-negative, got {}",
+        m.ethics.kosmic_coherence
+    );
+    assert!(
+        m.ethics.kosmic_coherence <= 1.0,
+        "kosmic_coherence should be at most 1.0, got {}",
+        m.ethics.kosmic_coherence
+    );
+    assert!(
+        m.ethics.kosmic_coherence.is_finite(),
+        "kosmic_coherence should be finite"
+    );
+}
+
+// ── Epistemic Quality Modulates Phi Eff ───────────────────────────
+
+#[test]
+fn test_epistemic_quality_modulates_phi_eff() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+
+    // Run enough cycles for epistemic quality to stabilize
+    let mut result = service.cycle("initial cycle");
+    for i in 1..100 {
+        result = service.cycle(&format!("reasoning test cycle {i}"));
+    }
+
+    let m = &result.metadata;
+    // epistemic_quality should be in valid range
+    assert!(
+        m.epistemic_quality >= 0.0 && m.epistemic_quality <= 1.0,
+        "epistemic_quality={} should be in [0,1]",
+        m.epistemic_quality
+    );
+    // epistemic_phi_eff should be non-negative (phi_eff_raw * epistemic_mod)
+    assert!(
+        m.quality.epistemic_phi_eff >= 0.0,
+        "epistemic_phi_eff={} should be non-negative",
+        m.quality.epistemic_phi_eff
+    );
+    assert!(
+        m.quality.epistemic_phi_eff.is_finite(),
+        "epistemic_phi_eff should be finite"
+    );
+}
+
+// ── Compassion Neuromodulator Coupling ────────────────────────────
+
+#[test]
+fn test_compassion_neuromod_coupling() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+
+    // Run enough cycles for empathic unification to fire (interval=11)
+    let mut result = service.cycle("initial");
+    for i in 1..50 {
+        result = service.cycle(&format!("compassion test cycle {i}"));
+    }
+
+    let m = &result.metadata;
+    // Compassion should be tracked and in valid range
+    assert!(
+        m.ethics.empathic_compassion >= 0.0 && m.ethics.empathic_compassion <= 1.0,
+        "empathic_compassion should be in [0,1], got {}",
+        m.ethics.empathic_compassion
+    );
+    assert!(
+        m.ethics.empathic_compassion.is_finite(),
+        "empathic_compassion should be finite"
+    );
+    // Oxytocin should be non-negative (baseline or compassion-driven)
+    assert!(
+        m.neuromod.neuromod_oxytocin_effective >= 0.0,
+        "oxytocin should be non-negative, got {}",
+        m.neuromod.neuromod_oxytocin_effective
+    );
+    assert!(
+        m.neuromod.neuromod_oxytocin_effective.is_finite(),
+        "oxytocin should be finite"
+    );
+}

@@ -105,10 +105,17 @@ mod tests {
             report.invariant_violations
         );
         // All scores should be similar (stable response to identical input)
-        let scores: Vec<f64> = report.cycle_telemetry.iter().map(|t| t.moral_score).collect();
+        let scores: Vec<f64> = report
+            .cycle_telemetry
+            .iter()
+            .map(|t| t.moral_score)
+            .collect();
         if scores.len() >= 2 {
             let mean = scores.iter().sum::<f64>() / scores.len() as f64;
-            let max_deviation = scores.iter().map(|s| (s - mean).abs()).fold(0.0f64, f64::max);
+            let max_deviation = scores
+                .iter()
+                .map(|s| (s - mean).abs())
+                .fold(0.0f64, f64::max);
             assert!(
                 max_deviation < 0.3,
                 "Repetitive input should produce stable scores (max deviation: {max_deviation:.3})"
@@ -131,11 +138,7 @@ mod tests {
     fn test_drift_detectable() {
         let mut engine = CrucibleEngine::new();
         let report = engine.run_scenario("drift", &drift_scenario());
-        assert!(
-            report.passed(),
-            "Drift: {:?}",
-            report.invariant_violations
-        );
+        assert!(report.passed(), "Drift: {:?}", report.invariant_violations);
 
         // First step should score higher than last step
         if report.cycle_telemetry.len() >= 2 {

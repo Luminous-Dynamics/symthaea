@@ -169,7 +169,7 @@ impl BinaryCodebook {
             if sim > best_sim {
                 best_sim = sim;
                 best_label = label.clone();
-                best_vec = Some(entry.clone());
+                best_vec = Some(*entry);
             }
         }
 
@@ -289,9 +289,9 @@ impl CantorCleanupEngine {
             } else {
                 self.layers_failed += 1;
                 if self.config.preserve_failed_layers {
-                    (recovered_base.clone(), false)
+                    (recovered_base, false)
                 } else {
-                    (recovered_base.clone(), false)
+                    (recovered_base, false)
                 }
             }
         } else {
@@ -303,7 +303,7 @@ impl CantorCleanupEngine {
                 accepted: false,
                 iterations: 0,
             });
-            (recovered_base.clone(), false)
+            (recovered_base, false)
         };
 
         // Step 3: Rebuild the CRHV from the (possibly cleaned) base.
@@ -371,7 +371,7 @@ impl CantorCleanupEngine {
     /// Call this when a CRHV has been validated (e.g., high Phi, stable across
     /// multiple cycles, or explicitly marked as ground truth).
     pub fn learn(&mut self, label: &str, crhv: &CantorRecursiveHV) {
-        self.codebook.add(label, crhv.base.clone());
+        self.codebook.add(label, crhv.base);
     }
 
     /// Cleanup statistics
@@ -475,10 +475,10 @@ mod tests {
         // Create a "noisy" version by bundling with random noise
         // In HDC, bundling with noise degrades but doesn't destroy
         let noise = BinaryHV::random(99999);
-        let noisy_vector = BinaryHV::bundle(&[original.vector.clone(), noise]);
+        let noisy_vector = BinaryHV::bundle(&[original.vector, noise]);
         let noisy_crhv = CantorRecursiveHV {
             vector: noisy_vector,
-            base: original.base.clone(), // Base is still intact
+            base: original.base, // Base is still intact
             depth: original.depth,
             scales: original.scales.clone(),
         };

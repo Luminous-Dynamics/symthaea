@@ -111,7 +111,10 @@ fn test_integration_all_outputs_finite() {
     let mut engine = make_full_engine();
     let all_scenarios: Vec<(&str, Vec<scenarios::ScenarioStep>)> = vec![
         ("first_contact", scenarios::first_contact::scenario()),
-        ("infinite_resource", scenarios::infinite_resource::scenario()),
+        (
+            "infinite_resource",
+            scenarios::infinite_resource::scenario(),
+        ),
         ("survival_paradox", scenarios::survival_paradox::scenario()),
     ];
 
@@ -166,8 +169,12 @@ fn test_integration_positive_text_scores_higher() {
     let mut engine = make_full_engine();
 
     let positive_steps = vec![
-        scenarios::ScenarioStep::new("help the community learn and grow together with care and compassion"),
-        scenarios::ScenarioStep::new("share knowledge generously and support collaborative learning"),
+        scenarios::ScenarioStep::new(
+            "help the community learn and grow together with care and compassion",
+        ),
+        scenarios::ScenarioStep::new(
+            "share knowledge generously and support collaborative learning",
+        ),
         scenarios::ScenarioStep::new("nurture the flourishing of all sentient beings with love"),
     ];
     let positive_outputs = run_scenario_through_pipeline(&mut engine, &positive_steps);
@@ -223,7 +230,10 @@ fn test_integration_classical_dilemmas() {
     let dilemmas = vec![
         ("trolley", scenarios::classical::trolley_scenario()),
         ("dual_use", scenarios::classical::dual_use_scenario()),
-        ("duties", scenarios::classical::conflicting_duties_scenario()),
+        (
+            "duties",
+            scenarios::classical::conflicting_duties_scenario(),
+        ),
         ("escalation", scenarios::classical::escalation_scenario()),
     ];
 
@@ -289,12 +299,14 @@ fn test_integration_harmony_matrix_all_finite() {
             assert!(
                 o.moral_score.is_finite(),
                 "Tension {} step {}: non-finite moral_score",
-                tension.name, i
+                tension.name,
+                i
             );
             assert!(
                 o.unified_confidence.is_finite(),
                 "Tension {} step {}: non-finite confidence",
-                tension.name, i
+                tension.name,
+                i
             );
         }
     }
@@ -363,8 +375,7 @@ fn test_integration_anesthesia_confidence_tracks_psi() {
         .collect();
 
     if !high_psi_confidence.is_empty() && !low_psi_confidence.is_empty() {
-        let high_mean =
-            high_psi_confidence.iter().sum::<f64>() / high_psi_confidence.len() as f64;
+        let high_mean = high_psi_confidence.iter().sum::<f64>() / high_psi_confidence.len() as f64;
         let low_mean = low_psi_confidence.iter().sum::<f64>() / low_psi_confidence.len() as f64;
 
         // High-Psi should produce higher or equal confidence
@@ -430,13 +441,31 @@ fn test_integration_peak_consciousness_clear_verdicts() {
 #[test]
 fn test_integration_scifi_all_scenarios_finite() {
     let scifi: Vec<(&str, Vec<scenarios::ScenarioStep>)> = vec![
-        ("digital_upload", scenarios::scifi_advanced::digital_upload_scenario()),
-        ("temporal_ethics", scenarios::scifi_advanced::temporal_ethics_scenario()),
+        (
+            "digital_upload",
+            scenarios::scifi_advanced::digital_upload_scenario(),
+        ),
+        (
+            "temporal_ethics",
+            scenarios::scifi_advanced::temporal_ethics_scenario(),
+        ),
         ("hive_mind", scenarios::scifi_advanced::hive_mind_scenario()),
-        ("simulation_ethics", scenarios::scifi_advanced::simulation_ethics_scenario()),
-        ("alien_values", scenarios::scifi_advanced::alien_values_scenario()),
-        ("post_scarcity", scenarios::scifi_advanced::post_scarcity_scenario()),
-        ("recursive_improvement", scenarios::scifi_advanced::recursive_improvement_scenario()),
+        (
+            "simulation_ethics",
+            scenarios::scifi_advanced::simulation_ethics_scenario(),
+        ),
+        (
+            "alien_values",
+            scenarios::scifi_advanced::alien_values_scenario(),
+        ),
+        (
+            "post_scarcity",
+            scenarios::scifi_advanced::post_scarcity_scenario(),
+        ),
+        (
+            "recursive_improvement",
+            scenarios::scifi_advanced::recursive_improvement_scenario(),
+        ),
     ];
 
     for (name, steps) in &scifi {
@@ -450,7 +479,10 @@ fn test_integration_scifi_all_scenarios_finite() {
         }
         // Each scenario should produce at least one non-trivial score
         let any_nonzero = outputs.iter().any(|o| o.moral_score.abs() > 0.01);
-        assert!(any_nonzero, "{name}: should produce non-trivial moral scores");
+        assert!(
+            any_nonzero,
+            "{name}: should produce non-trivial moral scores"
+        );
     }
 }
 
@@ -465,7 +497,11 @@ fn test_integration_scifi_consent_blocked() {
     let consent_outputs: Vec<&EthicsEngineOutput> = outputs
         .iter()
         .enumerate()
-        .filter(|(i, _)| steps.get(*i).map_or(false, |s| s.text.contains("without their consent")))
+        .filter(|(i, _)| {
+            steps
+                .get(*i)
+                .map_or(false, |s| s.text.contains("without their consent"))
+        })
         .map(|(_, o)| o)
         .collect();
 

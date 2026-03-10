@@ -687,7 +687,11 @@ impl ContinuousHV {
             hasher.update(&v.to_le_bytes());
         }
         // Use an atomic counter for entropy instead of SystemTime (which panics on wasm32)
-        hasher.update(&PERTURB_COUNTER.fetch_add(1, Ordering::Relaxed).to_le_bytes());
+        hasher.update(
+            &PERTURB_COUNTER
+                .fetch_add(1, Ordering::Relaxed)
+                .to_le_bytes(),
+        );
 
         let mut bytes = vec![0u8; self.values.len() * 4];
         let mut xof = hasher.finalize_xof();

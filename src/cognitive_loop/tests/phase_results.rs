@@ -50,6 +50,21 @@ fn dyn_reasoning_default_zeroed() {
     assert_eq!(d.mcts_plan_effectiveness, 0.0);
     assert_eq!(d.causal_attention_edges, 0);
     assert_eq!(d.school_predicted_phi_gain, 0.0);
+    // Internal reasoning engine diagnostics
+    assert_eq!(d.re_phi_eff_raw, 0.0);
+    assert_eq!(d.re_phi_eff, 0.0);
+    assert_eq!(d.re_epistemic_mod, 0.0);
+    assert_eq!(d.re_gamma, 0.0);
+    assert_eq!(d.re_reliability, 0.0);
+    assert_eq!(d.re_budget_consumed, 0.0);
+    assert_eq!(d.re_wall_time_us, 0);
+    assert_eq!(d.re_steps_taken, 0);
+    assert_eq!(d.re_tier_reached, 0);
+    assert_eq!(d.re_gate_checks, 0);
+    assert!(!d.re_budget_exceeded);
+    assert_eq!(d.re_evs, 0.0);
+    assert_eq!(d.re_mcts_iterations, 0);
+    assert!(!d.re_did_simulate);
 }
 
 #[test]
@@ -312,6 +327,7 @@ fn dyn_reasoning_field_count_10() {
         mcts_plan_effectiveness: _,
         causal_attention_edges: _,
         school_predicted_phi_gain: _,
+        ..
     } = d;
 }
 

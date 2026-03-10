@@ -1940,7 +1940,10 @@ mod tests {
         // Verify index matches the graph
         for ((from, to), _) in &graph.causal_graph {
             let targets = graph.from_index.get(from).expect("from_index missing key");
-            assert!(targets.contains(to), "from_index missing target {to} for {from}");
+            assert!(
+                targets.contains(to),
+                "from_index missing target {to} for {from}"
+            );
         }
     }
 

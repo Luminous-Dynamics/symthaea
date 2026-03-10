@@ -2049,6 +2049,165 @@ pub const GOV_REPUTATION_DECLINE_SHT: f32 = -0.02;
 pub const GOV_COLLECTIVE_PHI_ECB: f32 = 0.01;
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// FEP PRAGMATIC VALUE MODULATION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Scale factor for FEP exploitation dampening of exploration.
+/// Basis: Friston (2010) — high pragmatic value → reduce exploration (exploit known policy).
+pub const FEP_PRAGMATIC_EXPLOIT_SCALE: f64 = 0.3;
+
+/// Scale factor for FEP exploration boost when pragmatic value is low.
+/// Basis: Friston (2010) — low pragmatic value → explore for better policies.
+pub const FEP_PRAGMATIC_EXPLORE_SCALE: f64 = 0.15;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CAUSAL GRAPH CONFIDENCE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Confidence threshold for dense causal graph (>5 edges) → confidence boost.
+/// Basis: Pearl (2000) — rich causal structure supports strong inference.
+pub const CAUSAL_CONFIDENCE_DENSE_THRESHOLD: f32 = 0.5;
+
+/// Confidence boost scale for dense causal graph.
+pub const CAUSAL_DENSE_CONFIDENCE_SCALE: f32 = 0.03;
+
+/// Confidence threshold for emerging causal graph (3-5 edges) → small confidence boost.
+/// Basis: Pearl (2000) — partial causal knowledge still informative.
+pub const CAUSAL_CONFIDENCE_MODERATE_THRESHOLD: f32 = 0.4;
+
+/// Confidence boost scale for emerging causal graph.
+pub const CAUSAL_MODERATE_CONFIDENCE_SCALE: f32 = 0.01;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PIPELINE CONSCIOUSNESS GATING
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Pipeline consciousness above this → relax epistemic caution (system is integrated).
+/// Basis: Dehaene (2014) — global workspace ignition requires integrated processing.
+pub const PIPELINE_CONSCIOUSNESS_HIGH_THRESHOLD: f32 = 0.7;
+
+/// Pipeline consciousness below this → tighten caution (subsystems aren't coherent).
+pub const PIPELINE_CONSCIOUSNESS_LOW_THRESHOLD: f32 = 0.3;
+
+/// Threshold scaling for relaxed pipeline consciousness (multiplicative, <1 = relax).
+pub const PIPELINE_CONSCIOUSNESS_RELAX_SCALE: f32 = 0.97;
+
+/// Threshold scaling for cautious pipeline consciousness (multiplicative, >1 = tighten).
+pub const PIPELINE_CONSCIOUSNESS_CAUTION_SCALE: f32 = 1.03;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CONFIDENCE VELOCITY
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Positive confidence velocity threshold for exploration dampening.
+/// Basis: Daw et al. (2006) — confidence trajectory gates explore/exploit trade-off.
+pub const CONFIDENCE_VELOCITY_POSITIVE_THRESHOLD: f32 = 0.02;
+
+/// Scale factor for exploration dampening on rising confidence.
+pub const CONFIDENCE_VELOCITY_DAMPEN_SCALE: f32 = 0.1;
+
+/// Negative confidence velocity threshold for LR boost.
+/// Basis: Cools et al. (2008) — confidence collapse → serotonergic recalibration.
+pub const CONFIDENCE_VELOCITY_NEGATIVE_THRESHOLD: f32 = -0.05;
+
+/// Scale factor for LR boost on falling confidence.
+pub const CONFIDENCE_VELOCITY_BOOST_SCALE: f32 = 0.3;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SLEEP PRESSURE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Sleep pressure above this dampens learning rate.
+/// Basis: Vyazovskiy (2011) — sleep pressure reduces synaptic potentiation capacity.
+pub const SLEEP_PRESSURE_LR_THRESHOLD: f32 = 0.7;
+
+/// Scale factor for sleep pressure LR dampening.
+pub const SLEEP_PRESSURE_LR_DAMPEN_SCALE: f32 = 0.5;
+
+/// Minimum LR factor under maximal sleep pressure.
+pub const SLEEP_PRESSURE_LR_FACTOR_MIN: f32 = 0.5;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// EPISTEMIC PHI COUPLING
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Epistemic Phi below this → dampen confidence (low epistemic quality).
+/// Basis: Tononi (2004) — low Phi signals poor information integration.
+pub const EPISTEMIC_PHI_LOW_THRESHOLD: f64 = 0.2;
+
+/// Confidence scale when epistemic Phi is below threshold.
+pub const EPISTEMIC_PHI_LOW_CONFIDENCE_SCALE: f32 = 0.96;
+
+/// Epistemic Phi above this → boost confidence (strong epistemic coherence).
+/// Basis: IIT — high integration = reliable information structure.
+pub const EPISTEMIC_PHI_HIGH_THRESHOLD: f64 = 0.5;
+
+/// Confidence boost scale for high epistemic Phi.
+pub const EPISTEMIC_PHI_HIGH_CONFIDENCE_SCALE: f32 = 0.008;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PHENOMENAL BINDING STRENGTH
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Low phenomenal binding → boost exploration (unbound = incoherent representation).
+/// Basis: Treisman (1996) — weak binding → search for better feature conjunctions.
+pub const PHENOMENAL_BINDING_LOW_THRESHOLD: f64 = 0.3;
+
+/// Exploration boost when phenomenal binding is low.
+pub const PHENOMENAL_BINDING_LOW_EXPLORE_BOOST: f32 = 0.015;
+
+/// High phenomenal binding → dampen LR (stable binding, consolidate).
+/// Basis: Engel & Singer (2001) — strong synchrony-based binding supports stable representations.
+pub const PHENOMENAL_BINDING_HIGH_THRESHOLD: f64 = 0.7;
+
+/// LR dampening scale when phenomenal binding is high.
+pub const PHENOMENAL_BINDING_HIGH_LR_DAMPEN: f32 = 0.97;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TEMPORAL COHERENCE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// High temporal coherence → boost confidence (predictable temporal flow).
+/// Basis: Howard & Kahana (2002) — temporal context stability supports encoding reliability.
+pub const TEMPORAL_COHERENCE_HIGH_THRESHOLD: f64 = 0.6;
+
+/// Confidence boost per unit above temporal coherence threshold.
+pub const TEMPORAL_COHERENCE_CONFIDENCE_SCALE: f32 = 0.006;
+
+/// Low temporal coherence → boost exploration (temporal fragmentation = search for patterns).
+/// Basis: Howard & Kahana (2002) — fragmented temporal context degrades retrieval.
+pub const TEMPORAL_COHERENCE_LOW_THRESHOLD: f64 = 0.2;
+
+/// Exploration boost when temporal coherence is low.
+pub const TEMPORAL_COHERENCE_LOW_EXPLORE_BOOST: f32 = 0.01;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// HOLOGRAPHIC UNITY
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Low holographic unity → dampen LR (system decomposing, learning unreliable).
+/// Basis: Pribram (1991) — holographic storage depends on global coherence;
+/// local learning during decomposition risks interference.
+pub const HOLOGRAPHIC_UNITY_LOW_THRESHOLD: f64 = 0.3;
+
+/// LR dampening factor when holographic unity is low.
+pub const HOLOGRAPHIC_UNITY_LOW_LR_DAMPEN: f32 = 0.93;
+
+/// High holographic unity → boost confidence (globally integrated representation).
+pub const HOLOGRAPHIC_UNITY_HIGH_THRESHOLD: f64 = 0.7;
+
+/// Confidence boost scale for high holographic unity.
+pub const HOLOGRAPHIC_UNITY_HIGH_CONFIDENCE_SCALE: f32 = 0.005;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// EPISTEMIC CONFLICT
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Per-conflict exploration boost scale.
+/// Basis: Berlyne (1960) — epistemic curiosity arises from conflicting beliefs.
+pub const EPISTEMIC_CONFLICT_EXPLORE_SCALE: f32 = 0.015;
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // TESTS
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -2516,7 +2675,9 @@ mod tests {
     #[test]
     fn test_mce_bottleneck_params() {
         assert!(MCE_BOTTLENECK_LR_BOOST > 1.0 && MCE_BOTTLENECK_LR_BOOST < 1.5);
-        assert!(MCE_NON_BOTTLENECK_CONFIDENCE_BOOST > 0.0 && MCE_NON_BOTTLENECK_CONFIDENCE_BOOST < 0.05);
+        assert!(
+            MCE_NON_BOTTLENECK_CONFIDENCE_BOOST > 0.0 && MCE_NON_BOTTLENECK_CONFIDENCE_BOOST < 0.05
+        );
     }
 
     #[test]
@@ -2528,8 +2689,14 @@ mod tests {
     #[test]
     fn test_coherence_velocity_budget_params() {
         assert!(COHERENCE_VELOCITY_BUDGET_THRESHOLD > 0.0);
-        assert!(COHERENCE_VELOCITY_BUDGET_CONTRACT < 1.0, "Contract must reduce budget");
-        assert!(COHERENCE_VELOCITY_BUDGET_EXPAND > 1.0, "Expand must increase budget");
+        assert!(
+            COHERENCE_VELOCITY_BUDGET_CONTRACT < 1.0,
+            "Contract must reduce budget"
+        );
+        assert!(
+            COHERENCE_VELOCITY_BUDGET_EXPAND > 1.0,
+            "Expand must increase budget"
+        );
     }
 
     #[test]
@@ -2546,7 +2713,10 @@ mod tests {
         assert!(EQ_V2_WORKSPACE_CONFIDENCE_BOOST > 0.0);
         assert!(EQ_V2_INTEGRATION_CONFIDENCE_BOOST > 0.0);
         assert!(EQ_V2_KNOWLEDGE_EXPLORATION_BOOST > 0.0);
-        assert!(EQ_V2_RECURSION_LR_SCALE > 1.0, "Recursion LR scale must boost");
+        assert!(
+            EQ_V2_RECURSION_LR_SCALE > 1.0,
+            "Recursion LR scale must boost"
+        );
         // Confidence boosts should be moderate (not >0.1 per cycle)
         assert!(EQ_V2_WORKSPACE_CONFIDENCE_BOOST < 0.1);
         assert!(EQ_V2_INTEGRATION_CONFIDENCE_BOOST < 0.1);
@@ -2557,8 +2727,14 @@ mod tests {
     #[test]
     fn test_temporal_chain_depth_params() {
         assert!(TEMPORAL_CHAIN_SHALLOW_THRESHOLD < TEMPORAL_CHAIN_DEEP_THRESHOLD);
-        assert!(TEMPORAL_CHAIN_DEEP_LR_SCALE < 1.0, "Deep chains should dampen LR");
-        assert!(TEMPORAL_CHAIN_SHALLOW_LR_SCALE > 1.0, "Shallow chains should boost LR");
+        assert!(
+            TEMPORAL_CHAIN_DEEP_LR_SCALE < 1.0,
+            "Deep chains should dampen LR"
+        );
+        assert!(
+            TEMPORAL_CHAIN_SHALLOW_LR_SCALE > 1.0,
+            "Shallow chains should boost LR"
+        );
     }
 
     #[test]
@@ -2573,8 +2749,14 @@ mod tests {
     fn test_affective_consciousness_params() {
         // Arousal: high > low, both in [0,1]
         assert!(AFFECT_AROUSAL_HIGH_THRESHOLD > AFFECT_AROUSAL_LOW_THRESHOLD);
-        assert!(AFFECT_AROUSAL_HIGH_LR_SCALE > 1.0, "High arousal should boost LR");
-        assert!(AFFECT_AROUSAL_LOW_EXPLORE_DAMPEN < 1.0, "Low arousal should dampen exploration");
+        assert!(
+            AFFECT_AROUSAL_HIGH_LR_SCALE > 1.0,
+            "High arousal should boost LR"
+        );
+        assert!(
+            AFFECT_AROUSAL_LOW_EXPLORE_DAMPEN < 1.0,
+            "Low arousal should dampen exploration"
+        );
         // Valence: negative < 0 < positive
         assert!(AFFECT_VALENCE_NEGATIVE_THRESHOLD < 0.0);
         assert!(AFFECT_VALENCE_POSITIVE_THRESHOLD > 0.0);
@@ -2615,7 +2797,86 @@ mod tests {
         assert!(EMBODIED_AGENCY_CAUTION_FLOOR > 0.0 && EMBODIED_AGENCY_CAUTION_FLOOR < 1.0);
         assert!(HOMEOSTATIC_DEVIATION_THRESHOLD > 0.0);
         assert!(SENSORIMOTOR_SURPRISE_THRESHOLD > 0.0);
-        assert!(ALLOSTATIC_LOAD_DANGER_THRESHOLD > 0.5, "Allostatic load danger should be high");
+        assert!(
+            ALLOSTATIC_LOAD_DANGER_THRESHOLD > 0.5,
+            "Allostatic load danger should be high"
+        );
         assert!(ALLOSTATIC_LOAD_LR_DAMPEN > 0.0 && ALLOSTATIC_LOAD_LR_DAMPEN < 1.0);
+    }
+
+    #[test]
+    fn test_fep_pragmatic_scales() {
+        assert!(FEP_PRAGMATIC_EXPLOIT_SCALE > 0.0 && FEP_PRAGMATIC_EXPLOIT_SCALE < 1.0);
+        assert!(FEP_PRAGMATIC_EXPLORE_SCALE > 0.0 && FEP_PRAGMATIC_EXPLORE_SCALE < 1.0);
+        assert!(
+            FEP_PRAGMATIC_EXPLOIT_SCALE > FEP_PRAGMATIC_EXPLORE_SCALE,
+            "Exploitation should scale more aggressively than exploration"
+        );
+    }
+
+    #[test]
+    fn test_causal_graph_confidence_params() {
+        assert!(
+            CAUSAL_CONFIDENCE_MODERATE_THRESHOLD < CAUSAL_CONFIDENCE_DENSE_THRESHOLD,
+            "Moderate ({}) must be < dense ({})",
+            CAUSAL_CONFIDENCE_MODERATE_THRESHOLD,
+            CAUSAL_CONFIDENCE_DENSE_THRESHOLD
+        );
+        assert!(CAUSAL_DENSE_CONFIDENCE_SCALE > 0.0);
+        assert!(CAUSAL_MODERATE_CONFIDENCE_SCALE > 0.0);
+        assert!(
+            CAUSAL_DENSE_CONFIDENCE_SCALE > CAUSAL_MODERATE_CONFIDENCE_SCALE,
+            "Dense graph should boost confidence more than moderate"
+        );
+    }
+
+    #[test]
+    fn test_pipeline_consciousness_params() {
+        assert!(PIPELINE_CONSCIOUSNESS_LOW_THRESHOLD < PIPELINE_CONSCIOUSNESS_HIGH_THRESHOLD);
+        assert!(PIPELINE_CONSCIOUSNESS_RELAX_SCALE < 1.0, "Relax must reduce threshold");
+        assert!(PIPELINE_CONSCIOUSNESS_CAUTION_SCALE > 1.0, "Caution must increase threshold");
+    }
+
+    #[test]
+    fn test_confidence_velocity_params() {
+        assert!(CONFIDENCE_VELOCITY_POSITIVE_THRESHOLD > 0.0);
+        assert!(CONFIDENCE_VELOCITY_NEGATIVE_THRESHOLD < 0.0);
+        assert!(CONFIDENCE_VELOCITY_DAMPEN_SCALE > 0.0);
+        assert!(CONFIDENCE_VELOCITY_BOOST_SCALE > 0.0);
+    }
+
+    #[test]
+    fn test_sleep_pressure_params() {
+        assert!(SLEEP_PRESSURE_LR_THRESHOLD > 0.5, "Sleep pressure threshold should be high");
+        assert!(SLEEP_PRESSURE_LR_DAMPEN_SCALE > 0.0 && SLEEP_PRESSURE_LR_DAMPEN_SCALE < 1.0);
+        assert!(SLEEP_PRESSURE_LR_FACTOR_MIN > 0.0 && SLEEP_PRESSURE_LR_FACTOR_MIN < 1.0);
+    }
+
+    #[test]
+    fn test_epistemic_phi_params() {
+        assert!(EPISTEMIC_PHI_LOW_THRESHOLD < EPISTEMIC_PHI_HIGH_THRESHOLD);
+        assert!(EPISTEMIC_PHI_LOW_CONFIDENCE_SCALE < 1.0, "Low phi must dampen confidence");
+        assert!(EPISTEMIC_PHI_HIGH_CONFIDENCE_SCALE > 0.0);
+    }
+
+    #[test]
+    fn test_phenomenal_binding_params() {
+        assert!(PHENOMENAL_BINDING_LOW_THRESHOLD < PHENOMENAL_BINDING_HIGH_THRESHOLD);
+        assert!(PHENOMENAL_BINDING_LOW_EXPLORE_BOOST > 0.0);
+        assert!(PHENOMENAL_BINDING_HIGH_LR_DAMPEN < 1.0, "High binding must dampen LR");
+    }
+
+    #[test]
+    fn test_temporal_coherence_params() {
+        assert!(TEMPORAL_COHERENCE_LOW_THRESHOLD < TEMPORAL_COHERENCE_HIGH_THRESHOLD);
+        assert!(TEMPORAL_COHERENCE_CONFIDENCE_SCALE > 0.0);
+        assert!(TEMPORAL_COHERENCE_LOW_EXPLORE_BOOST > 0.0);
+    }
+
+    #[test]
+    fn test_holographic_unity_params() {
+        assert!(HOLOGRAPHIC_UNITY_LOW_THRESHOLD < HOLOGRAPHIC_UNITY_HIGH_THRESHOLD);
+        assert!(HOLOGRAPHIC_UNITY_LOW_LR_DAMPEN < 1.0, "Low unity must dampen LR");
+        assert!(HOLOGRAPHIC_UNITY_HIGH_CONFIDENCE_SCALE > 0.0);
     }
 }

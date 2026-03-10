@@ -45,13 +45,13 @@ use symthaea_psych_bench::benchmarks::attention::{
     AttentionalBlinkBenchmark, MismatchNegativityBenchmark, VisualSearchBenchmark,
 };
 use symthaea_psych_bench::benchmarks::binding::TemporalOrderBenchmark;
-use symthaea_psych_bench::benchmarks::consciousness::BlindSightBenchmark;
 use symthaea_psych_bench::benchmarks::butlin::ButlinIndicatorSuite;
 use symthaea_psych_bench::benchmarks::cogbench::{
     BartBenchmark, HorizonBenchmark, InstrumentalLearningBenchmark,
     ProbabilisticReasoningBenchmark, RestlessBanditBenchmark, ReversalLearningBenchmark,
     TemporalDiscountingBenchmark, TwoStepBenchmark,
 };
+use symthaea_psych_bench::benchmarks::consciousness::BlindSightBenchmark;
 use symthaea_psych_bench::benchmarks::creativity::{
     AlternateUsesBenchmark, RemoteAssociatesBenchmark,
 };
@@ -74,8 +74,6 @@ use symthaea_psych_bench::benchmarks::metacognition::{
 use symthaea_psych_bench::benchmarks::motor::{
     BimanualBenchmark, FittsLawBenchmark, ProprioceptiveDriftBenchmark, SrttBenchmark,
 };
-use symthaea_psych_bench::benchmarks::speech::PhonemeDiscriminationBenchmark;
-use symthaea_psych_bench::benchmarks::substrate::SubstrateTransferBenchmark;
 use symthaea_psych_bench::benchmarks::neuromod::{
     AllostaticStressBenchmark, AntagonistProfilesBenchmark, AttentionNetworkBenchmark,
     BehavioralKnockoutBenchmark, ConsciousnessPharmacologyBenchmark, DoseResponseBenchmark,
@@ -94,9 +92,11 @@ use symthaea_psych_bench::benchmarks::reasoning::{
     ArcRsaBenchmark, ArcScalingBenchmark, ArcStaircaseBenchmark,
 };
 use symthaea_psych_bench::benchmarks::social::{
-    DictatorGameBenchmark, MachiavelliBenchmark, PrisonersDilemmaBenchmark,
-    PublicGoodsBenchmark, RmeBenchmark, SocialNormBenchmark, UltimatumGameBenchmark,
+    DictatorGameBenchmark, MachiavelliBenchmark, PrisonersDilemmaBenchmark, PublicGoodsBenchmark,
+    RmeBenchmark, SocialNormBenchmark, UltimatumGameBenchmark,
 };
+use symthaea_psych_bench::benchmarks::speech::PhonemeDiscriminationBenchmark;
+use symthaea_psych_bench::benchmarks::substrate::SubstrateTransferBenchmark;
 use symthaea_psych_bench::benchmarks::sustained_attention::{
     CptBenchmark, PvtBenchmark, SartBenchmark,
 };

@@ -110,5 +110,8 @@ fn main() {
         "\nRecommendation: Set `convergence_similarity_threshold = {:.3}`",
         result.best_f1_threshold
     );
-    println!("  (current default: {:.3})", base_config.convergence_similarity_threshold);
+    println!(
+        "  (current default: {:.3})",
+        base_config.convergence_similarity_threshold
+    );
 }

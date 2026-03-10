@@ -64,7 +64,8 @@ impl CognitiveLoopService {
             } else if ema < CONSCIOUSNESS_EMA_LOW_THRESHOLD && ema > 0.0 {
                 self.stats.adaptive_learning_rate *= CONSCIOUSNESS_EMA_LR_DAMPEN;
             }
-            self.stats.adaptive_learning_rate = self.stats.adaptive_learning_rate.clamp(0.0001, 0.1);
+            self.stats.adaptive_learning_rate =
+                self.stats.adaptive_learning_rate.clamp(0.0001, 0.1);
         }
 
         // Snapshot exploration_urge for end-of-cycle budget clamping (Task B)

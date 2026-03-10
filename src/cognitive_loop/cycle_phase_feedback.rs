@@ -30,6 +30,8 @@ use super::thresholds::{
     EVOLUTION_PHI_THRESHOLD, EVOLUTION_POSITIVE_CONFIDENCE_MAX,
     EVOLUTION_POSITIVE_CONFIDENCE_SCALE, HARMONIC_ALL_CLEAR_BOOST, HARMONIC_INTERFERENCE_DAMPEN,
     HARMONIC_INTERFERENCE_MAX_COUNT, HARMONIC_INTERFERENCE_MAX_DAMPEN,
+    KOSMIC_HIGH_COHERENCE_CONFIDENCE_BOOST, KOSMIC_HIGH_COHERENCE_THRESHOLD,
+    KOSMIC_LOW_COHERENCE_EXPLORATION_DAMPEN, KOSMIC_LOW_COHERENCE_THRESHOLD, KOSMIC_SONG_INTERVAL,
     LOVE_RESONANCE_CONFIDENCE_SCALE, LOVE_RESONANCE_LR_FRACTION, LOVE_RESONANCE_THRESHOLD,
     LOW_QUALITY_EXPLORATION_DAMPEN, PHI_DIVERGENCE_MAX, PHI_DIVERGENCE_SCALE,
     PHI_DIVERGENCE_THRESHOLD, PHI_RELATIONAL_OXY_SCALE, PHI_RELATIONAL_OXY_THRESHOLD,
@@ -39,14 +41,11 @@ use super::thresholds::{
     SOCIAL_LR_BASE, SOCIAL_LR_RANGE, SPEECH_RATE_CLAMP_MAX, SPEECH_RATE_CLAMP_MIN,
     STRUCTURAL_BOTTLENECK_LR_SCALE, STRUCTURAL_BOTTLENECK_THRESHOLD,
     STRUCTURAL_EMERGENCE_CONFIDENCE_BOOST, STRUCTURAL_EMERGENCE_CONFIDENCE_THRESHOLD,
-    TEMPORAL_CHAIN_DEEP_LR_SCALE, TEMPORAL_CHAIN_DEEP_THRESHOLD,
-    TEMPORAL_CHAIN_SHALLOW_LR_SCALE, TEMPORAL_CHAIN_SHALLOW_THRESHOLD,
-    SUBSYSTEM_LR_FACTOR_MAX, SUBSYSTEM_LR_FACTOR_MIN, TOM_ACCURACY_HIGH, TOM_ACCURACY_LOW,
-    TOM_ACCURACY_SCALE, TRUST_DECAY_FACTOR, TRUST_SIGNAL_MIDPOINT, TRUST_SIGNAL_RATE,
-    UNIFIED_QUALITY_AGREEMENT_WEIGHT, UNIFIED_QUALITY_ANOMALY_WEIGHT,
-    UNIFIED_QUALITY_PREDICTION_WEIGHT,
-    KOSMIC_SONG_INTERVAL, KOSMIC_LOW_COHERENCE_THRESHOLD, KOSMIC_LOW_COHERENCE_EXPLORATION_DAMPEN,
-    KOSMIC_HIGH_COHERENCE_THRESHOLD, KOSMIC_HIGH_COHERENCE_CONFIDENCE_BOOST,
+    SUBSYSTEM_LR_FACTOR_MAX, SUBSYSTEM_LR_FACTOR_MIN, TEMPORAL_CHAIN_DEEP_LR_SCALE,
+    TEMPORAL_CHAIN_DEEP_THRESHOLD, TEMPORAL_CHAIN_SHALLOW_LR_SCALE,
+    TEMPORAL_CHAIN_SHALLOW_THRESHOLD, TOM_ACCURACY_HIGH, TOM_ACCURACY_LOW, TOM_ACCURACY_SCALE,
+    TRUST_DECAY_FACTOR, TRUST_SIGNAL_MIDPOINT, TRUST_SIGNAL_RATE, UNIFIED_QUALITY_AGREEMENT_WEIGHT,
+    UNIFIED_QUALITY_ANOMALY_WEIGHT, UNIFIED_QUALITY_PREDICTION_WEIGHT,
 };
 use super::{CognitiveLoopService, CycleState};
 
@@ -132,18 +131,12 @@ impl CognitiveLoopService {
         if temporal_max_chain_length >= TEMPORAL_CHAIN_DEEP_THRESHOLD
             && self.stats.total_cycles > 15
         {
-            self.scale_lr(
-                "deep_causal_chain",
-                TEMPORAL_CHAIN_DEEP_LR_SCALE,
-            );
+            self.scale_lr("deep_causal_chain", TEMPORAL_CHAIN_DEEP_LR_SCALE);
         } else if temporal_max_chain_length > 0
             && temporal_max_chain_length <= TEMPORAL_CHAIN_SHALLOW_THRESHOLD
             && self.stats.total_cycles > 15
         {
-            self.scale_lr(
-                "shallow_causal_chain",
-                TEMPORAL_CHAIN_SHALLOW_LR_SCALE,
-            );
+            self.scale_lr("shallow_causal_chain", TEMPORAL_CHAIN_SHALLOW_LR_SCALE);
         }
 
         let value_embeddings_created = consciousness_metrics.value_embeddings_created;
@@ -407,16 +400,23 @@ impl CognitiveLoopService {
         // Low pipeline consciousness → tighten caution (subsystems aren't coherent).
         // Science: Dehaene (2014) — global workspace ignition requires integrated processing.
         self.carryover.quality.last_pipeline_consciousness = pipeline_consciousness;
-        let _pipeline_consciousness_gated = if pipeline_consciousness > 0.7
+        let _pipeline_consciousness_gated = if pipeline_consciousness
+            > PIPELINE_CONSCIOUSNESS_HIGH_THRESHOLD
             && self.stats.total_cycles > 15
         {
-            self.scale_threshold("pipeline_conscious_relax", 0.97);
+            self.scale_threshold(
+                "pipeline_conscious_relax",
+                PIPELINE_CONSCIOUSNESS_RELAX_SCALE,
+            );
             true
-        } else if pipeline_consciousness < 0.3
+        } else if pipeline_consciousness < PIPELINE_CONSCIOUSNESS_LOW_THRESHOLD
             && pipeline_consciousness > 0.0
             && self.stats.total_cycles > 15
         {
-            self.scale_threshold("pipeline_conscious_caution", 1.03);
+            self.scale_threshold(
+                "pipeline_conscious_caution",
+                PIPELINE_CONSCIOUSNESS_CAUTION_SCALE,
+            );
             true
         } else {
             false
@@ -695,8 +695,7 @@ impl CognitiveLoopService {
                     .as_ref()
                     .map(|mc| {
                         let normalized_depth = mc.depth() as f64 / 3.0;
-                        normalized_depth
-                            * self.substrate_manager.hot_capability(&self.config)
+                        normalized_depth * self.substrate_manager.hot_capability(&self.config)
                     })
                     .unwrap_or(0.5), // preserve backward compat when disabled
             },
@@ -906,8 +905,11 @@ impl CognitiveLoopService {
             // Feed current moral uncertainty from ethics engine
             let drift = self.ethics_engine.moral_topology().moral_drift(20);
             if drift > 0.0 {
-                self.kosmic_song.moral_uncertainty =
-                    crate::mycelix::gis::MoralUncertainty::new(drift as f32, drift as f32 * 0.8, drift as f32 * 0.6);
+                self.kosmic_song.moral_uncertainty = crate::mycelix::gis::MoralUncertainty::new(
+                    drift as f32,
+                    drift as f32 * 0.8,
+                    drift as f32 * 0.6,
+                );
             }
 
             // Synthesize all layers
@@ -939,7 +941,11 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         let usi_vals = self.user_state.as_ref().map(|usi| {
             let state = usi.state();
-            (state.frustration, state.cognitive_load.level, state.engagement)
+            (
+                state.frustration,
+                state.cognitive_load.level,
+                state.engagement,
+            )
         });
         if let Some((frustration, cognitive_load_level, engagement)) = usi_vals {
             // High frustration → dampen exploration (user is struggling)
@@ -1211,7 +1217,7 @@ impl CognitiveLoopService {
         if epistemic_conflict_count > 2 && self.stats.total_cycles > 20 {
             self.adjust_exploration(
                 "epistemic_conflict",
-                epistemic_conflict_count as f32 * 0.015,
+                epistemic_conflict_count as f32 * EPISTEMIC_CONFLICT_EXPLORE_SCALE,
             );
         }
 
@@ -1241,6 +1247,77 @@ impl CognitiveLoopService {
         } else if cross_modal_binding_strength < 0.3 && self.stats.total_cycles > 10 {
             let binding_dampen = 1.0 - (0.3 - cross_modal_binding_strength) * 0.1;
             self.scale_confidence("binding_attention_lo", binding_dampen.max(0.95));
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // SESSION 16: ORPHANED SIGNAL WIRING
+        // Wire consciousness metrics that were computed but never drove behavior.
+        // ═══════════════════════════════════════════════════════════════════════
+
+        // Item 1: Epistemic Phi → confidence coupling.
+        // Low epistemic integration quality degrades confidence; high quality reinforces it.
+        // Science: Tononi (2004) — Phi measures integrated information; low Phi = unreliable inference.
+        if epistemic_phi_eff > EPISTEMIC_PHI_HIGH_THRESHOLD && self.stats.total_cycles > 20 {
+            let boost = ((epistemic_phi_eff - EPISTEMIC_PHI_HIGH_THRESHOLD)
+                * EPISTEMIC_PHI_HIGH_CONFIDENCE_SCALE as f64) as f32;
+            self.adjust_confidence("epistemic_phi_high", boost);
+        } else if epistemic_phi_eff > 0.0
+            && epistemic_phi_eff < EPISTEMIC_PHI_LOW_THRESHOLD
+            && self.stats.total_cycles > 20
+        {
+            self.scale_confidence("epistemic_phi_low", EPISTEMIC_PHI_LOW_CONFIDENCE_SCALE);
+        }
+
+        // Item 2: Phenomenal binding strength → LR/exploration coupling.
+        // Low binding = incoherent representation → explore for better conjunctions.
+        // High binding = stable gestalt → consolidate, dampen LR.
+        // Science: Treisman (1996) — feature integration requires binding; weak binding = search.
+        if phenomenal_binding_strength < PHENOMENAL_BINDING_LOW_THRESHOLD
+            && phenomenal_binding_strength > 0.0
+            && self.stats.total_cycles > 15
+        {
+            self.adjust_exploration("phenomenal_binding_low", PHENOMENAL_BINDING_LOW_EXPLORE_BOOST);
+        } else if phenomenal_binding_strength > PHENOMENAL_BINDING_HIGH_THRESHOLD
+            && self.stats.total_cycles > 15
+        {
+            self.scale_lr("phenomenal_binding_stable", PHENOMENAL_BINDING_HIGH_LR_DAMPEN);
+        }
+
+        // Item 3: Temporal coherence score → confidence/exploration coupling.
+        // High temporal coherence = predictable flow → boost confidence.
+        // Low temporal coherence = fragmented temporal context → explore for patterns.
+        // Science: Howard & Kahana (2002) — temporal context model: stability supports encoding.
+        if temporal_coherence_score > TEMPORAL_COHERENCE_HIGH_THRESHOLD
+            && self.stats.total_cycles > 15
+        {
+            let boost = ((temporal_coherence_score - TEMPORAL_COHERENCE_HIGH_THRESHOLD)
+                * TEMPORAL_COHERENCE_CONFIDENCE_SCALE as f64) as f32;
+            self.adjust_confidence("temporal_coherence_high", boost);
+        } else if temporal_coherence_score > 0.0
+            && temporal_coherence_score < TEMPORAL_COHERENCE_LOW_THRESHOLD
+            && self.stats.total_cycles > 15
+        {
+            self.adjust_exploration(
+                "temporal_coherence_low",
+                TEMPORAL_COHERENCE_LOW_EXPLORE_BOOST,
+            );
+        }
+
+        // Item 4: Holographic unity → LR/confidence gating.
+        // Low unity = global decomposition → learning during decomposition is noise.
+        // High unity = integrated representation → confident decisions.
+        // Science: Pribram (1991) — holographic storage coherence gates encoding fidelity.
+        if holographic_unity < HOLOGRAPHIC_UNITY_LOW_THRESHOLD
+            && holographic_unity > 0.0
+            && self.stats.total_cycles > 20
+        {
+            self.scale_lr("holographic_unity_low", HOLOGRAPHIC_UNITY_LOW_LR_DAMPEN);
+        } else if holographic_unity > HOLOGRAPHIC_UNITY_HIGH_THRESHOLD
+            && self.stats.total_cycles > 20
+        {
+            let boost = ((holographic_unity - HOLOGRAPHIC_UNITY_HIGH_THRESHOLD)
+                * HOLOGRAPHIC_UNITY_HIGH_CONFIDENCE_SCALE as f64) as f32;
+            self.adjust_confidence("holographic_unity_high", boost);
         }
 
         FeedbackPhaseResult {

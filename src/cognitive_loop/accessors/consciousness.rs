@@ -113,9 +113,13 @@ impl CognitiveLoopService {
             sigma: self.carryover.consciousness.last_sigma,
             integrity_critical: {
                 #[cfg(feature = "integrity")]
-                { self.integrity_manager.has_critical_anomaly() }
+                {
+                    self.integrity_manager.has_critical_anomaly()
+                }
                 #[cfg(not(feature = "integrity"))]
-                { false }
+                {
+                    false
+                }
             },
             avg_cycle_time_us: self.stats.avg_cycle_time_us,
             cycles_per_second: self.stats.cycles_per_second,

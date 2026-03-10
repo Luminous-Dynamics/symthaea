@@ -104,8 +104,12 @@ impl TemporalOrderBenchmark {
                     .wrapping_add(500)
                     .wrapping_add((gap_idx as u64) * 100)
                     .wrapping_add((ens as u64) * 10000);
-                let earlier_hv =
-                    blend_binary(&first_templates[ens], &second_templates[ens], gap, blend_seed);
+                let earlier_hv = blend_binary(
+                    &first_templates[ens],
+                    &second_templates[ens],
+                    gap,
+                    blend_seed,
+                );
                 let later_hv = blend_binary(
                     &second_templates[ens],
                     &first_templates[ens],
@@ -334,14 +338,8 @@ impl PsychBenchmark for TemporalOrderBenchmark {
             }
         }
 
-        result.insert(
-            "simultaneity_window",
-            MetricValue::from_samples(&windows),
-        );
-        result.insert(
-            "discrimination_slope",
-            MetricValue::from_samples(&slopes),
-        );
+        result.insert("simultaneity_window", MetricValue::from_samples(&windows));
+        result.insert("discrimination_slope", MetricValue::from_samples(&slopes));
         result.insert(
             "asymptotic_accuracy",
             MetricValue::from_samples(&asymptotes),
