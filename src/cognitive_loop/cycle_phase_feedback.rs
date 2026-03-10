@@ -1276,11 +1276,17 @@ impl CognitiveLoopService {
             && phenomenal_binding_strength > 0.0
             && self.stats.total_cycles > 15
         {
-            self.adjust_exploration("phenomenal_binding_low", PHENOMENAL_BINDING_LOW_EXPLORE_BOOST);
+            self.adjust_exploration(
+                "phenomenal_binding_low",
+                PHENOMENAL_BINDING_LOW_EXPLORE_BOOST,
+            );
         } else if phenomenal_binding_strength > PHENOMENAL_BINDING_HIGH_THRESHOLD
             && self.stats.total_cycles > 15
         {
-            self.scale_lr("phenomenal_binding_stable", PHENOMENAL_BINDING_HIGH_LR_DAMPEN);
+            self.scale_lr(
+                "phenomenal_binding_stable",
+                PHENOMENAL_BINDING_HIGH_LR_DAMPEN,
+            );
         }
 
         // Item 3: Temporal coherence score → confidence/exploration coupling.
