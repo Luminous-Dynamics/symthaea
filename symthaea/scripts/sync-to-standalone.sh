@@ -148,7 +148,7 @@ SUPPORT_DIRS=(
     dashboard
     demos
     figures
-    models
+    # models — excluded: 21GB of ONNX files, too large for standalone
     nix
     proptest-regressions
     rust-sentinels
@@ -270,6 +270,19 @@ if ! $DRY_RUN; then
         echo "$ESCAPED_PATHS"
         REWRITE_OK=false
     fi
+
+    # Strip workspace lints — they conflict with CI's feature-gated clippy -A flags.
+    # Crate-level #![deny(...)] in lib.rs provides local lint enforcement instead.
+    sed -i '/^\[workspace\.lints\.clippy\]/,/^$/d' "${STANDALONE_REPO}/Cargo.toml"
+    sed -i '/^# Workspace-wide lint configuration/d' "${STANDALONE_REPO}/Cargo.toml"
+    sed -i '/^# These lints apply on top/d' "${STANDALONE_REPO}/Cargo.toml"
+    # Remove [lints] workspace = true from main crate
+    sed -i '/^\[lints\]/{N;/workspace = true/d;}' "${STANDALONE_REPO}/Cargo.toml"
+    # Remove [lints] workspace = true from symthaea-core
+    if [ -f "${STANDALONE_REPO}/symthaea-core/Cargo.toml" ]; then
+        sed -i '/^\[lints\]/{N;/workspace = true/d;}' "${STANDALONE_REPO}/symthaea-core/Cargo.toml"
+    fi
+    ok "Stripped workspace lints (incompatible with CI clippy config)"
 
     if $REWRITE_OK; then
         ok "Cargo.toml fixups verified"
