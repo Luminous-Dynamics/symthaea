@@ -6,6 +6,7 @@
 
 use std::path::Path;
 use std::process::Command;
+use tracing::debug;
 
 /// Observes registered flakes, their inputs, and upstream update availability.
 pub struct FlakeRegistry;
@@ -154,6 +155,12 @@ impl FlakeRegistry {
         json_str: &str,
     ) -> Result<FlakeInfo, std::io::Error> {
         let value: serde_json::Value = serde_json::from_str(json_str).map_err(|e| {
+            debug!(
+                path,
+                error = %e,
+                json_preview = &json_str[..json_str.len().min(80)],
+                "failed to parse flake metadata JSON"
+            );
             std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
                 format!("failed to parse flake metadata JSON: {e}"),
@@ -194,19 +201,20 @@ impl FlakeRegistry {
         })
     }
 
+    /// Navigate into `value.locks.nodes.root` — the common prefix for lock queries.
+    fn locks_root(value: &serde_json::Value) -> Option<&serde_json::Value> {
+        value.get("locks")?.get("nodes")?.get("root")
+    }
+
     /// Extract flake input names from the locks structure.
     fn extract_inputs_from_locks(value: &serde_json::Value) -> Vec<String> {
         let mut inputs = Vec::new();
 
-        if let Some(locks) = value.get("locks") {
-            if let Some(nodes) = locks.get("nodes") {
-                if let Some(root) = nodes.get("root") {
-                    if let Some(root_inputs) = root.get("inputs") {
-                        if let Some(obj) = root_inputs.as_object() {
-                            for key in obj.keys() {
-                                inputs.push(key.clone());
-                            }
-                        }
+        if let Some(root) = Self::locks_root(value) {
+            if let Some(root_inputs) = root.get("inputs") {
+                if let Some(obj) = root_inputs.as_object() {
+                    for key in obj.keys() {
+                        inputs.push(key.clone());
                     }
                 }
             }
@@ -397,5 +405,37 @@ mod tests {
         let info = FlakeRegistry::parse_flake_metadata_json("/test", json).unwrap();
         assert!(info.description.is_none());
         assert!(info.last_modified.is_none());
+    }
+
+    #[test]
+    fn test_locks_root_helper() {
+        let full: serde_json::Value = serde_json::from_str(MOCK_FLAKE_METADATA).unwrap();
+        let root = FlakeRegistry::locks_root(&full);
+        assert!(root.is_some());
+        assert!(root.unwrap().get("inputs").is_some());
+    }
+
+    #[test]
+    fn test_locks_root_missing() {
+        let no_locks: serde_json::Value =
+            serde_json::from_str(r#"{"path": "/test"}"#).unwrap();
+        assert!(FlakeRegistry::locks_root(&no_locks).is_none());
+
+        let no_nodes: serde_json::Value =
+            serde_json::from_str(r#"{"locks": {}}"#).unwrap();
+        assert!(FlakeRegistry::locks_root(&no_nodes).is_none());
+
+        let no_root: serde_json::Value =
+            serde_json::from_str(r#"{"locks": {"nodes": {}}}"#).unwrap();
+        assert!(FlakeRegistry::locks_root(&no_root).is_none());
+    }
+
+    #[test]
+    fn test_parse_bad_json_returns_error() {
+        // Verify that malformed JSON produces an InvalidData error
+        let result = FlakeRegistry::parse_flake_metadata_json("/foo", "{truncated");
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert_eq!(err.kind(), std::io::ErrorKind::InvalidData);
     }
 }

@@ -5,6 +5,7 @@
 //! world model's understanding of resource constraints and availability.
 
 use std::process::Command;
+use tracing::debug;
 
 /// Observes hardware state: CPU, memory, disk, GPU, and peripheral status.
 pub struct HardwareObserver;
@@ -256,9 +257,15 @@ impl HardwareObserver {
 
         for line in meminfo_content.lines() {
             if line.starts_with("SwapTotal:") {
-                total_kb = Self::parse_meminfo_value(line).unwrap_or(0);
+                match Self::parse_meminfo_value(line) {
+                    Ok(v) => total_kb = v,
+                    Err(e) => debug!(line, error = %e, "Failed to parse SwapTotal"),
+                }
             } else if line.starts_with("SwapFree:") {
-                free_kb = Self::parse_meminfo_value(line).unwrap_or(0);
+                match Self::parse_meminfo_value(line) {
+                    Ok(v) => free_kb = v,
+                    Err(e) => debug!(line, error = %e, "Failed to parse SwapFree"),
+                }
             }
         }
 
@@ -533,6 +540,24 @@ efivarfs /sys/firmware 131072 65536\n\
     fn test_parse_loadavg_malformed() {
         let load = HardwareObserver::parse_loadavg("bad data here");
         assert_eq!(load, [0.0, 0.0, 0.0]);
+    }
+
+    #[test]
+    fn test_parse_swap_malformed_values() {
+        // Malformed swap values should gracefully return 0 (with debug logging)
+        let meminfo = "SwapTotal:       not_a_number kB\nSwapFree:        also_bad kB\n";
+        let (total, used) = HardwareObserver::parse_swap(meminfo);
+        assert_eq!(total, 0);
+        assert_eq!(used, 0);
+    }
+
+    #[test]
+    fn test_parse_swap_short_lines() {
+        // Short lines (missing value) should gracefully return 0
+        let meminfo = "SwapTotal:\nSwapFree:\n";
+        let (total, used) = HardwareObserver::parse_swap(meminfo);
+        assert_eq!(total, 0);
+        assert_eq!(used, 0);
     }
 
     #[test]

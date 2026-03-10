@@ -4,24 +4,30 @@
 //! rollback lookup for known NixOS operations.
 
 use super::executor::SafetyLevel;
+use std::borrow::Cow;
 
 /// Get the rollback command for known NixOS operations.
-pub fn get_nixos_rollback(command: &str) -> Option<String> {
+///
+/// Returns `Cow::Borrowed` for constant rollback strings and
+/// `Cow::Owned` when the rollback depends on the original command's arguments.
+pub fn get_nixos_rollback(command: &str) -> Option<Cow<'static, str>> {
     let cmd = command.trim().to_lowercase();
 
     if cmd.starts_with("nixos-rebuild switch") || cmd.starts_with("nixos-rebuild boot") {
-        Some("nixos-rebuild switch --rollback".to_string())
+        Some(Cow::Borrowed("nixos-rebuild switch --rollback"))
     } else if cmd.contains("nix-env -i") || cmd.contains("nix profile install") {
         let pkg = cmd.split_whitespace().last().unwrap_or("package");
-        Some(format!("nix-env -e {pkg} || nix profile remove {pkg}"))
+        Some(Cow::Owned(format!(
+            "nix-env -e {pkg} || nix profile remove {pkg}"
+        )))
     } else if cmd.starts_with("nix build")
         || cmd.starts_with("nix develop")
         || cmd.starts_with("nix shell")
     {
-        Some("exit".to_string()) // nix environments are ephemeral
+        Some(Cow::Borrowed("exit")) // nix environments are ephemeral
     } else if cmd.starts_with("systemctl restart") || cmd.starts_with("systemctl stop") {
         let svc = cmd.split_whitespace().last().unwrap_or("service");
-        Some(format!("systemctl start {svc}"))
+        Some(Cow::Owned(format!("systemctl start {svc}")))
     } else {
         None
     }
@@ -241,6 +247,24 @@ mod tests {
 
         // Unknown → None
         assert!(get_nixos_rollback("echo hello").is_none());
+    }
+
+    #[test]
+    fn test_rollback_cow_borrowed_for_constants() {
+        use std::borrow::Cow;
+        // Constant rollback strings should be Cow::Borrowed (zero allocation)
+        let rb = get_nixos_rollback("nixos-rebuild switch").unwrap();
+        assert!(
+            matches!(rb, Cow::Borrowed(_)),
+            "Constant rollback should be Cow::Borrowed"
+        );
+
+        // Dynamic rollback strings should be Cow::Owned
+        let rb = get_nixos_rollback("nix-env -i firefox").unwrap();
+        assert!(
+            matches!(rb, Cow::Owned(_)),
+            "Dynamic rollback should be Cow::Owned"
+        );
     }
 
     #[test]

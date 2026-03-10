@@ -64,6 +64,8 @@ pub struct SideEffectPrediction {
 pub struct NixCausalGraph {
     engine: CausalDiscoveryEngine,
     causal_graph: HashMap<(String, String), CausalEdge>,
+    /// Secondary index: from_node → set of to_nodes for O(1) outgoing edge lookup.
+    from_index: HashMap<String, HashSet<String>>,
     observations: HashMap<String, Vec<f64>>,
     /// Hebbian learning rate for edge strengthening/weakening.
     learning_rate: f64,
@@ -77,10 +79,20 @@ impl NixCausalGraph {
         Self {
             engine: CausalDiscoveryEngine::new(seed),
             causal_graph: HashMap::new(),
+            from_index: HashMap::new(),
             observations: HashMap::new(),
             learning_rate: 0.1,
             min_confidence: 0.05,
         }
+    }
+
+    /// Insert an edge and update the from_index.
+    fn insert_edge(&mut self, from: String, to: String, edge: CausalEdge) {
+        self.from_index
+            .entry(from.clone())
+            .or_default()
+            .insert(to.clone());
+        self.causal_graph.insert((from, to), edge);
     }
 
     /// Set the Hebbian learning rate (default 0.1).
@@ -108,15 +120,18 @@ impl NixCausalGraph {
         // Strengthen edges for effects that actually occurred
         for &effect in &observed_set {
             let key = (action.to_string(), effect.to_string());
-            let entry = self
-                .causal_graph
-                .entry(key.clone())
-                .or_insert_with(|| CausalEdge {
+            let entry = self.causal_graph.entry(key).or_insert_with(|| {
+                self.from_index
+                    .entry(action.to_string())
+                    .or_default()
+                    .insert(effect.to_string());
+                CausalEdge {
                     from: action.to_string(),
                     to: effect.to_string(),
                     direction: CausalDirection::Forward,
                     confidence: 0.3, // Start with moderate confidence for newly discovered edges
-                });
+                }
+            });
             // Hebbian strengthening: Δw = η * (1 - w) — bounded growth
             entry.confidence += self.learning_rate * (1.0 - entry.confidence);
             entry.confidence = entry.confidence.clamp(0.0, 1.0);
@@ -135,8 +150,17 @@ impl NixCausalGraph {
         }
 
         // Prune edges below minimum confidence threshold
-        self.causal_graph
-            .retain(|_, edge| edge.confidence >= self.min_confidence);
+        let min_conf = self.min_confidence;
+        self.causal_graph.retain(|(from, to), edge| {
+            if edge.confidence >= min_conf {
+                true
+            } else {
+                if let Some(targets) = self.from_index.get_mut(from) {
+                    targets.remove(to);
+                }
+                false
+            }
+        });
     }
 
     /// Record an observation of a configuration variable
@@ -191,7 +215,7 @@ impl NixCausalGraph {
                         confidence,
                     };
 
-                    self.causal_graph.insert((from, to), edge.clone());
+                    self.insert_edge(from, to, edge.clone());
                     edges.push(edge);
                 }
             }
@@ -253,7 +277,10 @@ impl NixCausalGraph {
         }
     }
 
-    /// Predict side effects of changing a variable
+    /// Predict side effects of changing a variable.
+    ///
+    /// Uses the `from_index` for O(1) outgoing-edge lookup per node
+    /// instead of iterating all edges in the graph.
     pub fn predict_side_effects(&self, variable: &str) -> Vec<SideEffectPrediction> {
         let mut effects = Vec::new();
 
@@ -266,14 +293,18 @@ impl NixCausalGraph {
             }
             visited.insert(current.clone());
 
-            for ((from, to), edge) in &self.causal_graph {
-                if from == &current && to != variable {
-                    effects.push(SideEffectPrediction {
-                        affected_variable: to.clone(),
-                        direction: "change".to_string(),
-                        confidence: edge.confidence,
-                    });
-                    to_visit.push(to.clone());
+            if let Some(targets) = self.from_index.get(&current) {
+                for to in targets {
+                    if to != variable {
+                        if let Some(edge) = self.causal_graph.get(&(current.clone(), to.clone())) {
+                            effects.push(SideEffectPrediction {
+                                affected_variable: to.clone(),
+                                direction: "change".to_string(),
+                                confidence: edge.confidence,
+                            });
+                            to_visit.push(to.clone());
+                        }
+                    }
                 }
             }
         }
@@ -342,8 +373,7 @@ impl NixCausalGraph {
             direction: CausalDirection::Forward,
             confidence,
         };
-        self.causal_graph
-            .insert((from.to_string(), to.to_string()), edge);
+        self.insert_edge(from.to_string(), to.to_string(), edge);
     }
 
     /// Save the causal graph to a JSON file for persistence across sessions.
@@ -376,6 +406,10 @@ impl NixCausalGraph {
         for edge in snapshot.edges {
             let key = (edge.from.clone(), edge.to.clone());
             if let std::collections::hash_map::Entry::Vacant(e) = self.causal_graph.entry(key) {
+                self.from_index
+                    .entry(edge.from.clone())
+                    .or_default()
+                    .insert(edge.to.clone());
                 e.insert(edge);
                 loaded += 1;
             }
@@ -1852,5 +1886,79 @@ mod tests {
                 edge.confidence
             );
         }
+    }
+
+    #[test]
+    fn test_from_index_maintained_on_add() {
+        let mut graph = NixCausalGraph::new(42);
+        graph.add_structural_edge("A", "B", 0.9);
+        graph.add_structural_edge("A", "C", 0.8);
+        graph.add_structural_edge("B", "C", 0.7);
+
+        let a_targets = graph.from_index.get("A").unwrap();
+        assert!(a_targets.contains("B"));
+        assert!(a_targets.contains("C"));
+        assert_eq!(a_targets.len(), 2);
+
+        let b_targets = graph.from_index.get("B").unwrap();
+        assert!(b_targets.contains("C"));
+        assert_eq!(b_targets.len(), 1);
+    }
+
+    #[test]
+    fn test_from_index_maintained_on_prune() {
+        let mut graph = NixCausalGraph::new(42);
+        graph.add_structural_edge("A", "B", 0.06); // just above min_confidence (0.05)
+
+        // Weaken until pruned
+        graph.observe_outcome("A", &[], &["B"]);
+        graph.observe_outcome("A", &[], &["B"]);
+
+        if !graph
+            .causal_graph
+            .contains_key(&("A".to_string(), "B".to_string()))
+        {
+            // Edge was pruned — index should not contain B as target of A
+            let a_targets = graph.from_index.get("A");
+            assert!(
+                a_targets.is_none() || !a_targets.unwrap().contains("B"),
+                "from_index should be cleaned up on prune"
+            );
+        }
+    }
+
+    #[test]
+    fn test_from_index_on_discover() {
+        let mut graph = NixCausalGraph::new(42);
+        for i in 0..50 {
+            graph.observe("x", i as f64);
+            graph.observe("y", 2.0 * i as f64);
+        }
+        let edges = graph.discover_structure();
+        assert!(!edges.is_empty());
+
+        // Verify index matches the graph
+        for ((from, to), _) in &graph.causal_graph {
+            let targets = graph.from_index.get(from).expect("from_index missing key");
+            assert!(targets.contains(to), "from_index missing target {to} for {from}");
+        }
+    }
+
+    #[test]
+    fn test_from_index_on_load() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("graph.json");
+
+        let mut g1 = NixCausalGraph::new(42);
+        g1.add_structural_edge("X", "Y", 0.9);
+        g1.add_structural_edge("X", "Z", 0.8);
+        g1.save(&path).unwrap();
+
+        let mut g2 = NixCausalGraph::new(42);
+        g2.load(&path).unwrap();
+
+        let targets = g2.from_index.get("X").unwrap();
+        assert!(targets.contains("Y"));
+        assert!(targets.contains("Z"));
     }
 }
