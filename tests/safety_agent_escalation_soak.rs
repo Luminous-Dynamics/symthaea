@@ -29,6 +29,7 @@ fn normal_metrics(cycle: usize) -> SafetyMetrics {
         consciousness_level: 0.75,
         prediction_error: 0.15,
         temporal_coherence: 0.85,
+        integrity_critical: false,
     }
 }
 
@@ -38,6 +39,7 @@ fn degraded_metrics(cycle: usize, consciousness: f32) -> SafetyMetrics {
         consciousness_level: consciousness,
         prediction_error: 0.5,
         temporal_coherence: 0.4,
+        integrity_critical: false,
     }
 }
 
@@ -47,6 +49,7 @@ fn collapsed_metrics(cycle: usize) -> SafetyMetrics {
         consciousness_level: 0.0,
         prediction_error: 1.0,
         temporal_coherence: 0.0,
+        integrity_critical: false,
     }
 }
 
@@ -198,6 +201,7 @@ fn soak_high_prediction_error_escalates() {
             consciousness_level: 0.7, // above yellow
             prediction_error: 0.9,    // above threshold (0.7)
             temporal_coherence: 0.8,
+            integrity_critical: false,
         };
         let assessment = agent.assess(metrics);
         // Prediction error alone should escalate from Green to Yellow
@@ -222,6 +226,7 @@ fn soak_low_coherence_escalates() {
             consciousness_level: 0.7, // above yellow
             prediction_error: 0.3,    // normal
             temporal_coherence: 0.1,  // below threshold (0.3)
+            integrity_critical: false,
         };
         let assessment = agent.assess(metrics);
         if cycle > 3 {
@@ -250,6 +255,7 @@ fn soak_compound_degradation_escalates_faster() {
         consciousness_level: 0.5, // below yellow
         prediction_error: 0.2,    // normal
         temporal_coherence: 0.8,  // normal
+        integrity_critical: false,
     };
 
     // Compound: low consciousness + high PE + low coherence
@@ -258,6 +264,7 @@ fn soak_compound_degradation_escalates_faster() {
         consciousness_level: 0.5, // below yellow
         prediction_error: 0.9,    // above threshold
         temporal_coherence: 0.1,  // below threshold
+        integrity_critical: false,
     };
 
     let single_assessment = agent_single.assess(single_metrics);
@@ -288,6 +295,7 @@ fn soak_nan_consciousness_clamps_to_worst_case() {
         consciousness_level: f32::NAN,
         prediction_error: 0.2,
         temporal_coherence: 0.8,
+        integrity_critical: false,
     };
     // NaN clamping happens in from_snapshot; test direct assess path
     // Direct construction with NaN should still produce a valid assessment
@@ -308,6 +316,7 @@ fn soak_infinity_prediction_error_escalates() {
         consciousness_level: 0.8,
         prediction_error: f32::INFINITY,
         temporal_coherence: 0.8,
+        integrity_critical: false,
     };
     let assessment = agent.assess(metrics);
     assert!(
@@ -325,6 +334,7 @@ fn soak_negative_infinity_coherence_escalates() {
         consciousness_level: 0.8,
         prediction_error: 0.2,
         temporal_coherence: f32::NEG_INFINITY,
+        integrity_critical: false,
     };
     let assessment = agent.assess(metrics);
     assert!(
@@ -350,6 +360,7 @@ fn soak_trend_detection_escalates_borderline_green() {
             consciousness_level: 0.55, // below yellow (0.6) → Yellow
             prediction_error: 0.3,
             temporal_coherence: 0.8,
+            integrity_critical: false,
         };
         let assessment = agent.assess(metrics);
         // These are Yellow (below 0.6), so trend detection should NOT
@@ -512,6 +523,7 @@ fn soak_1000_cycle_full_lifecycle() {
                     consciousness_level: 0.7,
                     prediction_error: 0.95,
                     temporal_coherence: 0.1,
+                    integrity_critical: false,
                 }
             }
             _ => normal_metrics(cycle), // Phase 8: Final normal
