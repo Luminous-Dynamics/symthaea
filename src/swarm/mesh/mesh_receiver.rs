@@ -229,8 +229,23 @@ impl MeshReceiver {
         #[cfg(feature = "mesh-encryption")]
         let decrypted_buf: zeroize::Zeroizing<Vec<u8>>;
         #[cfg(feature = "mesh-encryption")]
+        let mut nonce_bytes_saved: Option<[u8; 12]> = None;
+        #[cfg(feature = "mesh-encryption")]
         let raw = if self.fragment_encryption {
             if let Some(ref key) = self.encryption_key {
+                // Verify the nonce's source_id matches the transport-layer source
+                // before attempting decryption — prevents cross-stream injection.
+                if raw.len() >= super::AEAD_NONCE_SIZE {
+                    let nonce_source = &raw[..8];
+                    if nonce_source != &source {
+                        self.stats.packets_decrypt_failed += 1;
+                        return None;
+                    }
+                    // Save nonce for post-parse validation
+                    let mut nb = [0u8; 12];
+                    nb.copy_from_slice(&raw[..12]);
+                    nonce_bytes_saved = Some(nb);
+                }
                 match super::decrypt_fragment(raw, key) {
                     Some(plain) => {
                         decrypted_buf = zeroize::Zeroizing::new(plain);
@@ -256,6 +271,18 @@ impl MeshReceiver {
                 return None;
             }
         };
+
+        // Verify nonce thought_id matches parsed fragment — detects cross-stream
+        // injection where an attacker feeds a fragment encrypted for stream B
+        // into stream A's reassembly (nonce carries the original thought_id).
+        #[cfg(feature = "mesh-encryption")]
+        if let Some(nb) = nonce_bytes_saved {
+            let nonce_thought_id = u16::from_le_bytes([nb[8], nb[9]]);
+            if nonce_thought_id != frag.thought_id {
+                self.stats.packets_decrypt_failed += 1;
+                return None;
+            }
+        }
 
         self.stats.fragments_received += 1;
         let now = Instant::now();
