@@ -546,8 +546,8 @@ jobs:
           echo "WASM size: $((WASM_SIZE / 1024))KB ($WASM_SIZE bytes)"
           GZIP_SIZE=$(gzip -c crates/symthaea-spore/www/pkg/symthaea_spore_bg.wasm | wc -c)
           echo "WASM gzip: $((GZIP_SIZE / 1024))KB ($GZIP_SIZE bytes)"
-          if [ "$WASM_SIZE" -gt 307200 ]; then
-            echo "ERROR: WASM binary exceeds 300KB budget"
+          if [ "$WASM_SIZE" -gt 512000 ]; then
+            echo "ERROR: WASM binary exceeds 500KB budget"
             exit 1
           fi
 

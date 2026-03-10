@@ -14,7 +14,6 @@
 
 use std::collections::{HashMap, VecDeque};
 
-use ndarray::Array1;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 

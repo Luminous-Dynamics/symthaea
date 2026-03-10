@@ -3201,7 +3201,8 @@ mod tests {
     #[test]
     fn test_html_contains_substrate_section() {
         let html = generate_test_html();
-        assert!(html.contains("SiliconDigital") || html.contains("SUBSTRATE"), "should have substrate section");
+        // substrate_type "SiliconDigital" is rendered as "Silicon Digital" (space inserted)
+        assert!(html.contains("Silicon Digital") || html.contains("substrate"), "should have substrate section");
     }
 
     // ── Pure function tests ──────────────────────────────────────────────

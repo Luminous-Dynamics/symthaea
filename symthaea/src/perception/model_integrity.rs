@@ -48,7 +48,7 @@ impl ModelManifest {
         }
     }
 
-    /// Insert a path → hash entry.
+    /// Insert a path -> hash entry.
     pub fn insert(&mut self, path: impl Into<PathBuf>, hash: impl Into<String>) {
         self.hashes.insert(path.into(), hash.into());
     }

@@ -132,7 +132,7 @@ async fn run_acid_test(
     // Generate code via Tier 1 (native emitter). Should produce todo!().
     let mut spec = CodeSpec::new("rust", name, purpose).with_signature(signature);
     for c in constraints {
-        spec = spec.with_constraint(c);
+        spec = spec.with_constraint(*c);
     }
     let intent = CodeIntent::Create {
         target: CodeTarget::new(name, EntityKind::Function).with_language("rust"),
@@ -142,9 +142,9 @@ async fn run_acid_test(
     let generated = gen.generate(&intent, &ctx);
     let yielded_todo = needs_llm(&generated.source);
 
-    eprintln!("\n{'=':.>60}");
+    eprintln!("\n============================================================");
     eprintln!("ACID TEST: {}", name);
-    eprintln!("{'=':.>60}");
+    eprintln!("============================================================");
     eprintln!("  YIELD: todo!() emitted = {}", yielded_todo);
     eprintln!(
         "  Native source ({} bytes):\n    {}",
