@@ -1,6 +1,5 @@
 use std::collections::VecDeque;
-// web-time: drop-in Instant for wasm32 (std::time::Instant panics on wasm32-unknown-unknown)
-use web_time::Instant;
+use std::time::Instant;
 
 /// Social Embedding: Soc = other_modeling_accuracy × self_other_distinction
 ///
