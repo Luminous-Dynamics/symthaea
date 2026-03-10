@@ -864,7 +864,10 @@ impl CognitiveLoopService {
                     Some(
                         crate::consciousness::harmonies_integration::HarmoniesIntegrator::new(
                             crate::consciousness::harmonies_integration::HarmoniesIntegrationConfig {
-                                dimension: resonator_cfc_input_dim,
+                                // Match moral algebra dim so HarmoniesIntegrator shares the
+                                // HarmonyBasis with MoralTopology (dedup ~448KB of vectors)
+                                // and evaluates proper text encodings, not compressed CfC state.
+                                dimension: engine_ma.dim(),
                                 ..Default::default()
                             },
                         ),
@@ -880,10 +883,13 @@ impl CognitiveLoopService {
                     moral_anomaly_config.clone(),
                 )
             },
+            kosmic_song: crate::mycelix::KosmicSong::default(),
             drive_manager: super::managers::DriveManager::default(),
             memory_manager: super::managers::MemoryManager::default(),
             learning_manager: super::managers::LearningManager::default(),
             perception_manager: super::managers::PerceptionManager::default(),
+            #[cfg(feature = "mycelix")]
+            governance_mgr: super::managers::GovernanceManager::default(),
             #[cfg(feature = "integrity")]
             integrity_manager: {
                 let mut im = crate::integrity::IntegrityManager::new();

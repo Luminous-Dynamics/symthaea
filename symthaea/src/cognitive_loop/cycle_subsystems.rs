@@ -641,6 +641,27 @@ impl CognitiveLoopService {
                 self.carryover.learning.subsystem_lr_factor.clamp(0.8, 1.2);
         }
 
+        // NEUROMOD COUPLING: Empathic compassion → oxytocin + dopamine production.
+        // High compassion indicates prosocial resonance — reward via DA, bond via OXY.
+        // Science: Feldman (2012) — empathic resonance drives oxytocin release;
+        // Rilling et al. (2002) — mutual cooperation activates DA reward circuits.
+        {
+            use super::thresholds::{
+                EMPATHIC_COMPASSION_OXY_THRESHOLD, EMPATHIC_COMPASSION_OXY_SCALE,
+                EMPATHIC_COMPASSION_DA_THRESHOLD, EMPATHIC_COMPASSION_DA_SCALE,
+            };
+            if empathic_compassion > EMPATHIC_COMPASSION_OXY_THRESHOLD {
+                let oxy_boost = (empathic_compassion as f32 - EMPATHIC_COMPASSION_OXY_THRESHOLD as f32)
+                    * EMPATHIC_COMPASSION_OXY_SCALE;
+                self.neuromod.bath.oxytocin.produce(oxy_boost);
+            }
+            if empathic_compassion > EMPATHIC_COMPASSION_DA_THRESHOLD {
+                let da_boost = (empathic_compassion as f32 - EMPATHIC_COMPASSION_DA_THRESHOLD as f32)
+                    * EMPATHIC_COMPASSION_DA_SCALE;
+                self.neuromod.bath.dopamine.produce(da_boost);
+            }
+        }
+
         // ═══════════════════════════════════════════════════════════════════════
         // MULTI-OBJECTIVE EVOLUTION: Pareto-frontier consciousness optimization
         // Very expensive — runs once every 1000 cycles. Evolves primitives across

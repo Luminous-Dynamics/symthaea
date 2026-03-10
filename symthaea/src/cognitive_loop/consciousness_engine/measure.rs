@@ -307,18 +307,11 @@ impl ConsciousnessEngine {
         } else {
             0.0
         };
-        // Coherence field integration (McEwen 2007):
-        // High coherence (>0.5) slightly boosts consciousness (integrated state),
-        // low coherence (<0.5) dampens it (scattered, allostatic load).
-        // Scale: ±5% at extremes — gentle modulation, not override.
-        let coherence_modulation = (input.coherence_field_integration - 0.5) * 0.10;
-
         unified_consciousness = (unified_consciousness
             + sht_2a_boost as f64
             + gaba_a_dampen as f64
             + entropy_factor
-            + moral_dampen
-            + coherence_modulation)
+            + moral_dampen)
             .clamp(0.0, 1.0);
 
         let total_us = total_start.elapsed().as_micros() as u64;

@@ -1423,6 +1423,8 @@ pub struct EthicalTelemetry {
     pub empathic_tone_adj: f64,
     /// Empathic tone adjustment applied to speech rate (-1.0 to 1.0, 0.0 = no change).
     pub empathic_speech_rate_mod: f32,
+    /// KosmicSong coherence: Phi × HarmonicAlignment × MoralClarity (0.0–1.0).
+    pub kosmic_coherence: f32,
     /// β₀: connected components in moral space (1 = unified).
     pub moral_topo_beta_0: usize,
     /// β₁: 1-cycles (circular reasoning patterns).

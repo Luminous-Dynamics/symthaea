@@ -356,6 +356,7 @@ pub(super) struct FbEthics {
     pub(super) empathic_compassion: f64,
     pub(super) empathic_tone_adj: f64,
     pub(super) empathic_speech_rate_mod: f32,
+    pub(super) kosmic_coherence: f32,
 }
 
 /// Evolution and validation metrics.

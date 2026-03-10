@@ -714,21 +714,32 @@ impl CognitiveLoopService {
                 0.0
             };
 
-        // 2b. Physics bridge: blend physics-informed HDC into compressed state
-        #[allow(unused_mut)]
-        let mut compressed_for_cfc = perception.encoding.compressed_state.clone();
+        // 2b. Physics bridge: blend physics-informed HDC into compressed state.
+        // Only clone when physics-bridge feature needs to mutate the buffer;
+        // otherwise borrow directly to skip a Vec allocation per cycle.
         #[cfg(feature = "physics-bridge")]
-        if let Some(ref mut physics) = self.physics_integration {
-            physics.query_cycle(
-                self.stats.total_cycles,
-                self.config.physics_bridge_query_interval,
-                self.config.physics_bridge_blend_weight,
-                self.substrate_manager.tau_factor,
-                self.substrate_manager.scale_pressure,
-                &perception.encoding.hv16_cached,
-                &mut compressed_for_cfc,
-            );
-        }
+        let _compressed_owned;
+        #[cfg(feature = "physics-bridge")]
+        let compressed_for_cfc: &[f32] = {
+            _compressed_owned = {
+                let mut buf = perception.encoding.compressed_state.clone();
+                if let Some(ref mut physics) = self.physics_integration {
+                    physics.query_cycle(
+                        self.stats.total_cycles,
+                        self.config.physics_bridge_query_interval,
+                        self.config.physics_bridge_blend_weight,
+                        self.substrate_manager.tau_factor,
+                        self.substrate_manager.scale_pressure,
+                        &perception.encoding.hv16_cached,
+                        &mut buf,
+                    );
+                }
+                buf
+            };
+            &_compressed_owned
+        };
+        #[cfg(not(feature = "physics-bridge"))]
+        let compressed_for_cfc: &[f32] = &perception.encoding.compressed_state;
 
         // 3. Convert to ndarray for CfC
         let input_array: Array1<f32> = compressed_for_cfc.iter().copied().collect();

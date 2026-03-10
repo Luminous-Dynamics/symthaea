@@ -210,6 +210,7 @@ use crate::consciousness::unified_living_mind::UnifiedLivingMind;
 use crate::memory::coherence_tracker::ConversationCoherenceTracker;
 use crate::memory::memory_coordinator::MemoryCoordinator;
 use crate::memory::semantic_memory::SemanticMemory;
+use crate::mycelix::KosmicSong;
 // HumanPartnerModel + PhiDyadCalculator now owned by SocialManager
 #[cfg(feature = "neural-bridge")]
 use crate::perception::NeuralBridge;
@@ -717,6 +718,11 @@ pub struct CognitiveLoopService {
     /// Runs **alongside** existing inline code (additive wiring — old code not removed yet).
     ethics_engine: ethics_engine::EthicsEngine,
 
+    /// KosmicSong: Unified identity synthesizing Phi + Eight Harmonies + Epistemic Humility.
+    /// Computed every cycle after consciousness_engine + ethics_engine settle.
+    /// Outputs coherence_score (0.0-1.0) that gates FEP learning rate and exploration.
+    kosmic_song: KosmicSong,
+
     /// Drive Manager: consolidates curiosity, boredom, flow, and exploration drives.
     /// Implements CognitiveSubsystem — proposals fed into OutputCollector.
     drive_manager: managers::DriveManager,
@@ -732,6 +738,11 @@ pub struct CognitiveLoopService {
     /// Perception Manager: attention budget, coherence tracking, Yerkes-Dodson regulation.
     /// Implements CognitiveSubsystem — proposals fed into OutputCollector.
     perception_manager: managers::PerceptionManager,
+
+    /// Governance Manager: Mycelix governance events → neuromod contagion, confidence,
+    /// exploration. Implements CognitiveSubsystem at interval 37. Feature-gated behind `mycelix`.
+    #[cfg(feature = "mycelix")]
+    governance_mgr: managers::GovernanceManager,
 
     /// Integrity Manager: BLAKE3 attestation, temporal consistency, behavioral canaries.
     /// Runs tamper detection at co-prime intervals. Feature-gated behind `integrity`.

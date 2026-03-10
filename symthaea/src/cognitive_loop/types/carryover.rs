@@ -242,6 +242,9 @@ pub(crate) struct QualityMetrics {
     /// Consecutive cycles with near-zero consciousness gradient (Session 16).
     /// Science: Tononi (2004) — stable consciousness = reliable integration.
     pub(crate) consecutive_stable_gradient: u32,
+    /// Last KosmicSong coherence score (0.0-1.0, cached from last synthesis).
+    /// Synthesis of Phi × HarmonicAlignment × MoralClarity.
+    pub(crate) last_kosmic_coherence: f32,
 }
 
 impl Default for QualityMetrics {
@@ -283,6 +286,7 @@ impl Default for QualityMetrics {
             consecutive_high_quality: 0,
             consecutive_epistemic_rejections: 0,
             consecutive_stable_gradient: 0,
+            last_kosmic_coherence: 0.5,
         }
     }
 }

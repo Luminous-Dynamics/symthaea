@@ -867,6 +867,46 @@ pub const TRAINING_MAX_IMPORTANCE: f32 = 2.0;
 /// 1. `MORAL_CONCERN_THRESHOLD < 0 < MORAL_BENEFIT_THRESHOLD`
 /// 2. `FEP_LR_DECAY ∈ (0, 1)` (must actually decay)
 /// 3. `POLICY_SOFT_THRESHOLD ∈ (0, 1)` (valid probability)
+// ═══════════════════════════════════════════════════════════════════════════════
+// KOSMIC SONG (Unified Identity Synthesis)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// KosmicSong synthesis interval (cycles). Co-prime with ethics (19) and consciousness (25).
+/// Science: Identity coherence is slower than perceptual update but faster than value drift.
+pub const KOSMIC_SONG_INTERVAL: usize = 23;
+
+/// Low coherence threshold: below this, dampen exploration (fragmented identity → cautious).
+/// Science: Gallagher (2000) — fragmented narrative self reduces decision confidence.
+pub const KOSMIC_LOW_COHERENCE_THRESHOLD: f32 = 0.3;
+
+/// Low coherence exploration dampening (multiplicative).
+pub const KOSMIC_LOW_COHERENCE_EXPLORATION_DAMPEN: f32 = 0.95;
+
+/// High coherence confidence boost (additive).
+/// Science: Conway & Pleydell-Pearce (2000) — coherent identity → reliable decisions.
+pub const KOSMIC_HIGH_COHERENCE_CONFIDENCE_BOOST: f32 = 0.02;
+
+/// High coherence threshold: above this, boost confidence.
+pub const KOSMIC_HIGH_COHERENCE_THRESHOLD: f32 = 0.7;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// EMPATHIC NEUROMODULATION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Empathic compassion threshold for oxytocin production.
+/// Science: Feldman (2012) — empathic resonance drives oxytocin release.
+pub const EMPATHIC_COMPASSION_OXY_THRESHOLD: f64 = 0.7;
+
+/// Oxytocin production scale from empathic compassion.
+pub const EMPATHIC_COMPASSION_OXY_SCALE: f32 = 0.15;
+
+/// Empathic compassion threshold for dopamine boost (reward from connection).
+/// Science: Rilling et al. (2002) — mutual cooperation activates DA reward circuits.
+pub const EMPATHIC_COMPASSION_DA_THRESHOLD: f64 = 0.8;
+
+/// Dopamine production scale from empathic compassion.
+pub const EMPATHIC_COMPASSION_DA_SCALE: f32 = 0.08;
+
 /// 4. `ATTENTION_BUDGET_US > 0` (nonzero budget)
 /// 5. `POLICY_MIN_WINDOW < POLICY_WINDOW_SIZE`
 /// 6. `DOMINANCE_DEFAULT < DOMINANCE_CONFIDENT < DOMINANCE_FLOW_BASE`
@@ -1042,6 +1082,20 @@ pub fn validate() {
         REWARD_NEGATIVE_THRESHOLD,
         REWARD_POSITIVE_THRESHOLD
     );
+
+    // 19. Governance neuromod contagion — all doses conservative
+    assert!(GOV_NEUROMOD_FLOOR > 0.0 && GOV_NEUROMOD_FLOOR < 0.05);
+    assert!(GOV_EMERGENCY_NE_NUDGE > 0.0 && GOV_EMERGENCY_NE_NUDGE <= 0.10);
+    assert!(GOV_RECIPROCITY_OXY_DOSE > 0.0 && GOV_RECIPROCITY_OXY_DOSE <= 0.05);
+    assert!(GOV_RECIPROCITY_OXY_CAP >= GOV_RECIPROCITY_OXY_DOSE);
+    assert!(GOV_RECIPROCITY_OXY_HALFLIFE > 0);
+    assert!(GOV_DISPUTE_NE_NUDGE > 0.0 && GOV_DISPUTE_NE_NUDGE <= 0.10);
+    assert!(GOV_DISPUTE_SHT_NUDGE < 0.0 && GOV_DISPUTE_SHT_NUDGE >= -0.10);
+    assert!(GOV_ALIGNED_PASS_DA_DOSE > 0.0 && GOV_ALIGNED_PASS_DA_DOSE <= 0.20);
+    assert!(GOV_ALIGNED_PASS_DA_HALFLIFE > 0);
+    assert!(GOV_ALIGNED_FAIL_DA_NUDGE < 0.0 && GOV_ALIGNED_FAIL_DA_NUDGE >= -0.10);
+    assert!(GOV_REPUTATION_DECLINE_SHT < 0.0 && GOV_REPUTATION_DECLINE_SHT >= -0.10);
+    assert!(GOV_COLLECTIVE_PHI_ECB > 0.0 && GOV_COLLECTIVE_PHI_ECB <= 0.05);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1947,6 +2001,54 @@ pub const ALLOSTATIC_LOAD_DANGER_THRESHOLD: f64 = 0.7;
 pub const ALLOSTATIC_LOAD_LR_DAMPEN: f64 = 0.5;
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// GOVERNANCE NEUROMODULATORY CONTAGION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Minimum dose magnitude to queue a neuromod effect (prevents spurious micro-nudges).
+pub const GOV_NEUROMOD_FLOOR: f32 = 0.01;
+
+/// NE baseline nudge on EmergencyDeclared.
+/// Basis: Arnsten (2009) — acute stress NE surge for vigilance.
+pub const GOV_EMERGENCY_NE_NUDGE: f32 = 0.05;
+
+/// Oxytocin injection dose per ReciprocityPledge.
+/// Basis: Zak (2012) — reciprocity → oxytocin for social bonding.
+pub const GOV_RECIPROCITY_OXY_DOSE: f32 = 0.02;
+
+/// Maximum cumulative oxytocin from reciprocity per cycle.
+pub const GOV_RECIPROCITY_OXY_CAP: f32 = 0.10;
+
+/// Half-life (in cycles) for reciprocity oxytocin injection.
+pub const GOV_RECIPROCITY_OXY_HALFLIFE: u32 = 40;
+
+/// NE baseline nudge for self-involved JusticeDispute.
+/// Basis: Sapolsky (2004) — personal conflict → cortisol proxy.
+pub const GOV_DISPUTE_NE_NUDGE: f32 = 0.03;
+
+/// 5-HT baseline nudge for self-involved JusticeDispute (negative = dip).
+/// Basis: Sapolsky (2004) — stress → serotonin suppression.
+pub const GOV_DISPUTE_SHT_NUDGE: f32 = -0.02;
+
+/// DA phasic injection dose on aligned pass.
+/// Basis: Schultz (1997) — reward prediction confirmation → phasic dopamine.
+pub const GOV_ALIGNED_PASS_DA_DOSE: f32 = 0.10;
+
+/// Half-life (in cycles) for aligned-pass DA injection.
+pub const GOV_ALIGNED_PASS_DA_HALFLIFE: u32 = 20;
+
+/// DA baseline nudge on aligned fail (negative = dip).
+/// Basis: Schultz (1997) — reward prediction error → dopamine suppression.
+pub const GOV_ALIGNED_FAIL_DA_NUDGE: f32 = -0.02;
+
+/// 5-HT baseline nudge on negative reputation change.
+/// Basis: Crockett (2009) — social rejection → serotonin dip.
+pub const GOV_REPUTATION_DECLINE_SHT: f32 = -0.02;
+
+/// ECB baseline nudge on high collective Phi (>0.5).
+/// Group coherence → endocannabinoid system activation.
+pub const GOV_COLLECTIVE_PHI_ECB: f32 = 0.01;
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // TESTS
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -2485,6 +2587,24 @@ mod tests {
         assert!(NARRATIVE_SELF_PHI_LOW_THRESHOLD < NARRATIVE_SELF_PHI_CONFIDENCE_THRESHOLD);
         assert!(NARRATIVE_SELF_PHI_CONFIDENCE_SCALE > 0.0);
         assert!(NARRATIVE_SELF_PHI_LOW_EXPLORE_BOOST > 0.0);
+    }
+
+    #[test]
+    fn test_governance_neuromod_params() {
+        // Floor must be positive and small
+        assert!(GOV_NEUROMOD_FLOOR > 0.0 && GOV_NEUROMOD_FLOOR < 0.05);
+        // All positive nudges are conservative (<= 0.10)
+        assert!(GOV_EMERGENCY_NE_NUDGE <= 0.10);
+        assert!(GOV_RECIPROCITY_OXY_DOSE <= 0.05);
+        assert!(GOV_ALIGNED_PASS_DA_DOSE <= 0.20);
+        // Oxytocin cap >= per-dose
+        assert!(GOV_RECIPROCITY_OXY_CAP >= GOV_RECIPROCITY_OXY_DOSE);
+        // Negative nudges are negative
+        assert!(GOV_DISPUTE_SHT_NUDGE < 0.0);
+        assert!(GOV_ALIGNED_FAIL_DA_NUDGE < 0.0);
+        assert!(GOV_REPUTATION_DECLINE_SHT < 0.0);
+        // ECB nudge is small and positive
+        assert!(GOV_COLLECTIVE_PHI_ECB > 0.0 && GOV_COLLECTIVE_PHI_ECB <= 0.05);
     }
 
     #[test]

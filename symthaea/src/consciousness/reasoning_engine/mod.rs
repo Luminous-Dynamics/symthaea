@@ -140,7 +140,12 @@ impl ConsciousReasoningEngine {
         // ── STEP 2: ASSESS ─────────────────────────────────────────────
         let r = self.calibrator.reliability(&ctx.theory_metrics);
         let gamma = self.calibrator.gamma();
-        let phi_eff = effective_phi(ctx.phi, r, gamma);
+        let phi_eff_raw = effective_phi(ctx.phi, r, gamma);
+        // Epistemic quality modulates phi_eff: low evidence quality → conservative.
+        // Floor at 0.5 so even zero-quality claims retain 50% of their phi_eff.
+        // Science: epistemic humility — claims with weak evidence get less Phi amplification.
+        let epistemic_mod = 0.5 + 0.5 * ctx.epistemic_quality;
+        let phi_eff = phi_eff_raw * epistemic_mod;
 
         // Create budget tracker
         let budget = ReasoningBudget::new(ctx.available_budget_us, r);

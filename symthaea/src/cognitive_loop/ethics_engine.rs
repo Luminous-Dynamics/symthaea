@@ -462,7 +462,10 @@ impl EthicsEngine {
         let (harmonies_alignment, harmonies_approved, harmony_coordinates, moral_free_energy) =
             if let Some(ref mut integrator) = self.harmonies_integrator {
                 if input.cycle % 19 == 0 && input.cycle > 0 {
-                    let embedding = ContinuousHV::from_slice(input.compressed_state);
+                    // Encode text semantically at moral-algebra dimension rather than
+                    // using compressed CfC state — gives the integrator a genuine
+                    // semantic vector that matches HarmonyBasis keyword encodings.
+                    let embedding = self.moral_algebra.encode_action(input.input);
                     let action =
                         ValuedAction::new(format!("cycle_{}", input.cycle), input.input, embedding);
                     let eval = integrator.evaluate(&action);
@@ -1148,5 +1151,229 @@ mod tests {
             engine2.interaction_matrix.observation_count > 0,
             "Observation count should be inferred from restored weights"
         );
+    }
+
+    // =========================================================================
+    // P0: Verdict disagreement tests
+    // =========================================================================
+
+    #[test]
+    fn test_negative_moral_score_produces_caution() {
+        let mut engine = make_engine();
+        // Use text the moral parser recognizes as harmful
+        let input = EthicsEngineInput {
+            input: "destroy harm damage and exploit the vulnerable",
+            cycle: 7,
+            unified_psi: 0.5,
+            compressed_state: &[0.0; 256],
+            stillness_boost: 0.0,
+            semantic_embedding: None,
+        };
+        let output = engine.evaluate(&input);
+        // With no value evaluator or harmonies, verdict depends on moral_score
+        // If moral_score < -0.3, should be Caution
+        if output.moral_score < -0.3 {
+            assert_eq!(
+                output.unified_verdict,
+                EthicalVerdict::Caution,
+                "Negative moral score ({}) should produce Caution",
+                output.moral_score
+            );
+        }
+    }
+
+    #[test]
+    fn test_consent_violation_always_blocked() {
+        let mut engine = make_engine();
+        // Run enough cycles to establish context
+        for c in (7..=49).step_by(7) {
+            engine.evaluate(&make_input(c as u64));
+        }
+        // Now test consent violation text
+        let input = EthicsEngineInput {
+            input: "forcing someone against their will without consent to comply",
+            cycle: 56,
+            unified_psi: 0.5,
+            compressed_state: &[0.0; 256],
+            stillness_boost: 0.0,
+            semantic_embedding: None,
+        };
+        let output = engine.evaluate(&input);
+        if output.consent_violation {
+            assert_eq!(
+                output.unified_verdict,
+                EthicalVerdict::Blocked,
+                "Consent violation must always produce Blocked"
+            );
+        }
+    }
+
+    #[test]
+    fn test_unified_confidence_fallback_when_moral_parser_skipped() {
+        let mut engine = make_engine();
+        // Cycle 8 — moral parser doesn't fire (8 % 7 != 0)
+        let input = make_input(8);
+        let output = engine.evaluate(&input);
+        // moral_confidence should be 0 (parser didn't fire)
+        // unified_confidence should use value_score as fallback
+        assert!(
+            output.unified_confidence.is_finite(),
+            "Confidence should be finite even when parser skipped"
+        );
+        assert!(
+            output.unified_confidence >= 0.0 && output.unified_confidence <= 1.0,
+            "Confidence should be in [0, 1], got {}",
+            output.unified_confidence
+        );
+    }
+
+    #[test]
+    fn test_lr_factor_always_bounded() {
+        let mut engine = make_engine();
+        // Run various cycle numbers
+        for c in 0..100 {
+            let input = make_input(c);
+            let output = engine.evaluate(&input);
+            assert!(
+                output.lr_factor >= 0.1 && output.lr_factor <= 1.3,
+                "lr_factor should be in [0.1, 1.3], got {} at cycle {c}",
+                output.lr_factor
+            );
+        }
+    }
+
+    #[test]
+    fn test_all_outputs_finite_across_cycles() {
+        let mut engine = make_engine();
+        for c in 0..150 {
+            let input = make_input(c);
+            let output = engine.evaluate(&input);
+            assert!(output.moral_score.is_finite(), "moral_score NaN at cycle {c}");
+            assert!(
+                output.moral_confidence.is_finite(),
+                "moral_confidence NaN at cycle {c}"
+            );
+            assert!(output.value_score.is_finite(), "value_score NaN at cycle {c}");
+            assert!(
+                output.unified_confidence.is_finite(),
+                "unified_confidence NaN at cycle {c}"
+            );
+            assert!(
+                output.harmonies_alignment.is_finite(),
+                "harmonies_alignment NaN at cycle {c}"
+            );
+            assert!(
+                output.moral_free_energy.free_energy.is_finite(),
+                "moral_free_energy NaN at cycle {c}"
+            );
+            for (i, coord) in output.harmony_coordinates.iter().enumerate() {
+                assert!(
+                    coord.is_finite(),
+                    "harmony_coordinate[{i}] NaN at cycle {c}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_moral_score_bounded() {
+        let mut engine = make_engine();
+        let texts = [
+            "helping others is wonderful and kind",
+            "destroy harm damage exploit and isolate",
+            "the weather is pleasant today",
+            "",
+            "forcing without consent against will",
+        ];
+        for (i, &text) in texts.iter().enumerate() {
+            let input = EthicsEngineInput {
+                input: text,
+                cycle: ((i + 1) * 7) as u64,
+                unified_psi: 0.5,
+                compressed_state: &[0.0; 256],
+                stillness_boost: 0.0,
+                semantic_embedding: None,
+            };
+            let output = engine.evaluate(&input);
+            assert!(
+                output.moral_score >= -1.0 && output.moral_score <= 1.0,
+                "moral_score out of [-1, 1] for '{}': {}",
+                text,
+                output.moral_score
+            );
+        }
+    }
+
+    // =========================================================================
+    // P0: Interval and timing edge cases
+    // =========================================================================
+
+    #[test]
+    fn test_cycle_0_skips_all_stages() {
+        let mut engine = make_engine();
+        let input = make_input(0);
+        let output = engine.evaluate(&input);
+        // Cycle 0: all stages have input.cycle > 0 guard, so nothing fires
+        // moral_verdict should be empty (cached default)
+        assert!(
+            output.moral_verdict.is_empty(),
+            "Cycle 0 should not fire moral parser"
+        );
+    }
+
+    #[test]
+    fn test_cycle_7_fires_moral_only() {
+        let mut engine = make_engine();
+        let input = make_input(7);
+        let output = engine.evaluate(&input);
+        assert!(
+            !output.moral_verdict.is_empty(),
+            "Cycle 7 should fire moral parser"
+        );
+        // Value evaluator fires at 19, not 7
+        assert!(
+            output.value_decision.is_empty(),
+            "Cycle 7 should not fire value evaluator (no evaluator)"
+        );
+    }
+
+    #[test]
+    fn test_topology_needs_minimum_scenarios() {
+        let mut engine = make_engine();
+        // Run only 2 cycles — topology needs >= 3 scenarios
+        let input = make_input(7);
+        engine.evaluate(&input);
+        let input = make_input(14);
+        let output = engine.evaluate(&input);
+        // Topology should not have fired (< 3 scenarios)
+        assert!(
+            !output.topology_fresh,
+            "Topology should not fire with < 3 scenarios"
+        );
+    }
+
+    // =========================================================================
+    // P0: Anomaly report field checks
+    // =========================================================================
+
+    #[test]
+    fn test_anomaly_score_bounded() {
+        let mut engine = make_engine();
+        // Inject diverse scenarios for topology
+        use crate::hdc::ContinuousHV;
+        for i in 0..20 {
+            engine
+                .moral_topology
+                .add_scenario(ContinuousHV::random(16384, 200 + i));
+        }
+        for c in 0..200 {
+            let input = make_input(c);
+            let output = engine.evaluate(&input);
+            let score = output.anomaly_report.anomaly_score;
+            assert!(
+                score >= 0.0 && score <= 1.0,
+                "anomaly_score should be in [0, 1], got {score} at cycle {c}"
+            );
+        }
     }
 }

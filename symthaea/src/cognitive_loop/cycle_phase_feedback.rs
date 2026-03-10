@@ -45,6 +45,8 @@ use super::thresholds::{
     TOM_ACCURACY_SCALE, TRUST_DECAY_FACTOR, TRUST_SIGNAL_MIDPOINT, TRUST_SIGNAL_RATE,
     UNIFIED_QUALITY_AGREEMENT_WEIGHT, UNIFIED_QUALITY_ANOMALY_WEIGHT,
     UNIFIED_QUALITY_PREDICTION_WEIGHT,
+    KOSMIC_SONG_INTERVAL, KOSMIC_LOW_COHERENCE_THRESHOLD, KOSMIC_LOW_COHERENCE_EXPLORATION_DAMPEN,
+    KOSMIC_HIGH_COHERENCE_THRESHOLD, KOSMIC_HIGH_COHERENCE_CONFIDENCE_BOOST,
 };
 use super::{CognitiveLoopService, CycleState};
 
@@ -212,27 +214,6 @@ impl CognitiveLoopService {
         let grid_encoding_norm = subsystem_metrics.grid_encoding_norm;
         let grid_spatial_complexity = subsystem_metrics.grid_spatial_complexity;
 
-        // Session 16 Item 7: Multi-objective frontier size → exploration gating.
-        // Large Pareto frontier = many competing objectives → boost exploration.
-        // Single-point frontier = converged → dampen exploration.
-        // Science: Deb (2002) — Pareto frontier diversity signals solution space richness.
-        {
-            use super::thresholds::{
-                MULTI_OBJ_FRONTIER_DAMPEN, MULTI_OBJ_FRONTIER_EXPLORE_SCALE,
-                MULTI_OBJ_FRONTIER_LARGE, MULTI_OBJ_FRONTIER_SMALL,
-            };
-            if multi_obj_frontier_size >= MULTI_OBJ_FRONTIER_LARGE && self.stats.total_cycles > 15 {
-                let boost = (multi_obj_frontier_size - MULTI_OBJ_FRONTIER_LARGE + 1) as f32
-                    * MULTI_OBJ_FRONTIER_EXPLORE_SCALE;
-                self.adjust_exploration("frontier_large", boost.min(0.1));
-            } else if multi_obj_frontier_size <= MULTI_OBJ_FRONTIER_SMALL
-                && multi_obj_frontier_size > 0
-                && self.stats.total_cycles > 30
-            {
-                self.scale_exploration("frontier_converged", MULTI_OBJ_FRONTIER_DAMPEN);
-            }
-        }
-
         // ── Phase 18: Empathic tone → speech rate modulation ─────────────────
         let empathic_speech_rate_mod = if empathic_tone_adj.abs() > EMPATHIC_TONE_THRESHOLD as f64 {
             let rate_mod = 1.0 - empathic_tone_adj as f32 * EMPATHIC_TONE_RATE_SCALE;
@@ -272,40 +253,6 @@ impl CognitiveLoopService {
         } else {
             ""
         };
-
-        // Session 16 Item 2: Consciousness gradient magnitude → stability recovery.
-        // Large gradient = rapid consciousness change → cautious LR dampening.
-        // Near-zero gradient sustained → stable integration → confidence recovery.
-        // Science: Oizumi et al. (2014) — consciousness gradient tracks integration dynamics.
-        {
-            use super::thresholds::{
-                CONSCIOUSNESS_GRADIENT_CAUTION_THRESHOLD, CONSCIOUSNESS_GRADIENT_LR_SCALE,
-                CONSCIOUSNESS_GRADIENT_RECOVERY_BOOST, CONSCIOUSNESS_GRADIENT_STABLE_CYCLES,
-            };
-            if consciousness_gradient_magnitude > CONSCIOUSNESS_GRADIENT_CAUTION_THRESHOLD
-                && self.stats.total_cycles > 15
-            {
-                self.scale_lr("gradient_caution", CONSCIOUSNESS_GRADIENT_LR_SCALE);
-                self.carryover.quality.consecutive_stable_gradient = 0;
-            } else if consciousness_gradient_magnitude < 0.01 {
-                self.carryover.quality.consecutive_stable_gradient = self
-                    .carryover
-                    .quality
-                    .consecutive_stable_gradient
-                    .saturating_add(1);
-                if self.carryover.quality.consecutive_stable_gradient
-                    > CONSCIOUSNESS_GRADIENT_STABLE_CYCLES
-                    && self.stats.total_cycles > 20
-                {
-                    self.adjust_confidence(
-                        "gradient_stable_recovery",
-                        CONSCIOUSNESS_GRADIENT_RECOVERY_BOOST,
-                    );
-                }
-            } else {
-                self.carryover.quality.consecutive_stable_gradient = 0;
-            }
-        }
 
         // ── Phase 19: Harmonic love resonance → confidence/soul amplifier ────
         let love_resonance_boost = if harmonic_love_resonance > LOVE_RESONANCE_THRESHOLD as f64 {
@@ -453,33 +400,6 @@ impl CognitiveLoopService {
             let trust_factor =
                 (epistemic_gate_confidence - EPISTEMIC_TRUST_THRESHOLD) * EPISTEMIC_TRUST_SCALE;
             self.scale_threshold("epistemic_gate_trust", 1.0 - trust_factor);
-        }
-
-        // Session 16 Item 4: Epistemic gate rejection streak → recalibration.
-        // Consecutive rejections signal systematic model failure. After threshold,
-        // boost exploration and relax thresholds to let new information through.
-        // Science: Berlyne (1960) — sustained rejection = need for epistemic recalibration.
-        if !epistemic_gate_approved {
-            self.carryover.quality.consecutive_epistemic_rejections = self
-                .carryover
-                .quality
-                .consecutive_epistemic_rejections
-                .saturating_add(1);
-        } else {
-            self.carryover.quality.consecutive_epistemic_rejections = 0;
-        }
-        if self.carryover.quality.consecutive_epistemic_rejections
-            >= super::thresholds::EPISTEMIC_REJECTION_STREAK_THRESHOLD
-            && self.stats.total_cycles > 20
-        {
-            self.adjust_exploration(
-                "epistemic_streak_recal",
-                super::thresholds::EPISTEMIC_REJECTION_STREAK_EXPLORE,
-            );
-            self.scale_threshold(
-                "epistemic_streak_recal",
-                super::thresholds::EPISTEMIC_REJECTION_STREAK_THRESHOLD_RELAX,
-            );
         }
 
         // Session 15 Item 1: Pipeline consciousness → epistemic caution modulation.
@@ -768,12 +688,6 @@ impl CognitiveLoopService {
                 // Moral topology → consciousness coupling
                 moral_drift: self.ethics_engine.moral_topology().moral_drift(20),
                 moral_anomaly_score: self.ethics_engine.last_anomaly_report().anomaly_score,
-                // Coherence field → consciousness coupling (McEwen 2007)
-                coherence_field_integration: self
-                    .coherence_field
-                    .as_ref()
-                    .map(|cf| cf.coherence as f64)
-                    .unwrap_or(0.5), // neutral when disabled
                 // HOT recursion depth: meta_cognition depth × substrate HOT capability
                 hot_depth: self
                     .self_model_tier
@@ -899,71 +813,6 @@ impl CognitiveLoopService {
             );
         }
 
-        // ── Affective consciousness → behavior coupling ──────────────────
-        // Valence and arousal from the consciousness equation's affective bridge
-        // should drive learning and exploration, not just sit in telemetry.
-        // Science: Barrett (2017) — affect is the primary driver of cognition;
-        // Damasio (1999) — somatic markers guide all decisions.
-        {
-            use crate::cognitive_loop::thresholds::{
-                AFFECT_AROUSAL_HIGH_LR_SCALE, AFFECT_AROUSAL_HIGH_THRESHOLD,
-                AFFECT_AROUSAL_LOW_EXPLORE_DAMPEN, AFFECT_AROUSAL_LOW_THRESHOLD,
-                AFFECT_VALENCE_NEGATIVE_EXPLORE_BOOST, AFFECT_VALENCE_NEGATIVE_THRESHOLD,
-                AFFECT_VALENCE_POSITIVE_CONFIDENCE_BOOST, AFFECT_VALENCE_POSITIVE_THRESHOLD,
-            };
-            if affect_cons_arousal > AFFECT_AROUSAL_HIGH_THRESHOLD && self.stats.total_cycles > 10
-            {
-                self.scale_lr("affect_high_arousal", AFFECT_AROUSAL_HIGH_LR_SCALE);
-            } else if affect_cons_arousal < AFFECT_AROUSAL_LOW_THRESHOLD
-                && affect_cons_arousal > 0.0
-                && self.stats.total_cycles > 10
-            {
-                self.scale_exploration("affect_low_arousal", AFFECT_AROUSAL_LOW_EXPLORE_DAMPEN);
-            }
-            if affect_cons_valence < AFFECT_VALENCE_NEGATIVE_THRESHOLD
-                && self.stats.total_cycles > 10
-            {
-                self.adjust_exploration(
-                    "affect_negative_valence",
-                    AFFECT_VALENCE_NEGATIVE_EXPLORE_BOOST,
-                );
-            } else if affect_cons_valence > AFFECT_VALENCE_POSITIVE_THRESHOLD
-                && self.stats.total_cycles > 10
-            {
-                self.adjust_confidence(
-                    "affect_positive_valence",
-                    AFFECT_VALENCE_POSITIVE_CONFIDENCE_BOOST,
-                );
-            }
-        }
-
-        // ── Narrative self-phi → confidence coupling ─────────────────────
-        // Self-coherence (narrative identity integration) grounds confidence
-        // in decisions; fragmented identity → explore to find coherence.
-        // Science: Gallagher (2000) — narrative self underpins identity;
-        // Conway & Pleydell-Pearce (2000) — self-coherence → decision confidence.
-        {
-            use crate::cognitive_loop::thresholds::{
-                NARRATIVE_SELF_PHI_CONFIDENCE_SCALE, NARRATIVE_SELF_PHI_CONFIDENCE_THRESHOLD,
-                NARRATIVE_SELF_PHI_LOW_EXPLORE_BOOST, NARRATIVE_SELF_PHI_LOW_THRESHOLD,
-            };
-            if narrative_gwt_self_psi > NARRATIVE_SELF_PHI_CONFIDENCE_THRESHOLD
-                && self.stats.total_cycles > 15
-            {
-                let boost = ((narrative_gwt_self_psi - NARRATIVE_SELF_PHI_CONFIDENCE_THRESHOLD)
-                    * NARRATIVE_SELF_PHI_CONFIDENCE_SCALE as f64) as f32;
-                self.adjust_confidence("narrative_self_coherent", boost);
-            } else if narrative_gwt_self_psi > 0.0
-                && narrative_gwt_self_psi < NARRATIVE_SELF_PHI_LOW_THRESHOLD
-                && self.stats.total_cycles > 15
-            {
-                self.adjust_exploration(
-                    "narrative_self_fragmented",
-                    NARRATIVE_SELF_PHI_LOW_EXPLORE_BOOST,
-                );
-            }
-        }
-
         let consciousness_weights = consciousness_output.current_weights;
         let consciousness_weight_variance = consciousness_output.weight_variance;
         let convergence_state = format!("{:?}", consciousness_output.convergence_state);
@@ -1042,6 +891,47 @@ impl CognitiveLoopService {
             soul.integrate_experience(experience);
         }
         module_timings.soul_experience = _t.elapsed().as_micros() as u64;
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // KOSMIC SONG: Unified Identity Synthesis
+        // Phi × HarmonicAlignment × MoralClarity → coherence_score
+        // Gates FEP learning rate and exploration when identity is fragmented.
+        // Science: Gallagher (2000) — narrative self underpins agency;
+        // Conway & Pleydell-Pearce (2000) — self-coherence → decision confidence.
+        // ═══════════════════════════════════════════════════════════════════════
+        let kosmic_coherence = if self.stats.total_cycles % KOSMIC_SONG_INTERVAL == 0 {
+            // Feed current Phi into KosmicSong
+            self.kosmic_song.phi = (equation_v2_consciousness as f32).clamp(0.0, 0.5);
+
+            // Feed current moral uncertainty from ethics engine
+            let drift = self.ethics_engine.moral_topology().moral_drift(20);
+            if drift > 0.0 {
+                self.kosmic_song.moral_uncertainty =
+                    crate::mycelix::gis::MoralUncertainty::new(drift as f32, drift as f32 * 0.8, drift as f32 * 0.6);
+            }
+
+            // Synthesize all layers
+            let result = self.kosmic_song.synthesize();
+            self.carryover.quality.last_kosmic_coherence = result.score;
+            result.score
+        } else {
+            self.carryover.quality.last_kosmic_coherence
+        };
+
+        // Behavioral coupling from KosmicSong coherence
+        if self.stats.total_cycles > 10 {
+            if kosmic_coherence < KOSMIC_LOW_COHERENCE_THRESHOLD {
+                self.scale_exploration(
+                    "kosmic_low_coherence",
+                    KOSMIC_LOW_COHERENCE_EXPLORATION_DAMPEN,
+                );
+            } else if kosmic_coherence > KOSMIC_HIGH_COHERENCE_THRESHOLD {
+                self.adjust_confidence(
+                    "kosmic_high_coherence",
+                    KOSMIC_HIGH_COHERENCE_CONFIDENCE_BOOST,
+                );
+            }
+        }
 
         // ── Phi-Dyad: Relational Consciousness ─────────────────────────────
         // Compute Φ_dyad from recent AI + input HVs (Phase 6 wiring).
@@ -1309,25 +1199,6 @@ impl CognitiveLoopService {
             self.adjust_exploration("temporal_discontinuity", 0.02);
         }
 
-        // Session 16 Item 1: Temporal binding strength → exploration/LR feedback.
-        // Strong theta-gated binding → stable temporal model → exploit (dampen exploration).
-        // Weak binding → poor temporal integration → explore + dampen LR.
-        // Science: Buzsáki (2002) — theta oscillation gates temporal context binding.
-        {
-            use super::thresholds::{
-                TEMPORAL_BINDING_DAMPEN_THRESHOLD, TEMPORAL_BINDING_EXPLORE_SCALE,
-                TEMPORAL_BINDING_EXPLORE_THRESHOLD, TEMPORAL_BINDING_LOW_LR_SCALE,
-            };
-            let tb = perception.encoding.temporal_binding_strength;
-            if tb < TEMPORAL_BINDING_EXPLORE_THRESHOLD && self.stats.total_cycles > 15 {
-                let boost = (TEMPORAL_BINDING_EXPLORE_THRESHOLD - tb) * TEMPORAL_BINDING_EXPLORE_SCALE;
-                self.adjust_exploration("temporal_binding_low", boost);
-                self.scale_lr("temporal_binding_low", TEMPORAL_BINDING_LOW_LR_SCALE);
-            } else if tb > TEMPORAL_BINDING_DAMPEN_THRESHOLD && self.stats.total_cycles > 15 {
-                self.scale_exploration("temporal_binding_high", 0.98);
-            }
-        }
-
         // Session 12 Item 7: Cross-modal binding → attention sensitivity.
         // High binding (>0.7) → more modalities integrated → boost attention sensitivity.
         // Low binding (<0.3) → weak integration → dampen (trust only primary modality).
@@ -1464,6 +1335,7 @@ impl CognitiveLoopService {
                 empathic_compassion,
                 empathic_tone_adj,
                 empathic_speech_rate_mod,
+                kosmic_coherence,
             },
             evolution: FbEvolution {
                 hierarchical_ltc_phi,

@@ -183,6 +183,7 @@ impl CognitiveLoopService {
                 empathic_compassion: feedback.ethics.empathic_compassion,
                 empathic_tone_adj: feedback.ethics.empathic_tone_adj,
                 empathic_speech_rate_mod: feedback.ethics.empathic_speech_rate_mod,
+                kosmic_coherence: feedback.ethics.kosmic_coherence,
                 moral_topo_beta_0: self.ethics_engine.moral_topology().last_summary().beta_0,
                 moral_topo_beta_1: self.ethics_engine.moral_topology().last_summary().beta_1,
                 moral_topo_beta_2: self.ethics_engine.moral_topology().last_summary().beta_2,

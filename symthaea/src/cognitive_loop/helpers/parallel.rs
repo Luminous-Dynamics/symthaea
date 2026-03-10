@@ -3,6 +3,7 @@
 //! These are NOT methods on `&mut self` — they take explicit disjoint borrows
 //! so the borrow checker is satisfied for `rayon::join`'s Send requirements.
 
+use std::fmt::Write;
 use std::time::Instant;
 
 use crate::causal::CausalLoopEnhancer;
@@ -160,8 +161,11 @@ pub(in crate::cognitive_loop) fn parallel_episodic_learning(
                 .map(|(_, hv)| hv.clone());
 
             if let (Some(v_hv), Some(p_hv)) = (val_hv, phi_hv) {
+                // Pre-sized String avoids reallocation (ep_ + up to 20 digits)
+                let mut ep_key = String::with_capacity(23);
+                let _ = write!(ep_key, "ep_{}", ctx.total_cycles);
                 res_mem.store(
-                    &format!("ep_{}", ctx.total_cycles),
+                    ep_key.as_str(),
                     &[
                         ("content", "input", ctx.compressed_state),
                         ("valence", val_label, &v_hv),
