@@ -105,9 +105,7 @@ impl Scrubber {
         let mut type_counts: Vec<(&'static str, usize)> = Vec::new();
 
         for pattern in &self.patterns {
-            let replaced = pattern
-                .regex
-                .replace_all(&result, pattern.replacement);
+            let replaced = pattern.regex.replace_all(&result, pattern.replacement);
             // Count actual replacements by checking if the string changed
             if replaced != result {
                 let count = pattern.regex.find_iter(&result).count();

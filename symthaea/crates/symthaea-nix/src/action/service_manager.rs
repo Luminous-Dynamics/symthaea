@@ -114,9 +114,18 @@ impl ServiceManager {
         for line in stdout.lines() {
             if let Some((key, value)) = line.split_once('=') {
                 match key {
-                    "ActiveState" => { active_state = value.to_string(); parsed_fields += 1; }
-                    "SubState" => { sub_state = value.to_string(); parsed_fields += 1; }
-                    "UnitFileState" => { enabled = value == "enabled"; parsed_fields += 1; }
+                    "ActiveState" => {
+                        active_state = value.to_string();
+                        parsed_fields += 1;
+                    }
+                    "SubState" => {
+                        sub_state = value.to_string();
+                        parsed_fields += 1;
+                    }
+                    "UnitFileState" => {
+                        enabled = value == "enabled";
+                        parsed_fields += 1;
+                    }
                     _ => {}
                 }
             }

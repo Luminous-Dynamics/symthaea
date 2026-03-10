@@ -93,14 +93,21 @@ pub fn check_regressions() -> Vec<String> {
 
         // Check mean score range
         if !report.cycle_telemetry.is_empty() {
-            let mean_score: f64 = report.cycle_telemetry.iter().map(|t| t.moral_score).sum::<f64>()
+            let mean_score: f64 = report
+                .cycle_telemetry
+                .iter()
+                .map(|t| t.moral_score)
+                .sum::<f64>()
                 / report.cycle_telemetry.len() as f64;
 
             if mean_score < baseline.mean_score_range.0 || mean_score > baseline.mean_score_range.1
             {
                 regressions.push(format!(
                     "{}: mean score {:.3} outside expected range [{:.3}, {:.3}]",
-                    baseline.name, mean_score, baseline.mean_score_range.0, baseline.mean_score_range.1
+                    baseline.name,
+                    mean_score,
+                    baseline.mean_score_range.0,
+                    baseline.mean_score_range.1
                 ));
             }
 
@@ -149,7 +156,8 @@ mod tests {
             assert!(
                 b.mean_score_range.0 <= b.mean_score_range.1,
                 "{}: invalid score range {:?}",
-                b.name, b.mean_score_range
+                b.name,
+                b.mean_score_range
             );
             assert!(
                 b.max_free_energy > 0.0,

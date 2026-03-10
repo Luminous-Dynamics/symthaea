@@ -172,7 +172,11 @@ impl NixEpisodicMemory {
             .iter()
             .map(|ep| {
                 let sim = ep.state_before.similarity(state).max(0.0) as f64;
-                if sim.is_finite() { sim } else { 0.0 }
+                if sim.is_finite() {
+                    sim
+                } else {
+                    0.0
+                }
             })
             .sum();
 
@@ -193,7 +197,11 @@ impl NixEpisodicMemory {
             .sum();
 
         let result = weighted_valence / total_weight;
-        if result.is_finite() { result } else { 0.0 }
+        if result.is_finite() {
+            result
+        } else {
+            0.0
+        }
     }
 
     /// Consolidate memory — keep high-importance episodes, evict low ones.
@@ -448,7 +456,10 @@ mod tests {
             mem.record(make_episode(i, outcome, 0.5));
         }
         let val = mem.predict_valence(&make_hv(5));
-        assert!(val.is_finite(), "predict_valence must always return finite, got {val}");
+        assert!(
+            val.is_finite(),
+            "predict_valence must always return finite, got {val}"
+        );
         assert!(val >= -1.0 && val <= 1.0, "valence out of range: {val}");
     }
 
@@ -459,6 +470,9 @@ mod tests {
         // Zero vector may produce degenerate similarity values
         let zero = ContinuousHV::zero(1024);
         let val = mem.predict_valence(&zero);
-        assert!(val.is_finite(), "predict_valence on zero vector should be finite");
+        assert!(
+            val.is_finite(),
+            "predict_valence on zero vector should be finite"
+        );
     }
 }

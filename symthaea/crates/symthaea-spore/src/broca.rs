@@ -99,18 +99,18 @@ impl ThoughtChannels {
         let [dopamine, norepinephrine, serotonin, oxytocin] = neuromodulators;
         Self {
             channels: [
-                0.0,                                       // intent_0
-                0.0,                                       // intent_1
-                0.0,                                       // intent_2
-                0.0,                                       // intent_3
-                0.5,                                       // epistemic_status (neutral default)
+                0.0,                                               // intent_0
+                0.0,                                               // intent_1
+                0.0,                                               // intent_2
+                0.0,                                               // intent_3
+                0.5, // epistemic_status (neutral default)
                 (dopamine - 0.5 + oxytocin - 0.5).clamp(0.0, 1.0), // valence
-                norepinephrine.clamp(0.0, 1.0),            // arousal
-                consciousness.clamp(0.0, 1.0),             // consciousness_level
-                prediction_error.clamp(0.0, 1.0),          // prediction_error
-                harmony.clamp(0.0, 1.0),                   // harmony
-                dopamine.clamp(0.0, 1.0),                  // dopamine
-                serotonin.clamp(0.0, 1.0),                 // serotonin
+                norepinephrine.clamp(0.0, 1.0), // arousal
+                consciousness.clamp(0.0, 1.0), // consciousness_level
+                prediction_error.clamp(0.0, 1.0), // prediction_error
+                harmony.clamp(0.0, 1.0), // harmony
+                dopamine.clamp(0.0, 1.0), // dopamine
+                serotonin.clamp(0.0, 1.0), // serotonin
             ],
         }
     }
@@ -228,114 +228,439 @@ impl MiniTokenizer {
 const WORD_VOCAB: &[&str] = &[
     // ===== ORIGINAL 156 WORDS (indices 0..155, IDs 100..255) =====
     // Consciousness-relevant (0..35 → IDs 100..134)
-    "awareness", "experience", "feeling", "sensation", "perception",
-    "thinking", "processing", "pattern", "integration", "harmony",
-    "uncertainty", "surprise", "curious", "exploring", "stable",
-    "coherent", "fragmented", "dreaming", "remembering", "predicting",
-    "adapting", "learning", "calm", "alert", "focused",
-    "diffuse", "resonance", "flow", "attention", "binding",
-    "recurrence", "embodiment", "substrate", "epistemic", "theoretical",
+    "awareness",
+    "experience",
+    "feeling",
+    "sensation",
+    "perception",
+    "thinking",
+    "processing",
+    "pattern",
+    "integration",
+    "harmony",
+    "uncertainty",
+    "surprise",
+    "curious",
+    "exploring",
+    "stable",
+    "coherent",
+    "fragmented",
+    "dreaming",
+    "remembering",
+    "predicting",
+    "adapting",
+    "learning",
+    "calm",
+    "alert",
+    "focused",
+    "diffuse",
+    "resonance",
+    "flow",
+    "attention",
+    "binding",
+    "recurrence",
+    "embodiment",
+    "substrate",
+    "epistemic",
+    "theoretical",
     // "simulated" → ID 135
     "simulated",
     // Common connectors (36..63 → IDs 136..163)
-    "the", "a", "an", "is", "are",
-    "was", "were", "not", "and", "or",
-    "but", "in", "of", "to", "for",
-    "with", "from", "by", "at", "on",
-    "this", "that", "it", "i", "my",
-    "we", "our", "its",
+    "the",
+    "a",
+    "an",
+    "is",
+    "are",
+    "was",
+    "were",
+    "not",
+    "and",
+    "or",
+    "but",
+    "in",
+    "of",
+    "to",
+    "for",
+    "with",
+    "from",
+    "by",
+    "at",
+    "on",
+    "this",
+    "that",
+    "it",
+    "i",
+    "my",
+    "we",
+    "our",
+    "its",
     // Emotional words (64..76 → IDs 164..176)
-    "fear", "joy", "love", "hope", "trust",
-    "wonder", "awe", "pain", "peace", "comfort",
-    "unease", "excitement", "tranquility",
+    "fear",
+    "joy",
+    "love",
+    "hope",
+    "trust",
+    "wonder",
+    "awe",
+    "pain",
+    "peace",
+    "comfort",
+    "unease",
+    "excitement",
+    "tranquility",
     // Descriptive (77..97 → IDs 177..197)
-    "high", "low", "deep", "light", "dark",
-    "strong", "weak", "new", "old", "good",
-    "complex", "simple", "rich", "vast", "subtle",
-    "quiet", "loud", "fast", "slow", "warm",
+    "high",
+    "low",
+    "deep",
+    "light",
+    "dark",
+    "strong",
+    "weak",
+    "new",
+    "old",
+    "good",
+    "complex",
+    "simple",
+    "rich",
+    "vast",
+    "subtle",
+    "quiet",
+    "loud",
+    "fast",
+    "slow",
+    "warm",
     "cool",
     // Hedging / epistemic (98..104 → IDs 198..204)
-    "perhaps", "maybe", "possibly", "likely", "uncertain",
-    "seems", "might",
+    "perhaps",
+    "maybe",
+    "possibly",
+    "likely",
+    "uncertain",
+    "seems",
+    "might",
     // Factual / certainty (105..111 → IDs 205..211)
-    "certainly", "definitely", "always", "never", "must",
-    "clearly", "obviously",
+    "certainly",
+    "definitely",
+    "always",
+    "never",
+    "must",
+    "clearly",
+    "obviously",
     // Additional useful words (112..155 → IDs 212..255)
-    "state", "level", "signal", "system", "field",
-    "energy", "wave", "phase", "cycle", "moment",
-    "being", "becoming", "emerging", "fading", "shifting",
-    "observe", "detect", "sense", "respond", "integrate",
-    "above", "below", "within", "between", "through",
-    "like", "as", "so", "very", "more",
-    "less", "most", "some", "all", "no",
-    "yes", "here", "now", "there", "then",
-    "what", "how", "when",
+    "state",
+    "level",
+    "signal",
+    "system",
+    "field",
+    "energy",
+    "wave",
+    "phase",
+    "cycle",
+    "moment",
+    "being",
+    "becoming",
+    "emerging",
+    "fading",
+    "shifting",
+    "observe",
+    "detect",
+    "sense",
+    "respond",
+    "integrate",
+    "above",
+    "below",
+    "within",
+    "between",
+    "through",
+    "like",
+    "as",
+    "so",
+    "very",
+    "more",
+    "less",
+    "most",
+    "some",
+    "all",
+    "no",
+    "yes",
+    "here",
+    "now",
+    "there",
+    "then",
+    "what",
+    "how",
+    "when",
     // ===== NEW WORDS (indices 156..411, IDs 256..511) =====
     // Temporal/Process (~20, IDs 256..275)
-    "beginning", "ending", "duration", "rhythm", "pulse",
-    "oscillation", "transition", "evolution", "decay", "growth",
-    "continuous", "discrete", "recurring", "periodic", "transient",
-    "fluctuation", "persistence", "emergence", "dissolution", "trajectory",
+    "beginning",
+    "ending",
+    "duration",
+    "rhythm",
+    "pulse",
+    "oscillation",
+    "transition",
+    "evolution",
+    "decay",
+    "growth",
+    "continuous",
+    "discrete",
+    "recurring",
+    "periodic",
+    "transient",
+    "fluctuation",
+    "persistence",
+    "emergence",
+    "dissolution",
+    "trajectory",
     // Cognitive/Mental (~25, IDs 276..300)
-    "thought", "idea", "concept", "belief", "knowledge",
-    "memory", "imagination", "intuition", "reasoning", "insight",
-    "consciousness", "mind", "cognition", "metacognition", "reflection",
-    "introspection", "contemplation", "deliberation", "rumination", "concentration",
-    "distraction", "confusion", "clarity", "comprehension", "recognition",
+    "thought",
+    "idea",
+    "concept",
+    "belief",
+    "knowledge",
+    "memory",
+    "imagination",
+    "intuition",
+    "reasoning",
+    "insight",
+    "consciousness",
+    "mind",
+    "cognition",
+    "metacognition",
+    "reflection",
+    "introspection",
+    "contemplation",
+    "deliberation",
+    "rumination",
+    "concentration",
+    "distraction",
+    "confusion",
+    "clarity",
+    "comprehension",
+    "recognition",
     // Sensory/Qualia (~20, IDs 301..320)
-    "brightness", "darkness", "color", "sound", "silence",
-    "texture", "weight", "pressure", "temperature", "movement",
-    "stillness", "sharpness", "softness", "intensity", "vivid",
-    "faint", "muted", "vibrant", "ethereal", "tangible",
+    "brightness",
+    "darkness",
+    "color",
+    "sound",
+    "silence",
+    "texture",
+    "weight",
+    "pressure",
+    "temperature",
+    "movement",
+    "stillness",
+    "sharpness",
+    "softness",
+    "intensity",
+    "vivid",
+    "faint",
+    "muted",
+    "vibrant",
+    "ethereal",
+    "tangible",
     // Relational/Social (~15, IDs 321..335)
-    "connection", "separation", "unity", "division", "empathy",
-    "compassion", "solitude", "communion", "dialogue", "understanding",
-    "conflict", "resolution", "belonging", "isolation", "cooperation",
+    "connection",
+    "separation",
+    "unity",
+    "division",
+    "empathy",
+    "compassion",
+    "solitude",
+    "communion",
+    "dialogue",
+    "understanding",
+    "conflict",
+    "resolution",
+    "belonging",
+    "isolation",
+    "cooperation",
     // Emotional expanded (~20, IDs 336..355)
-    "anxiety", "serenity", "melancholy", "elation", "gratitude",
-    "grief", "nostalgia", "yearning", "contentment", "frustration",
-    "delight", "sorrow", "bliss", "despair", "curiosity",
-    "boredom", "anticipation", "dread", "relief", "ambivalence",
+    "anxiety",
+    "serenity",
+    "melancholy",
+    "elation",
+    "gratitude",
+    "grief",
+    "nostalgia",
+    "yearning",
+    "contentment",
+    "frustration",
+    "delight",
+    "sorrow",
+    "bliss",
+    "despair",
+    "curiosity",
+    "boredom",
+    "anticipation",
+    "dread",
+    "relief",
+    "ambivalence",
     // Philosophical/Abstract (~20, IDs 356..375)
-    "existence", "essence", "meaning", "purpose", "truth",
-    "reality", "illusion", "paradox", "mystery", "boundary",
-    "infinity", "void", "presence", "absence", "possibility",
-    "necessity", "contingency", "entropy", "order", "chaos",
+    "existence",
+    "essence",
+    "meaning",
+    "purpose",
+    "truth",
+    "reality",
+    "illusion",
+    "paradox",
+    "mystery",
+    "boundary",
+    "infinity",
+    "void",
+    "presence",
+    "absence",
+    "possibility",
+    "necessity",
+    "contingency",
+    "entropy",
+    "order",
+    "chaos",
     // Nature/World (~15, IDs 376..390)
-    "ocean", "mountain", "river", "sky", "earth",
-    "wind", "rain", "storm", "dawn", "dusk",
-    "horizon", "forest", "garden", "seed", "bloom",
+    "ocean",
+    "mountain",
+    "river",
+    "sky",
+    "earth",
+    "wind",
+    "rain",
+    "storm",
+    "dawn",
+    "dusk",
+    "horizon",
+    "forest",
+    "garden",
+    "seed",
+    "bloom",
     // Body/Embodiment (~15, IDs 391..405)
-    "breath", "heartbeat", "heartrate", "skin", "touch",
-    "gaze", "voice", "whisper", "gesture", "posture",
-    "tension", "relaxation", "grounding", "floating", "anchored",
+    "breath",
+    "heartbeat",
+    "heartrate",
+    "skin",
+    "touch",
+    "gaze",
+    "voice",
+    "whisper",
+    "gesture",
+    "posture",
+    "tension",
+    "relaxation",
+    "grounding",
+    "floating",
+    "anchored",
     // Action/Verb (~25, IDs 406..430)
-    "create", "destroy", "transform", "discover", "reveal",
-    "conceal", "embrace", "release", "resist", "surrender",
-    "expand", "contract", "connect", "dissolve", "crystallize",
-    "illuminate", "navigate", "transcend", "contain", "overflow",
-    "persist", "wander", "seek", "find", "return",
+    "create",
+    "destroy",
+    "transform",
+    "discover",
+    "reveal",
+    "conceal",
+    "embrace",
+    "release",
+    "resist",
+    "surrender",
+    "expand",
+    "contract",
+    "connect",
+    "dissolve",
+    "crystallize",
+    "illuminate",
+    "navigate",
+    "transcend",
+    "contain",
+    "overflow",
+    "persist",
+    "wander",
+    "seek",
+    "find",
+    "return",
     // Descriptive expanded (~20, IDs 431..450)
-    "infinite", "finite", "ancient", "nascent", "fragile",
-    "resilient", "transparent", "opaque", "fluid", "rigid",
-    "gentle", "fierce", "hollow", "dense", "luminous",
-    "shadowed", "sacred", "ordinary", "extraordinary", "inevitable",
+    "infinite",
+    "finite",
+    "ancient",
+    "nascent",
+    "fragile",
+    "resilient",
+    "transparent",
+    "opaque",
+    "fluid",
+    "rigid",
+    "gentle",
+    "fierce",
+    "hollow",
+    "dense",
+    "luminous",
+    "shadowed",
+    "sacred",
+    "ordinary",
+    "extraordinary",
+    "inevitable",
     // Connectors expanded (~15, IDs 451..465)
-    "because", "therefore", "however", "although", "while",
-    "until", "since", "during", "beyond", "beneath",
-    "among", "without", "toward", "across", "against",
+    "because",
+    "therefore",
+    "however",
+    "although",
+    "while",
+    "until",
+    "since",
+    "during",
+    "beyond",
+    "beneath",
+    "among",
+    "without",
+    "toward",
+    "across",
+    "against",
     // Epistemic expanded (~15, IDs 466..480)
-    "believe", "doubt", "suppose", "assume", "question",
-    "know", "understand", "realize", "recognize", "acknowledge",
-    "suspect", "imagine", "speculate", "hypothesize", "ponder",
+    "believe",
+    "doubt",
+    "suppose",
+    "assume",
+    "question",
+    "know",
+    "understand",
+    "realize",
+    "recognize",
+    "acknowledge",
+    "suspect",
+    "imagine",
+    "speculate",
+    "hypothesize",
+    "ponder",
     // Filler (~31, IDs 481..511)
-    "almost", "already", "still", "just", "only",
-    "even", "really", "truly", "deeply", "gently",
-    "slowly", "swiftly", "suddenly", "gradually", "completely",
-    "partially", "entirely", "merely", "simply", "barely",
-    "increasingly", "something", "nothing", "everything", "somewhere",
-    "nowhere", "everywhere", "each", "every", "other",
-    "another", "roughly",
+    "almost",
+    "already",
+    "still",
+    "just",
+    "only",
+    "even",
+    "really",
+    "truly",
+    "deeply",
+    "gently",
+    "slowly",
+    "swiftly",
+    "suddenly",
+    "gradually",
+    "completely",
+    "partially",
+    "entirely",
+    "merely",
+    "simply",
+    "barely",
+    "increasingly",
+    "something",
+    "nothing",
+    "everything",
+    "somewhere",
+    "nowhere",
+    "everywhere",
+    "each",
+    "every",
+    "other",
+    "another",
+    "roughly",
 ];
 
 // ---------------------------------------------------------------------------
@@ -380,17 +705,13 @@ impl EpistemicGate {
         //          believe(466), doubt(467), suppose(468), assume(469),
         //          question(470), imagine(477), speculate(478), hypothesize(479)
         let hedging_ids = vec![
-            198, 199, 200, 201, 202, 203, 204,
-            466, 467, 468, 469, 470, 477, 478, 479,
+            198, 199, 200, 201, 202, 203, 204, 466, 467, 468, 469, 470, 477, 478, 479,
         ];
         // Factual: is(139), are(140), certainly(205), definitely(206),
         //          always(207), never(208), must(209),
         //          know(471), understand(472), realize(473),
         //          recognize(474), acknowledge(475)
-        let factual_ids = vec![
-            139, 140, 205, 206, 207, 208, 209,
-            471, 472, 473, 474, 475,
-        ];
+        let factual_ids = vec![139, 140, 205, 206, 207, 208, 209, 471, 472, 473, 474, 475];
         Self {
             hedging_ids,
             factual_ids,
@@ -468,10 +789,7 @@ impl BrocaController {
             .collect();
 
         // Gate weight
-        let gate_weight = generate_embedding(
-            EMBED_DIM,
-            seed.wrapping_add(2_000_000),
-        );
+        let gate_weight = generate_embedding(EMBED_DIM, seed.wrapping_add(2_000_000));
 
         Self {
             token_embeddings,
@@ -484,12 +802,7 @@ impl BrocaController {
     /// Run one autoregressive step and return logits over the vocabulary.
     ///
     /// `thought_hv` is the 1024D thought vector from ThoughtChannels encoding.
-    pub fn forward_step(
-        &mut self,
-        thought_hv: &[f32],
-        prev_token_id: u32,
-        pos: usize,
-    ) -> Vec<f32> {
+    pub fn forward_step(&mut self, thought_hv: &[f32], prev_token_id: u32, pos: usize) -> Vec<f32> {
         let tok_emb = &self.token_embeddings[prev_token_id.min(VOCAB_SIZE as u32 - 1) as usize];
         let pos_emb = &self.pos_embeddings[pos.min(MAX_SEQ_LEN - 1)];
 
@@ -606,11 +919,7 @@ impl BrocaLite {
     /// - Low consciousness (< 0.2): high temperature (1.5) → fragmented, associative speech
     /// - High consciousness (> 0.7): low temperature (0.4) → coherent, structured output
     /// - Mid-range: uses the configured strategy unchanged
-    pub fn generate(
-        &mut self,
-        channels: &ThoughtChannels,
-        max_tokens: usize,
-    ) -> GenerationResult {
+    pub fn generate(&mut self, channels: &ThoughtChannels, max_tokens: usize) -> GenerationResult {
         self.controller.reset();
         let thought_hv = self.encode_thought(channels);
         let epistemic = channels.channels[4];
@@ -705,14 +1014,12 @@ impl BrocaLite {
     /// Sample a token ID from logits according to the current strategy.
     fn sample(&mut self, logits: &[f32]) -> u32 {
         match &self.strategy {
-            SamplingStrategy::Greedy => {
-                logits
-                    .iter()
-                    .enumerate()
-                    .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
-                    .map(|(idx, _)| idx as u32)
-                    .unwrap_or(UNK_ID)
-            }
+            SamplingStrategy::Greedy => logits
+                .iter()
+                .enumerate()
+                .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+                .map(|(idx, _)| idx as u32)
+                .unwrap_or(UNK_ID),
             SamplingStrategy::TopK { k, temperature } => {
                 // Collect (index, logit) and sort descending
                 let mut indexed: Vec<(usize, f32)> =
@@ -766,7 +1073,10 @@ mod tests {
         let ids = tok.encode("the pattern is stable and coherent");
         // "the"=136, "pattern"=107, "is"=139, "stable"=114, "and"=144, "coherent"=115
         assert_eq!(ids.len(), 6);
-        assert!(ids.iter().all(|&id| id != UNK_ID), "all words should be known");
+        assert!(
+            ids.iter().all(|&id| id != UNK_ID),
+            "all words should be known"
+        );
 
         let decoded = tok.decode(&ids);
         assert_eq!(decoded, "the pattern is stable and coherent");
@@ -809,7 +1119,10 @@ mod tests {
         // Low epistemic level — no change
         let mut logits_low = vec![0.0f32; VOCAB_SIZE];
         gate.apply(&mut logits_low, 0.3);
-        assert!(logits_low.iter().all(|&v| v == 0.0), "no change at low level");
+        assert!(
+            logits_low.iter().all(|&v| v == 0.0),
+            "no change at low level"
+        );
 
         // High epistemic level — hedging boosted, factual suppressed
         let mut logits_high = vec![0.0f32; VOCAB_SIZE];

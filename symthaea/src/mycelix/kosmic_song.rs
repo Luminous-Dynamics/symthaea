@@ -876,12 +876,7 @@ impl KosmicSong {
         }
 
         // Look at last 10 trajectory points
-        let recent: Vec<_> = self
-            .harmonic_trajectory
-            .iter()
-            .rev()
-            .take(10)
-            .collect();
+        let recent: Vec<_> = self.harmonic_trajectory.iter().rev().take(10).collect();
 
         // Compute variance of dominant harmony index
         let dominant_indices: Vec<usize> = recent

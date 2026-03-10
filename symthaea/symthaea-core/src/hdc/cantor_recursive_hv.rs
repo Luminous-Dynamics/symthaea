@@ -103,7 +103,7 @@ impl CantorRecursiveHV {
     /// Create with specific recursion depth
     pub fn from_base_with_depth(base: BinaryHV, max_depth: usize) -> Self {
         let dimension = BinaryHV::DIM;
-        let mut result = base.clone();
+        let mut result = base;
         let mut scales = Vec::new();
 
         // Calculate initial shift (1/3 of dimension)
@@ -196,7 +196,7 @@ impl CantorRecursiveHV {
     /// Because binding is its own inverse, we can attempt to recover
     /// the base by unbinding with the permuted versions.
     pub fn unbind_base(&self) -> BinaryHV {
-        let mut result = self.vector.clone();
+        let mut result = self.vector;
 
         // Unbind in reverse order
         for &shift in self.scales.iter().rev() {
@@ -295,7 +295,7 @@ impl CantorCognitiveElement {
     pub fn add_causal(&mut self, other: &CantorCognitiveElement, marker: &BinaryHV) {
         // Bind causal relation into the vector
         let causal_binding = marker.bind(&other.crhv.vector);
-        self.crhv.vector = BinaryHV::bundle(&[self.crhv.vector.clone(), causal_binding]);
+        self.crhv.vector = BinaryHV::bundle(&[self.crhv.vector, causal_binding]);
         self.causal_depth += 1;
     }
 
@@ -305,7 +305,7 @@ impl CantorCognitiveElement {
     pub fn add_self_reference(&mut self, self_marker: &BinaryHV) {
         // Bind the vector with itself, marked as self-reference
         let self_ref = self_marker.bind(&self.crhv.vector);
-        self.crhv.vector = BinaryHV::bundle(&[self.crhv.vector.clone(), self_ref]);
+        self.crhv.vector = BinaryHV::bundle(&[self.crhv.vector, self_ref]);
         self.self_reference_depth += 1;
     }
 
@@ -390,13 +390,13 @@ impl CantorCognitiveSpace {
         }
 
         // Get effect's vector for binding
-        let effect_vector = self.elements.get(effect).unwrap().crhv.vector.clone();
+        let effect_vector = self.elements.get(effect).unwrap().crhv.vector;
 
         // Update cause with causal relation
-        let marker = self.causal_marker.clone();
+        let marker = self.causal_marker;
         if let Some(cause_elem) = self.elements.get_mut(cause) {
             let causal_binding = marker.bind(&effect_vector);
-            cause_elem.crhv.vector = BinaryHV::bundle(&[cause_elem.crhv.vector.clone(), causal_binding]);
+            cause_elem.crhv.vector = BinaryHV::bundle(&[cause_elem.crhv.vector, causal_binding]);
             cause_elem.causal_depth += 1;
         }
     }
@@ -407,7 +407,7 @@ impl CantorCognitiveSpace {
             self.elements.insert(label.to_string(), CantorCognitiveElement::new(label));
         }
 
-        let marker = self.self_marker.clone();
+        let marker = self.self_marker;
         if let Some(elem) = self.elements.get_mut(label) {
             elem.add_self_reference(&marker);
         }

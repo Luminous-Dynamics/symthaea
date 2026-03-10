@@ -883,7 +883,7 @@ impl CodeGenerator {
         let intent_similarity = if !source.is_empty() {
             let coverage = plan.len() as f32 / 5.0;
             let mcts_bonus = context.mcts_plan_confidence * 0.1; // up to 0.1 bonus
-            // Weight: 60% plan coverage, 30% primitive phi, 10% MCTS confidence
+                                                                 // Weight: 60% plan coverage, 30% primitive phi, 10% MCTS confidence
             (coverage * 0.6 + primitive_result.phi * 0.3 + mcts_bonus).min(1.0)
         } else {
             0.0
@@ -952,7 +952,7 @@ impl CodeGenerator {
                         source.contains("Result") || source.contains("?")
                     }
                     PlanAction::Complete => true, // always counts
-                    _ => !source.is_empty(), // conservative: if we have code, count it
+                    _ => !source.is_empty(),      // conservative: if we have code, count it
                 })
                 .count();
             covered as f32 / plan.len() as f32
@@ -1515,10 +1515,7 @@ impl CodeGenerator {
                     if fixed.contains(".parse()") && !fixed.contains(".parse::<") {
                         // Try to infer type from context: look for -> Type or : Type
                         if let Some(ret) = Self::extract_return_type_from_source(&fixed) {
-                            fixed = fixed.replace(
-                                ".parse()",
-                                &format!(".parse::<{}>()", ret),
-                            );
+                            fixed = fixed.replace(".parse()", &format!(".parse::<{}>()", ret));
                             applied = true;
                         }
                     }
@@ -1536,15 +1533,13 @@ impl CodeGenerator {
                     // &T vs T: add .copied() or .cloned() before .collect()
                     if stderr.contains("expected") && fixed.contains(".iter()") {
                         if !fixed.contains(".cloned()") && !fixed.contains(".copied()") {
-                            fixed = fixed.replace(".iter().collect()", ".iter().cloned().collect()");
+                            fixed =
+                                fixed.replace(".iter().collect()", ".iter().cloned().collect()");
                             fixed = fixed.replace(
                                 ".iter().enumerate().collect()",
                                 ".into_iter().enumerate().collect()",
                             );
-                            fixed = fixed.replace(
-                                ".iter().zip(",
-                                ".into_iter().zip(",
-                            );
+                            fixed = fixed.replace(".iter().zip(", ".into_iter().zip(");
                             applied = true;
                         }
                     }
@@ -1685,14 +1680,20 @@ mod tests {
 
     #[test]
     fn test_parsed_type_simple() {
-        assert_eq!(ParsedType::parse("i32"), ParsedType::Simple("i32".to_string()));
+        assert_eq!(
+            ParsedType::parse("i32"),
+            ParsedType::Simple("i32".to_string())
+        );
     }
 
     #[test]
     fn test_parsed_type_generic() {
         let t = ParsedType::parse("Vec<i32>");
         match t {
-            ParsedType::Generic { ref base, ref params } => {
+            ParsedType::Generic {
+                ref base,
+                ref params,
+            } => {
                 assert_eq!(base, "Vec");
                 assert_eq!(params.len(), 1);
                 assert_eq!(params[0], ParsedType::Simple("i32".to_string()));
@@ -1705,7 +1706,10 @@ mod tests {
     fn test_parsed_type_nested() {
         let t = ParsedType::parse("HashMap<String, Vec<f64>>");
         match t {
-            ParsedType::Generic { ref base, ref params } => {
+            ParsedType::Generic {
+                ref base,
+                ref params,
+            } => {
                 assert_eq!(base, "HashMap");
                 assert_eq!(params.len(), 2);
                 assert!(matches!(&params[1], ParsedType::Generic { base, .. } if base == "Vec"));
@@ -1796,7 +1800,11 @@ mod tests {
             "Should not have todo: {}",
             result.source
         );
-        assert!(result.source.contains("a + b"), "Should have add body: {}", result.source);
+        assert!(
+            result.source.contains("a + b"),
+            "Should have add body: {}",
+            result.source
+        );
 
         // Type validation should be clean
         let type_warnings = CodeGenerator::validate_types(&spec, &result.source);
@@ -1808,7 +1816,11 @@ mod tests {
 
         // Dataflow should be clean
         if let Some(ref df) = result.dataflow {
-            assert!(df.is_clean(), "Dataflow should be clean: {:?}", df.use_before_def);
+            assert!(
+                df.is_clean(),
+                "Dataflow should be clean: {:?}",
+                df.use_before_def
+            );
         }
 
         // Distillation target should be available

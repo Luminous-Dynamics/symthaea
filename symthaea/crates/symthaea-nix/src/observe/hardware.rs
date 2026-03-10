@@ -483,7 +483,8 @@ tmpfs          /run                16777216     8388608
 
     #[test]
     fn test_parse_lspci_3d_controller() {
-        let output = r#"06:00.0 "3D controller [0302]" "NVIDIA Corporation [10de]" "A100 [2236]" "" """#;
+        let output =
+            r#"06:00.0 "3D controller [0302]" "NVIDIA Corporation [10de]" "A100 [2236]" "" """#;
         let gpus = HardwareObserver::parse_lspci_gpus(output);
         assert_eq!(gpus.len(), 1);
         assert!(gpus[0].name.contains("NVIDIA"));

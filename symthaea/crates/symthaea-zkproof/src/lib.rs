@@ -214,7 +214,10 @@ mod tests {
         };
         let output = compute_average_phi(&input);
         // Variance is always non-negative, so phi should be >= 0
-        assert!(output.average_phi >= 0.0, "phi with negative values should be >= 0");
+        assert!(
+            output.average_phi >= 0.0,
+            "phi with negative values should be >= 0"
+        );
     }
 
     #[test]
@@ -256,7 +259,10 @@ mod tests {
         };
         let out1 = compute_average_phi(&input);
         let out2 = compute_average_phi(&input);
-        assert_eq!(out1.average_phi, out2.average_phi, "Same input must produce same output");
+        assert_eq!(
+            out1.average_phi, out2.average_phi,
+            "Same input must produce same output"
+        );
     }
 
     #[test]

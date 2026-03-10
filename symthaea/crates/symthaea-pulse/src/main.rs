@@ -1584,7 +1584,11 @@ mod tests {
             .map(|_| make_sparkline_point(0.5, 0.3, 1.0))
             .collect();
         let result = detect_anomalies(&points);
-        assert!(result.is_empty(), "constant data should have no anomalies, got {}", result.len());
+        assert!(
+            result.is_empty(),
+            "constant data should have no anomalies, got {}",
+            result.len()
+        );
     }
 
     #[test]
@@ -1636,7 +1640,11 @@ mod tests {
             points.push(make_sparkline_point(c, 0.9, 0.0));
         }
         let result = detect_anomalies(&points);
-        assert!(result.len() <= 8, "anomalies should be truncated to 8, got {}", result.len());
+        assert!(
+            result.len() <= 8,
+            "anomalies should be truncated to 8, got {}",
+            result.len()
+        );
     }
 
     // ── PulseDelta tests ─────────────────────────────────────────────────
@@ -1727,6 +1735,9 @@ mod tests {
             color: "#e8c547",
         }];
         let report = generate_session_report(&v, &b, &c, &sparkline, &anomalies, None, &[]);
-        assert!(report.contains("C(t) Surge"), "report should list anomaly kinds");
+        assert!(
+            report.contains("C(t) Surge"),
+            "report should list anomaly kinds"
+        );
     }
 }

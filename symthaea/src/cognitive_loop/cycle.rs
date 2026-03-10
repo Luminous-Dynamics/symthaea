@@ -68,14 +68,15 @@ impl CognitiveLoopService {
                     "{failure}"
                 );
                 self.integrity_manager.status.attestation_passed = false;
-                self.integrity_manager.status.anomalies.push(
-                    crate::integrity::IntegrityAnomaly {
+                self.integrity_manager
+                    .status
+                    .anomalies
+                    .push(crate::integrity::IntegrityAnomaly {
                         source: "live_attestation",
                         description: failure,
                         detected_at: std::time::Instant::now(),
                         severity: crate::integrity::AnomalySeverity::Critical,
-                    },
-                );
+                    });
             }
             // Escalate critical integrity anomalies to safety telemetry
             if self.integrity_manager.has_critical_anomaly() {
@@ -117,7 +118,10 @@ impl CognitiveLoopService {
             if frustration > 0.4 {
                 let ne_base = self.neuromod.bath.noradrenaline.baseline_val();
                 let ne_nudge = 0.03 * (frustration - 0.4);
-                self.neuromod.bath.noradrenaline.set_baseline(ne_base + ne_nudge);
+                self.neuromod
+                    .bath
+                    .noradrenaline
+                    .set_baseline(ne_base + ne_nudge);
             }
             if state.is_in_flow() {
                 let da_base = self.neuromod.bath.dopamine.baseline_val();

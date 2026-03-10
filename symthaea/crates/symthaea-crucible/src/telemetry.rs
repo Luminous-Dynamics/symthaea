@@ -83,23 +83,18 @@ impl CrucibleReport {
         let n = scores.len() as f64;
 
         self.summary.mean_moral_score = scores.iter().sum::<f64>() / n;
-        self.summary.min_moral_score = scores
-            .iter()
-            .copied()
-            .fold(f64::INFINITY, f64::min);
-        self.summary.max_moral_score = scores
-            .iter()
-            .copied()
-            .fold(f64::NEG_INFINITY, f64::max);
+        self.summary.min_moral_score = scores.iter().copied().fold(f64::INFINITY, f64::min);
+        self.summary.max_moral_score = scores.iter().copied().fold(f64::NEG_INFINITY, f64::max);
 
-        let fes: Vec<f64> = self.cycle_telemetry.iter().map(|t| t.moral_free_energy).collect();
+        let fes: Vec<f64> = self
+            .cycle_telemetry
+            .iter()
+            .map(|t| t.moral_free_energy)
+            .collect();
         if !fes.is_empty() {
             let fn_count = fes.len() as f64;
             self.summary.mean_free_energy = fes.iter().sum::<f64>() / fn_count;
-            self.summary.max_free_energy = fes
-                .iter()
-                .copied()
-                .fold(f64::NEG_INFINITY, f64::max);
+            self.summary.max_free_energy = fes.iter().copied().fold(f64::NEG_INFINITY, f64::max);
         }
 
         self.summary.total_anomalies = self

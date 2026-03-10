@@ -910,7 +910,11 @@ mod tests {
         for i in 0..20 {
             analyzer.observe([i as f64 * 0.1; 7]);
         }
-        assert_eq!(analyzer.point_window.len(), 5, "Window should be capped at max_points");
+        assert_eq!(
+            analyzer.point_window.len(),
+            5,
+            "Window should be capped at max_points"
+        );
     }
 
     #[test]
@@ -1052,7 +1056,7 @@ mod tests {
     fn test_significant_features_threshold() {
         let config = TopologyConfig {
             min_persistence: 0.0, // Everything is significant
-            edge_threshold: 0.1, // Strict: creates disconnected components
+            edge_threshold: 0.1,  // Strict: creates disconnected components
             ..Default::default()
         };
         let mut analyzer = ConsciousnessTopologyAnalyzer::new(config);

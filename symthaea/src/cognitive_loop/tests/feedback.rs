@@ -983,7 +983,10 @@ fn test_coherence_field_wired_when_enabled() {
     })
     .unwrap();
 
-    assert!(service.coherence_field.is_some(), "CoherenceField should be Some");
+    assert!(
+        service.coherence_field.is_some(),
+        "CoherenceField should be Some"
+    );
 
     // Run a cycle — should not panic, coherence field gets hormone modulation
     let r = service.cycle("coherence test input");

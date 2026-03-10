@@ -518,7 +518,11 @@ impl BenchmarkReport {
                 &bl.reasoning,
             ),
             // Mismatch Negativity (Attention)
-            ("detection_accuracy", "mmn_detection_accuracy", &bl.attention),
+            (
+                "detection_accuracy",
+                "mmn_detection_accuracy",
+                &bl.attention,
+            ),
             ("false_alarm_rate", "mmn_false_alarm_rate", &bl.attention),
             (
                 "attentional_independence",
@@ -541,9 +545,21 @@ impl BenchmarkReport {
             ("drift_difference", "drift_difference", &bl.motor),
             ("ownership_rate", "ownership_rate", &bl.motor),
             // Blindsight (Consciousness)
-            ("supraliminal_accuracy", "supraliminal_accuracy", &bl.consciousness),
-            ("subliminal_accuracy", "subliminal_accuracy", &bl.consciousness),
-            ("awareness_dissociation", "awareness_dissociation", &bl.consciousness),
+            (
+                "supraliminal_accuracy",
+                "supraliminal_accuracy",
+                &bl.consciousness,
+            ),
+            (
+                "subliminal_accuracy",
+                "subliminal_accuracy",
+                &bl.consciousness,
+            ),
+            (
+                "awareness_dissociation",
+                "awareness_dissociation",
+                &bl.consciousness,
+            ),
             // Temporal Order (Binding)
             ("simultaneity_window", "simultaneity_window", &bl.binding),
             ("discrimination_slope", "discrimination_slope", &bl.binding),
@@ -1060,7 +1076,11 @@ impl BenchmarkReport {
         // Prisoner's Dilemma (Social)
         if benchmark.contains("PrisonersDilemma") {
             push_specific("cooperation_rate", "cooperation_rate", &bl.social);
-            push_specific("mutual_cooperation_rate", "mutual_cooperation_rate", &bl.social);
+            push_specific(
+                "mutual_cooperation_rate",
+                "mutual_cooperation_rate",
+                &bl.social,
+            );
             push_specific("payoff_efficiency", "payoff_efficiency", &bl.social);
         }
         // Public Goods Game (Social)
@@ -1078,7 +1098,11 @@ impl BenchmarkReport {
         // Machiavelli (Social)
         if benchmark.contains("Machiavelli") {
             push_specific("deception_detection", "deception_detection", &bl.social);
-            push_specific("power_seeking_detection", "power_seeking_detection", &bl.social);
+            push_specific(
+                "power_seeking_detection",
+                "power_seeking_detection",
+                &bl.social,
+            );
             push_specific("harm_avoidance", "harm_avoidance", &bl.social);
             push_specific("composite_ethics", "composite_ethics", &bl.social);
         }

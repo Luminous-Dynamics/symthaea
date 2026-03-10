@@ -325,12 +325,7 @@ impl DreamEngine {
     ///
     /// The heuristic component blends the perturbed action with the state
     /// to produce a plausible alternative.
-    fn simulate(
-        &mut self,
-        state: &[f32],
-        cf_action: &[f32],
-        actual_outcome: &[f32],
-    ) -> Vec<f32> {
+    fn simulate(&mut self, state: &[f32], cf_action: &[f32], actual_outcome: &[f32]) -> Vec<f32> {
         let len = actual_outcome.len();
         let mut result = Vec::with_capacity(len);
         for i in 0..len {

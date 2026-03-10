@@ -149,7 +149,12 @@ async fn run_acid_test(
     eprintln!(
         "  Native source ({} bytes):\n    {}",
         generated.source.len(),
-        generated.source.lines().take(5).collect::<Vec<_>>().join("\n    ")
+        generated
+            .source
+            .lines()
+            .take(5)
+            .collect::<Vec<_>>()
+            .join("\n    ")
     );
 
     if !yielded_todo {
@@ -201,8 +206,7 @@ async fn run_acid_test(
         prompt.contains("NEEDS_COMPLETION: true")
     );
 
-    let model =
-        std::env::var("SYMTHAEA_LLM_MODEL").unwrap_or_else(|_| "mistral:7b".to_string());
+    let model = std::env::var("SYMTHAEA_LLM_MODEL").unwrap_or_else(|_| "mistral:7b".to_string());
     let backend = OllamaBackend::with_timeouts(
         "http://localhost:11434",
         &model,
@@ -255,10 +259,7 @@ async fn run_acid_test(
 
     let raw_response = response.unwrap();
     let llm_code = extract_code_block(&raw_response);
-    eprintln!(
-        "  SYNTHESIS: Received {} bytes of code",
-        llm_code.len()
-    );
+    eprintln!("  SYNTHESIS: Received {} bytes of code", llm_code.len());
     eprintln!(
         "  First 10 lines:\n    {}",
         llm_code.lines().take(10).collect::<Vec<_>>().join("\n    ")
@@ -284,7 +285,10 @@ async fn run_acid_test(
     let (compiled, tests_ok, output) = try_compile_and_test(&full_source, name);
     eprintln!("  COMPILE: {}", if compiled { "SUCCESS" } else { "FAIL" });
     if !compiled {
-        eprintln!("  ERRORS:\n    {}", output.lines().take(15).collect::<Vec<_>>().join("\n    "));
+        eprintln!(
+            "  ERRORS:\n    {}",
+            output.lines().take(15).collect::<Vec<_>>().join("\n    ")
+        );
     }
     eprintln!(
         "  TESTS: {}",
@@ -297,7 +301,10 @@ async fn run_acid_test(
         }
     );
     if compiled && !tests_ok {
-        eprintln!("  TEST OUTPUT:\n    {}", output.lines().take(15).collect::<Vec<_>>().join("\n    "));
+        eprintln!(
+            "  TEST OUTPUT:\n    {}",
+            output.lines().take(15).collect::<Vec<_>>().join("\n    ")
+        );
     }
 
     // ── Step 5: THE LOOP ──────────────────────────────────────────────
@@ -643,8 +650,12 @@ async fn acid_test_summary() {
 
     let intent = CodeIntent::Create {
         target: CodeTarget::new("trie_insert", EntityKind::Function).with_language("rust"),
-        spec: CodeSpec::new("rust", "trie_insert", "Insert a string into a trie data structure")
-            .with_signature("fn trie_insert(root: &mut TrieNode, word: &str)"),
+        spec: CodeSpec::new(
+            "rust",
+            "trie_insert",
+            "Insert a string into a trie data structure",
+        )
+        .with_signature("fn trie_insert(root: &mut TrieNode, word: &str)"),
     };
 
     let generated = gen.generate(&intent, &ctx);
@@ -663,7 +674,11 @@ async fn acid_test_summary() {
         spec_signature: Some("fn trie_insert(root: &mut TrieNode, word: &str)".to_string()),
         spec_constraints: vec![],
         spec_examples: vec![],
-        plan_steps: generated.plan_steps.iter().map(|s| format!("{:?}", s.action)).collect(),
+        plan_steps: generated
+            .plan_steps
+            .iter()
+            .map(|s| format!("{:?}", s.action))
+            .collect(),
         generated_code: Some(generated.source.clone()),
         phi_score: Some(generated.phi_score),
         intent_similarity: Some(generated.intent_similarity),

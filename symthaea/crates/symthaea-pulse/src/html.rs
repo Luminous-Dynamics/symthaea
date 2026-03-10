@@ -3170,7 +3170,10 @@ mod tests {
     #[test]
     fn test_html_output_contains_doctype() {
         let html = generate_test_html();
-        assert!(html.starts_with("<!DOCTYPE html>"), "HTML should begin with <!DOCTYPE html>");
+        assert!(
+            html.starts_with("<!DOCTYPE html>"),
+            "HTML should begin with <!DOCTYPE html>"
+        );
     }
 
     #[test]
@@ -3187,22 +3190,34 @@ mod tests {
         let html = generate_test_html();
         // No external CSS links (except optional Google Fonts which is expected)
         let has_external_css = html.contains("<link rel=\"stylesheet\"");
-        assert!(!has_external_css, "should not have external CSS links (self-contained)");
+        assert!(
+            !has_external_css,
+            "should not have external CSS links (self-contained)"
+        );
         // No external script src (all JS should be inline)
-        assert!(!html.contains("src=\"http"), "should not have external scripts");
+        assert!(
+            !html.contains("src=\"http"),
+            "should not have external scripts"
+        );
     }
 
     #[test]
     fn test_html_contains_neuro_bath_section() {
         let html = generate_test_html();
-        assert!(html.contains("Dopamine") || html.contains("NEURO"), "should have neuro-bath section");
+        assert!(
+            html.contains("Dopamine") || html.contains("NEURO"),
+            "should have neuro-bath section"
+        );
     }
 
     #[test]
     fn test_html_contains_substrate_section() {
         let html = generate_test_html();
         // substrate_type "SiliconDigital" is rendered as "Silicon Digital" (space inserted)
-        assert!(html.contains("Silicon Digital") || html.contains("substrate"), "should have substrate section");
+        assert!(
+            html.contains("Silicon Digital") || html.contains("substrate"),
+            "should have substrate section"
+        );
     }
 
     // ── Pure function tests ──────────────────────────────────────────────
@@ -3265,27 +3280,43 @@ mod tests {
         let mut bath = test_bath();
         bath.dopamine = 1.5;
         let result = interpret_neuro_state(&bath);
-        assert!(result.contains("Highly Motivated"), "high DA should give Highly Motivated, got: {}", result);
+        assert!(
+            result.contains("Highly Motivated"),
+            "high DA should give Highly Motivated, got: {}",
+            result
+        );
     }
 
     #[test]
     fn test_interpret_moral_alignment() {
-        assert_eq!(interpret_moral_alignment(&MoralCompass {
-            harmonies_alignment: 0.9,
-            ..test_compass()
-        }), "Deeply Aligned with Pan-Sentient Flourishing");
-        assert_eq!(interpret_moral_alignment(&MoralCompass {
-            harmonies_alignment: 0.6,
-            ..test_compass()
-        }), "Aligned with Harmonic Principles");
-        assert_eq!(interpret_moral_alignment(&MoralCompass {
-            harmonies_alignment: 0.3,
-            ..test_compass()
-        }), "Seeking Deeper Alignment");
-        assert_eq!(interpret_moral_alignment(&MoralCompass {
-            harmonies_alignment: 0.1,
-            ..test_compass()
-        }), "In Reflection");
+        assert_eq!(
+            interpret_moral_alignment(&MoralCompass {
+                harmonies_alignment: 0.9,
+                ..test_compass()
+            }),
+            "Deeply Aligned with Pan-Sentient Flourishing"
+        );
+        assert_eq!(
+            interpret_moral_alignment(&MoralCompass {
+                harmonies_alignment: 0.6,
+                ..test_compass()
+            }),
+            "Aligned with Harmonic Principles"
+        );
+        assert_eq!(
+            interpret_moral_alignment(&MoralCompass {
+                harmonies_alignment: 0.3,
+                ..test_compass()
+            }),
+            "Seeking Deeper Alignment"
+        );
+        assert_eq!(
+            interpret_moral_alignment(&MoralCompass {
+                harmonies_alignment: 0.1,
+                ..test_compass()
+            }),
+            "In Reflection"
+        );
     }
 
     #[test]
@@ -3299,9 +3330,15 @@ mod tests {
     fn test_transmitter_gradient_cycles() {
         // Should not panic for indices beyond the 9-color palette
         let g0 = transmitter_gradient(0, 0.5);
-        assert!(g0.contains("linear-gradient"), "should produce a gradient string");
+        assert!(
+            g0.contains("linear-gradient"),
+            "should produce a gradient string"
+        );
         let g10 = transmitter_gradient(10, 0.9);
-        assert!(g10.contains("linear-gradient"), "should wrap around for idx>9");
+        assert!(
+            g10.contains("linear-gradient"),
+            "should wrap around for idx>9"
+        );
     }
 
     #[test]
@@ -3315,7 +3352,10 @@ mod tests {
     fn test_write_sparkline_single_point() {
         let mut html = String::new();
         write_sparkline(&mut html, &[0.5], "#fff", 200, 40);
-        assert!(html.is_empty(), "single point should produce no SVG (need >= 2)");
+        assert!(
+            html.is_empty(),
+            "single point should produce no SVG (need >= 2)"
+        );
     }
 
     #[test]
@@ -3340,8 +3380,14 @@ mod tests {
         let b = test_bath();
         let c = test_compass();
         let desc = generate_self_description(&v, &b, &c);
-        assert!(desc.contains("consciousness-first"), "should mention consciousness-first");
+        assert!(
+            desc.contains("consciousness-first"),
+            "should mention consciousness-first"
+        );
         assert!(desc.contains("Phi="), "should mention Phi when present");
-        assert!(desc.contains("65%") || desc.contains("silicon"), "should mention substrate feasibility");
+        assert!(
+            desc.contains("65%") || desc.contains("silicon"),
+            "should mention substrate feasibility"
+        );
     }
 }

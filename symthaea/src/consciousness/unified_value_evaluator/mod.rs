@@ -57,7 +57,7 @@
 //! }
 //! ```
 
-mod evaluator;
+pub(crate) mod evaluator;
 mod explanation;
 mod types;
 

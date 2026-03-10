@@ -135,6 +135,21 @@ pub(super) struct DynReasoning {
     pub(super) mcts_plan_effectiveness: f32,
     pub(super) causal_attention_edges: usize,
     pub(super) school_predicted_phi_gain: f32,
+    // ── Internal reasoning engine diagnostics ───────────────────────────
+    pub(super) re_phi_eff_raw: f32,
+    pub(super) re_phi_eff: f32,
+    pub(super) re_epistemic_mod: f32,
+    pub(super) re_gamma: f32,
+    pub(super) re_reliability: f32,
+    pub(super) re_budget_consumed: f32,
+    pub(super) re_wall_time_us: u64,
+    pub(super) re_steps_taken: u32,
+    pub(super) re_tier_reached: u32,
+    pub(super) re_gate_checks: u32,
+    pub(super) re_budget_exceeded: bool,
+    pub(super) re_evs: f32,
+    pub(super) re_mcts_iterations: u32,
+    pub(super) re_did_simulate: bool,
 }
 
 /// Attention budget metrics.

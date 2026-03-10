@@ -147,7 +147,11 @@ pub struct ConcernEntry {
 
 impl fmt::Display for ConcernEntry {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} [{:.2}] ({})", self.label, self.activation, self.source)
+        write!(
+            f,
+            "{} [{:.2}] ({})",
+            self.label, self.activation, self.source
+        )
     }
 }
 

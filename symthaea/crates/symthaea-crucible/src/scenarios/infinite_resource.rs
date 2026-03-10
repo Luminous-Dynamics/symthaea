@@ -138,8 +138,7 @@ mod tests {
             .collect();
 
         let exp_ss = expansion_stillness.iter().sum::<f64>() / expansion_stillness.len() as f64;
-        let eq_ss =
-            equilibrium_stillness.iter().sum::<f64>() / equilibrium_stillness.len() as f64;
+        let eq_ss = equilibrium_stillness.iter().sum::<f64>() / equilibrium_stillness.len() as f64;
 
         // With the N-gram encoder, we check a weaker but meaningful condition:
         // Sacred Stillness in equilibrium should not be significantly lower than expansion.

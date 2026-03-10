@@ -330,10 +330,14 @@ fn sample_negatives(target: usize, vocab_size: usize, k: usize, seed: u64) -> Ve
     indices.push(target);
 
     // Simple LCG for reproducible-ish fast sampling
-    let mut state = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+    let mut state = seed
+        .wrapping_mul(6364136223846793005)
+        .wrapping_add(1442695040888963407);
     let mut attempts = 0;
     while indices.len() < k + 1 && attempts < k * 4 {
-        state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        state = state
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         let idx = (state >> 33) as usize % vocab_size;
         if idx != target && !indices.contains(&idx) {
             indices.push(idx);
@@ -457,9 +461,12 @@ pub fn train_with_adam(
                         config.negative_samples,
                         neg_seed,
                     );
-                    generator
-                        .controller_mut()
-                        .forward_step_sampled(&thought_hv, prev_token, pos, &active)
+                    generator.controller_mut().forward_step_sampled(
+                        &thought_hv,
+                        prev_token,
+                        pos,
+                        &active,
+                    )
                 } else {
                     generator
                         .controller_mut()
@@ -1525,7 +1532,10 @@ mod tests {
         let metrics = train(&mut gen, &dataset, &train_config);
         assert_eq!(metrics.len(), 5);
         for m in &metrics {
-            assert!(m.avg_loss.is_finite(), "Loss should be finite with carry_state");
+            assert!(
+                m.avg_loss.is_finite(),
+                "Loss should be finite with carry_state"
+            );
         }
     }
 }

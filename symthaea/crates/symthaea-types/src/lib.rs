@@ -300,7 +300,11 @@ mod tests {
     #[test]
     fn test_base_weight_positive() {
         for h in Harmony::all() {
-            assert!(h.base_weight() > 0.0, "{} weight must be positive", h.name());
+            assert!(
+                h.base_weight() > 0.0,
+                "{} weight must be positive",
+                h.name()
+            );
         }
     }
 
@@ -346,7 +350,10 @@ mod tests {
     fn test_harmony_all_ordering_stable() {
         let first = Harmony::all();
         let second = Harmony::all();
-        assert_eq!(first, second, "all() must return same order on repeated calls");
+        assert_eq!(
+            first, second,
+            "all() must return same order on repeated calls"
+        );
     }
 
     #[test]

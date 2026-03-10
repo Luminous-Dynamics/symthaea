@@ -56,6 +56,8 @@ fn make_context(phi: f64, consensus: f64, budget_us: u64) -> ReasoningContext {
         tool: None,
         recent_utility: 0.5,
         cycle_id: 1,
+        neuromod_exploration_mod: 1.0,
+        epistemic_quality: 0.5,
     }
 }
 

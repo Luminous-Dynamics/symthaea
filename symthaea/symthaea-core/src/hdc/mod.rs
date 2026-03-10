@@ -260,9 +260,10 @@ impl From<usize> for LtcNeuronCount {
     }
 }
 
-pub mod cantor_recursive_hv; // Cantor Recursive Hypervectors: fractal self-similar cognition
-pub mod cantor_resonator_cleanup; // Layer-preserving cleanup for CRHVs during dream consolidation
-pub mod multidimensional_cantor; // Radial, 3D Dust, 4D Tesseract, Spherical Cantor structures
+// cantor modules: compile errors (BinaryHV::dimension()/DIM). Excluded until fixed.
+// pub mod cantor_recursive_hv;
+// pub mod cantor_resonator_cleanup;
+// pub mod multidimensional_cantor;
 
 pub mod cincinnati_advanced; // Advanced Cincinnati-LTC: chaos detection, adaptive weights, memory horizon
 pub mod cincinnati_enhanced; // Enhanced Cincinnati-LTC: multi-scale, amplitude encoding, attention modulation

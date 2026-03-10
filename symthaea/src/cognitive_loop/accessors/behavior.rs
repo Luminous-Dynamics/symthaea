@@ -383,7 +383,8 @@ impl CognitiveLoopService {
     /// computation in Phase 2 learning.
     #[cfg(feature = "mycelix")]
     pub fn predict_governance_outcome(&mut self, proposal_id: String, predicted_alignment: f64) {
-        self.governance_mgr.predict_outcome(proposal_id, predicted_alignment);
+        self.governance_mgr
+            .predict_outcome(proposal_id, predicted_alignment);
     }
 
     /// Process governance learning signals: reward, harmonic deltas, episodic memory.
@@ -422,41 +423,70 @@ impl CognitiveLoopService {
     pub(crate) fn apply_governance_neuromod(&mut self) {
         let injections = self.governance_mgr.drain_injections();
         for inj in injections {
-            self.neuromod.bath.inject(inj.target, inj.dose, inj.half_life);
+            self.neuromod
+                .bath
+                .inject(inj.target, inj.dose, inj.half_life);
         }
 
         let baselines = self.governance_mgr.drain_baselines();
         for bl in baselines {
             match bl.target {
                 "dopamine" => {
-                    self.neuromod.bath.dopamine.adjust_baseline(bl.nudge, 0.2, 0.8);
+                    self.neuromod
+                        .bath
+                        .dopamine
+                        .adjust_baseline(bl.nudge, 0.2, 0.8);
                 }
                 "noradrenaline" => {
-                    self.neuromod.bath.noradrenaline.adjust_baseline(bl.nudge, 0.2, 0.8);
+                    self.neuromod
+                        .bath
+                        .noradrenaline
+                        .adjust_baseline(bl.nudge, 0.2, 0.8);
                 }
                 "serotonin" => {
-                    self.neuromod.bath.serotonin.adjust_baseline(bl.nudge, 0.2, 0.8);
+                    self.neuromod
+                        .bath
+                        .serotonin
+                        .adjust_baseline(bl.nudge, 0.2, 0.8);
                 }
                 "oxytocin" => {
-                    self.neuromod.bath.oxytocin.adjust_baseline(bl.nudge, 0.2, 0.8);
+                    self.neuromod
+                        .bath
+                        .oxytocin
+                        .adjust_baseline(bl.nudge, 0.2, 0.8);
                 }
                 "endocannabinoid" => {
-                    self.neuromod.bath.endocannabinoid.adjust_baseline(bl.nudge, 0.2, 0.8);
+                    self.neuromod
+                        .bath
+                        .endocannabinoid
+                        .adjust_baseline(bl.nudge, 0.2, 0.8);
                 }
                 "acetylcholine" => {
-                    self.neuromod.bath.acetylcholine.adjust_baseline(bl.nudge, 0.2, 0.8);
+                    self.neuromod
+                        .bath
+                        .acetylcholine
+                        .adjust_baseline(bl.nudge, 0.2, 0.8);
                 }
                 "gaba" => {
                     self.neuromod.bath.gaba.adjust_baseline(bl.nudge, 0.2, 0.8);
                 }
                 "glutamate" => {
-                    self.neuromod.bath.glutamate.adjust_baseline(bl.nudge, 0.2, 0.8);
+                    self.neuromod
+                        .bath
+                        .glutamate
+                        .adjust_baseline(bl.nudge, 0.2, 0.8);
                 }
                 "adenosine" => {
-                    self.neuromod.bath.adenosine.adjust_baseline(bl.nudge, 0.2, 0.8);
+                    self.neuromod
+                        .bath
+                        .adenosine
+                        .adjust_baseline(bl.nudge, 0.2, 0.8);
                 }
                 _ => {
-                    tracing::warn!(target = bl.target, "Unknown neuromod target in governance baseline");
+                    tracing::warn!(
+                        target = bl.target,
+                        "Unknown neuromod target in governance baseline"
+                    );
                 }
             }
         }

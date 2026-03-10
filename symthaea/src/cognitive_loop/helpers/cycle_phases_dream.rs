@@ -129,16 +129,13 @@ impl CognitiveLoopService {
                             // Science: Walker (2009) — sleep-dependent memory consolidation
                             // strengthens autobiographical narrative structure.
                             // Valence: phi improvement is intrinsically positive.
-                            self.master_equation
-                                .narrative_coherence
-                                .add_episode(
-                                    format!(
-                                        "dream_insight_{}_phi{:.3}",
-                                        result.insights,
-                                        result.best_phi_improvement
-                                    ),
-                                    (result.best_phi_improvement as f64 * 0.5).clamp(-0.5, 0.5),
-                                );
+                            self.master_equation.narrative_coherence.add_episode(
+                                format!(
+                                    "dream_insight_{}_phi{:.3}",
+                                    result.insights, result.best_phi_improvement
+                                ),
+                                (result.best_phi_improvement as f64 * 0.5).clamp(-0.5, 0.5),
+                            );
                         }
                     }
                     Err(e) => {

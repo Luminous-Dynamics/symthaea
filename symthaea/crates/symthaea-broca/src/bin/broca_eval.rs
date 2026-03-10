@@ -179,11 +179,7 @@ fn main() {
                 channels.set_epistemic(parts[1]);
             }
             if parts.len() >= 3 {
-                channels.set_emotion(
-                    parts[2],
-                    parts.get(3).copied().unwrap_or(0.5),
-                    0.5,
-                );
+                channels.set_emotion(parts[2], parts.get(3).copied().unwrap_or(0.5), 0.5);
             }
             if parts.len() >= 5 {
                 channels.set_consciousness(parts[4], 0.5, 0.5);
@@ -226,7 +222,8 @@ fn parse_args(args: &[String]) -> Result<EvalOpts, String> {
         match args[i].as_str() {
             "--checkpoint" | "-c" => {
                 i += 1;
-                opts.checkpoint_path = args.get(i).cloned().ok_or("--checkpoint requires a path")?;
+                opts.checkpoint_path =
+                    args.get(i).cloned().ok_or("--checkpoint requires a path")?;
             }
             "--eval" => {
                 i += 1;

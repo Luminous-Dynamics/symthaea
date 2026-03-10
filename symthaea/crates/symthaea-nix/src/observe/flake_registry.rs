@@ -417,12 +417,10 @@ mod tests {
 
     #[test]
     fn test_locks_root_missing() {
-        let no_locks: serde_json::Value =
-            serde_json::from_str(r#"{"path": "/test"}"#).unwrap();
+        let no_locks: serde_json::Value = serde_json::from_str(r#"{"path": "/test"}"#).unwrap();
         assert!(FlakeRegistry::locks_root(&no_locks).is_none());
 
-        let no_nodes: serde_json::Value =
-            serde_json::from_str(r#"{"locks": {}}"#).unwrap();
+        let no_nodes: serde_json::Value = serde_json::from_str(r#"{"locks": {}}"#).unwrap();
         assert!(FlakeRegistry::locks_root(&no_nodes).is_none());
 
         let no_root: serde_json::Value =

@@ -251,10 +251,7 @@ impl PsychBenchmark for BlindSightBenchmark {
             sharpnesses.push(r.threshold_sharpness);
             if config.trial_trace {
                 let mut extra = BTreeMap::new();
-                extra.insert(
-                    "subliminal_accuracy".to_string(),
-                    r.subliminal_accuracy,
-                );
+                extra.insert("subliminal_accuracy".to_string(), r.subliminal_accuracy);
                 extra.insert(
                     "awareness_dissociation".to_string(),
                     r.awareness_dissociation,
@@ -276,10 +273,7 @@ impl PsychBenchmark for BlindSightBenchmark {
             "supraliminal_accuracy",
             MetricValue::from_samples(&supra_accs),
         );
-        result.insert(
-            "subliminal_accuracy",
-            MetricValue::from_samples(&sub_accs),
-        );
+        result.insert("subliminal_accuracy", MetricValue::from_samples(&sub_accs));
         result.insert(
             "awareness_dissociation",
             MetricValue::from_samples(&dissociations),

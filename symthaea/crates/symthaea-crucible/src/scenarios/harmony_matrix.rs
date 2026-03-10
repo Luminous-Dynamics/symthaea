@@ -328,13 +328,20 @@ mod tests {
     #[test]
     fn test_all_28_tensions_exist() {
         let tensions = all_tensions();
-        assert_eq!(tensions.len(), 28, "Should have C(8,2) = 28 pairwise tensions");
+        assert_eq!(
+            tensions.len(),
+            28,
+            "Should have C(8,2) = 28 pairwise tensions"
+        );
     }
 
     #[test]
     fn test_all_tension_pairs_unique() {
         let tensions = all_tensions();
-        let mut pairs: Vec<(usize, usize)> = tensions.iter().map(|t| (t.harmony_a, t.harmony_b)).collect();
+        let mut pairs: Vec<(usize, usize)> = tensions
+            .iter()
+            .map(|t| (t.harmony_a, t.harmony_b))
+            .collect();
         pairs.sort();
         pairs.dedup();
         assert_eq!(pairs.len(), 28, "All pairs should be unique");
@@ -398,18 +405,22 @@ mod tests {
                 assert!(
                     t.moral_score.is_finite(),
                     "Tension {} step {}: NaN/Inf moral score",
-                    tension.name, i
+                    tension.name,
+                    i
                 );
                 assert!(
                     t.moral_free_energy.is_finite(),
                     "Tension {} step {}: NaN/Inf free energy",
-                    tension.name, i
+                    tension.name,
+                    i
                 );
                 for (j, &c) in t.harmony_coordinates.iter().enumerate() {
                     assert!(
                         c.is_finite(),
                         "Tension {} step {} harmony[{}]: NaN/Inf",
-                        tension.name, i, j
+                        tension.name,
+                        i,
+                        j
                     );
                 }
             }

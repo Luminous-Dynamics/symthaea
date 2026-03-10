@@ -526,10 +526,7 @@ mod tests {
         // Should have per-facet drift scores
         assert_eq!(report.facet_drifts.len(), 2);
         for (name, sim) in &report.facet_drifts {
-            assert!(
-                sim.is_finite(),
-                "Facet '{name}' drift should be finite"
-            );
+            assert!(sim.is_finite(), "Facet '{name}' drift should be finite");
         }
     }
 

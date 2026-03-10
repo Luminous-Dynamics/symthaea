@@ -41,14 +41,14 @@ pub enum Manner {
 /// Place of articulation: Where is the constriction?
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Place {
-    Bilabial,    // Both lips (p, b, m)
-    Labiodental, // Lower lip + upper teeth (f, v)
-    Dental,      // Tongue + teeth (th, dh)
-    Alveolar,      // Tongue + alveolar ridge (t, d, n, s, z, l)
-    PostAlveolar,  // Tongue behind alveolar ridge (r, er)
-    Palatal,       // Tongue + hard palate (sh, zh, ch, jh, y)
-    Velar,       // Tongue back + soft palate (k, g, ng)
-    Glottal,     // Glottis (h)
+    Bilabial,     // Both lips (p, b, m)
+    Labiodental,  // Lower lip + upper teeth (f, v)
+    Dental,       // Tongue + teeth (th, dh)
+    Alveolar,     // Tongue + alveolar ridge (t, d, n, s, z, l)
+    PostAlveolar, // Tongue behind alveolar ridge (r, er)
+    Palatal,      // Tongue + hard palate (sh, zh, ch, jh, y)
+    Velar,        // Tongue back + soft palate (k, g, ng)
+    Glottal,      // Glottis (h)
     // Vowel places (tongue position)
     Front,   // Front vowels (iy, ih, ey, eh, ae)
     Central, // Central vowels (ah)
@@ -1523,8 +1523,7 @@ mod tests {
         // pair.  We only test phonemes whose feature tuple is unique across the
         // full inventory.
         let phonemes = [
-            "P", "B", "T", "D", "K", "G", "F", "V", "M", "N", "NG", "L", "R", "W", "Y", "AH",
-            "AA",
+            "P", "B", "T", "D", "K", "G", "F", "V", "M", "N", "NG", "L", "R", "W", "Y", "AH", "AA",
         ];
 
         for phone in &phonemes {

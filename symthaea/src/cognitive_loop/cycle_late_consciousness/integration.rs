@@ -380,8 +380,7 @@ impl CognitiveLoopService {
                         if response.sensorimotor_surprise > SENSORIMOTOR_SURPRISE_THRESHOLD {
                             let body_nudge = (response.sensorimotor_surprise
                                 * SENSORIMOTOR_SURPRISE_EXPLORE_SCALE)
-                                .min(0.15)
-                                as f32;
+                                .min(0.15) as f32;
                             self.adjust_exploration("sensorimotor_surprise", body_nudge);
                         }
                         // 3. High allostatic load suppresses learning (conserve resources)
@@ -417,12 +416,12 @@ impl CognitiveLoopService {
                 EMBODIED_AGENCY_LOW_THRESHOLD,
             };
             if embodied_agency > EMBODIED_AGENCY_HIGH_THRESHOLD {
-                let agency_boost =
-                    ((embodied_agency - EMBODIED_AGENCY_HIGH_THRESHOLD) * EMBODIED_AGENCY_BOOST_SCALE) as f32;
+                let agency_boost = ((embodied_agency - EMBODIED_AGENCY_HIGH_THRESHOLD)
+                    * EMBODIED_AGENCY_BOOST_SCALE) as f32;
                 self.adaptive_behavior.exploration_factor *= 1.0 + agency_boost;
             } else if embodied_agency > 0.0 && embodied_agency < EMBODIED_AGENCY_LOW_THRESHOLD {
-                let caution =
-                    ((EMBODIED_AGENCY_LOW_THRESHOLD - embodied_agency) * EMBODIED_AGENCY_CAUTION_SCALE) as f32;
+                let caution = ((EMBODIED_AGENCY_LOW_THRESHOLD - embodied_agency)
+                    * EMBODIED_AGENCY_CAUTION_SCALE) as f32;
                 self.scale_exploration(
                     "embodied_caution",
                     (1.0 - caution).max(EMBODIED_AGENCY_CAUTION_FLOOR),
@@ -553,12 +552,10 @@ impl CognitiveLoopService {
         // memory even without full conscious access (pre-attentive encoding).
         if ctx.surprise_triggered {
             let valence = -(ctx.prediction_error as f64 * 0.3); // surprise is mildly negative
-            self.master_equation
-                .narrative_coherence
-                .add_episode(
-                    format!("surprise_pre_pe{:.2}", ctx.prediction_error),
-                    valence,
-                );
+            self.master_equation.narrative_coherence.add_episode(
+                format!("surprise_pre_pe{:.2}", ctx.prediction_error),
+                valence,
+            );
         }
 
         // Run every 10th cycle to amortize cost. Maps cognitive loop signals to
@@ -825,9 +822,9 @@ impl CognitiveLoopService {
             // "aware" moments regardless of absolute consciousness range.
             let ema = &mut self.carryover.history.consciousness_ema;
             *ema = *ema * 0.95 + level * 0.05; // EMA α=0.05, ~20-cycle half-life
-            // Moral salience lowers consolidation threshold → morally significant
-            // moments are more readily encoded into episodic memory.
-            // Science: Zak (2012) — moral narratives activate oxytocin → enhanced encoding.
+                                               // Moral salience lowers consolidation threshold → morally significant
+                                               // moments are more readily encoded into episodic memory.
+                                               // Science: Zak (2012) — moral narratives activate oxytocin → enhanced encoding.
             let moral_ease = {
                 use crate::cognitive_loop::thresholds::{
                     MORAL_CONSOLIDATION_EASE, MORAL_CONSOLIDATION_THRESHOLD,
@@ -852,10 +849,7 @@ impl CognitiveLoopService {
                 // Valence: map from body arousal (emotional coloring of the moment).
                 let episode_valence = late.body_valence as f64 * 0.5; // [-0.5, 0.5]
                 let episode_label = if ctx.surprise_triggered {
-                    format!(
-                        "surprise_c{:.2}_pe{:.2}",
-                        level, ctx.prediction_error
-                    )
+                    format!("surprise_c{:.2}_pe{:.2}", level, ctx.prediction_error)
                 } else if ctx.moral_concern_detected {
                     format!("moral_c{:.2}", level)
                 } else {

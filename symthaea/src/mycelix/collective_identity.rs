@@ -59,12 +59,18 @@ impl CollectiveKosmicSong {
         let n = credentials.len();
 
         // Mean coherence
-        let coherence =
-            credentials.iter().map(|c| c.coherence_score as f64).sum::<f64>() / n as f64;
+        let coherence = credentials
+            .iter()
+            .map(|c| c.coherence_score as f64)
+            .sum::<f64>()
+            / n as f64;
 
         // Mean maturation
-        let mean_maturation =
-            credentials.iter().map(|c| c.maturation_signal as f64).sum::<f64>() / n as f64;
+        let mean_maturation = credentials
+            .iter()
+            .map(|c| c.maturation_signal as f64)
+            .sum::<f64>()
+            / n as f64;
 
         // Count dominant harmonies across agents
         let mut harmony_counts = [0u32; 8];
@@ -99,12 +105,12 @@ fn detect_community_mode(counts: &[u32; 8]) -> CommunityMode {
     // 3: SacredReciprocity, 4: EvolutionaryProgression, 5: InfinitePlay
     // 6: RadicalTransparency, 7: SacredStillness
 
-    let play = counts[3];       // InfinitePlay
-    let care = counts[1];       // PanSentientFlourishing
+    let play = counts[3]; // InfinitePlay
+    let care = counts[1]; // PanSentientFlourishing
     let reciprocity = counts[5]; // SacredReciprocity
-    let evolution = counts[6];  // EvolutionaryProgression
-    let stillness = counts[7];  // SacredStillness
-    let wisdom = counts[2];     // IntegralWisdom
+    let evolution = counts[6]; // EvolutionaryProgression
+    let stillness = counts[7]; // SacredStillness
+    let wisdom = counts[2]; // IntegralWisdom
 
     let exploratory_score = play + counts[4]; // play + interconnectedness
     let protective_score = care + reciprocity;
@@ -209,7 +215,11 @@ mod tests {
             .set_activation(Harmony::PanSentientFlourishing, 0.9);
 
         let affinity = ks.harmonic_affinity(&[Harmony::PanSentientFlourishing]);
-        assert!(affinity > 0.5, "Care-dominant should match care proposal: {}", affinity);
+        assert!(
+            affinity > 0.5,
+            "Care-dominant should match care proposal: {}",
+            affinity
+        );
 
         let low_affinity = ks.harmonic_affinity(&[Harmony::InfinitePlay]);
         assert!(

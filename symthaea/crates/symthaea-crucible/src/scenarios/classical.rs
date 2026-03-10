@@ -72,7 +72,11 @@ pub fn conflicting_duties_scenario() -> Vec<ScenarioStep> {
 /// Progressive moral escalation: increasingly severe choices.
 pub fn escalation_scenario() -> Vec<ScenarioStep> {
     vec![
-        ScenarioStep::full("helping a neighbor carry groceries", "mild", ExpectedValence::Positive),
+        ScenarioStep::full(
+            "helping a neighbor carry groceries",
+            "mild",
+            ExpectedValence::Positive,
+        ),
         ScenarioStep::full(
             "donating time and care to support the community shelter",
             "moderate",
@@ -105,14 +109,22 @@ mod tests {
     fn test_trolley_invariants() {
         let mut engine = CrucibleEngine::new();
         let report = engine.run_scenario("trolley", &trolley_scenario());
-        assert!(report.passed(), "Trolley: {:?}", report.invariant_violations);
+        assert!(
+            report.passed(),
+            "Trolley: {:?}",
+            report.invariant_violations
+        );
     }
 
     #[test]
     fn test_dual_use_invariants() {
         let mut engine = CrucibleEngine::new();
         let report = engine.run_scenario("dual_use", &dual_use_scenario());
-        assert!(report.passed(), "Dual use: {:?}", report.invariant_violations);
+        assert!(
+            report.passed(),
+            "Dual use: {:?}",
+            report.invariant_violations
+        );
     }
 
     #[test]
@@ -130,7 +142,11 @@ mod tests {
     fn test_escalation_scores_remain_positive() {
         let mut engine = CrucibleEngine::new();
         let report = engine.run_scenario("escalation", &escalation_scenario());
-        assert!(report.passed(), "Escalation: {:?}", report.invariant_violations);
+        assert!(
+            report.passed(),
+            "Escalation: {:?}",
+            report.invariant_violations
+        );
 
         // All escalation steps are positive — scores should be > 0
         for (i, t) in report.cycle_telemetry.iter().enumerate() {

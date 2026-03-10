@@ -669,7 +669,9 @@ impl StructuredThought {
                 .partition(|n| n.starts_with("PAST_EXAMPLE("));
             if !example_notes.is_empty() {
                 prompt.push_str("DISTILLATION_EXAMPLES:\n");
-                prompt.push_str("These are verified, high-quality code generations from this session.\n");
+                prompt.push_str(
+                    "These are verified, high-quality code generations from this session.\n",
+                );
                 prompt.push_str("Use them as style and pattern references:\n\n");
                 for note in &example_notes {
                     prompt.push_str(note);

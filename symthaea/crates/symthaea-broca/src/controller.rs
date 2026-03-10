@@ -701,7 +701,15 @@ mod tests {
         let sparse_logits = ctrl3.forward_step_sampled(&thought_hv, 0, 0, &subset);
         assert!(sparse_logits[0].is_finite(), "Index 0 should be computed");
         assert!(sparse_logits[5].is_finite(), "Index 5 should be computed");
-        assert_eq!(sparse_logits[1], f32::NEG_INFINITY, "Index 1 should be -inf");
-        assert_eq!(sparse_logits[3], f32::NEG_INFINITY, "Index 3 should be -inf");
+        assert_eq!(
+            sparse_logits[1],
+            f32::NEG_INFINITY,
+            "Index 1 should be -inf"
+        );
+        assert_eq!(
+            sparse_logits[3],
+            f32::NEG_INFINITY,
+            "Index 3 should be -inf"
+        );
     }
 }

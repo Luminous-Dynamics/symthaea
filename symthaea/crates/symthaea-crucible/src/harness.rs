@@ -147,11 +147,10 @@ impl CrucibleEngine {
             drift_alert: drift > 0.3,
             ..Default::default()
         };
-        let anomaly_score =
-            (value_inversion as u8 as f64 * 0.3
-                + fe_spike as u8 as f64 * 0.3
-                + anomaly_flags.drift_alert as u8 as f64 * 0.2)
-                .min(1.0);
+        let anomaly_score = (value_inversion as u8 as f64 * 0.3
+            + fe_spike as u8 as f64 * 0.3
+            + anomaly_flags.drift_alert as u8 as f64 * 0.2)
+            .min(1.0);
 
         // Determine moral verdict from harmony alignment
         let moral_score = alignment.overall_score;
@@ -198,7 +197,9 @@ impl CrucibleEngine {
             let violations = invariants::check_universal(&telemetry);
             report.invariant_violations.extend(violations);
 
-            report.harmony_trajectory.push(telemetry.harmony_coordinates);
+            report
+                .harmony_trajectory
+                .push(telemetry.harmony_coordinates);
             report.free_energy_trace.push(telemetry.moral_free_energy);
             report.cycle_telemetry.push(telemetry);
         }

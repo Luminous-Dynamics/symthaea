@@ -196,8 +196,12 @@ impl Default for ReasoningContextBuilder {
 pub struct ReasoningResult {
     /// Budget tier that was used.
     pub tier: BudgetTier,
-    /// Effective Φ = Φ × R^γ.
+    /// Effective Φ = Φ × R^γ (after epistemic modulation).
     pub phi_eff: f64,
+    /// Raw Φ_eff before epistemic modulation: Φ × R^γ.
+    pub phi_eff_raw: f64,
+    /// Epistemic quality modulation factor applied (0.5–1.0).
+    pub epistemic_mod: f64,
     /// Reliability R.
     pub reliability: f64,
     /// Current γ.
@@ -216,6 +220,10 @@ pub struct ReasoningResult {
     pub wall_time_us: u64,
     /// Whether budget was exceeded.
     pub budget_exceeded: bool,
+    /// Number of tool gate evaluations performed (0, 1, or 2).
+    pub gate_checks: u32,
+    /// Expected Value of Simulation (0.0 for Tier 0).
+    pub evs: f64,
 }
 
 impl ReasoningResult {
@@ -228,9 +236,12 @@ impl ReasoningResult {
         gate: Option<GateResult>,
         wall_time_us: u64,
     ) -> Self {
+        let gate_checks = if gate.is_some() { 1 } else { 0 };
         Self {
             tier: BudgetTier::Tier0,
             phi_eff,
+            phi_eff_raw: 0.0, // set by caller via with_internals()
+            epistemic_mod: 1.0,
             reliability,
             gamma,
             conflicts,
@@ -240,6 +251,8 @@ impl ReasoningResult {
             narrative: None,
             wall_time_us,
             budget_exceeded: false,
+            gate_checks,
+            evs: 0.0,
         }
     }
 
@@ -254,9 +267,12 @@ impl ReasoningResult {
         wall_time_us: u64,
         budget_exceeded: bool,
     ) -> Self {
+        let gate_checks = if gate.is_some() { 2 } else { 0 };
         Self {
             tier: BudgetTier::Tier1,
             phi_eff,
+            phi_eff_raw: 0.0,
+            epistemic_mod: 1.0,
             reliability,
             gamma,
             conflicts,
@@ -266,6 +282,8 @@ impl ReasoningResult {
             narrative: None,
             wall_time_us,
             budget_exceeded,
+            gate_checks,
+            evs: 0.0,
         }
     }
 
@@ -282,9 +300,12 @@ impl ReasoningResult {
         wall_time_us: u64,
         budget_exceeded: bool,
     ) -> Self {
+        let gate_checks = if gate.is_some() { 2 } else { 0 };
         Self {
             tier: BudgetTier::Tier2,
             phi_eff,
+            phi_eff_raw: 0.0,
+            epistemic_mod: 1.0,
             reliability,
             gamma,
             conflicts,
@@ -294,7 +315,18 @@ impl ReasoningResult {
             narrative,
             wall_time_us,
             budget_exceeded,
+            gate_checks,
+            evs: 0.0,
         }
+    }
+
+    /// Set internal diagnostics (phi_eff_raw, epistemic_mod, evs) on a result.
+    /// Called by the reasoning engine after construction.
+    pub fn with_internals(mut self, phi_eff_raw: f64, epistemic_mod: f64, evs: f64) -> Self {
+        self.phi_eff_raw = phi_eff_raw;
+        self.epistemic_mod = epistemic_mod;
+        self.evs = evs;
+        self
     }
 
     /// Whether the engine had enough budget for full reasoning.

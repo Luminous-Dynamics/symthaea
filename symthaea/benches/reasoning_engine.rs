@@ -90,6 +90,8 @@ mod benches {
             tool: None,
             recent_utility: 0.5,
             cycle_id: 0,
+            neuromod_exploration_mod: 1.0,
+            epistemic_quality: 0.5,
         };
 
         c.bench_function("full_tier0_cycle", |b| {
@@ -109,6 +111,8 @@ mod benches {
             tool: None,
             recent_utility: 0.5,
             cycle_id: 0,
+            neuromod_exploration_mod: 1.0,
+            epistemic_quality: 0.5,
         };
 
         c.bench_function("full_tier1_cycle", |b| {
@@ -133,6 +137,8 @@ mod benches {
             ),
             recent_utility: 0.5,
             cycle_id: 0,
+            neuromod_exploration_mod: 1.0,
+            epistemic_quality: 0.5,
         };
 
         c.bench_function("full_tier2_cycle", |b| {
@@ -172,6 +178,8 @@ mod benches {
                         tool: None,
                         recent_utility: 0.5,
                         cycle_id: i,
+                        neuromod_exploration_mod: 1.0,
+                        epistemic_quality: 0.5,
                     };
                     black_box(engine.reason(&ctx));
                 }

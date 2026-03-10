@@ -121,8 +121,11 @@ impl EpistemicMesh {
             .collect();
 
         // Sort by severity descending for deterministic ordering
-        self.blind_spots
-            .sort_by(|a, b| b.severity.partial_cmp(&a.severity).unwrap_or(std::cmp::Ordering::Equal));
+        self.blind_spots.sort_by(|a, b| {
+            b.severity
+                .partial_cmp(&a.severity)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
     }
 
     /// Get all detected blind spots.
@@ -178,10 +181,8 @@ impl EpistemicMesh {
                 continue;
             }
             // Does this agent have expertise here?
-            if let Some((_, confidence)) = summary
-                .domain_expertise
-                .iter()
-                .find(|(d, _)| d == domain)
+            if let Some((_, confidence)) =
+                summary.domain_expertise.iter().find(|(d, _)| d == domain)
             {
                 if *confidence > UNCERTAINTY_THRESHOLD {
                     // Expert in a blind-spot domain → boost proportional to confidence
@@ -225,10 +226,7 @@ mod tests {
         EpistemicSummary {
             agent_id: id.to_string(),
             dominant_ignorance: IgnoranceType::Known,
-            domain_expertise: expertise
-                .iter()
-                .map(|(d, c)| (d.to_string(), *c))
-                .collect(),
+            domain_expertise: expertise.iter().map(|(d, c)| (d.to_string(), *c)).collect(),
             blind_spots: spots.iter().map(|s| s.to_string()).collect(),
         }
     }
@@ -284,10 +282,7 @@ mod tests {
 
     #[test]
     fn test_proposal_no_escalation() {
-        let summaries = vec![
-            summary_with_spots("a1", &[]),
-            summary_with_spots("a2", &[]),
-        ];
+        let summaries = vec![summary_with_spots("a1", &[]), summary_with_spots("a2", &[])];
         let mesh = EpistemicMesh::new(summaries);
 
         let tier = mesh.proposal_escalation_required(&["anything".to_string()]);
@@ -298,7 +293,7 @@ mod tests {
     fn test_expertise_boost() {
         // "climate" is a blind spot; agent a1 has expertise
         let summaries = vec![
-            summary_with_spots("a1", &[]),        // expert, no spots
+            summary_with_spots("a1", &[]), // expert, no spots
             summary_with_spots("a2", &["climate"]),
             summary_with_spots("a3", &["climate"]),
             summary_with_spots("a4", &["climate"]),
@@ -307,20 +302,13 @@ mod tests {
 
         let expert = expert_summary("a1", &[], &[("climate", 0.9)]);
         let boost = mesh.expertise_boost(&expert, &["climate".to_string()]);
-        assert!(
-            boost > 1.0,
-            "Domain expert should get boost: {}",
-            boost
-        );
+        assert!(boost > 1.0, "Domain expert should get boost: {}", boost);
         assert!(boost <= 2.0, "Boost should be capped at 2.0");
     }
 
     #[test]
     fn test_expertise_no_boost_without_blind_spot() {
-        let summaries = vec![
-            summary_with_spots("a1", &[]),
-            summary_with_spots("a2", &[]),
-        ];
+        let summaries = vec![summary_with_spots("a1", &[]), summary_with_spots("a2", &[])];
         let mesh = EpistemicMesh::new(summaries);
 
         let expert = expert_summary("a1", &[], &[("climate", 0.9)]);

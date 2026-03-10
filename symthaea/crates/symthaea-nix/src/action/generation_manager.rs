@@ -359,7 +359,8 @@ old-package: 2.0 → ∅, -3.2 MiB
 
     #[test]
     fn test_parse_generations_non_numeric_skipped() {
-        let output = "Header line that is not a generation\n  42  2025-01-05  NixOS 24.11  linux 6.12\n";
+        let output =
+            "Header line that is not a generation\n  42  2025-01-05  NixOS 24.11  linux 6.12\n";
         let gens = GenerationManager::parse_generations(output).unwrap();
         assert_eq!(gens.len(), 1);
         assert_eq!(gens[0].number, 42);
