@@ -53,8 +53,8 @@ members = [
     "crates/symthaea-phi-oracle",
     "crates/symthaea-pulse",
     "crates/symthaea-spore",
+    "crates/symthaea-crucible",
 ]
-
 
 [workspace.dependencies]
 arrow-array = "56"
