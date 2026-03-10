@@ -14197,6 +14197,7 @@ dependencies = [
  "symthaea-consciousness-resonance",
  "symthaea-consciousness-topology",
  "symthaea-core",
+ "symthaea-crucible",
  "symthaea-dream",
  "symthaea-ectogenesis",
  "symthaea-embeddings",

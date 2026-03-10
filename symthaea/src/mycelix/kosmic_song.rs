@@ -64,8 +64,8 @@
 //! ```
 
 use super::gis::{
-    GracefulIgnoranceSystem, HarmonicIgnorance, Harmony, IgnoranceDetection, MoralUncertainty,
-    RashomonEngine, Situation, SynthesizedView,
+    GracefulIgnoranceSystem, HarmonicIgnorance, Harmony, IgnoranceDetection, IgnoranceType,
+    MoralUncertainty, RashomonEngine, Situation, SynthesizedView,
 };
 use std::time::SystemTime;
 

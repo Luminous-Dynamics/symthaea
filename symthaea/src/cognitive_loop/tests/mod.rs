@@ -9,6 +9,7 @@
 #[allow(clippy::field_reassign_with_default)]
 mod accessors_and_types;
 mod core;
+mod crucible_integration;
 mod cycle_properties;
 mod feedback;
 mod helpers;

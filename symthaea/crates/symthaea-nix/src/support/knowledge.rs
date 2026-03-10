@@ -1394,10 +1394,12 @@ mod tests {
         );
 
         let r1 = kb.search_all("stability test", &mut codebook, 10);
-        let r2 = kb.search_all("stability test", &mut codebook, 10);
+        let ids1: Vec<String> = r1.iter().map(|m| m.id().to_string()).collect();
+        drop(r1);
 
-        let ids1: Vec<&str> = r1.iter().map(|m| m.id()).collect();
-        let ids2: Vec<&str> = r2.iter().map(|m| m.id()).collect();
+        let r2 = kb.search_all("stability test", &mut codebook, 10);
+        let ids2: Vec<String> = r2.iter().map(|m| m.id().to_string()).collect();
+
         assert_eq!(ids1, ids2, "search_all sort should be deterministic");
     }
 }

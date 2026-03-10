@@ -364,8 +364,6 @@ pub struct Symthaea {
     // ── Output & Actions ────────────────────────────────────────────────
     /// Resonant speech: user-adaptive response generation.
     resonant_speech: crate::resonant_speech::ResonantSpeech,
-    /// Optional streaming inference engine for real-time sensor-driven CfC processing.
-    streaming_inference: Option<crate::inference::StreamingInference>,
     /// Registry of primitive action bindings.
     pub action_registry: ActionRegistry,
     /// Action executor with safety policy and dream integration.
@@ -712,7 +710,6 @@ impl Symthaea {
             memory_coordinator: MemoryCoordinator::new(CoordinatorConfig::default()),
             episodic_memory: EpisodicMemory::new(EpisodicReplayConfig::default()),
             resonant_speech: crate::resonant_speech::ResonantSpeech::new(),
-            streaming_inference: None,
             action_registry: ActionRegistry::standard(),
             executor: SimpleExecutor::new(),
             #[cfg(feature = "school_learning")]
@@ -948,7 +945,6 @@ impl Symthaea {
             memory_coordinator: MemoryCoordinator::new(CoordinatorConfig::default()),
             episodic_memory: EpisodicMemory::new(EpisodicReplayConfig::default()),
             resonant_speech: crate::resonant_speech::ResonantSpeech::new(),
-            streaming_inference: None,
             action_registry: ActionRegistry::standard(),
             executor: SimpleExecutor::new(),
             #[cfg(feature = "school_learning")]

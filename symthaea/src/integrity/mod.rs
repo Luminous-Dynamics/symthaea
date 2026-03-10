@@ -25,11 +25,58 @@ pub mod redundant_computation;
 pub mod temporal_consistency;
 
 use std::collections::VecDeque;
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Instant;
 
 pub use attestation::{AttestationRecord, AttestationRegistry};
 pub use behavioral_canaries::{CanaryFailure, CanaryRunner, CanarySeverity, CanaryTest};
 pub use temporal_consistency::TemporalConsistencyMonitor;
+
+// ── Panic Hook for Crash Forensics ───────────────────────────────────────
+
+/// Global storage for the most recent integrity snapshot blob.
+/// Updated each tick by `update_panic_snapshot()`, read by the panic hook.
+static PANIC_SNAPSHOT: OnceLock<Arc<Mutex<Option<Vec<u8>>>>> = OnceLock::new();
+
+fn panic_snapshot_storage() -> &'static Arc<Mutex<Option<Vec<u8>>>> {
+    PANIC_SNAPSHOT.get_or_init(|| Arc::new(Mutex::new(None)))
+}
+
+/// Install a panic hook that dumps the integrity snapshot to disk on crash.
+///
+/// The blob is written to `/tmp/symthaea-integrity-dump-{unix_secs}.bin`.
+/// The previous panic hook (if any) is chained so standard panic behavior is preserved.
+///
+/// Call once at startup (after IntegrityManager is constructed).
+pub fn install_panic_hook() {
+    let prev = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        // Try to dump the snapshot — best-effort, don't panic inside the panic hook
+        if let Ok(guard) = panic_snapshot_storage().lock() {
+            if let Some(blob) = guard.as_ref() {
+                let ts = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0);
+                let path = format!("/tmp/symthaea-integrity-dump-{ts}.bin");
+                if std::fs::write(&path, blob).is_ok() {
+                    eprintln!("[integrity] Crash forensics: dumped {} bytes to {path}", blob.len());
+                }
+            }
+        }
+        // Chain to previous hook
+        prev(info);
+    }));
+}
+
+/// Update the global panic snapshot with the latest integrity state.
+///
+/// Called from `IntegrityManager::tick()` each cycle so the dump is always fresh.
+pub fn update_panic_snapshot(blob: Vec<u8>) {
+    if let Ok(mut guard) = panic_snapshot_storage().lock() {
+        *guard = Some(blob);
+    }
+}
 
 /// Overall integrity status, updated each check cycle.
 #[derive(Debug, Clone)]
@@ -315,6 +362,11 @@ impl IntegrityManager {
             self.confidence_history.pop_front();
         }
         self.confidence_history.push_back(self.integrity_confidence);
+
+        // Update panic snapshot for crash forensics (best-effort, every 10th cycle)
+        if cycle % 10 == 0 {
+            update_panic_snapshot(self.export_snapshot());
+        }
 
         &self.status
     }

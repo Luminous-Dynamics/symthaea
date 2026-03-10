@@ -534,6 +534,7 @@ all_benchmarks = ["benchmarks", "physics"]              # All benchmarking featu
 criterion = "0.5"
 proptest = "1.4"
 serial_test = "3.2"
+symthaea-crucible = { path = "crates/symthaea-crucible" }
 tempfile = "3.8"  # For perception tests
 
 # Binaries

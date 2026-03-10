@@ -462,6 +462,14 @@ impl CognitiveLoopService {
         metadata.tom_exploration_triggered =
             self.stats.tom_prediction_mismatch_ema > 0.4 && self.stats.total_cycles > 10;
 
+        // ── User State Inference telemetry ──
+        if let Some(ref usi) = self.user_state {
+            let state = usi.state();
+            metadata.user_cognitive_load = state.cognitive_load.level as f32;
+            metadata.user_frustration = state.frustration as f32;
+            metadata.user_engagement = state.engagement as f32;
+        }
+
         // ── MCE factor telemetry (from consciousness carryover cache) ──
         metadata.mce_bottleneck = self.carryover.consciousness.mce_bottleneck_name.clone();
         metadata.mce_softmin = self.carryover.consciousness.mce_softmin;
@@ -1079,6 +1087,29 @@ impl CognitiveLoopService {
             .store_consensus_for_next_cycle(&feedback_consensus);
 
         // ── Phase 2.3: Integrate subsystem outputs ─────────────
+        // Populate per-manager telemetry before integration (collector still has outputs).
+        {
+            use super::types::telemetry::ManagerTelemetry;
+            let mut mt = ManagerTelemetry::default();
+            if let Some(o) = self.subsystem_collector.get("drive_manager") {
+                mt.drive_confidence_delta = o.confidence_delta as f32;
+                mt.drive_exploration_delta = o.exploration_delta as f32;
+            }
+            if let Some(o) = self.subsystem_collector.get("memory_manager") {
+                mt.memory_confidence_delta = o.confidence_delta as f32;
+                mt.memory_lr_modulation = o.lr_modulation as f32;
+            }
+            if let Some(o) = self.subsystem_collector.get("learning_manager") {
+                mt.learning_confidence_delta = o.confidence_delta as f32;
+                mt.learning_lr_modulation = o.lr_modulation as f32;
+            }
+            if let Some(o) = self.subsystem_collector.get("perception_manager") {
+                mt.perception_confidence_delta = o.confidence_delta as f32;
+                mt.perception_exploration_delta = o.exploration_delta as f32;
+            }
+            metadata.managers = mt;
+        }
+
         let integrated = self.subsystem_collector.integrate();
         if integrated.n_contributors > 0 {
             metadata.subsystem_integration_contributors = integrated.n_contributors as u32;

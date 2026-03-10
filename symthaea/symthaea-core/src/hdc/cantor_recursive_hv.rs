@@ -102,7 +102,7 @@ impl CantorRecursiveHV {
 
     /// Create with specific recursion depth
     pub fn from_base_with_depth(base: BinaryHV, max_depth: usize) -> Self {
-        let dimension = base.dimension();
+        let dimension = BinaryHV::DIM;
         let mut result = base.clone();
         let mut scales = Vec::new();
 

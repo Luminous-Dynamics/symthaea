@@ -83,7 +83,7 @@ impl CognitiveLoopService {
             #[cfg(feature = "vision-manifold")]
             scene_recognized: perception.scene_recognized,
             #[cfg(feature = "semantic-encoder")]
-            semantic_embedding: None, // TODO: wire to semantic_embedding_channel
+            semantic_embedding: self.last_semantic_continuous.as_deref(),
         };
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -929,6 +929,38 @@ impl CognitiveLoopService {
                 self.adjust_confidence(
                     "kosmic_high_coherence",
                     KOSMIC_HIGH_COHERENCE_CONFIDENCE_BOOST,
+                );
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // USER STATE INFERENCE → BEHAVIORAL COUPLING
+        // Swanson (2000) — frustration dampens exploration; engagement boosts learning.
+        // ═══════════════════════════════════════════════════════════════════════
+        let usi_vals = self.user_state.as_ref().map(|usi| {
+            let state = usi.state();
+            (state.frustration, state.cognitive_load.level, state.engagement)
+        });
+        if let Some((frustration, cognitive_load_level, engagement)) = usi_vals {
+            // High frustration → dampen exploration (user is struggling)
+            if frustration > 0.6 {
+                self.scale_exploration(
+                    "user_frustration",
+                    1.0 - (frustration as f32 - 0.6) * 0.25, // 0.9 at max frustration
+                );
+            }
+            // High cognitive load → reduce learning rate (prevent overload)
+            if cognitive_load_level > 0.7 {
+                self.scale_lr(
+                    "user_cognitive_load",
+                    1.0 - (cognitive_load_level as f32 - 0.7) * 0.3, // 0.91 at max load
+                );
+            }
+            // High engagement → boost confidence slightly
+            if engagement > 0.8 {
+                self.adjust_confidence(
+                    "user_engagement",
+                    (engagement as f32 - 0.8) * 0.05, // up to 0.01 boost
                 );
             }
         }

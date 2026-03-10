@@ -703,6 +703,10 @@ pub struct CycleMetadata {
     /// 0 = no subsystems using the new CognitiveSubsystem trait yet.
     pub subsystem_integration_contributors: u32,
 
+    /// Per-manager proposal magnitudes (which managers moved the needle this cycle).
+    #[serde(default)]
+    pub managers: ManagerTelemetry,
+
     // ── Nurture Attachment Telemetry ─────────────────────────────────────
     /// Current attachment style (e.g., "Forming", "Secure"). Empty when nurture disabled.
     pub attachment_style: Option<String>,
@@ -802,6 +806,17 @@ pub struct CycleMetadata {
     /// Whether ToM mismatch triggered exploration this cycle.
     #[serde(default)]
     pub tom_exploration_triggered: bool,
+
+    // ── User State Inference Telemetry ───────────────────────────────────
+    /// User cognitive load (0.0 = low, 1.0 = high). 0.0 when USI disabled.
+    #[serde(default)]
+    pub user_cognitive_load: f32,
+    /// User frustration level (0.0 = calm, 1.0 = very frustrated). 0.0 when USI disabled.
+    #[serde(default)]
+    pub user_frustration: f32,
+    /// User engagement level (0.0 = disengaged, 1.0 = highly engaged). 0.5 when USI disabled.
+    #[serde(default = "default_half_f32")]
+    pub user_engagement: f32,
 
     // ── Vision Manifold Telemetry ───────────────────────────────────────
     /// Vision manifold telemetry (None when vision-manifold feature disabled or not active).
@@ -1560,6 +1575,28 @@ pub struct FeedbackTelemetry {
     pub feedback_trace_exploration: Vec<(String, String)>,
     /// Per-proposal trace for threshold (populated when `trace_feedback = true`).
     pub feedback_trace_threshold: Vec<(String, String)>,
+}
+
+/// Per-manager telemetry: which managers fired and what they proposed.
+/// Each field is the manager's SubsystemOutput magnitude (0.0 = neutral/not run).
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ManagerTelemetry {
+    /// Drive manager confidence delta (curiosity, flow, boredom, exploration).
+    pub drive_confidence_delta: f32,
+    /// Drive manager exploration delta.
+    pub drive_exploration_delta: f32,
+    /// Memory manager confidence delta (episodic, semantic, resonator).
+    pub memory_confidence_delta: f32,
+    /// Memory manager LR modulation factor.
+    pub memory_lr_modulation: f32,
+    /// Learning manager confidence delta (FEP, dream, school).
+    pub learning_confidence_delta: f32,
+    /// Learning manager LR modulation factor.
+    pub learning_lr_modulation: f32,
+    /// Perception manager confidence delta (attention, multi-modal, social).
+    pub perception_confidence_delta: f32,
+    /// Perception manager exploration delta.
+    pub perception_exploration_delta: f32,
 }
 
 /// Per-module execution timings in microseconds for overhead profiling.

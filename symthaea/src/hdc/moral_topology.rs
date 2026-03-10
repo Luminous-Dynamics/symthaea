@@ -715,6 +715,185 @@ impl EscalationPolicy {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// Escalation Audit Log & Causal Attribution
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Immutable record of an escalation state transition.
+///
+/// Appended to the audit log every time the escalation level changes or a
+/// convergence detection fires. Provides forensic evidence for governance
+/// reviews and post-incident debugging.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EscalationAuditEntry {
+    /// Monotonic sequence number (unique across the session).
+    pub sequence: u64,
+    /// Cycle count at which this entry was recorded.
+    pub cycle: u64,
+    /// Previous escalation level (before this transition).
+    pub from_level: EscalationLevel,
+    /// New escalation level (after this transition).
+    pub to_level: EscalationLevel,
+    /// Raw severity that triggered this transition.
+    pub severity: f64,
+    /// Calibrated severity.
+    pub calibrated_severity: f64,
+    /// Which of the 4 signals were triggered.
+    pub signals_triggered: [bool; 4],
+    /// Signal values: [similarity_anomaly, entropy_decline, flourishing_deficit, spectral_gap_decline].
+    pub signal_values: [f64; 4],
+    /// Matched hazard template, if any.
+    pub matched_hazard: Option<String>,
+    /// Fingerprint velocity at time of event.
+    pub fingerprint_velocity: f64,
+    /// Persistence diagram Wasserstein distance.
+    pub persistence_distance: f64,
+    /// Scenario IDs (monotonic counters) of the requests in the recent window
+    /// at the time of this event. Used to trace which inputs contributed.
+    pub window_scenario_ids: Vec<u64>,
+    /// BLAKE3 hash of the serialized entry (excluding this field) for tamper evidence.
+    #[serde(default)]
+    pub integrity_hash: String,
+}
+
+impl EscalationAuditEntry {
+    /// Compute the BLAKE3 integrity hash for this entry.
+    ///
+    /// Hashes all fields except `integrity_hash` itself.
+    fn compute_hash(&self) -> String {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(&self.sequence.to_le_bytes());
+        hasher.update(&self.cycle.to_le_bytes());
+        hasher.update(&[self.from_level as u8, self.to_level as u8]);
+        hasher.update(&self.severity.to_le_bytes());
+        hasher.update(&self.calibrated_severity.to_le_bytes());
+        for &s in &self.signals_triggered {
+            hasher.update(&[s as u8]);
+        }
+        for &v in &self.signal_values {
+            hasher.update(&v.to_le_bytes());
+        }
+        if let Some(ref h) = self.matched_hazard {
+            hasher.update(h.as_bytes());
+        }
+        hasher.update(&self.fingerprint_velocity.to_le_bytes());
+        hasher.update(&self.persistence_distance.to_le_bytes());
+        for &id in &self.window_scenario_ids {
+            hasher.update(&id.to_le_bytes());
+        }
+        hasher.finalize().to_hex().to_string()
+    }
+
+    /// Seal this entry with its integrity hash.
+    pub fn seal(&mut self) {
+        self.integrity_hash = self.compute_hash();
+    }
+
+    /// Verify the integrity hash.
+    pub fn verify(&self) -> bool {
+        self.integrity_hash == self.compute_hash()
+    }
+}
+
+/// Append-only audit log for escalation events.
+///
+/// Bounded to `max_entries` to prevent unbounded memory growth.
+/// Oldest entries are evicted when the log is full, but they should
+/// have been persisted to disk via snapshot before eviction.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct EscalationAuditLog {
+    entries: VecDeque<EscalationAuditEntry>,
+    max_entries: usize,
+    next_sequence: u64,
+}
+
+impl EscalationAuditLog {
+    pub fn new(max_entries: usize) -> Self {
+        Self {
+            entries: VecDeque::new(),
+            max_entries,
+            next_sequence: 0,
+        }
+    }
+
+    /// Append a new audit entry. Seals it with BLAKE3 before insertion.
+    pub fn append(&mut self, mut entry: EscalationAuditEntry) {
+        entry.sequence = self.next_sequence;
+        self.next_sequence += 1;
+        entry.seal();
+        if self.entries.len() >= self.max_entries {
+            self.entries.pop_front();
+        }
+        self.entries.push_back(entry);
+    }
+
+    /// All entries in chronological order.
+    pub fn entries(&self) -> &VecDeque<EscalationAuditEntry> {
+        &self.entries
+    }
+
+    /// Number of entries in the log.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether the log is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Most recent entry, if any.
+    pub fn last(&self) -> Option<&EscalationAuditEntry> {
+        self.entries.back()
+    }
+
+    /// Verify integrity of all entries in the log.
+    ///
+    /// Returns the index of the first tampered entry, or None if all are valid.
+    pub fn verify_integrity(&self) -> Option<usize> {
+        for (i, entry) in self.entries.iter().enumerate() {
+            if !entry.verify() {
+                return Some(i);
+            }
+        }
+        None
+    }
+
+    /// Entries since a given sequence number (for incremental export).
+    pub fn entries_since(&self, since_sequence: u64) -> Vec<&EscalationAuditEntry> {
+        self.entries
+            .iter()
+            .filter(|e| e.sequence >= since_sequence)
+            .collect()
+    }
+}
+
+/// Result of causal attribution analysis.
+///
+/// Identifies which scenario requests contributed most to the convergence
+/// detection, using leave-one-out marginal contribution analysis.
+#[derive(Debug, Clone, Serialize)]
+pub struct CausalAttribution {
+    /// Scenario IDs ranked by their marginal contribution to severity.
+    /// First = most responsible for the convergence spike.
+    pub ranked_contributors: Vec<AttributionEntry>,
+    /// Baseline severity (with all points present).
+    pub baseline_severity: f64,
+}
+
+/// A single scenario's contribution to convergence severity.
+#[derive(Debug, Clone, Serialize)]
+pub struct AttributionEntry {
+    /// Monotonic scenario ID.
+    pub scenario_id: u64,
+    /// Severity when this scenario is removed from the window.
+    pub severity_without: f64,
+    /// Marginal contribution: baseline_severity - severity_without.
+    /// Positive = this scenario increases severity (suspicious).
+    /// Negative = this scenario decreases severity (benign anchor).
+    pub marginal_contribution: f64,
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // MoralTopology — Sliding-window persistent homology analyser
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -768,6 +947,14 @@ pub struct MoralTopology {
     fingerprint_velocity: f64,
     /// Previous persistence diagram for distance computation.
     prev_persistence_diagram: PersistenceDiagram,
+    /// Append-only forensic audit log of escalation transitions.
+    audit_log: EscalationAuditLog,
+    /// Monotonic scenario counter (incremented on every `add_scenario`).
+    scenario_counter: u64,
+    /// Cycle counter (incremented on every convergence detection).
+    detection_cycle: u64,
+    /// Scenario IDs currently in the window (parallel to `self.window`).
+    window_scenario_ids: VecDeque<u64>,
 }
 
 /// A single point on the moral manifold trajectory.
@@ -1103,6 +1290,10 @@ impl MoralTopology {
             prev_fingerprint: [0.0; N_HARMONIES],
             fingerprint_velocity: 0.0,
             prev_persistence_diagram: PersistenceDiagram::default(),
+            audit_log: EscalationAuditLog::new(1000),
+            scenario_counter: 0,
+            detection_cycle: 0,
+            window_scenario_ids: VecDeque::new(),
         }
     }
 
@@ -1140,6 +1331,10 @@ impl MoralTopology {
             prev_fingerprint: [0.0; N_HARMONIES],
             fingerprint_velocity: 0.0,
             prev_persistence_diagram: PersistenceDiagram::default(),
+            audit_log: EscalationAuditLog::new(1000),
+            scenario_counter: 0,
+            detection_cycle: 0,
+            window_scenario_ids: VecDeque::new(),
         }
     }
 
@@ -1148,6 +1343,10 @@ impl MoralTopology {
     /// Also updates the running EMA prior of harmony coordinates for
     /// moral free energy computation and records a trajectory point.
     pub fn add_scenario(&mut self, hv: ContinuousHV) {
+        // Assign monotonic scenario ID
+        let scenario_id = self.scenario_counter;
+        self.scenario_counter += 1;
+
         // Update harmony prior via EMA before evicting the oldest entry
         let coords = self.basis.project(&hv);
         let alpha = if self.prior_count == 0 { 1.0 } else { 0.05 };
@@ -1177,8 +1376,10 @@ impl MoralTopology {
 
         if self.window.len() >= self.config.window_size {
             self.window.pop_front();
+            self.window_scenario_ids.pop_front();
         }
         self.window.push_back(hv);
+        self.window_scenario_ids.push_back(scenario_id);
     }
 
     /// Number of scenarios currently in the window.
@@ -1290,6 +1491,118 @@ impl MoralTopology {
 
     pub fn last_persistent_features(&self) -> &[PersistentFeature] {
         &self.last_persistent_features
+    }
+
+    /// Access the escalation audit log (immutable).
+    pub fn audit_log(&self) -> &EscalationAuditLog {
+        &self.audit_log
+    }
+
+    /// Current scenario counter (total scenarios added since creation).
+    pub fn scenario_counter(&self) -> u64 {
+        self.scenario_counter
+    }
+
+    /// Perform leave-one-out causal attribution on the current window.
+    ///
+    /// For each scenario in the recent window, temporarily removes it and
+    /// recomputes the convergence severity. Scenarios whose removal causes
+    /// the largest severity drop are the primary contributors.
+    ///
+    /// **This is NOT cheap** — it runs N convergence detections where N is
+    /// the window size. Call it ONLY after an alert fires, never in the
+    /// hot path. Designed for post-hoc forensics.
+    pub fn compute_causal_attribution(&self) -> CausalAttribution {
+        let baseline_severity = self.last_convergence_report.severity;
+        let n = self.window.len();
+        if n < 2 {
+            return CausalAttribution {
+                ranked_contributors: Vec::new(),
+                baseline_severity,
+            };
+        }
+
+        let ac = &self.anomaly_config;
+        let min_pts = ac.convergence_min_points;
+        let mut contributions = Vec::with_capacity(n);
+
+        for skip_idx in 0..n {
+            // Build a reduced window without scenario[skip_idx]
+            let reduced_hvs: Vec<_> = (0..n).filter(|&i| i != skip_idx).map(|i| &self.window[i]).collect();
+            let reduced_traj: Vec<_> = self.trajectory.iter().collect();
+            let rn = reduced_hvs.len();
+
+            if rn < min_pts {
+                let scenario_id = self.window_scenario_ids.get(skip_idx).copied().unwrap_or(0);
+                contributions.push(AttributionEntry {
+                    scenario_id,
+                    severity_without: baseline_severity,
+                    marginal_contribution: 0.0,
+                });
+                continue;
+            }
+
+            // Recompute Signal 1: pairwise similarity
+            let recent_start = rn.saturating_sub(min_pts);
+            let decay_lambda = ac.convergence_decay_lambda;
+            let max_age = (rn - recent_start).max(1) as f64;
+            let mut sim_sum = 0.0f64;
+            let mut w_sum = 0.0f64;
+            for i in recent_start..rn {
+                for j in (i + 1)..rn {
+                    let s = reduced_hvs[i].similarity(reduced_hvs[j]) as f64;
+                    let age = (rn - 1 - j.max(i)) as f64 / max_age;
+                    let w = (-decay_lambda * age).exp();
+                    sim_sum += s * w;
+                    w_sum += w;
+                }
+            }
+            let recent_sim = if w_sum > 0.0 { sim_sum / w_sum } else { 0.0 };
+            let baseline_sim = if !self.baseline_similarity_window.is_empty() {
+                self.baseline_similarity_window.iter().sum::<f64>()
+                    / self.baseline_similarity_window.len() as f64
+            } else { 0.0 };
+            let sim_anomaly = recent_sim - baseline_sim;
+            let sim_sev = (sim_anomaly / ac.convergence_similarity_threshold.max(1e-9)).clamp(0.0, 1.0);
+
+            // Recompute Signal 2: entropy (use trajectory, not HVs — cheaper)
+            let recent_t: Vec<_> = reduced_traj.iter().rev().take(min_pts).collect();
+            let ent_sev = if recent_t.len() >= 2 {
+                let mut mean = [0.0f64; N_HARMONIES];
+                let n_f = recent_t.len() as f64;
+                for p in &recent_t { for i in 0..N_HARMONIES { mean[i] += p.coordinates[i]; } }
+                for m in &mut mean { *m /= n_f; }
+                let mut var = [0.0f64; N_HARMONIES];
+                for p in &recent_t { for i in 0..N_HARMONIES { let d = p.coordinates[i] - mean[i]; var[i] += d * d; } }
+                for v in &mut var { *v /= n_f; }
+                let total: f64 = var.iter().sum::<f64>().max(1e-12);
+                let ent: f64 = var.iter().map(|&v| { let p = (v / total).max(1e-12); -p * p.ln() }).sum();
+                let base_ent = if !self.baseline_entropy_window.is_empty() {
+                    self.baseline_entropy_window.iter().sum::<f64>() / self.baseline_entropy_window.len() as f64
+                } else { 0.0 };
+                let decline = if base_ent > 1e-9 { ((base_ent - ent) / base_ent).max(0.0) } else { 0.0 };
+                (decline / ac.convergence_entropy_decline_threshold.max(1e-9)).clamp(0.0, 1.0)
+            } else { 0.0 };
+
+            // Simplified severity: average of similarity + entropy signals
+            // (skip spectral gap and flourishing to keep attribution cheap)
+            let reduced_severity = ((sim_sev + ent_sev) / 2.0).clamp(0.0, 1.0);
+
+            let scenario_id = self.window_scenario_ids.get(skip_idx).copied().unwrap_or(0);
+            contributions.push(AttributionEntry {
+                scenario_id,
+                severity_without: reduced_severity,
+                marginal_contribution: baseline_severity - reduced_severity,
+            });
+        }
+
+        // Sort by marginal contribution (highest first = most suspicious)
+        contributions.sort_by(|a, b| b.marginal_contribution.partial_cmp(&a.marginal_contribution).unwrap());
+
+        CausalAttribution {
+            ranked_contributors: contributions,
+            baseline_severity,
+        }
     }
 
     /// Access the escalation policy (immutable).
@@ -1645,8 +1958,36 @@ impl MoralTopology {
         // Calibrated severity: map through empirical CDF if available
         let calibrated_severity = self.calibrate_severity(severity);
 
-        // ── Escalation policy ──────────────────────────────────────────
+        // ── Escalation policy + audit log ────────────────────────────
+        let prev_level = self.escalation_policy.current_level();
         let escalation_level = self.escalation_policy.update(calibrated_severity);
+        self.detection_cycle += 1;
+
+        // Write audit entry on any escalation transition OR on any detection event
+        if escalation_level != prev_level || convergence_detected {
+            let window_ids: Vec<u64> = self.window_scenario_ids.iter().copied().collect();
+            let entry = EscalationAuditEntry {
+                sequence: 0, // assigned by append()
+                cycle: self.detection_cycle,
+                from_level: prev_level,
+                to_level: escalation_level,
+                severity,
+                calibrated_severity,
+                signals_triggered: [sim_triggered, ent_triggered, fl_triggered, gap_triggered],
+                signal_values: [
+                    similarity_anomaly,
+                    entropy_decline_rate,
+                    flourishing_deficit,
+                    spectral_gap_decline,
+                ],
+                matched_hazard: matched_hazard.clone(),
+                fingerprint_velocity: 0.0, // will be computed below
+                persistence_distance: 0.0, // will be computed below
+                window_scenario_ids: window_ids,
+                integrity_hash: String::new(),
+            };
+            self.audit_log.append(entry);
+        }
 
         // ── Fingerprint velocity (Item 3) ──────────────────────────────
         // Compute current fingerprint from recent trajectory centroid
@@ -1684,6 +2025,16 @@ impl MoralTopology {
         let current_diagram = self.persistence_diagram();
         let persistence_distance = self.prev_persistence_diagram.wasserstein_distance(&current_diagram);
         self.prev_persistence_diagram = current_diagram;
+
+        // Patch the audit entry with velocity and persistence distance
+        // (computed after the entry was initially appended).
+        if let Some(last_entry) = self.audit_log.entries.back_mut() {
+            if last_entry.cycle == self.detection_cycle {
+                last_entry.fingerprint_velocity = fingerprint_velocity;
+                last_entry.persistence_distance = persistence_distance;
+                last_entry.seal(); // re-seal with updated values
+            }
+        }
 
         let report = TrajectoryConvergenceReport {
             recent_similarity,

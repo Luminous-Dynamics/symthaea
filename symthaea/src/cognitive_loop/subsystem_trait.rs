@@ -533,6 +533,15 @@ impl OutputCollector {
         self.outputs.clear();
     }
 
+    /// Look up a specific manager's output by name.
+    /// Returns `None` if the manager did not contribute this cycle.
+    pub fn get(&self, name: &str) -> Option<&SubsystemOutput> {
+        self.outputs
+            .iter()
+            .find(|(n, _)| *n == name)
+            .map(|(_, o)| o)
+    }
+
     /// Integrate all outputs into a single state update.
     ///
     /// Integration strategy:

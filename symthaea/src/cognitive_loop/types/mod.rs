@@ -6,7 +6,7 @@
 mod carryover;
 mod output;
 mod scheduling;
-mod telemetry;
+pub(crate) mod telemetry;
 
 pub use output::*;
 pub use scheduling::*;
@@ -63,7 +63,7 @@ fn default_one_f32_substrate() -> f32 {
 ///
 /// Reports tamper detection status: attestation, temporal consistency,
 /// behavioral canaries. Feature-gated behind `integrity`.
-#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct IntegrityTelemetry {
     /// Whether all BLAKE3 attestation hashes matched.
     pub attestation_passed: bool,
@@ -102,6 +102,25 @@ pub struct AttestationDetail {
     pub passed: bool,
     /// Number of consecutive failures (0 = healthy).
     pub consecutive_failures: usize,
+}
+
+/// When the `integrity` feature is off, IntegrityTelemetry defaults to "all pass, fully trusted".
+/// This prevents downstream consumers (Pulse, SafetyAgent) from seeing uninitialized false-alarm data.
+impl Default for IntegrityTelemetry {
+    fn default() -> Self {
+        Self {
+            attestation_passed: true,
+            temporal_passed: true,
+            canaries_passed: true,
+            anomaly_count: 0,
+            has_critical: false,
+            last_check_cycle: 0,
+            integrity_confidence: 1.0,
+            attestation_details: Vec::new(),
+            global_failure_streak: 0,
+            confidence_history: Vec::new(),
+        }
+    }
 }
 
 fn default_integrity_confidence() -> f32 {

@@ -934,6 +934,8 @@ impl CognitiveLoopService {
                 ]);
                 // Apply substrate tau factor for temporal consistency scaling (#3)
                 im.set_substrate_tau_factor(substrate_tau_for_integrity);
+                // Install panic hook for crash forensics — dumps integrity snapshot to disk
+                crate::integrity::install_panic_hook();
                 im
             },
         })

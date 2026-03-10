@@ -113,13 +113,13 @@ impl TemporalOrderBenchmark {
                     blend_seed.wrapping_add(7777),
                 );
 
-                // Bind stimuli with temporal positions using Permute + XOR.
+                // Bind stimuli with temporal positions using bind_temporal (ρ + XOR).
                 // Cyclic permutation makes binding non-commutative:
-                //   ρ(A) ⊕ pos ≠ ρ(pos) ⊕ A
+                //   A.bind_temporal(pos) ≠ pos.bind_temporal(A)
                 // This encodes the Arrow of Time — the system can distinguish
                 // "A then B" from "B then A" even when positions are symmetric.
-                a_bounds.push(stimulus_a.permute(1).bind(&earlier_hv));
-                b_bounds.push(stimulus_b.permute(1).bind(&later_hv));
+                a_bounds.push(stimulus_a.bind_temporal(&earlier_hv));
+                b_bounds.push(stimulus_b.bind_temporal(&later_hv));
             }
 
             // Multiple presentations per gap level for stable estimates
@@ -136,8 +136,8 @@ impl TemporalOrderBenchmark {
 
                 for ens in 0..N_ENSEMBLES {
                     // Unbind stimulus A's temporal position: (ρ(A) ⊕ earlier) ⊕ ρ(A) = earlier
-                    // XOR is perfectly self-inverse, so recovered == earlier_hv exactly.
-                    let a_temporal = a_bounds[ens].bind(&stimulus_a.permute(1));
+                    // XOR is perfectly self-inverse, so unbind recovers earlier_hv exactly.
+                    let a_temporal = a_bounds[ens].bind(&stimulus_a.permute(1)); // unbind with ρ(A)
                     let sim_first =
                         a_temporal.similarity(&first_templates[ens]) * (1.0 - noise_degrade);
                     let sim_second =
