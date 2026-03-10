@@ -326,7 +326,13 @@ pub mod batch {
     ) -> Vec<T> {
         records
             .iter()
-            .filter_map(|r| r.entry().to_app_option::<T>().ok().flatten())
+            .filter_map(|r| match r.entry().to_app_option::<T>() {
+                Ok(opt) => opt,
+                Err(_e) => {
+                    // Best-effort extraction: skip corrupt entries but don't crash
+                    None
+                }
+            })
             .collect()
     }
 

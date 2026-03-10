@@ -12,7 +12,7 @@
 //! - jubilee_normalize: Apply 4-year jubilee compression
 
 use hdk::prelude::*;
-use mycelix_finance_shared::{anchor_hash, verify_caller_is_did};
+use mycelix_finance_shared::{anchor_hash, follow_update_chain, verify_caller_is_did};
 
 // Re-export integrity types for external use
 pub use recognition_integrity::*;
@@ -230,12 +230,17 @@ pub fn get_recognition_received(
     let mut events = Vec::new();
     for link in links {
         if let Some(action_hash) = link.target.into_action_hash() {
+            // RecognitionEvents are immutable (never updated), so plain get() is correct here
             if let Some(record) = get(action_hash, GetOptions::default())? {
                 if let Some(event) = record
                     .entry()
                     .to_app_option::<RecognitionEvent>()
-                    .ok()
-                    .flatten()
+                    .map_err(|e| {
+                        wasm_error!(WasmErrorInner::Guest(format!(
+                            "RecognitionEvent deserialization error: {:?}",
+                            e
+                        )))
+                    })?
                 {
                     // Filter by cycle if specified
                     if let Some(ref cycle) = input.cycle_id {
@@ -705,15 +710,18 @@ fn find_mycel_state_with_hash(
 
     if let Some(link) = links.first() {
         if let Some(link_hash) = link.target.clone().into_action_hash() {
-            if let Some(record) = get(link_hash, GetOptions::default())? {
-                if let Some(state) = record
-                    .entry()
-                    .to_app_option::<MemberMycelState>()
-                    .ok()
-                    .flatten()
-                {
-                    return Ok(Some((state, record.action_address().clone())));
-                }
+            let record = follow_update_chain(link_hash)?;
+            let state = record
+                .entry()
+                .to_app_option::<MemberMycelState>()
+                .map_err(|e| {
+                    wasm_error!(WasmErrorInner::Guest(format!(
+                        "MemberMycelState deserialization error: {:?}",
+                        e
+                    )))
+                })?;
+            if let Some(state) = state {
+                return Ok(Some((state, record.action_address().clone())));
             }
         }
     }
@@ -736,15 +744,18 @@ fn get_or_create_allocation(
 
     if let Some(link) = links.first() {
         if let Some(action_hash) = link.target.clone().into_action_hash() {
-            if let Some(record) = get(action_hash, GetOptions::default())? {
-                if let Some(alloc) = record
-                    .entry()
-                    .to_app_option::<RecognitionAllocation>()
-                    .ok()
-                    .flatten()
-                {
-                    return Ok(alloc);
-                }
+            let record = follow_update_chain(action_hash)?;
+            let alloc = record
+                .entry()
+                .to_app_option::<RecognitionAllocation>()
+                .map_err(|e| {
+                    wasm_error!(WasmErrorInner::Guest(format!(
+                        "RecognitionAllocation deserialization error: {:?}",
+                        e
+                    )))
+                })?;
+            if let Some(alloc) = alloc {
+                return Ok(alloc);
             }
         }
     }
@@ -780,16 +791,19 @@ fn increment_allocation(recognizer_did: &str, cycle_id: &str) -> ExternResult<()
 
     if let Some(link) = links.first() {
         if let Some(link_hash) = link.target.clone().into_action_hash() {
-            if let Some(record) = get(link_hash, GetOptions::default())? {
-                if let Some(mut alloc) = record
-                    .entry()
-                    .to_app_option::<RecognitionAllocation>()
-                    .ok()
-                    .flatten()
-                {
-                    alloc.count += 1;
-                    update_entry(record.action_address().clone(), &alloc)?;
-                }
+            let record = follow_update_chain(link_hash)?;
+            if let Some(mut alloc) = record
+                .entry()
+                .to_app_option::<RecognitionAllocation>()
+                .map_err(|e| {
+                    wasm_error!(WasmErrorInner::Guest(format!(
+                        "RecognitionAllocation deserialization error: {:?}",
+                        e
+                    )))
+                })?
+            {
+                alloc.count += 1;
+                update_entry(record.action_address().clone(), &alloc)?;
             }
         }
     }

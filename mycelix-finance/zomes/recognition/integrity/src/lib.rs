@@ -269,6 +269,13 @@ fn validate_create_recognition(
         ));
     }
 
+    // NaN/Infinity guard — NaN fails all comparisons, bypassing range checks
+    if !event.recognizer_mycel.is_finite() || !event.weight.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Recognition weight and recognizer_mycel must be finite numbers".into(),
+        ));
+    }
+
     // Recognizer's MYCEL must be at least MIN_MYCEL_TO_GIVE
     if event.recognizer_mycel < MIN_MYCEL_TO_GIVE {
         return Ok(ValidateCallbackResult::Invalid(format!(
@@ -324,6 +331,18 @@ fn validate_create_mycel_state(
         ));
     }
 
+    // NaN/Infinity guard — NaN passes range comparisons like `< 0.0 || > 1.0`
+    if !state.mycel_score.is_finite()
+        || !state.participation.is_finite()
+        || !state.recognition.is_finite()
+        || !state.validation.is_finite()
+        || !state.longevity.is_finite()
+    {
+        return Ok(ValidateCallbackResult::Invalid(
+            "MYCEL score and components must be finite numbers".into(),
+        ));
+    }
+
     // MYCEL score must be 0.0-1.0
     if state.mycel_score < 0.0 || state.mycel_score > 1.0 {
         return Ok(ValidateCallbackResult::Invalid(
@@ -373,6 +392,18 @@ fn validate_update_mycel_state(
     if !state.member_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid(
             "Member must be a valid DID".into(),
+        ));
+    }
+
+    // NaN/Infinity guard
+    if !state.mycel_score.is_finite()
+        || !state.participation.is_finite()
+        || !state.recognition.is_finite()
+        || !state.validation.is_finite()
+        || !state.longevity.is_finite()
+    {
+        return Ok(ValidateCallbackResult::Invalid(
+            "MYCEL score and components must be finite numbers".into(),
         ));
     }
 

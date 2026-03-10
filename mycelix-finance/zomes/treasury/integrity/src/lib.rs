@@ -312,9 +312,9 @@ fn validate_create_treasury(
             ));
         }
     }
-    if treasury.reserve_ratio < 0.0 || treasury.reserve_ratio > 1.0 {
+    if !treasury.reserve_ratio.is_finite() || treasury.reserve_ratio < 0.0 || treasury.reserve_ratio > 1.0 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Reserve ratio must be between 0 and 1".into(),
+            "Reserve ratio must be a finite number between 0 and 1".into(),
         ));
     }
     Ok(ValidateCallbackResult::Valid)
@@ -324,9 +324,9 @@ fn validate_update_treasury(
     _action: Update,
     treasury: Treasury,
 ) -> ExternResult<ValidateCallbackResult> {
-    if treasury.reserve_ratio < 0.0 || treasury.reserve_ratio > 1.0 {
+    if !treasury.reserve_ratio.is_finite() || treasury.reserve_ratio < 0.0 || treasury.reserve_ratio > 1.0 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Reserve ratio must be between 0 and 1".into(),
+            "Reserve ratio must be a finite number between 0 and 1".into(),
         ));
     }
     Ok(ValidateCallbackResult::Valid)
@@ -442,9 +442,9 @@ fn validate_create_savings_pool(
             "Target amount must be positive".into(),
         ));
     }
-    if pool.yield_rate < 0.0 {
+    if !pool.yield_rate.is_finite() || pool.yield_rate < 0.0 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Yield rate cannot be negative".into(),
+            "Yield rate must be a finite non-negative number".into(),
         ));
     }
     Ok(ValidateCallbackResult::Valid)
@@ -457,6 +457,11 @@ fn validate_update_savings_pool(
     if pool.target_amount == 0 {
         return Ok(ValidateCallbackResult::Invalid(
             "Target amount must be positive".into(),
+        ));
+    }
+    if !pool.yield_rate.is_finite() || pool.yield_rate < 0.0 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Yield rate must be a finite non-negative number".into(),
         ));
     }
     Ok(ValidateCallbackResult::Valid)

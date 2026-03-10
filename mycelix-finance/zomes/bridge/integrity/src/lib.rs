@@ -440,9 +440,9 @@ fn validate_create_collateral_bridge_deposit(
             "SAP minted must be positive".into(),
         ));
     }
-    if deposit.oracle_rate <= 0.0 {
+    if !deposit.oracle_rate.is_finite() || deposit.oracle_rate <= 0.0 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Oracle rate must be positive".into(),
+            "Oracle rate must be a finite positive number".into(),
         ));
     }
     // Validate collateral type is supported
@@ -491,9 +491,9 @@ fn validate_update_collateral_bridge_deposit(
             "SAP minted must be positive".into(),
         ));
     }
-    if deposit.oracle_rate <= 0.0 {
+    if !deposit.oracle_rate.is_finite() || deposit.oracle_rate <= 0.0 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Oracle rate must be positive".into(),
+            "Oracle rate must be a finite positive number".into(),
         ));
     }
     if deposit.collateral_type != "ETH" && deposit.collateral_type != "USDC" {

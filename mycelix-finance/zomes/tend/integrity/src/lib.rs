@@ -751,10 +751,10 @@ fn validate_create_exchange(
         ));
     }
 
-    // Hours must be positive and within limits
-    if exchange.hours <= 0.0 {
+    // Hours must be finite, positive, and within limits
+    if !exchange.hours.is_finite() || exchange.hours <= 0.0 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Hours must be positive".into(),
+            "Hours must be a finite positive number".into(),
         ));
     }
 
@@ -793,9 +793,9 @@ fn validate_update_exchange(
 ) -> ExternResult<ValidateCallbackResult> {
     // Only status can change (Proposed -> Confirmed/Disputed/Cancelled)
     // Core data (provider, receiver, hours) cannot change
-    if exchange.hours <= 0.0 {
+    if !exchange.hours.is_finite() || exchange.hours <= 0.0 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Hours must be positive".into(),
+            "Hours must be a finite positive number".into(),
         ));
     }
     Ok(ValidateCallbackResult::Valid)
@@ -823,6 +823,13 @@ fn validate_create_balance(
         ));
     }
 
+    // Float fields must be finite
+    if !balance.total_provided.is_finite() || !balance.total_received.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "total_provided and total_received must be finite numbers".into(),
+        ));
+    }
+
     // Balance must be within the constitutional maximum (Emergency tier ±120).
     // The coordinator enforces the tighter dynamic limit based on oracle state.
     if balance.balance.abs() > BALANCE_LIMIT_EMERGENCY {
@@ -839,6 +846,12 @@ fn validate_update_balance(
     _action: Update,
     balance: TendBalance,
 ) -> ExternResult<ValidateCallbackResult> {
+    // Float fields must be finite
+    if !balance.total_provided.is_finite() || !balance.total_received.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "total_provided and total_received must be finite numbers".into(),
+        ));
+    }
     // Constitutional maximum — coordinator enforces dynamic limit
     if balance.balance.abs() > BALANCE_LIMIT_EMERGENCY {
         return Ok(ValidateCallbackResult::Invalid(format!(

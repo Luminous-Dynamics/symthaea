@@ -390,17 +390,17 @@ fn validate_create_stake(
         ));
     }
 
-    // Validate MYCEL score range (0.0 to 1.0)
-    if stake.mycel_score < 0.0 || stake.mycel_score > 1.0 {
+    // Validate MYCEL score range (0.0 to 1.0) — is_finite rejects NaN/Infinity
+    if !stake.mycel_score.is_finite() || stake.mycel_score < 0.0 || stake.mycel_score > 1.0 {
         return Ok(ValidateCallbackResult::Invalid(
-            "MYCEL score must be in [0.0, 1.0]".into(),
+            "MYCEL score must be a finite number in [0.0, 1.0]".into(),
         ));
     }
 
     // Validate stake weight = 1.0 + mycel_score (range 1.0-2.0)
-    if stake.stake_weight < 1.0 || stake.stake_weight > 2.0 {
+    if !stake.stake_weight.is_finite() || stake.stake_weight < 1.0 || stake.stake_weight > 2.0 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Stake weight must be in [1.0, 2.0]".into(),
+            "Stake weight must be a finite number in [1.0, 2.0]".into(),
         ));
     }
 
@@ -427,15 +427,15 @@ fn validate_update_stake(
     _action: Update,
     stake: CollateralStake,
 ) -> ExternResult<ValidateCallbackResult> {
-    // Validate MYCEL score range
-    if stake.mycel_score < 0.0 || stake.mycel_score > 1.0 {
+    // Validate MYCEL score range — is_finite rejects NaN/Infinity
+    if !stake.mycel_score.is_finite() || stake.mycel_score < 0.0 || stake.mycel_score > 1.0 {
         return Ok(ValidateCallbackResult::Invalid(
-            "MYCEL score must be in [0.0, 1.0]".into(),
+            "MYCEL score must be a finite number in [0.0, 1.0]".into(),
         ));
     }
 
     // Validate stake weight range
-    if stake.stake_weight < 1.0 || stake.stake_weight > 2.0 {
+    if !stake.stake_weight.is_finite() || stake.stake_weight < 1.0 || stake.stake_weight > 2.0 {
         return Ok(ValidateCallbackResult::Invalid(
             "Stake weight must be in [1.0, 2.0]".into(),
         ));

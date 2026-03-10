@@ -216,9 +216,7 @@ pub fn update_oracle_state(vitality: u32) -> ExternResult<OracleState> {
 
     if let Some(link) = links.first() {
         if let Some(link_hash) = link.target.clone().into_action_hash() {
-            let record = get(link_hash, GetOptions::default())?.ok_or(wasm_error!(
-                WasmErrorInner::Guest("Oracle state record not found".into())
-            ))?;
+            let record = follow_update_chain(link_hash)?;
             update_entry(
                 record.action_address().clone(),
                 &EntryTypes::OracleState(state.clone()),
@@ -466,15 +464,18 @@ fn get_or_create_hearth_balance(
     )?;
     if let Some(link) = links.first() {
         if let Some(action_hash) = link.target.clone().into_action_hash() {
-            if let Some(record) = get(action_hash, GetOptions::default())? {
-                if let Some(bal) = record
-                    .entry()
-                    .to_app_option::<HearthTendBalance>()
-                    .ok()
-                    .flatten()
-                {
-                    return Ok(bal);
-                }
+            let record = follow_update_chain(action_hash)?;
+            let bal = record
+                .entry()
+                .to_app_option::<HearthTendBalance>()
+                .map_err(|e| {
+                    wasm_error!(WasmErrorInner::Guest(format!(
+                        "HearthTendBalance deserialization error: {:?}",
+                        e
+                    )))
+                })?;
+            if let Some(bal) = bal {
+                return Ok(bal);
             }
         }
     }
@@ -552,26 +553,30 @@ fn update_hearth_balance(
     )?;
     if let Some(link) = links.first() {
         if let Some(link_hash) = link.target.clone().into_action_hash() {
-            if let Some(record) = get(link_hash, GetOptions::default())? {
-                if let Some(mut bal) = record
-                    .entry()
-                    .to_app_option::<HearthTendBalance>()
-                    .ok()
-                    .flatten()
-                {
-                    let now = sys_time()?;
-                    if is_provider {
-                        bal.balance += hours.round() as i32;
-                        bal.total_provided += hours;
-                    } else {
-                        bal.balance -= hours.round() as i32;
-                        bal.total_received += hours;
-                    }
-                    bal.exchange_count += 1;
-                    bal.last_activity = now;
-                    update_entry(record.action_address().clone(), &bal)?;
-                }
+            let record = follow_update_chain(link_hash)?;
+            let mut bal = record
+                .entry()
+                .to_app_option::<HearthTendBalance>()
+                .map_err(|e| {
+                    wasm_error!(WasmErrorInner::Guest(format!(
+                        "HearthTendBalance deserialization error: {:?}",
+                        e
+                    )))
+                })?
+                .ok_or(wasm_error!(WasmErrorInner::Guest(
+                    "HearthTendBalance entry missing".into()
+                )))?;
+            let now = sys_time()?;
+            if is_provider {
+                bal.balance += hours.round() as i32;
+                bal.total_provided += hours;
+            } else {
+                bal.balance -= hours.round() as i32;
+                bal.total_received += hours;
             }
+            bal.exchange_count += 1;
+            bal.last_activity = now;
+            update_entry(record.action_address().clone(), &bal)?;
         }
     }
     Ok(())
@@ -644,11 +649,15 @@ pub fn get_currency_alias(dao_did: String) -> ExternResult<Option<CurrencyAliasE
     if let Some(link) = links.last() {
         if let Some(action_hash) = link.target.clone().into_action_hash() {
             if let Some(record) = get(action_hash, GetOptions::default())? {
-                return Ok(record
+                return record
                     .entry()
                     .to_app_option::<CurrencyAliasEntry>()
-                    .ok()
-                    .flatten());
+                    .map_err(|e| {
+                        wasm_error!(WasmErrorInner::Guest(format!(
+                            "CurrencyAliasEntry deserialization error: {:?}",
+                            e
+                        )))
+                    });
             }
         }
     }
@@ -1333,7 +1342,8 @@ pub fn escalate_dispute(input: EscalateDisputeInput) -> ExternResult<Record> {
     // Update the entry in place
     update_entry(action_hash, &updated_dispute)?;
 
-    // Re-fetch the updated record via the link
+    // Re-fetch the updated record via follow_update_chain
+    // (the link points to the original create action, not the latest update)
     let links = get_links(
         LinkQuery::try_new(
             anchor_hash(&format!("dispute:{}", dispute_id))?,
@@ -1353,9 +1363,7 @@ pub fn escalate_dispute(input: EscalateDisputeInput) -> ExternResult<Record> {
             "Invalid dispute link target".into()
         )))?;
 
-    let record = get(hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
-        "Failed to retrieve updated dispute record".into()
-    )))?;
+    let record = follow_update_chain(hash)?;
 
     Ok(record)
 }
@@ -1422,7 +1430,8 @@ pub fn resolve_dispute(input: ResolveDisputeInput) -> ExternResult<Record> {
         }
     }
 
-    // Re-fetch the updated record via the link
+    // Re-fetch the updated record via follow_update_chain
+    // (the link points to the original create action, not the latest update)
     let links = get_links(
         LinkQuery::try_new(
             anchor_hash(&format!("dispute:{}", input.dispute_id))?,
@@ -1442,9 +1451,7 @@ pub fn resolve_dispute(input: ResolveDisputeInput) -> ExternResult<Record> {
             "Invalid dispute link target".into()
         )))?;
 
-    let record = get(hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
-        "Failed to retrieve resolved dispute record".into()
-    )))?;
+    let record = follow_update_chain(hash)?;
 
     Ok(record)
 }
@@ -1525,20 +1532,21 @@ pub fn get_my_exchanges(dao_did: String) -> ExternResult<Vec<ExchangeRecord>> {
     )?;
 
     for link in provider_links {
-        if let Some(record) = get(
-            link.target.into_action_hash().ok_or_else(|| {
-                wasm_error!(WasmErrorInner::Guest("Invalid link target".to_string()))
-            })?,
-            GetOptions::default(),
-        )? {
-            if let Some(exchange) = record
-                .entry()
-                .to_app_option::<TendExchange>()
-                .ok()
-                .flatten()
-            {
-                exchanges.push(exchange_to_record(&exchange));
-            }
+        let action_hash = link.target.into_action_hash().ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest("Invalid link target".to_string()))
+        })?;
+        let record = follow_update_chain(action_hash)?;
+        if let Some(exchange) = record
+            .entry()
+            .to_app_option::<TendExchange>()
+            .map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!(
+                    "TendExchange deserialization error: {:?}",
+                    e
+                )))
+            })?
+        {
+            exchanges.push(exchange_to_record(&exchange));
         }
     }
 
@@ -1552,22 +1560,23 @@ pub fn get_my_exchanges(dao_did: String) -> ExternResult<Vec<ExchangeRecord>> {
     )?;
 
     for link in receiver_links {
-        if let Some(record) = get(
-            link.target.into_action_hash().ok_or_else(|| {
-                wasm_error!(WasmErrorInner::Guest("Invalid link target".to_string()))
-            })?,
-            GetOptions::default(),
-        )? {
-            if let Some(exchange) = record
-                .entry()
-                .to_app_option::<TendExchange>()
-                .ok()
-                .flatten()
-            {
-                // Avoid duplicates (shouldn't happen, but safety)
-                if !exchanges.iter().any(|e| e.id == exchange.id) {
-                    exchanges.push(exchange_to_record(&exchange));
-                }
+        let action_hash = link.target.into_action_hash().ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest("Invalid link target".to_string()))
+        })?;
+        let record = follow_update_chain(action_hash)?;
+        if let Some(exchange) = record
+            .entry()
+            .to_app_option::<TendExchange>()
+            .map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!(
+                    "TendExchange deserialization error: {:?}",
+                    e
+                )))
+            })?
+        {
+            // Avoid duplicates (shouldn't happen, but safety)
+            if !exchanges.iter().any(|e| e.id == exchange.id) {
+                exchanges.push(exchange_to_record(&exchange));
             }
         }
     }
@@ -1601,9 +1610,9 @@ pub fn create_listing(input: CreateListingInput) -> ExternResult<ServiceListing>
         )));
     }
     if let Some(hours) = input.estimated_hours {
-        if hours <= 0.0 || hours > 168.0 {
+        if !hours.is_finite() || hours <= 0.0 || hours > 168.0 {
             return Err(wasm_error!(WasmErrorInner::Guest(
-                "Estimated hours must be between 0 and 168".into()
+                "Estimated hours must be a finite number between 0 and 168".into()
             )));
         }
     }
@@ -1687,23 +1696,24 @@ pub fn get_dao_listings(input: PaginatedDaoInput) -> ExternResult<Vec<ServiceLis
 
     let mut listings = Vec::new();
     for link in links {
-        if let Some(record) = get(
-            link.target.into_action_hash().ok_or_else(|| {
-                wasm_error!(WasmErrorInner::Guest("Invalid link target".to_string()))
-            })?,
-            GetOptions::default(),
-        )? {
-            if let Some(listing) = record
-                .entry()
-                .to_app_option::<ServiceListing>()
-                .ok()
-                .flatten()
-            {
-                if listing.active {
-                    listings.push(listing);
-                    if listings.len() >= limit {
-                        break;
-                    }
+        let action_hash = link.target.into_action_hash().ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest("Invalid link target".to_string()))
+        })?;
+        let record = follow_update_chain(action_hash)?;
+        if let Some(listing) = record
+            .entry()
+            .to_app_option::<ServiceListing>()
+            .map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!(
+                    "ServiceListing deserialization error: {:?}",
+                    e
+                )))
+            })?
+        {
+            if listing.active {
+                listings.push(listing);
+                if listings.len() >= limit {
+                    break;
                 }
             }
         }
@@ -1731,9 +1741,9 @@ pub fn create_request(input: CreateRequestInput) -> ExternResult<ServiceRequest>
         )));
     }
     if let Some(hours) = input.estimated_hours {
-        if hours <= 0.0 || hours > 168.0 {
+        if !hours.is_finite() || hours <= 0.0 || hours > 168.0 {
             return Err(wasm_error!(WasmErrorInner::Guest(
-                "Estimated hours must be between 0 and 168".into()
+                "Estimated hours must be a finite number between 0 and 168".into()
             )));
         }
     }
@@ -1787,23 +1797,24 @@ pub fn get_dao_requests(input: PaginatedDaoInput) -> ExternResult<Vec<ServiceReq
 
     let mut requests = Vec::new();
     for link in links {
-        if let Some(record) = get(
-            link.target.into_action_hash().ok_or_else(|| {
-                wasm_error!(WasmErrorInner::Guest("Invalid link target".to_string()))
-            })?,
-            GetOptions::default(),
-        )? {
-            if let Some(request) = record
-                .entry()
-                .to_app_option::<ServiceRequest>()
-                .ok()
-                .flatten()
-            {
-                if request.open {
-                    requests.push(request);
-                    if requests.len() >= limit {
-                        break;
-                    }
+        let action_hash = link.target.into_action_hash().ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest("Invalid link target".to_string()))
+        })?;
+        let record = follow_update_chain(action_hash)?;
+        if let Some(request) = record
+            .entry()
+            .to_app_option::<ServiceRequest>()
+            .map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!(
+                    "ServiceRequest deserialization error: {:?}",
+                    e
+                )))
+            })?
+        {
+            if request.open {
+                requests.push(request);
+                if requests.len() >= limit {
+                    break;
                 }
             }
         }
@@ -1856,12 +1867,17 @@ pub fn get_validation_score(input: GetValidationScoreInput) -> ExternResult<f64>
 
     for link in links.into_iter().take(limit) {
         if let Some(action_hash) = link.target.into_action_hash() {
+            // QualityRatings are immutable — plain get() is safe here
             if let Some(record) = get(action_hash, GetOptions::default())? {
                 if let Some(rating) = record
                     .entry()
                     .to_app_option::<QualityRating>()
-                    .ok()
-                    .flatten()
+                    .map_err(|e| {
+                        wasm_error!(WasmErrorInner::Guest(format!(
+                            "QualityRating deserialization error: {:?}",
+                            e
+                        )))
+                    })?
                 {
                     total += rating.rating as f64;
                     count += 1;
@@ -1964,7 +1980,8 @@ fn update_balance_after_exchange(
     Ok(())
 }
 
-/// Find an exchange by its ID using the ExchangeIdToExchange index
+/// Find an exchange by its ID using the ExchangeIdToExchange index.
+/// Follows the update chain to get the latest version (exchanges are mutable — status changes).
 fn find_exchange_by_id(exchange_id: &str) -> ExternResult<Option<TendExchange>> {
     let links = get_links(
         LinkQuery::try_new(
@@ -1976,20 +1993,24 @@ fn find_exchange_by_id(exchange_id: &str) -> ExternResult<Option<TendExchange>> 
 
     if let Some(link) = links.first() {
         if let Some(action_hash) = link.target.clone().into_action_hash() {
-            if let Some(record) = get(action_hash, GetOptions::default())? {
-                return Ok(record
-                    .entry()
-                    .to_app_option::<TendExchange>()
-                    .ok()
-                    .flatten());
-            }
+            let record = follow_update_chain(action_hash)?;
+            return record
+                .entry()
+                .to_app_option::<TendExchange>()
+                .map_err(|e| {
+                    wasm_error!(WasmErrorInner::Guest(format!(
+                        "TendExchange deserialization error: {:?}",
+                        e
+                    )))
+                });
         }
     }
 
     Ok(None)
 }
 
-/// Update an exchange entry by finding it via ID index and updating in place
+/// Update an exchange entry by finding it via ID index and updating in place.
+/// Follows the update chain to ensure we update the latest version (prevents fork).
 fn update_exchange_entry(exchange_id: &str, exchange: &TendExchange) -> ExternResult<()> {
     let links = get_links(
         LinkQuery::try_new(
@@ -2001,9 +2022,7 @@ fn update_exchange_entry(exchange_id: &str, exchange: &TendExchange) -> ExternRe
 
     if let Some(link) = links.first() {
         if let Some(link_hash) = link.target.clone().into_action_hash() {
-            let record = get(link_hash, GetOptions::default())?.ok_or(wasm_error!(
-                WasmErrorInner::Guest("Exchange record not found".into())
-            ))?;
+            let record = follow_update_chain(link_hash)?;
             update_entry(record.action_address().clone(), exchange)?;
             return Ok(());
         }
@@ -2150,9 +2169,9 @@ pub fn record_cross_dao_exchange(
             "Cross-DAO exchange requires two different DAOs".into()
         )));
     }
-    if input.hours <= 0.0 || input.hours > 168.0 {
+    if !input.hours.is_finite() || input.hours <= 0.0 || input.hours > 168.0 {
         return Err(wasm_error!(WasmErrorInner::Guest(
-            "Hours must be between 0 and 168".into()
+            "Hours must be a finite number between 0 and 168".into()
         )));
     }
 
@@ -2175,19 +2194,22 @@ pub fn record_cross_dao_exchange(
 
     if let Some(link) = links.first() {
         if let Some(link_hash) = link.target.clone().into_action_hash() {
-            if let Some(record) = get(link_hash, GetOptions::default())? {
-                if let Some(mut bal) = record
-                    .entry()
-                    .to_app_option::<BilateralBalance>()
-                    .ok()
-                    .flatten()
-                {
-                    bal.net_balance += delta;
-                    bal.total_exchanges += 1;
-                    bal.last_updated_at = now;
-                    update_entry(record.action_address().clone(), &bal)?;
-                    return Ok(bal);
-                }
+            let record = follow_update_chain(link_hash)?;
+            if let Some(mut bal) = record
+                .entry()
+                .to_app_option::<BilateralBalance>()
+                .map_err(|e| {
+                    wasm_error!(WasmErrorInner::Guest(format!(
+                        "BilateralBalance deserialization error: {:?}",
+                        e
+                    )))
+                })?
+            {
+                bal.net_balance += delta;
+                bal.total_exchanges += 1;
+                bal.last_updated_at = now;
+                update_entry(record.action_address().clone(), &bal)?;
+                return Ok(bal);
             }
         }
     }
@@ -2230,13 +2252,16 @@ pub fn get_bilateral_balance(input: GetBilateralInput) -> ExternResult<Option<Bi
 
     if let Some(link) = links.first() {
         if let Some(action_hash) = link.target.clone().into_action_hash() {
-            if let Some(record) = get(action_hash, GetOptions::default())? {
-                return Ok(record
-                    .entry()
-                    .to_app_option::<BilateralBalance>()
-                    .ok()
-                    .flatten());
-            }
+            let record = follow_update_chain(action_hash)?;
+            return record
+                .entry()
+                .to_app_option::<BilateralBalance>()
+                .map_err(|e| {
+                    wasm_error!(WasmErrorInner::Guest(format!(
+                        "BilateralBalance deserialization error: {:?}",
+                        e
+                    )))
+                });
         }
     }
     Ok(None)
@@ -2306,21 +2331,23 @@ pub fn settle_bilateral_balance(input: SettleBilateralInput) -> ExternResult<Rec
             let link = links.first().ok_or(wasm_error!(WasmErrorInner::Guest(
                 "No bilateral balance found between these DAOs".into()
             )))?;
-            let action_hash = link.target.clone().into_action_hash().ok_or(wasm_error!(
+            let link_hash = link.target.clone().into_action_hash().ok_or(wasm_error!(
                 WasmErrorInner::Guest("Invalid bilateral balance link target".into())
             ))?;
-            let record = get(action_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
-                WasmErrorInner::Guest("Bilateral balance record not found".into())
-            ))?;
+            let record = follow_update_chain(link_hash)?;
             let bal = record
                 .entry()
                 .to_app_option::<BilateralBalance>()
-                .ok()
-                .flatten()
+                .map_err(|e| {
+                    wasm_error!(WasmErrorInner::Guest(format!(
+                        "BilateralBalance deserialization error: {:?}",
+                        e
+                    )))
+                })?
                 .ok_or(wasm_error!(WasmErrorInner::Guest(
-                    "Failed to deserialize bilateral balance".into()
+                    "Bilateral balance entry missing".into()
                 )))?;
-            (action_hash, bal)
+            (record.action_address().clone(), bal)
         };
 
     if bal.net_balance == 0 {
@@ -2475,7 +2502,16 @@ pub fn forgive_balance(member_did: String) -> ExternResult<Vec<(String, i32)>> {
 
     let mut forgiven = Vec::new();
 
-    // Query all TendBalance entries to find ones for this member
+    // NOTE: query() only searches the CALLING AGENT's source chain.
+    // TendBalance entries are authored by the agent who triggered the exchange
+    // (the receiver in confirm_exchange), NOT the governance agent calling this.
+    // This means query() will only find balances if the governance agent also
+    // happened to participate in exchanges. For a proper implementation, we would
+    // need a "member → DAO memberships" link index and use find_balance() per DAO.
+    //
+    // For now, this works when the same agent that created the balances also
+    // calls forgive_balance (e.g., in single-agent test scenarios or when the
+    // member themselves initiates exit via the payments zome).
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(
             UnitEntryTypes::TendBalance,
