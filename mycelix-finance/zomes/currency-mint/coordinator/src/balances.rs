@@ -2,42 +2,49 @@
 
 use currency_mint_integrity::*;
 use hdk::prelude::*;
-use mycelix_finance_types::CurrencyStatus;
+use mycelix_finance_types::{compute_minted_demurrage, CurrencyStatus};
 
 use crate::helpers::*;
-use crate::{ApplyDemurrageInput, GetMintedBalanceInput, MintedBalanceInfo};
+use crate::{GetMintedBalanceInput, MintedBalanceInfo};
 
 /// Get a member's balance in a community-minted currency.
 ///
-/// Transparently applies demurrage if the currency has a non-zero demurrage rate.
-/// This ensures balances always reflect the current decay state without requiring
-/// a separate cron job or explicit demurrage call.
+/// **Pure read** — no DHT writes are performed. Demurrage is computed in-memory
+/// so the returned `effective_balance` reflects decay, but the stored balance is
+/// unchanged. Call `apply_minted_demurrage` explicitly when you need to persist
+/// demurrage (e.g., before exchanges, or via a periodic governance action).
+///
+/// RC-10 fix: previously this function called `apply_minted_demurrage` on every
+/// read, triggering DHT writes and amplifying race conditions across the system.
 #[hdk_extern]
 pub fn get_minted_balance(input: GetMintedBalanceInput) -> ExternResult<MintedBalanceInfo> {
     let (_, def) = get_currency_inner(&input.currency_id)?;
+    let bal = get_or_create_minted_balance(input.member_did, input.currency_id)?;
 
-    // Lazy demurrage: apply on read if currency has demurrage.
-    // After this block, `bal` holds the latest balance and `effective_balance`
-    // reflects any demurrage deduction — avoiding a redundant DHT read.
-    let (bal, effective_balance) =
+    // Compute demurrage in-memory only — no writes.
+    let pending_demurrage =
         if def.params.demurrage_rate > 0.0 && def.status == CurrencyStatus::Active {
-            let result = crate::demurrage::apply_minted_demurrage(ApplyDemurrageInput {
-                currency_id: input.currency_id.clone(),
-                member_did: input.member_did.clone(),
-            })?;
-            let bal = get_or_create_minted_balance(input.member_did, input.currency_id)?;
-            (bal, result.new_balance)
+            let now = sys_time()?;
+            let elapsed = now
+                .as_micros()
+                .saturating_sub(bal.last_activity.as_micros()) as u64
+                / 1_000_000; // microseconds → seconds
+            compute_minted_demurrage(bal.balance, def.params.demurrage_rate, elapsed)
         } else {
-            let bal = get_or_create_minted_balance(input.member_did, input.currency_id)?;
-            let balance = bal.balance;
-            (bal, balance)
+            0
         };
+
+    let effective_balance = bal.balance - pending_demurrage;
 
     Ok(MintedBalanceInfo {
         member_did: bal.member_did,
         currency_id: bal.currency_id,
         currency_name: def.params.name,
         currency_symbol: def.params.symbol,
+        raw_balance: bal.balance,
+        effective_balance,
+        pending_demurrage,
+        last_activity: bal.last_activity,
         balance: effective_balance,
         credit_limit: def.params.credit_limit,
         can_provide: effective_balance < def.params.credit_limit,

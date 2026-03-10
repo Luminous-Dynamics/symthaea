@@ -118,6 +118,15 @@ pub struct MintedBalanceInfo {
     pub currency_id: String,
     pub currency_name: String,
     pub currency_symbol: String,
+    /// Raw (stored) balance before demurrage computation.
+    pub raw_balance: i32,
+    /// Effective balance after in-memory demurrage computation (no writes performed).
+    pub effective_balance: i32,
+    /// Pending demurrage amount that would be deducted on next persist.
+    pub pending_demurrage: i32,
+    /// Timestamp of last recorded activity for this balance.
+    pub last_activity: Timestamp,
+    /// Legacy field: equals `effective_balance` for backward compatibility.
     pub balance: i32,
     pub credit_limit: i32,
     pub can_provide: bool,

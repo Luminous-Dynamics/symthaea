@@ -845,7 +845,77 @@ pub fn confirm_exchange(exchange_id: String) -> ExternResult<ExchangeRecord> {
         )));
     }
 
-    // Re-check balance limits at confirmation time (balances may have changed)
+    // RC-19 fix: Create confirmation guard link FIRST, then verify we won
+    // the race. This prevents duplicate balance updates from concurrent calls.
+    let confirm_anchor = format!("tend-confirm:{}", exchange_id);
+    let confirm_anchor_hash = anchor_hash(&confirm_anchor)?;
+
+    // Quick pre-check: if confirmation already happened, return idempotently
+    let pre_existing = get_links(
+        LinkQuery::try_new(confirm_anchor_hash.clone(), LinkTypes::AnchorLinks)?,
+        GetStrategy::default(),
+    )?;
+    if !pre_existing.is_empty() {
+        // Already confirmed by a prior call — re-fetch to get current status
+        let confirmed_ex = find_exchange_by_id(&exchange_id)?.ok_or(wasm_error!(
+            WasmErrorInner::Guest("Exchange not found".into())
+        ))?;
+        return Ok(ExchangeRecord {
+            id: confirmed_ex.id,
+            provider_did: confirmed_ex.provider_did,
+            receiver_did: confirmed_ex.receiver_did,
+            hours: confirmed_ex.hours,
+            service_description: confirmed_ex.service_description,
+            service_category: confirmed_ex.service_category,
+            status: ExchangeStatus::Confirmed,
+            timestamp: confirmed_ex.timestamp,
+        });
+    }
+
+    // Create the guard link BEFORE balance updates (claim our intent)
+    let our_link_hash = create_link(
+        confirm_anchor_hash.clone(),
+        AnyLinkableHash::from(agent_info()?.agent_initial_pubkey),
+        LinkTypes::AnchorLinks,
+        (),
+    )?;
+
+    // Re-read links to detect concurrent confirmations (create-then-verify)
+    let all_confirm_links = get_links(
+        LinkQuery::try_new(confirm_anchor_hash, LinkTypes::AnchorLinks)?,
+        GetStrategy::default(),
+    )?;
+
+    if all_confirm_links.len() > 1 {
+        // Race detected — winner is lowest ActionHash (deterministic)
+        let winner = all_confirm_links
+            .iter()
+            .min_by_key(|l| l.create_link_hash.clone())
+            .expect("at least one link exists");
+
+        if winner.create_link_hash != our_link_hash {
+            // We lost the race — clean up and return idempotently
+            delete_link(our_link_hash, GetOptions::default())?;
+            return Ok(ExchangeRecord {
+                id: exchange.id,
+                provider_did: exchange.provider_did,
+                receiver_did: exchange.receiver_did,
+                hours: exchange.hours,
+                service_description: exchange.service_description,
+                service_category: exchange.service_category,
+                status: ExchangeStatus::Confirmed,
+                timestamp: exchange.timestamp,
+            });
+        }
+        // We won — best-effort cleanup of loser links
+        for link in &all_confirm_links {
+            if link.create_link_hash != our_link_hash {
+                let _ = delete_link(link.create_link_hash.clone(), GetOptions::default());
+            }
+        }
+    }
+
+    // Only the race winner reaches here — re-check balance limits
     let provider_limit = get_effective_limit_for_member(&exchange.provider_did)?;
     let receiver_limit = get_effective_limit_for_member(&exchange.receiver_did)?;
 
@@ -1048,15 +1118,18 @@ pub fn rate_exchange(input: RateExchangeInput) -> ExternResult<Record> {
         )));
     }
 
-    // Check for duplicate rating via ExchangeToRating link
-    let existing_links = get_links(
-        LinkQuery::try_new(
-            anchor_hash(&format!("rating:{}", input.exchange_id))?,
-            LinkTypes::ExchangeToRating,
-        )?,
+    // RC-19 fix: Create-then-verify pattern to prevent duplicate ratings
+    // from concurrent calls. We create the rating link first, then check if
+    // we won the race.
+    let rating_anchor = format!("rating:{}", input.exchange_id);
+    let rating_anchor_hash = anchor_hash(&rating_anchor)?;
+
+    // Quick pre-check: if rating already exists, reject
+    let pre_existing = get_links(
+        LinkQuery::try_new(rating_anchor_hash.clone(), LinkTypes::ExchangeToRating)?,
         GetStrategy::default(),
     )?;
-    if !existing_links.is_empty() {
+    if !pre_existing.is_empty() {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "This exchange has already been rated".into()
         )));
@@ -1076,13 +1149,41 @@ pub fn rate_exchange(input: RateExchangeInput) -> ExternResult<Record> {
     // Store as a proper QualityRating entry type
     let rating_hash = create_entry(&EntryTypes::QualityRating(quality_rating))?;
 
-    // Link from exchange to rating
-    create_link(
-        anchor_hash(&format!("rating:{}", input.exchange_id))?,
+    // Link from exchange to rating — create BEFORE verifying uniqueness
+    let our_link_hash = create_link(
+        rating_anchor_hash.clone(),
         rating_hash.clone(),
         LinkTypes::ExchangeToRating,
         (),
     )?;
+
+    // Re-read to detect concurrent rating creation
+    let all_rating_links = get_links(
+        LinkQuery::try_new(rating_anchor_hash, LinkTypes::ExchangeToRating)?,
+        GetStrategy::default(),
+    )?;
+
+    if all_rating_links.len() > 1 {
+        // Race detected — winner is lowest ActionHash (deterministic)
+        let winner = all_rating_links
+            .iter()
+            .min_by_key(|l| l.create_link_hash.clone())
+            .expect("at least one link exists");
+
+        if winner.create_link_hash != our_link_hash {
+            // We lost the race — clean up and error
+            delete_link(our_link_hash, GetOptions::default())?;
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "This exchange has already been rated".into()
+            )));
+        }
+        // We won — best-effort cleanup of loser links
+        for link in &all_rating_links {
+            if link.create_link_hash != our_link_hash {
+                let _ = delete_link(link.create_link_hash.clone(), GetOptions::default());
+            }
+        }
+    }
 
     // Link from rated member (provider) to rating for aggregation
     create_link(
@@ -1138,15 +1239,18 @@ pub fn open_dispute(input: OpenDisputeInput) -> ExternResult<Record> {
         )));
     }
 
-    // Check for existing dispute on this exchange via ExchangeToDispute link
-    let existing_links = get_links(
-        LinkQuery::try_new(
-            anchor_hash(&format!("dispute_for_exchange:{}", input.exchange_id))?,
-            LinkTypes::ExchangeToDispute,
-        )?,
+    // RC-19 fix: Create-then-verify pattern to prevent duplicate disputes
+    // from concurrent calls. We create the dispute link first, then check if
+    // we won the race.
+    let dispute_anchor = format!("dispute_for_exchange:{}", input.exchange_id);
+    let dispute_anchor_hash = anchor_hash(&dispute_anchor)?;
+
+    // Quick pre-check: if dispute already exists, reject
+    let pre_existing = get_links(
+        LinkQuery::try_new(dispute_anchor_hash.clone(), LinkTypes::ExchangeToDispute)?,
         GetStrategy::default(),
     )?;
-    if !existing_links.is_empty() {
+    if !pre_existing.is_empty() {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "A dispute already exists for this exchange".into()
         )));
@@ -1179,13 +1283,41 @@ pub fn open_dispute(input: OpenDisputeInput) -> ExternResult<Record> {
     // Store as a proper DisputeCase entry type
     let dispute_hash = create_entry(&EntryTypes::DisputeCase(dispute_case))?;
 
-    // Link from exchange to dispute
-    create_link(
-        anchor_hash(&format!("dispute_for_exchange:{}", input.exchange_id))?,
+    // Link from exchange to dispute — create BEFORE verifying uniqueness
+    let our_link_hash = create_link(
+        dispute_anchor_hash.clone(),
         dispute_hash.clone(),
         LinkTypes::ExchangeToDispute,
         (),
     )?;
+
+    // Re-read to detect concurrent dispute creation
+    let all_dispute_links = get_links(
+        LinkQuery::try_new(dispute_anchor_hash, LinkTypes::ExchangeToDispute)?,
+        GetStrategy::default(),
+    )?;
+
+    if all_dispute_links.len() > 1 {
+        // Race detected — winner is lowest ActionHash (deterministic)
+        let winner = all_dispute_links
+            .iter()
+            .min_by_key(|l| l.create_link_hash.clone())
+            .expect("at least one link exists");
+
+        if winner.create_link_hash != our_link_hash {
+            // We lost the race — clean up and error
+            delete_link(our_link_hash, GetOptions::default())?;
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "A dispute already exists for this exchange".into()
+            )));
+        }
+        // We won — best-effort cleanup of loser links
+        for link in &all_dispute_links {
+            if link.create_link_hash != our_link_hash {
+                let _ = delete_link(link.create_link_hash.clone(), GetOptions::default());
+            }
+        }
+    }
 
     // Link from dispute ID for direct lookup
     create_link(

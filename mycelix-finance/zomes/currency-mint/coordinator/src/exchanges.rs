@@ -199,20 +199,23 @@ pub fn confirm_minted_exchange(exchange_id: String) -> ExternResult<MintedExchan
         )));
     }
 
-    // Check no existing confirmation
+    // RC-19 fix: Create confirmation link FIRST, then verify we won the race.
+    // This prevents duplicate balance updates from concurrent calls — both
+    // callers create their link, but only the one whose link is "first" by
+    // ActionHash ordering proceeds with balance updates.
     let confirm_anchor = format!("confirm:{}", exchange_id);
-    let existing = get_links(
-        LinkQuery::try_new(
-            anchor_hash(&confirm_anchor)?,
-            LinkTypes::ExchangeToConfirmation,
-        )?,
+    let confirm_anchor_hash = anchor_hash(&confirm_anchor)?;
+
+    // Quick pre-check: if confirmation already exists, return idempotently.
+    let pre_existing = get_links(
+        LinkQuery::try_new(confirm_anchor_hash.clone(), LinkTypes::ExchangeToConfirmation)?,
         GetStrategy::default(),
     )?;
-    if !existing.is_empty() {
+    if !pre_existing.is_empty() {
         return Ok(exchange);
     }
 
-    // Create confirmation receipt
+    // Create confirmation receipt and link BEFORE balance updates
     let now = sys_time()?;
     let confirmation = MintedExchangeConfirmation {
         exchange_id: exchange_id.clone(),
@@ -220,14 +223,42 @@ pub fn confirm_minted_exchange(exchange_id: String) -> ExternResult<MintedExchan
         timestamp: now,
     };
     let conf_hash = create_entry(&EntryTypes::MintedExchangeConfirmation(confirmation))?;
-    create_link(
-        anchor_hash(&confirm_anchor)?,
+    let our_link_hash = create_link(
+        confirm_anchor_hash.clone(),
         conf_hash,
         LinkTypes::ExchangeToConfirmation,
         (),
     )?;
 
-    // Now update balances (zero-sum)
+    // Re-read links to detect concurrent confirmations (create-then-verify)
+    let all_confirm_links = get_links(
+        LinkQuery::try_new(confirm_anchor_hash, LinkTypes::ExchangeToConfirmation)?,
+        GetStrategy::default(),
+    )?;
+
+    if all_confirm_links.len() > 1 {
+        // Race detected — determine winner by lowest ActionHash (deterministic).
+        // The link with the smallest create_link_hash wins.
+        let winner = all_confirm_links
+            .iter()
+            .min_by_key(|l| l.create_link_hash.clone())
+            .expect("at least one link exists");
+
+        if winner.create_link_hash != our_link_hash {
+            // We lost the race — clean up our link and return idempotently.
+            delete_link(our_link_hash, GetOptions::default())?;
+            return Ok(exchange);
+        }
+        // We won — clean up the loser's duplicate links for tidiness.
+        for link in &all_confirm_links {
+            if link.create_link_hash != our_link_hash {
+                // Best-effort cleanup; ignore errors (other agent may own it)
+                let _ = delete_link(link.create_link_hash.clone(), GetOptions::default());
+            }
+        }
+    }
+
+    // Only the race winner reaches here — update balances (zero-sum)
     update_minted_balance(
         &exchange.provider_did,
         &exchange.currency_id,

@@ -62,6 +62,21 @@ pub enum StakeStatus {
     Jailed,
 }
 
+impl StakeStatus {
+    /// Valid status transitions. Prevents reversal of terminal states.
+    pub fn can_transition_to(&self, new: &StakeStatus) -> bool {
+        matches!(
+            (self, new),
+            (StakeStatus::Active, StakeStatus::Unbonding)
+                | (StakeStatus::Active, StakeStatus::Slashed)
+                | (StakeStatus::Active, StakeStatus::Jailed)
+                | (StakeStatus::Unbonding, StakeStatus::Withdrawn)
+                | (StakeStatus::Slashed, StakeStatus::Unbonding)
+                | (StakeStatus::Slashed, StakeStatus::Jailed)
+        )
+    }
+}
+
 /// Slashing Event
 ///
 /// Records a slashing event with cryptographic evidence
@@ -236,12 +251,30 @@ pub enum EscrowHashType {
     Keccak256,
 }
 
-/// Signature on escrow release
+/// Signature on escrow release (legacy, embedded in CryptoEscrow)
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct EscrowSignature {
     pub signer_did: String,
     pub signature: Vec<u8>,
     pub signed_at: i64,
+}
+
+/// Immutable escrow signature entry (RC-18 fix: avoids race condition on mutable array)
+///
+/// Each signature is stored as its own DHT entry and linked to the escrow via
+/// `EscrowToSignatures`. This eliminates the concurrent-update race on
+/// `CryptoEscrow.collected_signatures`.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct EscrowSignatureEntry {
+    /// Escrow ID this signature belongs to
+    pub escrow_id: String,
+    /// Signer's DID
+    pub signer_did: String,
+    /// Cryptographic signature bytes
+    pub signature: Vec<u8>,
+    /// When the signature was created
+    pub timestamp: Timestamp,
 }
 
 /// Escrow status
@@ -259,6 +292,23 @@ pub enum EscrowStatus {
     Disputed,
     /// Expired without resolution
     Expired,
+}
+
+impl EscrowStatus {
+    /// Valid status transitions. Terminal states (Released, Refunded, Expired) cannot change.
+    pub fn can_transition_to(&self, new: &EscrowStatus) -> bool {
+        matches!(
+            (self, new),
+            (EscrowStatus::Pending, EscrowStatus::Releasable)
+                | (EscrowStatus::Pending, EscrowStatus::Refunded)
+                | (EscrowStatus::Pending, EscrowStatus::Disputed)
+                | (EscrowStatus::Pending, EscrowStatus::Expired)
+                | (EscrowStatus::Releasable, EscrowStatus::Released)
+                | (EscrowStatus::Releasable, EscrowStatus::Disputed)
+                | (EscrowStatus::Disputed, EscrowStatus::Released)
+                | (EscrowStatus::Disputed, EscrowStatus::Refunded)
+        )
+    }
 }
 
 /// Staking rewards distribution
@@ -295,6 +345,7 @@ pub enum EntryTypes {
     SlashingEvent(SlashingEvent),
     CryptoEscrow(CryptoEscrow),
     RewardDistribution(RewardDistribution),
+    EscrowSignatureEntry(EscrowSignatureEntry),
 }
 
 #[hdk_link_types]
@@ -317,6 +368,8 @@ pub enum LinkTypes {
     EscrowIdToEscrow,
     /// Link from governance_agents anchor to authorized agent pubkeys
     GovernanceAgents,
+    /// Link from escrow signature anchor to individual EscrowSignatureEntry entries
+    EscrowToSignatures,
 }
 
 /// Validation callback
@@ -329,6 +382,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::SlashingEvent(event) => validate_slashing_event(action, event),
                 EntryTypes::CryptoEscrow(escrow) => validate_escrow(action, escrow),
                 EntryTypes::RewardDistribution(dist) => validate_reward_distribution(action, dist),
+                EntryTypes::EscrowSignatureEntry(sig) => validate_escrow_signature_entry(action, sig),
             },
             OpEntry::UpdateEntry {
                 app_entry, action, ..
@@ -340,6 +394,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 )),
                 EntryTypes::RewardDistribution(_) => Ok(ValidateCallbackResult::Invalid(
                     "Reward distributions are immutable".into(),
+                )),
+                EntryTypes::EscrowSignatureEntry(_) => Ok(ValidateCallbackResult::Invalid(
+                    "Escrow signatures are immutable".into(),
                 )),
             },
             _ => Ok(ValidateCallbackResult::Valid),
@@ -354,6 +411,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             LinkTypes::StakeIdToStake => Ok(ValidateCallbackResult::Valid),
             LinkTypes::EscrowIdToEscrow => Ok(ValidateCallbackResult::Valid),
             LinkTypes::GovernanceAgents => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::EscrowToSignatures => Ok(ValidateCallbackResult::Valid),
         },
         _ => Ok(ValidateCallbackResult::Valid),
     }
@@ -422,9 +480,9 @@ fn validate_create_stake(
     Ok(ValidateCallbackResult::Valid)
 }
 
-/// Validate stake update
+/// Validate stake update — enforces status transition rules
 fn validate_update_stake(
-    _action: Update,
+    action: Update,
     stake: CollateralStake,
 ) -> ExternResult<ValidateCallbackResult> {
     // Validate MYCEL score range — is_finite rejects NaN/Infinity
@@ -439,6 +497,20 @@ fn validate_update_stake(
         return Ok(ValidateCallbackResult::Invalid(
             "Stake weight must be in [1.0, 2.0]".into(),
         ));
+    }
+
+    // Enforce status transition rules via original entry comparison
+    if let Ok(original_record) = must_get_valid_record(action.original_action_address) {
+        if let Ok(Some(original)) = original_record.entry().to_app_option::<CollateralStake>() {
+            if original.status != stake.status
+                && !original.status.can_transition_to(&stake.status)
+            {
+                return Ok(ValidateCallbackResult::Invalid(format!(
+                    "Invalid status transition: {:?} → {:?}",
+                    original.status, stake.status
+                )));
+            }
+        }
     }
 
     Ok(ValidateCallbackResult::Valid)
@@ -588,7 +660,7 @@ fn validate_escrow(_action: Create, escrow: CryptoEscrow) -> ExternResult<Valida
 
 /// Validate escrow update
 fn validate_update_escrow(
-    _action: Update,
+    action: Update,
     escrow: CryptoEscrow,
 ) -> ExternResult<ValidateCallbackResult> {
     // Basic validation
@@ -597,6 +669,55 @@ fn validate_update_escrow(
             "Depositor must be a valid DID".into(),
         ));
     }
+
+    // Enforce status transition rules
+    if let Ok(original_record) = must_get_valid_record(action.original_action_address) {
+        if let Ok(Some(original)) = original_record.entry().to_app_option::<CryptoEscrow>() {
+            if original.status != escrow.status
+                && !original.status.can_transition_to(&escrow.status)
+            {
+                return Ok(ValidateCallbackResult::Invalid(format!(
+                    "Invalid escrow status transition: {:?} → {:?}",
+                    original.status, escrow.status
+                )));
+            }
+        }
+    }
+
+    Ok(ValidateCallbackResult::Valid)
+}
+
+/// Validate escrow signature entry
+fn validate_escrow_signature_entry(
+    _action: Create,
+    sig: EscrowSignatureEntry,
+) -> ExternResult<ValidateCallbackResult> {
+    // String length checks
+    if sig.escrow_id.len() > MAX_ID_LEN {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Escrow ID exceeds maximum length".into(),
+        ));
+    }
+    if sig.signer_did.len() > MAX_DID_LEN {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Signer DID exceeds maximum length".into(),
+        ));
+    }
+
+    // Signer must be a valid DID
+    if !sig.signer_did.starts_with("did:") {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Signer must be a valid DID".into(),
+        ));
+    }
+
+    // Signature must not be empty
+    if sig.signature.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Signature must not be empty".into(),
+        ));
+    }
+
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -928,5 +1049,58 @@ mod tests {
         let result =
             validate_slashing_event(make_create(), event).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // =========================================================================
+    // Status transition state machines
+    // =========================================================================
+
+    #[test]
+    fn test_stake_status_valid_transitions() {
+        use StakeStatus::*;
+        assert!(Active.can_transition_to(&Unbonding));
+        assert!(Active.can_transition_to(&Slashed));
+        assert!(Active.can_transition_to(&Jailed));
+        assert!(Unbonding.can_transition_to(&Withdrawn));
+        assert!(Slashed.can_transition_to(&Unbonding));
+        assert!(Slashed.can_transition_to(&Jailed));
+    }
+
+    #[test]
+    fn test_stake_status_invalid_transitions() {
+        use StakeStatus::*;
+        // Terminal states
+        assert!(!Withdrawn.can_transition_to(&Active));
+        assert!(!Withdrawn.can_transition_to(&Unbonding));
+        assert!(!Jailed.can_transition_to(&Active));
+        assert!(!Jailed.can_transition_to(&Slashed));
+        // Cannot go backwards
+        assert!(!Unbonding.can_transition_to(&Active));
+        assert!(!Slashed.can_transition_to(&Active));
+    }
+
+    #[test]
+    fn test_escrow_status_valid_transitions() {
+        use EscrowStatus::*;
+        assert!(Pending.can_transition_to(&Releasable));
+        assert!(Pending.can_transition_to(&Refunded));
+        assert!(Pending.can_transition_to(&Disputed));
+        assert!(Pending.can_transition_to(&Expired));
+        assert!(Releasable.can_transition_to(&Released));
+        assert!(Releasable.can_transition_to(&Disputed));
+        assert!(Disputed.can_transition_to(&Released));
+        assert!(Disputed.can_transition_to(&Refunded));
+    }
+
+    #[test]
+    fn test_escrow_status_invalid_transitions() {
+        use EscrowStatus::*;
+        // Terminal states
+        assert!(!Released.can_transition_to(&Pending));
+        assert!(!Released.can_transition_to(&Refunded));
+        assert!(!Refunded.can_transition_to(&Pending));
+        assert!(!Refunded.can_transition_to(&Released));
+        assert!(!Expired.can_transition_to(&Pending));
+        assert!(!Expired.can_transition_to(&Released));
     }
 }

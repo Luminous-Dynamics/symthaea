@@ -192,9 +192,14 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::MintedDispute(dispute) => validate_minted_dispute(&dispute),
                 EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
             },
-            OpEntry::UpdateEntry { app_entry, .. } => {
+            OpEntry::UpdateEntry {
+                app_entry, action, ..
+            } => {
                 match app_entry {
-                    EntryTypes::CurrencyDefinition(def) => validate_update_currency(def),
+                    EntryTypes::CurrencyDefinition(def) => validate_update_currency(
+                        &action.original_action_address,
+                        def,
+                    ),
                     EntryTypes::MintedBalance(bal) => validate_minted_balance(&bal),
                     EntryTypes::MintedExchange(_) => {
                         // Exchanges are immutable once created
@@ -272,7 +277,10 @@ fn validate_create_currency(def: CurrencyDefinition) -> ExternResult<ValidateCal
     Ok(ValidateCallbackResult::Valid)
 }
 
-fn validate_update_currency(def: CurrencyDefinition) -> ExternResult<ValidateCallbackResult> {
+fn validate_update_currency(
+    original_action: &ActionHash,
+    def: CurrencyDefinition,
+) -> ExternResult<ValidateCallbackResult> {
     // Parameters must still be valid after update
     if let Err(e) = def.params.validate() {
         return Ok(ValidateCallbackResult::Invalid(format!(
@@ -280,9 +288,21 @@ fn validate_update_currency(def: CurrencyDefinition) -> ExternResult<ValidateCal
             e
         )));
     }
-    // Retired currencies cannot be un-retired
-    // (We can't check the original status in integrity validation, but
-    // the coordinator enforces valid status transitions)
+    // Enforce status transition rules
+    if let Ok(original_record) = must_get_valid_record(original_action.clone()) {
+        if let Ok(Some(original)) =
+            original_record.entry().to_app_option::<CurrencyDefinition>()
+        {
+            if original.status != def.status
+                && !original.status.can_transition_to(&def.status)
+            {
+                return Ok(ValidateCallbackResult::Invalid(format!(
+                    "Invalid currency status transition: {:?} → {:?}",
+                    original.status, def.status
+                )));
+            }
+        }
+    }
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -576,7 +596,9 @@ mod tests {
         let mut def = valid_currency_def();
         def.status = CurrencyStatus::Active;
         def.params.credit_limit = 80;
-        let result = validate_update_currency(def).unwrap();
+        // Dummy action hash — must_get_valid_record will fail gracefully outside WASM
+        let dummy_hash = ActionHash::from_raw_36(vec![0; 36]);
+        let result = validate_update_currency(&dummy_hash, def).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Valid));
     }
 
@@ -584,7 +606,8 @@ mod tests {
     fn test_currency_update_rejects_invalid_params() {
         let mut def = valid_currency_def();
         def.params.credit_limit = 999; // exceeds max
-        let result = validate_update_currency(def).unwrap();
+        let dummy_hash = ActionHash::from_raw_36(vec![0; 36]);
+        let result = validate_update_currency(&dummy_hash, def).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 

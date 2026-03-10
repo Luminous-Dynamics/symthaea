@@ -147,6 +147,20 @@ pub enum ExchangeStatus {
     Resolved,
 }
 
+impl ExchangeStatus {
+    /// Valid status transitions. Terminal states (Confirmed, Cancelled, Resolved) cannot revert.
+    pub fn can_transition_to(&self, new: &ExchangeStatus) -> bool {
+        matches!(
+            (self, new),
+            (ExchangeStatus::Proposed, ExchangeStatus::Confirmed)
+                | (ExchangeStatus::Proposed, ExchangeStatus::Disputed)
+                | (ExchangeStatus::Proposed, ExchangeStatus::Cancelled)
+                | (ExchangeStatus::Disputed, ExchangeStatus::Resolved)
+                | (ExchangeStatus::Disputed, ExchangeStatus::Cancelled)
+        )
+    }
+}
+
 /// Member's TEND balance within a DAO
 ///
 /// Balance can be positive (credit - you've provided more than received)
@@ -788,7 +802,7 @@ fn validate_create_exchange(
 }
 
 fn validate_update_exchange(
-    _action: Update,
+    action: Update,
     exchange: TendExchange,
 ) -> ExternResult<ValidateCallbackResult> {
     // Only status can change (Proposed -> Confirmed/Disputed/Cancelled)
@@ -798,6 +812,31 @@ fn validate_update_exchange(
             "Hours must be a finite positive number".into(),
         ));
     }
+
+    // Enforce status transition rules and immutable field invariants
+    if let Ok(original_record) = must_get_valid_record(action.original_action_address) {
+        if let Ok(Some(original)) = original_record.entry().to_app_option::<TendExchange>() {
+            // Status transitions must follow the state machine
+            if original.status != exchange.status
+                && !original.status.can_transition_to(&exchange.status)
+            {
+                return Ok(ValidateCallbackResult::Invalid(format!(
+                    "Invalid exchange status transition: {:?} → {:?}",
+                    original.status, exchange.status
+                )));
+            }
+            // Core fields are immutable after creation
+            if original.provider_did != exchange.provider_did
+                || original.receiver_did != exchange.receiver_did
+                || original.hours != exchange.hours
+            {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Cannot change provider, receiver, or hours on an existing exchange".into(),
+                ));
+            }
+        }
+    }
+
     Ok(ValidateCallbackResult::Valid)
 }
 

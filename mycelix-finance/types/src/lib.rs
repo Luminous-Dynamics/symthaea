@@ -294,6 +294,20 @@ pub enum CurrencyStatus {
     Retired,
 }
 
+impl CurrencyStatus {
+    /// Valid status transitions. Retired is terminal and cannot be reversed.
+    pub fn can_transition_to(&self, new: &CurrencyStatus) -> bool {
+        matches!(
+            (self, new),
+            (CurrencyStatus::Draft, CurrencyStatus::Active)
+                | (CurrencyStatus::Active, CurrencyStatus::Suspended)
+                | (CurrencyStatus::Active, CurrencyStatus::Retired)
+                | (CurrencyStatus::Suspended, CurrencyStatus::Active) // reactivation
+                | (CurrencyStatus::Suspended, CurrencyStatus::Retired)
+        )
+    }
+}
+
 /// Parameters for a community-minted mutual credit currency.
 ///
 /// Communities get **Parameter Sovereignty**: custom names, limits, demurrage.
@@ -1078,5 +1092,35 @@ mod tests {
             assert!(d >= prev, "rate {}: {} < {}", rate, d, prev);
             prev = d;
         }
+    }
+
+    // =========================================================================
+    // CurrencyStatus state machine transitions
+    // =========================================================================
+
+    #[test]
+    fn test_currency_status_valid_transitions() {
+        use CurrencyStatus::*;
+        // Forward transitions
+        assert!(Draft.can_transition_to(&Active));
+        assert!(Active.can_transition_to(&Suspended));
+        assert!(Active.can_transition_to(&Retired));
+        assert!(Suspended.can_transition_to(&Active)); // reactivation
+        assert!(Suspended.can_transition_to(&Retired));
+    }
+
+    #[test]
+    fn test_currency_status_invalid_transitions() {
+        use CurrencyStatus::*;
+        // Retired is terminal
+        assert!(!Retired.can_transition_to(&Active));
+        assert!(!Retired.can_transition_to(&Draft));
+        assert!(!Retired.can_transition_to(&Suspended));
+        // Draft can only go to Active
+        assert!(!Draft.can_transition_to(&Suspended));
+        assert!(!Draft.can_transition_to(&Retired));
+        // No self-transitions
+        assert!(!Active.can_transition_to(&Active));
+        assert!(!Draft.can_transition_to(&Draft));
     }
 }

@@ -572,11 +572,48 @@ fn compute_hash(preimage: &[u8], _hash_type: &EscrowHashType) -> Vec<u8> {
         .to_vec()
 }
 
-/// Add multi-sig signature to escrow
+/// Collect all EscrowSignatureEntry records linked to an escrow's signature anchor.
+fn get_escrow_signature_entries(
+    escrow_id: &str,
+) -> ExternResult<Vec<(ActionHash, EscrowSignatureEntry)>> {
+    let sig_anchor = anchor_hash(&format!("escrow-sigs:{}", escrow_id))?;
+    let links = get_links(
+        LinkQuery::try_new(sig_anchor, LinkTypes::EscrowToSignatures)?,
+        GetStrategy::default(),
+    )?;
+
+    let mut entries = Vec::new();
+    for link in links {
+        let ah = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        if let Some(record) = get(ah.clone(), GetOptions::default())? {
+            if let Some(sig_entry) = record
+                .entry()
+                .to_app_option::<EscrowSignatureEntry>()
+                .map_err(|e| {
+                    wasm_error!(WasmErrorInner::Guest(format!(
+                        "Deserialization error: {:?}",
+                        e
+                    )))
+                })?
+            {
+                entries.push((ah, sig_entry));
+            }
+        }
+    }
+    Ok(entries)
+}
+
+/// Add multi-sig signature to escrow (RC-18: race-condition-safe)
+///
+/// Creates an immutable `EscrowSignatureEntry` and links it to the escrow
+/// signature anchor. Duplicate detection is done AFTER creation for
+/// idempotency — if a duplicate is found, the link is deleted and Ok is
+/// returned.
 #[hdk_extern]
 pub fn add_escrow_signature(input: AddSignatureInput) -> ExternResult<Record> {
     let now = sys_time()?;
-    let (escrow, record) = find_escrow_by_id(&input.escrow_id)?;
+    let (escrow, _record) = find_escrow_by_id(&input.escrow_id)?;
 
     if escrow.status != EscrowStatus::Pending {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -591,59 +628,42 @@ pub fn add_escrow_signature(input: AddSignatureInput) -> ExternResult<Record> {
         )));
     }
 
-    // Check if already signed
-    if escrow
-        .collected_signatures
-        .iter()
-        .any(|s| s.signer_did == input.signer_did)
-    {
-        return Err(wasm_error!(WasmErrorInner::Guest("Already signed".into())));
-    }
-
-    let signature = EscrowSignature {
-        signer_did: input.signer_did,
+    // Create immutable signature entry
+    let sig_entry = EscrowSignatureEntry {
+        escrow_id: input.escrow_id.clone(),
+        signer_did: input.signer_did.clone(),
         signature: input.signature,
-        signed_at: now.as_micros() as i64,
+        timestamp: now,
     };
 
-    let mut collected = escrow.collected_signatures.clone();
-    collected.push(signature);
+    let sig_action_hash = create_entry(&EntryTypes::EscrowSignatureEntry(sig_entry))?;
 
-    // Check if multi-sig threshold is met
-    let mut met_conditions = escrow.met_conditions.clone();
-    if let Some(threshold) = escrow.multisig_threshold {
-        if collected.len() >= threshold as usize {
-            // Find and mark the multi-sig condition as met
-            for (i, condition) in escrow.conditions.iter().enumerate() {
-                if matches!(condition, ReleaseCondition::MultiSig { .. }) {
-                    if !met_conditions.contains(&(i as u8)) {
-                        met_conditions.push(i as u8);
-                    }
-                    break;
-                }
-            }
-        }
-    }
-
-    let status = if met_conditions.len() >= escrow.required_conditions as usize {
-        EscrowStatus::Releasable
-    } else {
-        EscrowStatus::Pending
-    };
-
-    let updated = CryptoEscrow {
-        collected_signatures: collected,
-        met_conditions,
-        status,
-        ..escrow
-    };
-
-    let action_hash = update_entry(
-        record.action_address().clone(),
-        &EntryTypes::CryptoEscrow(updated),
+    // Link from escrow signature anchor to this signature entry
+    let sig_anchor = anchor_hash(&format!("escrow-sigs:{}", input.escrow_id))?;
+    let link_hash = create_link(
+        sig_anchor,
+        sig_action_hash.clone(),
+        LinkTypes::EscrowToSignatures,
+        (),
     )?;
 
-    get(action_hash, GetOptions::default())?
+    // Check for duplicate signer (AFTER creating, for idempotency)
+    let existing_sigs = get_escrow_signature_entries(&input.escrow_id)?;
+    let duplicates: Vec<_> = existing_sigs
+        .iter()
+        .filter(|(ah, s)| s.signer_did == input.signer_did && *ah != sig_action_hash)
+        .collect();
+
+    if !duplicates.is_empty() {
+        // Another entry for this signer already exists — remove our link
+        delete_link(link_hash, GetOptions::default())?;
+        // Return the existing record
+        let (existing_ah, _) = &duplicates[0];
+        return get(existing_ah.clone(), GetOptions::default())?
+            .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+    }
+
+    get(sig_action_hash, GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
 
@@ -655,20 +675,64 @@ pub struct AddSignatureInput {
 }
 
 /// Release escrow to beneficiary
+///
+/// Verifies the multi-sig threshold by counting unique signer DIDs from
+/// linked `EscrowSignatureEntry` entries (RC-18 fix).
 #[hdk_extern]
 pub fn release_escrow(escrow_id: String) -> ExternResult<Record> {
     let now = sys_time()?;
     let (escrow, record) = find_escrow_by_id(&escrow_id)?;
 
-    if escrow.status != EscrowStatus::Releasable {
+    // Allow release if already marked Releasable, OR if still Pending but
+    // the multi-sig threshold is now met via linked signature entries.
+    if escrow.status != EscrowStatus::Releasable && escrow.status != EscrowStatus::Pending {
         return Err(wasm_error!(WasmErrorInner::Guest(
-            "Releasable escrow not found".into()
+            "Escrow is not in a releasable state".into()
+        )));
+    }
+
+    // Count unique signers from linked EscrowSignatureEntry entries
+    if let Some(threshold) = escrow.multisig_threshold {
+        let sig_entries = get_escrow_signature_entries(&escrow_id)?;
+        let mut unique_signers = std::collections::HashSet::new();
+        for (_ah, sig) in &sig_entries {
+            unique_signers.insert(sig.signer_did.clone());
+        }
+        if unique_signers.len() < threshold as usize {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Multi-sig threshold not met: {} of {} required signatures",
+                unique_signers.len(),
+                threshold
+            ))));
+        }
+    }
+
+    // Also check non-multisig met_conditions if required
+    // (legacy path: met_conditions covers hash-lock, timelock, etc.)
+    let mut met_conditions = escrow.met_conditions.clone();
+
+    // If multisig threshold is met, mark the MultiSig condition as met
+    if escrow.multisig_threshold.is_some() {
+        for (i, condition) in escrow.conditions.iter().enumerate() {
+            if matches!(condition, ReleaseCondition::MultiSig { .. }) {
+                if !met_conditions.contains(&(i as u8)) {
+                    met_conditions.push(i as u8);
+                }
+                break;
+            }
+        }
+    }
+
+    if met_conditions.len() < escrow.required_conditions as usize {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Not all required conditions are met".into()
         )));
     }
 
     let updated = CryptoEscrow {
         status: EscrowStatus::Released,
         released_at: Some(now),
+        met_conditions,
         ..escrow
     };
 

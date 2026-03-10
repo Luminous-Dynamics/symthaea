@@ -68,8 +68,17 @@ pub mod update_chain {
             )?;
             match details {
                 Details::Record(record_details) => {
-                    if let Some(latest_update) = record_details.updates.last() {
-                        current_hash = latest_update.action_address().clone();
+                    // Deterministic fork resolution: when concurrent updates
+                    // create a fork (multiple updates pointing to the same
+                    // predecessor), select the update with the LOWEST ActionHash
+                    // (lexicographic comparison of raw bytes). This ensures all
+                    // nodes converge to the same view regardless of DHT ordering.
+                    if let Some(chosen_update) = record_details
+                        .updates
+                        .iter()
+                        .min_by_key(|u| u.action_address().clone())
+                    {
+                        current_hash = chosen_update.action_address().clone();
                     } else {
                         return Ok(record_details.record);
                     }

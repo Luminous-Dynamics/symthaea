@@ -60,6 +60,22 @@ pub enum TransferStatus {
     Refunded,
 }
 
+impl TransferStatus {
+    /// Valid status transitions. Terminal states cannot revert.
+    pub fn can_transition_to(&self, new: &TransferStatus) -> bool {
+        matches!(
+            (self, new),
+            (TransferStatus::Pending, TransferStatus::Processing)
+                | (TransferStatus::Pending, TransferStatus::Completed)
+                | (TransferStatus::Pending, TransferStatus::Failed(_))
+                | (TransferStatus::Pending, TransferStatus::Cancelled)
+                | (TransferStatus::Processing, TransferStatus::Completed)
+                | (TransferStatus::Processing, TransferStatus::Failed(_))
+                | (TransferStatus::Completed, TransferStatus::Refunded)
+        )
+    }
+}
+
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
 pub struct PaymentChannel {
@@ -411,7 +427,7 @@ fn validate_create_payment(
 }
 
 fn validate_update_payment(
-    _action: Update,
+    action: Update,
     payment: Payment,
 ) -> ExternResult<ValidateCallbackResult> {
     // Status can change but amount/parties cannot
@@ -420,6 +436,32 @@ fn validate_update_payment(
             "Amount must be positive".into(),
         ));
     }
+
+    // Enforce status transition rules and immutable field invariants
+    if let Ok(original_record) = must_get_valid_record(action.original_action_address) {
+        if let Ok(Some(original)) = original_record.entry().to_app_option::<Payment>() {
+            if original.status != payment.status
+                && !original.status.can_transition_to(&payment.status)
+            {
+                return Ok(ValidateCallbackResult::Invalid(format!(
+                    "Invalid payment status transition: {:?} → {:?}",
+                    original.status, payment.status
+                )));
+            }
+            // Core fields are immutable
+            if original.from_did != payment.from_did
+                || original.to_did != payment.to_did
+                || original.amount != payment.amount
+                || original.currency != payment.currency
+            {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Cannot change sender, receiver, amount, or currency on an existing payment"
+                        .into(),
+                ));
+            }
+        }
+    }
+
     Ok(ValidateCallbackResult::Valid)
 }
 
