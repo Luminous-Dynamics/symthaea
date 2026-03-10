@@ -1,7 +1,7 @@
 #![deny(unsafe_code)]
 //! Treasury Coordinator Zome
 use hdk::prelude::*;
-use mycelix_finance_shared::{anchor_hash, follow_update_chain, verify_caller_is_did};
+use mycelix_finance_shared::{anchor_hash, follow_update_chain, validate_id, verify_caller_is_did};
 use treasury_integrity::*;
 
 const DEFAULT_LIST_LIMIT: usize = 100;
@@ -63,7 +63,10 @@ pub fn create_treasury(input: CreateTreasuryInput) -> ExternResult<Record> {
         )?;
     }
     get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+        .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+            "Treasury record not found after creation for treasury {}",
+            treasury.id
+        ))))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -107,7 +110,10 @@ pub fn contribute(input: ContributeInput) -> ExternResult<Record> {
     credit_treasury(&input.treasury_id, input.amount)?;
 
     get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+        .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+            "Contribution record not found after creation for treasury {}",
+            input.treasury_id
+        ))))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -259,7 +265,10 @@ pub fn propose_allocation(input: ProposeAllocationInput) -> ExternResult<Record>
         (),
     )?;
     get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+        .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+            "Allocation record not found after creation for allocation {}",
+            allocation.id
+        ))))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -274,6 +283,7 @@ pub struct ProposeAllocationInput {
 
 #[hdk_extern]
 pub fn execute_allocation(allocation_id: String) -> ExternResult<Record> {
+    validate_id(&allocation_id, "allocation_id")?;
     let (record, alloc) = get_allocation_record(&allocation_id)?;
     if alloc.status != AllocationStatus::Approved {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -292,7 +302,10 @@ pub fn execute_allocation(allocation_id: String) -> ExternResult<Record> {
         &EntryTypes::Allocation(executed),
     )?;
     get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+        .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+            "Allocation record not found after execution for allocation {}",
+            allocation_id
+        ))))
 }
 
 /// Internal helper: fetch an allocation Record + deserialized entry by ID via link index.
@@ -442,7 +455,10 @@ pub fn create_savings_pool(input: CreatePoolInput) -> ExternResult<Record> {
         )?;
     }
     get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+        .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+            "Savings pool record not found after creation for pool {}",
+            pool.id
+        ))))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -457,6 +473,7 @@ pub struct CreatePoolInput {
 
 #[hdk_extern]
 pub fn get_treasury(treasury_id: String) -> ExternResult<Option<Record>> {
+    validate_id(&treasury_id, "treasury_id")?;
     let links = get_links(
         LinkQuery::try_new(anchor_hash(&treasury_id)?, LinkTypes::TreasuryIdToTreasury)?,
         GetStrategy::default(),
@@ -531,7 +548,10 @@ pub fn approve_allocation(input: ApproveAllocationInput) -> ExternResult<Record>
         &EntryTypes::Allocation(updated),
     )?;
     get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+        .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+            "Allocation record not found after approval for allocation {}",
+            input.allocation_id
+        ))))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -587,7 +607,10 @@ pub fn reject_allocation(input: RejectAllocationInput) -> ExternResult<Record> {
         &EntryTypes::Allocation(rejected),
     )?;
     get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+        .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+            "Allocation record not found after rejection for allocation {}",
+            input.allocation_id
+        ))))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -678,7 +701,10 @@ pub fn add_manager(input: AddManagerInput) -> ExternResult<Record> {
         (),
     )?;
     get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+        .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+            "Treasury record not found after adding manager {} to treasury {}",
+            input.new_manager_did, input.treasury_id
+        ))))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -735,7 +761,10 @@ pub fn remove_manager(input: RemoveManagerInput) -> ExternResult<Record> {
         &EntryTypes::Treasury(updated),
     )?;
     get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+        .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+            "Treasury record not found after removing manager {} from treasury {}",
+            input.manager_did, input.treasury_id
+        ))))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -786,6 +815,7 @@ pub fn get_treasury_pools(input: ListInput) -> ExternResult<Vec<Record>> {
 /// Get a specific savings pool by ID (O(1) link-based lookup)
 #[hdk_extern]
 pub fn get_savings_pool(pool_id: String) -> ExternResult<Option<Record>> {
+    validate_id(&pool_id, "pool_id")?;
     let links = get_links(
         LinkQuery::try_new(anchor_hash(&pool_id)?, LinkTypes::PoolIdToPool)?,
         GetStrategy::default(),
@@ -826,7 +856,10 @@ pub fn join_savings_pool(input: JoinPoolInput) -> ExternResult<Record> {
         (),
     )?;
     get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+        .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+            "Savings pool record not found after member {} joined pool {}",
+            input.member_did, input.pool_id
+        ))))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -864,7 +897,10 @@ pub fn contribute_to_pool(input: PoolContributionInput) -> ExternResult<Record> 
         let (_, verify) = get_savings_pool_record(&input.pool_id)?;
         if verify.current_amount == new_amount {
             return get(action_hash, GetOptions::default())?
-                .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+                    "Savings pool record not found after contribution to pool {}",
+                    input.pool_id
+                ))));
         }
         if attempt == MAX_RETRIES {
             return Err(wasm_error!(WasmErrorInner::Guest(
@@ -971,7 +1007,10 @@ pub fn cancel_allocation(input: CancelAllocationInput) -> ExternResult<Record> {
         &EntryTypes::Allocation(cancelled),
     )?;
     get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+        .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+            "Allocation record not found after cancellation for allocation {}",
+            input.allocation_id
+        ))))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -1065,7 +1104,10 @@ pub fn create_commons_pool(input: CreateCommonsPoolInput) -> ExternResult<Record
     )?;
 
     get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+        .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+            "Commons pool record not found after creation for pool {}",
+            pool.id
+        ))))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -1110,7 +1152,10 @@ pub fn contribute_to_commons(input: ContributeToCommonsInput) -> ExternResult<Re
         let (_, verify) = get_commons_pool_record(&input.commons_pool_id)?;
         if verify.inalienable_reserve == new_reserve && verify.available_balance == new_available {
             return get(action_hash, GetOptions::default())?
-                .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+                    "Commons pool record not found after contribution to pool {}",
+                    input.commons_pool_id
+                ))));
         }
         if attempt == MAX_RETRIES {
             return Err(wasm_error!(WasmErrorInner::Guest(
@@ -1171,7 +1216,10 @@ pub fn receive_compost(input: ReceiveCompostInput) -> ExternResult<Record> {
         let (_, verify) = get_commons_pool_record(&input.commons_pool_id)?;
         if verify.available_balance == new_available {
             return get(action_hash, GetOptions::default())?
-                .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+                    "Commons pool record not found after receiving compost for pool {}",
+                    input.commons_pool_id
+                ))));
         }
         if attempt == MAX_RETRIES {
             return Err(wasm_error!(WasmErrorInner::Guest(
@@ -1236,7 +1284,10 @@ pub fn request_allocation(input: RequestCommonsAllocationInput) -> ExternResult<
         let (_, verify) = get_commons_pool_record(&input.commons_pool_id)?;
         if verify.available_balance == new_available {
             return get(action_hash, GetOptions::default())?
-                .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+                    "Commons pool record not found after allocation from pool {}",
+                    input.commons_pool_id
+                ))));
         }
         if attempt == MAX_RETRIES {
             return Err(wasm_error!(WasmErrorInner::Guest(
@@ -1258,6 +1309,7 @@ pub struct RequestCommonsAllocationInput {
 /// Get a commons pool by its ID (O(1) link-based lookup)
 #[hdk_extern]
 pub fn get_commons_pool(pool_id: String) -> ExternResult<Option<Record>> {
+    validate_id(&pool_id, "pool_id")?;
     let links = get_links(
         LinkQuery::try_new(anchor_hash(&pool_id)?, LinkTypes::CommonsPoolIdToPool)?,
         GetStrategy::default(),

@@ -5,6 +5,7 @@ use hdk::prelude::*;
 pub(crate) use mycelix_finance_shared::follow_update_chain;
 pub(crate) use mycelix_finance_shared::pick_race_winner;
 pub(crate) use mycelix_finance_shared::COMMUNITY_GOVERNANCE_THRESHOLD;
+pub(crate) use mycelix_finance_shared::{validate_id, validate_did_format};
 use mycelix_finance_shared::anchor_hash;
 
 pub(crate) fn get_currency_inner(currency_id: &str) -> ExternResult<(Record, CurrencyDefinition)> {

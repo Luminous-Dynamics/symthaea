@@ -2,6 +2,7 @@
 name = "treasury"
 version = "0.1.0"
 edition = "2021"
+description = "Treasury coordinator zome — allocations, contributions, savings pools, commons reserve"
 
 [lib]
 crate-type = ["cdylib", "rlib"]

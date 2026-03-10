@@ -651,6 +651,43 @@ pub fn get_community_member_count(dao_did: String) -> ExternResult<u32> {
     }
 }
 
+/// Verify that a governance proposal exists and is in Approved/Executed state.
+///
+/// Used by currency-mint to validate that governance_proposal_id references a real
+/// proposal before creating/amending currencies. Returns true if the proposal is
+/// valid, false if not found or not approved. Permissive on bridge failure (returns
+/// true) to avoid blocking operations when governance cluster is unreachable.
+#[hdk_extern]
+pub fn verify_governance_proposal(proposal_id: String) -> ExternResult<bool> {
+    match call(
+        CallTargetCell::OtherRole("governance".into()),
+        ZomeName::from("governance_bridge"),
+        FunctionName::from("get_proposal_status"),
+        None,
+        proposal_id.clone(),
+    ) {
+        Ok(ZomeCallResponse::Ok(result)) => {
+            // Expect a string status like "Approved", "Executed", "Pending", "Rejected"
+            let status = result.decode::<String>().unwrap_or_default();
+            Ok(status == "Approved" || status == "Executed")
+        }
+        Ok(_other) => {
+            // Governance returned non-Ok — proposal likely doesn't exist
+            Ok(false)
+        }
+        Err(_e) => {
+            // SECURITY NOTE: Permissive default — when governance cluster is unreachable,
+            // allow the operation to proceed. The governance agent verification (separate
+            // check) is still enforced locally via verify_governance_agent.
+            debug!(
+                "verify_governance_proposal: governance unreachable for {}, defaulting to true (permissive)",
+                proposal_id
+            );
+            Ok(true)
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Cross-Cluster Dispatch Handlers (incoming calls from other clusters)
 // ---------------------------------------------------------------------------

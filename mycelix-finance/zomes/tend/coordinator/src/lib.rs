@@ -1789,14 +1789,15 @@ pub fn get_balance(input: GetBalanceInput) -> ExternResult<BalanceInfo> {
     get_or_create_balance(input.member_did, input.dao_did)
 }
 
-/// Get all exchanges for a member in a DAO
+/// Get all exchanges for a member in a DAO (paginated, default limit 100)
 #[hdk_extern]
-pub fn get_my_exchanges(dao_did: String) -> ExternResult<Vec<ExchangeRecord>> {
-    if dao_did.is_empty() || dao_did.len() > 256 {
+pub fn get_my_exchanges(input: PaginatedDaoInput) -> ExternResult<Vec<ExchangeRecord>> {
+    if input.dao_did.is_empty() || input.dao_did.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "DAO DID must be 1-256 characters".into()
         )));
     }
+    let limit = input.limit.unwrap_or(100);
     let caller = agent_info()?.agent_initial_pubkey;
     let member_did = format!("did:mycelix:{}", caller);
 
@@ -1805,7 +1806,7 @@ pub fn get_my_exchanges(dao_did: String) -> ExternResult<Vec<ExchangeRecord>> {
     // Get exchanges where member was provider
     let provider_links = get_links(
         LinkQuery::try_new(
-            anchor_hash(&format!("provider:{}:{}", dao_did, member_did))?,
+            anchor_hash(&format!("provider:{}:{}", input.dao_did, member_did))?,
             LinkTypes::ProviderToExchanges,
         )?,
         GetStrategy::default(),
@@ -1833,7 +1834,7 @@ pub fn get_my_exchanges(dao_did: String) -> ExternResult<Vec<ExchangeRecord>> {
     // Get exchanges where member was receiver
     let receiver_links = get_links(
         LinkQuery::try_new(
-            anchor_hash(&format!("receiver:{}:{}", dao_did, member_did))?,
+            anchor_hash(&format!("receiver:{}:{}", input.dao_did, member_did))?,
             LinkTypes::ReceiverToExchanges,
         )?,
         GetStrategy::default(),
@@ -1863,6 +1864,7 @@ pub fn get_my_exchanges(dao_did: String) -> ExternResult<Vec<ExchangeRecord>> {
 
     // Sort by timestamp (newest first)
     exchanges.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+    exchanges.truncate(limit);
 
     Ok(exchanges)
 }

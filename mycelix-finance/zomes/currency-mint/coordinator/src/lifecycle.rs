@@ -38,7 +38,7 @@ pub fn create_currency(input: CreateCurrencyInput) -> ExternResult<CurrencyDefin
                 COMMUNITY_GOVERNANCE_THRESHOLD, community_size
             ))));
         }
-        // Verify governance authorization
+        // Verify governance authorization (caller must be governance agent)
         match call(
             CallTargetCell::Local,
             ZomeName::from("tend"),
@@ -55,9 +55,29 @@ pub fn create_currency(input: CreateCurrencyInput) -> ExternResult<CurrencyDefin
             }
             Err(e) => {
                 return Err(wasm_error!(WasmErrorInner::Guest(format!(
-                    "Currency creation requires governance authorization for communities >10 members: {:?}", e
+                    "Currency creation requires governance authorization for communities >{} members: {:?}",
+                    COMMUNITY_GOVERNANCE_THRESHOLD, e
                 ))));
             }
+        }
+
+        // Verify the referenced governance proposal exists and is approved
+        if let Some(ref proposal_id) = input.governance_proposal_id {
+            if let Ok(ZomeCallResponse::Ok(result)) = call(
+                CallTargetCell::Local,
+                ZomeName::from("finance_bridge"),
+                FunctionName::from("verify_governance_proposal"),
+                None,
+                proposal_id.clone(),
+            ) {
+                if !result.decode::<bool>().unwrap_or(true) {
+                    return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                        "Governance proposal '{}' not found or not in Approved/Executed state",
+                        proposal_id
+                    ))));
+                }
+            }
+            // Bridge unreachable — permissive (governance agent already verified above)
         }
     }
 
@@ -138,6 +158,7 @@ pub fn activate_currency(input: ActivateCurrencyInput) -> ExternResult<CurrencyD
 /// Suspend an Active currency (transitions Active → Suspended).
 #[hdk_extern]
 pub fn suspend_currency(currency_id: String) -> ExternResult<CurrencyDefinition> {
+    validate_id(&currency_id, "currency_id")?;
     let (record, def) = get_currency_inner(&currency_id)?;
 
     if def.status != CurrencyStatus::Active {
@@ -165,6 +186,7 @@ pub fn suspend_currency(currency_id: String) -> ExternResult<CurrencyDefinition>
 /// Reactivate a Suspended currency (transitions Suspended → Active).
 #[hdk_extern]
 pub fn reactivate_currency(currency_id: String) -> ExternResult<CurrencyDefinition> {
+    validate_id(&currency_id, "currency_id")?;
     let (record, def) = get_currency_inner(&currency_id)?;
 
     if def.status != CurrencyStatus::Suspended {
@@ -210,6 +232,7 @@ pub fn reactivate_currency(currency_id: String) -> ExternResult<CurrencyDefiniti
 /// activated first (prevents bypassing governance gate via Draft → Retired).
 #[hdk_extern]
 pub fn retire_currency(currency_id: String) -> ExternResult<CurrencyDefinition> {
+    validate_id(&currency_id, "currency_id")?;
     let (record, def) = get_currency_inner(&currency_id)?;
 
     match def.status {
@@ -245,6 +268,7 @@ pub fn retire_currency(currency_id: String) -> ExternResult<CurrencyDefinition> 
 /// Get a currency definition by ID.
 #[hdk_extern]
 pub fn get_currency(currency_id: String) -> ExternResult<Option<CurrencyDefinition>> {
+    validate_id(&currency_id, "currency_id")?;
     match get_currency_inner(&currency_id) {
         Ok((_, def)) => Ok(Some(def)),
         Err(_) => Ok(None),
@@ -254,6 +278,7 @@ pub fn get_currency(currency_id: String) -> ExternResult<Option<CurrencyDefiniti
 /// Get all currencies created by a DAO.
 #[hdk_extern]
 pub fn get_dao_currencies(dao_did: String) -> ExternResult<Vec<CurrencyDefinition>> {
+    validate_did_format(&dao_did, "dao_did")?;
     let entries = collect_linked_entries::<CurrencyDefinition>(
         &format!("dao-currencies:{}", dao_did),
         LinkTypes::DaoToCurrencies,
@@ -282,6 +307,11 @@ pub fn list_active_currencies(_: ()) -> ExternResult<Vec<CurrencyDefinition>> {
 /// when a member wants to find currencies to join.
 #[hdk_extern]
 pub fn search_currencies(query: String) -> ExternResult<Vec<CurrencyDefinition>> {
+    if query.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "query must be 1-256 characters, got {}", query.len()
+        ))));
+    }
     let query_lower = query.to_lowercase();
     let entries = collect_linked_entries::<CurrencyDefinition>(
         "all-active-currencies",
@@ -347,11 +377,30 @@ pub fn amend_currency_params(input: AmendCurrencyParamsInput) -> ExternResult<Cu
         ) {
             Ok(ZomeCallResponse::Ok(_)) => {}
             _ => {
-                return Err(wasm_error!(WasmErrorInner::Guest(
-                    "Parameter amendment requires governance authorization for communities >10 members"
-                        .into()
-                )));
+                return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                    "Parameter amendment requires governance authorization for communities >{} members",
+                    COMMUNITY_GOVERNANCE_THRESHOLD
+                ))));
             }
+        }
+
+        // Verify the referenced governance proposal exists and is approved
+        if let Some(ref proposal_id) = input.governance_proposal_id {
+            if let Ok(ZomeCallResponse::Ok(result)) = call(
+                CallTargetCell::Local,
+                ZomeName::from("finance_bridge"),
+                FunctionName::from("verify_governance_proposal"),
+                None,
+                proposal_id.clone(),
+            ) {
+                if !result.decode::<bool>().unwrap_or(true) {
+                    return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                        "Governance proposal '{}' not found or not in Approved/Executed state",
+                        proposal_id
+                    ))));
+                }
+            }
+            // Bridge unreachable — permissive (governance agent already verified above)
         }
     }
 

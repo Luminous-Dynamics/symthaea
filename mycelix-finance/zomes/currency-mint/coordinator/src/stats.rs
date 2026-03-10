@@ -12,6 +12,7 @@ use crate::{CompostBalance, CurrencyStats, DemurrageReport, DemurrageReportEntry
 /// exchange count, and net sum (should always be 0 for zero-sum currencies).
 #[hdk_extern]
 pub fn get_currency_stats(currency_id: String) -> ExternResult<CurrencyStats> {
+    validate_id(&currency_id, "currency_id")?;
     let (_, def) = get_currency_inner(&currency_id)?;
 
     let member_dids = collect_currency_members(&currency_id)?;
@@ -56,6 +57,7 @@ pub fn get_currency_stats(currency_id: String) -> ExternResult<CurrencyStats> {
 /// from exchange history. Useful for governance flows and UI member lists.
 #[hdk_extern]
 pub fn list_currency_members(currency_id: String) -> ExternResult<Vec<String>> {
+    validate_id(&currency_id, "currency_id")?;
     // Verify currency exists
     let _ = get_currency_inner(&currency_id)?;
     let members = collect_currency_members(&currency_id)?;
@@ -70,6 +72,7 @@ pub fn list_currency_members(currency_id: String) -> ExternResult<Vec<String>> {
 /// returns a summary. Useful for governance review before redistribution.
 #[hdk_extern]
 pub fn get_demurrage_report(currency_id: String) -> ExternResult<DemurrageReport> {
+    validate_id(&currency_id, "currency_id")?;
     let (_, def) = get_currency_inner(&currency_id)?;
 
     if def.params.demurrage_rate <= 0.0 {
@@ -127,6 +130,7 @@ pub fn get_demurrage_report(currency_id: String) -> ExternResult<DemurrageReport
 /// Get the accumulated compost (demurrage) balance for a currency.
 #[hdk_extern]
 pub fn get_compost_balance(currency_id: String) -> ExternResult<CompostBalance> {
+    validate_id(&currency_id, "currency_id")?;
     let compost_did = format!("did:mycelix:__compost__:{}", currency_id);
     let bal = get_or_create_minted_balance(compost_did, currency_id.clone())?;
     Ok(CompostBalance {

@@ -1,7 +1,7 @@
 #![deny(unsafe_code)]
 //! Payments Coordinator Zome
 use hdk::prelude::*;
-use mycelix_finance_shared::{anchor_hash, follow_update_chain, verify_caller_is_did};
+use mycelix_finance_shared::{anchor_hash, follow_update_chain, validate_did_format, validate_id, verify_caller_is_did};
 use mycelix_finance_types::{
     compute_demurrage_deduction, FeeTier, SapMintSource, SuccessionPreference, COMPOST_LOCAL_PCT,
     COMPOST_REGIONAL_PCT, DEMURRAGE_EXEMPT_FLOOR, DEMURRAGE_RATE, SAP_MINT_ANNUAL_MAX,
@@ -16,6 +16,7 @@ use payments_integrity::*;
 /// Initialize a SAP balance for a new member (zero balance).
 #[hdk_extern]
 pub fn initialize_sap_balance(member_did: String) -> ExternResult<Record> {
+    validate_did_format(&member_did, "member_did")?;
     verify_caller_is_did(&member_did)?;
 
     // Check if balance already exists
@@ -41,13 +42,17 @@ pub fn initialize_sap_balance(member_did: String) -> ExternResult<Record> {
     )?;
 
     get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+        .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+            "SAP balance record not found after creation for member {}",
+            member_did
+        ))))
 }
 
 /// Get the effective SAP balance for a member (after applying demurrage).
 /// This is a read-only query — it does NOT persist the demurrage deduction.
 #[hdk_extern]
 pub fn get_sap_balance(member_did: String) -> ExternResult<SapBalanceResponse> {
+    validate_did_format(&member_did, "member_did")?;
     let (record, bal) = get_sap_balance_inner(&member_did)?;
     let now = sys_time()?;
     let elapsed = elapsed_seconds(bal.last_demurrage_at, now);
@@ -217,7 +222,10 @@ pub fn credit_sap(input: CreditSapInput) -> ExternResult<Record> {
             (),
         )?;
         return get(action_hash, GetOptions::default())?
-            .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+            .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+                "SAP balance record not found after credit_sap initialization for member {}",
+                input.member_did
+            ))));
     }
 
     // Existing balance: optimistic-locking retry loop
@@ -251,7 +259,10 @@ pub fn credit_sap(input: CreditSapInput) -> ExternResult<Record> {
         if let Some((_, actual)) = verify {
             if actual.balance == expected_balance {
                 return get(action_hash, GetOptions::default())?
-                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                    .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+                        "SAP balance record not found after credit for member {}",
+                        input.member_did
+                    ))));
             }
         }
 
@@ -323,7 +334,10 @@ pub fn debit_sap(input: DebitSapInput) -> ExternResult<Record> {
         if let Some((_, actual)) = verify {
             if actual.balance == expected_balance {
                 return get(action_hash, GetOptions::default())?
-                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                    .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+                        "SAP balance record not found after debit for member {}",
+                        input.member_did
+                    ))));
             }
         }
 
@@ -511,6 +525,7 @@ struct BroadcastMintEventPayload {
 /// Get all mint records for a member
 #[hdk_extern]
 pub fn get_mint_records(member_did: String) -> ExternResult<Vec<Record>> {
+    validate_did_format(&member_did, "member_did")?;
     let links = get_links(
         LinkQuery::try_new(
             anchor_hash(&format!("mints:{}", member_did))?,
@@ -838,7 +853,10 @@ pub fn send_payment(input: SendPaymentInput) -> ExternResult<Record> {
     )?;
 
     get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+        .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+            "Payment record not found after creation for payment {}",
+            payment.id
+        ))))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -905,7 +923,10 @@ pub fn open_payment_channel(input: OpenChannelInput) -> ExternResult<Record> {
         (),
     )?;
     get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+        .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+            "Payment channel record not found after creation for channel {}",
+            channel.id
+        ))))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -1013,7 +1034,10 @@ pub fn channel_transfer(input: ChannelTransferInput) -> ExternResult<Record> {
         &EntryTypes::PaymentChannel(updated),
     )?;
     get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+        .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+            "Payment channel record not found after transfer for channel {}",
+            input.channel_id
+        ))))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -1063,6 +1087,7 @@ pub fn get_payment_history(input: GetPaymentHistoryInput) -> ExternResult<Vec<Re
 /// Get a specific payment by ID (O(1) link-based lookup)
 #[hdk_extern]
 pub fn get_payment(payment_id: String) -> ExternResult<Option<Record>> {
+    validate_id(&payment_id, "payment_id")?;
     let links = get_links(
         LinkQuery::try_new(anchor_hash(&payment_id)?, LinkTypes::PaymentIdToPayment)?,
         GetStrategy::default(),
@@ -1079,6 +1104,7 @@ pub fn get_payment(payment_id: String) -> ExternResult<Option<Record>> {
 /// Get receipt for a payment
 #[hdk_extern]
 pub fn get_receipt(payment_id: String) -> ExternResult<Option<Record>> {
+    validate_id(&payment_id, "payment_id")?;
     // Find the payment first
     let Some(payment_record) = get_payment(payment_id.clone())? else {
         return Ok(None);
@@ -1102,6 +1128,7 @@ pub fn get_receipt(payment_id: String) -> ExternResult<Option<Record>> {
 /// Close a payment channel (settle balances)
 #[hdk_extern]
 pub fn close_payment_channel(channel_id: String) -> ExternResult<Record> {
+    validate_id(&channel_id, "channel_id")?;
     let (record, channel) = get_channel_record(&channel_id)?;
 
     if channel.closed.is_some() {
@@ -1120,12 +1147,16 @@ pub fn close_payment_channel(channel_id: String) -> ExternResult<Record> {
         &EntryTypes::PaymentChannel(closed),
     )?;
     get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+        .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+            "Payment channel record not found after closing channel {}",
+            channel_id
+        ))))
 }
 
 /// Refund a payment (creates reverse payment)
 #[hdk_extern]
 pub fn refund_payment(payment_id: String) -> ExternResult<Record> {
+    validate_id(&payment_id, "payment_id")?;
     let original = get_payment(payment_id.clone())?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Payment not found".into()
     )))?;
@@ -1194,7 +1225,10 @@ pub fn refund_payment(payment_id: String) -> ExternResult<Record> {
     )?;
 
     get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+        .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+            "Refund payment record not found after creation for original payment {}",
+            payment_id
+        ))))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -1242,6 +1276,9 @@ pub fn create_escrow(input: CreateEscrowInput) -> ExternResult<Record> {
     verify_caller_is_did(&input.from_did)?;
 
     let now = sys_time()?;
+    let from_did = input.from_did.clone();
+    let to_did = input.to_did.clone();
+    let escrow_id = input.escrow_id.clone();
     // Compute fee for escrow (SAP: progressive fee; TEND: zero)
     let escrow_fee = if input.currency == "SAP" {
         compute_sap_fee(&input.from_did, input.amount)?
@@ -1250,8 +1287,8 @@ pub fn create_escrow(input: CreateEscrowInput) -> ExternResult<Record> {
     };
     let payment = Payment {
         id: format!("escrow:{}:{}", input.from_did, now.as_micros()),
-        from_did: input.from_did.clone(),
-        to_did: input.to_did.clone(),
+        from_did: input.from_did,
+        to_did: input.to_did,
         amount: input.amount,
         fee: escrow_fee,
         currency: input.currency,
@@ -1264,19 +1301,22 @@ pub fn create_escrow(input: CreateEscrowInput) -> ExternResult<Record> {
 
     let action_hash = create_entry(&EntryTypes::Payment(payment.clone()))?;
     create_link(
-        anchor_hash(&input.from_did)?,
+        anchor_hash(&from_did)?,
         action_hash.clone(),
         LinkTypes::SenderToPayments,
         (),
     )?;
     create_link(
-        anchor_hash(&input.to_did)?,
+        anchor_hash(&to_did)?,
         action_hash.clone(),
         LinkTypes::ReceiverToPayments,
         (),
     )?;
     get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+        .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+            "Escrow payment record not found after creation for escrow {}",
+            escrow_id
+        ))))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -1440,7 +1480,10 @@ pub fn release_escrow(payment_id: String) -> ExternResult<Record> {
         &EntryTypes::Payment(released),
     )?;
     get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+        .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+            "Escrow payment record not found after release for payment {}",
+            payment_id
+        ))))
 }
 
 // =============================================================================

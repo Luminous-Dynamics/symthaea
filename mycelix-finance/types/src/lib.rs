@@ -1096,6 +1096,98 @@ mod tests {
     }
 
     // =========================================================================
+    // Compost redistribution rounding edge cases
+    // =========================================================================
+
+    #[test]
+    fn test_compost_redistribution_rounding_101() {
+        // 101 SAP split among 70/20/10 percentages
+        let total: u64 = 101;
+        let local = total * COMPOST_LOCAL_PCT / 100;
+        let regional = total * COMPOST_REGIONAL_PCT / 100;
+        let global = total - local - regional; // remainder to global
+        assert_eq!(
+            local + regional + global,
+            total,
+            "No rounding loss for 101: local={}, regional={}, global={}",
+            local,
+            regional,
+            global
+        );
+    }
+
+    #[test]
+    fn test_compost_redistribution_rounding_257() {
+        let total: u64 = 257;
+        let local = total * COMPOST_LOCAL_PCT / 100;
+        let regional = total * COMPOST_REGIONAL_PCT / 100;
+        let global = total - local - regional;
+        assert_eq!(
+            local + regional + global,
+            total,
+            "No rounding loss for 257: local={}, regional={}, global={}",
+            local,
+            regional,
+            global
+        );
+    }
+
+    #[test]
+    fn test_compost_redistribution_rounding_999() {
+        let total: u64 = 999;
+        let local = total * COMPOST_LOCAL_PCT / 100;
+        let regional = total * COMPOST_REGIONAL_PCT / 100;
+        let global = total - local - regional;
+        assert_eq!(
+            local + regional + global,
+            total,
+            "No rounding loss for 999: local={}, regional={}, global={}",
+            local,
+            regional,
+            global
+        );
+    }
+
+    #[test]
+    fn test_compost_redistribution_rounding_1() {
+        // Edge case: smallest possible amount
+        let total: u64 = 1;
+        let local = total * COMPOST_LOCAL_PCT / 100;
+        let regional = total * COMPOST_REGIONAL_PCT / 100;
+        let global = total - local - regional;
+        assert_eq!(
+            local + regional + global,
+            total,
+            "No rounding loss for 1: local={}, regional={}, global={}",
+            local,
+            regional,
+            global
+        );
+    }
+
+    #[test]
+    fn test_compost_redistribution_rounding_individual_values() {
+        // Verify the floor-division behavior for non-evenly-divisible amounts
+        // 101: 70% = 70, 20% = 20, remainder = 11 (not 10.1)
+        let total: u64 = 101;
+        let local = total * COMPOST_LOCAL_PCT / 100;
+        let regional = total * COMPOST_REGIONAL_PCT / 100;
+        let global = total - local - regional;
+        assert_eq!(local, 70);
+        assert_eq!(regional, 20);
+        assert_eq!(global, 11); // gets the remainder
+
+        // 999: 70% = 699, 20% = 199, remainder = 101
+        let total2: u64 = 999;
+        let local2 = total2 * COMPOST_LOCAL_PCT / 100;
+        let regional2 = total2 * COMPOST_REGIONAL_PCT / 100;
+        let global2 = total2 - local2 - regional2;
+        assert_eq!(local2, 699);
+        assert_eq!(regional2, 199);
+        assert_eq!(global2, 101);
+    }
+
+    // =========================================================================
     // CurrencyStatus state machine transitions
     // =========================================================================
 

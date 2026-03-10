@@ -132,6 +132,33 @@ pub struct MintedDispute {
     pub resolved_at: Option<Timestamp>,
 }
 
+/// A pending balance adjustment for crash recovery during exchange confirmation.
+///
+/// Created BEFORE balance updates in `confirm_minted_exchange`. If a crash occurs
+/// between the provider update and the receiver update, a governance agent can call
+/// `recover_incomplete_minted_confirmations` to complete the interrupted operation and
+/// restore the zero-sum invariant.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct PendingMintedAdjustment {
+    /// The exchange this adjustment belongs to
+    pub exchange_id: String,
+    /// DID of the service provider (gains hours)
+    pub provider_did: String,
+    /// DID of the service receiver (spends hours)
+    pub receiver_did: String,
+    /// Amount of hours being exchanged
+    pub hours: f64,
+    /// The currency this adjustment belongs to
+    pub currency_id: String,
+    /// Whether the provider's balance has been updated
+    pub provider_completed: bool,
+    /// Whether the receiver's balance has been updated
+    pub receiver_completed: bool,
+    /// When this pending adjustment was created
+    pub created_at: Timestamp,
+}
+
 /// Anchor entry for deterministic link bases
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
@@ -149,6 +176,7 @@ pub enum EntryTypes {
     MintedExchange(MintedExchange),
     MintedExchangeConfirmation(MintedExchangeConfirmation),
     MintedDispute(MintedDispute),
+    PendingMintedAdjustment(PendingMintedAdjustment),
     Anchor(Anchor),
 }
 
@@ -166,6 +194,8 @@ pub enum LinkTypes {
     ExchangeToConfirmation,
     /// Link from exchange ID to its dispute
     ExchangeToDispute,
+    /// Link from pending minted adjustment anchor to its entry
+    PendingMintedAdjustmentToExchange,
     /// Anchor infrastructure
     AnchorLinks,
 }
@@ -191,6 +221,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     validate_exchange_confirmation(&conf)
                 }
                 EntryTypes::MintedDispute(dispute) => validate_minted_dispute(&dispute),
+                EntryTypes::PendingMintedAdjustment(adj) => {
+                    validate_create_pending_minted_adjustment(adj)
+                }
                 EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
             },
             OpEntry::UpdateEntry {
@@ -212,6 +245,16 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                         ValidateCallbackResult::Invalid("Confirmations cannot be updated".into()),
                     ),
                     EntryTypes::MintedDispute(dispute) => validate_dispute_update(&dispute),
+                    EntryTypes::PendingMintedAdjustment(adj) => {
+                        // Only completed flags can change; hours must stay valid
+                        if !adj.hours.is_finite() || adj.hours <= 0.0 {
+                            Ok(ValidateCallbackResult::Invalid(
+                                "PendingMintedAdjustment hours must be finite and positive".into(),
+                            ))
+                        } else {
+                            Ok(ValidateCallbackResult::Valid)
+                        }
+                    }
                     EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Invalid(
                         "Anchors cannot be updated".into(),
                     )),
@@ -226,6 +269,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             LinkTypes::CurrencyToExchanges => Ok(ValidateCallbackResult::Valid),
             LinkTypes::ExchangeToConfirmation => Ok(ValidateCallbackResult::Valid),
             LinkTypes::ExchangeToDispute => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::PendingMintedAdjustmentToExchange => Ok(ValidateCallbackResult::Valid),
             LinkTypes::AnchorLinks => Ok(ValidateCallbackResult::Valid),
         },
         FlatOp::RegisterDeleteLink { .. } => Ok(ValidateCallbackResult::Valid),
@@ -497,6 +541,48 @@ fn validate_dispute_update(dispute: &MintedDispute) -> ExternResult<ValidateCall
                 ));
             }
         }
+    }
+
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_create_pending_minted_adjustment(
+    adj: PendingMintedAdjustment,
+) -> ExternResult<ValidateCallbackResult> {
+    // Hours must be finite and positive
+    if !adj.hours.is_finite() || adj.hours <= 0.0 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "PendingMintedAdjustment hours must be finite and positive".into(),
+        ));
+    }
+
+    // DID length checks
+    if adj.provider_did.len() > MAX_DID_LEN || adj.receiver_did.len() > MAX_DID_LEN {
+        return Ok(ValidateCallbackResult::Invalid(
+            "DID exceeds maximum length".into(),
+        ));
+    }
+    if adj.exchange_id.len() > MAX_ID_LEN {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Exchange ID exceeds maximum length".into(),
+        ));
+    }
+    if adj.currency_id.len() > MAX_ID_LEN {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Currency ID exceeds maximum length".into(),
+        ));
+    }
+
+    // DIDs must be valid
+    if !adj.provider_did.starts_with("did:") {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Provider must be a valid DID".into(),
+        ));
+    }
+    if !adj.receiver_did.starts_with("did:") {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Receiver must be a valid DID".into(),
+        ));
     }
 
     Ok(ValidateCallbackResult::Valid)

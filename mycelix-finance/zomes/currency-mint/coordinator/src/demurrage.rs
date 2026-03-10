@@ -17,6 +17,7 @@ use crate::{ApplyDemurrageInput, DemurrageResult, RedistributeCompostResult};
 /// Communities that set demurrage_rate = 0.0 are exempt (no-op).
 #[hdk_extern]
 pub fn apply_minted_demurrage(input: ApplyDemurrageInput) -> ExternResult<DemurrageResult> {
+    validate_id(&input.currency_id, "currency_id")?;
     let (_, def) = get_currency_inner(&input.currency_id)?;
 
     if def.status != CurrencyStatus::Active {
@@ -81,6 +82,7 @@ pub fn apply_minted_demurrage(input: ApplyDemurrageInput) -> ExternResult<Demurr
 /// Returns a result for each member that had a deduction applied.
 #[hdk_extern]
 pub fn apply_demurrage_all(currency_id: String) -> ExternResult<Vec<DemurrageResult>> {
+    validate_id(&currency_id, "currency_id")?;
     let (_, def) = get_currency_inner(&currency_id)?;
 
     if def.status != CurrencyStatus::Active {
@@ -121,6 +123,7 @@ pub fn apply_demurrage_all(currency_id: String) -> ExternResult<Vec<DemurrageRes
 /// redistribution operations.
 #[hdk_extern]
 pub fn redistribute_compost(currency_id: String) -> ExternResult<RedistributeCompostResult> {
+    validate_id(&currency_id, "currency_id")?;
     let (_, def) = get_currency_inner(&currency_id)?;
     if def.status != CurrencyStatus::Active {
         return Err(wasm_error!(WasmErrorInner::Guest(

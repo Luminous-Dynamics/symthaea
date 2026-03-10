@@ -6,7 +6,10 @@ use mycelix_finance_shared::anchor_hash;
 use mycelix_finance_types::CurrencyStatus;
 
 use crate::helpers::*;
-use crate::{GetMemberExchangesInput, PaginatedCurrencyInput, RecordMintedExchangeInput};
+use crate::{
+    GetMemberExchangesInput, PaginatedCurrencyInput, PaginatedReceiverInput,
+    RecordMintedExchangeInput,
+};
 
 /// Record an exchange in a community-minted currency.
 ///
@@ -254,18 +257,79 @@ pub fn confirm_minted_exchange(exchange_id: String) -> ExternResult<MintedExchan
         }
     }
 
-    // Only the race winner reaches here — update balances (zero-sum)
+    // Only the race winner reaches here.
+
+    // Create a PendingMintedAdjustment BEFORE balance updates for crash recovery.
+    // If a crash occurs between the two updates, recover_incomplete_minted_confirmations
+    // can complete the interrupted operation and restore the zero-sum invariant.
+    let pending_adj = PendingMintedAdjustment {
+        exchange_id: exchange.id.clone(),
+        provider_did: exchange.provider_did.clone(),
+        receiver_did: exchange.receiver_did.clone(),
+        hours: exchange.hours as f64,
+        currency_id: exchange.currency_id.clone(),
+        provider_completed: false,
+        receiver_completed: false,
+        created_at: now,
+    };
+    let pending_adj_hash =
+        create_entry(&EntryTypes::PendingMintedAdjustment(pending_adj))?;
+
+    // Link from a well-known anchor so recover_incomplete_minted_confirmations can find them
+    let pending_adj_anchor = anchor_hash("pending-minted-adjustments")?;
+    create_link(
+        pending_adj_anchor,
+        pending_adj_hash.clone(),
+        LinkTypes::PendingMintedAdjustmentToExchange,
+        (),
+    )?;
+
+    // Update balances — provider first (zero-sum)
     update_minted_balance(
         &exchange.provider_did,
         &exchange.currency_id,
         exchange.hours,
         true,
     )?;
+
+    // Mark provider side as completed
+    let pending_adj_provider_done = PendingMintedAdjustment {
+        exchange_id: exchange.id.clone(),
+        provider_did: exchange.provider_did.clone(),
+        receiver_did: exchange.receiver_did.clone(),
+        hours: exchange.hours as f64,
+        currency_id: exchange.currency_id.clone(),
+        provider_completed: true,
+        receiver_completed: false,
+        created_at: now,
+    };
+    update_entry(
+        pending_adj_hash.clone(),
+        &EntryTypes::PendingMintedAdjustment(pending_adj_provider_done),
+    )?;
+
+    // Update balances — receiver second
     update_minted_balance(
         &exchange.receiver_did,
         &exchange.currency_id,
         exchange.hours,
         false,
+    )?;
+
+    // Mark both sides as completed
+    let pending_adj_all_done = PendingMintedAdjustment {
+        exchange_id: exchange.id.clone(),
+        provider_did: exchange.provider_did.clone(),
+        receiver_did: exchange.receiver_did.clone(),
+        hours: exchange.hours as f64,
+        currency_id: exchange.currency_id.clone(),
+        provider_completed: true,
+        receiver_completed: true,
+        created_at: now,
+    };
+    update_entry(
+        pending_adj_hash,
+        &EntryTypes::PendingMintedAdjustment(pending_adj_all_done),
     )?;
 
     // Remove from receiver's pending index so it no longer appears in
@@ -301,32 +365,39 @@ pub fn confirm_minted_exchange(exchange_id: String) -> ExternResult<MintedExchan
     })
 }
 
-/// List pending (unconfirmed) exchanges for a currency.
+/// List pending (unconfirmed) exchanges for a currency (paginated, default limit 100).
 #[hdk_extern]
-pub fn list_pending_exchanges(currency_id: String) -> ExternResult<Vec<MintedExchange>> {
+pub fn list_pending_exchanges(input: PaginatedCurrencyInput) -> ExternResult<Vec<MintedExchange>> {
+    validate_id(&input.currency_id, "currency_id")?;
+    let limit = input.limit.unwrap_or(100);
     let entries = collect_linked_entries::<MintedExchange>(
-        &format!("mex:{}", currency_id),
+        &format!("mex:{}", input.currency_id),
         LinkTypes::CurrencyToExchanges,
     )?;
-    Ok(entries
+    let mut results: Vec<MintedExchange> = entries
         .into_iter()
         .map(|(ex, _)| ex)
         .filter(|ex| !ex.confirmed)
-        .collect())
+        .collect();
+    results.truncate(limit);
+    Ok(results)
 }
 
-/// List pending exchanges awaiting confirmation by a specific receiver.
+/// List pending exchanges awaiting confirmation by a specific receiver (paginated, default limit 100).
 #[hdk_extern]
-pub fn list_pending_for_receiver(receiver_did: String) -> ExternResult<Vec<MintedExchange>> {
+pub fn list_pending_for_receiver(input: PaginatedReceiverInput) -> ExternResult<Vec<MintedExchange>> {
+    let limit = input.limit.unwrap_or(100);
     let entries = collect_linked_entries::<MintedExchange>(
-        &format!("receiver-pending:{}", receiver_did),
+        &format!("receiver-pending:{}", input.receiver_did),
         LinkTypes::CurrencyToExchanges,
     )?;
-    Ok(entries
+    let mut results: Vec<MintedExchange> = entries
         .into_iter()
         .map(|(ex, _)| ex)
-        .filter(|ex| !ex.confirmed && ex.receiver_did == receiver_did)
-        .collect())
+        .filter(|ex| !ex.confirmed && ex.receiver_did == input.receiver_did)
+        .collect();
+    results.truncate(limit);
+    Ok(results)
 }
 
 /// Cancel an expired unconfirmed exchange.
@@ -336,7 +407,8 @@ pub fn list_pending_for_receiver(receiver_did: String) -> ExternResult<Vec<Minte
 /// Only the provider or receiver can cancel.
 #[hdk_extern]
 pub fn cancel_expired_exchange(exchange_id: String) -> ExternResult<bool> {
-    let (exchange, _) = find_minted_exchange(&exchange_id)?;
+    validate_id(&exchange_id, "exchange_id")?;
+    let (exchange, original_action_hash) = find_minted_exchange(&exchange_id)?;
 
     if exchange.confirmed {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -405,12 +477,29 @@ pub fn cancel_expired_exchange(exchange_id: String) -> ExternResult<bool> {
         }
     }
 
+    // Clean up global exchange index so cancelled exchanges don't appear
+    // in list_pending_exchanges or currency exchange queries.
+    let global_anchor = anchor_hash(&format!("mex:{}", exchange.currency_id))?;
+    let global_links = get_links(
+        LinkQuery::try_new(global_anchor, LinkTypes::CurrencyToExchanges)?,
+        GetStrategy::default(),
+    )?;
+    for link in global_links {
+        if let Some(hash) = link.target.into_action_hash() {
+            if hash == original_action_hash {
+                delete_link(link.create_link_hash, GetOptions::default())?;
+                break;
+            }
+        }
+    }
+
     Ok(true)
 }
 
 /// Get a single exchange by ID.
 #[hdk_extern]
 pub fn get_exchange(exchange_id: String) -> ExternResult<Option<MintedExchange>> {
+    validate_id(&exchange_id, "exchange_id")?;
     match find_minted_exchange(&exchange_id) {
         Ok((ex, _)) => Ok(Some(ex)),
         Err(_) => Ok(None),
@@ -473,4 +562,137 @@ pub fn get_member_exchanges(input: GetMemberExchangesInput) -> ExternResult<Vec<
     exchanges.sort_by(|a, b| b.timestamp.as_micros().cmp(&a.timestamp.as_micros()));
     exchanges.truncate(limit);
     Ok(exchanges)
+}
+
+// =============================================================================
+// PENDING MINTED ADJUSTMENT RECOVERY
+// =============================================================================
+
+/// Recover incomplete balance adjustments from interrupted confirm_minted_exchange calls.
+///
+/// When confirm_minted_exchange crashes between the provider and receiver balance updates,
+/// the zero-sum invariant is broken. This function finds all PendingMintedAdjustment
+/// entries that are not fully completed and retries the missing balance updates.
+///
+/// Only callable by a governance agent (or during bootstrap when no agents exist).
+///
+/// Returns the number of adjustments that were recovered.
+#[hdk_extern]
+pub fn recover_incomplete_minted_confirmations(currency_id: String) -> ExternResult<u32> {
+    if currency_id.is_empty() || currency_id.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Currency ID must be 1-256 characters".into()
+        )));
+    }
+
+    // Governance gate: communities above threshold require authorization
+    let (_, def) = get_currency_inner(&currency_id)?;
+    let community_size = fetch_community_size(&def.creator_dao_did);
+    if community_size > COMMUNITY_GOVERNANCE_THRESHOLD {
+        match call(
+            CallTargetCell::Local,
+            ZomeName::from("tend"),
+            FunctionName::from("verify_governance_agent"),
+            None,
+            (),
+        ) {
+            Ok(ZomeCallResponse::Ok(_)) => {} // Authorized
+            _ => {
+                return Err(wasm_error!(WasmErrorInner::Guest(
+                    "Recovery of pending minted adjustments requires governance authorization for communities >10 members".into()
+                )));
+            }
+        }
+    }
+
+    let pending_anchor = anchor_hash("pending-minted-adjustments")?;
+    let links = get_links(
+        LinkQuery::try_new(pending_anchor, LinkTypes::PendingMintedAdjustmentToExchange)?,
+        GetStrategy::default(),
+    )?;
+
+    let mut recovered: u32 = 0;
+
+    for link in links {
+        let Some(target_hash) = link.target.into_action_hash() else {
+            continue;
+        };
+
+        // Follow the update chain to get the latest version of this entry
+        let record = match follow_update_chain(target_hash) {
+            Ok(r) => r,
+            Err(_) => continue,
+        };
+
+        let Some(adj) = record
+            .entry()
+            .to_app_option::<PendingMintedAdjustment>()
+            .map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!(
+                    "PendingMintedAdjustment deserialization error: {:?}",
+                    e
+                )))
+            })?
+        else {
+            continue;
+        };
+
+        // Skip entries not matching the requested currency
+        if adj.currency_id != currency_id {
+            continue;
+        }
+
+        // Skip fully completed adjustments
+        if adj.provider_completed && adj.receiver_completed {
+            continue;
+        }
+
+        let hours = adj.hours as f32;
+        let mut current_action = record.action_address().clone();
+
+        // Retry missing balance updates
+        if !adj.provider_completed {
+            // Neither side completed — retry provider first
+            update_minted_balance(
+                &adj.provider_did,
+                &adj.currency_id,
+                hours,
+                true, // provider gains
+            )?;
+
+            // Mark provider done
+            let updated = PendingMintedAdjustment {
+                provider_completed: true,
+                ..adj.clone()
+            };
+            current_action = update_entry(
+                current_action,
+                &EntryTypes::PendingMintedAdjustment(updated),
+            )?;
+        }
+
+        if !adj.receiver_completed {
+            update_minted_balance(
+                &adj.receiver_did,
+                &adj.currency_id,
+                hours,
+                false, // receiver pays
+            )?;
+
+            // Mark both sides done
+            let updated = PendingMintedAdjustment {
+                provider_completed: true,
+                receiver_completed: true,
+                ..adj.clone()
+            };
+            update_entry(
+                current_action,
+                &EntryTypes::PendingMintedAdjustment(updated),
+            )?;
+        }
+
+        recovered += 1;
+    }
+
+    Ok(recovered)
 }

@@ -38,6 +38,7 @@ pub use types::*;
 pub use update_chain::*;
 pub use race_resolution::*;
 pub use validation::*;
+pub use input_validation::*;
 
 /// Community size threshold above which governance proposals are required for
 /// currency creation, demurrage changes, and dispute resolution.
@@ -635,6 +636,36 @@ pub mod identity {
             return Err(wasm_error!(WasmErrorInner::Guest(format!(
                 "Caller DID mismatch: claimed {} but agent is {}",
                 claimed_did, actual
+            ))));
+        }
+        Ok(())
+    }
+}
+
+/// String ID input validation helpers
+pub mod input_validation {
+    use super::*;
+
+    /// Validate that a string ID is non-empty and within reasonable bounds.
+    pub fn validate_id(id: &str, field_name: &str) -> ExternResult<()> {
+        if id.is_empty() || id.len() > 256 {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "{} must be 1-256 characters, got {}", field_name, id.len()
+            ))));
+        }
+        Ok(())
+    }
+
+    /// Validate that a DID string has proper format (non-empty, starts with "did:").
+    pub fn validate_did_format(did: &str, field_name: &str) -> ExternResult<()> {
+        if did.is_empty() || did.len() > 256 {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "{} must be 1-256 characters, got {}", field_name, did.len()
+            ))));
+        }
+        if !did.starts_with("did:") {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "{} must start with 'did:', got '{}'", field_name, &did[..did.len().min(20)]
             ))));
         }
         Ok(())
