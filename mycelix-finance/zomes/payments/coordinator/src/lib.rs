@@ -189,54 +189,87 @@ pub struct DemurrageResult {
     pub redistributed: bool,
 }
 
+/// Maximum retries for optimistic-locking SAP balance mutations.
+const MAX_SAP_RETRIES: usize = 3;
+
 /// Credit SAP to a member's balance (used by bridge deposits and community issuance).
 /// Auto-initializes the SapBalance entry if the member has none yet.
+///
+/// Uses optimistic locking with retry: after updating, re-reads via
+/// `follow_update_chain` to verify our update won. If a concurrent update
+/// created a fork, retries up to `MAX_SAP_RETRIES` times.
 #[hdk_extern]
 pub fn credit_sap(input: CreditSapInput) -> ExternResult<Record> {
-    let now = sys_time()?;
-
-    match find_sap_balance_record(&input.member_did)? {
-        Some((record, bal)) => {
-            // Existing balance: apply pending demurrage first, then credit
-            let elapsed = elapsed_seconds(bal.last_demurrage_at, now);
-            let deduction = compute_demurrage_deduction(
-                bal.balance,
-                DEMURRAGE_EXEMPT_FLOOR,
-                DEMURRAGE_RATE,
-                elapsed,
-            );
-            let post_demurrage = bal.balance.saturating_sub(deduction);
-
-            let updated = SapBalance {
-                balance: post_demurrage + input.amount,
-                last_demurrage_at: now,
-                ..bal
-            };
-            let action_hash = update_entry(
-                record.action_address().clone(),
-                &EntryTypes::SapBalance(updated),
-            )?;
-            get(action_hash, GetOptions::default())?
-                .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
-        }
-        None => {
-            // First-time credit: auto-initialize balance with credited amount
-            let balance = SapBalance {
-                member_did: input.member_did.clone(),
-                balance: input.amount,
-                last_demurrage_at: now,
-            };
-            let action_hash = create_entry(&EntryTypes::SapBalance(balance))?;
-            create_link(
-                anchor_hash(&format!("sap:{}", input.member_did))?,
-                action_hash.clone(),
-                LinkTypes::DidToSapBalance,
-                (),
-            )?;
-            get(action_hash, GetOptions::default())?
-                .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
-        }
+    // Check if this member has no balance — if so, auto-initialize (no race concern for create)
+    if find_sap_balance_record(&input.member_did)?.is_none() {
+        let now = sys_time()?;
+        let balance = SapBalance {
+            member_did: input.member_did.clone(),
+            balance: input.amount,
+            last_demurrage_at: now,
+        };
+        let action_hash = create_entry(&EntryTypes::SapBalance(balance))?;
+        create_link(
+            anchor_hash(&format!("sap:{}", input.member_did))?,
+            action_hash.clone(),
+            LinkTypes::DidToSapBalance,
+            (),
+        )?;
+        return get(action_hash, GetOptions::default())?
+            .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
     }
+
+    // Existing balance: optimistic-locking retry loop
+    for attempt in 0..MAX_SAP_RETRIES {
+        let (record, bal) = get_sap_balance_inner(&input.member_did)?;
+        let now = sys_time()?;
+
+        // Apply pending demurrage first, then credit
+        let elapsed = elapsed_seconds(bal.last_demurrage_at, now);
+        let deduction = compute_demurrage_deduction(
+            bal.balance,
+            DEMURRAGE_EXEMPT_FLOOR,
+            DEMURRAGE_RATE,
+            elapsed,
+        );
+        let post_demurrage = bal.balance.saturating_sub(deduction);
+
+        let expected_balance = post_demurrage + input.amount;
+        let updated = SapBalance {
+            balance: expected_balance,
+            last_demurrage_at: now,
+            ..bal
+        };
+        let action_hash = update_entry(
+            record.action_address().clone(),
+            &EntryTypes::SapBalance(updated),
+        )?;
+
+        // Verify our update won: re-read from the anchor
+        let verify = find_sap_balance_record(&input.member_did)?;
+        if let Some((_, actual)) = verify {
+            if actual.balance == expected_balance {
+                return get(action_hash, GetOptions::default())?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+            }
+        }
+
+        // Concurrent update detected
+        if attempt == MAX_SAP_RETRIES - 1 {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "credit_sap for {} failed after {} retries due to concurrent modifications",
+                input.member_did, MAX_SAP_RETRIES
+            ))));
+        }
+        debug!(
+            "credit_sap: concurrent update detected for {}, retry {}/{}",
+            input.member_did, attempt + 1, MAX_SAP_RETRIES
+        );
+    }
+
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "credit_sap: retry loop exited unexpectedly".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -247,35 +280,68 @@ pub struct CreditSapInput {
 }
 
 /// Debit SAP from a member's balance (enforces demurrage + sufficient balance).
+///
+/// Uses optimistic locking with retry: after updating, re-reads to verify
+/// our update won. If a concurrent update created a fork, retries.
 #[hdk_extern]
 pub fn debit_sap(input: DebitSapInput) -> ExternResult<Record> {
-    let (record, bal) = get_sap_balance_inner(&input.member_did)?;
-    let now = sys_time()?;
+    for attempt in 0..MAX_SAP_RETRIES {
+        let (record, bal) = get_sap_balance_inner(&input.member_did)?;
+        let now = sys_time()?;
 
-    // Apply pending demurrage first
-    let elapsed = elapsed_seconds(bal.last_demurrage_at, now);
-    let deduction =
-        compute_demurrage_deduction(bal.balance, DEMURRAGE_EXEMPT_FLOOR, DEMURRAGE_RATE, elapsed);
-    let effective = bal.balance.saturating_sub(deduction);
+        // Apply pending demurrage first
+        let elapsed = elapsed_seconds(bal.last_demurrage_at, now);
+        let deduction = compute_demurrage_deduction(
+            bal.balance,
+            DEMURRAGE_EXEMPT_FLOOR,
+            DEMURRAGE_RATE,
+            elapsed,
+        );
+        let effective = bal.balance.saturating_sub(deduction);
 
-    if input.amount > effective {
-        return Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "Insufficient SAP balance: effective {} (raw {} - demurrage {}), need {}",
-            effective, bal.balance, deduction, input.amount
-        ))));
+        if input.amount > effective {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Insufficient SAP balance: effective {} (raw {} - demurrage {}), need {}",
+                effective, bal.balance, deduction, input.amount
+            ))));
+        }
+
+        let expected_balance = effective - input.amount;
+        let updated = SapBalance {
+            balance: expected_balance,
+            last_demurrage_at: now,
+            ..bal
+        };
+        let action_hash = update_entry(
+            record.action_address().clone(),
+            &EntryTypes::SapBalance(updated),
+        )?;
+
+        // Verify our update won: re-read from the anchor
+        let verify = find_sap_balance_record(&input.member_did)?;
+        if let Some((_, actual)) = verify {
+            if actual.balance == expected_balance {
+                return get(action_hash, GetOptions::default())?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+            }
+        }
+
+        // Concurrent update detected
+        if attempt == MAX_SAP_RETRIES - 1 {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "debit_sap for {} failed after {} retries due to concurrent modifications",
+                input.member_did, MAX_SAP_RETRIES
+            ))));
+        }
+        debug!(
+            "debit_sap: concurrent update detected for {}, retry {}/{}",
+            input.member_did, attempt + 1, MAX_SAP_RETRIES
+        );
     }
 
-    let updated = SapBalance {
-        balance: effective - input.amount,
-        last_demurrage_at: now,
-        ..bal
-    };
-    let action_hash = update_entry(
-        record.action_address().clone(),
-        &EntryTypes::SapBalance(updated),
-    )?;
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "debit_sap: retry loop exited unexpectedly".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]

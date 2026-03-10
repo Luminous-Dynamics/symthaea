@@ -2,6 +2,7 @@
 
 use currency_mint_integrity::*;
 use hdk::prelude::*;
+pub(crate) use mycelix_finance_shared::follow_update_chain;
 use mycelix_finance_shared::anchor_hash;
 
 pub(crate) fn get_currency_inner(currency_id: &str) -> ExternResult<(Record, CurrencyDefinition)> {
@@ -64,21 +65,25 @@ pub(crate) fn get_or_create_minted_balance(
         GetStrategy::default(),
     )?;
 
-    if let Some(link) = links.first() {
-        if let Some(action_hash) = link.target.clone().into_action_hash() {
-            let record = follow_update_chain(action_hash)?;
-            let bal = record
-                .entry()
-                .to_app_option::<MintedBalance>()
-                .map_err(|e| {
-                    wasm_error!(WasmErrorInner::Guest(format!(
-                        "Balance deserialization error for {}:{}: {:?}",
-                        currency_id, member_did, e
-                    )))
-                })?;
-            if let Some(bal) = bal {
-                return Ok(bal);
-            }
+    // Pick the link with the lowest target ActionHash (deterministic winner)
+    // to handle orphaned links from past race conditions.
+    if let Some(action_hash) = links
+        .iter()
+        .filter_map(|l| l.target.clone().into_action_hash())
+        .min()
+    {
+        let record = follow_update_chain(action_hash)?;
+        let bal = record
+            .entry()
+            .to_app_option::<MintedBalance>()
+            .map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!(
+                    "Balance deserialization error for {}:{}: {:?}",
+                    currency_id, member_did, e
+                )))
+            })?;
+        if let Some(bal) = bal {
+            return Ok(bal);
         }
     }
 
@@ -97,10 +102,47 @@ pub(crate) fn get_or_create_minted_balance(
     let hash = create_entry(&EntryTypes::MintedBalance(bal.clone()))?;
     create_link(
         anchor_hash(&anchor_key)?,
-        hash,
+        hash.clone(),
         LinkTypes::CurrencyMemberToBalance,
         (),
     )?;
+
+    // RC-12: Race condition guard — re-read links to detect concurrent creators.
+    // If multiple links exist, deterministically pick the one with the lowest
+    // target ActionHash. If we're not the winner, return the winner's entry.
+    let recheck_links = get_links(
+        LinkQuery::try_new(
+            anchor_hash(&anchor_key)?,
+            LinkTypes::CurrencyMemberToBalance,
+        )?,
+        GetStrategy::default(),
+    )?;
+    if recheck_links.len() > 1 {
+        if let Some(winner_link) = recheck_links
+            .iter()
+            .filter_map(|l| l.target.clone().into_action_hash().map(|h| (l, h)))
+            .min_by(|(_, a), (_, b)| a.cmp(b))
+        {
+            let winner_hash = winner_link.1;
+            if winner_hash != hash {
+                // We lost the race — return the winner's entry instead
+                let record = follow_update_chain(winner_hash)?;
+                let winner_bal = record
+                    .entry()
+                    .to_app_option::<MintedBalance>()
+                    .map_err(|e| {
+                        wasm_error!(WasmErrorInner::Guest(format!(
+                            "Balance deserialization error for {}:{}: {:?}",
+                            currency_id, member_did, e
+                        )))
+                    })?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest(
+                        "Winner balance entry missing".into()
+                    )))?;
+                return Ok(winner_bal);
+            }
+        }
+    }
 
     // Index member → currency for O(1) portfolio lookups.
     // Skip compost pseudo-members (internal bookkeeping, not real members).
@@ -381,15 +423,25 @@ pub(crate) fn collect_linked_entries<T: TryFrom<SerializedBytes, Error = Seriali
     Ok(entries)
 }
 
-/// Mutate a member's balance entry in-place via a closure.
+/// Maximum retries for optimistic-locking balance mutations.
+/// If a concurrent update is detected (fork), we re-read and retry.
+const MAX_BALANCE_RETRIES: usize = 3;
+
+/// Mutate a member's balance entry in-place via a closure, with optimistic
+/// locking and retry to handle concurrent updates (race conditions RC-1..RC-5).
 ///
-/// Follows the update chain to the latest balance record, applies `f` to the
-/// deserialized `MintedBalance`, and writes the update. Returns the updated balance.
-/// No-ops if the balance link doesn't exist (returns Ok(None)).
+/// Pattern:
+/// 1. Follow update chain to get latest record + value
+/// 2. Apply mutation
+/// 3. `update_entry` using the record's action hash
+/// 4. Re-read via `follow_update_chain` from the original link target
+/// 5. If re-read value doesn't match what we wrote, a concurrent update won — retry
+///
+/// Returns `Ok(None)` if no balance link exists (no-op).
 pub(crate) fn mutate_balance(
     member_did: &str,
     currency_id: &str,
-    f: impl FnOnce(&mut MintedBalance),
+    f: impl Fn(&mut MintedBalance),
 ) -> ExternResult<Option<MintedBalance>> {
     let anchor_key = format!("mbal:{}:{}", currency_id, member_did);
     let links = get_links(
@@ -400,73 +452,62 @@ pub(crate) fn mutate_balance(
         GetStrategy::default(),
     )?;
 
-    let Some(link) = links.first() else {
+    // Pick the link with the lowest target ActionHash (deterministic winner)
+    // to handle orphaned links from past race conditions (RC-12).
+    let Some(original_hash) = links
+        .iter()
+        .filter_map(|l| l.target.clone().into_action_hash())
+        .min()
+    else {
         return Ok(None);
     };
-    let Some(link_hash) = link.target.clone().into_action_hash() else {
-        return Ok(None);
-    };
-    let record = follow_update_chain(link_hash)?;
-    let mut bal = record
-        .entry()
-        .to_app_option::<MintedBalance>()
-        .map_err(|e| {
-            wasm_error!(WasmErrorInner::Guest(format!(
-                "Balance deserialization error for {}:{}: {:?}",
-                currency_id, member_did, e
-            )))
-        })?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
-            "Balance entry missing for {}:{}",
-            currency_id, member_did
-        ))))?;
 
-    f(&mut bal);
-    update_entry(record.action_address().clone(), &bal)?;
-    Ok(Some(bal))
-}
+    for attempt in 0..MAX_BALANCE_RETRIES {
+        let record = follow_update_chain(original_hash.clone())?;
+        let mut bal = record
+            .entry()
+            .to_app_option::<MintedBalance>()
+            .map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!(
+                    "Balance deserialization error for {}:{}: {:?}",
+                    currency_id, member_did, e
+                )))
+            })?
+            .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+                "Balance entry missing for {}:{}",
+                currency_id, member_did
+            ))))?;
 
-/// Maximum update chain depth before we bail out.
-/// Prevents unbounded network calls on entries with pathological update histories.
-const MAX_UPDATE_CHAIN_DEPTH: usize = 256;
+        f(&mut bal);
+        let expected = bal.clone();
+        update_entry(record.action_address().clone(), &bal)?;
 
-/// Recursively follow the Holochain update chain from an original action hash
-/// to find the latest version of a record. Each `update_entry` creates a new
-/// action that is recorded as an update of its predecessor.
-///
-/// Stops after [`MAX_UPDATE_CHAIN_DEPTH`] hops to prevent unbounded traversal.
-pub(crate) fn follow_update_chain(action_hash: ActionHash) -> ExternResult<Record> {
-    let mut current_hash = action_hash;
-    for _ in 0..MAX_UPDATE_CHAIN_DEPTH {
-        let details = get_details(current_hash.clone(), GetOptions::default())?.ok_or(
-            wasm_error!(WasmErrorInner::Guest("Record not found".into())),
-        )?;
-        match details {
-            Details::Record(record_details) => {
-                // Deterministic fork resolution: when concurrent updates
-                // create a fork (multiple updates pointing to the same
-                // predecessor), select the update with the LOWEST ActionHash
-                // (lexicographic comparison of raw bytes). This ensures all
-                // nodes converge to the same view regardless of DHT ordering.
-                if let Some(chosen_update) = record_details
-                    .updates
-                    .iter()
-                    .min_by_key(|u| u.action_address().clone())
-                {
-                    current_hash = chosen_update.action_address().clone();
-                } else {
-                    return Ok(record_details.record);
-                }
-            }
-            _ => {
-                return get(current_hash, GetOptions::default())?.ok_or(wasm_error!(
-                    WasmErrorInner::Guest("Record not found".into())
-                ));
+        // Verify our update won: re-read from the original link target
+        let verify_record = follow_update_chain(original_hash.clone())?;
+        if let Ok(Some(actual)) = verify_record.entry().to_app_option::<MintedBalance>() {
+            if actual.balance == expected.balance
+                && actual.exchange_count == expected.exchange_count
+            {
+                return Ok(Some(expected));
             }
         }
+
+        // Concurrent update detected — retry unless exhausted
+        if attempt == MAX_BALANCE_RETRIES - 1 {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Balance update for {}:{} failed after {} retries due to concurrent modifications",
+                currency_id, member_did, MAX_BALANCE_RETRIES
+            ))));
+        }
+        debug!(
+            "mutate_balance: concurrent update detected for {}:{}, retry {}/{}",
+            currency_id, member_did, attempt + 1, MAX_BALANCE_RETRIES
+        );
     }
-    // Reached max depth — return whatever we have at the current hash
-    get(current_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
-        "Update chain exceeded maximum depth".into()
+
+    // Unreachable, but satisfies the compiler
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "Balance update failed: retry loop exited unexpectedly".into()
     )))
 }
+

@@ -443,21 +443,25 @@ fn get_or_create_hearth_balance(
         LinkQuery::try_new(anchor_hash(&anchor_key)?, LinkTypes::HearthToBalances)?,
         GetStrategy::default(),
     )?;
-    if let Some(link) = links.first() {
-        if let Some(action_hash) = link.target.clone().into_action_hash() {
-            let record = follow_update_chain(action_hash)?;
-            let bal = record
-                .entry()
-                .to_app_option::<HearthTendBalance>()
-                .map_err(|e| {
-                    wasm_error!(WasmErrorInner::Guest(format!(
-                        "HearthTendBalance deserialization error: {:?}",
-                        e
-                    )))
-                })?;
-            if let Some(bal) = bal {
-                return Ok(bal);
-            }
+    // Pick the link with the lowest target ActionHash (deterministic winner)
+    // to handle orphaned links from past race conditions (RC-14).
+    if let Some(action_hash) = links
+        .iter()
+        .filter_map(|l| l.target.clone().into_action_hash())
+        .min()
+    {
+        let record = follow_update_chain(action_hash)?;
+        let bal = record
+            .entry()
+            .to_app_option::<HearthTendBalance>()
+            .map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!(
+                    "HearthTendBalance deserialization error: {:?}",
+                    e
+                )))
+            })?;
+        if let Some(bal) = bal {
+            return Ok(bal);
         }
     }
     // Create new zero balance
@@ -472,18 +476,51 @@ fn get_or_create_hearth_balance(
         last_activity: now,
     };
     let hash = create_entry(&EntryTypes::HearthTendBalance(bal.clone()))?;
+    let anchor = anchor_hash(&anchor_key)?;
     create_link(
-        anchor_hash(&anchor_key)?,
+        anchor.clone(),
         hash.clone(),
         LinkTypes::HearthToBalances,
         (),
     )?;
     create_link(
         anchor_hash(&format!("my-hearths:{}", member_did))?,
-        hash,
+        hash.clone(),
         LinkTypes::MemberToHearthBalance,
         (),
     )?;
+
+    // RC-14: Race condition guard — re-read links to detect concurrent creators.
+    let recheck_links = get_links(
+        LinkQuery::try_new(anchor, LinkTypes::HearthToBalances)?,
+        GetStrategy::default(),
+    )?;
+    if recheck_links.len() > 1 {
+        if let Some(winner_hash) = recheck_links
+            .iter()
+            .filter_map(|l| l.target.clone().into_action_hash())
+            .min()
+        {
+            if winner_hash != hash {
+                // We lost the race — return the winner's entry instead
+                let record = follow_update_chain(winner_hash)?;
+                let winner_bal = record
+                    .entry()
+                    .to_app_option::<HearthTendBalance>()
+                    .map_err(|e| {
+                        wasm_error!(WasmErrorInner::Guest(format!(
+                            "HearthTendBalance deserialization error: {:?}",
+                            e
+                        )))
+                    })?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest(
+                        "Winner hearth balance entry missing".into()
+                    )))?;
+                return Ok(winner_bal);
+            }
+        }
+    }
+
     Ok(bal)
 }
 
@@ -545,34 +582,70 @@ fn update_hearth_balance(
         LinkQuery::try_new(anchor_hash(&anchor_key)?, LinkTypes::HearthToBalances)?,
         GetStrategy::default(),
     )?;
-    if let Some(link) = links.first() {
-        if let Some(link_hash) = link.target.clone().into_action_hash() {
-            let record = follow_update_chain(link_hash)?;
-            let mut bal = record
-                .entry()
-                .to_app_option::<HearthTendBalance>()
-                .map_err(|e| {
-                    wasm_error!(WasmErrorInner::Guest(format!(
-                        "HearthTendBalance deserialization error: {:?}",
-                        e
-                    )))
-                })?
-                .ok_or(wasm_error!(WasmErrorInner::Guest(
-                    "HearthTendBalance entry missing".into()
-                )))?;
-            let now = sys_time()?;
-            if is_provider {
-                bal.balance += hours.round() as i32;
-                bal.total_provided += hours;
-            } else {
-                bal.balance -= hours.round() as i32;
-                bal.total_received += hours;
-            }
-            bal.exchange_count += 1;
-            bal.last_activity = now;
-            update_entry(record.action_address().clone(), &bal)?;
+
+    // Pick the link with the lowest target ActionHash (deterministic winner)
+    // to handle orphaned links from past race conditions (RC-14).
+    let Some(original_hash) = links
+        .iter()
+        .filter_map(|l| l.target.clone().into_action_hash())
+        .min()
+    else {
+        return Ok(());
+    };
+
+    for attempt in 0..MAX_BALANCE_RETRIES {
+        let record = follow_update_chain(original_hash.clone())?;
+        let mut bal = record
+            .entry()
+            .to_app_option::<HearthTendBalance>()
+            .map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!(
+                    "HearthTendBalance deserialization error: {:?}",
+                    e
+                )))
+            })?
+            .ok_or(wasm_error!(WasmErrorInner::Guest(
+                "HearthTendBalance entry missing".into()
+            )))?;
+
+        let now = sys_time()?;
+        if is_provider {
+            bal.balance += hours.round() as i32;
+            bal.total_provided += hours;
+        } else {
+            bal.balance -= hours.round() as i32;
+            bal.total_received += hours;
         }
+        bal.exchange_count += 1;
+        bal.last_activity = now;
+
+        let expected_balance = bal.balance;
+        let expected_count = bal.exchange_count;
+        update_entry(record.action_address().clone(), &bal)?;
+
+        // Verify our update won: re-read from the original link target
+        let verify_record = follow_update_chain(original_hash.clone())?;
+        if let Ok(Some(actual)) = verify_record.entry().to_app_option::<HearthTendBalance>() {
+            if actual.balance == expected_balance
+                && actual.exchange_count == expected_count
+            {
+                return Ok(());
+            }
+        }
+
+        // Concurrent update detected — retry unless exhausted
+        if attempt == MAX_BALANCE_RETRIES - 1 {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Hearth balance update for {}:{} failed after {} retries due to concurrent modifications",
+                hearth_did, member_did, MAX_BALANCE_RETRIES
+            ))));
+        }
+        debug!(
+            "update_hearth_balance: concurrent update detected for {}:{}, retry {}/{}",
+            hearth_did, member_did, attempt + 1, MAX_BALANCE_RETRIES
+        );
     }
+
     Ok(())
 }
 
@@ -1608,12 +1681,42 @@ fn get_or_create_balance(member_did: String, dao_did: String) -> ExternResult<Ba
 
     let action_hash = create_entry(&EntryTypes::TendBalance(balance.clone()))?;
 
-    create_link(
-        anchor_hash(&format!("balance:{}:{}", dao_did, member_did))?,
-        action_hash,
-        LinkTypes::MemberToBalance,
-        (),
+    let anchor = anchor_hash(&format!("balance:{}:{}", dao_did, member_did))?;
+    create_link(anchor.clone(), action_hash.clone(), LinkTypes::MemberToBalance, ())?;
+
+    // RC-13: Race condition guard — re-read links to detect concurrent creators.
+    // If multiple links exist, deterministically pick the one with the lowest
+    // target ActionHash. If we're not the winner, return the winner's entry.
+    let recheck_links = get_links(
+        LinkQuery::try_new(anchor, LinkTypes::MemberToBalance)?,
+        GetStrategy::default(),
     )?;
+    if recheck_links.len() > 1 {
+        if let Some(winner_hash) = recheck_links
+            .iter()
+            .filter_map(|l| l.target.clone().into_action_hash())
+            .min()
+        {
+            if winner_hash != action_hash {
+                // We lost the race — return the winner's entry instead
+                let record = follow_update_chain(winner_hash)?;
+                let winner_bal = record
+                    .entry()
+                    .to_app_option::<TendBalance>()
+                    .map_err(|e| {
+                        wasm_error!(WasmErrorInner::Guest(format!(
+                            "TendBalance deserialization error: {:?}",
+                            e
+                        )))
+                    })?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest(
+                        "Winner balance entry missing".into()
+                    )))?;
+                let limit = get_effective_limit_for_member(&member_did)?;
+                return Ok(balance_to_info(&winner_bal, limit));
+            }
+        }
+    }
 
     let limit = get_effective_limit_for_member(&member_did)?;
     Ok(balance_to_info(&balance, limit))
@@ -2036,12 +2139,13 @@ fn find_balance(member_did: &str, dao_did: &str) -> ExternResult<Option<TendBala
         GetStrategy::default(),
     )?;
 
-    if let Some(link) = links.first() {
-        let action_hash = link.target.clone().into_action_hash().ok_or_else(|| {
-            wasm_error!(WasmErrorInner::Guest(
-                "Invalid link target: expected ActionHash".into()
-            ))
-        })?;
+    // Pick the link with the lowest target ActionHash (deterministic winner)
+    // to handle orphaned links from past race conditions (RC-13).
+    if let Some(action_hash) = links
+        .iter()
+        .filter_map(|l| l.target.clone().into_action_hash())
+        .min()
+    {
         let record = follow_update_chain(action_hash)?;
         return record
             .entry()
@@ -2057,26 +2161,36 @@ fn find_balance(member_did: &str, dao_did: &str) -> ExternResult<Option<TendBala
     Ok(None)
 }
 
+/// Maximum retries for optimistic-locking balance mutations.
+const MAX_BALANCE_RETRIES: usize = 3;
+
 fn update_balance_after_exchange(
     member_did: &str,
     dao_did: &str,
     hours: f32,
     is_provider: bool,
 ) -> ExternResult<()> {
+    let anchor_key = format!("balance:{}:{}", dao_did, member_did);
     let links = get_links(
         LinkQuery::try_new(
-            anchor_hash(&format!("balance:{}:{}", dao_did, member_did))?,
+            anchor_hash(&anchor_key)?,
             LinkTypes::MemberToBalance,
         )?,
         GetStrategy::default(),
     )?;
 
-    if let Some(link) = links.first() {
-        let link_hash =
-            link.target.clone().into_action_hash().ok_or_else(|| {
-                wasm_error!(WasmErrorInner::Guest("Invalid link target".to_string()))
-            })?;
-        let record = follow_update_chain(link_hash)?;
+    // Pick the link with the lowest target ActionHash (deterministic winner)
+    // to handle orphaned links from past race conditions (RC-13).
+    let Some(original_hash) = links
+        .iter()
+        .filter_map(|l| l.target.clone().into_action_hash())
+        .min()
+    else {
+        return Ok(());
+    };
+
+    for attempt in 0..MAX_BALANCE_RETRIES {
+        let record = follow_update_chain(original_hash.clone())?;
         if let Some(mut balance) = record
             .entry()
             .to_app_option::<TendBalance>()
@@ -2099,7 +2213,33 @@ fn update_balance_after_exchange(
             balance.exchange_count += 1;
             balance.last_activity = now;
 
+            let expected_balance = balance.balance;
+            let expected_count = balance.exchange_count;
             update_entry(record.action_address().clone(), &balance)?;
+
+            // Verify our update won: re-read from the original link target
+            let verify_record = follow_update_chain(original_hash.clone())?;
+            if let Ok(Some(actual)) = verify_record.entry().to_app_option::<TendBalance>() {
+                if actual.balance == expected_balance
+                    && actual.exchange_count == expected_count
+                {
+                    return Ok(());
+                }
+            }
+
+            // Concurrent update detected — retry unless exhausted
+            if attempt == MAX_BALANCE_RETRIES - 1 {
+                return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                    "Balance update for {}:{} failed after {} retries due to concurrent modifications",
+                    dao_did, member_did, MAX_BALANCE_RETRIES
+                ))));
+            }
+            debug!(
+                "update_balance_after_exchange: concurrent update detected for {}:{}, retry {}/{}",
+                dao_did, member_did, attempt + 1, MAX_BALANCE_RETRIES
+            );
+        } else {
+            return Ok(());
         }
     }
 

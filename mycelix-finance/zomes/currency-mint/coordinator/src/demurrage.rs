@@ -1,6 +1,8 @@
 //! Demurrage application and compost redistribution.
 
+use currency_mint_integrity::*;
 use hdk::prelude::*;
+use mycelix_finance_shared::anchor_hash;
 use mycelix_finance_types::{compute_minted_demurrage, CurrencyStatus};
 
 use crate::helpers::*;
@@ -112,6 +114,11 @@ pub fn apply_demurrage_all(currency_id: String) -> ExternResult<Vec<DemurrageRes
 /// Splits the compost balance equally among all members with a balance entry
 /// (excluding the compost pseudo-member). Remainder stays in compost.
 /// Zero-sum is preserved: compost decreases by exactly what members gain.
+///
+/// RC-11 fix: Uses create-then-verify idempotency guard to prevent concurrent
+/// calls from redistributing compost multiple times (creating money from nothing).
+/// The guard uses `AnchorLinks` because no dedicated link type exists for
+/// redistribution operations.
 #[hdk_extern]
 pub fn redistribute_compost(currency_id: String) -> ExternResult<RedistributeCompostResult> {
     let (_, def) = get_currency_inner(&currency_id)?;
@@ -139,6 +146,73 @@ pub fn redistribute_compost(currency_id: String) -> ExternResult<RedistributeCom
             }
         }
     }
+
+    // ---- RC-11 fix: Create-then-verify idempotency guard ----
+    // Create a link on the redistribution anchor BEFORE doing any balance
+    // mutations. Then re-read: if multiple links exist, only the winner
+    // (lowest ActionHash) proceeds. Losers delete their link and return 0.
+    // This uses AnchorLinks because no dedicated link type exists for
+    // redistribution guards.
+    let redist_anchor = format!("compost-redistribute:{}", currency_id);
+    let redist_anchor_hash = anchor_hash(&redist_anchor)?;
+
+    // Quick pre-check: if a redistribution guard already exists, return
+    // idempotently (redistribution already happened or is in progress).
+    let pre_existing = get_links(
+        LinkQuery::try_new(redist_anchor_hash.clone(), LinkTypes::AnchorLinks)?,
+        GetStrategy::default(),
+    )?;
+    if !pre_existing.is_empty() {
+        return Ok(RedistributeCompostResult {
+            currency_id,
+            total_redistributed: 0,
+            recipients: 0,
+            per_member_amount: 0,
+            remainder_kept: 0,
+        });
+    }
+
+    // Create our idempotency guard link (target is our agent key as a
+    // unique marker — the link's existence is what matters, not the target).
+    let our_link_hash = create_link(
+        redist_anchor_hash.clone(),
+        AnyLinkableHash::from(agent_info()?.agent_initial_pubkey),
+        LinkTypes::AnchorLinks,
+        (),
+    )?;
+
+    // Re-read all links on this anchor to detect concurrent callers.
+    let all_redist_links = get_links(
+        LinkQuery::try_new(redist_anchor_hash, LinkTypes::AnchorLinks)?,
+        GetStrategy::default(),
+    )?;
+
+    if all_redist_links.len() > 1 {
+        // Race detected — determine winner by lowest ActionHash (deterministic).
+        let winner = all_redist_links
+            .iter()
+            .min_by_key(|l| l.create_link_hash.clone())
+            .expect("at least one link exists");
+
+        if winner.create_link_hash != our_link_hash {
+            // We lost the race — clean up our link and return 0 redistributed.
+            delete_link(our_link_hash, GetOptions::default())?;
+            return Ok(RedistributeCompostResult {
+                currency_id,
+                total_redistributed: 0,
+                recipients: 0,
+                per_member_amount: 0,
+                remainder_kept: 0,
+            });
+        }
+        // We won — clean up loser links for tidiness.
+        for link in &all_redist_links {
+            if link.create_link_hash != our_link_hash {
+                let _ = delete_link(link.create_link_hash.clone(), GetOptions::default());
+            }
+        }
+    }
+    // ---- End RC-11 idempotency guard ----
 
     let compost_did = format!("did:mycelix:__compost__:{}", currency_id);
     let compost_bal = get_or_create_minted_balance(compost_did.clone(), currency_id.clone())?;

@@ -5,6 +5,9 @@ use treasury_integrity::*;
 
 const DEFAULT_LIST_LIMIT: usize = 100;
 
+/// Maximum retries for optimistic-locking read-modify-write loops (RC-6 through RC-8).
+const MAX_RETRIES: u8 = 3;
+
 /// Generic list input with an ID and optional limit for pagination.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ListInput {
@@ -116,42 +119,67 @@ pub struct ContributeInput {
 }
 
 fn credit_treasury(treasury_id: &str, amount: u64) -> ExternResult<()> {
-    let (record, treasury) = get_treasury_record(treasury_id)?;
-    let now = sys_time()?;
-    let new_balance = treasury
-        .balance
-        .checked_add(amount)
-        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Treasury balance overflow".into())))?;
-    let updated = Treasury {
-        balance: new_balance,
-        last_updated: now,
-        ..treasury
-    };
-    update_entry(
-        record.action_address().clone(),
-        &EntryTypes::Treasury(updated),
-    )?;
-    Ok(())
+    for attempt in 0..=MAX_RETRIES {
+        let (record, treasury) = get_treasury_record(treasury_id)?;
+        let now = sys_time()?;
+        let new_balance = treasury.balance.checked_add(amount).ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest("Treasury balance overflow".into()))
+        })?;
+        let updated = Treasury {
+            balance: new_balance,
+            last_updated: now,
+            ..treasury
+        };
+        update_entry(
+            record.action_address().clone(),
+            &EntryTypes::Treasury(updated),
+        )?;
+
+        // Verify: re-read and check if our update won
+        let (_, verify) = get_treasury_record(treasury_id)?;
+        if verify.balance == new_balance {
+            return Ok(());
+        }
+        if attempt == MAX_RETRIES {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "credit_treasury: concurrent update conflict after retries".into()
+            )));
+        }
+    }
+    unreachable!()
 }
 
 fn debit_treasury(treasury_id: &str, amount: u64) -> ExternResult<()> {
-    let (record, treasury) = get_treasury_record(treasury_id)?;
-    let now = sys_time()?;
-    let new_balance = treasury.balance.checked_sub(amount).ok_or_else(|| {
-        wasm_error!(WasmErrorInner::Guest(
-            "Insufficient treasury balance".into()
-        ))
-    })?;
-    let updated = Treasury {
-        balance: new_balance,
-        last_updated: now,
-        ..treasury
-    };
-    update_entry(
-        record.action_address().clone(),
-        &EntryTypes::Treasury(updated),
-    )?;
-    Ok(())
+    for attempt in 0..=MAX_RETRIES {
+        let (record, treasury) = get_treasury_record(treasury_id)?;
+        let now = sys_time()?;
+        let new_balance = treasury.balance.checked_sub(amount).ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Insufficient treasury balance".into()
+            ))
+        })?;
+        let updated = Treasury {
+            balance: new_balance,
+            last_updated: now,
+            ..treasury
+        };
+        update_entry(
+            record.action_address().clone(),
+            &EntryTypes::Treasury(updated),
+        )?;
+
+        // Verify: re-read and check if our update won
+        let (_, verify) = get_treasury_record(treasury_id)?;
+        if verify.balance == new_balance {
+            return Ok(());
+        }
+        if attempt == MAX_RETRIES {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "debit_treasury: concurrent update conflict after retries".into()
+            )));
+        }
+    }
+    unreachable!()
 }
 
 /// Internal helper: fetch a treasury Record + deserialized entry by ID via link index.
@@ -809,29 +837,41 @@ pub struct JoinPoolInput {
 /// Contribute to a savings pool
 #[hdk_extern]
 pub fn contribute_to_pool(input: PoolContributionInput) -> ExternResult<Record> {
-    let (record, pool) = get_savings_pool_record(&input.pool_id)?;
+    for attempt in 0..=MAX_RETRIES {
+        let (record, pool) = get_savings_pool_record(&input.pool_id)?;
 
-    if !pool.members.contains(&input.contributor_did) {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            "Only members can contribute".into()
-        )));
+        if !pool.members.contains(&input.contributor_did) {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Only members can contribute".into()
+            )));
+        }
+
+        let new_amount = pool.current_amount.checked_add(input.amount).ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest("Pool balance overflow".into()))
+        })?;
+        let updated = SavingsPool {
+            current_amount: new_amount,
+            ..pool
+        };
+
+        let action_hash = update_entry(
+            record.action_address().clone(),
+            &EntryTypes::SavingsPool(updated),
+        )?;
+
+        // Verify: re-read and check if our update won
+        let (_, verify) = get_savings_pool_record(&input.pool_id)?;
+        if verify.current_amount == new_amount {
+            return get(action_hash, GetOptions::default())?
+                .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+        }
+        if attempt == MAX_RETRIES {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "contribute_to_pool: concurrent update conflict after retries".into()
+            )));
+        }
     }
-
-    let new_amount = pool
-        .current_amount
-        .checked_add(input.amount)
-        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Pool balance overflow".into())))?;
-    let updated = SavingsPool {
-        current_amount: new_amount,
-        ..pool
-    };
-
-    let action_hash = update_entry(
-        record.action_address().clone(),
-        &EntryTypes::SavingsPool(updated),
-    )?;
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+    unreachable!()
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -1037,37 +1077,47 @@ pub struct CreateCommonsPoolInput {
 #[hdk_extern]
 pub fn contribute_to_commons(input: ContributeToCommonsInput) -> ExternResult<Record> {
     verify_caller_is_did(&input.contributor_did)?;
-    let (record, pool) = get_commons_pool_record(&input.commons_pool_id)?;
-    let now = sys_time()?;
 
-    // Split: 25% inalienable reserve, 75% available (integer math)
-    let to_reserve = input.amount / 4;
-    let to_available = input.amount - to_reserve;
+    for attempt in 0..=MAX_RETRIES {
+        let (record, pool) = get_commons_pool_record(&input.commons_pool_id)?;
+        let now = sys_time()?;
 
-    let new_reserve = pool
-        .inalienable_reserve
-        .checked_add(to_reserve)
-        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Reserve overflow".into())))?;
-    let new_available = pool
-        .available_balance
-        .checked_add(to_available)
-        .ok_or_else(|| {
+        // Split: 25% inalienable reserve, 75% available (integer math)
+        let to_reserve = input.amount / 4;
+        let to_available = input.amount - to_reserve;
+
+        let new_reserve = pool.inalienable_reserve.checked_add(to_reserve).ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest("Reserve overflow".into()))
+        })?;
+        let new_available = pool.available_balance.checked_add(to_available).ok_or_else(|| {
             wasm_error!(WasmErrorInner::Guest("Available balance overflow".into()))
         })?;
 
-    let updated = CommonsPool {
-        inalienable_reserve: new_reserve,
-        available_balance: new_available,
-        last_activity: now,
-        ..pool
-    };
+        let updated = CommonsPool {
+            inalienable_reserve: new_reserve,
+            available_balance: new_available,
+            last_activity: now,
+            ..pool
+        };
 
-    let action_hash = update_entry(
-        record.action_address().clone(),
-        &EntryTypes::CommonsPool(updated),
-    )?;
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+        let action_hash = update_entry(
+            record.action_address().clone(),
+            &EntryTypes::CommonsPool(updated),
+        )?;
+
+        // Verify: re-read and check if our update won
+        let (_, verify) = get_commons_pool_record(&input.commons_pool_id)?;
+        if verify.inalienable_reserve == new_reserve && verify.available_balance == new_available {
+            return get(action_hash, GetOptions::default())?
+                .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+        }
+        if attempt == MAX_RETRIES {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "contribute_to_commons: concurrent update conflict after retries".into()
+            )));
+        }
+    }
+    unreachable!()
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -1080,16 +1130,14 @@ pub struct ContributeToCommonsInput {
 /// Receive demurrage redistribution (compost) into the commons pool available balance.
 #[hdk_extern]
 pub fn receive_compost(input: ReceiveCompostInput) -> ExternResult<Record> {
-    let (record, pool) = get_commons_pool_record(&input.commons_pool_id)?;
-    let now = sys_time()?;
-
-    // Record the compost receival
+    // Record the compost receival once (idempotent side-effect outside retry loop)
+    let now_receipt = sys_time()?;
     let receival = CompostReceival {
-        id: format!("compost:{}:{}", input.commons_pool_id, now.as_micros()),
+        id: format!("compost:{}:{}", input.commons_pool_id, now_receipt.as_micros()),
         commons_pool_id: input.commons_pool_id.clone(),
         amount: input.amount,
         source_member_did: input.source_member_did.clone(),
-        timestamp: now,
+        timestamp: now_receipt,
     };
     let receival_hash = create_entry(&EntryTypes::CompostReceival(receival))?;
     create_link(
@@ -1099,25 +1147,38 @@ pub fn receive_compost(input: ReceiveCompostInput) -> ExternResult<Record> {
         (),
     )?;
 
-    // Add to available balance (compost goes to available, not reserve)
-    let new_available = pool
-        .available_balance
-        .checked_add(input.amount)
-        .ok_or_else(|| {
+    for attempt in 0..=MAX_RETRIES {
+        let (record, pool) = get_commons_pool_record(&input.commons_pool_id)?;
+        let now = sys_time()?;
+
+        // Add to available balance (compost goes to available, not reserve)
+        let new_available = pool.available_balance.checked_add(input.amount).ok_or_else(|| {
             wasm_error!(WasmErrorInner::Guest("Available balance overflow".into()))
         })?;
-    let updated = CommonsPool {
-        available_balance: new_available,
-        last_activity: now,
-        ..pool
-    };
+        let updated = CommonsPool {
+            available_balance: new_available,
+            last_activity: now,
+            ..pool
+        };
 
-    let action_hash = update_entry(
-        record.action_address().clone(),
-        &EntryTypes::CommonsPool(updated),
-    )?;
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+        let action_hash = update_entry(
+            record.action_address().clone(),
+            &EntryTypes::CommonsPool(updated),
+        )?;
+
+        // Verify: re-read and check if our update won
+        let (_, verify) = get_commons_pool_record(&input.commons_pool_id)?;
+        if verify.available_balance == new_available {
+            return get(action_hash, GetOptions::default())?
+                .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+        }
+        if attempt == MAX_RETRIES {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "receive_compost: concurrent update conflict after retries".into()
+            )));
+        }
+    }
+    unreachable!()
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -1132,44 +1193,57 @@ pub struct ReceiveCompostInput {
 /// reserve ratio remains at or above 25% after the allocation.
 #[hdk_extern]
 pub fn request_allocation(input: RequestCommonsAllocationInput) -> ExternResult<Record> {
-    let (record, pool) = get_commons_pool_record(&input.commons_pool_id)?;
+    for attempt in 0..=MAX_RETRIES {
+        let (record, pool) = get_commons_pool_record(&input.commons_pool_id)?;
 
-    // Validate: allocation comes only from available balance
-    if input.amount > pool.available_balance {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            "Allocation exceeds available balance (inalienable reserve is untouchable)"
-                .into()
-        )));
-    }
-
-    let new_available = pool.available_balance - input.amount;
-    let new_total = pool.inalienable_reserve + new_available;
-
-    // Validate reserve ratio stays >= 25% (or total is 0)
-    if new_total > 0 {
-        let reserve_pct = pool.inalienable_reserve as u128 * 100;
-        let threshold = new_total as u128 * 25;
-        if reserve_pct < threshold {
+        // Validate: allocation comes only from available balance
+        if input.amount > pool.available_balance {
             return Err(wasm_error!(WasmErrorInner::Guest(
-                "Allocation would drop reserve ratio below 25% constitutional minimum"
+                "Allocation exceeds available balance (inalienable reserve is untouchable)"
                     .into()
             )));
         }
+
+        let new_available = pool.available_balance - input.amount;
+        let new_total = pool.inalienable_reserve + new_available;
+
+        // Validate reserve ratio stays >= 25% (or total is 0)
+        if new_total > 0 {
+            let reserve_pct = pool.inalienable_reserve as u128 * 100;
+            let threshold = new_total as u128 * 25;
+            if reserve_pct < threshold {
+                return Err(wasm_error!(WasmErrorInner::Guest(
+                    "Allocation would drop reserve ratio below 25% constitutional minimum"
+                        .into()
+                )));
+            }
+        }
+
+        let now = sys_time()?;
+        let updated = CommonsPool {
+            available_balance: new_available,
+            last_activity: now,
+            ..pool
+        };
+
+        let action_hash = update_entry(
+            record.action_address().clone(),
+            &EntryTypes::CommonsPool(updated),
+        )?;
+
+        // Verify: re-read and check if our update won
+        let (_, verify) = get_commons_pool_record(&input.commons_pool_id)?;
+        if verify.available_balance == new_available {
+            return get(action_hash, GetOptions::default())?
+                .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+        }
+        if attempt == MAX_RETRIES {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "request_allocation: concurrent update conflict after retries".into()
+            )));
+        }
     }
-
-    let now = sys_time()?;
-    let updated = CommonsPool {
-        available_balance: new_available,
-        last_activity: now,
-        ..pool
-    };
-
-    let action_hash = update_entry(
-        record.action_address().clone(),
-        &EntryTypes::CommonsPool(updated),
-    )?;
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+    unreachable!()
 }
 
 #[derive(Serialize, Deserialize, Debug)]
