@@ -31,6 +31,7 @@ pub use mycelix_finance_types;
 pub use anchors::*;
 pub use batch::*;
 pub use economics::*;
+pub use governance::*;
 pub use identity::*;
 pub use types::*;
 pub use update_chain::*;
@@ -514,6 +515,64 @@ pub mod types {
 /// This module re-exports them for backward compatibility.
 pub mod economics {
     pub use mycelix_finance_types::*;
+}
+
+/// Governance authorization helpers
+///
+/// Shared logic for checking if the calling agent is an authorized governance
+/// agent. Each coordinator zome fetches its own `LinkTypes::GovernanceAgents`
+/// links and passes them to `verify_governance_or_bootstrap_from_links()`.
+///
+/// This eliminates duplicated authorization logic across recognition, staking,
+/// and tend coordinators while keeping link type resolution local to each zome.
+pub mod governance {
+    use super::*;
+
+    /// Standard anchor name for governance agent registration links.
+    /// All zomes MUST use this same anchor string to share a single governance
+    /// agent registry within the DNA.
+    pub const GOVERNANCE_AGENTS_ANCHOR: &str = "governance_agents";
+
+    /// Check if the calling agent is in the provided governance agent links.
+    ///
+    /// **Bootstrap rule**: if the links list is empty (no governance agents
+    /// registered yet), any agent is allowed. This enables initial setup.
+    ///
+    /// # Usage
+    /// ```rust,ignore
+    /// use mycelix_finance_shared::governance::*;
+    ///
+    /// fn verify_governance_or_bootstrap() -> ExternResult<()> {
+    ///     let gov_links = get_links(
+    ///         LinkQuery::try_new(
+    ///             anchor_hash(GOVERNANCE_AGENTS_ANCHOR)?,
+    ///             LinkTypes::GovernanceAgents,
+    ///         )?,
+    ///         GetStrategy::default(),
+    ///     )?;
+    ///     verify_governance_or_bootstrap_from_links(gov_links)
+    /// }
+    /// ```
+    pub fn verify_governance_or_bootstrap_from_links(
+        gov_links: Vec<Link>,
+    ) -> ExternResult<()> {
+        if gov_links.is_empty() {
+            return Ok(());
+        }
+
+        let caller = agent_info()?.agent_initial_pubkey;
+        for link in gov_links {
+            if let Ok(agent) = AgentPubKey::try_from(link.target) {
+                if agent == caller {
+                    return Ok(());
+                }
+            }
+        }
+
+        Err(wasm_error!(WasmErrorInner::Guest(
+            "Caller is not an authorized governance agent".into()
+        )))
+    }
 }
 
 /// Agent identity helpers

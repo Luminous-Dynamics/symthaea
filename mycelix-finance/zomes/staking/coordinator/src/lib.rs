@@ -7,18 +7,16 @@
 //! - Reward distribution with Merkle proofs
 
 use hdk::prelude::*;
-use mycelix_finance_shared::{anchor_hash, follow_update_chain, verify_caller_is_did};
+use mycelix_finance_shared::{
+    anchor_hash, follow_update_chain, verify_caller_is_did,
+    verify_governance_or_bootstrap_from_links, GOVERNANCE_AGENTS_ANCHOR,
+};
 use staking_integrity::*;
 
 /// Anchor for active stakes
 const ACTIVE_STAKES_ANCHOR: &str = "active_stakes";
 
-const GOVERNANCE_AGENTS_ANCHOR: &str = "governance_agents";
-
-/// Check if the calling agent is a registered governance agent.
-/// If no governance agents are registered yet (bootstrap), allow any agent.
 fn verify_governance_or_bootstrap() -> ExternResult<()> {
-    let caller = agent_info()?.agent_initial_pubkey;
     let gov_links = get_links(
         LinkQuery::try_new(
             anchor_hash(GOVERNANCE_AGENTS_ANCHOR)?,
@@ -26,24 +24,7 @@ fn verify_governance_or_bootstrap() -> ExternResult<()> {
         )?,
         GetStrategy::default(),
     )?;
-
-    // Bootstrap: if no governance agents registered yet, allow anyone
-    if gov_links.is_empty() {
-        return Ok(());
-    }
-
-    // Check if caller is in the governance list
-    for link in gov_links {
-        if let Ok(agent) = AgentPubKey::try_from(link.target) {
-            if agent == caller {
-                return Ok(());
-            }
-        }
-    }
-
-    Err(wasm_error!(WasmErrorInner::Guest(
-        "Caller is not an authorized governance agent".into()
-    )))
+    verify_governance_or_bootstrap_from_links(gov_links)
 }
 
 /// Register a governance agent. Only existing governance agents can register
