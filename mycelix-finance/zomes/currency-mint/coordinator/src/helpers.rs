@@ -120,6 +120,10 @@ pub(crate) fn get_or_create_minted_balance(
 
 /// Fetch community member count via cross-zome call to governance/identity.
 /// Falls back to 0 (permissive) if the cross-zome call is unreachable.
+///
+/// SECURITY NOTE: Returning 0 is PERMISSIVE — it bypasses the governance proposal
+/// requirement for communities >10 members. This is deliberate for bootstrap/standalone
+/// mode. The integrity zome still enforces zero-sum and constitutional limits.
 pub(crate) fn fetch_community_size(dao_did: &str) -> u32 {
     match call(
         CallTargetCell::Local,
@@ -129,7 +133,14 @@ pub(crate) fn fetch_community_size(dao_did: &str) -> u32 {
         dao_did.to_string(),
     ) {
         Ok(ZomeCallResponse::Ok(result)) => result.decode::<u32>().unwrap_or(0),
-        _ => 0,
+        Ok(other) => {
+            debug!("fetch_community_size: finance_bridge returned {:?} for {}, defaulting to 0 (permissive)", other, dao_did);
+            0
+        }
+        Err(e) => {
+            debug!("fetch_community_size: finance_bridge unreachable for {}: {:?}, defaulting to 0 (permissive)", dao_did, e);
+            0
+        }
     }
 }
 

@@ -296,10 +296,20 @@ fn fetch_verified_mycel_score(staker_did: &str) -> ExternResult<f32> {
             }
             match result.decode::<MycelState>() {
                 Ok(state) => Ok((state.mycel_score as f32).clamp(0.0, 1.0)),
-                Err(_) => Ok(0.0),
+                Err(e) => {
+                    debug!("fetch_verified_mycel_score: decode error for {}: {:?}, defaulting to 0.0", staker_did, e);
+                    Ok(0.0)
+                }
             }
         }
-        _ => Ok(0.0), // Recognition unreachable → minimum weight
+        Ok(other) => {
+            debug!("fetch_verified_mycel_score: recognition returned {:?} for {}, defaulting to 0.0", other, staker_did);
+            Ok(0.0)
+        }
+        Err(e) => {
+            debug!("fetch_verified_mycel_score: recognition unreachable for {}: {:?}, defaulting to 0.0", staker_did, e);
+            Ok(0.0) // Recognition unreachable → minimum weight
+        }
     }
 }
 

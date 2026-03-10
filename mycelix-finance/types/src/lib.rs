@@ -941,4 +941,142 @@ mod tests {
         assert!(d > 0);
         assert!(d < i32::MAX);
     }
+
+    // =========================================================================
+    // SAP demurrage (compute_demurrage_deduction) edge cases
+    // =========================================================================
+
+    #[test]
+    fn test_sap_demurrage_nan_rate() {
+        // NaN rate: decay = 1 - exp(NaN) = NaN, deduction = NaN → clamped to 0
+        let d = compute_demurrage_deduction(10_000_000_000, 1_000_000_000, f64::NAN, 31_536_000);
+        assert_eq!(d, 0);
+    }
+
+    #[test]
+    fn test_sap_demurrage_infinity_rate() {
+        let d =
+            compute_demurrage_deduction(10_000_000_000, 1_000_000_000, f64::INFINITY, 31_536_000);
+        // exp(-Inf) = 0, decay = 1.0, deduction = eligible (full decay)
+        assert_eq!(d, 9_000_000_000);
+    }
+
+    #[test]
+    fn test_sap_demurrage_neg_infinity_rate() {
+        let d = compute_demurrage_deduction(
+            10_000_000_000,
+            1_000_000_000,
+            f64::NEG_INFINITY,
+            31_536_000,
+        );
+        // exp(+Inf) = Inf, decay = 1 - Inf = -Inf, deduction < 0 → clamped to 0
+        assert_eq!(d, 0);
+    }
+
+    #[test]
+    fn test_sap_demurrage_negative_rate() {
+        // Negative rate: exp(+years) > 1, decay < 0 → deduction < 0 → clamped to 0
+        let d = compute_demurrage_deduction(10_000_000_000, 1_000_000_000, -0.05, 31_536_000);
+        assert_eq!(d, 0);
+    }
+
+    #[test]
+    fn test_sap_demurrage_max_u64_balance() {
+        // Should not panic or overflow
+        let d = compute_demurrage_deduction(u64::MAX, 0, 0.02, 31_536_000);
+        // u64::MAX - 0 = u64::MAX eligible, ~1.98% decay
+        assert!(d > 0);
+        assert!(d < u64::MAX);
+    }
+
+    #[test]
+    fn test_sap_demurrage_exempt_equals_balance() {
+        // Balance == floor → no eligible amount → 0
+        assert_eq!(
+            compute_demurrage_deduction(5_000, 5_000, 0.02, 31_536_000),
+            0
+        );
+    }
+
+    #[test]
+    fn test_sap_demurrage_one_micro_above_floor() {
+        // 1 micro-SAP above floor, 2% for 1 year: deduction = 1 * 0.0198 → floors to 0
+        assert_eq!(
+            compute_demurrage_deduction(1_001, 1_000, 0.02, 31_536_000),
+            0
+        );
+    }
+
+    #[test]
+    fn test_sap_demurrage_multi_year_never_exceeds_eligible() {
+        // After 100 years at 5%, deduction should approach but never exceed eligible
+        let balance = 10_000_000_000u64;
+        let floor = 1_000_000_000u64;
+        let d = compute_demurrage_deduction(balance, floor, 0.05, 100 * 31_536_000);
+        let eligible = balance - floor;
+        assert!(d <= eligible);
+        // Should be very close to eligible (>99.9%)
+        assert!(d as f64 / eligible as f64 > 0.99);
+    }
+
+    #[test]
+    fn test_sap_demurrage_zero_rate() {
+        // Zero rate: exp(0) = 1, decay = 0 → no deduction
+        let d = compute_demurrage_deduction(10_000_000_000, 1_000_000_000, 0.0, 31_536_000);
+        assert_eq!(d, 0);
+    }
+
+    // =========================================================================
+    // Cross-function invariants
+    // =========================================================================
+
+    #[test]
+    fn test_demurrage_monotonicity_in_time() {
+        // Deduction must increase (or stay same) as time increases
+        let mut prev = 0u64;
+        for years in 1..=20 {
+            let d = compute_demurrage_deduction(
+                10_000_000_000,
+                1_000_000_000,
+                0.02,
+                years * 31_536_000,
+            );
+            assert!(d >= prev, "year {}: {} < {}", years, d, prev);
+            prev = d;
+        }
+    }
+
+    #[test]
+    fn test_minted_demurrage_monotonicity_in_time() {
+        let mut prev = 0i32;
+        for years in 1..=20u64 {
+            let d = compute_minted_demurrage(1000, 0.02, years * 31_536_000);
+            assert!(d >= prev, "year {}: {} < {}", years, d, prev);
+            prev = d;
+        }
+    }
+
+    #[test]
+    fn test_demurrage_monotonicity_in_rate() {
+        // Higher rate → more deduction
+        let mut prev = 0u64;
+        for rate_bps in [10, 50, 100, 200, 500] {
+            let rate = rate_bps as f64 / 10_000.0;
+            let d =
+                compute_demurrage_deduction(10_000_000_000, 1_000_000_000, rate, 31_536_000);
+            assert!(d >= prev, "rate {}: {} < {}", rate, d, prev);
+            prev = d;
+        }
+    }
+
+    #[test]
+    fn test_minted_demurrage_monotonicity_in_rate() {
+        let mut prev = 0i32;
+        for rate_bps in [10, 50, 100, 200, 500] {
+            let rate = rate_bps as f64 / 10_000.0;
+            let d = compute_minted_demurrage(10_000, rate, 31_536_000);
+            assert!(d >= prev, "rate {}: {} < {}", rate, d, prev);
+            prev = d;
+        }
+    }
 }

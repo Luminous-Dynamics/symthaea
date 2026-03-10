@@ -557,10 +557,24 @@ fn fetch_mycel_score(member_did: &str) -> f64 {
             }
             match result.decode::<MycelState>() {
                 Ok(state) if state.mycel_score.is_finite() => state.mycel_score,
-                _ => 0.0,
+                Ok(state) => {
+                    debug!("fetch_mycel_score: non-finite MYCEL score {:?} for {}, defaulting to 0.0", state.mycel_score, member_did);
+                    0.0
+                }
+                Err(e) => {
+                    debug!("fetch_mycel_score: decode error for {}: {:?}, defaulting to 0.0", member_did, e);
+                    0.0
+                }
             }
         }
-        _ => 0.0,
+        Ok(other) => {
+            debug!("fetch_mycel_score: recognition zome returned {:?} for {}, defaulting to 0.0", other, member_did);
+            0.0
+        }
+        Err(e) => {
+            debug!("fetch_mycel_score: recognition zome unreachable for {}: {:?}, defaulting to 0.0", member_did, e);
+            0.0
+        }
     }
 }
 
@@ -581,10 +595,20 @@ fn fetch_oracle_vitality() -> u32 {
             }
             match result.decode::<OracleResp>() {
                 Ok(state) => state.vitality,
-                _ => 50,
+                Err(e) => {
+                    debug!("fetch_oracle_vitality: decode error: {:?}, defaulting to 50 (Normal tier)", e);
+                    50
+                }
             }
         }
-        _ => 50,
+        Ok(other) => {
+            debug!("fetch_oracle_vitality: tend zome returned {:?}, defaulting to 50 (Normal tier)", other);
+            50
+        }
+        Err(e) => {
+            debug!("fetch_oracle_vitality: tend zome unreachable: {:?}, defaulting to 50 (Normal tier)", e);
+            50
+        }
     }
 }
 
@@ -608,8 +632,19 @@ pub fn get_community_member_count(dao_did: String) -> ExternResult<u32> {
         dao_did.clone(),
     ) {
         Ok(ZomeCallResponse::Ok(result)) => Ok(result.decode::<u32>().unwrap_or(0)),
-        _ => {
-            // Governance cluster unreachable — return 0 (permissive)
+        Ok(other) => {
+            // SECURITY NOTE: Returning 0 members is PERMISSIVE — it means the governance
+            // proposal requirement (>10 members) will be skipped. This is deliberate:
+            // when the governance cluster is unreachable (bootstrap, standalone, or network
+            // partition), we allow small-community operations to proceed rather than blocking
+            // all currency creation/amendment. The integrity zome still enforces zero-sum
+            // and constitutional limits regardless of governance gate.
+            debug!("get_community_member_count: governance returned {:?} for {}, defaulting to 0 (permissive)", other, dao_did);
+            Ok(0)
+        }
+        Err(e) => {
+            // SECURITY NOTE: Same permissive default as above — see comment.
+            debug!("get_community_member_count: governance unreachable for {}: {:?}, defaulting to 0 (permissive)", dao_did, e);
             Ok(0)
         }
     }
@@ -648,12 +683,24 @@ pub fn query_sap_balance(member_did: String) -> ExternResult<BalanceResponse> {
                 available: true,
             })
         }
-        _ => Ok(BalanceResponse {
-            member_did,
-            currency: "SAP".into(),
-            balance: 0,
-            available: false,
-        }),
+        Ok(other) => {
+            debug!("query_sap_balance: payments zome returned {:?} for {}, reporting unavailable", other, member_did);
+            Ok(BalanceResponse {
+                member_did,
+                currency: "SAP".into(),
+                balance: 0,
+                available: false,
+            })
+        }
+        Err(e) => {
+            debug!("query_sap_balance: payments zome unreachable for {}: {:?}, reporting unavailable", member_did, e);
+            Ok(BalanceResponse {
+                member_did,
+                currency: "SAP".into(),
+                balance: 0,
+                available: false,
+            })
+        }
     }
 }
 
@@ -686,12 +733,24 @@ pub fn query_tend_balance(member_did: String) -> ExternResult<TendBalanceRespons
                 available: true,
             })
         }
-        _ => Ok(TendBalanceResponse {
-            member_did,
-            balance: 0,
-            mycel_score: 0.0,
-            available: false,
-        }),
+        Ok(other) => {
+            debug!("query_tend_balance: tend zome returned {:?} for {}, reporting unavailable", other, member_did);
+            Ok(TendBalanceResponse {
+                member_did,
+                balance: 0,
+                mycel_score: 0.0,
+                available: false,
+            })
+        }
+        Err(e) => {
+            debug!("query_tend_balance: tend zome unreachable for {}: {:?}, reporting unavailable", member_did, e);
+            Ok(TendBalanceResponse {
+                member_did,
+                balance: 0,
+                mycel_score: 0.0,
+                available: false,
+            })
+        }
     }
 }
 

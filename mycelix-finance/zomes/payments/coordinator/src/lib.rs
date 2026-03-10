@@ -297,17 +297,26 @@ pub struct DebitSapInput {
 #[hdk_extern]
 pub fn mint_sap_from_governance(input: MintSapFromGovernanceInput) -> ExternResult<Record> {
     // Verify caller is governance-authorized
-    if let Err(e) = call(
+    match call(
         CallTargetCell::Local,
         ZomeName::from("tend"),
         FunctionName::from("verify_governance_agent"),
         None,
         (),
     ) {
-        return Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "SAP minting requires governance authorization: {:?}",
-            e
-        ))));
+        Ok(ZomeCallResponse::Ok(_)) => {} // Authorized
+        Ok(other) => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "SAP minting requires governance authorization: unexpected response {:?}",
+                other
+            ))));
+        }
+        Err(e) => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "SAP minting requires governance authorization: {:?}",
+                e
+            ))));
+        }
     }
 
     // Consciousness gate: SAP minting requires Steward tier (consciousness >= 0.6)
@@ -334,7 +343,10 @@ pub fn mint_sap_from_governance(input: MintSapFromGovernanceInput) -> ExternResu
             }
         }
     }
-    // If bridge is unreachable, allow the mint (bootstrap/standalone mode)
+    // SECURITY NOTE: If bridge is unreachable, we allow the mint (bootstrap/standalone mode).
+    // This is PERMISSIVE — the consciousness gate is bypassed. Governance authorization
+    // (checked above) is still required, so this only weakens the tier check, not
+    // the authorization check. Per-proposal and annual caps still apply.
 
     // Constitutional cap: per-proposal maximum
     if input.amount > SAP_MINT_PER_PROPOSAL_MAX {
@@ -544,10 +556,18 @@ fn compute_sap_fee(sender_did: &str, micro_amount: u64) -> ExternResult<u64> {
             }
             match result.decode::<TierResp>() {
                 Ok(resp) if resp.base_fee_rate.is_finite() => resp.base_fee_rate,
-                _ => FeeTier::Newcomer.base_fee_rate(),
+                Ok(resp) => {
+                    debug!("compute_sap_fee: non-finite fee rate {:?} for {}, using Newcomer rate", resp.base_fee_rate, sender_did);
+                    FeeTier::Newcomer.base_fee_rate()
+                }
+                Err(e) => {
+                    debug!("compute_sap_fee: fee tier decode error for {}: {:?}, using Newcomer rate", sender_did, e);
+                    FeeTier::Newcomer.base_fee_rate()
+                }
             }
         }
-        _ => {
+        Ok(other) => {
+            debug!("compute_sap_fee: bridge returned {:?} for {}, falling back to direct recognition", other, sender_did);
             // Bridge unavailable — fall back to direct recognition call
             let mycel_score = match call(
                 CallTargetCell::Local,
@@ -566,7 +586,45 @@ fn compute_sap_fee(sender_did: &str, micro_amount: u64) -> ExternResult<u64> {
                         .map(|s| s.mycel_score)
                         .unwrap_or(0.0)
                 }
-                _ => 0.0,
+                Ok(other) => {
+                    debug!("compute_sap_fee: recognition returned {:?} for {}, defaulting to 0.0", other, sender_did);
+                    0.0
+                }
+                Err(e) => {
+                    debug!("compute_sap_fee: recognition unreachable for {}: {:?}, defaulting to 0.0", sender_did, e);
+                    0.0
+                }
+            };
+            FeeTier::from_mycel(mycel_score).base_fee_rate()
+        }
+        Err(e) => {
+            debug!("compute_sap_fee: bridge unreachable for {}: {:?}, falling back to direct recognition", sender_did, e);
+            // Bridge unavailable — fall back to direct recognition call
+            let mycel_score = match call(
+                CallTargetCell::Local,
+                ZomeName::from("recognition"),
+                FunctionName::from("get_mycel_score"),
+                None,
+                sender_did.to_string(),
+            ) {
+                Ok(ZomeCallResponse::Ok(result)) => {
+                    #[derive(Debug, Deserialize)]
+                    struct MycelState {
+                        mycel_score: f64,
+                    }
+                    result
+                        .decode::<MycelState>()
+                        .map(|s| s.mycel_score)
+                        .unwrap_or(0.0)
+                }
+                Ok(other) => {
+                    debug!("compute_sap_fee: recognition returned {:?} for {}, defaulting to 0.0", other, sender_did);
+                    0.0
+                }
+                Err(e2) => {
+                    debug!("compute_sap_fee: recognition also unreachable for {}: {:?}, defaulting to 0.0", sender_did, e2);
+                    0.0
+                }
             };
             FeeTier::from_mycel(mycel_score).base_fee_rate()
         }
@@ -747,6 +805,17 @@ pub fn open_payment_channel(input: OpenChannelInput) -> ExternResult<Record> {
         last_updated: now,
         closed: None,
     };
+
+    // Prevent duplicate IDs
+    let existing = get_links(
+        LinkQuery::try_new(anchor_hash(&channel.id)?, LinkTypes::ChannelIdToChannel)?,
+        GetStrategy::default(),
+    )?;
+    if !existing.is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Payment channel with this ID already exists".into()
+        )));
+    }
 
     let action_hash = create_entry(&EntryTypes::PaymentChannel(channel.clone()))?;
     // ID-based index link for O(1) lookups
@@ -1378,29 +1447,9 @@ pub fn contribute_to_hearth_pool(input: ContributeToHearthInput) -> ExternResult
     verify_hearth_membership(&caller_did, &input.hearth_did)?;
 
     // Deduct from personal SAP balance
-    let anchor_key = format!("sap-balance:{}", caller_did);
-    let links = get_links(
-        LinkQuery::try_new(anchor_hash(&anchor_key)?, LinkTypes::DidToSapBalance)?,
-        GetStrategy::default(),
-    )?;
-
-    let link = links.first().ok_or(wasm_error!(WasmErrorInner::Guest(
-        "No SAP balance found".into()
-    )))?;
-    let action_hash =
-        link.target
-            .clone()
-            .into_action_hash()
-            .ok_or(wasm_error!(WasmErrorInner::Guest(
-                "Invalid link target".into()
-            )))?;
-    let record = follow_update_chain(action_hash)?;
-    let mut personal_bal = record
-        .entry()
-        .to_app_option::<SapBalance>()
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {:?}", e))))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "SAP balance entry missing".into()
+    let (record, mut personal_bal) =
+        find_sap_balance_record(&caller_did)?.ok_or(wasm_error!(WasmErrorInner::Guest(
+            "No SAP balance found".into()
         )))?;
 
     if personal_bal.balance < input.amount {
@@ -1478,29 +1527,9 @@ pub fn withdraw_from_hearth_pool(input: WithdrawFromHearthInput) -> ExternResult
     update_hearth_pool(&input.hearth_did, &pool)?;
 
     // Credit personal SAP balance
-    let anchor_key = format!("sap-balance:{}", caller_did);
-    let links = get_links(
-        LinkQuery::try_new(anchor_hash(&anchor_key)?, LinkTypes::DidToSapBalance)?,
-        GetStrategy::default(),
-    )?;
-
-    if let Some(link) = links.first() {
-        if let Some(action_hash) = link.target.clone().into_action_hash() {
-            let record = follow_update_chain(action_hash)?;
-            if let Some(mut personal_bal) = record
-                .entry()
-                .to_app_option::<SapBalance>()
-                .map_err(|e| {
-                    wasm_error!(WasmErrorInner::Guest(format!(
-                        "SapBalance deserialization error: {:?}",
-                        e
-                    )))
-                })?
-            {
-                personal_bal.balance += input.amount;
-                update_entry(record.action_address().clone(), &personal_bal)?;
-            }
-        }
+    if let Some((record, mut personal_bal)) = find_sap_balance_record(&caller_did)? {
+        personal_bal.balance += input.amount;
+        update_entry(record.action_address().clone(), &personal_bal)?;
     }
 
     Ok(pool)
@@ -1541,7 +1570,7 @@ pub fn apply_hearth_demurrage(input: ApplyHearthDemurrageInput) -> ExternResult<
     let source_did = format!("hearth:{}", input.hearth_did);
 
     if let Some(ref pool_id) = input.local_commons_pool_id {
-        let _ = call(
+        if let Err(e) = call(
             CallTargetCell::Local,
             ZomeName::from("treasury"),
             FunctionName::from("receive_compost"),
@@ -1551,10 +1580,15 @@ pub fn apply_hearth_demurrage(input: ApplyHearthDemurrageInput) -> ExternResult<
                 amount: local_amount,
                 source_member_did: source_did.clone(),
             },
-        );
+        ) {
+            debug!(
+                "Hearth compost redistribution to local pool {} failed: {:?}",
+                pool_id, e
+            );
+        }
     }
     if let Some(ref pool_id) = input.regional_commons_pool_id {
-        let _ = call(
+        if let Err(e) = call(
             CallTargetCell::Local,
             ZomeName::from("treasury"),
             FunctionName::from("receive_compost"),
@@ -1564,10 +1598,15 @@ pub fn apply_hearth_demurrage(input: ApplyHearthDemurrageInput) -> ExternResult<
                 amount: regional_amount,
                 source_member_did: source_did.clone(),
             },
-        );
+        ) {
+            debug!(
+                "Hearth compost redistribution to regional pool {} failed: {:?}",
+                pool_id, e
+            );
+        }
     }
     if let Some(ref pool_id) = input.global_commons_pool_id {
-        let _ = call(
+        if let Err(e) = call(
             CallTargetCell::Local,
             ZomeName::from("treasury"),
             FunctionName::from("receive_compost"),
@@ -1577,7 +1616,12 @@ pub fn apply_hearth_demurrage(input: ApplyHearthDemurrageInput) -> ExternResult<
                 amount: global_amount,
                 source_member_did: source_did,
             },
-        );
+        ) {
+            debug!(
+                "Hearth compost redistribution to global pool {} failed: {:?}",
+                pool_id, e
+            );
+        }
     }
 
     Ok(DemurrageResult {
@@ -1674,11 +1718,26 @@ fn verify_hearth_membership(caller_did: &str, hearth_did: &str) -> ExternResult<
     ) {
         Ok(ZomeCallResponse::Ok(result)) => match result.decode::<bool>() {
             Ok(true) => Ok(()),
-            _ => Err(wasm_error!(WasmErrorInner::Guest(
+            Ok(false) => Err(wasm_error!(WasmErrorInner::Guest(
                 "Not a member of this hearth".into()
             ))),
+            Err(e) => {
+                debug!("verify_hearth_membership: decode error for {}@{}: {:?}, rejecting", caller_did, hearth_did, e);
+                Err(wasm_error!(WasmErrorInner::Guest(
+                    "Not a member of this hearth".into()
+                )))
+            }
         },
-        // Hearth cluster unreachable — allow in standalone mode
-        _ => Ok(()),
+        Ok(other) => {
+            // SECURITY NOTE: Hearth cluster unreachable/unauthorized — allow in standalone mode.
+            // In production with a running hearth cluster, this path should not be reached.
+            debug!("verify_hearth_membership: hearth_bridge returned {:?} for {}@{}, allowing (standalone mode)", other, caller_did, hearth_did);
+            Ok(())
+        }
+        Err(e) => {
+            // SECURITY NOTE: Hearth cluster unreachable — allow in standalone mode.
+            debug!("verify_hearth_membership: hearth_bridge unreachable for {}@{}: {:?}, allowing (standalone mode)", caller_did, hearth_did, e);
+            Ok(())
+        }
     }
 }

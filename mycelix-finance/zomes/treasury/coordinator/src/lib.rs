@@ -31,6 +31,17 @@ pub fn create_treasury(input: CreateTreasuryInput) -> ExternResult<Record> {
         last_updated: now,
     };
 
+    // Prevent duplicate IDs
+    let existing = get_links(
+        LinkQuery::try_new(anchor_hash(&treasury.id)?, LinkTypes::TreasuryIdToTreasury)?,
+        GetStrategy::default(),
+    )?;
+    if !existing.is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Treasury with this ID already exists".into()
+        )));
+    }
+
     let action_hash = create_entry(&EntryTypes::Treasury(treasury.clone()))?;
     // ID-based index link
     create_link(
@@ -189,6 +200,20 @@ pub fn propose_allocation(input: ProposeAllocationInput) -> ExternResult<Record>
         created: now,
         executed: None,
     };
+
+    // Prevent duplicate IDs
+    let existing = get_links(
+        LinkQuery::try_new(
+            anchor_hash(&allocation.id)?,
+            LinkTypes::AllocationIdToAllocation,
+        )?,
+        GetStrategy::default(),
+    )?;
+    if !existing.is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Allocation with this ID already exists".into()
+        )));
+    }
 
     let action_hash = create_entry(&EntryTypes::Allocation(allocation.clone()))?;
     create_link(
@@ -353,6 +378,17 @@ pub fn create_savings_pool(input: CreatePoolInput) -> ExternResult<Record> {
         yield_rate: input.yield_rate,
         created: now,
     };
+
+    // Prevent duplicate IDs
+    let existing = get_links(
+        LinkQuery::try_new(anchor_hash(&pool.id)?, LinkTypes::PoolIdToPool)?,
+        GetStrategy::default(),
+    )?;
+    if !existing.is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Savings pool with this ID already exists".into()
+        )));
+    }
 
     let action_hash = create_entry(&EntryTypes::SavingsPool(pool.clone()))?;
     // ID-based index link for O(1) lookups
@@ -960,6 +996,17 @@ pub fn create_commons_pool(input: CreateCommonsPoolInput) -> ExternResult<Record
         created_at: now,
         last_activity: now,
     };
+
+    // Prevent duplicate IDs
+    let existing = get_links(
+        LinkQuery::try_new(anchor_hash(&pool.id)?, LinkTypes::CommonsPoolIdToPool)?,
+        GetStrategy::default(),
+    )?;
+    if !existing.is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Commons pool with this ID already exists".into()
+        )));
+    }
 
     let action_hash = create_entry(&EntryTypes::CommonsPool(pool.clone()))?;
     // ID-based index link for O(1) lookups
