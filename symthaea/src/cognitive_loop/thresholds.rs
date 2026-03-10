@@ -2833,8 +2833,14 @@ mod tests {
     #[test]
     fn test_pipeline_consciousness_params() {
         assert!(PIPELINE_CONSCIOUSNESS_LOW_THRESHOLD < PIPELINE_CONSCIOUSNESS_HIGH_THRESHOLD);
-        assert!(PIPELINE_CONSCIOUSNESS_RELAX_SCALE < 1.0, "Relax must reduce threshold");
-        assert!(PIPELINE_CONSCIOUSNESS_CAUTION_SCALE > 1.0, "Caution must increase threshold");
+        assert!(
+            PIPELINE_CONSCIOUSNESS_RELAX_SCALE < 1.0,
+            "Relax must reduce threshold"
+        );
+        assert!(
+            PIPELINE_CONSCIOUSNESS_CAUTION_SCALE > 1.0,
+            "Caution must increase threshold"
+        );
     }
 
     #[test]
@@ -2847,7 +2853,10 @@ mod tests {
 
     #[test]
     fn test_sleep_pressure_params() {
-        assert!(SLEEP_PRESSURE_LR_THRESHOLD > 0.5, "Sleep pressure threshold should be high");
+        assert!(
+            SLEEP_PRESSURE_LR_THRESHOLD > 0.5,
+            "Sleep pressure threshold should be high"
+        );
         assert!(SLEEP_PRESSURE_LR_DAMPEN_SCALE > 0.0 && SLEEP_PRESSURE_LR_DAMPEN_SCALE < 1.0);
         assert!(SLEEP_PRESSURE_LR_FACTOR_MIN > 0.0 && SLEEP_PRESSURE_LR_FACTOR_MIN < 1.0);
     }
@@ -2855,7 +2864,10 @@ mod tests {
     #[test]
     fn test_epistemic_phi_params() {
         assert!(EPISTEMIC_PHI_LOW_THRESHOLD < EPISTEMIC_PHI_HIGH_THRESHOLD);
-        assert!(EPISTEMIC_PHI_LOW_CONFIDENCE_SCALE < 1.0, "Low phi must dampen confidence");
+        assert!(
+            EPISTEMIC_PHI_LOW_CONFIDENCE_SCALE < 1.0,
+            "Low phi must dampen confidence"
+        );
         assert!(EPISTEMIC_PHI_HIGH_CONFIDENCE_SCALE > 0.0);
     }
 
@@ -2863,7 +2875,10 @@ mod tests {
     fn test_phenomenal_binding_params() {
         assert!(PHENOMENAL_BINDING_LOW_THRESHOLD < PHENOMENAL_BINDING_HIGH_THRESHOLD);
         assert!(PHENOMENAL_BINDING_LOW_EXPLORE_BOOST > 0.0);
-        assert!(PHENOMENAL_BINDING_HIGH_LR_DAMPEN < 1.0, "High binding must dampen LR");
+        assert!(
+            PHENOMENAL_BINDING_HIGH_LR_DAMPEN < 1.0,
+            "High binding must dampen LR"
+        );
     }
 
     #[test]
@@ -2876,7 +2891,10 @@ mod tests {
     #[test]
     fn test_holographic_unity_params() {
         assert!(HOLOGRAPHIC_UNITY_LOW_THRESHOLD < HOLOGRAPHIC_UNITY_HIGH_THRESHOLD);
-        assert!(HOLOGRAPHIC_UNITY_LOW_LR_DAMPEN < 1.0, "Low unity must dampen LR");
+        assert!(
+            HOLOGRAPHIC_UNITY_LOW_LR_DAMPEN < 1.0,
+            "Low unity must dampen LR"
+        );
         assert!(HOLOGRAPHIC_UNITY_HIGH_CONFIDENCE_SCALE > 0.0);
     }
 }

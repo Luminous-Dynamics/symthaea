@@ -5093,8 +5093,7 @@ mod tests {
         anomaly_config.initial_cadence = 1;
         anomaly_config.convergence_similarity_threshold = 0.01;
         let basis = Arc::new(HarmonyBasis::new(TEST_DIM));
-        let mut topo =
-            MoralTopology::with_anomaly_config(test_config(), basis, anomaly_config);
+        let mut topo = MoralTopology::with_anomaly_config(test_config(), basis, anomaly_config);
 
         // Feed identical HVs to trigger convergence
         let hv = ContinuousHV::random(TEST_DIM, 42);
@@ -5131,8 +5130,7 @@ mod tests {
         anomaly_config.initial_cadence = 1;
         anomaly_config.convergence_baseline_window = 20;
         let basis = Arc::new(HarmonyBasis::new(TEST_DIM));
-        let mut topo =
-            MoralTopology::with_anomaly_config(test_config(), basis, anomaly_config);
+        let mut topo = MoralTopology::with_anomaly_config(test_config(), basis, anomaly_config);
 
         // Add diverse baseline scenarios
         for seed in 0..8u64 {

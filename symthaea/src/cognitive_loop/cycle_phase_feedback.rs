@@ -1249,6 +1249,83 @@ impl CognitiveLoopService {
             self.scale_confidence("binding_attention_lo", binding_dampen.max(0.95));
         }
 
+        // ═══════════════════════════════════════════════════════════════════════
+        // SESSION 16: ORPHANED SIGNAL WIRING
+        // Wire consciousness metrics that were computed but never drove behavior.
+        // ═══════════════════════════════════════════════════════════════════════
+
+        // Item 1: Epistemic Phi → confidence coupling.
+        // Low epistemic integration quality degrades confidence; high quality reinforces it.
+        // Science: Tononi (2004) — Phi measures integrated information; low Phi = unreliable inference.
+        if epistemic_phi_eff > EPISTEMIC_PHI_HIGH_THRESHOLD && self.stats.total_cycles > 20 {
+            let boost = ((epistemic_phi_eff - EPISTEMIC_PHI_HIGH_THRESHOLD)
+                * EPISTEMIC_PHI_HIGH_CONFIDENCE_SCALE as f64) as f32;
+            self.adjust_confidence("epistemic_phi_high", boost);
+        } else if epistemic_phi_eff > 0.0
+            && epistemic_phi_eff < EPISTEMIC_PHI_LOW_THRESHOLD
+            && self.stats.total_cycles > 20
+        {
+            self.scale_confidence("epistemic_phi_low", EPISTEMIC_PHI_LOW_CONFIDENCE_SCALE);
+        }
+
+        // Item 2: Phenomenal binding strength → LR/exploration coupling.
+        // Low binding = incoherent representation → explore for better conjunctions.
+        // High binding = stable gestalt → consolidate, dampen LR.
+        // Science: Treisman (1996) — feature integration requires binding; weak binding = search.
+        if phenomenal_binding_strength < PHENOMENAL_BINDING_LOW_THRESHOLD
+            && phenomenal_binding_strength > 0.0
+            && self.stats.total_cycles > 15
+        {
+            self.adjust_exploration(
+                "phenomenal_binding_low",
+                PHENOMENAL_BINDING_LOW_EXPLORE_BOOST,
+            );
+        } else if phenomenal_binding_strength > PHENOMENAL_BINDING_HIGH_THRESHOLD
+            && self.stats.total_cycles > 15
+        {
+            self.scale_lr(
+                "phenomenal_binding_stable",
+                PHENOMENAL_BINDING_HIGH_LR_DAMPEN,
+            );
+        }
+
+        // Item 3: Temporal coherence score → confidence/exploration coupling.
+        // High temporal coherence = predictable flow → boost confidence.
+        // Low temporal coherence = fragmented temporal context → explore for patterns.
+        // Science: Howard & Kahana (2002) — temporal context model: stability supports encoding.
+        if temporal_coherence_score > TEMPORAL_COHERENCE_HIGH_THRESHOLD
+            && self.stats.total_cycles > 15
+        {
+            let boost = ((temporal_coherence_score - TEMPORAL_COHERENCE_HIGH_THRESHOLD)
+                * TEMPORAL_COHERENCE_CONFIDENCE_SCALE as f64) as f32;
+            self.adjust_confidence("temporal_coherence_high", boost);
+        } else if temporal_coherence_score > 0.0
+            && temporal_coherence_score < TEMPORAL_COHERENCE_LOW_THRESHOLD
+            && self.stats.total_cycles > 15
+        {
+            self.adjust_exploration(
+                "temporal_coherence_low",
+                TEMPORAL_COHERENCE_LOW_EXPLORE_BOOST,
+            );
+        }
+
+        // Item 4: Holographic unity → LR/confidence gating.
+        // Low unity = global decomposition → learning during decomposition is noise.
+        // High unity = integrated representation → confident decisions.
+        // Science: Pribram (1991) — holographic storage coherence gates encoding fidelity.
+        if holographic_unity < HOLOGRAPHIC_UNITY_LOW_THRESHOLD
+            && holographic_unity > 0.0
+            && self.stats.total_cycles > 20
+        {
+            self.scale_lr("holographic_unity_low", HOLOGRAPHIC_UNITY_LOW_LR_DAMPEN);
+        } else if holographic_unity > HOLOGRAPHIC_UNITY_HIGH_THRESHOLD
+            && self.stats.total_cycles > 20
+        {
+            let boost = ((holographic_unity - HOLOGRAPHIC_UNITY_HIGH_THRESHOLD)
+                * HOLOGRAPHIC_UNITY_HIGH_CONFIDENCE_SCALE as f64) as f32;
+            self.adjust_confidence("holographic_unity_high", boost);
+        }
+
         FeedbackPhaseResult {
             quality: FbQuality {
                 cross_module_agreement,
