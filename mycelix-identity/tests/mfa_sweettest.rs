@@ -16,7 +16,16 @@
 
 use holochain::sweettest::*;
 use holochain::prelude::*;
+use sha2::{Sha256, Digest};
 use std::path::PathBuf;
+
+/// Compute the primary key hash the same way the MFA zome does:
+/// `sha256:{hex(SHA256(agent.get_raw_39()))}`
+fn compute_primary_key_hash(agent: &AgentPubKey) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(agent.get_raw_39());
+    format!("sha256:{:x}", hasher.finalize())
+}
 
 // ============================================================================
 // Mirror types (avoids importing zome crates / duplicate symbols)
@@ -275,8 +284,11 @@ pub struct MfaSummary {
 pub struct DidDocument {
     pub id: String,
     pub controller: AgentPubKey,
+    #[serde(rename = "verificationMethod", alias = "verification_method")]
     pub verification_method: Vec<VerificationMethod>,
     pub authentication: Vec<String>,
+    #[serde(rename = "keyAgreement", alias = "key_agreement", default)]
+    pub key_agreement: Vec<String>,
     pub service: Vec<ServiceEndpoint>,
     pub created: Timestamp,
     pub updated: Timestamp,
@@ -287,16 +299,22 @@ pub struct DidDocument {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct VerificationMethod {
     pub id: String,
+    #[serde(rename = "type", alias = "type_")]
     pub type_: String,
     pub controller: String,
+    #[serde(rename = "publicKeyMultibase", alias = "public_key_multibase")]
     pub public_key_multibase: String,
+    #[serde(default)]
+    pub algorithm: Option<u16>,
 }
 
 /// Mirror of did_registry_integrity::ServiceEndpoint
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct ServiceEndpoint {
     pub id: String,
+    #[serde(rename = "type", alias = "type_")]
     pub type_: String,
+    #[serde(rename = "serviceEndpoint", alias = "service_endpoint")]
     pub service_endpoint: String,
 }
 
@@ -354,7 +372,7 @@ mod mfa_state_creation {
             .await;
 
         let did_doc: DidDocument = decode_entry(&did_record).expect("Failed to decode DID");
-        let primary_key_hash = format!("sha256:{}", agent);
+        let primary_key_hash = compute_primary_key_hash(&agent);
 
         // Create MFA state
         let input = CreateMfaStateInput {
@@ -487,7 +505,7 @@ mod factor_enrollment {
         // Create MFA state
         let input = CreateMfaStateInput {
             did: did_doc.id.clone(),
-            primary_key_hash: format!("sha256:{}", agent),
+            primary_key_hash: compute_primary_key_hash(&agent),
         };
         let output: MfaStateOutput = conductor
             .call(&cell.zome("mfa"), "create_mfa_state", input)
@@ -862,7 +880,7 @@ mod verification_challenges {
 
         let mfa_input = CreateMfaStateInput {
             did: did_doc.id.clone(),
-            primary_key_hash: format!("sha256:{}", agent),
+            primary_key_hash: compute_primary_key_hash(&agent),
         };
         let mfa_output: MfaStateOutput = conductor
             .call(&cell.zome("mfa"), "create_mfa_state", mfa_input)
@@ -917,7 +935,7 @@ mod verification_challenges {
 
         let mfa_input = CreateMfaStateInput {
             did: did_doc.id.clone(),
-            primary_key_hash: format!("sha256:{}", agent),
+            primary_key_hash: compute_primary_key_hash(&agent),
         };
         let _: MfaStateOutput = conductor
             .call(&cell.zome("mfa"), "create_mfa_state", mfa_input)
@@ -986,7 +1004,7 @@ mod factor_verification {
             .await;
         let did_doc: DidDocument = decode_entry(&did_record).expect("Failed to decode DID");
 
-        let primary_key_hash = format!("sha256:{}", agent);
+        let primary_key_hash = compute_primary_key_hash(&agent);
         let mfa_input = CreateMfaStateInput {
             did: did_doc.id.clone(),
             primary_key_hash: primary_key_hash.clone(),
@@ -1040,7 +1058,7 @@ mod factor_verification {
 
         let mfa_input = CreateMfaStateInput {
             did: did_doc.id.clone(),
-            primary_key_hash: format!("sha256:{}", agent),
+            primary_key_hash: compute_primary_key_hash(&agent),
         };
         let _: MfaStateOutput = conductor
             .call(&cell.zome("mfa"), "create_mfa_state", mfa_input)
@@ -1121,7 +1139,7 @@ mod assurance_calculation {
 
         let mfa_input = CreateMfaStateInput {
             did: did_doc.id.clone(),
-            primary_key_hash: format!("sha256:{}", agent),
+            primary_key_hash: compute_primary_key_hash(&agent),
         };
         let output: MfaStateOutput = conductor
             .call(&cell.zome("mfa"), "create_mfa_state", mfa_input)
@@ -1159,7 +1177,7 @@ mod assurance_calculation {
 
         let mfa_input = CreateMfaStateInput {
             did: did_doc.id.clone(),
-            primary_key_hash: format!("sha256:{}", agent),
+            primary_key_hash: compute_primary_key_hash(&agent),
         };
         let _: MfaStateOutput = conductor
             .call(&cell.zome("mfa"), "create_mfa_state", mfa_input)
@@ -1224,7 +1242,7 @@ mod assurance_calculation {
 
         let mfa_input = CreateMfaStateInput {
             did: did_doc.id.clone(),
-            primary_key_hash: format!("sha256:{}", agent),
+            primary_key_hash: compute_primary_key_hash(&agent),
         };
         let _: MfaStateOutput = conductor
             .call(&cell.zome("mfa"), "create_mfa_state", mfa_input)
@@ -1297,7 +1315,7 @@ mod assurance_calculation {
 
         let mfa_input = CreateMfaStateInput {
             did: did_doc.id.clone(),
-            primary_key_hash: format!("sha256:{}", agent),
+            primary_key_hash: compute_primary_key_hash(&agent),
         };
         let _: MfaStateOutput = conductor
             .call(&cell.zome("mfa"), "create_mfa_state", mfa_input)
@@ -1343,7 +1361,7 @@ mod fl_eligibility {
 
         let mfa_input = CreateMfaStateInput {
             did: did_doc.id.clone(),
-            primary_key_hash: format!("sha256:{}", agent),
+            primary_key_hash: compute_primary_key_hash(&agent),
         };
         let _: MfaStateOutput = conductor
             .call(&cell.zome("mfa"), "create_mfa_state", mfa_input)
@@ -1381,7 +1399,7 @@ mod fl_eligibility {
 
         let mfa_input = CreateMfaStateInput {
             did: did_doc.id.clone(),
-            primary_key_hash: format!("sha256:{}", agent),
+            primary_key_hash: compute_primary_key_hash(&agent),
         };
         let _: MfaStateOutput = conductor
             .call(&cell.zome("mfa"), "create_mfa_state", mfa_input)
@@ -1454,7 +1472,7 @@ mod fl_eligibility {
 
         let mfa_input = CreateMfaStateInput {
             did: did_doc.id.clone(),
-            primary_key_hash: format!("sha256:{}", agent),
+            primary_key_hash: compute_primary_key_hash(&agent),
         };
         let _: MfaStateOutput = conductor
             .call(&cell.zome("mfa"), "create_mfa_state", mfa_input)
@@ -1516,7 +1534,7 @@ mod factor_removal {
 
         let mfa_input = CreateMfaStateInput {
             did: did_doc.id.clone(),
-            primary_key_hash: format!("sha256:{}", agent),
+            primary_key_hash: compute_primary_key_hash(&agent),
         };
         let _: MfaStateOutput = conductor
             .call(&cell.zome("mfa"), "create_mfa_state", mfa_input)
@@ -1575,7 +1593,7 @@ mod factor_removal {
             .await;
         let did_doc: DidDocument = decode_entry(&did_record).expect("Failed to decode DID");
 
-        let primary_key_hash = format!("sha256:{}", agent);
+        let primary_key_hash = compute_primary_key_hash(&agent);
         let mfa_input = CreateMfaStateInput {
             did: did_doc.id.clone(),
             primary_key_hash: primary_key_hash.clone(),
@@ -1617,7 +1635,7 @@ mod factor_removal {
 
         let mfa_input = CreateMfaStateInput {
             did: did_doc.id.clone(),
-            primary_key_hash: format!("sha256:{}", agent),
+            primary_key_hash: compute_primary_key_hash(&agent),
         };
         let _: MfaStateOutput = conductor
             .call(&cell.zome("mfa"), "create_mfa_state", mfa_input)
@@ -1656,7 +1674,7 @@ mod factor_removal {
 
         let mfa_input = CreateMfaStateInput {
             did: did_doc.id.clone(),
-            primary_key_hash: format!("sha256:{}", agent),
+            primary_key_hash: compute_primary_key_hash(&agent),
         };
         let _: MfaStateOutput = conductor
             .call(&cell.zome("mfa"), "create_mfa_state", mfa_input)
@@ -1748,7 +1766,7 @@ mod enrollment_history {
 
         let mfa_input = CreateMfaStateInput {
             did: did_doc.id.clone(),
-            primary_key_hash: format!("sha256:{}", agent),
+            primary_key_hash: compute_primary_key_hash(&agent),
         };
         let _: MfaStateOutput = conductor
             .call(&cell.zome("mfa"), "create_mfa_state", mfa_input)
@@ -1844,7 +1862,7 @@ mod enrollment_history {
 
         let mfa_input = CreateMfaStateInput {
             did: did_doc.id.clone(),
-            primary_key_hash: format!("sha256:{}", agent),
+            primary_key_hash: compute_primary_key_hash(&agent),
         };
         let _: MfaStateOutput = conductor
             .call(&cell.zome("mfa"), "create_mfa_state", mfa_input)
@@ -1909,7 +1927,7 @@ mod bridge_integration {
 
         let mfa_input = CreateMfaStateInput {
             did: did_doc.id.clone(),
-            primary_key_hash: format!("sha256:{}", agent),
+            primary_key_hash: compute_primary_key_hash(&agent),
         };
         let _: MfaStateOutput = conductor
             .call(&cell.zome("mfa"), "create_mfa_state", mfa_input)
@@ -2181,7 +2199,7 @@ mod crypto_hardening {
 
         let mfa_input = CreateMfaStateInput {
             did: did_doc.id.clone(),
-            primary_key_hash: format!("sha256:{}", agent),
+            primary_key_hash: compute_primary_key_hash(&agent),
         };
         let _: MfaStateOutput = conductor
             .call(&cell.zome("mfa"), "create_mfa_state", mfa_input)

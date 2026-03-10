@@ -5,7 +5,7 @@
 
 use finance_bridge_integrity::*;
 use hdk::prelude::*;
-use mycelix_finance_shared::{anchor_hash, verify_caller_is_did};
+use mycelix_finance_shared::{anchor_hash, follow_update_chain, verify_caller_is_did};
 use mycelix_finance_types::{FeeTier, TendLimitTier};
 
 const FINANCE_HAPP_ID: &str = "mycelix-finance";
@@ -344,9 +344,7 @@ pub fn confirm_deposit(deposit_id: String) -> ExternResult<Record> {
     )))?;
     let hash = ActionHash::try_from(link.target.clone())
         .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-    let record = get(hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
-        WasmErrorInner::Guest("Deposit not found".into())
-    ))?;
+    let record = follow_update_chain(hash)?;
     let deposit = record
         .entry()
         .to_app_option::<CollateralBridgeDeposit>()
@@ -400,9 +398,7 @@ pub fn redeem_collateral(deposit_id: String) -> ExternResult<Record> {
     )))?;
     let hash = ActionHash::try_from(link.target.clone())
         .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-    let record = get(hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
-        WasmErrorInner::Guest("Deposit not found".into())
-    ))?;
+    let record = follow_update_chain(hash)?;
     let deposit = record
         .entry()
         .to_app_option::<CollateralBridgeDeposit>()

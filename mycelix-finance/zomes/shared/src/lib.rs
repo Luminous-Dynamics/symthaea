@@ -33,7 +33,59 @@ pub use batch::*;
 pub use economics::*;
 pub use identity::*;
 pub use types::*;
+pub use update_chain::*;
 pub use validation::*;
+
+/// Update chain traversal for Holochain entries.
+///
+/// In Holochain, `get()` returns the **original** entry, not the latest version.
+/// When an entry has been modified via `update_entry()`, you must use `get_details()`
+/// to discover the update chain and follow it to the latest version.
+///
+/// All coordinator zomes that do link-based lookups SHOULD use `follow_update_chain`
+/// instead of bare `get()` when the entry might have been updated.
+pub mod update_chain {
+    use super::*;
+
+    /// Maximum update chain depth before we bail out.
+    /// Prevents unbounded network calls on entries with pathological update histories.
+    pub const MAX_UPDATE_CHAIN_DEPTH: usize = 256;
+
+    /// Recursively follow the Holochain update chain from an original action hash
+    /// to find the latest version of a record.
+    ///
+    /// Each `update_entry` creates a new action that is recorded as an update of
+    /// its predecessor. This function walks `get_details().updates` until it finds
+    /// an action with no further updates.
+    ///
+    /// Stops after [`MAX_UPDATE_CHAIN_DEPTH`] hops to prevent unbounded traversal.
+    pub fn follow_update_chain(action_hash: ActionHash) -> ExternResult<Record> {
+        let mut current_hash = action_hash;
+        for _ in 0..MAX_UPDATE_CHAIN_DEPTH {
+            let details = get_details(current_hash.clone(), GetOptions::default())?.ok_or(
+                wasm_error!(WasmErrorInner::Guest("Record not found".into())),
+            )?;
+            match details {
+                Details::Record(record_details) => {
+                    if let Some(latest_update) = record_details.updates.last() {
+                        current_hash = latest_update.action_address().clone();
+                    } else {
+                        return Ok(record_details.record);
+                    }
+                }
+                _ => {
+                    return get(current_hash, GetOptions::default())?.ok_or(wasm_error!(
+                        WasmErrorInner::Guest("Record not found".into())
+                    ));
+                }
+            }
+        }
+        // Reached max depth — return whatever we have at the current hash
+        get(current_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Update chain exceeded maximum depth".into()
+        )))
+    }
+}
 
 /// Batch operations module - solves N+1 query patterns
 ///

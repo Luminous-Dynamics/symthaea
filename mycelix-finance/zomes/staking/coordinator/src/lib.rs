@@ -7,7 +7,7 @@
 //! - Reward distribution with Merkle proofs
 
 use hdk::prelude::*;
-use mycelix_finance_shared::{anchor_hash, verify_caller_is_did};
+use mycelix_finance_shared::{anchor_hash, follow_update_chain, verify_caller_is_did};
 use staking_integrity::*;
 
 /// Anchor for active stakes
@@ -142,6 +142,7 @@ pub fn create_stake(input: CreateStakeInput) -> ExternResult<Record> {
 
 /// Look up a stake by its ID using the StakeIdToStake link index.
 /// Returns (CollateralStake, Record) or an error if not found.
+/// Follows the update chain to return the latest version.
 fn find_stake_by_id(stake_id: &str) -> ExternResult<(CollateralStake, Record)> {
     let links = get_links(
         LinkQuery::try_new(anchor_hash(stake_id)?, LinkTypes::StakeIdToStake)?,
@@ -152,9 +153,7 @@ fn find_stake_by_id(stake_id: &str) -> ExternResult<(CollateralStake, Record)> {
         .ok_or(wasm_error!(WasmErrorInner::Guest("Stake not found".into())))?;
     let hash = ActionHash::try_from(link.target.clone())
         .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-    let record = get(hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
-        "Stake record not found".into()
-    )))?;
+    let record = follow_update_chain(hash)?;
     let stake = record
         .entry()
         .to_app_option::<CollateralStake>()
@@ -172,6 +171,7 @@ fn find_stake_by_id(stake_id: &str) -> ExternResult<(CollateralStake, Record)> {
 
 /// Look up an escrow by its ID using the EscrowIdToEscrow link index.
 /// Returns (CryptoEscrow, Record) or an error if not found.
+/// Follows the update chain to return the latest version.
 fn find_escrow_by_id(escrow_id: &str) -> ExternResult<(CryptoEscrow, Record)> {
     let links = get_links(
         LinkQuery::try_new(anchor_hash(escrow_id)?, LinkTypes::EscrowIdToEscrow)?,
@@ -182,9 +182,7 @@ fn find_escrow_by_id(escrow_id: &str) -> ExternResult<(CryptoEscrow, Record)> {
     )))?;
     let hash = ActionHash::try_from(link.target.clone())
         .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-    let record = get(hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
-        "Escrow record not found".into()
-    )))?;
+    let record = follow_update_chain(hash)?;
     let escrow = record
         .entry()
         .to_app_option::<CryptoEscrow>()

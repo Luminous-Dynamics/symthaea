@@ -93,8 +93,11 @@ pub struct IdentityBridgeHealth {
 pub struct DidDocument {
     pub id: String,
     pub controller: ::holochain::prelude::AgentPubKey,
+    #[serde(rename = "verificationMethod", alias = "verification_method")]
     pub verification_method: Vec<VerificationMethod>,
     pub authentication: Vec<String>,
+    #[serde(rename = "keyAgreement", alias = "key_agreement", default)]
+    pub key_agreement: Vec<String>,
     pub service: Vec<ServiceEndpoint>,
     pub created: ::holochain::prelude::Timestamp,
     pub updated: ::holochain::prelude::Timestamp,
@@ -104,15 +107,21 @@ pub struct DidDocument {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct VerificationMethod {
     pub id: String,
+    #[serde(rename = "type", alias = "type_")]
     pub type_: String,
     pub controller: String,
+    #[serde(rename = "publicKeyMultibase", alias = "public_key_multibase")]
     pub public_key_multibase: String,
+    #[serde(default)]
+    pub algorithm: Option<u16>,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct ServiceEndpoint {
     pub id: String,
+    #[serde(rename = "type", alias = "type_")]
     pub type_: String,
+    #[serde(rename = "serviceEndpoint", alias = "service_endpoint")]
     pub service_endpoint: String,
 }
 

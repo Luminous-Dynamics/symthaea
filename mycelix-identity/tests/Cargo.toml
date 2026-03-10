@@ -24,6 +24,9 @@ serde_json = "1.0"
 # Serialization (msgpack for Holochain entry deserialization)
 rmp-serde = "1.1"
 
+# Cryptographic hashing (must match zome's SHA256 computation)
+sha2 = "0.10"
+
 # Utilities
 chrono = "0.4"
 uuid = { version = "1.6", features = ["v4"] }

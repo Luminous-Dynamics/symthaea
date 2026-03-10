@@ -14,7 +14,7 @@
 //! This radical equality is the foundation of time banking.
 
 use hdk::prelude::*;
-use mycelix_finance_shared::anchor_hash;
+use mycelix_finance_shared::{anchor_hash, follow_update_chain};
 
 // Re-export integrity types for external use
 pub use tend_integrity::*;
@@ -248,7 +248,8 @@ pub fn get_dynamic_tend_limit(_: ()) -> ExternResult<i32> {
     Ok(read_current_tier()?.limit())
 }
 
-/// Internal: read the current tier from oracle state
+/// Internal: read the current tier from oracle state.
+/// Follows the update chain to get the latest oracle state.
 fn read_current_tier() -> ExternResult<TendLimitTier> {
     let links = get_links(
         LinkQuery::try_new(anchor_hash(ORACLE_STATE_ANCHOR)?, LinkTypes::AnchorLinks)?,
@@ -257,10 +258,18 @@ fn read_current_tier() -> ExternResult<TendLimitTier> {
 
     if let Some(link) = links.first() {
         if let Some(action_hash) = link.target.clone().into_action_hash() {
-            if let Some(record) = get(action_hash, GetOptions::default())? {
-                if let Some(state) = record.entry().to_app_option::<OracleState>().ok().flatten() {
-                    return Ok(state.tier);
-                }
+            let record = follow_update_chain(action_hash)?;
+            let state = record
+                .entry()
+                .to_app_option::<OracleState>()
+                .map_err(|e| {
+                    wasm_error!(WasmErrorInner::Guest(format!(
+                        "OracleState deserialization error: {:?}",
+                        e
+                    )))
+                })?;
+            if let Some(state) = state {
+                return Ok(state.tier);
             }
         }
     }
@@ -279,14 +288,22 @@ pub fn get_oracle_state(_: ()) -> ExternResult<OracleStateResponse> {
     )?;
     if let Some(link) = links.first() {
         if let Some(action_hash) = link.target.clone().into_action_hash() {
-            if let Some(record) = get(action_hash, GetOptions::default())? {
-                if let Some(state) = record.entry().to_app_option::<OracleState>().ok().flatten() {
-                    return Ok(OracleStateResponse {
-                        vitality: state.vitality,
-                        tier_name: format!("{:?}", state.tier),
-                        limit: state.tier.limit(),
-                    });
-                }
+            let record = follow_update_chain(action_hash)?;
+            let state = record
+                .entry()
+                .to_app_option::<OracleState>()
+                .map_err(|e| {
+                    wasm_error!(WasmErrorInner::Guest(format!(
+                        "OracleState deserialization error: {:?}",
+                        e
+                    )))
+                })?;
+            if let Some(state) = state {
+                return Ok(OracleStateResponse {
+                    vitality: state.vitality,
+                    tier_name: format!("{:?}", state.tier),
+                    limit: state.tier.limit(),
+                });
             }
         }
     }
@@ -1883,9 +1900,16 @@ fn find_balance(member_did: &str, dao_did: &str) -> ExternResult<Option<TendBala
                 "Invalid link target: expected ActionHash".into()
             ))
         })?;
-        if let Some(record) = get(action_hash, GetOptions::default())? {
-            return Ok(record.entry().to_app_option::<TendBalance>().ok().flatten());
-        }
+        let record = follow_update_chain(action_hash)?;
+        return record
+            .entry()
+            .to_app_option::<TendBalance>()
+            .map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!(
+                    "TendBalance deserialization error: {:?}",
+                    e
+                )))
+            });
     }
 
     Ok(None)
@@ -1910,23 +1934,30 @@ fn update_balance_after_exchange(
             link.target.clone().into_action_hash().ok_or_else(|| {
                 wasm_error!(WasmErrorInner::Guest("Invalid link target".to_string()))
             })?;
-        if let Some(record) = get(link_hash, GetOptions::default())? {
-            if let Some(mut balance) = record.entry().to_app_option::<TendBalance>().ok().flatten()
-            {
-                let now = sys_time()?;
+        let record = follow_update_chain(link_hash)?;
+        if let Some(mut balance) = record
+            .entry()
+            .to_app_option::<TendBalance>()
+            .map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!(
+                    "TendBalance deserialization error: {:?}",
+                    e
+                )))
+            })?
+        {
+            let now = sys_time()?;
 
-                if is_provider {
-                    balance.balance += hours.round() as i32;
-                    balance.total_provided += hours;
-                } else {
-                    balance.balance -= hours.round() as i32;
-                    balance.total_received += hours;
-                }
-                balance.exchange_count += 1;
-                balance.last_activity = now;
-
-                update_entry(record.action_address().clone(), &balance)?;
+            if is_provider {
+                balance.balance += hours.round() as i32;
+                balance.total_provided += hours;
+            } else {
+                balance.balance -= hours.round() as i32;
+                balance.total_received += hours;
             }
+            balance.exchange_count += 1;
+            balance.last_activity = now;
+
+            update_entry(record.action_address().clone(), &balance)?;
         }
     }
 
@@ -2007,7 +2038,8 @@ fn check_mediator_eligible(mediator_did: &str) -> ExternResult<bool> {
     }
 }
 
-/// Find a dispute case by its ID, returning both the deserialized case and the action hash
+/// Find a dispute case by its ID, returning both the deserialized case and the action hash.
+/// Follows the update chain to get the latest version.
 fn find_dispute_by_id(dispute_id: &str) -> ExternResult<Option<(DisputeCase, ActionHash)>> {
     let links = get_links(
         LinkQuery::try_new(
@@ -2019,12 +2051,18 @@ fn find_dispute_by_id(dispute_id: &str) -> ExternResult<Option<(DisputeCase, Act
 
     if let Some(link) = links.first() {
         if let Some(link_hash) = link.target.clone().into_action_hash() {
-            if let Some(record) = get(link_hash, GetOptions::default())? {
-                if let Some(dispute_case) =
-                    record.entry().to_app_option::<DisputeCase>().ok().flatten()
-                {
-                    return Ok(Some((dispute_case, record.action_address().clone())));
-                }
+            let record = follow_update_chain(link_hash)?;
+            let dispute_case = record
+                .entry()
+                .to_app_option::<DisputeCase>()
+                .map_err(|e| {
+                    wasm_error!(WasmErrorInner::Guest(format!(
+                        "DisputeCase deserialization error: {:?}",
+                        e
+                    )))
+                })?;
+            if let Some(dispute_case) = dispute_case {
+                return Ok(Some((dispute_case, record.action_address().clone())));
             }
         }
     }
@@ -2445,7 +2483,9 @@ pub fn forgive_balance(member_did: String) -> ExternResult<Vec<(String, i32)>> {
         .include_entries(true);
 
     for record in query(filter)? {
-        if let Some(balance) = record.entry().to_app_option::<TendBalance>().ok().flatten() {
+        if let Some(balance) = record.entry().to_app_option::<TendBalance>().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!("TendBalance deserialization error: {:?}", e)))
+        })? {
             if balance.member_did == member_did && balance.balance != 0 {
                 let forgiven_amount = balance.balance;
                 let now = sys_time()?;

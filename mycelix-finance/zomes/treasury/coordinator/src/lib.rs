@@ -1,6 +1,6 @@
 //! Treasury Coordinator Zome
 use hdk::prelude::*;
-use mycelix_finance_shared::{anchor_hash, verify_caller_is_did};
+use mycelix_finance_shared::{anchor_hash, follow_update_chain, verify_caller_is_did};
 use treasury_integrity::*;
 
 const DEFAULT_LIST_LIMIT: usize = 100;
@@ -144,29 +144,33 @@ fn debit_treasury(treasury_id: &str, amount: u64) -> ExternResult<()> {
 }
 
 /// Internal helper: fetch a treasury Record + deserialized entry by ID via link index.
+/// Follows the update chain to return the latest version.
 fn get_treasury_record(treasury_id: &str) -> ExternResult<(Record, Treasury)> {
     let links = get_links(
         LinkQuery::try_new(anchor_hash(treasury_id)?, LinkTypes::TreasuryIdToTreasury)?,
         GetStrategy::default(),
     )?;
-    if let Some(link) = links.first() {
-        let hash = ActionHash::try_from(link.target.clone())
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(hash, GetOptions::default())? {
-            let treasury = record
-                .entry()
-                .to_app_option::<Treasury>()
-                .ok()
-                .flatten()
-                .ok_or_else(|| {
-                    wasm_error!(WasmErrorInner::Guest("Invalid treasury data".into()))
-                })?;
-            return Ok((record, treasury));
-        }
-    }
-    Err(wasm_error!(WasmErrorInner::Guest(
-        "Treasury not found".into()
-    )))
+    let link = links
+        .first()
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Treasury not found".into()
+        )))?;
+    let hash = ActionHash::try_from(link.target.clone())
+        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+    let record = follow_update_chain(hash)?;
+    let treasury = record
+        .entry()
+        .to_app_option::<Treasury>()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Treasury deserialization error: {:?}",
+                e
+            )))
+        })?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Treasury entry missing".into()
+        )))?;
+    Ok((record, treasury))
 }
 
 #[hdk_extern]
@@ -238,6 +242,7 @@ pub fn execute_allocation(allocation_id: String) -> ExternResult<Record> {
 }
 
 /// Internal helper: fetch an allocation Record + deserialized entry by ID via link index.
+/// Follows the update chain to return the latest version.
 fn get_allocation_record(allocation_id: &str) -> ExternResult<(Record, Allocation)> {
     let links = get_links(
         LinkQuery::try_new(
@@ -246,24 +251,27 @@ fn get_allocation_record(allocation_id: &str) -> ExternResult<(Record, Allocatio
         )?,
         GetStrategy::default(),
     )?;
-    if let Some(link) = links.first() {
-        let hash = ActionHash::try_from(link.target.clone())
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(hash, GetOptions::default())? {
-            let alloc = record
-                .entry()
-                .to_app_option::<Allocation>()
-                .ok()
-                .flatten()
-                .ok_or_else(|| {
-                    wasm_error!(WasmErrorInner::Guest("Invalid allocation data".into()))
-                })?;
-            return Ok((record, alloc));
-        }
-    }
-    Err(wasm_error!(WasmErrorInner::Guest(
-        "Allocation not found".into()
-    )))
+    let link = links
+        .first()
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Allocation not found".into()
+        )))?;
+    let hash = ActionHash::try_from(link.target.clone())
+        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+    let record = follow_update_chain(hash)?;
+    let alloc = record
+        .entry()
+        .to_app_option::<Allocation>()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Allocation deserialization error: {:?}",
+                e
+            )))
+        })?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Allocation entry missing".into()
+        )))?;
+    Ok((record, alloc))
 }
 
 #[hdk_extern]
@@ -324,7 +332,7 @@ pub fn get_treasury(treasury_id: String) -> ExternResult<Option<Record>> {
     if let Some(link) = links.first() {
         let hash = ActionHash::try_from(link.target.clone())
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        return get(hash, GetOptions::default());
+        return Ok(Some(follow_update_chain(hash)?));
     }
     Ok(None)
 }
@@ -350,10 +358,14 @@ pub fn approve_allocation(input: ApproveAllocationInput) -> ExternResult<Record>
     let treasury_data = treasury
         .entry()
         .to_app_option::<Treasury>()
-        .ok()
-        .flatten()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Treasury deserialization error: {:?}",
+                e
+            )))
+        })?
         .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Invalid treasury data".into()
+            "Treasury entry missing".into()
         )))?;
 
     if !treasury_data.managers.contains(&input.approver_did) {
@@ -417,10 +429,14 @@ pub fn reject_allocation(input: RejectAllocationInput) -> ExternResult<Record> {
     let treasury_data = treasury
         .entry()
         .to_app_option::<Treasury>()
-        .ok()
-        .flatten()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Treasury deserialization error: {:?}",
+                e
+            )))
+        })?
         .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Invalid treasury data".into()
+            "Treasury entry missing".into()
         )))?;
 
     if !treasury_data.managers.contains(&input.rejector_did) {
@@ -651,7 +667,9 @@ pub fn get_savings_pool(pool_id: String) -> ExternResult<Option<Record>> {
         .include_entries(true);
 
     for record in query(filter)? {
-        if let Some(pool) = record.entry().to_app_option::<SavingsPool>().ok().flatten() {
+        if let Some(pool) = record.entry().to_app_option::<SavingsPool>().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!("SavingsPool deserialization error: {:?}", e)))
+        })? {
             if pool.id == pool_id {
                 return Ok(Some(record));
             }
@@ -671,7 +689,9 @@ pub fn join_savings_pool(input: JoinPoolInput) -> ExternResult<Record> {
         .include_entries(true);
 
     for record in query(filter)? {
-        if let Some(pool) = record.entry().to_app_option::<SavingsPool>().ok().flatten() {
+        if let Some(pool) = record.entry().to_app_option::<SavingsPool>().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!("SavingsPool deserialization error: {:?}", e)))
+        })? {
             if pool.id == input.pool_id {
                 if pool.members.contains(&input.member_did) {
                     return Err(wasm_error!(WasmErrorInner::Guest(
@@ -718,7 +738,9 @@ pub fn contribute_to_pool(input: PoolContributionInput) -> ExternResult<Record> 
         .include_entries(true);
 
     for record in query(filter)? {
-        if let Some(pool) = record.entry().to_app_option::<SavingsPool>().ok().flatten() {
+        if let Some(pool) = record.entry().to_app_option::<SavingsPool>().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!("SavingsPool deserialization error: {:?}", e)))
+        })? {
             if pool.id == input.pool_id {
                 if !pool.members.contains(&input.contributor_did) {
                     return Err(wasm_error!(WasmErrorInner::Guest(
@@ -821,10 +843,14 @@ pub fn cancel_allocation(input: CancelAllocationInput) -> ExternResult<Record> {
     let treasury_data = treasury
         .entry()
         .to_app_option::<Treasury>()
-        .ok()
-        .flatten()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Treasury deserialization error: {:?}",
+                e
+            )))
+        })?
         .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Invalid treasury data".into()
+            "Treasury entry missing".into()
         )))?;
 
     if !treasury_data.managers.contains(&input.cancelled_by_did) {
@@ -863,7 +889,9 @@ pub fn get_allocations_by_status(input: AllocationStatusQuery) -> ExternResult<V
 
     let mut results = Vec::new();
     for record in query(filter)? {
-        if let Some(alloc) = record.entry().to_app_option::<Allocation>().ok().flatten() {
+        if let Some(alloc) = record.entry().to_app_option::<Allocation>().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!("Allocation deserialization error: {:?}", e)))
+        })? {
             if alloc.treasury_id == input.treasury_id && alloc.status == input.status {
                 results.push(record);
             }
@@ -929,7 +957,9 @@ pub fn contribute_to_commons(input: ContributeToCommonsInput) -> ExternResult<Re
         .include_entries(true);
 
     for record in query(filter)? {
-        if let Some(pool) = record.entry().to_app_option::<CommonsPool>().ok().flatten() {
+        if let Some(pool) = record.entry().to_app_option::<CommonsPool>().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!("CommonsPool deserialization error: {:?}", e)))
+        })? {
             if pool.id == input.commons_pool_id {
                 let now = sys_time()?;
 
@@ -986,7 +1016,9 @@ pub fn receive_compost(input: ReceiveCompostInput) -> ExternResult<Record> {
         .include_entries(true);
 
     for record in query(filter)? {
-        if let Some(pool) = record.entry().to_app_option::<CommonsPool>().ok().flatten() {
+        if let Some(pool) = record.entry().to_app_option::<CommonsPool>().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!("CommonsPool deserialization error: {:?}", e)))
+        })? {
             if pool.id == input.commons_pool_id {
                 let now = sys_time()?;
 
@@ -1052,7 +1084,9 @@ pub fn request_allocation(input: RequestCommonsAllocationInput) -> ExternResult<
         .include_entries(true);
 
     for record in query(filter)? {
-        if let Some(pool) = record.entry().to_app_option::<CommonsPool>().ok().flatten() {
+        if let Some(pool) = record.entry().to_app_option::<CommonsPool>().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!("CommonsPool deserialization error: {:?}", e)))
+        })? {
             if pool.id == input.commons_pool_id {
                 // Validate: allocation comes only from available balance
                 if input.amount > pool.available_balance {
@@ -1116,7 +1150,9 @@ pub fn get_commons_pool(pool_id: String) -> ExternResult<Option<Record>> {
         .include_entries(true);
 
     for record in query(filter)? {
-        if let Some(pool) = record.entry().to_app_option::<CommonsPool>().ok().flatten() {
+        if let Some(pool) = record.entry().to_app_option::<CommonsPool>().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!("CommonsPool deserialization error: {:?}", e)))
+        })? {
             if pool.id == pool_id {
                 return Ok(Some(record));
             }
