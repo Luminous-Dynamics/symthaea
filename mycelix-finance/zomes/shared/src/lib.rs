@@ -353,12 +353,10 @@ pub mod batch {
         records
             .iter()
             .filter(|r| {
-                r.entry()
-                    .to_app_option::<T>()
-                    .ok()
-                    .flatten()
-                    .map(|entry| predicate(&entry))
-                    .unwrap_or(false)
+                match r.entry().to_app_option::<T>() {
+                    Ok(Some(entry)) => predicate(&entry),
+                    _ => false,
+                }
             })
             .cloned()
             .collect()
