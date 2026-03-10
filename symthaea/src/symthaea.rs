@@ -413,6 +413,10 @@ pub struct Symthaea {
     /// Injected as "AVOID" notes into future generations.
     #[cfg(feature = "code_generation")]
     error_pattern_memory: Vec<(String, String)>,
+    /// Last MCTS plan confidence from the reasoning engine (set by cognitive loop).
+    /// Feeds into code generation to modulate plan ambition.
+    #[cfg(feature = "code_generation")]
+    last_mcts_plan_confidence: f32,
 
     // ── Nociception: Pain & Infrastructure Health ──────────────────────
     /// Somatic error bridge: drains infrastructure errors → felt stress.
@@ -740,6 +744,8 @@ impl Symthaea {
             code_generation_cache: Vec::new(),
             #[cfg(feature = "code_generation")]
             error_pattern_memory: Vec::new(),
+            #[cfg(feature = "code_generation")]
+            last_mcts_plan_confidence: 0.0,
             somatic_bridge,
             pain_tx,
             task_supervisor,
@@ -816,6 +822,15 @@ impl Symthaea {
     /// Cloneable handle to the consciousness database (if configured).
     pub fn database_arc(&self) -> Option<Arc<dyn ConsciousnessDatabase>> {
         self.database.as_ref().map(Arc::clone)
+    }
+
+    /// Feed MCTS plan confidence from the reasoning engine into code generation.
+    ///
+    /// Called by the cognitive loop after the reasoning phase completes.
+    /// Higher confidence (0.0-1.0) produces more ambitious code plans.
+    #[cfg(feature = "code_generation")]
+    pub fn feed_mcts_plan_confidence(&mut self, confidence: f32) {
+        self.last_mcts_plan_confidence = confidence.clamp(0.0, 1.0);
     }
 
     /// Attach the power SSM sensor (INA219 or simulated) to the sensor registry.
@@ -1024,6 +1039,8 @@ impl Symthaea {
             code_generation_cache: Vec::new(),
             #[cfg(feature = "code_generation")]
             error_pattern_memory: Vec::new(),
+            #[cfg(feature = "code_generation")]
+            last_mcts_plan_confidence: 0.0,
             somatic_bridge,
             pain_tx,
             task_supervisor,
@@ -1652,6 +1669,7 @@ impl Symthaea {
 
             let gen_ctx = crate::language::code_generator::CodeContext {
                 past_examples: relevant_examples,
+                mcts_plan_confidence: self.last_mcts_plan_confidence,
                 ..Default::default()
             };
 
@@ -1786,11 +1804,23 @@ impl Symthaea {
             thought.semantic_intent = crate::mind::SemanticIntent::Answer;
             thought.epistemic_status = generated.epistemic_status;
 
+            // Plan coverage metric: log plan gap for FEP learning signal
+            let plan_gap = 1.0 - generated.plan_coverage;
+            if plan_gap > 0.3 {
+                tracing::warn!(
+                    target: "symthaea::code",
+                    plan_coverage = generated.plan_coverage,
+                    plan_gap = plan_gap,
+                    "Plan gap > 0.3 — CfC planner producing unused steps"
+                );
+            }
+
             tracing::debug!(
                 target: "symthaea::code",
                 phi = generated.phi_score,
                 similarity = generated.intent_similarity,
                 plan_steps = generated.plan_steps.len(),
+                plan_coverage = generated.plan_coverage,
                 "Phase 3.6: CfC code plan injected into structured thought"
             );
 

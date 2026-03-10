@@ -511,6 +511,10 @@ pub struct GeneratedCode {
     pub primitives_used: Vec<String>,
     /// Dataflow analysis of generated code
     pub dataflow: Option<DataflowInfo>,
+    /// Plan depth metric: fraction of plan steps that produced actual code (0.0-1.0).
+    /// Low values indicate the planner is generating steps that the emitter can't use.
+    /// Can be fed to FEP as a learning signal (plan_gap = 1.0 - plan_coverage).
+    pub plan_coverage: f32,
 }
 
 /// Context provided to the code generator
@@ -524,6 +528,10 @@ pub struct CodeContext<'a> {
     /// Past successful code generations (from episodic memory).
     /// Each entry is (purpose, source_code) for few-shot context.
     pub past_examples: Vec<(String, String)>,
+    /// MCTS plan confidence from the reasoning engine (0.0-1.0).
+    /// When > 0, modulates the CfC sequencer's completion threshold —
+    /// higher MCTS confidence means more ambitious plans.
+    pub mcts_plan_confidence: f32,
 }
 
 impl<'a> Default for CodeContext<'a> {
@@ -533,6 +541,7 @@ impl<'a> Default for CodeContext<'a> {
             context_hvs: Vec::new(),
             source_files: Vec::new(),
             past_examples: Vec::new(),
+            mcts_plan_confidence: 0.0,
         }
     }
 }
@@ -855,17 +864,27 @@ impl CodeGenerator {
         let similar_hvs = self.find_similar_context(&intent_hv, context);
         let similar_refs: Vec<&ContinuousHV> = similar_hvs.iter().collect();
 
-        // 3. CfC plan (informed by primitive composition)
-        let plan = self.sequencer.plan_structure(&intent_hv, &similar_refs);
+        // 3. CfC plan (informed by primitive composition + MCTS confidence)
+        let mut plan = self.sequencer.plan_structure(&intent_hv, &similar_refs);
+
+        // If MCTS confidence is high, boost low-confidence plan steps
+        // (the reasoning engine has already vetted this direction)
+        if context.mcts_plan_confidence > 0.5 {
+            let boost = (context.mcts_plan_confidence - 0.5) * 0.4; // up to 0.2 boost
+            for step in &mut plan {
+                step.confidence = (step.confidence + boost).min(1.0);
+            }
+        }
 
         // 4. Emit code using language-specific emitter
         let source = self.emit_from_plan(&plan, spec, &spec.language);
 
-        // 5. Compute intent similarity (combine plan coverage + primitive phi)
+        // 5. Compute intent similarity (combine plan coverage + primitive phi + MCTS)
         let intent_similarity = if !source.is_empty() {
             let coverage = plan.len() as f32 / 5.0;
-            // Weight: 70% plan coverage, 30% primitive phi (measures integration)
-            (coverage * 0.7 + primitive_result.phi * 0.3).min(1.0)
+            let mcts_bonus = context.mcts_plan_confidence * 0.1; // up to 0.1 bonus
+            // Weight: 60% plan coverage, 30% primitive phi, 10% MCTS confidence
+            (coverage * 0.6 + primitive_result.phi * 0.3 + mcts_bonus).min(1.0)
         } else {
             0.0
         };
@@ -911,6 +930,34 @@ impl CodeGenerator {
             }
         }
 
+        // Compute plan coverage: how many plan steps produced visible code artifacts.
+        // A DefineFunction step that results in a fn declaration counts; a DefineStruct
+        // step that doesn't produce struct code doesn't count.
+        let plan_coverage = if plan.is_empty() {
+            0.0
+        } else {
+            use crate::dynamics::cfc_code_sequencer::PlanAction;
+            let covered = plan
+                .iter()
+                .filter(|step| match step.action {
+                    PlanAction::DefineFunction => source.contains("fn "),
+                    PlanAction::DefineStruct => source.contains("struct "),
+                    PlanAction::DefineTrait => source.contains("trait "),
+                    PlanAction::AddField => source.contains(':'),
+                    PlanAction::AddMethod => source.contains("fn "),
+                    PlanAction::ImplTrait => source.contains("impl "),
+                    PlanAction::AddImport => source.contains("use "),
+                    PlanAction::AddDocumentation => source.contains("///"),
+                    PlanAction::AddErrorHandling => {
+                        source.contains("Result") || source.contains("?")
+                    }
+                    PlanAction::Complete => true, // always counts
+                    _ => !source.is_empty(), // conservative: if we have code, count it
+                })
+                .count();
+            covered as f32 / plan.len() as f32
+        };
+
         GeneratedCode {
             source,
             language: spec.language.clone(),
@@ -925,6 +972,7 @@ impl CodeGenerator {
                 .map(|p| p.primitive.name.clone())
                 .collect(),
             dataflow,
+            plan_coverage,
         }
     }
 
@@ -979,6 +1027,7 @@ impl CodeGenerator {
                 .map(|p| p.primitive.name.clone())
                 .collect(),
             dataflow: None,
+            plan_coverage: 0.0,
         }
     }
 
@@ -1239,6 +1288,7 @@ impl CodeGenerator {
                 .map(|p| p.primitive.name.clone())
                 .collect(),
             dataflow: None,
+            plan_coverage: 0.0,
         }
     }
 
@@ -1283,6 +1333,7 @@ impl CodeGenerator {
                 .map(|p| p.primitive.name.clone())
                 .collect(),
             dataflow: None,
+            plan_coverage: 0.0,
         }
     }
 
@@ -1344,6 +1395,7 @@ impl CodeGenerator {
                 .map(|p| p.primitive.name.clone())
                 .collect(),
             dataflow: None,
+            plan_coverage: 0.0,
         }
     }
 
@@ -1380,6 +1432,7 @@ impl CodeGenerator {
                 .map(|p| p.primitive.name.clone())
                 .collect(),
             dataflow: None,
+            plan_coverage: 0.0,
         }
     }
 

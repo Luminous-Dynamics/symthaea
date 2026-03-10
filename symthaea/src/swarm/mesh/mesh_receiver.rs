@@ -229,8 +229,23 @@ impl MeshReceiver {
         #[cfg(feature = "mesh-encryption")]
         let decrypted_buf: zeroize::Zeroizing<Vec<u8>>;
         #[cfg(feature = "mesh-encryption")]
+        let mut nonce_bytes_saved: Option<[u8; 12]> = None;
+        #[cfg(feature = "mesh-encryption")]
         let raw = if self.fragment_encryption {
             if let Some(ref key) = self.encryption_key {
+                // Verify the nonce's source_id matches the transport-layer source
+                // before attempting decryption — prevents cross-stream injection.
+                if raw.len() >= super::AEAD_NONCE_SIZE {
+                    let nonce_source = &raw[..8];
+                    if nonce_source != &source {
+                        self.stats.packets_decrypt_failed += 1;
+                        return None;
+                    }
+                    // Save nonce for post-parse validation
+                    let mut nb = [0u8; 12];
+                    nb.copy_from_slice(&raw[..12]);
+                    nonce_bytes_saved = Some(nb);
+                }
                 match super::decrypt_fragment(raw, key) {
                     Some(plain) => {
                         decrypted_buf = zeroize::Zeroizing::new(plain);
@@ -257,6 +272,18 @@ impl MeshReceiver {
             }
         };
 
+        // Verify nonce thought_id matches parsed fragment — detects cross-stream
+        // injection where an attacker feeds a fragment encrypted for stream B
+        // into stream A's reassembly (nonce carries the original thought_id).
+        #[cfg(feature = "mesh-encryption")]
+        if let Some(nb) = nonce_bytes_saved {
+            let nonce_thought_id = u16::from_le_bytes([nb[8], nb[9]]);
+            if nonce_thought_id != frag.thought_id {
+                self.stats.packets_decrypt_failed += 1;
+                return None;
+            }
+        }
+
         self.stats.fragments_received += 1;
         let now = Instant::now();
 
@@ -276,13 +303,18 @@ impl MeshReceiver {
         }
 
         // Compute 16-bit key fingerprint for this fragment (Item 12).
-        // Samples 8 evenly-spaced bytes from the 32-byte key, folds into
-        // two u8 lanes via XOR, then combines into a u16 (~1/65536 collision).
+        // FNV-1a-inspired 16-bit hash over 8 evenly-spaced key bytes.
+        // Position-dependent mixing avoids collisions for uniform keys
+        // (e.g., [0xAA; 32] vs [0xBB; 32] which pure XOR would collapse to 0).
         #[cfg(feature = "mesh-encryption")]
         let current_fingerprint: Option<u16> = self.encryption_key.map(|k| {
-            let lo = k[0] ^ k[4] ^ k[8] ^ k[12];
-            let hi = k[16] ^ k[20] ^ k[24] ^ k[31];
-            ((hi as u16) << 8) | (lo as u16)
+            let samples = [k[0], k[4], k[8], k[12], k[16], k[20], k[24], k[31]];
+            let mut h: u16 = 0x811C; // FNV offset basis (truncated)
+            for &b in &samples {
+                h ^= b as u16;
+                h = h.wrapping_mul(0x0101); // FNV-like prime
+            }
+            h
         });
 
         // Get or create the assembler for this stream
@@ -348,11 +380,23 @@ impl MeshReceiver {
             let assembly = self.pending.remove(&key).unwrap();
             let used_fec = assembly.assembler.used_fec_recovery();
 
-            // Decrypt (if key set) → decompress → parse, with fallback.
-            let packet = assembly
-                .assembler
-                .assemble()
-                .and_then(|assembled| self.decode_envelope(&assembled));
+            // When fragment_encryption is active, fragments were already
+            // decrypted individually — skip packet-level decryption and
+            // go straight to decompress → parse.
+            #[cfg(feature = "mesh-encryption")]
+            let already_decrypted = self.fragment_encryption && self.encryption_key.is_some();
+            #[cfg(not(feature = "mesh-encryption"))]
+            let already_decrypted = false;
+
+            let packet = assembly.assembler.assemble().and_then(|assembled| {
+                if already_decrypted {
+                    super::decompress_packet(&assembled)
+                        .and_then(|raw| WisdomPacket::from_bytes(&raw))
+                        .or_else(|| WisdomPacket::from_bytes(&assembled))
+                } else {
+                    self.decode_envelope(&assembled)
+                }
+            });
 
             if let Some(packet) = packet {
                 self.stats.packets_complete += 1;

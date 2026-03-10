@@ -139,6 +139,7 @@ fn generate_metrics(step: usize, domain_idx: usize) -> SafetyMetrics {
         consciousness_level: consciousness.clamp(0.0, 1.0),
         prediction_error: pred_error.clamp(0.0, 1.0),
         temporal_coherence: coherence.clamp(0.0, 1.0),
+        integrity_critical: false,
     }
 }
 

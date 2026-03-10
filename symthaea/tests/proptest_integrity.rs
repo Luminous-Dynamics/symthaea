@@ -40,7 +40,7 @@ proptest! {
     fn prop_consecutive_failures_monotonic(n_failures in 1usize..10) {
         let mut reg = AttestationRegistry::new();
         let baseline = blake3_hash(b"original");
-        reg.register(
+        reg.register_tampered(
             "test",
             baseline,
             Box::new(|| blake3_hash(b"tampered")),
@@ -64,7 +64,7 @@ proptest! {
         let call_count = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let cc = call_count.clone();
         let threshold = n_failures;
-        reg.register(
+        reg.register_tampered(
             "switchable",
             hash,
             Box::new(move || {
@@ -117,7 +117,7 @@ proptest! {
     fn prop_three_plus_failures_critical(n in 3usize..15) {
         let mut mgr = IntegrityManager::new();
         let baseline = blake3_hash(b"original");
-        mgr.attestation.register(
+        mgr.attestation.register_tampered(
             "tampered",
             baseline,
             Box::new(|| blake3_hash(b"modified")),
@@ -149,7 +149,10 @@ proptest! {
         mgr.register_safety_thresholds(&values);
         let mut tampered = values.clone();
         let idx = delta_idx % tampered.len();
-        tampered[idx] += 1.0; // ensure at least one value differs
+        // Use bit-level manipulation to guarantee a different value
+        // (adding 1.0 to large floats can be a no-op due to ULP)
+        let bits = tampered[idx].to_bits();
+        tampered[idx] = f32::from_bits(bits ^ 1); // flip LSB — always different bytes
         let live = blake3_hash_f32_slice(&tampered);
         prop_assert!(mgr.verify_live_thresholds("safety_thresholds", live).is_some());
     }
@@ -159,7 +162,7 @@ proptest! {
     fn prop_event_log_bounded(n_ticks in 1usize..200) {
         let mut mgr = IntegrityManager::new();
         let baseline = blake3_hash(b"original");
-        mgr.attestation.register(
+        mgr.attestation.register_tampered(
             "tampered",
             baseline,
             Box::new(|| blake3_hash(b"modified")),

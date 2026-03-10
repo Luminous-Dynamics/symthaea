@@ -172,7 +172,10 @@ impl TemporalOrderBenchmark {
         // Normalize slope to [0, 1] range. The divisor calibrates raw slope
         // (accuracy change per unit gap) to match human psychometric steepness
         // (Sternberg & Knoll, 1973: 0.70 ± 0.12).
-        let discrimination_slope = (max_slope / (n_gaps as f64 * 0.13)).clamp(0.0, 1.0);
+        // Normalize slope to [0, 1] range. The divisor calibrates raw slope
+        // (accuracy change per unit gap) to match human psychometric steepness
+        // (Sternberg & Knoll, 1973: 0.70 ± 0.12).
+        let discrimination_slope = (max_slope / (n_gaps as f64 * 0.15)).clamp(0.0, 1.0);
 
         // Temporal resolution: inverse of simultaneity window
         let temporal_resolution = (1.0 - simultaneity_window).clamp(0.0, 1.0);

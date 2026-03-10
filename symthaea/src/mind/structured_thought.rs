@@ -662,9 +662,24 @@ impl StructuredThought {
                 prompt.push_str("Replace ONLY the placeholder bodies with real implementations.\n");
                 prompt.push_str("Keep the function signatures, struct definitions, and test assertions exactly as-is.\n");
             }
-            if !ctx.notes.is_empty() {
+            // Separate distillation examples from other notes for structured few-shot
+            let (example_notes, other_notes): (Vec<_>, Vec<_>) = ctx
+                .notes
+                .iter()
+                .partition(|n| n.starts_with("PAST_EXAMPLE("));
+            if !example_notes.is_empty() {
+                prompt.push_str("DISTILLATION_EXAMPLES:\n");
+                prompt.push_str("These are verified, high-quality code generations from this session.\n");
+                prompt.push_str("Use them as style and pattern references:\n\n");
+                for note in &example_notes {
+                    prompt.push_str(note);
+                    prompt.push('\n');
+                }
+                prompt.push('\n');
+            }
+            if !other_notes.is_empty() {
                 prompt.push_str("CODE_NOTES:\n");
-                for note in &ctx.notes {
+                for note in &other_notes {
                     prompt.push_str(&format!("  - {note}\n"));
                 }
             }

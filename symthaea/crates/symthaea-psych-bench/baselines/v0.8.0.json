@@ -1,6 +1,6 @@
 {
   "name": "baseline",
-  "timestamp": "2026-03-09T23:47:06.912258960+00:00",
+  "timestamp": "2026-03-10T00:48:27.555425769+00:00",
   "git_hash": "dc1764c3",
   "config_summary": "dim=512, trials=10, seed=42",
   "schema_version": "1.1",
@@ -4176,11 +4176,11 @@
         "ci_upper": 1.065302696610997
       },
       "elapsed_ms": {
-        "mean": 10628.0,
+        "mean": 9324.0,
         "std_dev": 0.0,
         "n": 1,
-        "ci_lower": 10628.0,
-        "ci_upper": 10628.0
+        "ci_lower": 9324.0,
+        "ci_upper": 9324.0
       },
       "gwt_effective_threshold": {
         "mean": 0.634,

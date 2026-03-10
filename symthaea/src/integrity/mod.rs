@@ -247,13 +247,14 @@ impl IntegrityManager {
         }
 
         // Log all anomalies to the persistent ring buffer for post-mortem analysis
-        for anomaly in &self.status.anomalies {
-            self.log_event(
-                cycle,
-                anomaly.source,
-                anomaly.description.clone(),
-                anomaly.severity,
-            );
+        let events_to_log: Vec<_> = self
+            .status
+            .anomalies
+            .iter()
+            .map(|a| (a.source, a.description.clone(), a.severity))
+            .collect();
+        for (source, description, severity) in events_to_log {
+            self.log_event(cycle, source, description, severity);
         }
 
         // Compute integrity confidence for consciousness gating.
@@ -420,7 +421,7 @@ mod tests {
     fn test_full_sweep_detects_drift_on_first_failure() {
         let mut mgr = IntegrityManager::new();
         let baseline = attestation::blake3_hash(b"original");
-        mgr.attestation.register(
+        mgr.attestation.register_tampered(
             "tampered",
             baseline,
             Box::new(move || attestation::blake3_hash(b"modified")),
@@ -437,7 +438,7 @@ mod tests {
     fn test_consecutive_failures_escalate_to_critical() {
         let mut mgr = IntegrityManager::new();
         let baseline = attestation::blake3_hash(b"original");
-        mgr.attestation.register(
+        mgr.attestation.register_tampered(
             "tampered",
             baseline,
             Box::new(move || attestation::blake3_hash(b"modified")),
@@ -459,7 +460,7 @@ mod tests {
 
         // Register a tampered attestation
         let baseline = attestation::blake3_hash(b"original");
-        mgr.attestation.register(
+        mgr.attestation.register_tampered(
             "tampered",
             baseline,
             Box::new(move || attestation::blake3_hash(b"modified")),

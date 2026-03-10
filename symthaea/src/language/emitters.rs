@@ -437,15 +437,26 @@ fn infer_rust_body(
     }
     if purpose_lower.contains("filter") {
         if params.len() >= 1 && params[0].1.contains("Vec") {
-            return format!(
-                "{}.iter().filter(|x| /* condition */).cloned().collect()",
-                params[0].0
-            );
+            let cond = infer_filter_closure(&purpose_lower);
+            let iter = iter_method_for_owned(return_type);
+            if iter == ".into_iter()" {
+                return format!(
+                    "{}.into_iter().filter(|x| {}).collect()",
+                    params[0].0, cond
+                );
+            } else {
+                return format!(
+                    "{}.iter().filter(|x| {}).cloned().collect()",
+                    params[0].0, cond
+                );
+            }
         }
     }
     if purpose_lower.contains("map") || purpose_lower.contains("transform") {
         if params.len() >= 1 && params[0].1.contains("Vec") {
-            return format!("{}.iter().map(|x| /* transform */).collect()", params[0].0);
+            let body = infer_map_closure(&purpose_lower);
+            let iter = iter_method_for_owned(return_type);
+            return format!("{}{}.map(|x| {}).collect()", params[0].0, iter, body);
         }
     }
     if purpose_lower.contains("flatten") {
@@ -626,7 +637,8 @@ fn infer_rust_body(
     if ret.contains("Option") {
         if purpose_lower.contains("find") || purpose_lower.contains("first") {
             if params.len() >= 1 {
-                return format!("{}.iter().find(|x| /* condition */).cloned()", params[0].0);
+                let cond = infer_filter_closure(&purpose_lower);
+                return format!("{}.iter().find(|x| {}).cloned()", params[0].0, cond);
             }
         }
     }
@@ -663,7 +675,8 @@ fn infer_rust_body(
     // partition / split into
     if purpose_lower.contains("partition") || purpose_lower.contains("split into") {
         if params.len() == 1 && params[0].1.contains("Vec") {
-            return format!("{}.iter().partition(|x| /* condition */)", params[0].0);
+            let cond = infer_filter_closure(&purpose_lower);
+            return format!("{}.iter().partition(|x| {})", params[0].0, cond);
         }
     }
     // any / any element
@@ -673,12 +686,14 @@ fn infer_rust_body(
             && params.len() == 1
             && params[0].1.contains("Vec"))
     {
-        return format!("{}.iter().any(|x| /* condition */)", params[0].0);
+        let cond = infer_filter_closure(&purpose_lower);
+        return format!("{}.iter().any(|x| {})", params[0].0, cond);
     }
     // all / every element
     if purpose_lower.contains("all elements") || purpose_lower.contains("every element") {
         if params.len() == 1 && params[0].1.contains("Vec") {
-            return format!("{}.iter().all(|x| /* condition */)", params[0].0);
+            let cond = infer_filter_closure(&purpose_lower);
+            return format!("{}.iter().all(|x| {})", params[0].0, cond);
         }
     }
 
@@ -892,7 +907,7 @@ fn infer_composed_body(
             ".filter(|x| *x < 0)",
             "filter_neg",
         ),
-        (&["filter"], ".filter(|x| /* condition */)", "filter"),
+        (&["filter"], "", "filter"), // handled in match arm via infer_filter_closure
         (&["sort", "order"], "", "sort"), // handled specially
         (&["reverse", "reversed"], ".rev()", "reverse"),
         (
@@ -1065,6 +1080,36 @@ fn extract_number_from_text(text: &str) -> Option<usize> {
 }
 
 /// Infer a filter closure body from the purpose description.
+/// Choose the right iterator method based on whether the return type needs owned values.
+///
+/// - Returns `".into_iter()"` when the return type contains owned collections (`Vec<T>`,
+///   `HashMap`, `HashSet`, `String`, `Result`, `Option`) since these need owned `T`.
+/// - Returns `".iter()"` for reference return types or when no return type is specified.
+fn iter_method_for_owned(return_type: Option<&str>) -> &'static str {
+    match return_type {
+        Some(ret) => {
+            if ret.contains("Vec<")
+                || ret.contains("HashMap")
+                || ret.contains("HashSet")
+                || ret.contains("String")
+                || ret.contains("Result<")
+                || ret.contains("Option<")
+                || ret == "usize"
+                || ret == "i32"
+                || ret == "i64"
+                || ret == "f32"
+                || ret == "f64"
+                || ret == "bool"
+            {
+                ".into_iter()"
+            } else {
+                ".iter()"
+            }
+        }
+        None => ".into_iter()", // default to owned for safety
+    }
+}
+
 fn infer_filter_closure(purpose: &str) -> &'static str {
     if purpose.contains("even") {
         return "*x % 2 == 0";
@@ -1089,6 +1134,36 @@ fn infer_filter_closure(purpose: &str) -> &'static str {
     }
     if purpose.contains("empty") {
         return "!x.is_empty()";
+    }
+    if purpose.contains("contains") {
+        return "x.contains(&target)";
+    }
+    if purpose.contains("starts with") || purpose.contains("starts_with") {
+        return "x.starts_with(&prefix)";
+    }
+    if purpose.contains("ends with") || purpose.contains("ends_with") {
+        return "x.ends_with(&suffix)";
+    }
+    if purpose.contains("greater") || purpose.contains("above") {
+        return "*x > threshold";
+    }
+    if purpose.contains("less") || purpose.contains("below") {
+        return "*x < threshold";
+    }
+    if purpose.contains("between") || purpose.contains("in range") {
+        return "*x >= low && *x <= high";
+    }
+    if purpose.contains("divisible") {
+        return "*x % divisor == 0";
+    }
+    if purpose.contains("alphabetic") {
+        return "x.chars().all(|c| c.is_alphabetic())";
+    }
+    if purpose.contains("numeric") || purpose.contains("digit") {
+        return "x.chars().all(|c| c.is_numeric())";
+    }
+    if purpose.contains("unique") {
+        return "true /* deduplicated upstream */";
     }
     "true /* TODO: specify condition */"
 }
@@ -1131,7 +1206,40 @@ fn infer_map_closure(purpose: &str) -> &'static str {
     if purpose.contains("length") || purpose.contains("len") {
         return "x.len()";
     }
-    "*x /* TODO: specify transform */"
+    if purpose.contains("trim") {
+        return "x.trim().to_string()";
+    }
+    if purpose.contains("reverse") {
+        return "x.chars().rev().collect::<String>()";
+    }
+    if purpose.contains("clamp") {
+        return "x.clamp(low, high)";
+    }
+    if purpose.contains("reciprocal") || purpose.contains("invert") {
+        return "1.0 / x";
+    }
+    if purpose.contains("ceil") {
+        return "x.ceil()";
+    }
+    if purpose.contains("floor") {
+        return "x.floor()";
+    }
+    if purpose.contains("round") {
+        return "x.round()";
+    }
+    if purpose.contains("sqrt") || purpose.contains("square root") {
+        return "(x as f64).sqrt()";
+    }
+    if purpose.contains("cube") {
+        return "x * x * x";
+    }
+    if purpose.contains("sign") || purpose.contains("signum") {
+        return "x.signum()";
+    }
+    if purpose.contains("ascii") {
+        return "*x as u8";
+    }
+    "x /* TODO: specify transform */"
 }
 
 /// Compose multiple atomic patterns into multi-step algorithms.
@@ -1222,13 +1330,22 @@ fn compose_patterns(
     }
 
     // ── 4. Zip + combine: element-wise operations on two vectors ──
+    // Guard: only match when there's an actual arithmetic operation, not plain "zip together"
+    // Exclude "dot product" which has its own specific pattern in infer_rust_body
+    let has_arithmetic_intent = !purpose.contains("dot")
+        && !purpose.contains("cartesian")
+        && (purpose.contains("add")
+            || purpose.contains("subtract")
+            || purpose.contains("multiply")
+            || purpose.contains("product")
+            || purpose.contains("difference")
+            || purpose.contains("element-wise")
+            || purpose.contains("elementwise")
+            || purpose.contains("pairwise"));
     if params.len() >= 2
         && p0_is_vec
         && (params[1].1.contains("Vec") || params[1].1.contains("&["))
-        && (purpose.contains("element-wise")
-            || purpose.contains("elementwise")
-            || purpose.contains("zip")
-            || purpose.contains("pairwise"))
+        && has_arithmetic_intent
     {
         let p1 = &params[1].0;
         let op = if purpose.contains("multiply") || purpose.contains("product") {
@@ -1305,7 +1422,7 @@ fn compose_patterns(
             } else if purpose.contains("odd") {
                 "|x| **x % 2 != 0"
             } else {
-                "|x| true /* condition */"
+                "|x| true"
             };
 
             let transform = if purpose.contains("double") {
@@ -1536,6 +1653,13 @@ impl CodeEmitter for RustEmitter {
 
         // Try to parse the provided signature
         let parsed_sig = spec.signature.as_deref().and_then(parse_rust_signature);
+
+        // If we have a parsed function signature, ensure function emission regardless
+        // of what actions the CfC planner produced. The planner sometimes emits
+        // DefineStruct for simple function tasks (e.g., parse_integer).
+        if parsed_sig.is_some() {
+            has_function = true;
+        }
 
         // Emit struct
         if has_struct {

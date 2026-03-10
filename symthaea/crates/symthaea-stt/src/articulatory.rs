@@ -483,7 +483,7 @@ impl ArticulatoryMapper {
                 voicing: Voicing::Voiced,
                 manner: Manner::Vowel,
                 place: Place::Back,
-                height: Some(VowelHeight::Low),
+                height: Some(VowelHeight::Mid), // /ɔː/ is open-mid, distinct from AA /ɑː/ which is fully low
                 roundness: Some(true),
             },
         );

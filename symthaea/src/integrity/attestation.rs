@@ -116,6 +116,27 @@ impl AttestationRegistry {
         self.hashers.push(hasher);
     }
 
+    /// Register without the self-test assertion.
+    ///
+    /// **Only for testing**: allows intentionally mismatched baseline/hasher to simulate
+    /// tampering. Production code should always use `register()`.
+    #[cfg(any(test, feature = "integrity"))]
+    pub fn register_tampered(
+        &mut self,
+        name: &'static str,
+        initial_hash: [u8; 32],
+        hasher: Box<dyn Fn() -> [u8; 32] + Send + Sync>,
+    ) {
+        self.records.push(AttestationRecord {
+            name,
+            baseline_hash: initial_hash,
+            baseline_time: Instant::now(),
+            last_verification: None,
+            consecutive_failures: 0,
+        });
+        self.hashers.push(hasher);
+    }
+
     /// Register from an `Attestable` implementor.
     ///
     /// Note: This takes a snapshot hash at registration time. For runtime re-verification,
@@ -274,7 +295,7 @@ mod tests {
     fn test_registry_detects_tampering() {
         let mut reg = AttestationRegistry::new();
         let baseline = blake3_hash(b"original");
-        reg.register(
+        reg.register_tampered(
             "tampered",
             baseline,
             Box::new(move || blake3_hash(b"modified")),

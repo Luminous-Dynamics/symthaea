@@ -30,6 +30,7 @@ fn main() {
             consciousness_level: *consciousness,
             prediction_error: *pred_err,
             temporal_coherence: *coherence,
+            integrity_critical: false,
         };
         let assessment = agent.assess(metrics);
         println!(
