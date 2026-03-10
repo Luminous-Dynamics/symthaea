@@ -168,13 +168,13 @@ impl SporeEngine {
     // ======================================================================
 
     /// Analyze consciousness topology. Returns TopologyAnalysis.
-    pub fn topology_analysis(&self) -> Result<JsValue, JsError> {
+    pub fn topology_analysis(&mut self) -> Result<JsValue, JsError> {
         let analysis = self.inner.topology_analysis();
         serde_wasm_bindgen::to_value(&analysis).map_err(|e| JsError::new(&e.to_string()))
     }
 
     /// Human-readable topology report.
-    pub fn topology_report(&self) -> String {
+    pub fn topology_report(&mut self) -> String {
         self.inner.topology_report()
     }
 

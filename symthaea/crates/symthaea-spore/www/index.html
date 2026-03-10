@@ -107,6 +107,51 @@
     .inject-row { display: flex; gap: 0.3rem; align-items: center; margin-top: 0.6rem; }
     .inject-row select { background: #0d0d15; color: var(--fg); border: 1px solid #333; border-radius: 4px; padding: 0.25rem; font-size: 0.7rem; font-family: inherit; }
 
+    /* --- Cognition Tabs --- */
+    .tab-bar { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 1rem; overflow-x: auto; }
+    .tab-btn {
+      padding: 0.5rem 1rem; font-size: 0.7rem; color: var(--dim); background: none; border: none;
+      border-bottom: 2px solid transparent; cursor: pointer; font-family: inherit; white-space: nowrap;
+      transition: color 0.2s, border-color 0.2s;
+    }
+    .tab-btn:hover { color: var(--fg); }
+    .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* --- Broca --- */
+    #broca-output {
+      font-size: 1rem; line-height: 1.8; color: #d0c8e0; min-height: 3rem; padding: 0.5rem;
+      background: #0d0d15; border-radius: 6px; border: 1px solid #1a1a2e; font-style: italic;
+    }
+    #broca-output .broca-word { transition: opacity 0.3s; }
+
+    /* --- Dream --- */
+    .dream-log { max-height: 200px; overflow-y: auto; font-size: 0.7rem; font-family: 'JetBrains Mono', monospace; line-height: 1.6; }
+    .dream-log .wisdom { color: #a78bfa; }
+    .dream-log .event { color: #555; }
+    .wisdom-count { font-size: 2rem; font-weight: 200; color: var(--accent); font-family: 'JetBrains Mono', monospace; }
+
+    /* --- FEP --- */
+    .fep-gauge { display: flex; align-items: center; gap: 1rem; margin: 0.8rem 0; }
+    .fep-number { font-size: 1.8rem; font-weight: 200; font-family: 'JetBrains Mono', monospace; }
+    .motor-cmd { display: inline-block; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.65rem; font-family: 'JetBrains Mono', monospace; background: #1a1a2e; color: #94a3b8; margin: 0.15rem; }
+    .motor-cmd.active-cmd { background: #2d1b69; color: var(--accent); border: 1px solid var(--accent); }
+    .motor-log { max-height: 150px; overflow-y: auto; font-size: 0.65rem; font-family: 'JetBrains Mono', monospace; line-height: 1.5; color: #666; }
+
+    /* --- Topology --- */
+    .betti-display { display: flex; gap: 1.5rem; justify-content: center; margin: 0.8rem 0; }
+    .betti-item { text-align: center; }
+    .betti-item .betti-val { font-size: 1.6rem; font-weight: 200; font-family: 'JetBrains Mono', monospace; }
+    .betti-item .betti-label { font-size: 0.6rem; color: var(--dim); }
+    .topo-interpretation { font-size: 0.8rem; color: #888; text-align: center; margin-top: 0.5rem; }
+
+    /* --- Memory --- */
+    .mem-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+    .mem-stat { background: #0d0d15; border-radius: 6px; padding: 0.6rem; text-align: center; }
+    .mem-stat .mem-val { font-size: 1.3rem; font-weight: 200; font-family: 'JetBrains Mono', monospace; color: var(--accent2); }
+    .mem-stat .mem-label { font-size: 0.6rem; color: var(--dim); }
+
     /* --- Footer --- */
     .status-bar { text-align: center; font-size: 0.65rem; color: #444; padding: 1rem; }
 
@@ -200,6 +245,112 @@
       <div class="similarity-value" id="similarity-value">0.000</div>
       <div class="similarity-label" id="similarity-label">cosine similarity in 16,384D space</div>
       <div class="similarity-bar"><div class="fill" id="similarity-fill" style="width:50%;"></div></div>
+    </div>
+  </div>
+
+  <!-- Cognitive Subsystems -->
+  <div class="panel" style="margin-top:1rem;">
+    <div class="panel-title">Cognitive Subsystems</div>
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('broca')">Language (Broca)</button>
+      <button class="tab-btn" onclick="switchTab('dream')">Dream Engine</button>
+      <button class="tab-btn" onclick="switchTab('fep')">Active Inference</button>
+      <button class="tab-btn" onclick="switchTab('topology')">Topology</button>
+      <button class="tab-btn" onclick="switchTab('memory-tab')">Memory</button>
+    </div>
+
+    <!-- Broca Language Generation -->
+    <div class="tab-content active" id="tab-broca">
+      <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.8rem;">
+        <span style="font-size:0.75rem; color:#888;">Spore speaks:</span>
+        <button class="btn" id="btn-speak" onclick="generateSpeech()">Generate</button>
+        <button class="btn" onclick="startAutoSpeak()">Auto</button>
+        <button class="btn" onclick="stopAutoSpeak()">Stop</button>
+      </div>
+      <div id="broca-output">Waiting for first generation...</div>
+      <div style="font-size:0.6rem; color:#555; margin-top:0.5rem;">
+        256-token vocabulary, 1024D element-wise gated recurrence, epistemic filtering
+      </div>
+    </div>
+
+    <!-- Dream Engine -->
+    <div class="tab-content" id="tab-dream">
+      <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.8rem;">
+        <button class="btn btn-accent" id="btn-dream" onclick="runDreamSession()">Dream (5 cycles)</button>
+        <button class="btn" onclick="runSingleDream()">Single Cycle</button>
+        <div style="margin-left:auto; text-align:right;">
+          <span style="font-size:0.6rem; color:#666;">Wisdom consolidated:</span>
+          <span class="wisdom-count" id="wisdom-count">0</span>
+        </div>
+      </div>
+      <div class="dream-log" id="dream-log">No dreams yet. The engine records high-surprise events during waking cycles, then generates counterfactual scenarios during dream sessions to consolidate wisdom.</div>
+    </div>
+
+    <!-- Active Inference (FEP) -->
+    <div class="tab-content" id="tab-fep">
+      <div class="fep-gauge">
+        <div>
+          <div style="font-size:0.6rem; color:#666;">Free Energy</div>
+          <div class="fep-number" id="fep-energy">—</div>
+        </div>
+        <div style="flex:1;">
+          <div style="font-size:0.6rem; color:#666; margin-bottom:0.3rem;">Motor Commands</div>
+          <div id="motor-commands">
+            <span class="motor-cmd">AttentionShift</span>
+            <span class="motor-cmd">LearningRate</span>
+            <span class="motor-cmd">Explore</span>
+            <span class="motor-cmd">Reflect</span>
+            <span class="motor-cmd">Consolidate</span>
+            <span class="motor-cmd">Reset</span>
+            <span class="motor-cmd">Motor</span>
+            <span class="motor-cmd">NoOp</span>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex; gap:0.5rem; align-items:center;">
+        <button class="btn" onclick="runFepCycle()">FEP Cycle</button>
+        <button class="btn" onclick="startAutoFep()">Auto (1Hz)</button>
+        <button class="btn" onclick="stopAutoFep()">Stop</button>
+        <span style="font-size:0.6rem; color:#555; margin-left:auto;" id="fep-mode-label"></span>
+      </div>
+      <canvas id="fep-chart" style="height:90px; margin-top:0.5rem;"></canvas>
+      <div class="motor-log" id="fep-log"></div>
+    </div>
+
+    <!-- Topology -->
+    <div class="tab-content" id="tab-topology">
+      <div class="betti-display" id="betti-display">
+        <div class="betti-item"><div class="betti-val" id="betti-0">—</div><div class="betti-label">β₀ Components</div></div>
+        <div class="betti-item"><div class="betti-val" id="betti-1">—</div><div class="betti-label">β₁ Loops</div></div>
+        <div class="betti-item"><div class="betti-val" id="betti-2">—</div><div class="betti-label">β₂ Voids</div></div>
+      </div>
+      <div class="topo-interpretation" id="topo-interpretation">Run analysis to see consciousness topology</div>
+      <canvas id="persistence-diagram" style="height:140px; margin-top:0.5rem;"></canvas>
+      <div style="margin-top:0.5rem; display:flex; gap:0.5rem;">
+        <button class="btn btn-accent" onclick="runTopology()">Analyze Now</button>
+        <button class="btn" onclick="runTopologyReport()">Full Report</button>
+      </div>
+      <div class="result" id="topo-report" style="font-size:0.65rem; margin-top:0.5rem; white-space:pre-wrap;"></div>
+    </div>
+
+    <!-- Memory -->
+    <div class="tab-content" id="tab-memory-tab">
+      <div class="mem-stats" id="mem-stats">
+        <div class="mem-stat"><div class="mem-val" id="mem-semantic">—</div><div class="mem-label">Semantic Memories</div></div>
+        <div class="mem-stat"><div class="mem-val" id="mem-episodic">—</div><div class="mem-label">Episodes</div></div>
+        <div class="mem-stat"><div class="mem-val" id="mem-replays">—</div><div class="mem-label">Total Cycles</div></div>
+        <div class="mem-stat"><div class="mem-val" id="mem-avg-phi">—</div><div class="mem-label">Current Phi</div></div>
+        <div class="mem-stat" style="grid-column: span 2;">
+          <div style="font-size:0.6rem; color:#666; margin-bottom:0.3rem;">Memory Coherence</div>
+          <div style="height:6px; background:#1a1a2e; border-radius:3px; overflow:hidden;">
+            <div id="mem-coherence-bar" style="height:100%; width:0%; background:linear-gradient(90deg, #3b82f6, #a78bfa); border-radius:3px; transition:width 0.5s;"></div>
+          </div>
+          <div style="font-size:0.6rem; color:#555; margin-top:0.2rem; text-align:right;" id="mem-coherence-val">0.000</div>
+        </div>
+      </div>
+      <div style="margin-top:0.8rem;">
+        <button class="btn" onclick="refreshMemory()">Refresh Stats</button>
+      </div>
     </div>
   </div>
 
@@ -815,6 +966,326 @@
   };
 
   // ======================================================================
+  // Cognitive Subsystem Tabs
+  // ======================================================================
+
+  window.switchTab = function(tabId) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.getElementById(`tab-${tabId}`).classList.add('active');
+    // Find the matching button by text
+    document.querySelectorAll('.tab-btn').forEach(b => {
+      const map = { 'Language (Broca)': 'broca', 'Dream Engine': 'dream', 'Active Inference': 'fep', 'Topology': 'topology', 'Memory': 'memory-tab' };
+      if (map[b.textContent] === tabId) b.classList.add('active');
+    });
+  };
+
+  // ======================================================================
+  // Broca Language Generation
+  // ======================================================================
+
+  let autoSpeakTimer = null;
+
+  window.generateSpeech = async function() {
+    if (!workerReady) return;
+    const el = document.getElementById('broca-output');
+    el.textContent = 'Generating...';
+    try {
+      const result = await send('generateText', { maxTokens: 32 });
+      if (result && result.text) {
+        el.innerHTML = result.text + `<span style="color:#444; font-size:0.6rem; margin-left:0.5rem;">(${result.num_tokens} tokens${result.eos_terminated ? ', EOS' : ''})</span>`;
+      } else {
+        el.innerHTML = '<span style="color:#555">No output (epistemic gate may have filtered)</span>';
+      }
+    } catch (e) {
+      el.innerHTML = `<span style="color:#ef4444">${e.message}</span>`;
+    }
+  };
+
+  window.startAutoSpeak = function() {
+    stopAutoSpeak();
+    generateSpeech();
+    autoSpeakTimer = setInterval(generateSpeech, 3000);
+  };
+
+  window.stopAutoSpeak = function() {
+    if (autoSpeakTimer) { clearInterval(autoSpeakTimer); autoSpeakTimer = null; }
+  };
+
+  // ======================================================================
+  // Dream Engine
+  // ======================================================================
+
+  window.runSingleDream = async function() {
+    if (!workerReady) return;
+    const log = document.getElementById('dream-log');
+    try {
+      const result = await send('dreamCycle');
+      if (result) {
+        const entry = result.insights > 0
+          ? `<div class="wisdom">Insight! ${result.simulations_run} simulations, phi improvement: ${result.best_phi_improvement.toFixed(3)}</div>`
+          : `<div class="event">Dream: ${result.events_processed} events, ${result.simulations_run} simulations</div>`;
+        log.innerHTML = entry + log.innerHTML;
+      } else {
+        log.innerHTML = '<div class="event">No events to dream about yet -- run more cycles first.</div>' + log.innerHTML;
+      }
+      updateWisdomCount();
+    } catch (e) {
+      log.innerHTML = `<div style="color:#ef4444">Dream error: ${e.message}</div>` + log.innerHTML;
+    }
+  };
+
+  window.runDreamSession = async function() {
+    if (!workerReady) return;
+    const log = document.getElementById('dream-log');
+    const btn = document.getElementById('btn-dream');
+    btn.disabled = true;
+    btn.textContent = 'Dreaming...';
+
+    try {
+      await send('stopLoop');
+      const results = await send('dreamSession', { cycles: 5 });
+
+      if (results && results.length > 0) {
+        const totalInsights = results.reduce((s, r) => s + r.insights, 0);
+        const totalSims = results.reduce((s, r) => s + r.simulations_run, 0);
+        const entries = results.map(r => {
+          if (r.insights > 0) return `<div class="wisdom">Insight! phi +${r.best_phi_improvement.toFixed(3)}</div>`;
+          return `<div class="event">${r.events_processed} events, ${r.simulations_run} sims</div>`;
+        }).join('');
+        log.innerHTML = `<div style="color:#666; font-size:0.6rem;">-- Dream session: ${totalInsights} insights, ${totalSims} simulations --</div>` + entries + log.innerHTML;
+      } else {
+        log.innerHTML = '<div class="event">Dream session produced no results -- need more waking experience first.</div>' + log.innerHTML;
+      }
+
+      updateWisdomCount();
+      await send('startLoop', { interval: 50 });
+    } catch (e) {
+      log.innerHTML = `<div style="color:#ef4444">Session error: ${e.message}</div>` + log.innerHTML;
+      await send('startLoop', { interval: 50 });
+    }
+    btn.disabled = false;
+    btn.textContent = 'Dream (5 cycles)';
+  };
+
+  async function updateWisdomCount() {
+    if (!workerReady) return;
+    try {
+      const count = await send('dreamWisdomCount');
+      document.getElementById('wisdom-count').textContent = Number(count);
+    } catch (e) { /* ignore */ }
+  }
+
+  // ======================================================================
+  // Active Inference (FEP)
+  // ======================================================================
+
+  let autoFepTimer = null;
+  const MOTOR_NAMES = ['AttentionShift', 'LearningRate', 'Explore', 'Reflect', 'Consolidate', 'Reset', 'Motor', 'NoOp'];
+  let fepHistory = [];
+  const MAX_FEP_HISTORY = 100;
+
+  window.runFepCycle = async function() {
+    if (!workerReady) return;
+    try {
+      const result = await send('fepCycle');
+      if (result) {
+        document.getElementById('fep-energy').textContent = result.free_energy.toFixed(3);
+
+        // Map command_type enum to display names
+        const cmdTypeMap = {
+          'AttentionShift': 'AttentionShift', 'LearningRateAdjust': 'LearningRate',
+          'ExplorationTrigger': 'Explore', 'ReflectionInitiate': 'Reflect',
+          'MemoryConsolidate': 'Consolidate', 'ExpectationReset': 'Reset',
+          'MotorOutput': 'Motor', 'NoOp': 'NoOp'
+        };
+        const cmdName = cmdTypeMap[result.motor_command.command_type] || result.motor_command.command_type;
+
+        // Highlight active motor command
+        const cmds = document.getElementById('motor-commands').children;
+        for (let i = 0; i < cmds.length; i++) {
+          cmds[i].classList.toggle('active-cmd', cmds[i].textContent === cmdName);
+        }
+
+        // Mode label
+        const modeLabel = document.getElementById('fep-mode-label');
+        modeLabel.textContent = result.exploration_mode ? 'EXPLORING' : 'EXPLOITING';
+        modeLabel.style.color = result.exploration_mode ? '#f59e0b' : '#4ade80';
+
+        // Track history and draw chart
+        fepHistory.push(result.free_energy);
+        if (fepHistory.length > MAX_FEP_HISTORY) fepHistory.shift();
+        if (fepHistory.length > 2) {
+          drawLineChart('fep-chart', [
+            { data: fepHistory, color: '#ef4444', label: 'F' },
+          ], { yMax: Math.max(...fepHistory, 0.01) * 1.1 });
+        }
+
+        // Log
+        const log = document.getElementById('fep-log');
+        const mode = result.exploration_mode ? ' [explore]' : '';
+        const surprised = result.is_surprised ? ' !' : '';
+        const line = `FE: ${result.free_energy.toFixed(3)} | ${result.motor_command.command_type} @${result.motor_command.intensity.toFixed(2)}${mode}${surprised}`;
+        log.innerHTML = line + '\n' + log.innerHTML;
+        if (log.childNodes.length > 50) log.innerHTML = log.innerHTML.split('\n').slice(0, 50).join('\n');
+      }
+    } catch (e) {
+      document.getElementById('fep-log').innerHTML = `Error: ${e.message}\n` + document.getElementById('fep-log').innerHTML;
+    }
+  };
+
+  window.startAutoFep = function() {
+    stopAutoFep();
+    runFepCycle();
+    autoFepTimer = setInterval(runFepCycle, 1000);
+  };
+
+  window.stopAutoFep = function() {
+    if (autoFepTimer) { clearInterval(autoFepTimer); autoFepTimer = null; }
+  };
+
+  // ======================================================================
+  // Persistence Diagram
+  // ======================================================================
+
+  function drawPersistenceDiagram(pairs) {
+    const canvas = document.getElementById('persistence-diagram');
+    if (!canvas || !pairs.length) return;
+    canvas.style.display = 'block';
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+    const w = rect.width, h = rect.height;
+    const pad = 30;
+
+    ctx.fillStyle = '#0d0d15';
+    ctx.fillRect(0, 0, w, h);
+
+    // Find max value for scaling (death can be null = infinite persistence)
+    let maxVal = 0;
+    for (const p of pairs) {
+      if (p.birth > maxVal) maxVal = p.birth;
+      if (p.death != null && p.death > maxVal) maxVal = p.death;
+    }
+    maxVal = maxVal || 1;
+    const infiniteDeath = maxVal * 1.2; // represent null death as beyond max
+
+    const scale = (v) => pad + (v / maxVal) * (Math.min(w, h) - 2 * pad);
+    const scaleY = (v) => h - pad - (v / maxVal) * (h - 2 * pad);
+
+    // Diagonal (birth = death)
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 0.5;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(pad, h - pad);
+    ctx.lineTo(Math.min(w, h) - pad + pad, h - (Math.min(w, h) - pad));
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Axes labels
+    ctx.fillStyle = '#555';
+    ctx.font = '9px monospace';
+    ctx.fillText('birth', w / 2 - 10, h - 5);
+    ctx.save();
+    ctx.translate(8, h / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillText('death', -10, 0);
+    ctx.restore();
+
+    // Points (color by dimension)
+    const dimColors = ['#3b82f6', '#ef4444', '#4ade80'];
+    for (const p of pairs) {
+      const deathVal = p.death != null ? p.death : infiniteDeath;
+      const x = scale(p.birth);
+      const y = scaleY(deathVal);
+      const dim = p.dimension || 0;
+      ctx.fillStyle = dimColors[dim % 3];
+      ctx.beginPath();
+      ctx.arc(x, y, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Legend
+    ctx.font = '8px monospace';
+    ['H0', 'H1', 'H2'].forEach((label, i) => {
+      ctx.fillStyle = dimColors[i];
+      ctx.fillRect(w - 60, 8 + i * 12, 8, 8);
+      ctx.fillStyle = '#888';
+      ctx.fillText(label, w - 48, 16 + i * 12);
+    });
+  }
+
+  // ======================================================================
+  // Topology
+  // ======================================================================
+
+  window.runTopology = async function() {
+    if (!workerReady) return;
+    const interp = document.getElementById('topo-interpretation');
+    interp.textContent = 'Analyzing...';
+    try {
+      const result = await send('topologyAnalysis');
+      if (result) {
+        const b = result.betti;
+        document.getElementById('betti-0').textContent = b.beta_0;
+        document.getElementById('betti-1').textContent = b.beta_1;
+        document.getElementById('betti-2').textContent = b.beta_2;
+
+        // Interpret
+        let text = '';
+        if (b.beta_0 === 1) text = 'Fully connected consciousness -- single integrated field.';
+        else text = `${b.beta_0} disconnected components -- fragmented awareness.`;
+        if (b.beta_1 > 0) text += ` ${b.beta_1} feedback loop(s) detected.`;
+        if (b.beta_2 > 0) text += ` ${b.beta_2} higher-order void(s).`;
+        if (result.wave_packets && result.wave_packets.length > 0) text += ` ${result.wave_packets.length} wave packet(s) propagating.`;
+        text += ` (Euler characteristic: ${b.euler_characteristic})`;
+        interp.textContent = text;
+
+        // Draw persistence diagram
+        if (result.persistence_pairs && result.persistence_pairs.length > 0) {
+          drawPersistenceDiagram(result.persistence_pairs);
+        }
+      }
+    } catch (e) {
+      interp.textContent = `Error: ${e.message}`;
+    }
+  };
+
+  window.runTopologyReport = async function() {
+    if (!workerReady) return;
+    try {
+      const report = await send('topologyReport');
+      document.getElementById('topo-report').textContent = report || 'No report available';
+    } catch (e) {
+      document.getElementById('topo-report').textContent = `Error: ${e.message}`;
+    }
+  };
+
+  // ======================================================================
+  // Memory
+  // ======================================================================
+
+  window.refreshMemory = async function() {
+    if (!workerReady) return;
+    try {
+      const stats = await send('memoryStats');
+      if (stats) {
+        document.getElementById('mem-semantic').textContent = `${stats.semantic_count}/${stats.semantic_capacity}`;
+        document.getElementById('mem-episodic').textContent = `${stats.episodic_count}/${stats.episodic_capacity}`;
+        document.getElementById('mem-replays').textContent = Number(stats.total_cycles);
+        document.getElementById('mem-avg-phi').textContent = stats.current_phi.toFixed(3);
+        const coherence = stats.current_coherence || 0;
+        document.getElementById('mem-coherence-bar').style.width = `${(coherence * 100).toFixed(0)}%`;
+        document.getElementById('mem-coherence-val').textContent = coherence.toFixed(3);
+      }
+    } catch (e) { /* ignore */ }
+  };
+
+  // ======================================================================
   // Request HV periodically for visualization
   // (Worker sends HV every 10th cycle automatically, but we also fetch on demand)
   // ======================================================================
@@ -843,6 +1314,12 @@
 
       // Fetch initial HV
       setTimeout(fetchHV, 500);
+
+      // Periodic memory + wisdom updates
+      setInterval(() => {
+        refreshMemory();
+        updateWisdomCount();
+      }, 5000);
 
       // Also compare enter key on comparison inputs
       document.getElementById('compare-a').addEventListener('keydown', e => { if (e.key === 'Enter') compareThoughts(); });

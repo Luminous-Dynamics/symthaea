@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // End-to-end test: instantiate the real Spore WASM engine in Node.js,
-// run consciousness cycles, execute all 4 validation experiments.
+// run consciousness cycles, execute all 4 validation experiments,
+// and verify Phase 1-5 subsystems (Broca, Dream, FEP, Topology, Memory).
 //
 // This proves the full pipeline works, not just that exports exist.
 //
@@ -166,7 +167,107 @@ try {
   assert(lastC < firstC, `Degradation works: ${firstC.toFixed(4)} -> ${lastC.toFixed(4)}`);
 
   // ================================================================
-  section('11. Instance Counter');
+  section('12. Language Generation (Broca)');
+  const eng12 = new SporeEngine(null);
+  // Run a few cycles to warm the engine
+  for (let i = 0; i < 5; i++) eng12.cycle('warming up broca');
+
+  const broca1 = eng12.generate_text(16);
+  assert(typeof broca1.text === 'string' && broca1.text.length > 0, `Generated text: "${broca1.text.substring(0, 40)}..."`);
+  assert(broca1.num_tokens > 0, `Tokens generated: ${broca1.num_tokens}`);
+  assert(broca1.num_tokens <= 16, `Tokens within limit: ${broca1.num_tokens} <= 16`);
+  assert(typeof broca1.eos_terminated === 'boolean', `EOS terminated: ${broca1.eos_terminated}`);
+
+  const broca2 = eng12.generate_text(16);
+  assert(typeof broca2.text === 'string' && broca2.text.length > 0, `Second generation non-empty: "${broca2.text.substring(0, 40)}..."`);
+  eng12.free();
+
+  // ================================================================
+  section('13. Dream Engine');
+  const eng13 = new SporeEngine(null);
+  for (let i = 0; i < 5; i++) eng13.cycle('dream warmup');
+
+  const wisdomCount = eng13.dream_wisdom_count();
+  assert(typeof wisdomCount === 'number' && wisdomCount >= 0, `Dream wisdom count: ${wisdomCount}`);
+
+  const dreamResult = eng13.dream_cycle();
+  if (dreamResult !== null && dreamResult !== undefined) {
+    assert(dreamResult.events_processed >= 0, `Dream events processed: ${dreamResult.events_processed}`);
+    assert(dreamResult.simulations_run >= 0, `Dream simulations run: ${dreamResult.simulations_run}`);
+  } else {
+    assert(true, 'Dream cycle returned null (no events to replay)');
+  }
+
+  const dreamSession = eng13.dream_session(3);
+  assert(Array.isArray(dreamSession), `Dream session returns array (length ${dreamSession.length})`);
+
+  const dreamStats = eng13.dream_stats();
+  assert(dreamStats.events_recorded !== undefined, `Dream stats has events_recorded: ${dreamStats.events_recorded}`);
+  assert(Number(dreamStats.events_recorded) >= 0, `Events recorded >= 0`);
+  assert(Number(dreamStats.dream_cycles) >= 0, `Dream cycles >= 0`);
+  assert(Number(dreamStats.total_insights) >= 0, `Total insights >= 0`);
+  assert(Number(dreamStats.total_simulations) >= 0, `Total simulations >= 0`);
+  assert(typeof dreamStats.wisdom_count === 'number', `Wisdom count is number: ${dreamStats.wisdom_count}`);
+  eng13.free();
+
+  // ================================================================
+  section('14. Active Inference (FEP)');
+  const eng14 = new SporeEngine(null);
+  for (let i = 0; i < 5; i++) eng14.cycle('fep warmup');
+
+  const fe = eng14.free_energy();
+  assert(typeof fe === 'number', `Free energy: ${fe.toFixed(4)}`);
+
+  const fepResult = eng14.fep_cycle();
+  assert(typeof fepResult.free_energy === 'number', `FEP free energy: ${fepResult.free_energy.toFixed(4)}`);
+  assert(typeof fepResult.prediction_error === 'number', `Prediction error: ${fepResult.prediction_error.toFixed(4)}`);
+  assert(typeof fepResult.motor_command === 'object' && fepResult.motor_command !== null, 'Motor command is object');
+  assert(typeof fepResult.motor_command.command_type === 'string', `Command type: ${fepResult.motor_command.command_type}`);
+
+  const validCommands = ['AttentionShift', 'LearningRateAdjust', 'ExplorationTrigger', 'ReflectionInitiate',
+                         'MemoryConsolidate', 'ExpectationReset', 'MotorOutput', 'NoOp'];
+  assert(validCommands.includes(fepResult.motor_command.command_type),
+    `Command type valid: ${fepResult.motor_command.command_type}`);
+  assert(fepResult.motor_command.intensity >= 0 && fepResult.motor_command.intensity <= 1,
+    `Intensity in range: ${fepResult.motor_command.intensity.toFixed(3)}`);
+  assert(typeof fepResult.is_surprised === 'boolean', `Is surprised: ${fepResult.is_surprised}`);
+  assert(typeof fepResult.exploration_mode === 'boolean', `Exploration mode: ${fepResult.exploration_mode}`);
+  assert(typeof fepResult.belief_confidence === 'number', `Belief confidence: ${fepResult.belief_confidence.toFixed(3)}`);
+  eng14.free();
+
+  // ================================================================
+  section('15. Topology Analysis');
+  const eng15 = new SporeEngine(null);
+  for (let i = 0; i < 5; i++) eng15.cycle('topology warmup');
+
+  const topo = eng15.topology_analysis();
+  assert(topo.betti !== undefined && topo.betti !== null, 'Betti numbers present');
+  assert(topo.betti.beta_0 >= 1, `Beta_0 >= 1 (connected components): ${topo.betti.beta_0}`);
+  assert(topo.betti.beta_1 >= 0, `Beta_1 >= 0 (loops): ${topo.betti.beta_1}`);
+  assert(topo.betti.beta_2 >= 0, `Beta_2 >= 0 (voids): ${topo.betti.beta_2}`);
+  assert(typeof topo.betti.euler_characteristic === 'number', `Euler characteristic: ${topo.betti.euler_characteristic}`);
+  assert(topo.points_analyzed > 0, `Points analyzed: ${topo.points_analyzed}`);
+
+  const topoReport = eng15.topology_report();
+  assert(typeof topoReport === 'string' && topoReport.length > 0, `Topology report: ${topoReport.substring(0, 60)}...`);
+  eng15.free();
+
+  // ================================================================
+  section('16. Memory');
+  const eng16 = new SporeEngine(null);
+  for (let i = 0; i < 5; i++) eng16.cycle('memory warmup');
+
+  const memStats = eng16.memory_stats();
+  assert(memStats.semantic_count >= 0, `Semantic count: ${memStats.semantic_count}`);
+  assert(memStats.episodic_count >= 0, `Episodic count: ${memStats.episodic_count}`);
+  assert(memStats.semantic_capacity > 0, `Semantic capacity: ${memStats.semantic_capacity}`);
+  assert(memStats.episodic_capacity > 0, `Episodic capacity: ${memStats.episodic_capacity}`);
+  assert(Number(memStats.total_cycles) > 0, `Total cycles > 0: ${Number(memStats.total_cycles)}`);
+  assert(memStats.current_phi >= 0, `Current phi >= 0: ${memStats.current_phi.toFixed(4)}`);
+  eng16.free();
+
+  // ================================================================
+  section('17. Instance Counter');
   const countBefore = SporeEngine.active_instance_count();
   const tmp1 = new SporeEngine(null);
   const tmp2 = new SporeEngine(null);

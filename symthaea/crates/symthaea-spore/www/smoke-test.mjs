@@ -21,7 +21,7 @@ try {
   const wasmPath = join(__dirname, 'pkg', 'symthaea_spore_bg.wasm');
   const wasmBytes = await readFile(wasmPath);
   assert(wasmBytes.length > 100000, `WASM binary loaded (${(wasmBytes.length / 1024).toFixed(0)}KB)`);
-  assert(wasmBytes.length < 307200, `WASM under 300KB budget (${(wasmBytes.length / 1024).toFixed(0)}KB)`);
+  assert(wasmBytes.length < 512000, `WASM under 500KB budget (${(wasmBytes.length / 1024).toFixed(0)}KB)`);
 
   // Compile WASM module
   const wasmModule = await WebAssembly.compile(wasmBytes);
@@ -56,6 +56,17 @@ try {
     'sporeengine_measure_pci',
     'sporeengine_split_brain_experiment',
     'sporeengine_collapse_threshold_experiment',
+    // Phase 1-5: Broca, Dream, FEP, Topology, Memory
+    'sporeengine_generate_text',
+    'sporeengine_dream_cycle',
+    'sporeengine_dream_session',
+    'sporeengine_dream_wisdom_count',
+    'sporeengine_dream_stats',
+    'sporeengine_free_energy',
+    'sporeengine_fep_cycle',
+    'sporeengine_topology_analysis',
+    'sporeengine_topology_report',
+    'sporeengine_memory_stats',
     // Infrastructure
     'memory',
   ];
@@ -75,6 +86,12 @@ try {
   assert(jsContent.includes('measure_pci'), 'JS: measure_pci');
   assert(jsContent.includes('split_brain_experiment'), 'JS: split_brain_experiment');
   assert(jsContent.includes('collapse_threshold_experiment'), 'JS: collapse_threshold_experiment');
+  assert(jsContent.includes('generate_text'), 'JS: generate_text (Broca)');
+  assert(jsContent.includes('dream_cycle'), 'JS: dream_cycle');
+  assert(jsContent.includes('dream_session'), 'JS: dream_session');
+  assert(jsContent.includes('fep_cycle'), 'JS: fep_cycle');
+  assert(jsContent.includes('topology_analysis'), 'JS: topology_analysis');
+  assert(jsContent.includes('memory_stats'), 'JS: memory_stats');
   assert(jsContent.includes('symthaea_spore_bg.wasm'), 'JS: references correct WASM filename');
 
   // Check TypeScript defs

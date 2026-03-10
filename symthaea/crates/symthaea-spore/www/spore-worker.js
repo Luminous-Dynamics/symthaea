@@ -178,6 +178,41 @@ self.onmessage = async function(e) {
       case 'report':
         if (engine) result = engine.consciousness_report();
         break;
+      // Phase 1: Language generation (Broca)
+      case 'generateText':
+        if (engine) result = engine.generate_text(params.maxTokens || 32);
+        break;
+      // Phase 2: Dream engine
+      case 'dreamCycle':
+        if (engine) result = engine.dream_cycle();
+        break;
+      case 'dreamSession':
+        if (engine) result = engine.dream_session(params.cycles || 5);
+        break;
+      case 'dreamStats':
+        if (engine) result = engine.dream_stats();
+        break;
+      case 'dreamWisdomCount':
+        if (engine) result = engine.dream_wisdom_count();
+        break;
+      // Phase 3: Memory
+      case 'memoryStats':
+        if (engine) result = engine.memory_stats();
+        break;
+      // Phase 4: Topology
+      case 'topologyAnalysis':
+        if (engine) result = engine.topology_analysis();
+        break;
+      case 'topologyReport':
+        if (engine) result = engine.topology_report();
+        break;
+      // Phase 5: FEP
+      case 'freeEnergy':
+        if (engine) result = engine.free_energy();
+        break;
+      case 'fepCycle':
+        if (engine) result = engine.fep_cycle();
+        break;
       default:
         throw new Error(`Unknown action: ${action}`);
     }

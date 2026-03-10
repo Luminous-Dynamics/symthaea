@@ -624,6 +624,11 @@ impl ActiveInferenceAgent {
         self.last_fe.prediction_error > 0.5
     }
 
+    /// Current belief confidence (0.0-1.0).
+    pub fn belief_confidence(&self) -> f32 {
+        self.belief.confidence()
+    }
+
     /// Current cycle count.
     pub fn cycle_count(&self) -> u64 {
         self.cycle
@@ -667,7 +672,7 @@ mod tests {
         let mut counts = [0u32; 8];
         // Reset RNG each time to get varied results across many samples
         for seed in 0..200u64 {
-            agent.rng_state = 0x9E3779B97F4A7C15 ^ (seed * 6364136223846793005);
+            agent.rng_state = 0x9E3779B97F4A7C15 ^ seed.wrapping_mul(6364136223846793005);
             let (idx, cmd) = agent.select_action();
             assert!(idx < 8, "action index out of range: {}", idx);
             assert_eq!(cmd.command_type, MotorCommandType::from_action_index(idx));

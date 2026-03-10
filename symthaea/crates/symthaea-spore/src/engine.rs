@@ -1,9 +1,9 @@
 //! SporeEngine: the core consciousness loop for WASM targets.
 
-use crate::broca::{BrocaLite, ThoughtChannels};
+use crate::broca::BrocaLite;
 use crate::config::SporeConfig;
-use crate::dream::{DreamConfig, DreamEngine};
-use crate::fep::{ActiveInferenceAgent, ActiveInferenceConfig, FepCycleResult};
+use crate::dream::DreamEngine;
+use crate::fep::{ActiveInferenceAgent, FepCycleResult};
 use crate::memory::MemoryCoordinator;
 use crate::topology::TopologyAnalyzer;
 use serde::{Deserialize, Serialize};
@@ -347,6 +347,8 @@ impl SporeEngine {
         );
 
         // Topology: observe consciousness dimensions
+        // Knowledge dimension modulated by dream wisdom
+        let wisdom_knowledge = (0.5 + self.dream.wisdom().len() as f64 * 0.02).min(0.8);
         self.topology.observe(
             [
                 consciousness_level as f64,
@@ -355,20 +357,36 @@ impl SporeEngine {
                 neuromods[1] as f64, // attention
                 0.7, // recurrence
                 self.substrate_feasibility,
-                0.5, // knowledge
+                wisdom_knowledge,
             ],
             self.cycle_count,
         );
 
         // Apply FEP motor command effects to neuromodulators
+        let intensity = fep_result.motor_command.intensity;
         match fep_result.motor_command.command_type {
             crate::fep::MotorCommandType::ExplorationTrigger => {
                 self.bath.dopamine.level =
-                    (self.bath.dopamine.level + 0.05).clamp(0.0, 1.0);
+                    (self.bath.dopamine.level + 0.05 * intensity).clamp(0.0, 1.0);
             }
             crate::fep::MotorCommandType::LearningRateAdjust => {
                 self.bath.noradrenaline.level =
-                    (self.bath.noradrenaline.level + 0.03).clamp(0.0, 1.0);
+                    (self.bath.noradrenaline.level + 0.03 * intensity).clamp(0.0, 1.0);
+            }
+            crate::fep::MotorCommandType::ReflectionInitiate => {
+                // Reflection calms arousal, boosts serotonin
+                self.bath.serotonin.level =
+                    (self.bath.serotonin.level + 0.04 * intensity).clamp(0.0, 1.0);
+            }
+            crate::fep::MotorCommandType::MemoryConsolidate => {
+                // Consolidation activates social/bonding circuits
+                self.bath.oxytocin.level =
+                    (self.bath.oxytocin.level + 0.03 * intensity).clamp(0.0, 1.0);
+            }
+            crate::fep::MotorCommandType::AttentionShift => {
+                // Attention shift briefly spikes norepinephrine
+                self.bath.noradrenaline.level =
+                    (self.bath.noradrenaline.level + 0.02 * intensity).clamp(0.0, 1.0);
             }
             _ => {}
         }
@@ -386,16 +404,34 @@ impl SporeEngine {
     }
 
     /// Compute consciousness level from current state.
+    ///
+    /// Cross-subsystem coupling:
+    /// - Dream wisdom increases knowledge input (consolidated insights)
+    /// - Memory coherence modulates working memory capacity
+    /// - FEP belief confidence contributes to synchrony
     fn compute_consciousness(&mut self, prediction_error: f32) -> f32 {
+        // Dream wisdom contributes to knowledge (capped at 0.8 bonus)
+        let wisdom_bonus = (self.dream.wisdom().len() as f64 * 0.02).min(0.3);
+        let knowledge = 0.5 + wisdom_bonus;
+
+        // Memory coherence modulates working memory
+        let mem_stats = self.memory.stats();
+        let mem_coherence = mem_stats.current_coherence as f64;
+        let working_memory = ((1.0 - prediction_error as f64 * 0.5) * (0.7 + 0.3 * mem_coherence)).max(0.0);
+
+        // FEP belief confidence contributes to synchrony
+        let fep_confidence = self.fep.belief_confidence() as f64;
+        let synchrony = self.bath.serotonin.effective() as f64 * 0.8 + fep_confidence * 0.1;
+
         let inputs = ConsciousnessInputs {
             phi: self.bath.dopamine.effective() as f64 * 0.8,
             broadcast: 0.6,
-            working_memory: (1.0 - prediction_error as f64 * 0.5).max(0.0),
+            working_memory,
             attention: self.bath.noradrenaline.effective() as f64,
             recurrence: 0.7,
             embodiment: self.substrate_feasibility * 0.8,
-            knowledge: 0.5,
-            synchrony: self.bath.serotonin.effective() as f64 * 0.9,
+            knowledge,
+            synchrony,
         };
         let result = self.equation.compute(&inputs);
         let c = (result.consciousness_level as f32 * self.substrate_feasibility as f32)
@@ -461,12 +497,12 @@ impl SporeEngine {
     }
 
     /// Run topology analysis on accumulated consciousness observations.
-    pub fn topology_analysis(&self) -> crate::topology::TopologyAnalysis {
+    pub fn topology_analysis(&mut self) -> crate::topology::TopologyAnalysis {
         self.topology.analyze()
     }
 
     /// Get topology report as human-readable string.
-    pub fn topology_report(&self) -> String {
+    pub fn topology_report(&mut self) -> String {
         self.topology.report()
     }
 

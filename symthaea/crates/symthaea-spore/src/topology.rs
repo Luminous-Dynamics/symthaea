@@ -385,8 +385,8 @@ impl TopologyAnalyzer {
     /// Compute Betti numbers from the current complex.
     fn compute_betti(&self) -> BettiNumbers {
         let n = self.points.len();
-        if n == 0 {
-            return BettiNumbers::new(0, 0, 0);
+        if n == 0 || self.adjacency.len() != n {
+            return BettiNumbers::new(n.min(1), 0, 0);
         }
 
         // β₀ via union-find.
@@ -552,7 +552,11 @@ impl TopologyAnalyzer {
     }
 
     /// Run full topology analysis on the current point window.
-    pub fn analyze(&self) -> TopologyAnalysis {
+    pub fn analyze(&mut self) -> TopologyAnalysis {
+        // Ensure complex is up to date
+        if self.adjacency.len() != self.points.len() && !self.points.is_empty() {
+            self.rebuild_complex();
+        }
         let betti = self.compute_betti();
         let persistence_pairs = self.compute_persistence();
         let wave_packets = self.detect_wave_packets();
@@ -570,7 +574,7 @@ impl TopologyAnalyzer {
     }
 
     /// Human-readable topology report.
-    pub fn report(&self) -> String {
+    pub fn report(&mut self) -> String {
         let a = self.analyze();
         format!(
             "Topology Report ({} points)\n\
