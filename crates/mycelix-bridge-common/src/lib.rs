@@ -26,6 +26,11 @@ pub use consciousness_profile::{
     GRACE_PERIOD_US, REFRESH_WINDOW_US,
 };
 
+pub mod collective_phi;
+pub use collective_phi::{
+    AgentConsciousnessVector, CollectivePhiEngine, CollectivePhiResult, COLLECTIVE_PHI_MAX_SYNC,
+};
+
 pub mod routing;
 pub use routing::{
     resolve_civic_zome, resolve_commons_zome, BridgeDomain, CivicZome, CommonsZome,
