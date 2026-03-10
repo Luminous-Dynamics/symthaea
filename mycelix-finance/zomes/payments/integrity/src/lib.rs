@@ -186,6 +186,7 @@ pub enum LinkTypes {
     MintIdToMintRecord,
     DidToMintRecords,
     HearthDidToSapPool,
+    ChannelIdToChannel,
 }
 
 /// Genesis self-check
@@ -310,6 +311,14 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     if base_address.as_ref().len() != 39 || target_address.as_ref().len() != 39 {
                         return Ok(ValidateCallbackResult::Invalid(
                             "Link must connect valid hashes".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::ChannelIdToChannel => {
+                    if target_address.as_ref().len() != 39 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "Link target must be a valid action hash".into(),
                         ));
                     }
                     Ok(ValidateCallbackResult::Valid)

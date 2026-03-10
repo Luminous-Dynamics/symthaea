@@ -746,7 +746,14 @@ pub fn open_payment_channel(input: OpenChannelInput) -> ExternResult<Record> {
         closed: None,
     };
 
-    let action_hash = create_entry(&EntryTypes::PaymentChannel(channel))?;
+    let action_hash = create_entry(&EntryTypes::PaymentChannel(channel.clone()))?;
+    // ID-based index link for O(1) lookups
+    create_link(
+        anchor_hash(&channel.id)?,
+        action_hash.clone(),
+        LinkTypes::ChannelIdToChannel,
+        (),
+    )?;
     create_link(
         anchor_hash(&input.party_a)?,
         action_hash.clone(),
@@ -772,61 +779,103 @@ pub struct OpenChannelInput {
     pub initial_deposit_b: u64,
 }
 
+/// Internal helper: fetch a PaymentChannel Record + deserialized entry by ID via link index.
+/// Follows the update chain to return the latest version.
+fn get_channel_record(channel_id: &str) -> ExternResult<(Record, PaymentChannel)> {
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(channel_id)?, LinkTypes::ChannelIdToChannel)?,
+        GetStrategy::default(),
+    )?;
+    let link = links
+        .first()
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Channel not found".into()
+        )))?;
+    let hash = ActionHash::try_from(link.target.clone())
+        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+    let record = follow_update_chain(hash)?;
+    let channel = record
+        .entry()
+        .to_app_option::<PaymentChannel>()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "PaymentChannel deserialization error: {:?}",
+                e
+            )))
+        })?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "PaymentChannel entry missing".into()
+        )))?;
+    Ok((record, channel))
+}
+
+/// Internal helper: fetch a Payment Record + deserialized entry by ID via link index.
+/// Follows the update chain to return the latest version.
+fn get_payment_record(payment_id: &str) -> ExternResult<(Record, Payment)> {
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(payment_id)?, LinkTypes::PaymentIdToPayment)?,
+        GetStrategy::default(),
+    )?;
+    let link = links
+        .first()
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Payment not found".into()
+        )))?;
+    let hash = ActionHash::try_from(link.target.clone())
+        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+    let record = follow_update_chain(hash)?;
+    let payment = record
+        .entry()
+        .to_app_option::<Payment>()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Payment deserialization error: {:?}",
+                e
+            )))
+        })?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Payment entry missing".into()
+        )))?;
+    Ok((record, payment))
+}
+
 #[hdk_extern]
 pub fn channel_transfer(input: ChannelTransferInput) -> ExternResult<Record> {
-    let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(
-            UnitEntryTypes::PaymentChannel,
-        )?))
-        .include_entries(true);
-    for record in query(filter)? {
-        if let Some(channel) = record
-            .entry()
-            .to_app_option::<PaymentChannel>()
-            .ok()
-            .flatten()
-        {
-            if channel.id == input.channel_id {
-                let now = sys_time()?;
-                let (new_a, new_b) = if input.from_a {
-                    (
-                        channel
-                            .balance_a
-                            .checked_sub(input.amount)
-                            .ok_or(wasm_error!(WasmErrorInner::Guest(
-                                "Insufficient balance for party A".into()
-                            )))?,
-                        channel.balance_b + input.amount,
-                    )
-                } else {
-                    (
-                        channel.balance_a + input.amount,
-                        channel
-                            .balance_b
-                            .checked_sub(input.amount)
-                            .ok_or(wasm_error!(WasmErrorInner::Guest(
-                                "Insufficient balance for party B".into()
-                            )))?,
-                    )
-                };
-                let updated = PaymentChannel {
-                    balance_a: new_a,
-                    balance_b: new_b,
-                    last_updated: now,
-                    ..channel
-                };
-                let action_hash = update_entry(
-                    record.action_address().clone(),
-                    &EntryTypes::PaymentChannel(updated),
-                )?;
-                return get(action_hash, GetOptions::default())?
-                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
-            }
-        }
-    }
-    Err(wasm_error!(WasmErrorInner::Guest(
-        "Channel not found".into()
-    )))
+    let (record, channel) = get_channel_record(&input.channel_id)?;
+    let now = sys_time()?;
+    let (new_a, new_b) = if input.from_a {
+        (
+            channel
+                .balance_a
+                .checked_sub(input.amount)
+                .ok_or(wasm_error!(WasmErrorInner::Guest(
+                    "Insufficient balance for party A".into()
+                )))?,
+            channel.balance_b + input.amount,
+        )
+    } else {
+        (
+            channel.balance_a + input.amount,
+            channel
+                .balance_b
+                .checked_sub(input.amount)
+                .ok_or(wasm_error!(WasmErrorInner::Guest(
+                    "Insufficient balance for party B".into()
+                )))?,
+        )
+    };
+    let updated = PaymentChannel {
+        balance_a: new_a,
+        balance_b: new_b,
+        last_updated: now,
+        ..channel
+    };
+    let action_hash = update_entry(
+        record.action_address().clone(),
+        &EntryTypes::PaymentChannel(updated),
+    )?;
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -922,43 +971,25 @@ pub fn get_receipt(payment_id: String) -> ExternResult<Option<Record>> {
 /// Close a payment channel (settle balances)
 #[hdk_extern]
 pub fn close_payment_channel(channel_id: String) -> ExternResult<Record> {
-    let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(
-            UnitEntryTypes::PaymentChannel,
-        )?))
-        .include_entries(true);
+    let (record, channel) = get_channel_record(&channel_id)?;
 
-    for record in query(filter)? {
-        if let Some(channel) = record
-            .entry()
-            .to_app_option::<PaymentChannel>()
-            .ok()
-            .flatten()
-        {
-            if channel.id == channel_id {
-                if channel.closed.is_some() {
-                    return Err(wasm_error!(WasmErrorInner::Guest(
-                        "Channel already closed".into()
-                    )));
-                }
-                let now = sys_time()?;
-                let closed = PaymentChannel {
-                    closed: Some(now),
-                    last_updated: now,
-                    ..channel
-                };
-                let action_hash = update_entry(
-                    record.action_address().clone(),
-                    &EntryTypes::PaymentChannel(closed),
-                )?;
-                return get(action_hash, GetOptions::default())?
-                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
-            }
-        }
+    if channel.closed.is_some() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Channel already closed".into()
+        )));
     }
-    Err(wasm_error!(WasmErrorInner::Guest(
-        "Channel not found".into()
-    )))
+    let now = sys_time()?;
+    let closed = PaymentChannel {
+        closed: Some(now),
+        last_updated: now,
+        ..channel
+    };
+    let action_hash = update_entry(
+        record.action_address().clone(),
+        &EntryTypes::PaymentChannel(closed),
+    )?;
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
 
 /// Refund a payment (creates reverse payment)
@@ -1261,45 +1292,30 @@ pub fn initiate_exit(input: InitiateExitInput) -> ExternResult<Record> {
 /// Release escrow to recipient
 #[hdk_extern]
 pub fn release_escrow(payment_id: String) -> ExternResult<Record> {
-    let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(
-            UnitEntryTypes::Payment,
-        )?))
-        .include_entries(true);
+    let (record, payment) = get_payment_record(&payment_id)?;
 
-    for record in query(filter)? {
-        if let Some(payment) = record.entry().to_app_option::<Payment>().map_err(|e| {
-            wasm_error!(WasmErrorInner::Guest(format!("Payment deserialization error: {:?}", e)))
-        })? {
-            if payment.id == payment_id {
-                if !matches!(payment.payment_type, PaymentType::Escrow(_)) {
-                    return Err(wasm_error!(WasmErrorInner::Guest(
-                        "Not an escrow payment".into()
-                    )));
-                }
-                if payment.status != TransferStatus::Pending {
-                    return Err(wasm_error!(WasmErrorInner::Guest(
-                        "Escrow not in pending state".into()
-                    )));
-                }
-                let now = sys_time()?;
-                let released = Payment {
-                    status: TransferStatus::Completed,
-                    completed: Some(now),
-                    ..payment
-                };
-                let action_hash = update_entry(
-                    record.action_address().clone(),
-                    &EntryTypes::Payment(released),
-                )?;
-                return get(action_hash, GetOptions::default())?
-                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
-            }
-        }
+    if !matches!(payment.payment_type, PaymentType::Escrow(_)) {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Not an escrow payment".into()
+        )));
     }
-    Err(wasm_error!(WasmErrorInner::Guest(
-        "Payment not found".into()
-    )))
+    if payment.status != TransferStatus::Pending {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Escrow not in pending state".into()
+        )));
+    }
+    let now = sys_time()?;
+    let released = Payment {
+        status: TransferStatus::Completed,
+        completed: Some(now),
+        ..payment
+    };
+    let action_hash = update_entry(
+        record.action_address().clone(),
+        &EntryTypes::Payment(released),
+    )?;
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
 
 // =============================================================================

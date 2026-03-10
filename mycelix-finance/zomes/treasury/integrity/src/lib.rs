@@ -133,6 +133,8 @@ pub enum LinkTypes {
     CommonsPoolToCompost,
     TreasuryIdToTreasury,
     AllocationIdToAllocation,
+    PoolIdToPool,
+    CommonsPoolIdToPool,
 }
 
 /// Genesis self-check
@@ -233,7 +235,10 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     }
                     Ok(ValidateCallbackResult::Valid)
                 }
-                LinkTypes::TreasuryIdToTreasury | LinkTypes::AllocationIdToAllocation => {
+                LinkTypes::TreasuryIdToTreasury
+                | LinkTypes::AllocationIdToAllocation
+                | LinkTypes::PoolIdToPool
+                | LinkTypes::CommonsPoolIdToPool => {
                     // Anchor-to-entry links for ID-based lookups
                     if !base_valid || !target_valid {
                         return Ok(ValidateCallbackResult::Invalid(

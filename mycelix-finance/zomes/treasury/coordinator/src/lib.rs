@@ -274,6 +274,66 @@ fn get_allocation_record(allocation_id: &str) -> ExternResult<(Record, Allocatio
     Ok((record, alloc))
 }
 
+/// Internal helper: fetch a SavingsPool Record + deserialized entry by ID via link index.
+/// Follows the update chain to return the latest version.
+fn get_savings_pool_record(pool_id: &str) -> ExternResult<(Record, SavingsPool)> {
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(pool_id)?, LinkTypes::PoolIdToPool)?,
+        GetStrategy::default(),
+    )?;
+    let link = links
+        .first()
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Savings pool not found".into()
+        )))?;
+    let hash = ActionHash::try_from(link.target.clone())
+        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+    let record = follow_update_chain(hash)?;
+    let pool = record
+        .entry()
+        .to_app_option::<SavingsPool>()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "SavingsPool deserialization error: {:?}",
+                e
+            )))
+        })?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "SavingsPool entry missing".into()
+        )))?;
+    Ok((record, pool))
+}
+
+/// Internal helper: fetch a CommonsPool Record + deserialized entry by ID via link index.
+/// Follows the update chain to return the latest version.
+fn get_commons_pool_record(pool_id: &str) -> ExternResult<(Record, CommonsPool)> {
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(pool_id)?, LinkTypes::CommonsPoolIdToPool)?,
+        GetStrategy::default(),
+    )?;
+    let link = links
+        .first()
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Commons pool not found".into()
+        )))?;
+    let hash = ActionHash::try_from(link.target.clone())
+        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+    let record = follow_update_chain(hash)?;
+    let pool = record
+        .entry()
+        .to_app_option::<CommonsPool>()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "CommonsPool deserialization error: {:?}",
+                e
+            )))
+        })?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "CommonsPool entry missing".into()
+        )))?;
+    Ok((record, pool))
+}
+
 #[hdk_extern]
 pub fn create_savings_pool(input: CreatePoolInput) -> ExternResult<Record> {
     if !input.yield_rate.is_finite() || input.yield_rate < 0.0 {
@@ -294,7 +354,14 @@ pub fn create_savings_pool(input: CreatePoolInput) -> ExternResult<Record> {
         created: now,
     };
 
-    let action_hash = create_entry(&EntryTypes::SavingsPool(pool))?;
+    let action_hash = create_entry(&EntryTypes::SavingsPool(pool.clone()))?;
+    // ID-based index link for O(1) lookups
+    create_link(
+        anchor_hash(&pool.id)?,
+        action_hash.clone(),
+        LinkTypes::PoolIdToPool,
+        (),
+    )?;
     create_link(
         anchor_hash(&input.treasury_id)?,
         action_hash.clone(),
@@ -651,23 +718,17 @@ pub fn get_treasury_pools(input: ListInput) -> ExternResult<Vec<Record>> {
     Ok(pools)
 }
 
-/// Get a specific savings pool by ID
+/// Get a specific savings pool by ID (O(1) link-based lookup)
 #[hdk_extern]
 pub fn get_savings_pool(pool_id: String) -> ExternResult<Option<Record>> {
-    let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(
-            UnitEntryTypes::SavingsPool,
-        )?))
-        .include_entries(true);
-
-    for record in query(filter)? {
-        if let Some(pool) = record.entry().to_app_option::<SavingsPool>().map_err(|e| {
-            wasm_error!(WasmErrorInner::Guest(format!("SavingsPool deserialization error: {:?}", e)))
-        })? {
-            if pool.id == pool_id {
-                return Ok(Some(record));
-            }
-        }
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(&pool_id)?, LinkTypes::PoolIdToPool)?,
+        GetStrategy::default(),
+    )?;
+    if let Some(link) = links.first() {
+        let hash = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        return Ok(Some(follow_update_chain(hash)?));
     }
     Ok(None)
 }
@@ -676,44 +737,31 @@ pub fn get_savings_pool(pool_id: String) -> ExternResult<Option<Record>> {
 #[hdk_extern]
 pub fn join_savings_pool(input: JoinPoolInput) -> ExternResult<Record> {
     verify_caller_is_did(&input.member_did)?;
-    let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(
-            UnitEntryTypes::SavingsPool,
-        )?))
-        .include_entries(true);
+    let (record, pool) = get_savings_pool_record(&input.pool_id)?;
 
-    for record in query(filter)? {
-        if let Some(pool) = record.entry().to_app_option::<SavingsPool>().map_err(|e| {
-            wasm_error!(WasmErrorInner::Guest(format!("SavingsPool deserialization error: {:?}", e)))
-        })? {
-            if pool.id == input.pool_id {
-                if pool.members.contains(&input.member_did) {
-                    return Err(wasm_error!(WasmErrorInner::Guest(
-                        "Already a member".into()
-                    )));
-                }
-
-                let mut members = pool.members.clone();
-                members.push(input.member_did.clone());
-
-                let updated = SavingsPool { members, ..pool };
-
-                let action_hash = update_entry(
-                    record.action_address().clone(),
-                    &EntryTypes::SavingsPool(updated),
-                )?;
-                create_link(
-                    anchor_hash(&input.member_did)?,
-                    action_hash.clone(),
-                    LinkTypes::MemberToPool,
-                    (),
-                )?;
-                return get(action_hash, GetOptions::default())?
-                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
-            }
-        }
+    if pool.members.contains(&input.member_did) {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Already a member".into()
+        )));
     }
-    Err(wasm_error!(WasmErrorInner::Guest("Pool not found".into())))
+
+    let mut members = pool.members.clone();
+    members.push(input.member_did.clone());
+
+    let updated = SavingsPool { members, ..pool };
+
+    let action_hash = update_entry(
+        record.action_address().clone(),
+        &EntryTypes::SavingsPool(updated),
+    )?;
+    create_link(
+        anchor_hash(&input.member_did)?,
+        action_hash.clone(),
+        LinkTypes::MemberToPool,
+        (),
+    )?;
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -725,44 +773,29 @@ pub struct JoinPoolInput {
 /// Contribute to a savings pool
 #[hdk_extern]
 pub fn contribute_to_pool(input: PoolContributionInput) -> ExternResult<Record> {
-    let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(
-            UnitEntryTypes::SavingsPool,
-        )?))
-        .include_entries(true);
+    let (record, pool) = get_savings_pool_record(&input.pool_id)?;
 
-    for record in query(filter)? {
-        if let Some(pool) = record.entry().to_app_option::<SavingsPool>().map_err(|e| {
-            wasm_error!(WasmErrorInner::Guest(format!("SavingsPool deserialization error: {:?}", e)))
-        })? {
-            if pool.id == input.pool_id {
-                if !pool.members.contains(&input.contributor_did) {
-                    return Err(wasm_error!(WasmErrorInner::Guest(
-                        "Only members can contribute".into()
-                    )));
-                }
-
-                let new_amount =
-                    pool.current_amount
-                        .checked_add(input.amount)
-                        .ok_or_else(|| {
-                            wasm_error!(WasmErrorInner::Guest("Pool balance overflow".into()))
-                        })?;
-                let updated = SavingsPool {
-                    current_amount: new_amount,
-                    ..pool
-                };
-
-                let action_hash = update_entry(
-                    record.action_address().clone(),
-                    &EntryTypes::SavingsPool(updated),
-                )?;
-                return get(action_hash, GetOptions::default())?
-                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
-            }
-        }
+    if !pool.members.contains(&input.contributor_did) {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only members can contribute".into()
+        )));
     }
-    Err(wasm_error!(WasmErrorInner::Guest("Pool not found".into())))
+
+    let new_amount = pool
+        .current_amount
+        .checked_add(input.amount)
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Pool balance overflow".into())))?;
+    let updated = SavingsPool {
+        current_amount: new_amount,
+        ..pool
+    };
+
+    let action_hash = update_entry(
+        record.action_address().clone(),
+        &EntryTypes::SavingsPool(updated),
+    )?;
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -870,21 +903,29 @@ pub struct CancelAllocationInput {
     pub cancelled_by_did: String,
 }
 
-/// Get allocations by status
+/// Get allocations by status (uses TreasuryToAllocations links + in-memory status filter)
 #[hdk_extern]
 pub fn get_allocations_by_status(input: AllocationStatusQuery) -> ExternResult<Vec<Record>> {
-    let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(
-            UnitEntryTypes::Allocation,
-        )?))
-        .include_entries(true);
-
+    let query = LinkQuery::try_new(
+        anchor_hash(&input.treasury_id)?,
+        LinkTypes::TreasuryToAllocations,
+    )?;
     let mut results = Vec::new();
-    for record in query(filter)? {
-        if let Some(alloc) = record.entry().to_app_option::<Allocation>().map_err(|e| {
-            wasm_error!(WasmErrorInner::Guest(format!("Allocation deserialization error: {:?}", e)))
-        })? {
-            if alloc.treasury_id == input.treasury_id && alloc.status == input.status {
+    for link in get_links(query, GetStrategy::default())? {
+        let hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?;
+        let record = follow_update_chain(hash)?;
+        if let Some(alloc) = record
+            .entry()
+            .to_app_option::<Allocation>()
+            .map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!(
+                    "Allocation deserialization error: {:?}",
+                    e
+                )))
+            })?
+        {
+            if alloc.status == input.status {
                 results.push(record);
             }
         }
@@ -920,7 +961,14 @@ pub fn create_commons_pool(input: CreateCommonsPoolInput) -> ExternResult<Record
         last_activity: now,
     };
 
-    let action_hash = create_entry(&EntryTypes::CommonsPool(pool))?;
+    let action_hash = create_entry(&EntryTypes::CommonsPool(pool.clone()))?;
+    // ID-based index link for O(1) lookups
+    create_link(
+        anchor_hash(&pool.id)?,
+        action_hash.clone(),
+        LinkTypes::CommonsPoolIdToPool,
+        (),
+    )?;
     create_link(
         anchor_hash(&input.dao_did)?,
         action_hash.clone(),
@@ -942,53 +990,37 @@ pub struct CreateCommonsPoolInput {
 #[hdk_extern]
 pub fn contribute_to_commons(input: ContributeToCommonsInput) -> ExternResult<Record> {
     verify_caller_is_did(&input.contributor_did)?;
-    let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(
-            UnitEntryTypes::CommonsPool,
-        )?))
-        .include_entries(true);
+    let (record, pool) = get_commons_pool_record(&input.commons_pool_id)?;
+    let now = sys_time()?;
 
-    for record in query(filter)? {
-        if let Some(pool) = record.entry().to_app_option::<CommonsPool>().map_err(|e| {
-            wasm_error!(WasmErrorInner::Guest(format!("CommonsPool deserialization error: {:?}", e)))
-        })? {
-            if pool.id == input.commons_pool_id {
-                let now = sys_time()?;
+    // Split: 25% inalienable reserve, 75% available (integer math)
+    let to_reserve = input.amount / 4;
+    let to_available = input.amount - to_reserve;
 
-                // Split: 25% inalienable reserve, 75% available (integer math)
-                let to_reserve = input.amount / 4;
-                let to_available = input.amount - to_reserve;
+    let new_reserve = pool
+        .inalienable_reserve
+        .checked_add(to_reserve)
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Reserve overflow".into())))?;
+    let new_available = pool
+        .available_balance
+        .checked_add(to_available)
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest("Available balance overflow".into()))
+        })?;
 
-                let new_reserve = pool
-                    .inalienable_reserve
-                    .checked_add(to_reserve)
-                    .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Reserve overflow".into())))?;
-                let new_available = pool
-                    .available_balance
-                    .checked_add(to_available)
-                    .ok_or_else(|| {
-                        wasm_error!(WasmErrorInner::Guest("Available balance overflow".into()))
-                    })?;
+    let updated = CommonsPool {
+        inalienable_reserve: new_reserve,
+        available_balance: new_available,
+        last_activity: now,
+        ..pool
+    };
 
-                let updated = CommonsPool {
-                    inalienable_reserve: new_reserve,
-                    available_balance: new_available,
-                    last_activity: now,
-                    ..pool
-                };
-
-                let action_hash = update_entry(
-                    record.action_address().clone(),
-                    &EntryTypes::CommonsPool(updated),
-                )?;
-                return get(action_hash, GetOptions::default())?
-                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
-            }
-        }
-    }
-    Err(wasm_error!(WasmErrorInner::Guest(
-        "Commons pool not found".into()
-    )))
+    let action_hash = update_entry(
+        record.action_address().clone(),
+        &EntryTypes::CommonsPool(updated),
+    )?;
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -1001,60 +1033,44 @@ pub struct ContributeToCommonsInput {
 /// Receive demurrage redistribution (compost) into the commons pool available balance.
 #[hdk_extern]
 pub fn receive_compost(input: ReceiveCompostInput) -> ExternResult<Record> {
-    let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(
-            UnitEntryTypes::CommonsPool,
-        )?))
-        .include_entries(true);
+    let (record, pool) = get_commons_pool_record(&input.commons_pool_id)?;
+    let now = sys_time()?;
 
-    for record in query(filter)? {
-        if let Some(pool) = record.entry().to_app_option::<CommonsPool>().map_err(|e| {
-            wasm_error!(WasmErrorInner::Guest(format!("CommonsPool deserialization error: {:?}", e)))
-        })? {
-            if pool.id == input.commons_pool_id {
-                let now = sys_time()?;
+    // Record the compost receival
+    let receival = CompostReceival {
+        id: format!("compost:{}:{}", input.commons_pool_id, now.as_micros()),
+        commons_pool_id: input.commons_pool_id.clone(),
+        amount: input.amount,
+        source_member_did: input.source_member_did.clone(),
+        timestamp: now,
+    };
+    let receival_hash = create_entry(&EntryTypes::CompostReceival(receival))?;
+    create_link(
+        anchor_hash(&input.commons_pool_id)?,
+        receival_hash,
+        LinkTypes::CommonsPoolToCompost,
+        (),
+    )?;
 
-                // Record the compost receival
-                let receival = CompostReceival {
-                    id: format!("compost:{}:{}", input.commons_pool_id, now.as_micros()),
-                    commons_pool_id: input.commons_pool_id.clone(),
-                    amount: input.amount,
-                    source_member_did: input.source_member_did.clone(),
-                    timestamp: now,
-                };
-                let receival_hash = create_entry(&EntryTypes::CompostReceival(receival))?;
-                create_link(
-                    anchor_hash(&input.commons_pool_id)?,
-                    receival_hash,
-                    LinkTypes::CommonsPoolToCompost,
-                    (),
-                )?;
+    // Add to available balance (compost goes to available, not reserve)
+    let new_available = pool
+        .available_balance
+        .checked_add(input.amount)
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest("Available balance overflow".into()))
+        })?;
+    let updated = CommonsPool {
+        available_balance: new_available,
+        last_activity: now,
+        ..pool
+    };
 
-                // Add to available balance (compost goes to available, not reserve)
-                let new_available = pool
-                    .available_balance
-                    .checked_add(input.amount)
-                    .ok_or_else(|| {
-                        wasm_error!(WasmErrorInner::Guest("Available balance overflow".into()))
-                    })?;
-                let updated = CommonsPool {
-                    available_balance: new_available,
-                    last_activity: now,
-                    ..pool
-                };
-
-                let action_hash = update_entry(
-                    record.action_address().clone(),
-                    &EntryTypes::CommonsPool(updated),
-                )?;
-                return get(action_hash, GetOptions::default())?
-                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
-            }
-        }
-    }
-    Err(wasm_error!(WasmErrorInner::Guest(
-        "Commons pool not found".into()
-    )))
+    let action_hash = update_entry(
+        record.action_address().clone(),
+        &EntryTypes::CommonsPool(updated),
+    )?;
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -1069,59 +1085,44 @@ pub struct ReceiveCompostInput {
 /// reserve ratio remains at or above 25% after the allocation.
 #[hdk_extern]
 pub fn request_allocation(input: RequestCommonsAllocationInput) -> ExternResult<Record> {
-    let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(
-            UnitEntryTypes::CommonsPool,
-        )?))
-        .include_entries(true);
+    let (record, pool) = get_commons_pool_record(&input.commons_pool_id)?;
 
-    for record in query(filter)? {
-        if let Some(pool) = record.entry().to_app_option::<CommonsPool>().map_err(|e| {
-            wasm_error!(WasmErrorInner::Guest(format!("CommonsPool deserialization error: {:?}", e)))
-        })? {
-            if pool.id == input.commons_pool_id {
-                // Validate: allocation comes only from available balance
-                if input.amount > pool.available_balance {
-                    return Err(wasm_error!(WasmErrorInner::Guest(
-                        "Allocation exceeds available balance (inalienable reserve is untouchable)"
-                            .into()
-                    )));
-                }
+    // Validate: allocation comes only from available balance
+    if input.amount > pool.available_balance {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Allocation exceeds available balance (inalienable reserve is untouchable)"
+                .into()
+        )));
+    }
 
-                let new_available = pool.available_balance - input.amount;
-                let new_total = pool.inalienable_reserve + new_available;
+    let new_available = pool.available_balance - input.amount;
+    let new_total = pool.inalienable_reserve + new_available;
 
-                // Validate reserve ratio stays >= 25% (or total is 0)
-                if new_total > 0 {
-                    let reserve_pct = pool.inalienable_reserve as u128 * 100;
-                    let threshold = new_total as u128 * 25;
-                    if reserve_pct < threshold {
-                        return Err(wasm_error!(WasmErrorInner::Guest(
-                            "Allocation would drop reserve ratio below 25% constitutional minimum"
-                                .into()
-                        )));
-                    }
-                }
-
-                let now = sys_time()?;
-                let updated = CommonsPool {
-                    available_balance: new_available,
-                    last_activity: now,
-                    ..pool
-                };
-
-                let action_hash = update_entry(
-                    record.action_address().clone(),
-                    &EntryTypes::CommonsPool(updated),
-                )?;
-                return get(action_hash, GetOptions::default())?
-                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
-            }
+    // Validate reserve ratio stays >= 25% (or total is 0)
+    if new_total > 0 {
+        let reserve_pct = pool.inalienable_reserve as u128 * 100;
+        let threshold = new_total as u128 * 25;
+        if reserve_pct < threshold {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Allocation would drop reserve ratio below 25% constitutional minimum"
+                    .into()
+            )));
         }
     }
-    Err(wasm_error!(WasmErrorInner::Guest(
-        "Commons pool not found".into()
-    )))
+
+    let now = sys_time()?;
+    let updated = CommonsPool {
+        available_balance: new_available,
+        last_activity: now,
+        ..pool
+    };
+
+    let action_hash = update_entry(
+        record.action_address().clone(),
+        &EntryTypes::CommonsPool(updated),
+    )?;
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -1132,23 +1133,17 @@ pub struct RequestCommonsAllocationInput {
     pub purpose: String,
 }
 
-/// Get a commons pool by its ID
+/// Get a commons pool by its ID (O(1) link-based lookup)
 #[hdk_extern]
 pub fn get_commons_pool(pool_id: String) -> ExternResult<Option<Record>> {
-    let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(
-            UnitEntryTypes::CommonsPool,
-        )?))
-        .include_entries(true);
-
-    for record in query(filter)? {
-        if let Some(pool) = record.entry().to_app_option::<CommonsPool>().map_err(|e| {
-            wasm_error!(WasmErrorInner::Guest(format!("CommonsPool deserialization error: {:?}", e)))
-        })? {
-            if pool.id == pool_id {
-                return Ok(Some(record));
-            }
-        }
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(&pool_id)?, LinkTypes::CommonsPoolIdToPool)?,
+        GetStrategy::default(),
+    )?;
+    if let Some(link) = links.first() {
+        let hash = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        return Ok(Some(follow_update_chain(hash)?));
     }
     Ok(None)
 }
