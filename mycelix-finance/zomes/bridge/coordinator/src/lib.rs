@@ -442,7 +442,7 @@ pub fn redeem_collateral(deposit_id: String) -> ExternResult<Record> {
         amount: u64,
         reason: String,
     }
-    if let Err(e) = call(
+    match call(
         CallTargetCell::Local,
         ZomeName::from("payments"),
         FunctionName::from("debit_sap"),
@@ -453,10 +453,19 @@ pub fn redeem_collateral(deposit_id: String) -> ExternResult<Record> {
             reason: format!("Collateral bridge redemption: {}", deposit.collateral_type),
         },
     ) {
-        return Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "Cannot redeem: failed to debit SAP — {:?}",
-            e
-        ))));
+        Ok(ZomeCallResponse::Ok(_)) => {}
+        Ok(other) => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Cannot redeem: failed to debit SAP — unexpected response {:?}",
+                other
+            ))));
+        }
+        Err(e) => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Cannot redeem: failed to debit SAP — {:?}",
+                e
+            ))));
+        }
     }
 
     // Broadcast the redemption event
@@ -784,10 +793,13 @@ fn enforce_rate_limit(member_did: &str, new_amount: u64, now: Timestamp) -> Exte
     let deposits: Vec<CollateralBridgeDeposit> = query(filter)?
         .into_iter()
         .filter_map(|r| {
-            r.entry()
-                .to_app_option::<CollateralBridgeDeposit>()
-                .ok()
-                .flatten()
+            match r.entry().to_app_option::<CollateralBridgeDeposit>() {
+                Ok(opt) => opt,
+                Err(e) => {
+                    debug!("enforce_rate_limit: deposit deserialization error: {:?}", e);
+                    None
+                }
+            }
         })
         .collect();
 

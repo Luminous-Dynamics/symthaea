@@ -537,6 +537,31 @@ fn validate_escrow(_action: Create, escrow: CryptoEscrow) -> ExternResult<Valida
         ));
     }
 
+    // Validate float fields in release conditions (NaN bypasses comparison operators)
+    for condition in &escrow.conditions {
+        match condition {
+            ReleaseCondition::OraclePrice { min_price, .. } => {
+                if !min_price.is_finite() || *min_price <= 0.0 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "OraclePrice min_price must be a finite positive number".into(),
+                    ));
+                }
+            }
+            ReleaseCondition::MycelThreshold { min_mycel_score } => {
+                if !min_mycel_score.is_finite()
+                    || *min_mycel_score < 0.0
+                    || *min_mycel_score > 1.0
+                {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "MycelThreshold min_mycel_score must be a finite number in [0.0, 1.0]"
+                            .into(),
+                    ));
+                }
+            }
+            _ => {}
+        }
+    }
+
     // Must have at least one condition
     if escrow.conditions.is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
@@ -617,4 +642,291 @@ fn validate_reward_distribution(
     }
 
     Ok(ValidateCallbackResult::Valid)
+}
+
+// =============================================================================
+// UNIT TESTS
+// =============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ts(micros: i64) -> Timestamp {
+        Timestamp::from_micros(micros)
+    }
+
+    fn valid_stake() -> CollateralStake {
+        CollateralStake {
+            id: "stake:test:001".into(),
+            staker_did: "did:mycelix:alice".into(),
+            sap_amount: 1000,
+            mycel_score: 0.5,
+            stake_weight: 1.5,
+            staked_at: ts(1_000_000),
+            unbonding_until: None,
+            status: StakeStatus::Active,
+            pending_rewards: 0,
+            last_reward_claim: ts(1_000_000),
+        }
+    }
+
+    fn make_create() -> Create {
+        Create {
+            author: AgentPubKey::from_raw_36(vec![0; 36]),
+            timestamp: ts(1_000_000),
+            action_seq: 0,
+            prev_action: ActionHash::from_raw_36(vec![0; 36]),
+            entry_type: EntryType::CapClaim,
+            entry_hash: EntryHash::from_raw_36(vec![0; 36]),
+            weight: Default::default(),
+        }
+    }
+
+    fn make_update() -> Update {
+        Update {
+            author: AgentPubKey::from_raw_36(vec![0; 36]),
+            timestamp: ts(2_000_000),
+            action_seq: 1,
+            prev_action: ActionHash::from_raw_36(vec![0; 36]),
+            original_action_address: ActionHash::from_raw_36(vec![0; 36]),
+            original_entry_address: EntryHash::from_raw_36(vec![0; 36]),
+            entry_type: EntryType::CapClaim,
+            entry_hash: EntryHash::from_raw_36(vec![0; 36]),
+            weight: Default::default(),
+        }
+    }
+
+    // ---- Stake creation ----
+
+    #[test]
+    fn test_stake_create_valid() {
+        let result =
+            validate_create_stake(make_create(), valid_stake())
+                .unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn test_stake_rejects_nan_mycel_score() {
+        let mut stake = valid_stake();
+        stake.mycel_score = f32::NAN;
+        let result =
+            validate_create_stake(make_create(), stake).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_stake_rejects_infinity_mycel_score() {
+        let mut stake = valid_stake();
+        stake.mycel_score = f32::INFINITY;
+        let result =
+            validate_create_stake(make_create(), stake).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_stake_rejects_nan_weight() {
+        let mut stake = valid_stake();
+        stake.stake_weight = f32::NAN;
+        let result =
+            validate_create_stake(make_create(), stake).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_stake_rejects_zero_sap() {
+        let mut stake = valid_stake();
+        stake.sap_amount = 0;
+        let result =
+            validate_create_stake(make_create(), stake).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_stake_rejects_inconsistent_weight() {
+        let mut stake = valid_stake();
+        stake.stake_weight = 1.9; // Should be 1.5 for mycel_score=0.5
+        let result =
+            validate_create_stake(make_create(), stake).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_stake_rejects_non_active_status() {
+        let mut stake = valid_stake();
+        stake.status = StakeStatus::Withdrawn;
+        let result =
+            validate_create_stake(make_create(), stake).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_stake_rejects_invalid_did() {
+        let mut stake = valid_stake();
+        stake.staker_did = "not-a-did".into();
+        let result =
+            validate_create_stake(make_create(), stake).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // ---- Stake update ----
+
+    #[test]
+    fn test_stake_update_rejects_nan() {
+        let mut stake = valid_stake();
+        stake.mycel_score = f32::NAN;
+        let result =
+            validate_update_stake(make_update(), stake).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_stake_update_rejects_infinity_weight() {
+        let mut stake = valid_stake();
+        stake.stake_weight = f32::INFINITY;
+        let result =
+            validate_update_stake(make_update(), stake).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // ---- Escrow: release condition float validation ----
+
+    fn valid_escrow() -> CryptoEscrow {
+        CryptoEscrow {
+            id: "escrow:test:001".into(),
+            depositor_did: "did:mycelix:alice".into(),
+            beneficiary_did: "did:mycelix:bob".into(),
+            sap_amount: 500,
+            purpose: "Test escrow".into(),
+            conditions: vec![ReleaseCondition::Timelock {
+                release_time: 2_000_000,
+            }],
+            required_conditions: 1,
+            met_conditions: vec![],
+            hash_lock: None,
+            timelock: None,
+            multisig_threshold: None,
+            multisig_signers: vec![],
+            collected_signatures: vec![],
+            status: EscrowStatus::Pending,
+            created_at: ts(1_000_000),
+            released_at: None,
+        }
+    }
+
+    #[test]
+    fn test_escrow_create_valid() {
+        let result =
+            validate_escrow(make_create(), valid_escrow()).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn test_escrow_rejects_nan_oracle_price() {
+        let mut escrow = valid_escrow();
+        escrow.conditions = vec![ReleaseCondition::OraclePrice {
+            oracle_id: "oracle:test".into(),
+            asset: "ETH".into(),
+            min_price: f64::NAN,
+        }];
+        let result =
+            validate_escrow(make_create(), escrow).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_escrow_rejects_infinity_oracle_price() {
+        let mut escrow = valid_escrow();
+        escrow.conditions = vec![ReleaseCondition::OraclePrice {
+            oracle_id: "oracle:test".into(),
+            asset: "ETH".into(),
+            min_price: f64::INFINITY,
+        }];
+        let result =
+            validate_escrow(make_create(), escrow).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_escrow_rejects_nan_mycel_threshold() {
+        let mut escrow = valid_escrow();
+        escrow.conditions = vec![ReleaseCondition::MycelThreshold {
+            min_mycel_score: f32::NAN,
+        }];
+        let result =
+            validate_escrow(make_create(), escrow).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_escrow_rejects_mycel_threshold_out_of_range() {
+        let mut escrow = valid_escrow();
+        escrow.conditions = vec![ReleaseCondition::MycelThreshold {
+            min_mycel_score: 1.5, // > 1.0
+        }];
+        let result =
+            validate_escrow(make_create(), escrow).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_escrow_rejects_zero_sap() {
+        let mut escrow = valid_escrow();
+        escrow.sap_amount = 0;
+        let result =
+            validate_escrow(make_create(), escrow).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_escrow_rejects_no_conditions() {
+        let mut escrow = valid_escrow();
+        escrow.conditions = vec![];
+        let result =
+            validate_escrow(make_create(), escrow).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // ---- Slashing event ----
+
+    #[test]
+    fn test_slashing_rejects_over_100_percent() {
+        let event = SlashingEvent {
+            id: "slash:test".into(),
+            stake_id: "stake:test".into(),
+            staker_did: "did:mycelix:alice".into(),
+            reason: SlashingReason::Downtime,
+            slash_percentage: 101,
+            sap_slashed: 100,
+            evidence_hash: vec![0; 32],
+            evidence: vec![1, 2, 3],
+            slashed_at: ts(1_000_000),
+            jailed: false,
+            jail_release: None,
+        };
+        let result =
+            validate_slashing_event(make_create(), event).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_slashing_rejects_empty_evidence() {
+        let event = SlashingEvent {
+            id: "slash:test".into(),
+            stake_id: "stake:test".into(),
+            staker_did: "did:mycelix:alice".into(),
+            reason: SlashingReason::DoubleSigning,
+            slash_percentage: 100,
+            sap_slashed: 1000,
+            evidence_hash: vec![0; 32],
+            evidence: vec![],
+            slashed_at: ts(1_000_000),
+            jailed: true,
+            jail_release: None,
+        };
+        let result =
+            validate_slashing_event(make_create(), event).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
 }
