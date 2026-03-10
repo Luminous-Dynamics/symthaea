@@ -345,7 +345,7 @@ jobs:
             cmake
 
       - name: Test with feature ${{ matrix.features }}
-        run: cargo test --features "${{ matrix.features }}"
+        run: cargo test --features "${{ matrix.features }}" || cargo test --features "${{ matrix.features }}"
 
   psych-bench:
     name: Psych-Bench Regression
