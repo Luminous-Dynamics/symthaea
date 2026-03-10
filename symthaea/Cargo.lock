@@ -14350,6 +14350,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-crucible"
+version = "0.1.0"
+dependencies = [
+ "proptest",
+ "serde",
+ "serde_json",
+ "symthaea-core",
+ "symthaea-harmonies",
+ "symthaea-types",
+]
+
+[[package]]
 name = "symthaea-dream"
 version = "0.1.0"
 dependencies = [

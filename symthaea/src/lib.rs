@@ -197,6 +197,12 @@ Key types are re-exported at the crate root for convenience:
 
 */
 
+// ── Strict deny lints ──
+// Workspace lints (Cargo.toml [workspace.lints]) handle: dbg_macro, todo,
+// unimplemented, eq_op, erasing_op, invalid_regex, self_assignment,
+// cast_ptr_alignment, nonsensical_open_options, unused_io_amount.
+// Below: additional crate-specific denies not in workspace config.
+#![deny(clippy::zero_divided_by_zero, clippy::fn_to_numeric_cast)]
 // HDC code uses index-based iteration for element-wise vector operations (~1,075 sites).
 #![allow(clippy::needless_range_loop)]
 // Crate-level allows: each lint has 5+ occurrences across src/ (verified Feb 2026).
