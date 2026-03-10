@@ -34,12 +34,12 @@ pub use batch::*;
 pub use economics::*;
 pub use governance::*;
 pub use identity::*;
+pub use input_validation::*;
+pub use race_resolution::*;
+pub use rate_limit::*;
 pub use types::*;
 pub use update_chain::*;
-pub use race_resolution::*;
 pub use validation::*;
-pub use input_validation::*;
-pub use rate_limit::*;
 
 /// Community size threshold above which governance proposals are required for
 /// currency creation, demurrage changes, and dispute resolution.
@@ -391,11 +391,9 @@ pub mod batch {
     {
         records
             .iter()
-            .filter(|r| {
-                match r.entry().to_app_option::<T>() {
-                    Ok(Some(entry)) => predicate(&entry),
-                    _ => false,
-                }
+            .filter(|r| match r.entry().to_app_option::<T>() {
+                Ok(Some(entry)) => predicate(&entry),
+                _ => false,
             })
             .cloned()
             .collect()
@@ -590,9 +588,7 @@ pub mod governance {
     ///     verify_governance_or_bootstrap_from_links(gov_links)
     /// }
     /// ```
-    pub fn verify_governance_or_bootstrap_from_links(
-        gov_links: Vec<Link>,
-    ) -> ExternResult<()> {
+    pub fn verify_governance_or_bootstrap_from_links(gov_links: Vec<Link>) -> ExternResult<()> {
         if gov_links.is_empty() {
             return Ok(());
         }
@@ -651,7 +647,9 @@ pub mod input_validation {
     pub fn validate_id(id: &str, field_name: &str) -> ExternResult<()> {
         if id.is_empty() || id.len() > 256 {
             return Err(wasm_error!(WasmErrorInner::Guest(format!(
-                "{} must be 1-256 characters, got {}", field_name, id.len()
+                "{} must be 1-256 characters, got {}",
+                field_name,
+                id.len()
             ))));
         }
         Ok(())
@@ -661,12 +659,16 @@ pub mod input_validation {
     pub fn validate_did_format(did: &str, field_name: &str) -> ExternResult<()> {
         if did.is_empty() || did.len() > 256 {
             return Err(wasm_error!(WasmErrorInner::Guest(format!(
-                "{} must be 1-256 characters, got {}", field_name, did.len()
+                "{} must be 1-256 characters, got {}",
+                field_name,
+                did.len()
             ))));
         }
         if !did.starts_with("did:") {
             return Err(wasm_error!(WasmErrorInner::Guest(format!(
-                "{} must start with 'did:', got '{}'", field_name, &did[..did.len().min(20)]
+                "{} must start with 'did:', got '{}'",
+                field_name,
+                &did[..did.len().min(20)]
             ))));
         }
         Ok(())

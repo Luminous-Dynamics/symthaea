@@ -242,7 +242,10 @@ pub fn confirm_minted_exchange(exchange_id: String) -> ExternResult<MintedExchan
 
     // Quick pre-check: if confirmation already exists, return idempotently.
     let pre_existing = get_links(
-        LinkQuery::try_new(confirm_anchor_hash.clone(), LinkTypes::ExchangeToConfirmation)?,
+        LinkQuery::try_new(
+            confirm_anchor_hash.clone(),
+            LinkTypes::ExchangeToConfirmation,
+        )?,
         GetStrategy::default(),
     )?;
     if !pre_existing.is_empty() {
@@ -303,8 +306,7 @@ pub fn confirm_minted_exchange(exchange_id: String) -> ExternResult<MintedExchan
         receiver_completed: false,
         created_at: now,
     };
-    let pending_adj_hash =
-        create_entry(&EntryTypes::PendingMintedAdjustment(pending_adj))?;
+    let pending_adj_hash = create_entry(&EntryTypes::PendingMintedAdjustment(pending_adj))?;
 
     // Link from a well-known anchor so recover_incomplete_minted_confirmations can find them
     let pending_adj_anchor = anchor_hash("pending-minted-adjustments")?;
@@ -416,7 +418,9 @@ pub fn list_pending_exchanges(input: PaginatedCurrencyInput) -> ExternResult<Vec
 
 /// List pending exchanges awaiting confirmation by a specific receiver (paginated, default limit 100).
 #[hdk_extern]
-pub fn list_pending_for_receiver(input: PaginatedReceiverInput) -> ExternResult<Vec<MintedExchange>> {
+pub fn list_pending_for_receiver(
+    input: PaginatedReceiverInput,
+) -> ExternResult<Vec<MintedExchange>> {
     let limit = input.limit.unwrap_or(100);
     let entries = collect_linked_entries::<MintedExchange>(
         &format!("receiver-pending:{}", input.receiver_did),

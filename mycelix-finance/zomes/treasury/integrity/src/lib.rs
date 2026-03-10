@@ -318,7 +318,10 @@ fn validate_create_treasury(
             ));
         }
     }
-    if !treasury.reserve_ratio.is_finite() || treasury.reserve_ratio < 0.0 || treasury.reserve_ratio > 1.0 {
+    if !treasury.reserve_ratio.is_finite()
+        || treasury.reserve_ratio < 0.0
+        || treasury.reserve_ratio > 1.0
+    {
         return Ok(ValidateCallbackResult::Invalid(
             "Reserve ratio must be a finite number between 0 and 1".into(),
         ));
@@ -330,7 +333,10 @@ fn validate_update_treasury(
     _action: Update,
     treasury: Treasury,
 ) -> ExternResult<ValidateCallbackResult> {
-    if !treasury.reserve_ratio.is_finite() || treasury.reserve_ratio < 0.0 || treasury.reserve_ratio > 1.0 {
+    if !treasury.reserve_ratio.is_finite()
+        || treasury.reserve_ratio < 0.0
+        || treasury.reserve_ratio > 1.0
+    {
         return Ok(ValidateCallbackResult::Invalid(
             "Reserve ratio must be a finite number between 0 and 1".into(),
         ));
@@ -681,11 +687,9 @@ mod tests {
 
     #[test]
     fn test_treasury_create_valid() {
-        let result = validate_create_treasury(
-            EntryCreationAction::Create(make_create()),
-            valid_treasury(),
-        )
-        .unwrap();
+        let result =
+            validate_create_treasury(EntryCreationAction::Create(make_create()), valid_treasury())
+                .unwrap();
         assert!(matches!(result, ValidateCallbackResult::Valid));
     }
 
@@ -693,11 +697,8 @@ mod tests {
     fn test_treasury_rejects_nan_reserve_ratio() {
         let mut t = valid_treasury();
         t.reserve_ratio = f64::NAN;
-        let result = validate_create_treasury(
-            EntryCreationAction::Create(make_create()),
-            t,
-        )
-        .unwrap();
+        let result =
+            validate_create_treasury(EntryCreationAction::Create(make_create()), t).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -705,11 +706,8 @@ mod tests {
     fn test_treasury_rejects_inf_reserve_ratio() {
         let mut t = valid_treasury();
         t.reserve_ratio = f64::INFINITY;
-        let result = validate_create_treasury(
-            EntryCreationAction::Create(make_create()),
-            t,
-        )
-        .unwrap();
+        let result =
+            validate_create_treasury(EntryCreationAction::Create(make_create()), t).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -717,11 +715,8 @@ mod tests {
     fn test_treasury_rejects_reserve_ratio_out_of_range() {
         let mut t = valid_treasury();
         t.reserve_ratio = 1.5;
-        let result = validate_create_treasury(
-            EntryCreationAction::Create(make_create()),
-            t,
-        )
-        .unwrap();
+        let result =
+            validate_create_treasury(EntryCreationAction::Create(make_create()), t).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -729,11 +724,8 @@ mod tests {
     fn test_treasury_rejects_negative_reserve_ratio() {
         let mut t = valid_treasury();
         t.reserve_ratio = -0.1;
-        let result = validate_create_treasury(
-            EntryCreationAction::Create(make_create()),
-            t,
-        )
-        .unwrap();
+        let result =
+            validate_create_treasury(EntryCreationAction::Create(make_create()), t).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -741,11 +733,8 @@ mod tests {
     fn test_treasury_rejects_no_managers() {
         let mut t = valid_treasury();
         t.managers = vec![];
-        let result = validate_create_treasury(
-            EntryCreationAction::Create(make_create()),
-            t,
-        )
-        .unwrap();
+        let result =
+            validate_create_treasury(EntryCreationAction::Create(make_create()), t).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -753,11 +742,8 @@ mod tests {
     fn test_treasury_rejects_invalid_manager_did() {
         let mut t = valid_treasury();
         t.managers = vec!["not-a-did".into()];
-        let result = validate_create_treasury(
-            EntryCreationAction::Create(make_create()),
-            t,
-        )
-        .unwrap();
+        let result =
+            validate_create_treasury(EntryCreationAction::Create(make_create()), t).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -779,11 +765,8 @@ mod tests {
     fn test_treasury_rejects_name_too_long() {
         let mut t = valid_treasury();
         t.name = "x".repeat(201);
-        let result = validate_create_treasury(
-            EntryCreationAction::Create(make_create()),
-            t,
-        )
-        .unwrap();
+        let result =
+            validate_create_treasury(EntryCreationAction::Create(make_create()), t).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -803,11 +786,8 @@ mod tests {
     fn test_contribution_rejects_zero_amount() {
         let mut c = valid_contribution();
         c.amount = 0;
-        let result = validate_create_contribution(
-            EntryCreationAction::Create(make_create()),
-            c,
-        )
-        .unwrap();
+        let result =
+            validate_create_contribution(EntryCreationAction::Create(make_create()), c).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -815,11 +795,8 @@ mod tests {
     fn test_contribution_rejects_invalid_did() {
         let mut c = valid_contribution();
         c.contributor_did = "notadid".into();
-        let result = validate_create_contribution(
-            EntryCreationAction::Create(make_create()),
-            c,
-        )
-        .unwrap();
+        let result =
+            validate_create_contribution(EntryCreationAction::Create(make_create()), c).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -839,11 +816,8 @@ mod tests {
     fn test_allocation_rejects_zero_amount() {
         let mut a = valid_allocation();
         a.amount = 0;
-        let result = validate_create_allocation(
-            EntryCreationAction::Create(make_create()),
-            a,
-        )
-        .unwrap();
+        let result =
+            validate_create_allocation(EntryCreationAction::Create(make_create()), a).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -853,10 +827,11 @@ mod tests {
     fn test_contribution_update_rejected() {
         // Contributions are rejected inline in the validate() match arm.
         // Verify the invariant directly: the result is always Invalid.
-        let result: ValidateCallbackResult = ValidateCallbackResult::Invalid(
-            "Contributions cannot be updated".into(),
+        let result: ValidateCallbackResult =
+            ValidateCallbackResult::Invalid("Contributions cannot be updated".into());
+        assert!(
+            matches!(result, ValidateCallbackResult::Invalid(msg) if msg == "Contributions cannot be updated")
         );
-        assert!(matches!(result, ValidateCallbackResult::Invalid(msg) if msg == "Contributions cannot be updated"));
     }
 
     // ---- Compost receivals cannot be updated ----
@@ -868,7 +843,9 @@ mod tests {
         let result: ValidateCallbackResult = ValidateCallbackResult::Invalid(
             "Compost receivals cannot be updated -- they are immutable records".into(),
         );
-        assert!(matches!(result, ValidateCallbackResult::Invalid(msg) if msg.contains("Compost receivals cannot be updated")));
+        assert!(
+            matches!(result, ValidateCallbackResult::Invalid(msg) if msg.contains("Compost receivals cannot be updated"))
+        );
     }
 
     // ---- SavingsPool creation ----
@@ -887,11 +864,8 @@ mod tests {
     fn test_savings_pool_rejects_nan_yield_rate() {
         let mut p = valid_savings_pool();
         p.yield_rate = f64::NAN;
-        let result = validate_create_savings_pool(
-            EntryCreationAction::Create(make_create()),
-            p,
-        )
-        .unwrap();
+        let result =
+            validate_create_savings_pool(EntryCreationAction::Create(make_create()), p).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -899,11 +873,8 @@ mod tests {
     fn test_savings_pool_rejects_inf_yield_rate() {
         let mut p = valid_savings_pool();
         p.yield_rate = f64::INFINITY;
-        let result = validate_create_savings_pool(
-            EntryCreationAction::Create(make_create()),
-            p,
-        )
-        .unwrap();
+        let result =
+            validate_create_savings_pool(EntryCreationAction::Create(make_create()), p).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -911,11 +882,8 @@ mod tests {
     fn test_savings_pool_rejects_zero_target() {
         let mut p = valid_savings_pool();
         p.target_amount = 0;
-        let result = validate_create_savings_pool(
-            EntryCreationAction::Create(make_create()),
-            p,
-        )
-        .unwrap();
+        let result =
+            validate_create_savings_pool(EntryCreationAction::Create(make_create()), p).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -935,11 +903,8 @@ mod tests {
     fn test_commons_pool_rejects_not_demurrage_exempt() {
         let mut p = valid_commons_pool();
         p.demurrage_exempt = false;
-        let result = validate_create_commons_pool(
-            EntryCreationAction::Create(make_create()),
-            p,
-        )
-        .unwrap();
+        let result =
+            validate_create_commons_pool(EntryCreationAction::Create(make_create()), p).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -949,11 +914,8 @@ mod tests {
         // inalienable_reserve=1000, available_balance=9000 => reserve ratio = 10%
         p.inalienable_reserve = 1_000;
         p.available_balance = 9_000;
-        let result = validate_create_commons_pool(
-            EntryCreationAction::Create(make_create()),
-            p,
-        )
-        .unwrap();
+        let result =
+            validate_create_commons_pool(EntryCreationAction::Create(make_create()), p).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -962,11 +924,8 @@ mod tests {
         let mut p = valid_commons_pool();
         p.inalienable_reserve = 0;
         p.available_balance = 0;
-        let result = validate_create_commons_pool(
-            EntryCreationAction::Create(make_create()),
-            p,
-        )
-        .unwrap();
+        let result =
+            validate_create_commons_pool(EntryCreationAction::Create(make_create()), p).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Valid));
     }
 
@@ -976,11 +935,8 @@ mod tests {
         // 25 / 100 = exactly 25%
         p.inalienable_reserve = 25;
         p.available_balance = 75;
-        let result = validate_create_commons_pool(
-            EntryCreationAction::Create(make_create()),
-            p,
-        )
-        .unwrap();
+        let result =
+            validate_create_commons_pool(EntryCreationAction::Create(make_create()), p).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Valid));
     }
 
@@ -1000,11 +956,9 @@ mod tests {
     fn test_compost_receival_rejects_zero_amount() {
         let mut r = valid_compost_receival();
         r.amount = 0;
-        let result = validate_create_compost_receival(
-            EntryCreationAction::Create(make_create()),
-            r,
-        )
-        .unwrap();
+        let result =
+            validate_create_compost_receival(EntryCreationAction::Create(make_create()), r)
+                .unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -1012,11 +966,9 @@ mod tests {
     fn test_compost_receival_rejects_invalid_did() {
         let mut r = valid_compost_receival();
         r.source_member_did = "notadid".into();
-        let result = validate_create_compost_receival(
-            EntryCreationAction::Create(make_create()),
-            r,
-        )
-        .unwrap();
+        let result =
+            validate_create_compost_receival(EntryCreationAction::Create(make_create()), r)
+                .unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 }

@@ -309,7 +309,8 @@ pub fn list_active_currencies(_: ()) -> ExternResult<Vec<CurrencyDefinition>> {
 pub fn search_currencies(query: String) -> ExternResult<Vec<CurrencyDefinition>> {
     if query.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "query must be 1-256 characters, got {}", query.len()
+            "query must be 1-256 characters, got {}",
+            query.len()
         ))));
     }
     let query_lower = query.to_lowercase();

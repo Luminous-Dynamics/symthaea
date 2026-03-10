@@ -117,9 +117,10 @@ pub fn create_stake(input: CreateStakeInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
-        format!("Stake record not found after creation for staker {}", input.staker_did)
-    )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+        "Stake record not found after creation for staker {}",
+        input.staker_did
+    ))))
 }
 
 /// Look up a stake by its ID using the StakeIdToStake link index.
@@ -162,9 +163,12 @@ fn find_escrow_by_id(escrow_id: &str) -> ExternResult<(CryptoEscrow, Record)> {
         LinkQuery::try_new(anchor_hash(escrow_id)?, LinkTypes::EscrowIdToEscrow)?,
         GetStrategy::default(),
     )?;
-    let link = links.first().ok_or(wasm_error!(WasmErrorInner::Guest(
-        format!("Escrow not found for ID {}", escrow_id)
-    )))?;
+    let link = links
+        .first()
+        .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+            "Escrow not found for ID {}",
+            escrow_id
+        ))))?;
     let hash = ActionHash::try_from(link.target.clone())
         .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
     let record = follow_update_chain(hash)?;
@@ -211,11 +215,10 @@ pub fn begin_unbonding(stake_id: String) -> ExternResult<Record> {
         &EntryTypes::CollateralStake(updated),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
-            "Stake record not found after unbonding for stake {}",
-            stake_id
-        ))))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+        "Stake record not found after unbonding for stake {}",
+        stake_id
+    ))))
 }
 
 /// Complete withdrawal after unbonding period
@@ -250,11 +253,10 @@ pub fn withdraw_stake(stake_id: String) -> ExternResult<Record> {
         &EntryTypes::CollateralStake(updated),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
-            "Stake record not found after withdrawal for stake {}",
-            stake_id
-        ))))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+        "Stake record not found after withdrawal for stake {}",
+        stake_id
+    ))))
 }
 
 /// Update stake MYCEL score
@@ -283,11 +285,10 @@ pub fn update_stake_mycel(input: UpdateMycelInput) -> ExternResult<Record> {
         &EntryTypes::CollateralStake(updated),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
-            "Stake record not found after MYCEL update for stake {}",
-            input.stake_id
-        ))))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+        "Stake record not found after MYCEL update for stake {}",
+        input.stake_id
+    ))))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -313,13 +314,19 @@ fn fetch_verified_mycel_score(staker_did: &str) -> ExternResult<f32> {
             match result.decode::<MycelState>() {
                 Ok(state) => Ok((state.mycel_score as f32).clamp(0.0, 1.0)),
                 Err(e) => {
-                    debug!("fetch_verified_mycel_score: decode error for {}: {:?}, defaulting to 0.0", staker_did, e);
+                    debug!(
+                        "fetch_verified_mycel_score: decode error for {}: {:?}, defaulting to 0.0",
+                        staker_did, e
+                    );
                     Ok(0.0)
                 }
             }
         }
         Ok(other) => {
-            debug!("fetch_verified_mycel_score: recognition returned {:?} for {}, defaulting to 0.0", other, staker_did);
+            debug!(
+                "fetch_verified_mycel_score: recognition returned {:?} for {}, defaulting to 0.0",
+                other, staker_did
+            );
             Ok(0.0)
         }
         Err(e) => {
@@ -425,11 +432,10 @@ pub fn slash_stake(input: SlashStakeInput) -> ExternResult<Record> {
         &EntryTypes::CollateralStake(updated_stake),
     )?;
 
-    get(event_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
-            "Slashing event record not found after creation for stake {}",
-            input.stake_id
-        ))))
+    get(event_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+        "Slashing event record not found after creation for stake {}",
+        input.stake_id
+    ))))
 }
 
 // =============================================================================
@@ -510,11 +516,10 @@ pub fn create_escrow(input: CreateEscrowInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
-            "Escrow record not found after creation for escrow {}",
-            escrow_id
-        ))))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+        "Escrow record not found after creation for escrow {}",
+        escrow_id
+    ))))
 }
 
 /// Reveal hash preimage to satisfy hash-lock condition
@@ -566,11 +571,12 @@ pub fn reveal_hash_preimage(input: RevealPreimageInput) -> ExternResult<Record> 
                     &EntryTypes::CryptoEscrow(updated),
                 )?;
 
-                return get(action_hash, GetOptions::default())?
-                    .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+                return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(
+                    WasmErrorInner::Guest(format!(
                         "Escrow record not found after hash preimage reveal for escrow {}",
                         input.escrow_id
-                    ))));
+                    ))
+                ));
             }
         }
     }
@@ -689,18 +695,18 @@ pub fn add_escrow_signature(input: AddSignatureInput) -> ExternResult<Record> {
         delete_link(link_hash, GetOptions::default())?;
         // Return the existing record
         let (existing_ah, _) = &duplicates[0];
-        return get(existing_ah.clone(), GetOptions::default())?
-            .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+        return get(existing_ah.clone(), GetOptions::default())?.ok_or(wasm_error!(
+            WasmErrorInner::Guest(format!(
                 "Existing signature record not found for escrow {} signer {}",
                 input.escrow_id, input.signer_did
-            ))));
+            ))
+        ));
     }
 
-    get(sig_action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
-            "Signature record not found after creation for escrow {} signer {}",
-            input.escrow_id, input.signer_did
-        ))))
+    get(sig_action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+        "Signature record not found after creation for escrow {} signer {}",
+        input.escrow_id, input.signer_did
+    ))))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -777,11 +783,10 @@ pub fn release_escrow(escrow_id: String) -> ExternResult<Record> {
         &EntryTypes::CryptoEscrow(updated),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
-            "Escrow record not found after release for escrow {}",
-            escrow_id
-        ))))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+        "Escrow record not found after release for escrow {}",
+        escrow_id
+    ))))
 }
 
 // =============================================================================

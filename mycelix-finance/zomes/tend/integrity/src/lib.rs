@@ -1586,11 +1586,9 @@ mod tests {
 
     #[test]
     fn test_exchange_create_valid() {
-        let result = validate_create_exchange(
-            EntryCreationAction::Create(make_create()),
-            valid_exchange(),
-        )
-        .unwrap();
+        let result =
+            validate_create_exchange(EntryCreationAction::Create(make_create()), valid_exchange())
+                .unwrap();
         assert!(matches!(result, ValidateCallbackResult::Valid));
     }
 
@@ -1598,11 +1596,8 @@ mod tests {
     fn test_exchange_rejects_invalid_provider_did() {
         let mut ex = valid_exchange();
         ex.provider_did = "not-a-did".into();
-        let result = validate_create_exchange(
-            EntryCreationAction::Create(make_create()),
-            ex,
-        )
-        .unwrap();
+        let result =
+            validate_create_exchange(EntryCreationAction::Create(make_create()), ex).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -1610,11 +1605,8 @@ mod tests {
     fn test_exchange_rejects_invalid_receiver_did() {
         let mut ex = valid_exchange();
         ex.receiver_did = "bad".into();
-        let result = validate_create_exchange(
-            EntryCreationAction::Create(make_create()),
-            ex,
-        )
-        .unwrap();
+        let result =
+            validate_create_exchange(EntryCreationAction::Create(make_create()), ex).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -1622,11 +1614,8 @@ mod tests {
     fn test_exchange_rejects_self_exchange() {
         let mut ex = valid_exchange();
         ex.receiver_did = ex.provider_did.clone();
-        let result = validate_create_exchange(
-            EntryCreationAction::Create(make_create()),
-            ex,
-        )
-        .unwrap();
+        let result =
+            validate_create_exchange(EntryCreationAction::Create(make_create()), ex).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -1634,11 +1623,8 @@ mod tests {
     fn test_exchange_rejects_nan_hours() {
         let mut ex = valid_exchange();
         ex.hours = f32::NAN;
-        let result = validate_create_exchange(
-            EntryCreationAction::Create(make_create()),
-            ex,
-        )
-        .unwrap();
+        let result =
+            validate_create_exchange(EntryCreationAction::Create(make_create()), ex).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -1646,11 +1632,8 @@ mod tests {
     fn test_exchange_rejects_zero_hours() {
         let mut ex = valid_exchange();
         ex.hours = 0.0;
-        let result = validate_create_exchange(
-            EntryCreationAction::Create(make_create()),
-            ex,
-        )
-        .unwrap();
+        let result =
+            validate_create_exchange(EntryCreationAction::Create(make_create()), ex).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -1658,11 +1641,8 @@ mod tests {
     fn test_exchange_rejects_negative_hours() {
         let mut ex = valid_exchange();
         ex.hours = -1.0;
-        let result = validate_create_exchange(
-            EntryCreationAction::Create(make_create()),
-            ex,
-        )
-        .unwrap();
+        let result =
+            validate_create_exchange(EntryCreationAction::Create(make_create()), ex).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -1670,11 +1650,8 @@ mod tests {
     fn test_exchange_rejects_infinity_hours() {
         let mut ex = valid_exchange();
         ex.hours = f32::INFINITY;
-        let result = validate_create_exchange(
-            EntryCreationAction::Create(make_create()),
-            ex,
-        )
-        .unwrap();
+        let result =
+            validate_create_exchange(EntryCreationAction::Create(make_create()), ex).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -1682,11 +1659,8 @@ mod tests {
     fn test_exchange_rejects_exceeding_max_hours() {
         let mut ex = valid_exchange();
         ex.hours = 9.0; // MAX_SERVICE_HOURS is 8
-        let result = validate_create_exchange(
-            EntryCreationAction::Create(make_create()),
-            ex,
-        )
-        .unwrap();
+        let result =
+            validate_create_exchange(EntryCreationAction::Create(make_create()), ex).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -1694,11 +1668,8 @@ mod tests {
     fn test_exchange_rejects_below_min_minutes() {
         let mut ex = valid_exchange();
         ex.hours = 0.1; // 6 minutes, MIN_SERVICE_MINUTES is 15
-        let result = validate_create_exchange(
-            EntryCreationAction::Create(make_create()),
-            ex,
-        )
-        .unwrap();
+        let result =
+            validate_create_exchange(EntryCreationAction::Create(make_create()), ex).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -1706,11 +1677,8 @@ mod tests {
     fn test_exchange_rejects_empty_description() {
         let mut ex = valid_exchange();
         ex.service_description = "".into();
-        let result = validate_create_exchange(
-            EntryCreationAction::Create(make_create()),
-            ex,
-        )
-        .unwrap();
+        let result =
+            validate_create_exchange(EntryCreationAction::Create(make_create()), ex).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -1718,11 +1686,8 @@ mod tests {
     fn test_exchange_rejects_overlong_description() {
         let mut ex = valid_exchange();
         ex.service_description = "x".repeat(2001);
-        let result = validate_create_exchange(
-            EntryCreationAction::Create(make_create()),
-            ex,
-        )
-        .unwrap();
+        let result =
+            validate_create_exchange(EntryCreationAction::Create(make_create()), ex).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -1730,11 +1695,8 @@ mod tests {
     fn test_exchange_rejects_overlong_cultural_alias() {
         let mut ex = valid_exchange();
         ex.cultural_alias = Some("x".repeat(65)); // MAX_CULTURAL_ALIAS_LEN is 64
-        let result = validate_create_exchange(
-            EntryCreationAction::Create(make_create()),
-            ex,
-        )
-        .unwrap();
+        let result =
+            validate_create_exchange(EntryCreationAction::Create(make_create()), ex).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -1752,11 +1714,9 @@ mod tests {
 
     #[test]
     fn test_balance_create_valid() {
-        let result = validate_create_balance(
-            EntryCreationAction::Create(make_create()),
-            valid_balance(),
-        )
-        .unwrap();
+        let result =
+            validate_create_balance(EntryCreationAction::Create(make_create()), valid_balance())
+                .unwrap();
         assert!(matches!(result, ValidateCallbackResult::Valid));
     }
 
@@ -1764,11 +1724,8 @@ mod tests {
     fn test_balance_rejects_invalid_member_did() {
         let mut bal = valid_balance();
         bal.member_did = "nope".into();
-        let result = validate_create_balance(
-            EntryCreationAction::Create(make_create()),
-            bal,
-        )
-        .unwrap();
+        let result =
+            validate_create_balance(EntryCreationAction::Create(make_create()), bal).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -1776,11 +1733,8 @@ mod tests {
     fn test_balance_rejects_invalid_dao_did() {
         let mut bal = valid_balance();
         bal.dao_did = "nope".into();
-        let result = validate_create_balance(
-            EntryCreationAction::Create(make_create()),
-            bal,
-        )
-        .unwrap();
+        let result =
+            validate_create_balance(EntryCreationAction::Create(make_create()), bal).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -1788,11 +1742,8 @@ mod tests {
     fn test_balance_rejects_nan_total_provided() {
         let mut bal = valid_balance();
         bal.total_provided = f32::NAN;
-        let result = validate_create_balance(
-            EntryCreationAction::Create(make_create()),
-            bal,
-        )
-        .unwrap();
+        let result =
+            validate_create_balance(EntryCreationAction::Create(make_create()), bal).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -1800,11 +1751,8 @@ mod tests {
     fn test_balance_rejects_inf_total_received() {
         let mut bal = valid_balance();
         bal.total_received = f32::INFINITY;
-        let result = validate_create_balance(
-            EntryCreationAction::Create(make_create()),
-            bal,
-        )
-        .unwrap();
+        let result =
+            validate_create_balance(EntryCreationAction::Create(make_create()), bal).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -1812,11 +1760,8 @@ mod tests {
     fn test_balance_rejects_exceeding_emergency_limit() {
         let mut bal = valid_balance();
         bal.balance = 121; // BALANCE_LIMIT_EMERGENCY is 120
-        let result = validate_create_balance(
-            EntryCreationAction::Create(make_create()),
-            bal,
-        )
-        .unwrap();
+        let result =
+            validate_create_balance(EntryCreationAction::Create(make_create()), bal).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -1824,11 +1769,8 @@ mod tests {
     fn test_balance_rejects_negative_exceeding_emergency_limit() {
         let mut bal = valid_balance();
         bal.balance = -121;
-        let result = validate_create_balance(
-            EntryCreationAction::Create(make_create()),
-            bal,
-        )
-        .unwrap();
+        let result =
+            validate_create_balance(EntryCreationAction::Create(make_create()), bal).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -1836,11 +1778,8 @@ mod tests {
     fn test_balance_allows_emergency_limit_exactly() {
         let mut bal = valid_balance();
         bal.balance = 120;
-        let result = validate_create_balance(
-            EntryCreationAction::Create(make_create()),
-            bal,
-        )
-        .unwrap();
+        let result =
+            validate_create_balance(EntryCreationAction::Create(make_create()), bal).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Valid));
     }
 
@@ -1878,11 +1817,8 @@ mod tests {
     fn test_rating_rejects_self_rating() {
         let mut r = valid_rating();
         r.provider_did = r.rater_did.clone();
-        let result = validate_create_quality_rating(
-            EntryCreationAction::Create(make_create()),
-            r,
-        )
-        .unwrap();
+        let result =
+            validate_create_quality_rating(EntryCreationAction::Create(make_create()), r).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -1890,11 +1826,8 @@ mod tests {
     fn test_rating_rejects_zero_score() {
         let mut r = valid_rating();
         r.rating = 0;
-        let result = validate_create_quality_rating(
-            EntryCreationAction::Create(make_create()),
-            r,
-        )
-        .unwrap();
+        let result =
+            validate_create_quality_rating(EntryCreationAction::Create(make_create()), r).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -1902,11 +1835,8 @@ mod tests {
     fn test_rating_rejects_above_five() {
         let mut r = valid_rating();
         r.rating = 6;
-        let result = validate_create_quality_rating(
-            EntryCreationAction::Create(make_create()),
-            r,
-        )
-        .unwrap();
+        let result =
+            validate_create_quality_rating(EntryCreationAction::Create(make_create()), r).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -1914,11 +1844,8 @@ mod tests {
     fn test_rating_rejects_empty_exchange_id() {
         let mut r = valid_rating();
         r.exchange_id = "".into();
-        let result = validate_create_quality_rating(
-            EntryCreationAction::Create(make_create()),
-            r,
-        )
-        .unwrap();
+        let result =
+            validate_create_quality_rating(EntryCreationAction::Create(make_create()), r).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -1926,11 +1853,8 @@ mod tests {
     fn test_rating_rejects_invalid_rater_did() {
         let mut r = valid_rating();
         r.rater_did = "bad".into();
-        let result = validate_create_quality_rating(
-            EntryCreationAction::Create(make_create()),
-            r,
-        )
-        .unwrap();
+        let result =
+            validate_create_quality_rating(EntryCreationAction::Create(make_create()), r).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -1950,11 +1874,8 @@ mod tests {
     fn test_dispute_rejects_self_dispute() {
         let mut d = valid_dispute();
         d.respondent_did = d.complainant_did.clone();
-        let result = validate_create_dispute_case(
-            EntryCreationAction::Create(make_create()),
-            d,
-        )
-        .unwrap();
+        let result =
+            validate_create_dispute_case(EntryCreationAction::Create(make_create()), d).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -1962,11 +1883,8 @@ mod tests {
     fn test_dispute_rejects_empty_description() {
         let mut d = valid_dispute();
         d.description = "".into();
-        let result = validate_create_dispute_case(
-            EntryCreationAction::Create(make_create()),
-            d,
-        )
-        .unwrap();
+        let result =
+            validate_create_dispute_case(EntryCreationAction::Create(make_create()), d).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -1974,11 +1892,8 @@ mod tests {
     fn test_dispute_rejects_empty_exchange_id() {
         let mut d = valid_dispute();
         d.exchange_id = "".into();
-        let result = validate_create_dispute_case(
-            EntryCreationAction::Create(make_create()),
-            d,
-        )
-        .unwrap();
+        let result =
+            validate_create_dispute_case(EntryCreationAction::Create(make_create()), d).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -1991,11 +1906,8 @@ mod tests {
             "did:mycelix:m2".into(),
             "did:mycelix:m3".into(),
         ];
-        let result = validate_create_dispute_case(
-            EntryCreationAction::Create(make_create()),
-            d,
-        )
-        .unwrap();
+        let result =
+            validate_create_dispute_case(EntryCreationAction::Create(make_create()), d).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 

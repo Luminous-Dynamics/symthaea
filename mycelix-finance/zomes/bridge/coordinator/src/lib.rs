@@ -574,21 +574,33 @@ fn fetch_mycel_score(member_did: &str) -> f64 {
             match result.decode::<MycelState>() {
                 Ok(state) if state.mycel_score.is_finite() => state.mycel_score,
                 Ok(state) => {
-                    debug!("fetch_mycel_score: non-finite MYCEL score {:?} for {}, defaulting to 0.0", state.mycel_score, member_did);
+                    debug!(
+                        "fetch_mycel_score: non-finite MYCEL score {:?} for {}, defaulting to 0.0",
+                        state.mycel_score, member_did
+                    );
                     0.0
                 }
                 Err(e) => {
-                    debug!("fetch_mycel_score: decode error for {}: {:?}, defaulting to 0.0", member_did, e);
+                    debug!(
+                        "fetch_mycel_score: decode error for {}: {:?}, defaulting to 0.0",
+                        member_did, e
+                    );
                     0.0
                 }
             }
         }
         Ok(other) => {
-            debug!("fetch_mycel_score: recognition zome returned {:?} for {}, defaulting to 0.0", other, member_did);
+            debug!(
+                "fetch_mycel_score: recognition zome returned {:?} for {}, defaulting to 0.0",
+                other, member_did
+            );
             0.0
         }
         Err(e) => {
-            debug!("fetch_mycel_score: recognition zome unreachable for {}: {:?}, defaulting to 0.0", member_did, e);
+            debug!(
+                "fetch_mycel_score: recognition zome unreachable for {}: {:?}, defaulting to 0.0",
+                member_did, e
+            );
             0.0
         }
     }
@@ -612,13 +624,19 @@ fn fetch_oracle_vitality() -> u32 {
             match result.decode::<OracleResp>() {
                 Ok(state) => state.vitality,
                 Err(e) => {
-                    debug!("fetch_oracle_vitality: decode error: {:?}, defaulting to 50 (Normal tier)", e);
+                    debug!(
+                        "fetch_oracle_vitality: decode error: {:?}, defaulting to 50 (Normal tier)",
+                        e
+                    );
                     50
                 }
             }
         }
         Ok(other) => {
-            debug!("fetch_oracle_vitality: tend zome returned {:?}, defaulting to 50 (Normal tier)", other);
+            debug!(
+                "fetch_oracle_vitality: tend zome returned {:?}, defaulting to 50 (Normal tier)",
+                other
+            );
             50
         }
         Err(e) => {
@@ -767,7 +785,10 @@ pub fn query_sap_balance(member_did: String) -> ExternResult<BalanceResponse> {
             })
         }
         Ok(other) => {
-            debug!("query_sap_balance: payments zome returned {:?} for {}, reporting unavailable", other, member_did);
+            debug!(
+                "query_sap_balance: payments zome returned {:?} for {}, reporting unavailable",
+                other, member_did
+            );
             Ok(BalanceResponse {
                 member_did,
                 currency: "SAP".into(),
@@ -776,7 +797,10 @@ pub fn query_sap_balance(member_did: String) -> ExternResult<BalanceResponse> {
             })
         }
         Err(e) => {
-            debug!("query_sap_balance: payments zome unreachable for {}: {:?}, reporting unavailable", member_did, e);
+            debug!(
+                "query_sap_balance: payments zome unreachable for {}: {:?}, reporting unavailable",
+                member_did, e
+            );
             Ok(BalanceResponse {
                 member_did,
                 currency: "SAP".into(),
@@ -817,7 +841,10 @@ pub fn query_tend_balance(member_did: String) -> ExternResult<TendBalanceRespons
             })
         }
         Ok(other) => {
-            debug!("query_tend_balance: tend zome returned {:?} for {}, reporting unavailable", other, member_did);
+            debug!(
+                "query_tend_balance: tend zome returned {:?} for {}, reporting unavailable",
+                other, member_did
+            );
             Ok(TendBalanceResponse {
                 member_did,
                 balance: 0,
@@ -826,7 +853,10 @@ pub fn query_tend_balance(member_did: String) -> ExternResult<TendBalanceRespons
             })
         }
         Err(e) => {
-            debug!("query_tend_balance: tend zome unreachable for {}: {:?}, reporting unavailable", member_did, e);
+            debug!(
+                "query_tend_balance: tend zome unreachable for {}: {:?}, reporting unavailable",
+                member_did, e
+            );
             Ok(TendBalanceResponse {
                 member_did,
                 balance: 0,
@@ -934,15 +964,15 @@ fn enforce_rate_limit(member_did: &str, new_amount: u64, now: Timestamp) -> Exte
 
     let deposits: Vec<CollateralBridgeDeposit> = query(filter)?
         .into_iter()
-        .filter_map(|r| {
-            match r.entry().to_app_option::<CollateralBridgeDeposit>() {
+        .filter_map(
+            |r| match r.entry().to_app_option::<CollateralBridgeDeposit>() {
                 Ok(opt) => opt,
                 Err(e) => {
                     debug!("enforce_rate_limit: deposit deserialization error: {:?}", e);
                     None
                 }
-            }
-        })
+            },
+        )
         .collect();
 
     // Total vault = sum of all confirmed deposit SAP

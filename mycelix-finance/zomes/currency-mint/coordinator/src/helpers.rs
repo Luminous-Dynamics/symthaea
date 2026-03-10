@@ -2,11 +2,11 @@
 
 use currency_mint_integrity::*;
 use hdk::prelude::*;
+use mycelix_finance_shared::anchor_hash;
 pub(crate) use mycelix_finance_shared::follow_update_chain;
 pub(crate) use mycelix_finance_shared::pick_race_winner;
 pub(crate) use mycelix_finance_shared::COMMUNITY_GOVERNANCE_THRESHOLD;
-pub(crate) use mycelix_finance_shared::{validate_id, validate_did_format};
-use mycelix_finance_shared::anchor_hash;
+pub(crate) use mycelix_finance_shared::{validate_did_format, validate_id};
 
 pub(crate) fn get_currency_inner(currency_id: &str) -> ExternResult<(Record, CurrencyDefinition)> {
     let links = get_links(
@@ -504,7 +504,10 @@ pub(crate) fn mutate_balance(
         }
         debug!(
             "mutate_balance: concurrent update detected for {}:{}, retry {}/{}",
-            currency_id, member_did, attempt + 1, MAX_BALANCE_RETRIES
+            currency_id,
+            member_did,
+            attempt + 1,
+            MAX_BALANCE_RETRIES
         );
     }
 
@@ -513,4 +516,3 @@ pub(crate) fn mutate_balance(
         "Balance update failed: retry loop exited unexpectedly".into()
     )))
 }
-

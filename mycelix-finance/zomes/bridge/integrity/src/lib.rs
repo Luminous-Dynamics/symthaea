@@ -630,11 +630,9 @@ mod tests {
     fn test_payment_rejects_zero_amount() {
         let mut p = valid_payment();
         p.amount = 0;
-        let result = validate_create_cross_happ_payment(
-            EntryCreationAction::Create(make_create()),
-            p,
-        )
-        .unwrap();
+        let result =
+            validate_create_cross_happ_payment(EntryCreationAction::Create(make_create()), p)
+                .unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -642,11 +640,9 @@ mod tests {
     fn test_payment_rejects_non_sap_currency() {
         let mut p = valid_payment();
         p.currency = "USD".into();
-        let result = validate_create_cross_happ_payment(
-            EntryCreationAction::Create(make_create()),
-            p,
-        )
-        .unwrap();
+        let result =
+            validate_create_cross_happ_payment(EntryCreationAction::Create(make_create()), p)
+                .unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -654,11 +650,9 @@ mod tests {
     fn test_payment_rejects_oversized_from_did() {
         let mut p = valid_payment();
         p.from_did = "d".repeat(MAX_DID_LEN + 1);
-        let result = validate_create_cross_happ_payment(
-            EntryCreationAction::Create(make_create()),
-            p,
-        )
-        .unwrap();
+        let result =
+            validate_create_cross_happ_payment(EntryCreationAction::Create(make_create()), p)
+                .unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -666,11 +660,9 @@ mod tests {
     fn test_payment_rejects_oversized_to_did() {
         let mut p = valid_payment();
         p.to_did = "d".repeat(MAX_DID_LEN + 1);
-        let result = validate_create_cross_happ_payment(
-            EntryCreationAction::Create(make_create()),
-            p,
-        )
-        .unwrap();
+        let result =
+            validate_create_cross_happ_payment(EntryCreationAction::Create(make_create()), p)
+                .unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -678,11 +670,9 @@ mod tests {
     fn test_payment_rejects_oversized_source_happ() {
         let mut p = valid_payment();
         p.source_happ = "h".repeat(MAX_HAPP_ID_LEN + 1);
-        let result = validate_create_cross_happ_payment(
-            EntryCreationAction::Create(make_create()),
-            p,
-        )
-        .unwrap();
+        let result =
+            validate_create_cross_happ_payment(EntryCreationAction::Create(make_create()), p)
+                .unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -690,11 +680,9 @@ mod tests {
     fn test_payment_rejects_oversized_reference() {
         let mut p = valid_payment();
         p.reference = "r".repeat(MAX_REFERENCE_LEN + 1);
-        let result = validate_create_cross_happ_payment(
-            EntryCreationAction::Create(make_create()),
-            p,
-        )
-        .unwrap();
+        let result =
+            validate_create_cross_happ_payment(EntryCreationAction::Create(make_create()), p)
+                .unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -702,11 +690,9 @@ mod tests {
     fn test_payment_rejects_oversized_id() {
         let mut p = valid_payment();
         p.id = "i".repeat(MAX_REFERENCE_LEN + 1);
-        let result = validate_create_cross_happ_payment(
-            EntryCreationAction::Create(make_create()),
-            p,
-        )
-        .unwrap();
+        let result =
+            validate_create_cross_happ_payment(EntryCreationAction::Create(make_create()), p)
+                .unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -716,8 +702,7 @@ mod tests {
 
     #[test]
     fn test_payment_update_valid() {
-        let result =
-            validate_update_cross_happ_payment(make_update(), valid_payment()).unwrap();
+        let result = validate_update_cross_happ_payment(make_update(), valid_payment()).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Valid));
     }
 
@@ -739,11 +724,9 @@ mod tests {
     fn test_collateral_rejects_missing_did_prefix() {
         let mut c = valid_collateral();
         c.owner_did = "alice".into();
-        let result = validate_create_collateral_registration(
-            EntryCreationAction::Create(make_create()),
-            c,
-        )
-        .unwrap();
+        let result =
+            validate_create_collateral_registration(EntryCreationAction::Create(make_create()), c)
+                .unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -751,11 +734,9 @@ mod tests {
     fn test_collateral_rejects_zero_value_estimate() {
         let mut c = valid_collateral();
         c.value_estimate = 0;
-        let result = validate_create_collateral_registration(
-            EntryCreationAction::Create(make_create()),
-            c,
-        )
-        .unwrap();
+        let result =
+            validate_create_collateral_registration(EntryCreationAction::Create(make_create()), c)
+                .unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -763,11 +744,9 @@ mod tests {
     fn test_collateral_rejects_empty_asset_id() {
         let mut c = valid_collateral();
         c.asset_id = "".into();
-        let result = validate_create_collateral_registration(
-            EntryCreationAction::Create(make_create()),
-            c,
-        )
-        .unwrap();
+        let result =
+            validate_create_collateral_registration(EntryCreationAction::Create(make_create()), c)
+                .unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -775,11 +754,9 @@ mod tests {
     fn test_collateral_rejects_empty_source_happ() {
         let mut c = valid_collateral();
         c.source_happ = "".into();
-        let result = validate_create_collateral_registration(
-            EntryCreationAction::Create(make_create()),
-            c,
-        )
-        .unwrap();
+        let result =
+            validate_create_collateral_registration(EntryCreationAction::Create(make_create()), c)
+                .unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -787,11 +764,9 @@ mod tests {
     fn test_collateral_rejects_empty_currency() {
         let mut c = valid_collateral();
         c.currency = "".into();
-        let result = validate_create_collateral_registration(
-            EntryCreationAction::Create(make_create()),
-            c,
-        )
-        .unwrap();
+        let result =
+            validate_create_collateral_registration(EntryCreationAction::Create(make_create()), c)
+                .unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -799,11 +774,9 @@ mod tests {
     fn test_collateral_rejects_oversized_owner_did() {
         let mut c = valid_collateral();
         c.owner_did = "d".repeat(MAX_DID_LEN + 1);
-        let result = validate_create_collateral_registration(
-            EntryCreationAction::Create(make_create()),
-            c,
-        )
-        .unwrap();
+        let result =
+            validate_create_collateral_registration(EntryCreationAction::Create(make_create()), c)
+                .unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -811,11 +784,9 @@ mod tests {
     fn test_collateral_rejects_oversized_asset_id() {
         let mut c = valid_collateral();
         c.asset_id = "a".repeat(MAX_REFERENCE_LEN + 1);
-        let result = validate_create_collateral_registration(
-            EntryCreationAction::Create(make_create()),
-            c,
-        )
-        .unwrap();
+        let result =
+            validate_create_collateral_registration(EntryCreationAction::Create(make_create()), c)
+                .unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -823,11 +794,9 @@ mod tests {
     fn test_collateral_rejects_oversized_id() {
         let mut c = valid_collateral();
         c.id = "i".repeat(MAX_REFERENCE_LEN + 1);
-        let result = validate_create_collateral_registration(
-            EntryCreationAction::Create(make_create()),
-            c,
-        )
-        .unwrap();
+        let result =
+            validate_create_collateral_registration(EntryCreationAction::Create(make_create()), c)
+                .unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -835,11 +804,9 @@ mod tests {
     fn test_collateral_rejects_oversized_source_happ() {
         let mut c = valid_collateral();
         c.source_happ = "h".repeat(MAX_HAPP_ID_LEN + 1);
-        let result = validate_create_collateral_registration(
-            EntryCreationAction::Create(make_create()),
-            c,
-        )
-        .unwrap();
+        let result =
+            validate_create_collateral_registration(EntryCreationAction::Create(make_create()), c)
+                .unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -850,8 +817,7 @@ mod tests {
     #[test]
     fn test_collateral_update_valid() {
         let result =
-            validate_update_collateral_registration(make_update(), valid_collateral())
-                .unwrap();
+            validate_update_collateral_registration(make_update(), valid_collateral()).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Valid));
     }
 
@@ -859,8 +825,7 @@ mod tests {
     fn test_collateral_update_rejects_invalid_did() {
         let mut c = valid_collateral();
         c.owner_did = "no-prefix".into();
-        let result =
-            validate_update_collateral_registration(make_update(), c).unwrap();
+        let result = validate_update_collateral_registration(make_update(), c).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -868,8 +833,7 @@ mod tests {
     fn test_collateral_update_rejects_zero_value() {
         let mut c = valid_collateral();
         c.value_estimate = 0;
-        let result =
-            validate_update_collateral_registration(make_update(), c).unwrap();
+        let result = validate_update_collateral_registration(make_update(), c).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -891,11 +855,9 @@ mod tests {
     fn test_event_rejects_empty_source_happ() {
         let mut e = valid_event();
         e.source_happ = "".into();
-        let result = validate_create_finance_bridge_event(
-            EntryCreationAction::Create(make_create()),
-            e,
-        )
-        .unwrap();
+        let result =
+            validate_create_finance_bridge_event(EntryCreationAction::Create(make_create()), e)
+                .unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -903,11 +865,9 @@ mod tests {
     fn test_event_rejects_oversized_payload() {
         let mut e = valid_event();
         e.payload = "x".repeat(MAX_PAYLOAD_LEN + 1);
-        let result = validate_create_finance_bridge_event(
-            EntryCreationAction::Create(make_create()),
-            e,
-        )
-        .unwrap();
+        let result =
+            validate_create_finance_bridge_event(EntryCreationAction::Create(make_create()), e)
+                .unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -915,11 +875,9 @@ mod tests {
     fn test_event_rejects_oversized_subject_did() {
         let mut e = valid_event();
         e.subject_did = "d".repeat(MAX_DID_LEN + 1);
-        let result = validate_create_finance_bridge_event(
-            EntryCreationAction::Create(make_create()),
-            e,
-        )
-        .unwrap();
+        let result =
+            validate_create_finance_bridge_event(EntryCreationAction::Create(make_create()), e)
+                .unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -927,11 +885,9 @@ mod tests {
     fn test_event_rejects_oversized_source_happ() {
         let mut e = valid_event();
         e.source_happ = "h".repeat(MAX_HAPP_ID_LEN + 1);
-        let result = validate_create_finance_bridge_event(
-            EntryCreationAction::Create(make_create()),
-            e,
-        )
-        .unwrap();
+        let result =
+            validate_create_finance_bridge_event(EntryCreationAction::Create(make_create()), e)
+                .unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -939,11 +895,9 @@ mod tests {
     fn test_event_rejects_oversized_id() {
         let mut e = valid_event();
         e.id = "i".repeat(MAX_REFERENCE_LEN + 1);
-        let result = validate_create_finance_bridge_event(
-            EntryCreationAction::Create(make_create()),
-            e,
-        )
-        .unwrap();
+        let result =
+            validate_create_finance_bridge_event(EntryCreationAction::Create(make_create()), e)
+                .unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -1181,8 +1135,7 @@ mod tests {
     fn test_deposit_update_valid_confirmed() {
         let mut d = valid_deposit();
         d.status = BridgeDepositStatus::Confirmed;
-        let result =
-            validate_update_collateral_bridge_deposit(make_update(), d).unwrap();
+        let result = validate_update_collateral_bridge_deposit(make_update(), d).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Valid));
     }
 
@@ -1190,8 +1143,7 @@ mod tests {
     fn test_deposit_update_valid_redeemed() {
         let mut d = valid_deposit();
         d.status = BridgeDepositStatus::Redeemed;
-        let result =
-            validate_update_collateral_bridge_deposit(make_update(), d).unwrap();
+        let result = validate_update_collateral_bridge_deposit(make_update(), d).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Valid));
     }
 
@@ -1199,8 +1151,7 @@ mod tests {
     fn test_deposit_update_valid_failed() {
         let mut d = valid_deposit();
         d.status = BridgeDepositStatus::Failed;
-        let result =
-            validate_update_collateral_bridge_deposit(make_update(), d).unwrap();
+        let result = validate_update_collateral_bridge_deposit(make_update(), d).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Valid));
     }
 
@@ -1208,8 +1159,7 @@ mod tests {
     fn test_deposit_update_rejects_pending_status() {
         let mut d = valid_deposit();
         d.status = BridgeDepositStatus::Pending;
-        let result =
-            validate_update_collateral_bridge_deposit(make_update(), d).unwrap();
+        let result = validate_update_collateral_bridge_deposit(make_update(), d).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -1218,8 +1168,7 @@ mod tests {
         let mut d = valid_deposit();
         d.status = BridgeDepositStatus::Confirmed;
         d.depositor_did = "no-prefix".into();
-        let result =
-            validate_update_collateral_bridge_deposit(make_update(), d).unwrap();
+        let result = validate_update_collateral_bridge_deposit(make_update(), d).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -1228,8 +1177,7 @@ mod tests {
         let mut d = valid_deposit();
         d.status = BridgeDepositStatus::Confirmed;
         d.collateral_amount = 0;
-        let result =
-            validate_update_collateral_bridge_deposit(make_update(), d).unwrap();
+        let result = validate_update_collateral_bridge_deposit(make_update(), d).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -1238,8 +1186,7 @@ mod tests {
         let mut d = valid_deposit();
         d.status = BridgeDepositStatus::Confirmed;
         d.sap_minted = 0;
-        let result =
-            validate_update_collateral_bridge_deposit(make_update(), d).unwrap();
+        let result = validate_update_collateral_bridge_deposit(make_update(), d).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -1248,8 +1195,7 @@ mod tests {
         let mut d = valid_deposit();
         d.status = BridgeDepositStatus::Confirmed;
         d.oracle_rate = f64::NAN;
-        let result =
-            validate_update_collateral_bridge_deposit(make_update(), d).unwrap();
+        let result = validate_update_collateral_bridge_deposit(make_update(), d).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -1258,8 +1204,7 @@ mod tests {
         let mut d = valid_deposit();
         d.status = BridgeDepositStatus::Confirmed;
         d.collateral_type = "DOGE".into();
-        let result =
-            validate_update_collateral_bridge_deposit(make_update(), d).unwrap();
+        let result = validate_update_collateral_bridge_deposit(make_update(), d).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 }

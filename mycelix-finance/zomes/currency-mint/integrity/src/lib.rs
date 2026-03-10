@@ -230,10 +230,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 app_entry, action, ..
             } => {
                 match app_entry {
-                    EntryTypes::CurrencyDefinition(def) => validate_update_currency(
-                        &action.original_action_address,
-                        def,
-                    ),
+                    EntryTypes::CurrencyDefinition(def) => {
+                        validate_update_currency(&action.original_action_address, def)
+                    }
                     EntryTypes::MintedBalance(bal) => validate_minted_balance(&bal),
                     EntryTypes::MintedExchange(_) => {
                         // Exchanges are immutable once created
@@ -335,12 +334,11 @@ fn validate_update_currency(
     }
     // Enforce status transition rules
     if let Ok(original_record) = must_get_valid_record(original_action.clone()) {
-        if let Ok(Some(original)) =
-            original_record.entry().to_app_option::<CurrencyDefinition>()
+        if let Ok(Some(original)) = original_record
+            .entry()
+            .to_app_option::<CurrencyDefinition>()
         {
-            if original.status != def.status
-                && !original.status.can_transition_to(&def.status)
-            {
+            if original.status != def.status && !original.status.can_transition_to(&def.status) {
                 return Ok(ValidateCallbackResult::Invalid(format!(
                     "Invalid currency status transition: {:?} → {:?}",
                     original.status, def.status

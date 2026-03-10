@@ -219,15 +219,16 @@ pub fn get_recognition_received(
         if let Some(action_hash) = link.target.into_action_hash() {
             // RecognitionEvents are immutable (never updated), so plain get() is correct here
             if let Some(record) = get(action_hash, GetOptions::default())? {
-                if let Some(event) = record
-                    .entry()
-                    .to_app_option::<RecognitionEvent>()
-                    .map_err(|e| {
-                        wasm_error!(WasmErrorInner::Guest(format!(
-                            "RecognitionEvent deserialization error: {:?}",
-                            e
-                        )))
-                    })?
+                if let Some(event) =
+                    record
+                        .entry()
+                        .to_app_option::<RecognitionEvent>()
+                        .map_err(|e| {
+                            wasm_error!(WasmErrorInner::Guest(format!(
+                                "RecognitionEvent deserialization error: {:?}",
+                                e
+                            )))
+                        })?
                 {
                     // Filter by cycle if specified
                     if let Some(ref cycle) = input.cycle_id {

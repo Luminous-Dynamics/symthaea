@@ -193,33 +193,42 @@ fn verify_record_author(record: &Record) -> ExternResult<AgentPubKey> {
 /// could vote on expired proposals.
 fn verify_voting_period(proposal_id: &str) -> ExternResult<()> {
     // Use call_local (not best_effort) so errors propagate with diagnostics
-    let extern_io = governance_utils::call_local(
-        "proposals",
-        "get_proposal",
-        proposal_id.to_string(),
-    ).map_err(|e| wasm_error!(WasmErrorInner::Guest(format!(
+    let extern_io =
+        governance_utils::call_local("proposals", "get_proposal", proposal_id.to_string())
+            .map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!(
         "Cannot verify voting period: cross-zome call to proposals::get_proposal failed: {}", e
-    ))))?;
+    )))
+            })?;
 
-    let record: Option<Record> = extern_io.decode().map_err(|e| wasm_error!(
-        WasmErrorInner::Guest(format!(
-            "Cannot verify voting period: failed to decode proposal response: {}", e
-        ))
-    ))?;
+    let record: Option<Record> = extern_io.decode().map_err(|e| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "Cannot verify voting period: failed to decode proposal response: {}",
+            e
+        )))
+    })?;
 
-    let record = record.ok_or_else(|| wasm_error!(WasmErrorInner::Guest(format!(
-        "Cannot verify voting period: proposal '{}' not found", proposal_id
-    ))))?;
+    let record = record.ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "Cannot verify voting period: proposal '{}' not found",
+            proposal_id
+        )))
+    })?;
 
     let proposal: ProposalMirror = record
         .entry()
         .to_app_option()
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!(
-            "Cannot verify voting period: failed to deserialize proposal: {}", e
-        ))))?
-        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest(
-            "Cannot verify voting period: proposal entry has no data".into()
-        )))?;
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Cannot verify voting period: failed to deserialize proposal: {}",
+                e
+            )))
+        })?
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Cannot verify voting period: proposal entry has no data".into()
+            ))
+        })?;
 
     let now = sys_time()?;
     if now < proposal.voting_starts {

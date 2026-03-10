@@ -18,8 +18,16 @@ use mycelix_bridge_common::consciousness_profile::{
 pub struct DidDocumentData {
     pub id: String,
     pub controller: AgentPubKey,
+    #[serde(rename = "verificationMethod", alias = "verification_method")]
     pub verification_method: Vec<VerificationMethodData>,
     pub authentication: Vec<String>,
+    #[serde(
+        rename = "keyAgreement",
+        alias = "key_agreement",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub key_agreement: Vec<String>,
     pub service: Vec<ServiceEndpointData>,
     pub created: Timestamp,
     pub updated: Timestamp,
@@ -46,15 +54,21 @@ impl TryFrom<DidDocumentData> for SerializedBytes {
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub struct VerificationMethodData {
     pub id: String,
+    #[serde(rename = "type", alias = "type_")]
     pub type_: String,
     pub controller: String,
+    #[serde(rename = "publicKeyMultibase", alias = "public_key_multibase")]
     pub public_key_multibase: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub algorithm: Option<u16>,
 }
 
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub struct ServiceEndpointData {
     pub id: String,
+    #[serde(rename = "type", alias = "type_")]
     pub type_: String,
+    #[serde(rename = "serviceEndpoint", alias = "service_endpoint")]
     pub service_endpoint: String,
 }
 

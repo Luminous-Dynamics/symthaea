@@ -180,7 +180,8 @@ pub fn update_oracle_state(vitality: u32) -> ExternResult<OracleState> {
     verify_governance_or_bootstrap()?;
     if vitality > MAX_VITALITY {
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "Vitality must be 0-{}", MAX_VITALITY
+            "Vitality must be 0-{}",
+            MAX_VITALITY
         ))));
     }
 
@@ -241,15 +242,12 @@ fn read_current_tier() -> ExternResult<TendLimitTier> {
     if let Some(link) = links.first() {
         if let Some(action_hash) = link.target.clone().into_action_hash() {
             let record = follow_update_chain(action_hash)?;
-            let state = record
-                .entry()
-                .to_app_option::<OracleState>()
-                .map_err(|e| {
-                    wasm_error!(WasmErrorInner::Guest(format!(
-                        "OracleState deserialization error: {:?}",
-                        e
-                    )))
-                })?;
+            let state = record.entry().to_app_option::<OracleState>().map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!(
+                    "OracleState deserialization error: {:?}",
+                    e
+                )))
+            })?;
             if let Some(state) = state {
                 return Ok(state.tier);
             }
@@ -271,15 +269,12 @@ pub fn get_oracle_state(_: ()) -> ExternResult<OracleStateResponse> {
     if let Some(link) = links.first() {
         if let Some(action_hash) = link.target.clone().into_action_hash() {
             let record = follow_update_chain(action_hash)?;
-            let state = record
-                .entry()
-                .to_app_option::<OracleState>()
-                .map_err(|e| {
-                    wasm_error!(WasmErrorInner::Guest(format!(
-                        "OracleState deserialization error: {:?}",
-                        e
-                    )))
-                })?;
+            let state = record.entry().to_app_option::<OracleState>().map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!(
+                    "OracleState deserialization error: {:?}",
+                    e
+                )))
+            })?;
             if let Some(state) = state {
                 return Ok(OracleStateResponse {
                     vitality: state.vitality,
@@ -629,9 +624,7 @@ fn update_hearth_balance(
         // Verify our update won: re-read from the original link target
         let verify_record = follow_update_chain(original_hash.clone())?;
         if let Ok(Some(actual)) = verify_record.entry().to_app_option::<HearthTendBalance>() {
-            if actual.balance == expected_balance
-                && actual.exchange_count == expected_count
-            {
+            if actual.balance == expected_balance && actual.exchange_count == expected_count {
                 return Ok(());
             }
         }
@@ -645,7 +638,10 @@ fn update_hearth_balance(
         }
         debug!(
             "update_hearth_balance: concurrent update detected for {}:{}, retry {}/{}",
-            hearth_did, member_did, attempt + 1, MAX_BALANCE_RETRIES
+            hearth_did,
+            member_did,
+            attempt + 1,
+            MAX_BALANCE_RETRIES
         );
     }
 
@@ -1758,7 +1754,12 @@ fn get_or_create_balance(member_did: String, dao_did: String) -> ExternResult<Ba
     let action_hash = create_entry(&EntryTypes::TendBalance(balance.clone()))?;
 
     let anchor = anchor_hash(&format!("balance:{}:{}", dao_did, member_did))?;
-    create_link(anchor.clone(), action_hash.clone(), LinkTypes::MemberToBalance, ())?;
+    create_link(
+        anchor.clone(),
+        action_hash.clone(),
+        LinkTypes::MemberToBalance,
+        (),
+    )?;
 
     // RC-13: Race condition guard — re-read links to detect concurrent creators.
     // If multiple links exist, deterministically pick the one with the lowest
@@ -1838,9 +1839,10 @@ pub fn get_my_exchanges(input: PaginatedDaoInput) -> ExternResult<Vec<ExchangeRe
     )?;
 
     for link in provider_links {
-        let action_hash = link.target.into_action_hash().ok_or_else(|| {
-            wasm_error!(WasmErrorInner::Guest("Invalid link target".to_string()))
-        })?;
+        let action_hash = link
+            .target
+            .into_action_hash()
+            .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Invalid link target".to_string())))?;
         let record = follow_update_chain(action_hash)?;
         if let Some(exchange) = record
             .entry()
@@ -1866,9 +1868,10 @@ pub fn get_my_exchanges(input: PaginatedDaoInput) -> ExternResult<Vec<ExchangeRe
     )?;
 
     for link in receiver_links {
-        let action_hash = link.target.into_action_hash().ok_or_else(|| {
-            wasm_error!(WasmErrorInner::Guest("Invalid link target".to_string()))
-        })?;
+        let action_hash = link
+            .target
+            .into_action_hash()
+            .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Invalid link target".to_string())))?;
         let record = follow_update_chain(action_hash)?;
         if let Some(exchange) = record
             .entry()
@@ -2003,9 +2006,10 @@ pub fn get_dao_listings(input: PaginatedDaoInput) -> ExternResult<Vec<ServiceLis
 
     let mut listings = Vec::new();
     for link in links {
-        let action_hash = link.target.into_action_hash().ok_or_else(|| {
-            wasm_error!(WasmErrorInner::Guest("Invalid link target".to_string()))
-        })?;
+        let action_hash = link
+            .target
+            .into_action_hash()
+            .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Invalid link target".to_string())))?;
         let record = follow_update_chain(action_hash)?;
         if let Some(listing) = record
             .entry()
@@ -2104,9 +2108,10 @@ pub fn get_dao_requests(input: PaginatedDaoInput) -> ExternResult<Vec<ServiceReq
 
     let mut requests = Vec::new();
     for link in links {
-        let action_hash = link.target.into_action_hash().ok_or_else(|| {
-            wasm_error!(WasmErrorInner::Guest("Invalid link target".to_string()))
-        })?;
+        let action_hash = link
+            .target
+            .into_action_hash()
+            .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Invalid link target".to_string())))?;
         let record = follow_update_chain(action_hash)?;
         if let Some(request) = record
             .entry()
@@ -2176,15 +2181,16 @@ pub fn get_validation_score(input: GetValidationScoreInput) -> ExternResult<f64>
         if let Some(action_hash) = link.target.into_action_hash() {
             // QualityRatings are immutable — plain get() is safe here
             if let Some(record) = get(action_hash, GetOptions::default())? {
-                if let Some(rating) = record
-                    .entry()
-                    .to_app_option::<QualityRating>()
-                    .map_err(|e| {
-                        wasm_error!(WasmErrorInner::Guest(format!(
-                            "QualityRating deserialization error: {:?}",
-                            e
-                        )))
-                    })?
+                if let Some(rating) =
+                    record
+                        .entry()
+                        .to_app_option::<QualityRating>()
+                        .map_err(|e| {
+                            wasm_error!(WasmErrorInner::Guest(format!(
+                                "QualityRating deserialization error: {:?}",
+                                e
+                            )))
+                        })?
                 {
                     total += rating.rating as f64;
                     count += 1;
@@ -2225,15 +2231,12 @@ fn find_balance(member_did: &str, dao_did: &str) -> ExternResult<Option<TendBala
         .min()
     {
         let record = follow_update_chain(action_hash)?;
-        return record
-            .entry()
-            .to_app_option::<TendBalance>()
-            .map_err(|e| {
-                wasm_error!(WasmErrorInner::Guest(format!(
-                    "TendBalance deserialization error: {:?}",
-                    e
-                )))
-            });
+        return record.entry().to_app_option::<TendBalance>().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "TendBalance deserialization error: {:?}",
+                e
+            )))
+        });
     }
 
     Ok(None)
@@ -2250,10 +2253,7 @@ fn update_balance_after_exchange(
 ) -> ExternResult<()> {
     let anchor_key = format!("balance:{}:{}", dao_did, member_did);
     let links = get_links(
-        LinkQuery::try_new(
-            anchor_hash(&anchor_key)?,
-            LinkTypes::MemberToBalance,
-        )?,
+        LinkQuery::try_new(anchor_hash(&anchor_key)?, LinkTypes::MemberToBalance)?,
         GetStrategy::default(),
     )?;
 
@@ -2269,16 +2269,12 @@ fn update_balance_after_exchange(
 
     for attempt in 0..MAX_BALANCE_RETRIES {
         let record = follow_update_chain(original_hash.clone())?;
-        if let Some(mut balance) = record
-            .entry()
-            .to_app_option::<TendBalance>()
-            .map_err(|e| {
-                wasm_error!(WasmErrorInner::Guest(format!(
-                    "TendBalance deserialization error: {:?}",
-                    e
-                )))
-            })?
-        {
+        if let Some(mut balance) = record.entry().to_app_option::<TendBalance>().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "TendBalance deserialization error: {:?}",
+                e
+            )))
+        })? {
             let now = sys_time()?;
 
             if is_provider {
@@ -2298,9 +2294,7 @@ fn update_balance_after_exchange(
             // Verify our update won: re-read from the original link target
             let verify_record = follow_update_chain(original_hash.clone())?;
             if let Ok(Some(actual)) = verify_record.entry().to_app_option::<TendBalance>() {
-                if actual.balance == expected_balance
-                    && actual.exchange_count == expected_count
-                {
+                if actual.balance == expected_balance && actual.exchange_count == expected_count {
                     return Ok(());
                 }
             }
@@ -2314,7 +2308,10 @@ fn update_balance_after_exchange(
             }
             debug!(
                 "update_balance_after_exchange: concurrent update detected for {}:{}, retry {}/{}",
-                dao_did, member_did, attempt + 1, MAX_BALANCE_RETRIES
+                dao_did,
+                member_did,
+                attempt + 1,
+                MAX_BALANCE_RETRIES
             );
         } else {
             return Ok(());
@@ -2338,15 +2335,12 @@ fn find_exchange_by_id(exchange_id: &str) -> ExternResult<Option<TendExchange>> 
     if let Some(link) = links.first() {
         if let Some(action_hash) = link.target.clone().into_action_hash() {
             let record = follow_update_chain(action_hash)?;
-            return record
-                .entry()
-                .to_app_option::<TendExchange>()
-                .map_err(|e| {
-                    wasm_error!(WasmErrorInner::Guest(format!(
-                        "TendExchange deserialization error: {:?}",
-                        e
-                    )))
-                });
+            return record.entry().to_app_option::<TendExchange>().map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!(
+                    "TendExchange deserialization error: {:?}",
+                    e
+                )))
+            });
         }
     }
 
@@ -2415,15 +2409,12 @@ fn find_dispute_by_id(dispute_id: &str) -> ExternResult<Option<(DisputeCase, Act
     if let Some(link) = links.first() {
         if let Some(link_hash) = link.target.clone().into_action_hash() {
             let record = follow_update_chain(link_hash)?;
-            let dispute_case = record
-                .entry()
-                .to_app_option::<DisputeCase>()
-                .map_err(|e| {
-                    wasm_error!(WasmErrorInner::Guest(format!(
-                        "DisputeCase deserialization error: {:?}",
-                        e
-                    )))
-                })?;
+            let dispute_case = record.entry().to_app_option::<DisputeCase>().map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!(
+                    "DisputeCase deserialization error: {:?}",
+                    e
+                )))
+            })?;
             if let Some(dispute_case) = dispute_case {
                 return Ok(Some((dispute_case, record.action_address().clone())));
             }
@@ -2539,15 +2530,16 @@ pub fn record_cross_dao_exchange(
     if let Some(link) = links.first() {
         if let Some(link_hash) = link.target.clone().into_action_hash() {
             let record = follow_update_chain(link_hash)?;
-            if let Some(mut bal) = record
-                .entry()
-                .to_app_option::<BilateralBalance>()
-                .map_err(|e| {
-                    wasm_error!(WasmErrorInner::Guest(format!(
-                        "BilateralBalance deserialization error: {:?}",
-                        e
-                    )))
-                })?
+            if let Some(mut bal) =
+                record
+                    .entry()
+                    .to_app_option::<BilateralBalance>()
+                    .map_err(|e| {
+                        wasm_error!(WasmErrorInner::Guest(format!(
+                            "BilateralBalance deserialization error: {:?}",
+                            e
+                        )))
+                    })?
             {
                 bal.net_balance += delta;
                 bal.total_exchanges += 1;
@@ -2864,7 +2856,10 @@ pub fn forgive_balance(member_did: String) -> ExternResult<Vec<(String, i32)>> {
 
     for record in query(filter)? {
         if let Some(balance) = record.entry().to_app_option::<TendBalance>().map_err(|e| {
-            wasm_error!(WasmErrorInner::Guest(format!("TendBalance deserialization error: {:?}", e)))
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "TendBalance deserialization error: {:?}",
+                e
+            )))
         })? {
             if balance.member_did == member_did && balance.balance != 0 {
                 let forgiven_amount = balance.balance;

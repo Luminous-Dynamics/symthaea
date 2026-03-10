@@ -383,7 +383,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::SlashingEvent(event) => validate_slashing_event(action, event),
                 EntryTypes::CryptoEscrow(escrow) => validate_escrow(action, escrow),
                 EntryTypes::RewardDistribution(dist) => validate_reward_distribution(action, dist),
-                EntryTypes::EscrowSignatureEntry(sig) => validate_escrow_signature_entry(action, sig),
+                EntryTypes::EscrowSignatureEntry(sig) => {
+                    validate_escrow_signature_entry(action, sig)
+                }
             },
             OpEntry::UpdateEntry {
                 app_entry, action, ..
@@ -503,8 +505,7 @@ fn validate_update_stake(
     // Enforce status transition rules via original entry comparison
     if let Ok(original_record) = must_get_valid_record(action.original_action_address) {
         if let Ok(Some(original)) = original_record.entry().to_app_option::<CollateralStake>() {
-            if original.status != stake.status
-                && !original.status.can_transition_to(&stake.status)
+            if original.status != stake.status && !original.status.can_transition_to(&stake.status)
             {
                 return Ok(ValidateCallbackResult::Invalid(format!(
                     "Invalid status transition: {:?} → {:?}",
@@ -621,9 +622,7 @@ fn validate_escrow(_action: Create, escrow: CryptoEscrow) -> ExternResult<Valida
                 }
             }
             ReleaseCondition::MycelThreshold { min_mycel_score } => {
-                if !min_mycel_score.is_finite()
-                    || *min_mycel_score < 0.0
-                    || *min_mycel_score > 1.0
+                if !min_mycel_score.is_finite() || *min_mycel_score < 0.0 || *min_mycel_score > 1.0
                 {
                     return Ok(ValidateCallbackResult::Invalid(
                         "MycelThreshold min_mycel_score must be a finite number in [0.0, 1.0]"
@@ -823,9 +822,7 @@ mod tests {
 
     #[test]
     fn test_stake_create_valid() {
-        let result =
-            validate_create_stake(make_create(), valid_stake())
-                .unwrap();
+        let result = validate_create_stake(make_create(), valid_stake()).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Valid));
     }
 
@@ -833,8 +830,7 @@ mod tests {
     fn test_stake_rejects_nan_mycel_score() {
         let mut stake = valid_stake();
         stake.mycel_score = f32::NAN;
-        let result =
-            validate_create_stake(make_create(), stake).unwrap();
+        let result = validate_create_stake(make_create(), stake).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -842,8 +838,7 @@ mod tests {
     fn test_stake_rejects_infinity_mycel_score() {
         let mut stake = valid_stake();
         stake.mycel_score = f32::INFINITY;
-        let result =
-            validate_create_stake(make_create(), stake).unwrap();
+        let result = validate_create_stake(make_create(), stake).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -851,8 +846,7 @@ mod tests {
     fn test_stake_rejects_nan_weight() {
         let mut stake = valid_stake();
         stake.stake_weight = f32::NAN;
-        let result =
-            validate_create_stake(make_create(), stake).unwrap();
+        let result = validate_create_stake(make_create(), stake).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -860,8 +854,7 @@ mod tests {
     fn test_stake_rejects_zero_sap() {
         let mut stake = valid_stake();
         stake.sap_amount = 0;
-        let result =
-            validate_create_stake(make_create(), stake).unwrap();
+        let result = validate_create_stake(make_create(), stake).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -869,8 +862,7 @@ mod tests {
     fn test_stake_rejects_inconsistent_weight() {
         let mut stake = valid_stake();
         stake.stake_weight = 1.9; // Should be 1.5 for mycel_score=0.5
-        let result =
-            validate_create_stake(make_create(), stake).unwrap();
+        let result = validate_create_stake(make_create(), stake).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -878,8 +870,7 @@ mod tests {
     fn test_stake_rejects_non_active_status() {
         let mut stake = valid_stake();
         stake.status = StakeStatus::Withdrawn;
-        let result =
-            validate_create_stake(make_create(), stake).unwrap();
+        let result = validate_create_stake(make_create(), stake).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -887,8 +878,7 @@ mod tests {
     fn test_stake_rejects_invalid_did() {
         let mut stake = valid_stake();
         stake.staker_did = "not-a-did".into();
-        let result =
-            validate_create_stake(make_create(), stake).unwrap();
+        let result = validate_create_stake(make_create(), stake).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -898,8 +888,7 @@ mod tests {
     fn test_stake_update_rejects_nan() {
         let mut stake = valid_stake();
         stake.mycel_score = f32::NAN;
-        let result =
-            validate_update_stake(make_update(), stake).unwrap();
+        let result = validate_update_stake(make_update(), stake).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -907,8 +896,7 @@ mod tests {
     fn test_stake_update_rejects_infinity_weight() {
         let mut stake = valid_stake();
         stake.stake_weight = f32::INFINITY;
-        let result =
-            validate_update_stake(make_update(), stake).unwrap();
+        let result = validate_update_stake(make_update(), stake).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -939,8 +927,7 @@ mod tests {
 
     #[test]
     fn test_escrow_create_valid() {
-        let result =
-            validate_escrow(make_create(), valid_escrow()).unwrap();
+        let result = validate_escrow(make_create(), valid_escrow()).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Valid));
     }
 
@@ -952,8 +939,7 @@ mod tests {
             asset: "ETH".into(),
             min_price: f64::NAN,
         }];
-        let result =
-            validate_escrow(make_create(), escrow).unwrap();
+        let result = validate_escrow(make_create(), escrow).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -965,8 +951,7 @@ mod tests {
             asset: "ETH".into(),
             min_price: f64::INFINITY,
         }];
-        let result =
-            validate_escrow(make_create(), escrow).unwrap();
+        let result = validate_escrow(make_create(), escrow).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -976,8 +961,7 @@ mod tests {
         escrow.conditions = vec![ReleaseCondition::MycelThreshold {
             min_mycel_score: f32::NAN,
         }];
-        let result =
-            validate_escrow(make_create(), escrow).unwrap();
+        let result = validate_escrow(make_create(), escrow).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -987,8 +971,7 @@ mod tests {
         escrow.conditions = vec![ReleaseCondition::MycelThreshold {
             min_mycel_score: 1.5, // > 1.0
         }];
-        let result =
-            validate_escrow(make_create(), escrow).unwrap();
+        let result = validate_escrow(make_create(), escrow).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -996,8 +979,7 @@ mod tests {
     fn test_escrow_rejects_zero_sap() {
         let mut escrow = valid_escrow();
         escrow.sap_amount = 0;
-        let result =
-            validate_escrow(make_create(), escrow).unwrap();
+        let result = validate_escrow(make_create(), escrow).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -1005,8 +987,7 @@ mod tests {
     fn test_escrow_rejects_no_conditions() {
         let mut escrow = valid_escrow();
         escrow.conditions = vec![];
-        let result =
-            validate_escrow(make_create(), escrow).unwrap();
+        let result = validate_escrow(make_create(), escrow).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -1027,8 +1008,7 @@ mod tests {
             jailed: false,
             jail_release: None,
         };
-        let result =
-            validate_slashing_event(make_create(), event).unwrap();
+        let result = validate_slashing_event(make_create(), event).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -1047,8 +1027,7 @@ mod tests {
             jailed: true,
             jail_release: None,
         };
-        let result =
-            validate_slashing_event(make_create(), event).unwrap();
+        let result = validate_slashing_event(make_create(), event).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 

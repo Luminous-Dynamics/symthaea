@@ -189,18 +189,25 @@ pub struct CreateMfaStateInput {
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct ReportReputationInput {
-    pub subject_did: String,
+    pub did: String,
     pub source_happ: String,
     pub score: f64,
-    pub context: String,
+    pub interactions: u64,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct ReputationSource {
+    pub source_happ: String,
+    pub score: f64,
+    pub interactions: u64,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct AggregatedReputation {
     pub did: String,
     pub aggregate_score: f64,
-    pub report_count: u32,
-    pub sources: Vec<String>,
+    pub sources: Vec<ReputationSource>,
+    pub total_interactions: u64,
 }
 
 // ============================================================================
@@ -1012,10 +1019,10 @@ async fn test_reputation_affects_consciousness_credential() {
 
     // Report positive reputation
     let rep_input = ReportReputationInput {
-        subject_did: did.clone(),
+        did: did.clone(),
         source_happ: "test-happ".to_string(),
         score: 0.9,
-        context: "Excellent contribution for consciousness gating test".to_string(),
+        interactions: 50,
     };
 
     let _rep_record: ::holochain::prelude::Record = conductor

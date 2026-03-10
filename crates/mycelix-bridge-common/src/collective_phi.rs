@@ -131,7 +131,11 @@ impl CollectivePhiEngine {
         {
             // Stride-based deterministic sampling
             let stride = self.vectors.len() / COLLECTIVE_PHI_MAX_SYNC;
-            self.vectors.iter().step_by(stride.max(1)).take(COLLECTIVE_PHI_MAX_SYNC).collect()
+            self.vectors
+                .iter()
+                .step_by(stride.max(1))
+                .take(COLLECTIVE_PHI_MAX_SYNC)
+                .collect()
         } else {
             self.vectors.iter().collect()
         };
@@ -358,7 +362,10 @@ mod tests {
 
         assert_eq!(result.n_agents, 200);
         assert!(result.collective_phi > 0.0);
-        assert!(result.inter_agent_coherence > 0.9, "Similar agents should have high coherence even after sampling");
+        assert!(
+            result.inter_agent_coherence > 0.9,
+            "Similar agents should have high coherence even after sampling"
+        );
     }
 
     #[test]

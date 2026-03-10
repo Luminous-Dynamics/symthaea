@@ -1,7 +1,10 @@
 #![deny(unsafe_code)]
 //! Payments Coordinator Zome
 use hdk::prelude::*;
-use mycelix_finance_shared::{anchor_hash, follow_update_chain, links_to_records, rate_limit_anchor_key, validate_did_format, validate_id, verify_caller_is_did, DEFAULT_RATE_LIMIT_PER_MINUTE};
+use mycelix_finance_shared::{
+    anchor_hash, follow_update_chain, links_to_records, rate_limit_anchor_key, validate_did_format,
+    validate_id, verify_caller_is_did, DEFAULT_RATE_LIMIT_PER_MINUTE,
+};
 use mycelix_finance_types::{
     compute_demurrage_deduction, FeeTier, SapMintSource, SuccessionPreference, COMPOST_LOCAL_PCT,
     COMPOST_REGIONAL_PCT, DEMURRAGE_EXEMPT_FLOOR, DEMURRAGE_RATE, SAP_MINT_ANNUAL_MAX,
@@ -41,11 +44,10 @@ pub fn initialize_sap_balance(member_did: String) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
-            "SAP balance record not found after creation for member {}",
-            member_did
-        ))))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+        "SAP balance record not found after creation for member {}",
+        member_did
+    ))))
 }
 
 /// Get the effective SAP balance for a member (after applying demurrage).
@@ -221,11 +223,12 @@ pub fn credit_sap(input: CreditSapInput) -> ExternResult<Record> {
             LinkTypes::DidToSapBalance,
             (),
         )?;
-        return get(action_hash, GetOptions::default())?
-            .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+        return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+            format!(
                 "SAP balance record not found after credit_sap initialization for member {}",
                 input.member_did
-            ))));
+            )
+        )));
     }
 
     // Existing balance: optimistic-locking retry loop
@@ -258,11 +261,12 @@ pub fn credit_sap(input: CreditSapInput) -> ExternResult<Record> {
         let verify = find_sap_balance_record(&input.member_did)?;
         if let Some((_, actual)) = verify {
             if actual.balance == expected_balance {
-                return get(action_hash, GetOptions::default())?
-                    .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+                return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(
+                    WasmErrorInner::Guest(format!(
                         "SAP balance record not found after credit for member {}",
                         input.member_did
-                    ))));
+                    ))
+                ));
             }
         }
 
@@ -275,7 +279,9 @@ pub fn credit_sap(input: CreditSapInput) -> ExternResult<Record> {
         }
         debug!(
             "credit_sap: concurrent update detected for {}, retry {}/{}",
-            input.member_did, attempt + 1, MAX_SAP_RETRIES
+            input.member_did,
+            attempt + 1,
+            MAX_SAP_RETRIES
         );
     }
 
@@ -333,11 +339,12 @@ pub fn debit_sap(input: DebitSapInput) -> ExternResult<Record> {
         let verify = find_sap_balance_record(&input.member_did)?;
         if let Some((_, actual)) = verify {
             if actual.balance == expected_balance {
-                return get(action_hash, GetOptions::default())?
-                    .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+                return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(
+                    WasmErrorInner::Guest(format!(
                         "SAP balance record not found after debit for member {}",
                         input.member_did
-                    ))));
+                    ))
+                ));
             }
         }
 
@@ -350,7 +357,9 @@ pub fn debit_sap(input: DebitSapInput) -> ExternResult<Record> {
         }
         debug!(
             "debit_sap: concurrent update detected for {}, retry {}/{}",
-            input.member_did, attempt + 1, MAX_SAP_RETRIES
+            input.member_did,
+            attempt + 1,
+            MAX_SAP_RETRIES
         );
     }
 
@@ -555,13 +564,11 @@ fn enforce_annual_mint_cap(new_amount: u64, now: Timestamp) -> ExternResult<()> 
 
     let annual_total: u64 = query(filter)?
         .into_iter()
-        .filter_map(|r| {
-            match r.entry().to_app_option::<SapMintRecord>() {
-                Ok(opt) => opt,
-                Err(e) => {
-                    debug!("SapMintRecord deserialization error: {:?}", e);
-                    None
-                }
+        .filter_map(|r| match r.entry().to_app_option::<SapMintRecord>() {
+            Ok(opt) => opt,
+            Err(e) => {
+                debug!("SapMintRecord deserialization error: {:?}", e);
+                None
             }
         })
         .filter(|m| m.minted_at.as_micros() > cutoff)
@@ -590,15 +597,12 @@ fn find_sap_balance_record(member_did: &str) -> ExternResult<Option<(Record, Sap
         let hash = ActionHash::try_from(link.target.clone())
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
         let record = follow_update_chain(hash)?;
-        let bal = record
-            .entry()
-            .to_app_option::<SapBalance>()
-            .map_err(|e| {
-                wasm_error!(WasmErrorInner::Guest(format!(
-                    "SapBalance deserialization error: {:?}",
-                    e
-                )))
-            })?;
+        let bal = record.entry().to_app_option::<SapBalance>().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "SapBalance deserialization error: {:?}",
+                e
+            )))
+        })?;
         if let Some(bal) = bal {
             return Ok(Some((record, bal)));
         }
@@ -634,17 +638,26 @@ fn compute_sap_fee(sender_did: &str, micro_amount: u64) -> ExternResult<u64> {
             match result.decode::<TierResp>() {
                 Ok(resp) if resp.base_fee_rate.is_finite() => resp.base_fee_rate,
                 Ok(resp) => {
-                    debug!("compute_sap_fee: non-finite fee rate {:?} for {}, using Newcomer rate", resp.base_fee_rate, sender_did);
+                    debug!(
+                        "compute_sap_fee: non-finite fee rate {:?} for {}, using Newcomer rate",
+                        resp.base_fee_rate, sender_did
+                    );
                     FeeTier::Newcomer.base_fee_rate()
                 }
                 Err(e) => {
-                    debug!("compute_sap_fee: fee tier decode error for {}: {:?}, using Newcomer rate", sender_did, e);
+                    debug!(
+                        "compute_sap_fee: fee tier decode error for {}: {:?}, using Newcomer rate",
+                        sender_did, e
+                    );
                     FeeTier::Newcomer.base_fee_rate()
                 }
             }
         }
         Ok(other) => {
-            debug!("compute_sap_fee: bridge returned {:?} for {}, falling back to direct recognition", other, sender_did);
+            debug!(
+                "compute_sap_fee: bridge returned {:?} for {}, falling back to direct recognition",
+                other, sender_did
+            );
             // Bridge unavailable — fall back to direct recognition call
             let mycel_score = match call(
                 CallTargetCell::Local,
@@ -664,11 +677,17 @@ fn compute_sap_fee(sender_did: &str, micro_amount: u64) -> ExternResult<u64> {
                         .unwrap_or(0.0)
                 }
                 Ok(other) => {
-                    debug!("compute_sap_fee: recognition returned {:?} for {}, defaulting to 0.0", other, sender_did);
+                    debug!(
+                        "compute_sap_fee: recognition returned {:?} for {}, defaulting to 0.0",
+                        other, sender_did
+                    );
                     0.0
                 }
                 Err(e) => {
-                    debug!("compute_sap_fee: recognition unreachable for {}: {:?}, defaulting to 0.0", sender_did, e);
+                    debug!(
+                        "compute_sap_fee: recognition unreachable for {}: {:?}, defaulting to 0.0",
+                        sender_did, e
+                    );
                     0.0
                 }
             };
@@ -695,7 +714,10 @@ fn compute_sap_fee(sender_did: &str, micro_amount: u64) -> ExternResult<u64> {
                         .unwrap_or(0.0)
                 }
                 Ok(other) => {
-                    debug!("compute_sap_fee: recognition returned {:?} for {}, defaulting to 0.0", other, sender_did);
+                    debug!(
+                        "compute_sap_fee: recognition returned {:?} for {}, defaulting to 0.0",
+                        other, sender_did
+                    );
                     0.0
                 }
                 Err(e2) => {
@@ -872,11 +894,10 @@ pub fn send_payment(input: SendPaymentInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
-            "Payment record not found after creation for payment {}",
-            payment.id
-        ))))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+        "Payment record not found after creation for payment {}",
+        payment.id
+    ))))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -942,11 +963,10 @@ pub fn open_payment_channel(input: OpenChannelInput) -> ExternResult<Record> {
         LinkTypes::ChannelPartyB,
         (),
     )?;
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
-            "Payment channel record not found after creation for channel {}",
-            channel.id
-        ))))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+        "Payment channel record not found after creation for channel {}",
+        channel.id
+    ))))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -965,11 +985,9 @@ fn get_channel_record(channel_id: &str) -> ExternResult<(Record, PaymentChannel)
         LinkQuery::try_new(anchor_hash(channel_id)?, LinkTypes::ChannelIdToChannel)?,
         GetStrategy::default(),
     )?;
-    let link = links
-        .first()
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Channel not found".into()
-        )))?;
+    let link = links.first().ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Channel not found".into()
+    )))?;
     let hash = ActionHash::try_from(link.target.clone())
         .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
     let record = follow_update_chain(hash)?;
@@ -995,11 +1013,9 @@ fn get_payment_record(payment_id: &str) -> ExternResult<(Record, Payment)> {
         LinkQuery::try_new(anchor_hash(payment_id)?, LinkTypes::PaymentIdToPayment)?,
         GetStrategy::default(),
     )?;
-    let link = links
-        .first()
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Payment not found".into()
-        )))?;
+    let link = links.first().ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Payment not found".into()
+    )))?;
     let hash = ActionHash::try_from(link.target.clone())
         .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
     let record = follow_update_chain(hash)?;
@@ -1053,11 +1069,10 @@ pub fn channel_transfer(input: ChannelTransferInput) -> ExternResult<Record> {
         record.action_address().clone(),
         &EntryTypes::PaymentChannel(updated),
     )?;
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
-            "Payment channel record not found after transfer for channel {}",
-            input.channel_id
-        ))))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+        "Payment channel record not found after transfer for channel {}",
+        input.channel_id
+    ))))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -1166,11 +1181,10 @@ pub fn close_payment_channel(channel_id: String) -> ExternResult<Record> {
         record.action_address().clone(),
         &EntryTypes::PaymentChannel(closed),
     )?;
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
-            "Payment channel record not found after closing channel {}",
-            channel_id
-        ))))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+        "Payment channel record not found after closing channel {}",
+        channel_id
+    ))))
 }
 
 /// Refund a payment (creates reverse payment)
@@ -1244,11 +1258,10 @@ pub fn refund_payment(payment_id: String) -> ExternResult<Record> {
         &EntryTypes::Payment(refunded),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
-            "Refund payment record not found after creation for original payment {}",
-            payment_id
-        ))))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+        "Refund payment record not found after creation for original payment {}",
+        payment_id
+    ))))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -1332,11 +1345,10 @@ pub fn create_escrow(input: CreateEscrowInput) -> ExternResult<Record> {
         LinkTypes::ReceiverToPayments,
         (),
     )?;
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
-            "Escrow payment record not found after creation for escrow {}",
-            escrow_id
-        ))))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+        "Escrow payment record not found after creation for escrow {}",
+        escrow_id
+    ))))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -1499,11 +1511,10 @@ pub fn release_escrow(payment_id: String) -> ExternResult<Record> {
         record.action_address().clone(),
         &EntryTypes::Payment(released),
     )?;
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
-            "Escrow payment record not found after release for payment {}",
-            payment_id
-        ))))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+        "Escrow payment record not found after release for payment {}",
+        payment_id
+    ))))
 }
 
 // =============================================================================
@@ -1577,10 +1588,9 @@ pub fn contribute_to_hearth_pool(input: ContributeToHearthInput) -> ExternResult
     verify_hearth_membership(&caller_did, &input.hearth_did)?;
 
     // Deduct from personal SAP balance
-    let (record, mut personal_bal) =
-        find_sap_balance_record(&caller_did)?.ok_or(wasm_error!(WasmErrorInner::Guest(
-            "No SAP balance found".into()
-        )))?;
+    let (record, mut personal_bal) = find_sap_balance_record(&caller_did)?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("No SAP balance found".into())
+    ))?;
 
     if personal_bal.balance < input.amount {
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
@@ -1852,7 +1862,10 @@ fn verify_hearth_membership(caller_did: &str, hearth_did: &str) -> ExternResult<
                 "Not a member of this hearth".into()
             ))),
             Err(e) => {
-                debug!("verify_hearth_membership: decode error for {}@{}: {:?}, rejecting", caller_did, hearth_did, e);
+                debug!(
+                    "verify_hearth_membership: decode error for {}@{}: {:?}, rejecting",
+                    caller_did, hearth_did, e
+                );
                 Err(wasm_error!(WasmErrorInner::Guest(
                     "Not a member of this hearth".into()
                 )))

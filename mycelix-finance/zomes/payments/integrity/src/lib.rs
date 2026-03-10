@@ -773,11 +773,9 @@ mod tests {
 
     #[test]
     fn test_valid_payment_sap_with_fee() {
-        let result = validate_create_payment(
-            EntryCreationAction::Create(make_create()),
-            valid_payment(),
-        )
-        .unwrap();
+        let result =
+            validate_create_payment(EntryCreationAction::Create(make_create()), valid_payment())
+                .unwrap();
         assert!(matches!(result, ValidateCallbackResult::Valid));
     }
 
@@ -787,11 +785,8 @@ mod tests {
     fn test_payment_zero_amount() {
         let mut p = valid_payment();
         p.amount = 0;
-        let result = validate_create_payment(
-            EntryCreationAction::Create(make_create()),
-            p,
-        )
-        .unwrap();
+        let result =
+            validate_create_payment(EntryCreationAction::Create(make_create()), p).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -801,11 +796,8 @@ mod tests {
     fn test_payment_self_send() {
         let mut p = valid_payment();
         p.to_did = p.from_did.clone();
-        let result = validate_create_payment(
-            EntryCreationAction::Create(make_create()),
-            p,
-        )
-        .unwrap();
+        let result =
+            validate_create_payment(EntryCreationAction::Create(make_create()), p).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -815,11 +807,8 @@ mod tests {
     fn test_payment_invalid_from_did() {
         let mut p = valid_payment();
         p.from_did = "not-a-did".into();
-        let result = validate_create_payment(
-            EntryCreationAction::Create(make_create()),
-            p,
-        )
-        .unwrap();
+        let result =
+            validate_create_payment(EntryCreationAction::Create(make_create()), p).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -829,11 +818,8 @@ mod tests {
     fn test_payment_invalid_to_did() {
         let mut p = valid_payment();
         p.to_did = "not-a-did".into();
-        let result = validate_create_payment(
-            EntryCreationAction::Create(make_create()),
-            p,
-        )
-        .unwrap();
+        let result =
+            validate_create_payment(EntryCreationAction::Create(make_create()), p).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -843,11 +829,8 @@ mod tests {
     fn test_payment_unsupported_currency() {
         let mut p = valid_payment();
         p.currency = "BTC".into();
-        let result = validate_create_payment(
-            EntryCreationAction::Create(make_create()),
-            p,
-        )
-        .unwrap();
+        let result =
+            validate_create_payment(EntryCreationAction::Create(make_create()), p).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -858,11 +841,8 @@ mod tests {
         let mut p = valid_payment();
         p.amount = 1_000_000; // min fee = 1_000_000 / 10_000 = 100
         p.fee = 99; // below minimum
-        let result = validate_create_payment(
-            EntryCreationAction::Create(make_create()),
-            p,
-        )
-        .unwrap();
+        let result =
+            validate_create_payment(EntryCreationAction::Create(make_create()), p).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -873,11 +853,8 @@ mod tests {
         let mut p = valid_payment();
         p.currency = "TEND".into();
         p.fee = 1;
-        let result = validate_create_payment(
-            EntryCreationAction::Create(make_create()),
-            p,
-        )
-        .unwrap();
+        let result =
+            validate_create_payment(EntryCreationAction::Create(make_create()), p).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -899,11 +876,9 @@ mod tests {
     fn test_channel_invalid_party_did() {
         let mut ch = valid_channel();
         ch.party_a = "not-a-did".into();
-        let result = validate_create_payment_channel(
-            EntryCreationAction::Create(make_create()),
-            ch,
-        )
-        .unwrap();
+        let result =
+            validate_create_payment_channel(EntryCreationAction::Create(make_create()), ch)
+                .unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -913,11 +888,9 @@ mod tests {
     fn test_channel_unsupported_currency() {
         let mut ch = valid_channel();
         ch.currency = "ETH".into();
-        let result = validate_create_payment_channel(
-            EntryCreationAction::Create(make_create()),
-            ch,
-        )
-        .unwrap();
+        let result =
+            validate_create_payment_channel(EntryCreationAction::Create(make_create()), ch)
+                .unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -925,11 +898,9 @@ mod tests {
 
     #[test]
     fn test_valid_receipt() {
-        let result = validate_create_receipt(
-            EntryCreationAction::Create(make_create()),
-            valid_receipt(),
-        )
-        .unwrap();
+        let result =
+            validate_create_receipt(EntryCreationAction::Create(make_create()), valid_receipt())
+                .unwrap();
         assert!(matches!(result, ValidateCallbackResult::Valid));
     }
 
@@ -939,11 +910,8 @@ mod tests {
     fn test_receipt_zero_amount() {
         let mut r = valid_receipt();
         r.amount = 0;
-        let result = validate_create_receipt(
-            EntryCreationAction::Create(make_create()),
-            r,
-        )
-        .unwrap();
+        let result =
+            validate_create_receipt(EntryCreationAction::Create(make_create()), r).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -953,11 +921,8 @@ mod tests {
     fn test_receipt_empty_signature() {
         let mut r = valid_receipt();
         r.signature = String::new();
-        let result = validate_create_receipt(
-            EntryCreationAction::Create(make_create()),
-            r,
-        )
-        .unwrap();
+        let result =
+            validate_create_receipt(EntryCreationAction::Create(make_create()), r).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -967,11 +932,8 @@ mod tests {
     fn test_receipt_signature_too_short() {
         let mut r = valid_receipt();
         r.signature = "abcd1234".into(); // 8 chars, well below 64
-        let result = validate_create_receipt(
-            EntryCreationAction::Create(make_create()),
-            r,
-        )
-        .unwrap();
+        let result =
+            validate_create_receipt(EntryCreationAction::Create(make_create()), r).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -982,11 +944,8 @@ mod tests {
         let mut r = valid_receipt();
         // 128 chars but contains invalid characters (spaces, symbols)
         r.signature = "!@#$".repeat(32);
-        let result = validate_create_receipt(
-            EntryCreationAction::Create(make_create()),
-            r,
-        )
-        .unwrap();
+        let result =
+            validate_create_receipt(EntryCreationAction::Create(make_create()), r).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -998,7 +957,9 @@ mod tests {
         // We test the logic directly: the match arm returns Invalid.
         let result: ValidateCallbackResult =
             ValidateCallbackResult::Invalid("Receipts cannot be updated".into());
-        assert!(matches!(result, ValidateCallbackResult::Invalid(msg) if msg.contains("Receipts cannot be updated")));
+        assert!(
+            matches!(result, ValidateCallbackResult::Invalid(msg) if msg.contains("Receipts cannot be updated"))
+        );
     }
 
     // ---- 18. Valid SapBalance ----
@@ -1023,8 +984,7 @@ mod tests {
 
     #[test]
     fn test_valid_sap_mint_record() {
-        let result =
-            validate_create_sap_mint_record(&valid_sap_mint_record()).unwrap();
+        let result = validate_create_sap_mint_record(&valid_sap_mint_record()).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Valid));
     }
 
@@ -1045,7 +1005,9 @@ mod tests {
         // The validate() main function returns Invalid for mint record updates.
         let result: ValidateCallbackResult =
             ValidateCallbackResult::Invalid("SAP mint records cannot be updated".into());
-        assert!(matches!(result, ValidateCallbackResult::Invalid(msg) if msg.contains("cannot be updated")));
+        assert!(
+            matches!(result, ValidateCallbackResult::Invalid(msg) if msg.contains("cannot be updated"))
+        );
     }
 
     // ---- 23. Valid ExitRecord ----
@@ -1065,13 +1027,9 @@ mod tests {
     #[test]
     fn test_exit_record_designee_cannot_be_self() {
         let mut exit = valid_exit_record();
-        exit.succession_preference =
-            SuccessionPreference::Designee("did:mycelix:alice".into());
-        let result = validate_create_exit_record(
-            EntryCreationAction::Create(make_create()),
-            exit,
-        )
-        .unwrap();
+        exit.succession_preference = SuccessionPreference::Designee("did:mycelix:alice".into());
+        let result =
+            validate_create_exit_record(EntryCreationAction::Create(make_create()), exit).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 }
