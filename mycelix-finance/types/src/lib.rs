@@ -228,19 +228,19 @@ pub fn compute_demurrage_deduction(
     rate: f64,
     seconds_elapsed: u64,
 ) -> u64 {
-    if balance <= exempt_floor || seconds_elapsed == 0 {
+    if balance <= exempt_floor || seconds_elapsed == 0 || rate <= 0.0 || !rate.is_finite() {
         return 0;
     }
-    let eligible = (balance - exempt_floor) as f64;
+    let eligible_int = balance - exempt_floor;
+    let eligible = eligible_int as f64;
     let years = seconds_elapsed as f64 / 31_536_000.0;
     let decay = 1.0 - (-rate * years).exp();
     let deduction = eligible * decay;
-    if deduction < 0.0 {
+    if deduction <= 0.0 || deduction.is_nan() {
         0
-    } else if deduction > eligible {
-        eligible as u64
     } else {
-        deduction as u64
+        // Clamp to integer eligible to avoid f64 rounding exceeding the true value
+        (deduction as u64).min(eligible_int)
     }
 }
 
@@ -260,7 +260,8 @@ pub fn compute_minted_demurrage(balance: i32, rate: f64, seconds_elapsed: u64) -
     if deduction < 1.0 {
         0 // Sub-hour amounts round down (no deduction)
     } else {
-        deduction.floor() as i32
+        // Clamp to balance to prevent f64 rounding from exceeding the original value
+        (deduction.floor() as i32).min(balance)
     }
 }
 
@@ -972,8 +973,8 @@ mod tests {
     fn test_sap_demurrage_infinity_rate() {
         let d =
             compute_demurrage_deduction(10_000_000_000, 1_000_000_000, f64::INFINITY, 31_536_000);
-        // exp(-Inf) = 0, decay = 1.0, deduction = eligible (full decay)
-        assert_eq!(d, 9_000_000_000);
+        // Non-finite rates return 0 (invalid input)
+        assert_eq!(d, 0);
     }
 
     #[test]
@@ -1077,8 +1078,7 @@ mod tests {
         let mut prev = 0u64;
         for rate_bps in [10, 50, 100, 200, 500] {
             let rate = rate_bps as f64 / 10_000.0;
-            let d =
-                compute_demurrage_deduction(10_000_000_000, 1_000_000_000, rate, 31_536_000);
+            let d = compute_demurrage_deduction(10_000_000_000, 1_000_000_000, rate, 31_536_000);
             assert!(d >= prev, "rate {}: {} < {}", rate, d, prev);
             prev = d;
         }
