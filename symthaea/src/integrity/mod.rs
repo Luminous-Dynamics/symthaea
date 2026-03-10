@@ -560,9 +560,10 @@ mod tests {
             Box::new(move || attestation::blake3_hash(b"modified")),
         );
         // 3 consecutive failures → escalate to Critical
-        mgr.tick(101, 0.02, false); // streak=1
-        mgr.tick(202, 0.02, false); // streak=2
-        mgr.tick(303, 0.02, false); // streak=3 → Critical
+        // Use full_sweep=true to bypass jittered interval timing
+        mgr.tick(101, 0.02, true); // streak=1
+        mgr.tick(202, 0.02, true); // streak=2
+        mgr.tick(303, 0.02, true); // streak=3 → Critical
         assert!(!mgr.status.attestation_passed);
         assert!(mgr.has_critical_anomaly());
     }
@@ -582,12 +583,13 @@ mod tests {
             Box::new(move || attestation::blake3_hash(b"modified")),
         );
         // First failure → Warning → confidence 0.5
-        mgr.tick(101, 0.02, false);
+        // Use full_sweep=true to bypass jittered interval timing
+        mgr.tick(101, 0.02, true);
         assert_eq!(mgr.integrity_confidence, 0.5);
 
         // 3 consecutive → Critical → confidence 0.1
-        mgr.tick(202, 0.02, false);
-        mgr.tick(303, 0.02, false);
+        mgr.tick(202, 0.02, true);
+        mgr.tick(303, 0.02, true);
         assert_eq!(mgr.integrity_confidence, 0.1);
     }
 
@@ -606,5 +608,69 @@ mod tests {
         mgr.register_safety_thresholds(&[1.0, 2.0, 3.0]);
         let tampered_hash = attestation::blake3_hash_f32_slice(&[1.0, 2.0, 999.0]);
         assert!(mgr.verify_live_thresholds("safety_thresholds", tampered_hash).is_some());
+    }
+
+    #[test]
+    fn test_snapshot_export_and_verify() {
+        let mut mgr = IntegrityManager::new();
+        mgr.register_safety_thresholds(&[1.0, 2.0, 3.0]);
+        mgr.tick(1, 0.02, true);
+        let blob = mgr.export_snapshot();
+        assert!(blob.len() > 32);
+        assert!(IntegrityManager::verify_snapshot(&blob));
+        // Tamper with one byte → verification fails
+        let mut tampered = blob.clone();
+        tampered[4] ^= 0xFF;
+        assert!(!IntegrityManager::verify_snapshot(&tampered));
+    }
+
+    #[test]
+    fn test_unified_failure_streak_resets() {
+        let mut mgr = IntegrityManager::new();
+        let baseline = attestation::blake3_hash(b"original");
+        mgr.attestation.register_tampered(
+            "tampered",
+            baseline,
+            Box::new(move || attestation::blake3_hash(b"modified")),
+        );
+        // Build streak with full sweep
+        mgr.tick(1, 0.02, true);
+        assert_eq!(mgr.global_failure_streak, 1);
+        mgr.tick(2, 0.02, true);
+        assert_eq!(mgr.global_failure_streak, 2);
+        // Remove the tampered attestation by replacing registry
+        mgr.attestation = attestation::AttestationRegistry::new();
+        // Clean tick → streak resets
+        mgr.tick(3, 0.02, true);
+        assert_eq!(mgr.global_failure_streak, 0);
+    }
+
+    #[test]
+    fn test_confidence_history_accumulates() {
+        let mut mgr = IntegrityManager::new();
+        for i in 1..=5 {
+            mgr.tick(i, 0.02, false);
+        }
+        assert_eq!(mgr.confidence_history.len(), 5);
+        assert!(mgr.confidence_history.iter().all(|&c| c == 1.0));
+    }
+
+    #[test]
+    fn test_confidence_history_bounded_at_60() {
+        let mut mgr = IntegrityManager::new();
+        for i in 1..=100 {
+            mgr.tick(i, 0.02, false);
+        }
+        assert_eq!(mgr.confidence_history.len(), 60);
+    }
+
+    #[test]
+    fn test_jittered_attestation_fires_near_interval() {
+        let mgr = IntegrityManager::new();
+        // Over cycles 80-120, at least one should trigger jittered attestation
+        let fired: Vec<usize> = (80..=120)
+            .filter(|&c| mgr.jittered_attestation_due(c))
+            .collect();
+        assert!(!fired.is_empty(), "jittered attestation should fire at least once near interval 101");
     }
 }

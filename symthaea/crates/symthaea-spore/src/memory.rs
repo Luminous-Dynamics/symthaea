@@ -93,7 +93,6 @@ impl SemanticMemory {
     /// Find the `top_k` most similar entries to `query` by cosine similarity.
     /// Returns `(index, similarity)` pairs sorted descending by similarity.
     pub fn find_similar(&self, query: &[f32], top_k: usize) -> Vec<(usize, f32)> {
-        self.stats();
         let mut scored: Vec<(usize, f32)> = self
             .entries
             .iter()
@@ -172,7 +171,7 @@ impl Episode {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EpisodicMemory {
     episodes: Vec<Episode>,
-    max_episodes: usize,
+    pub(crate) max_episodes: usize,
     phi_threshold: f32,
 }
 

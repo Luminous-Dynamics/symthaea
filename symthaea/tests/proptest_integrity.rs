@@ -122,9 +122,9 @@ proptest! {
             baseline,
             Box::new(|| blake3_hash(b"modified")),
         );
-        // Run n failures at attestation intervals
+        // Run n failures with full_sweep to bypass jittered intervals
         for i in 1..=n {
-            mgr.tick(i * 101, 0.02, false);
+            mgr.tick(i * 101, 0.02, true);
         }
         prop_assert!(mgr.has_critical_anomaly());
         prop_assert_eq!(mgr.integrity_confidence, 0.1);
@@ -168,7 +168,7 @@ proptest! {
             Box::new(|| blake3_hash(b"modified")),
         );
         for i in 1..=n_ticks {
-            mgr.tick(i * 101, 0.02, false); // every tick fires attestation
+            mgr.tick(i * 101, 0.02, true); // full_sweep to bypass jittered interval
         }
         prop_assert!(mgr.event_log.len() <= 64, "event log exceeded capacity: {}", mgr.event_log.len());
     }

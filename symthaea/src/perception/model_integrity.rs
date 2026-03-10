@@ -19,13 +19,16 @@
 //! let hash = compute_model_hash(&path)?;
 //! ```
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use std::collections::HashMap;
-use std::io::Read;
 use std::path::{Path, PathBuf};
 
 #[cfg(feature = "neural-bridge")]
+use anyhow::Context;
+#[cfg(feature = "neural-bridge")]
 use sha2::{Digest, Sha256};
+#[cfg(feature = "neural-bridge")]
+use std::io::Read;
 
 /// A manifest mapping model file paths to their expected SHA-256 hashes.
 ///

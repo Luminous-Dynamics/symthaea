@@ -1,6 +1,6 @@
 //! Payments Coordinator Zome
 use hdk::prelude::*;
-use mycelix_finance_shared::{anchor_hash, verify_caller_is_did};
+use mycelix_finance_shared::{anchor_hash, follow_update_chain, verify_caller_is_did};
 use mycelix_finance_types::{
     compute_demurrage_deduction, FeeTier, SapMintSource, SuccessionPreference, COMPOST_LOCAL_PCT,
     COMPOST_REGIONAL_PCT, DEMURRAGE_EXEMPT_FLOOR, DEMURRAGE_RATE, SAP_MINT_ANNUAL_MAX,
@@ -466,7 +466,13 @@ fn enforce_annual_mint_cap(new_amount: u64, now: Timestamp) -> ExternResult<()> 
 
     let annual_total: u64 = query(filter)?
         .into_iter()
-        .filter_map(|r| r.entry().to_app_option::<SapMintRecord>().ok().flatten())
+        .filter_map(|r| {
+            r.entry()
+                .to_app_option::<SapMintRecord>()
+                .map_err(|e| debug!("SapMintRecord deserialization error: {:?}", e))
+                .ok()
+                .flatten()
+        })
         .filter(|m| m.minted_at.as_micros() > cutoff)
         .filter(|m| matches!(m.source, SapMintSource::GovernanceProposal { .. }))
         .map(|m| m.amount)
@@ -492,10 +498,18 @@ fn find_sap_balance_record(member_did: &str) -> ExternResult<Option<(Record, Sap
     if let Some(link) = links.last() {
         let hash = ActionHash::try_from(link.target.clone())
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(hash, GetOptions::default())? {
-            if let Some(bal) = record.entry().to_app_option::<SapBalance>().ok().flatten() {
-                return Ok(Some((record, bal)));
-            }
+        let record = follow_update_chain(hash)?;
+        let bal = record
+            .entry()
+            .to_app_option::<SapBalance>()
+            .map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!(
+                    "SapBalance deserialization error: {:?}",
+                    e
+                )))
+            })?;
+        if let Some(bal) = bal {
+            return Ok(Some((record, bal)));
         }
     }
     Ok(None)
@@ -1248,7 +1262,9 @@ pub fn release_escrow(payment_id: String) -> ExternResult<Record> {
         .include_entries(true);
 
     for record in query(filter)? {
-        if let Some(payment) = record.entry().to_app_option::<Payment>().ok().flatten() {
+        if let Some(payment) = record.entry().to_app_option::<Payment>().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!("Payment deserialization error: {:?}", e)))
+        })? {
             if payment.id == payment_id {
                 if !matches!(payment.payment_type, PaymentType::Escrow(_)) {
                     return Err(wasm_error!(WasmErrorInner::Guest(
@@ -1461,13 +1477,19 @@ pub fn withdraw_from_hearth_pool(input: WithdrawFromHearthInput) -> ExternResult
 
     if let Some(link) = links.first() {
         if let Some(action_hash) = link.target.clone().into_action_hash() {
-            if let Some(record) = get(action_hash, GetOptions::default())? {
-                if let Some(mut personal_bal) =
-                    record.entry().to_app_option::<SapBalance>().ok().flatten()
-                {
-                    personal_bal.balance += input.amount;
-                    update_entry(record.action_address().clone(), &personal_bal)?;
-                }
+            let record = follow_update_chain(action_hash)?;
+            if let Some(mut personal_bal) = record
+                .entry()
+                .to_app_option::<SapBalance>()
+                .map_err(|e| {
+                    wasm_error!(WasmErrorInner::Guest(format!(
+                        "SapBalance deserialization error: {:?}",
+                        e
+                    )))
+                })?
+            {
+                personal_bal.balance += input.amount;
+                update_entry(record.action_address().clone(), &personal_bal)?;
             }
         }
     }

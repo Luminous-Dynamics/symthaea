@@ -21,6 +21,29 @@ use sha2::{Digest, Sha256};
 use subtle::ConstantTimeEq;
 
 // =============================================================================
+// HELPERS
+// =============================================================================
+
+/// Follow update chains to get the latest version of a record.
+fn get_latest_record(action_hash: ActionHash) -> ExternResult<Option<Record>> {
+    let Some(details) = get_details(action_hash, GetOptions::default())? else {
+        return Ok(None);
+    };
+    match details {
+        Details::Record(record_details) => {
+            if record_details.updates.is_empty() {
+                Ok(Some(record_details.record))
+            } else {
+                let latest_update = &record_details.updates[record_details.updates.len() - 1];
+                let latest_hash = latest_update.action_address().clone();
+                get_latest_record(latest_hash)
+            }
+        }
+        Details::Entry(_) => Ok(None),
+    }
+}
+
+// =============================================================================
 // RATE LIMITING CONFIGURATION
 // =============================================================================
 
@@ -2319,8 +2342,11 @@ fn get_mfa_state_internal(did: &str) -> ExternResult<(MfaState, ActionHash)> {
         .into_action_hash()
         .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
 
-    let record = get(action_hash.clone(), GetOptions::default())?
+    let record = get_latest_record(action_hash.clone())?
         .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("MFA state record not found".into())))?;
+
+    // Use the latest record's action hash for subsequent updates
+    let action_hash = record.action_address().clone();
 
     let state = record
         .entry()

@@ -1076,6 +1076,16 @@ mod factor_verification {
             .call(&cell.zome("mfa"), "enroll_factor", enroll_input)
             .await;
 
+        // Generate a proper verification challenge from the zome
+        let challenge_input = GenerateChallengeInput {
+            did: did_doc.id.clone(),
+            factor_id: "yubikey-test".to_string(),
+            factor_type: FactorType::HardwareKey,
+        };
+        let challenge_resp: VerificationChallenge = conductor
+            .call(&cell.zome("mfa"), "generate_verification_challenge", challenge_input)
+            .await;
+
         // Verify with WebAuthn proof — must provide structurally valid data:
         // - authenticator_data: 37+ bytes (rpIdHash:32 + flags:1 + counter:4)
         // - client_data_hash: valid base64, 32 bytes (SHA256)
@@ -1083,7 +1093,7 @@ mod factor_verification {
         let verify_input = VerifyFactorInput {
             did: did_doc.id.clone(),
             factor_id: "yubikey-test".to_string(),
-            challenge: Some("test-challenge-123".to_string()),
+            challenge: Some(challenge_resp.challenge),
             proof: Some(VerificationProof::WebAuthn {
                 // 37 bytes: 32-byte rpIdHash (zeros) + flags 0x45 (UP+UV) + counter 1
                 authenticator_data: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABFAAAAAQ==".to_string(),

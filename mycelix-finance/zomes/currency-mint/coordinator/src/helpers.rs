@@ -337,7 +337,8 @@ pub(crate) fn collect_currency_members(
 ///
 /// Follows the update chain for each link target, deserializes to `T`,
 /// and returns all successfully decoded entries with their latest action hash.
-/// Silently skips links that can't be resolved (deleted entries, network errors).
+/// Skips links that can't be resolved (deleted entries, network errors) but
+/// logs deserialization errors via `debug!` for observability.
 pub(crate) fn collect_linked_entries<T: TryFrom<SerializedBytes, Error = SerializedBytesError>>(
     anchor: &str,
     link_type: LinkTypes,
@@ -351,8 +352,17 @@ pub(crate) fn collect_linked_entries<T: TryFrom<SerializedBytes, Error = Seriali
     for link in links {
         if let Some(action_hash) = link.target.into_action_hash() {
             if let Ok(record) = follow_update_chain(action_hash) {
-                if let Some(entry) = record.entry().to_app_option::<T>().ok().flatten() {
-                    entries.push((entry, record.action_address().clone()));
+                match record.entry().to_app_option::<T>() {
+                    Ok(Some(entry)) => {
+                        entries.push((entry, record.action_address().clone()));
+                    }
+                    Ok(None) => {} // No entry content (e.g. deleted)
+                    Err(e) => {
+                        debug!(
+                            "collect_linked_entries: deserialization error for {}: {:?}",
+                            anchor, e
+                        );
+                    }
                 }
             }
         }

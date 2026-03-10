@@ -1,6 +1,11 @@
 //! SporeEngine: the core consciousness loop for WASM targets.
 
+use crate::broca::{BrocaLite, ThoughtChannels};
 use crate::config::SporeConfig;
+use crate::dream::{DreamConfig, DreamEngine};
+use crate::fep::{ActiveInferenceAgent, ActiveInferenceConfig, FepCycleResult};
+use crate::memory::MemoryCoordinator;
+use crate::topology::TopologyAnalyzer;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use symthaea_consciousness_equation::{
@@ -170,6 +175,12 @@ pub struct SporeEngine {
     last_consciousness: f32,
     last_output: Option<ContinuousHV>,
     instance_id: usize,
+    // Phase 1-5: expanded cognitive subsystems
+    memory: MemoryCoordinator,
+    dream: DreamEngine,
+    fep: ActiveInferenceAgent,
+    topology: TopologyAnalyzer,
+    broca: BrocaLite,
 }
 
 impl SporeEngine {
@@ -222,6 +233,11 @@ impl SporeEngine {
             last_consciousness: 0.0,
             last_output: None,
             instance_id,
+            memory: MemoryCoordinator::new(500, 100),
+            dream: DreamEngine::with_defaults(),
+            fep: ActiveInferenceAgent::with_defaults(),
+            topology: TopologyAnalyzer::with_defaults(),
+            broca: BrocaLite::new(42),
         }
     }
 
@@ -291,15 +307,76 @@ impl SporeEngine {
         // Build epistemic status — the ethics gate
         let epistemic_status = self.build_epistemic_status();
 
+        let neuromods = [
+            self.bath.dopamine.effective(),
+            self.bath.noradrenaline.effective(),
+            self.bath.serotonin.effective(),
+            self.bath.oxytocin.effective(),
+        ];
+
+        // Memory: record this cycle's input/output
+        if let Some(ref out) = self.last_output {
+            self.memory.record_cycle(
+                &input_hv.values,
+                &out.values,
+                prediction_error,
+                consciousness_level,
+                self.cycle_count,
+            );
+        }
+
+        // Dream: record high-surprise events
+        if prediction_error > 0.1 {
+            if let Some(ref out) = self.last_output {
+                self.dream.record(
+                    &input_hv.values,
+                    &out.values[..64.min(out.values.len())],
+                    &out.values,
+                    prediction_error,
+                    self.cycle_count,
+                );
+            }
+        }
+
+        // FEP: active inference cycle
+        let fep_result = self.fep.cycle(
+            consciousness_level,
+            harmony_alignment,
+            1.0 - prediction_error,
+            neuromods[1], // norepinephrine as attention proxy
+        );
+
+        // Topology: observe consciousness dimensions
+        self.topology.observe(
+            [
+                consciousness_level as f64,
+                harmony_alignment as f64,
+                0.6, // workspace (constant for now)
+                neuromods[1] as f64, // attention
+                0.7, // recurrence
+                self.substrate_feasibility,
+                0.5, // knowledge
+            ],
+            self.cycle_count,
+        );
+
+        // Apply FEP motor command effects to neuromodulators
+        match fep_result.motor_command.command_type {
+            crate::fep::MotorCommandType::ExplorationTrigger => {
+                self.bath.dopamine.level =
+                    (self.bath.dopamine.level + 0.05).clamp(0.0, 1.0);
+            }
+            crate::fep::MotorCommandType::LearningRateAdjust => {
+                self.bath.noradrenaline.level =
+                    (self.bath.noradrenaline.level + 0.03).clamp(0.0, 1.0);
+            }
+            _ => {}
+        }
+
         CycleResult {
             consciousness_level,
             cycle: self.cycle_count,
-            neuromodulators: [
-                self.bath.dopamine.effective(),
-                self.bath.noradrenaline.effective(),
-                self.bath.serotonin.effective(),
-                self.bath.oxytocin.effective(),
-            ],
+            neuromodulators: neuromods,
             substrate_feasibility: self.substrate_feasibility as f32,
             prediction_error,
             bottleneck: String::new(),
@@ -325,6 +402,82 @@ impl SporeEngine {
             .clamp(0.0, 1.0);
         self.last_consciousness = c;
         c
+    }
+
+    // ======================================================================
+    // Expanded cognitive subsystem accessors
+    // ======================================================================
+
+    /// Generate text from current consciousness state using the Broca language center.
+    pub fn generate_text(&mut self, max_tokens: usize) -> crate::broca::GenerationResult {
+        let neuromods = [
+            self.bath.dopamine.effective(),
+            self.bath.noradrenaline.effective(),
+            self.bath.serotonin.effective(),
+            self.bath.oxytocin.effective(),
+        ];
+        self.broca.generate_from_text(
+            self.last_consciousness,
+            self.last_output.as_ref().map_or(0.5, |_| 0.3),
+            self.evaluate_harmony_alignment(self.last_consciousness),
+            neuromods,
+            max_tokens,
+        )
+    }
+
+    /// Run a dream cycle: simulate counterfactual alternatives to high-surprise events.
+    pub fn dream_cycle(&mut self) -> Option<crate::dream::DreamResult> {
+        self.dream.dream()
+    }
+
+    /// Run a dream session (multiple dream cycles).
+    pub fn dream_session(&mut self, cycles: usize) -> Vec<crate::dream::DreamResult> {
+        self.dream.dream_session(cycles)
+    }
+
+    /// Get accumulated dream wisdom.
+    pub fn dream_wisdom_count(&self) -> usize {
+        self.dream.wisdom().len()
+    }
+
+    /// Get dream engine statistics.
+    pub fn dream_stats(&self) -> crate::dream::DreamStats {
+        self.dream.stats()
+    }
+
+    /// Run a single FEP active inference cycle.
+    pub fn fep_cycle(&mut self) -> FepCycleResult {
+        self.fep.cycle(
+            self.last_consciousness,
+            self.evaluate_harmony_alignment(self.last_consciousness),
+            0.7,
+            self.bath.noradrenaline.effective(),
+        )
+    }
+
+    /// Get current free energy.
+    pub fn free_energy(&self) -> f32 {
+        self.fep.free_energy()
+    }
+
+    /// Run topology analysis on accumulated consciousness observations.
+    pub fn topology_analysis(&self) -> crate::topology::TopologyAnalysis {
+        self.topology.analyze()
+    }
+
+    /// Get topology report as human-readable string.
+    pub fn topology_report(&self) -> String {
+        self.topology.report()
+    }
+
+    /// Get memory statistics.
+    pub fn memory_stats(&self) -> crate::memory::MemoryStats {
+        self.memory.stats()
+    }
+
+    /// Query semantic memory for similar patterns.
+    pub fn memory_query(&self, query: &[f32], top_k: usize) -> Vec<(usize, f32)> {
+        self.memory.query_semantic(query, top_k)
     }
 
     // ======================================================================
