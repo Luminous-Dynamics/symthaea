@@ -45,13 +45,13 @@ pub enum Place {
     Labiodental,  // Lower lip + upper teeth (f, v)
     Dental,       // Tongue + teeth (th, dh)
     Alveolar,     // Tongue + alveolar ridge (t, d, n, s, z, l)
-    PostAlveolar, // Tongue behind alveolar ridge (r)
+    PostAlveolar, // Tongue behind alveolar ridge (r, er)
     Palatal,      // Tongue + hard palate (sh, zh, ch, jh, y)
     Velar,        // Tongue back + soft palate (k, g, ng)
     Glottal,      // Glottis (h)
     // Vowel places (tongue position)
     Front,   // Front vowels (iy, ih, ey, eh, ae)
-    Central, // Central vowels (ah, er)
+    Central, // Central vowels (ah)
     Back,    // Back vowels (uw, uh, ow, ao, aa)
 }
 
@@ -426,9 +426,9 @@ impl ArticulatoryMapper {
             ArticulatoryFeatures {
                 voicing: Voicing::Voiced,
                 manner: Manner::Vowel,
-                place: Place::Central,
+                place: Place::PostAlveolar, // Rhotacized — tongue curls to postalveolar region for /ɝ/
                 height: Some(VowelHeight::Mid),
-                roundness: Some(false),
+                roundness: Some(true), // Rhotacized — lips round slightly for /ɝ/
             },
         );
 
@@ -483,7 +483,7 @@ impl ArticulatoryMapper {
                 voicing: Voicing::Voiced,
                 manner: Manner::Vowel,
                 place: Place::Back,
-                height: Some(VowelHeight::Low),
+                height: Some(VowelHeight::Mid), // /ɔː/ is open-mid, distinct from AA /ɑː/ which is fully low
                 roundness: Some(true),
             },
         );
@@ -708,7 +708,7 @@ impl ArticulatoryHDC {
             "L", "R", // Liquids
             "W", "Y", // Glides
             "IY", "IH", "EY", "EH", "AE", // Front vowels
-            "AH", "ER", // Central vowels
+            "AH", "ER", // Central/rhotacized vowels
             "UW", "UH", "OW", "AA", "AO", // Back vowels
             "AY", "AW", "OY", // Diphthongs
         ];
