@@ -238,11 +238,7 @@ pub fn confirm_minted_exchange(exchange_id: String) -> ExternResult<MintedExchan
 
     if all_confirm_links.len() > 1 {
         // Race detected — determine winner by lowest ActionHash (deterministic).
-        // The link with the smallest create_link_hash wins.
-        let winner = all_confirm_links
-            .iter()
-            .min_by_key(|l| l.create_link_hash.clone())
-            .expect("at least one link exists");
+        let winner = pick_race_winner(&all_confirm_links)?;
 
         if winner.create_link_hash != our_link_hash {
             // We lost the race — clean up our link and return idempotently.
@@ -470,7 +466,7 @@ pub fn get_member_exchanges(input: GetMemberExchangesInput) -> ExternResult<Vec<
                 && input
                     .after_timestamp
                     .as_ref()
-                    .map_or(true, |cursor| ex.timestamp.as_micros() > cursor.as_micros())
+                    .is_none_or(|cursor| ex.timestamp.as_micros() > cursor.as_micros())
         })
         .collect();
 

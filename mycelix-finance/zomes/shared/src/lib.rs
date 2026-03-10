@@ -1,3 +1,4 @@
+#![deny(unsafe_code)]
 //! Mycelix Finance Shared Utilities
 //!
 //! This crate provides common functionality for all Mycelix Finance zomes:
@@ -35,7 +36,40 @@ pub use governance::*;
 pub use identity::*;
 pub use types::*;
 pub use update_chain::*;
+pub use race_resolution::*;
 pub use validation::*;
+
+/// Community size threshold above which governance proposals are required for
+/// currency creation, demurrage changes, and dispute resolution.
+pub const COMMUNITY_GOVERNANCE_THRESHOLD: u32 = 10;
+
+/// Race-condition resolution for concurrent link creation.
+///
+/// When multiple agents create the same logical link simultaneously, we need
+/// a deterministic way to pick a single winner. This module provides a shared
+/// helper that selects the link with the lowest `create_link_hash`.
+pub mod race_resolution {
+    use super::*;
+
+    /// Deterministically pick a single winner from a set of concurrent links.
+    ///
+    /// Returns the link with the lowest `create_link_hash` (lexicographic byte
+    /// comparison), which is consistent across all DHT nodes regardless of the
+    /// order in which links are observed.
+    ///
+    /// # Errors
+    /// Returns an error if the slice is empty.
+    pub fn pick_race_winner(links: &[Link]) -> ExternResult<&Link> {
+        links
+            .iter()
+            .min_by_key(|l| l.create_link_hash.clone())
+            .ok_or_else(|| {
+                wasm_error!(WasmErrorInner::Guest(
+                    "Race resolution failed: no links found after creation".into()
+                ))
+            })
+    }
+}
 
 /// Update chain traversal for Holochain entries.
 ///
@@ -336,13 +370,7 @@ pub mod batch {
     ) -> Vec<T> {
         records
             .iter()
-            .filter_map(|r| match r.entry().to_app_option::<T>() {
-                Ok(opt) => opt,
-                Err(_e) => {
-                    // Best-effort extraction: skip corrupt entries but don't crash
-                    None
-                }
-            })
+            .filter_map(|r| r.entry().to_app_option::<T>().unwrap_or_default())
             .collect()
     }
 
@@ -903,5 +931,48 @@ mod tests {
         assert!(result.records.is_empty());
         assert!(result.not_found.is_empty());
         assert!(result.errors.is_empty());
+    }
+
+    // =========================================================================
+    // Property-based tests (proptest)
+    // =========================================================================
+
+    mod proptests {
+        use super::*;
+        use proptest::prelude::*;
+
+        // Property: `anchor_hash` is deterministic -- same input always produces
+        // the same hash.
+        proptest! {
+            #![proptest_config(ProptestConfig::with_cases(256))]
+
+            #[test]
+            fn anchor_hash_is_deterministic(input in "\\PC{1,200}") {
+                let hash1 = anchors::anchor_hash(&input).unwrap();
+                let hash2 = anchors::anchor_hash(&input).unwrap();
+                prop_assert_eq!(hash1, hash2, "anchor_hash must be deterministic");
+            }
+        }
+
+        // Property: `anchor_hash` has no collisions for distinct inputs.
+        // With blake2b-256, any two distinct strings should produce distinct hashes.
+        proptest! {
+            #![proptest_config(ProptestConfig::with_cases(256))]
+
+            #[test]
+            fn anchor_hash_no_collisions(
+                a in "\\PC{1,100}",
+                b in "\\PC{1,100}",
+            ) {
+                prop_assume!(a != b);
+                let hash_a = anchors::anchor_hash(&a).unwrap();
+                let hash_b = anchors::anchor_hash(&b).unwrap();
+                prop_assert_ne!(
+                    hash_a, hash_b,
+                    "Distinct inputs must produce distinct hashes: {:?} vs {:?}",
+                    a, b
+                );
+            }
+        }
     }
 }

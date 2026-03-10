@@ -1,3 +1,4 @@
+#![deny(unsafe_code)]
 //! Staking Coordinator Zome
 //!
 //! Business logic for SAP-based collateral staking with MYCEL weighting:

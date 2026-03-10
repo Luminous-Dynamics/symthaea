@@ -1,3 +1,4 @@
+#![deny(unsafe_code)]
 //! Mycelix Finance Shared Types
 //!
 //! Canonical type definitions for the Mycelix three-currency economic system.
@@ -1122,5 +1123,163 @@ mod tests {
         // No self-transitions
         assert!(!Active.can_transition_to(&Active));
         assert!(!Draft.can_transition_to(&Draft));
+    }
+
+    // =========================================================================
+    // Property-based tests (proptest)
+    // =========================================================================
+
+    mod proptests {
+        use super::super::*;
+        use proptest::prelude::*;
+
+        // Property: fork resolution via `min_by_key` is deterministic.
+        // Given any permutation of the same set of byte arrays (simulating
+        // ActionHashes in `follow_update_chain`), `min_by_key` always selects
+        // the same winner.
+        proptest! {
+            #![proptest_config(ProptestConfig::with_cases(256))]
+
+            #[test]
+            fn fork_resolution_is_deterministic(
+                hashes in prop::collection::hash_set(
+                    prop::collection::vec(any::<u8>(), 32..=32),
+                    2..10
+                )
+            ) {
+                let hashes_vec: Vec<Vec<u8>> = hashes.into_iter().collect();
+
+                // The canonical winner is the lexicographic minimum
+                let winner = hashes_vec.iter().min().unwrap().clone();
+
+                // Reversed order must yield the same winner
+                let mut shuffled = hashes_vec.clone();
+                shuffled.reverse();
+                let winner2 = shuffled.iter().min().unwrap().clone();
+                prop_assert_eq!(&winner, &winner2);
+
+                // Rotated order must yield the same winner
+                let mut rotated = hashes_vec.clone();
+                rotated.rotate_left(1);
+                let winner3 = rotated.iter().min().unwrap().clone();
+                prop_assert_eq!(&winner, &winner3);
+            }
+        }
+
+        // Property: `CurrencyStatus::can_transition_to` is anti-symmetric.
+        // If A can transition to B, then B cannot transition to A,
+        // except for the Suspended <-> Active pair.
+        proptest! {
+            #![proptest_config(ProptestConfig::with_cases(256))]
+
+            #[test]
+            fn currency_status_transition_antisymmetric(
+                a_idx in 0usize..4,
+                b_idx in 0usize..4,
+            ) {
+                let statuses = [
+                    CurrencyStatus::Draft,
+                    CurrencyStatus::Active,
+                    CurrencyStatus::Suspended,
+                    CurrencyStatus::Retired,
+                ];
+                let a = &statuses[a_idx];
+                let b = &statuses[b_idx];
+
+                if a == b {
+                    // Self-transitions are always invalid
+                    prop_assert!(!a.can_transition_to(b));
+                } else if a.can_transition_to(b) {
+                    let is_suspended_active = matches!(
+                        (a, b),
+                        (CurrencyStatus::Suspended, CurrencyStatus::Active)
+                            | (CurrencyStatus::Active, CurrencyStatus::Suspended)
+                    );
+                    if !is_suspended_active {
+                        prop_assert!(
+                            !b.can_transition_to(a),
+                            "Anti-symmetry violated: {:?} -> {:?} and {:?} -> {:?}",
+                            a, b, b, a
+                        );
+                    }
+                }
+            }
+        }
+
+        // Property: balance mutations preserve `is_finite`.
+        // If input balance is finite and mutation amount is finite, result is finite.
+        proptest! {
+            #![proptest_config(ProptestConfig::with_cases(256))]
+
+            #[test]
+            fn balance_mutation_preserves_finite(
+                balance in 0.0f64..1e15,
+                mutation in -1e12f64..1e12,
+            ) {
+                let sum = balance + mutation;
+                prop_assert!(
+                    sum.is_finite(),
+                    "finite + finite must be finite: {} + {} = {}",
+                    balance, mutation, sum
+                );
+
+                let product = balance * mutation;
+                prop_assert!(
+                    product.is_finite(),
+                    "finite * finite must be finite: {} * {} = {}",
+                    balance, mutation, product
+                );
+            }
+        }
+
+        // Property: demurrage deduction is monotonic in time.
+        // For any valid rate and balance, longer elapsed time means
+        // equal or greater deduction.
+        proptest! {
+            #![proptest_config(ProptestConfig::with_cases(256))]
+
+            #[test]
+            fn demurrage_monotonic_in_time(
+                balance in (DEMURRAGE_EXEMPT_FLOOR + 1)..=(u64::MAX / 2),
+                rate in 0.001f64..0.05,
+                t1_secs in 1u64..=(100 * 31_536_000u64),
+                extra_secs in 1u64..=31_536_000u64,
+            ) {
+                let t2_secs = t1_secs.saturating_add(extra_secs);
+                let d1 = compute_demurrage_deduction(balance, DEMURRAGE_EXEMPT_FLOOR, rate, t1_secs);
+                let d2 = compute_demurrage_deduction(balance, DEMURRAGE_EXEMPT_FLOOR, rate, t2_secs);
+                prop_assert!(
+                    d2 >= d1,
+                    "Demurrage must be monotonic: d({})={} should be >= d({})={} for balance={}, rate={}",
+                    t2_secs, d2, t1_secs, d1, balance, rate
+                );
+            }
+        }
+
+        // Property: demurrage deduction is bounded -- never exceeds eligible balance.
+        // For reasonable durations (< 100 years) and valid rates.
+        proptest! {
+            #![proptest_config(ProptestConfig::with_cases(256))]
+
+            #[test]
+            fn demurrage_bounded_by_balance(
+                balance in (DEMURRAGE_EXEMPT_FLOOR + 1)..=(u64::MAX / 2),
+                rate in 0.001f64..0.05,
+                seconds in 1u64..=(100 * 31_536_000u64),
+            ) {
+                let eligible = balance - DEMURRAGE_EXEMPT_FLOOR;
+                let deduction = compute_demurrage_deduction(
+                    balance,
+                    DEMURRAGE_EXEMPT_FLOOR,
+                    rate,
+                    seconds,
+                );
+                prop_assert!(
+                    deduction <= eligible,
+                    "Deduction {} exceeds eligible {} (balance={}, rate={}, secs={})",
+                    deduction, eligible, balance, rate, seconds
+                );
+            }
+        }
     }
 }

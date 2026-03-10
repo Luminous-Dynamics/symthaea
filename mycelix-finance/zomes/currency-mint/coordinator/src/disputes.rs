@@ -95,10 +95,10 @@ pub fn resolve_minted_dispute(input: ResolveDisputeInput) -> ExternResult<Minted
         )));
     }
 
-    // Governance gate: communities with >10 members require authorization
+    // Governance gate: communities above threshold require authorization
     let (_, def) = get_currency_inner(&exchange.currency_id)?;
     let community_size = fetch_community_size(&def.creator_dao_did);
-    if community_size > 10 {
+    if community_size > COMMUNITY_GOVERNANCE_THRESHOLD {
         match call(
             CallTargetCell::Local,
             ZomeName::from("tend"),

@@ -1,3 +1,4 @@
+#![deny(unsafe_code)]
 //! TEND (Time Exchange) Coordinator Zome
 //!
 //! Implements Commons Charter Article II, Section 2 - Time Exchange Module
@@ -15,8 +16,8 @@
 
 use hdk::prelude::*;
 use mycelix_finance_shared::{
-    anchor_hash, follow_update_chain, verify_governance_or_bootstrap_from_links,
-    GOVERNANCE_AGENTS_ANCHOR,
+    anchor_hash, follow_update_chain, pick_race_winner,
+    verify_governance_or_bootstrap_from_links, GOVERNANCE_AGENTS_ANCHOR,
 };
 
 // Re-export integrity types for external use
@@ -167,6 +168,7 @@ pub fn get_current_tend_limit(tier: TendLimitTier) -> ExternResult<i32> {
 }
 
 const ORACLE_STATE_ANCHOR: &str = "tend:oracle_state";
+const MAX_VITALITY: u32 = 100;
 
 /// Update the oracle state (sets current vitality and limit tier).
 ///
@@ -175,10 +177,10 @@ const ORACLE_STATE_ANCHOR: &str = "tend:oracle_state";
 #[hdk_extern]
 pub fn update_oracle_state(vitality: u32) -> ExternResult<OracleState> {
     verify_governance_or_bootstrap()?;
-    if vitality > 100 {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            "Vitality must be 0-100".into()
-        )));
+    if vitality > MAX_VITALITY {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Vitality must be 0-{}", MAX_VITALITY
+        ))));
     }
 
     let now = sys_time()?;
@@ -961,10 +963,7 @@ pub fn confirm_exchange(exchange_id: String) -> ExternResult<ExchangeRecord> {
 
     if all_confirm_links.len() > 1 {
         // Race detected — winner is lowest ActionHash (deterministic)
-        let winner = all_confirm_links
-            .iter()
-            .min_by_key(|l| l.create_link_hash.clone())
-            .expect("at least one link exists");
+        let winner = pick_race_winner(&all_confirm_links)?;
 
         if winner.create_link_hash != our_link_hash {
             // We lost the race — clean up and return idempotently
@@ -1012,7 +1011,32 @@ pub fn confirm_exchange(exchange_id: String) -> ExternResult<ExchangeRecord> {
         ))));
     }
 
-    // Update balances
+    // Create a PendingBalanceAdjustment BEFORE balance updates for crash recovery.
+    // If a crash occurs between the two updates, recover_pending_adjustments can
+    // complete the interrupted operation and restore the zero-sum invariant.
+    let now_ts = sys_time()?;
+    let pending_adj = PendingBalanceAdjustment {
+        exchange_id: exchange.id.clone(),
+        provider_did: exchange.provider_did.clone(),
+        receiver_did: exchange.receiver_did.clone(),
+        hours: exchange.hours as f64,
+        currency_id: exchange.dao_did.clone(),
+        provider_completed: false,
+        receiver_completed: false,
+        created_at: now_ts,
+    };
+    let pending_adj_hash = create_entry(&EntryTypes::PendingBalanceAdjustment(pending_adj))?;
+
+    // Link from a well-known anchor so recover_pending_adjustments can find them
+    let pending_anchor = anchor_hash("pending-balance-adjustments")?;
+    create_link(
+        pending_anchor,
+        pending_adj_hash.clone(),
+        LinkTypes::PendingAdjustmentToExchange,
+        (),
+    )?;
+
+    // Update balances — provider first
     update_balance_after_exchange(
         &exchange.provider_did,
         &exchange.dao_did,
@@ -1020,11 +1044,44 @@ pub fn confirm_exchange(exchange_id: String) -> ExternResult<ExchangeRecord> {
         true, // provider gains
     )?;
 
+    // Mark provider side as completed
+    let pending_adj_provider_done = PendingBalanceAdjustment {
+        exchange_id: exchange.id.clone(),
+        provider_did: exchange.provider_did.clone(),
+        receiver_did: exchange.receiver_did.clone(),
+        hours: exchange.hours as f64,
+        currency_id: exchange.dao_did.clone(),
+        provider_completed: true,
+        receiver_completed: false,
+        created_at: now_ts,
+    };
+    update_entry(
+        pending_adj_hash.clone(),
+        &EntryTypes::PendingBalanceAdjustment(pending_adj_provider_done),
+    )?;
+
+    // Update balances — receiver second
     update_balance_after_exchange(
         &exchange.receiver_did,
         &exchange.dao_did,
         exchange.hours,
         false, // receiver pays
+    )?;
+
+    // Mark both sides as completed
+    let pending_adj_all_done = PendingBalanceAdjustment {
+        exchange_id: exchange.id.clone(),
+        provider_did: exchange.provider_did.clone(),
+        receiver_did: exchange.receiver_did.clone(),
+        hours: exchange.hours as f64,
+        currency_id: exchange.dao_did.clone(),
+        provider_completed: true,
+        receiver_completed: true,
+        created_at: now_ts,
+    };
+    update_entry(
+        pending_adj_hash,
+        &EntryTypes::PendingBalanceAdjustment(pending_adj_all_done),
     )?;
 
     // Update exchange status
@@ -1238,10 +1295,7 @@ pub fn rate_exchange(input: RateExchangeInput) -> ExternResult<Record> {
 
     if all_rating_links.len() > 1 {
         // Race detected — winner is lowest ActionHash (deterministic)
-        let winner = all_rating_links
-            .iter()
-            .min_by_key(|l| l.create_link_hash.clone())
-            .expect("at least one link exists");
+        let winner = pick_race_winner(&all_rating_links)?;
 
         if winner.create_link_hash != our_link_hash {
             // We lost the race — clean up and error
@@ -1372,10 +1426,7 @@ pub fn open_dispute(input: OpenDisputeInput) -> ExternResult<Record> {
 
     if all_dispute_links.len() > 1 {
         // Race detected — winner is lowest ActionHash (deterministic)
-        let winner = all_dispute_links
-            .iter()
-            .min_by_key(|l| l.create_link_hash.clone())
-            .expect("at least one link exists");
+        let winner = pick_race_winner(&all_dispute_links)?;
 
         if winner.create_link_hash != our_link_hash {
             // We lost the race — clean up and error
@@ -2806,4 +2857,119 @@ pub fn forgive_balance(member_did: String) -> ExternResult<Vec<(String, i32)>> {
     }
 
     Ok(forgiven)
+}
+
+// =============================================================================
+// PENDING BALANCE ADJUSTMENT RECOVERY
+// =============================================================================
+
+/// Recover incomplete balance adjustments from interrupted confirm_exchange calls.
+///
+/// When confirm_exchange crashes between the provider and receiver balance updates,
+/// the zero-sum invariant is broken. This function finds all PendingBalanceAdjustment
+/// entries that are not fully completed and retries the missing balance updates.
+///
+/// Only callable by a governance agent (or during bootstrap when no agents exist).
+///
+/// Returns the number of adjustments that were recovered.
+#[hdk_extern]
+pub fn recover_pending_adjustments(currency_id: String) -> ExternResult<u32> {
+    verify_governance_or_bootstrap()?;
+
+    if currency_id.is_empty() || currency_id.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Currency ID must be 1-256 characters".into()
+        )));
+    }
+
+    let pending_anchor = anchor_hash("pending-balance-adjustments")?;
+    let links = get_links(
+        LinkQuery::try_new(pending_anchor, LinkTypes::PendingAdjustmentToExchange)?,
+        GetStrategy::default(),
+    )?;
+
+    let mut recovered: u32 = 0;
+
+    for link in links {
+        let Some(target_hash) = link.target.into_action_hash() else {
+            continue;
+        };
+
+        // Follow the update chain to get the latest version of this entry
+        let record = match follow_update_chain(target_hash) {
+            Ok(r) => r,
+            Err(_) => continue,
+        };
+
+        let Some(adj) = record
+            .entry()
+            .to_app_option::<PendingBalanceAdjustment>()
+            .map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!(
+                    "PendingBalanceAdjustment deserialization error: {:?}",
+                    e
+                )))
+            })?
+        else {
+            continue;
+        };
+
+        // Skip entries not matching the requested currency
+        if adj.currency_id != currency_id {
+            continue;
+        }
+
+        // Skip fully completed adjustments
+        if adj.provider_completed && adj.receiver_completed {
+            continue;
+        }
+
+        let hours = adj.hours as f32;
+        let mut current_action = record.action_address().clone();
+
+        // Retry missing balance updates
+        if !adj.provider_completed {
+            // Neither side completed — retry provider first
+            update_balance_after_exchange(
+                &adj.provider_did,
+                &adj.currency_id,
+                hours,
+                true, // provider gains
+            )?;
+
+            // Mark provider done
+            let updated = PendingBalanceAdjustment {
+                provider_completed: true,
+                ..adj.clone()
+            };
+            current_action = update_entry(
+                current_action,
+                &EntryTypes::PendingBalanceAdjustment(updated),
+            )?;
+        }
+
+        if !adj.receiver_completed {
+            update_balance_after_exchange(
+                &adj.receiver_did,
+                &adj.currency_id,
+                hours,
+                false, // receiver pays
+            )?;
+
+            // Mark both sides done
+            let updated = PendingBalanceAdjustment {
+                provider_completed: true,
+                receiver_completed: true,
+                ..adj.clone()
+            };
+            update_entry(
+                current_action,
+                &EntryTypes::PendingBalanceAdjustment(updated),
+            )?;
+        }
+
+        recovered += 1;
+    }
+
+    Ok(recovered)
 }

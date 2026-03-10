@@ -1,3 +1,4 @@
+#![deny(unsafe_code)]
 //! Recognition Integrity Zome
 //!
 //! Implements the MYCEL reputation system through weighted recognition events.

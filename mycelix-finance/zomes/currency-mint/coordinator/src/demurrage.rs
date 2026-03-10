@@ -128,9 +128,9 @@ pub fn redistribute_compost(currency_id: String) -> ExternResult<RedistributeCom
         )));
     }
 
-    // Governance gate: communities with >10 members require authorization
+    // Governance gate: communities above threshold require authorization
     let community_size = fetch_community_size(&def.creator_dao_did);
-    if community_size > 10 {
+    if community_size > COMMUNITY_GOVERNANCE_THRESHOLD {
         match call(
             CallTargetCell::Local,
             ZomeName::from("tend"),
@@ -189,10 +189,7 @@ pub fn redistribute_compost(currency_id: String) -> ExternResult<RedistributeCom
 
     if all_redist_links.len() > 1 {
         // Race detected — determine winner by lowest ActionHash (deterministic).
-        let winner = all_redist_links
-            .iter()
-            .min_by_key(|l| l.create_link_hash.clone())
-            .expect("at least one link exists");
+        let winner = pick_race_winner(&all_redist_links)?;
 
         if winner.create_link_hash != our_link_hash {
             // We lost the race — clean up our link and return 0 redistributed.

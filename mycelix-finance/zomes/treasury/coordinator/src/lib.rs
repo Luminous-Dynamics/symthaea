@@ -1,3 +1,4 @@
+#![deny(unsafe_code)]
 //! Treasury Coordinator Zome
 use hdk::prelude::*;
 use mycelix_finance_shared::{anchor_hash, follow_update_chain, verify_caller_is_did};

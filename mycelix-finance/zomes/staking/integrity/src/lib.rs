@@ -1,3 +1,4 @@
+#![deny(unsafe_code)]
 //! Staking Integrity Zome
 //!
 //! Defines entry types for SAP-based collateral staking with MYCEL weighting:

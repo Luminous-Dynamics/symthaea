@@ -29,13 +29,13 @@ pub fn create_currency(input: CreateCurrencyInput) -> ExternResult<CurrencyDefin
         ))));
     }
 
-    // Governance gate: communities with >10 members require a governance proposal
+    // Governance gate: communities above threshold require a governance proposal
     let community_size = fetch_community_size(&input.dao_did);
-    if community_size > 10 {
+    if community_size > COMMUNITY_GOVERNANCE_THRESHOLD {
         if input.governance_proposal_id.is_none() {
             return Err(wasm_error!(WasmErrorInner::Guest(format!(
-                "Communities with >10 members ({} members) require a governance proposal to create a currency",
-                community_size
+                "Communities with >{} members ({} members) require a governance proposal to create a currency",
+                COMMUNITY_GOVERNANCE_THRESHOLD, community_size
             ))));
         }
         // Verify governance authorization
@@ -331,12 +331,12 @@ pub fn amend_currency_params(input: AmendCurrencyParamsInput) -> ExternResult<Cu
 
     // Governance gate
     let community_size = fetch_community_size(&def.creator_dao_did);
-    if community_size > 10 {
+    if community_size > COMMUNITY_GOVERNANCE_THRESHOLD {
         if input.governance_proposal_id.is_none() {
-            return Err(wasm_error!(WasmErrorInner::Guest(
-                "Communities with >10 members require a governance proposal to amend parameters"
-                    .into()
-            )));
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Communities with >{} members require a governance proposal to amend parameters",
+                COMMUNITY_GOVERNANCE_THRESHOLD
+            ))));
         }
         match call(
             CallTargetCell::Local,

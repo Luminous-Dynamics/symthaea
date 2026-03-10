@@ -1,3 +1,4 @@
+#![deny(unsafe_code)]
 //! Payments Integrity Zome
 //! Updated to use HDI 0.7 patterns with FlatOp validation
 use hdi::prelude::*;

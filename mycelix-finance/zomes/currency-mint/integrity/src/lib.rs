@@ -1,3 +1,4 @@
+#![deny(unsafe_code)]
 //! Currency Factory Integrity Zome
 //!
 //! Enforces the **Immutable Economic Physics** for community-minted currencies:

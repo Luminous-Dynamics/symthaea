@@ -1,3 +1,4 @@
+#![deny(unsafe_code)]
 //! Currency Factory Coordinator Zome
 //!
 //! Enables communities to create their own mutual credit currencies with

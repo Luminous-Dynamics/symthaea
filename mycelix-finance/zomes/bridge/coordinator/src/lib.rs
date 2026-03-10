@@ -1,3 +1,4 @@
+#![deny(unsafe_code)]
 //! Finance Bridge Coordinator Zome
 //!
 //! Cross-hApp communication for payment processing, collateral management,

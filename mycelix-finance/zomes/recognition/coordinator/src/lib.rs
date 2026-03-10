@@ -1,3 +1,4 @@
+#![deny(unsafe_code)]
 //! Recognition Coordinator Zome
 //!
 //! Implements MYCEL reputation through weighted recognition events.
