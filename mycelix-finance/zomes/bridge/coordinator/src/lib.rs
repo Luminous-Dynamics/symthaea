@@ -11,6 +11,21 @@ use mycelix_finance_types::{FeeTier, TendLimitTier};
 
 const FINANCE_HAPP_ID: &str = "mycelix-finance";
 
+/// When true, cross-cluster bridge calls that fail to reach the governance
+/// cluster will return errors instead of permissive defaults.
+///
+/// **Security tradeoff**:
+/// - `false` (default): Operations proceed when governance is unreachable
+///   (bootstrap, standalone, network partition). This prioritizes availability
+///   — the integrity zome still enforces zero-sum and constitutional limits.
+/// - `true`: All governance-dependent operations fail-closed when the governance
+///   cluster is unreachable. This is stricter but can block legitimate operations
+///   during network partitions or bootstrapping.
+///
+/// Set to `true` for high-security deployments where governance availability
+/// is guaranteed and any gap in oversight is unacceptable.
+const STRICT_GOVERNANCE_MODE: bool = false;
+
 /// Maximum percentage of vault that any single member can deposit/redeem per day
 const DAILY_RATE_LIMIT_PCT: f64 = 0.05; // 5%
 
@@ -640,11 +655,27 @@ pub fn get_community_member_count(dao_did: String) -> ExternResult<u32> {
             // partition), we allow small-community operations to proceed rather than blocking
             // all currency creation/amendment. The integrity zome still enforces zero-sum
             // and constitutional limits regardless of governance gate.
+            //
+            // When STRICT_GOVERNANCE_MODE is true, this returns an error instead,
+            // blocking the operation until governance is reachable.
+            if STRICT_GOVERNANCE_MODE {
+                return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                    "Governance cluster returned non-Ok response for {}: {:?}. Strict mode requires governance availability.",
+                    dao_did, other
+                ))));
+            }
             debug!("get_community_member_count: governance returned {:?} for {}, defaulting to 0 (permissive)", other, dao_did);
             Ok(0)
         }
         Err(e) => {
             // SECURITY NOTE: Same permissive default as above — see comment.
+            // When STRICT_GOVERNANCE_MODE is true, fail-closed instead.
+            if STRICT_GOVERNANCE_MODE {
+                return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                    "Governance cluster unreachable for {}: {:?}. Strict mode requires governance availability.",
+                    dao_did, e
+                ))));
+            }
             debug!("get_community_member_count: governance unreachable for {}: {:?}, defaulting to 0 (permissive)", dao_did, e);
             Ok(0)
         }
@@ -655,8 +686,13 @@ pub fn get_community_member_count(dao_did: String) -> ExternResult<u32> {
 ///
 /// Used by currency-mint to validate that governance_proposal_id references a real
 /// proposal before creating/amending currencies. Returns true if the proposal is
-/// valid, false if not found or not approved. Permissive on bridge failure (returns
-/// true) to avoid blocking operations when governance cluster is unreachable.
+/// valid, false if not found or not approved.
+///
+/// **Fallback behavior** depends on `STRICT_GOVERNANCE_MODE`:
+/// - `false` (default): Returns `true` when governance is unreachable (permissive).
+/// - `true`: Returns `false` when governance is unreachable (fail-closed),
+///   blocking any operation that requires a governance proposal until the
+///   governance cluster is available.
 #[hdk_extern]
 pub fn verify_governance_proposal(proposal_id: String) -> ExternResult<bool> {
     match call(
@@ -676,14 +712,23 @@ pub fn verify_governance_proposal(proposal_id: String) -> ExternResult<bool> {
             Ok(false)
         }
         Err(_e) => {
-            // SECURITY NOTE: Permissive default — when governance cluster is unreachable,
-            // allow the operation to proceed. The governance agent verification (separate
-            // check) is still enforced locally via verify_governance_agent.
-            debug!(
-                "verify_governance_proposal: governance unreachable for {}, defaulting to true (permissive)",
-                proposal_id
-            );
-            Ok(true)
+            // SECURITY NOTE: When governance cluster is unreachable, behavior depends
+            // on STRICT_GOVERNANCE_MODE. In strict mode we fail-closed (return false),
+            // blocking operations that need governance approval. In permissive mode
+            // we return true, relying on local verify_governance_agent as a fallback.
+            if STRICT_GOVERNANCE_MODE {
+                debug!(
+                    "verify_governance_proposal: governance unreachable for {}, strict mode returning false (fail-closed)",
+                    proposal_id
+                );
+                Ok(false)
+            } else {
+                debug!(
+                    "verify_governance_proposal: governance unreachable for {}, defaulting to true (permissive)",
+                    proposal_id
+                );
+                Ok(true)
+            }
         }
     }
 }

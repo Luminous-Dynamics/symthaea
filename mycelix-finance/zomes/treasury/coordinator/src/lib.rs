@@ -1,7 +1,7 @@
 #![deny(unsafe_code)]
 //! Treasury Coordinator Zome
 use hdk::prelude::*;
-use mycelix_finance_shared::{anchor_hash, follow_update_chain, validate_id, verify_caller_is_did};
+use mycelix_finance_shared::{anchor_hash, follow_update_chain, links_to_records, validate_id, verify_caller_is_did};
 use treasury_integrity::*;
 
 const DEFAULT_LIST_LIMIT: usize = 100;
@@ -620,24 +620,19 @@ pub struct RejectAllocationInput {
 }
 
 /// Get contributions for a treasury (paginated)
+///
+/// Batch-optimized: Contribution entries are immutable (write-once records of
+/// SAP contributed), so bare get() via links_to_records is equivalent to
+/// follow_update_chain.
 #[hdk_extern]
 pub fn get_treasury_contributions(input: ListInput) -> ExternResult<Vec<Record>> {
     let limit = input.limit.unwrap_or(DEFAULT_LIST_LIMIT);
-    let mut contributions = Vec::new();
     let query = LinkQuery::try_new(anchor_hash(&input.id)?, LinkTypes::TreasuryToContributions)?;
-    for link in get_links(query, GetStrategy::default())?
+    let links: Vec<_> = get_links(query, GetStrategy::default())?
         .into_iter()
         .take(limit)
-    {
-        if let Some(record) = get(
-            ActionHash::try_from(link.target)
-                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?,
-            GetOptions::default(),
-        )? {
-            contributions.push(record);
-        }
-    }
-    Ok(contributions)
+        .collect();
+    links_to_records(links)
 }
 
 /// Get allocations for a treasury (paginated)
@@ -938,27 +933,22 @@ pub fn get_member_pools(input: ListInput) -> ExternResult<Vec<Record>> {
 }
 
 /// Get contributor's contribution history (paginated)
+///
+/// Batch-optimized: Contribution entries are immutable (write-once records of
+/// SAP contributed), so bare get() via links_to_records is equivalent to
+/// follow_update_chain.
 #[hdk_extern]
 pub fn get_contributor_history(input: ListInput) -> ExternResult<Vec<Record>> {
     let limit = input.limit.unwrap_or(DEFAULT_LIST_LIMIT);
-    let mut contributions = Vec::new();
     let query = LinkQuery::try_new(
         anchor_hash(&input.id)?,
         LinkTypes::ContributorToContributions,
     )?;
-    for link in get_links(query, GetStrategy::default())?
+    let links: Vec<_> = get_links(query, GetStrategy::default())?
         .into_iter()
         .take(limit)
-    {
-        if let Some(record) = get(
-            ActionHash::try_from(link.target)
-                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?,
-            GetOptions::default(),
-        )? {
-            contributions.push(record);
-        }
-    }
-    Ok(contributions)
+        .collect();
+    links_to_records(links)
 }
 
 /// Cancel a proposed allocation (proposer or manager)
@@ -1020,6 +1010,8 @@ pub struct CancelAllocationInput {
 }
 
 /// Get allocations by status (uses TreasuryToAllocations links + in-memory status filter)
+///
+// NOTE: Sequential follow_update_chain required — entries are mutable (status transitions)
 #[hdk_extern]
 pub fn get_allocations_by_status(input: AllocationStatusQuery) -> ExternResult<Vec<Record>> {
     let query = LinkQuery::try_new(

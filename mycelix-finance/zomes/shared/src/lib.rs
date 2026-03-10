@@ -39,6 +39,7 @@ pub use update_chain::*;
 pub use race_resolution::*;
 pub use validation::*;
 pub use input_validation::*;
+pub use rate_limit::*;
 
 /// Community size threshold above which governance proposals are required for
 /// currency creation, demurrage changes, and dispute resolution.
@@ -741,6 +742,60 @@ pub mod validation {
             )));
         }
         Ok(())
+    }
+}
+
+/// Per-agent rate limiting constants and utilities.
+///
+/// Holochain coordinator zomes each define their own `LinkTypes`, so the shared
+/// crate cannot directly create or query links.  Instead we provide the
+/// constants and anchor-naming convention here; each coordinator applies the
+/// check using its own link type.
+///
+/// ## Recommended pattern (in a coordinator zome)
+///
+/// ```rust,ignore
+/// use mycelix_finance_shared::{anchor_hash, DEFAULT_RATE_LIMIT_PER_MINUTE, rate_limit_anchor_key};
+///
+/// fn check_rate_limit(anchor_prefix: &str, agent: &AgentPubKey) -> ExternResult<()> {
+///     let key = rate_limit_anchor_key(anchor_prefix, agent);
+///     let anchor = anchor_hash(&key)?;
+///     let links = get_links(
+///         LinkQuery::try_new(anchor.clone(), LinkTypes::AnchorLinks)?,
+///         GetStrategy::default(),
+///     )?;
+///     if links.len() >= DEFAULT_RATE_LIMIT_PER_MINUTE {
+///         return Err(wasm_error!(WasmErrorInner::Guest(format!(
+///             "Rate limit exceeded: max {} ops/min for {}",
+///             DEFAULT_RATE_LIMIT_PER_MINUTE, anchor_prefix
+///         ))));
+///     }
+///     // Record this operation
+///     create_link(anchor, agent.clone().into(), LinkTypes::AnchorLinks, ())?;
+///     Ok(())
+/// }
+/// ```
+pub mod rate_limit {
+    /// Default maximum operations per minute per agent.
+    ///
+    /// Individual coordinator zomes may override this with a tighter limit
+    /// (e.g., currency-mint uses 60 for exchange recording).
+    pub const DEFAULT_RATE_LIMIT_PER_MINUTE: usize = 100;
+
+    /// Build the anchor key for a rate-limit bucket.
+    ///
+    /// The key encodes the anchor prefix, the agent's public key, and a
+    /// minute-granularity time bucket so that old buckets naturally become
+    /// unreferenced and can be garbage-collected.
+    ///
+    /// `now_micros` should come from `sys_time()?.as_micros()`.
+    pub fn rate_limit_anchor_key(
+        anchor_prefix: &str,
+        agent: &hdk::prelude::AgentPubKey,
+        now_micros: i64,
+    ) -> String {
+        let bucket = now_micros / 60_000_000; // 60-second window
+        format!("rate:{}:{}:{}", anchor_prefix, agent, bucket)
     }
 }
 

@@ -9,7 +9,7 @@
 
 use hdk::prelude::*;
 use mycelix_finance_shared::{
-    anchor_hash, follow_update_chain, verify_caller_is_did,
+    anchor_hash, follow_update_chain, links_to_records, verify_caller_is_did,
     verify_governance_or_bootstrap_from_links, GOVERNANCE_AGENTS_ANCHOR,
 };
 use staking_integrity::*;
@@ -600,6 +600,10 @@ fn compute_hash(preimage: &[u8], _hash_type: &EscrowHashType) -> Vec<u8> {
 }
 
 /// Collect all EscrowSignatureEntry records linked to an escrow's signature anchor.
+///
+/// Batch-optimized: EscrowSignatureEntry entries are immutable (write-once
+/// signatures), so bare get() via links_to_records is equivalent to
+/// follow_update_chain. The records are then deserialized in-memory.
 fn get_escrow_signature_entries(
     escrow_id: &str,
 ) -> ExternResult<Vec<(ActionHash, EscrowSignatureEntry)>> {
@@ -609,23 +613,21 @@ fn get_escrow_signature_entries(
         GetStrategy::default(),
     )?;
 
+    let records = links_to_records(links)?;
     let mut entries = Vec::new();
-    for link in links {
-        let ah = ActionHash::try_from(link.target)
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(ah.clone(), GetOptions::default())? {
-            if let Some(sig_entry) = record
-                .entry()
-                .to_app_option::<EscrowSignatureEntry>()
-                .map_err(|e| {
-                    wasm_error!(WasmErrorInner::Guest(format!(
-                        "Deserialization error: {:?}",
-                        e
-                    )))
-                })?
-            {
-                entries.push((ah, sig_entry));
-            }
+    for record in records {
+        let ah = record.action_address().clone();
+        if let Some(sig_entry) = record
+            .entry()
+            .to_app_option::<EscrowSignatureEntry>()
+            .map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!(
+                    "Deserialization error: {:?}",
+                    e
+                )))
+            })?
+        {
+            entries.push((ah, sig_entry));
         }
     }
     Ok(entries)
@@ -795,7 +797,8 @@ pub struct PaginatedDidInput {
 
 /// Get all stakes for a staker (paginated, default limit 100)
 ///
-/// Uses follow_update_chain because stakes are mutable (status transitions).
+// NOTE: Sequential follow_update_chain required — entries are mutable (status transitions:
+// Active → Unbonding → Withdrawn, or Active → Slashed/Jailed)
 #[hdk_extern]
 pub fn get_staker_stakes(input: PaginatedDidInput) -> ExternResult<Vec<Record>> {
     let limit = input.limit.unwrap_or(100);
@@ -817,7 +820,7 @@ pub fn get_staker_stakes(input: PaginatedDidInput) -> ExternResult<Vec<Record>> 
 
 /// Get all active stakes (paginated, default limit 100)
 ///
-/// Uses follow_update_chain because stakes are mutable (status transitions).
+// NOTE: Sequential follow_update_chain required — entries are mutable (status transitions).
 /// Filters to only return currently-Active stakes (skips Withdrawn, Slashed, etc.).
 #[hdk_extern]
 pub fn get_active_stakes(limit: Option<usize>) -> ExternResult<Vec<Record>> {
@@ -849,7 +852,7 @@ pub fn get_active_stakes(limit: Option<usize>) -> ExternResult<Vec<Record>> {
 
 /// Get escrows for a depositor (paginated, default limit 100)
 ///
-/// Uses follow_update_chain because escrows are mutable (conditions met, status changes).
+// NOTE: Sequential follow_update_chain required — entries are mutable (conditions met, status changes).
 #[hdk_extern]
 pub fn get_depositor_escrows(input: PaginatedDidInput) -> ExternResult<Vec<Record>> {
     let limit = input.limit.unwrap_or(100);
@@ -871,7 +874,7 @@ pub fn get_depositor_escrows(input: PaginatedDidInput) -> ExternResult<Vec<Recor
 
 /// Get escrows for a beneficiary (paginated, default limit 100)
 ///
-/// Uses follow_update_chain because escrows are mutable (conditions met, status changes).
+// NOTE: Sequential follow_update_chain required — entries are mutable (conditions met, status changes).
 #[hdk_extern]
 pub fn get_beneficiary_escrows(input: PaginatedDidInput) -> ExternResult<Vec<Record>> {
     let limit = input.limit.unwrap_or(100);

@@ -190,6 +190,11 @@ pub fn recognize_member(input: RecognizeMemberInput) -> ExternResult<Record> {
 }
 
 /// Get all recognitions received by a member, optionally filtered by cycle (paginated, default limit 100)
+///
+// NOTE: RecognitionEvents are immutable and could use links_to_records, but this
+// function applies cycle_id filtering with early-exit on limit during iteration.
+// Batch-fetching all records then filtering would be wasteful when cycle_id is set,
+// so sequential get() with inline filtering is kept intentionally.
 #[hdk_extern]
 pub fn get_recognition_received(
     input: GetRecognitionsInput,

@@ -116,6 +116,11 @@ path = "currency_mint_test/main.rs"
 name = "sweettest_consciousness_gating"
 path = "sweettest_consciousness_gating.rs"
 
+# Race Condition Sweettest (concurrent balance, double-confirm, crash recovery)
+[[test]]
+name = "sweettest_race_conditions"
+path = "sweettest_race_conditions.rs"
+
 # NOTE: economics_stress_test has been moved to types/tests/ where it compiles
 # without the heavy Holochain dependency. Run with:
 #   cargo test -p mycelix_finance_types --test economics_stress_test

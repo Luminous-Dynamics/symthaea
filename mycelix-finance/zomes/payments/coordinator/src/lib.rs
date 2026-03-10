@@ -1,7 +1,7 @@
 #![deny(unsafe_code)]
 //! Payments Coordinator Zome
 use hdk::prelude::*;
-use mycelix_finance_shared::{anchor_hash, follow_update_chain, validate_did_format, validate_id, verify_caller_is_did};
+use mycelix_finance_shared::{anchor_hash, follow_update_chain, links_to_records, rate_limit_anchor_key, validate_did_format, validate_id, verify_caller_is_did, DEFAULT_RATE_LIMIT_PER_MINUTE};
 use mycelix_finance_types::{
     compute_demurrage_deduction, FeeTier, SapMintSource, SuccessionPreference, COMPOST_LOCAL_PCT,
     COMPOST_REGIONAL_PCT, DEMURRAGE_EXEMPT_FLOOR, DEMURRAGE_RATE, SAP_MINT_ANNUAL_MAX,
@@ -523,6 +523,9 @@ struct BroadcastMintEventPayload {
 }
 
 /// Get all mint records for a member
+///
+/// Batch-optimized: SapMintRecord entries are immutable (write-once mint events),
+/// so bare get() via links_to_records is equivalent to follow_update_chain.
 #[hdk_extern]
 pub fn get_mint_records(member_did: String) -> ExternResult<Vec<Record>> {
     validate_did_format(&member_did, "member_did")?;
@@ -533,15 +536,7 @@ pub fn get_mint_records(member_did: String) -> ExternResult<Vec<Record>> {
         )?,
         GetStrategy::default(),
     )?;
-    let mut records = Vec::new();
-    for link in links {
-        let hash = ActionHash::try_from(link.target)
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(hash, GetOptions::default())? {
-            records.push(record);
-        }
-    }
-    Ok(records)
+    links_to_records(links)
 }
 
 // --- Internal helpers ---
@@ -739,6 +734,31 @@ pub fn send_payment(input: SendPaymentInput) -> ExternResult<Record> {
     }
 
     let now = sys_time()?;
+
+    // Per-agent rate limit: reject if this agent has exceeded the payment
+    // send limit within the current 60-second window.
+    {
+        let agent = agent_info()?.agent_initial_pubkey;
+        let key = rate_limit_anchor_key("payment", &agent, now.as_micros());
+        let anchor = anchor_hash(&key)?;
+        let recent_links = get_links(
+            LinkQuery::try_new(anchor.clone(), LinkTypes::SenderToPayments)?,
+            GetStrategy::default(),
+        )?;
+        if recent_links.len() >= DEFAULT_RATE_LIMIT_PER_MINUTE {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Rate limit exceeded: max {} payments per minute",
+                DEFAULT_RATE_LIMIT_PER_MINUTE
+            ))));
+        }
+        // Record this operation in the rate-limit bucket
+        create_link(
+            anchor,
+            AnyLinkableHash::from(agent.clone()),
+            LinkTypes::SenderToPayments,
+            (),
+        )?;
+    }
 
     // If sending SAP, enforce on-chain balance with demurrage + progressive fee
     let (memo, fee_amount) = if input.currency == "SAP" {

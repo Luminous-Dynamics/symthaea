@@ -16,8 +16,9 @@
 
 use hdk::prelude::*;
 use mycelix_finance_shared::{
-    anchor_hash, follow_update_chain, pick_race_winner,
-    verify_governance_or_bootstrap_from_links, GOVERNANCE_AGENTS_ANCHOR,
+    anchor_hash, follow_update_chain, pick_race_winner, rate_limit_anchor_key,
+    verify_governance_or_bootstrap_from_links, DEFAULT_RATE_LIMIT_PER_MINUTE,
+    GOVERNANCE_AGENTS_ANCHOR,
 };
 
 // Re-export integrity types for external use
@@ -784,6 +785,30 @@ pub fn record_exchange(input: RecordExchangeInput) -> ExternResult<ExchangeRecor
     let caller = agent_info()?.agent_initial_pubkey;
     let provider_did = format!("did:mycelix:{}", caller);
     let now = sys_time()?;
+
+    // Per-agent rate limit: reject if this agent has exceeded the exchange
+    // recording limit within the current 60-second window.
+    {
+        let key = rate_limit_anchor_key("tend_exchange", &caller, now.as_micros());
+        let anchor = anchor_hash(&key)?;
+        let recent_links = get_links(
+            LinkQuery::try_new(anchor.clone(), LinkTypes::DaoToExchanges)?,
+            GetStrategy::default(),
+        )?;
+        if recent_links.len() >= DEFAULT_RATE_LIMIT_PER_MINUTE {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Rate limit exceeded: max {} TEND exchanges per minute",
+                DEFAULT_RATE_LIMIT_PER_MINUTE
+            ))));
+        }
+        // Record this operation in the rate-limit bucket
+        create_link(
+            anchor,
+            AnyLinkableHash::from(caller.clone()),
+            LinkTypes::DaoToExchanges,
+            (),
+        )?;
+    }
 
     // Validate not exchanging with self
     if provider_did == input.receiver_did {

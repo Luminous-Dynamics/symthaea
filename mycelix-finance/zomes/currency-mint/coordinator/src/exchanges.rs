@@ -2,8 +2,13 @@
 
 use currency_mint_integrity::*;
 use hdk::prelude::*;
-use mycelix_finance_shared::anchor_hash;
+use mycelix_finance_shared::{anchor_hash, rate_limit_anchor_key};
 use mycelix_finance_types::CurrencyStatus;
+
+/// Per-agent rate limit for minted exchange recording (operations per minute).
+/// Tighter than the global default because exchange recording is the most
+/// spammable operation — it creates entries AND triggers balance changes.
+const EXCHANGE_RATE_LIMIT_PER_MINUTE: usize = 60;
 
 use crate::helpers::*;
 use crate::{
@@ -27,6 +32,32 @@ pub fn record_minted_exchange(input: RecordMintedExchangeInput) -> ExternResult<
             "Currency {} is {:?}, exchanges only allowed when Active",
             def.params.name, def.status
         ))));
+    }
+
+    // Per-agent rate limit: reject if this agent has exceeded the exchange
+    // recording limit within the current 60-second window.
+    {
+        let agent = agent_info()?.agent_initial_pubkey;
+        let now_micros = sys_time()?.as_micros();
+        let key = rate_limit_anchor_key("exchange", &agent, now_micros);
+        let anchor = anchor_hash(&key)?;
+        let recent_links = get_links(
+            LinkQuery::try_new(anchor.clone(), LinkTypes::CurrencyToExchanges)?,
+            GetStrategy::default(),
+        )?;
+        if recent_links.len() >= EXCHANGE_RATE_LIMIT_PER_MINUTE {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Rate limit exceeded: max {} exchange recordings per minute",
+                EXCHANGE_RATE_LIMIT_PER_MINUTE
+            ))));
+        }
+        // Record this operation in the rate-limit bucket
+        create_link(
+            anchor,
+            AnyLinkableHash::from(agent.clone()),
+            LinkTypes::CurrencyToExchanges,
+            (),
+        )?;
     }
 
     // Guard against NaN/Inf — must come before any arithmetic
