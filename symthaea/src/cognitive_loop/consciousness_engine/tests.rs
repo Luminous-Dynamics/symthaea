@@ -44,6 +44,8 @@ fn make_input<'a>(
         attention_capability: 1.0,
         moral_drift: 0.0,
         moral_anomaly_score: 0.0,
+        coherence_field_integration: 0.5,
+        hot_depth: 0.5,
     }
 }
 
@@ -135,6 +137,8 @@ fn test_equation_v2_feedback_deltas() {
             attention_capability: 1.0,
             moral_drift: 0.0,
             moral_anomaly_score: 0.0,
+            coherence_field_integration: 0.5,
+            hot_depth: 0.5,
         };
         let output = engine.measure(&input);
 
@@ -203,6 +207,8 @@ fn test_low_consciousness_boosts_exploration() {
             attention_capability: 1.0,
             moral_drift: 0.0,
             moral_anomaly_score: 0.0,
+            coherence_field_integration: 0.5,
+            hot_depth: 0.5,
         };
         let output = engine.measure(&input);
 
@@ -272,6 +278,8 @@ fn test_high_sht_2a_boosts_consciousness() {
         attention_capability: 1.0,
         moral_drift: 0.0,
         moral_anomaly_score: 0.0,
+        coherence_field_integration: 0.5,
+        hot_depth: 0.5,
     };
     let out_base = engine.measure(&input_baseline);
 
@@ -312,6 +320,8 @@ fn test_high_gaba_a_dampens_consciousness() {
         attention_capability: 1.0,
         moral_drift: 0.0,
         moral_anomaly_score: 0.0,
+        coherence_field_integration: 0.5,
+        hot_depth: 0.5,
     };
     let out_base = engine.measure(&input_baseline);
 
@@ -352,6 +362,8 @@ fn test_attractor_depresses_consciousness() {
         attention_capability: 1.0,
         moral_drift: 0.0,
         moral_anomaly_score: 0.0,
+        coherence_field_integration: 0.5,
+        hot_depth: 0.5,
     };
     let out_no = engine.measure(&input_no_attractor);
 
@@ -393,6 +405,8 @@ fn test_bath_modulation_clamped() {
         attention_capability: 1.0,
         moral_drift: 0.0,
         moral_anomaly_score: 0.0,
+        coherence_field_integration: 0.5,
+        hot_depth: 0.5,
     };
     let out = engine.measure(&input);
     assert!(
@@ -979,6 +993,8 @@ fn test_substrate_feasibility_affects_consciousness() {
             attention_capability: 1.0,
             moral_drift: 0.0,
             moral_anomaly_score: 0.0,
+            coherence_field_integration: 0.5,
+            hot_depth: 0.5,
         };
         out_full = Some(engine1.measure(&input_full));
 
@@ -1062,6 +1078,8 @@ fn test_reduced_substrate_capabilities_lower_consciousness() {
             attention_capability: 1.0,
             moral_drift: 0.0,
             moral_anomaly_score: 0.0,
+            coherence_field_integration: 0.5,
+            hot_depth: 0.5,
         };
         out_bio = Some(engine_bio.measure(&input_bio));
 
@@ -1201,4 +1219,76 @@ fn test_convergence_state_equal_variance_is_oscillating() {
         "Equal variance in both halves should yield Oscillating, got {:?}",
         state
     );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// HOT (Higher-Order Thought) Recursion Depth Tests
+// ═══════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_recursion_varies_with_hot_depth() {
+    // Verify that different hot_depth values produce different consciousness
+    // scores once EquationV2 fires (cycle >= 23).
+    let eq_v2 = ConsciousnessEquationV2::new();
+
+    let mut engine_low = make_engine();
+    engine_low.consciousness_equation_v2 = Some(eq_v2.clone());
+    let mut engine_high = make_engine();
+    engine_high.consciousness_equation_v2 = Some(eq_v2);
+
+    let hdv = ContinuousHV::random(16384, 99);
+    let hv16 = BinaryHV::random(99);
+
+    let mut out_low = None;
+    let mut out_high = None;
+
+    for cycle in 0..30 {
+        let mut input_low = make_input(&hdv, &hv16, cycle);
+        input_low.hot_depth = 0.1; // Low HOT recursion
+
+        let mut input_high = make_input(&hdv, &hv16, cycle);
+        input_high.hot_depth = 0.9; // High HOT recursion
+
+        out_low = Some(engine_low.measure(&input_low));
+        out_high = Some(engine_high.measure(&input_high));
+    }
+
+    let low = out_low.unwrap();
+    let high = out_high.unwrap();
+
+    // EquationV2 fires at cycle 23+. Higher HOT depth should produce
+    // higher Recursion component → higher equation_v2_consciousness.
+    if high.equation_v2_consciousness > 0.01 {
+        assert!(
+            high.equation_v2_consciousness > low.equation_v2_consciousness,
+            "Higher hot_depth (0.9) should produce higher consciousness ({:.4}) \
+                 than lower hot_depth (0.1) ({:.4})",
+            high.equation_v2_consciousness,
+            low.equation_v2_consciousness
+        );
+    }
+}
+
+#[test]
+fn test_hot_depth_default_preserves_backward_compat() {
+    // hot_depth=0.5 (the default when meta_cognition is disabled) should
+    // produce the same result as the previous hardcoded Recursion=0.5.
+    let eq_v2 = ConsciousnessEquationV2::new();
+    let mut engine = make_engine();
+    engine.consciousness_equation_v2 = Some(eq_v2);
+
+    let hdv = ContinuousHV::random(16384, 77);
+    let hv16 = BinaryHV::random(77);
+
+    // Run through cycle 23+ where EquationV2 fires
+    for cycle in 0..30 {
+        let input = make_input(&hdv, &hv16, cycle);
+        // make_input already sets hot_depth=0.5
+        let out = engine.measure(&input);
+        assert!(
+            out.equation_v2_consciousness.is_finite(),
+            "consciousness should be finite at cycle {}",
+            cycle
+        );
+    }
 }

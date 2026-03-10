@@ -107,6 +107,26 @@ impl CognitiveLoopService {
             if state.is_in_flow() {
                 self.carryover.quality.last_exploration_bonus += 0.05;
             }
+
+            // USI → neuromodulator coupling (Sapolsky 2004; Schultz 1997)
+            // Frustration raises NE baseline (stress-arousal axis, locus coeruleus)
+            // Flow raises DA baseline (reward-engagement axis, VTA)
+            // Gentle nudges toward current baseline ± 0.03, naturally decays via bath dynamics
+            let frustration = state.frustration as f32;
+            let engagement = state.engagement as f32;
+            if frustration > 0.4 {
+                let ne_base = self.neuromod.bath.noradrenaline.baseline_val();
+                let ne_nudge = 0.03 * (frustration - 0.4);
+                self.neuromod.bath.noradrenaline.set_baseline(ne_base + ne_nudge);
+            }
+            if state.is_in_flow() {
+                let da_base = self.neuromod.bath.dopamine.baseline_val();
+                self.neuromod.bath.dopamine.set_baseline(da_base + 0.02);
+            } else if engagement < 0.3 {
+                // Disengagement → slight DA reduction (anhedonia pathway)
+                let da_base = self.neuromod.bath.dopamine.baseline_val();
+                self.neuromod.bath.dopamine.set_baseline(da_base - 0.01);
+            }
         }
 
         // ═══════════════════════════════════════════════════════════════════

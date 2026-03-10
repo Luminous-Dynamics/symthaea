@@ -14302,6 +14302,7 @@ name = "symthaea-consciousness-equation"
 version = "0.1.0"
 dependencies = [
  "serde",
+ "web-time",
 ]
 
 [[package]]
@@ -14389,6 +14390,7 @@ dependencies = [
  "safetensors",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
  "symthaea-core",
  "tokenizers",
  "tokio",
