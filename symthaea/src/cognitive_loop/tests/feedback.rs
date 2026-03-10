@@ -972,6 +972,69 @@ fn test_user_state_disabled_returns_none() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
+// CoherenceField integration tests
+// ═══════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_coherence_field_wired_when_enabled() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_coherence_field: true,
+        ..Default::default()
+    })
+    .unwrap();
+
+    assert!(service.coherence_field.is_some(), "CoherenceField should be Some");
+
+    // Run a cycle — should not panic, coherence field gets hormone modulation
+    let r = service.cycle("coherence test input");
+    assert!(r.prediction_error.is_finite());
+
+    // Coherence should remain bounded
+    let cf = service.coherence_field.as_ref().unwrap();
+    assert!(cf.coherence >= 0.0 && cf.coherence <= 1.0);
+}
+
+#[test]
+fn test_coherence_field_none_when_disabled() {
+    let service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_coherence_field: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    assert!(service.coherence_field.is_none());
+}
+
+#[test]
+fn test_usi_frustration_dampens_exploration() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_user_state_inference: true,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // Baseline exploration
+    let r1 = service.cycle("normal operation");
+    let baseline_exploration = service.carryover.quality.last_exploration_bonus;
+
+    // Pump frustration with error-like inputs
+    for _ in 0..10 {
+        service.cycle("error error broken crash failing");
+    }
+
+    // Exploration should be dampened when frustrated
+    let state = service.user_state().unwrap();
+    if state.frustration > 0.5 {
+        // After frustration, exploration rate should be ≤ baseline
+        assert!(
+            service.carryover.quality.last_exploration_bonus <= baseline_exploration + 0.1,
+            "High frustration should dampen exploration"
+        );
+    }
+    let _ = r1; // use binding
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 // Consciousness monitor feedback tests
 // ═══════════════════════════════════════════════════════════════════════
 

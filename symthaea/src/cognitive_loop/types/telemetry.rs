@@ -1032,6 +1032,12 @@ pub struct CycleMetadata {
     /// Whether coherence velocity scaled attention budget.
     #[serde(default)]
     pub coherence_velocity_budget_scaled: bool,
+    /// Whether temporal chain depth modulated LR (deep=dampen, shallow=boost).
+    #[serde(default)]
+    pub temporal_chain_depth_lr_mod: bool,
+    /// Whether EqV2 bottleneck response fired a targeted boost.
+    #[serde(default)]
+    pub eq_v2_bottleneck_response: bool,
 
     // ── Session 14: Late Consciousness Feedback ──────────────────────────
     /// Whether living mind vitality modulated confidence.

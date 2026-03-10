@@ -39,6 +39,8 @@ use super::thresholds::{
     SOCIAL_LR_BASE, SOCIAL_LR_RANGE, SPEECH_RATE_CLAMP_MAX, SPEECH_RATE_CLAMP_MIN,
     STRUCTURAL_BOTTLENECK_LR_SCALE, STRUCTURAL_BOTTLENECK_THRESHOLD,
     STRUCTURAL_EMERGENCE_CONFIDENCE_BOOST, STRUCTURAL_EMERGENCE_CONFIDENCE_THRESHOLD,
+    TEMPORAL_CHAIN_DEEP_LR_SCALE, TEMPORAL_CHAIN_DEEP_THRESHOLD,
+    TEMPORAL_CHAIN_SHALLOW_LR_SCALE, TEMPORAL_CHAIN_SHALLOW_THRESHOLD,
     SUBSYSTEM_LR_FACTOR_MAX, SUBSYSTEM_LR_FACTOR_MIN, TOM_ACCURACY_HIGH, TOM_ACCURACY_LOW,
     TOM_ACCURACY_SCALE, TRUST_DECAY_FACTOR, TRUST_SIGNAL_MIDPOINT, TRUST_SIGNAL_RATE,
     UNIFIED_QUALITY_AGREEMENT_WEIGHT, UNIFIED_QUALITY_ANOMALY_WEIGHT,
@@ -118,6 +120,28 @@ impl CognitiveLoopService {
             let adjusted_psi = (unified_psi * scale).clamp(0.0, 1.0);
             self.unification_engine.update_psi(adjusted_psi);
             self.stats.context_phi_applied_count += 1;
+        }
+
+        // ── Temporal chain depth → LR gating ──────────────────────────────
+        // Deep causal chains need stable consolidation (dampen LR);
+        // shallow chains need rapid hypothesis testing (boost LR).
+        // Science: Zelazo (2004) — cognitive complexity demands stable representations;
+        // Gopnik (2012) — shallow causal models benefit from rapid exploration.
+        if temporal_max_chain_length >= TEMPORAL_CHAIN_DEEP_THRESHOLD
+            && self.stats.total_cycles > 15
+        {
+            self.scale_lr(
+                "deep_causal_chain",
+                TEMPORAL_CHAIN_DEEP_LR_SCALE,
+            );
+        } else if temporal_max_chain_length > 0
+            && temporal_max_chain_length <= TEMPORAL_CHAIN_SHALLOW_THRESHOLD
+            && self.stats.total_cycles > 15
+        {
+            self.scale_lr(
+                "shallow_causal_chain",
+                TEMPORAL_CHAIN_SHALLOW_LR_SCALE,
+            );
         }
 
         let value_embeddings_created = consciousness_metrics.value_embeddings_created;
@@ -809,23 +833,27 @@ impl CognitiveLoopService {
         // bottleneck detection. Covers all 7 CoreComponents including
         // Workspace, Recursion, Integration, Knowledge (not in gradient path).
         if let Some(ref component) = consciousness_output.limiting_component {
+            use crate::cognitive_loop::thresholds::{
+                EQ_V2_INTEGRATION_CONFIDENCE_BOOST, EQ_V2_KNOWLEDGE_EXPLORATION_BOOST,
+                EQ_V2_RECURSION_LR_SCALE, EQ_V2_WORKSPACE_CONFIDENCE_BOOST,
+            };
             use crate::consciousness::consciousness_equation_v2::CoreComponent;
             match component {
                 CoreComponent::Workspace => {
                     // Low workspace → boost attention budget and GWT broadcast
-                    self.adjust_confidence("eq_v2_workspace", 0.005);
+                    self.adjust_confidence("eq_v2_workspace", EQ_V2_WORKSPACE_CONFIDENCE_BOOST);
                 }
                 CoreComponent::Recursion => {
                     // Low recursion (HOT depth) → boost meta-cognitive sensitivity
-                    self.scale_lr("eq_v2_recursion", 1.02);
+                    self.scale_lr("eq_v2_recursion", EQ_V2_RECURSION_LR_SCALE);
                 }
                 CoreComponent::Integration => {
                     // Low integration → increase coherence sensitivity
-                    self.adjust_confidence("eq_v2_integration", 0.008);
+                    self.adjust_confidence("eq_v2_integration", EQ_V2_INTEGRATION_CONFIDENCE_BOOST);
                 }
                 CoreComponent::Knowledge => {
                     // Low epistemic quality → boost exploration for information gain
-                    self.adjust_exploration("eq_v2_knowledge", 0.02);
+                    self.adjust_exploration("eq_v2_knowledge", EQ_V2_KNOWLEDGE_EXPLORATION_BOOST);
                 }
                 // Attention, Binding, Efficacy already handled by Phase 19 gradient path
                 _ => {}

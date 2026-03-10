@@ -733,9 +733,7 @@ impl CognitiveLoopService {
                 None
             },
             coherence_field: if enable_coherence_field {
-                Some(crate::physiology::CoherenceField::new(
-                    crate::physiology::CoherenceConfig::default(),
-                ))
+                Some(crate::physiology::CoherenceField::new())
             } else {
                 None
             },

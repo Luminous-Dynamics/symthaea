@@ -341,6 +341,24 @@ pub const WM_MISMATCH_LR_SCALE: f32 = 0.75;
 pub const WM_MISMATCH_CONFIDENCE_SCALE: f32 = 0.9;
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// TEMPORAL CHAIN DEPTH → LR GATING
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Deep causal chain threshold (>= this many links = deep chain → dampen LR).
+/// Science: Zelazo (2004) — cognitive complexity demands stable representations.
+pub const TEMPORAL_CHAIN_DEEP_THRESHOLD: usize = 5;
+
+/// LR scale for deep causal chains (dampen to stabilize consolidation).
+pub const TEMPORAL_CHAIN_DEEP_LR_SCALE: f32 = 0.85;
+
+/// Shallow causal chain threshold (<= this many links = shallow → boost LR).
+/// Science: Gopnik (2012) — shallow causal models benefit from rapid exploration.
+pub const TEMPORAL_CHAIN_SHALLOW_THRESHOLD: usize = 2;
+
+/// LR scale for shallow causal chains (boost to accelerate hypothesis testing).
+pub const TEMPORAL_CHAIN_SHALLOW_LR_SCALE: f32 = 1.15;
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // MCE BOTTLENECK → SUBSYSTEM MODULATION
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -1724,6 +1742,39 @@ pub const EXPLORATION_SCALE_MIDPOINT: f32 = 0.5;
 pub const EXPLORATION_SCALE_SENSITIVITY: f32 = 0.2;
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// EQ V2 BOTTLENECK RESPONSE
+// Science: Tononi (2004) — consciousness limited by weakest dimension.
+// Boosting the bottleneck subsystem is the highest-leverage intervention.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Confidence boost when EqV2 identifies Workspace as limiting component.
+/// Basis: Baars (2002) — workspace bottleneck → attention redistribution.
+pub const EQ_V2_WORKSPACE_CONFIDENCE_BOOST: f32 = 0.015;
+
+/// LR scale when EqV2 identifies Recursion (HOT depth) as limiting.
+/// Basis: Rosenthal (2005) — higher-order thought depth requires active learning.
+pub const EQ_V2_RECURSION_LR_SCALE: f32 = 1.05;
+
+/// Confidence boost when EqV2 identifies Integration as limiting.
+/// Basis: Tononi (2004) — integration bottleneck → coherence sensitivity.
+pub const EQ_V2_INTEGRATION_CONFIDENCE_BOOST: f32 = 0.02;
+
+/// Exploration boost when EqV2 identifies Knowledge as limiting.
+/// Basis: Friston (2010) — epistemic poverty → active information seeking.
+pub const EQ_V2_KNOWLEDGE_EXPLORATION_BOOST: f32 = 0.04;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CROSS-MODAL BINDING PSI
+// Science: Treisman (1996) — coherent binding → confident perception.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Cross-modal Psi threshold for confidence boost.
+pub const CROSS_MODAL_PSI_CONFIDENCE_THRESHOLD: f64 = 0.3;
+
+/// Cross-modal Psi → confidence scale factor.
+pub const CROSS_MODAL_PSI_CONFIDENCE_SCALE: f64 = 0.05;
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // TESTS
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -2213,5 +2264,34 @@ mod tests {
         assert!(HOMEOSTASIS_RECALIBRATE_HIGH > 1.0);
         assert!(HOMEOSTASIS_RECALIBRATE_LOW < HOMEOSTASIS_RECALIBRATE_HIGH);
         assert!(HOMEOSTASIS_NEUROMOD_STEP > 0.0 && HOMEOSTASIS_NEUROMOD_STEP < 0.1);
+    }
+
+    #[test]
+    fn test_eq_v2_bottleneck_params() {
+        // All boosts must be positive
+        assert!(EQ_V2_WORKSPACE_CONFIDENCE_BOOST > 0.0);
+        assert!(EQ_V2_INTEGRATION_CONFIDENCE_BOOST > 0.0);
+        assert!(EQ_V2_KNOWLEDGE_EXPLORATION_BOOST > 0.0);
+        assert!(EQ_V2_RECURSION_LR_SCALE > 1.0, "Recursion LR scale must boost");
+        // Confidence boosts should be moderate (not >0.1 per cycle)
+        assert!(EQ_V2_WORKSPACE_CONFIDENCE_BOOST < 0.1);
+        assert!(EQ_V2_INTEGRATION_CONFIDENCE_BOOST < 0.1);
+        // Integration > Workspace (integration is harder to fix)
+        assert!(EQ_V2_INTEGRATION_CONFIDENCE_BOOST > EQ_V2_WORKSPACE_CONFIDENCE_BOOST);
+    }
+
+    #[test]
+    fn test_temporal_chain_depth_params() {
+        assert!(TEMPORAL_CHAIN_SHALLOW_THRESHOLD < TEMPORAL_CHAIN_DEEP_THRESHOLD);
+        assert!(TEMPORAL_CHAIN_DEEP_LR_SCALE < 1.0, "Deep chains should dampen LR");
+        assert!(TEMPORAL_CHAIN_SHALLOW_LR_SCALE > 1.0, "Shallow chains should boost LR");
+    }
+
+    #[test]
+    fn test_cross_modal_psi_params() {
+        assert!(CROSS_MODAL_PSI_CONFIDENCE_THRESHOLD > 0.0);
+        assert!(CROSS_MODAL_PSI_CONFIDENCE_THRESHOLD < 1.0);
+        assert!(CROSS_MODAL_PSI_CONFIDENCE_SCALE > 0.0);
+        assert!(CROSS_MODAL_PSI_CONFIDENCE_SCALE < 0.2);
     }
 }

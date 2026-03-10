@@ -733,6 +733,11 @@ impl EthicsEngine {
         &self.moral_topology
     }
 
+    /// Access the moral topology analyser (mutable, for peer correlation boost).
+    pub fn moral_topology_mut(&mut self) -> &mut MoralTopology {
+        &mut self.moral_topology
+    }
+
     /// Cached harmony coordinates from last harmonies evaluation.
     pub fn last_harmony_coordinates(&self) -> &[f64; N_HARMONIES] {
         &self.cache.last_harmony_coordinates

@@ -591,6 +591,14 @@ impl CognitiveLoopService {
             metadata.coherence_velocity_budget_scaled =
                 cv.abs() > COHERENCE_VELOCITY_BUDGET_THRESHOLD;
         }
+        metadata.temporal_chain_depth_lr_mod = self.stats.total_cycles > 15
+            && feedback.consciousness.temporal_max_chain_length > 0
+            && (feedback.consciousness.temporal_max_chain_length
+                >= crate::cognitive_loop::thresholds::TEMPORAL_CHAIN_DEEP_THRESHOLD
+                || feedback.consciousness.temporal_max_chain_length
+                    <= crate::cognitive_loop::thresholds::TEMPORAL_CHAIN_SHALLOW_THRESHOLD);
+        metadata.eq_v2_bottleneck_response =
+            !feedback.consciousness.eq_v2_limiting_component.is_empty();
 
         // ── GWT handler telemetry ──
         metadata.gwt_memory_consolidation_requested = self
@@ -680,6 +688,21 @@ impl CognitiveLoopService {
                 has_critical: self.integrity_manager.has_critical_anomaly(),
                 last_check_cycle: status.last_check_cycle,
                 integrity_confidence: self.integrity_manager.integrity_confidence,
+                attestation_details: self
+                    .integrity_manager
+                    .attestation
+                    .records()
+                    .iter()
+                    .map(|r| super::AttestationDetail {
+                        name: r.name.to_string(),
+                        passed: r
+                            .last_verification
+                            .as_ref()
+                            .map(|v| v.passed)
+                            .unwrap_or(true),
+                        consecutive_failures: r.consecutive_failures,
+                    })
+                    .collect(),
             };
             // Integrity-aware consciousness gating: if integrity is compromised,
             // discount consciousness scores — the system should distrust its own
@@ -1030,6 +1053,15 @@ impl CognitiveLoopService {
             .with_metadata("depth", &format!("{:?}", self.cognitive_depth));
             viz.record(snapshot);
         }
+
+        // Final safety clamps — absolute last point in the cycle.
+        // Late consciousness phases (integration, monitors) can multiply exploration_factor
+        // below bounds set in cycle_quality.rs. Re-clamp here to guarantee invariants.
+        self.adaptive_behavior.exploration_factor =
+            self.adaptive_behavior.exploration_factor.clamp(0.1, 3.0);
+        self.adaptive_behavior.learning_rate_multiplier =
+            self.adaptive_behavior.learning_rate_multiplier.clamp(0.1, 2.0);
+        self.curiosity_drive.boredom = self.curiosity_drive.boredom.clamp(0.0, 1.5);
 
         CycleResult {
             output: dynamics.core.output.clone(),

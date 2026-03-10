@@ -640,9 +640,15 @@ impl CognitiveLoopService {
 
         // FEEDBACK: High cross-modal Phi boosts confidence (binding integration)
         // Science: Treisman (1996) — coherent binding -> confident perception
-        if cross_modal_psi > 0.3 {
-            let boost = ((cross_modal_psi - 0.3) * 0.05) as f32;
-            self.adjust_confidence("cross_modal_psi", boost);
+        {
+            use crate::cognitive_loop::thresholds::{
+                CROSS_MODAL_PSI_CONFIDENCE_SCALE, CROSS_MODAL_PSI_CONFIDENCE_THRESHOLD,
+            };
+            if cross_modal_psi > CROSS_MODAL_PSI_CONFIDENCE_THRESHOLD {
+                let boost = ((cross_modal_psi - CROSS_MODAL_PSI_CONFIDENCE_THRESHOLD)
+                    * CROSS_MODAL_PSI_CONFIDENCE_SCALE) as f32;
+                self.adjust_confidence("cross_modal_psi", boost);
+            }
         }
 
         // FEEDBACK: Predictive <-> Cross-Modal bidirectional coupling (Talsma 2015)

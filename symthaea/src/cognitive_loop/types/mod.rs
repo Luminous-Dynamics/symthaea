@@ -80,6 +80,21 @@ pub struct IntegrityTelemetry {
     /// Consciousness confidence multiplier (1.0 = trusted, 0.5 = drift, 0.1 = critical).
     #[serde(default = "default_integrity_confidence")]
     pub integrity_confidence: f32,
+    /// Per-attestation detail: (name, passed, consecutive_failures).
+    /// Empty when no attestation check ran this cycle.
+    #[serde(default)]
+    pub attestation_details: Vec<AttestationDetail>,
+}
+
+/// Per-attestation telemetry entry for dashboard visibility.
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct AttestationDetail {
+    /// Attestation name (e.g., "safety_thresholds").
+    pub name: String,
+    /// Whether this attestation passed on last check.
+    pub passed: bool,
+    /// Number of consecutive failures (0 = healthy).
+    pub consecutive_failures: usize,
 }
 
 fn default_integrity_confidence() -> f32 {
