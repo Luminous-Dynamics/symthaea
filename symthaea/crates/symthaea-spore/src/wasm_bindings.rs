@@ -95,6 +95,22 @@ impl SporeEngine {
     }
 
     // ======================================================================
+    // Hypervector access (for visualization)
+    // ======================================================================
+
+    /// Get the current network output hypervector (16,384 f32 values).
+    /// Used for live waveform visualization in the browser demo.
+    pub fn get_output_hv(&self) -> Vec<f32> {
+        self.inner.get_output_hv()
+    }
+
+    /// Encode text to an HDC hypervector without running a full cycle.
+    /// Returns bipolar encoding as f32 values. Used for thought comparison.
+    pub fn encode_text(&mut self, text: &str) -> Vec<f32> {
+        self.inner.encode_text(text)
+    }
+
+    // ======================================================================
     // Consciousness validation experiments
     // ======================================================================
 

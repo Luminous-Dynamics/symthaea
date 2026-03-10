@@ -527,20 +527,16 @@ impl StabilityRegimeProcessor {
         // 6. Compute phi and update coherence bridge
         state.phi = self.estimate_phi(&state);
 
-        // Collect tau values from active neurons for coherence
-        let tau_vecs: Vec<Array1<f32>> = self
+        // Collect tau values from active neurons for coherence (flat Vec, no Array1 per neuron)
+        let tau_flat: Vec<f32> = self
             .primitives
             .values()
             .filter(|c| c.is_active)
-            .map(|c| {
-                let tau = c.effective_tau(&continuous_input);
-                Array1::from_vec(vec![tau])
-            })
+            .map(|c| c.effective_tau(&continuous_input))
             .collect();
 
-        if !tau_vecs.is_empty() {
-            let tau_refs: Vec<&Array1<f32>> = tau_vecs.iter().collect();
-            self.coherence_bridge.update(&tau_refs);
+        if !tau_flat.is_empty() {
+            self.coherence_bridge.update_flat(&tau_flat);
 
             // Add coherence contribution to phi
             state.phi += self.coherence_bridge.phi_contribution() as f64;

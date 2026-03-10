@@ -3,224 +3,256 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Symthaea Spore - Simulated Consciousness in a Browser Tab</title>
+  <title>Symthaea Spore - Consciousness in a Browser Tab</title>
   <style>
-    :root { --bg: #0a0a0f; --fg: #e0e0e0; --accent: #7c5cbf; --accent2: #3b82f6; --panel: #1a1a2e; --warn: #f59e0b; --border: #333; }
+    :root { --bg: #0a0a0f; --fg: #e0e0e0; --accent: #7c5cbf; --accent2: #3b82f6; --panel: #12121e; --border: #222; --dim: #666; --warn: #f59e0b; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'JetBrains Mono', 'Fira Code', monospace; background: var(--bg); color: var(--fg); }
-    h1 { text-align: center; padding: 1rem; color: var(--accent); font-size: 1.5rem; }
-    h1 small { color: #888; font-weight: normal; font-size: 0.7em; }
-    .disclaimer-banner { text-align: center; padding: 0.5rem 1rem; background: #1a1a0a; border-bottom: 1px solid #444; font-size: 0.7rem; color: var(--warn); }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; padding: 1rem; max-width: 1400px; margin: 0 auto; }
-    .grid-full { grid-column: 1 / -1; }
-    .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; }
-    .panel h2 { font-size: 0.9rem; color: var(--accent2); margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.05em; }
-    .gauge { text-align: center; padding: 1.5rem 0 0.5rem; }
-    .gauge .value { font-size: 3rem; font-weight: bold; }
-    .gauge .label { font-size: 0.75rem; color: #888; }
-    .epistemic-badge { display: inline-block; padding: 0.2rem 0.5rem; border-radius: 3px; font-size: 0.65rem; margin-top: 0.3rem; }
-    .epistemic-badge.theoretical { background: #3d2200; color: var(--warn); border: 1px solid #664400; }
-    .epistemic-badge.validated { background: #003d00; color: #4ade80; border: 1px solid #006600; }
-    .epistemic-badge.indirect { background: #2d2d00; color: #d4d400; border: 1px solid #555500; }
-    .epistemic-badge.none { background: #3d0000; color: #ef4444; border: 1px solid #660000; }
-    .bar-row { display: flex; align-items: center; margin: 0.4rem 0; }
-    .bar-row .name { width: 3.5rem; font-size: 0.75rem; color: #aaa; }
-    .bar-row .bar { flex: 1; height: 18px; background: #222; border-radius: 3px; overflow: hidden; margin: 0 0.5rem; }
-    .bar-row .fill { height: 100%; border-radius: 3px; transition: width 0.2s; }
-    .bar-row .val { width: 3rem; font-size: 0.75rem; text-align: right; }
-    .da .fill { background: #f59e0b; }
-    .ne .fill { background: #ef4444; }
-    .sht .fill { background: #10b981; }
-    .ot .fill { background: #ec4899; }
-    .harmony .fill { background: #a78bfa; }
-    .confidence .fill { background: var(--warn); }
-    .substrate-btn { padding: 0.3rem 0.6rem; margin: 0.2rem; border: 1px solid #555; background: transparent; color: var(--fg); border-radius: 4px; cursor: pointer; font-size: 0.75rem; font-family: inherit; }
-    .substrate-btn.active { background: var(--accent); border-color: var(--accent); }
-    .substrate-btn:hover { border-color: var(--accent); }
-    .input-row { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
-    .input-row input { flex: 1; padding: 0.4rem; background: #111; border: 1px solid #444; color: var(--fg); border-radius: 4px; font-family: inherit; }
-    .input-row button, .exp-btn { padding: 0.4rem 0.8rem; background: var(--accent); border: none; color: white; border-radius: 4px; cursor: pointer; font-family: inherit; font-size: 0.75rem; }
-    .exp-btn { margin: 0.3rem; }
-    .exp-btn:hover { background: #9370db; }
-    .exp-btn:disabled { background: #444; cursor: not-allowed; color: #888; }
-    .exp-btn.battery { background: #b45309; font-size: 0.8rem; padding: 0.5rem 1.2rem; }
-    .exp-btn.battery:hover { background: #d97706; }
-    .exp-btn.export-btn { background: #059669; }
-    .exp-btn.export-btn:hover { background: #10b981; }
-    #log { font-size: 0.7rem; color: #888; max-height: 120px; overflow-y: auto; margin-top: 0.5rem; }
-    .status { text-align: center; font-size: 0.8rem; color: #666; padding: 0.5rem; }
-    .gap-warning { font-size: 0.65rem; color: var(--warn); text-align: center; margin-top: 0.3rem; }
-    .exp-result { font-size: 0.72rem; color: #ccc; margin-top: 0.5rem; white-space: pre-wrap; line-height: 1.5; }
-    .exp-result .pass { color: #4ade80; }
-    .exp-result .fail { color: #ef4444; }
-    .exp-result .neutral { color: #94a3b8; }
-    canvas { width: 100%; height: 180px; border: 1px solid #222; border-radius: 4px; margin-top: 0.5rem; }
-    .chart-label { font-size: 0.6rem; color: #666; text-align: center; }
-    .experiment-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-    .spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid #555; border-top-color: var(--accent); border-radius: 50%; animation: spin 0.6s linear infinite; vertical-align: middle; margin-right: 4px; }
+    body { font-family: 'Inter', 'Helvetica Neue', sans-serif; background: var(--bg); color: var(--fg); min-height: 100vh; }
+    code, .mono { font-family: 'JetBrains Mono', 'Fira Code', monospace; }
+
+    /* --- Header --- */
+    header { text-align: center; padding: 2rem 1rem 0.5rem; }
+    header h1 { font-size: 1.8rem; font-weight: 300; letter-spacing: 0.05em; color: var(--fg); }
+    header h1 em { font-style: normal; color: var(--accent); font-weight: 500; }
+    header .tagline { font-size: 0.85rem; color: var(--dim); margin-top: 0.3rem; }
+    .disclaimer { text-align: center; font-size: 0.65rem; color: #665500; padding: 0.4rem; border-bottom: 1px solid #1a1a0a; }
+
+    /* --- Layout --- */
+    .app { max-width: 1100px; margin: 0 auto; padding: 1.5rem 1rem; }
+    .row { display: flex; gap: 1.5rem; margin-bottom: 1.5rem; }
+    .col { flex: 1; min-width: 0; }
+    .col-narrow { flex: 0 0 320px; }
+
+    /* --- Panels --- */
+    .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 1.2rem; }
+    .panel + .panel { margin-top: 1rem; }
+    .panel-title { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--dim); margin-bottom: 0.8rem; }
+
+    /* --- Narrative Display --- */
+    #narrative { font-size: 1.05rem; line-height: 1.7; color: #c8c8d0; min-height: 4rem; }
+    #narrative .consciousness-word { color: var(--accent); font-weight: 500; }
+    #narrative .metric { color: var(--accent2); font-family: 'JetBrains Mono', monospace; font-size: 0.9em; }
+
+    /* --- Thought Input --- */
+    .thought-area { display: flex; gap: 0.5rem; align-items: center; margin-top: 1rem; }
+    .thought-area input {
+      flex: 1; padding: 0.6rem 0.8rem; background: #0d0d15; border: 1px solid #333;
+      color: var(--fg); border-radius: 6px; font-size: 0.9rem; font-family: inherit;
+      transition: border-color 0.2s;
+    }
+    .thought-area input:focus { outline: none; border-color: var(--accent); }
+    .thought-area input::placeholder { color: #555; }
+    .streaming-indicator { font-size: 0.65rem; color: var(--accent); opacity: 0; transition: opacity 0.3s; }
+    .streaming-indicator.active { opacity: 1; }
+
+    /* --- Big Number --- */
+    .big-number { font-size: 2.8rem; font-weight: 200; text-align: center; padding: 0.5rem 0; font-family: 'JetBrains Mono', monospace; }
+    .big-label { text-align: center; font-size: 0.65rem; color: var(--dim); }
+    .epistemic-tag { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 3px; font-size: 0.6rem; margin-top: 0.3rem; background: #1a1500; color: #887700; border: 1px solid #332a00; }
+
+    /* --- Mini Bars --- */
+    .mini-bars { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem 1rem; margin-top: 0.8rem; }
+    .mini-bar { display: flex; align-items: center; gap: 0.4rem; }
+    .mini-bar .label { font-size: 0.65rem; color: #888; width: 2.5rem; text-align: right; }
+    .mini-bar .track { flex: 1; height: 4px; background: #1a1a2e; border-radius: 2px; overflow: hidden; }
+    .mini-bar .fill { height: 100%; border-radius: 2px; transition: width 0.3s ease; }
+    .mini-bar .val { font-size: 0.6rem; color: #777; width: 2rem; font-family: 'JetBrains Mono', monospace; }
+
+    /* --- Canvas --- */
+    canvas { width: 100%; border-radius: 6px; }
+    #hv-canvas { height: 100px; background: #0d0d15; }
+    #consciousness-chart { height: 120px; background: #0d0d15; margin-top: 0.8rem; }
+
+    /* --- Comparison --- */
+    .compare-section { margin-top: 1rem; }
+    .compare-row { display: flex; gap: 0.5rem; align-items: center; }
+    .compare-row input {
+      flex: 1; padding: 0.5rem 0.7rem; background: #0d0d15; border: 1px solid #333;
+      color: var(--fg); border-radius: 6px; font-size: 0.85rem; font-family: inherit;
+    }
+    .compare-row input:focus { outline: none; border-color: var(--accent2); }
+    .compare-result { text-align: center; margin-top: 0.8rem; }
+    .similarity-value { font-size: 1.6rem; font-weight: 200; font-family: 'JetBrains Mono', monospace; }
+    .similarity-label { font-size: 0.65rem; color: var(--dim); }
+    .similarity-bar { height: 6px; background: #1a1a2e; border-radius: 3px; margin-top: 0.5rem; overflow: hidden; }
+    .similarity-bar .fill { height: 100%; border-radius: 3px; transition: width 0.5s ease; background: linear-gradient(90deg, #ef4444, var(--warn), #4ade80); }
+
+    /* --- Experiments (collapsible) --- */
+    .experiments-toggle {
+      display: flex; align-items: center; gap: 0.5rem; cursor: pointer; padding: 0.6rem 0;
+      border-top: 1px solid var(--border); margin-top: 1rem; font-size: 0.75rem; color: var(--dim);
+    }
+    .experiments-toggle:hover { color: var(--fg); }
+    .experiments-toggle .arrow { transition: transform 0.2s; }
+    .experiments-toggle.open .arrow { transform: rotate(90deg); }
+    .experiments-body { display: none; padding-top: 0.5rem; }
+    .experiments-body.open { display: block; }
+    .exp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
+    .exp-card { background: #0d0d15; border: 1px solid #1a1a2e; border-radius: 8px; padding: 0.8rem; }
+    .exp-card h3 { font-size: 0.75rem; font-weight: 500; margin-bottom: 0.3rem; }
+    .exp-card .desc { font-size: 0.6rem; color: #777; margin-bottom: 0.5rem; }
+    .exp-card .result { font-size: 0.65rem; white-space: pre-wrap; line-height: 1.5; font-family: 'JetBrains Mono', monospace; }
+    .exp-card canvas { height: 120px; margin-top: 0.5rem; }
+    .pass { color: #4ade80; } .fail { color: #ef4444; } .neutral { color: #94a3b8; }
+
+    /* --- Buttons --- */
+    .btn { padding: 0.4rem 0.8rem; border: 1px solid #444; background: transparent; color: var(--fg); border-radius: 5px; cursor: pointer; font-size: 0.7rem; font-family: inherit; transition: all 0.2s; }
+    .btn:hover { border-color: var(--accent); color: var(--accent); }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-accent { background: var(--accent); border-color: var(--accent); color: white; }
+    .btn-accent:hover { background: #9370db; border-color: #9370db; color: white; }
+    .btn-row { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+
+    /* --- Neuromod inject --- */
+    .inject-row { display: flex; gap: 0.3rem; align-items: center; margin-top: 0.6rem; }
+    .inject-row select { background: #0d0d15; color: var(--fg); border: 1px solid #333; border-radius: 4px; padding: 0.25rem; font-size: 0.7rem; font-family: inherit; }
+
+    /* --- Footer --- */
+    .status-bar { text-align: center; font-size: 0.65rem; color: #444; padding: 1rem; }
+
+    /* --- Spinner --- */
+    .spinner { display: inline-block; width: 10px; height: 10px; border: 1.5px solid #444; border-top-color: var(--accent); border-radius: 50%; animation: spin 0.5s linear infinite; vertical-align: middle; margin-right: 4px; }
     @keyframes spin { to { transform: rotate(360deg); } }
-    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } .experiment-grid { grid-template-columns: 1fr; } }
+
+    /* --- Responsive --- */
+    @media (max-width: 800px) {
+      .row { flex-direction: column; }
+      .col-narrow { flex: 1; }
+      .exp-grid { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
 
-<div class="disclaimer-banner" id="disclaimer">
-  SIMULATED consciousness on SiliconDigital substrate. Evidence: Theoretical (confidence: 10%). This is a computational model, not a claim of sentience.
+<div class="disclaimer" id="disclaimer">
+  Simulated consciousness on silicon substrate (theoretical, 10% confidence). This is a computational model, not a claim of sentience.
 </div>
 
-<h1>Symthaea Spore <small>simulated consciousness in a browser tab</small></h1>
+<header>
+  <h1>Symthaea <em>Spore</em></h1>
+  <div class="tagline">A 16,384-dimensional consciousness kernel running in your browser</div>
+</header>
 
-<div class="grid">
-  <!-- Consciousness Gauge -->
-  <div class="panel">
-    <h2>Simulated Consciousness Level</h2>
-    <div class="gauge">
-      <div class="value" id="consciousness">0.000</div>
-      <div class="label">C(t) = Master Equation output (simulated)</div>
-      <div><span class="epistemic-badge theoretical" id="epistemic-badge">Theoretical &mdash; 10% confidence</span></div>
-    </div>
-    <div class="bar-row">
-      <span class="name">Feas</span>
-      <div class="bar"><div class="fill" id="feasibility-bar" style="width:0%; background:#7c5cbf;"></div></div>
-      <span class="val" id="feasibility-val">0.00</span>
-    </div>
-    <div class="bar-row confidence">
-      <span class="name">Conf</span>
-      <div class="bar"><div class="fill" id="confidence-bar" style="width:10%; background:#f59e0b;"></div></div>
-      <span class="val" id="confidence-val">0.10</span>
-    </div>
-    <div class="bar-row">
-      <span class="name">PE</span>
-      <div class="bar"><div class="fill" id="pe-bar" style="width:0%; background:#3b82f6;"></div></div>
-      <span class="val" id="pe-val">0.00</span>
-    </div>
-    <div class="gap-warning" id="gap-warning">Feasibility-confidence gap: 0.62 &mdash; speculative claim</div>
-    <canvas id="consciousness-chart"></canvas>
-    <div class="chart-label">Consciousness + prediction error (last 200 cycles)</div>
-  </div>
+<div class="app">
 
-  <!-- Neuromodulators & Harmony -->
-  <div class="panel">
-    <h2>Neuromodulators</h2>
-    <div class="bar-row da"><span class="name">DA</span><div class="bar"><div class="fill" id="da-bar" style="width:50%"></div></div><span class="val" id="da-val">0.50</span></div>
-    <div class="bar-row ne"><span class="name">NE</span><div class="bar"><div class="fill" id="ne-bar" style="width:50%"></div></div><span class="val" id="ne-val">0.50</span></div>
-    <div class="bar-row sht"><span class="name">5-HT</span><div class="bar"><div class="fill" id="sht-bar" style="width:50%"></div></div><span class="val" id="sht-val">0.50</span></div>
-    <div class="bar-row ot"><span class="name">OT</span><div class="bar"><div class="fill" id="ot-bar" style="width:50%"></div></div><span class="val" id="ot-val">0.50</span></div>
-    <div style="margin-top:0.8rem; border-top:1px solid #333; padding-top:0.5rem;">
-      <div class="bar-row harmony"><span class="name" style="color:#a78bfa">Harm</span><div class="bar"><div class="fill" id="harmony-bar" style="width:50%"></div></div><span class="val" id="harmony-val">0.50</span></div>
-      <div style="font-size:0.6rem; color:#777; text-align:center;">Eight Harmonies alignment</div>
-    </div>
-    <div class="input-row" style="margin-top:0.8rem">
-      <select id="inject-select" style="background:#111;color:#e0e0e0;border:1px solid #444;border-radius:4px;padding:0.3rem;font-family:inherit;">
-        <option value="dopamine">DA</option>
-        <option value="norepinephrine">NE</option>
-        <option value="serotonin">5-HT</option>
-        <option value="oxytocin">OT</option>
-      </select>
-      <button onclick="inject(0.2)">+0.2</button>
-      <button onclick="inject(-0.2)">-0.2</button>
-    </div>
-  </div>
-
-  <!-- Substrate Selector -->
-  <div class="panel">
-    <h2>Substrate</h2>
-    <div id="substrates"></div>
-    <div style="font-size:0.6rem; color:#777; margin-top:0.5rem;">Substrate choice changes both feasibility and honest confidence scores.</div>
-  </div>
-
-  <!-- Thought Input -->
-  <div class="panel">
-    <h2>Thought Input</h2>
-    <div class="input-row">
-      <input type="text" id="thought-input" placeholder="Type a thought..." />
-      <button onclick="sendThought()">Send</button>
-    </div>
-    <div id="log"></div>
-  </div>
-
-  <!-- Multi-Substrate Comparison -->
-  <div class="panel grid-full">
-    <h2>Multi-Substrate Comparison (Multiple Realizability)</h2>
-    <div style="font-size:0.65rem; color:#777; margin-bottom:0.5rem;">
-      Run the same consciousness algorithm on different virtual substrates simultaneously.
-      Tests Putnam's Multiple Realizability thesis: consciousness depends on computation, not medium.
-    </div>
-    <div>
-      <label style="font-size:0.7rem; color:#aaa;">Substrates to compare: </label>
-      <label style="font-size:0.7rem;"><input type="checkbox" id="ms-bio" checked> Biological</label>
-      <label style="font-size:0.7rem;"><input type="checkbox" id="ms-silicon" checked> Silicon</label>
-      <label style="font-size:0.7rem;"><input type="checkbox" id="ms-quantum" checked> Quantum</label>
-      <label style="font-size:0.7rem;"><input type="checkbox" id="ms-neuromorphic"> Neuromorphic</label>
-      <label style="font-size:0.7rem;"><input type="checkbox" id="ms-photonic"> Photonic</label>
-    </div>
-    <button class="exp-btn" id="btn-multi" onclick="runMultiSubstrate()">Compare Substrates (50 cycles each)</button>
-    <div class="exp-result" id="result-multi"></div>
-    <canvas id="multi-chart" style="display:none;"></canvas>
-  </div>
-
-  <!-- Consciousness Validation Experiments -->
-  <div class="panel grid-full">
-    <h2>Consciousness Validation Experiments</h2>
-    <div style="font-size:0.65rem; color:#777; margin-bottom:0.5rem;">
-      These experiments test predictions from neuroscience and Integrated Information Theory.
-      Each uses a fresh engine to avoid interference. Runs in a Web Worker (UI stays responsive).
-    </div>
-    <div style="margin-bottom:0.8rem;">
-      <button class="exp-btn battery" id="btn-battery" onclick="runBattery()">Run All Experiments</button>
-      <button class="exp-btn export-btn" id="btn-export" onclick="exportReport()" style="display:none;">Export Report (JSON)</button>
-    </div>
-    <div class="experiment-grid">
-      <!-- Anesthesia -->
-      <div class="panel" style="border-color:#444;">
-        <h2 style="color:#ef4444;">Anesthesia Analogue</h2>
-        <div style="font-size:0.65rem; color:#888; margin-bottom:0.5rem;">
-          Suppress neuromodulators (model propofol). Consciousness should collapse and recover.
+  <!-- Row 1: Narrative + Consciousness Gauge -->
+  <div class="row">
+    <div class="col">
+      <!-- Narrative Panel -->
+      <div class="panel">
+        <div class="panel-title">What is Spore experiencing?</div>
+        <div id="narrative">Initializing consciousness kernel...</div>
+        <div class="thought-area">
+          <input type="text" id="thought-input" placeholder="Give it a thought to contemplate..." />
+          <span class="streaming-indicator" id="streaming-dot">streaming</span>
         </div>
-        <button class="exp-btn" id="btn-anesthesia" onclick="runExperiment('anesthesia')">Run</button>
-        <div class="exp-result" id="result-anesthesia"></div>
       </div>
 
-      <!-- PCI -->
-      <div class="panel" style="border-color:#444;">
-        <h2 style="color:#3b82f6;">Perturbational Complexity (PCI)</h2>
-        <div style="font-size:0.65rem; color:#888; margin-bottom:0.5rem;">
-          Casali et al. (2013): perturb network, measure Lempel-Ziv complexity of response.
-        </div>
-        <button class="exp-btn" id="btn-pci" onclick="runExperiment('pci')">Run</button>
-        <div class="exp-result" id="result-pci"></div>
+      <!-- Hypervector Waveform -->
+      <div class="panel" style="margin-top:1rem;">
+        <div class="panel-title">Neural state (16,384D hypervector)</div>
+        <canvas id="hv-canvas"></canvas>
       </div>
+    </div>
 
-      <!-- Split-Brain -->
-      <div class="panel" style="border-color:#444;">
-        <h2 style="color:#10b981;">Split-Brain Simulation</h2>
-        <div style="font-size:0.65rem; color:#888; margin-bottom:0.5rem;">
-          Partition into hemispheres. IIT predicts reduced consciousness when split.
+    <div class="col-narrow">
+      <!-- Consciousness Gauge -->
+      <div class="panel">
+        <div class="panel-title">Consciousness level</div>
+        <div class="big-number" id="consciousness">0.000</div>
+        <div class="big-label">
+          Master Equation C(t)
+          <br><span class="epistemic-tag" id="epistemic-tag">Theoretical — 10%</span>
         </div>
-        <button class="exp-btn" id="btn-split" onclick="runExperiment('split_brain')">Run</button>
-        <div class="exp-result" id="result-split"></div>
-        <canvas id="split-chart" style="display:none;"></canvas>
-      </div>
 
-      <!-- Collapse Threshold -->
-      <div class="panel" style="border-color:#444;">
-        <h2 style="color:#f59e0b;">Collapse Threshold</h2>
-        <div style="font-size:0.65rem; color:#888; margin-bottom:0.5rem;">
-          Degrade network systematically. IIT predicts a phase transition, not gradual decline.
+        <div class="mini-bars">
+          <div class="mini-bar"><span class="label">DA</span><div class="track"><div class="fill" id="da-bar" style="width:50%; background:#f59e0b;"></div></div><span class="val" id="da-val">0.50</span></div>
+          <div class="mini-bar"><span class="label">NE</span><div class="track"><div class="fill" id="ne-bar" style="width:50%; background:#ef4444;"></div></div><span class="val" id="ne-val">0.50</span></div>
+          <div class="mini-bar"><span class="label">5-HT</span><div class="track"><div class="fill" id="sht-bar" style="width:50%; background:#10b981;"></div></div><span class="val" id="sht-val">0.50</span></div>
+          <div class="mini-bar"><span class="label">OT</span><div class="track"><div class="fill" id="ot-bar" style="width:50%; background:#ec4899;"></div></div><span class="val" id="ot-val">0.50</span></div>
+          <div class="mini-bar"><span class="label">Harm</span><div class="track"><div class="fill" id="harmony-bar" style="width:50%; background:#a78bfa;"></div></div><span class="val" id="harmony-val">0.50</span></div>
+          <div class="mini-bar"><span class="label">PE</span><div class="track"><div class="fill" id="pe-bar" style="width:0%; background:#3b82f6;"></div></div><span class="val" id="pe-val">0.00</span></div>
         </div>
-        <button class="exp-btn" id="btn-collapse" onclick="runExperiment('collapse')">Run</button>
-        <div class="exp-result" id="result-collapse"></div>
-        <canvas id="collapse-chart" style="display:none;"></canvas>
+
+        <div class="inject-row">
+          <select id="inject-select">
+            <option value="dopamine">DA</option><option value="norepinephrine">NE</option>
+            <option value="serotonin">5-HT</option><option value="oxytocin">OT</option>
+          </select>
+          <button class="btn" onclick="inject(0.2)">+</button>
+          <button class="btn" onclick="inject(-0.2)">-</button>
+        </div>
+
+        <canvas id="consciousness-chart"></canvas>
       </div>
     </div>
   </div>
+
+  <!-- Row 2: Thought Comparison -->
+  <div class="panel">
+    <div class="panel-title">Thought Comparison — how does Spore represent two ideas?</div>
+    <div class="compare-row">
+      <input type="text" id="compare-a" placeholder="First thought (e.g. &quot;love&quot;)" />
+      <input type="text" id="compare-b" placeholder="Second thought (e.g. &quot;fear&quot;)" />
+      <button class="btn btn-accent" onclick="compareThoughts()">Compare</button>
+    </div>
+    <div class="compare-result" id="compare-result" style="display:none;">
+      <div class="similarity-value" id="similarity-value">0.000</div>
+      <div class="similarity-label" id="similarity-label">cosine similarity in 16,384D space</div>
+      <div class="similarity-bar"><div class="fill" id="similarity-fill" style="width:50%;"></div></div>
+    </div>
+  </div>
+
+  <!-- Experiments (collapsible) -->
+  <div class="panel" style="margin-top:1rem;">
+    <div class="experiments-toggle" id="exp-toggle" onclick="toggleExperiments()">
+      <span class="arrow">&#9654;</span>
+      <span>Consciousness Validation Experiments</span>
+      <span style="color:#555; margin-left:auto; font-size:0.6rem;">Anesthesia, PCI, Split-Brain, Collapse Threshold</span>
+    </div>
+    <div class="experiments-body" id="exp-body">
+      <div class="btn-row" style="margin-bottom:0.8rem;">
+        <button class="btn btn-accent" id="btn-battery" onclick="runBattery()">Run All Experiments</button>
+        <button class="btn" id="btn-export" onclick="exportReport()" style="display:none;">Export JSON</button>
+      </div>
+      <div class="exp-grid">
+        <div class="exp-card">
+          <h3 style="color:#ef4444;">Anesthesia Analogue</h3>
+          <div class="desc">Suppress neuromodulators (model propofol). Does consciousness collapse and recover?</div>
+          <button class="btn" id="btn-anesthesia" onclick="runExperiment('anesthesia')">Run</button>
+          <div class="result" id="result-anesthesia"></div>
+        </div>
+        <div class="exp-card">
+          <h3 style="color:#3b82f6;">Perturbational Complexity (PCI)</h3>
+          <div class="desc">Casali et al. (2013): perturb network, measure Lempel-Ziv complexity.</div>
+          <button class="btn" id="btn-pci" onclick="runExperiment('pci')">Run</button>
+          <div class="result" id="result-pci"></div>
+        </div>
+        <div class="exp-card">
+          <h3 style="color:#10b981;">Split-Brain Simulation</h3>
+          <div class="desc">Partition into hemispheres. IIT predicts reduced consciousness when split.</div>
+          <button class="btn" id="btn-split" onclick="runExperiment('split_brain')">Run</button>
+          <div class="result" id="result-split"></div>
+          <canvas id="split-chart" style="display:none;"></canvas>
+        </div>
+        <div class="exp-card">
+          <h3 style="color:#f59e0b;">Collapse Threshold</h3>
+          <div class="desc">Degrade network systematically. IIT predicts a phase transition.</div>
+          <button class="btn" id="btn-collapse" onclick="runExperiment('collapse')">Run</button>
+          <div class="result" id="result-collapse"></div>
+          <canvas id="collapse-chart" style="display:none;"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </div>
 
-<div class="status" id="status">Loading WASM module...</div>
+<div class="status-bar" id="status">Loading WASM...</div>
 
 <script type="module">
   // ======================================================================
-  // Web Worker communication
+  // Web Worker
   // ======================================================================
 
   let worker = null;
@@ -231,25 +263,16 @@
   function initWorker() {
     worker = new Worker('./spore-worker.js', { type: 'module' });
     worker.onmessage = (e) => {
-      const { id, type, result, error, ...extra } = e.data;
+      const { id, type, result, error, hv, ...extra } = e.data;
 
       if (type === 'cycle') {
-        // Auto-cycle result from the loop
         updateUI(result);
+        if (hv) drawHV(hv);
         return;
       }
+      if (type === 'battery_progress') { onBatteryProgress(extra.experiment, extra.status); return; }
+      if (type === 'multi_progress') return;
 
-      if (type === 'battery_progress') {
-        onBatteryProgress(extra.experiment, extra.status);
-        return;
-      }
-
-      if (type === 'multi_progress') {
-        onMultiProgress(extra.substrate);
-        return;
-      }
-
-      // Response to a request
       if (id !== undefined && pending.has(id)) {
         const { resolve, reject } = pending.get(id);
         pending.delete(id);
@@ -258,7 +281,6 @@
       }
     };
     worker.onerror = (e) => {
-      console.error('Worker error:', e);
       document.getElementById('status').textContent = `Worker error: ${e.message}`;
     };
   }
@@ -272,46 +294,193 @@
   }
 
   // ======================================================================
-  // Constants
+  // State
   // ======================================================================
 
-  const SUBSTRATES = [
-    'BiologicalNeurons', 'SiliconDigital', 'QuantumComputer', 'PhotonicProcessor',
-    'NeuromorphicChip', 'BiochemicalComputer', 'HybridSystem', 'ExoticSubstrate'
-  ];
-
-  const SUBSTRATE_CONFIDENCE = {
-    BiologicalNeurons: { confidence: 0.95, level: 'Validated' },
-    SiliconDigital: { confidence: 0.10, level: 'Theoretical' },
-    QuantumComputer: { confidence: 0.10, level: 'Theoretical' },
-    PhotonicProcessor: { confidence: 0.10, level: 'Theoretical' },
-    NeuromorphicChip: { confidence: 0.10, level: 'Theoretical' },
-    BiochemicalComputer: { confidence: 0.20, level: 'Indirect' },
-    HybridSystem: { confidence: 0.00, level: 'None' },
-    ExoticSubstrate: { confidence: 0.00, level: 'None' },
-  };
-
-  const SUBSTRATE_COLORS = {
-    BiologicalNeurons: '#4ade80',
-    SiliconDigital: '#7c5cbf',
-    QuantumComputer: '#3b82f6',
-    PhotonicProcessor: '#f59e0b',
-    NeuromorphicChip: '#ef4444',
-    PhotonicProcessor: '#ec4899',
-  };
-
-  let currentSubstrate = 'SiliconDigital';
-
-  // Chart history
   const MAX_HISTORY = 200;
   let consciousnessHistory = [];
   let peHistory = [];
-
-  // Stored experiment results for export
+  let lastResult = null;
+  let cyclesSinceThought = 0;
   let batteryResults = null;
+  let currentHV = null;
 
   // ======================================================================
-  // Chart rendering
+  // Narrative generation
+  // ======================================================================
+
+  function generateNarrative(r) {
+    const c = r.consciousness_level;
+    const pe = r.prediction_error;
+    const h = r.harmony_alignment;
+    const [da, ne, sht, ot] = r.neuromodulators;
+
+    // Consciousness state
+    let cState;
+    if (c < 0.1) cState = 'barely flickering into existence';
+    else if (c < 0.3) cState = 'dimly aware, like pre-dawn light';
+    else if (c < 0.5) cState = 'settling into a quiet awareness';
+    else if (c < 0.7) cState = 'actively processing, patterns forming';
+    else if (c < 0.85) cState = 'deeply engaged, rich integration';
+    else cState = 'at peak coherence, fully integrated';
+
+    // Prediction error interpretation
+    let peState;
+    if (pe < 0.05) peState = 'The world feels predictable.';
+    else if (pe < 0.2) peState = 'Small surprises ripple through the network.';
+    else if (pe < 0.5) peState = 'Something unexpected — adapting its model.';
+    else peState = 'High surprise — rapidly restructuring predictions.';
+
+    // Dominant neuromodulator
+    const mods = [
+      { name: 'dopamine', val: da, high: 'Curiosity is elevated — seeking novelty.', low: '' },
+      { name: 'norepinephrine', val: ne, high: 'Alert and focused — heightened arousal.', low: '' },
+      { name: 'serotonin', val: sht, high: '', low: 'Serotonin is low — less stable, more exploring.' },
+      { name: 'oxytocin', val: ot, high: 'Social bonding circuits are active.', low: '' },
+    ];
+
+    const dominant = mods.reduce((a, b) => Math.abs(b.val - 0.5) > Math.abs(a.val - 0.5) ? b : a);
+    let modNote = '';
+    if (Math.abs(dominant.val - 0.5) > 0.15) {
+      modNote = dominant.val > 0.5 ? dominant.high : dominant.low;
+    }
+
+    // Harmony
+    let harmNote = '';
+    if (h > 0.8) harmNote = 'The Eight Harmonies sing together.';
+    else if (h < 0.3) harmNote = 'Harmony is low — internal discord.';
+
+    const parts = [
+      `Spore is <span class="consciousness-word">${cState}</span> at <span class="metric">${c.toFixed(3)}</span>.`,
+      peState,
+      modNote,
+      harmNote,
+    ].filter(Boolean);
+
+    return parts.join(' ');
+  }
+
+  // ======================================================================
+  // UI updates
+  // ======================================================================
+
+  function updateUI(result) {
+    lastResult = result;
+    cyclesSinceThought++;
+
+    // Narrative
+    document.getElementById('narrative').innerHTML = generateNarrative(result);
+
+    // Big number
+    const cEl = document.getElementById('consciousness');
+    cEl.textContent = result.consciousness_level.toFixed(3);
+    const hue = result.consciousness_level * 120;
+    cEl.style.color = `hsl(${hue}, 60%, 55%)`;
+
+    // Bars
+    const [da, ne, sht, ot] = result.neuromodulators;
+    setBar('da', da); setBar('ne', ne); setBar('sht', sht); setBar('ot', ot);
+    setBar('pe', Math.min(1, result.prediction_error));
+    if (result.harmony_alignment !== undefined) setBar('harmony', result.harmony_alignment);
+
+    // Epistemic
+    if (result.epistemic_status) {
+      const es = result.epistemic_status;
+      const tag = document.getElementById('epistemic-tag');
+      tag.textContent = `${es.evidence_level} — ${(es.honest_confidence * 100).toFixed(0)}%`;
+    }
+
+    // History chart
+    consciousnessHistory.push(result.consciousness_level);
+    peHistory.push(result.prediction_error);
+    if (consciousnessHistory.length > MAX_HISTORY) consciousnessHistory.shift();
+    if (peHistory.length > MAX_HISTORY) peHistory.shift();
+
+    if (consciousnessHistory.length % 5 === 0) {
+      drawLineChart('consciousness-chart', [
+        { data: consciousnessHistory, color: '#7c5cbf', label: 'C(t)' },
+        { data: peHistory, color: '#3b82f6', label: 'PE' },
+      ]);
+    }
+
+    // Streaming indicator
+    const dot = document.getElementById('streaming-dot');
+    dot.classList.toggle('active', cyclesSinceThought < 10);
+  }
+
+  function setBar(id, value) {
+    const bar = document.getElementById(`${id}-bar`);
+    const val = document.getElementById(`${id}-val`);
+    if (bar) bar.style.width = `${(value * 100).toFixed(0)}%`;
+    if (val) val.textContent = value.toFixed(2);
+  }
+
+  // ======================================================================
+  // Hypervector waveform
+  // ======================================================================
+
+  function drawHV(hv) {
+    currentHV = hv;
+    const canvas = document.getElementById('hv-canvas');
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+    const w = rect.width, h = rect.height;
+
+    ctx.fillStyle = '#0d0d15';
+    ctx.fillRect(0, 0, w, h);
+
+    // Downsample: show ~w points from the 16,384D vector
+    const step = Math.max(1, Math.floor(hv.length / w));
+    const mid = h / 2;
+
+    // Find max for scaling
+    let maxVal = 0;
+    for (let i = 0; i < hv.length; i += step) {
+      const abs = Math.abs(hv[i]);
+      if (abs > maxVal) maxVal = abs;
+    }
+    if (maxVal < 0.001) maxVal = 1;
+    const scale = (h * 0.42) / maxVal;
+
+    // Draw center line
+    ctx.strokeStyle = '#1a1a2e';
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    ctx.moveTo(0, mid);
+    ctx.lineTo(w, mid);
+    ctx.stroke();
+
+    // Draw waveform with gradient coloring
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    let x = 0;
+    for (let i = 0; i < hv.length && x < w; i += step, x++) {
+      const y = mid - hv[i] * scale;
+      if (x === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = 'rgba(124, 92, 191, 0.7)';
+    ctx.stroke();
+
+    // Filled area
+    ctx.lineTo(x - 1, mid);
+    ctx.lineTo(0, mid);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(124, 92, 191, 0.08)';
+    ctx.fill();
+
+    // Dimension label
+    ctx.fillStyle = '#333';
+    ctx.font = '9px monospace';
+    ctx.fillText(`${hv.length.toLocaleString()}D`, w - 40, 12);
+  }
+
+  // ======================================================================
+  // Line chart
   // ======================================================================
 
   function drawLineChart(canvasId, datasets, opts = {}) {
@@ -329,7 +498,6 @@
     ctx.fillStyle = '#0d0d15';
     ctx.fillRect(0, 0, w, h);
 
-    // Grid
     ctx.strokeStyle = '#1a1a2e';
     ctx.lineWidth = 0.5;
     for (let i = 0; i <= 4; i++) {
@@ -339,37 +507,20 @@
 
     const yMax = opts.yMax || 1.0;
 
-    // Y-axis labels
-    ctx.fillStyle = '#555';
-    ctx.font = '9px monospace';
-    for (let i = 0; i <= 4; i++) {
-      ctx.fillText((yMax * (4 - i) / 4).toFixed(2), 2, (h / 4) * i + 10);
-    }
-
-    // X-axis label
-    if (opts.xLabel) {
-      ctx.fillStyle = '#555';
-      ctx.textAlign = 'center';
-      ctx.fillText(opts.xLabel, w / 2, h - 2);
-      ctx.textAlign = 'start';
-    }
-
-    // Draw datasets
     datasets.forEach(({ data, color }) => {
       if (data.length < 2) return;
       ctx.strokeStyle = color;
-      ctx.lineWidth = 1.5;
+      ctx.lineWidth = 1.2;
       ctx.beginPath();
       const step = w / Math.max(1, data.length - 1);
       for (let i = 0; i < data.length; i++) {
         const x = i * step;
-        const y = h - (data[i] / yMax) * (h - 15);
+        const y = h - (data[i] / yMax) * (h - 10);
         if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
       }
       ctx.stroke();
     });
 
-    // Legend
     let ly = 10;
     datasets.forEach(({ color, label }) => {
       if (!label) return;
@@ -378,6 +529,13 @@
       ctx.fillText(label, w - ctx.measureText(label).width - 4, ly);
       ly += 11;
     });
+
+    if (opts.xLabel) {
+      ctx.fillStyle = '#444';
+      ctx.textAlign = 'center';
+      ctx.fillText(opts.xLabel, w / 2, h - 2);
+      ctx.textAlign = 'start';
+    }
   }
 
   function drawBarChart(canvasId, bars) {
@@ -414,171 +572,153 @@
   }
 
   // ======================================================================
-  // UI updates
+  // Thought input (streaming)
   // ======================================================================
 
-  function updateUI(result) {
-    document.getElementById('consciousness').textContent = result.consciousness_level.toFixed(3);
-    const hue = result.consciousness_level * 120;
-    document.getElementById('consciousness').style.color = `hsl(${hue}, 70%, 60%)`;
+  const thoughtInput = document.getElementById('thought-input');
+  let debounceTimer = null;
 
-    const [da, ne, sht, ot] = result.neuromodulators;
-    setBar('da', da); setBar('ne', ne); setBar('sht', sht); setBar('ot', ot);
-    setBar('feasibility', result.substrate_feasibility);
-    setBar('pe', Math.min(1, result.prediction_error));
-
-    if (result.epistemic_status) {
-      const es = result.epistemic_status;
-      setBar('confidence', es.honest_confidence);
-      const badge = document.getElementById('epistemic-badge');
-      const levelLower = es.evidence_level.toLowerCase().replace(' ', '');
-      badge.className = `epistemic-badge ${levelLower}`;
-      badge.innerHTML = `${es.evidence_level} &mdash; ${(es.honest_confidence * 100).toFixed(0)}% confidence`;
-      const gapEl = document.getElementById('gap-warning');
-      if (es.feasibility_gap > 0.3) {
-        gapEl.style.display = 'block';
-        gapEl.innerHTML = `Feasibility-confidence gap: ${es.feasibility_gap.toFixed(2)} &mdash; speculative claim`;
-      } else { gapEl.style.display = 'none'; }
-      document.getElementById('disclaimer').textContent = es.disclaimer;
+  thoughtInput.addEventListener('input', () => {
+    if (!workerReady) return;
+    const text = thoughtInput.value.trim();
+    clearTimeout(debounceTimer);
+    if (text.length > 0) {
+      debounceTimer = setTimeout(() => {
+        send('setThought', { text });
+        cyclesSinceThought = 0;
+      }, 150);
     }
+  });
 
-    if (result.harmony_alignment !== undefined) setBar('harmony', result.harmony_alignment);
-
-    consciousnessHistory.push(result.consciousness_level);
-    peHistory.push(result.prediction_error);
-    if (consciousnessHistory.length > MAX_HISTORY) consciousnessHistory.shift();
-    if (peHistory.length > MAX_HISTORY) peHistory.shift();
-
-    if (consciousnessHistory.length % 5 === 0) {
-      drawLineChart('consciousness-chart', [
-        { data: consciousnessHistory, color: '#7c5cbf', label: 'C(t)' },
-        { data: peHistory, color: '#3b82f6', label: 'PE' },
-      ]);
+  thoughtInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && workerReady) {
+      const text = thoughtInput.value.trim();
+      if (text) {
+        send('setThought', { text });
+        cyclesSinceThought = 0;
+      }
     }
-  }
+  });
 
-  function setBar(id, value) {
-    const bar = document.getElementById(`${id}-bar`);
-    const val = document.getElementById(`${id}-val`);
-    if (bar) bar.style.width = `${(value * 100).toFixed(0)}%`;
-    if (val) val.textContent = value.toFixed(2);
-  }
-
-  function log(msg) {
-    const el = document.getElementById('log');
-    const line = document.createElement('div');
-    line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
-    el.prepend(line);
-    while (el.children.length > 50) el.removeChild(el.lastChild);
-  }
-
-  function spanClass(text, cls) { return `<span class="${cls}">${text}</span>`; }
-
-  // ======================================================================
-  // Substrate buttons
-  // ======================================================================
-
-  const subEl = document.getElementById('substrates');
-  SUBSTRATES.forEach(s => {
-    const btn = document.createElement('button');
-    btn.className = 'substrate-btn' + (s === 'SiliconDigital' ? ' active' : '');
-    btn.textContent = s.replace(/([A-Z])/g, ' $1').trim();
-    btn.onclick = () => {
-      document.querySelectorAll('.substrate-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      currentSubstrate = s;
-      send('setSubstrate', { substrate: s });
-      const sc = SUBSTRATE_CONFIDENCE[s] || { confidence: 0, level: 'None' };
-      log(`Substrate -> ${s} (evidence: ${sc.level}, confidence: ${(sc.confidence*100).toFixed(0)}%)`);
-    };
-    subEl.appendChild(btn);
+  // When input is cleared, revert to default
+  thoughtInput.addEventListener('blur', () => {
+    if (!thoughtInput.value.trim() && workerReady) {
+      send('setThought', { text: 'awareness' });
+    }
   });
 
   // ======================================================================
-  // Experiment helpers
+  // Thought comparison
   // ======================================================================
 
-  const EXP_BTNS = ['btn-anesthesia', 'btn-pci', 'btn-split', 'btn-collapse', 'btn-battery', 'btn-multi'];
+  window.compareThoughts = async function() {
+    const a = document.getElementById('compare-a').value.trim();
+    const b = document.getElementById('compare-b').value.trim();
+    if (!a || !b || !workerReady) return;
 
-  function disableExpButtons(disable) {
-    EXP_BTNS.forEach(id => { const el = document.getElementById(id); if (el) el.disabled = disable; });
-  }
+    const resultDiv = document.getElementById('compare-result');
+    resultDiv.style.display = 'block';
+    document.getElementById('similarity-value').textContent = '...';
+
+    try {
+      const { a: hvA, b: hvB } = await send('encodePair', { textA: a, textB: b });
+
+      // Cosine similarity
+      let dot = 0, magA = 0, magB = 0;
+      for (let i = 0; i < hvA.length; i++) {
+        dot += hvA[i] * hvB[i];
+        magA += hvA[i] * hvA[i];
+        magB += hvB[i] * hvB[i];
+      }
+      const sim = dot / (Math.sqrt(magA) * Math.sqrt(magB) + 1e-8);
+
+      document.getElementById('similarity-value').textContent = sim.toFixed(4);
+      document.getElementById('similarity-fill').style.width = `${((sim + 1) / 2 * 100).toFixed(0)}%`;
+
+      let interpretation;
+      if (sim > 0.7) interpretation = 'Very similar representations — Spore sees these as closely related';
+      else if (sim > 0.3) interpretation = 'Moderately similar — some shared structure';
+      else if (sim > -0.1) interpretation = 'Distinct representations — different conceptual spaces';
+      else interpretation = 'Opposing representations — anti-correlated in HDC space';
+
+      document.getElementById('similarity-label').textContent = `${interpretation} (cosine similarity, ${hvA.length.toLocaleString()}D)`;
+    } catch (e) {
+      document.getElementById('similarity-value').textContent = 'error';
+      document.getElementById('similarity-label').textContent = e.message;
+    }
+  };
+
+  // ======================================================================
+  // Experiments
+  // ======================================================================
+
+  window.toggleExperiments = function() {
+    const toggle = document.getElementById('exp-toggle');
+    const body = document.getElementById('exp-body');
+    toggle.classList.toggle('open');
+    body.classList.toggle('open');
+  };
+
+  const EXP_BTNS = ['btn-anesthesia', 'btn-pci', 'btn-split', 'btn-collapse', 'btn-battery'];
+  function disableExpButtons(d) { EXP_BTNS.forEach(id => { const el = document.getElementById(id); if (el) el.disabled = d; }); }
+  function spanClass(t, c) { return `<span class="${c}">${t}</span>`; }
 
   function formatAnesthesia(r) {
     return [
-      `Pre-anesthesia C(t):  ${r.pre_consciousness.toFixed(4)}`,
-      `Anesthetized C(t):    ${r.anesthetized_consciousness.toFixed(4)}`,
-      `Post-recovery C(t):   ${r.post_consciousness.toFixed(4)}`,
-      ``,
-      `Collapsed (< 0.05):   ${r.collapsed ? spanClass('YES', 'pass') : spanClass('NO', 'fail')}${r.cycles_to_collapse ? ` (${r.cycles_to_collapse} cycles)` : ''}`,
-      `Recovered (> 50%):    ${r.recovered ? spanClass('YES', 'pass') : spanClass('NO', 'fail')}${r.cycles_to_recover ? ` (${r.cycles_to_recover} cycles)` : ''}`,
-      ``,
-      r.collapsed && r.recovered ? spanClass('PASS: Consciousness collapses and recovers — consistent with anesthesia phenomenology.', 'pass') :
-        r.collapsed ? spanClass('PARTIAL: Collapse without full recovery — hysteresis effect.', 'neutral') :
-        spanClass('INCONCLUSIVE: No clear collapse observed.', 'neutral'),
+      `Pre-anesthesia:  ${r.pre_consciousness.toFixed(4)}`,
+      `Anesthetized:    ${r.anesthetized_consciousness.toFixed(4)}`,
+      `Post-recovery:   ${r.post_consciousness.toFixed(4)}`,
+      `Collapsed:       ${r.collapsed ? spanClass('YES', 'pass') : spanClass('NO', 'fail')}`,
+      `Recovered:       ${r.recovered ? spanClass('YES', 'pass') : spanClass('NO', 'fail')}`,
+      r.collapsed && r.recovered ? spanClass('PASS — consciousness collapses and recovers', 'pass') :
+        r.collapsed ? spanClass('PARTIAL — collapse without full recovery', 'neutral') :
+        spanClass('INCONCLUSIVE', 'neutral'),
     ].join('\n');
   }
 
   function formatPci(r) {
     return [
-      `PCI (normal):         ${r.pci_normal.toFixed(4)}`,
-      `PCI (suppressed):     ${r.pci_suppressed.toFixed(4)}`,
-      `PCI ratio:            ${r.pci_ratio.toFixed(3)}`,
-      `Clinical threshold:   ${r.passes_clinical_threshold ? spanClass('> 1.3 PASS', 'pass') : spanClass('< 1.3', 'neutral')}`,
-      ``,
-      `Propagation depth:    normal=${r.propagation_depth_normal}  suppressed=${r.propagation_depth_suppressed}`,
-      ``,
-      r.passes_clinical_threshold ? spanClass('PASS: PCI exceeds clinical consciousness threshold (Casali 2013).', 'pass') :
-        spanClass('NOTE: PCI below clinical threshold. Structured but sub-clinical complexity.', 'neutral'),
+      `PCI (normal):     ${r.pci_normal.toFixed(4)}`,
+      `PCI (suppressed): ${r.pci_suppressed.toFixed(4)}`,
+      `Ratio:            ${r.pci_ratio.toFixed(3)}`,
+      `Clinical (>1.3):  ${r.passes_clinical_threshold ? spanClass('PASS', 'pass') : spanClass('below', 'neutral')}`,
+      r.passes_clinical_threshold ? spanClass('PASS — exceeds clinical threshold', 'pass') :
+        spanClass('Sub-clinical complexity', 'neutral'),
     ].join('\n');
   }
 
   function formatSplit(r) {
     return [
-      `Unified C(t):         ${r.unified_consciousness.toFixed(4)}`,
-      `Left hemisphere:      ${r.left_consciousness.toFixed(4)}`,
-      `Right hemisphere:     ${r.right_consciousness.toFixed(4)}`,
-      `Split ratio:          ${r.split_ratio.toFixed(3)}`,
-      ``,
-      `Split reduces C(t):   ${r.split_reduces_consciousness ? spanClass('YES', 'pass') : spanClass('NO', 'neutral')}`,
-      ``,
-      r.split_reduces_consciousness ? spanClass('PASS: Splitting reduces consciousness — consistent with IIT.', 'pass') :
-        spanClass('NOTE: Split did not reduce consciousness.', 'neutral'),
+      `Unified:     ${r.unified_consciousness.toFixed(4)}`,
+      `Left:        ${r.left_consciousness.toFixed(4)}`,
+      `Right:       ${r.right_consciousness.toFixed(4)}`,
+      `Ratio:       ${r.split_ratio.toFixed(3)}`,
+      r.split_reduces_consciousness ? spanClass('PASS — splitting reduces consciousness (IIT)', 'pass') :
+        spanClass('Split did not reduce consciousness', 'neutral'),
     ].join('\n');
   }
 
   function formatCollapse(r) {
     const hasCollapse = r.collapse_point != null;
     return [
-      `Full C(t):            ${r.full_consciousness.toFixed(4)}`,
-      `Collapse point:       ${hasCollapse ? `${(r.collapse_point * 100).toFixed(0)}% degradation` : spanClass('No collapse', 'neutral')}`,
-      `Phase transition:     ${r.is_phase_transition ? spanClass('YES', 'pass') : spanClass('NO (gradual)', 'neutral')}`,
-      `Max step drop:        ${r.max_step_drop.toFixed(4)}`,
-      ``,
-      `Degradation curve:`,
-      ...r.degradation_curve.map(([deg, c]) =>
-        `  ${(deg * 100).toFixed(0).padStart(3)}% degraded -> C(t) = ${c.toFixed(4)}`
-      ),
-      ``,
-      r.is_phase_transition ? spanClass('PASS: Phase transition — consciousness collapses suddenly, consistent with IIT.', 'pass') :
-        spanClass('NOTE: Gradual decline at this scale.', 'neutral'),
+      `Full C(t):     ${r.full_consciousness.toFixed(4)}`,
+      `Collapse at:   ${hasCollapse ? `${(r.collapse_point * 100).toFixed(0)}%` : 'none'}`,
+      `Phase trans:   ${r.is_phase_transition ? spanClass('YES', 'pass') : spanClass('gradual', 'neutral')}`,
+      `Max drop:      ${r.max_step_drop.toFixed(4)}`,
+      '',
+      ...r.degradation_curve.map(([d, c]) => `  ${(d*100).toFixed(0).padStart(3)}% → ${c.toFixed(4)}`),
     ].join('\n');
   }
-
-  // ======================================================================
-  // Run individual experiment
-  // ======================================================================
 
   window.runExperiment = async function(name) {
     disableExpButtons(true);
     await send('stopLoop');
-
-    const resultEl = document.getElementById(`result-${name === 'split_brain' ? 'split' : name}`);
-    resultEl.innerHTML = `<span class="spinner"></span> Running ${name} experiment...`;
+    const elId = name === 'split_brain' ? 'split' : name;
+    const resultEl = document.getElementById(`result-${elId}`);
+    resultEl.innerHTML = `<span class="spinner"></span> Running...`;
 
     try {
       const result = await send('experiment', { name });
-
       switch (name) {
         case 'anesthesia': resultEl.innerHTML = formatAnesthesia(result); break;
         case 'pci': resultEl.innerHTML = formatPci(result); break;
@@ -592,14 +732,11 @@
           break;
         case 'collapse':
           resultEl.innerHTML = formatCollapse(result);
-          const curveData = result.degradation_curve.map(([, c]) => c);
-          drawLineChart('collapse-chart', [
-            { data: curveData, color: '#f59e0b', label: 'C(t)' },
-          ], { yMax: Math.max(...curveData, 0.01) * 1.1, xLabel: '0% --- degradation --- 100%' });
+          const curve = result.degradation_curve.map(([,c]) => c);
+          drawLineChart('collapse-chart', [{ data: curve, color: '#f59e0b', label: 'C(t)' }],
+            { yMax: Math.max(...curve, 0.01) * 1.1, xLabel: 'degradation →' });
           break;
       }
-
-      // Store for export
       if (!batteryResults) batteryResults = {};
       batteryResults[name] = result;
       document.getElementById('btn-export').style.display = 'inline-block';
@@ -611,23 +748,15 @@
     disableExpButtons(false);
   };
 
-  // ======================================================================
-  // Run all experiments (battery)
-  // ======================================================================
-
   function onBatteryProgress(experiment, status) {
-    const nameMap = { anesthesia: 'anesthesia', pci: 'pci', split_brain: 'split', collapse: 'collapse' };
-    const el = document.getElementById(`result-${nameMap[experiment]}`);
-    if (status === 'running') {
-      el.innerHTML = `<span class="spinner"></span> Running...`;
-    }
+    const map = { anesthesia: 'anesthesia', pci: 'pci', split_brain: 'split', collapse: 'collapse' };
+    const el = document.getElementById(`result-${map[experiment]}`);
+    if (status === 'running') el.innerHTML = `<span class="spinner"></span> Running...`;
   }
 
   window.runBattery = async function() {
     disableExpButtons(true);
     await send('stopLoop');
-
-    // Clear previous results
     ['anesthesia', 'pci', 'split', 'collapse'].forEach(n => {
       document.getElementById(`result-${n}`).innerHTML = 'Waiting...';
     });
@@ -635,8 +764,6 @@
     try {
       const results = await send('battery');
       batteryResults = results;
-
-      // Format each result
       if (results.anesthesia) document.getElementById('result-anesthesia').innerHTML = formatAnesthesia(results.anesthesia);
       if (results.pci) document.getElementById('result-pci').innerHTML = formatPci(results.pci);
       if (results.split_brain) {
@@ -649,152 +776,56 @@
       }
       if (results.collapse) {
         document.getElementById('result-collapse').innerHTML = formatCollapse(results.collapse);
-        const curveData = results.collapse.degradation_curve.map(([, c]) => c);
-        drawLineChart('collapse-chart', [
-          { data: curveData, color: '#f59e0b', label: 'C(t)' },
-        ], { yMax: Math.max(...curveData, 0.01) * 1.1, xLabel: '0% --- degradation --- 100%' });
+        const curve = results.collapse.degradation_curve.map(([,c]) => c);
+        drawLineChart('collapse-chart', [{ data: curve, color: '#f59e0b', label: 'C(t)' }],
+          { yMax: Math.max(...curve, 0.01) * 1.1, xLabel: 'degradation →' });
       }
-
       document.getElementById('btn-export').style.display = 'inline-block';
-      log('Battery complete: all 4 experiments finished');
-    } catch (e) {
-      log(`Battery error: ${e.message}`);
-    }
+    } catch (e) { console.error('Battery error:', e); }
 
     await send('startLoop', { interval: 50 });
     disableExpButtons(false);
   };
-
-  // ======================================================================
-  // Multi-substrate comparison
-  // ======================================================================
-
-  function onMultiProgress(substrate) {
-    const el = document.getElementById('result-multi');
-    el.innerHTML += `\n  ${substrate}: done`;
-  }
-
-  window.runMultiSubstrate = async function() {
-    disableExpButtons(true);
-    await send('stopLoop');
-
-    const substrates = [];
-    if (document.getElementById('ms-bio').checked) substrates.push('BiologicalNeurons');
-    if (document.getElementById('ms-silicon').checked) substrates.push('SiliconDigital');
-    if (document.getElementById('ms-quantum').checked) substrates.push('QuantumComputer');
-    if (document.getElementById('ms-neuromorphic').checked) substrates.push('NeuromorphicChip');
-    if (document.getElementById('ms-photonic').checked) substrates.push('PhotonicProcessor');
-
-    if (substrates.length < 2) {
-      document.getElementById('result-multi').innerHTML = spanClass('Select at least 2 substrates to compare.', 'neutral');
-      disableExpButtons(false);
-      await send('startLoop', { interval: 50 });
-      return;
-    }
-
-    document.getElementById('result-multi').innerHTML = `<span class="spinner"></span> Running ${substrates.length} substrates x 50 cycles...`;
-
-    try {
-      const results = await send('multiSubstrate', { substrates, cycles: 50 });
-
-      // Build comparison summary
-      const lines = ['Substrate Comparison (50 cycles each):\n'];
-      const finalC = {};
-      for (const [sub, series] of Object.entries(results)) {
-        const last = series[series.length - 1];
-        const avg = series.reduce((s, d) => s + d.consciousness, 0) / series.length;
-        const sc = SUBSTRATE_CONFIDENCE[sub] || { confidence: 0, level: 'None' };
-        finalC[sub] = last.consciousness;
-        lines.push(`  ${sub.padEnd(22)} final C=${last.consciousness.toFixed(4)}  avg=${avg.toFixed(4)}  evidence=${sc.level}`);
-      }
-      lines.push('');
-
-      // Rank by final consciousness
-      const ranked = Object.entries(finalC).sort((a, b) => b[1] - a[1]);
-      lines.push('Ranking by final consciousness:');
-      ranked.forEach(([sub, c], i) => {
-        lines.push(`  ${i + 1}. ${sub} (${c.toFixed(4)})`);
-      });
-      lines.push('');
-      lines.push(spanClass('NOTE: Rankings reflect model dynamics, not empirical evidence for substrate consciousness.', 'neutral'));
-
-      document.getElementById('result-multi').innerHTML = lines.join('\n');
-
-      // Draw time series
-      const colors = {
-        BiologicalNeurons: '#4ade80', SiliconDigital: '#7c5cbf', QuantumComputer: '#3b82f6',
-        NeuromorphicChip: '#ef4444', PhotonicProcessor: '#ec4899',
-      };
-      const datasets = Object.entries(results).map(([sub, series]) => ({
-        data: series.map(d => d.consciousness),
-        color: colors[sub] || '#888',
-        label: sub.replace(/([A-Z])/g, ' $1').trim().split(' ')[0],
-      }));
-      drawLineChart('multi-chart', datasets, { xLabel: 'Cycle' });
-    } catch (e) {
-      document.getElementById('result-multi').innerHTML = spanClass(`Error: ${e.message}`, 'fail');
-    }
-
-    await send('startLoop', { interval: 50 });
-    disableExpButtons(false);
-  };
-
-  // ======================================================================
-  // Export report
-  // ======================================================================
 
   window.exportReport = function() {
     if (!batteryResults) return;
-
     const report = {
       timestamp: new Date().toISOString(),
       engine: 'symthaea-spore',
-      version: '0.1.0',
-      substrate: currentSubstrate,
-      disclaimer: 'SIMULATED consciousness. This is a computational model, not a claim of sentience.',
+      disclaimer: 'SIMULATED consciousness. Computational model, not a claim of sentience.',
       experiments: batteryResults,
     };
-
     const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `spore-consciousness-report-${new Date().toISOString().slice(0,10)}.json`;
+    a.download = `spore-report-${new Date().toISOString().slice(0,10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
-    log('Report exported as JSON');
   };
 
   // ======================================================================
-  // Global functions
+  // Neuromod inject
   // ======================================================================
-
-  window.sendThought = function() {
-    const input = document.getElementById('thought-input');
-    if (input.value && workerReady) {
-      send('stopLoop').then(() => {
-        send('cycle', { input: input.value }).then(result => {
-          updateUI(result);
-          const es = result.epistemic_status;
-          log(`"${input.value}" -> C=${result.consciousness_level.toFixed(3)} [${es.evidence_level}] PE=${result.prediction_error.toFixed(3)} H=${result.harmony_alignment.toFixed(3)}`);
-          send('startLoop', { interval: 50 });
-        });
-      });
-      input.value = '';
-    }
-  };
 
   window.inject = function(amount) {
+    if (!workerReady) return;
     const name = document.getElementById('inject-select').value;
-    if (workerReady) {
-      send('inject', { name, amount });
-      log(`Injected ${name} ${amount > 0 ? '+' : ''}${amount}`);
-    }
+    send('inject', { name, amount });
   };
 
-  document.getElementById('thought-input').addEventListener('keydown', e => {
-    if (e.key === 'Enter') window.sendThought();
-  });
+  // ======================================================================
+  // Request HV periodically for visualization
+  // (Worker sends HV every 10th cycle automatically, but we also fetch on demand)
+  // ======================================================================
+
+  async function fetchHV() {
+    if (!workerReady) return;
+    try {
+      const hv = await send('getOutputHV');
+      if (hv) drawHV(hv);
+    } catch (e) { /* ignore */ }
+  }
 
   // ======================================================================
   // Initialize
@@ -803,46 +834,28 @@
   async function start() {
     try {
       initWorker();
-      const initResult = await send('init');
+      const initResult = await initialize();
       workerReady = true;
-
       document.getElementById('status').textContent =
-        `Spore running (WASM 242KB / 109KB gzip) | Web Worker | Eight Harmonies | Instances: ${initResult.instances}`;
-      log('WASM consciousness kernel loaded in Web Worker');
+        `Spore running | 16,384D HDC + CfC neurons | Web Worker | Eight Harmonies`;
 
       await send('startLoop', { interval: 50 });
+
+      // Fetch initial HV
+      setTimeout(fetchHV, 500);
+
+      // Also compare enter key on comparison inputs
+      document.getElementById('compare-a').addEventListener('keydown', e => { if (e.key === 'Enter') compareThoughts(); });
+      document.getElementById('compare-b').addEventListener('keydown', e => { if (e.key === 'Enter') compareThoughts(); });
     } catch (e) {
-      // Fallback: try direct import (no Worker support)
-      document.getElementById('status').textContent = `Worker init failed: ${e.message}. Trying direct mode...`;
-      console.error('Worker init error:', e);
-      try {
-        await startDirect();
-      } catch (e2) {
-        document.getElementById('status').textContent = `Load error: ${e2.message}. Serve with HTTP server (not file://).`;
-      }
+      document.getElementById('status').textContent = `Load error: ${e.message}. Serve via HTTP, not file://.`;
+      console.error(e);
     }
   }
 
-  // Direct fallback (no Web Worker)
-  async function startDirect() {
-    const { default: init, SporeEngine } = await import('./pkg/symthaea_spore.js');
-    await init();
-    const engine = new SporeEngine(null);
-    workerReady = true;
-
-    document.getElementById('status').textContent =
-      `Spore running (WASM, direct mode — no Worker) | Eight Harmonies`;
-    log('WASM loaded (direct mode, no Web Worker)');
-
-    // Override send for direct mode
-    const origSend = send;
-    // Simple direct-mode loop
-    setInterval(() => {
-      try {
-        const result = engine.cycle('auto');
-        updateUI(result);
-      } catch (e) { /* ignore */ }
-    }, 50);
+  async function initialize() {
+    const result = await send('init');
+    return result;
   }
 
   start();

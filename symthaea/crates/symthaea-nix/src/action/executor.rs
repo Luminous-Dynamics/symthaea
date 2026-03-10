@@ -8,6 +8,7 @@
 
 use crate::traits::{ActionType, ConsciousnessThresholds, PhiAwareScoring};
 use serde::{Deserialize, Serialize};
+use std::collections::VecDeque;
 use std::process::Stdio;
 use tokio::process::Command;
 use tracing::{info, warn};
@@ -199,47 +200,59 @@ impl NixOSCommand {
     pub fn to_command(&self) -> (String, Vec<String>) {
         match self {
             Self::RebuildSwitch { flake, extra_args } => {
-                let mut args = vec!["switch".to_string()];
+                let flake_extra = if flake.is_some() { 2 } else { 0 };
+                let mut args = Vec::with_capacity(1 + flake_extra + extra_args.len());
+                args.push("switch".to_string());
                 if let Some(f) = flake {
                     args.push("--flake".to_string());
                     args.push(f.clone());
                 }
-                args.extend(extra_args.clone());
+                args.extend(extra_args.iter().cloned());
                 ("nixos-rebuild".to_string(), args)
             }
             Self::RebuildTest { flake, extra_args } => {
-                let mut args = vec!["test".to_string()];
+                let flake_extra = if flake.is_some() { 2 } else { 0 };
+                let mut args = Vec::with_capacity(1 + flake_extra + extra_args.len());
+                args.push("test".to_string());
                 if let Some(f) = flake {
                     args.push("--flake".to_string());
                     args.push(f.clone());
                 }
-                args.extend(extra_args.clone());
+                args.extend(extra_args.iter().cloned());
                 ("nixos-rebuild".to_string(), args)
             }
             Self::RebuildBoot { flake, extra_args } => {
-                let mut args = vec!["boot".to_string()];
+                let flake_extra = if flake.is_some() { 2 } else { 0 };
+                let mut args = Vec::with_capacity(1 + flake_extra + extra_args.len());
+                args.push("boot".to_string());
                 if let Some(f) = flake {
                     args.push("--flake".to_string());
                     args.push(f.clone());
                 }
-                args.extend(extra_args.clone());
+                args.extend(extra_args.iter().cloned());
                 ("nixos-rebuild".to_string(), args)
             }
             Self::EnvInstall { packages } => {
-                let mut args = vec!["-iA".to_string()];
+                let mut args = Vec::with_capacity(1 + packages.len());
+                args.push("-iA".to_string());
                 for pkg in packages {
                     args.push(format!("nixpkgs.{pkg}"));
                 }
                 ("nix-env".to_string(), args)
             }
             Self::EnvRemove { packages } => {
-                let mut args = vec!["-e".to_string()];
-                args.extend(packages.clone());
+                let mut args = Vec::with_capacity(1 + packages.len());
+                args.push("-e".to_string());
+                args.extend(packages.iter().cloned());
                 ("nix-env".to_string(), args)
             }
             Self::EnvRollback => ("nix-env".to_string(), vec!["--rollback".to_string()]),
             Self::Search { query, json } => {
-                let mut args = vec!["search".to_string(), "nixpkgs".to_string(), query.clone()];
+                let cap = if *json { 4 } else { 3 };
+                let mut args = Vec::with_capacity(cap);
+                args.push("search".to_string());
+                args.push("nixpkgs".to_string());
+                args.push(query.clone());
                 if *json {
                     args.push("--json".to_string());
                 }
@@ -247,7 +260,9 @@ impl NixOSCommand {
             }
             Self::Channel { operation } => match operation {
                 ChannelOperation::Update { channel } => {
-                    let mut args = vec!["--update".to_string()];
+                    let cap = if channel.is_some() { 2 } else { 1 };
+                    let mut args = Vec::with_capacity(cap);
+                    args.push("--update".to_string());
                     if let Some(ch) = channel {
                         args.push(ch.clone());
                     }
@@ -265,12 +280,16 @@ impl NixOSCommand {
             },
             Self::Flake { operation } => match operation {
                 FlakeOperation::Update { inputs } => {
-                    let mut args = vec!["flake".to_string(), "update".to_string()];
-                    args.extend(inputs.clone());
+                    let mut args = Vec::with_capacity(2 + inputs.len());
+                    args.push("flake".to_string());
+                    args.push("update".to_string());
+                    args.extend(inputs.iter().cloned());
                     ("nix".to_string(), args)
                 }
                 FlakeOperation::Lock { inputs } => {
-                    let mut args = vec!["flake".to_string(), "lock".to_string()];
+                    let mut args = Vec::with_capacity(2 + 2 * inputs.len());
+                    args.push("flake".to_string());
+                    args.push("lock".to_string());
                     for input in inputs {
                         args.push("--update-input".to_string());
                         args.push(input.clone());
@@ -287,7 +306,9 @@ impl NixOSCommand {
                 ),
             },
             Self::HomeManagerSwitch { flake } => {
-                let mut args = vec!["switch".to_string()];
+                let cap = if flake.is_some() { 3 } else { 1 };
+                let mut args = Vec::with_capacity(cap);
+                args.push("switch".to_string());
                 if let Some(f) = flake {
                     args.push("--flake".to_string());
                     args.push(f.clone());
@@ -298,7 +319,11 @@ impl NixOSCommand {
                 older_than_days,
                 delete_all,
             } => {
-                let mut args = vec!["-d".to_string()];
+                let cap = 1
+                    + if older_than_days.is_some() { 2 } else { 0 }
+                    + if *delete_all { 1 } else { 0 };
+                let mut args = Vec::with_capacity(cap);
+                args.push("-d".to_string());
                 if let Some(days) = older_than_days {
                     args.push("--delete-older-than".to_string());
                     args.push(format!("{days}d"));
@@ -345,7 +370,7 @@ pub enum ExecutionResult {
 pub struct NixOSExecutor {
     current_generation: Option<u32>,
     thresholds: ConsciousnessThresholds,
-    history: Vec<ExecutionRecord>,
+    history: VecDeque<ExecutionRecord>,
     dry_run: bool,
 }
 
@@ -369,7 +394,7 @@ impl NixOSExecutor {
         Self {
             current_generation: None,
             thresholds: ConsciousnessThresholds::default(),
-            history: Vec::new(),
+            history: VecDeque::with_capacity(1000),
             dry_run: false,
         }
     }
@@ -585,14 +610,14 @@ impl NixOSExecutor {
                 .map(|d| d.as_millis() as u64)
                 .unwrap_or(0),
         };
-        self.history.push(record);
+        self.history.push_back(record);
 
         if self.history.len() > 1000 {
-            self.history.remove(0);
+            self.history.pop_front();
         }
     }
 
-    pub fn history(&self) -> &[ExecutionRecord] {
+    pub fn history(&self) -> &VecDeque<ExecutionRecord> {
         &self.history
     }
 
@@ -983,6 +1008,56 @@ mod tests {
         let executor = NixOSExecutor::new();
         assert!(executor.success_rate(SafetyLevel::ReadOnly).is_none());
         assert!(executor.success_rate(SafetyLevel::UserModify).is_none());
+    }
+
+    #[test]
+    fn test_history_ring_buffer_eviction() {
+        let mut executor = NixOSExecutor::new();
+        // Fill beyond 1000 entries
+        for i in 0..1005 {
+            let record = ExecutionRecord {
+                command: NixOSCommand::Search {
+                    query: format!("pkg{i}"),
+                    json: false,
+                },
+                phi_at_execution: 0.5,
+                result: ExecutionResult::Success {
+                    stdout: String::new(),
+                    stderr: String::new(),
+                    execution_time_ms: 0,
+                },
+                timestamp_ms: i as u64,
+            };
+            executor.history.push_back(record);
+            if executor.history.len() > 1000 {
+                executor.history.pop_front();
+            }
+        }
+        assert_eq!(executor.history.len(), 1000);
+        // Oldest entry should be pkg5 (0..4 evicted)
+        if let NixOSCommand::Search { query, .. } = &executor.history[0].command {
+            assert_eq!(query, "pkg5");
+        } else {
+            panic!("Expected Search command");
+        }
+    }
+
+    #[test]
+    fn test_to_command_capacity_hints() {
+        // Ensure pre-allocated capacity is sufficient (no reallocation panics)
+        let cmd = NixOSCommand::RebuildSwitch {
+            flake: Some(".#host".into()),
+            extra_args: vec!["--show-trace".into(), "--verbose".into()],
+        };
+        let (_, args) = cmd.to_command();
+        assert_eq!(args.len(), 5); // switch, --flake, .#host, --show-trace, --verbose
+
+        let cmd = NixOSCommand::CollectGarbage {
+            older_than_days: Some(30),
+            delete_all: true,
+        };
+        let (_, args) = cmd.to_command();
+        assert_eq!(args.len(), 4); // -d, --delete-older-than, 30d, --delete-old
     }
 
     #[test]

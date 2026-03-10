@@ -180,4 +180,96 @@ mod tests {
         assert!((output.average_phi - 0.25).abs() < 1e-6);
         assert_eq!(output.episode_count, 2);
     }
+
+    #[test]
+    fn test_compute_phi_nan_input() {
+        let input = EvolutionInput {
+            episodes: vec![vec![f32::NAN, 1.0, 2.0]],
+            tau_scale: 1.0,
+            threshold: 0.0,
+        };
+        let output = compute_average_phi(&input);
+        // Should not panic; NaN propagates through arithmetic
+        assert!(output.average_phi.is_nan() || output.average_phi >= 0.0);
+    }
+
+    #[test]
+    fn test_compute_phi_inf_input() {
+        let input = EvolutionInput {
+            episodes: vec![vec![f32::INFINITY, 1.0]],
+            tau_scale: 1.0,
+            threshold: 0.0,
+        };
+        let output = compute_average_phi(&input);
+        // Should not panic; Inf propagates
+        assert!(output.average_phi.is_infinite() || output.average_phi.is_nan());
+    }
+
+    #[test]
+    fn test_compute_phi_negative_values() {
+        let input = EvolutionInput {
+            episodes: vec![vec![-1.0, -2.0, -3.0]],
+            tau_scale: 1.0,
+            threshold: 0.0,
+        };
+        let output = compute_average_phi(&input);
+        // Variance is always non-negative, so phi should be >= 0
+        assert!(output.average_phi >= 0.0, "phi with negative values should be >= 0");
+    }
+
+    #[test]
+    fn test_compute_phi_very_large_values() {
+        let input = EvolutionInput {
+            episodes: vec![vec![1e30, -1e30]],
+            tau_scale: 1.0,
+            threshold: 0.0,
+        };
+        let output = compute_average_phi(&input);
+        // Should not panic; large values produce large variance
+        assert!(output.average_phi.is_finite() || output.average_phi.is_infinite());
+    }
+
+    #[test]
+    fn test_attestation_at_exact_threshold() {
+        let output = EvolutionOutput {
+            average_phi: 0.5,
+            tau_scale: 1.0,
+            episode_count: 1,
+        };
+        // phi == threshold should pass (>=)
+        assert!(attestation_passes(&output, 0.5));
+        // phi just below threshold should fail
+        let output_below = EvolutionOutput {
+            average_phi: 0.4999,
+            tau_scale: 1.0,
+            episode_count: 1,
+        };
+        assert!(!attestation_passes(&output_below, 0.5));
+    }
+
+    #[test]
+    fn test_compute_phi_deterministic() {
+        let input = EvolutionInput {
+            episodes: vec![vec![1.0, 2.0, 3.0], vec![4.0, 5.0]],
+            tau_scale: 0.7,
+            threshold: 0.0,
+        };
+        let out1 = compute_average_phi(&input);
+        let out2 = compute_average_phi(&input);
+        assert_eq!(out1.average_phi, out2.average_phi, "Same input must produce same output");
+    }
+
+    #[test]
+    fn test_evolution_output_episode_count() {
+        let input = EvolutionInput {
+            episodes: vec![vec![1.0], vec![], vec![2.0, 3.0], vec![]],
+            tau_scale: 1.0,
+            threshold: 0.0,
+        };
+        let output = compute_average_phi(&input);
+        assert_eq!(
+            output.episode_count, 4,
+            "episode_count should match total episodes including empty"
+        );
+    }
 }

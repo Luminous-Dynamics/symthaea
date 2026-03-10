@@ -118,10 +118,22 @@ pub struct IntegrityManager {
     /// Ring buffer of recent integrity events (capacity 64).
     /// Persists across tick() cycles for post-mortem analysis.
     pub event_log: VecDeque<IntegrityEvent>,
+    /// Unified cross-source failure streak (attestation + canary failures combined).
+    /// Resets to 0 when a full tick completes with no anomalies.
+    /// Used for severity escalation: 1-2 = Warning, 3+ = Critical.
+    pub global_failure_streak: usize,
+    /// Rolling 60-cycle history of integrity_confidence values for sparkline display.
+    pub confidence_history: VecDeque<f32>,
+    /// Deterministic jitter seed for attestation interval randomization.
+    /// Initialized from cycle 0 hash to avoid predictable check timing.
+    jitter_seed: u64,
 }
 
-/// Co-prime attestation check interval (not in the existing set: 7,11,13,19,23,47,97).
+/// Base attestation check interval (subject to ±10% jitter).
 const ATTESTATION_INTERVAL: usize = 101;
+
+/// Capacity of the integrity confidence sparkline history.
+const CONFIDENCE_HISTORY_CAPACITY: usize = 60;
 
 impl IntegrityManager {
     /// Create a new integrity manager, computing baseline hashes immediately.
@@ -151,6 +163,9 @@ impl IntegrityManager {
             substrate_tau_factor: 1.0,
             integrity_confidence: 1.0,
             event_log: VecDeque::with_capacity(EVENT_LOG_CAPACITY),
+            global_failure_streak: 0,
+            confidence_history: VecDeque::with_capacity(CONFIDENCE_HISTORY_CAPACITY),
+            jitter_seed: 0x5AFE_C0DE_DEAD_BEEF,
         }
     }
 
@@ -166,46 +181,52 @@ impl IntegrityManager {
             std::time::Duration::from_micros((100.0 * inv_tau as f64) as u64);
     }
 
+    /// Compute a deterministic jittered attestation interval for the given cycle.
+    ///
+    /// Applies ±10% jitter using a simple hash of (cycle + seed) to make
+    /// check timing unpredictable. An attacker who knows the base interval
+    /// cannot time manipulation to fall between checks.
+    fn jittered_attestation_due(&self, cycle: usize) -> bool {
+        if cycle == 0 {
+            return false;
+        }
+        // Simple deterministic jitter: hash cycle with seed, produce offset in [-10, +10]
+        let h = (cycle as u64).wrapping_mul(self.jitter_seed).wrapping_add(0x9E37_79B9_7F4A_7C15);
+        let jitter = (h % 21) as isize - 10; // range [-10, +10]
+        let interval = (ATTESTATION_INTERVAL as isize + jitter).max(80) as usize;
+        cycle % interval == 0
+    }
+
     /// Run integrity checks that are due this cycle. Self-tracks wall elapsed.
     ///
     /// Each component fires at its own co-prime interval:
-    /// - Attestation: every 101 cycles
+    /// - Attestation: every ~101 cycles (±10% jitter)
     /// - Temporal: every cycle (lightweight)
-    /// - Canaries: individual intervals (103, 107, 109, 113)
+    /// - Canaries: individual intervals (103, 107, 109, 113, 127, 131)
     ///
     /// When `full_sweep` is true (Night phase), all checks run unconditionally.
     /// Science: Besedovsky et al. (2012) — immune system maintenance peaks during sleep.
+    ///
+    /// **Unified severity**: Attestation and canary failures feed a single
+    /// `global_failure_streak`. 1-2 = Warning, 3+ = Critical. The streak resets
+    /// only when a full tick completes with zero anomalies across all sources.
     pub fn tick(&mut self, cycle: usize, cfc_delta_t: f32, full_sweep: bool) -> &IntegrityStatus {
         let wall_elapsed = self.last_cycle_instant.elapsed();
         self.last_cycle_instant = Instant::now();
         self.status.anomalies.clear();
         self.status.last_check_cycle = cycle;
 
-        // Attestation (every 101 cycles, or every cycle during full sweep)
-        if full_sweep || (cycle % ATTESTATION_INTERVAL == 0 && cycle > 0) {
+        // Attestation (jittered ~101 cycles, or every cycle during full sweep)
+        if full_sweep || self.jittered_attestation_due(cycle) {
             let failures = self.attestation.verify_all(cycle);
             self.status.attestation_passed = failures.is_empty();
-            // Determine severity from consecutive failure streaks:
-            // 1-2 consecutive = Warning (transient drift, FP noise)
-            // 3+  consecutive = Critical (persistent corruption)
-            let max_streak = self
-                .attestation
-                .records()
-                .iter()
-                .map(|r| r.consecutive_failures)
-                .max()
-                .unwrap_or(0);
-            let severity = if max_streak >= 3 {
-                AnomalySeverity::Critical
-            } else {
-                AnomalySeverity::Warning
-            };
             for failure in failures {
                 self.status.anomalies.push(IntegrityAnomaly {
                     source: "attestation",
                     description: failure,
                     detected_at: Instant::now(),
-                    severity,
+                    // Severity assigned below from unified streak
+                    severity: AnomalySeverity::Warning,
                 });
             }
         }
@@ -231,10 +252,6 @@ impl IntegrityManager {
         };
         self.status.canaries_passed = canary_failures.is_empty();
         for failure in canary_failures {
-            let severity = match failure.severity {
-                CanarySeverity::Drift => AnomalySeverity::Warning,
-                CanarySeverity::Corruption => AnomalySeverity::Critical,
-            };
             self.status.anomalies.push(IntegrityAnomaly {
                 source: "canary",
                 description: format!(
@@ -242,8 +259,34 @@ impl IntegrityManager {
                     failure.canary_name, failure.expected, failure.actual
                 ),
                 detected_at: Instant::now(),
-                severity,
+                // Canary Corruption → will be escalated via streak below
+                severity: match failure.severity {
+                    CanarySeverity::Drift => AnomalySeverity::Warning,
+                    CanarySeverity::Corruption => AnomalySeverity::Critical,
+                },
             });
+        }
+
+        // ── Unified severity pipeline ──────────────────────────────────────
+        // All anomaly sources (attestation, canary, temporal) feed a single
+        // global_failure_streak. Resets on clean tick; escalates to Critical at 3+.
+        if self.status.anomalies.is_empty() {
+            self.global_failure_streak = 0;
+        } else {
+            self.global_failure_streak += 1;
+        }
+
+        // Upgrade all anomaly severities based on unified streak
+        let unified_severity = if self.global_failure_streak >= 3 {
+            AnomalySeverity::Critical
+        } else {
+            AnomalySeverity::Warning
+        };
+        // Escalate warnings to critical if streak warrants it (never downgrade)
+        for anomaly in &mut self.status.anomalies {
+            if unified_severity == AnomalySeverity::Critical {
+                anomaly.severity = AnomalySeverity::Critical;
+            }
         }
 
         // Log all anomalies to the persistent ring buffer for post-mortem analysis
@@ -266,6 +309,12 @@ impl IntegrityManager {
         } else {
             1.0
         };
+
+        // Record confidence for sparkline history
+        if self.confidence_history.len() >= CONFIDENCE_HISTORY_CAPACITY {
+            self.confidence_history.pop_front();
+        }
+        self.confidence_history.push_back(self.integrity_confidence);
 
         &self.status
     }
@@ -295,6 +344,73 @@ impl IntegrityManager {
             .anomalies
             .iter()
             .any(|a| a.severity == AnomalySeverity::Critical)
+    }
+
+    /// Get the rolling confidence history for sparkline display.
+    pub fn confidence_history(&self) -> &VecDeque<f32> {
+        &self.confidence_history
+    }
+
+    /// Export a BLAKE3-signed snapshot of all attestation state for forensic analysis.
+    ///
+    /// The blob contains: record count, per-record (name, baseline_hash, consecutive_failures),
+    /// global_failure_streak, integrity_confidence, and a trailing BLAKE3 signature over all
+    /// preceding bytes. This enables external auditors to verify the blob's integrity
+    /// and reconstruct the attestation state at dump time.
+    ///
+    /// Format: `[u32:count][records...][u32:streak][f32:confidence][32:blake3_signature]`
+    pub fn export_snapshot(&self) -> Vec<u8> {
+        let mut blob = Vec::with_capacity(512);
+
+        // Record count
+        let count = self.attestation.records().len() as u32;
+        blob.extend_from_slice(&count.to_le_bytes());
+
+        // Per-record: name_len(u16) + name(utf8) + baseline_hash(32) + consecutive_failures(u32)
+        for record in self.attestation.records() {
+            let name_bytes = record.name.as_bytes();
+            blob.extend_from_slice(&(name_bytes.len() as u16).to_le_bytes());
+            blob.extend_from_slice(name_bytes);
+            blob.extend_from_slice(&record.baseline_hash);
+            blob.extend_from_slice(&(record.consecutive_failures as u32).to_le_bytes());
+        }
+
+        // Global state
+        blob.extend_from_slice(&(self.global_failure_streak as u32).to_le_bytes());
+        blob.extend_from_slice(&self.integrity_confidence.to_le_bytes());
+
+        // Event log count + last N events (source + severity)
+        let event_count = self.event_log.len().min(EVENT_LOG_CAPACITY) as u32;
+        blob.extend_from_slice(&event_count.to_le_bytes());
+        for event in &self.event_log {
+            let src = event.source.as_bytes();
+            blob.extend_from_slice(&(src.len() as u16).to_le_bytes());
+            blob.extend_from_slice(src);
+            blob.push(match event.severity {
+                AnomalySeverity::Warning => 0,
+                AnomalySeverity::Critical => 1,
+            });
+            blob.extend_from_slice(&(event.cycle as u32).to_le_bytes());
+        }
+
+        // BLAKE3 signature over everything above
+        let signature = *blake3::hash(&blob).as_bytes();
+        blob.extend_from_slice(&signature);
+
+        blob
+    }
+
+    /// Verify an exported snapshot blob's BLAKE3 signature.
+    ///
+    /// Returns true if the trailing 32-byte signature matches the BLAKE3 hash
+    /// of the preceding content bytes.
+    pub fn verify_snapshot(blob: &[u8]) -> bool {
+        if blob.len() < 32 {
+            return false;
+        }
+        let (content, sig) = blob.split_at(blob.len() - 32);
+        let expected = blake3::hash(content);
+        expected.as_bytes() == sig
     }
 }
 

@@ -1000,6 +1000,26 @@ impl BenchmarkReport {
             push_specific("d_prime", "sart_d_prime", &bl.sustained_attention);
             push_specific("rt_ticks", "sart_rt_ticks", &bl.sustained_attention);
         }
+        // PVT (Sustained Attention)
+        if benchmark.contains("PVT") {
+            push_specific(
+                "vigilance_decrement",
+                "vigilance_decrement",
+                &bl.sustained_attention,
+            );
+            push_specific("lapse_rate", "lapse_rate", &bl.sustained_attention);
+            push_specific("fastest_10pct", "fastest_10pct", &bl.sustained_attention);
+        }
+        // CPT (Sustained Attention)
+        if benchmark.contains("CPT") {
+            push_specific("d_prime", "cpt_d_prime", &bl.sustained_attention);
+            push_specific("hit_rate", "cpt_hit_rate", &bl.sustained_attention);
+            push_specific(
+                "false_alarm_rate",
+                "cpt_false_alarm_rate",
+                &bl.sustained_attention,
+            );
+        }
         // SRTT (Motor)
         if benchmark.contains("SRTT") {
             push_specific("learning_effect", "learning_effect", &bl.motor);

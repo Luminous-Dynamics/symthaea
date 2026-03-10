@@ -403,7 +403,7 @@ foveation-perception = ["foveation", "symthaea-foveation/perception"]  # Foveati
 integrity = []  # Hardware integrity / tamper detection framework (attestation, temporal checks, canaries)
 semantic-encoder = ["symthaea-embeddings/embed-channel"]  # Background Qwen3 embedding channel for cognitive loop telemetry
 # Neural Bridge v2: BGE-M3 via Candle (LLM as Semantic Sensor)
-neural-bridge = ["candle-core", "candle-nn", "candle-transformers", "tokenizers", "hf-hub"]
+neural-bridge = ["candle-core", "candle-nn", "candle-transformers", "tokenizers", "hf-hub", "dep:sha2"]
 neural-bridge-cuda = ["neural-bridge", "candle-core/cuda", "candle-nn/cuda", "candle-transformers/cuda"]
 
 # ── Distributed / Network ──────────────────────────────────────────

@@ -252,6 +252,55 @@ impl LanguageController {
         self.token_embeddings.len()
     }
 
+    /// Forward step with sampled softmax (for training efficiency).
+    ///
+    /// Only computes cosine similarity for the specified `active_indices`,
+    /// setting all other logits to `NEG_INFINITY`. This gives ~60× speedup
+    /// for 4K vocabularies when using 64 negative samples.
+    ///
+    /// The CfC network evolution is identical to `forward_step`.
+    pub fn forward_step_sampled(
+        &mut self,
+        thought_hv: &ContinuousHV,
+        prev_token_id: u32,
+        pos: usize,
+        active_indices: &[usize],
+    ) -> Vec<f32> {
+        // 1. Compose input (same as forward_step)
+        let token_emb = self.get_token_embedding(prev_token_id);
+        let pos_emb = self.position_base.permute(pos);
+        let input_hv = thought_hv.bind(&token_emb).bind(&pos_emb);
+
+        let dt = if self.config.dt_per_token.is_finite() && self.config.dt_per_token > 0.0 {
+            self.config.dt_per_token
+        } else {
+            0.02
+        };
+
+        // 2. Evolve network dynamics
+        self.network.evolve_closed_form(dt, &input_hv);
+
+        // 3. Get normalized output
+        let output_hv = self.network.output().normalize();
+
+        // 4. Sparse logits: only compute similarity for active indices
+        let mut logits = vec![f32::NEG_INFINITY; self.token_embeddings.len()];
+        let inv_temp = 1.0 / self.config.logit_temperature.max(1e-6);
+
+        for &i in active_indices {
+            if i < self.token_embeddings.len() {
+                let mut s = output_hv.similarity(&self.token_embeddings[i]) * inv_temp;
+                if !s.is_finite() {
+                    s = 0.0;
+                }
+                logits[i] = s;
+            }
+        }
+
+        self.current_pos = pos + 1;
+        logits
+    }
+
     /// Get current sequence position.
     pub fn current_pos(&self) -> usize {
         self.current_pos
@@ -620,5 +669,39 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn test_forward_step_sampled() {
+        let genesis = test_genesis();
+        let config = test_config();
+
+        let thought_hv = ContinuousHV::from_genesis(&genesis, "test_thought", HDC_DIMENSION);
+
+        // Full forward step
+        let mut ctrl1 = LanguageController::new(&genesis, &config);
+        let full_logits = ctrl1.forward_step(&thought_hv, 0, 0);
+
+        // Sampled forward step with all indices = should match full
+        let all_indices: Vec<usize> = (0..config.vocab_size).collect();
+        let mut ctrl2 = LanguageController::new(&genesis, &config);
+        let sampled_logits = ctrl2.forward_step_sampled(&thought_hv, 0, 0, &all_indices);
+
+        assert_eq!(full_logits.len(), sampled_logits.len());
+        for (a, b) in full_logits.iter().zip(sampled_logits.iter()) {
+            assert!(
+                (a - b).abs() < 1e-5,
+                "Sampled (all indices) should match full: {a} vs {b}"
+            );
+        }
+
+        // Sampled with subset: non-sampled indices should be -inf
+        let subset = vec![0, 5, 10];
+        let mut ctrl3 = LanguageController::new(&genesis, &config);
+        let sparse_logits = ctrl3.forward_step_sampled(&thought_hv, 0, 0, &subset);
+        assert!(sparse_logits[0].is_finite(), "Index 0 should be computed");
+        assert!(sparse_logits[5].is_finite(), "Index 5 should be computed");
+        assert_eq!(sparse_logits[1], f32::NEG_INFINITY, "Index 1 should be -inf");
+        assert_eq!(sparse_logits[3], f32::NEG_INFINITY, "Index 3 should be -inf");
     }
 }

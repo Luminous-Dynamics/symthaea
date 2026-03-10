@@ -158,6 +158,23 @@ impl CognitiveLoopService {
         corr
     }
 
+    /// Get the current escalation level from the topological immune system.
+    pub fn convergence_escalation_level(
+        &self,
+    ) -> crate::hdc::moral_topology::EscalationLevel {
+        self.ethics_engine
+            .moral_topology()
+            .escalation_policy()
+            .current_level()
+    }
+
+    /// Get the fingerprint velocity (rate of directional change in harmony space).
+    pub fn convergence_fingerprint_velocity(&self) -> f64 {
+        self.ethics_engine
+            .moral_topology()
+            .fingerprint_velocity()
+    }
+
     /// Evaluate temporal prediction horizon accuracy from the vision manifold.
     #[cfg(feature = "vision-manifold")]
     pub fn vision_evaluate_horizons(&self) -> Option<symthaea_vision_manifold::HorizonAccuracy> {

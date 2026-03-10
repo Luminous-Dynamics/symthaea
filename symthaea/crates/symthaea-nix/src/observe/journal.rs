@@ -5,6 +5,7 @@
 //! in the world model.
 
 use std::process::Command;
+use tracing::debug;
 
 /// Observes and streams journal log entries for anomaly detection.
 pub struct JournalObserver;
@@ -177,6 +178,11 @@ impl JournalObserver {
             return None;
         }
 
+        debug!(
+            line_preview = &line[..line.len().min(80)],
+            "Journal line did not match standard short format, using fallback parser"
+        );
+
         Some(JournalEntry {
             timestamp: String::new(),
             unit: "unknown".to_string(),
@@ -251,5 +257,33 @@ Jan 15 10:30:01 myhost kernel: BUG: unable to handle page fault at 0xdeadbeef
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].unit, "kernel");
         assert_eq!(entries[0].message, "some kernel message");
+    }
+
+    #[test]
+    fn test_parse_short_line_fallback() {
+        // Lines that are too short for standard parsing use fallback
+        let output = "short\n";
+        let entries = JournalObserver::parse_short_output(output, 6).unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].unit, "unknown");
+        assert_eq!(entries[0].message, "short");
+        assert!(entries[0].timestamp.is_empty());
+    }
+
+    #[test]
+    fn test_parse_no_entries_marker() {
+        let output = "-- No entries --\n";
+        let entries = JournalObserver::parse_short_output(output, 6).unwrap();
+        assert!(entries.is_empty());
+    }
+
+    #[test]
+    fn test_parse_mixed_valid_and_fallback() {
+        let output = "Jan 15 10:30:00 myhost nginx[1234]: valid entry\n\
+                       orphan line\n";
+        let entries = JournalObserver::parse_short_output(output, 6).unwrap();
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].unit, "nginx");
+        assert_eq!(entries[1].unit, "unknown"); // fallback
     }
 }

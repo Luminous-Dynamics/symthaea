@@ -1775,6 +1775,178 @@ pub const CROSS_MODAL_PSI_CONFIDENCE_THRESHOLD: f64 = 0.3;
 pub const CROSS_MODAL_PSI_CONFIDENCE_SCALE: f64 = 0.05;
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// SESSION 16: BIDIRECTIONAL FEEDBACK DEEPENING
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Temporal binding strength below which exploration is boosted.
+/// Basis: Buzsáki (2002) — weak theta binding → poor temporal integration → explore.
+pub const TEMPORAL_BINDING_EXPLORE_THRESHOLD: f32 = 0.2;
+
+/// Temporal binding strength above which exploration is dampened.
+/// Basis: Buzsáki (2002) — strong theta binding → stable temporal model → exploit.
+pub const TEMPORAL_BINDING_DAMPEN_THRESHOLD: f32 = 0.6;
+
+/// Exploration boost scale for low temporal binding.
+pub const TEMPORAL_BINDING_EXPLORE_SCALE: f32 = 0.03;
+
+/// LR dampening scale for low temporal binding.
+pub const TEMPORAL_BINDING_LOW_LR_SCALE: f32 = 0.97;
+
+/// Consciousness gradient magnitude above which stability recovery triggers.
+/// Basis: Oizumi et al. (2014) — large gradient = rapid consciousness change → caution.
+pub const CONSCIOUSNESS_GRADIENT_CAUTION_THRESHOLD: f64 = 0.1;
+
+/// LR dampening for high consciousness gradient.
+pub const CONSCIOUSNESS_GRADIENT_LR_SCALE: f32 = 0.97;
+
+/// Confidence recovery for near-zero gradient + stable consciousness.
+/// Basis: Tononi (2004) — stable integration = reliable metrics → trust more.
+pub const CONSCIOUSNESS_GRADIENT_RECOVERY_BOOST: f32 = 0.005;
+
+/// Minimum cycles of near-zero gradient before confidence recovery.
+pub const CONSCIOUSNESS_GRADIENT_STABLE_CYCLES: u32 = 20;
+
+/// Startup exploration ramp: initial exploration fraction during early warmup.
+/// Basis: Hopfield (1982) — settling time requires constrained exploration.
+pub const STARTUP_EXPLORATION_INITIAL: f32 = 0.3;
+
+/// Consecutive epistemic gate rejections before recalibration triggers.
+/// Basis: Berlyne (1960) — sustained rejection = systematic model failure → recalibrate.
+pub const EPISTEMIC_REJECTION_STREAK_THRESHOLD: u32 = 5;
+
+/// Exploration boost when epistemic rejection streak triggers recalibration.
+pub const EPISTEMIC_REJECTION_STREAK_EXPLORE: f32 = 0.05;
+
+/// Threshold relaxation when epistemic rejection streak triggers recalibration.
+pub const EPISTEMIC_REJECTION_STREAK_THRESHOLD_RELAX: f32 = 0.95;
+
+/// Consecutive full-dampen cycles before protective threshold freeze.
+/// Basis: Turrigiano (2008) — sustained dampening = synaptic silencing → protect.
+pub const FULL_DAMPEN_FREEZE_THRESHOLD: u32 = 5;
+
+/// Consciousness EMA threshold above which LR gets a startup bias boost.
+/// Basis: Dehaene (2014) — integrated processing supports faster learning.
+pub const CONSCIOUSNESS_EMA_HIGH_THRESHOLD: f64 = 0.5;
+
+/// LR scale for high consciousness EMA.
+pub const CONSCIOUSNESS_EMA_LR_BOOST: f32 = 1.03;
+
+/// Consciousness EMA threshold below which LR gets a startup bias dampening.
+pub const CONSCIOUSNESS_EMA_LOW_THRESHOLD: f64 = 0.2;
+
+/// LR scale for low consciousness EMA.
+pub const CONSCIOUSNESS_EMA_LR_DAMPEN: f32 = 0.97;
+
+/// Multi-objective frontier size above which exploration is boosted.
+/// Basis: Deb (2002) — large Pareto frontier = many competing objectives → explore.
+pub const MULTI_OBJ_FRONTIER_LARGE: usize = 5;
+
+/// Multi-objective frontier exploration boost scale.
+pub const MULTI_OBJ_FRONTIER_EXPLORE_SCALE: f32 = 0.02;
+
+/// Multi-objective frontier size at which exploration is dampened (converged).
+pub const MULTI_OBJ_FRONTIER_SMALL: usize = 1;
+
+/// Multi-objective frontier convergence exploration dampening.
+pub const MULTI_OBJ_FRONTIER_DAMPEN: f32 = 0.98;
+
+/// Error oscillation ratio above which bifurcation response triggers.
+/// Basis: Kelso (1995) — high oscillation at phase transition → freeze and observe.
+pub const ERROR_OSCILLATION_BIFURCATION: f32 = 0.7;
+
+/// LR freeze during bifurcation (multiplicative).
+pub const ERROR_OSCILLATION_BIFURCATION_LR: f32 = 0.9;
+
+/// Exploration boost during bifurcation.
+pub const ERROR_OSCILLATION_BIFURCATION_EXPLORE: f32 = 0.03;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// AFFECTIVE CONSCIOUSNESS
+// Science: Barrett (2017) — affect is the primary driver of cognition.
+// Damasio (1999) — somatic markers (valence/arousal) guide all decisions.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Arousal threshold above which LR is boosted (high arousal = salient event).
+/// Basis: Yerkes-Dodson (1908) — moderate-high arousal enhances learning.
+pub const AFFECT_AROUSAL_HIGH_THRESHOLD: f32 = 0.6;
+
+/// LR scale for high arousal (boost learning during salient events).
+pub const AFFECT_AROUSAL_HIGH_LR_SCALE: f32 = 1.06;
+
+/// Arousal threshold below which exploration is dampened (low arousal = low drive).
+pub const AFFECT_AROUSAL_LOW_THRESHOLD: f32 = 0.2;
+
+/// Exploration dampening for low arousal.
+pub const AFFECT_AROUSAL_LOW_EXPLORE_DAMPEN: f32 = 0.97;
+
+/// Negative valence threshold below which exploration is boosted (seek novelty to escape).
+/// Basis: Carver & Scheier (1998) — negative affect signals goal discrepancy → seek alternatives.
+pub const AFFECT_VALENCE_NEGATIVE_THRESHOLD: f32 = -0.3;
+
+/// Exploration boost for negative valence.
+pub const AFFECT_VALENCE_NEGATIVE_EXPLORE_BOOST: f32 = 0.03;
+
+/// Positive valence threshold above which confidence is boosted.
+/// Basis: Fredrickson (2001) — positive affect broadens cognitive resources.
+pub const AFFECT_VALENCE_POSITIVE_THRESHOLD: f32 = 0.3;
+
+/// Confidence boost for positive valence.
+pub const AFFECT_VALENCE_POSITIVE_CONFIDENCE_BOOST: f32 = 0.01;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// NARRATIVE SELF-PHI
+// Science: Gallagher (2000) — narrative self underpins identity coherence.
+// Conway & Pleydell-Pearce (2000) — self-coherence → decision confidence.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Self-Phi threshold above which confidence is boosted (coherent identity).
+pub const NARRATIVE_SELF_PHI_CONFIDENCE_THRESHOLD: f64 = 0.4;
+
+/// Confidence boost scale for high narrative self-phi.
+pub const NARRATIVE_SELF_PHI_CONFIDENCE_SCALE: f32 = 0.008;
+
+/// Self-Phi threshold below which exploration is boosted (fragmented identity → seek coherence).
+pub const NARRATIVE_SELF_PHI_LOW_THRESHOLD: f64 = 0.15;
+
+/// Exploration boost for low narrative self-phi.
+pub const NARRATIVE_SELF_PHI_LOW_EXPLORE_BOOST: f32 = 0.02;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// EMBODIED CONSCIOUSNESS (integration.rs constants)
+// Science: Varela et al. (1991) — embodied cognition grounds all consciousness.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Embodied agency threshold for exploration boost (high agency = confident body).
+pub const EMBODIED_AGENCY_HIGH_THRESHOLD: f64 = 0.7;
+
+/// Embodied agency boost scale (exploration, multiplicative).
+pub const EMBODIED_AGENCY_BOOST_SCALE: f64 = 0.15;
+
+/// Embodied agency threshold for caution (low agency = uncertain body).
+pub const EMBODIED_AGENCY_LOW_THRESHOLD: f64 = 0.3;
+
+/// Embodied agency caution scale (exploration dampening).
+pub const EMBODIED_AGENCY_CAUTION_SCALE: f64 = 0.1;
+
+/// Embodied agency caution floor (minimum exploration multiplier).
+pub const EMBODIED_AGENCY_CAUTION_FLOOR: f32 = 0.7;
+
+/// Homeostatic deviation threshold preventing Cruise mode.
+pub const HOMEOSTATIC_DEVIATION_THRESHOLD: f64 = 0.5;
+
+/// Sensorimotor surprise threshold for exploration boost.
+pub const SENSORIMOTOR_SURPRISE_THRESHOLD: f64 = 0.3;
+
+/// Sensorimotor surprise → exploration scale.
+pub const SENSORIMOTOR_SURPRISE_EXPLORE_SCALE: f64 = 0.1;
+
+/// Allostatic load threshold above which LR is dampened (body stressed).
+pub const ALLOSTATIC_LOAD_DANGER_THRESHOLD: f64 = 0.7;
+
+/// Allostatic load LR dampening scale.
+pub const ALLOSTATIC_LOAD_LR_DAMPEN: f64 = 0.5;
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // TESTS
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -2293,5 +2465,37 @@ mod tests {
         assert!(CROSS_MODAL_PSI_CONFIDENCE_THRESHOLD < 1.0);
         assert!(CROSS_MODAL_PSI_CONFIDENCE_SCALE > 0.0);
         assert!(CROSS_MODAL_PSI_CONFIDENCE_SCALE < 0.2);
+    }
+
+    #[test]
+    fn test_affective_consciousness_params() {
+        // Arousal: high > low, both in [0,1]
+        assert!(AFFECT_AROUSAL_HIGH_THRESHOLD > AFFECT_AROUSAL_LOW_THRESHOLD);
+        assert!(AFFECT_AROUSAL_HIGH_LR_SCALE > 1.0, "High arousal should boost LR");
+        assert!(AFFECT_AROUSAL_LOW_EXPLORE_DAMPEN < 1.0, "Low arousal should dampen exploration");
+        // Valence: negative < 0 < positive
+        assert!(AFFECT_VALENCE_NEGATIVE_THRESHOLD < 0.0);
+        assert!(AFFECT_VALENCE_POSITIVE_THRESHOLD > 0.0);
+        assert!(AFFECT_VALENCE_NEGATIVE_EXPLORE_BOOST > 0.0);
+        assert!(AFFECT_VALENCE_POSITIVE_CONFIDENCE_BOOST > 0.0);
+    }
+
+    #[test]
+    fn test_narrative_self_phi_params() {
+        assert!(NARRATIVE_SELF_PHI_LOW_THRESHOLD < NARRATIVE_SELF_PHI_CONFIDENCE_THRESHOLD);
+        assert!(NARRATIVE_SELF_PHI_CONFIDENCE_SCALE > 0.0);
+        assert!(NARRATIVE_SELF_PHI_LOW_EXPLORE_BOOST > 0.0);
+    }
+
+    #[test]
+    fn test_embodied_consciousness_params() {
+        assert!(EMBODIED_AGENCY_LOW_THRESHOLD < EMBODIED_AGENCY_HIGH_THRESHOLD);
+        assert!(EMBODIED_AGENCY_BOOST_SCALE > 0.0);
+        assert!(EMBODIED_AGENCY_CAUTION_SCALE > 0.0);
+        assert!(EMBODIED_AGENCY_CAUTION_FLOOR > 0.0 && EMBODIED_AGENCY_CAUTION_FLOOR < 1.0);
+        assert!(HOMEOSTATIC_DEVIATION_THRESHOLD > 0.0);
+        assert!(SENSORIMOTOR_SURPRISE_THRESHOLD > 0.0);
+        assert!(ALLOSTATIC_LOAD_DANGER_THRESHOLD > 0.5, "Allostatic load danger should be high");
+        assert!(ALLOSTATIC_LOAD_LR_DAMPEN > 0.0 && ALLOSTATIC_LOAD_LR_DAMPEN < 1.0);
     }
 }

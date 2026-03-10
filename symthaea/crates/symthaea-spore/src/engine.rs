@@ -964,6 +964,22 @@ impl SporeEngine {
     pub fn instance_id(&self) -> usize {
         self.instance_id
     }
+
+    /// Get the current network output hypervector (16,384D).
+    /// Returns the normalized output state as a flat f32 slice.
+    pub fn get_output_hv(&self) -> Vec<f32> {
+        self.network.output().normalize().values.clone()
+    }
+
+    /// Encode text to an HDC hypervector without running a full cycle.
+    /// Returns the raw text encoding as f32 values (converted from bipolar i8).
+    pub fn encode_text(&mut self, text: &str) -> Vec<f32> {
+        let encoded = self
+            .text_encoder
+            .encode_sentence(text)
+            .unwrap_or_else(|_| vec![0i8; HDC_DIMENSION]);
+        encoded.iter().map(|&x| x as f32).collect()
+    }
 }
 
 impl Drop for SporeEngine {

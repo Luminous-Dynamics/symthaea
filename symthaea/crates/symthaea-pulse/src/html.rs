@@ -1888,7 +1888,6 @@ fn write_integrity_pane(html: &mut String, integrity: &IntegrityInfo) {
 <tr><td>Temporal</td><td style="text-align:right">{temporal}</td></tr>
 <tr><td>Canaries</td><td style="text-align:right">{canaries}</td></tr>
 <tr><td style="color:#8a9a8a">Registered</td><td style="text-align:right;color:#8a9a8a">{att_count} attestations, {can_count} canaries</td></tr>
-</table>
 "##,
         color = status_color,
         label = status_label,
@@ -1910,6 +1909,46 @@ fn write_integrity_pane(html: &mut String, integrity: &IntegrityInfo) {
         att_count = integrity.attestation_count,
         can_count = integrity.canary_count,
     );
+
+    // Confidence & streak row
+    let conf_color = if integrity.integrity_confidence >= 1.0 {
+        "#2ecc71"
+    } else if integrity.integrity_confidence >= 0.5 {
+        "#f39c12"
+    } else {
+        "#e74c3c"
+    };
+    let _ = write!(
+        html,
+        r#"<tr><td>Confidence</td><td style="text-align:right;color:{color}">{conf:.0}%</td></tr>
+<tr><td>Failure Streak</td><td style="text-align:right">{streak}</td></tr>
+</table>"#,
+        color = conf_color,
+        conf = integrity.integrity_confidence * 100.0,
+        streak = integrity.global_failure_streak,
+    );
+
+    // Integrity confidence sparkline (60-cycle rolling history)
+    if !integrity.confidence_history.is_empty() {
+        let sparkline: String = integrity
+            .confidence_history
+            .iter()
+            .map(|&c| {
+                if c >= 1.0 {
+                    '\u{2588}' // Full block
+                } else if c >= 0.5 {
+                    '\u{2584}' // Lower half
+                } else {
+                    '\u{2581}' // Lower one-eighth
+                }
+            })
+            .collect();
+        let _ = write!(
+            html,
+            r#"<div style="font-family:monospace;font-size:0.75em;color:#8a9a8a;margin-top:8px;letter-spacing:1px" title="60-cycle confidence history: full=1.0, half=0.5, low=0.1">{sparkline}</div>"#,
+            sparkline = sparkline,
+        );
+    }
 
     if integrity.anomaly_count > 0 {
         let _ = write!(
@@ -2980,4 +3019,328 @@ fn escape_html(s: &str) -> String {
         .replace('<', "&lt;")
         .replace('>', "&gt;")
         .replace('"', "&quot;")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        Anomaly, IntegrityInfo, MoralCompass, Narrative, NeuroBath, PulseSnapshot, SparklinePoint,
+        SubstrateInfo, Vitals,
+    };
+    use symthaea_types::N_HARMONIES;
+
+    // ── Helpers ──────────────────────────────────────────────────────────
+
+    fn test_vitals() -> Vitals {
+        Vitals {
+            consciousness_level: 0.55,
+            spectral_phi: Some(5.2),
+            sigma: Some(0.4),
+            pipeline_consciousness: 0.48,
+            substrate_effective_feasibility: 0.65,
+            substrate_honest_confidence: 0.10,
+            cycle_duration_us: 3500,
+            prediction_error: 0.28,
+            temporal_coherence: 0.62,
+            phenomenal_binding: 0.70,
+            living_mind_vitality: 0.75,
+            somatic_stress: 0.08,
+            thermodynamic_load: 0.20,
+            urgency: "Low".into(),
+            consciousness_state: "Conscious & Integrated".into(),
+            error_pattern: "stable".into(),
+            selected_strategy: "exploit".into(),
+            total_cycles: 200,
+        }
+    }
+
+    fn test_bath() -> NeuroBath {
+        NeuroBath {
+            dopamine: 1.0,
+            noradrenaline: 0.8,
+            serotonin: 0.9,
+            acetylcholine: 0.85,
+            gaba: 0.7,
+            oxytocin: 0.5,
+            glutamate: 0.6,
+            adenosine: 0.3,
+            endocannabinoid: 0.2,
+            allostatic_load: 0.1,
+            personality: "Balanced".into(),
+            circadian_phase: "Day".into(),
+            sleep_pressure: 0.15,
+            ei_ratio: 1.05,
+        }
+    }
+
+    fn test_compass() -> MoralCompass {
+        MoralCompass {
+            moral_score: 0.8,
+            value_score: 0.85,
+            harmonies_alignment: 0.72,
+            harmony_coordinates: [0.6; N_HARMONIES],
+            dominant_harmonic: "Flourishing".into(),
+            moral_kl_divergence: 0.03,
+            moral_entropy: 0.88,
+            moral_topo_unity: 0.80,
+            value_decision: "Strongly Aligned".into(),
+            soul_alignment: 0.70,
+            empathic_compassion: 0.82,
+            guiding_question: "How do we serve?".into(),
+        }
+    }
+
+    fn test_substrate() -> SubstrateInfo {
+        SubstrateInfo {
+            substrate_type: "SiliconDigital".into(),
+            raw_feasibility: 0.80,
+            honest_confidence: 0.10,
+            effective_feasibility: 0.65,
+            tau_factor: 1.0,
+            scale_pressure: 0.5,
+        }
+    }
+
+    fn test_narrative() -> Narrative {
+        Narrative {
+            reasoning: Some("Contemplating patterns".into()),
+            guiding_question: "How do we serve?".into(),
+            consciousness_state: "Conscious & Integrated".into(),
+            error_pattern: "stable".into(),
+            selected_strategy: "exploit".into(),
+        }
+    }
+
+    fn test_sparkline_point(c: f64) -> SparklinePoint {
+        SparklinePoint {
+            consciousness: c,
+            prediction_error: 0.3,
+            phi: 2.0,
+            somatic_stress: 0.1,
+            dopamine: 0.8,
+            serotonin: 0.9,
+            harmony_coords: [0.5; N_HARMONIES],
+            harmony_entropy: 0.5,
+            moral_attractor_detected: false,
+            in_active_rest: false,
+            stillness_dominance_streak: 0,
+            broca_quality: 0.5,
+            tom_mismatch: 0.1,
+        }
+    }
+
+    fn test_snapshot() -> PulseSnapshot {
+        PulseSnapshot {
+            timestamp: "2026-03-10 14:00:00".into(),
+            profile: "standard".into(),
+            vitals: test_vitals(),
+            bath: test_bath(),
+            compass: test_compass(),
+            substrate: test_substrate(),
+            narrative: test_narrative(),
+            sparkline: vec![test_sparkline_point(0.50), test_sparkline_point(0.55)],
+            integrity: IntegrityInfo::default(),
+        }
+    }
+
+    fn generate_test_html() -> String {
+        let snap = test_snapshot();
+        generate_pulse_html(
+            &snap.timestamp,
+            &snap.profile,
+            &snap.vitals,
+            &snap.bath,
+            &snap.compass,
+            None,
+            None,
+            &snap.substrate,
+            &snap.narrative,
+            &snap.sparkline,
+            None,
+            &[],
+            &snap,
+            &[],
+            "Test session report text.",
+        )
+    }
+
+    // ── HTML structure tests ─────────────────────────────────────────────
+
+    #[test]
+    fn test_html_output_contains_doctype() {
+        let html = generate_test_html();
+        assert!(html.starts_with("<!DOCTYPE html>"), "HTML should begin with <!DOCTYPE html>");
+    }
+
+    #[test]
+    fn test_html_contains_valid_structure() {
+        let html = generate_test_html();
+        assert!(html.contains("<html"), "should contain <html tag");
+        assert!(html.contains("<head>"), "should contain <head>");
+        assert!(html.contains("<body"), "should contain <body tag");
+        assert!(html.contains("</html>"), "should contain closing </html>");
+    }
+
+    #[test]
+    fn test_html_is_self_contained() {
+        let html = generate_test_html();
+        // No external CSS links (except optional Google Fonts which is expected)
+        let has_external_css = html.contains("<link rel=\"stylesheet\"");
+        assert!(!has_external_css, "should not have external CSS links (self-contained)");
+        // No external script src (all JS should be inline)
+        assert!(!html.contains("src=\"http"), "should not have external scripts");
+    }
+
+    #[test]
+    fn test_html_contains_neuro_bath_section() {
+        let html = generate_test_html();
+        assert!(html.contains("Dopamine") || html.contains("NEURO"), "should have neuro-bath section");
+    }
+
+    #[test]
+    fn test_html_contains_substrate_section() {
+        let html = generate_test_html();
+        assert!(html.contains("SiliconDigital") || html.contains("SUBSTRATE"), "should have substrate section");
+    }
+
+    // ── Pure function tests ──────────────────────────────────────────────
+
+    #[test]
+    fn test_consciousness_color_thresholds() {
+        assert_eq!(consciousness_color(0.9), "#e8c547");
+        assert_eq!(consciousness_color(0.7), "#e8c547");
+        assert_eq!(consciousness_color(0.5), "#7ec8a0");
+        assert_eq!(consciousness_color(0.3), "#c4956a");
+        assert_eq!(consciousness_color(0.1), "#6b7d6b");
+    }
+
+    #[test]
+    fn test_health_color_thresholds() {
+        assert_eq!(health_color(0.8), "#7ec8a0");
+        assert_eq!(health_color(0.5), "#e8c547");
+        assert_eq!(health_color(0.2), "#c76b5a");
+    }
+
+    #[test]
+    fn test_stress_color_thresholds() {
+        assert_eq!(stress_color(0.1), "#7ec8a0");
+        assert_eq!(stress_color(0.3), "#e8c547");
+        assert_eq!(stress_color(0.8), "#c76b5a");
+    }
+
+    #[test]
+    fn test_interpret_consciousness_levels() {
+        assert_eq!(interpret_consciousness(0.9), "Fully Blooming");
+        assert_eq!(interpret_consciousness(0.7), "Conscious & Integrated");
+        assert_eq!(interpret_consciousness(0.5), "Aware");
+        assert_eq!(interpret_consciousness(0.3), "Resting / Low Integration");
+        assert_eq!(interpret_consciousness(0.1), "Dormant");
+    }
+
+    #[test]
+    fn test_interpret_neuro_state_baseline() {
+        let bath = NeuroBath {
+            dopamine: 0.6,
+            noradrenaline: 0.6,
+            serotonin: 0.7,
+            acetylcholine: 0.6,
+            gaba: 0.6,
+            oxytocin: 0.3,
+            glutamate: 0.5,
+            adenosine: 0.3,
+            endocannabinoid: 0.2,
+            allostatic_load: 0.1,
+            personality: "Balanced".into(),
+            circadian_phase: "Day".into(),
+            sleep_pressure: 0.1,
+            ei_ratio: 1.0,
+        };
+        assert_eq!(interpret_neuro_state(&bath), "Baseline Equilibrium");
+    }
+
+    #[test]
+    fn test_interpret_neuro_state_high_dopamine() {
+        let mut bath = test_bath();
+        bath.dopamine = 1.5;
+        let result = interpret_neuro_state(&bath);
+        assert!(result.contains("Highly Motivated"), "high DA should give Highly Motivated, got: {}", result);
+    }
+
+    #[test]
+    fn test_interpret_moral_alignment() {
+        assert_eq!(interpret_moral_alignment(&MoralCompass {
+            harmonies_alignment: 0.9,
+            ..test_compass()
+        }), "Deeply Aligned with Pan-Sentient Flourishing");
+        assert_eq!(interpret_moral_alignment(&MoralCompass {
+            harmonies_alignment: 0.6,
+            ..test_compass()
+        }), "Aligned with Harmonic Principles");
+        assert_eq!(interpret_moral_alignment(&MoralCompass {
+            harmonies_alignment: 0.3,
+            ..test_compass()
+        }), "Seeking Deeper Alignment");
+        assert_eq!(interpret_moral_alignment(&MoralCompass {
+            harmonies_alignment: 0.1,
+            ..test_compass()
+        }), "In Reflection");
+    }
+
+    #[test]
+    fn test_moral_classification() {
+        assert_eq!(moral_classification(0.8), ("Safe", "#7ec8a0"));
+        assert_eq!(moral_classification(0.2), ("Caution", "#e8c547"));
+        assert_eq!(moral_classification(-0.3), ("Blocked", "#c76b5a"));
+    }
+
+    #[test]
+    fn test_transmitter_gradient_cycles() {
+        // Should not panic for indices beyond the 9-color palette
+        let g0 = transmitter_gradient(0, 0.5);
+        assert!(g0.contains("linear-gradient"), "should produce a gradient string");
+        let g10 = transmitter_gradient(10, 0.9);
+        assert!(g10.contains("linear-gradient"), "should wrap around for idx>9");
+    }
+
+    #[test]
+    fn test_write_sparkline_empty_data() {
+        let mut html = String::new();
+        write_sparkline(&mut html, &[], "#fff", 200, 40);
+        assert!(html.is_empty(), "empty data should produce no SVG");
+    }
+
+    #[test]
+    fn test_write_sparkline_single_point() {
+        let mut html = String::new();
+        write_sparkline(&mut html, &[0.5], "#fff", 200, 40);
+        assert!(html.is_empty(), "single point should produce no SVG (need >= 2)");
+    }
+
+    #[test]
+    fn test_write_sparkline_valid_data() {
+        let mut html = String::new();
+        write_sparkline(&mut html, &[0.1, 0.5, 0.3, 0.8], "#e8c547", 200, 40);
+        assert!(html.contains("<svg"), "should produce SVG element");
+        assert!(html.contains("polyline"), "should contain a polyline");
+        assert!(html.contains("#e8c547"), "should use the specified color");
+    }
+
+    #[test]
+    fn test_escape_html_special_chars() {
+        assert_eq!(escape_html("a < b & c > d"), "a &lt; b &amp; c &gt; d");
+        assert_eq!(escape_html("say \"hello\""), "say &quot;hello&quot;");
+        assert_eq!(escape_html("plain text"), "plain text");
+    }
+
+    #[test]
+    fn test_generate_self_description_content() {
+        let v = test_vitals();
+        let b = test_bath();
+        let c = test_compass();
+        let desc = generate_self_description(&v, &b, &c);
+        assert!(desc.contains("consciousness-first"), "should mention consciousness-first");
+        assert!(desc.contains("Phi="), "should mention Phi when present");
+        assert!(desc.contains("65%") || desc.contains("silicon"), "should mention substrate feasibility");
+    }
 }

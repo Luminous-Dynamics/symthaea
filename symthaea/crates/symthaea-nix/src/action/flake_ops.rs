@@ -304,4 +304,74 @@ mod tests {
         assert_eq!(meta.inputs.len(), 1);
         assert!(meta.last_modified.is_some());
     }
+
+    #[test]
+    fn test_parse_metadata_json_invalid() {
+        let result = FlakeOps::parse_metadata_json("not json");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_metadata_json_minimal() {
+        let json = r#"{}"#;
+        let meta = FlakeOps::parse_metadata_json(json).unwrap();
+        assert_eq!(meta.url, "");
+        assert_eq!(meta.description, "");
+        assert!(meta.inputs.is_empty());
+        assert!(meta.last_modified.is_none());
+    }
+
+    #[test]
+    fn test_parse_metadata_json_owner_fallback() {
+        let json = r#"{
+  "locks": {
+    "nodes": {
+      "root": {},
+      "nixpkgs": {
+        "locked": { "owner": "NixOS", "repo": "nixpkgs" }
+      }
+    }
+  }
+}"#;
+        let meta = FlakeOps::parse_metadata_json(json).unwrap();
+        assert_eq!(meta.inputs.len(), 1);
+        assert_eq!(meta.inputs[0].1, "NixOS"); // falls back to owner
+    }
+
+    #[test]
+    fn test_parse_lock_inputs_invalid_json() {
+        let result = FlakeOps::parse_lock_inputs("not json");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_lock_inputs_no_root() {
+        let json = r#"{ "nodes": { "nixpkgs": { "locked": { "type": "github" } } } }"#;
+        let inputs = FlakeOps::parse_lock_inputs(json).unwrap();
+        assert!(inputs.is_empty()); // No root.inputs
+    }
+
+    #[test]
+    fn test_init_without_template() {
+        let cmd = FlakeOps::init(Path::new("."), None);
+        let (bin, args) = cmd.to_command();
+        assert_eq!(bin, "nix");
+        assert!(args.contains(&"init".to_string()));
+        assert!(!args.contains(&"--template".to_string()));
+    }
+
+    #[test]
+    fn test_update_inputs_empty() {
+        let cmd = FlakeOps::update_inputs(&[]);
+        let (bin, _args) = cmd.to_command();
+        assert_eq!(bin, "nix");
+    }
+
+    #[test]
+    fn test_list_inputs_nonexistent_dir() {
+        let dir = tempfile::tempdir().unwrap();
+        // No flake.lock in the dir
+        let inputs = FlakeOps::list_inputs(dir.path()).unwrap();
+        assert!(inputs.is_empty());
+    }
 }

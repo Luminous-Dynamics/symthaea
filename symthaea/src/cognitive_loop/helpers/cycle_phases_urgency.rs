@@ -368,7 +368,23 @@ impl CognitiveLoopService {
         // Oscillating error pattern → LR dampening to prevent chaotic weight updates.
         // Doya (2002): oscillating error signals indicate meta-uncertainty about the
         // learning target; reducing LR prevents gradient interference.
-        if oscillation_ratio > 0.5 {
+        if oscillation_ratio > super::super::thresholds::ERROR_OSCILLATION_BIFURCATION {
+            // Session 16 Item 8: Very high oscillation → bifurcation point.
+            // System is at a phase transition — freeze LR and boost exploration to find
+            // new attractor basin. Kelso (1995): high oscillation near bifurcation.
+            self.scale_lr(
+                "error_bifurcation",
+                super::super::thresholds::ERROR_OSCILLATION_BIFURCATION_LR,
+            );
+            self.scale_confidence(
+                "error_bifurcation",
+                super::super::thresholds::ERROR_OSCILLATION_BIFURCATION_LR,
+            );
+            self.adjust_exploration(
+                "error_bifurcation",
+                super::super::thresholds::ERROR_OSCILLATION_BIFURCATION_EXPLORE,
+            );
+        } else if oscillation_ratio > 0.5 {
             let osc_dampen = 1.0 - (oscillation_ratio - 0.5) * 0.2; // 0.9–1.0
             self.scale_lr("error_oscillation", osc_dampen.max(0.9));
             // Session 11 Item 6: Oscillation → confidence dampening.

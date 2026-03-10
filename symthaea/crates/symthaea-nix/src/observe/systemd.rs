@@ -266,4 +266,57 @@ Description=A high performance web server and reverse proxy
         assert_eq!(units.len(), 1);
         assert_eq!(units[0].active_state, "failed");
     }
+
+    #[test]
+    fn test_parse_unit_list_short_line_skipped() {
+        let output = "too short\nfoo\n  a.service loaded active running OK\n";
+        let units = SystemdObserver::parse_unit_list(output).unwrap();
+        assert_eq!(units.len(), 1);
+        assert_eq!(units[0].name, "a.service");
+    }
+
+    #[test]
+    fn test_parse_unit_list_no_description() {
+        let output = "  bare.service loaded active exited\n";
+        let units = SystemdObserver::parse_unit_list(output).unwrap();
+        assert_eq!(units.len(), 1);
+        assert_eq!(units[0].description, "");
+        assert_eq!(units[0].sub_state, "exited");
+    }
+
+    #[test]
+    fn test_parse_unit_show_extra_keys_ignored() {
+        let output = "Id=test.service\nLoadState=loaded\nActiveState=active\nSubState=running\nDescription=Test\nExtraKey=ignored\n";
+        let unit = SystemdObserver::parse_unit_show(output).unwrap();
+        assert_eq!(unit.name, "test.service");
+    }
+
+    #[test]
+    fn test_parse_unit_show_empty_values() {
+        let output = "Id=test.service\nLoadState=\nActiveState=\nSubState=\nDescription=\n";
+        let unit = SystemdObserver::parse_unit_show(output).unwrap();
+        assert_eq!(unit.name, "test.service");
+        assert_eq!(unit.load_state, "");
+    }
+
+    #[test]
+    fn test_parse_unit_show_empty_output() {
+        let result = SystemdObserver::parse_unit_show("");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_unit_list_mixed_states() {
+        let output = "\
+  a.service loaded active   running   Service A\n\
+  b.service loaded inactive dead      Service B\n\
+  c.service loaded failed   failed    Service C\n\
+  d.service masked inactive dead      Masked D\n";
+        let units = SystemdObserver::parse_unit_list(output).unwrap();
+        assert_eq!(units.len(), 4);
+        assert_eq!(units[0].active_state, "active");
+        assert_eq!(units[1].active_state, "inactive");
+        assert_eq!(units[2].active_state, "failed");
+        assert_eq!(units[3].load_state, "masked");
+    }
 }

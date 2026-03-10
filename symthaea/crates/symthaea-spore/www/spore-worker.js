@@ -6,6 +6,8 @@ import init, { SporeEngine } from './pkg/symthaea_spore.js';
 let engine = null;
 let running = false;
 let cycleInterval = null;
+let currentThought = 'awareness';
+let cycleCount = 0;
 
 // Initialize WASM and engine
 async function initialize(config) {
@@ -17,18 +19,27 @@ async function initialize(config) {
 // Run a single cycle
 function cycle(input) {
   if (!engine) throw new Error('Engine not initialized');
-  return engine.cycle(input || 'auto');
+  return engine.cycle(input || currentThought);
 }
 
 // Start auto-cycling at given interval (ms)
 function startLoop(intervalMs) {
   if (cycleInterval) clearInterval(cycleInterval);
   running = true;
+  cycleCount = 0;
   cycleInterval = setInterval(() => {
     if (!running || !engine) return;
     try {
-      const result = engine.cycle('auto');
-      self.postMessage({ type: 'cycle', result });
+      const result = engine.cycle(currentThought);
+      cycleCount++;
+
+      // Every 10th cycle, also send the output HV for visualization
+      let hv = null;
+      if (cycleCount % 10 === 0) {
+        hv = Array.from(engine.get_output_hv());
+      }
+
+      self.postMessage({ type: 'cycle', result, hv });
     } catch (e) {
       self.postMessage({ type: 'error', error: e.message });
     }
@@ -129,6 +140,10 @@ self.onmessage = async function(e) {
         stopLoop();
         result = { ok: true };
         break;
+      case 'setThought':
+        currentThought = params.text || 'awareness';
+        result = { ok: true };
+        break;
       case 'setSubstrate':
         if (engine) engine.set_substrate(params.substrate);
         result = { ok: true };
@@ -136,6 +151,17 @@ self.onmessage = async function(e) {
       case 'inject':
         if (engine) engine.inject_neuromodulator(params.name, params.amount);
         result = { ok: true };
+        break;
+      case 'getOutputHV':
+        if (engine) result = Array.from(engine.get_output_hv());
+        break;
+      case 'encodePair':
+        if (engine) {
+          result = {
+            a: Array.from(engine.encode_text(params.textA)),
+            b: Array.from(engine.encode_text(params.textB)),
+          };
+        }
         break;
       case 'experiment':
         stopLoop();

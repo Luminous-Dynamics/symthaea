@@ -562,6 +562,50 @@ impl CognitiveLoopService {
         metadata.anomaly_recovery_phi_accelerated = self.carryover.urgency.anomaly_was_active
             && self.stats.unified_psi > self.stats.avg_psi * 1.05;
 
+        // ── Session 16 telemetry ──
+        {
+            use super::thresholds::{
+                CONSCIOUSNESS_EMA_HIGH_THRESHOLD, CONSCIOUSNESS_EMA_LOW_THRESHOLD,
+                CONSCIOUSNESS_GRADIENT_CAUTION_THRESHOLD, EPISTEMIC_REJECTION_STREAK_THRESHOLD,
+                FULL_DAMPEN_FREEZE_THRESHOLD, MULTI_OBJ_FRONTIER_LARGE,
+                MULTI_OBJ_FRONTIER_SMALL, TEMPORAL_BINDING_DAMPEN_THRESHOLD,
+                TEMPORAL_BINDING_EXPLORE_THRESHOLD,
+            };
+            let tb = perception.encoding.temporal_binding_strength;
+            metadata.temporal_binding_feedback = self.stats.total_cycles > 15
+                && (tb < TEMPORAL_BINDING_EXPLORE_THRESHOLD
+                    || tb > TEMPORAL_BINDING_DAMPEN_THRESHOLD);
+            metadata.consciousness_gradient_active = feedback
+                .consciousness
+                .consciousness_gradient_magnitude
+                > CONSCIOUSNESS_GRADIENT_CAUTION_THRESHOLD
+                || self.carryover.quality.consecutive_stable_gradient > 20;
+            metadata.startup_exploration_ramped = self.stats.total_cycles
+                <= super::thresholds::STARTUP_WARMUP_CYCLES;
+            metadata.epistemic_rejection_streak_recal = self
+                .carryover
+                .quality
+                .consecutive_epistemic_rejections
+                >= EPISTEMIC_REJECTION_STREAK_THRESHOLD
+                && self.stats.total_cycles > 20;
+            metadata.full_dampen_threshold_freeze = self
+                .carryover
+                .quality
+                .consecutive_full_dampen
+                >= FULL_DAMPEN_FREEZE_THRESHOLD;
+            let ema = self.carryover.history.consciousness_ema;
+            metadata.consciousness_ema_lr_bias = self.stats.total_cycles > 30
+                && (ema > CONSCIOUSNESS_EMA_HIGH_THRESHOLD
+                    || (ema < CONSCIOUSNESS_EMA_LOW_THRESHOLD && ema > 0.0));
+            metadata.multi_obj_frontier_gated = feedback.multi_obj_frontier_size
+                >= MULTI_OBJ_FRONTIER_LARGE
+                || (feedback.multi_obj_frontier_size <= MULTI_OBJ_FRONTIER_SMALL
+                    && feedback.multi_obj_frontier_size > 0
+                    && self.stats.total_cycles > 30);
+            metadata.error_bifurcation_response = perception.urgency.oscillation_ratio
+                > super::thresholds::ERROR_OSCILLATION_BIFURCATION;
+        }
+
         // ── Session 15 continued: Feedback Loop Observability ──
         {
             use crate::cognitive_loop::thresholds::{
@@ -599,6 +643,24 @@ impl CognitiveLoopService {
                     <= crate::cognitive_loop::thresholds::TEMPORAL_CHAIN_SHALLOW_THRESHOLD);
         metadata.eq_v2_bottleneck_response =
             !feedback.consciousness.eq_v2_limiting_component.is_empty();
+        {
+            use crate::cognitive_loop::thresholds::{
+                AFFECT_AROUSAL_HIGH_THRESHOLD, AFFECT_AROUSAL_LOW_THRESHOLD,
+                AFFECT_VALENCE_NEGATIVE_THRESHOLD, AFFECT_VALENCE_POSITIVE_THRESHOLD,
+                NARRATIVE_SELF_PHI_CONFIDENCE_THRESHOLD, NARRATIVE_SELF_PHI_LOW_THRESHOLD,
+            };
+            let av = feedback.consciousness.affect_cons_valence;
+            let aa = feedback.consciousness.affect_cons_arousal;
+            metadata.affect_consciousness_modulated = self.stats.total_cycles > 10
+                && (aa > AFFECT_AROUSAL_HIGH_THRESHOLD
+                    || (aa < AFFECT_AROUSAL_LOW_THRESHOLD && aa > 0.0)
+                    || av < AFFECT_VALENCE_NEGATIVE_THRESHOLD
+                    || av > AFFECT_VALENCE_POSITIVE_THRESHOLD);
+            let nsp = feedback.self_model.narrative_gwt_self_psi;
+            metadata.narrative_self_phi_modulated = self.stats.total_cycles > 15
+                && (nsp > NARRATIVE_SELF_PHI_CONFIDENCE_THRESHOLD
+                    || (nsp > 0.0 && nsp < NARRATIVE_SELF_PHI_LOW_THRESHOLD));
+        }
 
         // ── GWT handler telemetry ──
         metadata.gwt_memory_consolidation_requested = self
@@ -703,6 +765,8 @@ impl CognitiveLoopService {
                         consecutive_failures: r.consecutive_failures,
                     })
                     .collect(),
+                global_failure_streak: self.integrity_manager.global_failure_streak,
+                confidence_history: self.integrity_manager.confidence_history().iter().copied().collect(),
             };
             // Integrity-aware consciousness gating: if integrity is compromised,
             // discount consciousness scores — the system should distrust its own
@@ -966,6 +1030,24 @@ impl CognitiveLoopService {
             self.carryover.quality.consecutive_full_dampen += 1;
         } else {
             self.carryover.quality.consecutive_full_dampen = 0;
+        }
+
+        // Session 16 Item 5: consecutive_full_dampen → protective threshold freeze.
+        // When all 4 feedback channels have been dampened for 5+ consecutive cycles,
+        // the system is in a sustained suppression state. Freeze thresholds to prevent
+        // further spiraling — let the system recover before making more adjustments.
+        // Science: Turrigiano (2008) — sustained dampening triggers synaptic silencing.
+        if self.carryover.quality.consecutive_full_dampen
+            >= super::thresholds::FULL_DAMPEN_FREEZE_THRESHOLD
+        {
+            // Reset threshold scale toward neutral to break the dampening spiral
+            self.carryover.learning.adaptive_threshold_scale = self
+                .carryover
+                .learning
+                .adaptive_threshold_scale
+                .clamp(0.9, 1.1);
+            // Gentle exploration boost to escape the suppressed state
+            self.adjust_exploration("full_dampen_escape", 0.02);
         }
 
         // Session 9 Item 8: Substrate tau → feedback integration rate.

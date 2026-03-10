@@ -1038,6 +1038,12 @@ pub struct CycleMetadata {
     /// Whether EqV2 bottleneck response fired a targeted boost.
     #[serde(default)]
     pub eq_v2_bottleneck_response: bool,
+    /// Whether affective consciousness modulated LR or exploration.
+    #[serde(default)]
+    pub affect_consciousness_modulated: bool,
+    /// Whether narrative self-phi modulated confidence or exploration.
+    #[serde(default)]
+    pub narrative_self_phi_modulated: bool,
 
     // ── Session 14: Late Consciousness Feedback ──────────────────────────
     /// Whether living mind vitality modulated confidence.
@@ -1075,6 +1081,32 @@ pub struct CycleMetadata {
     /// Whether anomaly recovery was accelerated by improving Phi.
     #[serde(default)]
     pub anomaly_recovery_phi_accelerated: bool,
+
+    // ── Session 16: Bidirectional Feedback Deepening ─────────────────────
+    /// Whether temporal binding strength modulated exploration/LR.
+    #[serde(default)]
+    pub temporal_binding_feedback: bool,
+    /// Whether consciousness gradient magnitude triggered caution or recovery.
+    #[serde(default)]
+    pub consciousness_gradient_active: bool,
+    /// Whether startup exploration ramp was active (warmup phase).
+    #[serde(default)]
+    pub startup_exploration_ramped: bool,
+    /// Whether epistemic rejection streak triggered recalibration.
+    #[serde(default)]
+    pub epistemic_rejection_streak_recal: bool,
+    /// Whether consecutive full-dampen triggered protective threshold freeze.
+    #[serde(default)]
+    pub full_dampen_threshold_freeze: bool,
+    /// Whether consciousness EMA biased learning rate initialization.
+    #[serde(default)]
+    pub consciousness_ema_lr_bias: bool,
+    /// Whether multi-objective frontier size modulated exploration.
+    #[serde(default)]
+    pub multi_obj_frontier_gated: bool,
+    /// Whether error oscillation bifurcation response fired.
+    #[serde(default)]
+    pub error_bifurcation_response: bool,
 }
 
 fn default_response_profile() -> String {

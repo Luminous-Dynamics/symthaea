@@ -366,22 +366,34 @@ impl CognitiveLoopService {
                     // Wire embodied signals into cognitive loop:
                     // 1. Homeostatic deviation increases urgency (survival takes priority)
                     // Science: Damasio (1999) — somatic markers guide decision-making
-                    if response.homeostatic_deviation > 0.5 {
-                        self.carryover.urgency.consecutive_low_error = 0; // prevent Cruise when body is stressed
-                    }
-                    // 2. Sensorimotor surprise blends into exploration urge
-                    // Science: Friston (2010) — interoceptive surprise drives active inference
-                    if response.sensorimotor_surprise > 0.3 {
-                        let body_nudge = (response.sensorimotor_surprise * 0.1).min(0.15) as f32;
-                        self.adjust_exploration("sensorimotor_surprise", body_nudge);
-                    }
-                    // 3. High allostatic load suppresses learning (conserve resources)
-                    // Science: McEwen (2004) — allostatic overload impairs plasticity
-                    if response.allostatic_load > 0.7 {
-                        self.scale_lr(
-                            "allostatic_overload",
-                            1.0 - (response.allostatic_load - 0.7) as f32 * 0.5,
-                        );
+                    {
+                        use crate::cognitive_loop::thresholds::{
+                            ALLOSTATIC_LOAD_DANGER_THRESHOLD, ALLOSTATIC_LOAD_LR_DAMPEN,
+                            HOMEOSTATIC_DEVIATION_THRESHOLD, SENSORIMOTOR_SURPRISE_EXPLORE_SCALE,
+                            SENSORIMOTOR_SURPRISE_THRESHOLD,
+                        };
+                        if response.homeostatic_deviation > HOMEOSTATIC_DEVIATION_THRESHOLD {
+                            self.carryover.urgency.consecutive_low_error = 0; // prevent Cruise when body is stressed
+                        }
+                        // 2. Sensorimotor surprise blends into exploration urge
+                        // Science: Friston (2010) — interoceptive surprise drives active inference
+                        if response.sensorimotor_surprise > SENSORIMOTOR_SURPRISE_THRESHOLD {
+                            let body_nudge = (response.sensorimotor_surprise
+                                * SENSORIMOTOR_SURPRISE_EXPLORE_SCALE)
+                                .min(0.15)
+                                as f32;
+                            self.adjust_exploration("sensorimotor_surprise", body_nudge);
+                        }
+                        // 3. High allostatic load suppresses learning (conserve resources)
+                        // Science: McEwen (2004) — allostatic overload impairs plasticity
+                        if response.allostatic_load > ALLOSTATIC_LOAD_DANGER_THRESHOLD {
+                            self.scale_lr(
+                                "allostatic_overload",
+                                1.0 - (response.allostatic_load - ALLOSTATIC_LOAD_DANGER_THRESHOLD)
+                                    as f32
+                                    * ALLOSTATIC_LOAD_LR_DAMPEN as f32,
+                            );
+                        }
                     }
 
                     (response.phi_modulation, response.sense_of_agency)
@@ -398,12 +410,24 @@ impl CognitiveLoopService {
         // FEEDBACK: Embodied agency modulates exploration risk tolerance
         // Science: Friston, Stephan et al. (2015) — sense of agency enables bold action
         // High agency → allow riskier exploration; low agency → cautious retreat
-        if embodied_agency > 0.7 {
-            let agency_boost = ((embodied_agency - 0.7) * 0.15) as f32; // up to +4.5%
-            self.adaptive_behavior.exploration_factor *= 1.0 + agency_boost;
-        } else if embodied_agency > 0.0 && embodied_agency < 0.3 {
-            let caution = ((0.3 - embodied_agency) * 0.1) as f32; // up to -3%
-            self.scale_exploration("embodied_caution", (1.0 - caution).max(0.7));
+        {
+            use crate::cognitive_loop::thresholds::{
+                EMBODIED_AGENCY_BOOST_SCALE, EMBODIED_AGENCY_CAUTION_FLOOR,
+                EMBODIED_AGENCY_CAUTION_SCALE, EMBODIED_AGENCY_HIGH_THRESHOLD,
+                EMBODIED_AGENCY_LOW_THRESHOLD,
+            };
+            if embodied_agency > EMBODIED_AGENCY_HIGH_THRESHOLD {
+                let agency_boost =
+                    ((embodied_agency - EMBODIED_AGENCY_HIGH_THRESHOLD) * EMBODIED_AGENCY_BOOST_SCALE) as f32;
+                self.adaptive_behavior.exploration_factor *= 1.0 + agency_boost;
+            } else if embodied_agency > 0.0 && embodied_agency < EMBODIED_AGENCY_LOW_THRESHOLD {
+                let caution =
+                    ((EMBODIED_AGENCY_LOW_THRESHOLD - embodied_agency) * EMBODIED_AGENCY_CAUTION_SCALE) as f32;
+                self.scale_exploration(
+                    "embodied_caution",
+                    (1.0 - caution).max(EMBODIED_AGENCY_CAUTION_FLOOR),
+                );
+            }
         }
 
         // ═══════════════════════════════════════════════════════════════════════

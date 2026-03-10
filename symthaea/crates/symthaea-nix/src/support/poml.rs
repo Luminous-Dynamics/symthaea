@@ -1271,4 +1271,121 @@ mod tests {
         assert_eq!(result.metadata.model_hints.temperature, Some(0.3));
         assert_eq!(result.metadata.model_hints.max_tokens, Some(256));
     }
+
+    #[test]
+    fn test_load_empty_template() {
+        let mut proc = PomlProcessor::new("/tmp/nonexistent");
+        let result = proc.load_template_str("bad", "");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_process_nonexistent_template() {
+        let mut proc = PomlProcessor::new("/tmp/nonexistent");
+        let ctx = PomlContext::default();
+        let result = proc.process("nonexistent", &ctx);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_minimal_template() {
+        let template = r#"<poml version="2.0">
+  <metadata><title>Minimal</title></metadata>
+  <prompt><system>Hello</system></prompt>
+</poml>"#;
+        let mut proc = PomlProcessor::new("/tmp/nonexistent");
+        proc.load_template_str("min", template).unwrap();
+
+        let ctx = PomlContext::default();
+        let result = proc.process("min", &ctx).unwrap();
+        assert!(result.prompt.contains("Hello"));
+        assert_eq!(result.metadata.title.as_deref(), Some("Minimal"));
+    }
+
+    #[test]
+    fn test_condition_in_operator() {
+        let mut vars = HashMap::new();
+        vars.insert("items".into(), PomlValue::String("foo bar baz".into()));
+        let ctx = PomlContext::default();
+
+        assert!(evaluate_condition("'foo' in items", &vars, &ctx));
+        assert!(!evaluate_condition("'qux' in items", &vars, &ctx));
+    }
+
+    #[test]
+    fn test_condition_empty() {
+        let vars = HashMap::new();
+        let ctx = PomlContext::default();
+        assert!(!evaluate_condition("", &vars, &ctx));
+    }
+
+    #[test]
+    fn test_condition_inequality() {
+        let mut vars = HashMap::new();
+        vars.insert("mode".into(), PomlValue::String("debug".into()));
+        let ctx = PomlContext::default();
+
+        assert!(evaluate_condition("mode != 'release'", &vars, &ctx));
+        assert!(!evaluate_condition("mode != 'debug'", &vars, &ctx));
+    }
+
+    #[test]
+    fn test_variable_substitution_no_match() {
+        let vars = HashMap::new();
+        let result = substitute_variables("No variables here", &vars);
+        assert_eq!(result, "No variables here");
+    }
+
+    #[test]
+    fn test_variable_substitution_multiple() {
+        let mut vars = HashMap::new();
+        vars.insert("a".into(), PomlValue::String("1".into()));
+        vars.insert("b".into(), PomlValue::String("2".into()));
+
+        let result = substitute_variables("{{ a }} and {{ b }}", &vars);
+        assert_eq!(result, "1 and 2");
+    }
+
+    #[test]
+    fn test_poml_value_from_string() {
+        let val: PomlValue = "hello".into();
+        assert_eq!(val.to_display(), "hello");
+    }
+
+    #[test]
+    fn test_poml_value_list_display() {
+        let val = PomlValue::List(vec!["a".into(), "b".into(), "c".into()]);
+        let display = val.to_display();
+        assert!(display.contains("a"));
+        assert!(display.contains("b"));
+        assert!(display.contains("c"));
+    }
+
+    #[test]
+    fn test_poml_context_default() {
+        let ctx = PomlContext::default();
+        assert!(ctx.variables.is_empty());
+        assert!(ctx.persona.is_none());
+    }
+
+    #[test]
+    fn test_load_template_str_overwrite() {
+        let template = r#"<poml version="2.0">
+  <metadata><title>V1</title></metadata>
+  <prompt><system>First</system></prompt>
+</poml>"#;
+        let template2 = r#"<poml version="2.0">
+  <metadata><title>V2</title></metadata>
+  <prompt><system>Second</system></prompt>
+</poml>"#;
+
+        let mut proc = PomlProcessor::new("/tmp/nonexistent");
+        proc.load_template_str("t", template).unwrap();
+        proc.load_template_str("t", template2).unwrap();
+
+        let ctx = PomlContext::default();
+        let result = proc.process("t", &ctx).unwrap();
+        assert_eq!(result.metadata.title.as_deref(), Some("V2"));
+        assert!(result.prompt.contains("Second"));
+    }
 }

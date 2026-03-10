@@ -84,6 +84,13 @@ pub struct IntegrityTelemetry {
     /// Empty when no attestation check ran this cycle.
     #[serde(default)]
     pub attestation_details: Vec<AttestationDetail>,
+    /// Unified cross-source failure streak (attestation + canary).
+    /// 1-2 = Warning, 3+ = Critical. Resets on clean tick.
+    #[serde(default)]
+    pub global_failure_streak: usize,
+    /// Rolling 60-cycle history of integrity_confidence values for sparkline display.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub confidence_history: Vec<f32>,
 }
 
 /// Per-attestation telemetry entry for dashboard visibility.

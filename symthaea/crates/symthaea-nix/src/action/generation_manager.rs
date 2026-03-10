@@ -338,4 +338,69 @@ old-package: 2.0 → ∅, -3.2 MiB
         assert_eq!(diff.changed.len(), 1);
         assert_eq!(diff.changed[0].0, "firefox");
     }
+
+    #[test]
+    fn test_parse_diff_empty() {
+        let diff = GenerationManager::parse_diff("", 1, 2).unwrap();
+        assert!(diff.added.is_empty());
+        assert!(diff.removed.is_empty());
+        assert!(diff.changed.is_empty());
+        assert_eq!(diff.from, 1);
+        assert_eq!(diff.to, 2);
+    }
+
+    #[test]
+    fn test_parse_diff_ascii_arrows() {
+        let output = "new-pkg: ∅ -> 1.0, +1 MiB\nold-pkg: 2.0 -> ∅, -1 MiB\n";
+        let diff = GenerationManager::parse_diff(output, 10, 11).unwrap();
+        assert_eq!(diff.added.len(), 1);
+        assert_eq!(diff.removed.len(), 1);
+    }
+
+    #[test]
+    fn test_parse_generations_non_numeric_skipped() {
+        let output = "Header line that is not a generation\n  42  2025-01-05  NixOS 24.11  linux 6.12\n";
+        let gens = GenerationManager::parse_generations(output).unwrap();
+        assert_eq!(gens.len(), 1);
+        assert_eq!(gens[0].number, 42);
+    }
+
+    #[test]
+    fn test_parse_generations_minimal_tokens() {
+        let output = "  99  2025-03-01  (current)\n";
+        let gens = GenerationManager::parse_generations(output).unwrap();
+        assert_eq!(gens.len(), 1);
+        assert!(gens[0].current);
+        assert_eq!(gens[0].number, 99);
+        assert_eq!(gens[0].date, "2025-03-01");
+    }
+
+    #[test]
+    fn test_delete_older_than_various() {
+        let cmd = GenerationManager::delete_older_than(7);
+        let (_, args) = cmd.to_command();
+        assert!(args.contains(&"7d".to_string()));
+
+        let cmd2 = GenerationManager::delete_older_than(0);
+        let (_, args2) = cmd2.to_command();
+        assert!(args2.contains(&"0d".to_string()));
+    }
+
+    #[test]
+    fn test_switch_to_safety_level() {
+        let cmd = GenerationManager::switch_to(1);
+        assert_eq!(cmd.safety_level(), SafetyLevel::SystemCritical);
+    }
+
+    #[test]
+    fn test_rollback_safety_level() {
+        let cmd = GenerationManager::rollback();
+        assert_eq!(cmd.safety_level(), SafetyLevel::SystemCritical);
+    }
+
+    #[test]
+    fn test_delete_old_safety_level() {
+        let cmd = GenerationManager::delete_old(3);
+        assert_eq!(cmd.safety_level(), SafetyLevel::Destructive);
+    }
 }

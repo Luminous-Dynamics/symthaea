@@ -1,5 +1,6 @@
 use std::collections::VecDeque;
-use std::time::Instant;
+// web-time: drop-in Instant for wasm32 (std::time::Instant panics on wasm32-unknown-unknown)
+use web_time::Instant;
 
 /// Narrative Coherence: N = autobiographical_integration × future_simulation_depth
 ///
