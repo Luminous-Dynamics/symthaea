@@ -467,11 +467,13 @@ fn enforce_annual_mint_cap(new_amount: u64, now: Timestamp) -> ExternResult<()> 
     let annual_total: u64 = query(filter)?
         .into_iter()
         .filter_map(|r| {
-            r.entry()
-                .to_app_option::<SapMintRecord>()
-                .map_err(|e| debug!("SapMintRecord deserialization error: {:?}", e))
-                .ok()
-                .flatten()
+            match r.entry().to_app_option::<SapMintRecord>() {
+                Ok(opt) => opt,
+                Err(e) => {
+                    debug!("SapMintRecord deserialization error: {:?}", e);
+                    None
+                }
+            }
         })
         .filter(|m| m.minted_at.as_micros() > cutoff)
         .filter(|m| matches!(m.source, SapMintSource::GovernanceProposal { .. }))
@@ -891,6 +893,7 @@ pub struct GetPaymentHistoryInput {
     pub limit: Option<usize>,
 }
 
+/// Uses follow_update_chain because payments are mutable (status transitions).
 #[hdk_extern]
 pub fn get_payment_history(input: GetPaymentHistoryInput) -> ExternResult<Vec<Record>> {
     let max = input.limit.unwrap_or(100);
@@ -901,13 +904,9 @@ pub fn get_payment_history(input: GetPaymentHistoryInput) -> ExternResult<Vec<Re
         .into_iter()
         .take(max)
     {
-        if let Some(record) = get(
-            ActionHash::try_from(link.target)
-                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?,
-            GetOptions::default(),
-        )? {
-            payments.push(record);
-        }
+        let hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?;
+        payments.push(follow_update_chain(hash)?);
     }
     // Get received payments (respect remaining budget)
     let remaining = max.saturating_sub(payments.len());
@@ -917,13 +916,9 @@ pub fn get_payment_history(input: GetPaymentHistoryInput) -> ExternResult<Vec<Re
             .into_iter()
             .take(remaining)
         {
-            if let Some(record) = get(
-                ActionHash::try_from(link.target)
-                    .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?,
-                GetOptions::default(),
-            )? {
-                payments.push(record);
-            }
+            let hash = ActionHash::try_from(link.target)
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?;
+            payments.push(follow_update_chain(hash)?);
         }
     }
     Ok(payments)
@@ -939,7 +934,7 @@ pub fn get_payment(payment_id: String) -> ExternResult<Option<Record>> {
     if let Some(link) = links.first() {
         let hash = ActionHash::try_from(link.target.clone())
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        Ok(get(hash, GetOptions::default())?)
+        Ok(Some(follow_update_chain(hash)?))
     } else {
         Ok(None)
     }
@@ -1073,6 +1068,8 @@ pub struct GetChannelsInput {
 }
 
 /// Get all channels for a party
+///
+/// Uses follow_update_chain because payment channels are mutable (balance, close).
 #[hdk_extern]
 pub fn get_channels(input: GetChannelsInput) -> ExternResult<Vec<Record>> {
     let max = input.limit.unwrap_or(100);
@@ -1083,13 +1080,9 @@ pub fn get_channels(input: GetChannelsInput) -> ExternResult<Vec<Record>> {
         .into_iter()
         .take(max)
     {
-        if let Some(record) = get(
-            ActionHash::try_from(link.target)
-                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?,
-            GetOptions::default(),
-        )? {
-            channels.push(record);
-        }
+        let hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?;
+        channels.push(follow_update_chain(hash)?);
     }
     // Party B channels (respect remaining budget)
     let remaining = max.saturating_sub(channels.len());
@@ -1099,13 +1092,9 @@ pub fn get_channels(input: GetChannelsInput) -> ExternResult<Vec<Record>> {
             .into_iter()
             .take(remaining)
         {
-            if let Some(record) = get(
-                ActionHash::try_from(link.target)
-                    .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?,
-                GetOptions::default(),
-            )? {
-                channels.push(record);
-            }
+            let hash = ActionHash::try_from(link.target)
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?;
+            channels.push(follow_update_chain(hash)?);
         }
     }
     Ok(channels)
@@ -1405,9 +1394,7 @@ pub fn contribute_to_hearth_pool(input: ContributeToHearthInput) -> ExternResult
             .ok_or(wasm_error!(WasmErrorInner::Guest(
                 "Invalid link target".into()
             )))?;
-    let record = get(action_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
-        WasmErrorInner::Guest("SAP balance record not found".into())
-    ))?;
+    let record = follow_update_chain(action_hash)?;
     let mut personal_bal = record
         .entry()
         .to_app_option::<SapBalance>()
@@ -1616,15 +1603,18 @@ fn get_or_create_hearth_pool(hearth_did: &str) -> ExternResult<HearthSapPool> {
 
     if let Some(link) = links.first() {
         if let Some(action_hash) = link.target.clone().into_action_hash() {
-            if let Some(record) = get(action_hash, GetOptions::default())? {
-                if let Some(pool) = record
-                    .entry()
-                    .to_app_option::<HearthSapPool>()
-                    .ok()
-                    .flatten()
-                {
-                    return Ok(pool);
-                }
+            let record = follow_update_chain(action_hash)?;
+            if let Some(pool) = record
+                .entry()
+                .to_app_option::<HearthSapPool>()
+                .map_err(|e| {
+                    wasm_error!(WasmErrorInner::Guest(format!(
+                        "HearthSapPool deserialization error: {:?}",
+                        e
+                    )))
+                })?
+            {
+                return Ok(pool);
             }
         }
     }
@@ -1658,11 +1648,7 @@ fn update_hearth_pool(hearth_did: &str, pool: &HearthSapPool) -> ExternResult<()
 
     if let Some(link) = links.first() {
         if let Some(action_hash) = link.target.clone().into_action_hash() {
-            // Get the latest record to avoid update forks — the link points to the
-            // original create action, but the entry may have been updated since.
-            let record = get(action_hash, GetOptions::default())?.ok_or(wasm_error!(
-                WasmErrorInner::Guest("Hearth pool record not found".into())
-            ))?;
+            let record = follow_update_chain(action_hash)?;
             update_entry(record.action_address().clone(), pool)?;
         }
     }
