@@ -284,6 +284,23 @@ if ! $DRY_RUN; then
     fi
     ok "Stripped workspace lints (incompatible with CI clippy config)"
 
+    # Remove workspace members that don't exist in the standalone repo
+    # (e.g., symthaea-crucible exists in monorepo but isn't synced)
+    local TOML="${STANDALONE_REPO}/Cargo.toml"
+    local REMOVED_MEMBERS=0
+    while IFS= read -r line; do
+        local crate_path
+        crate_path=$(echo "$line" | sed -n 's/.*"\(crates\/[^"]*\)".*/\1/p')
+        if [ -n "$crate_path" ] && [ ! -d "${STANDALONE_REPO}/${crate_path}" ]; then
+            sed -i "\|\"${crate_path}\"|d" "$TOML"
+            REMOVED_MEMBERS=$((REMOVED_MEMBERS + 1))
+            warn "Removed missing workspace member: ${crate_path}"
+        fi
+    done < <(grep '"crates/' "$TOML")
+    if [ $REMOVED_MEMBERS -gt 0 ]; then
+        ok "Removed $REMOVED_MEMBERS missing workspace members"
+    fi
+
     if $REWRITE_OK; then
         ok "Cargo.toml fixups verified"
     else
