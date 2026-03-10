@@ -6,9 +6,6 @@ authors = ["Luminous Dynamics"]
 description = "Core primitives for Symthaea: HDC, Phi Engine, and basic Consciousness structures"
 license = "MIT"
 
-[lints]
-workspace = true
-
 [dependencies]
 ndarray = { workspace = true }
 rand = { workspace = true }
