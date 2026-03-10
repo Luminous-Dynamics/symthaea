@@ -286,10 +286,9 @@ if ! $DRY_RUN; then
 
     # Remove workspace members that don't exist in the standalone repo
     # (e.g., symthaea-crucible exists in monorepo but isn't synced)
-    local TOML="${STANDALONE_REPO}/Cargo.toml"
-    local REMOVED_MEMBERS=0
+    TOML="${STANDALONE_REPO}/Cargo.toml"
+    REMOVED_MEMBERS=0
     while IFS= read -r line; do
-        local crate_path
         crate_path=$(echo "$line" | sed -n 's/.*"\(crates\/[^"]*\)".*/\1/p')
         if [ -n "$crate_path" ] && [ ! -d "${STANDALONE_REPO}/${crate_path}" ]; then
             sed -i "\|\"${crate_path}\"|d" "$TOML"
