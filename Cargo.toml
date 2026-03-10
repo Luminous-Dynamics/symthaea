@@ -55,6 +55,21 @@ members = [
     "crates/symthaea-spore",
 ]
 
+# Workspace-wide lint configuration. Members opt in via [lints] workspace = true.
+# These lints apply on top of any crate-level #![deny/allow/warn] attributes.
+[workspace.lints.clippy]
+# Restriction lints: prevent debugging artifacts in production code
+dbg_macro = "deny"
+todo = "deny"
+unimplemented = "deny"
+# Correctness lints (already deny-by-default, listed explicitly for documentation)
+eq_op = "deny"
+erasing_op = "deny"
+invalid_regex = "deny"
+self_assignment = "deny"
+cast_ptr_alignment = "deny"
+nonsensical_open_options = "deny"
+unused_io_amount = "deny"
 
 [workspace.dependencies]
 arrow-array = "56"
@@ -100,6 +115,9 @@ homepage = "https://luminousdynamics.org"
 documentation = "https://docs.rs/symthaea"
 keywords = ["consciousness", "ai", "hdc", "integrated-information", "neuroscience"]
 categories = ["science", "algorithms", "data-structures"]
+
+[lints]
+workspace = true
 
 [dependencies]
 # Symthaea Core - HDC, Φ engine, and minimal consciousness pipeline
@@ -403,7 +421,7 @@ foveation-perception = ["foveation", "symthaea-foveation/perception"]  # Foveati
 integrity = []  # Hardware integrity / tamper detection framework (attestation, temporal checks, canaries)
 semantic-encoder = ["symthaea-embeddings/embed-channel"]  # Background Qwen3 embedding channel for cognitive loop telemetry
 # Neural Bridge v2: BGE-M3 via Candle (LLM as Semantic Sensor)
-neural-bridge = ["candle-core", "candle-nn", "candle-transformers", "tokenizers", "hf-hub"]
+neural-bridge = ["candle-core", "candle-nn", "candle-transformers", "tokenizers", "hf-hub", "dep:sha2"]
 neural-bridge-cuda = ["neural-bridge", "candle-core/cuda", "candle-nn/cuda", "candle-transformers/cuda"]
 
 # ── Distributed / Network ──────────────────────────────────────────

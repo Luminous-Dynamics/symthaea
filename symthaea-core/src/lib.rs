@@ -31,6 +31,12 @@
 //! - **[`observability`]** — Metrics, tracing, and introspection
 
 #![warn(missing_docs)]
+// Strict deny lints: workspace lints (Cargo.toml) handle dbg_macro, todo,
+// unimplemented, eq_op, erasing_op, etc. Below: additional crate-specific denies.
+#![deny(
+    clippy::zero_divided_by_zero,
+    clippy::fn_to_numeric_cast
+)]
 #![allow(clippy::needless_range_loop)]
 #![allow(clippy::manual_clamp)]
 #![allow(clippy::new_without_default)]
