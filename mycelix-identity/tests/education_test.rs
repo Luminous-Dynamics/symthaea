@@ -27,6 +27,37 @@ use holochain::prelude::*;
 use std::path::PathBuf;
 
 // ============================================================================
+// DID Mirror Types (needed for dynamic DID creation)
+// ============================================================================
+
+/// Mirror of did_registry_integrity::DidDocument (minimal fields for education tests)
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct DidDocument {
+    pub id: String,
+    pub controller: AgentPubKey,
+    #[serde(rename = "verificationMethod", alias = "verification_method")]
+    pub verification_method: Vec<serde_json::Value>,
+    pub authentication: Vec<String>,
+    #[serde(rename = "keyAgreement", alias = "key_agreement", default)]
+    pub key_agreement: Vec<String>,
+    pub service: Vec<serde_json::Value>,
+    pub created: Timestamp,
+    pub updated: Timestamp,
+    pub version: u32,
+}
+
+/// Decode an entry from a Record via MessagePack deserialization
+fn decode_entry<T: serde::de::DeserializeOwned>(record: &Record) -> Option<T> {
+    match record.entry().as_option()? {
+        Entry::App(bytes) => {
+            let sb = SerializedBytes::from(bytes.to_owned());
+            rmp_serde::from_slice(sb.bytes()).ok()
+        }
+        _ => None,
+    }
+}
+
+// ============================================================================
 // Mirror types for deserialization (avoids importing zome crates)
 // ============================================================================
 
@@ -251,9 +282,9 @@ async fn load_dna() -> DnaFile {
         .expect("Failed to load DNA bundle")
 }
 
-fn test_issuer() -> InstitutionalIssuer {
+fn test_issuer(institution_did: &str) -> InstitutionalIssuer {
     InstitutionalIssuer {
-        id: "did:dns:registrar.testuniversity.edu".to_string(),
+        id: institution_did.to_string(),
         name: "Test University".to_string(),
         issuer_type: vec!["EducationalOrganization".to_string()],
         image: None,
@@ -320,9 +351,9 @@ fn test_proof() -> AcademicProof {
     }
 }
 
-fn test_create_input(subject_suffix: &str) -> CreateAcademicCredentialInput {
+fn test_create_input(institution_did: &str, subject_suffix: &str) -> CreateAcademicCredentialInput {
     CreateAcademicCredentialInput {
-        issuer: test_issuer(),
+        issuer: test_issuer(institution_did),
         subject: test_subject(subject_suffix),
         achievement: test_achievement(),
         dns_did: test_dns_did(),
@@ -341,7 +372,8 @@ fn test_create_input(subject_suffix: &str) -> CreateAcademicCredentialInput {
 mod education_integration {
     use super::*;
 
-    async fn setup() -> (SweetConductor, SweetCell) {
+    /// Setup conductor with DNA, create a DID for the agent (needed for institution auth check)
+    async fn setup() -> (SweetConductor, SweetCell, String) {
         let mut conductor = SweetConductor::from_standard_config().await;
         let dna = load_dna().await;
         let app = conductor
@@ -349,16 +381,25 @@ mod education_integration {
             .await
             .expect("Failed to install hApp");
         let cell = app.cells()[0].clone();
-        (conductor, cell)
+
+        // Create a DID for the agent — education zome checks caller DID matches issuer.id
+        let did_record: Record = conductor
+            .call(&cell.zome("did_registry"), "create_did", ())
+            .await;
+        let did_doc: DidDocument = decode_entry(&did_record)
+            .expect("Failed to decode DID document");
+        let institution_did = did_doc.id.clone();
+
+        (conductor, cell, institution_did)
     }
 
     /// Test: Create an academic credential and retrieve it
     #[tokio::test(flavor = "multi_thread")]
     #[ignore] // Requires DNA bundle
     async fn test_create_and_get_credential() {
-        let (conductor, cell) = setup().await;
+        let (conductor, cell, institution_did) = setup().await;
 
-        let input = test_create_input("alice");
+        let input = test_create_input(&institution_did, "alice");
         let output: CreateAcademicCredentialOutput = conductor
             .call(&cell.zome("education"), "create_academic_credential", input)
             .await;
@@ -391,11 +432,11 @@ mod education_integration {
     #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_query_by_institution() {
-        let (conductor, cell) = setup().await;
+        let (conductor, cell, institution_did) = setup().await;
 
         // Create two credentials from same institution
-        let input1 = test_create_input("bob");
-        let input2 = test_create_input("carol");
+        let input1 = test_create_input(&institution_did, "bob");
+        let input2 = test_create_input(&institution_did, "carol");
 
         let _: CreateAcademicCredentialOutput = conductor
             .call(&cell.zome("education"), "create_academic_credential", input1)
@@ -408,7 +449,7 @@ mod education_integration {
             .call(
                 &cell.zome("education"),
                 "get_credentials_by_institution",
-                "did:dns:registrar.testuniversity.edu".to_string(),
+                institution_did.clone(),
             )
             .await;
 
@@ -422,9 +463,9 @@ mod education_integration {
     #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_query_by_subject() {
-        let (conductor, cell) = setup().await;
+        let (conductor, cell, institution_did) = setup().await;
 
-        let input = test_create_input("dave");
+        let input = test_create_input(&institution_did, "dave");
         let output: CreateAcademicCredentialOutput = conductor
             .call(&cell.zome("education"), "create_academic_credential", input)
             .await;
@@ -445,9 +486,9 @@ mod education_integration {
     #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_zk_commitment_verification() {
-        let (conductor, cell) = setup().await;
+        let (conductor, cell, institution_did) = setup().await;
 
-        let input = test_create_input("eve");
+        let input = test_create_input(&institution_did, "eve");
         let output: CreateAcademicCredentialOutput = conductor
             .call(&cell.zome("education"), "create_academic_credential", input)
             .await;
@@ -489,9 +530,9 @@ mod education_integration {
     #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_revocation_request() {
-        let (conductor, cell) = setup().await;
+        let (conductor, cell, institution_did) = setup().await;
 
-        let input = test_create_input("frank");
+        let input = test_create_input(&institution_did, "frank");
         let output: CreateAcademicCredentialOutput = conductor
             .call(&cell.zome("education"), "create_academic_credential", input)
             .await;

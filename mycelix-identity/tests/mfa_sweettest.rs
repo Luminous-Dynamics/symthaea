@@ -991,14 +991,18 @@ mod factor_verification {
             did: did_doc.id.clone(),
             primary_key_hash: primary_key_hash.clone(),
         };
-        let _: MfaStateOutput = conductor
+        let mfa_output: MfaStateOutput = conductor
             .call(&cell.zome("mfa"), "create_mfa_state", mfa_input)
             .await;
+
+        // Use the actual enrolled factor_id from the output (MFA zome computes
+        // the real SHA256 hash internally, which may differ from our input)
+        let enrolled_factor_id = mfa_output.state.factors[0].factor_id.clone();
 
         // Verify factor (primary key uses implicit Holochain authentication)
         let verify_input = VerifyFactorInput {
             did: did_doc.id.clone(),
-            factor_id: primary_key_hash,
+            factor_id: enrolled_factor_id,
             challenge: None,
             proof: None, // Primary key verified by Holochain capability system
         };
@@ -1054,15 +1058,21 @@ mod factor_verification {
             .call(&cell.zome("mfa"), "enroll_factor", enroll_input)
             .await;
 
-        // Verify with WebAuthn proof
+        // Verify with WebAuthn proof — must provide structurally valid data:
+        // - authenticator_data: 37+ bytes (rpIdHash:32 + flags:1 + counter:4)
+        // - client_data_hash: valid base64, 32 bytes (SHA256)
+        // - signature: valid base64
         let verify_input = VerifyFactorInput {
             did: did_doc.id.clone(),
             factor_id: "yubikey-test".to_string(),
             challenge: Some("test-challenge-123".to_string()),
             proof: Some(VerificationProof::WebAuthn {
-                authenticator_data: "AQIDBA==".to_string(), // Base64 encoded test data
-                client_data_hash: "test-hash".to_string(),
-                signature: "test-signature".to_string(),
+                // 37 bytes: 32-byte rpIdHash (zeros) + flags 0x45 (UP+UV) + counter 1
+                authenticator_data: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABFAAAAAQ==".to_string(),
+                // 32-byte SHA256 hash (all 0x01) in base64
+                client_data_hash: "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=".to_string(),
+                // 64-byte dummy signature in base64
+                signature: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==".to_string(),
             }),
         };
 

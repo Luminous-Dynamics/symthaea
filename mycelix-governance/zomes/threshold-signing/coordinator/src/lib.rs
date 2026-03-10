@@ -16,6 +16,29 @@ use k256::ecdsa::signature::Verifier;
 use threshold_signing_integrity::*;
 
 // ============================================================================
+// HELPERS
+// ============================================================================
+
+/// Follow update chains to get the latest version of a record.
+fn get_latest_record(action_hash: ActionHash) -> ExternResult<Option<Record>> {
+    let Some(details) = get_details(action_hash, GetOptions::default())? else {
+        return Ok(None);
+    };
+    match details {
+        Details::Record(record_details) => {
+            if record_details.updates.is_empty() {
+                Ok(Some(record_details.record))
+            } else {
+                let latest_update = &record_details.updates[record_details.updates.len() - 1];
+                let latest_hash = latest_update.action_address().clone();
+                get_latest_record(latest_hash)
+            }
+        }
+        Details::Entry(_) => Ok(None),
+    }
+}
+
+// ============================================================================
 // REAL-TIME SIGNALS
 // ============================================================================
 
@@ -1346,7 +1369,7 @@ fn validate_id(id: &str, field_name: &str) -> ExternResult<()> {
     Ok(())
 }
 
-/// Get committee by ID
+/// Get committee by ID (follows update chains to get latest state)
 #[hdk_extern]
 pub fn get_committee(committee_id: String) -> ExternResult<Option<Record>> {
     validate_id(&committee_id, "Committee ID")?;
@@ -1362,7 +1385,7 @@ pub fn get_committee(committee_id: String) -> ExternResult<Option<Record>> {
     if let Some(link) = latest {
         let ah = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        return get(ah, GetOptions::default());
+        return get_latest_record(ah);
     }
 
     Ok(None)
@@ -1428,7 +1451,7 @@ pub fn get_all_committees(_: ()) -> ExternResult<Vec<Record>> {
     for link in links {
         let ah = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(ah, GetOptions::default())? {
+        if let Some(record) = get_latest_record(ah)? {
             // Only include active committees
             if let Some(committee) = record
                 .entry()

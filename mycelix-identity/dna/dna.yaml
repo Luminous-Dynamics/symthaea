@@ -64,6 +64,8 @@ coordinator:
         - name: identity_bridge_integrity
         - name: did_registry_integrity
         - name: verifiable_credential_integrity
+        - name: mfa_integrity
+        - name: trust_credential_integrity
 
     - name: trust_credential
       path: "../target/wasm32-unknown-unknown/release/trust_credential_coordinator.wasm"
