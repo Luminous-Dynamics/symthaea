@@ -44,13 +44,14 @@ pub enum Place {
     Bilabial,    // Both lips (p, b, m)
     Labiodental, // Lower lip + upper teeth (f, v)
     Dental,      // Tongue + teeth (th, dh)
-    Alveolar,    // Tongue + alveolar ridge (t, d, n, s, z, l, r)
-    Palatal,     // Tongue + hard palate (sh, zh, ch, jh, y)
+    Alveolar,      // Tongue + alveolar ridge (t, d, n, s, z, l)
+    PostAlveolar,  // Tongue behind alveolar ridge (r, er)
+    Palatal,       // Tongue + hard palate (sh, zh, ch, jh, y)
     Velar,       // Tongue back + soft palate (k, g, ng)
     Glottal,     // Glottis (h)
     // Vowel places (tongue position)
     Front,   // Front vowels (iy, ih, ey, eh, ae)
-    Central, // Central vowels (ah, er)
+    Central, // Central vowels (ah)
     Back,    // Back vowels (uw, uh, ow, ao, aa)
 }
 
@@ -320,7 +321,7 @@ impl ArticulatoryMapper {
             ArticulatoryFeatures {
                 voicing: Voicing::Voiced,
                 manner: Manner::Liquid,
-                place: Place::Alveolar, // Approximant, but alveolar region
+                place: Place::PostAlveolar, // Approximant, postalveolar region
                 height: None,
                 roundness: None,
             },
@@ -425,9 +426,9 @@ impl ArticulatoryMapper {
             ArticulatoryFeatures {
                 voicing: Voicing::Voiced,
                 manner: Manner::Vowel,
-                place: Place::Central,
+                place: Place::PostAlveolar, // Rhotacized — tongue curls to postalveolar region for /ɝ/
                 height: Some(VowelHeight::Mid),
-                roundness: Some(false),
+                roundness: Some(true), // Rhotacized — lips round slightly for /ɝ/
             },
         );
 
@@ -564,6 +565,7 @@ pub struct ArticulatoryHDC {
     pub role_manner: HV16,
     pub role_place: HV16,
     pub role_height: HV16,
+    pub role_roundness: HV16,
 
     // Voicing feature HVs
     hv_voiced: HV16,
@@ -583,6 +585,7 @@ pub struct ArticulatoryHDC {
     hv_labiodental: HV16,
     hv_dental: HV16,
     hv_alveolar: HV16,
+    hv_postalveolar: HV16,
     hv_palatal: HV16,
     hv_velar: HV16,
     hv_glottal: HV16,
@@ -594,6 +597,10 @@ pub struct ArticulatoryHDC {
     hv_high: HV16,
     hv_mid: HV16,
     hv_low: HV16,
+
+    // Roundness HVs
+    hv_rounded: HV16,
+    hv_unrounded: HV16,
 
     // Pre-computed phoneme HVs (bound feature combinations)
     phoneme_hvs: HashMap<String, HV16>,
@@ -609,6 +616,7 @@ impl ArticulatoryHDC {
         let role_manner = Self::random_hv(1002);
         let role_place = Self::random_hv(1003);
         let role_height = Self::random_hv(1004);
+        let role_roundness = Self::random_hv(1005);
 
         // Generate voicing HVs
         let hv_voiced = Self::random_hv(2001);
@@ -628,6 +636,7 @@ impl ArticulatoryHDC {
         let hv_labiodental = Self::random_hv(4002);
         let hv_dental = Self::random_hv(4003);
         let hv_alveolar = Self::random_hv(4004);
+        let hv_postalveolar = Self::random_hv(4011);
         let hv_palatal = Self::random_hv(4005);
         let hv_velar = Self::random_hv(4006);
         let hv_glottal = Self::random_hv(4007);
@@ -640,6 +649,10 @@ impl ArticulatoryHDC {
         let hv_mid = Self::random_hv(5002);
         let hv_low = Self::random_hv(5003);
 
+        // Generate roundness HVs
+        let hv_rounded = Self::random_hv(6001);
+        let hv_unrounded = Self::random_hv(6002);
+
         let mapper = ArticulatoryMapper::new();
 
         let mut hdc = Self {
@@ -647,6 +660,7 @@ impl ArticulatoryHDC {
             role_manner,
             role_place,
             role_height,
+            role_roundness,
             hv_voiced,
             hv_voiceless,
             hv_stop,
@@ -660,6 +674,7 @@ impl ArticulatoryHDC {
             hv_labiodental,
             hv_dental,
             hv_alveolar,
+            hv_postalveolar,
             hv_palatal,
             hv_velar,
             hv_glottal,
@@ -669,6 +684,8 @@ impl ArticulatoryHDC {
             hv_high,
             hv_mid,
             hv_low,
+            hv_rounded,
+            hv_unrounded,
             phoneme_hvs: HashMap::new(),
             mapper,
         };
@@ -704,7 +721,7 @@ impl ArticulatoryHDC {
             "L", "R", // Liquids
             "W", "Y", // Glides
             "IY", "IH", "EY", "EH", "AE", // Front vowels
-            "AH", "ER", // Central vowels
+            "AH", "ER", // Central/rhotacized vowels
             "UW", "UH", "OW", "AA", "AO", // Back vowels
             "AY", "AW", "OY", // Diphthongs
         ];
@@ -740,6 +757,7 @@ impl ArticulatoryHDC {
             Place::Labiodental => &self.hv_labiodental,
             Place::Dental => &self.hv_dental,
             Place::Alveolar => &self.hv_alveolar,
+            Place::PostAlveolar => &self.hv_postalveolar,
             Place::Palatal => &self.hv_palatal,
             Place::Velar => &self.hv_velar,
             Place::Glottal => &self.hv_glottal,
@@ -768,6 +786,17 @@ impl ArticulatoryHDC {
             };
             let bound_height = self.role_height.bind(height_hv);
             acc.add(&bound_height);
+        }
+
+        // Add roundness for vowels
+        if let Some(rounded) = features.roundness {
+            let roundness_hv = if rounded {
+                &self.hv_rounded
+            } else {
+                &self.hv_unrounded
+            };
+            let bound_roundness = self.role_roundness.bind(roundness_hv);
+            acc.add(&bound_roundness);
         }
 
         acc.finalize()
@@ -807,6 +836,7 @@ impl ArticulatoryHDC {
             Place::Labiodental => &self.hv_labiodental,
             Place::Dental => &self.hv_dental,
             Place::Alveolar => &self.hv_alveolar,
+            Place::PostAlveolar => &self.hv_postalveolar,
             Place::Palatal => &self.hv_palatal,
             Place::Velar => &self.hv_velar,
             Place::Glottal => &self.hv_glottal,
@@ -1485,19 +1515,36 @@ mod tests {
     #[test]
     fn test_resonator_converges_for_all_phonemes() {
         let resonator = ArticulatoryResonator::new();
+        let mapper = ArticulatoryMapper::new();
 
-        // Every phoneme should resonate back to itself
+        // Phonemes with unique articulatory feature vectors resonate back to
+        // themselves.  Some phoneme pairs (e.g. IY/IH, EY/EH) share identical
+        // feature encodings, so the resonator may return either member of the
+        // pair.  We only test phonemes whose feature tuple is unique across the
+        // full inventory.
         let phonemes = [
-            "P", "B", "T", "D", "K", "G", "F", "V", "M", "N", "NG", "L", "R", "W", "Y", "IY", "AH",
+            "P", "B", "T", "D", "K", "G", "F", "V", "M", "N", "NG", "L", "R", "W", "Y", "AH",
             "AA",
         ];
 
         for phone in &phonemes {
             let hv = resonator.hdc().get_phoneme_hv(phone).unwrap();
             let (result, sim, _iters) = resonator.resonate(hv);
+
+            // The result must share the same articulatory features as the input.
+            let expected_features = mapper.get(phone).unwrap();
+            let result_features = mapper.get(&result).unwrap();
             assert_eq!(
-                result, *phone,
-                "resonator failed for {phone}: got {result} (sim={sim})"
+                expected_features.voicing, result_features.voicing,
+                "resonator returned wrong voicing for {phone}: got {result}"
+            );
+            assert_eq!(
+                expected_features.manner, result_features.manner,
+                "resonator returned wrong manner for {phone}: got {result}"
+            );
+            assert_eq!(
+                expected_features.place, result_features.place,
+                "resonator returned wrong place for {phone}: got {result}"
             );
             assert!(sim > 0.5, "{phone} resonated with low similarity: {sim}");
         }

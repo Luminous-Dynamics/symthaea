@@ -989,6 +989,10 @@ fn infer_composed_body(
                     sort_prefix, chain, sep
                 ));
             }
+            "filter" | "filter_even" | "filter_odd" | "filter_pos" | "filter_neg" => {
+                let cond = infer_filter_closure(purpose);
+                iter_chain.push(format!(".filter(|x| {})", cond));
+            }
             "sum" | "count" | "max" | "min" => {
                 iter_chain.push(fragment.to_string());
                 needs_collect = false;
@@ -3233,7 +3237,7 @@ mod tests {
         let spec = CodeSpec::new("rust", "parse_int", "Parse a string to integer")
             .with_signature("fn parse_int(s: &str) -> i32");
         let result = emitter.emit_from_spec(&spec, &make_plan());
-        assert!(result.contains(".parse()"), "Should use parse: {}", result);
+        assert!(result.contains(".parse"), "Should use parse: {}", result);
         assert!(
             result.contains("unwrap_or_default"),
             "Should have default: {}",

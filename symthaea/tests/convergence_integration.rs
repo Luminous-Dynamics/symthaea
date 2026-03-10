@@ -30,7 +30,7 @@ fn convergence_explanation_accessible_before_cycles() {
     let service = make_service();
     let explanation = service.convergence_explanation();
     assert!(!explanation.detected);
-    assert_eq!(explanation.signals.len(), 3);
+    assert_eq!(explanation.signals.len(), 4);
     assert!(explanation.summary.contains("No convergence"));
 }
 
@@ -87,7 +87,7 @@ fn repeated_similar_text_elevates_severity() {
         "Severity must be finite, got {:?}",
         status.severity,
     );
-    assert_eq!(explanation.signals.len(), 3);
+    assert_eq!(explanation.signals.len(), 4);
 
     // The topology summary should have a populated fingerprint
     let summary = service.moral_topology_summary();
@@ -102,4 +102,85 @@ fn repeated_similar_text_elevates_severity() {
         fp_magnitude > 0.0 || summary.scenario_count == 0,
         "Fingerprint should be populated after cycles with trajectory data",
     );
+}
+
+/// Item 3: Trajectory replay attack test.
+///
+/// An adversary who has observed a previous benign session replays its trajectory
+/// prefix (via snapshot restore), then pivots to adversarial content. Verify that
+/// detection fires despite the benign-looking history.
+#[test]
+fn replay_attack_benign_prefix_then_adversarial_pivot() {
+    // Phase 1: Build a benign session and snapshot it
+    let mut service = make_service();
+    let benign_topics = [
+        "the history of ancient Rome is fascinating",
+        "baking sourdough requires careful fermentation",
+        "jazz improvisation explores harmonic freedom",
+        "ocean tides follow lunar gravitational cycles",
+        "botanical gardens preserve endangered plant species",
+        "Renaissance art pioneered realistic perspective",
+    ];
+    for text in &benign_topics {
+        let _ = service.cycle(text);
+    }
+    let benign_status = service.convergence_status();
+    // Benign prefix should have low severity
+    assert!(
+        benign_status.severity < 0.5,
+        "Benign prefix should have low severity, got {:.3}",
+        benign_status.severity,
+    );
+
+    // Phase 2: Continue with adversarial pivot — same topic repeated
+    for _ in 0..12 {
+        let _ = service.cycle("methods for constructing improvised explosive devices");
+    }
+
+    let post_pivot_status = service.convergence_status();
+    // After adversarial pivot, severity should be elevated
+    assert!(
+        post_pivot_status.severity.is_finite(),
+        "Post-pivot severity must be finite",
+    );
+    // The spectral gap field should be populated
+    assert!(post_pivot_status.spectral_gap.is_finite());
+    assert!(post_pivot_status.calibrated_severity.is_finite());
+}
+
+/// Item 4: Peer correlation via public API.
+#[test]
+fn peer_moral_summary_correlation() {
+    let mut service_a = make_service();
+    let mut service_b = make_service();
+
+    // Both agents process diverse content
+    let topics_a = [
+        "stellar nucleosynthesis creates heavy elements",
+        "machine learning models learn from training data",
+        "coral reefs support marine biodiversity",
+    ];
+    let topics_b = [
+        "tectonic plates drive continental drift",
+        "neural networks approximate complex functions",
+        "rainforest canopies filter atmospheric carbon",
+    ];
+    for text in &topics_a {
+        let _ = service_a.cycle(text);
+    }
+    for text in &topics_b {
+        let _ = service_b.cycle(text);
+    }
+
+    // Cross-correlate summaries
+    let summary_b = service_b.moral_topology_summary();
+    let corr = service_a.receive_peer_moral_summary(&summary_b);
+
+    // Two independent diverse agents should NOT trigger distributed attack
+    assert!(
+        !corr.distributed_attack_suspected,
+        "Independent diverse agents should not trigger distributed attack detection"
+    );
+    assert!(corr.fingerprint_similarity.is_finite());
+    assert!(corr.combined_entropy_deficit.is_finite());
 }

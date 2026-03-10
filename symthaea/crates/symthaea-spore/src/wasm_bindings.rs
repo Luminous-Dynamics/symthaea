@@ -20,6 +20,7 @@ impl SporeEngine {
     /// Pass `null` or `undefined` for defaults.
     #[wasm_bindgen(constructor)]
     pub fn new(config: JsValue) -> Result<SporeEngine, JsError> {
+        console_error_panic_hook::set_once();
         let config: SporeConfig = if config.is_null() || config.is_undefined() {
             SporeConfig::default()
         } else {

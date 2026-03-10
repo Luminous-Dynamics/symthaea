@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Result};
-use candle_core::{DType, Device, Tensor};
-use candle_transformers::generation::LogitsProcessor;
-use candle_transformers::models::llama as llama_model;
+use candle_core::{Device, Tensor};
+use candle_transformers::generation::{LogitsProcessor, Sampling};
+use candle_transformers::models::quantized_llama as qlm;
 use hf_hub::{api::sync::Api, Repo};
 use std::sync::Arc;
 use tokenizers::Tokenizer;
@@ -13,35 +13,36 @@ use super::llm_backend::{GenerationParams, LLMBackend};
 pub struct AffectiveLogitsProcessor {
     inner: LogitsProcessor,
     repetition_penalty: f32,
-    top_k: Option<usize>,
 }
 
 impl AffectiveLogitsProcessor {
     pub fn new(seed: u64, temperature: f32, repetition_penalty: f32, top_k: Option<usize>) -> Self {
+        // Build the appropriate sampling strategy with top-k baked in
+        let sampling = match top_k {
+            Some(k) => Sampling::TopK {
+                k,
+                temperature: temperature as f64,
+            },
+            None => Sampling::All {
+                temperature: temperature as f64,
+            },
+        };
         Self {
-            inner: LogitsProcessor::new(seed, Some(temperature as f64), None),
+            inner: LogitsProcessor::from_sampling(seed, sampling),
             repetition_penalty,
-            top_k,
         }
     }
 
     pub fn sample(&mut self, logits: &Tensor) -> Result<u32> {
-        // Apply Top-K if set
-        let logits = if let Some(k) = self.top_k {
-            candle_transformers::utils::top_k(logits, k)?
-        } else {
-            logits.clone()
-        };
-
-        // Use internal candle sampler
-        let token = self.inner.sample(&logits)?;
+        // Top-K is now handled internally by the LogitsProcessor sampling strategy
+        let token = self.inner.sample(logits)?;
         Ok(token)
     }
 }
 
-/// In-process Candle backend for Llama-3-GGUF.
+/// In-process Candle backend for Llama-3-GGUF (quantized).
 pub struct CandleBackend {
-    model: Arc<Mutex<llama_model::Llama>>,
+    model: Arc<Mutex<qlm::ModelWeights>>,
     tokenizer: Tokenizer,
     device: Device,
     /// Shared affective state
@@ -60,10 +61,10 @@ impl CandleBackend {
         let tokenizer_path = repo.get("tokenizer.json")?;
         let tokenizer = Tokenizer::from_file(tokenizer_path).map_err(|e| anyhow!(e))?;
 
-        // Load GGUF model
+        // Load GGUF model via quantized_llama ModelWeights
         let mut file = std::fs::File::open(&model_path)?;
         let model_content = candle_core::quantized::gguf_file::Content::read(&mut file)?;
-        let model = llama_model::Llama::from_gguf(model_content, &mut file, &device)?;
+        let model = qlm::ModelWeights::from_gguf(model_content, &mut file, &device)?;
 
         Ok(Self {
             model: Arc::new(Mutex::new(model)),
@@ -128,8 +129,9 @@ impl LLMBackend for CandleBackend {
 
         let mut model = self.model.lock().await;
 
-        for i in 0..params.max_tokens {
+        for _i in 0..params.max_tokens {
             let input = Tensor::new(&tokens[..], &self.device)?.unsqueeze(0)?;
+            // quantized_llama::ModelWeights::forward takes (x, index_pos)
             let logits = model.forward(&input, tokens.len())?;
             let logits = logits.squeeze(0)?;
             let logits = logits.get(logits.dim(0)? - 1)?;

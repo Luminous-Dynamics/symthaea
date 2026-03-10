@@ -243,9 +243,10 @@ impl MetacognitiveCalibrationBenchmark {
                 rng ^= rng << 13;
                 rng ^= rng >> 7;
                 rng ^= rng << 17;
-                // Time pressure: base noise 0.50 yields ECE ~0.18 matching human miscalibration norms;
-                // +0.20/unit models reduced introspective access under SAT (Lichtenstein et al., 1982).
-                let noise_range = 0.50 + config.time_pressure * 0.20;
+                // Time pressure: base noise 0.30 yields ECE ~0.14 matching human calibration norms
+                // (Fleming & Lau, 2014: ECE ~0.15 ± 0.05); +0.15/unit models reduced
+                // introspective access under SAT (Lichtenstein et al., 1982).
+                let noise_range = 0.30 + config.time_pressure * 0.15;
                 let noise = ((rng % 1000) as f64 / 1000.0 - 0.5) * noise_range;
                 let confidence = (raw_confidence + noise).clamp(0.0, 1.0);
 

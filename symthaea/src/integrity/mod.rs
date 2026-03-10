@@ -24,6 +24,7 @@ pub mod hsm_interface;
 pub mod redundant_computation;
 pub mod temporal_consistency;
 
+use std::collections::VecDeque;
 use std::time::Instant;
 
 pub use attestation::{AttestationRecord, AttestationRegistry};
@@ -79,6 +80,24 @@ pub enum AnomalySeverity {
     Critical,
 }
 
+/// A timestamped integrity event for the history ring buffer.
+#[derive(Debug, Clone)]
+pub struct IntegrityEvent {
+    /// Cycle when the event occurred.
+    pub cycle: usize,
+    /// When the event was recorded.
+    pub timestamp: Instant,
+    /// Source component (attestation, temporal, canary, live_attestation).
+    pub source: &'static str,
+    /// Human-readable description.
+    pub description: String,
+    /// Severity at the time of the event.
+    pub severity: AnomalySeverity,
+}
+
+/// Capacity of the integrity event history ring buffer.
+const EVENT_LOG_CAPACITY: usize = 64;
+
 /// Main integrity manager, integrated into CognitiveLoopService.
 ///
 /// Runs attestation, temporal, and canary checks at co-prime intervals.
@@ -96,6 +115,9 @@ pub struct IntegrityManager {
     /// Confidence multiplier for consciousness scores (1.0 = fully trusted,
     /// 0.5 = drift detected, 0.1 = critical anomaly). Updated each tick.
     pub integrity_confidence: f32,
+    /// Ring buffer of recent integrity events (capacity 64).
+    /// Persists across tick() cycles for post-mortem analysis.
+    pub event_log: VecDeque<IntegrityEvent>,
 }
 
 /// Co-prime attestation check interval (not in the existing set: 7,11,13,19,23,47,97).
@@ -128,6 +150,7 @@ impl IntegrityManager {
             last_cycle_instant: Instant::now(),
             substrate_tau_factor: 1.0,
             integrity_confidence: 1.0,
+            event_log: VecDeque::with_capacity(EVENT_LOG_CAPACITY),
         }
     }
 
@@ -223,6 +246,16 @@ impl IntegrityManager {
             });
         }
 
+        // Log all anomalies to the persistent ring buffer for post-mortem analysis
+        for anomaly in &self.status.anomalies {
+            self.log_event(
+                cycle,
+                anomaly.source,
+                anomaly.description.clone(),
+                anomaly.severity,
+            );
+        }
+
         // Compute integrity confidence for consciousness gating.
         // Critical anomaly → 0.1 (distrust metrics), Warning only → 0.5, clean → 1.0.
         self.integrity_confidence = if self.has_critical_anomaly() {
@@ -234,6 +267,25 @@ impl IntegrityManager {
         };
 
         &self.status
+    }
+
+    /// Push an event to the ring buffer, evicting the oldest if at capacity.
+    fn log_event(&mut self, cycle: usize, source: &'static str, description: String, severity: AnomalySeverity) {
+        if self.event_log.len() >= EVENT_LOG_CAPACITY {
+            self.event_log.pop_front();
+        }
+        self.event_log.push_back(IntegrityEvent {
+            cycle,
+            timestamp: Instant::now(),
+            source,
+            description,
+            severity,
+        });
+    }
+
+    /// Get the event history for debugging/dashboard display.
+    pub fn event_history(&self) -> &VecDeque<IntegrityEvent> {
+        &self.event_log
     }
 
     /// Check if any critical anomalies have been detected.

@@ -20,6 +20,7 @@ serde_json = { workspace = true }
 # WASM bindings (optional — rlib builds skip this)
 wasm-bindgen = { version = "0.2", optional = true }
 serde-wasm-bindgen = { version = "0.6", optional = true }
+console_error_panic_hook = { version = "0.1", optional = true }
 
 # WASM support — getrandom needs "js"/"wasm_js" and uuid needs "rng-getrandom" on wasm32
 # getrandom 0.2 (used by rand 0.8/symthaea-core) uses feature "js"
@@ -31,4 +32,4 @@ uuid = { version = "1.6", features = ["rng-getrandom"] }
 
 [features]
 default = []
-wasm = ["dep:wasm-bindgen", "dep:serde-wasm-bindgen"]
+wasm = ["dep:wasm-bindgen", "dep:serde-wasm-bindgen", "dep:console_error_panic_hook"]

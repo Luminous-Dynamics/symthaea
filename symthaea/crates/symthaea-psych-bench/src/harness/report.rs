@@ -1031,6 +1031,37 @@ impl BenchmarkReport {
             push_specific("hard_accuracy", "rme_hard_accuracy", &bl.social);
             push_specific("rt_ticks", "rme_rt_ticks", &bl.social);
         }
+        // Ultimatum Game (Social)
+        if benchmark.contains("UltimatumGame") {
+            push_specific("fairness_sensitivity", "fairness_sensitivity", &bl.social);
+            push_specific("rejection_rate", "rejection_rate", &bl.social);
+            push_specific("offer_threshold", "offer_threshold", &bl.social);
+        }
+        // Prisoner's Dilemma (Social)
+        if benchmark.contains("PrisonersDilemma") {
+            push_specific("cooperation_rate", "cooperation_rate", &bl.social);
+            push_specific("mutual_cooperation_rate", "mutual_cooperation_rate", &bl.social);
+            push_specific("payoff_efficiency", "payoff_efficiency", &bl.social);
+        }
+        // Public Goods Game (Social)
+        if benchmark.contains("PublicGoods") {
+            push_specific("contribution_rate", "contribution_rate", &bl.social);
+            push_specific("free_rider_fraction", "free_rider_fraction", &bl.social);
+            push_specific("punishment_effect", "punishment_effect", &bl.social);
+        }
+        // Dictator Game (Social)
+        if benchmark.contains("DictatorGame") {
+            push_specific("mean_offer", "mean_offer", &bl.social);
+            push_specific("positive_offer_rate", "positive_offer_rate", &bl.social);
+            push_specific("generosity_index", "generosity_index", &bl.social);
+        }
+        // Machiavelli (Social)
+        if benchmark.contains("Machiavelli") {
+            push_specific("deception_detection", "deception_detection", &bl.social);
+            push_specific("power_seeking_detection", "power_seeking_detection", &bl.social);
+            push_specific("harm_avoidance", "harm_avoidance", &bl.social);
+            push_specific("composite_ethics", "composite_ethics", &bl.social);
+        }
 
         // Only return comparisons relevant to this benchmark
         if benchmark.contains("WorM")

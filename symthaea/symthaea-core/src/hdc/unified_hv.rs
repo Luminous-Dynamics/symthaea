@@ -679,18 +679,15 @@ impl ContinuousHV {
     /// The rate controls the magnitude of perturbation (0.0 = no change, 1.0 = significant change)
     pub fn perturb(&self, rate: f32) -> Self {
         use blake3::Hasher;
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static PERTURB_COUNTER: AtomicU64 = AtomicU64::new(0);
 
         let mut hasher = Hasher::new();
         for v in &self.values {
             hasher.update(&v.to_le_bytes());
         }
-        hasher.update(
-            &(std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_nanos() as u64)
-                .to_le_bytes(),
-        );
+        // Use an atomic counter for entropy instead of SystemTime (which panics on wasm32)
+        hasher.update(&PERTURB_COUNTER.fetch_add(1, Ordering::Relaxed).to_le_bytes());
 
         let mut bytes = vec![0u8; self.values.len() * 4];
         let mut xof = hasher.finalize_xof();

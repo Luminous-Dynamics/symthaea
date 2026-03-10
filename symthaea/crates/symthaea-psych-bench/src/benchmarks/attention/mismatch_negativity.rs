@@ -53,16 +53,17 @@ impl MismatchNegativityBenchmark {
         // Detection threshold: prediction error must exceed this to flag deviant.
         // Time pressure raises threshold (less careful monitoring).
         // Treisman & Gelade (1980): speed emphasis narrows the attentional filter.
-        let detection_threshold: f64 = (0.25 + config.time_pressure * 0.10)
+        let detection_threshold: f64 = (0.18 + config.time_pressure * 0.10)
             * diff_model.temperature_multiplier(config.difficulty);
 
         // Attentional load noise: degrades the prediction model when attention
         // is diverted, modeling the dual-task conditions in Naatanen (2007).
-        let load_noise_weight: f32 = 0.15;
+        // MMN is pre-attentive, so load effect should be modest.
+        let load_noise_weight: f32 = 0.08;
 
         // EMA decay for building the predictive model of the standard.
         // Higher alpha = faster adaptation to recent stimuli.
-        let ema_alpha: f32 = 0.15;
+        let ema_alpha: f32 = 0.25;
 
         // Sequence parameters
         let sequence_len = 80; // Total stimuli per sequence
@@ -122,7 +123,7 @@ impl MismatchNegativityBenchmark {
                     // First 5 stimuli are always standards (build up prediction)
                     xor_shift(&mut rng);
                     let is_deviant =
-                        step >= 5 && ((rng % 1000) as f64 / 1000.0) < deviant_probability;
+                        step >= 8 && ((rng % 1000) as f64 / 1000.0) < deviant_probability;
 
                     // Generate stimulus
                     xor_shift(&mut rng);
@@ -201,13 +202,16 @@ impl MismatchNegativityBenchmark {
                         }
                     }
 
-                    // Update prediction model via EMA (only for non-deviants or
-                    // all stimuli — the brain updates regardless, but the standard
-                    // dominates due to frequency)
-                    prediction_model = ContinuousHV::weighted_bundle(
-                        &[&prediction_model, &stimulus],
-                        &[1.0 - ema_alpha, ema_alpha],
-                    );
+                    // Update prediction model via EMA only for stimuli not flagged
+                    // as deviant. This prevents deviant contamination of the
+                    // predictive model, matching the brain's gating mechanism
+                    // (Winkler et al. 1996: deviants do not update the standard trace).
+                    if !detected_as_deviant {
+                        prediction_model = ContinuousHV::weighted_bundle(
+                            &[&prediction_model, &stimulus],
+                            &[1.0 - ema_alpha, ema_alpha],
+                        );
+                    }
                 }
             }
         }

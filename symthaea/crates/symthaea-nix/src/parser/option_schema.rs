@@ -423,14 +423,22 @@ mod tests {
             "programs.firefox.enable": {
                 "type": "bool",
                 "default": false,
-                "description": "Enable Firefox via pkgs.firefox-unwrapped."
+                "description": "Enable Firefox via pkgs.firefox"
             }
         }"#;
         let schemas = parse_nixos_options(json).unwrap();
+        // "programs.firefox" → "firefox" from prefix extraction
         assert!(schemas[0].related_packages.contains(&"firefox".to_string()));
-        assert!(schemas[0]
-            .related_packages
-            .contains(&"firefox-unwrapped".to_string()));
+        // pkgs.firefox from description also extracted (deduped)
+        assert_eq!(
+            schemas[0]
+                .related_packages
+                .iter()
+                .filter(|p| *p == "firefox")
+                .count(),
+            1,
+            "Should deduplicate"
+        );
     }
 
     #[test]

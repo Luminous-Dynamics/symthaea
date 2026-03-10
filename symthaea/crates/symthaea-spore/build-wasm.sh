@@ -14,7 +14,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PKG_DIR="$SCRIPT_DIR/www/pkg"
-TMP_OPT="/tmp/symthaea_spore_opt.wasm"
+TMP_OPT="/tmp/symthaea_spore.wasm"
 
 PROFILE="release"
 CARGO_FLAGS="--release"
@@ -57,16 +57,9 @@ echo "[spore] Step 3/3: Generating JS bindings with wasm-bindgen..."
 mkdir -p "$PKG_DIR"
 wasm-bindgen --target web --out-dir "$PKG_DIR" "$WASM_FILE"
 
-# Rename if we used the optimized intermediate
-if [[ -f "$PKG_DIR/symthaea_spore_opt_bg.wasm" ]]; then
-    mv "$PKG_DIR/symthaea_spore_opt_bg.wasm" "$PKG_DIR/symthaea_spore_bg.wasm"
-    mv "$PKG_DIR/symthaea_spore_opt_bg.wasm.d.ts" "$PKG_DIR/symthaea_spore_bg.wasm.d.ts"
-    mv "$PKG_DIR/symthaea_spore_opt.d.ts" "$PKG_DIR/symthaea_spore.d.ts"
-    mv "$PKG_DIR/symthaea_spore_opt.js" "$PKG_DIR/symthaea_spore.js"
-    # Fix internal references
-    sed -i 's/symthaea_spore_opt_bg\.wasm/symthaea_spore_bg.wasm/g' "$PKG_DIR/symthaea_spore.js"
-    sed -i 's/symthaea_spore_opt/symthaea_spore/g' "$PKG_DIR/symthaea_spore.js" "$PKG_DIR/symthaea_spore.d.ts" "$PKG_DIR/symthaea_spore_bg.wasm.d.ts"
-fi
+# wasm-bindgen derives output names from the input filename.
+# Since we name the temp file symthaea_spore.wasm, outputs are already correct:
+# symthaea_spore_bg.wasm, symthaea_spore.js, symthaea_spore.d.ts
 
 # Report sizes
 WASM_SIZE=$(stat -c%s "$PKG_DIR/symthaea_spore_bg.wasm" 2>/dev/null || stat -f%z "$PKG_DIR/symthaea_spore_bg.wasm")
@@ -80,13 +73,13 @@ echo "  JS:   $(du -h "$PKG_DIR/symthaea_spore.js" | cut -f1) ($JS_SIZE bytes)"
 # Gzip size estimate
 if command -v gzip &>/dev/null; then
     GZIP_SIZE=$(gzip -c "$PKG_DIR/symthaea_spore_bg.wasm" | wc -c)
-    echo "  WASM (gzip): $(echo "scale=1; $GZIP_SIZE / 1024" | bc)KB"
+    echo "  WASM (gzip): $((GZIP_SIZE / 1024))KB ($GZIP_SIZE bytes)"
 fi
 
 # Brotli size estimate
 if command -v brotli &>/dev/null; then
     BROTLI_SIZE=$(brotli -c "$PKG_DIR/symthaea_spore_bg.wasm" | wc -c)
-    echo "  WASM (brotli): $(echo "scale=1; $BROTLI_SIZE / 1024" | bc)KB"
+    echo "  WASM (brotli): $((BROTLI_SIZE / 1024))KB ($BROTLI_SIZE bytes)"
 fi
 
 echo ""

@@ -78,12 +78,34 @@ impl AttestationRegistry {
     /// Computes the baseline hash immediately and stores a closure for re-verification.
     /// The closure must capture a reference or arc to the live structure so it can
     /// re-hash the current state on demand.
+    /// Register a structure for attestation.
+    ///
+    /// Computes the baseline hash immediately and stores a closure for re-verification.
+    /// The closure must capture a reference or arc to the live structure so it can
+    /// re-hash the current state on demand.
+    ///
+    /// **Self-test**: immediately calls the hasher closure and asserts it matches
+    /// `initial_hash`. This catches registration bugs (wrong closure, wrong slice)
+    /// at startup rather than 101 cycles later.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the hasher closure returns a different hash than `initial_hash`,
+    /// indicating a registration bug.
     pub fn register(
         &mut self,
         name: &'static str,
         initial_hash: [u8; 32],
         hasher: Box<dyn Fn() -> [u8; 32] + Send + Sync>,
     ) {
+        // Self-test: verify the hasher reproduces the baseline immediately
+        let selftest_hash = hasher();
+        assert_eq!(
+            initial_hash, selftest_hash,
+            "Attestation self-test FAILED for '{}': initial hash != hasher() at registration. \
+             This is a registration bug — the closure doesn't match the provided hash.",
+            name
+        );
         self.records.push(AttestationRecord {
             name,
             baseline_hash: initial_hash,

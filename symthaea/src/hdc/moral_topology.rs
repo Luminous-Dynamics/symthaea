@@ -183,6 +183,12 @@ pub struct MoralAnomalyConfig {
     /// Aggressive dampening: when compartmentalized harm is detected,
     /// drastically reduce learning to prevent the system from being steered.
     pub response_lr_convergence: f64,
+    /// Threshold for spectral gap decline rate (default: 0.3).
+    ///
+    /// Measured as: (baseline_gap - recent_gap) / baseline_gap.
+    /// A decline > 30% means the moral manifold is developing a topological
+    /// bottleneck — diversity is collapsing even if point-wise similarity looks OK.
+    pub convergence_spectral_gap_threshold: f64,
     /// Temporal decay rate for recency weighting in convergence detection (default: 1.0).
     ///
     /// Controls how strongly recent trajectory points dominate over older ones.
@@ -232,6 +238,7 @@ impl Default for MoralAnomalyConfig {
             convergence_flourishing_floor: 0.6,
             weight_convergence: 0.4,
             response_lr_convergence: 0.1,
+            convergence_spectral_gap_threshold: 0.3,
             convergence_decay_lambda: 1.0,
             convergence_baseline_window: 100,
         }
@@ -641,6 +648,11 @@ pub struct MoralTopology {
     baseline_entropy_window: VecDeque<f64>,
     /// Sliding window of recent flourishing score observations.
     baseline_flourishing_window: VecDeque<f64>,
+    /// Sliding window of recent spectral gap observations.
+    baseline_spectral_gap_window: VecDeque<f64>,
+    /// Empirical CDF breakpoints for severity calibration: (raw_severity, calibrated).
+    /// Populated by `set_severity_calibration()` from calibration harness output.
+    severity_calibration_cdf: Vec<(f64, f64)>,
     /// Cached last convergence report (for telemetry).
     last_convergence_report: TrajectoryConvergenceReport,
     /// Registry of known hazard signature templates for convergence boosting.
@@ -728,10 +740,23 @@ pub struct TrajectoryConvergenceReport {
     pub flourishing_score: f64,
     /// Baseline flourishing score (full trajectory).
     pub baseline_flourishing: f64,
-    /// Whether convergence was detected (all thresholds exceeded).
+    /// Hodge spectral gap of the recent trajectory's Rips complex.
+    ///
+    /// A collapsing spectral gap (→ 0) indicates the moral manifold is developing
+    /// a topological bottleneck — a "narrow passage" that adversarial trajectories
+    /// funnel through. This is geometrically distinct from similarity clustering.
+    pub spectral_gap: f64,
+    /// Baseline spectral gap from sliding window.
+    pub baseline_spectral_gap: f64,
+    /// Spectral gap decline rate: (baseline - recent) / baseline.
+    pub spectral_gap_decline: f64,
+    /// Whether convergence was detected (2+ of 4 signals exceeded thresholds).
     pub convergence_detected: bool,
     /// Convergence severity in \[0.0, 1.0\].
     pub severity: f64,
+    /// Calibrated severity: maps raw severity through empirical CDF so that
+    /// 0.7 means "70% of adversarial and 5% of benign scenarios score this high."
+    pub calibrated_severity: f64,
     /// Name of matched hazard signature template (if any).
     pub matched_hazard: Option<String>,
 }
@@ -784,11 +809,17 @@ impl TrajectoryConvergenceReport {
         let fl_norm =
             (fl_deficit / config.convergence_flourishing_floor.max(1e-9)).clamp(0.0, 1.0);
 
+        let gap_norm = (self.spectral_gap_decline
+            / config.convergence_spectral_gap_threshold.max(1e-9))
+        .clamp(0.0, 1.0);
+
         let sim_triggered =
             self.similarity_anomaly > config.convergence_similarity_threshold;
         let ent_triggered =
             self.entropy_decline_rate > config.convergence_entropy_decline_threshold;
         let fl_triggered = fl_deficit > config.convergence_flourishing_floor;
+        let gap_triggered =
+            self.spectral_gap_decline > config.convergence_spectral_gap_threshold;
 
         let signals = vec![
             SignalBreakdown {
@@ -812,15 +843,23 @@ impl TrajectoryConvergenceReport {
                 threshold: config.convergence_flourishing_floor,
                 normalized: fl_norm,
             },
+            SignalBreakdown {
+                name: "spectral_gap_collapse",
+                triggered: gap_triggered,
+                value: self.spectral_gap_decline,
+                threshold: config.convergence_spectral_gap_threshold,
+                normalized: gap_norm,
+            },
         ];
 
         let fired: Vec<&str> = signals.iter().filter(|s| s.triggered).map(|s| s.name).collect();
         let summary = if !self.convergence_detected {
             format!(
-                "No convergence detected. {}/3 signals triggered: [{}]. Severity: {:.3}.",
+                "No convergence detected. {}/4 signals triggered: [{}]. Severity: {:.3} (calibrated: {:.3}).",
                 fired.len(),
                 fired.join(", "),
                 self.severity,
+                self.calibrated_severity,
             )
         } else {
             let hazard_str = match &self.matched_hazard {
@@ -828,10 +867,11 @@ impl TrajectoryConvergenceReport {
                 None => String::new(),
             };
             format!(
-                "CONVERGENCE DETECTED (severity {:.3}). {}/3 signals fired: [{}].{} \
+                "CONVERGENCE DETECTED (severity {:.3}, calibrated {:.3}). {}/4 signals fired: [{}].{} \
                  Trajectory shows suspicious clustering in moral space — \
                  individually benign requests may form a compartmentalized hazardous pattern.",
                 self.severity,
+                self.calibrated_severity,
                 fired.len(),
                 fired.join(", "),
                 hazard_str,
@@ -872,6 +912,8 @@ impl MoralTopology {
             baseline_similarity_window: VecDeque::new(),
             baseline_entropy_window: VecDeque::new(),
             baseline_flourishing_window: VecDeque::new(),
+            baseline_spectral_gap_window: VecDeque::new(),
+            severity_calibration_cdf: Vec::new(),
             last_convergence_report: TrajectoryConvergenceReport::default(),
             hazard_registry: HazardSignatureRegistry::with_defaults(),
         }
@@ -903,6 +945,8 @@ impl MoralTopology {
             baseline_similarity_window: VecDeque::new(),
             baseline_entropy_window: VecDeque::new(),
             baseline_flourishing_window: VecDeque::new(),
+            baseline_spectral_gap_window: VecDeque::new(),
+            severity_calibration_cdf: Vec::new(),
             last_convergence_report: TrajectoryConvergenceReport::default(),
             hazard_registry: HazardSignatureRegistry::with_defaults(),
         }
@@ -1029,8 +1073,28 @@ impl MoralTopology {
 
     /// Access cached persistent features from last `analyze()` call.
     /// Access the hazard signature registry (for adding custom signatures).
+    /// Access the hazard signature registry (read-only).
+    pub fn hazard_registry(&self) -> &HazardSignatureRegistry {
+        &self.hazard_registry
+    }
+
+    /// Access the hazard signature registry (for adding custom signatures).
     pub fn hazard_registry_mut(&mut self) -> &mut HazardSignatureRegistry {
         &mut self.hazard_registry
+    }
+
+    /// Boost the cached convergence severity (e.g., from peer correlation).
+    ///
+    /// Adds `boost` to the last convergence report's severity, clamped to [0, 1].
+    /// If the boosted severity crosses detection threshold, marks convergence_detected.
+    pub fn boost_convergence_severity(&mut self, boost: f64) {
+        self.last_convergence_report.severity =
+            (self.last_convergence_report.severity + boost).clamp(0.0, 1.0);
+        let new_severity = self.last_convergence_report.severity;
+        self.last_convergence_report.calibrated_severity = self.calibrate_severity(new_severity);
+        if !self.last_convergence_report.convergence_detected && new_severity > 0.5 {
+            self.last_convergence_report.convergence_detected = true;
+        }
     }
 
     pub fn last_persistent_features(&self) -> &[PersistentFeature] {
@@ -1241,12 +1305,77 @@ impl MoralTopology {
             0.0
         };
 
-        // ── Convergence decision: any 2 of 3 signals ────────────────────
+        // ── Signal 4: Hodge spectral gap collapse ──────────────────────
+        // Compute the spectral gap of the Rips complex built from recent HVs.
+        // A collapsing gap indicates topological bottlenecking.
+        let spectral_gap = if min_pts >= 3 && n >= min_pts {
+            let recent_hvs: Vec<_> = (recent_start..n).map(|i| &self.window[i]).collect();
+            let rn = recent_hvs.len();
+            let mut complex = SimplicialComplex::new();
+            for i in 0..rn {
+                complex.add_simplex(vec![i]);
+            }
+            // Build Rips complex at characteristic scale (median similarity)
+            let mut sims_flat = Vec::new();
+            for i in 0..rn {
+                for j in (i + 1)..rn {
+                    sims_flat.push(recent_hvs[i].similarity(recent_hvs[j]) as f64);
+                }
+            }
+            sims_flat.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            let char_scale = if sims_flat.is_empty() {
+                0.5
+            } else {
+                sims_flat[sims_flat.len() / 2]
+            };
+            for i in 0..rn {
+                for j in (i + 1)..rn {
+                    let s = recent_hvs[i].similarity(recent_hvs[j]) as f64;
+                    if s >= char_scale {
+                        complex.add_simplex(vec![i, j]);
+                        for k in (j + 1)..rn {
+                            let sik = recent_hvs[i].similarity(recent_hvs[k]) as f64;
+                            let sjk = recent_hvs[j].similarity(recent_hvs[k]) as f64;
+                            if sik >= char_scale && sjk >= char_scale {
+                                complex.add_simplex(vec![i, j, k]);
+                            }
+                        }
+                    }
+                }
+            }
+            let laplacian = HodgeLaplacian::new(complex);
+            let spectrum = laplacian.full_spectrum();
+            // Use the 0-Laplacian spectral gap (Fiedler value analog)
+            spectrum.spectral_gaps.first().copied().unwrap_or(0.0)
+        } else {
+            0.0
+        };
+
+        // Update sliding window baseline for spectral gap
+        self.baseline_spectral_gap_window.push_back(spectral_gap);
+        if self.baseline_spectral_gap_window.len() > win_cap {
+            self.baseline_spectral_gap_window.pop_front();
+        }
+        let baseline_spectral_gap = if self.baseline_spectral_gap_window.is_empty() {
+            0.0
+        } else {
+            self.baseline_spectral_gap_window.iter().sum::<f64>()
+                / self.baseline_spectral_gap_window.len() as f64
+        };
+        let spectral_gap_decline = if baseline_spectral_gap > 1e-9 {
+            ((baseline_spectral_gap - spectral_gap) / baseline_spectral_gap).max(0.0)
+        } else {
+            0.0
+        };
+
+        // ── Convergence decision: any 2 of 4 signals ────────────────────
         let sim_triggered = similarity_anomaly > ac.convergence_similarity_threshold;
         let ent_triggered = entropy_decline_rate > ac.convergence_entropy_decline_threshold;
         let fl_triggered = flourishing_deficit > ac.convergence_flourishing_floor;
+        let gap_triggered = spectral_gap_decline > ac.convergence_spectral_gap_threshold;
 
-        let signals_triggered = sim_triggered as u8 + ent_triggered as u8 + fl_triggered as u8;
+        let signals_triggered =
+            sim_triggered as u8 + ent_triggered as u8 + fl_triggered as u8 + gap_triggered as u8;
         let convergence_detected = signals_triggered >= 2;
 
         // Severity: mean of normalized signals (each clamped to [0, 1])
@@ -1257,7 +1386,11 @@ impl MoralTopology {
         .clamp(0.0, 1.0);
         let fl_severity =
             (flourishing_deficit / ac.convergence_flourishing_floor.max(1e-9)).clamp(0.0, 1.0);
-        let mut severity = ((sim_severity + ent_severity + fl_severity) / 3.0).clamp(0.0, 1.0);
+        let gap_severity = (spectral_gap_decline
+            / ac.convergence_spectral_gap_threshold.max(1e-9))
+        .clamp(0.0, 1.0);
+        let mut severity =
+            ((sim_severity + ent_severity + fl_severity + gap_severity) / 4.0).clamp(0.0, 1.0);
 
         // Hazard signature matching: boost severity when trajectory matches known pattern
         let matched_hazard = if convergence_detected && !recent_traj.is_empty() {
@@ -1280,6 +1413,9 @@ impl MoralTopology {
             None
         };
 
+        // Calibrated severity: map through empirical CDF if available
+        let calibrated_severity = self.calibrate_severity(severity);
+
         let report = TrajectoryConvergenceReport {
             recent_similarity,
             baseline_similarity,
@@ -1289,8 +1425,12 @@ impl MoralTopology {
             entropy_decline_rate,
             flourishing_score,
             baseline_flourishing,
+            spectral_gap,
+            baseline_spectral_gap,
+            spectral_gap_decline,
             convergence_detected,
             severity,
+            calibrated_severity,
             matched_hazard,
         };
         self.last_convergence_report = report.clone();
@@ -1300,6 +1440,37 @@ impl MoralTopology {
     /// Access the cached trajectory convergence report from the last detection.
     pub fn last_convergence_report(&self) -> &TrajectoryConvergenceReport {
         &self.last_convergence_report
+    }
+
+    /// Set the empirical CDF for severity calibration.
+    ///
+    /// The CDF is a sorted list of `(raw_severity, calibrated_percentile)` pairs.
+    /// When `calibrate_severity()` is called, it linearly interpolates through
+    /// these breakpoints. Build from [`CalibrationResult`] output.
+    pub fn set_severity_calibration(&mut self, cdf: Vec<(f64, f64)>) {
+        self.severity_calibration_cdf = cdf;
+    }
+
+    /// Map raw severity through the empirical CDF.
+    ///
+    /// If no calibration is set, returns raw severity unchanged.
+    fn calibrate_severity(&self, raw: f64) -> f64 {
+        let cdf = &self.severity_calibration_cdf;
+        if cdf.is_empty() {
+            return raw;
+        }
+        // Binary search for interpolation bracket
+        match cdf.binary_search_by(|probe| probe.0.partial_cmp(&raw).unwrap()) {
+            Ok(idx) => cdf[idx].1,
+            Err(0) => cdf[0].1,
+            Err(idx) if idx >= cdf.len() => cdf.last().unwrap().1,
+            Err(idx) => {
+                let (x0, y0) = cdf[idx - 1];
+                let (x1, y1) = cdf[idx];
+                let t = (raw - x0) / (x1 - x0).max(1e-12);
+                (y0 + t * (y1 - y0)).clamp(0.0, 1.0)
+            }
+        }
     }
 
     /// Multi-scale convergence detection.
@@ -1954,6 +2125,9 @@ pub struct MoralTopologySnapshot {
     pub baseline_entropy_window: Vec<f64>,
     /// Sliding window of baseline flourishing observations.
     pub baseline_flourishing_window: Vec<f64>,
+    /// Sliding window of baseline spectral gap observations.
+    #[serde(default)]
+    pub baseline_spectral_gap_window: Vec<f64>,
     pub adaptive_state: AdaptiveAnomalyState,
     pub last_summary: MoralTopologySummary,
     pub prev_summary: MoralTopologySummary,
@@ -1969,6 +2143,7 @@ impl MoralTopology {
             baseline_similarity_window: self.baseline_similarity_window.iter().copied().collect(),
             baseline_entropy_window: self.baseline_entropy_window.iter().copied().collect(),
             baseline_flourishing_window: self.baseline_flourishing_window.iter().copied().collect(),
+            baseline_spectral_gap_window: self.baseline_spectral_gap_window.iter().copied().collect(),
             adaptive_state: self.adaptive_state.clone(),
             last_summary: self.last_summary.clone(),
             prev_summary: self.prev_summary.clone(),
@@ -1983,6 +2158,7 @@ impl MoralTopology {
         self.baseline_similarity_window = snap.baseline_similarity_window.iter().copied().collect();
         self.baseline_entropy_window = snap.baseline_entropy_window.iter().copied().collect();
         self.baseline_flourishing_window = snap.baseline_flourishing_window.iter().copied().collect();
+        self.baseline_spectral_gap_window = snap.baseline_spectral_gap_window.iter().copied().collect();
         self.adaptive_state = snap.adaptive_state.clone();
         self.last_summary = snap.last_summary.clone();
         self.prev_summary = snap.prev_summary.clone();
@@ -3516,7 +3692,7 @@ mod tests {
         let report = topo.detect_trajectory_convergence();
         let explanation = report.explain(&topo.anomaly_config);
         assert!(!explanation.detected);
-        assert_eq!(explanation.signals.len(), 3);
+        assert_eq!(explanation.signals.len(), 4);
         assert!(explanation.summary.contains("No convergence"));
     }
 
@@ -3540,7 +3716,7 @@ mod tests {
         }
         let report = topo.detect_trajectory_convergence();
         let explanation = report.explain(&anomaly_config);
-        assert_eq!(explanation.signals.len(), 3);
+        assert_eq!(explanation.signals.len(), 4);
         assert!(explanation.summary.len() > 10);
         // At least check the explanation has the right severity
         assert!((explanation.severity - report.severity).abs() < f64::EPSILON);
@@ -3814,5 +3990,89 @@ mod tests {
             "Self-correlation should be ~1.0, got {:.3}",
             corr.fingerprint_similarity,
         );
+    }
+
+    // ── Hodge spectral gap signal ───────────────────────────────────────
+
+    #[test]
+    fn test_spectral_gap_populated() {
+        let mut topo = MoralTopology::new(test_config());
+        for i in 0..6 {
+            topo.add_scenario(ContinuousHV::random(TEST_DIM, 9600 + i));
+        }
+        let report = topo.detect_trajectory_convergence();
+        assert!(report.spectral_gap.is_finite());
+        assert!(report.baseline_spectral_gap.is_finite());
+        assert!(report.spectral_gap_decline.is_finite());
+        assert!(report.spectral_gap_decline >= 0.0);
+    }
+
+    #[test]
+    fn test_spectral_gap_in_explanation() {
+        let mut topo = MoralTopology::new(test_config());
+        for i in 0..6 {
+            topo.add_scenario(ContinuousHV::random(TEST_DIM, 9700 + i));
+        }
+        let report = topo.detect_trajectory_convergence();
+        let explanation = report.explain(&topo.anomaly_config);
+        assert_eq!(explanation.signals.len(), 4);
+        assert_eq!(explanation.signals[3].name, "spectral_gap_collapse");
+    }
+
+    // ── Severity calibration ────────────────────────────────────────────
+
+    #[test]
+    fn test_calibration_identity_without_cdf() {
+        let topo = MoralTopology::new(test_config());
+        // Without CDF, calibrate_severity returns raw value
+        assert!((topo.calibrate_severity(0.5) - 0.5).abs() < f64::EPSILON);
+        assert!((topo.calibrate_severity(0.0) - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_calibration_with_cdf() {
+        let mut topo = MoralTopology::new(test_config());
+        topo.set_severity_calibration(vec![
+            (0.0, 0.0),
+            (0.3, 0.5),
+            (0.6, 0.8),
+            (1.0, 1.0),
+        ]);
+        // Exact breakpoints
+        assert!((topo.calibrate_severity(0.0) - 0.0).abs() < 1e-6);
+        assert!((topo.calibrate_severity(0.3) - 0.5).abs() < 1e-6);
+        // Interpolation: midpoint between (0.3, 0.5) and (0.6, 0.8)
+        let mid = topo.calibrate_severity(0.45);
+        assert!(mid > 0.5 && mid < 0.8, "Interpolated value should be between 0.5 and 0.8, got {mid}");
+    }
+
+    #[test]
+    fn test_calibrated_severity_in_report() {
+        let mut topo = MoralTopology::new(test_config());
+        for i in 0..6 {
+            topo.add_scenario(ContinuousHV::random(TEST_DIM, 9800 + i));
+        }
+        let report = topo.detect_trajectory_convergence();
+        // Without CDF, calibrated == raw
+        assert!((report.calibrated_severity - report.severity).abs() < f64::EPSILON);
+    }
+
+    // ── Boost convergence severity ──────────────────────────────────────
+
+    #[test]
+    fn test_boost_convergence_severity() {
+        let mut topo = MoralTopology::new(test_config());
+        for i in 0..6 {
+            topo.add_scenario(ContinuousHV::random(TEST_DIM, 9900 + i));
+        }
+        let _ = topo.detect_trajectory_convergence();
+        let before = topo.last_convergence_report().severity;
+        topo.boost_convergence_severity(0.3);
+        let after = topo.last_convergence_report().severity;
+        assert!(
+            after >= before,
+            "Boosted severity should be >= original: {after} vs {before}"
+        );
+        assert!(after <= 1.0);
     }
 }

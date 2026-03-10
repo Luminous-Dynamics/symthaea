@@ -357,10 +357,10 @@ impl AsyncMind {
 
                             // SYNC with LLM Backend (Sovereign Voice)
                             // If the backend is Candle, we push the physical affect into the neural weights
-                            #[cfg(feature = "full_language")]
+                            #[cfg(feature = "liquid-mamba")]
                             {
-                                if let Some(backend) = mind.llm_organ.get_backend() {
-                                    mind.llm_organ.update_affective_state(load, mind.state.mood_temperature);
+                                if let Some(ref backend) = mind.llm_backend {
+                                    backend.update_affect(load, mind.state.mood_temperature);
                                 }
                             }
 

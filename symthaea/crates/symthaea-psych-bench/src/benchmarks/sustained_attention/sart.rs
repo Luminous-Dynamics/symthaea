@@ -63,7 +63,11 @@ impl SartBenchmark {
         // Automatic response tendency builds over go trials.
         // Starts moderate — the system begins cautious and becomes more
         // impulsive with repeated go trials (Robertson et al., 1997).
-        let mut response_tendency: f32 = 0.40;
+        // Higher difficulty → weaker top-down inhibitory control → higher starting
+        // tendency and faster habituation (more commission errors).
+        let signal_mult = diff_model.signal_multiplier(config.difficulty) as f32;
+        let difficulty_tendency_boost: f32 = config.difficulty as f32 * 0.12;
+        let mut response_tendency: f32 = 0.40 + difficulty_tendency_boost;
         let tendency_growth: f32 =
             0.003 * diff_model.temperature_multiplier(config.difficulty) as f32;
 
@@ -90,7 +94,8 @@ impl SartBenchmark {
             xor_shift(&mut rng);
             let noise = (rng % 10000) as f32 / 10000.0 * tp_noise;
 
-            let inhibit_threshold = 0.45 + target_sim * 0.30;
+            // Difficulty degrades target salience → weaker inhibition cue.
+            let inhibit_threshold = 0.45 + target_sim * 0.30 * signal_mult;
             let respond = response_tendency + noise > inhibit_threshold;
 
             if is_target {

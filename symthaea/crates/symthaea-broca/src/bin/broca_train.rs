@@ -82,7 +82,7 @@ fn main() {
         }
     } else {
         let config = BrocaConfig::default();
-        (BrocaGenerator::new(&genesis, config), None)
+        (BrocaGenerator::new_4k(&genesis, config), None)
     };
 
     // Re-tokenize all pairs with the generator's BPE tokenizer.

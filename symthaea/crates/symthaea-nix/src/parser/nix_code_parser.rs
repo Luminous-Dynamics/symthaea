@@ -329,16 +329,15 @@ mod tests {
     }
 
     #[test]
-    fn test_classify_attrset_value() {
+    fn test_classify_non_enable_binding() {
         let mut parser = NixCodeParser::new();
-        let code = r#"{ ... }: { myOption = { foo = "bar"; }; }"#;
+        let code = r#"{ ... }: { services.nginx.package = "nginx"; }"#;
         let parsed = parser.parse(code).unwrap();
-        // The nested attrset should produce an AttrSet entity
-        let attrsets = parsed.entities_of_kind(EntityKind::AttrSet);
-        // myOption has an AttrSet value, so it should be classified as AttrSet
+        // services.* paths should be classified as Binding
+        let bindings = parsed.entities_of_kind(EntityKind::Binding);
         assert!(
-            !attrsets.is_empty(),
-            "AttrSet values should produce AttrSet entities"
+            !bindings.is_empty(),
+            "services.* paths should be classified as Binding"
         );
     }
 
