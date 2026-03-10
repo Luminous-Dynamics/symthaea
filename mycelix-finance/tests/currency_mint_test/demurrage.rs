@@ -46,17 +46,17 @@ async fn test_demurrage_all_inner() {
         let receiver_did = bob_did.clone();
 
         // Create currency with 2% demurrage
-        let def: CurrencyDefinition = conductor
-            .call(
-                &zome_a,
-                "create_currency",
-                CreateCurrencyInput {
-                    dao_did: "did:mycelix:dao:compost-test".into(),
-                    params: test_params("CompostCoin", "CC"),
-                    governance_proposal_id: None,
-                },
-            )
-            .await;
+        let def: CurrencyDefinition = call_with_retry(
+            &conductor,
+            &zome_a,
+            "create_currency",
+            CreateCurrencyInput {
+                dao_did: "did:mycelix:dao:compost-test".into(),
+                params: test_params("CompostCoin", "CC"),
+                governance_proposal_id: None,
+            },
+        )
+        .await;
 
         let _: CurrencyDefinition = conductor
             .call(

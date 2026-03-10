@@ -33,17 +33,17 @@ async fn test_discovery_active_only_inner() {
     let zome = cell.zome("currency_mint");
 
     // Create two currencies
-    let def_a: CurrencyDefinition = conductor
-        .call(
-            &zome,
-            "create_currency",
-            CreateCurrencyInput {
-                dao_did: "did:mycelix:dao:discovery".into(),
-                params: test_params("AlphaCoin", "AC"),
-                governance_proposal_id: None,
-            },
-        )
-        .await;
+    let def_a: CurrencyDefinition = call_with_retry(
+        &conductor,
+        &zome,
+        "create_currency",
+        CreateCurrencyInput {
+            dao_did: "did:mycelix:dao:discovery".into(),
+            params: test_params("AlphaCoin", "AC"),
+            governance_proposal_id: None,
+        },
+    )
+    .await;
 
     let def_b: CurrencyDefinition = conductor
         .call(

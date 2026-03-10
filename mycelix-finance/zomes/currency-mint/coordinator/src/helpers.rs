@@ -269,21 +269,25 @@ pub(crate) fn count_currency_exchanges(currency_id: &str) -> ExternResult<(u64, 
     let mut pending = 0u64;
 
     for link in exchange_links {
-        if let Some(action_hash) = link.target.into_action_hash() {
-            if let Ok(record) = follow_update_chain(action_hash) {
-                if let Some(ex) = record
-                    .entry()
-                    .to_app_option::<MintedExchange>()
-                    .ok()
-                    .flatten()
-                {
-                    total += 1;
-                    if ex.confirmed {
-                        confirmed += 1;
-                    } else {
-                        pending += 1;
-                    }
-                }
+        let Some(action_hash) = link.target.into_action_hash() else {
+            continue; // deleted link
+        };
+        let record = follow_update_chain(action_hash)?;
+        let ex = record
+            .entry()
+            .to_app_option::<MintedExchange>()
+            .map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!(
+                    "Exchange deserialization error in count for {}: {:?}",
+                    currency_id, e
+                )))
+            })?;
+        if let Some(ex) = ex {
+            total += 1;
+            if ex.confirmed {
+                confirmed += 1;
+            } else {
+                pending += 1;
             }
         }
     }
@@ -304,21 +308,25 @@ pub(crate) fn collect_currency_members(
 
     let mut member_dids = std::collections::HashSet::new();
     for link in exchange_links {
-        if let Some(action_hash) = link.target.into_action_hash() {
-            if let Ok(record) = follow_update_chain(action_hash) {
-                if let Some(ex) = record
-                    .entry()
-                    .to_app_option::<MintedExchange>()
-                    .ok()
-                    .flatten()
-                {
-                    if !ex.provider_did.contains("__compost__") {
-                        member_dids.insert(ex.provider_did);
-                    }
-                    if !ex.receiver_did.contains("__compost__") {
-                        member_dids.insert(ex.receiver_did);
-                    }
-                }
+        let Some(action_hash) = link.target.into_action_hash() else {
+            continue; // deleted link
+        };
+        let record = follow_update_chain(action_hash)?;
+        let ex = record
+            .entry()
+            .to_app_option::<MintedExchange>()
+            .map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!(
+                    "Exchange deserialization error in members for {}: {:?}",
+                    currency_id, e
+                )))
+            })?;
+        if let Some(ex) = ex {
+            if !ex.provider_did.contains("__compost__") {
+                member_dids.insert(ex.provider_did);
+            }
+            if !ex.receiver_did.contains("__compost__") {
+                member_dids.insert(ex.receiver_did);
             }
         }
     }

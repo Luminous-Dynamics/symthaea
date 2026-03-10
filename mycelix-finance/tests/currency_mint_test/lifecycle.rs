@@ -48,7 +48,8 @@ async fn test_lifecycle_all_inner() {
             governance_proposal_id: None,
         };
 
-        let def: CurrencyDefinition = conductor.call(&zome_a, "create_currency", input).await;
+        let def: CurrencyDefinition =
+            call_with_retry(&conductor, &zome_a, "create_currency", input).await;
         assert_eq!(def.status, CurrencyStatus::Draft);
         assert_eq!(def.params.symbol, "GH");
         println!("  - Created draft: {} ({})", def.params.name, def.id);

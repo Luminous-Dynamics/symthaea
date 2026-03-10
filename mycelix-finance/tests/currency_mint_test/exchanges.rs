@@ -66,9 +66,8 @@ async fn test_exchanges_all_inner() {
             params: test_params("Meal Credits", "MC"),
             governance_proposal_id: None,
         };
-        let def: CurrencyDefinition = conductor
-            .call(&zome_a, "create_currency", input)
-            .await;
+        let def: CurrencyDefinition =
+            call_with_retry(&conductor, &zome_a, "create_currency", input).await;
         let _active: CurrencyDefinition = conductor
             .call(
                 &zome_a,

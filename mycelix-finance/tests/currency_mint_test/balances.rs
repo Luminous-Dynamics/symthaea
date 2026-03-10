@@ -43,17 +43,17 @@ async fn test_balances_all_inner() {
     {
         let dao_did = "did:mycelix:dao:listing-test";
         for (name, sym) in [("Alpha", "A"), ("Beta", "B"), ("Gamma", "G")] {
-            let _: CurrencyDefinition = conductor
-                .call(
-                    &zome_a,
-                    "create_currency",
-                    CreateCurrencyInput {
-                        dao_did: dao_did.into(),
-                        params: test_params(name, sym),
-                        governance_proposal_id: None,
-                    },
-                )
-                .await;
+            let _: CurrencyDefinition = call_with_retry(
+                &conductor,
+                &zome_a,
+                "create_currency",
+                CreateCurrencyInput {
+                    dao_did: dao_did.into(),
+                    params: test_params(name, sym),
+                    governance_proposal_id: None,
+                },
+            )
+            .await;
         }
 
         let currencies: Vec<CurrencyDefinition> = conductor

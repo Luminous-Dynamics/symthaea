@@ -267,11 +267,18 @@ pub async fn setup_finance_conductor(
         .await
         .expect("Install app");
 
-    // Warmup: give the conductor a moment to fully initialize its nonce
-    // witness database. Without this, the first zome call often hits
-    // BadNonce("Expired") under load because the SQLite nonce store
-    // isn't ready when the call arrives.
-    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+    // Warmup probe: issue a no-op read call with retry to ensure the
+    // conductor's nonce witness database is ready. Under system load the
+    // first zome call often hits BadNonce("Expired") because SQLite isn't
+    // fully initialised yet. This absorbs that transient failure here
+    // rather than in the first test scenario.
+    let warmup_zome = apps[0].cells()[0].zome("currency_mint");
+    let _: Result<Vec<String>, _> = conductor
+        .call_fallible(&warmup_zome, "list_currency_members", "warmup-probe".to_string())
+        .await;
+    // Ignore the result — the call itself is enough to prime the nonce store.
+    // A short pause gives the conductor time to settle.
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 
     (conductor, agents, apps.into())
 }

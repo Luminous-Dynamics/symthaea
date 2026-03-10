@@ -45,17 +45,17 @@ async fn test_disputes_all_inner() {
 
         let receiver_did = format!("did:mycelix:{}", agents[1]);
 
-        let def: CurrencyDefinition = conductor
-            .call(
-                &zome_a,
-                "create_currency",
-                CreateCurrencyInput {
-                    dao_did: "did:mycelix:dao:dispute-test".into(),
-                    params: test_params("DisputeCoin", "DC"),
-                    governance_proposal_id: None,
-                },
-            )
-            .await;
+        let def: CurrencyDefinition = call_with_retry(
+            &conductor,
+            &zome_a,
+            "create_currency",
+            CreateCurrencyInput {
+                dao_did: "did:mycelix:dao:dispute-test".into(),
+                params: test_params("DisputeCoin", "DC"),
+                governance_proposal_id: None,
+            },
+        )
+        .await;
 
         let _: CurrencyDefinition = conductor
             .call(

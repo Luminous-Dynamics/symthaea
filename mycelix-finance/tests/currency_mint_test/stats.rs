@@ -39,7 +39,8 @@ async fn test_stats_all_inner() {
             params: test_params("Stats Coin", "ST"),
             governance_proposal_id: None,
         };
-        let def: CurrencyDefinition = conductor.call(&zome_a, "create_currency", input).await;
+        let def: CurrencyDefinition =
+            call_with_retry(&conductor, &zome_a, "create_currency", input).await;
         let _: CurrencyDefinition = conductor
             .call(
                 &zome_a,
