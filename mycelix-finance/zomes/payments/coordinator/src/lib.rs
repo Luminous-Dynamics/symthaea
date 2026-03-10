@@ -971,9 +971,15 @@ pub fn refund_payment(payment_id: String) -> ExternResult<Record> {
     let original_payment = original
         .entry()
         .to_app_option::<Payment>()
-        .ok()
-        .flatten()
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid payment".into())))?;
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Payment deserialization error: {:?}",
+                e
+            )))
+        })?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Payment entry missing".into()
+        )))?;
 
     // Only the original receiver (who is the refund sender) can initiate a refund
     verify_caller_is_did(&original_payment.to_did)?;

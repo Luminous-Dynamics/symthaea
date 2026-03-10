@@ -486,6 +486,8 @@ pub fn get_treasury_contributions(input: ListInput) -> ExternResult<Vec<Record>>
 }
 
 /// Get allocations for a treasury (paginated)
+///
+/// Uses follow_update_chain because allocations are mutable (status transitions).
 #[hdk_extern]
 pub fn get_treasury_allocations(input: ListInput) -> ExternResult<Vec<Record>> {
     let limit = input.limit.unwrap_or(DEFAULT_LIST_LIMIT);
@@ -495,13 +497,9 @@ pub fn get_treasury_allocations(input: ListInput) -> ExternResult<Vec<Record>> {
         .into_iter()
         .take(limit)
     {
-        if let Some(record) = get(
-            ActionHash::try_from(link.target)
-                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?,
-            GetOptions::default(),
-        )? {
-            allocations.push(record);
-        }
+        let hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?;
+        allocations.push(follow_update_chain(hash)?);
     }
     Ok(allocations)
 }
@@ -616,6 +614,8 @@ pub struct RemoveManagerInput {
 }
 
 /// Get treasuries managed by a DID (paginated)
+///
+/// Uses follow_update_chain because treasuries are mutable (balance, managers).
 #[hdk_extern]
 pub fn get_manager_treasuries(input: ListInput) -> ExternResult<Vec<Record>> {
     let limit = input.limit.unwrap_or(DEFAULT_LIST_LIMIT);
@@ -625,18 +625,16 @@ pub fn get_manager_treasuries(input: ListInput) -> ExternResult<Vec<Record>> {
         .into_iter()
         .take(limit)
     {
-        if let Some(record) = get(
-            ActionHash::try_from(link.target)
-                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?,
-            GetOptions::default(),
-        )? {
-            treasuries.push(record);
-        }
+        let hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?;
+        treasuries.push(follow_update_chain(hash)?);
     }
     Ok(treasuries)
 }
 
 /// Get savings pools for a treasury (paginated)
+///
+/// Uses follow_update_chain because savings pools are mutable (members, balance).
 #[hdk_extern]
 pub fn get_treasury_pools(input: ListInput) -> ExternResult<Vec<Record>> {
     let limit = input.limit.unwrap_or(DEFAULT_LIST_LIMIT);
@@ -646,13 +644,9 @@ pub fn get_treasury_pools(input: ListInput) -> ExternResult<Vec<Record>> {
         .into_iter()
         .take(limit)
     {
-        if let Some(record) = get(
-            ActionHash::try_from(link.target)
-                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?,
-            GetOptions::default(),
-        )? {
-            pools.push(record);
-        }
+        let hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?;
+        pools.push(follow_update_chain(hash)?);
     }
     Ok(pools)
 }
@@ -779,6 +773,8 @@ pub struct PoolContributionInput {
 }
 
 /// Get pools a member belongs to (paginated)
+///
+/// Uses follow_update_chain because savings pools are mutable (members, balance).
 #[hdk_extern]
 pub fn get_member_pools(input: ListInput) -> ExternResult<Vec<Record>> {
     let limit = input.limit.unwrap_or(DEFAULT_LIST_LIMIT);
@@ -788,13 +784,9 @@ pub fn get_member_pools(input: ListInput) -> ExternResult<Vec<Record>> {
         .into_iter()
         .take(limit)
     {
-        if let Some(record) = get(
-            ActionHash::try_from(link.target)
-                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?,
-            GetOptions::default(),
-        )? {
-            pools.push(record);
-        }
+        let hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?;
+        pools.push(follow_update_chain(hash)?);
     }
     Ok(pools)
 }

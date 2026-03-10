@@ -702,6 +702,8 @@ pub struct PaginatedDidInput {
 }
 
 /// Get all stakes for a staker (paginated, default limit 100)
+///
+/// Uses follow_update_chain because stakes are mutable (status transitions).
 #[hdk_extern]
 pub fn get_staker_stakes(input: PaginatedDidInput) -> ExternResult<Vec<Record>> {
     let limit = input.limit.unwrap_or(100);
@@ -715,15 +717,16 @@ pub fn get_staker_stakes(input: PaginatedDidInput) -> ExternResult<Vec<Record>> 
     for link in links.into_iter().take(limit) {
         let ah = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(ah, GetOptions::default())? {
-            stakes.push(record);
-        }
+        stakes.push(follow_update_chain(ah)?);
     }
 
     Ok(stakes)
 }
 
 /// Get all active stakes (paginated, default limit 100)
+///
+/// Uses follow_update_chain because stakes are mutable (status transitions).
+/// Filters to only return currently-Active stakes (skips Withdrawn, Slashed, etc.).
 #[hdk_extern]
 pub fn get_active_stakes(limit: Option<usize>) -> ExternResult<Vec<Record>> {
     let limit = limit.unwrap_or(100);
@@ -734,17 +737,16 @@ pub fn get_active_stakes(limit: Option<usize>) -> ExternResult<Vec<Record>> {
     for link in links {
         let ah = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(ah.clone(), GetOptions::default())? {
-            if let Some(stake) = record
-                .entry()
-                .to_app_option::<CollateralStake>()
-                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-            {
-                if stake.status == StakeStatus::Active {
-                    stakes.push(record);
-                    if stakes.len() >= limit {
-                        break;
-                    }
+        let record = follow_update_chain(ah)?;
+        if let Some(stake) = record
+            .entry()
+            .to_app_option::<CollateralStake>()
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        {
+            if stake.status == StakeStatus::Active {
+                stakes.push(record);
+                if stakes.len() >= limit {
+                    break;
                 }
             }
         }
@@ -754,6 +756,8 @@ pub fn get_active_stakes(limit: Option<usize>) -> ExternResult<Vec<Record>> {
 }
 
 /// Get escrows for a depositor (paginated, default limit 100)
+///
+/// Uses follow_update_chain because escrows are mutable (conditions met, status changes).
 #[hdk_extern]
 pub fn get_depositor_escrows(input: PaginatedDidInput) -> ExternResult<Vec<Record>> {
     let limit = input.limit.unwrap_or(100);
@@ -767,15 +771,15 @@ pub fn get_depositor_escrows(input: PaginatedDidInput) -> ExternResult<Vec<Recor
     for link in links.into_iter().take(limit) {
         let ah = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(ah, GetOptions::default())? {
-            escrows.push(record);
-        }
+        escrows.push(follow_update_chain(ah)?);
     }
 
     Ok(escrows)
 }
 
 /// Get escrows for a beneficiary (paginated, default limit 100)
+///
+/// Uses follow_update_chain because escrows are mutable (conditions met, status changes).
 #[hdk_extern]
 pub fn get_beneficiary_escrows(input: PaginatedDidInput) -> ExternResult<Vec<Record>> {
     let limit = input.limit.unwrap_or(100);
@@ -791,9 +795,7 @@ pub fn get_beneficiary_escrows(input: PaginatedDidInput) -> ExternResult<Vec<Rec
     for link in links.into_iter().take(limit) {
         let ah = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(ah, GetOptions::default())? {
-            escrows.push(record);
-        }
+        escrows.push(follow_update_chain(ah)?);
     }
 
     Ok(escrows)
