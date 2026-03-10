@@ -64,8 +64,8 @@
 //! ```
 
 use super::gis::{
-    GracefulIgnoranceSystem, HarmonicIgnorance, Harmony, IgnoranceDetection, MoralUncertainty,
-    RashomonEngine, Situation, SynthesizedView,
+    GracefulIgnoranceSystem, HarmonicIgnorance, Harmony, IgnoranceDetection, IgnoranceType,
+    MoralUncertainty, RashomonEngine, Situation, SynthesizedView,
 };
 use std::time::SystemTime;
 
@@ -797,6 +797,122 @@ impl KosmicSong {
         let moral_penalty = synthesis.moral_uncertainty.confidence();
 
         (base * ignorance_penalty * moral_penalty).clamp(0.1, 0.95)
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// GOVERNANCE IDENTITY (Phase 5)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Compact credential extracted from a KosmicSong for governance participation.
+///
+/// Contains the essential identity signals needed for consciousness-gated
+/// governance without exposing the full KosmicSong state.
+#[derive(Debug, Clone)]
+pub struct KosmicCredential {
+    /// Agent identifier.
+    pub agent_id: String,
+    /// Dominant harmony in the harmonic profile.
+    pub dominant_harmony: Harmony,
+    /// Internal coherence score (0.0–1.0).
+    pub coherence_score: f32,
+    /// Current moral uncertainty assessment.
+    pub moral_uncertainty: MoralUncertainty,
+    /// Dominant ignorance type from GIS.
+    pub gis_type: IgnoranceType,
+    /// Stability of harmonic trajectory over time (0.0–1.0).
+    /// High maturation = stable values; low = still exploring.
+    pub maturation_signal: f32,
+}
+
+impl KosmicSong {
+    /// Extract a governance credential from the current KosmicSong state.
+    pub fn governance_credential(&self) -> KosmicCredential {
+        KosmicCredential {
+            agent_id: self.agent_id.clone(),
+            dominant_harmony: self.harmonic_profile.dominant(),
+            coherence_score: self.coherence_score,
+            moral_uncertainty: self.moral_uncertainty.clone(),
+            gis_type: self.gis.dominant_ignorance_type(),
+            maturation_signal: self.compute_maturation(),
+        }
+    }
+
+    /// Compute affinity between this agent's harmonic profile and a proposal's
+    /// relevant harmonies. Returns a value in [0.0, 1.0].
+    ///
+    /// Higher affinity means the agent's values align with the proposal's domain.
+    pub fn harmonic_affinity(&self, proposal_harmonies: &[Harmony]) -> f64 {
+        if proposal_harmonies.is_empty() {
+            return 0.5; // neutral affinity for harmony-agnostic proposals
+        }
+
+        let sum: f64 = proposal_harmonies
+            .iter()
+            .map(|h| self.harmonic_profile.activation(*h) as f64)
+            .sum();
+        (sum / proposal_harmonies.len() as f64).clamp(0.0, 1.0)
+    }
+
+    /// Apply governance outcome deltas to the harmonic profile.
+    ///
+    /// Each delta[i] modulates the i-th harmony's activation. Positive values
+    /// reinforce, negative values suppress. Clamped to ±0.05 per application.
+    pub fn apply_governance_deltas(&mut self, deltas: &[f64; 8]) {
+        for (i, delta) in deltas.iter().enumerate() {
+            let clamped = delta.clamp(-0.05, 0.05) as f32;
+            let current = self.harmonic_profile.activations[i];
+            self.harmonic_profile.activations[i] = (current + clamped).clamp(0.0, 1.0);
+        }
+    }
+
+    /// Compute maturation signal from harmonic trajectory stability.
+    ///
+    /// Looks at variance of the dominant harmony over the trajectory history.
+    /// Low variance = mature (stable values), high variance = still developing.
+    fn compute_maturation(&self) -> f32 {
+        if self.harmonic_trajectory.len() < 2 {
+            return 0.0; // Not enough history
+        }
+
+        // Look at last 10 trajectory points
+        let recent: Vec<_> = self
+            .harmonic_trajectory
+            .iter()
+            .rev()
+            .take(10)
+            .collect();
+
+        // Compute variance of dominant harmony index
+        let dominant_indices: Vec<usize> = recent
+            .iter()
+            .map(|(_, profile)| {
+                profile
+                    .activations
+                    .iter()
+                    .enumerate()
+                    .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
+                    .map(|(idx, _)| idx)
+                    .unwrap_or(0)
+            })
+            .collect();
+
+        // If all same dominant → high maturation; if varied → low
+        let mode = dominant_indices[0];
+        let agreement = dominant_indices.iter().filter(|&&idx| idx == mode).count() as f32
+            / dominant_indices.len() as f32;
+
+        agreement // 1.0 = perfectly stable, 0.1 = very unstable
+    }
+
+    /// Generate an epistemic summary for the EpistemicMesh.
+    pub fn epistemic_summary(&self) -> super::epistemic_mesh::EpistemicSummary {
+        super::epistemic_mesh::EpistemicSummary {
+            agent_id: self.agent_id.clone(),
+            dominant_ignorance: self.gis.dominant_ignorance_type(),
+            domain_expertise: vec![], // Populated by external domain mapping
+            blind_spots: vec![],      // Populated by external domain mapping
+        }
     }
 }
 

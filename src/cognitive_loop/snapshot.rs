@@ -207,6 +207,15 @@ pub struct ConsciousnessSnapshot {
     pub sigma: Option<f64>,
 
     // ═══════════════════════════════════════════════════════════════════════════
+    // INTEGRITY
+    // ═══════════════════════════════════════════════════════════════════════════
+    /// Whether a critical integrity anomaly was detected (attestation failure,
+    /// canary corruption). When true, consciousness metrics may be untrustworthy.
+    /// Feature-gated behind `integrity`; defaults to false.
+    #[serde(default)]
+    pub integrity_critical: bool,
+
+    // ═══════════════════════════════════════════════════════════════════════════
     // PERFORMANCE METRICS
     // ═══════════════════════════════════════════════════════════════════════════
     /// Average cycle time in microseconds (EMA).
@@ -375,6 +384,7 @@ mod tests {
             harmonies_alignment: 0.5,
             empathic_compassion: 0.5,
             sigma: None,
+            integrity_critical: false,
             avg_cycle_time_us: 100.0,
             cycles_per_second: 50.0,
         }

@@ -482,40 +482,6 @@ impl EpisodicMemory {
         }
     }
 
-    /// Retrieve episodes by semantic embedding similarity (cosine).
-    ///
-    /// Returns episodes whose semantic embeddings have cosine similarity above
-    /// the threshold, sorted by similarity (highest first).
-    pub fn retrieve_by_embedding_similarity(
-        &mut self,
-        query: &[f32],
-        top_k: usize,
-    ) -> Vec<&Episode> {
-        let mut scored: Vec<(f32, &PrioritizedEpisode)> = self
-            .episodes
-            .iter()
-            .filter_map(|ep| {
-                let emb = ep.episode.semantic_embedding.as_ref()?;
-                if emb.len() != query.len() || query.is_empty() {
-                    return None;
-                }
-                let dot: f32 = emb.iter().zip(query).map(|(a, b)| a * b).sum();
-                let norm_a: f32 = emb.iter().map(|x| x * x).sum::<f32>().sqrt();
-                let norm_b: f32 = query.iter().map(|x| x * x).sum::<f32>().sqrt();
-                if norm_a < 1e-9 || norm_b < 1e-9 {
-                    return None;
-                }
-                Some((dot / (norm_a * norm_b), ep))
-            })
-            .collect();
-        scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
-        scored
-            .into_iter()
-            .take(top_k)
-            .map(|(_, ep)| &ep.episode)
-            .collect()
-    }
-
     /// Store an episode if its Phi exceeds the threshold
     ///
     /// Returns true if the episode was stored, false if it was below threshold.

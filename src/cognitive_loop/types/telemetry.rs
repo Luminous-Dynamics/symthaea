@@ -703,6 +703,10 @@ pub struct CycleMetadata {
     /// 0 = no subsystems using the new CognitiveSubsystem trait yet.
     pub subsystem_integration_contributors: u32,
 
+    /// Per-manager proposal magnitudes (which managers moved the needle this cycle).
+    #[serde(default)]
+    pub managers: ManagerTelemetry,
+
     // ── Nurture Attachment Telemetry ─────────────────────────────────────
     /// Current attachment style (e.g., "Forming", "Secure"). Empty when nurture disabled.
     pub attachment_style: Option<String>,
@@ -802,6 +806,17 @@ pub struct CycleMetadata {
     /// Whether ToM mismatch triggered exploration this cycle.
     #[serde(default)]
     pub tom_exploration_triggered: bool,
+
+    // ── User State Inference Telemetry ───────────────────────────────────
+    /// User cognitive load (0.0 = low, 1.0 = high). 0.0 when USI disabled.
+    #[serde(default)]
+    pub user_cognitive_load: f32,
+    /// User frustration level (0.0 = calm, 1.0 = very frustrated). 0.0 when USI disabled.
+    #[serde(default)]
+    pub user_frustration: f32,
+    /// User engagement level (0.0 = disengaged, 1.0 = highly engaged). 0.5 when USI disabled.
+    #[serde(default = "default_half_f32")]
+    pub user_engagement: f32,
 
     // ── Vision Manifold Telemetry ───────────────────────────────────────
     /// Vision manifold telemetry (None when vision-manifold feature disabled or not active).
@@ -1038,6 +1053,12 @@ pub struct CycleMetadata {
     /// Whether EqV2 bottleneck response fired a targeted boost.
     #[serde(default)]
     pub eq_v2_bottleneck_response: bool,
+    /// Whether affective consciousness modulated LR or exploration.
+    #[serde(default)]
+    pub affect_consciousness_modulated: bool,
+    /// Whether narrative self-phi modulated confidence or exploration.
+    #[serde(default)]
+    pub narrative_self_phi_modulated: bool,
 
     // ── Session 14: Late Consciousness Feedback ──────────────────────────
     /// Whether living mind vitality modulated confidence.
@@ -1075,6 +1096,32 @@ pub struct CycleMetadata {
     /// Whether anomaly recovery was accelerated by improving Phi.
     #[serde(default)]
     pub anomaly_recovery_phi_accelerated: bool,
+
+    // ── Session 16: Bidirectional Feedback Deepening ─────────────────────
+    /// Whether temporal binding strength modulated exploration/LR.
+    #[serde(default)]
+    pub temporal_binding_feedback: bool,
+    /// Whether consciousness gradient magnitude triggered caution or recovery.
+    #[serde(default)]
+    pub consciousness_gradient_active: bool,
+    /// Whether startup exploration ramp was active (warmup phase).
+    #[serde(default)]
+    pub startup_exploration_ramped: bool,
+    /// Whether epistemic rejection streak triggered recalibration.
+    #[serde(default)]
+    pub epistemic_rejection_streak_recal: bool,
+    /// Whether consecutive full-dampen triggered protective threshold freeze.
+    #[serde(default)]
+    pub full_dampen_threshold_freeze: bool,
+    /// Whether consciousness EMA biased learning rate initialization.
+    #[serde(default)]
+    pub consciousness_ema_lr_bias: bool,
+    /// Whether multi-objective frontier size modulated exploration.
+    #[serde(default)]
+    pub multi_obj_frontier_gated: bool,
+    /// Whether error oscillation bifurcation response fired.
+    #[serde(default)]
+    pub error_bifurcation_response: bool,
 }
 
 fn default_response_profile() -> String {
@@ -1391,6 +1438,8 @@ pub struct EthicalTelemetry {
     pub empathic_tone_adj: f64,
     /// Empathic tone adjustment applied to speech rate (-1.0 to 1.0, 0.0 = no change).
     pub empathic_speech_rate_mod: f32,
+    /// KosmicSong coherence: Phi × HarmonicAlignment × MoralClarity (0.0–1.0).
+    pub kosmic_coherence: f32,
     /// β₀: connected components in moral space (1 = unified).
     pub moral_topo_beta_0: usize,
     /// β₁: 1-cycles (circular reasoning patterns).
@@ -1526,6 +1575,28 @@ pub struct FeedbackTelemetry {
     pub feedback_trace_exploration: Vec<(String, String)>,
     /// Per-proposal trace for threshold (populated when `trace_feedback = true`).
     pub feedback_trace_threshold: Vec<(String, String)>,
+}
+
+/// Per-manager telemetry: which managers fired and what they proposed.
+/// Each field is the manager's SubsystemOutput magnitude (0.0 = neutral/not run).
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ManagerTelemetry {
+    /// Drive manager confidence delta (curiosity, flow, boredom, exploration).
+    pub drive_confidence_delta: f32,
+    /// Drive manager exploration delta.
+    pub drive_exploration_delta: f32,
+    /// Memory manager confidence delta (episodic, semantic, resonator).
+    pub memory_confidence_delta: f32,
+    /// Memory manager LR modulation factor.
+    pub memory_lr_modulation: f32,
+    /// Learning manager confidence delta (FEP, dream, school).
+    pub learning_confidence_delta: f32,
+    /// Learning manager LR modulation factor.
+    pub learning_lr_modulation: f32,
+    /// Perception manager confidence delta (attention, multi-modal, social).
+    pub perception_confidence_delta: f32,
+    /// Perception manager exploration delta.
+    pub perception_exploration_delta: f32,
 }
 
 /// Per-module execution timings in microseconds for overhead profiling.

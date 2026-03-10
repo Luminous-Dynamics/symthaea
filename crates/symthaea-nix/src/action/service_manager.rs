@@ -97,20 +97,36 @@ impl ServiceManager {
             ])
             .output()?;
 
+        if !output.status.success() {
+            return Err(std::io::Error::other(format!(
+                "systemctl show failed for '{}': {}",
+                unit,
+                String::from_utf8_lossy(&output.stderr).trim()
+            )));
+        }
+
         let stdout = String::from_utf8_lossy(&output.stdout);
         let mut active_state = String::new();
         let mut sub_state = String::new();
         let mut enabled = false;
+        let mut parsed_fields = 0u32;
 
         for line in stdout.lines() {
             if let Some((key, value)) = line.split_once('=') {
                 match key {
-                    "ActiveState" => active_state = value.to_string(),
-                    "SubState" => sub_state = value.to_string(),
-                    "UnitFileState" => enabled = value == "enabled",
+                    "ActiveState" => { active_state = value.to_string(); parsed_fields += 1; }
+                    "SubState" => { sub_state = value.to_string(); parsed_fields += 1; }
+                    "UnitFileState" => { enabled = value == "enabled"; parsed_fields += 1; }
                     _ => {}
                 }
             }
+        }
+
+        if parsed_fields == 0 {
+            return Err(std::io::Error::other(format!(
+                "systemctl show returned no parseable properties for '{}'",
+                unit
+            )));
         }
 
         Ok(ServiceStatus {
@@ -245,5 +261,30 @@ mod tests {
         let cmd = ServiceManager::stop("docker.socket");
         let (_, args) = cmd.to_command();
         assert_eq!(args[1], "docker.socket");
+    }
+
+    #[test]
+    fn test_service_status_struct() {
+        let status = ServiceStatus {
+            name: "nginx.service".to_string(),
+            active: true,
+            enabled: true,
+            active_state: "active".to_string(),
+            sub_state: "running".to_string(),
+        };
+        assert!(status.active);
+        assert!(status.enabled);
+        assert_eq!(status.active_state, "active");
+
+        // Inactive service
+        let status = ServiceStatus {
+            name: "stopped.service".to_string(),
+            active: false,
+            enabled: false,
+            active_state: "inactive".to_string(),
+            sub_state: "dead".to_string(),
+        };
+        assert!(!status.active);
+        assert!(!status.enabled);
     }
 }

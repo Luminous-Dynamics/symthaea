@@ -145,6 +145,16 @@ pub struct TrainingConfig {
     /// Target L2 norm for embedding normalization (0.0 = disabled).
     /// Prevents embedding norm explosion (observed >3000 without normalization).
     pub embedding_target_norm: f32,
+    /// Number of negative samples for sampled softmax (0 = full softmax).
+    /// When > 0, only computes logits for target + N random tokens per step.
+    /// Gives ~V/N speedup (e.g., 4096/64 = 64×) with minimal quality loss.
+    /// Recommended: 64-128 for 4K vocabulary.
+    pub negative_samples: usize,
+    /// Probability of carrying CfC state between training pairs (0.0-1.0).
+    /// When > 0, skips controller.reset() between pairs with this probability,
+    /// teaching the CfC network cross-sentence temporal coherence.
+    /// Recommended: 0.3-0.5.
+    pub carry_state: f32,
 }
 
 impl Default for TrainingConfig {
@@ -162,6 +172,8 @@ impl Default for TrainingConfig {
             train_network: true,
             network_lr_scale: 0.3,
             embedding_target_norm: 128.0,
+            negative_samples: 0,
+            carry_state: 0.0,
         }
     }
 }
@@ -309,6 +321,29 @@ fn warmup_lr(base_lr: f32, step: usize, total_steps: usize, warmup_fraction: f32
     }
 }
 
+/// Sample negative indices for sampled softmax training.
+///
+/// Returns a vector of `target` plus `k` random token indices (without duplicates).
+/// Uses a simple LCG for speed (not cryptographic quality — fine for training).
+fn sample_negatives(target: usize, vocab_size: usize, k: usize, seed: u64) -> Vec<usize> {
+    let mut indices = Vec::with_capacity(k + 1);
+    indices.push(target);
+
+    // Simple LCG for reproducible-ish fast sampling
+    let mut state = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+    let mut attempts = 0;
+    while indices.len() < k + 1 && attempts < k * 4 {
+        state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        let idx = (state >> 33) as usize % vocab_size;
+        if idx != target && !indices.contains(&idx) {
+            indices.push(idx);
+        }
+        attempts += 1;
+    }
+
+    indices
+}
+
 /// Train the BrocaGenerator on a dataset using teacher forcing.
 ///
 /// For each pair:
@@ -370,11 +405,17 @@ pub fn train_with_adam(
         None
     };
 
+    let use_sampled = config.negative_samples > 0;
+    let vocab_size = generator.tokenizer().vocab_size();
+
     for epoch in 0..config.epochs {
         let mut total_loss = 0.0f32;
         let mut total_tokens = 0usize;
 
-        for pair in &dataset.pairs {
+        // LCG state for negative sampling (varies per epoch)
+        let mut neg_seed = epoch as u64 * 1000003 + 42;
+
+        for (pair_idx, pair) in dataset.pairs.iter().enumerate() {
             if pair.target_ids.is_empty() {
                 continue;
             }
@@ -384,8 +425,15 @@ pub fn train_with_adam(
             };
             let thought_hv = generator.encoder().encode(&channels);
 
-            // Reset controller for this sequence
-            generator.controller_mut().reset();
+            // Reset controller for this sequence (unless carrying state)
+            let should_carry = config.carry_state > 0.0 && pair_idx > 0 && {
+                // Deterministic carry decision based on epoch + pair index
+                let hash = (epoch * 10007 + pair_idx * 1009) % 1000;
+                (hash as f32 / 1000.0) < config.carry_state
+            };
+            if !should_carry {
+                generator.controller_mut().reset();
+            }
 
             // Teacher-forced forward pass
             let mut prev_token = generator.tokenizer().thought_id;
@@ -401,9 +449,22 @@ pub fn train_with_adam(
                 );
                 generator.controller_mut().set_learning_rate(lr);
 
-                let logits = generator
-                    .controller_mut()
-                    .forward_step(&thought_hv, prev_token, pos);
+                let logits = if use_sampled {
+                    neg_seed = neg_seed.wrapping_add(global_step as u64);
+                    let active = sample_negatives(
+                        target_id as usize,
+                        vocab_size,
+                        config.negative_samples,
+                        neg_seed,
+                    );
+                    generator
+                        .controller_mut()
+                        .forward_step_sampled(&thought_hv, prev_token, pos, &active)
+                } else {
+                    generator
+                        .controller_mut()
+                        .forward_step(&thought_hv, prev_token, pos)
+                };
 
                 // Cross-entropy loss: -log(softmax[target])
                 let loss = cross_entropy_loss(&logits, target_id as usize);
@@ -1389,6 +1450,82 @@ mod tests {
                 norm <= max_allowed,
                 "Embedding norm {norm:.1} should be ≤ {max_allowed:.1} after normalization"
             );
+        }
+    }
+
+    #[test]
+    fn test_negative_sampling() {
+        // Verify sample_negatives produces correct output
+        let indices = sample_negatives(5, 100, 10, 42);
+        assert!(indices.contains(&5), "Must include target");
+        assert_eq!(indices.len(), 11, "target + 10 negatives");
+        // No duplicates
+        let mut sorted = indices.clone();
+        sorted.sort();
+        sorted.dedup();
+        assert_eq!(sorted.len(), indices.len(), "No duplicates");
+    }
+
+    #[test]
+    fn test_sampled_softmax_training() {
+        let genesis = test_genesis();
+        let config = test_config();
+        let mut gen = BrocaGenerator::new(&genesis, config);
+
+        let tok = gen.tokenizer().clone();
+        let mut dataset = TrainingDataset::default();
+        let channels = ThoughtChannels::default();
+        for _ in 0..5 {
+            dataset.push(TrainingPair::new(channels, "hello".to_string(), &tok));
+        }
+
+        let train_config = TrainingConfig {
+            epochs: 10,
+            learning_rate: 0.05,
+            bptt_window: 8,
+            negative_samples: 16, // Only compute 16 negatives + target
+            ..Default::default()
+        };
+
+        let metrics = train(&mut gen, &dataset, &train_config);
+        assert_eq!(metrics.len(), 10);
+
+        // Loss should be finite and decreasing
+        let first = metrics[0].avg_loss;
+        let last = metrics.last().unwrap().avg_loss;
+        assert!(first.is_finite(), "First loss should be finite");
+        assert!(last.is_finite(), "Last loss should be finite");
+        assert!(
+            last < first,
+            "Sampled softmax should still reduce loss: {first} → {last}"
+        );
+    }
+
+    #[test]
+    fn test_carry_state_training() {
+        let genesis = test_genesis();
+        let config = test_config();
+        let mut gen = BrocaGenerator::new(&genesis, config);
+
+        let tok = gen.tokenizer().clone();
+        let mut dataset = TrainingDataset::default();
+        for i in 0..5 {
+            let channels = ThoughtChannels::with_intent(i % 3);
+            dataset.push(TrainingPair::new(channels, "test".to_string(), &tok));
+        }
+
+        let train_config = TrainingConfig {
+            epochs: 5,
+            learning_rate: 0.01,
+            bptt_window: 8,
+            carry_state: 0.5, // 50% chance of carrying state
+            ..Default::default()
+        };
+
+        let metrics = train(&mut gen, &dataset, &train_config);
+        assert_eq!(metrics.len(), 5);
+        for m in &metrics {
+            assert!(m.avg_loss.is_finite(), "Loss should be finite with carry_state");
         }
     }
 }

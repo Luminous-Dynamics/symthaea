@@ -270,6 +270,43 @@ impl GracefulIgnoranceSystem {
         stats
     }
 
+    /// Get the dominant ignorance type across all active records.
+    ///
+    /// Returns the most frequently occurring ignorance type. If no records exist,
+    /// returns `IgnoranceType::None` (no ignorance detected).
+    pub fn dominant_ignorance_type(&self) -> IgnoranceType {
+        if self.ignorance_records.is_empty() {
+            return IgnoranceType::None;
+        }
+
+        let mut counts = [0u32; 5]; // None, Known, KnownUnknown, Unknown, Impossible
+        for record in self.ignorance_records.values() {
+            let idx = match record.detection.ignorance_type {
+                IgnoranceType::None => 0,
+                IgnoranceType::Known => 1,
+                IgnoranceType::KnownUnknown => 2,
+                IgnoranceType::Unknown => 3,
+                IgnoranceType::Impossible => 4,
+            };
+            counts[idx] += 1;
+        }
+
+        let (max_idx, _) = counts
+            .iter()
+            .enumerate()
+            .max_by_key(|(_, &c)| c)
+            .unwrap_or((0, &0));
+
+        match max_idx {
+            0 => IgnoranceType::None,
+            1 => IgnoranceType::Known,
+            2 => IgnoranceType::KnownUnknown,
+            3 => IgnoranceType::Unknown,
+            4 => IgnoranceType::Impossible,
+            _ => IgnoranceType::None,
+        }
+    }
+
     // --- Private helpers ---
 
     fn classify_domain(&self, query: &str) -> Domain {

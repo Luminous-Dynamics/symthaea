@@ -96,7 +96,7 @@ impl CognitiveLoopService {
         // get up-weighted for longer-horizon predictions (bias toward later horizons).
         // Only re-query the causal graph every 41 cycles (co-prime with world model update)
         // to avoid redundant graph copies. Between updates, use uniform weighting.
-        let causal_dims: Vec<bool> = if self.stats.total_cycles % 41 == 0 {
+        let causal_dims: Option<Vec<bool>> = if self.stats.total_cycles % 41 == 0 {
             if let Some(ref enhancer) = self.causal_enhancer {
                 let graph = enhancer.current_graph();
                 let mut has_edge = vec![false; dim];
@@ -108,27 +108,42 @@ impl CognitiveLoopService {
                         has_edge[e.to] = true;
                     }
                 }
-                has_edge
+                // Only allocate if there are actual causal edges
+                if has_edge.iter().any(|&b| b) {
+                    Some(has_edge)
+                } else {
+                    None
+                }
             } else {
-                vec![false; dim]
+                None
             }
         } else {
-            vec![false; dim]
+            None
         };
 
-        for (pred_idx, pred) in predictions.iter().enumerate() {
-            // Horizon weight: later predictions get more weight for causal dims.
-            // Uniform (1/n) for non-causal dims; linearly increasing for causal dims.
-            let horizon_frac = (pred_idx + 1) as f32 / n as f32;
-            for (i, val) in pred.iter().enumerate() {
-                if i < dim {
-                    let w = if causal_dims[i] {
-                        // Linearly increasing: 0.5/n at first → 1.5/n at last
-                        (0.5 + horizon_frac) / n as f32
-                    } else {
-                        1.0 / n as f32
-                    };
-                    result[i] += val * w;
+        let inv_n = 1.0 / n as f32;
+        if let Some(ref causal) = causal_dims {
+            // Causal-weighted path (only on 41st cycle with actual edges)
+            for (pred_idx, pred) in predictions.iter().enumerate() {
+                let horizon_frac = (pred_idx + 1) as f32 / n as f32;
+                for (i, val) in pred.iter().enumerate() {
+                    if i < dim {
+                        let w = if causal[i] {
+                            (0.5 + horizon_frac) * inv_n
+                        } else {
+                            inv_n
+                        };
+                        result[i] += val * w;
+                    }
+                }
+            }
+        } else {
+            // Uniform-weight fast path (no causal edges, 40/41 cycles)
+            for pred in predictions.iter() {
+                for (i, val) in pred.iter().enumerate() {
+                    if i < dim {
+                        result[i] += val * inv_n;
+                    }
                 }
             }
         }

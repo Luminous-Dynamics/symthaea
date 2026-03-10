@@ -148,7 +148,7 @@ SUPPORT_DIRS=(
     dashboard
     demos
     figures
-    models
+    # models — excluded: 21GB of ONNX files, too large for standalone
     nix
     proptest-regressions
     rust-sentinels
@@ -269,6 +269,35 @@ if ! $DRY_RUN; then
         warn "Cargo.toml still has external path deps:"
         echo "$ESCAPED_PATHS"
         REWRITE_OK=false
+    fi
+
+    # Strip workspace lints — they conflict with CI's feature-gated clippy -A flags.
+    # Crate-level #![deny(...)] in lib.rs provides local lint enforcement instead.
+    sed -i '/^\[workspace\.lints\.clippy\]/,/^$/d' "${STANDALONE_REPO}/Cargo.toml"
+    sed -i '/^# Workspace-wide lint configuration/d' "${STANDALONE_REPO}/Cargo.toml"
+    sed -i '/^# These lints apply on top/d' "${STANDALONE_REPO}/Cargo.toml"
+    # Remove [lints] workspace = true from main crate
+    sed -i '/^\[lints\]/{N;/workspace = true/d;}' "${STANDALONE_REPO}/Cargo.toml"
+    # Remove [lints] workspace = true from symthaea-core
+    if [ -f "${STANDALONE_REPO}/symthaea-core/Cargo.toml" ]; then
+        sed -i '/^\[lints\]/{N;/workspace = true/d;}' "${STANDALONE_REPO}/symthaea-core/Cargo.toml"
+    fi
+    ok "Stripped workspace lints (incompatible with CI clippy config)"
+
+    # Remove workspace members that don't exist in the standalone repo
+    # (e.g., symthaea-crucible exists in monorepo but isn't synced)
+    TOML="${STANDALONE_REPO}/Cargo.toml"
+    REMOVED_MEMBERS=0
+    while IFS= read -r line; do
+        crate_path=$(echo "$line" | sed -n 's/.*"\(crates\/[^"]*\)".*/\1/p')
+        if [ -n "$crate_path" ] && [ ! -d "${STANDALONE_REPO}/${crate_path}" ]; then
+            sed -i "\|\"${crate_path}\"|d" "$TOML"
+            REMOVED_MEMBERS=$((REMOVED_MEMBERS + 1))
+            warn "Removed missing workspace member: ${crate_path}"
+        fi
+    done < <(grep '"crates/' "$TOML")
+    if [ $REMOVED_MEMBERS -gt 0 ]; then
+        ok "Removed $REMOVED_MEMBERS missing workspace members"
     fi
 
     if $REWRITE_OK; then

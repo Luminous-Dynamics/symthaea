@@ -42,6 +42,8 @@ pub struct PlanExecutionResult {
     pub completed_count: usize,
     /// Number of steps rolled back (if any).
     pub rolled_back_count: usize,
+    /// Rollback failures: (step_index, error_description).
+    pub rollback_failures: Vec<(usize, String)>,
 }
 
 /// Orchestrates multi-step NixOS action plans with rollback on failure.
@@ -139,7 +141,7 @@ impl PlanExecutor {
                 self.steps[i].status = StepStatus::Failed(format!("{result:?}"));
                 results.push((self.steps[i].clone(), Some(result)));
 
-                let rolled_back = self
+                let (rolled_back, rollback_failures) = self
                     .rollback_completed(executor, &mut results, completed)
                     .await;
 
@@ -154,6 +156,7 @@ impl PlanExecutor {
                     success: false,
                     completed_count: completed,
                     rolled_back_count: rolled_back,
+                    rollback_failures,
                 };
             } else {
                 // Non-critical failure — continue
@@ -167,26 +170,42 @@ impl PlanExecutor {
             success: true,
             completed_count: completed,
             rolled_back_count: 0,
+            rollback_failures: Vec::new(),
         }
     }
 
     /// Roll back completed steps in reverse order.
+    ///
+    /// Returns `(rolled_back_count, rollback_failures)`.
     async fn rollback_completed(
         &self,
         executor: &mut NixOSExecutor,
         _results: &mut Vec<(PlanStep, Option<ExecutionResult>)>,
         completed: usize,
-    ) -> usize {
+    ) -> (usize, Vec<(usize, String)>) {
         let mut rolled_back = 0;
+        let mut failures = Vec::new();
 
         for i in (0..completed).rev() {
             if let Some(rollback_cmd) = self.steps[i].command.rollback_command() {
-                let _rb_result = executor.execute_confirmed(rollback_cmd, self.phi).await;
-                rolled_back += 1;
+                let rb_result = executor.execute_confirmed(rollback_cmd, self.phi).await;
+                match &rb_result {
+                    ExecutionResult::Success { .. } => {
+                        rolled_back += 1;
+                    }
+                    ExecutionResult::FailedNoRollback { error, .. } => {
+                        rolled_back += 1; // attempted
+                        failures.push((i, format!("rollback failed: {error}")));
+                    }
+                    other => {
+                        rolled_back += 1;
+                        failures.push((i, format!("rollback unexpected result: {other:?}")));
+                    }
+                }
             }
         }
 
-        rolled_back
+        (rolled_back, failures)
     }
 }
 
@@ -633,6 +652,52 @@ mod tests {
         assert_eq!(result.completed_count, 3);
         // All 3 EnvInstall commands have rollback → 3 rolled back
         assert_eq!(result.rolled_back_count, 3);
+    }
+
+    #[tokio::test]
+    async fn test_rollback_failures_tracked() {
+        let mut nix_executor = NixOSExecutor::new().with_dry_run(true);
+        let mut plan = PlanExecutor::new(0.35);
+
+        // Step 0: install (succeeds)
+        plan.add_step(
+            NixOSCommand::EnvInstall {
+                packages: vec!["vim".into()],
+            },
+            "Install vim",
+        );
+        // Step 1: rebuild (fails due to phi)
+        plan.add_step(
+            NixOSCommand::RebuildSwitch {
+                flake: None,
+                extra_args: vec![],
+            },
+            "Rebuild",
+        );
+
+        let result = plan.execute(&mut nix_executor).await;
+        assert!(!result.success);
+        // In dry-run mode, rollback "succeeds" — so rollback_failures should be empty
+        assert!(
+            result.rollback_failures.is_empty(),
+            "Dry-run rollbacks should not produce failures"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_success_path_no_rollback_failures() {
+        let mut nix_executor = NixOSExecutor::new().with_dry_run(true);
+        let mut plan = PlanExecutor::new(0.5);
+        plan.add_step(
+            NixOSCommand::Search {
+                query: "vim".into(),
+                json: false,
+            },
+            "Search",
+        );
+        let result = plan.execute(&mut nix_executor).await;
+        assert!(result.success);
+        assert!(result.rollback_failures.is_empty());
     }
 
     #[tokio::test]

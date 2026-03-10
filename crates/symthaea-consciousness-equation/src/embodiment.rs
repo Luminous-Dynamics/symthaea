@@ -1,5 +1,6 @@
 use std::collections::VecDeque;
-use std::time::Instant;
+// web-time: drop-in Instant for wasm32 (std::time::Instant panics on wasm32-unknown-unknown)
+use web_time::Instant;
 
 /// Embodiment Factor: M = sensorimotor_prediction_accuracy × interoceptive_coherence
 ///

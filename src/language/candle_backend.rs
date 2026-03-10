@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Result};
-use candle_core::{Device, IndexOp, Tensor};
-use candle_transformers::generation::LogitsProcessor;
-use candle_transformers::models::quantized_llama as ql;
+use candle_core::{Device, Tensor};
+use candle_transformers::generation::{LogitsProcessor, Sampling};
+use candle_transformers::models::quantized_llama as qlm;
 use hf_hub::{api::sync::Api, Repo};
 use std::sync::Arc;
 use tokenizers::Tokenizer;
@@ -9,60 +9,40 @@ use tokio::sync::Mutex;
 
 use super::llm_backend::{GenerationParams, LLMBackend};
 
-/// Apply top-k filtering to logits tensor.
-///
-/// Keeps only the top `k` logit values; all others are set to negative infinity.
-fn apply_top_k(logits: &Tensor, k: usize) -> Result<Tensor> {
-    let logits_vec: Vec<f32> = logits.to_vec1()?;
-    let len = logits_vec.len();
-    if k >= len {
-        return Ok(logits.clone());
-    }
-    // Get indices sorted by value descending
-    let mut indexed: Vec<(usize, f32)> = logits_vec.iter().copied().enumerate().collect();
-    indexed.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-    let mut result = vec![f32::NEG_INFINITY; len];
-    for &(idx, val) in indexed.iter().take(k) {
-        result[idx] = val;
-    }
-    Tensor::new(result, logits.device()).map_err(Into::into)
-}
-
 /// Affective Logits Processor that warps vocabulary based on physics.
 pub struct AffectiveLogitsProcessor {
     inner: LogitsProcessor,
     repetition_penalty: f32,
-    top_k: Option<usize>,
 }
 
 impl AffectiveLogitsProcessor {
     pub fn new(seed: u64, temperature: f32, repetition_penalty: f32, top_k: Option<usize>) -> Self {
+        // Build the appropriate sampling strategy with top-k baked in
+        let sampling = match top_k {
+            Some(k) => Sampling::TopK {
+                k,
+                temperature: temperature as f64,
+            },
+            None => Sampling::All {
+                temperature: temperature as f64,
+            },
+        };
         Self {
-            inner: LogitsProcessor::new(seed, Some(temperature as f64), None),
+            inner: LogitsProcessor::from_sampling(seed, sampling),
             repetition_penalty,
-            top_k,
         }
     }
 
     pub fn sample(&mut self, logits: &Tensor) -> Result<u32> {
-        // Apply Top-K if set
-        let logits = if let Some(k) = self.top_k {
-            apply_top_k(logits, k)?
-        } else {
-            logits.clone()
-        };
-
-        // Use internal candle sampler
-        let token = self.inner.sample(&logits)?;
+        // Top-K is now handled internally by the LogitsProcessor sampling strategy
+        let token = self.inner.sample(logits)?;
         Ok(token)
     }
 }
 
-/// In-process Candle backend for Llama-3-GGUF.
-///
-/// Uses `quantized_llama::ModelWeights` for GGUF model loading (candle 0.8.x).
+/// In-process Candle backend for Llama-3-GGUF (quantized).
 pub struct CandleBackend {
-    model: Arc<Mutex<ql::ModelWeights>>,
+    model: Arc<Mutex<qlm::ModelWeights>>,
     tokenizer: Tokenizer,
     device: Device,
     /// Shared affective state
@@ -73,7 +53,7 @@ pub struct CandleBackend {
 }
 
 impl CandleBackend {
-    pub fn new(model_id: &str, _revision: &str, file_name: &str) -> Result<Self> {
+    pub fn new(model_id: &str, revision: &str, file_name: &str) -> Result<Self> {
         let device = Device::Cpu; // Default to CPU for 6W edge logic, can be optimized later
         let api = Api::new()?;
         let repo = api.repo(Repo::model(model_id.to_string()));
@@ -81,10 +61,10 @@ impl CandleBackend {
         let tokenizer_path = repo.get("tokenizer.json")?;
         let tokenizer = Tokenizer::from_file(tokenizer_path).map_err(|e| anyhow!(e))?;
 
-        // Load GGUF model via quantized path
+        // Load GGUF model via quantized_llama ModelWeights
         let mut file = std::fs::File::open(&model_path)?;
         let model_content = candle_core::quantized::gguf_file::Content::read(&mut file)?;
-        let model = ql::ModelWeights::from_gguf(model_content, &mut file, &device)?;
+        let model = qlm::ModelWeights::from_gguf(model_content, &mut file, &device)?;
 
         Ok(Self {
             model: Arc::new(Mutex::new(model)),
@@ -151,9 +131,10 @@ impl LLMBackend for CandleBackend {
 
         for _i in 0..params.max_tokens {
             let input = Tensor::new(&tokens[..], &self.device)?.unsqueeze(0)?;
+            // quantized_llama::ModelWeights::forward takes (x, index_pos)
             let logits = model.forward(&input, tokens.len())?;
             let logits = logits.squeeze(0)?;
-            let logits = logits.i(logits.dim(0)? - 1)?;
+            let logits = logits.get(logits.dim(0)? - 1)?;
 
             let next_token = logits_processor.sample(&logits)?;
             tokens.push(next_token);

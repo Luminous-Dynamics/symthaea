@@ -4,6 +4,7 @@
 //! commands to observe store size, path counts, closure sizes, and GC roots.
 
 use std::process::Command;
+use tracing::debug;
 
 /// Observes the Nix store: paths, closures, references, and disk usage.
 pub struct StoreObserver;
@@ -115,8 +116,15 @@ impl StoreObserver {
 
             // If there is a second column, it is the closure size in bytes
             if parts.len() >= 2 {
-                if let Ok(size) = parts[1].parse::<u64>() {
-                    total_size_bytes += size;
+                match parts[1].parse::<u64>() {
+                    Ok(size) => total_size_bytes += size,
+                    Err(_) => {
+                        debug!(
+                            path = parts[0],
+                            raw_size = parts[1],
+                            "Skipping unparseable store path size"
+                        );
+                    }
                 }
             }
 
@@ -254,5 +262,40 @@ mod tests {
     fn test_parse_gc_roots_empty() {
         let roots = StoreObserver::parse_gc_roots("").unwrap();
         assert!(roots.is_empty());
+    }
+
+    #[test]
+    fn test_parse_store_info_unparseable_size() {
+        // Lines with non-numeric sizes should be counted as paths but not add to total_size
+        let output = "/nix/store/abc123-pkg   not_a_number\n\
+                       /nix/store/def456-pkg   1024\n";
+        let info = StoreObserver::parse_store_info(output).unwrap();
+        assert_eq!(info.path_count, 2);
+        assert_eq!(info.total_size_bytes, 1024); // only the parseable one
+    }
+
+    #[test]
+    fn test_parse_store_info_path_only_no_size() {
+        // Lines with only a path (no size column)
+        let output = "/nix/store/abc123-pkg\n";
+        let info = StoreObserver::parse_store_info(output).unwrap();
+        assert_eq!(info.path_count, 1);
+        assert_eq!(info.total_size_bytes, 0);
+    }
+
+    #[test]
+    fn test_parse_gc_roots_no_arrow() {
+        // Lines without " -> " should be silently skipped
+        let output = "this line has no arrow\n\
+                       /valid/root -> /nix/store/abc123-pkg\n";
+        let roots = StoreObserver::parse_gc_roots(output).unwrap();
+        assert_eq!(roots.len(), 1);
+        assert_eq!(roots[0].path, "/valid/root");
+    }
+
+    #[test]
+    fn test_parse_path_size_empty() {
+        let result = StoreObserver::parse_path_size("");
+        assert!(result.is_err());
     }
 }

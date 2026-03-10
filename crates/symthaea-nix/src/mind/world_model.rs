@@ -31,6 +31,23 @@ pub enum ActionCategory {
     Custom(String),
 }
 
+impl std::fmt::Display for ActionCategory {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Install => f.write_str("Install"),
+            Self::Remove => f.write_str("Remove"),
+            Self::Enable => f.write_str("Enable"),
+            Self::Disable => f.write_str("Disable"),
+            Self::Rebuild => f.write_str("Rebuild"),
+            Self::Rollback => f.write_str("Rollback"),
+            Self::Configure => f.write_str("Configure"),
+            Self::GarbageCollect => f.write_str("GarbageCollect"),
+            Self::Update => f.write_str("Update"),
+            Self::Custom(s) => write!(f, "Custom({s})"),
+        }
+    }
+}
+
 impl ActionCategory {
     /// Classify a command string into a category.
     pub fn from_command(cmd: &str) -> Self {
@@ -482,5 +499,34 @@ mod tests {
             "Unknown action should predict no change (sim={:.6})",
             sim
         );
+    }
+
+    #[test]
+    fn test_action_category_display() {
+        assert_eq!(format!("{}", ActionCategory::Install), "Install");
+        assert_eq!(format!("{}", ActionCategory::Remove), "Remove");
+        assert_eq!(format!("{}", ActionCategory::Enable), "Enable");
+        assert_eq!(format!("{}", ActionCategory::Disable), "Disable");
+        assert_eq!(format!("{}", ActionCategory::Rebuild), "Rebuild");
+        assert_eq!(format!("{}", ActionCategory::Rollback), "Rollback");
+        assert_eq!(format!("{}", ActionCategory::Configure), "Configure");
+        assert_eq!(format!("{}", ActionCategory::GarbageCollect), "GarbageCollect");
+        assert_eq!(format!("{}", ActionCategory::Update), "Update");
+        assert_eq!(
+            format!("{}", ActionCategory::Custom("reboot".into())),
+            "Custom(reboot)"
+        );
+    }
+
+    #[test]
+    fn test_action_category_display_vs_debug_differ() {
+        // Display should be cleaner than Debug for Custom variant
+        let custom = ActionCategory::Custom("hello".into());
+        let display = format!("{custom}");
+        let debug = format!("{custom:?}");
+        assert_eq!(display, "Custom(hello)");
+        assert!(debug.contains("Custom"));
+        // Debug wraps the string in quotes, Display doesn't
+        assert!(!display.contains('"'));
     }
 }

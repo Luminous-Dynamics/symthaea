@@ -37,13 +37,6 @@ name = "ring"
 expression = "MIT AND ISC AND OpenSSL"
 license-files = [{ path = "LICENSE", hash = 0xbd0eed23 }]
 
-# serde_core is an internal crate from the serde ecosystem (MIT OR Apache-2.0)
-# It doesn't carry its own license field; it inherits from the serde workspace.
-[[licenses.clarify]]
-name = "serde_core"
-expression = "MIT OR Apache-2.0"
-license-files = []
-
 [bans]
 multiple-versions = "warn"
 wildcards = "allow"

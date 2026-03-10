@@ -96,20 +96,24 @@ impl Scrubber {
     }
 
     /// Scrub all PII from the given text.
+    ///
+    /// Counts matches *after* replacement by each pattern, so earlier patterns
+    /// that redact text cannot inflate match counts for later patterns.
     pub fn scrub(&self, text: &str) -> ScrubResult {
         let mut result = text.to_string();
         let mut total_count = 0usize;
         let mut type_counts: Vec<(&'static str, usize)> = Vec::new();
 
         for pattern in &self.patterns {
-            let count = pattern.regex.find_iter(&result).count();
-            if count > 0 {
-                result = pattern
-                    .regex
-                    .replace_all(&result, pattern.replacement)
-                    .to_string();
+            let replaced = pattern
+                .regex
+                .replace_all(&result, pattern.replacement);
+            // Count actual replacements by checking if the string changed
+            if replaced != result {
+                let count = pattern.regex.find_iter(&result).count();
                 total_count += count;
                 type_counts.push((pattern.name, count));
+                result = replaced.into_owned();
             }
         }
 
@@ -240,5 +244,28 @@ mod tests {
         let result = scrubber.scrub(&input);
         assert!(result.scrubbed_text.contains("[REDACTED-KEY]"));
         assert!(!result.scrubbed_text.contains(&example_key));
+    }
+
+    #[test]
+    fn test_scrub_no_double_count_overlapping() {
+        let scrubber = Scrubber::new();
+        // Home path contains a username that could partially look like other patterns.
+        // Earlier patterns should not inflate counts for later patterns.
+        let input = "error in /home/admin at 10.0.0.1";
+        let result = scrubber.scrub(input);
+        // home_path and ipv4 should each be counted once
+        assert_eq!(result.redaction_count, 2);
+        assert!(!result.scrubbed_text.contains("admin"));
+        assert!(!result.scrubbed_text.contains("10.0.0.1"));
+    }
+
+    #[test]
+    fn test_scrub_count_accuracy_single_type() {
+        let scrubber = Scrubber::new();
+        let input = "IPs: 10.0.0.1 and 10.0.0.2 and 10.0.0.3";
+        let result = scrubber.scrub(input);
+        let ipv4_entry = result.redaction_types.iter().find(|(n, _)| *n == "ipv4");
+        assert_eq!(ipv4_entry.unwrap().1, 3);
+        assert_eq!(result.scrubbed_text.matches("[REDACTED-IP]").count(), 3);
     }
 }

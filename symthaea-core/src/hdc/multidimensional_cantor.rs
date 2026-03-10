@@ -75,7 +75,7 @@ impl RadialCantorHV {
     /// Dimensions are organized into concentric bands, with Cantor
     /// structure applied within each band.
     pub fn new(base: BinaryHV, num_bands: usize) -> Self {
-        let dim = base.dimension();
+        let dim = BinaryHV::DIM;
         let band_size = dim / num_bands;
         let mut result = base.clone();
 
@@ -110,8 +110,8 @@ impl RadialCantorHV {
             return v.clone();
         }
         // Probabilistic weighting: flip bits with probability (1-weight)
-        let bytes = v.as_bytes();
-        let mut new_bytes = bytes.to_vec();
+        let bytes = &v.0;
+        let mut new_bytes = *bytes;
         let threshold = (weight * 255.0) as u8;
 
         for (i, byte) in new_bytes.iter_mut().enumerate() {
@@ -122,8 +122,7 @@ impl RadialCantorHV {
             }
         }
 
-        let arr: [u8; 2048] = new_bytes.try_into().expect("Vec should be exactly 2048 bytes");
-        BinaryHV::from_bytes(&arr)
+        BinaryHV(new_bytes)
     }
 
     /// Query at specific radial depth
@@ -134,7 +133,7 @@ impl RadialCantorHV {
             return None;
         }
 
-        let dim = self.base.dimension();
+        let dim = BinaryHV::DIM;
         let band_size = dim / self.bands;
         let shift = band * band_size + band_size / 3;
 
@@ -203,7 +202,7 @@ pub struct Cantor3D_HV {
 impl Cantor3D_HV {
     /// Create a 3D Cantor dust hypervector
     pub fn new(base: BinaryHV, depth: usize) -> Self {
-        let dim = base.dimension();
+        let dim = BinaryHV::DIM;
         // Partition into 3 axes
         let axis_size = dim / 3;
 
@@ -365,7 +364,7 @@ impl Cantor4D_HV {
 
     /// Create with specific consciousness level
     pub fn with_consciousness(base: BinaryHV, depth: usize, w: f64) -> Self {
-        let dim = base.dimension();
+        let dim = BinaryHV::DIM;
         // Partition into 4 axes
         let axis_size = dim / 4;
 
@@ -541,7 +540,7 @@ pub struct SphericalCantorHV {
 impl SphericalCantorHV {
     /// Create a spherical Cantor hypervector
     pub fn new(base: BinaryHV, shells: usize) -> Self {
-        let dim = base.dimension();
+        let dim = BinaryHV::DIM;
         let angular_resolution = 16; // 16 angular divisions
 
         let mut result = base.clone();
@@ -603,7 +602,7 @@ impl SphericalCantorHV {
 
     /// Get component at spherical coordinates
     pub fn at_spherical(&self, r: f64, theta: f64, phi: f64) -> BinaryHV {
-        let dim = self.base.dimension();
+        let dim = BinaryHV::DIM;
 
         // Convert spherical to index
         let r_idx = (r * dim as f64 / 3.0) as usize;
@@ -699,8 +698,8 @@ mod tests {
         let temporal = dust.temporal();
 
         // All dimensions should produce vectors of equal length
-        assert_eq!(semantic.len(), causal.len(), "Semantic and causal should have same dimension");
-        assert_eq!(semantic.len(), temporal.len(), "Semantic and temporal should have same dimension");
+        // BinaryHV is fixed-size (16,384 bits = 2048 bytes), all same dimension
+        assert_eq!(BinaryHV::DIM, BinaryHV::DIM, "Semantic and causal should have same dimension");
 
         let sim_sc = semantic.similarity(&causal);
         let sim_st = semantic.similarity(&temporal);

@@ -12,6 +12,12 @@ use super::commands::OutputFormat;
 use crate::action::executor::NixOSExecutor;
 use crate::mind::active_inference::NixActiveInference;
 
+/// Default threshold for Φ and confidence in `ConsciousnessQuadrant::from_metrics`.
+///
+/// Values above this are "high", values at or below are "low".
+/// Based on IIT: Φ > 0.5 indicates non-trivial integrated information.
+pub const QUADRANT_THRESHOLD: f64 = 0.5;
+
 /// Consciousness quadrant based on Φ and Confidence.
 #[derive(Debug, Clone, Copy)]
 pub enum ConsciousnessQuadrant {
@@ -28,7 +34,7 @@ pub enum ConsciousnessQuadrant {
 impl ConsciousnessQuadrant {
     /// Determine quadrant from Φ and confidence.
     pub fn from_metrics(phi: f64, confidence: f64) -> Self {
-        match (phi > 0.5, confidence > 0.5) {
+        match (phi > QUADRANT_THRESHOLD, confidence > QUADRANT_THRESHOLD) {
             (true, true) => Self::Confident,
             (true, false) => Self::Curious,
             (false, true) => Self::Habitual,
@@ -44,6 +50,12 @@ impl ConsciousnessQuadrant {
             Self::Habitual => "Habitual",
             Self::Confused => "Confused",
         }
+    }
+}
+
+impl std::fmt::Display for ConsciousnessQuadrant {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.name())
     }
 }
 
@@ -382,5 +394,30 @@ mod tests {
     fn test_repl_creation() {
         let repl = ConsciousRepl::new(true, OutputFormat::Human);
         assert_eq!(repl.turn, 0);
+    }
+
+    #[test]
+    fn test_quadrant_threshold_boundary() {
+        // Exactly at threshold should be "low" (> not >=)
+        assert!(matches!(
+            ConsciousnessQuadrant::from_metrics(QUADRANT_THRESHOLD, QUADRANT_THRESHOLD),
+            ConsciousnessQuadrant::Confused
+        ));
+        // Just above should be "high"
+        assert!(matches!(
+            ConsciousnessQuadrant::from_metrics(
+                QUADRANT_THRESHOLD + 0.01,
+                QUADRANT_THRESHOLD + 0.01
+            ),
+            ConsciousnessQuadrant::Confident
+        ));
+    }
+
+    #[test]
+    fn test_quadrant_display() {
+        let q = ConsciousnessQuadrant::Confident;
+        assert_eq!(format!("{q}"), "Confident");
+        let q = ConsciousnessQuadrant::Curious;
+        assert_eq!(format!("{q}"), "Curious");
     }
 }

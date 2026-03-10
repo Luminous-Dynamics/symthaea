@@ -28,7 +28,53 @@
 //! ```
 
 use std::collections::HashMap;
+use std::fmt;
 use std::path::PathBuf;
+
+// ---------------------------------------------------------------------------
+// Errors
+// ---------------------------------------------------------------------------
+
+/// Typed errors for POML parsing and processing.
+#[derive(Debug)]
+pub enum PomlError {
+    /// XML parsing failed at the given byte offset.
+    XmlParse { offset: usize, detail: String },
+    /// A required element (e.g. `<prompt>`) is missing.
+    MissingElement { element: String, template: String },
+    /// Template file could not be read.
+    IoError { path: String, source: std::io::Error },
+    /// Template not found in cache or on disk.
+    NotFound(String),
+}
+
+impl fmt::Display for PomlError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::XmlParse { offset, detail } => {
+                write!(f, "XML parse error at byte {offset}: {detail}")
+            }
+            Self::MissingElement { element, template } => {
+                write!(f, "Template '{template}' missing <{element}> section")
+            }
+            Self::IoError { path, source } => {
+                write!(f, "Failed to read {path}: {source}")
+            }
+            Self::NotFound(name) => {
+                write!(f, "Template not found: {name}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for PomlError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::IoError { source, .. } => Some(source),
+            _ => None,
+        }
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -168,7 +214,7 @@ impl XmlNode {
 }
 
 /// Parse a POML XML string into a tree of XmlNodes.
-fn parse_xml(input: &str) -> Result<XmlNode, String> {
+fn parse_xml(input: &str) -> Result<XmlNode, PomlError> {
     let input = input.trim();
     // Skip XML declaration
     let input = if input.starts_with("<?xml") {
@@ -182,9 +228,13 @@ fn parse_xml(input: &str) -> Result<XmlNode, String> {
     };
 
     let mut parser = XmlParser::new(input);
-    parser
-        .parse_element()
-        .ok_or_else(|| "Failed to parse XML".to_string())
+    parser.parse_element().ok_or_else(|| PomlError::XmlParse {
+        offset: parser.pos,
+        detail: format!(
+            "unexpected content near: {:?}",
+            &parser.remaining()[..parser.remaining().len().min(40)]
+        ),
+    })
 }
 
 struct XmlParser<'a> {
@@ -384,7 +434,7 @@ impl PomlProcessor {
     }
 
     /// Load a template by name (with .poml extension).
-    pub(crate) fn load_template(&mut self, name: &str) -> Result<&XmlNode, String> {
+    pub(crate) fn load_template(&mut self, name: &str) -> Result<&XmlNode, PomlError> {
         if self.template_cache.contains_key(name) {
             return Ok(&self.template_cache[name]);
         }
@@ -393,26 +443,28 @@ impl PomlProcessor {
         if !path.exists() {
             path = self.template_dir.join(name);
             if !path.exists() {
-                return Err(format!("Template not found: {}", name));
+                return Err(PomlError::NotFound(name.to_string()));
             }
         }
 
-        let content = std::fs::read_to_string(&path)
-            .map_err(|e| format!("Failed to read {}: {}", name, e))?;
+        let content = std::fs::read_to_string(&path).map_err(|e| PomlError::IoError {
+            path: name.to_string(),
+            source: e,
+        })?;
         let root = parse_xml(&content)?;
         self.template_cache.insert(name.to_string(), root);
         Ok(&self.template_cache[name])
     }
 
     /// Load a template from a string (for testing or inline templates).
-    pub fn load_template_str(&mut self, name: &str, content: &str) -> Result<(), String> {
+    pub fn load_template_str(&mut self, name: &str, content: &str) -> Result<(), PomlError> {
         let root = parse_xml(content)?;
         self.template_cache.insert(name.to_string(), root);
         Ok(())
     }
 
     /// Process a template with the given context.
-    pub fn process(&mut self, name: &str, context: &PomlContext) -> Result<PomlResult, String> {
+    pub fn process(&mut self, name: &str, context: &PomlContext) -> Result<PomlResult, PomlError> {
         // Load and clone to avoid borrow issues
         if !self.template_cache.contains_key(name) {
             self.load_template(name)?;
@@ -431,7 +483,10 @@ impl PomlProcessor {
         let prompt = if let Some(prompt_elem) = template.find("prompt") {
             Self::build_prompt(prompt_elem, &mut vars, context, &mut features_used)
         } else {
-            return Err(format!("Template {} missing <prompt> section", name));
+            return Err(PomlError::MissingElement {
+                element: "prompt".to_string(),
+                template: name.to_string(),
+            });
         };
 
         // Cache settings
@@ -1270,5 +1325,181 @@ mod tests {
         assert!(result.prompt.contains("diagnostician"));
         assert_eq!(result.metadata.model_hints.temperature, Some(0.3));
         assert_eq!(result.metadata.model_hints.max_tokens, Some(256));
+    }
+
+    #[test]
+    fn test_load_empty_template() {
+        let mut proc = PomlProcessor::new("/tmp/nonexistent");
+        let result = proc.load_template_str("bad", "");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_process_nonexistent_template() {
+        let mut proc = PomlProcessor::new("/tmp/nonexistent");
+        let ctx = PomlContext::default();
+        let result = proc.process("nonexistent", &ctx);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_minimal_template() {
+        let template = r#"<poml version="2.0">
+  <metadata><title>Minimal</title></metadata>
+  <prompt><system>Hello</system></prompt>
+</poml>"#;
+        let mut proc = PomlProcessor::new("/tmp/nonexistent");
+        proc.load_template_str("min", template).unwrap();
+
+        let ctx = PomlContext::default();
+        let result = proc.process("min", &ctx).unwrap();
+        assert!(result.prompt.contains("Hello"));
+        assert_eq!(result.metadata.title.as_deref(), Some("Minimal"));
+    }
+
+    #[test]
+    fn test_condition_in_operator() {
+        let mut vars = HashMap::new();
+        vars.insert("items".into(), PomlValue::String("foo bar baz".into()));
+        let ctx = PomlContext::default();
+
+        assert!(evaluate_condition("'foo' in items", &vars, &ctx));
+        assert!(!evaluate_condition("'qux' in items", &vars, &ctx));
+    }
+
+    #[test]
+    fn test_condition_empty() {
+        let vars = HashMap::new();
+        let ctx = PomlContext::default();
+        assert!(!evaluate_condition("", &vars, &ctx));
+    }
+
+    #[test]
+    fn test_condition_inequality() {
+        let mut vars = HashMap::new();
+        vars.insert("mode".into(), PomlValue::String("debug".into()));
+        let ctx = PomlContext::default();
+
+        assert!(evaluate_condition("mode != 'release'", &vars, &ctx));
+        assert!(!evaluate_condition("mode != 'debug'", &vars, &ctx));
+    }
+
+    #[test]
+    fn test_variable_substitution_no_match() {
+        let vars = HashMap::new();
+        let result = substitute_variables("No variables here", &vars);
+        assert_eq!(result, "No variables here");
+    }
+
+    #[test]
+    fn test_variable_substitution_multiple() {
+        let mut vars = HashMap::new();
+        vars.insert("a".into(), PomlValue::String("1".into()));
+        vars.insert("b".into(), PomlValue::String("2".into()));
+
+        let result = substitute_variables("{{ a }} and {{ b }}", &vars);
+        assert_eq!(result, "1 and 2");
+    }
+
+    #[test]
+    fn test_poml_value_from_string() {
+        let val: PomlValue = "hello".into();
+        assert_eq!(val.to_display(), "hello");
+    }
+
+    #[test]
+    fn test_poml_value_list_display() {
+        let val = PomlValue::List(vec!["a".into(), "b".into(), "c".into()]);
+        let display = val.to_display();
+        assert!(display.contains("a"));
+        assert!(display.contains("b"));
+        assert!(display.contains("c"));
+    }
+
+    #[test]
+    fn test_poml_context_default() {
+        let ctx = PomlContext::default();
+        assert!(ctx.variables.is_empty());
+        assert!(ctx.persona.is_none());
+    }
+
+    #[test]
+    fn test_load_template_str_overwrite() {
+        let template = r#"<poml version="2.0">
+  <metadata><title>V1</title></metadata>
+  <prompt><system>First</system></prompt>
+</poml>"#;
+        let template2 = r#"<poml version="2.0">
+  <metadata><title>V2</title></metadata>
+  <prompt><system>Second</system></prompt>
+</poml>"#;
+
+        let mut proc = PomlProcessor::new("/tmp/nonexistent");
+        proc.load_template_str("t", template).unwrap();
+        proc.load_template_str("t", template2).unwrap();
+
+        let ctx = PomlContext::default();
+        let result = proc.process("t", &ctx).unwrap();
+        assert_eq!(result.metadata.title.as_deref(), Some("V2"));
+        assert!(result.prompt.contains("Second"));
+    }
+
+    #[test]
+    fn test_poml_error_xml_parse() {
+        let mut proc = PomlProcessor::new("/tmp/nonexistent");
+        let result = proc.load_template_str("bad", "not xml at all <<<");
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(
+            matches!(err, PomlError::XmlParse { .. }),
+            "Expected XmlParse error, got: {err}"
+        );
+        // Display should include offset info
+        let msg = format!("{err}");
+        assert!(msg.contains("byte"), "Error msg should mention byte offset: {msg}");
+    }
+
+    #[test]
+    fn test_poml_error_missing_prompt() {
+        let template = r#"<poml version="2.0">
+  <metadata><title>No Prompt</title></metadata>
+</poml>"#;
+        let mut proc = PomlProcessor::new("/tmp/nonexistent");
+        proc.load_template_str("noprompt", template).unwrap();
+        let ctx = PomlContext::default();
+        let result = proc.process("noprompt", &ctx);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(
+            matches!(err, PomlError::MissingElement { .. }),
+            "Expected MissingElement error, got: {err}"
+        );
+    }
+
+    #[test]
+    fn test_poml_error_not_found() {
+        let mut proc = PomlProcessor::new("/tmp/nonexistent");
+        let result = proc.load_template("does_not_exist");
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(
+            matches!(err, PomlError::NotFound(_)),
+            "Expected NotFound error, got: {err}"
+        );
+    }
+
+    #[test]
+    fn test_poml_error_display() {
+        let err = PomlError::XmlParse {
+            offset: 42,
+            detail: "unexpected EOF".to_string(),
+        };
+        assert_eq!(
+            format!("{err}"),
+            "XML parse error at byte 42: unexpected EOF"
+        );
+
+        let err = PomlError::NotFound("mytemplate".to_string());
+        assert_eq!(format!("{err}"), "Template not found: mytemplate");
     }
 }

@@ -14,7 +14,9 @@
 use anyhow::{Context, Result};
 use burn::module::{ModuleMapper, ParamId};
 use burn::prelude::*;
+use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
+use std::io::Read;
 use std::path::Path;
 
 use super::model::Qwen3ModelConfig;
@@ -52,14 +54,81 @@ impl<B: Backend> ModuleMapper<B> for SafetensorsMapper {
     }
 }
 
+// ── Model integrity verification ──────────────────────────────────
+
+/// Verify model file integrity via SHA-256 before unsafe memory-mapped loading.
+///
+/// - If `expected_hash` is `Some(hash)`, computes SHA-256 and verifies it matches.
+/// - If `expected_hash` is `None`, logs a warning but allows loading (graceful degradation).
+/// - Always fails if the file does not exist.
+fn verify_model_integrity(path: &Path, expected_hash: Option<&str>) -> Result<()> {
+    if !path.exists() {
+        anyhow::bail!(
+            "model_integrity: model file does not exist: {}",
+            path.display()
+        );
+    }
+
+    match expected_hash {
+        Some(expected) => {
+            let actual = compute_model_hash(path)?;
+            if actual != expected {
+                anyhow::bail!(
+                    "model_integrity: SHA-256 mismatch for {}\n  expected: {}\n  actual:   {}",
+                    path.display(),
+                    expected,
+                    actual
+                );
+            }
+            tracing::debug!(
+                path = %path.display(),
+                "model_integrity: SHA-256 verified"
+            );
+            Ok(())
+        }
+        None => {
+            tracing::warn!(
+                path = %path.display(),
+                "model_integrity: loading model without integrity verification \
+                 (no expected hash provided)"
+            );
+            Ok(())
+        }
+    }
+}
+
+/// Compute the SHA-256 hash of a file, returned as a lowercase hex string.
+fn compute_model_hash(path: &Path) -> Result<String> {
+    let mut file = std::fs::File::open(path)
+        .with_context(|| format!("model_integrity: failed to open {}", path.display()))?;
+
+    let mut hasher = Sha256::new();
+    let mut buffer = [0u8; 65536];
+
+    loop {
+        let bytes_read = file
+            .read(&mut buffer)
+            .with_context(|| format!("model_integrity: failed to read {}", path.display()))?;
+        if bytes_read == 0 {
+            break;
+        }
+        hasher.update(&buffer[..bytes_read]);
+    }
+
+    let hash = hasher.finalize();
+    Ok(format!("{:x}", hash))
+}
+
 // ── Memory-mapped file helper ───────────────────────────────────────
 
 /// Memory-map a file for zero-copy safetensors deserialization.
 ///
-/// Safe because model weight files are read-only artifacts not modified during loading.
+/// Verifies model integrity via SHA-256 before performing the unsafe mmap.
 /// The `Mmap` derefs to `&[u8]`, so `SafeTensors::deserialize(&mmap)` works unchanged.
 #[allow(unsafe_code)]
 fn mmap_file(path: &Path) -> Result<memmap2::Mmap> {
+    // Verify model integrity before unsafe memory-mapped loading
+    verify_model_integrity(path, None)?;
     let file =
         std::fs::File::open(path).with_context(|| format!("Failed to open {}", path.display()))?;
     unsafe { memmap2::MmapOptions::new().map(&file) }

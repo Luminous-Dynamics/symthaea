@@ -160,6 +160,8 @@ impl NixEpisodicMemory {
     ///
     /// Positive = past similar states led to success.
     /// Negative = past similar states led to failure.
+    /// Returns 0.0 when no prior experience exists or when similarity
+    /// values are degenerate (NaN/Inf).
     pub fn predict_valence(&self, state: &ContinuousHV) -> f64 {
         let similar = self.retrieve_similar(state, 5);
         if similar.is_empty() {
@@ -168,10 +170,13 @@ impl NixEpisodicMemory {
 
         let total_weight: f64 = similar
             .iter()
-            .map(|ep| ep.state_before.similarity(state).max(0.0) as f64)
+            .map(|ep| {
+                let sim = ep.state_before.similarity(state).max(0.0) as f64;
+                if sim.is_finite() { sim } else { 0.0 }
+            })
             .sum();
 
-        if total_weight < 1e-6 {
+        if !total_weight.is_finite() || total_weight < 1e-6 {
             return 0.0;
         }
 
@@ -179,11 +184,16 @@ impl NixEpisodicMemory {
             .iter()
             .map(|ep| {
                 let sim = ep.state_before.similarity(state).max(0.0) as f64;
-                sim * ep.emotional_valence
+                if sim.is_finite() {
+                    sim * ep.emotional_valence
+                } else {
+                    0.0
+                }
             })
             .sum();
 
-        weighted_valence / total_weight
+        let result = weighted_valence / total_weight;
+        if result.is_finite() { result } else { 0.0 }
     }
 
     /// Consolidate memory — keep high-importance episodes, evict low ones.
@@ -416,5 +426,39 @@ mod tests {
 
         assert_eq!(mem.len(), 4);
         assert_eq!(mem.failure_count(), 1);
+    }
+
+    #[test]
+    fn test_predict_valence_empty_memory() {
+        let mem = NixEpisodicMemory::new();
+        let val = mem.predict_valence(&make_hv(42));
+        assert!((val - 0.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_predict_valence_returns_finite() {
+        let mut mem = NixEpisodicMemory::new();
+        // Add episodes with varying valences
+        for i in 0..10 {
+            let outcome = if i % 2 == 0 {
+                EpisodeOutcome::Success
+            } else {
+                EpisodeOutcome::Failure("err".into())
+            };
+            mem.record(make_episode(i, outcome, 0.5));
+        }
+        let val = mem.predict_valence(&make_hv(5));
+        assert!(val.is_finite(), "predict_valence must always return finite, got {val}");
+        assert!(val >= -1.0 && val <= 1.0, "valence out of range: {val}");
+    }
+
+    #[test]
+    fn test_predict_valence_zero_vector() {
+        let mut mem = NixEpisodicMemory::new();
+        mem.record(make_episode(1, EpisodeOutcome::Success, 0.5));
+        // Zero vector may produce degenerate similarity values
+        let zero = ContinuousHV::zero(1024);
+        let val = mem.predict_valence(&zero);
+        assert!(val.is_finite(), "predict_valence on zero vector should be finite");
     }
 }

@@ -336,11 +336,11 @@
         "ci_upper": 1.0
       },
       "discrimination_slope": {
-        "mean": 0.6,
-        "std_dev": 0.5163977794943223,
+        "mean": 0.69,
+        "std_dev": 0.277,
         "n": 10,
-        "ci_lower": 0.2306169467882967,
-        "ci_upper": 0.9693830532117033
+        "ci_lower": 0.587,
+        "ci_upper": 0.794
       },
       "rt_ticks": {
         "mean": 5.499999999999992,

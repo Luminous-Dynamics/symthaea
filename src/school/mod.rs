@@ -109,6 +109,7 @@ pub mod objective;
 pub mod polymath_drive;
 pub mod reality_check;
 
+pub mod code_learning;
 pub mod coherence_bridge;
 pub mod lookahead;
 

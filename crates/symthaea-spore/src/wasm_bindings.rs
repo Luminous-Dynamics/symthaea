@@ -20,6 +20,7 @@ impl SporeEngine {
     /// Pass `null` or `undefined` for defaults.
     #[wasm_bindgen(constructor)]
     pub fn new(config: JsValue) -> Result<SporeEngine, JsError> {
+        console_error_panic_hook::set_once();
         let config: SporeConfig = if config.is_null() || config.is_undefined() {
             SporeConfig::default()
         } else {
@@ -91,6 +92,100 @@ impl SporeEngine {
     /// Number of active SporeEngine instances globally.
     pub fn active_instance_count() -> usize {
         InnerEngine::active_instance_count()
+    }
+
+    // ======================================================================
+    // Hypervector access (for visualization)
+    // ======================================================================
+
+    /// Get the current network output hypervector (16,384 f32 values).
+    /// Used for live waveform visualization in the browser demo.
+    pub fn get_output_hv(&self) -> Vec<f32> {
+        self.inner.get_output_hv()
+    }
+
+    /// Encode text to an HDC hypervector without running a full cycle.
+    /// Returns bipolar encoding as f32 values. Used for thought comparison.
+    pub fn encode_text(&mut self, text: &str) -> Vec<f32> {
+        self.inner.encode_text(text)
+    }
+
+    // ======================================================================
+    // Language generation (Broca)
+    // ======================================================================
+
+    /// Generate text from current consciousness state.
+    /// Returns GenerationResult as JS object with `text`, `num_tokens`, `eos_terminated`.
+    pub fn generate_text(&mut self, max_tokens: usize) -> Result<JsValue, JsError> {
+        let result = self.inner.generate_text(max_tokens);
+        serde_wasm_bindgen::to_value(&result).map_err(|e| JsError::new(&e.to_string()))
+    }
+
+    // ======================================================================
+    // Dream engine
+    // ======================================================================
+
+    /// Run a dream cycle — simulate counterfactual alternatives.
+    pub fn dream_cycle(&mut self) -> Result<JsValue, JsError> {
+        let result = self.inner.dream_cycle();
+        serde_wasm_bindgen::to_value(&result).map_err(|e| JsError::new(&e.to_string()))
+    }
+
+    /// Run a dream session (multiple dream cycles).
+    pub fn dream_session(&mut self, cycles: usize) -> Result<JsValue, JsError> {
+        let results = self.inner.dream_session(cycles);
+        serde_wasm_bindgen::to_value(&results).map_err(|e| JsError::new(&e.to_string()))
+    }
+
+    /// Number of wisdom entries accumulated from dreaming.
+    pub fn dream_wisdom_count(&self) -> usize {
+        self.inner.dream_wisdom_count()
+    }
+
+    /// Dream engine statistics.
+    pub fn dream_stats(&self) -> Result<JsValue, JsError> {
+        let stats = self.inner.dream_stats();
+        serde_wasm_bindgen::to_value(&stats).map_err(|e| JsError::new(&e.to_string()))
+    }
+
+    // ======================================================================
+    // Active inference (FEP)
+    // ======================================================================
+
+    /// Current free energy value.
+    pub fn free_energy(&self) -> f32 {
+        self.inner.free_energy()
+    }
+
+    /// Run an explicit FEP cycle. Returns FepCycleResult.
+    pub fn fep_cycle(&mut self) -> Result<JsValue, JsError> {
+        let result = self.inner.fep_cycle();
+        serde_wasm_bindgen::to_value(&result).map_err(|e| JsError::new(&e.to_string()))
+    }
+
+    // ======================================================================
+    // Topology analysis
+    // ======================================================================
+
+    /// Analyze consciousness topology. Returns TopologyAnalysis.
+    pub fn topology_analysis(&mut self) -> Result<JsValue, JsError> {
+        let analysis = self.inner.topology_analysis();
+        serde_wasm_bindgen::to_value(&analysis).map_err(|e| JsError::new(&e.to_string()))
+    }
+
+    /// Human-readable topology report.
+    pub fn topology_report(&mut self) -> String {
+        self.inner.topology_report()
+    }
+
+    // ======================================================================
+    // Memory
+    // ======================================================================
+
+    /// Memory subsystem statistics.
+    pub fn memory_stats(&self) -> Result<JsValue, JsError> {
+        let stats = self.inner.memory_stats();
+        serde_wasm_bindgen::to_value(&stats).map_err(|e| JsError::new(&e.to_string()))
     }
 
     // ======================================================================

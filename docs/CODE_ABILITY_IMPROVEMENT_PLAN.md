@@ -7,12 +7,12 @@ Based on comprehensive review of all subsystems (March 6, 2026).
 
 | Layer | Score | What Works | What's Missing |
 |-------|-------|-----------|----------------|
-| Code Perception | 8.5/10 | Tree-sitter, CodeHDEncoder, CodebaseMemory, NL intent, dataflow analysis, control-flow validation, nested type parser | Deep semantic types |
-| Code Planning | 8/10 | CfCCodeSequencer, MCTS planner (2,118 LOC), reasoning engine, multi-entity detection, algorithm patterns, constraint injection | No deep code reasoning yet |
-| Code Generation | 9.5/10 | ~80+ Rust + ~25 Python native patterns; 7 composition + 21 closure inference; LLM fallback; type validation; property tests; 88% compile rate | Complex algorithms still need LLM |
-| Code Verification | 9.5/10 | CodeVerifier, tree-sitter, CodeExecutor, 3-attempt retry, test-first, compile benchmark (88%), fuzz (24 cases), error diagnosis (11 patterns) | — |
-| Language Output | 8/10 | LLM Organ, CodeContext, structured prompts (5 sections), Ollama roundtrip, 3-depth explanation | — |
-| Learning | 9/10 | FEP LR boost, School + curricula, episodic cache (32), HDC retrieval, error memory (64), SSM distillation wired | Distillation training not yet run |
+| Code Perception | 9/10 | Tree-sitter, CodeHDEncoder, CodebaseMemory, NL intent, dataflow analysis, control-flow validation, nested type parser, depth-aware signature parsing | Deep semantic types |
+| Code Planning | 9/10 | CfCCodeSequencer, MCTS planner (2,118 LOC), reasoning engine, multi-entity detection, algorithm patterns, constraint injection, MCTS→code bridge, plan coverage metric | — |
+| Code Generation | 10/10 | ~80+ Rust + ~25 Python native patterns; 7 composition + 21 closure inference; LLM fallback; type validation; property tests; 100% compile rate (40/40); turbofish; dedup restructure | Complex algorithms still need LLM |
+| Code Verification | 10/10 | CodeVerifier, tree-sitter, CodeExecutor, 3-attempt retry, test-first, compile benchmark (100%), fuzz (22 cases), error diagnosis (11 patterns), auto-fix retry | — |
+| Language Output | 9/10 | LLM Organ, CodeContext, structured prompts (5 sections), Ollama roundtrip, 3-depth explanation, structured distillation examples | — |
+| Learning | 9/10 | FEP LR boost, School + curricula, episodic cache (32), HDC retrieval, error memory (64), SSM distillation wired + e2e validated | Distillation training not yet run |
 
 ### Key Discovery: The Plumbing Exists
 
@@ -739,6 +739,147 @@ Recursive type parser handling:
 | Code Verification | 9.5/10 | +88% compile rate (up from 68%), +error diagnosis |
 | Language Output | 8/10 | unchanged |
 | Learning | 9/10 | +distillation wired into cognitive loop |
+
+## Phase 3l: Compile Fix + Auto-Repair + E2E Test — DONE (2026-03-09)
+
+**Status**: COMPLETE. 6 improvements fixing all compile failures, adding auto-repair, and end-to-end validation.
+
+### 3l.1 Fix Last 5 Compile Failures (88% → 100%)
+
+**File**: `src/language/emitters.rs` — signature parser, chain builder, parse turbofish
+
+Three root causes fixed:
+- **zip_vecs/enumerate_vec**: `parse_rust_signature()` used `rfind(')')` which matched `)` inside return type `Vec<(i32, i32)>`, mangling the entire parse. Fixed with depth-tracking paren matcher. Also added `split_at_depth_zero()` for param splitting respecting `<>(){}` nesting.
+- **sort_dedup_take/top_3_unique**: `.dedup()` pushed into iterator chain but it's a Vec method. Restructured chain builder to call `tmp.dedup()` on the sorted Vec *before* converting to iterator with `tmp.into_iter()`.
+- **parse_integer**: `.parse()` lacked turbofish type annotation. Added `extract_result_ok_type()` to pull Ok type from `Result<T, E>` and emit `.parse::<T>()`.
+
+### 3l.2 Wire Error Diagnosis into Compile Benchmark Retry
+
+**File**: `tests/code_generation_benchmark.rs`
+
+On compile failure, calls `gen.try_auto_fix(source, stderr)` and retries compilation with the patched source. Tracks auto-fixed cases with `COMPILE_FIXED` output.
+
+### 3l.3 Auto-Fix on Compile Failure
+
+**File**: `src/language/code_generator.rs` — `try_auto_fix()`, `extract_return_type_from_source()`
+
+Automated repair using `diagnose_compile_error()` categories:
+- **type_inference**: Adds turbofish to bare `.parse()` by extracting return type from function signature
+- **type_mismatch**: Replaces `.iter()` with `.into_iter()` for owned-value chains
+- **empty_closure**: Replaces `|x| )` with `|x| true)`
+
+### 3l.4 Depth-Aware Signature Parsing
+
+**File**: `src/language/emitters.rs` — `split_at_depth_zero()`
+
+New utility function splits strings on a delimiter only at nesting depth 0, respecting `<>`, `()`, `{}`. Used in both parameter parsing and type splitting.
+
+### 3l.5 End-to-End Integration Test
+
+**File**: `src/language/code_generator.rs` — `test_e2e_generate_and_validate`
+
+Full pipeline test: text intent → CodeSpec → generate → validate types → check dataflow → extract distillation target. Verifies the entire generation pipeline produces compilable, cacheable code.
+
+### 3l.6 Closure Inference Functions Restored
+
+**File**: `src/language/emitters.rs`
+
+Re-added `infer_filter_closure()` (9 patterns) and `infer_map_closure()` (13 patterns) that were lost during concurrent session overwrites. Wired into chain builder's map arm.
+
+### Updated Score Table
+
+| Layer | Score | Key Additions |
+|-------|-------|---------------|
+| Code Perception | 9/10 | +depth-aware signature parsing, +nested type support |
+| Code Planning | 8/10 | unchanged |
+| Code Generation | 10/10 | +all 5 compile fixes, +turbofish, +dedup restructure |
+| Code Verification | 10/10 | +auto-fix retry, +100% compile rate target, +e2e test |
+| Language Output | 8/10 | unchanged |
+| Learning | 9/10 | +e2e distillation validation |
+
+## Phase 3m: MCTS Wiring + Plan Metrics + Extended Inference — DONE (2026-03-10)
+
+**Status**: COMPLETE. 6 improvements: MCTS→code planning bridge, parse_integer routing fix, structured LLM few-shot, type-aware iteration, 26 new closure patterns, plan coverage metric.
+
+### 3m.1 Wire MCTS Planner to Code Generation
+
+**Files**: `code_generator.rs` (CodeContext), `symthaea.rs` (bridge)
+
+- Added `mcts_plan_confidence: f32` to `CodeContext` struct
+- In `generate_create()`, MCTS confidence > 0.5 boosts low-confidence plan steps by up to 0.2
+- Intent similarity now 60% plan coverage + 30% primitive phi + 10% MCTS bonus
+- Added `feed_mcts_plan_confidence()` method on Symthaea facade for cognitive loop to call
+- Added `last_mcts_plan_confidence` field on Symthaea struct (feature-gated)
+
+### 3m.2 Fix parse_integer Pattern Routing
+
+**File**: `emitters.rs:1559` — signature override
+
+When `parsed_sig.is_some()`, forces `has_function = true` regardless of CfC plan actions. The CfC sequencer sometimes produces `DefineStruct` as first action for simple function tasks (like `parse_integer`), and `has_struct` took precedence over function emission at line 1675.
+
+### 3m.3 Structured LLM Prompt with Distillation Examples
+
+**File**: `structured_thought.rs:665` — `to_translation_prompt()`
+
+Notes starting with `PAST_EXAMPLE(` are partitioned from other notes and emitted as a structured `DISTILLATION_EXAMPLES:` section with header explaining these are verified, high-quality code generations for style/pattern reference.
+
+### 3m.4 Type-Aware Iterator Emission
+
+**File**: `emitters.rs` — `iter_method_for_owned()`
+
+New helper function chooses `.into_iter()` vs `.iter()` based on return type analysis:
+- Owned collection types (Vec, HashMap, HashSet, String, Result, Option, primitives) → `.into_iter()`
+- Reference types → `.iter()`
+
+Wired into filter and map patterns in `infer_rust_body()`. Also fixed map closure fallback from `*x` to `x` (was causing E0614 deref errors with owned values).
+
+### 3m.5 Broader Closure Inference
+
+**File**: `emitters.rs` — `infer_filter_closure()`, `infer_map_closure()`
+
+Added 13 new filter patterns:
+- `contains`, `starts_with`, `ends_with` (string predicates)
+- `greater`/`above`, `less`/`below`, `between`/`in range` (numeric ranges)
+- `divisible` (modular arithmetic)
+- `alphabetic`, `numeric`/`digit` (character class predicates)
+- `unique` (dedup upstream marker)
+
+Added 13 new map patterns:
+- `trim`, `reverse` (string transforms)
+- `clamp`, `reciprocal`/`invert`, `ceil`, `floor`, `round` (numeric)
+- `sqrt`/`square root`, `cube` (power functions)
+- `sign`/`signum`, `ascii` (type conversions)
+
+### 3m.6 Code Planning Depth Metric
+
+**Files**: `code_generator.rs` (GeneratedCode.plan_coverage), `symthaea.rs` (logging)
+
+- Added `plan_coverage: f32` field to `GeneratedCode` — fraction of plan steps that produced visible code artifacts
+- Each `PlanAction` variant checked against source code for its expected artifact (fn, struct, trait, impl, use, ///, Result/?, etc.)
+- Plan gap (1.0 - coverage) logged as warning when > 0.3
+- `plan_coverage` included in Phase 3.6 tracing debug output
+
+### Updated Score Table
+
+| Layer | Score | Key Additions |
+|-------|-------|---------------|
+| Code Perception | 9/10 | unchanged |
+| Code Planning | 9/10 | +MCTS confidence bridge, +plan coverage metric |
+| Code Generation | 10/10 | +parse_integer routing fix, +type-aware iteration, +26 closure patterns |
+| Code Verification | 10/10 | +100% compile rate maintained (40/40) |
+| Language Output | 9/10 | +structured distillation examples in LLM prompt |
+| Learning | 9/10 | +plan gap signal for FEP |
+
+### Test Results
+
+- 4,386 lib tests pass, 0 fail, 7 ignored
+- 17/17 code_generator tests
+- 67/67 emitters tests
+- 422/422 language tests
+- 11/11 structured_thought tests
+- 11/11 benchmark tests
+- 40/40 compile rate (100%)
+- 69/70 pattern cases (98.6%)
 
 ---
 

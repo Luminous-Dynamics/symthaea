@@ -1,6 +1,11 @@
 //! SporeEngine: the core consciousness loop for WASM targets.
 
+use crate::broca::BrocaLite;
 use crate::config::SporeConfig;
+use crate::dream::DreamEngine;
+use crate::fep::{ActiveInferenceAgent, FepCycleResult};
+use crate::memory::MemoryCoordinator;
+use crate::topology::TopologyAnalyzer;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use symthaea_consciousness_equation::{
@@ -170,6 +175,12 @@ pub struct SporeEngine {
     last_consciousness: f32,
     last_output: Option<ContinuousHV>,
     instance_id: usize,
+    // Phase 1-5: expanded cognitive subsystems
+    memory: MemoryCoordinator,
+    dream: DreamEngine,
+    fep: ActiveInferenceAgent,
+    topology: TopologyAnalyzer,
+    broca: BrocaLite,
 }
 
 impl SporeEngine {
@@ -222,6 +233,11 @@ impl SporeEngine {
             last_consciousness: 0.0,
             last_output: None,
             instance_id,
+            memory: MemoryCoordinator::new(500, 100),
+            dream: DreamEngine::with_defaults(),
+            fep: ActiveInferenceAgent::with_defaults(),
+            topology: TopologyAnalyzer::with_defaults(),
+            broca: BrocaLite::new(42),
         }
     }
 
@@ -278,11 +294,12 @@ impl SporeEngine {
             (self.bath.serotonin.level + (1.0 - prediction_error) * 0.05 - 0.01).clamp(0.0, 1.0);
 
         // Compute consciousness (every N cycles or every cycle)
-        let consciousness_level = if self.cycle_count % self.config.phi_every_n_cycles as u64 == 0 {
-            self.compute_consciousness(prediction_error)
-        } else {
-            self.last_consciousness
-        };
+        let consciousness_level =
+            if self.cycle_count % self.config.phi_every_n_cycles as u64 == 0 {
+                self.compute_consciousness(prediction_error)
+            } else {
+                self.last_consciousness
+            };
 
         // Evaluate Eight Harmonies alignment
         let harmony_alignment = self.evaluate_harmony_alignment(consciousness_level);
@@ -290,15 +307,94 @@ impl SporeEngine {
         // Build epistemic status — the ethics gate
         let epistemic_status = self.build_epistemic_status();
 
+        let neuromods = [
+            self.bath.dopamine.effective(),
+            self.bath.noradrenaline.effective(),
+            self.bath.serotonin.effective(),
+            self.bath.oxytocin.effective(),
+        ];
+
+        // Memory: record this cycle's input/output
+        if let Some(ref out) = self.last_output {
+            self.memory.record_cycle(
+                &input_hv.values,
+                &out.values,
+                prediction_error,
+                consciousness_level,
+                self.cycle_count,
+            );
+        }
+
+        // Dream: record high-surprise events
+        if prediction_error > 0.1 {
+            if let Some(ref out) = self.last_output {
+                self.dream.record(
+                    &input_hv.values,
+                    &out.values[..64.min(out.values.len())],
+                    &out.values,
+                    prediction_error,
+                    self.cycle_count,
+                );
+            }
+        }
+
+        // FEP: active inference cycle
+        let fep_result = self.fep.cycle(
+            consciousness_level,
+            harmony_alignment,
+            1.0 - prediction_error,
+            neuromods[1], // norepinephrine as attention proxy
+        );
+
+        // Topology: observe consciousness dimensions
+        // Knowledge dimension modulated by dream wisdom
+        let wisdom_knowledge = (0.5 + self.dream.wisdom().len() as f64 * 0.02).min(0.8);
+        self.topology.observe(
+            [
+                consciousness_level as f64,
+                harmony_alignment as f64,
+                0.6, // workspace (constant for now)
+                neuromods[1] as f64, // attention
+                0.7, // recurrence
+                self.substrate_feasibility,
+                wisdom_knowledge,
+            ],
+            self.cycle_count,
+        );
+
+        // Apply FEP motor command effects to neuromodulators
+        let intensity = fep_result.motor_command.intensity;
+        match fep_result.motor_command.command_type {
+            crate::fep::MotorCommandType::ExplorationTrigger => {
+                self.bath.dopamine.level =
+                    (self.bath.dopamine.level + 0.05 * intensity).clamp(0.0, 1.0);
+            }
+            crate::fep::MotorCommandType::LearningRateAdjust => {
+                self.bath.noradrenaline.level =
+                    (self.bath.noradrenaline.level + 0.03 * intensity).clamp(0.0, 1.0);
+            }
+            crate::fep::MotorCommandType::ReflectionInitiate => {
+                // Reflection calms arousal, boosts serotonin
+                self.bath.serotonin.level =
+                    (self.bath.serotonin.level + 0.04 * intensity).clamp(0.0, 1.0);
+            }
+            crate::fep::MotorCommandType::MemoryConsolidate => {
+                // Consolidation activates social/bonding circuits
+                self.bath.oxytocin.level =
+                    (self.bath.oxytocin.level + 0.03 * intensity).clamp(0.0, 1.0);
+            }
+            crate::fep::MotorCommandType::AttentionShift => {
+                // Attention shift briefly spikes norepinephrine
+                self.bath.noradrenaline.level =
+                    (self.bath.noradrenaline.level + 0.02 * intensity).clamp(0.0, 1.0);
+            }
+            _ => {}
+        }
+
         CycleResult {
             consciousness_level,
             cycle: self.cycle_count,
-            neuromodulators: [
-                self.bath.dopamine.effective(),
-                self.bath.noradrenaline.effective(),
-                self.bath.serotonin.effective(),
-                self.bath.oxytocin.effective(),
-            ],
+            neuromodulators: neuromods,
             substrate_feasibility: self.substrate_feasibility as f32,
             prediction_error,
             bottleneck: String::new(),
@@ -308,22 +404,116 @@ impl SporeEngine {
     }
 
     /// Compute consciousness level from current state.
+    ///
+    /// Cross-subsystem coupling:
+    /// - Dream wisdom increases knowledge input (consolidated insights)
+    /// - Memory coherence modulates working memory capacity
+    /// - FEP belief confidence contributes to synchrony
     fn compute_consciousness(&mut self, prediction_error: f32) -> f32 {
+        // Dream wisdom contributes to knowledge (capped at 0.8 bonus)
+        let wisdom_bonus = (self.dream.wisdom().len() as f64 * 0.02).min(0.3);
+        let knowledge = 0.5 + wisdom_bonus;
+
+        // Memory coherence modulates working memory
+        let mem_stats = self.memory.stats();
+        let mem_coherence = mem_stats.current_coherence as f64;
+        let working_memory = ((1.0 - prediction_error as f64 * 0.5) * (0.7 + 0.3 * mem_coherence)).max(0.0);
+
+        // FEP belief confidence contributes to synchrony
+        let fep_confidence = self.fep.belief_confidence() as f64;
+        let synchrony = self.bath.serotonin.effective() as f64 * 0.8 + fep_confidence * 0.1;
+
         let inputs = ConsciousnessInputs {
             phi: self.bath.dopamine.effective() as f64 * 0.8,
             broadcast: 0.6,
-            working_memory: (1.0 - prediction_error as f64 * 0.5).max(0.0),
+            working_memory,
             attention: self.bath.noradrenaline.effective() as f64,
             recurrence: 0.7,
             embodiment: self.substrate_feasibility * 0.8,
-            knowledge: 0.5,
-            synchrony: self.bath.serotonin.effective() as f64 * 0.9,
+            knowledge,
+            synchrony,
         };
         let result = self.equation.compute(&inputs);
-        let c =
-            (result.consciousness_level as f32 * self.substrate_feasibility as f32).clamp(0.0, 1.0);
+        let c = (result.consciousness_level as f32 * self.substrate_feasibility as f32)
+            .clamp(0.0, 1.0);
         self.last_consciousness = c;
         c
+    }
+
+    // ======================================================================
+    // Expanded cognitive subsystem accessors
+    // ======================================================================
+
+    /// Generate text from current consciousness state using the Broca language center.
+    pub fn generate_text(&mut self, max_tokens: usize) -> crate::broca::GenerationResult {
+        let neuromods = [
+            self.bath.dopamine.effective(),
+            self.bath.noradrenaline.effective(),
+            self.bath.serotonin.effective(),
+            self.bath.oxytocin.effective(),
+        ];
+        self.broca.generate_from_text(
+            self.last_consciousness,
+            self.last_output.as_ref().map_or(0.5, |_| 0.3),
+            self.evaluate_harmony_alignment(self.last_consciousness),
+            neuromods,
+            max_tokens,
+        )
+    }
+
+    /// Run a dream cycle: simulate counterfactual alternatives to high-surprise events.
+    pub fn dream_cycle(&mut self) -> Option<crate::dream::DreamResult> {
+        self.dream.dream()
+    }
+
+    /// Run a dream session (multiple dream cycles).
+    pub fn dream_session(&mut self, cycles: usize) -> Vec<crate::dream::DreamResult> {
+        self.dream.dream_session(cycles)
+    }
+
+    /// Get accumulated dream wisdom.
+    pub fn dream_wisdom_count(&self) -> usize {
+        self.dream.wisdom().len()
+    }
+
+    /// Get dream engine statistics.
+    pub fn dream_stats(&self) -> crate::dream::DreamStats {
+        self.dream.stats()
+    }
+
+    /// Run a single FEP active inference cycle.
+    pub fn fep_cycle(&mut self) -> FepCycleResult {
+        self.fep.cycle(
+            self.last_consciousness,
+            self.evaluate_harmony_alignment(self.last_consciousness),
+            0.7,
+            self.bath.noradrenaline.effective(),
+        )
+    }
+
+    /// Get current free energy.
+    pub fn free_energy(&self) -> f32 {
+        self.fep.free_energy()
+    }
+
+    /// Run topology analysis on accumulated consciousness observations.
+    pub fn topology_analysis(&mut self) -> crate::topology::TopologyAnalysis {
+        self.topology.analyze()
+    }
+
+    /// Get topology report as human-readable string.
+    pub fn topology_report(&mut self) -> String {
+        self.topology.report()
+    }
+
+    /// Get memory statistics.
+    pub fn memory_stats(&self) -> crate::memory::MemoryStats {
+        self.memory.stats()
+    }
+
+    /// Query semantic memory for similar patterns.
+    pub fn memory_query(&self, query: &[f32], top_k: usize) -> Vec<(usize, f32)> {
+        self.memory.query_semantic(query, top_k)
     }
 
     // ======================================================================
@@ -526,7 +716,8 @@ impl SporeEngine {
         let baseline_output = self.network.output().normalize();
 
         // Accumulate binarized responses across repetitions
-        let mut accumulated: Vec<f32> = vec![0.0; observation_cycles * n_channels];
+        let mut accumulated: Vec<f32> =
+            vec![0.0; observation_cycles * n_channels];
         let mut total_propagation_depth = 0usize;
 
         for _rep in 0..n_reps {
@@ -638,7 +829,8 @@ impl SporeEngine {
                 1.0
             };
             self.last_output = Some(output);
-            self.bath.dopamine.level = (self.bath.dopamine.level + pe * 0.1 - 0.02).clamp(0.0, 1.0);
+            self.bath.dopamine.level =
+                (self.bath.dopamine.level + pe * 0.1 - 0.02).clamp(0.0, 1.0);
             self.bath.noradrenaline.level =
                 (self.bath.noradrenaline.level + pe * 0.15 - 0.03).clamp(0.0, 1.0);
             self.bath.serotonin.level =
@@ -662,7 +854,8 @@ impl SporeEngine {
                 1.0
             };
             self.last_output = Some(output);
-            self.bath.dopamine.level = (self.bath.dopamine.level + pe * 0.1 - 0.02).clamp(0.0, 1.0);
+            self.bath.dopamine.level =
+                (self.bath.dopamine.level + pe * 0.1 - 0.02).clamp(0.0, 1.0);
             self.bath.noradrenaline.level =
                 (self.bath.noradrenaline.level + pe * 0.15 - 0.03).clamp(0.0, 1.0);
             self.bath.serotonin.level =
@@ -805,7 +998,9 @@ impl SporeEngine {
             }
             Harmony::PanSentientFlourishing => 0.9,
             Harmony::IntegralWisdom => (self.honest_confidence as f32 * 0.8 + 0.2).clamp(0.0, 1.0),
-            Harmony::InfinitePlay => (self.bath.dopamine.effective() * 0.6 + 0.4).clamp(0.0, 1.0),
+            Harmony::InfinitePlay => {
+                (self.bath.dopamine.effective() * 0.6 + 0.4).clamp(0.0, 1.0)
+            }
             Harmony::UniversalInterconnectedness => {
                 (self.bath.oxytocin.effective() * 0.7 + 0.3).clamp(0.0, 1.0)
             }
@@ -815,7 +1010,9 @@ impl SporeEngine {
                         * 0.5;
                 balance.clamp(0.0, 1.0)
             }
-            Harmony::EvolutionaryProgression => (consciousness_level * 0.7 + 0.3).clamp(0.0, 1.0),
+            Harmony::EvolutionaryProgression => {
+                (consciousness_level * 0.7 + 0.3).clamp(0.0, 1.0)
+            }
             Harmony::SacredStillness => {
                 (self.bath.serotonin.effective() * 0.6 + 0.4).clamp(0.0, 1.0)
             }
@@ -956,6 +1153,22 @@ impl SporeEngine {
     pub fn instance_id(&self) -> usize {
         self.instance_id
     }
+
+    /// Get the current network output hypervector (16,384D).
+    /// Returns the normalized output state as a flat f32 slice.
+    pub fn get_output_hv(&self) -> Vec<f32> {
+        self.network.output().normalize().values.clone()
+    }
+
+    /// Encode text to an HDC hypervector without running a full cycle.
+    /// Returns the raw text encoding as f32 values (converted from bipolar i8).
+    pub fn encode_text(&mut self, text: &str) -> Vec<f32> {
+        let encoded = self
+            .text_encoder
+            .encode_sentence(text)
+            .unwrap_or_else(|_| vec![0i8; HDC_DIMENSION]);
+        encoded.iter().map(|&x| x as f32).collect()
+    }
 }
 
 impl Drop for SporeEngine {
@@ -1003,10 +1216,7 @@ fn lz76_count(sequence: &[bool]) -> usize {
         for j in i..l {
             if k <= n - j {
                 let mut match_len = 0;
-                while match_len < k
-                    && l + match_len < n
-                    && sequence[j + match_len] == sequence[l + match_len]
-                {
+                while match_len < k && l + match_len < n && sequence[j + match_len] == sequence[l + match_len] {
                     match_len += 1;
                 }
                 if match_len >= k {
@@ -1116,10 +1326,7 @@ mod tests {
         let mut engine = SporeEngine::new(SporeConfig::default());
         let r1 = engine.cycle("hello world");
         assert_eq!(r1.cycle, 1);
-        assert!(
-            r1.prediction_error > 0.0,
-            "First cycle should have surprise"
-        );
+        assert!(r1.prediction_error > 0.0, "First cycle should have surprise");
         for i in 0..10 {
             let r = engine.cycle(&format!("cycle {i}"));
             assert_eq!(r.cycle, i as u64 + 2);
@@ -1145,10 +1352,7 @@ mod tests {
         engine.set_substrate("BiologicalNeurons");
         let bio_f = engine.substrate_feasibility();
 
-        assert!(
-            bio_f > silicon_f,
-            "bio={bio_f} should > silicon={silicon_f}"
-        );
+        assert!(bio_f > silicon_f, "bio={bio_f} should > silicon={silicon_f}");
     }
 
     #[test]
@@ -1157,10 +1361,7 @@ mod tests {
         let baseline_da = engine.bath.dopamine.effective();
         engine.inject_neuromodulator("dopamine", 0.3);
         let boosted_da = engine.bath.dopamine.effective();
-        assert!(
-            boosted_da > baseline_da,
-            "DA should increase after injection"
-        );
+        assert!(boosted_da > baseline_da, "DA should increase after injection");
     }
 
     #[test]
@@ -1187,10 +1388,7 @@ mod tests {
             }
             last_pe = r.prediction_error;
         }
-        assert!(
-            decreased,
-            "Prediction error should decrease with repeated input"
-        );
+        assert!(decreased, "Prediction error should decrease with repeated input");
     }
 
     // --- Ethical safeguard tests ---
@@ -1415,7 +1613,9 @@ mod tests {
     #[test]
     fn test_lz76_complex_sequence() {
         // Pseudo-random sequence should have higher complexity
-        let complex: Vec<bool> = (0..100).map(|i| ((i * 7 + 13) % 17) > 8).collect();
+        let complex: Vec<bool> = (0..100)
+            .map(|i| ((i * 7 + 13) % 17) > 8)
+            .collect();
         let c_complex = normalized_lz76(&complex);
         let c_constant = normalized_lz76(&vec![true; 100]);
         assert!(

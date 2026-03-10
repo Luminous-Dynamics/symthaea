@@ -357,8 +357,12 @@ impl AsyncMind {
 
                             // SYNC with LLM Backend (Sovereign Voice)
                             // If the backend is Candle, we push the physical affect into the neural weights
-                            // NOTE: llm_organ integration deferred — ContinuousMind does not have this field yet.
-                            // When re-enabled, use the language subsystem's affective state update path.
+                            #[cfg(feature = "liquid-mamba")]
+                            {
+                                if let Some(ref backend) = mind.llm_backend {
+                                    backend.update_affect(load, mind.state.mood_temperature);
+                                }
+                            }
 
                             let interval_ms = 100 + (load * 900.0) as u64; // 100ms to 1s
                             metabolism = tokio::time::interval(std::time::Duration::from_millis(interval_ms));

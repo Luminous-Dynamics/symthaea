@@ -104,6 +104,8 @@ fn main() {
         train_network: opts.train_network,
         network_lr_scale: opts.network_lr_scale,
         embedding_target_norm: opts.embedding_target_norm,
+        negative_samples: opts.negative_samples,
+        carry_state: opts.carry_state,
     };
 
     tracing::info!(
@@ -115,6 +117,8 @@ fn main() {
         train_network = opts.train_network,
         network_lr_scale = opts.network_lr_scale,
         embedding_norm = opts.embedding_target_norm,
+        negative_samples = opts.negative_samples,
+        carry_state = opts.carry_state,
         diagnostics = opts.diagnostics,
         "Starting training"
     );
@@ -238,6 +242,10 @@ struct TrainOpts {
     network_lr_scale: f32,
     /// Target embedding L2 norm, 0 = disabled (default: 128.0).
     embedding_target_norm: f32,
+    /// Negative samples for sampled softmax, 0 = full (default: 0).
+    negative_samples: usize,
+    /// Probability of carrying CfC state between pairs (default: 0.0).
+    carry_state: f32,
 }
 
 fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
@@ -258,6 +266,8 @@ fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
         train_network: true,
         network_lr_scale: 0.3,
         embedding_target_norm: 128.0,
+        negative_samples: 0,
+        carry_state: 0.0,
     };
 
     let mut i = 1;
@@ -358,6 +368,22 @@ fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
                     .parse()
                     .map_err(|_| "--embedding-norm must be a float (0 to disable)")?;
             }
+            "--negative-samples" | "--neg-samples" => {
+                i += 1;
+                opts.negative_samples = args
+                    .get(i)
+                    .ok_or("--negative-samples requires a number")?
+                    .parse()
+                    .map_err(|_| "--negative-samples must be a non-negative integer")?;
+            }
+            "--carry-state" => {
+                i += 1;
+                opts.carry_state = args
+                    .get(i)
+                    .ok_or("--carry-state requires a number")?
+                    .parse()
+                    .map_err(|_| "--carry-state must be a float 0.0-1.0")?;
+            }
             "--help" | "-h" => {
                 print_usage();
                 process::exit(0);
@@ -396,5 +422,7 @@ fn print_usage() {
     eprintln!("  --no-network-train   Only train embeddings, not CfC network weights");
     eprintln!("  --network-lr-scale F CfC network LR scale (default: 0.3)");
     eprintln!("  --embedding-norm F   Target embedding L2 norm, 0=off (default: 128.0)");
+    eprintln!("  --negative-samples N Sampled softmax negatives, 0=full (default: 0)");
+    eprintln!("  --carry-state F      CfC state carry probability 0-1 (default: 0.0)");
     eprintln!("  --help, -h           Show this help message");
 }

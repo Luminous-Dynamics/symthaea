@@ -364,8 +364,6 @@ pub struct Symthaea {
     // ── Output & Actions ────────────────────────────────────────────────
     /// Resonant speech: user-adaptive response generation.
     resonant_speech: crate::resonant_speech::ResonantSpeech,
-    /// Optional streaming inference engine for real-time sensor-driven CfC processing.
-    streaming_inference: Option<crate::inference::StreamingInference>,
     /// Registry of primitive action bindings.
     pub action_registry: ActionRegistry,
     /// Action executor with safety policy and dream integration.
@@ -413,6 +411,10 @@ pub struct Symthaea {
     /// Injected as "AVOID" notes into future generations.
     #[cfg(feature = "code_generation")]
     error_pattern_memory: Vec<(String, String)>,
+    /// Last MCTS plan confidence from the reasoning engine (set by cognitive loop).
+    /// Feeds into code generation to modulate plan ambition.
+    #[cfg(feature = "code_generation")]
+    last_mcts_plan_confidence: f32,
 
     // ── Nociception: Pain & Infrastructure Health ──────────────────────
     /// Somatic error bridge: drains infrastructure errors → felt stress.
@@ -708,7 +710,6 @@ impl Symthaea {
             memory_coordinator: MemoryCoordinator::new(CoordinatorConfig::default()),
             episodic_memory: EpisodicMemory::new(EpisodicReplayConfig::default()),
             resonant_speech: crate::resonant_speech::ResonantSpeech::new(),
-            streaming_inference: None,
             action_registry: ActionRegistry::standard(),
             executor: SimpleExecutor::new(),
             #[cfg(feature = "school_learning")]
@@ -740,6 +741,8 @@ impl Symthaea {
             code_generation_cache: Vec::new(),
             #[cfg(feature = "code_generation")]
             error_pattern_memory: Vec::new(),
+            #[cfg(feature = "code_generation")]
+            last_mcts_plan_confidence: 0.0,
             somatic_bridge,
             pain_tx,
             task_supervisor,
@@ -761,29 +764,7 @@ impl Symthaea {
 
     /// Create a Symthaea instance with a custom Liquid-Mamba configuration.
     ///
-    /// This overrides the default LLM backend with a Liquid-Mamba backend
-    /// configured from the provided `LiquidMambaConfig`. Requires network
-    /// access on first run to download the Mamba model.
-    #[cfg(feature = "liquid-mamba")]
-    pub async fn with_liquid_mamba_config(
-        hdc_dim: usize,
-        ltc_neurons: usize,
-        genesis: &symthaea_core::genesis::GenesisSeed,
-        lm_config: symthaea_broca::LiquidMambaConfig,
-    ) -> Result<Self> {
-        let backend = llm_backend::backend_with_liquid_mamba_config(genesis, lm_config)?;
-        let llm_organ_config = LLMOrganConfig {
-            dimension: hdc_dim,
-            ..LLMOrganConfig::default()
-        };
-        let mut instance = Self::new(hdc_dim, ltc_neurons).await?;
-        instance.llm = LLMOrgan::with_backend(llm_organ_config, backend);
-        // Re-wire the new backend into ContinuousMind for swarm gradient exchange
-        if let Some(backend) = instance.llm.get_backend() {
-            instance.mind.set_llm_backend(backend);
-        }
-        Ok(instance)
-    }
+    // NOTE: `with_liquid_mamba_config()` removed — zero callers, dead code (Mar 2026).
 
     /// Create a Symthaea instance with persistent database storage.
     pub async fn with_database(
@@ -818,6 +799,9 @@ impl Symthaea {
         self.database.as_ref().map(Arc::clone)
     }
 
+    /// Feed MCTS plan confidence from the reasoning engine into code generation.
+    // NOTE: `feed_mcts_plan_confidence()` removed — zero callers, dead code (Mar 2026).
+
     /// Attach the power SSM sensor (INA219 or simulated) to the sensor registry.
     #[cfg(feature = "ssm-power")]
     pub fn attach_power_ssm_sensor(&mut self) -> Result<()> {
@@ -826,31 +810,8 @@ impl Symthaea {
         Ok(())
     }
 
-    /// Create a streaming inference engine for real-time sensor-driven CfC processing.
-    ///
-    /// This is independent of the main cognitive loop — suited for edge deployments,
-    /// robot control, and other scenarios needing low-latency incremental inference.
-    pub fn create_streaming_engine(
-        &mut self,
-        input_dim: usize,
-        output_dim: usize,
-    ) -> &crate::inference::StreamingInference {
-        self.streaming_inference = Some(crate::inference::default_streaming(input_dim, output_dim));
-        // SAFETY: We just assigned Some(...) above, so this is always Some
-        self.streaming_inference
-            .as_ref()
-            .expect("streaming_inference was just set to Some")
-    }
-
-    /// Get a reference to the streaming inference engine (if created).
-    pub fn streaming_engine(&self) -> Option<&crate::inference::StreamingInference> {
-        self.streaming_inference.as_ref()
-    }
-
-    /// Get a mutable reference to the streaming inference engine (if created).
-    pub fn streaming_engine_mut(&mut self) -> Option<&mut crate::inference::StreamingInference> {
-        self.streaming_inference.as_mut()
-    }
+    // NOTE: `create_streaming_engine()`, `streaming_engine()`, `streaming_engine_mut()`
+    // removed — zero callers, dead code (Mar 2026).
 
     /// Resume from a saved state file.
     ///
@@ -984,7 +945,6 @@ impl Symthaea {
             memory_coordinator: MemoryCoordinator::new(CoordinatorConfig::default()),
             episodic_memory: EpisodicMemory::new(EpisodicReplayConfig::default()),
             resonant_speech: crate::resonant_speech::ResonantSpeech::new(),
-            streaming_inference: None,
             action_registry: ActionRegistry::standard(),
             executor: SimpleExecutor::new(),
             #[cfg(feature = "school_learning")]
@@ -1024,6 +984,8 @@ impl Symthaea {
             code_generation_cache: Vec::new(),
             #[cfg(feature = "code_generation")]
             error_pattern_memory: Vec::new(),
+            #[cfg(feature = "code_generation")]
+            last_mcts_plan_confidence: 0.0,
             somatic_bridge,
             pain_tx,
             task_supervisor,
@@ -1652,6 +1614,7 @@ impl Symthaea {
 
             let gen_ctx = crate::language::code_generator::CodeContext {
                 past_examples: relevant_examples,
+                mcts_plan_confidence: self.last_mcts_plan_confidence,
                 ..Default::default()
             };
 
@@ -1786,11 +1749,23 @@ impl Symthaea {
             thought.semantic_intent = crate::mind::SemanticIntent::Answer;
             thought.epistemic_status = generated.epistemic_status;
 
+            // Plan coverage metric: log plan gap for FEP learning signal
+            let plan_gap = 1.0 - generated.plan_coverage;
+            if plan_gap > 0.3 {
+                tracing::warn!(
+                    target: "symthaea::code",
+                    plan_coverage = generated.plan_coverage,
+                    plan_gap = plan_gap,
+                    "Plan gap > 0.3 — CfC planner producing unused steps"
+                );
+            }
+
             tracing::debug!(
                 target: "symthaea::code",
                 phi = generated.phi_score,
                 similarity = generated.intent_similarity,
                 plan_steps = generated.plan_steps.len(),
+                plan_coverage = generated.plan_coverage,
                 "Phase 3.6: CfC code plan injected into structured thought"
             );
 
@@ -3309,20 +3284,8 @@ impl Symthaea {
         &mut self.mind
     }
 
-    /// Inject a peer's moral topology summary into the mesh gossip cache.
-    ///
-    /// Mesh peers call this after receiving a topology summary from another agent.
-    /// The cached summary is included in outgoing mesh telemetry, enabling
-    /// cross-agent moral drift detection.
-    ///
-    /// Pattern: Same as `set_relational_psi()` — external signal → Mind → mesh cache.
-    #[cfg(feature = "mesh")]
-    pub fn inject_moral_topology(
-        &mut self,
-        summary: crate::hdc::moral_topology::MoralTopologySummary,
-    ) {
-        self.mind.set_cached_moral_topology(summary);
-    }
+    // NOTE: `inject_moral_topology()` removed — zero callers, dead code (Mar 2026).
+    // Moral topology mesh sync is reserved for Phase 4 (multi-instance swarm).
 
     /// Extract current social signals from Mind's SocialCoherence.
     /// Returns (trust, cooperation_rate, prediction_accuracy, models_count, mean_trust).
@@ -3643,49 +3606,7 @@ impl Symthaea {
         Ok(())
     }
 
-    /// Generate a lightweight curriculum report for diagnostics.
-    #[cfg(feature = "school_learning")]
-    pub fn curriculum_report(&self, limit: usize) -> CurriculumReport {
-        let recent = self
-            .curriculum
-            .objectives
-            .iter()
-            .rev()
-            .take(limit)
-            .cloned()
-            .collect::<Vec<_>>();
-
-        let mut summaries = Vec::with_capacity(recent.len());
-        for obj in recent.into_iter().rev() {
-            let mut description = obj.description.clone();
-            if description.len() > 160 {
-                description.truncate(160);
-                description.push_str("...");
-            }
-
-            summaries.push(CurriculumObjectiveSummary {
-                id: obj.id,
-                name: obj.name,
-                domain: obj.domain.name().to_string(),
-                difficulty: format!("{:?}", obj.difficulty),
-                estimated_minutes: obj.estimated_minutes,
-                tags: obj.tags,
-                description,
-            });
-        }
-
-        CurriculumReport {
-            curriculum_id: self.curriculum.id.clone(),
-            curriculum_name: self.curriculum.name.clone(),
-            total_objectives: self.curriculum.objectives.len(),
-            dimension: self.hdc_dim,
-            last_research_topic: self.curriculum_meta.last_research_topic.clone(),
-            last_research_at: self.curriculum_meta.last_research_at.clone(),
-            last_saved_at: self.curriculum_meta.last_saved_at.clone(),
-            last_objectives_added: self.curriculum_meta.last_objectives_added,
-            recent_objectives: summaries,
-        }
-    }
+    // NOTE: `curriculum_report()` removed — zero callers, dead code (Mar 2026).
 
     #[cfg(all(feature = "web_research_module", feature = "school_learning"))]
     fn apply_research_updates(&mut self) {

@@ -353,6 +353,115 @@ impl CognitiveLoopService {
         self.social_mgr.social.relational_psi = psi;
     }
 
+    /// Inject a governance event into the GovernanceManager for processing.
+    ///
+    /// Events are queued and drained during the next `process()` call (interval 37).
+    /// Call this from the Mycelix bridge whenever governance activity occurs.
+    #[cfg(feature = "mycelix")]
+    pub fn inject_governance_event(
+        &mut self,
+        event: super::super::managers::governance_manager::GovernanceEvent,
+    ) {
+        self.governance_mgr.inject_event(event);
+    }
+
+    /// Inject a governance outcome for learning feedback.
+    ///
+    /// Outcomes track whether our vote aligned with the result, enabling
+    /// reward-based learning and confidence modulation.
+    #[cfg(feature = "mycelix")]
+    pub fn inject_governance_outcome(
+        &mut self,
+        outcome: super::super::managers::governance_manager::GovernanceOutcome,
+    ) {
+        self.governance_mgr.inject_outcome(outcome);
+    }
+
+    /// Record a predicted outcome alignment for a governance proposal.
+    ///
+    /// Call this when casting a vote to enable governance prediction error
+    /// computation in Phase 2 learning.
+    #[cfg(feature = "mycelix")]
+    pub fn predict_governance_outcome(&mut self, proposal_id: String, predicted_alignment: f64) {
+        self.governance_mgr.predict_outcome(proposal_id, predicted_alignment);
+    }
+
+    /// Process governance learning signals: reward, harmonic deltas, episodic memory.
+    ///
+    /// Called after governance processing. Feeds reward to the FEP learning loop,
+    /// applies harmonic deltas to the experience bus's KosmicSong, and drains
+    /// completed outcomes for episodic recording.
+    #[cfg(feature = "mycelix")]
+    pub(crate) fn process_governance_learning(&mut self) {
+        // 1. Feed governance reward to provide_reward()
+        if let Some(reward) = self.governance_mgr.take_latest_reward() {
+            self.social_mgr.social.external_reward = reward.clamp(-1.0, 1.0);
+        }
+
+        // 2. Update KosmicSong harmonic weights from governance feedback
+        let deltas = self.governance_mgr.take_harmonic_deltas();
+        let has_deltas = deltas.iter().any(|d| d.abs() > 1e-10);
+        if has_deltas {
+            if let Some(ref mut bus) = self.experience_bus {
+                bus.kosmic_state.harmonies.apply_governance_deltas(&deltas);
+            }
+        }
+
+        // 3. Drain completed outcomes (available for external episodic recording)
+        let _completed = self.governance_mgr.drain_completed();
+        // Note: episodic recording via experience_bus.record() would go here
+        // when the Experience type supports governance episodes.
+    }
+
+    /// Apply pending neuromodulatory effects from governance events.
+    ///
+    /// Drains the GovernanceManager's injection and baseline queues, applying
+    /// each to the neuromodulator bath. Called after governance processing
+    /// in the feedback phase.
+    #[cfg(feature = "mycelix")]
+    pub(crate) fn apply_governance_neuromod(&mut self) {
+        let injections = self.governance_mgr.drain_injections();
+        for inj in injections {
+            self.neuromod.bath.inject(inj.target, inj.dose, inj.half_life);
+        }
+
+        let baselines = self.governance_mgr.drain_baselines();
+        for bl in baselines {
+            match bl.target {
+                "dopamine" => {
+                    self.neuromod.bath.dopamine.adjust_baseline(bl.nudge, 0.2, 0.8);
+                }
+                "noradrenaline" => {
+                    self.neuromod.bath.noradrenaline.adjust_baseline(bl.nudge, 0.2, 0.8);
+                }
+                "serotonin" => {
+                    self.neuromod.bath.serotonin.adjust_baseline(bl.nudge, 0.2, 0.8);
+                }
+                "oxytocin" => {
+                    self.neuromod.bath.oxytocin.adjust_baseline(bl.nudge, 0.2, 0.8);
+                }
+                "endocannabinoid" => {
+                    self.neuromod.bath.endocannabinoid.adjust_baseline(bl.nudge, 0.2, 0.8);
+                }
+                "acetylcholine" => {
+                    self.neuromod.bath.acetylcholine.adjust_baseline(bl.nudge, 0.2, 0.8);
+                }
+                "gaba" => {
+                    self.neuromod.bath.gaba.adjust_baseline(bl.nudge, 0.2, 0.8);
+                }
+                "glutamate" => {
+                    self.neuromod.bath.glutamate.adjust_baseline(bl.nudge, 0.2, 0.8);
+                }
+                "adenosine" => {
+                    self.neuromod.bath.adenosine.adjust_baseline(bl.nudge, 0.2, 0.8);
+                }
+                _ => {
+                    tracing::warn!(target = bl.target, "Unknown neuromod target in governance baseline");
+                }
+            }
+        }
+    }
+
     /// Inject a Mycelix ConsciousnessProfile back into the cognitive loop,
     /// closing the bidirectional consciousness bridge.
     ///

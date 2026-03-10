@@ -66,7 +66,10 @@ impl SubstrateTransferBenchmark {
         let signal_weight = profile.precision_scale * (1.0 - profile.noise_level);
         let noise_weight = profile.noise_level;
 
-        let noisy = ContinuousHV::weighted_bundle(&[hv, &noise_hv], &[signal_weight, noise_weight]);
+        let noisy = ContinuousHV::weighted_bundle(
+            &[hv, &noise_hv],
+            &[signal_weight, noise_weight],
+        );
         noisy.normalize()
     }
 
@@ -153,8 +156,7 @@ impl SubstrateTransferBenchmark {
 
         let bound_refs: Vec<&ContinuousHV> = bound_roles.iter().collect();
         let equal_weights = vec![1.0f32; num_roles as usize];
-        let cognitive_state =
-            ContinuousHV::weighted_bundle(&bound_refs, &equal_weights).normalize();
+        let cognitive_state = ContinuousHV::weighted_bundle(&bound_refs, &equal_weights).normalize();
 
         // Baseline Phi on original state
         let phi_original = Self::phi_proxy(&cognitive_state, &role_contents, &role_binders);
@@ -169,8 +171,13 @@ impl SubstrateTransferBenchmark {
         // Encode state on each substrate (single hop)
         let mut substrate_states: Vec<ContinuousHV> = Vec::new();
         for profile in &substrates {
-            let encoded =
-                Self::apply_substrate_noise(&cognitive_state, profile, &mut rng, dim, &xor_shift);
+            let encoded = Self::apply_substrate_noise(
+                &cognitive_state,
+                profile,
+                &mut rng,
+                dim,
+                &xor_shift,
+            );
             substrate_states.push(encoded);
         }
 
@@ -195,7 +202,8 @@ impl SubstrateTransferBenchmark {
                 fidelities.push(fidelity);
 
                 // Phi preservation: integration after transfer vs original
-                let phi_transferred = Self::phi_proxy(&transferred, &role_contents, &role_binders);
+                let phi_transferred =
+                    Self::phi_proxy(&transferred, &role_contents, &role_binders);
                 let phi_ratio = if phi_original > 0.0 {
                     (phi_transferred / phi_original).min(1.0)
                 } else {
@@ -204,9 +212,8 @@ impl SubstrateTransferBenchmark {
                 phi_ratios.push(phi_ratio);
 
                 // Cross-substrate output correlation: compare substrate i and j encodings
-                let output_sim = substrate_states[i]
-                    .similarity(&substrate_states[j])
-                    .max(0.0) as f64;
+                let output_sim =
+                    substrate_states[i].similarity(&substrate_states[j]).max(0.0) as f64;
                 output_similarities.push(output_sim);
             }
         }
@@ -217,8 +224,13 @@ impl SubstrateTransferBenchmark {
         let mut hop_fidelities = Vec::new();
 
         for profile in &substrates {
-            chain_state =
-                Self::apply_substrate_noise(&chain_state, profile, &mut rng, dim, &xor_shift);
+            chain_state = Self::apply_substrate_noise(
+                &chain_state,
+                profile,
+                &mut rng,
+                dim,
+                &xor_shift,
+            );
             let hop_fidelity = chain_state.similarity(&cognitive_state).max(0.0) as f64;
             hop_fidelities.push(hop_fidelity);
         }
@@ -289,8 +301,14 @@ impl PsychBenchmark for SubstrateTransferBenchmark {
 
             if config.trial_trace {
                 let mut extra = BTreeMap::new();
-                extra.insert("phi_preservation".to_string(), r.phi_preservation);
-                extra.insert("degradation".to_string(), r.degradation_gradient);
+                extra.insert(
+                    "phi_preservation".to_string(),
+                    r.phi_preservation,
+                );
+                extra.insert(
+                    "degradation".to_string(),
+                    r.degradation_gradient,
+                );
                 trace.push(TrialOutcome {
                     trial_idx: trial,
                     condition: "substrate_transfer".to_string(),

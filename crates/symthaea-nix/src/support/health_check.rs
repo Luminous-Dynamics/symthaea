@@ -846,4 +846,128 @@ mod tests {
         assert_eq!(check.status, HealthStatus::Critical);
         assert!(check.message.contains("100"));
     }
+
+    #[test]
+    fn test_check_disk_no_disks() {
+        let assessor = HealthAssessor::default();
+        let hw = HardwareInfo::default();
+        let check = assessor.check_disk(&hw);
+        assert_eq!(check.status, HealthStatus::Healthy);
+        assert_eq!(check.category, IssueCategory::Disk);
+    }
+
+    #[test]
+    fn test_check_disk_zero_total_bytes() {
+        let assessor = HealthAssessor::default();
+        let hw = HardwareInfo {
+            disks: vec![DiskInfo {
+                device: "/dev/zero".to_string(),
+                mount_point: "/mnt".to_string(),
+                total_bytes: 0,
+                used_bytes: 0,
+            }],
+            ..Default::default()
+        };
+        let check = assessor.check_disk(&hw);
+        assert_eq!(check.status, HealthStatus::Healthy);
+    }
+
+    #[test]
+    fn test_check_memory_zero_total() {
+        let assessor = HealthAssessor::default();
+        let hw = HardwareInfo {
+            memory_total_mb: 0,
+            ..Default::default()
+        };
+        let check = assessor.check_memory(&hw);
+        assert_eq!(check.status, HealthStatus::Healthy);
+        assert!(check.message.contains("unavailable"));
+    }
+
+    #[test]
+    fn test_check_store_no_path_count() {
+        let assessor = HealthAssessor::default();
+        let snapshot = make_snapshot(vec![], None);
+        let check = assessor.check_store(&snapshot);
+        assert_eq!(check.status, HealthStatus::Healthy);
+    }
+
+    #[test]
+    fn test_check_store_with_size() {
+        let assessor = HealthAssessor::default();
+        let mut snapshot = make_snapshot(vec![], Some(5000));
+        snapshot.store_size_bytes = Some(10_737_418_240); // 10 GiB
+        let check = assessor.check_store(&snapshot);
+        assert_eq!(check.status, HealthStatus::Healthy);
+        assert!(check.message.contains("GiB"));
+    }
+
+    #[test]
+    fn test_health_status_display() {
+        assert_eq!(format!("{}", HealthStatus::Healthy), "HEALTHY");
+        assert_eq!(format!("{}", HealthStatus::Warning), "WARNING");
+        assert_eq!(format!("{}", HealthStatus::Critical), "CRITICAL");
+    }
+
+    #[test]
+    fn test_issue_category_display() {
+        assert_eq!(format!("{}", IssueCategory::Disk), "disk");
+        assert_eq!(format!("{}", IssueCategory::Memory), "memory");
+        assert_eq!(format!("{}", IssueCategory::Services), "services");
+        assert_eq!(format!("{}", IssueCategory::Store), "store");
+        assert_eq!(format!("{}", IssueCategory::Flake), "flake");
+        assert_eq!(format!("{}", IssueCategory::Load), "load");
+        assert_eq!(format!("{}", IssueCategory::Swap), "swap");
+    }
+
+    #[test]
+    fn test_health_status_ordering() {
+        assert!(HealthStatus::Healthy < HealthStatus::Warning);
+        assert!(HealthStatus::Warning < HealthStatus::Critical);
+    }
+
+    #[test]
+    fn test_disk_at_exact_warning_threshold() {
+        let assessor = HealthAssessor::default();
+        let hw = make_hardware(80.0, 40.0);
+        let check = assessor.check_disk(&hw);
+        assert_eq!(check.status, HealthStatus::Warning);
+    }
+
+    #[test]
+    fn test_disk_just_below_warning() {
+        let assessor = HealthAssessor::default();
+        let hw = make_hardware(79.9, 40.0);
+        let check = assessor.check_disk(&hw);
+        assert_eq!(check.status, HealthStatus::Healthy);
+    }
+
+    #[test]
+    fn test_flake_freshness_no_last_modified() {
+        let assessor = HealthAssessor::default();
+        let flakes = vec![FlakeInfo {
+            path: "/etc/nixos".to_string(),
+            description: None,
+            inputs: vec![],
+            last_modified: None,
+        }];
+        let check = assessor.check_flake_freshness_from_infos(&flakes);
+        // No parseable date → worst_age stays 0 → healthy
+        assert_eq!(check.status, HealthStatus::Healthy);
+    }
+
+    #[test]
+    fn test_services_all_healthy() {
+        let assessor = HealthAssessor::default();
+        let snapshot = make_snapshot(
+            vec![
+                ("a.service", ServiceState::Running),
+                ("b.service", ServiceState::Running),
+            ],
+            None,
+        );
+        let check = assessor.check_services(&snapshot);
+        assert_eq!(check.status, HealthStatus::Healthy);
+        assert!(check.recommendations.is_empty());
+    }
 }

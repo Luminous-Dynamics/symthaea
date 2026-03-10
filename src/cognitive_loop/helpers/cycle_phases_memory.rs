@@ -369,7 +369,7 @@ impl CognitiveLoopService {
                 if !similar.is_empty() {
                     let avg_pe: f32 = similar
                         .iter()
-                        .filter_map(|ep| ep.prediction_error)
+                        .filter_map(|(ep, _)| ep.prediction_error)
                         .sum::<f32>()
                         / similar.len().max(1) as f32;
                     if avg_pe < self.stats.avg_prediction_error * 0.5 {

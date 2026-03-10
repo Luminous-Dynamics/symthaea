@@ -428,11 +428,14 @@ impl PredictiveMonitor {
     }
 
     /// Verify matured predictions against actual telemetry values.
+    ///
+    /// Single-pass: partitions pending predictions in-place using `retain`,
+    /// feeding matured errors directly into the MAE ring buffer.
     fn verify_predictions(&mut self, now_secs: u64, actual: &SystemTelemetry) {
-        let mut errors = Vec::new();
-        let mut retained = Vec::new();
+        let mae_buffer = &mut self.mae_buffer;
+        let max_mae = self.max_mae_buffer;
 
-        for pred in self.pending_predictions.drain(..) {
+        self.pending_predictions.retain(|pred| {
             let target_time = pred.made_at + (pred.hours_ahead * 3600.0) as u64;
             if now_secs >= target_time {
                 // Prediction has matured — compare against actual
@@ -443,23 +446,18 @@ impl PredictiveMonitor {
                     "failed_unit_count" => actual.failed_unit_count as f64,
                     "load_average_1m" => actual.load_average_1m,
                     "swap_used_pct" => actual.swap_used_pct,
-                    _ => continue,
+                    _ => return false, // unknown metric — discard
                 };
                 let abs_error = (pred.predicted_value - actual_value).abs();
-                errors.push(abs_error);
+                if mae_buffer.len() >= max_mae {
+                    mae_buffer.drain(..1);
+                }
+                mae_buffer.push(abs_error);
+                false // remove matured prediction
             } else {
-                retained.push(pred);
+                true // retain immature prediction
             }
-        }
-        self.pending_predictions = retained;
-
-        // Feed errors into MAE buffer
-        for e in errors {
-            self.mae_buffer.push(e);
-            if self.mae_buffer.len() > self.max_mae_buffer {
-                self.mae_buffer.remove(0);
-            }
-        }
+        });
 
         // Self-calibration (AT): if MAE is too high, dampen confidence
         self.self_calibrate();
@@ -618,7 +616,9 @@ impl PredictiveMonitor {
             return TelemetryTrend::default();
         }
 
-        let (first_time, _, first) = &self.history[0];
+        let Some((first_time, _, first)) = self.history.first() else {
+            return TelemetryTrend::default();
+        };
         let Some((last_time, _, last)) = self.history.last() else {
             return TelemetryTrend::default();
         };
@@ -986,5 +986,81 @@ mod tests {
             original_norm,
             restored_norm
         );
+    }
+
+    #[test]
+    fn test_compute_trend_safe_first_access() {
+        // Verify compute_trend uses .first() safely, not direct indexing
+        let mut monitor = PredictiveMonitor::with_defaults();
+        // Empty history — should return default trend
+        let trend = monitor.compute_trend();
+        assert!((trend.disk_used_pct).abs() < 1e-10);
+
+        // Single sample — should return default (len < 2 guard)
+        monitor.ingest(sample_telemetry(50.0, 40.0, 50_000, 0));
+        let trend = monitor.compute_trend();
+        assert!((trend.disk_used_pct).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_verify_predictions_single_pass() {
+        // Verify the retain-based single-pass correctly feeds MAE buffer
+        let mut monitor = PredictiveMonitor::with_defaults();
+        // Manually add matured predictions
+        monitor.pending_predictions.push(PendingPrediction {
+            made_at: 0,
+            hours_ahead: 1.0,
+            predicted_value: 55.0,
+            metric: "disk_used_pct",
+        });
+        monitor.pending_predictions.push(PendingPrediction {
+            made_at: 0,
+            hours_ahead: 1.0,
+            predicted_value: 42.0,
+            metric: "memory_used_pct",
+        });
+        // Add one that hasn't matured yet
+        monitor.pending_predictions.push(PendingPrediction {
+            made_at: u64::MAX / 2,
+            hours_ahead: 1.0,
+            predicted_value: 99.0,
+            metric: "disk_used_pct",
+        });
+
+        let actual = sample_telemetry(50.0, 40.0, 50_000, 0);
+        monitor.verify_predictions(100_000, &actual);
+
+        // Two matured predictions should have been verified
+        assert_eq!(monitor.mae_buffer.len(), 2);
+        // One immature should be retained
+        assert_eq!(monitor.pending_predictions.len(), 1);
+        // MAE values: |55-50|=5, |42-40|=2
+        assert!((monitor.mae_buffer[0] - 5.0).abs() < 1e-6);
+        assert!((monitor.mae_buffer[1] - 2.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_mae_buffer_ring_via_verify() {
+        // Verify MAE buffer eviction uses drain instead of remove(0)
+        let mut monitor = PredictiveMonitor::with_defaults();
+        // Pre-fill MAE buffer to capacity
+        for i in 0..100 {
+            monitor.mae_buffer.push(i as f64);
+        }
+        assert_eq!(monitor.mae_buffer.len(), 100);
+
+        // Add a matured prediction — should evict oldest and push new
+        monitor.pending_predictions.push(PendingPrediction {
+            made_at: 0,
+            hours_ahead: 1.0,
+            predicted_value: 60.0,
+            metric: "disk_used_pct",
+        });
+        let actual = sample_telemetry(50.0, 40.0, 50_000, 0);
+        monitor.verify_predictions(100_000, &actual);
+
+        assert_eq!(monitor.mae_buffer.len(), 100);
+        // Last element should be |60-50|=10
+        assert!((*monitor.mae_buffer.last().unwrap() - 10.0).abs() < 1e-6);
     }
 }

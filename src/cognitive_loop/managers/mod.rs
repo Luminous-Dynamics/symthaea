@@ -11,6 +11,7 @@
 //! | [`MemoryManager`] | episodic, semantic, resonator, coordinator | 11 | Tulving (2002), Cowan (2001) |
 //! | [`LearningManager`] | FEP, dream, school, evolution | 13 | Friston (2010), Walker (2017) |
 //! | [`PerceptionManager`] | attention, multi-modal, social | 19 | Posner (1980), Baron-Cohen (1995) |
+//! | [`GovernanceManager`] | governance events, neuromod contagion | 37 | Schultz (1997), Zak (2012) | `mycelix` |
 //!
 //! ## Architecture
 //!
@@ -30,7 +31,13 @@ pub mod learning_manager;
 pub mod memory_manager;
 pub mod perception_manager;
 
+#[cfg(feature = "mycelix")]
+pub mod governance_manager;
+
 pub use drive_manager::DriveManager;
 pub use learning_manager::LearningManager;
 pub use memory_manager::MemoryManager;
 pub use perception_manager::PerceptionManager;
+
+#[cfg(feature = "mycelix")]
+pub use governance_manager::GovernanceManager;

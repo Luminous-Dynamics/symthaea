@@ -1156,11 +1156,33 @@ fn benchmark_compile_verification() {
                 }
                 Ok(o) => {
                     let stderr = String::from_utf8_lossy(&o.stderr);
-                    println!(
-                        "COMPILE_FAIL: {} — {}",
-                        case.name,
-                        stderr.lines().take(3).collect::<Vec<_>>().join(" | ")
-                    );
+
+                    // Auto-fix retry: diagnose error and attempt repair
+                    if let Some(fixed_source) = gen.try_auto_fix(&source, &stderr) {
+                        let _ = std::fs::File::create(&file_path)
+                            .and_then(|mut f| f.write_all(fixed_source.as_bytes()));
+                        let retry = std::process::Command::new("rustc")
+                            .args(["--edition", "2021", "--crate-type", "lib", "-o"])
+                            .arg(&out_path)
+                            .arg(&file_path)
+                            .output();
+                        if retry.map_or(false, |r| r.status.success()) {
+                            compiled_ok += 1;
+                            println!("COMPILE_FIXED: {} — auto-fix succeeded", case.name);
+                        } else {
+                            println!(
+                                "COMPILE_FAIL: {} — {}",
+                                case.name,
+                                stderr.lines().take(3).collect::<Vec<_>>().join(" | ")
+                            );
+                        }
+                    } else {
+                        println!(
+                            "COMPILE_FAIL: {} — {}",
+                            case.name,
+                            stderr.lines().take(3).collect::<Vec<_>>().join(" | ")
+                        );
+                    }
                 }
                 Err(e) => {
                     println!("COMPILE_SKIP: {} — rustc not available: {}", case.name, e);
@@ -1181,8 +1203,8 @@ fn benchmark_compile_verification() {
             compiled_ok, attempted, rate
         );
         assert!(
-            rate >= 60.0,
-            "Native compilation rate {:.0}% is below 60% threshold ({}/{})",
+            rate >= 85.0,
+            "Native compilation rate {:.0}% is below 85% threshold ({}/{})",
             rate,
             compiled_ok,
             attempted

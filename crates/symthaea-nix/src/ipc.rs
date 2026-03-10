@@ -8,7 +8,47 @@
 //! (overridable via `NIX_MIND_STATE_DIR`).
 
 use serde::{Deserialize, Serialize};
+use std::fmt;
 use std::path::{Path, PathBuf};
+
+/// Errors that can occur during IPC operations.
+#[derive(Debug)]
+pub enum IpcError {
+    /// Filesystem I/O error (create dir, write, rename).
+    Io(std::io::Error),
+    /// JSON serialization error.
+    Serialize(serde_json::Error),
+}
+
+impl fmt::Display for IpcError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Io(e) => write!(f, "IPC I/O error: {e}"),
+            Self::Serialize(e) => write!(f, "IPC serialization error: {e}"),
+        }
+    }
+}
+
+impl std::error::Error for IpcError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Io(e) => Some(e),
+            Self::Serialize(e) => Some(e),
+        }
+    }
+}
+
+impl From<std::io::Error> for IpcError {
+    fn from(e: std::io::Error) -> Self {
+        Self::Io(e)
+    }
+}
+
+impl From<serde_json::Error> for IpcError {
+    fn from(e: serde_json::Error) -> Self {
+        Self::Serialize(e)
+    }
+}
 
 /// Current IPC schema version. Increment when adding/removing fields.
 pub const SNAPSHOT_VERSION: u32 = 2;
@@ -88,6 +128,12 @@ pub struct CausalEdgeEntry {
     pub confidence: f64,
 }
 
+impl fmt::Display for CausalEdgeEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} → {} ({:.2})", self.from, self.to, self.confidence)
+    }
+}
+
 /// A concern tracked in working memory.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConcernEntry {
@@ -97,6 +143,12 @@ pub struct ConcernEntry {
     pub activation: f64,
     /// Source category.
     pub source: String,
+}
+
+impl fmt::Display for ConcernEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} [{:.2}] ({})", self.label, self.activation, self.source)
+    }
 }
 
 /// A recent journal anomaly.
@@ -116,12 +168,28 @@ pub struct AnomalyEntry {
     pub suggestion: Option<String>,
 }
 
+impl fmt::Display for AnomalyEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}: {} ({:.2})", self.unit, self.reason, self.score)
+    }
+}
+
 /// Severity level for predictive alerts.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AlertSeverity {
     Critical,
     Warning,
     Info,
+}
+
+impl fmt::Display for AlertSeverity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Critical => write!(f, "critical"),
+            Self::Warning => write!(f, "warning"),
+            Self::Info => write!(f, "info"),
+        }
+    }
 }
 
 /// A predictive alert entry from the daemon.
@@ -161,17 +229,17 @@ impl DaemonSnapshot {
     ///
     /// Uses write-to-temp + rename for atomicity, preventing the TUI
     /// from reading a partially-written file.
-    pub fn write_to(&self, path: &Path) -> Result<(), String> {
+    pub fn write_to(&self, path: &Path) -> Result<(), IpcError> {
         // Ensure parent directory exists
         if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| format!("create dir: {e}"))?;
+            std::fs::create_dir_all(parent)?;
         }
 
-        let json = serde_json::to_string_pretty(self).map_err(|e| format!("serialize: {e}"))?;
+        let json = serde_json::to_string_pretty(self)?;
 
         let tmp_path = path.with_extension("tmp");
-        std::fs::write(&tmp_path, json.as_bytes()).map_err(|e| format!("write tmp: {e}"))?;
-        std::fs::rename(&tmp_path, path).map_err(|e| format!("rename: {e}"))?;
+        std::fs::write(&tmp_path, json.as_bytes())?;
+        std::fs::rename(&tmp_path, path)?;
         Ok(())
     }
 
@@ -353,12 +421,13 @@ impl DaemonConfig {
     }
 
     /// Save config to a JSON file.
-    pub fn save(&self, path: &Path) -> Result<(), String> {
+    pub fn save(&self, path: &Path) -> Result<(), IpcError> {
         if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| format!("create dir: {e}"))?;
+            std::fs::create_dir_all(parent)?;
         }
-        let json = serde_json::to_string_pretty(self).map_err(|e| format!("serialize: {e}"))?;
-        std::fs::write(path, json).map_err(|e| format!("write: {e}"))
+        let json = serde_json::to_string_pretty(self)?;
+        std::fs::write(path, json)?;
+        Ok(())
     }
 }
 
@@ -564,6 +633,87 @@ mod tests {
         assert!(json.contains("\"version\""));
         let restored: DaemonSnapshot = serde_json::from_str(&json).unwrap();
         assert_eq!(restored.version, SNAPSHOT_VERSION);
+    }
+
+    #[test]
+    fn test_ipc_error_display() {
+        let io_err = IpcError::Io(std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            "access denied",
+        ));
+        let display = format!("{io_err}");
+        assert!(display.contains("I/O error"));
+        assert!(display.contains("access denied"));
+
+        let json_err = serde_json::from_str::<DaemonSnapshot>("bad json").unwrap_err();
+        let ser_err = IpcError::Serialize(json_err);
+        let display = format!("{ser_err}");
+        assert!(display.contains("serialization error"));
+    }
+
+    #[test]
+    fn test_ipc_error_source() {
+        use std::error::Error;
+        let io_err = IpcError::from(std::io::Error::new(std::io::ErrorKind::NotFound, "gone"));
+        assert!(io_err.source().is_some());
+    }
+
+    #[test]
+    fn test_alert_severity_display() {
+        assert_eq!(format!("{}", AlertSeverity::Critical), "critical");
+        assert_eq!(format!("{}", AlertSeverity::Warning), "warning");
+        assert_eq!(format!("{}", AlertSeverity::Info), "info");
+    }
+
+    #[test]
+    fn test_causal_edge_entry_display() {
+        let edge = CausalEdgeEntry {
+            from: "nginx".into(),
+            to: "port_80".into(),
+            confidence: 0.875,
+        };
+        let display = format!("{edge}");
+        assert!(display.contains("nginx"));
+        assert!(display.contains("port_80"));
+        assert!(display.contains("0.88") || display.contains("0.87"));
+    }
+
+    #[test]
+    fn test_concern_entry_display() {
+        let concern = ConcernEntry {
+            label: "high memory".into(),
+            activation: 0.8,
+            source: "system".into(),
+        };
+        let display = format!("{concern}");
+        assert!(display.contains("high memory"));
+        assert!(display.contains("0.80"));
+        assert!(display.contains("system"));
+    }
+
+    #[test]
+    fn test_anomaly_entry_display() {
+        let anomaly = AnomalyEntry {
+            score: 0.7,
+            reason: "OOM killer".into(),
+            unit: "kernel".into(),
+            error_type: None,
+            suggestion: None,
+        };
+        let display = format!("{anomaly}");
+        assert!(display.contains("kernel"));
+        assert!(display.contains("OOM killer"));
+        assert!(display.contains("0.70"));
+    }
+
+    #[test]
+    fn test_write_to_bad_path() {
+        let snap = sample_snapshot();
+        let result = snap.write_to(Path::new("/nonexistent/deeply/nested/state.json"));
+        // Should fail with IpcError::Io
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(matches!(err, IpcError::Io(_)));
     }
 
     #[test]

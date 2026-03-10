@@ -394,6 +394,51 @@ impl EightHarmonies {
         self.evaluate(action_description)
     }
 
+    /// HDC-based semantic evaluation: computes alignment via cosine similarity
+    /// between the action's hypervector and each harmony's basis vector.
+    ///
+    /// This replaces keyword substring matching with genuine semantic geometry.
+    /// The `action_hv` should be encoded through `TextHdcEncoder` at the same
+    /// dimension as the `HarmonyBasis`.
+    pub fn evaluate_hdc(
+        &mut self,
+        action_hv: &symthaea_core::hdc::ContinuousHV,
+        basis: &[symthaea_core::hdc::ContinuousHV],
+    ) -> AlignmentResult {
+        let start = std::time::Instant::now();
+        let all = Harmony::all();
+
+        let alignments: Vec<HarmonyAlignment> = all
+            .iter()
+            .enumerate()
+            .map(|(i, &harmony)| {
+                let score = if i < basis.len() {
+                    action_hv.similarity(&basis[i]) as f64
+                } else {
+                    0.0
+                };
+                // Confidence = absolute similarity strength (higher |score| = more decisive)
+                let confidence = score.abs().min(1.0);
+                HarmonyAlignment::new(harmony, score, confidence)
+            })
+            .collect();
+
+        let mut result = AlignmentResult::from_alignments(alignments);
+        result.processing_time_ms = start.elapsed().as_secs_f32() * 1000.0;
+
+        // Update stats
+        self.stats.total_evaluations += 1;
+        if result.recommended {
+            self.stats.passed += 1;
+        } else {
+            self.stats.failed += 1;
+        }
+        let n = self.stats.total_evaluations as f64;
+        self.stats.avg_score = (self.stats.avg_score * (n - 1.0) + result.overall_score) / n;
+
+        result
+    }
+
     /// Get alignment for a specific harmony from the last evaluation
     /// Note: For proper usage, call evaluate() first and use get() on the result
     pub fn get(&self, _harmony: Harmony) -> Option<HarmonyEncoding> {

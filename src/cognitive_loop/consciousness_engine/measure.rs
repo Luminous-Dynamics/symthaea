@@ -187,7 +187,7 @@ impl ConsciousnessEngine {
                     CoreComponent::Attention,
                     input.phi_attention_weight as f64 * input.attention_capability,
                 );
-                core_values.insert(CoreComponent::Recursion, 0.5); // Placeholder: HOT depth
+                core_values.insert(CoreComponent::Recursion, input.hot_depth);
                 core_values.insert(CoreComponent::Efficacy, 1.0 - input.prediction_error as f64);
 
                 // Approach C: Drift-driven epistemic humility

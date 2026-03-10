@@ -240,6 +240,58 @@ impl ConfigWriter {
         })
     }
 
+    /// Validate that content has balanced braces and doesn't remove critical patterns.
+    fn validate_content_structure(
+        original: &str,
+        modified: &str,
+    ) -> Result<(), std::io::Error> {
+        // Check balanced braces in modified content
+        let open_braces = modified.chars().filter(|&c| c == '{').count();
+        let close_braces = modified.chars().filter(|&c| c == '}').count();
+        if open_braces != close_braces {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!(
+                    "Unbalanced braces in modified content: {} open, {} close",
+                    open_braces, close_braces
+                ),
+            ));
+        }
+
+        let open_brackets = modified.chars().filter(|&c| c == '[').count();
+        let close_brackets = modified.chars().filter(|&c| c == ']').count();
+        if open_brackets != close_brackets {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!(
+                    "Unbalanced brackets in modified content: {} open, {} close",
+                    open_brackets, close_brackets
+                ),
+            ));
+        }
+
+        // Detect removal of critical NixOS module imports
+        let critical_patterns = [
+            "boot.loader",
+            "fileSystems",
+            "networking.hostName",
+        ];
+
+        for pattern in &critical_patterns {
+            if original.contains(pattern) && !modified.contains(pattern) {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!(
+                        "Refusing to remove critical config line containing '{}'",
+                        pattern
+                    ),
+                ));
+            }
+        }
+
+        Ok(())
+    }
+
     /// Apply a patch: create backup, validate, write atomically.
     pub fn apply_patch(&self, patch: &ConfigPatch) -> Result<WriteResult, std::io::Error> {
         if patch.is_noop() {
@@ -250,6 +302,9 @@ impl ConfigWriter {
                 diff: String::new(),
             });
         }
+
+        // Structural validation (always runs, even in dry-run)
+        Self::validate_content_structure(&patch.original, &patch.modified)?;
 
         if self.dry_run {
             return Ok(WriteResult {
@@ -465,6 +520,73 @@ mod tests {
         // Original file should be unchanged in dry-run
         let content = fs::read_to_string(dir.path().join("configuration.nix")).unwrap();
         assert!(!content.contains("pkgs.htop"));
+    }
+
+    #[test]
+    fn test_validate_content_balanced_braces() {
+        let original = "{ config }: { foo = 1; }";
+        let modified = "{ config }: { foo = 1;"; // missing closing brace
+        let result = ConfigWriter::validate_content_structure(original, modified);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Unbalanced braces"));
+    }
+
+    #[test]
+    fn test_validate_content_balanced_brackets() {
+        let original = "[ a b c ]";
+        let modified = "[ a b c"; // missing closing bracket
+        let result = ConfigWriter::validate_content_structure(original, modified);
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Unbalanced brackets")
+        );
+    }
+
+    #[test]
+    fn test_validate_content_critical_removal_blocked() {
+        let original = "{ boot.loader.grub.enable = true; networking.hostName = \"box\"; }";
+        let modified = "{ networking.hostName = \"box\"; }"; // removed boot.loader
+        let result = ConfigWriter::validate_content_structure(original, modified);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("boot.loader"));
+    }
+
+    #[test]
+    fn test_validate_content_critical_hostname_removal_blocked() {
+        let original = "{ networking.hostName = \"box\"; foo = 1; }";
+        let modified = "{ foo = 1; }";
+        let result = ConfigWriter::validate_content_structure(original, modified);
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("networking.hostName")
+        );
+    }
+
+    #[test]
+    fn test_validate_content_ok() {
+        let original = "{ boot.loader.grub.enable = true; }";
+        let modified = "{ boot.loader.grub.enable = false; }";
+        let result = ConfigWriter::validate_content_structure(original, modified);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_apply_patch_rejects_unbalanced() {
+        let (_dir, writer) = setup_temp_config(SAMPLE_CONFIG);
+        let patch = ConfigPatch {
+            target: PathBuf::from("/tmp/test.nix"),
+            original: "{ foo = 1; }".to_string(),
+            modified: "{ foo = 1;".to_string(), // unbalanced
+            description: "bad patch".to_string(),
+        };
+        let result = writer.apply_patch(&patch);
+        assert!(result.is_err());
     }
 
     #[test]

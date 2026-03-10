@@ -201,6 +201,19 @@ pub struct IntegrityInfo {
     pub canary_count: usize,
     /// Number of registered attestations.
     pub attestation_count: usize,
+    /// Consciousness confidence multiplier (1.0 = trusted, 0.5 = drift, 0.1 = critical).
+    #[serde(default = "default_integrity_confidence")]
+    pub integrity_confidence: f32,
+    /// Unified cross-source failure streak.
+    #[serde(default)]
+    pub global_failure_streak: usize,
+    /// Rolling 60-cycle history of integrity_confidence for sparkline display.
+    #[serde(default)]
+    pub confidence_history: Vec<f32>,
+}
+
+fn default_integrity_confidence() -> f32 {
+    1.0
 }
 
 impl Default for IntegrityInfo {
@@ -213,6 +226,9 @@ impl Default for IntegrityInfo {
             has_critical: false,
             canary_count: 0,
             attestation_count: 0,
+            integrity_confidence: 1.0,
+            global_failure_streak: 0,
+            confidence_history: Vec::new(),
         }
     }
 }
@@ -1030,6 +1046,9 @@ fn main() -> Result<()> {
             has_critical: m.integrity.has_critical,
             canary_count: 6,      // 6 built-in canaries
             attestation_count: 3, // safety thresholds + consciousness weights + receptor sensitivities
+            integrity_confidence: m.integrity.integrity_confidence,
+            global_failure_streak: m.integrity.global_failure_streak,
+            confidence_history: m.integrity.confidence_history.clone(),
         },
     };
 
@@ -1272,6 +1291,9 @@ fn main() -> Result<()> {
                     has_critical: wm.integrity.has_critical,
                     canary_count: 6,
                     attestation_count: 3,
+                    integrity_confidence: wm.integrity.integrity_confidence,
+                    global_failure_streak: wm.integrity.global_failure_streak,
+                    confidence_history: wm.integrity.confidence_history.clone(),
                 },
             };
 
@@ -1318,4 +1340,393 @@ fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use symthaea_types::N_HARMONIES;
+
+    // ── Helper factory functions ─────────────────────────────────────────
+
+    fn make_vitals() -> Vitals {
+        Vitals {
+            consciousness_level: 0.42,
+            spectral_phi: Some(3.14),
+            sigma: Some(0.5),
+            pipeline_consciousness: 0.38,
+            substrate_effective_feasibility: 0.65,
+            substrate_honest_confidence: 0.10,
+            cycle_duration_us: 4200,
+            prediction_error: 0.33,
+            temporal_coherence: 0.55,
+            phenomenal_binding: 0.62,
+            living_mind_vitality: 0.71,
+            somatic_stress: 0.12,
+            thermodynamic_load: 0.25,
+            urgency: "Low".into(),
+            consciousness_state: "Aware".into(),
+            error_pattern: "stable".into(),
+            selected_strategy: "explore".into(),
+            total_cycles: 150,
+        }
+    }
+
+    fn make_bath() -> NeuroBath {
+        NeuroBath {
+            dopamine: 0.85,
+            noradrenaline: 0.72,
+            serotonin: 0.91,
+            acetylcholine: 0.68,
+            gaba: 0.55,
+            oxytocin: 0.40,
+            glutamate: 0.60,
+            adenosine: 0.30,
+            endocannabinoid: 0.20,
+            allostatic_load: 0.15,
+            personality: "Balanced".into(),
+            circadian_phase: "Day".into(),
+            sleep_pressure: 0.2,
+            ei_ratio: 1.1,
+        }
+    }
+
+    fn make_compass() -> MoralCompass {
+        MoralCompass {
+            moral_score: 0.75,
+            value_score: 0.82,
+            harmonies_alignment: 0.68,
+            harmony_coordinates: [0.5; N_HARMONIES],
+            dominant_harmonic: "Coherence".into(),
+            moral_kl_divergence: 0.05,
+            moral_entropy: 0.9,
+            moral_topo_unity: 0.77,
+            value_decision: "Aligned".into(),
+            soul_alignment: 0.65,
+            empathic_compassion: 0.80,
+            guiding_question: "What serves all beings?".into(),
+        }
+    }
+
+    fn make_substrate() -> SubstrateInfo {
+        SubstrateInfo {
+            substrate_type: "SiliconDigital".into(),
+            raw_feasibility: 0.80,
+            honest_confidence: 0.10,
+            effective_feasibility: 0.65,
+            tau_factor: 1.0,
+            scale_pressure: 0.5,
+        }
+    }
+
+    fn make_narrative() -> Narrative {
+        Narrative {
+            reasoning: Some("Exploring patterns in the data".into()),
+            guiding_question: "What serves all beings?".into(),
+            consciousness_state: "Aware".into(),
+            error_pattern: "stable".into(),
+            selected_strategy: "explore".into(),
+        }
+    }
+
+    fn make_sparkline_point(consciousness: f64, pe: f32, phi: f64) -> SparklinePoint {
+        SparklinePoint {
+            consciousness,
+            prediction_error: pe,
+            phi,
+            somatic_stress: 0.1,
+            dopamine: 0.8,
+            serotonin: 0.9,
+            harmony_coords: [0.5; N_HARMONIES],
+            harmony_entropy: 0.5,
+            moral_attractor_detected: false,
+            in_active_rest: false,
+            stillness_dominance_streak: 0,
+            broca_quality: 0.5,
+            tom_mismatch: 0.1,
+        }
+    }
+
+    fn make_snapshot() -> PulseSnapshot {
+        PulseSnapshot {
+            timestamp: "2026-03-10 12:00:00".into(),
+            profile: "standard".into(),
+            vitals: make_vitals(),
+            bath: make_bath(),
+            compass: make_compass(),
+            substrate: make_substrate(),
+            narrative: make_narrative(),
+            sparkline: vec![
+                make_sparkline_point(0.40, 0.35, 0.0),
+                make_sparkline_point(0.42, 0.33, 3.14),
+            ],
+            integrity: IntegrityInfo::default(),
+        }
+    }
+
+    // ── Data structure tests ─────────────────────────────────────────────
+
+    #[test]
+    fn test_vitals_creation() {
+        let v = make_vitals();
+        assert!((v.consciousness_level - 0.42).abs() < 1e-9);
+        assert_eq!(v.spectral_phi, Some(3.14));
+        assert_eq!(v.total_cycles, 150);
+        assert_eq!(v.consciousness_state, "Aware");
+    }
+
+    #[test]
+    fn test_neuro_bath_creation() {
+        let b = make_bath();
+        assert!((b.dopamine - 0.85).abs() < 1e-6);
+        assert!((b.serotonin - 0.91).abs() < 1e-6);
+        assert_eq!(b.personality, "Balanced");
+        assert_eq!(b.circadian_phase, "Day");
+    }
+
+    #[test]
+    fn test_moral_compass_creation() {
+        let c = make_compass();
+        assert!((c.harmonies_alignment - 0.68).abs() < 1e-6);
+        assert_eq!(c.harmony_coordinates.len(), N_HARMONIES);
+        assert_eq!(c.dominant_harmonic, "Coherence");
+    }
+
+    #[test]
+    fn test_substrate_info_creation() {
+        let s = make_substrate();
+        assert_eq!(s.substrate_type, "SiliconDigital");
+        assert!((s.raw_feasibility - 0.80).abs() < 1e-9);
+        assert!((s.honest_confidence - 0.10).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_narrative_creation() {
+        let n = make_narrative();
+        assert!(n.reasoning.is_some());
+        assert_eq!(n.consciousness_state, "Aware");
+    }
+
+    #[test]
+    fn test_integrity_info_default() {
+        let i = IntegrityInfo::default();
+        assert!(i.attestation_passed);
+        assert!(i.temporal_passed);
+        assert!(i.canaries_passed);
+        assert_eq!(i.anomaly_count, 0);
+        assert!(!i.has_critical);
+        assert!((i.integrity_confidence - 1.0).abs() < 1e-6);
+        assert_eq!(i.global_failure_streak, 0);
+        assert!(i.confidence_history.is_empty());
+    }
+
+    #[test]
+    fn test_pulse_snapshot_creation() {
+        let snap = make_snapshot();
+        assert_eq!(snap.profile, "standard");
+        assert_eq!(snap.sparkline.len(), 2);
+        assert!((snap.vitals.consciousness_level - 0.42).abs() < 1e-9);
+    }
+
+    // ── Serialization round-trip tests ───────────────────────────────────
+
+    #[test]
+    fn test_vitals_serialize_roundtrip() {
+        let v = make_vitals();
+        let json = serde_json::to_string(&v).expect("serialize vitals");
+        let v2: Vitals = serde_json::from_str(&json).expect("deserialize vitals");
+        assert!((v.consciousness_level - v2.consciousness_level).abs() < 1e-12);
+        assert_eq!(v.spectral_phi, v2.spectral_phi);
+        assert_eq!(v.total_cycles, v2.total_cycles);
+        assert_eq!(v.urgency, v2.urgency);
+    }
+
+    #[test]
+    fn test_neuro_bath_serialize_roundtrip() {
+        let b = make_bath();
+        let json = serde_json::to_string(&b).expect("serialize bath");
+        let b2: NeuroBath = serde_json::from_str(&json).expect("deserialize bath");
+        assert!((b.dopamine - b2.dopamine).abs() < 1e-6);
+        assert_eq!(b.personality, b2.personality);
+    }
+
+    #[test]
+    fn test_pulse_snapshot_serialize_roundtrip() {
+        let snap = make_snapshot();
+        let json = serde_json::to_string_pretty(&snap).expect("serialize snapshot");
+        let snap2: PulseSnapshot = serde_json::from_str(&json).expect("deserialize snapshot");
+        assert_eq!(snap.timestamp, snap2.timestamp);
+        assert_eq!(snap.profile, snap2.profile);
+        assert!((snap.vitals.consciousness_level - snap2.vitals.consciousness_level).abs() < 1e-12);
+        assert_eq!(snap.sparkline.len(), snap2.sparkline.len());
+        assert!(snap2.integrity.attestation_passed); // default via serde
+    }
+
+    // ── Anomaly detection tests ──────────────────────────────────────────
+
+    #[test]
+    fn test_detect_anomalies_empty_sparkline() {
+        let result = detect_anomalies(&[]);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_detect_anomalies_too_few_points() {
+        let points = vec![make_sparkline_point(0.5, 0.3, 1.0)];
+        let result = detect_anomalies(&points);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_detect_anomalies_constant_values() {
+        // Constant values should produce no anomalies (delta < threshold)
+        let points: Vec<SparklinePoint> = (0..10)
+            .map(|_| make_sparkline_point(0.5, 0.3, 1.0))
+            .collect();
+        let result = detect_anomalies(&points);
+        assert!(result.is_empty(), "constant data should have no anomalies, got {}", result.len());
+    }
+
+    #[test]
+    fn test_detect_anomalies_consciousness_surge() {
+        let mut points = vec![make_sparkline_point(0.3, 0.3, 1.0)];
+        // Sudden consciousness jump > 0.05
+        points.push(make_sparkline_point(0.5, 0.3, 1.0));
+        points.push(make_sparkline_point(0.5, 0.3, 1.0));
+        let result = detect_anomalies(&points);
+        assert!(!result.is_empty());
+        assert!(result.iter().any(|a| a.kind == "C(t) Surge"));
+    }
+
+    #[test]
+    fn test_detect_anomalies_consciousness_drop() {
+        let mut points = vec![make_sparkline_point(0.5, 0.3, 1.0)];
+        points.push(make_sparkline_point(0.3, 0.3, 1.0));
+        points.push(make_sparkline_point(0.3, 0.3, 1.0));
+        let result = detect_anomalies(&points);
+        assert!(result.iter().any(|a| a.kind == "C(t) Drop"));
+    }
+
+    #[test]
+    fn test_detect_anomalies_phi_spike() {
+        let mut points = vec![make_sparkline_point(0.5, 0.3, 0.5)];
+        // Phi jumps from <1 to >10
+        points.push(make_sparkline_point(0.5, 0.3, 15.0));
+        points.push(make_sparkline_point(0.5, 0.3, 15.0));
+        let result = detect_anomalies(&points);
+        assert!(result.iter().any(|a| a.kind == "Phi Spike"));
+    }
+
+    #[test]
+    fn test_detect_anomalies_pe_drop() {
+        let mut points = vec![make_sparkline_point(0.5, 0.5, 1.0)];
+        // PE drops >20%
+        points.push(make_sparkline_point(0.5, 0.3, 1.0));
+        points.push(make_sparkline_point(0.5, 0.3, 1.0));
+        let result = detect_anomalies(&points);
+        assert!(result.iter().any(|a| a.kind == "PE Drop"));
+    }
+
+    #[test]
+    fn test_detect_anomalies_truncates_to_8() {
+        // Create many anomalies — should be capped at 8
+        let mut points = vec![make_sparkline_point(0.1, 0.9, 0.0)];
+        for i in 1..20 {
+            let c = if i % 2 == 0 { 0.1 } else { 0.5 };
+            points.push(make_sparkline_point(c, 0.9, 0.0));
+        }
+        let result = detect_anomalies(&points);
+        assert!(result.len() <= 8, "anomalies should be truncated to 8, got {}", result.len());
+    }
+
+    // ── PulseDelta tests ─────────────────────────────────────────────────
+
+    #[test]
+    fn test_pulse_delta_identical_snapshots() {
+        let s1 = make_snapshot();
+        let s2 = make_snapshot();
+        let delta = PulseDelta::compute(&s1, &s2);
+        assert!((delta.consciousness_level).abs() < 1e-12);
+        assert!((delta.spectral_phi).abs() < 1e-12);
+        assert!((delta.dopamine).abs() < 1e-6);
+        assert!((delta.harmonies_alignment).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_pulse_delta_calculation() {
+        let s1 = make_snapshot();
+        let mut s2 = make_snapshot();
+        s2.vitals.consciousness_level = 0.30;
+        s2.vitals.spectral_phi = Some(1.0);
+        s2.bath.dopamine = 0.50;
+        s2.compass.harmonies_alignment = 0.40;
+        let delta = PulseDelta::compute(&s1, &s2);
+        // current - previous: 0.42 - 0.30 = 0.12
+        assert!((delta.consciousness_level - 0.12).abs() < 1e-9);
+        // 3.14 - 1.0 = 2.14
+        assert!((delta.spectral_phi - 2.14).abs() < 1e-9);
+        // 0.85 - 0.50 = 0.35
+        assert!((delta.dopamine - 0.35).abs() < 1e-5);
+        // 0.68 - 0.40 = 0.28
+        assert!((delta.harmonies_alignment - 0.28).abs() < 1e-5);
+    }
+
+    // ── select_profile tests ─────────────────────────────────────────────
+
+    #[test]
+    fn test_select_profile_known() {
+        // Just check it doesn't panic for known profiles
+        let _ = select_profile("minimal");
+        let _ = select_profile("standard");
+        let _ = select_profile("full");
+        let _ = select_profile("research");
+    }
+
+    #[test]
+    fn test_select_profile_unknown_defaults_to_standard() {
+        // Unknown profile should return Standard (same as "standard")
+        let p = select_profile("nonexistent");
+        // ConsciousnessProfile doesn't impl PartialEq so we just confirm it doesn't panic
+        let _ = p;
+    }
+
+    // ── Session report tests ─────────────────────────────────────────────
+
+    #[test]
+    fn test_generate_session_report_basic() {
+        let v = make_vitals();
+        let b = make_bath();
+        let c = make_compass();
+        let sparkline = vec![
+            make_sparkline_point(0.40, 0.35, 0.0),
+            make_sparkline_point(0.42, 0.33, 3.14),
+        ];
+        let anomalies: Vec<Anomaly> = vec![];
+        let report = generate_session_report(&v, &b, &c, &sparkline, &anomalies, None, &[]);
+        assert!(!report.is_empty());
+        assert!(report.contains("150"), "report should mention cycle count");
+        assert!(
+            report.contains("smooth") || report.contains("anomal") || report.contains("No"),
+            "report should mention anomaly status"
+        );
+    }
+
+    #[test]
+    fn test_generate_session_report_with_anomalies() {
+        let v = make_vitals();
+        let b = make_bath();
+        let c = make_compass();
+        let sparkline = vec![
+            make_sparkline_point(0.40, 0.35, 0.0),
+            make_sparkline_point(0.42, 0.33, 3.14),
+        ];
+        let anomalies = vec![Anomaly {
+            cycle: 1,
+            kind: "C(t) Surge".into(),
+            description: "C(t) rose by 0.02".into(),
+            color: "#e8c547",
+        }];
+        let report = generate_session_report(&v, &b, &c, &sparkline, &anomalies, None, &[]);
+        assert!(report.contains("C(t) Surge"), "report should list anomaly kinds");
+    }
 }

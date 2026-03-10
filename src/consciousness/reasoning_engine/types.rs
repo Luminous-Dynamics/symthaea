@@ -36,6 +36,10 @@ pub struct ReasoningContext {
     /// Neuromod modulation of MCTS exploration constant (multiplier, default 1.0).
     /// 5-HT/NE-driven: low 5-HT → explore more, high 5-HT → exploit more.
     pub neuromod_exploration_mod: f64,
+    /// Epistemic quality score (0.0-1.0) from E/N/M classification.
+    /// Modulates phi_eff: low epistemic quality → conservative reasoning.
+    /// Science: epistemic humility — claims with weak evidence get less Phi amplification.
+    pub epistemic_quality: f64,
 }
 
 impl ReasoningContext {
@@ -77,6 +81,7 @@ pub struct ReasoningContextBuilder {
     tool: Option<ToolDescriptor>,
     recent_utility: f64,
     cycle_id: u64,
+    epistemic_quality: f64,
 }
 
 impl ReasoningContextBuilder {
@@ -90,6 +95,7 @@ impl ReasoningContextBuilder {
             tool: None,
             recent_utility: 0.5,
             cycle_id: 0,
+            epistemic_quality: 0.5,
         }
     }
 
@@ -135,6 +141,12 @@ impl ReasoningContextBuilder {
         self
     }
 
+    /// Set the epistemic quality (0.0-1.0).
+    pub fn with_epistemic_quality(mut self, quality: f64) -> Self {
+        self.epistemic_quality = quality;
+        self
+    }
+
     /// Build the ReasoningContext.
     ///
     /// If theory_metrics was not set, creates default metrics based on phi.
@@ -161,6 +173,7 @@ impl ReasoningContextBuilder {
             recent_utility: self.recent_utility,
             cycle_id: self.cycle_id,
             neuromod_exploration_mod: 1.0,
+            epistemic_quality: self.epistemic_quality,
         }
     }
 }

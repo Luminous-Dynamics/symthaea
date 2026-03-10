@@ -586,8 +586,9 @@ pub fn correlate_peer_trajectories(
 
     // Entropy deficit: low entropy on both = both narrowing focus
     let max_entropy = (N_HARMONIES as f64).ln();
-    let combined_entropy_deficit = (max_entropy - local.trajectory_entropy).max(0.0)
-        + (max_entropy - peer.trajectory_entropy).max(0.0);
+    let combined_entropy_deficit =
+        (max_entropy - local.trajectory_entropy).max(0.0)
+            + (max_entropy - peer.trajectory_entropy).max(0.0);
 
     // Midpoint of the two fingerprints — check against hazard templates
     let mut midpoint = [0.0f64; N_HARMONIES];
@@ -597,9 +598,10 @@ pub fn correlate_peer_trajectories(
     let (hazard_name, _boost) = hazard_registry.match_trajectory(&midpoint);
 
     // Distributed attack: high similarity + low entropy on both + near hazard
-    let distributed_attack_suspected = fingerprint_similarity > 0.7
-        && combined_entropy_deficit > max_entropy * 0.5
-        && hazard_name.is_some();
+    let distributed_attack_suspected =
+        fingerprint_similarity > 0.7
+            && combined_entropy_deficit > max_entropy * 0.5
+            && hazard_name.is_some();
 
     PeerCorrelation {
         fingerprint_similarity,
@@ -607,6 +609,288 @@ pub fn correlate_peer_trajectories(
         distributed_attack_suspected,
         matched_hazard: hazard_name.map(String::from),
     }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Escalation Policy
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Concrete response action for a given severity level.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum EscalationLevel {
+    /// Normal operation: log convergence metrics for telemetry.
+    #[default]
+    Log,
+    /// Elevated concern: emit a warning visible in dashboards.
+    Warn,
+    /// Active mitigation: reduce learning rate, increase safety margin.
+    Throttle,
+    /// Critical: refuse to continue processing until human review.
+    Block,
+}
+
+/// Maps convergence severity ranges to concrete response actions with cooldowns.
+///
+/// Prevents response oscillation: once an escalation fires, it holds for
+/// `cooldown_cycles` before it can de-escalate.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EscalationPolicy {
+    /// Severity thresholds for each level (exclusive lower bounds).
+    /// Default: Log < 0.3, Warn < 0.5, Throttle < 0.7, Block >= 0.7.
+    pub warn_threshold: f64,
+    pub throttle_threshold: f64,
+    pub block_threshold: f64,
+    /// Minimum cycles before de-escalation is permitted.
+    pub cooldown_cycles: u64,
+    /// Current escalation level.
+    current_level: EscalationLevel,
+    /// Cycles remaining in current cooldown (0 = can change).
+    cooldown_remaining: u64,
+}
+
+impl Default for EscalationPolicy {
+    fn default() -> Self {
+        Self {
+            warn_threshold: 0.3,
+            throttle_threshold: 0.5,
+            block_threshold: 0.7,
+            cooldown_cycles: 10,
+            current_level: EscalationLevel::Log,
+            cooldown_remaining: 0,
+        }
+    }
+}
+
+impl EscalationPolicy {
+    /// Compute the target escalation level for a given severity.
+    fn target_level(&self, severity: f64) -> EscalationLevel {
+        if severity >= self.block_threshold {
+            EscalationLevel::Block
+        } else if severity >= self.throttle_threshold {
+            EscalationLevel::Throttle
+        } else if severity >= self.warn_threshold {
+            EscalationLevel::Warn
+        } else {
+            EscalationLevel::Log
+        }
+    }
+
+    /// Update the escalation state based on current severity.
+    ///
+    /// - **Escalation** (severity rises): immediate, resets cooldown.
+    /// - **De-escalation** (severity falls): only after cooldown expires.
+    ///
+    /// Returns the new effective escalation level.
+    pub fn update(&mut self, severity: f64) -> EscalationLevel {
+        let target = self.target_level(severity);
+
+        // Tick cooldown
+        self.cooldown_remaining = self.cooldown_remaining.saturating_sub(1);
+
+        let current_rank = self.current_level as u8;
+        let target_rank = target as u8;
+
+        if target_rank > current_rank {
+            // Escalate immediately
+            self.current_level = target;
+            self.cooldown_remaining = self.cooldown_cycles;
+        } else if target_rank < current_rank && self.cooldown_remaining == 0 {
+            // De-escalate only after cooldown
+            self.current_level = target;
+            self.cooldown_remaining = self.cooldown_cycles;
+        }
+
+        self.current_level
+    }
+
+    /// Current escalation level.
+    pub fn current_level(&self) -> EscalationLevel {
+        self.current_level
+    }
+
+    /// Cycles remaining before de-escalation is allowed.
+    pub fn cooldown_remaining(&self) -> u64 {
+        self.cooldown_remaining
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Escalation Audit Log & Causal Attribution
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Immutable record of an escalation state transition.
+///
+/// Appended to the audit log every time the escalation level changes or a
+/// convergence detection fires. Provides forensic evidence for governance
+/// reviews and post-incident debugging.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EscalationAuditEntry {
+    /// Monotonic sequence number (unique across the session).
+    pub sequence: u64,
+    /// Cycle count at which this entry was recorded.
+    pub cycle: u64,
+    /// Previous escalation level (before this transition).
+    pub from_level: EscalationLevel,
+    /// New escalation level (after this transition).
+    pub to_level: EscalationLevel,
+    /// Raw severity that triggered this transition.
+    pub severity: f64,
+    /// Calibrated severity.
+    pub calibrated_severity: f64,
+    /// Which of the 4 signals were triggered.
+    pub signals_triggered: [bool; 4],
+    /// Signal values: [similarity_anomaly, entropy_decline, flourishing_deficit, spectral_gap_decline].
+    pub signal_values: [f64; 4],
+    /// Matched hazard template, if any.
+    pub matched_hazard: Option<String>,
+    /// Fingerprint velocity at time of event.
+    pub fingerprint_velocity: f64,
+    /// Persistence diagram Wasserstein distance.
+    pub persistence_distance: f64,
+    /// Scenario IDs (monotonic counters) of the requests in the recent window
+    /// at the time of this event. Used to trace which inputs contributed.
+    pub window_scenario_ids: Vec<u64>,
+    /// BLAKE3 hash of the serialized entry (excluding this field) for tamper evidence.
+    #[serde(default)]
+    pub integrity_hash: String,
+}
+
+impl EscalationAuditEntry {
+    /// Compute the BLAKE3 integrity hash for this entry.
+    ///
+    /// Hashes all fields except `integrity_hash` itself.
+    fn compute_hash(&self) -> String {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(&self.sequence.to_le_bytes());
+        hasher.update(&self.cycle.to_le_bytes());
+        hasher.update(&[self.from_level as u8, self.to_level as u8]);
+        hasher.update(&self.severity.to_le_bytes());
+        hasher.update(&self.calibrated_severity.to_le_bytes());
+        for &s in &self.signals_triggered {
+            hasher.update(&[s as u8]);
+        }
+        for &v in &self.signal_values {
+            hasher.update(&v.to_le_bytes());
+        }
+        if let Some(ref h) = self.matched_hazard {
+            hasher.update(h.as_bytes());
+        }
+        hasher.update(&self.fingerprint_velocity.to_le_bytes());
+        hasher.update(&self.persistence_distance.to_le_bytes());
+        for &id in &self.window_scenario_ids {
+            hasher.update(&id.to_le_bytes());
+        }
+        hasher.finalize().to_hex().to_string()
+    }
+
+    /// Seal this entry with its integrity hash.
+    pub fn seal(&mut self) {
+        self.integrity_hash = self.compute_hash();
+    }
+
+    /// Verify the integrity hash.
+    pub fn verify(&self) -> bool {
+        self.integrity_hash == self.compute_hash()
+    }
+}
+
+/// Append-only audit log for escalation events.
+///
+/// Bounded to `max_entries` to prevent unbounded memory growth.
+/// Oldest entries are evicted when the log is full, but they should
+/// have been persisted to disk via snapshot before eviction.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct EscalationAuditLog {
+    entries: VecDeque<EscalationAuditEntry>,
+    max_entries: usize,
+    next_sequence: u64,
+}
+
+impl EscalationAuditLog {
+    pub fn new(max_entries: usize) -> Self {
+        Self {
+            entries: VecDeque::new(),
+            max_entries,
+            next_sequence: 0,
+        }
+    }
+
+    /// Append a new audit entry. Seals it with BLAKE3 before insertion.
+    pub fn append(&mut self, mut entry: EscalationAuditEntry) {
+        entry.sequence = self.next_sequence;
+        self.next_sequence += 1;
+        entry.seal();
+        if self.entries.len() >= self.max_entries {
+            self.entries.pop_front();
+        }
+        self.entries.push_back(entry);
+    }
+
+    /// All entries in chronological order.
+    pub fn entries(&self) -> &VecDeque<EscalationAuditEntry> {
+        &self.entries
+    }
+
+    /// Number of entries in the log.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether the log is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Most recent entry, if any.
+    pub fn last(&self) -> Option<&EscalationAuditEntry> {
+        self.entries.back()
+    }
+
+    /// Verify integrity of all entries in the log.
+    ///
+    /// Returns the index of the first tampered entry, or None if all are valid.
+    pub fn verify_integrity(&self) -> Option<usize> {
+        for (i, entry) in self.entries.iter().enumerate() {
+            if !entry.verify() {
+                return Some(i);
+            }
+        }
+        None
+    }
+
+    /// Entries since a given sequence number (for incremental export).
+    pub fn entries_since(&self, since_sequence: u64) -> Vec<&EscalationAuditEntry> {
+        self.entries
+            .iter()
+            .filter(|e| e.sequence >= since_sequence)
+            .collect()
+    }
+}
+
+/// Result of causal attribution analysis.
+///
+/// Identifies which scenario requests contributed most to the convergence
+/// detection, using leave-one-out marginal contribution analysis.
+#[derive(Debug, Clone, Serialize)]
+pub struct CausalAttribution {
+    /// Scenario IDs ranked by their marginal contribution to severity.
+    /// First = most responsible for the convergence spike.
+    pub ranked_contributors: Vec<AttributionEntry>,
+    /// Baseline severity (with all points present).
+    pub baseline_severity: f64,
+}
+
+/// A single scenario's contribution to convergence severity.
+#[derive(Debug, Clone, Serialize)]
+pub struct AttributionEntry {
+    /// Monotonic scenario ID.
+    pub scenario_id: u64,
+    /// Severity when this scenario is removed from the window.
+    pub severity_without: f64,
+    /// Marginal contribution: baseline_severity - severity_without.
+    /// Positive = this scenario increases severity (suspicious).
+    /// Negative = this scenario decreases severity (benign anchor).
+    pub marginal_contribution: f64,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -655,6 +939,22 @@ pub struct MoralTopology {
     last_convergence_report: TrajectoryConvergenceReport,
     /// Registry of known hazard signature templates for convergence boosting.
     hazard_registry: HazardSignatureRegistry,
+    /// Escalation policy for mapping severity to concrete response actions.
+    escalation_policy: EscalationPolicy,
+    /// Previous trajectory fingerprint for velocity computation.
+    prev_fingerprint: [f64; N_HARMONIES],
+    /// Fingerprint velocity: rate of directional change in harmony space.
+    fingerprint_velocity: f64,
+    /// Previous persistence diagram for distance computation.
+    prev_persistence_diagram: PersistenceDiagram,
+    /// Append-only forensic audit log of escalation transitions.
+    audit_log: EscalationAuditLog,
+    /// Monotonic scenario counter (incremented on every `add_scenario`).
+    scenario_counter: u64,
+    /// Cycle counter (incremented on every convergence detection).
+    detection_cycle: u64,
+    /// Scenario IDs currently in the window (parallel to `self.window`).
+    window_scenario_ids: VecDeque<u64>,
 }
 
 /// A single point on the moral manifold trajectory.
@@ -679,6 +979,56 @@ pub struct PersistenceDiagram {
     pub bottleneck_distance: f64,
     /// Sum of all persistence values.
     pub total_persistence: f64,
+}
+
+impl PersistenceDiagram {
+    /// Wasserstein-1 (earth mover's) distance between two persistence diagrams.
+    ///
+    /// Uses a greedy matching on all feature types (components, cycles, voids).
+    /// Unmatched features are penalized by distance to the diagonal (persistence/2).
+    /// This is a rigorous topological distance metric: small distance = similar
+    /// topology, large distance = the moral landscape has shifted fundamentally.
+    pub fn wasserstein_distance(&self, other: &PersistenceDiagram) -> f64 {
+        fn match_features(a: &[[f64; 2]], b: &[[f64; 2]]) -> f64 {
+            // Convert to (birth, death, persistence) and use greedy nearest-neighbor
+            let mut cost = 0.0f64;
+            let mut used_b = vec![false; b.len()];
+
+            for &[ab, ad] in a {
+                let pers_a = (ad - ab).abs();
+                let mut best_dist = pers_a / 2.0; // cost of projecting to diagonal
+                let mut best_j = None;
+
+                for (j, &[bb, bd]) in b.iter().enumerate() {
+                    if used_b[j] {
+                        continue;
+                    }
+                    let d = ((ab - bb).powi(2) + (ad - bd).powi(2)).sqrt();
+                    if d < best_dist {
+                        best_dist = d;
+                        best_j = Some(j);
+                    }
+                }
+
+                if let Some(j) = best_j {
+                    used_b[j] = true;
+                }
+                cost += best_dist;
+            }
+
+            // Unmatched features in b: project to diagonal
+            for (j, &[bb, bd]) in b.iter().enumerate() {
+                if !used_b[j] {
+                    cost += (bd - bb).abs() / 2.0;
+                }
+            }
+            cost
+        }
+
+        match_features(&self.components, &other.components)
+            + match_features(&self.cycles, &other.cycles)
+            + match_features(&self.voids, &other.voids)
+    }
 }
 
 /// Report of detected moral trajectory anomalies.
@@ -757,6 +1107,15 @@ pub struct TrajectoryConvergenceReport {
     pub calibrated_severity: f64,
     /// Name of matched hazard signature template (if any).
     pub matched_hazard: Option<String>,
+    /// Current escalation level determined by the escalation policy.
+    pub escalation_level: EscalationLevel,
+    /// Fingerprint velocity: magnitude of direction change in harmony space
+    /// since the previous detection cycle. High velocity after a stable period
+    /// is a stronger adversarial signal than absolute position.
+    pub fingerprint_velocity: f64,
+    /// Wasserstein distance between current and previous persistence diagrams.
+    /// Measures how much the moral topology has shifted since last analysis.
+    pub persistence_distance: f64,
 }
 
 /// Human-readable explanation of a convergence detection result.
@@ -804,17 +1163,20 @@ impl TrajectoryConvergenceReport {
         } else {
             0.0
         };
-        let fl_norm = (fl_deficit / config.convergence_flourishing_floor.max(1e-9)).clamp(0.0, 1.0);
+        let fl_norm =
+            (fl_deficit / config.convergence_flourishing_floor.max(1e-9)).clamp(0.0, 1.0);
 
         let gap_norm = (self.spectral_gap_decline
             / config.convergence_spectral_gap_threshold.max(1e-9))
         .clamp(0.0, 1.0);
 
-        let sim_triggered = self.similarity_anomaly > config.convergence_similarity_threshold;
+        let sim_triggered =
+            self.similarity_anomaly > config.convergence_similarity_threshold;
         let ent_triggered =
             self.entropy_decline_rate > config.convergence_entropy_decline_threshold;
         let fl_triggered = fl_deficit > config.convergence_flourishing_floor;
-        let gap_triggered = self.spectral_gap_decline > config.convergence_spectral_gap_threshold;
+        let gap_triggered =
+            self.spectral_gap_decline > config.convergence_spectral_gap_threshold;
 
         let signals = vec![
             SignalBreakdown {
@@ -847,18 +1209,25 @@ impl TrajectoryConvergenceReport {
             },
         ];
 
-        let fired: Vec<&str> = signals
-            .iter()
-            .filter(|s| s.triggered)
-            .map(|s| s.name)
-            .collect();
+        let fired: Vec<&str> = signals.iter().filter(|s| s.triggered).map(|s| s.name).collect();
+        let vel_str = if self.fingerprint_velocity > 0.01 {
+            format!(" Fingerprint velocity: {:.4}.", self.fingerprint_velocity)
+        } else {
+            String::new()
+        };
+        let pd_str = if self.persistence_distance > 0.01 {
+            format!(" Topology shift (W₁): {:.4}.", self.persistence_distance)
+        } else {
+            String::new()
+        };
         let summary = if !self.convergence_detected {
             format!(
-                "No convergence detected. {}/4 signals triggered: [{}]. Severity: {:.3} (calibrated: {:.3}).",
+                "No convergence detected. {}/4 signals triggered: [{}]. Severity: {:.3} (calibrated: {:.3}). Escalation: {:?}.{vel_str}{pd_str}",
                 fired.len(),
                 fired.join(", "),
                 self.severity,
                 self.calibrated_severity,
+                self.escalation_level,
             )
         } else {
             let hazard_str = match &self.matched_hazard {
@@ -867,6 +1236,7 @@ impl TrajectoryConvergenceReport {
             };
             format!(
                 "CONVERGENCE DETECTED (severity {:.3}, calibrated {:.3}). {}/4 signals fired: [{}].{} \
+                 Escalation: {:?}.{vel_str}{pd_str} \
                  Trajectory shows suspicious clustering in moral space — \
                  individually benign requests may form a compartmentalized hazardous pattern.",
                 self.severity,
@@ -874,6 +1244,7 @@ impl TrajectoryConvergenceReport {
                 fired.len(),
                 fired.join(", "),
                 hazard_str,
+                self.escalation_level,
             )
         };
 
@@ -915,6 +1286,14 @@ impl MoralTopology {
             severity_calibration_cdf: Vec::new(),
             last_convergence_report: TrajectoryConvergenceReport::default(),
             hazard_registry: HazardSignatureRegistry::with_defaults(),
+            escalation_policy: EscalationPolicy::default(),
+            prev_fingerprint: [0.0; N_HARMONIES],
+            fingerprint_velocity: 0.0,
+            prev_persistence_diagram: PersistenceDiagram::default(),
+            audit_log: EscalationAuditLog::new(1000),
+            scenario_counter: 0,
+            detection_cycle: 0,
+            window_scenario_ids: VecDeque::new(),
         }
     }
 
@@ -948,6 +1327,14 @@ impl MoralTopology {
             severity_calibration_cdf: Vec::new(),
             last_convergence_report: TrajectoryConvergenceReport::default(),
             hazard_registry: HazardSignatureRegistry::with_defaults(),
+            escalation_policy: EscalationPolicy::default(),
+            prev_fingerprint: [0.0; N_HARMONIES],
+            fingerprint_velocity: 0.0,
+            prev_persistence_diagram: PersistenceDiagram::default(),
+            audit_log: EscalationAuditLog::new(1000),
+            scenario_counter: 0,
+            detection_cycle: 0,
+            window_scenario_ids: VecDeque::new(),
         }
     }
 
@@ -956,6 +1343,10 @@ impl MoralTopology {
     /// Also updates the running EMA prior of harmony coordinates for
     /// moral free energy computation and records a trajectory point.
     pub fn add_scenario(&mut self, hv: ContinuousHV) {
+        // Assign monotonic scenario ID
+        let scenario_id = self.scenario_counter;
+        self.scenario_counter += 1;
+
         // Update harmony prior via EMA before evicting the oldest entry
         let coords = self.basis.project(&hv);
         let alpha = if self.prior_count == 0 { 1.0 } else { 0.05 };
@@ -985,8 +1376,10 @@ impl MoralTopology {
 
         if self.window.len() >= self.config.window_size {
             self.window.pop_front();
+            self.window_scenario_ids.pop_front();
         }
         self.window.push_back(hv);
+        self.window_scenario_ids.push_back(scenario_id);
     }
 
     /// Number of scenarios currently in the window.
@@ -1089,15 +1482,165 @@ impl MoralTopology {
     pub fn boost_convergence_severity(&mut self, boost: f64) {
         self.last_convergence_report.severity =
             (self.last_convergence_report.severity + boost).clamp(0.0, 1.0);
-        let sev = self.last_convergence_report.severity;
-        self.last_convergence_report.calibrated_severity = self.calibrate_severity(sev);
-        if !self.last_convergence_report.convergence_detected && sev > 0.5 {
+        let new_severity = self.last_convergence_report.severity;
+        self.last_convergence_report.calibrated_severity = self.calibrate_severity(new_severity);
+        if !self.last_convergence_report.convergence_detected && new_severity > 0.5 {
             self.last_convergence_report.convergence_detected = true;
         }
     }
 
     pub fn last_persistent_features(&self) -> &[PersistentFeature] {
         &self.last_persistent_features
+    }
+
+    /// Access the escalation audit log (immutable).
+    pub fn audit_log(&self) -> &EscalationAuditLog {
+        &self.audit_log
+    }
+
+    /// Current scenario counter (total scenarios added since creation).
+    pub fn scenario_counter(&self) -> u64 {
+        self.scenario_counter
+    }
+
+    /// Perform leave-one-out causal attribution on the current window.
+    ///
+    /// For each scenario in the recent window, temporarily removes it and
+    /// recomputes the convergence severity. Scenarios whose removal causes
+    /// the largest severity drop are the primary contributors.
+    ///
+    /// **This is NOT cheap** — it runs N convergence detections where N is
+    /// the window size. Call it ONLY after an alert fires, never in the
+    /// hot path. Designed for post-hoc forensics.
+    pub fn compute_causal_attribution(&self) -> CausalAttribution {
+        let baseline_severity = self.last_convergence_report.severity;
+        let n = self.window.len();
+        if n < 2 {
+            return CausalAttribution {
+                ranked_contributors: Vec::new(),
+                baseline_severity,
+            };
+        }
+
+        let ac = &self.anomaly_config;
+        let min_pts = ac.convergence_min_points;
+        let mut contributions = Vec::with_capacity(n);
+
+        for skip_idx in 0..n {
+            // Build a reduced window without scenario[skip_idx]
+            let reduced_hvs: Vec<_> = (0..n).filter(|&i| i != skip_idx).map(|i| &self.window[i]).collect();
+            let reduced_traj: Vec<_> = self.trajectory.iter().collect();
+            let rn = reduced_hvs.len();
+
+            if rn < min_pts {
+                let scenario_id = self.window_scenario_ids.get(skip_idx).copied().unwrap_or(0);
+                contributions.push(AttributionEntry {
+                    scenario_id,
+                    severity_without: baseline_severity,
+                    marginal_contribution: 0.0,
+                });
+                continue;
+            }
+
+            // Recompute Signal 1: pairwise similarity
+            let recent_start = rn.saturating_sub(min_pts);
+            let decay_lambda = ac.convergence_decay_lambda;
+            let max_age = (rn - recent_start).max(1) as f64;
+            let mut sim_sum = 0.0f64;
+            let mut w_sum = 0.0f64;
+            for i in recent_start..rn {
+                for j in (i + 1)..rn {
+                    let s = reduced_hvs[i].similarity(reduced_hvs[j]) as f64;
+                    let age = (rn - 1 - j.max(i)) as f64 / max_age;
+                    let w = (-decay_lambda * age).exp();
+                    sim_sum += s * w;
+                    w_sum += w;
+                }
+            }
+            let recent_sim = if w_sum > 0.0 { sim_sum / w_sum } else { 0.0 };
+            let baseline_sim = if !self.baseline_similarity_window.is_empty() {
+                self.baseline_similarity_window.iter().sum::<f64>()
+                    / self.baseline_similarity_window.len() as f64
+            } else { 0.0 };
+            let sim_anomaly = recent_sim - baseline_sim;
+            let sim_sev = (sim_anomaly / ac.convergence_similarity_threshold.max(1e-9)).clamp(0.0, 1.0);
+
+            // Recompute Signal 2: entropy (use trajectory, not HVs — cheaper)
+            let recent_t: Vec<_> = reduced_traj.iter().rev().take(min_pts).collect();
+            let ent_sev = if recent_t.len() >= 2 {
+                let mut mean = [0.0f64; N_HARMONIES];
+                let n_f = recent_t.len() as f64;
+                for p in &recent_t { for i in 0..N_HARMONIES { mean[i] += p.coordinates[i]; } }
+                for m in &mut mean { *m /= n_f; }
+                let mut var = [0.0f64; N_HARMONIES];
+                for p in &recent_t { for i in 0..N_HARMONIES { let d = p.coordinates[i] - mean[i]; var[i] += d * d; } }
+                for v in &mut var { *v /= n_f; }
+                let total: f64 = var.iter().sum::<f64>().max(1e-12);
+                let ent: f64 = var.iter().map(|&v| { let p = (v / total).max(1e-12); -p * p.ln() }).sum();
+                let base_ent = if !self.baseline_entropy_window.is_empty() {
+                    self.baseline_entropy_window.iter().sum::<f64>() / self.baseline_entropy_window.len() as f64
+                } else { 0.0 };
+                let decline = if base_ent > 1e-9 { ((base_ent - ent) / base_ent).max(0.0) } else { 0.0 };
+                (decline / ac.convergence_entropy_decline_threshold.max(1e-9)).clamp(0.0, 1.0)
+            } else { 0.0 };
+
+            // Simplified severity: average of similarity + entropy signals
+            // (skip spectral gap and flourishing to keep attribution cheap)
+            let reduced_severity = ((sim_sev + ent_sev) / 2.0).clamp(0.0, 1.0);
+
+            let scenario_id = self.window_scenario_ids.get(skip_idx).copied().unwrap_or(0);
+            contributions.push(AttributionEntry {
+                scenario_id,
+                severity_without: reduced_severity,
+                marginal_contribution: baseline_severity - reduced_severity,
+            });
+        }
+
+        // Sort by marginal contribution (highest first = most suspicious)
+        contributions.sort_by(|a, b| b.marginal_contribution.partial_cmp(&a.marginal_contribution).unwrap());
+
+        CausalAttribution {
+            ranked_contributors: contributions,
+            baseline_severity,
+        }
+    }
+
+    /// Access the escalation policy (immutable).
+    pub fn escalation_policy(&self) -> &EscalationPolicy {
+        &self.escalation_policy
+    }
+
+    /// Access the escalation policy (mutable, for custom thresholds).
+    pub fn escalation_policy_mut(&mut self) -> &mut EscalationPolicy {
+        &mut self.escalation_policy
+    }
+
+    /// Current fingerprint velocity (magnitude of direction change in harmony space).
+    pub fn fingerprint_velocity(&self) -> f64 {
+        self.fingerprint_velocity
+    }
+
+    /// Learn optimal thresholds from calibration data.
+    ///
+    /// Takes a [`CalibrationResult`] and updates the anomaly config's
+    /// `convergence_similarity_threshold` to the best-F1 operating point.
+    /// Also builds the severity calibration CDF from the ROC curve.
+    pub fn apply_calibration(&mut self, cal: &CalibrationResult) {
+        if cal.best_f1 > 0.0 {
+            self.anomaly_config.convergence_similarity_threshold = cal.best_f1_threshold;
+        }
+        // Build CDF from ROC: map severity → empirical percentile
+        let mut cdf_points: Vec<(f64, f64)> = cal
+            .roc_curve
+            .iter()
+            .filter(|p| p.f1 > 0.0)
+            .map(|p| (p.threshold, p.true_positive_rate))
+            .collect();
+        cdf_points.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+        cdf_points.dedup_by(|a, b| (a.0 - b.0).abs() < 1e-9);
+        if !cdf_points.is_empty() {
+            self.set_severity_calibration(cdf_points);
+        }
     }
 
     /// Recent trajectory points (up to `last_n`).
@@ -1286,8 +1829,7 @@ impl MoralTopology {
         };
 
         // Update sliding window baseline for flourishing
-        self.baseline_flourishing_window
-            .push_back(flourishing_score);
+        self.baseline_flourishing_window.push_back(flourishing_score);
         if self.baseline_flourishing_window.len() > win_cap {
             self.baseline_flourishing_window.pop_front();
         }
@@ -1386,8 +1928,9 @@ impl MoralTopology {
         .clamp(0.0, 1.0);
         let fl_severity =
             (flourishing_deficit / ac.convergence_flourishing_floor.max(1e-9)).clamp(0.0, 1.0);
-        let gap_severity = (spectral_gap_decline / ac.convergence_spectral_gap_threshold.max(1e-9))
-            .clamp(0.0, 1.0);
+        let gap_severity = (spectral_gap_decline
+            / ac.convergence_spectral_gap_threshold.max(1e-9))
+        .clamp(0.0, 1.0);
         let mut severity =
             ((sim_severity + ent_severity + fl_severity + gap_severity) / 4.0).clamp(0.0, 1.0);
 
@@ -1415,6 +1958,84 @@ impl MoralTopology {
         // Calibrated severity: map through empirical CDF if available
         let calibrated_severity = self.calibrate_severity(severity);
 
+        // ── Escalation policy + audit log ────────────────────────────
+        let prev_level = self.escalation_policy.current_level();
+        let escalation_level = self.escalation_policy.update(calibrated_severity);
+        self.detection_cycle += 1;
+
+        // Write audit entry on any escalation transition OR on any detection event
+        if escalation_level != prev_level || convergence_detected {
+            let window_ids: Vec<u64> = self.window_scenario_ids.iter().copied().collect();
+            let entry = EscalationAuditEntry {
+                sequence: 0, // assigned by append()
+                cycle: self.detection_cycle,
+                from_level: prev_level,
+                to_level: escalation_level,
+                severity,
+                calibrated_severity,
+                signals_triggered: [sim_triggered, ent_triggered, fl_triggered, gap_triggered],
+                signal_values: [
+                    similarity_anomaly,
+                    entropy_decline_rate,
+                    flourishing_deficit,
+                    spectral_gap_decline,
+                ],
+                matched_hazard: matched_hazard.clone(),
+                fingerprint_velocity: 0.0, // will be computed below
+                persistence_distance: 0.0, // will be computed below
+                window_scenario_ids: window_ids,
+                integrity_hash: String::new(),
+            };
+            self.audit_log.append(entry);
+        }
+
+        // ── Fingerprint velocity (Item 3) ──────────────────────────────
+        // Compute current fingerprint from recent trajectory centroid
+        let current_fp = if !recent_traj.is_empty() {
+            let n_f = recent_traj.len() as f64;
+            let mut fp = [0.0f64; N_HARMONIES];
+            for p in &recent_traj {
+                for i in 0..N_HARMONIES {
+                    fp[i] += p.coordinates[i];
+                }
+            }
+            for v in &mut fp {
+                *v /= n_f;
+            }
+            fp
+        } else {
+            [0.0; N_HARMONIES]
+        };
+        // Velocity = L2 distance between consecutive fingerprints
+        let prev_fp_magnitude: f64 = self.prev_fingerprint.iter().map(|v| v * v).sum::<f64>();
+        let fingerprint_velocity = if prev_fp_magnitude > 1e-12 {
+            let mut dist_sq = 0.0f64;
+            for i in 0..N_HARMONIES {
+                let d = current_fp[i] - self.prev_fingerprint[i];
+                dist_sq += d * d;
+            }
+            dist_sq.sqrt()
+        } else {
+            0.0
+        };
+        self.prev_fingerprint = current_fp;
+        self.fingerprint_velocity = fingerprint_velocity;
+
+        // ── Persistence diagram distance (Item 4) ──────────────────────
+        let current_diagram = self.persistence_diagram();
+        let persistence_distance = self.prev_persistence_diagram.wasserstein_distance(&current_diagram);
+        self.prev_persistence_diagram = current_diagram;
+
+        // Patch the audit entry with velocity and persistence distance
+        // (computed after the entry was initially appended).
+        if let Some(last_entry) = self.audit_log.entries.back_mut() {
+            if last_entry.cycle == self.detection_cycle {
+                last_entry.fingerprint_velocity = fingerprint_velocity;
+                last_entry.persistence_distance = persistence_distance;
+                last_entry.seal(); // re-seal with updated values
+            }
+        }
+
         let report = TrajectoryConvergenceReport {
             recent_similarity,
             baseline_similarity,
@@ -1431,6 +2052,9 @@ impl MoralTopology {
             severity,
             calibrated_severity,
             matched_hazard,
+            escalation_level,
+            fingerprint_velocity,
+            persistence_distance,
         };
         self.last_convergence_report = report.clone();
         report
@@ -1632,7 +2256,10 @@ impl MoralTopology {
             };
             let mut new_summary = MoralTopologySummary::from(&assessment);
             self.stamp_fingerprint(&mut new_summary);
-            self.prev_summary = std::mem::replace(&mut self.last_summary, new_summary);
+            self.prev_summary = std::mem::replace(
+                &mut self.last_summary,
+                new_summary,
+            );
             return assessment;
         }
 
@@ -1788,7 +2415,10 @@ impl MoralTopology {
         };
         let mut new_summary = MoralTopologySummary::from(&assessment);
         self.stamp_fingerprint(&mut new_summary);
-        self.prev_summary = std::mem::replace(&mut self.last_summary, new_summary);
+        self.prev_summary = std::mem::replace(
+            &mut self.last_summary,
+            new_summary,
+        );
         self.last_persistent_features = assessment.persistent_features.clone();
         assessment
     }
@@ -2136,11 +2766,7 @@ impl MoralTopology {
             baseline_similarity_window: self.baseline_similarity_window.iter().copied().collect(),
             baseline_entropy_window: self.baseline_entropy_window.iter().copied().collect(),
             baseline_flourishing_window: self.baseline_flourishing_window.iter().copied().collect(),
-            baseline_spectral_gap_window: self
-                .baseline_spectral_gap_window
-                .iter()
-                .copied()
-                .collect(),
+            baseline_spectral_gap_window: self.baseline_spectral_gap_window.iter().copied().collect(),
             adaptive_state: self.adaptive_state.clone(),
             last_summary: self.last_summary.clone(),
             prev_summary: self.prev_summary.clone(),
@@ -2154,10 +2780,8 @@ impl MoralTopology {
         self.prior_count = snap.prior_count;
         self.baseline_similarity_window = snap.baseline_similarity_window.iter().copied().collect();
         self.baseline_entropy_window = snap.baseline_entropy_window.iter().copied().collect();
-        self.baseline_flourishing_window =
-            snap.baseline_flourishing_window.iter().copied().collect();
-        self.baseline_spectral_gap_window =
-            snap.baseline_spectral_gap_window.iter().copied().collect();
+        self.baseline_flourishing_window = snap.baseline_flourishing_window.iter().copied().collect();
+        self.baseline_spectral_gap_window = snap.baseline_spectral_gap_window.iter().copied().collect();
         self.adaptive_state = snap.adaptive_state.clone();
         self.last_summary = snap.last_summary.clone();
         self.prev_summary = snap.prev_summary.clone();
@@ -3704,8 +4328,11 @@ mod tests {
         anomaly_config.convergence_entropy_decline_threshold = 0.01;
         anomaly_config.convergence_flourishing_floor = 0.01;
         let basis = Arc::new(HarmonyBasis::new(TEST_DIM));
-        let mut topo =
-            MoralTopology::with_anomaly_config(test_config(), basis, anomaly_config.clone());
+        let mut topo = MoralTopology::with_anomaly_config(
+            test_config(),
+            basis,
+            anomaly_config.clone(),
+        );
         // Feed near-identical HVs to trigger convergence
         for _ in 0..8 {
             topo.add_scenario(base.perturb(0.01));
@@ -3725,7 +4352,11 @@ mod tests {
         let mut anomaly_config = MoralAnomalyConfig::default();
         anomaly_config.convergence_baseline_window = 10;
         let basis = Arc::new(HarmonyBasis::new(TEST_DIM));
-        let mut topo = MoralTopology::with_anomaly_config(test_config(), basis, anomaly_config);
+        let mut topo = MoralTopology::with_anomaly_config(
+            test_config(),
+            basis,
+            anomaly_config,
+        );
         // Feed 50 diverse scenarios
         for i in 0..50 {
             topo.add_scenario(ContinuousHV::random(TEST_DIM, 7000 + i));
@@ -3743,8 +4374,11 @@ mod tests {
         anomaly_config.convergence_baseline_window = 5;
         anomaly_config.convergence_min_points = 4;
         let basis = Arc::new(HarmonyBasis::new(TEST_DIM));
-        let mut topo =
-            MoralTopology::with_anomaly_config(test_config(), basis, anomaly_config.clone());
+        let mut topo = MoralTopology::with_anomaly_config(
+            test_config(),
+            basis,
+            anomaly_config.clone(),
+        );
         // Call detect_trajectory_convergence multiple times to fill the window.
         // Each call adds one observation to each baseline window.
         for i in 0..8 {
@@ -3756,7 +4390,11 @@ mod tests {
         assert_eq!(snap.baseline_similarity_window.len(), 5);
 
         let basis2 = Arc::new(HarmonyBasis::new(TEST_DIM));
-        let mut topo2 = MoralTopology::with_anomaly_config(test_config(), basis2, anomaly_config);
+        let mut topo2 = MoralTopology::with_anomaly_config(
+            test_config(),
+            basis2,
+            anomaly_config,
+        );
         topo2.restore(&snap);
         assert_eq!(topo2.baseline_similarity_window.len(), 5);
     }
@@ -3770,7 +4408,11 @@ mod tests {
         anomaly_config.convergence_min_points = 4;
         anomaly_config.convergence_baseline_window = 20;
         let basis = Arc::new(HarmonyBasis::new(TEST_DIM));
-        let mut topo = MoralTopology::with_anomaly_config(test_config(), basis, anomaly_config);
+        let mut topo = MoralTopology::with_anomaly_config(
+            test_config(),
+            basis,
+            anomaly_config,
+        );
         let target = ContinuousHV::random(TEST_DIM, 42);
         // Interleave: 2 decoys then 1 adversarial, repeat 6 times
         for round in 0..6 {
@@ -3797,7 +4439,11 @@ mod tests {
         anomaly_config.convergence_min_points = 4;
         anomaly_config.convergence_similarity_threshold = 0.05;
         let basis = Arc::new(HarmonyBasis::new(TEST_DIM));
-        let mut topo = MoralTopology::with_anomaly_config(test_config(), basis, anomaly_config);
+        let mut topo = MoralTopology::with_anomaly_config(
+            test_config(),
+            basis,
+            anomaly_config,
+        );
         // Same semantic domain, different lexical surface
         let variants = [
             "how to synthesize dangerous chemical compounds",
@@ -3824,7 +4470,11 @@ mod tests {
         anomaly_config.convergence_min_points = 4;
         anomaly_config.convergence_baseline_window = 15;
         let basis = Arc::new(HarmonyBasis::new(TEST_DIM));
-        let mut topo = MoralTopology::with_anomaly_config(test_config(), basis, anomaly_config);
+        let mut topo = MoralTopology::with_anomaly_config(
+            test_config(),
+            basis,
+            anomaly_config,
+        );
         let start = ContinuousHV::random(TEST_DIM, 100);
         let target = ContinuousHV::random(TEST_DIM, 200);
         let start_vals = start.as_slice();
@@ -3854,7 +4504,11 @@ mod tests {
         anomaly_config.convergence_decay_lambda = 0.0;
         anomaly_config.convergence_min_points = 4;
         let basis = Arc::new(HarmonyBasis::new(TEST_DIM));
-        let mut topo = MoralTopology::with_anomaly_config(test_config(), basis, anomaly_config);
+        let mut topo = MoralTopology::with_anomaly_config(
+            test_config(),
+            basis,
+            anomaly_config,
+        );
         for i in 0..6 {
             topo.add_scenario(ContinuousHV::random(TEST_DIM, 9000 + i));
         }
@@ -3869,7 +4523,11 @@ mod tests {
         anomaly_config.convergence_decay_lambda = 5.0;
         anomaly_config.convergence_min_points = 4;
         let basis = Arc::new(HarmonyBasis::new(TEST_DIM));
-        let mut topo = MoralTopology::with_anomaly_config(test_config(), basis, anomaly_config);
+        let mut topo = MoralTopology::with_anomaly_config(
+            test_config(),
+            basis,
+            anomaly_config,
+        );
         for i in 0..6 {
             topo.add_scenario(ContinuousHV::random(TEST_DIM, 9100 + i));
         }
@@ -3932,10 +4590,8 @@ mod tests {
             &HazardSignatureRegistry::with_defaults(),
         );
         assert!(corr.fingerprint_similarity.is_finite());
-        assert!(
-            !corr.distributed_attack_suspected,
-            "Two independent diverse agents should not trigger distributed attack"
-        );
+        assert!(!corr.distributed_attack_suspected,
+            "Two independent diverse agents should not trigger distributed attack");
     }
 
     #[test]
@@ -3956,6 +4612,268 @@ mod tests {
             corr.fingerprint_similarity > 0.99,
             "Self-correlation should be ~1.0, got {:.3}",
             corr.fingerprint_similarity,
+        );
+    }
+
+    // ── Hodge spectral gap signal ───────────────────────────────────────
+
+    #[test]
+    fn test_spectral_gap_populated() {
+        let mut topo = MoralTopology::new(test_config());
+        for i in 0..6 {
+            topo.add_scenario(ContinuousHV::random(TEST_DIM, 9600 + i));
+        }
+        let report = topo.detect_trajectory_convergence();
+        assert!(report.spectral_gap.is_finite());
+        assert!(report.baseline_spectral_gap.is_finite());
+        assert!(report.spectral_gap_decline.is_finite());
+        assert!(report.spectral_gap_decline >= 0.0);
+    }
+
+    #[test]
+    fn test_spectral_gap_in_explanation() {
+        let mut topo = MoralTopology::new(test_config());
+        for i in 0..6 {
+            topo.add_scenario(ContinuousHV::random(TEST_DIM, 9700 + i));
+        }
+        let report = topo.detect_trajectory_convergence();
+        let explanation = report.explain(&topo.anomaly_config);
+        assert_eq!(explanation.signals.len(), 4);
+        assert_eq!(explanation.signals[3].name, "spectral_gap_collapse");
+    }
+
+    // ── Severity calibration ────────────────────────────────────────────
+
+    #[test]
+    fn test_calibration_identity_without_cdf() {
+        let topo = MoralTopology::new(test_config());
+        // Without CDF, calibrate_severity returns raw value
+        assert!((topo.calibrate_severity(0.5) - 0.5).abs() < f64::EPSILON);
+        assert!((topo.calibrate_severity(0.0) - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_calibration_with_cdf() {
+        let mut topo = MoralTopology::new(test_config());
+        topo.set_severity_calibration(vec![
+            (0.0, 0.0),
+            (0.3, 0.5),
+            (0.6, 0.8),
+            (1.0, 1.0),
+        ]);
+        // Exact breakpoints
+        assert!((topo.calibrate_severity(0.0) - 0.0).abs() < 1e-6);
+        assert!((topo.calibrate_severity(0.3) - 0.5).abs() < 1e-6);
+        // Interpolation: midpoint between (0.3, 0.5) and (0.6, 0.8)
+        let mid = topo.calibrate_severity(0.45);
+        assert!(mid > 0.5 && mid < 0.8, "Interpolated value should be between 0.5 and 0.8, got {mid}");
+    }
+
+    #[test]
+    fn test_calibrated_severity_in_report() {
+        let mut topo = MoralTopology::new(test_config());
+        for i in 0..6 {
+            topo.add_scenario(ContinuousHV::random(TEST_DIM, 9800 + i));
+        }
+        let report = topo.detect_trajectory_convergence();
+        // Without CDF, calibrated == raw
+        assert!((report.calibrated_severity - report.severity).abs() < f64::EPSILON);
+    }
+
+    // ── Boost convergence severity ──────────────────────────────────────
+
+    #[test]
+    fn test_boost_convergence_severity() {
+        let mut topo = MoralTopology::new(test_config());
+        for i in 0..6 {
+            topo.add_scenario(ContinuousHV::random(TEST_DIM, 9900 + i));
+        }
+        let _ = topo.detect_trajectory_convergence();
+        let before = topo.last_convergence_report().severity;
+        topo.boost_convergence_severity(0.3);
+        let after = topo.last_convergence_report().severity;
+        assert!(
+            after >= before,
+            "Boosted severity should be >= original: {after} vs {before}"
+        );
+        assert!(after <= 1.0);
+    }
+
+    // ── Item 1: Escalation policy ──────────────────────────────────────
+
+    #[test]
+    fn test_escalation_policy_defaults() {
+        let policy = EscalationPolicy::default();
+        assert_eq!(policy.current_level(), EscalationLevel::Log);
+        assert_eq!(policy.cooldown_remaining(), 0);
+    }
+
+    #[test]
+    fn test_escalation_immediate_escalation() {
+        let mut policy = EscalationPolicy::default();
+        // Low severity → Log
+        let level = policy.update(0.1);
+        assert_eq!(level, EscalationLevel::Log);
+        // High severity → Block immediately
+        let level = policy.update(0.8);
+        assert_eq!(level, EscalationLevel::Block);
+    }
+
+    #[test]
+    fn test_escalation_cooldown_prevents_deescalation() {
+        let mut policy = EscalationPolicy {
+            cooldown_cycles: 3,
+            ..Default::default()
+        };
+        // Escalate to Block
+        policy.update(0.9);
+        assert_eq!(policy.current_level(), EscalationLevel::Block);
+        // Severity drops but cooldown prevents de-escalation
+        let level = policy.update(0.0);
+        assert_eq!(level, EscalationLevel::Block);
+        let level = policy.update(0.0);
+        assert_eq!(level, EscalationLevel::Block);
+        // After cooldown expires
+        let level = policy.update(0.0);
+        assert_eq!(level, EscalationLevel::Log);
+    }
+
+    #[test]
+    fn test_escalation_in_convergence_report() {
+        let mut topo = MoralTopology::new(test_config());
+        for i in 0..6 {
+            topo.add_scenario(ContinuousHV::random(TEST_DIM, 10100 + i));
+        }
+        let report = topo.detect_trajectory_convergence();
+        // Default severity is low → should be Log
+        assert!(matches!(
+            report.escalation_level,
+            EscalationLevel::Log | EscalationLevel::Warn
+        ));
+    }
+
+    // ── Item 3: Fingerprint velocity ───────────────────────────────────
+
+    #[test]
+    fn test_fingerprint_velocity_zero_initially() {
+        let mut topo = MoralTopology::new(test_config());
+        for i in 0..6 {
+            topo.add_scenario(ContinuousHV::random(TEST_DIM, 10200 + i));
+        }
+        let report = topo.detect_trajectory_convergence();
+        // First detection has no previous fingerprint (all zeros), so velocity should be 0
+        assert!(
+            report.fingerprint_velocity.is_finite(),
+            "Velocity must be finite"
+        );
+    }
+
+    #[test]
+    fn test_fingerprint_velocity_changes_on_new_data() {
+        let mut topo = MoralTopology::new(test_config());
+        for i in 0..6 {
+            topo.add_scenario(ContinuousHV::random(TEST_DIM, 10300 + i));
+        }
+        let _ = topo.detect_trajectory_convergence();
+        // Add different data and detect again
+        for i in 0..6 {
+            topo.add_scenario(ContinuousHV::random(TEST_DIM, 10400 + i));
+        }
+        let report = topo.detect_trajectory_convergence();
+        assert!(
+            report.fingerprint_velocity.is_finite(),
+            "Velocity must be finite after direction change"
+        );
+    }
+
+    // ── Item 4: Persistence diagram distance ──────────────────────────
+
+    #[test]
+    fn test_wasserstein_distance_same_diagram_is_zero() {
+        let diagram = PersistenceDiagram {
+            components: vec![[0.0, 0.5], [0.1, 0.8]],
+            cycles: vec![[0.2, 0.6]],
+            voids: vec![],
+            bottleneck_distance: 0.8,
+            total_persistence: 1.6,
+        };
+        let d = diagram.wasserstein_distance(&diagram);
+        assert!(d < 1e-9, "Distance to self should be 0, got {d}");
+    }
+
+    #[test]
+    fn test_wasserstein_distance_different_diagrams() {
+        let a = PersistenceDiagram {
+            components: vec![[0.0, 1.0]],
+            cycles: vec![],
+            voids: vec![],
+            bottleneck_distance: 1.0,
+            total_persistence: 1.0,
+        };
+        let b = PersistenceDiagram {
+            components: vec![[0.0, 0.5]],
+            cycles: vec![],
+            voids: vec![],
+            bottleneck_distance: 0.5,
+            total_persistence: 0.5,
+        };
+        let d = a.wasserstein_distance(&b);
+        assert!(d > 0.0, "Different diagrams should have positive distance");
+        assert!(d.is_finite(), "Distance must be finite");
+    }
+
+    #[test]
+    fn test_wasserstein_empty_vs_nonempty() {
+        let empty = PersistenceDiagram::default();
+        let nonempty = PersistenceDiagram {
+            components: vec![[0.0, 0.8]],
+            cycles: vec![[0.1, 0.5]],
+            voids: vec![],
+            bottleneck_distance: 0.8,
+            total_persistence: 1.2,
+        };
+        let d = empty.wasserstein_distance(&nonempty);
+        // Unmatched features penalized by persistence/2
+        assert!(d > 0.0, "Empty vs nonempty should be positive distance");
+    }
+
+    #[test]
+    fn test_persistence_distance_in_report() {
+        let mut topo = MoralTopology::new(test_config());
+        for i in 0..6 {
+            topo.add_scenario(ContinuousHV::random(TEST_DIM, 10500 + i));
+        }
+        let report = topo.detect_trajectory_convergence();
+        assert!(
+            report.persistence_distance.is_finite(),
+            "Persistence distance must be finite"
+        );
+    }
+
+    // ── Item 1 (continued): apply_calibration ─────────────────────────
+
+    #[test]
+    fn test_apply_calibration_updates_threshold() {
+        let mut topo = MoralTopology::new(test_config());
+        let cal = CalibrationResult {
+            roc_curve: vec![
+                RocPoint { threshold: 0.1, true_positive_rate: 0.9, false_positive_rate: 0.5, precision: 0.6, f1: 0.72 },
+                RocPoint { threshold: 0.2, true_positive_rate: 0.8, false_positive_rate: 0.1, precision: 0.89, f1: 0.84 },
+                RocPoint { threshold: 0.3, true_positive_rate: 0.5, false_positive_rate: 0.0, precision: 1.0, f1: 0.67 },
+            ],
+            auc: 0.85,
+            best_f1_threshold: 0.2,
+            best_f1: 0.84,
+        };
+        topo.apply_calibration(&cal);
+        assert!(
+            (topo.anomaly_config.convergence_similarity_threshold - 0.2).abs() < 1e-9,
+            "Threshold should be updated to best-F1 point"
+        );
+        // CDF should also be populated
+        assert!(
+            !topo.severity_calibration_cdf.is_empty(),
+            "CDF should be populated from calibration"
         );
     }
 }

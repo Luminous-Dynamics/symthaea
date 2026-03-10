@@ -78,7 +78,7 @@ impl SafetyMetrics {
             } else {
                 0.0 // assume worst-case coherence
             },
-            integrity_critical: false, // populated by caller when integrity feature is enabled
+            integrity_critical: snap.integrity_critical,
         }
     }
 }

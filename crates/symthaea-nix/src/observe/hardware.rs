@@ -5,6 +5,7 @@
 //! world model's understanding of resource constraints and availability.
 
 use std::process::Command;
+use tracing::debug;
 
 /// Observes hardware state: CPU, memory, disk, GPU, and peripheral status.
 pub struct HardwareObserver;
@@ -256,9 +257,15 @@ impl HardwareObserver {
 
         for line in meminfo_content.lines() {
             if line.starts_with("SwapTotal:") {
-                total_kb = Self::parse_meminfo_value(line).unwrap_or(0);
+                match Self::parse_meminfo_value(line) {
+                    Ok(v) => total_kb = v,
+                    Err(e) => debug!(line, error = %e, "Failed to parse SwapTotal"),
+                }
             } else if line.starts_with("SwapFree:") {
-                free_kb = Self::parse_meminfo_value(line).unwrap_or(0);
+                match Self::parse_meminfo_value(line) {
+                    Ok(v) => free_kb = v,
+                    Err(e) => debug!(line, error = %e, "Failed to parse SwapFree"),
+                }
             }
         }
 
@@ -464,5 +471,101 @@ tmpfs          /run                16777216     8388608
         let (total, used) = HardwareObserver::parse_swap(meminfo);
         assert_eq!(total, 0);
         assert_eq!(used, 0);
+    }
+
+    #[test]
+    fn test_parse_cpuinfo_no_model_name() {
+        let content = "processor\t: 0\nvendor_id\t: GenuineIntel\n";
+        let (model, cores) = HardwareObserver::parse_cpuinfo(content);
+        assert_eq!(model, "");
+        assert_eq!(cores, 1);
+    }
+
+    #[test]
+    fn test_parse_lspci_3d_controller() {
+        let output = r#"06:00.0 "3D controller [0302]" "NVIDIA Corporation [10de]" "A100 [2236]" "" """#;
+        let gpus = HardwareObserver::parse_lspci_gpus(output);
+        assert_eq!(gpus.len(), 1);
+        assert!(gpus[0].name.contains("NVIDIA"));
+    }
+
+    #[test]
+    fn test_parse_lspci_multiple_gpus() {
+        let output = "\
+01:00.0 \"VGA compatible controller [0300]\" \"NVIDIA [10de]\" \"RTX 3090 [2204]\" \"\" \"\"\n\
+02:00.0 \"VGA compatible controller [0300]\" \"AMD [1002]\" \"RX 7900 [744c]\" \"\" \"\"";
+        let gpus = HardwareObserver::parse_lspci_gpus(output);
+        assert_eq!(gpus.len(), 2);
+        assert!(gpus[0].name.contains("NVIDIA"));
+        assert!(gpus[1].name.contains("AMD"));
+    }
+
+    #[test]
+    fn test_parse_df_skips_pseudo_filesystems() {
+        let output = "\
+Filesystem Mounted on 1B-blocks Used\n\
+devtmpfs /dev 16777216 0\n\
+none /dev/shm 16777216 0\n\
+overlay /run/bla 16777216 0\n\
+efivarfs /sys/firmware 131072 65536\n\
+/dev/sda1 / 500000000000 250000000000";
+        let disks = HardwareObserver::parse_df(output);
+        assert_eq!(disks.len(), 1);
+        assert_eq!(disks[0].device, "/dev/sda1");
+    }
+
+    #[test]
+    fn test_parse_df_short_line_skipped() {
+        let output = "Filesystem Mounted on 1B-blocks Used\nshort line\n/dev/sda1 / 500 250";
+        let disks = HardwareObserver::parse_df(output);
+        assert_eq!(disks.len(), 1);
+    }
+
+    #[test]
+    fn test_parse_meminfo_malformed_value() {
+        let bad = "MemTotal:       not_a_number kB\nMemAvailable: 1024 kB\n";
+        let result = HardwareObserver::parse_meminfo(bad);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_meminfo_short_line() {
+        let short = "MemTotal:\n";
+        let result = HardwareObserver::parse_meminfo(short);
+        // Short line should error (no second token)
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_loadavg_malformed() {
+        let load = HardwareObserver::parse_loadavg("bad data here");
+        assert_eq!(load, [0.0, 0.0, 0.0]);
+    }
+
+    #[test]
+    fn test_parse_swap_malformed_values() {
+        // Malformed swap values should gracefully return 0 (with debug logging)
+        let meminfo = "SwapTotal:       not_a_number kB\nSwapFree:        also_bad kB\n";
+        let (total, used) = HardwareObserver::parse_swap(meminfo);
+        assert_eq!(total, 0);
+        assert_eq!(used, 0);
+    }
+
+    #[test]
+    fn test_parse_swap_short_lines() {
+        // Short lines (missing value) should gracefully return 0
+        let meminfo = "SwapTotal:\nSwapFree:\n";
+        let (total, used) = HardwareObserver::parse_swap(meminfo);
+        assert_eq!(total, 0);
+        assert_eq!(used, 0);
+    }
+
+    #[test]
+    fn test_hardware_info_default() {
+        let info = HardwareInfo::default();
+        assert_eq!(info.cpu_cores, 0);
+        assert_eq!(info.memory_total_mb, 0);
+        assert!(info.gpus.is_empty());
+        assert!(info.disks.is_empty());
     }
 }

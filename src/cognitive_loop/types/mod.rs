@@ -6,7 +6,7 @@
 mod carryover;
 mod output;
 mod scheduling;
-mod telemetry;
+pub(crate) mod telemetry;
 
 pub use output::*;
 pub use scheduling::*;
@@ -63,7 +63,7 @@ fn default_one_f32_substrate() -> f32 {
 ///
 /// Reports tamper detection status: attestation, temporal consistency,
 /// behavioral canaries. Feature-gated behind `integrity`.
-#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct IntegrityTelemetry {
     /// Whether all BLAKE3 attestation hashes matched.
     pub attestation_passed: bool,
@@ -80,6 +80,47 @@ pub struct IntegrityTelemetry {
     /// Consciousness confidence multiplier (1.0 = trusted, 0.5 = drift, 0.1 = critical).
     #[serde(default = "default_integrity_confidence")]
     pub integrity_confidence: f32,
+    /// Per-attestation detail: (name, passed, consecutive_failures).
+    /// Empty when no attestation check ran this cycle.
+    #[serde(default)]
+    pub attestation_details: Vec<AttestationDetail>,
+    /// Unified cross-source failure streak (attestation + canary).
+    /// 1-2 = Warning, 3+ = Critical. Resets on clean tick.
+    #[serde(default)]
+    pub global_failure_streak: usize,
+    /// Rolling 60-cycle history of integrity_confidence values for sparkline display.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub confidence_history: Vec<f32>,
+}
+
+/// Per-attestation telemetry entry for dashboard visibility.
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct AttestationDetail {
+    /// Attestation name (e.g., "safety_thresholds").
+    pub name: String,
+    /// Whether this attestation passed on last check.
+    pub passed: bool,
+    /// Number of consecutive failures (0 = healthy).
+    pub consecutive_failures: usize,
+}
+
+/// When the `integrity` feature is off, IntegrityTelemetry defaults to "all pass, fully trusted".
+/// This prevents downstream consumers (Pulse, SafetyAgent) from seeing uninitialized false-alarm data.
+impl Default for IntegrityTelemetry {
+    fn default() -> Self {
+        Self {
+            attestation_passed: true,
+            temporal_passed: true,
+            canaries_passed: true,
+            anomaly_count: 0,
+            has_critical: false,
+            last_check_cycle: 0,
+            integrity_confidence: 1.0,
+            attestation_details: Vec::new(),
+            global_failure_streak: 0,
+            confidence_history: Vec::new(),
+        }
+    }
 }
 
 fn default_integrity_confidence() -> f32 {

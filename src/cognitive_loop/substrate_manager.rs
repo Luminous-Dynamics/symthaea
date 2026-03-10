@@ -398,6 +398,16 @@ impl SubstrateManager {
         Self::requirements_for(&substrate).attention_capability
     }
 
+    /// HOT (Higher-Order Thought) capability [0,1] of the substrate running
+    /// prefrontal processing. Uses per-region substrate (Prefrontal) when
+    /// configured, else global. Modulates the Recursion component in
+    /// ConsciousnessEquationV2 — substrates with poor meta-representation
+    /// (e.g. exotic) score lower on higher-order thought.
+    pub(crate) fn hot_capability(&self, config: &CognitiveLoopConfig) -> f64 {
+        let substrate = self.substrate_for_region(config, CorticalRegion::Prefrontal);
+        Self::requirements_for(&substrate).hot_capability
+    }
+
     /// Get the substrate type for a specific cortical region.
     /// Falls back to global substrate_type when per-region is not configured.
     fn substrate_for_region(

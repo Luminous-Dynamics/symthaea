@@ -8,3 +8,6 @@ license = "MIT"
 
 [dependencies]
 serde = { workspace = true }
+# Required: std::time::Instant panics on wasm32-unknown-unknown.
+# web-time provides a drop-in Instant that uses performance.now() in browsers.
+web-time = "1"

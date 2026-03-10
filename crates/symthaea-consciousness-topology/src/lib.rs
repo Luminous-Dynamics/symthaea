@@ -899,4 +899,180 @@ mod tests {
         assert_eq!(interp.fragmentation, 0.0);
         assert_eq!(interp.complexity, 0.0);
     }
+
+    #[test]
+    fn test_observe_respects_max_points() {
+        let config = TopologyConfig {
+            max_points: 5,
+            ..Default::default()
+        };
+        let mut analyzer = ConsciousnessTopologyAnalyzer::new(config);
+        for i in 0..20 {
+            analyzer.observe([i as f64 * 0.1; 7]);
+        }
+        assert_eq!(analyzer.point_window.len(), 5, "Window should be capped at max_points");
+    }
+
+    #[test]
+    fn test_observe_fifo_eviction() {
+        let config = TopologyConfig {
+            max_points: 3,
+            ..Default::default()
+        };
+        let mut analyzer = ConsciousnessTopologyAnalyzer::new(config);
+        // Add 5 points; first 2 should be evicted
+        for i in 0..5 {
+            analyzer.observe([i as f64; 7]);
+        }
+        assert_eq!(analyzer.point_window.len(), 3);
+        // Front of deque should be the 3rd point (index 2)
+        assert_eq!(analyzer.point_window.front().unwrap().index, 2);
+    }
+
+    #[test]
+    fn test_edge_threshold_affects_connectivity() {
+        // Strict threshold: points far apart should be disconnected
+        let strict = TopologyConfig {
+            edge_threshold: 0.01,
+            ..Default::default()
+        };
+        let mut a_strict = ConsciousnessTopologyAnalyzer::new(strict);
+        a_strict.observe([0.0; 7]);
+        a_strict.observe([0.5; 7]);
+        let analysis_strict = a_strict.analyze();
+
+        // Loose threshold: same points should be connected
+        let loose = TopologyConfig {
+            edge_threshold: 10.0,
+            ..Default::default()
+        };
+        let mut a_loose = ConsciousnessTopologyAnalyzer::new(loose);
+        a_loose.observe([0.0; 7]);
+        a_loose.observe([0.5; 7]);
+        let analysis_loose = a_loose.analyze();
+
+        assert!(
+            analysis_strict.betti_numbers.beta_0 >= analysis_loose.betti_numbers.beta_0,
+            "Strict threshold should have >= components than loose"
+        );
+    }
+
+    #[test]
+    fn test_curvature_empty_points() {
+        let mut analyzer = ConsciousnessTopologyAnalyzer::new(TopologyConfig::default());
+        // No points observed
+        let analysis = analyzer.analyze();
+        let curv = analysis.curvature.unwrap();
+        assert_eq!(curv.dimensionality, 0.0);
+        assert_eq!(curv.mean_curvature, 0.0);
+    }
+
+    #[test]
+    fn test_curvature_colinear_points() {
+        let mut analyzer = ConsciousnessTopologyAnalyzer::new(TopologyConfig::default());
+        // Points along a straight line in dim 0
+        for i in 0..10 {
+            let t = i as f64 * 0.1;
+            analyzer.observe([t, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
+        }
+        let analysis = analyzer.analyze();
+        let curv = analysis.curvature.unwrap();
+        // For colinear points, curvature should be near zero
+        assert!(
+            curv.mean_curvature.abs() < 0.01,
+            "Colinear points should have near-zero curvature, got {}",
+            curv.mean_curvature
+        );
+    }
+
+    #[test]
+    fn test_unity_single_component() {
+        let betti = BettiNumbers {
+            beta_0: 1,
+            beta_1: 0,
+            beta_2: 0,
+            euler_characteristic: 1,
+        };
+        let interp = betti.interpretation();
+        assert_eq!(interp.unity, 1.0, "Single component should have unity=1.0");
+    }
+
+    #[test]
+    fn test_fragmentation_multiple_components() {
+        let betti = BettiNumbers {
+            beta_0: 4,
+            beta_1: 0,
+            beta_2: 0,
+            euler_characteristic: 4,
+        };
+        let interp = betti.interpretation();
+        assert!(
+            interp.unity < 1.0,
+            "Multiple components should have unity < 1.0, got {}",
+            interp.unity
+        );
+        assert!(
+            interp.fragmentation > 0.0,
+            "Multiple components should have fragmentation > 0"
+        );
+    }
+
+    #[test]
+    fn test_rebuild_idempotence() {
+        let mut analyzer = ConsciousnessTopologyAnalyzer::new(TopologyConfig::default());
+        for i in 0..10 {
+            analyzer.observe([0.5 + i as f64 * 0.01; 7]);
+        }
+        let a1 = analyzer.analyze();
+        let a2 = analyzer.analyze();
+        assert_eq!(
+            a1.betti_numbers.beta_0, a2.betti_numbers.beta_0,
+            "Rebuilding on same points should give same beta_0"
+        );
+        assert_eq!(a1.betti_numbers.beta_1, a2.betti_numbers.beta_1);
+    }
+
+    #[test]
+    fn test_dimensionality_constant_signal() {
+        let mut analyzer = ConsciousnessTopologyAnalyzer::new(TopologyConfig::default());
+        // All points identical -> zero variance -> low dimensionality
+        for _ in 0..10 {
+            analyzer.observe([0.5; 7]);
+        }
+        let analysis = analyzer.analyze();
+        let curv = analysis.curvature.unwrap();
+        assert!(
+            curv.dimensionality < 0.01,
+            "Constant signal should have near-zero dimensionality, got {}",
+            curv.dimensionality
+        );
+    }
+
+    #[test]
+    fn test_significant_features_threshold() {
+        let config = TopologyConfig {
+            min_persistence: 0.0, // Everything is significant
+            edge_threshold: 0.1, // Strict: creates disconnected components
+            ..Default::default()
+        };
+        let mut analyzer = ConsciousnessTopologyAnalyzer::new(config);
+        analyzer.observe([0.0; 7]);
+        analyzer.observe([1.0; 7]);
+        let analysis_low = analyzer.analyze();
+
+        let config2 = TopologyConfig {
+            min_persistence: 100.0, // Nothing is significant
+            edge_threshold: 0.1,
+            ..Default::default()
+        };
+        let mut analyzer2 = ConsciousnessTopologyAnalyzer::new(config2);
+        analyzer2.observe([0.0; 7]);
+        analyzer2.observe([1.0; 7]);
+        let analysis_high = analyzer2.analyze();
+
+        assert!(
+            analysis_low.significant_features >= analysis_high.significant_features,
+            "Lower persistence threshold should yield >= significant features"
+        );
+    }
 }

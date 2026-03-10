@@ -23,6 +23,9 @@ pub use symthaea_vision_manifold as vision_manifold;
 // Audio perception - Speech recognition via symthaea-stt
 pub mod audio;
 
+// SHA-256 integrity verification for model weight files
+pub mod model_integrity;
+
 // Model status registry for graceful degradation
 pub mod model_status;
 pub use model_status::{ModelLoadError, ModelRegistry};

@@ -272,4 +272,88 @@ mod tests {
             assert!(!h.code().is_empty());
         }
     }
+
+    #[test]
+    fn test_epistemic_modes_are_distinct() {
+        let modes: Vec<&str> = Harmony::all().iter().map(|h| h.epistemic_mode()).collect();
+        for (i, m) in modes.iter().enumerate() {
+            for (j, n) in modes.iter().enumerate() {
+                if i != j {
+                    assert_ne!(m, n, "Epistemic modes must be unique");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_sacred_questions_are_distinct() {
+        let questions: Vec<&str> = Harmony::all().iter().map(|h| h.sacred_question()).collect();
+        for (i, q) in questions.iter().enumerate() {
+            for (j, r) in questions.iter().enumerate() {
+                if i != j {
+                    assert_ne!(q, r, "Sacred questions must be unique");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_base_weight_positive() {
+        for h in Harmony::all() {
+            assert!(h.base_weight() > 0.0, "{} weight must be positive", h.name());
+        }
+    }
+
+    #[test]
+    fn test_base_weight_reasonable_range() {
+        for h in Harmony::all() {
+            let w = h.base_weight();
+            assert!(
+                w >= 0.05 && w <= 0.25,
+                "{} weight {} outside [0.05, 0.25]",
+                h.name(),
+                w
+            );
+        }
+    }
+
+    #[test]
+    fn test_harmony_codes_length() {
+        for h in Harmony::all() {
+            let len = h.code().len();
+            assert!(
+                len >= 2 && len <= 3,
+                "{} code '{}' length {} not in [2,3]",
+                h.name(),
+                h.code(),
+                len
+            );
+        }
+    }
+
+    #[test]
+    fn test_focus_questions_nonempty() {
+        for h in Harmony::all() {
+            assert!(
+                !h.focus_question().is_empty(),
+                "{} has empty focus_question",
+                h.name()
+            );
+        }
+    }
+
+    #[test]
+    fn test_harmony_all_ordering_stable() {
+        let first = Harmony::all();
+        let second = Harmony::all();
+        assert_eq!(first, second, "all() must return same order on repeated calls");
+    }
+
+    #[test]
+    fn test_harmony_clone_eq() {
+        for h in Harmony::all() {
+            let cloned = h;
+            assert_eq!(h, cloned, "Clone of {:?} must equal original", h);
+        }
+    }
 }

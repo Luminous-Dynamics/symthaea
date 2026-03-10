@@ -131,6 +131,13 @@ pub(crate) struct ConsciousnessEngineInput<'a> {
     /// Composite moral anomaly score [0,1] from MoralAnomalyReport.
     /// Used for unified consciousness dampening alongside bath coupling.
     pub moral_anomaly_score: f64,
+
+    // ── HOT (Higher-Order Thought) → Recursion component ──────────
+    /// Normalized HOT recursion depth [0.0, 1.0].
+    /// Computed as: (meta_cognition.depth / 3.0) × substrate.hot_capability.
+    /// Replaces the hardcoded Recursion=0.5 in ConsciousnessEquationV2.
+    /// Defaults to 0.5 when meta_cognition is disabled (backward compat).
+    pub hot_depth: f64,
 }
 
 /// Dynamic weights for the unified consciousness computation.

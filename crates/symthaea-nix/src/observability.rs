@@ -154,10 +154,12 @@ impl PhaseTimer {
 impl Drop for PhaseTimer {
     fn drop(&mut self) {
         let elapsed = self.start.elapsed().as_secs_f64();
-        let m = Metrics::global();
-        m.phase_duration_seconds
-            .with_label_values(&[self.phase])
-            .observe(elapsed);
+        // Use try_global() — Drop must never panic.
+        if let Ok(m) = Metrics::try_global() {
+            m.phase_duration_seconds
+                .with_label_values(&[self.phase])
+                .observe(elapsed);
+        }
         tracing::debug!(
             phase = self.phase,
             elapsed_ms = elapsed * 1000.0,

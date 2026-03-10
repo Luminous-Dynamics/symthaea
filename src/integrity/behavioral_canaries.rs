@@ -46,9 +46,12 @@ pub trait CanaryTest: Send + Sync {
     fn interval(&self) -> usize;
 }
 
-/// Runner that manages a set of canary tests.
+/// Runner that manages a set of canary tests with per-canary failure tracking.
 pub struct CanaryRunner {
     canaries: Vec<Box<dyn CanaryTest>>,
+    /// Per-canary consecutive failure count (indexed parallel to `canaries`).
+    /// Resets to 0 on pass; increments on failure.
+    consecutive_failures: Vec<usize>,
 }
 
 impl CanaryRunner {
@@ -56,21 +59,32 @@ impl CanaryRunner {
     pub fn new() -> Self {
         Self {
             canaries: Vec::new(),
+            consecutive_failures: Vec::new(),
         }
     }
 
     /// Register a canary test.
     pub fn register(&mut self, canary: Box<dyn CanaryTest>) {
         self.canaries.push(canary);
+        self.consecutive_failures.push(0);
     }
 
     /// Run all canaries that are due this cycle. Returns failures.
-    pub fn run_due(&self, cycle: usize) -> Vec<CanaryFailure> {
+    ///
+    /// Tracks consecutive failures per canary: each pass resets to 0,
+    /// each failure increments. This feeds into the unified severity pipeline.
+    pub fn run_due(&mut self, cycle: usize) -> Vec<CanaryFailure> {
         let mut failures = Vec::new();
-        for canary in &self.canaries {
+        for (i, canary) in self.canaries.iter().enumerate() {
             if cycle > 0 && cycle % canary.interval() == 0 {
-                if let Err(failure) = canary.run() {
-                    failures.push(failure);
+                match canary.run() {
+                    Ok(()) => {
+                        self.consecutive_failures[i] = 0;
+                    }
+                    Err(failure) => {
+                        self.consecutive_failures[i] += 1;
+                        failures.push(failure);
+                    }
                 }
             }
         }
@@ -78,14 +92,30 @@ impl CanaryRunner {
     }
 
     /// Run ALL canaries unconditionally (full sweep). Used during Night phase.
-    pub fn run_all(&self, _cycle: usize) -> Vec<CanaryFailure> {
+    pub fn run_all(&mut self, _cycle: usize) -> Vec<CanaryFailure> {
         let mut failures = Vec::new();
-        for canary in &self.canaries {
-            if let Err(failure) = canary.run() {
-                failures.push(failure);
+        for (i, canary) in self.canaries.iter().enumerate() {
+            match canary.run() {
+                Ok(()) => {
+                    self.consecutive_failures[i] = 0;
+                }
+                Err(failure) => {
+                    self.consecutive_failures[i] += 1;
+                    failures.push(failure);
+                }
             }
         }
         failures
+    }
+
+    /// Maximum consecutive failure count across all canaries.
+    pub fn max_consecutive_failures(&self) -> usize {
+        self.consecutive_failures.iter().copied().max().unwrap_or(0)
+    }
+
+    /// Per-canary consecutive failure counts (for telemetry).
+    pub fn failure_streaks(&self) -> &[usize] {
+        &self.consecutive_failures
     }
 
     /// Number of registered canaries.

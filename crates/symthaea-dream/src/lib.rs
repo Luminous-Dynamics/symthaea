@@ -826,4 +826,159 @@ mod tests {
         assert_eq!(engine.stats().dream_cycles, 5);
         assert!(engine.stats().total_simulations > 0);
     }
+
+    #[test]
+    fn test_cosine_similarity_identical() {
+        let engine = DreamEngine::<Vec<f32>>::with_defaults();
+        let a = vec![1.0, 2.0, 3.0];
+        let sim = engine.cosine_similarity(&a, &a);
+        assert!(
+            (sim - 1.0).abs() < 1e-6,
+            "sim(a,a) should be 1.0, got {}",
+            sim
+        );
+    }
+
+    #[test]
+    fn test_cosine_similarity_orthogonal() {
+        let engine = DreamEngine::<Vec<f32>>::with_defaults();
+        let a = vec![1.0, 0.0];
+        let b = vec![0.0, 1.0];
+        let sim = engine.cosine_similarity(&a, &b);
+        assert!(
+            sim.abs() < 1e-6,
+            "Orthogonal vectors should have sim ~0, got {}",
+            sim
+        );
+    }
+
+    #[test]
+    fn test_cosine_similarity_opposite() {
+        let engine = DreamEngine::<Vec<f32>>::with_defaults();
+        let a = vec![1.0, 2.0, 3.0];
+        let b: Vec<f32> = a.iter().map(|x| -x).collect();
+        let sim = engine.cosine_similarity(&a, &b);
+        assert!(
+            (sim - (-1.0)).abs() < 1e-6,
+            "sim(a,-a) should be -1.0, got {}",
+            sim
+        );
+    }
+
+    #[test]
+    fn test_cosine_similarity_zero_vector() {
+        let engine = DreamEngine::<Vec<f32>>::with_defaults();
+        let a = vec![1.0, 2.0, 3.0];
+        let zero = vec![0.0, 0.0, 0.0];
+        let sim = engine.cosine_similarity(&a, &zero);
+        assert_eq!(sim, 0.0, "Zero vector should return 0.0");
+    }
+
+    #[test]
+    fn test_ei_estimation_empty() {
+        let ei = DreamEngine::<Vec<f32>>::estimate_ei(&[]);
+        assert_eq!(ei, 0.0, "EI of empty should be 0.0");
+    }
+
+    #[test]
+    fn test_ei_estimation_deterministic_high() {
+        // Uniform signal = zero variance = high EI
+        let uniform = vec![0.8; 64];
+        let ei = DreamEngine::<Vec<f32>>::estimate_ei(&uniform);
+        assert!(
+            ei > 0.9,
+            "Uniform signal should have high EI (low variance), got {}",
+            ei
+        );
+    }
+
+    #[test]
+    fn test_wisdom_confidence_bounded() {
+        let config = DreamEngineConfig {
+            counterfactual_count: 20,
+            wisdom_threshold: 0.001,
+            ..Default::default()
+        };
+        let mut engine = DreamEngine::<Vec<f32>>::new(config);
+        for i in 0..10 {
+            let state: Vec<f32> = (0..64).map(|j| ((i * 7 + j) as f32 / 100.0).sin()).collect();
+            let action: Vec<f32> = (0..32).map(|j| ((i * 3 + j) as f32 / 50.0).cos()).collect();
+            let outcome: Vec<f32> = (0..64).map(|j| ((i * 11 + j) as f32 / 80.0).sin().abs()).collect();
+            engine.record(&state, action, &outcome, 0.5 + (i as f32) * 0.05);
+        }
+        engine.dream_session(5).unwrap();
+        for w in engine.wisdom() {
+            assert!(
+                w.confidence >= 0.0 && w.confidence <= 1.0,
+                "Wisdom confidence {} not in [0, 1]",
+                w.confidence
+            );
+        }
+    }
+
+    #[test]
+    fn test_world_model_observation_count() {
+        let mut engine = DreamEngine::<Vec<f32>>::with_defaults();
+        for i in 0..5 {
+            engine.record(
+                &vec![i as f32 * 0.1; 64],
+                vec![0.1; 32],
+                &vec![0.3; 64],
+                0.5,
+            );
+        }
+        assert_eq!(
+            engine.world_model.observations.len(),
+            5,
+            "World model should accumulate observations"
+        );
+    }
+
+    #[test]
+    fn test_predict_outcome_fallback() {
+        let engine = DreamEngine::<Vec<f32>>::with_defaults();
+        // No prior observations => fallback to heuristic
+        let state = vec![0.5; 64];
+        let action = vec![0.2; 32];
+        let outcome = engine.simulate_outcome(&state, &action);
+        assert_eq!(outcome.len(), state.len(), "Predicted outcome should match state length");
+        // All values should be bounded
+        for v in &outcome {
+            assert!(*v >= -1.0 && *v <= 1.0, "Predicted value {} out of bounds", v);
+        }
+    }
+
+    #[test]
+    fn test_dream_stats_event_count() {
+        let mut engine = DreamEngine::<Vec<f32>>::with_defaults();
+        engine.record(&vec![0.5; 64], vec![0.1; 32], &vec![0.3; 64], 0.5);
+        engine.record(&vec![0.6; 64], vec![0.2; 32], &vec![0.4; 64], 0.6);
+        engine.record(&vec![0.7; 64], vec![0.3; 32], &vec![0.5; 64], 0.05); // rejected
+        assert_eq!(engine.stats().events_recorded, 2);
+        assert_eq!(engine.stats().events_rejected, 1);
+    }
+
+    #[test]
+    fn test_action_perturbation_bounded() {
+        let action = vec![0.5; 32];
+        let perturbed = action.perturb(42);
+        assert_eq!(perturbed.len(), action.len());
+        for v in &perturbed {
+            assert!(
+                *v >= -1.0 && *v <= 1.0,
+                "Perturbed value {} out of [-1,1]",
+                v
+            );
+        }
+    }
+
+    #[test]
+    fn test_most_surprising_event_selection() {
+        let mut engine = DreamEngine::<Vec<f32>>::with_defaults();
+        engine.record(&vec![0.1; 64], vec![0.1; 32], &vec![0.1; 64], 0.3);
+        engine.record(&vec![0.2; 64], vec![0.2; 32], &vec![0.2; 64], 0.9); // most surprising
+        engine.record(&vec![0.3; 64], vec![0.3; 32], &vec![0.3; 64], 0.5);
+        let idx = engine.find_most_surprising_event();
+        assert_eq!(idx, 1, "Should select event with highest surprise");
+    }
 }

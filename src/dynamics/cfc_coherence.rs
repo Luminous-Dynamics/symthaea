@@ -235,12 +235,18 @@ impl CfCCoherenceBridge {
             .iter()
             .flat_map(|arr| arr.iter().cloned())
             .collect();
+        self.update_flat(&all_tau)
+    }
 
+    /// Update the bridge with pre-flattened tau values (avoids intermediate Array1 allocations).
+    ///
+    /// Returns the updated metrics and modulated learning rate.
+    pub fn update_flat(&mut self, all_tau: &[f32]) -> &TemporalCoherenceMetrics {
         if all_tau.is_empty() {
             return &self.current_metrics;
         }
 
-        let combined_tau = Array1::from_vec(all_tau);
+        let combined_tau = Array1::from_vec(all_tau.to_vec());
         self.current_metrics = TemporalCoherenceMetrics::from_tau(&combined_tau);
 
         // Update history

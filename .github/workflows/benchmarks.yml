@@ -15,8 +15,6 @@ on:
       - 'Cargo.lock'
   pull_request:
     branches: [main]
-  schedule:
-    - cron: '0 2 * * *'  # Nightly full suite at 2 AM UTC
   workflow_dispatch:
     inputs:
       benchmark_suite:
@@ -87,14 +85,11 @@ jobs:
               --results target/criterion/baseline-comparisons.json
           fi
 
-  # Full benchmark suite (nightly or manual)
+  # Full benchmark suite (manual dispatch only — requires self-hosted runner)
   full-benchmark:
     name: Full Benchmark Suite
     runs-on: [self-hosted, gpu, nixos]
-    if: |
-      github.event_name == 'schedule' ||
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    if: github.event_name == 'workflow_dispatch'
     timeout-minutes: 180
 
     steps:
@@ -225,12 +220,11 @@ jobs:
           cat regression_report.json
           exit 1
 
-  # Consciousness-specific benchmarks
+  # Consciousness-specific benchmarks (manual dispatch only — requires self-hosted runner)
   consciousness-benchmarks:
     name: Consciousness Benchmarks (Φ Suite)
     runs-on: [self-hosted, gpu]
-    if: |
-      github.event_name == 'workflow_dispatch' && inputs.benchmark_suite == 'consciousness'
+    if: github.event_name == 'workflow_dispatch' && inputs.benchmark_suite == 'consciousness'
     timeout-minutes: 90
 
     steps:
@@ -262,12 +256,11 @@ jobs:
             target/criterion/consciousness/
             results/phi_report_*.md
 
-  # Ethics and safety benchmarks
+  # Ethics and safety benchmarks (manual dispatch only — requires self-hosted runner)
   ethics-benchmarks:
     name: Ethics & Safety Benchmarks
     runs-on: [self-hosted, gpu]
-    if: |
-      github.event_name == 'workflow_dispatch' && inputs.benchmark_suite == 'ethics'
+    if: github.event_name == 'workflow_dispatch' && inputs.benchmark_suite == 'ethics'
     timeout-minutes: 60
 
     steps:
@@ -350,15 +343,14 @@ jobs:
           python3 scripts/format_summary.py \
             --results aggregated_results.json >> $GITHUB_STEP_SUMMARY
 
-  # OSWorld-Verified: NixOS VM benchmark (self-hosted NixOS runner only)
+  # OSWorld-Verified: NixOS VM benchmark (manual dispatch only — requires self-hosted runner)
   osworld:
     name: OSWorld-Verified Benchmark
     runs-on: [self-hosted, nixos]
     timeout-minutes: 120
     if: |
-      (github.event_name == 'schedule') ||
-      (github.event_name == 'workflow_dispatch' &&
-       (inputs.benchmark_suite == 'full' || inputs.benchmark_suite == 'standard'))
+      github.event_name == 'workflow_dispatch' &&
+      (inputs.benchmark_suite == 'full' || inputs.benchmark_suite == 'standard')
     steps:
       - uses: actions/checkout@v4
 

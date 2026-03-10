@@ -342,6 +342,11 @@ impl DomainPlugin for NixOsPlugin {
         }
     }
 
+    /// Diagnose a NixOS error by matching against known error patterns.
+    ///
+    /// Scans `error_text` (case-insensitive) against `NIX_ERROR_PATTERNS`.
+    /// Returns `Some(ErrorDiagnosis)` with the error type, suggestion, and
+    /// file location (if parseable), or `None` for unrecognized errors.
     fn diagnose_error(&self, error_text: &str) -> Option<ErrorDiagnosis> {
         let lower = error_text.to_lowercase();
 
@@ -369,6 +374,11 @@ impl DomainPlugin for NixOsPlugin {
         None
     }
 
+    /// Validate Nix expression syntax at a structural level.
+    ///
+    /// Checks for balanced braces `{}` and brackets `[]`. Also warns when
+    /// attribute sets contain `=` bindings but no semicolons. Does not
+    /// invoke the Nix parser — this is a fast pre-flight check.
     fn validate_input(&self, input: &str) -> ValidationResult {
         let mut errors = Vec::new();
         let mut warnings = Vec::new();
@@ -405,6 +415,11 @@ impl DomainPlugin for NixOsPlugin {
         }
     }
 
+    /// Score how likely `topic` belongs to the NixOS domain (0.0–1.0).
+    ///
+    /// High-confidence keywords (nixos, nixpkgs, flake.nix, etc.) add +0.4;
+    /// general keywords (boot, services, config) add +0.15. Any match sets
+    /// a floor of 0.6. Returns 0.1 when no keywords match.
     fn is_in_domain(&self, topic: &str) -> f64 {
         let lower = topic.to_lowercase();
         let mut score: f64 = 0.0;
@@ -439,10 +454,12 @@ impl DomainPlugin for NixOsPlugin {
         }
     }
 
+    /// Return the full NixOS keyword vocabulary for HDC encoding.
     fn vocabulary(&self) -> Vec<String> {
         NIXOS_KEYWORDS.iter().map(|s| s.to_string()).collect()
     }
 
+    /// Normalize common NixOS command misspellings (e.g. "nixos rebuild" → "nixos-rebuild").
     fn preprocess(&self, input: &str) -> String {
         input
             .replace("nixos rebuild", "nixos-rebuild")
@@ -451,6 +468,11 @@ impl DomainPlugin for NixOsPlugin {
             .replace("nix shell", "nix-shell")
     }
 
+    /// Suggest NixOS actions based on keywords in `context`.
+    ///
+    /// Matches "install", "error"/"failed", "update"/"upgrade", and
+    /// "space"/"disk"/"garbage" to return relevant nix commands.
+    /// Returns an empty vec when no keywords match.
     fn suggest_actions(&self, context: &str) -> Vec<String> {
         let lower = context.to_lowercase();
         let mut actions = Vec::new();
@@ -695,6 +717,39 @@ mod tests {
         // Non-NixOS should score low
         assert!(plugin.is_in_domain("How do I cook pasta?") < 0.3);
         assert!(plugin.is_in_domain("What is 2 + 2?") < 0.3);
+    }
+
+    #[test]
+    fn test_suggest_actions_install() {
+        let plugin = NixOsPlugin;
+        let actions = plugin.suggest_actions("I want to install firefox");
+        assert!(!actions.is_empty());
+        assert!(actions.iter().any(|a| a.contains("nix-env")));
+    }
+
+    #[test]
+    fn test_suggest_actions_garbage() {
+        let plugin = NixOsPlugin;
+        let actions = plugin.suggest_actions("running out of disk space, need garbage collection");
+        assert!(actions.iter().any(|a| a.contains("nix-collect-garbage")));
+        assert!(actions.iter().any(|a| a.contains("optimise")));
+    }
+
+    #[test]
+    fn test_suggest_actions_no_match() {
+        let plugin = NixOsPlugin;
+        let actions = plugin.suggest_actions("hello world");
+        assert!(actions.is_empty());
+    }
+
+    #[test]
+    fn test_preprocess_normalizes_commands() {
+        let plugin = NixOsPlugin;
+        assert_eq!(
+            plugin.preprocess("nixos rebuild switch"),
+            "nixos-rebuild switch"
+        );
+        assert_eq!(plugin.preprocess("nix env -i vim"), "nix-env -i vim");
     }
 
     #[test]

@@ -61,6 +61,8 @@
 //! println!("Perspectives considered: {}", response.perspectives_considered);
 //! ```
 
+pub mod collective_identity;
+pub mod epistemic_mesh;
 pub mod gis;
 pub mod kosmic_song;
 pub mod mapper;

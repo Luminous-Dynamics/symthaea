@@ -288,6 +288,28 @@ impl EightHarmonies {
         }
     }
 
+    /// Apply governance outcome deltas to harmony activations.
+    ///
+    /// Each delta[i] maps to: [coherence, flourishing, wisdom, play,
+    /// interconnect, reciprocity, evolution, stillness]. Clamped to ±0.05
+    /// per application to prevent sudden swings.
+    pub fn apply_governance_deltas(&mut self, deltas: &[f64; 8]) {
+        let fields = [
+            &mut self.coherence,
+            &mut self.flourishing,
+            &mut self.wisdom,
+            &mut self.play,
+            &mut self.interconnect,
+            &mut self.reciprocity,
+            &mut self.evolution,
+            &mut self.stillness,
+        ];
+        for (field, delta) in fields.into_iter().zip(deltas.iter()) {
+            let clamped = delta.clamp(-0.05, 0.05) as f32;
+            field.activation = (field.activation + clamped).clamp(0.0, 1.0);
+        }
+    }
+
     /// Reset all harmonies to default activation
     pub fn reset(&mut self) {
         self.coherence.activation = 0.5;

@@ -111,6 +111,12 @@ impl CognitiveLoopService {
                 .map(|_| 0.0) // Compassion is per-cycle; snapshot shows lifetime average
                 .unwrap_or(0.0),
             sigma: self.carryover.consciousness.last_sigma,
+            integrity_critical: {
+                #[cfg(feature = "integrity")]
+                { self.integrity_manager.has_critical_anomaly() }
+                #[cfg(not(feature = "integrity"))]
+                { false }
+            },
             avg_cycle_time_us: self.stats.avg_cycle_time_us,
             cycles_per_second: self.stats.cycles_per_second,
         }

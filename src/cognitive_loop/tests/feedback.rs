@@ -983,10 +983,7 @@ fn test_coherence_field_wired_when_enabled() {
     })
     .unwrap();
 
-    assert!(
-        service.coherence_field.is_some(),
-        "CoherenceField should be Some"
-    );
+    assert!(service.coherence_field.is_some(), "CoherenceField should be Some");
 
     // Run a cycle — should not panic, coherence field gets hormone modulation
     let r = service.cycle("coherence test input");
@@ -1028,13 +1025,58 @@ fn test_usi_frustration_dampens_exploration() {
     // Exploration should be dampened when frustrated
     let state = service.user_state().unwrap();
     if state.frustration > 0.5 {
-        // After frustration, exploration bonus should be ≤ baseline
+        // After frustration, exploration rate should be ≤ baseline
         assert!(
             service.carryover.quality.last_exploration_bonus <= baseline_exploration + 0.1,
             "High frustration should dampen exploration"
         );
     }
     let _ = r1; // use binding
+}
+
+#[test]
+fn test_coherence_field_modulates_consciousness() {
+    // With coherence field enabled, the consciousness engine should receive
+    // the coherence level. We verify by running cycles and checking that
+    // the consciousness level is finite and bounded.
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_coherence_field: true,
+        ..Default::default()
+    })
+    .unwrap();
+    // Run a few cycles to let coherence field settle
+    for i in 0..5 {
+        let r = service.cycle(&format!("coherence consciousness test {i}"));
+        assert!(
+            r.metadata.consciousness_level >= 0.0 && r.metadata.consciousness_level <= 1.0,
+            "consciousness_level out of bounds: {}",
+            r.metadata.consciousness_level
+        );
+    }
+    // Verify the coherence field has a valid value
+    let cf = service.coherence_field.as_ref().unwrap();
+    assert!(cf.coherence >= 0.0 && cf.coherence <= 1.0);
+}
+
+#[test]
+fn test_usi_frustration_modulates_neuromod() {
+    // USI frustration > 0.4 should raise NE baseline
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_user_state_inference: true,
+        ..Default::default()
+    })
+    .unwrap();
+    let ne_before = service.neuromod.bath.noradrenaline.baseline_val();
+    // Feed frustrating input patterns (errors, confusion)
+    for _ in 0..3 {
+        service.cycle("error error error ERROR failed broken bug");
+    }
+    let ne_after = service.neuromod.bath.noradrenaline.baseline_val();
+    // NE should have nudged up (or clamped at max 0.8)
+    assert!(
+        ne_after >= ne_before,
+        "Frustration should raise NE baseline: before={ne_before}, after={ne_after}"
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════

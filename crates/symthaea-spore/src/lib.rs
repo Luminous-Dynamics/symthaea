@@ -37,8 +37,13 @@
 
 #![deny(unsafe_code)]
 
+pub mod broca;
 pub mod config;
+pub mod dream;
 pub mod engine;
+pub mod fep;
+pub mod memory;
+pub mod topology;
 
 #[cfg(feature = "wasm")]
 pub mod wasm_bindings;

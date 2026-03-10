@@ -39,8 +39,32 @@ impl CognitiveLoopService {
             // Ramp learning rate from 20% → 100% over warmup period
             let lr_scale = 0.2 + 0.8 * startup_warmup_progress;
             self.stats.adaptive_learning_rate *= lr_scale;
-            // Suppress curiosity during transient (let CfC settle)
-            self.scale_exploration("startup_warmup", startup_warmup_progress);
+            // Session 16 Item 3: Startup exploration ramp.
+            // Instead of flat suppression, ramp from STARTUP_EXPLORATION_INITIAL to 1.0.
+            // Early cycles get heavily constrained; later warmup cycles less so.
+            // Science: Hopfield (1982) — settling time requires graded exploration.
+            let explore_ramp = super::super::thresholds::STARTUP_EXPLORATION_INITIAL
+                + (1.0 - super::super::thresholds::STARTUP_EXPLORATION_INITIAL)
+                    * startup_warmup_progress;
+            self.scale_exploration("startup_warmup", explore_ramp);
+        }
+
+        // Session 16 Item 6: Consciousness EMA → learning rate initialization bias.
+        // High consciousness EMA → system is integrated → slight LR boost.
+        // Low consciousness EMA → fragmented → slight LR dampening.
+        // Science: Dehaene (2014) — integrated processing supports faster learning.
+        if !startup_suppressed && self.stats.total_cycles > 30 {
+            use super::super::thresholds::{
+                CONSCIOUSNESS_EMA_HIGH_THRESHOLD, CONSCIOUSNESS_EMA_LOW_THRESHOLD,
+                CONSCIOUSNESS_EMA_LR_BOOST, CONSCIOUSNESS_EMA_LR_DAMPEN,
+            };
+            let ema = self.carryover.history.consciousness_ema;
+            if ema > CONSCIOUSNESS_EMA_HIGH_THRESHOLD {
+                self.stats.adaptive_learning_rate *= CONSCIOUSNESS_EMA_LR_BOOST;
+            } else if ema < CONSCIOUSNESS_EMA_LOW_THRESHOLD && ema > 0.0 {
+                self.stats.adaptive_learning_rate *= CONSCIOUSNESS_EMA_LR_DAMPEN;
+            }
+            self.stats.adaptive_learning_rate = self.stats.adaptive_learning_rate.clamp(0.0001, 0.1);
         }
 
         // Snapshot exploration_urge for end-of-cycle budget clamping (Task B)

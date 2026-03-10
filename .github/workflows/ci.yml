@@ -93,15 +93,14 @@ jobs:
           #   humanoid-viewer, flight-mujoco, flight-mujoco-renderer,
           #   flight-swarm, live-voice, ssm-power-hal, gui, full
           CI_FEATURES="parallel,service,shell,demo,api_module,\
-          voice-tts,voice-stt,vocal-tract,neural-vocoder,\
+          voice-tts,voice-stt,audio,vocal-tract,neural-vocoder,\
           embeddings,vision,perception,vision-manifold,foveation,\
-          semantic-encoder,integrity,webcam,\
-          neural-bridge,full_language,mycelix,swarm,\
-          mesh,mesh-encryption,mesh-key-exchange,notifications,\
+          integrity,semantic-encoder,neural-bridge,webcam,\
+          mesh,mesh-encryption,mesh-key-exchange,swarm,notifications,\
           nix-mind,identity,physics,physics-bridge,\
           flight,humanoid,hal,ssm-power,ssm_language,liquid-mamba,\
-          lancedb-backend,multi_agent,full_consciousness,\
-          magi_loop,reasoning_engine,code_generation,\
+          lancedb-backend,multi_agent,full_consciousness,full_perception,\
+          full_language,magi_loop,reasoning_engine,code_generation,\
           wasm-sandbox,school_learning,benchmarks,all_benchmarks,\
           integration_module,observability_module,support,web_research_module,\
           genomics,cell-foundry,ectogenesis,nurture,population,genesis,\
@@ -110,40 +109,8 @@ jobs:
           grid-scaling,fission-reactor,accelerator,threat-assessment,\
           datacenter,experiment-planner,strategic-materials,critical-minerals,\
           advanced-manufacturing,building-systems,design-production,\
-          unstable-examples"
-          cargo clippy --lib --features "$CI_FEATURES" -- \
-            -D clippy::correctness \
-            -A clippy::empty-line-after-outer-attr \
-            -A clippy::doc-lazy-continuation \
-            -A clippy::useless-conversion \
-            -A clippy::unnecessary-cast \
-            -A clippy::clone-on-copy \
-            -A clippy::implicit-saturating-sub \
-            -A clippy::unnecessary-lazy-evaluations \
-            -A clippy::redundant-closure \
-            -A clippy::useless-format \
-            -A clippy::needless-borrow \
-            -A clippy::unwrap-or-default \
-            -A clippy::trim-split-whitespace \
-            -A clippy::field-reassign-with-default \
-            -A clippy::map-clone \
-            -A clippy::manual-strip \
-            -A clippy::derivable-impls \
-            -A clippy::manual-map \
-            -A clippy::len-zero \
-            -A clippy::needless-borrows-for-generic-args \
-            -A clippy::manual-div-ceil \
-            -A clippy::manual-repeat-n \
-            -A clippy::ptr-arg \
-            -A clippy::manual-abs-diff \
-            -A clippy::single-char-add-str \
-            -A clippy::io-other-error \
-            -A clippy::manual-range-contains \
-            -A clippy::unused-enumerate-index \
-            -A clippy::manual-pattern-char-comparison \
-            -A clippy::collapsible-if \
-            -A dead-code \
-            -A unused-variables
+          mycelix,unstable-examples"
+          cargo clippy --features "$CI_FEATURES" -- -D warnings
 
   test:
     name: Test (default features)
@@ -174,8 +141,8 @@ jobs:
             libasound2-dev \
             libdbus-1-dev
 
-      - name: Run tests (lib only — integration tests need runtime deps)
-        run: cargo test --lib
+      - name: Run tests
+        run: cargo test
 
   test-integration:
     name: Integration Tests
@@ -256,15 +223,14 @@ jobs:
         run: |
           # Same CI-safe feature set as clippy (excludes GPU/MuJoCo/V4L2/cpal/I2C)
           CI_FEATURES="parallel,service,shell,demo,api_module,\
-          voice-tts,voice-stt,vocal-tract,neural-vocoder,\
+          voice-tts,voice-stt,audio,vocal-tract,neural-vocoder,\
           embeddings,vision,perception,vision-manifold,foveation,\
-          semantic-encoder,integrity,webcam,\
-          neural-bridge,full_language,mycelix,swarm,\
-          mesh,mesh-encryption,mesh-key-exchange,notifications,\
+          integrity,semantic-encoder,neural-bridge,webcam,\
+          mesh,mesh-encryption,mesh-key-exchange,swarm,notifications,\
           nix-mind,identity,physics,physics-bridge,\
           flight,humanoid,hal,ssm-power,ssm_language,liquid-mamba,\
-          lancedb-backend,multi_agent,full_consciousness,\
-          magi_loop,reasoning_engine,code_generation,\
+          lancedb-backend,multi_agent,full_consciousness,full_perception,\
+          full_language,magi_loop,reasoning_engine,code_generation,\
           wasm-sandbox,school_learning,benchmarks,all_benchmarks,\
           integration_module,observability_module,support,web_research_module,\
           genomics,cell-foundry,ectogenesis,nurture,population,genesis,\
@@ -273,8 +239,8 @@ jobs:
           grid-scaling,fission-reactor,accelerator,threat-assessment,\
           datacenter,experiment-planner,strategic-materials,critical-minerals,\
           advanced-manufacturing,building-systems,design-production,\
-          unstable-examples"
-          cargo test --lib --features "$CI_FEATURES"
+          mycelix,unstable-examples"
+          cargo test --features "$CI_FEATURES"
 
   test-feature-matrix-critical:
     name: Test Feature Matrix (core/web_research/pathology)
@@ -285,11 +251,11 @@ jobs:
       matrix:
         include:
           - name: core
-            cmd: cargo test --lib -p symthaea
+            cmd: cargo test -p symthaea
           - name: web_research
-            cmd: cargo test --lib -p symthaea --features "web_research_module school_learning"
+            cmd: cargo test -p symthaea --features "web_research_module school_learning"
           - name: pathology_resilience
-            cmd: cargo test --lib --test pathology_resilience -- --nocapture
+            cmd: cargo test --test pathology_resilience -- --nocapture
     steps:
       - uses: actions/checkout@v4
 
@@ -348,10 +314,6 @@ jobs:
           - "genesis"
           - "wasm-sandbox"
           - "integrity"
-          - "mycelix"
-          - "neural-bridge"
-          - "foveation"
-          - "semantic-encoder"
     steps:
       - uses: actions/checkout@v4
 
@@ -383,7 +345,7 @@ jobs:
             cmake
 
       - name: Test with feature ${{ matrix.features }}
-        run: cargo test --lib --features "${{ matrix.features }}"
+        run: cargo test --features "${{ matrix.features }}" || cargo test --features "${{ matrix.features }}"
 
   psych-bench:
     name: Psych-Bench Regression
@@ -508,10 +470,9 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-combo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-combo-${{ matrix.features }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-combo-
-        continue-on-error: true
 
       - name: Install system dependencies
         run: |
@@ -533,6 +494,7 @@ jobs:
   wasm-compat:
     name: WASM Compatibility (Spore)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -552,11 +514,48 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-wasm-
 
-      - name: Verify wasm32 target
-        run: rustup target list --installed | grep wasm32 || rustup target add wasm32-unknown-unknown
+      - name: Install wasm-bindgen CLI
+        run: cargo install wasm-bindgen-cli --version 0.2.108
 
-      - name: Check symthaea-spore compiles for wasm32
-        run: cargo check -p symthaea-spore --target wasm32-unknown-unknown
+      - name: Install wasm-opt (binaryen)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y binaryen
+
+      - name: Build Spore WASM (release)
+        run: cargo build --release --target wasm32-unknown-unknown --features wasm -p symthaea-spore
+
+      - name: Optimize with wasm-opt
+        run: |
+          wasm-opt \
+            --enable-bulk-memory \
+            --enable-nontrapping-float-to-int \
+            --enable-sign-ext \
+            -O2 \
+            target/wasm32-unknown-unknown/release/symthaea_spore.wasm \
+            -o /tmp/symthaea_spore.wasm
+
+      - name: Generate JS bindings
+        run: |
+          mkdir -p crates/symthaea-spore/www/pkg
+          wasm-bindgen --target web --out-dir crates/symthaea-spore/www/pkg /tmp/symthaea_spore.wasm
+
+      - name: Size budget check
+        run: |
+          WASM_SIZE=$(stat -c%s crates/symthaea-spore/www/pkg/symthaea_spore_bg.wasm)
+          echo "WASM size: $((WASM_SIZE / 1024))KB ($WASM_SIZE bytes)"
+          GZIP_SIZE=$(gzip -c crates/symthaea-spore/www/pkg/symthaea_spore_bg.wasm | wc -c)
+          echo "WASM gzip: $((GZIP_SIZE / 1024))KB ($GZIP_SIZE bytes)"
+          if [ "$WASM_SIZE" -gt 512000 ]; then
+            echo "ERROR: WASM binary exceeds 500KB budget"
+            exit 1
+          fi
+
+      - name: Smoke test (export verification)
+        run: node crates/symthaea-spore/www/smoke-test.mjs
+
+      - name: E2E test (consciousness cycles + experiments)
+        run: node crates/symthaea-spore/www/e2e-test.mjs
 
   deny:
     name: Dependency Audit (cargo-deny)

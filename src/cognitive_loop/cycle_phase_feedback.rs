@@ -39,11 +39,14 @@ use super::thresholds::{
     SOCIAL_LR_BASE, SOCIAL_LR_RANGE, SPEECH_RATE_CLAMP_MAX, SPEECH_RATE_CLAMP_MIN,
     STRUCTURAL_BOTTLENECK_LR_SCALE, STRUCTURAL_BOTTLENECK_THRESHOLD,
     STRUCTURAL_EMERGENCE_CONFIDENCE_BOOST, STRUCTURAL_EMERGENCE_CONFIDENCE_THRESHOLD,
-    SUBSYSTEM_LR_FACTOR_MAX, SUBSYSTEM_LR_FACTOR_MIN, TEMPORAL_CHAIN_DEEP_LR_SCALE,
-    TEMPORAL_CHAIN_DEEP_THRESHOLD, TEMPORAL_CHAIN_SHALLOW_LR_SCALE,
-    TEMPORAL_CHAIN_SHALLOW_THRESHOLD, TOM_ACCURACY_HIGH, TOM_ACCURACY_LOW, TOM_ACCURACY_SCALE,
-    TRUST_DECAY_FACTOR, TRUST_SIGNAL_MIDPOINT, TRUST_SIGNAL_RATE, UNIFIED_QUALITY_AGREEMENT_WEIGHT,
-    UNIFIED_QUALITY_ANOMALY_WEIGHT, UNIFIED_QUALITY_PREDICTION_WEIGHT,
+    TEMPORAL_CHAIN_DEEP_LR_SCALE, TEMPORAL_CHAIN_DEEP_THRESHOLD,
+    TEMPORAL_CHAIN_SHALLOW_LR_SCALE, TEMPORAL_CHAIN_SHALLOW_THRESHOLD,
+    SUBSYSTEM_LR_FACTOR_MAX, SUBSYSTEM_LR_FACTOR_MIN, TOM_ACCURACY_HIGH, TOM_ACCURACY_LOW,
+    TOM_ACCURACY_SCALE, TRUST_DECAY_FACTOR, TRUST_SIGNAL_MIDPOINT, TRUST_SIGNAL_RATE,
+    UNIFIED_QUALITY_AGREEMENT_WEIGHT, UNIFIED_QUALITY_ANOMALY_WEIGHT,
+    UNIFIED_QUALITY_PREDICTION_WEIGHT,
+    KOSMIC_SONG_INTERVAL, KOSMIC_LOW_COHERENCE_THRESHOLD, KOSMIC_LOW_COHERENCE_EXPLORATION_DAMPEN,
+    KOSMIC_HIGH_COHERENCE_THRESHOLD, KOSMIC_HIGH_COHERENCE_CONFIDENCE_BOOST,
 };
 use super::{CognitiveLoopService, CycleState};
 
@@ -80,7 +83,7 @@ impl CognitiveLoopService {
             #[cfg(feature = "vision-manifold")]
             scene_recognized: perception.scene_recognized,
             #[cfg(feature = "semantic-encoder")]
-            semantic_embedding: None, // TODO: wire to semantic_embedding_channel
+            semantic_embedding: self.last_semantic_continuous.as_deref(),
         };
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -129,12 +132,18 @@ impl CognitiveLoopService {
         if temporal_max_chain_length >= TEMPORAL_CHAIN_DEEP_THRESHOLD
             && self.stats.total_cycles > 15
         {
-            self.scale_lr("deep_causal_chain", TEMPORAL_CHAIN_DEEP_LR_SCALE);
+            self.scale_lr(
+                "deep_causal_chain",
+                TEMPORAL_CHAIN_DEEP_LR_SCALE,
+            );
         } else if temporal_max_chain_length > 0
             && temporal_max_chain_length <= TEMPORAL_CHAIN_SHALLOW_THRESHOLD
             && self.stats.total_cycles > 15
         {
-            self.scale_lr("shallow_causal_chain", TEMPORAL_CHAIN_SHALLOW_LR_SCALE);
+            self.scale_lr(
+                "shallow_causal_chain",
+                TEMPORAL_CHAIN_SHALLOW_LR_SCALE,
+            );
         }
 
         let value_embeddings_created = consciousness_metrics.value_embeddings_created;
@@ -398,19 +407,20 @@ impl CognitiveLoopService {
         // Low pipeline consciousness → tighten caution (subsystems aren't coherent).
         // Science: Dehaene (2014) — global workspace ignition requires integrated processing.
         self.carryover.quality.last_pipeline_consciousness = pipeline_consciousness;
-        let _pipeline_consciousness_gated =
-            if pipeline_consciousness > 0.7 && self.stats.total_cycles > 15 {
-                self.scale_threshold("pipeline_conscious_relax", 0.97);
-                true
-            } else if pipeline_consciousness < 0.3
-                && pipeline_consciousness > 0.0
-                && self.stats.total_cycles > 15
-            {
-                self.scale_threshold("pipeline_conscious_caution", 1.03);
-                true
-            } else {
-                false
-            };
+        let _pipeline_consciousness_gated = if pipeline_consciousness > 0.7
+            && self.stats.total_cycles > 15
+        {
+            self.scale_threshold("pipeline_conscious_relax", 0.97);
+            true
+        } else if pipeline_consciousness < 0.3
+            && pipeline_consciousness > 0.0
+            && self.stats.total_cycles > 15
+        {
+            self.scale_threshold("pipeline_conscious_caution", 1.03);
+            true
+        } else {
+            false
+        };
 
         // ═══════════════════════════════════════════════════════════════════════
         // RESONATOR CODEBOOK GROWTH
@@ -678,6 +688,17 @@ impl CognitiveLoopService {
                 // Moral topology → consciousness coupling
                 moral_drift: self.ethics_engine.moral_topology().moral_drift(20),
                 moral_anomaly_score: self.ethics_engine.last_anomaly_report().anomaly_score,
+                // HOT recursion depth: meta_cognition depth × substrate HOT capability
+                hot_depth: self
+                    .self_model_tier
+                    .meta_cognition
+                    .as_ref()
+                    .map(|mc| {
+                        let normalized_depth = mc.depth() as f64 / 3.0;
+                        normalized_depth
+                            * self.substrate_manager.hot_capability(&self.config)
+                    })
+                    .unwrap_or(0.5), // preserve backward compat when disabled
             },
         );
         self.consciousness_engine
@@ -870,6 +891,79 @@ impl CognitiveLoopService {
             soul.integrate_experience(experience);
         }
         module_timings.soul_experience = _t.elapsed().as_micros() as u64;
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // KOSMIC SONG: Unified Identity Synthesis
+        // Phi × HarmonicAlignment × MoralClarity → coherence_score
+        // Gates FEP learning rate and exploration when identity is fragmented.
+        // Science: Gallagher (2000) — narrative self underpins agency;
+        // Conway & Pleydell-Pearce (2000) — self-coherence → decision confidence.
+        // ═══════════════════════════════════════════════════════════════════════
+        let kosmic_coherence = if self.stats.total_cycles % KOSMIC_SONG_INTERVAL == 0 {
+            // Feed current Phi into KosmicSong
+            self.kosmic_song.phi = (equation_v2_consciousness as f32).clamp(0.0, 0.5);
+
+            // Feed current moral uncertainty from ethics engine
+            let drift = self.ethics_engine.moral_topology().moral_drift(20);
+            if drift > 0.0 {
+                self.kosmic_song.moral_uncertainty =
+                    crate::mycelix::gis::MoralUncertainty::new(drift as f32, drift as f32 * 0.8, drift as f32 * 0.6);
+            }
+
+            // Synthesize all layers
+            let result = self.kosmic_song.synthesize();
+            self.carryover.quality.last_kosmic_coherence = result.score;
+            result.score
+        } else {
+            self.carryover.quality.last_kosmic_coherence
+        };
+
+        // Behavioral coupling from KosmicSong coherence
+        if self.stats.total_cycles > 10 {
+            if kosmic_coherence < KOSMIC_LOW_COHERENCE_THRESHOLD {
+                self.scale_exploration(
+                    "kosmic_low_coherence",
+                    KOSMIC_LOW_COHERENCE_EXPLORATION_DAMPEN,
+                );
+            } else if kosmic_coherence > KOSMIC_HIGH_COHERENCE_THRESHOLD {
+                self.adjust_confidence(
+                    "kosmic_high_coherence",
+                    KOSMIC_HIGH_COHERENCE_CONFIDENCE_BOOST,
+                );
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // USER STATE INFERENCE → BEHAVIORAL COUPLING
+        // Swanson (2000) — frustration dampens exploration; engagement boosts learning.
+        // ═══════════════════════════════════════════════════════════════════════
+        let usi_vals = self.user_state.as_ref().map(|usi| {
+            let state = usi.state();
+            (state.frustration, state.cognitive_load.level, state.engagement)
+        });
+        if let Some((frustration, cognitive_load_level, engagement)) = usi_vals {
+            // High frustration → dampen exploration (user is struggling)
+            if frustration > 0.6 {
+                self.scale_exploration(
+                    "user_frustration",
+                    1.0 - (frustration as f32 - 0.6) * 0.25, // 0.9 at max frustration
+                );
+            }
+            // High cognitive load → reduce learning rate (prevent overload)
+            if cognitive_load_level > 0.7 {
+                self.scale_lr(
+                    "user_cognitive_load",
+                    1.0 - (cognitive_load_level as f32 - 0.7) * 0.3, // 0.91 at max load
+                );
+            }
+            // High engagement → boost confidence slightly
+            if engagement > 0.8 {
+                self.adjust_confidence(
+                    "user_engagement",
+                    (engagement as f32 - 0.8) * 0.05, // up to 0.01 boost
+                );
+            }
+        }
 
         // ── Phi-Dyad: Relational Consciousness ─────────────────────────────
         // Compute Φ_dyad from recent AI + input HVs (Phase 6 wiring).
@@ -1273,6 +1367,7 @@ impl CognitiveLoopService {
                 empathic_compassion,
                 empathic_tone_adj,
                 empathic_speech_rate_mod,
+                kosmic_coherence,
             },
             evolution: FbEvolution {
                 hierarchical_ltc_phi,

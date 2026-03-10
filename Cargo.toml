@@ -53,6 +53,7 @@ members = [
     "crates/symthaea-phi-oracle",
     "crates/symthaea-pulse",
     "crates/symthaea-spore",
+    "crates/symthaea-crucible",
 ]
 
 [workspace.dependencies]
@@ -99,6 +100,7 @@ homepage = "https://luminousdynamics.org"
 documentation = "https://docs.rs/symthaea"
 keywords = ["consciousness", "ai", "hdc", "integrated-information", "neuroscience"]
 categories = ["science", "algorithms", "data-structures"]
+
 
 [dependencies]
 # Symthaea Core - HDC, Φ engine, and minimal consciousness pipeline
@@ -514,6 +516,7 @@ all_benchmarks = ["benchmarks", "physics"]              # All benchmarking featu
 criterion = "0.5"
 proptest = "1.4"
 serial_test = "3.2"
+symthaea-crucible = { path = "crates/symthaea-crucible" }
 tempfile = "3.8"  # For perception tests
 
 # Binaries

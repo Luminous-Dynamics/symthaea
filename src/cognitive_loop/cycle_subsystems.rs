@@ -617,9 +617,7 @@ impl CognitiveLoopService {
         let (empathic_compassion, empathic_tone_adj) =
             if let Some(ref mut empathy) = self.primitive_tier.empathic_unification {
                 if self.stats.total_cycles % 11 == 0 {
-                    let context = self
-                        .user_state
-                        .as_ref()
+                    let context = self.user_state.as_ref()
                         .map(|usi| usi.state().context)
                         .unwrap_or(crate::user_state_inference::ContextKind::Task);
                     let response = empathy.process(input, context);
@@ -641,6 +639,27 @@ impl CognitiveLoopService {
                 1.0 + (empathic_compassion as f32 - 0.7) * 0.02;
             self.carryover.learning.subsystem_lr_factor =
                 self.carryover.learning.subsystem_lr_factor.clamp(0.8, 1.2);
+        }
+
+        // NEUROMOD COUPLING: Empathic compassion → oxytocin + dopamine production.
+        // High compassion indicates prosocial resonance — reward via DA, bond via OXY.
+        // Science: Feldman (2012) — empathic resonance drives oxytocin release;
+        // Rilling et al. (2002) — mutual cooperation activates DA reward circuits.
+        {
+            use super::thresholds::{
+                EMPATHIC_COMPASSION_OXY_THRESHOLD, EMPATHIC_COMPASSION_OXY_SCALE,
+                EMPATHIC_COMPASSION_DA_THRESHOLD, EMPATHIC_COMPASSION_DA_SCALE,
+            };
+            if empathic_compassion > EMPATHIC_COMPASSION_OXY_THRESHOLD {
+                let oxy_boost = (empathic_compassion as f32 - EMPATHIC_COMPASSION_OXY_THRESHOLD as f32)
+                    * EMPATHIC_COMPASSION_OXY_SCALE;
+                self.neuromod.bath.oxytocin.produce(oxy_boost);
+            }
+            if empathic_compassion > EMPATHIC_COMPASSION_DA_THRESHOLD {
+                let da_boost = (empathic_compassion as f32 - EMPATHIC_COMPASSION_DA_THRESHOLD as f32)
+                    * EMPATHIC_COMPASSION_DA_SCALE;
+                self.neuromod.bath.dopamine.produce(da_boost);
+            }
         }
 
         // ═══════════════════════════════════════════════════════════════════════

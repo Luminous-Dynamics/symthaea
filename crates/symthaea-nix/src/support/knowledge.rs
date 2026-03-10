@@ -229,10 +229,12 @@ impl KnowledgeBase {
             });
         }
 
+        // Sort by similarity descending, with stable tie-breaking on article ID
         scored.sort_by(|a, b| {
             b.similarity()
                 .partial_cmp(&a.similarity())
                 .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.id().cmp(b.id()))
         });
         scored.truncate(k);
 
@@ -296,10 +298,12 @@ impl KnowledgeBase {
             })
             .collect();
 
+        // Sort by similarity descending, with stable tie-breaking on article ID
         scored.sort_by(|a, b| {
             b.similarity
                 .partial_cmp(&a.similarity)
                 .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.article.id.cmp(b.article.id))
         });
         scored.truncate(k);
         scored
@@ -1360,5 +1364,42 @@ mod tests {
             Some(hits_before),
             "Hit count should be preserved through save/load"
         );
+    }
+
+    #[test]
+    fn test_search_sort_stability() {
+        let mut codebook = NixCodebook::new();
+        let kb = KnowledgeBase::new(&mut codebook);
+
+        // Run the same search twice — results should be in the same order
+        let r1 = kb.search("error hash", &mut codebook, 10);
+        let r2 = kb.search("error hash", &mut codebook, 10);
+
+        let ids1: Vec<&str> = r1.iter().map(|m| m.article.id).collect();
+        let ids2: Vec<&str> = r2.iter().map(|m| m.article.id).collect();
+        assert_eq!(ids1, ids2, "Sort should be deterministic across runs");
+    }
+
+    #[test]
+    fn test_search_all_sort_stability() {
+        let mut codebook = NixCodebook::new();
+        let mut kb = KnowledgeBase::new(&mut codebook);
+        kb.add_learned_article(
+            make_dynamic_article("dyn-stab-1", "Stability test A"),
+            &mut codebook,
+        );
+        kb.add_learned_article(
+            make_dynamic_article("dyn-stab-2", "Stability test B"),
+            &mut codebook,
+        );
+
+        let r1 = kb.search_all("stability test", &mut codebook, 10);
+        let ids1: Vec<String> = r1.iter().map(|m| m.id().to_string()).collect();
+        drop(r1);
+
+        let r2 = kb.search_all("stability test", &mut codebook, 10);
+        let ids2: Vec<String> = r2.iter().map(|m| m.id().to_string()).collect();
+
+        assert_eq!(ids1, ids2, "search_all sort should be deterministic");
     }
 }

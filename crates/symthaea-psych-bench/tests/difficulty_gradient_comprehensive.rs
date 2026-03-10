@@ -148,9 +148,7 @@ fn comprehensive_difficulty_gradient() {
         "WorM::N-back",              // nback_2::accuracy ceiling at dim=128
         "WorM::SpatialUpdating",     // overall_accuracy at ceiling (1.0)
         "SustainedAttention::CPT",   // d' at ceiling with dim=128 HVs
-        // SustainedAttention::SART and Social::RME now have difficulty properly
-        // wired into their run_trial() — removed from exempt list.
-        "ToMBench::Hinting", // keyword-dominant scoring, sigmoid too flat
+        "ToMBench::Hinting",         // keyword-dominant scoring, sigmoid too flat
     ];
 
     let mut failures = Vec::new();

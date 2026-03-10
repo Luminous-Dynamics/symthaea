@@ -35,15 +35,32 @@ pub fn search_aliases(query: &str) -> Vec<(&'static str, &'static str)> {
         .collect()
 }
 
+/// Minimum Jaro-Winkler similarity to consider a suggestion relevant.
+/// Aliases scoring below this are omitted from results.
+const SUGGEST_MIN_SIMILARITY: f64 = 0.6;
+
 /// Suggest similar aliases using edit distance (for typo correction).
+///
+/// Skips aliases whose length differs too much from the query (heuristic
+/// early-exit) and filters out entries below `SUGGEST_MIN_SIMILARITY`.
 pub fn suggest_similar(name: &str, max: usize) -> Vec<(&'static str, &'static str)> {
     let q = name.to_lowercase();
+    let q_len = q.len();
+    // Aliases whose length differs by more than 50% are unlikely matches
+    let min_len = q_len / 2;
+    let max_len = q_len.saturating_mul(2);
+
     let mut scored: Vec<_> = ALIASES
         .iter()
+        .filter(|(alias, _)| {
+            let a_len = alias.len();
+            a_len >= min_len && a_len <= max_len
+        })
         .map(|(alias, pkg)| {
             let dist = strsim::jaro_winkler(alias, &q);
             (dist, *alias, *pkg)
         })
+        .filter(|(dist, _, _)| *dist >= SUGGEST_MIN_SIMILARITY)
         .collect();
     scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
     scored
@@ -815,5 +832,43 @@ mod tests {
         assert_eq!(resolve_alias("illustrator"), Some("inkscape"));
         assert_eq!(resolve_alias("word"), Some("libreoffice"));
         assert_eq!(resolve_alias("matlab"), Some("octave"));
+    }
+
+    #[test]
+    fn test_suggest_similar_filters_low_similarity() {
+        // "zzzzzzzzz" matches nothing well — should get empty or very few results
+        let results = suggest_similar("zzzzzzzzz", 10);
+        // All returned results should have similarity >= SUGGEST_MIN_SIMILARITY
+        // (we can't directly check score, but absurdly different strings should be filtered)
+        assert!(
+            results.len() <= 3,
+            "Garbage input should produce few suggestions, got {}",
+            results.len()
+        );
+    }
+
+    #[test]
+    fn test_suggest_similar_length_filter() {
+        // Very short query — should skip very long aliases
+        let results = suggest_similar("ab", 5);
+        // Results should exist (some short aliases match) but not include
+        // aliases like "midnight commander" which is way longer
+        for (alias, _) in &results {
+            assert!(
+                alias.len() <= 4,
+                "Short query 'ab' should not match long alias '{alias}'"
+            );
+        }
+    }
+
+    #[test]
+    fn test_suggest_similar_still_finds_typos() {
+        // "fierfox" is a classic typo for "firefox" — should still be found
+        let results = suggest_similar("fierfox", 3);
+        assert!(!results.is_empty(), "Should find suggestions for typo");
+        assert_eq!(
+            results[0].0, "firefox",
+            "Top suggestion should be firefox"
+        );
     }
 }

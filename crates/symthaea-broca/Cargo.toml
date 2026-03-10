@@ -32,6 +32,10 @@ name = "broca-train"
 path = "src/bin/broca_train.rs"
 
 [[bin]]
+name = "broca-eval"
+path = "src/bin/broca_eval.rs"
+
+[[bin]]
 name = "broca-collect"
 path = "src/bin/broca_collect.rs"
 required-features = ["collect"]

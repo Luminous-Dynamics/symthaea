@@ -236,6 +236,15 @@ pub(crate) struct QualityMetrics {
     pub(crate) consecutive_low_td_error: u32,
     /// Consecutive cycles with high unified quality (for exploration floor).
     pub(crate) consecutive_high_quality: u32,
+    /// Consecutive cycles where epistemic gate rejected (Session 16).
+    /// Science: Berlyne (1960) — sustained rejection = model failure.
+    pub(crate) consecutive_epistemic_rejections: u32,
+    /// Consecutive cycles with near-zero consciousness gradient (Session 16).
+    /// Science: Tononi (2004) — stable consciousness = reliable integration.
+    pub(crate) consecutive_stable_gradient: u32,
+    /// Last KosmicSong coherence score (0.0-1.0, cached from last synthesis).
+    /// Synthesis of Phi × HarmonicAlignment × MoralClarity.
+    pub(crate) last_kosmic_coherence: f32,
 }
 
 impl Default for QualityMetrics {
@@ -275,6 +284,9 @@ impl Default for QualityMetrics {
             interference_free_cycles: 0,
             consecutive_low_td_error: 0,
             consecutive_high_quality: 0,
+            consecutive_epistemic_rejections: 0,
+            consecutive_stable_gradient: 0,
+            last_kosmic_coherence: 0.5,
         }
     }
 }
