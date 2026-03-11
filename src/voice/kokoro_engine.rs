@@ -87,7 +87,7 @@ impl KokoroEngine {
 
         // Create ONNX Runtime session (ort 2.0 API)
         let session = match ort::session::Session::builder()
-            .and_then(|builder| builder.commit_from_file(&model_path))
+            .and_then(|mut builder| builder.commit_from_file(&model_path))
         {
             Ok(session) => session,
             Err(e) => {

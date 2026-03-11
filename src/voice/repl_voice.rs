@@ -2061,7 +2061,7 @@ impl ReplVoiceOutput {
         let g2p = SimpleG2P::new();
 
         // Try to initialize audio
-        let (audio_available, _audio_stream, _audio_sink) = Self::init_audio(&config);
+        let (audio_available, _audio_stream, audio_sink) = Self::init_audio(&config);
 
         // Initialize LTC pipeline if requested and feature-enabled
         #[cfg(feature = "vocal-tract")]

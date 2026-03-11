@@ -131,7 +131,7 @@ impl NeuralVocoderChannel {
             .name("symthaea-neural-vocoder".into())
             .spawn(move || {
                 // Build ONNX session — optionally with GPU execution provider
-                let builder = match ort::session::Session::builder() {
+                let mut builder = match ort::session::Session::builder() {
                     Ok(b) => b,
                     Err(e) => {
                         warn!("Failed to create session builder: {}. Thread exiting.", e);
@@ -141,7 +141,7 @@ impl NeuralVocoderChannel {
 
                 // GPU acceleration (improvement #7)
                 #[cfg(feature = "neural-vocoder-gpu")]
-                let builder = if _use_gpu {
+                let mut builder = if _use_gpu {
                     info!("Attempting GPU acceleration for BigVGAN...");
                     // Try CUDA first, then CoreML, fall back to CPU
                     match builder.with_execution_providers([
