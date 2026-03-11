@@ -1701,12 +1701,33 @@ pub fn issue_credential_with_proof(input: IssueCredentialWithProofInput) -> Exte
 
 /// Format timestamp as ISO 8601 string
 fn format_timestamp_iso8601(ts: Timestamp) -> String {
-    // Convert microseconds to RFC 3339 format
-    let secs = ts.as_micros() / 1_000_000;
-    let _nanos = ((ts.as_micros() % 1_000_000) * 1000) as u32;
+    // Convert microseconds → RFC 3339 / ISO 8601 (no chrono in WASM)
+    let total_secs = ts.as_micros() / 1_000_000;
 
-    // Simple formatting (would use chrono in production)
-    format!("{}Z", secs)
+    // Days since Unix epoch
+    let days = total_secs / 86400;
+    let day_secs = total_secs % 86400;
+    let hour = day_secs / 3600;
+    let minute = (day_secs % 3600) / 60;
+    let second = day_secs % 60;
+
+    // Civil date from day count (Euclidean affine algorithm)
+    // Shift epoch to 0000-03-01 for easy leap year math
+    let z = days + 719468; // days from 0000-03-01 to 1970-01-01
+    let era = z / 146097;
+    let doe = z - era * 146097; // day of era [0, 146096]
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    let y = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = if m <= 2 { y + 1 } else { y };
+
+    format!(
+        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z",
+        y, m, d, hour, minute, second
+    )
 }
 
 // =============================================================================
