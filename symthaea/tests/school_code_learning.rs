@@ -1,4 +1,4 @@
-#![cfg(feature = "code_generation")]
+#![cfg(all(feature = "code_generation", feature = "school_learning"))]
 //! Integration test: School Code Learning with real compilation
 //!
 //! Runs the CodeLearningEngine with real `rustc` execution to validate
