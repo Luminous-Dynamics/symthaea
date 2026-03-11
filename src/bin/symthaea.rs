@@ -1051,9 +1051,7 @@ impl ServiceState {
                 phi_threshold,
                 require_confirmation,
             } => {
-                use symthaea::action::{
-                    classify_command_destructiveness, get_rollback_hint, DestructivenessLevel,
-                };
+                use symthaea::action::{classify_command_destructiveness, get_rollback_hint};
 
                 let intro = self.symthaea.introspect();
                 let current_phi = intro.consciousness_level; // Use consciousness_level as phi
@@ -1204,7 +1202,7 @@ impl ServiceState {
 
 /// Generate IntelliSense completions for partial input
 fn generate_intellisense_completions(partial: &str) -> Vec<Completion> {
-    use symthaea::action::{classify_command_destructiveness, DestructivenessLevel};
+    use symthaea::action::classify_command_destructiveness;
 
     let partial_lower = partial.to_lowercase();
     let mut completions = Vec::new();
@@ -1319,7 +1317,7 @@ fn calculate_completion_confidence(partial: &str, full: &str) -> f32 {
 
 /// Generate command preview for multi-step operations
 fn generate_command_preview(command: &str) -> Option<CommandPreview> {
-    use symthaea::action::{classify_command_destructiveness, DestructivenessLevel};
+    use symthaea::action::classify_command_destructiveness;
 
     let parts: Vec<&str> = command.split_whitespace().collect();
     if parts.is_empty() {
