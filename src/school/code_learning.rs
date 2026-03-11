@@ -854,6 +854,11 @@ impl ErrorPatternTracker {
         self.patterns.len()
     }
 
+    /// Whether there are no tracked patterns.
+    pub fn is_empty(&self) -> bool {
+        self.patterns.is_empty()
+    }
+
     /// Number of evolved patterns.
     pub fn evolved_count(&self) -> usize {
         self.patterns.values().filter(|p| p.evolved).count()

@@ -1000,7 +1000,7 @@ impl CognitiveLoopService {
             });
 
         // Encode all 8 harmony keyword strings in batch
-        let keyword_refs: Vec<&str> = HARMONY_KEYWORDS.iter().copied().collect();
+        let keyword_refs: Vec<&str> = HARMONY_KEYWORDS.to_vec();
         let batch_result = match embedder.embed_batch(&keyword_refs) {
             Ok(results) => results,
             Err(e) => {

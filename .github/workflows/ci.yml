@@ -142,7 +142,7 @@ jobs:
             libdbus-1-dev
 
       - name: Run tests
-        run: cargo test
+        run: cargo test --lib
 
   test-integration:
     name: Integration Tests
