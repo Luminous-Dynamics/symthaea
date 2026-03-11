@@ -17,7 +17,7 @@ use std::collections::HashMap;
 use symthaea_core::hdc::ContinuousHV;
 
 use crate::hdc::code_encoder::CodeHDEncoder;
-use crate::language::code_parser::{CodeEntity, EntityKind, ParsedCode, Relation};
+use crate::language::code_parser::{CodeEntity, ParsedCode};
 
 /// Phi-inspired code quality score
 #[derive(Debug, Clone)]
@@ -234,7 +234,7 @@ impl PhiCodeAnalyzer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::language::code_parser::{CodeRelation, CodeStructure, Span};
+    use crate::language::code_parser::{CodeRelation, CodeStructure, EntityKind, Relation, Span};
 
     fn test_span() -> Span {
         Span {

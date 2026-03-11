@@ -642,7 +642,7 @@ pub fn try_auto_fix(source: &str, errors: &[String]) -> Option<String> {
                 let var_clean = var.trim_start_matches('*');
                 // Only clone if the variable is used, not a field access
                 if !var_clean.contains('.') {
-                    let use_pattern = format!("{}", var_clean);
+                    let _use_pattern = format!("{}", var_clean);
                     // Don't blindly add .clone() — too risky without line info
                 }
             }

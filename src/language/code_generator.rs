@@ -168,7 +168,6 @@ impl ControlFlowInfo {
                     "UNREACHABLE_CODE: line {} after return/break",
                     i + 1
                 ));
-                prev_was_terminator = false;
             }
             prev_was_terminator = trimmed.starts_with("return ")
                 || trimmed == "return;"
@@ -788,7 +787,7 @@ impl CodeGenerator {
     /// Used for test-first generation: produce behavioral expectations before
     /// generating the code. Tests come from spec examples + purpose-based auto-tests.
     pub fn generate_tests_only(&self, spec: &CodeSpec) -> Option<String> {
-        let emitter: &dyn CodeEmitter = match spec.language.as_str() {
+        let _emitter: &dyn CodeEmitter = match spec.language.as_str() {
             "rust" => &self.rust_emitter,
             "python" => &self.python_emitter,
             "nix" => &self.nix_emitter,
@@ -1101,7 +1100,9 @@ impl CodeGenerator {
                         result.insert_str(line_start, &format!("{}/// {}\n", whitespace, content));
                     }
                 }
-                CodeChange::AddErrorHandling { strategy } => {
+                CodeChange::AddErrorHandling {
+                    strategy: _strategy,
+                } => {
                     // Wrap return type in Result if not already
                     let fn_pattern = format!("fn {}(", func_name);
                     if let Some(fn_pos) = result.find(&fn_pattern) {

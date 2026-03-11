@@ -10,8 +10,7 @@
 //! consciousness state is exposed to the translation layer.
 
 use crate::language::llm_organ::{
-    ConversationMessage, LLMGenerationResult, LLMOrgan, LLMQuery, LLMQueryParams, MessageRole,
-    QueryType,
+    ConversationMessage, LLMGenerationResult, LLMOrgan, LLMQuery, LLMQueryParams, QueryType,
 };
 
 /// Lightweight meta-consciousness state for LLM prompt augmentation.
@@ -161,6 +160,7 @@ impl Default for MetaConsciousLlmBridge {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::language::llm_organ::MessageRole;
 
     #[test]
     fn test_build_request_includes_meta_summary() {

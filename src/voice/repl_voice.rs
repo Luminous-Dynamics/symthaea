@@ -2651,8 +2651,6 @@ impl ReplVoiceOutput {
     /// Play audio samples
     #[cfg(feature = "audio")]
     fn play_audio(&mut self, samples: &[f32]) -> Result<()> {
-        use rodio::Source;
-
         if !self.audio_available {
             debug!("Audio not available, skipping playback");
             return Ok(());
@@ -2661,7 +2659,7 @@ impl ReplVoiceOutput {
         let sink = self
             .audio_sink
             .as_ref()
-            .ok_or_else(|| anyhow!("Audio sink not initialized"))?;
+            .ok_or_else(|| anyhow::anyhow!("Audio sink not initialized"))?;
 
         // Create rodio source from samples
         let sample_rate = self.config.sample_rate;

@@ -56,9 +56,8 @@ use super::resilience::{
     ResilientResult,
 };
 use crate::perception::{
-    ImageCaption, ImageEmbedding, ModalityType, MultiModalConfig, MultiModalPerception, OcrSystem,
-    PerceptionInput, SemanticVision, VisionConfig, VisualCortex, VisualCortexConfig,
-    VisualFeatures,
+    ImageCaption, ImageEmbedding, ModalityType, MultiModalPerception, OcrSystem, PerceptionInput,
+    SemanticVision, VisionConfig, VisualCortex, VisualCortexConfig, VisualFeatures,
 };
 use symthaea_core::hdc::causal_mind::{CausalMind, GroundedCausalLearning};
 use symthaea_core::hdc::ContinuousHV as HdcVector;

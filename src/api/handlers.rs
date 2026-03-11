@@ -529,7 +529,7 @@ fn process_submission_inline(state: &AppState, submission_id: Uuid, request: &Su
 pub async fn get_results(
     State(state): State<Arc<AppState>>,
     Path(submission_id): Path<Uuid>,
-    Query(params): Query<std::collections::HashMap<String, String>>,
+    Query(_params): Query<std::collections::HashMap<String, String>>,
 ) -> Result<Json<EvaluationResult>, (StatusCode, Json<ApiError>)> {
     // Check if result exists
     if let Some(result) = state.results.read().await.get(&submission_id) {
@@ -811,7 +811,7 @@ async fn get_model_info(
 /// Run dimensional sweep analysis
 pub async fn dimensional_sweep(
     State(state): State<Arc<AppState>>,
-    Json(request): Json<DimensionalSweepRequest>,
+    Json(_request): Json<DimensionalSweepRequest>,
 ) -> Result<(StatusCode, Json<SubmissionResponse>), (StatusCode, Json<ApiError>)> {
     let _permit = state.request_semaphore.acquire().await.map_err(|_| {
         (
