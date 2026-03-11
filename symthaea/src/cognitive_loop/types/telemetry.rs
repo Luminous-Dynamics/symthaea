@@ -1474,6 +1474,15 @@ pub struct EthicalTelemetry {
     pub empathic_speech_rate_mod: f32,
     /// KosmicSong coherence: Phi × HarmonicAlignment × MoralClarity (0.0–1.0).
     pub kosmic_coherence: f32,
+    /// Soul coherence — essence-values similarity (0.0–1.0). 0.0 when soul disabled.
+    #[serde(default)]
+    pub soul_coherence: f32,
+    /// Soul growth potential from self-assessment (0.0–1.0). 0.0 when soul disabled.
+    #[serde(default)]
+    pub soul_growth_potential: f32,
+    /// Soul average value alignment trend (0.0–1.0). 0.0 when soul disabled.
+    #[serde(default)]
+    pub soul_avg_value_alignment: f32,
     /// β₀: connected components in moral space (1 = unified).
     pub moral_topo_beta_0: usize,
     /// β₁: 1-cycles (circular reasoning patterns).

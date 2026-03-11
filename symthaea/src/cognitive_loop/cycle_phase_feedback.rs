@@ -44,15 +44,16 @@ use super::thresholds::{
     KOSMIC_HIGH_COHERENCE_THRESHOLD, KOSMIC_LOW_COHERENCE_EXPLORATION_DAMPEN,
     KOSMIC_LOW_COHERENCE_THRESHOLD, KOSMIC_SONG_INTERVAL, LOVE_RESONANCE_CONFIDENCE_SCALE,
     LOVE_RESONANCE_LR_FRACTION, LOVE_RESONANCE_THRESHOLD, LOW_QUALITY_EXPLORATION_DAMPEN,
-    NARRATIVE_SELF_PHI_CONFIDENCE_SCALE, NARRATIVE_SELF_PHI_CONFIDENCE_THRESHOLD,
-    NARRATIVE_SELF_PHI_LOW_EXPLORE_BOOST, NARRATIVE_SELF_PHI_LOW_THRESHOLD,
-    PHENOMENAL_BINDING_HIGH_LR_DAMPEN, PHENOMENAL_BINDING_HIGH_THRESHOLD,
-    PHENOMENAL_BINDING_LOW_EXPLORE_BOOST, PHENOMENAL_BINDING_LOW_THRESHOLD, PHI_DIVERGENCE_MAX,
-    PHI_DIVERGENCE_SCALE, PHI_DIVERGENCE_THRESHOLD, PHI_RELATIONAL_OXY_SCALE,
-    PHI_RELATIONAL_OXY_THRESHOLD, PIPELINE_CONSCIOUSNESS_CAUTION_SCALE,
-    PIPELINE_CONSCIOUSNESS_HIGH_THRESHOLD, PIPELINE_CONSCIOUSNESS_LOW_THRESHOLD,
-    PIPELINE_CONSCIOUSNESS_RELAX_SCALE, QUALITY_EMA_DECAY, QUALITY_HIGH_LR_SCALE,
-    QUALITY_LR_CLAMP_MAX, QUALITY_LR_CLAMP_MIN, REASONING_CHAIN_BOOST_SCALE,
+    MULTI_OBJ_FRONTIER_DAMPEN, MULTI_OBJ_FRONTIER_EXPLORE_SCALE, MULTI_OBJ_FRONTIER_LARGE,
+    MULTI_OBJ_FRONTIER_SMALL, NARRATIVE_SELF_PHI_CONFIDENCE_SCALE,
+    NARRATIVE_SELF_PHI_CONFIDENCE_THRESHOLD, NARRATIVE_SELF_PHI_LOW_EXPLORE_BOOST,
+    NARRATIVE_SELF_PHI_LOW_THRESHOLD, PHENOMENAL_BINDING_HIGH_LR_DAMPEN,
+    PHENOMENAL_BINDING_HIGH_THRESHOLD, PHENOMENAL_BINDING_LOW_EXPLORE_BOOST,
+    PHENOMENAL_BINDING_LOW_THRESHOLD, PHI_DIVERGENCE_MAX, PHI_DIVERGENCE_SCALE,
+    PHI_DIVERGENCE_THRESHOLD, PHI_RELATIONAL_OXY_SCALE, PHI_RELATIONAL_OXY_THRESHOLD,
+    PIPELINE_CONSCIOUSNESS_CAUTION_SCALE, PIPELINE_CONSCIOUSNESS_HIGH_THRESHOLD,
+    PIPELINE_CONSCIOUSNESS_LOW_THRESHOLD, PIPELINE_CONSCIOUSNESS_RELAX_SCALE, QUALITY_EMA_DECAY,
+    QUALITY_HIGH_LR_SCALE, QUALITY_LR_CLAMP_MAX, QUALITY_LR_CLAMP_MIN, REASONING_CHAIN_BOOST_SCALE,
     REASONING_CHAIN_CONFIDENCE_THRESHOLD, REST_BINDING_DAMPEN, REST_COHERENCE_WEIGHT,
     REST_MODULATION_BINDING_FRAC, REST_MODULATION_COHERENCE_FRAC, SOCIAL_LR_BASE, SOCIAL_LR_RANGE,
     SPEECH_RATE_CLAMP_MAX, SPEECH_RATE_CLAMP_MIN, STRUCTURAL_BOTTLENECK_LR_SCALE,
@@ -912,6 +913,37 @@ impl CognitiveLoopService {
         module_timings.soul_experience = _t.elapsed().as_micros() as u64;
 
         // ═══════════════════════════════════════════════════════════════════════
+        // SOUL SELF-ASSESSMENT → BEHAVIORAL COUPLING
+        // Damasio (2010) — somatic markers from self-assessment guide decisions.
+        // ═══════════════════════════════════════════════════════════════════════
+        let soul_snapshot = self.soul.as_ref().map(|s| {
+            (
+                s.stats().soul_coherence,
+                s.self_model().current_assessment.growth_potential,
+                s.stats().avg_value_alignment,
+            )
+        });
+        if let Some((soul_coherence, growth_potential, avg_value_alignment)) = soul_snapshot {
+            // Low soul coherence → dampen confidence (fragmented identity)
+            if soul_coherence < 0.5 && self.stats.total_cycles > 20 {
+                self.adjust_confidence("soul_low_coherence", -0.01 * (0.5 - soul_coherence));
+            }
+
+            // High growth potential → boost exploration (learning opportunity)
+            if growth_potential > 0.7 && self.stats.total_cycles > 15 {
+                self.adjust_exploration("soul_growth_potential", 0.01 * (growth_potential - 0.7));
+            }
+
+            // Low value alignment trend → boost exploration (misaligned, need recalibration)
+            if avg_value_alignment < 0.3 && self.stats.total_cycles > 30 {
+                self.scale_exploration(
+                    "soul_low_alignment",
+                    1.02, // Slight exploration boost
+                );
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
         // KOSMIC SONG: Unified Identity Synthesis
         // Phi × HarmonicAlignment × MoralClarity → coherence_score
         // Gates FEP learning rate and exploration when identity is fragmented.
@@ -1438,6 +1470,22 @@ impl CognitiveLoopService {
                 "consciousness_gradient_high",
                 CONSCIOUSNESS_GRADIENT_LR_SCALE,
             );
+        }
+
+        // ─── Multi-Objective Frontier → Exploration ────────────────────────
+        // Deb (2002) — large Pareto frontier = competing objectives → explore tradeoffs.
+        // Kelso (1995) — converged frontier = phase lock → dampen and observe.
+        if self.stats.total_cycles > 15 {
+            if multi_obj_frontier_size >= MULTI_OBJ_FRONTIER_LARGE {
+                self.adjust_exploration(
+                    "multi_obj_frontier_large",
+                    MULTI_OBJ_FRONTIER_EXPLORE_SCALE,
+                );
+            } else if multi_obj_frontier_size <= MULTI_OBJ_FRONTIER_SMALL
+                && multi_obj_frontier_size > 0
+            {
+                self.scale_exploration("multi_obj_frontier_converged", MULTI_OBJ_FRONTIER_DAMPEN);
+            }
         }
 
         FeedbackPhaseResult {

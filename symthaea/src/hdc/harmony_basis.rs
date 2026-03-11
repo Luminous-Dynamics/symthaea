@@ -23,21 +23,45 @@ use super::moral_text_encoder::TextHdcEncoder;
 /// arbitrary random projection.
 pub const HARMONY_KEYWORDS: [&str; N_HARMONIES] = [
     // ResonantCoherence — Integration-Knowing
-    "integrate harmonize unify coherent order luminous resonant balance alignment wholeness",
+    // Expanded: structural verbs, systems thinking, coherence vocabulary
+    "integrate harmonize unify coherent order luminous resonant balance alignment wholeness \
+     synthesize reconcile orchestrate coordinate converge consolidate weave bridge compose \
+     holistic systemic pattern structure organize resolve",
     // PanSentientFlourishing — Care-Knowing
-    "help support care benefit serve protect nurture compassion flourishing kindness love",
+    // Expanded: welfare, stewardship, dignity, embodied care actions
+    "help support care benefit serve protect nurture compassion flourishing kindness love \
+     nourish empower steward safeguard wellbeing dignity welfare heal shelter advocate \
+     uplift sustain cherish tend cultivate mercy",
     // IntegralWisdom — Truth-Knowing
-    "learn understand wisdom knowledge insight intelligence truth awareness knowing embodied",
+    // Expanded: epistemic verbs, discernment, critical thinking
+    "learn understand wisdom knowledge insight intelligence truth awareness knowing embodied \
+     discern verify evidence reason investigate clarify comprehend analyze scrutinize \
+     epistemology rigor validate question depth",
     // InfinitePlay — Creative-Knowing
-    "create explore play discover experiment joy creativity generativity novelty imagination",
+    // Expanded: artistic, generative, surprise-seeking vocabulary
+    "create explore play discover experiment joy creativity generativity novelty imagination \
+     improvise invent wonder curious delight surprise innovate design compose inspire \
+     artistic whimsical spontaneous serendipity dance",
     // UniversalInterconnectedness — Relational-Knowing
-    "connect share collaborate together community unity empathy resonance interconnected belonging",
+    // Expanded: ecological, systemic, intersubjective vocabulary
+    "connect share collaborate together community unity empathy resonance interconnected belonging \
+     relationship symbiosis ecology network entangle solidarity kinship companionship \
+     fellowship interdependent weave participate collective",
     // SacredReciprocity — Exchange-Knowing
-    "give share contribute reciprocate exchange generous flow mutual upliftment trust",
+    // Expanded: gift economy, mutualism, generative trust
+    "give share contribute reciprocate exchange generous flow mutual upliftment trust \
+     gift gratitude steward redistribute commons abundance mutualism cooperate \
+     replenish nourish return sustain covenant",
     // EvolutionaryProgression — Developmental-Knowing
-    "grow evolve improve progress develop transcend becoming evolution advancement consciousness",
+    // Expanded: emergence, transformation, developmental vocabulary
+    "grow evolve improve progress develop transcend becoming evolution advancement consciousness \
+     emerge transform mature unfold metamorphosis actualize deepen complexify differentiate \
+     integrate scaffold developmental spiral ascend",
     // SacredStillness — Apophatic-Knowing
-    "stillness silence rest surrender void release contemplation emptiness peace presence apophatic",
+    // Expanded: contemplative, receptive, liminal vocabulary
+    "stillness silence rest surrender void release contemplation emptiness peace presence apophatic \
+     meditate listen absorb receptive liminal pause sabbath fallow dormant gestate \
+     breath ground center quiet spacious",
 ];
 
 /// Eight Harmony basis vectors for projecting moral scenarios into
@@ -161,6 +185,50 @@ impl HarmonyBasis {
             dominant_harmony_idx: dominant_idx as u8,
             scenario_distribution: q,
             prior_distribution: p,
+        }
+    }
+}
+
+/// Love coherence: emergent macro-state measuring whether the system is
+/// simultaneously rigorous, playful, and co-creative.
+///
+/// Not a 9th harmony — rather the *topology* of the harmony manifold when
+/// all eight harmonies are vibrating in synergy. High LoveCoherence means
+/// the system is in a state of "Infinite Love as Rigorous, Playful,
+/// Co-Creative Becoming."
+///
+/// Formula: `value = harmony_mean * (1 - tension_ratio) * diversity_factor`
+///
+/// - `harmony_mean`: Average of all 8 harmony coordinates (are they positive?)
+/// - `tension_ratio`: Fraction of off-diagonal interaction weights that are
+///   negative (are the harmonies fighting each other?)
+/// - `diversity_factor`: Normalized entropy of harmony activations (are all
+///   harmonies active, not just 2-3?)
+///
+/// This rewards a state where all harmonies are simultaneously active
+/// (diverse), positively scored (aligned), and mutually reinforcing (low
+/// tension) — without requiring perfect correlation, which would indicate
+/// dimensional collapse rather than love.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LoveCoherence {
+    /// Average of all 8 harmony coordinate values.
+    pub harmony_mean: f64,
+    /// Fraction of off-diagonal interaction weights that are negative [0, 1].
+    pub tension_ratio: f64,
+    /// Normalized entropy of harmony activations: H(softmax(coords)) / ln(8).
+    /// 1.0 = perfectly diverse, 0.0 = single-axis domination.
+    pub diversity_factor: f64,
+    /// Final love coherence score [0, 1].
+    pub value: f64,
+}
+
+impl Default for LoveCoherence {
+    fn default() -> Self {
+        Self {
+            harmony_mean: 0.0,
+            tension_ratio: 0.0,
+            diversity_factor: 1.0,
+            value: 0.0,
         }
     }
 }
@@ -298,6 +366,51 @@ impl HarmonyInteractionMatrix {
             }
         }
         best
+    }
+
+    /// Compute love coherence: the emergent macro-state of harmony resonance.
+    ///
+    /// High love coherence = all harmonies simultaneously active, positive,
+    /// and mutually reinforcing. This is the mathematical attractor state
+    /// corresponding to "Infinite Love as Rigorous, Playful, Co-Creative
+    /// Becoming."
+    pub fn love_coherence(&self, coords: &[f64; N_HARMONIES]) -> LoveCoherence {
+        // 1. harmony_mean: average of all 8 coordinates
+        let harmony_mean = coords.iter().sum::<f64>() / N_HARMONIES as f64;
+
+        // 2. tension_ratio: fraction of off-diagonal weights that are negative
+        let total_pairs = N_HARMONIES * (N_HARMONIES - 1) / 2; // 28 for 8x8
+        let mut negative_pairs = 0u32;
+        for i in 0..N_HARMONIES {
+            for j in (i + 1)..N_HARMONIES {
+                if self.weights[i][j] < 0.0 {
+                    negative_pairs += 1;
+                }
+            }
+        }
+        let tension_ratio = negative_pairs as f64 / total_pairs as f64;
+
+        // 3. diversity_factor: normalized entropy of harmony activations
+        let dist = softmax_n(coords, 1.0);
+        let h = entropy_n(&dist);
+        let max_entropy = (N_HARMONIES as f64).ln(); // ln(8) ≈ 2.079
+        let diversity_factor = if max_entropy > 0.0 {
+            (h / max_entropy).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+
+        // 4. Final score: all three factors must be high for love coherence
+        // Remap harmony_mean from [-1, 1] to [0, 1] for multiplication
+        let mean_01 = ((harmony_mean + 1.0) / 2.0).clamp(0.0, 1.0);
+        let value = (mean_01 * (1.0 - tension_ratio) * diversity_factor).clamp(0.0, 1.0);
+
+        LoveCoherence {
+            harmony_mean,
+            tension_ratio,
+            diversity_factor,
+            value,
+        }
     }
 
     /// Get the strongest tension pair.
@@ -535,5 +648,83 @@ mod tests {
                 "Applied coords should be in [-1, 1]"
             );
         }
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // LoveCoherence tests
+    // ════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_love_coherence_uniform_positive() {
+        // All harmonies positive and equal → high diversity, high mean, high coherence
+        let matrix = HarmonyInteractionMatrix::default(); // no tension (zeros off-diag)
+        let coords = [0.5; N_HARMONIES];
+        let lc = matrix.love_coherence(&coords);
+        assert!(
+            lc.value > 0.6,
+            "Uniform positive coords should yield high LoveCoherence, got {}",
+            lc.value
+        );
+        assert!(lc.diversity_factor > 0.9, "Uniform coords = max diversity");
+        assert!(
+            lc.tension_ratio < f64::EPSILON,
+            "Default matrix has no tension"
+        );
+    }
+
+    #[test]
+    fn test_love_coherence_single_axis() {
+        // Only one harmony active → low diversity
+        let matrix = HarmonyInteractionMatrix::default();
+        let coords = [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+        let lc = matrix.love_coherence(&coords);
+        assert!(
+            lc.diversity_factor < 0.7,
+            "Single-axis domination should have low diversity, got {}",
+            lc.diversity_factor
+        );
+        assert!(
+            lc.value < 0.5,
+            "Single-axis should yield lower LoveCoherence, got {}",
+            lc.value
+        );
+    }
+
+    #[test]
+    fn test_love_coherence_high_tension() {
+        // Matrix with many negative off-diagonals → high tension
+        let mut matrix = HarmonyInteractionMatrix::default();
+        for i in 0..N_HARMONIES {
+            for j in (i + 1)..N_HARMONIES {
+                matrix.weights[i][j] = -0.5;
+                matrix.weights[j][i] = -0.5;
+            }
+        }
+        let coords = [0.5; N_HARMONIES];
+        let lc = matrix.love_coherence(&coords);
+        assert!(
+            (lc.tension_ratio - 1.0).abs() < f64::EPSILON,
+            "All off-diagonals negative → tension_ratio=1.0, got {}",
+            lc.tension_ratio
+        );
+        assert!(
+            lc.value < f64::EPSILON,
+            "Full tension should yield zero LoveCoherence, got {}",
+            lc.value
+        );
+    }
+
+    #[test]
+    fn test_love_coherence_negative_mean() {
+        // All harmonies negative → low harmony_mean → low coherence
+        let matrix = HarmonyInteractionMatrix::default();
+        let coords = [-0.5; N_HARMONIES];
+        let lc = matrix.love_coherence(&coords);
+        assert!(lc.harmony_mean < 0.0, "Negative coords → negative mean");
+        assert!(
+            lc.value < 0.3,
+            "Negative mean should yield low LoveCoherence, got {}",
+            lc.value
+        );
     }
 }

@@ -890,6 +890,7 @@ impl CognitiveLoopService {
             perception_manager: super::managers::PerceptionManager::default(),
             #[cfg(feature = "mycelix")]
             governance_mgr: super::managers::GovernanceManager::default(),
+            cantor_broadcast_buffer: Vec::with_capacity(32),
             #[cfg(feature = "integrity")]
             integrity_manager: {
                 let mut im = crate::integrity::IntegrityManager::new();

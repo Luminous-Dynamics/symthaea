@@ -5199,4 +5199,56 @@ mod tests {
             assert!(entry.severity_without.is_finite());
         }
     }
+
+    // ── Forensics: Snapshot roundtrip for forensic state ────────────────
+
+    #[test]
+    fn test_snapshot_preserves_forensic_state() {
+        let mut anomaly_config = MoralAnomalyConfig::default();
+        anomaly_config.convergence_min_points = 2;
+        anomaly_config.initial_cadence = 1;
+        anomaly_config.convergence_similarity_threshold = 0.01;
+        let basis = Arc::new(HarmonyBasis::new(TEST_DIM));
+        let mut topo =
+            MoralTopology::with_anomaly_config(test_config(), basis.clone(), anomaly_config);
+
+        // Build up some state
+        let hv = ContinuousHV::random(TEST_DIM, 42);
+        for _ in 0..8 {
+            topo.add_scenario(hv.clone());
+        }
+        let _ = topo.detect_trajectory_convergence();
+
+        // Capture pre-snapshot state
+        let pre_scenario_counter = topo.scenario_counter();
+        let pre_detection_cycle = topo.detection_cycle;
+        let pre_audit_len = topo.audit_log().len();
+        let pre_fingerprint_velocity = topo.fingerprint_velocity();
+
+        // Snapshot and restore
+        let snap = topo.snapshot();
+        let mut topo2 =
+            MoralTopology::with_anomaly_config(test_config(), basis, MoralAnomalyConfig::default());
+        topo2.restore(&snap);
+
+        // Verify forensic state survived the roundtrip
+        assert_eq!(topo2.scenario_counter(), pre_scenario_counter);
+        assert_eq!(topo2.detection_cycle, pre_detection_cycle);
+        assert_eq!(topo2.audit_log().len(), pre_audit_len);
+        assert!((topo2.fingerprint_velocity() - pre_fingerprint_velocity).abs() < 1e-12);
+
+        // Verify audit log integrity survives serialization
+        if !topo2.audit_log().is_empty() {
+            assert!(
+                topo2.audit_log().verify_integrity().is_none(),
+                "Audit log must remain valid after snapshot roundtrip"
+            );
+        }
+
+        // JSON roundtrip
+        let json = serde_json::to_string(&snap).expect("serialize");
+        let restored: MoralTopologySnapshot = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(restored.scenario_counter, pre_scenario_counter);
+        assert_eq!(restored.audit_log.len(), pre_audit_len);
+    }
 }

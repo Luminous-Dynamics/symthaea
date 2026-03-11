@@ -73,12 +73,11 @@ pub mod learning_persistence;
 pub mod meta_conscious_llm_bridge;
 
 // Enhanced modules (need API alignment - cfg-gated)
-#[cfg(feature = "full_language")]
-pub mod enhanced_consciousness;
+// REMOVED: enhanced_consciousness (~1,936 LOC) — zero external usage, dead code
+// REMOVED: semantic_enrichment (~2,391 LOC) — zero external usage, dead code
+// Files retained on disk for reference; just not compiled.
 #[cfg(feature = "full_language")]
 pub mod multi_theory_consciousness;
-#[cfg(feature = "full_language")]
-pub mod semantic_enrichment;
 
 // Re-exports
 pub use domain_plugin::ErrorDiagnosis as DomainErrorDiagnosis;

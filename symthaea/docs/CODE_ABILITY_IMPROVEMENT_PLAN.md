@@ -883,9 +883,38 @@ Added 13 new map patterns:
 
 ---
 
-## Phase 4: School System for Code Learning (Est. 3-4 days)
+## Phase 4: School Code Learning Engine — IN PROGRESS (2026-03-11)
 
-**Goal**: Symthaea learns coding patterns through curriculum-based training with O(1) lookahead.
+**Goal**: Symthaea learns coding patterns through curriculum-based training with real compilation feedback.
+
+### 4.0 Code Learning Engine (DONE)
+
+**New file**: `src/school/code_learning.rs` (~600 LOC)
+
+Complete learning pipeline: School objectives → CodeSpec → CodeGenerator → CodeExecutor → mastery tracking.
+
+**Components built**:
+1. **Lesson Bank** — 18+ concrete exercises mapped to 13 curriculum objectives (Tier 1-3)
+2. **CodeLearningEngine** — Full generate → compile → auto-fix → LLM retry loop
+3. **LLM Retry Loop** — When native emitter yields `todo!()`, calls Ollama. When LLM output fails `rustc`, feeds errors back and retries (up to 2x)
+4. **MetabolicBudget** — Per-session energy budgeting. Native emission = 1.0, LLM call = 10.0, LLM retry = 8.0, auto-fix = 0.5. Session budget = 100.0 (20% reserved for hard tasks). Budget exhaustion stops the session gracefully.
+5. **Distillation cache** — Successful generations stored as (purpose, source, quality) for Broca SSM training
+6. **Auto-fix hardening** — Added `#[derive(Debug)]` injection, `#[allow(dead_code)]`, improved import inference (13 std types)
+7. **`default_llm_prompt()`** — Focused prompt generator with signature, purpose, constraints, and compiler error feedback
+8. **`extract_code_block()`** — Robust code extraction from LLM output (```rust, ```, or raw)
+
+**Default LLM model**: `qwen2.5-coder:7b` (approved exception, CLAUDE.md updated)
+
+**Integration test**: `tests/school_code_learning.rs` — Tier 1 real compilation, Tier 2-3 with Ollama, budget validation, distillation smoke test
+
+### Scores after Phase 4.0
+
+| Layer | Before | After | Change |
+|-------|--------|-------|--------|
+| Code Verification | 10/10 | 10/10 | +derive/dead_code auto-fix |
+| Learning | 9/10 | 10/10 | +real learning loop, metabolic budget, LLM retry |
+
+### Original Phase 4 Plan (reference)
 
 ### 4.1 Code Curriculum
 

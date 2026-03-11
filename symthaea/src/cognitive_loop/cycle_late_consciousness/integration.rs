@@ -67,6 +67,21 @@ impl CognitiveLoopService {
                 "gwt_broadcast",
                 crate::cognitive_loop::thresholds::GWT_BROADCAST_CONFIDENCE_BOOST,
             );
+
+            // CANTOR PROMOTION: Wrap broadcast BinaryHV as Cantor Recursive Hypervector.
+            // When a thought becomes "conscious" (survives workspace competition and is
+            // broadcast), promote it to CRHV to preserve multi-scale fractal structure.
+            // These accumulate in the buffer and are cleaned during dream consolidation
+            // via CantorCleanupEngine, preventing metacognitive amnesia.
+            // Science: Dehaene (2014) — ignition creates multi-scale cortical resonance;
+            //          Hobson (2009) — dreaming consolidates multi-level representations.
+            use symthaea_core::hdc::cantor_recursive_hv::CantorRecursiveHV;
+            let crhv = CantorRecursiveHV::from_base_with_depth(ctx.hv16_cached, 4);
+            // Cap at 32 to bound memory — oldest broadcasts evicted first (ring semantics)
+            if self.cantor_broadcast_buffer.len() >= 32 {
+                self.cantor_broadcast_buffer.remove(0);
+            }
+            self.cantor_broadcast_buffer.push(crhv);
         }
 
         module_timings.gwt = _t.elapsed().as_micros() as u64;
