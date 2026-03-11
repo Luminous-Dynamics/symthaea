@@ -3088,15 +3088,24 @@ mod tests {
     #[test]
     fn test_consciousness_state_level_params() {
         assert!(CONSCIOUSNESS_STATE_LOW_THRESHOLD < CONSCIOUSNESS_STATE_HIGH_THRESHOLD);
-        assert!(CONSCIOUSNESS_STATE_HIGH_LR_SCALE > 1.0, "High state should boost LR");
-        assert!(CONSCIOUSNESS_STATE_LOW_LR_DAMPEN < 1.0, "Low state should dampen LR");
+        assert!(
+            CONSCIOUSNESS_STATE_HIGH_LR_SCALE > 1.0,
+            "High state should boost LR"
+        );
+        assert!(
+            CONSCIOUSNESS_STATE_LOW_LR_DAMPEN < 1.0,
+            "Low state should dampen LR"
+        );
     }
 
     #[test]
     fn test_living_mind_vitality_params() {
         assert!(LIVING_MIND_VITALITY_LOW_THRESHOLD < LIVING_MIND_VITALITY_HIGH_THRESHOLD);
         assert!(LIVING_MIND_VITALITY_CONFIDENCE_BOOST > 0.0);
-        assert!(LIVING_MIND_VITALITY_LOW_LR_DAMPEN < 1.0, "Low vitality should dampen LR");
+        assert!(
+            LIVING_MIND_VITALITY_LOW_LR_DAMPEN < 1.0,
+            "Low vitality should dampen LR"
+        );
     }
 
     #[test]

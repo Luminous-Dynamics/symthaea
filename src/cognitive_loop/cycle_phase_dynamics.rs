@@ -187,7 +187,6 @@ impl CognitiveLoopService {
             }
         }
 
-
         // ── Phase 17: Self-model accuracy tracking ───────────────────────
         let self_model_accuracy = self.carryover.learning.self_model_accuracy;
         if let Some((made_at, pred_confidence, pred_urgency)) =

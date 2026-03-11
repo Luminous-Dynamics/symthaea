@@ -78,7 +78,10 @@ fn test_cantor_buffer_accumulates_on_gwt_broadcast() {
         }
     }
     // Soft: GWT broadcast depends on activation dynamics
-    println!("Cantor buffer max occupancy over 100 cycles: {}", max_occupancy);
+    println!(
+        "Cantor buffer max occupancy over 100 cycles: {}",
+        max_occupancy
+    );
 }
 
 // =============================================================================

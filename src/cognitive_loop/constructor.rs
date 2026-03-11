@@ -908,9 +908,10 @@ impl CognitiveLoopService {
             #[cfg(feature = "mycelix")]
             governance_mgr: super::managers::GovernanceManager::default(),
             cantor_broadcast_buffer: Vec::with_capacity(32),
-            cantor_cleanup_engine: symthaea_core::hdc::cantor_resonator_cleanup::CantorCleanupEngine::new(
-                symthaea_core::hdc::cantor_resonator_cleanup::CantorCleanupConfig::default(),
-            ),
+            cantor_cleanup_engine:
+                symthaea_core::hdc::cantor_resonator_cleanup::CantorCleanupEngine::new(
+                    symthaea_core::hdc::cantor_resonator_cleanup::CantorCleanupConfig::default(),
+                ),
             cantor_last_activation: 0.0,
             #[cfg(feature = "integrity")]
             integrity_manager: {
@@ -986,20 +987,17 @@ impl CognitiveLoopService {
         let mut embedder = match symthaea_embeddings::Qwen3Embedder::new(qwen_config) {
             Ok(e) => e,
             Err(e) => {
-                tracing::warn!(
-                    "Failed to create Qwen3 embedder for dense HarmonyBasis: {e}"
-                );
+                tracing::warn!("Failed to create Qwen3 embedder for dense HarmonyBasis: {e}");
                 return None;
             }
         };
 
-        let bridge = symthaea_embeddings::HdcBridge::with_config(
-            symthaea_embeddings::BridgeConfig {
+        let bridge =
+            symthaea_embeddings::HdcBridge::with_config(symthaea_embeddings::BridgeConfig {
                 input_dim: symthaea_embeddings::QWEN3_DIMENSION,
                 output_dim: dim,
                 ..Default::default()
-            },
-        );
+            });
 
         // Encode all 8 harmony keyword strings in batch
         let keyword_refs: Vec<&str> = HARMONY_KEYWORDS.iter().copied().collect();
@@ -1026,9 +1024,9 @@ impl CognitiveLoopService {
             vectors.push(ContinuousHV::from_slice(&projected));
         }
 
-        let arr: [ContinuousHV; N_HARMONIES] = vectors.try_into().unwrap_or_else(
-            |_| [(); N_HARMONIES].map(|_| ContinuousHV::zero(dim)),
-        );
+        let arr: [ContinuousHV; N_HARMONIES] = vectors
+            .try_into()
+            .unwrap_or_else(|_| [(); N_HARMONIES].map(|_| ContinuousHV::zero(dim)));
 
         let basis = HarmonyBasis::with_dense_vectors(dim, arr);
         tracing::info!(

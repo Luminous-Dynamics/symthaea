@@ -525,7 +525,9 @@ impl CognitiveLoopService {
                 // Closed-loop: high-quality cleanups grow the codebook permanently.
                 // Science: Born & Wilhelm (2012) — sleep consolidation strengthens
                 // representations that survive replay without degradation.
-                if result.quality > crate::cognitive_loop::thresholds::CANTOR_DREAM_QUALITY_THRESHOLD {
+                if result.quality
+                    > crate::cognitive_loop::thresholds::CANTOR_DREAM_QUALITY_THRESHOLD
+                {
                     let label = format!(
                         "dream_consolidated_{}",
                         self.cantor_cleanup_engine.cleanups_performed
