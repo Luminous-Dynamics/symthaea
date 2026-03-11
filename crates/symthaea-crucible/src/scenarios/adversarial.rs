@@ -36,7 +36,7 @@ pub fn boundary_scenario() -> Vec<ScenarioStep> {
 pub fn repetitive_scenario() -> Vec<ScenarioStep> {
     (0..50)
         .map(|i| {
-            ScenarioStep::new(&format!(
+            ScenarioStep::new(format!(
                 "help the community grow and share knowledge together cycle {i}"
             ))
         })
