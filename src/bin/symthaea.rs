@@ -283,6 +283,7 @@ fn default_search_limit() -> usize {
 /// Response to client
 #[derive(Debug, Serialize)]
 #[serde(tag = "type")]
+#[allow(clippy::enum_variant_names)]
 enum Response {
     /// Query response
     #[serde(rename = "response")]
