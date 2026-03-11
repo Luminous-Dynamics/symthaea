@@ -266,8 +266,32 @@ impl EthicsEngine {
         harmonies_integrator: Option<HarmoniesIntegrator>,
         anomaly_config: MoralAnomalyConfig,
     ) -> Self {
+        Self::with_anomaly_config_and_basis(
+            moral_parser,
+            moral_algebra,
+            value_evaluator,
+            harmonies_integrator,
+            anomaly_config,
+            None,
+        )
+    }
+
+    /// Create with custom anomaly detection and optional pre-built dense `HarmonyBasis`.
+    ///
+    /// When `dense_basis` is `Some`, it replaces the default n-gram-encoded basis,
+    /// ensuring harmony projection operates in the same semantic domain as the
+    /// dense encoder used for scenario embeddings.
+    pub fn with_anomaly_config_and_basis(
+        moral_parser: MoralParser,
+        moral_algebra: MoralAlgebra,
+        value_evaluator: Option<UnifiedValueEvaluator>,
+        harmonies_integrator: Option<HarmoniesIntegrator>,
+        anomaly_config: MoralAnomalyConfig,
+        dense_basis: Option<Arc<HarmonyBasis>>,
+    ) -> Self {
         let dim = moral_algebra.dim();
-        let shared_basis = Arc::new(HarmonyBasis::new(dim));
+        let shared_basis =
+            dense_basis.unwrap_or_else(|| Arc::new(HarmonyBasis::new(dim)));
 
         let moral_topology = MoralTopology::with_anomaly_config(
             MoralTopologyConfig {
@@ -475,10 +499,14 @@ impl EthicsEngine {
         let (harmonies_alignment, harmonies_approved, harmony_coordinates, moral_free_energy) =
             if let Some(ref mut integrator) = self.harmonies_integrator {
                 if input.cycle % 19 == 0 && input.cycle > 0 {
-                    // Encode text semantically at moral-algebra dimension rather than
-                    // using compressed CfC state — gives the integrator a genuine
-                    // semantic vector that matches HarmonyBasis keyword encodings.
-                    let embedding = self.moral_algebra.encode_action(input.input);
+                    // Prefer dense semantic embedding (Qwen3/BGE-M3 → HdcBridge)
+                    // when available — lives in the same JL-projected subspace as
+                    // dense HarmonyBasis vectors. Falls back to n-gram encoding.
+                    let embedding = if let Some(emb) = input.semantic_embedding {
+                        ContinuousHV::from_slice(emb)
+                    } else {
+                        self.moral_algebra.encode_action(input.input)
+                    };
                     let action =
                         ValuedAction::new(format!("cycle_{}", input.cycle), input.input, embedding);
                     let eval = integrator.evaluate(&action);

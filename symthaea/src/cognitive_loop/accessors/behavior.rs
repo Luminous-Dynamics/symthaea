@@ -387,6 +387,16 @@ impl CognitiveLoopService {
             .predict_outcome(proposal_id, predicted_alignment);
     }
 
+    #[cfg(feature = "mycelix")]
+    pub fn governance_reward_ema(&self) -> f64 {
+        self.governance_mgr.reward_ema()
+    }
+
+    #[cfg(feature = "mycelix")]
+    pub fn governance_pending_count(&self) -> usize {
+        self.governance_mgr.pending_event_count()
+    }
+
     /// Process governance learning signals: reward, harmonic deltas, episodic memory.
     ///
     /// Called after governance processing. Feeds reward to the FEP learning loop,
