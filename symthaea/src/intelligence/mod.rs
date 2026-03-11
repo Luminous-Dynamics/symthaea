@@ -6,9 +6,11 @@
 
 pub mod causal_consciousness;
 pub mod causal_discovery;
+pub mod nixos_causal;
 
 pub use causal_consciousness::{
     CausalAnalysisResult, CausalAttention, CausalConsciousness, CausalLTCBridge, GridSearchResult,
     HSICTest, LiveLearningRouter, RandomThresholdSearch, ThresholdTuner,
 };
 pub use causal_discovery::{CausalDirection, CausalDiscoveryEngine, MetaFeatures};
+pub use nixos_causal::NixOSCausalAnalyzer;
