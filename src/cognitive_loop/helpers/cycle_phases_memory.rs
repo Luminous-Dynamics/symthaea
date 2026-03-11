@@ -488,6 +488,59 @@ impl CognitiveLoopService {
             }
         }
 
+        // Track 3h: Cantor dream consolidation — cleanup buffered CRHVs through resonator codebook
+        // Science: Stickgold (2005) — sleep replay extracts gist; Hobson (2009) — dreaming
+        // consolidates multi-level representations. CantorCleanupEngine unbinds each Cantor
+        // layer, cleans against the codebook, and rebuilds — preserving faint peripheral
+        // layers (shift/27, shift/81) that standard flat cleanup would strip.
+        // This prevents "metacognitive amnesia" — loss of subtle associative structure.
+        if !self.cantor_broadcast_buffer.is_empty() {
+            if let Some(ref res_mem) = self.resonator_memory {
+                if !res_mem.resonator.codebooks.is_empty() {
+                    use symthaea_core::hdc::cantor_resonator_cleanup::{
+                        CantorCleanupConfig, CantorCleanupEngine,
+                    };
+
+                    let mut engine = CantorCleanupEngine::new(CantorCleanupConfig::default());
+
+                    // Populate Cantor codebook from resonator's continuous-domain codebook.
+                    // Threshold continuous vectors to binary for CRHV-compatible cleanup.
+                    for cb in &res_mem.resonator.codebooks {
+                        for (label, continuous_vec) in &cb.symbols {
+                            let mut bytes = [0u8; 2048];
+                            for (i, &val) in continuous_vec.iter().enumerate() {
+                                if i / 8 < 2048 && val > 0.0 {
+                                    bytes[i / 8] |= 1 << (i % 8);
+                                }
+                            }
+                            let bhv = symthaea_core::hdc::BinaryHV(bytes);
+                            engine.codebook.add(label, bhv);
+                        }
+                    }
+
+                    // Drain the buffer — each CRHV gets cleaned and rebuilt
+                    let crhvs: Vec<_> = self.cantor_broadcast_buffer.drain(..).collect();
+                    for crhv in &crhvs {
+                        let _cleaned = engine.cleanup(crhv);
+                        // The cleanup itself is the consolidation — it strengthens
+                        // codebook-aligned layers and preserves failed (novel) ones.
+                    }
+
+                    tracing::debug!(
+                        cleanups = engine.cleanups_performed,
+                        layers_cleaned = engine.layers_cleaned,
+                        layers_failed = engine.layers_failed,
+                        "Cantor dream consolidation complete"
+                    );
+                } else {
+                    // No codebook entries yet — just clear buffer to prevent unbounded growth
+                    self.cantor_broadcast_buffer.clear();
+                }
+            } else {
+                self.cantor_broadcast_buffer.clear();
+            }
+        }
+
         // Track 4d: Adaptive replay scheduling — modulate interval based on error volatility
         // Science: McClelland et al. (1995) — fast-changing environments need more replay
         if self.stats.total_cycles % 50 == 0 && self.stats.total_cycles > 50 {

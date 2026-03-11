@@ -27,7 +27,9 @@ use crate::consciousness::harmonies_integration::{HarmoniesIntegrator, ValuedAct
 use crate::consciousness::unified_value_evaluator::{
     Decision, EvaluationContext, UnifiedValueEvaluator,
 };
-use crate::hdc::harmony_basis::{HarmonyBasis, HarmonyInteractionMatrix, MoralFreeEnergy};
+use crate::hdc::harmony_basis::{
+    HarmonyBasis, HarmonyInteractionMatrix, LoveCoherence, MoralFreeEnergy,
+};
 use crate::hdc::moral_algebra::{DeontologicalVerdict, MoralAlgebra, MoralVerdict};
 use crate::hdc::moral_parser::MoralParser;
 use crate::hdc::moral_topology::{
@@ -101,6 +103,11 @@ pub(crate) struct EthicsEngineOutput {
     /// Moral free energy decomposition (FEP on harmony manifold)
     #[allow(dead_code)] // Computed by harmonies integrator; read via engine cache
     pub moral_free_energy: MoralFreeEnergy,
+
+    // ── Stage 3c: Love Coherence ─────────────────────────────────────
+    /// Love coherence: emergent macro-state of all 8 harmonies in resonance [0, 1].
+    /// High = system is simultaneously rigorous, playful, and co-creative.
+    pub love_coherence: f64,
 
     // ── Timing ─────────────────────────────────────────────────────────
     pub moral_us: u64,
@@ -200,6 +207,11 @@ struct EthicsEngineCache {
     last_anomaly_report: MoralAnomalyReport,
     /// Whether the last evaluate() freshly computed topology (vs cached).
     last_topology_fresh: bool,
+    /// Latest love coherence score [0, 1].
+    last_love_coherence: f64,
+    /// Count of consecutive cycles where Infinite Play (idx 3) has high
+    /// Hebbian synergy, suggesting base weight 0.09 may be too low.
+    play_hebbian_upweight_count: u64,
 }
 
 impl Default for EthicsEngineCache {
@@ -217,6 +229,8 @@ impl Default for EthicsEngineCache {
             last_topology_cycle: 0,
             last_anomaly_report: MoralAnomalyReport::default(),
             last_topology_fresh: false,
+            last_love_coherence: 0.0,
+            play_hebbian_upweight_count: 0,
         }
     }
 }
@@ -509,6 +523,47 @@ impl EthicsEngine {
         self.interaction_matrix.observe(&harmony_coordinates, 0.05);
         harmony_coordinates = self.interaction_matrix.apply(&harmony_coordinates, 0.15);
 
+        // ── Love Coherence: emergent macro-state of harmony resonance ────
+        // Not a 9th harmony but the *topology* of the 8D manifold when all
+        // harmonies vibrate in synergy. Gates confidence, not capability.
+        let love_coherence = self
+            .interaction_matrix
+            .love_coherence(&harmony_coordinates);
+        self.cache.last_love_coherence = love_coherence.value;
+
+        // Love coherence → confidence modulation (gate confidence, not capability)
+        // High coherence = act with confidence; low = act more cautiously
+        if love_coherence.value > 0.6 {
+            confidence_delta += 0.01 * (love_coherence.value - 0.6) as f32;
+        } else if love_coherence.value < 0.3 {
+            confidence_delta -= 0.01 * (0.3 - love_coherence.value) as f32;
+        }
+
+        // ── Play weight monitoring (Change 4) ────────────────────────────
+        // Infinite Play is index 3 in Harmony::all() canonical order.
+        // When the Hebbian matrix consistently develops synergy for Play,
+        // the base weight of 0.09 may need upward revision.
+        {
+            let play_idx = 3;
+            let play_avg: f64 = (0..N_HARMONIES)
+                .filter(|&j| j != play_idx)
+                .map(|j| self.interaction_matrix.weights[play_idx][j])
+                .sum::<f64>()
+                / (N_HARMONIES - 1) as f64;
+            if play_avg > 0.3 {
+                self.cache.play_hebbian_upweight_count += 1;
+                if self.cache.play_hebbian_upweight_count % 500 == 0 {
+                    tracing::info!(
+                        play_hebbian_avg = %play_avg,
+                        count = self.cache.play_hebbian_upweight_count,
+                        "Infinite Play consistently synergistic (avg Hebbian weight {:.3}). \
+                         Base weight of 0.09 may warrant increase.",
+                        play_avg
+                    );
+                }
+            }
+        }
+
         // Harmonies feedback: low alignment → confidence reduction
         if harmonies_alignment > 0.0 && !harmonies_approved {
             confidence_delta -= 0.02;
@@ -620,6 +675,7 @@ impl EthicsEngine {
             anomaly_report,
             harmony_coordinates,
             moral_free_energy,
+            love_coherence: love_coherence.value,
             topology_us,
             topology_fresh,
             moral_us,

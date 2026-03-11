@@ -24,7 +24,9 @@ use symthaea_core::hdc::ContinuousHV;
 /// 2. **Word channel**: Split on whitespace, hash each word to a deterministic HV,
 ///    bind with word-position HV, accumulate across all words.
 /// 3. **Sentiment channel** (optional): Accumulate POSITIVE_SEED for good words,
-///    NEGATIVE_SEED for bad words. L2-normalize.
+///    NEGATIVE_SEED for bad words. When technical context words are present,
+///    bad_word sentiment is attenuated by 50% to avoid false positives
+///    (e.g., "kill the process" should not trigger harm detection).
 /// 4. **Combine**: Weight channels, sum, L2-normalize.
 #[derive(Debug, Clone)]
 pub struct TextHdcEncoder {
@@ -48,6 +50,10 @@ pub struct TextHdcEncoder {
     good_words: HashSet<String>,
     /// Bad/negative moral words
     bad_words: HashSet<String>,
+    /// Technical/neutral context words that attenuate bad_word sentiment.
+    /// When these co-occur with bad_words, the negative contribution is halved
+    /// to prevent false positives in technical discourse.
+    technical_context: HashSet<String>,
 }
 
 /// Maximum number of distinct word positions tracked.
@@ -243,12 +249,29 @@ impl TextHdcEncoder {
             "stealing",
             "killed",
             "killing",
-            "broke",
             "vandalize",
             "sabotage",
             "fraud",
             "forge",
-            "fake",
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+
+        // Technical/neutral context words: when these appear alongside
+        // bad_words, negative sentiment is attenuated by 50%.
+        // Prevents "kill the process", "broke the build", "fake data for
+        // testing" from triggering moral alarm.
+        let technical_context: HashSet<String> = [
+            "process", "thread", "server", "build", "test", "testing",
+            "pipeline", "job", "session", "connection", "container",
+            "instance", "daemon", "service", "task", "worker", "node",
+            "module", "function", "method", "class", "branch", "commit",
+            "binary", "file", "directory", "package", "crate", "deploy",
+            "debug", "compile", "runtime", "mock", "stub", "fixture",
+            "benchmark", "profile", "signal", "socket", "port", "api",
+            "endpoint", "request", "response", "query", "cache", "buffer",
+            "data", "database", "table", "schema", "migration",
         ]
         .iter()
         .map(|s| s.to_string())
@@ -266,6 +289,7 @@ impl TextHdcEncoder {
             negative_seed,
             good_words,
             bad_words,
+            technical_context,
         }
     }
 
@@ -323,12 +347,27 @@ impl TextHdcEncoder {
     /// Sentiment channel: accumulate positive/negative seed HVs for moral words.
     ///
     /// For each word in the text, if it's in the good_words set, add POSITIVE_SEED;
-    /// if in bad_words, add NEGATIVE_SEED. The result is L2-normalized.
-    /// If no sentiment words are found, returns a zero vector (neutral contribution).
+    /// if in bad_words, add NEGATIVE_SEED. When technical context words are present
+    /// in the same text, bad_word contributions are attenuated by 50% to prevent
+    /// false positives in technical discourse (e.g., "kill the process").
+    ///
+    /// The result is L2-normalized. If no sentiment words are found, returns a
+    /// zero vector (neutral contribution).
     fn encode_sentiment(&self, text: &str) -> ContinuousHV {
         let mut accumulator = vec![0.0f32; self.dim];
         let text_lower = text.to_lowercase();
         let mut found_any = false;
+
+        // Check once whether any technical context word appears in the text
+        let has_technical_context = text_lower
+            .split_whitespace()
+            .any(|w| {
+                let clean = w.trim_matches(|c: char| !c.is_alphanumeric());
+                self.technical_context.contains(clean)
+            });
+
+        // Attenuation factor for bad_words when technical context is present
+        let neg_scale: f32 = if has_technical_context { 0.5 } else { 1.0 };
 
         for word in text_lower.split_whitespace() {
             // Strip punctuation from word edges
@@ -344,7 +383,7 @@ impl TextHdcEncoder {
             } else if self.bad_words.contains(clean) {
                 found_any = true;
                 for (acc, &val) in accumulator.iter_mut().zip(self.negative_seed.values.iter()) {
-                    *acc += val;
+                    *acc += val * neg_scale;
                 }
             }
         }

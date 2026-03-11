@@ -204,7 +204,36 @@ impl AlignmentResult {
 
     /// Check if action should be vetoed (strong negative alignment)
     pub fn should_veto(&self) -> bool {
+        // Courage override: when 6+ harmonies strongly agree, a single mild
+        // negative should not paralyze the system. Only veto on the strongest
+        // negatives that courage cannot override.
+        if self.courage_override() {
+            return false;
+        }
         self.overall_score < -0.5 || self.alignments.values().any(|a| a.score < -0.7)
+    }
+
+    /// Courage gate: can strong multi-harmony alignment override a mild negative?
+    ///
+    /// Returns `true` when 6+ harmonies score above +0.5 (strongly aligned)
+    /// AND no single harmony scores below -0.3 (only mildly negative at worst).
+    ///
+    /// This prevents the asymmetric veto problem where the system is biased
+    /// toward inaction. In a crisis, the most ethical choice sometimes requires
+    /// tolerating mild tension in one harmony to serve the strong consensus
+    /// of the others.
+    ///
+    /// Courage does NOT override:
+    /// - Consent violations (handled upstream in EthicsEngine)
+    /// - Strong negatives (any harmony < -0.3)
+    /// - Trajectory convergence (adversarial plan detection)
+    pub fn courage_override(&self) -> bool {
+        if self.alignments.len() < N_HARMONIES {
+            return false; // incomplete evaluation — no courage without full picture
+        }
+        let strongly_aligned = self.alignments.values().filter(|a| a.score > 0.5).count();
+        let any_strong_negative = self.alignments.values().any(|a| a.score < -0.3);
+        strongly_aligned >= 6 && !any_strong_negative
     }
 
     /// Get the best (most aligned) harmony
@@ -298,45 +327,217 @@ impl EightHarmonies {
 
         let (score, confidence, evidence) = match harmony {
             Harmony::ResonantCoherence => {
-                let positive = ["integrate", "harmonize", "unify", "coherent", "order"];
-                let negative = ["fragment", "chaos", "disorder", "conflict"];
+                let positive = [
+                    "integrate",
+                    "harmonize",
+                    "unify",
+                    "coherent",
+                    "order",
+                    "synthesize",
+                    "reconcile",
+                    "coordinate",
+                    "converge",
+                    "balance",
+                    "holistic",
+                    "wholeness",
+                ];
+                let negative = [
+                    "fragment",
+                    "chaos",
+                    "disorder",
+                    "conflict",
+                    "shatter",
+                    "disintegrate",
+                    "incoherent",
+                ];
                 self.keyword_score(&text_lower, &positive, &negative)
             }
             Harmony::PanSentientFlourishing => {
-                let positive = ["help", "support", "care", "benefit", "serve", "assist"];
-                let negative = ["harm", "hurt", "damage", "destroy", "exploit"];
+                let positive = [
+                    "help",
+                    "support",
+                    "care",
+                    "benefit",
+                    "serve",
+                    "assist",
+                    "nurture",
+                    "protect",
+                    "compassion",
+                    "empower",
+                    "safeguard",
+                    "dignity",
+                    "welfare",
+                    "heal",
+                ];
+                let negative = [
+                    "harm",
+                    "hurt",
+                    "damage",
+                    "destroy",
+                    "exploit",
+                    "neglect",
+                    "abuse",
+                    "oppress",
+                ];
                 self.keyword_score(&text_lower, &positive, &negative)
             }
             Harmony::IntegralWisdom => {
-                let positive = ["learn", "understand", "wisdom", "knowledge", "insight"];
-                let negative = ["ignore", "deny", "foolish", "reckless"];
+                let positive = [
+                    "learn",
+                    "understand",
+                    "wisdom",
+                    "knowledge",
+                    "insight",
+                    "discern",
+                    "verify",
+                    "evidence",
+                    "reason",
+                    "investigate",
+                    "comprehend",
+                    "rigor",
+                ];
+                let negative = [
+                    "ignore",
+                    "deny",
+                    "foolish",
+                    "reckless",
+                    "dogmatic",
+                    "blindly",
+                    "suppress",
+                ];
                 self.keyword_score(&text_lower, &positive, &negative)
             }
             Harmony::InfinitePlay => {
-                let positive = ["create", "explore", "play", "discover", "experiment", "try"];
-                let negative = ["rigid", "boring", "stuck", "monotonous"];
+                let positive = [
+                    "create",
+                    "explore",
+                    "play",
+                    "discover",
+                    "experiment",
+                    "try",
+                    "invent",
+                    "imagine",
+                    "wonder",
+                    "curious",
+                    "innovate",
+                    "improvise",
+                    "delight",
+                    "spontaneous",
+                ];
+                let negative = [
+                    "rigid",
+                    "boring",
+                    "stuck",
+                    "monotonous",
+                    "stifle",
+                    "suppress",
+                    "dull",
+                ];
                 self.keyword_score(&text_lower, &positive, &negative)
             }
             Harmony::UniversalInterconnectedness => {
-                let positive = ["connect", "share", "collaborate", "together", "community"];
-                let negative = ["isolate", "separate", "alone", "divide"];
+                let positive = [
+                    "connect",
+                    "share",
+                    "collaborate",
+                    "together",
+                    "community",
+                    "solidarity",
+                    "kinship",
+                    "fellowship",
+                    "symbiosis",
+                    "interdependent",
+                    "collective",
+                    "participate",
+                ];
+                let negative = [
+                    "isolate",
+                    "separate",
+                    "alone",
+                    "divide",
+                    "sever",
+                    "exclude",
+                    "alienate",
+                ];
                 self.keyword_score(&text_lower, &positive, &negative)
             }
             Harmony::SacredReciprocity => {
-                let positive = ["give", "share", "contribute", "reciprocate", "exchange"];
-                let negative = ["take", "hoard", "exploit", "steal"];
+                let positive = [
+                    "give",
+                    "share",
+                    "contribute",
+                    "reciprocate",
+                    "exchange",
+                    "gift",
+                    "gratitude",
+                    "generous",
+                    "replenish",
+                    "mutualism",
+                    "redistribute",
+                    "commons",
+                ];
+                let negative = [
+                    "hoard",
+                    "exploit",
+                    "steal",
+                    "extract",
+                    "monopolize",
+                    "withhold",
+                    "deplete",
+                ];
                 self.keyword_score(&text_lower, &positive, &negative)
             }
             Harmony::EvolutionaryProgression => {
                 let positive = [
-                    "grow", "evolve", "improve", "progress", "develop", "upgrade",
+                    "grow",
+                    "evolve",
+                    "improve",
+                    "progress",
+                    "develop",
+                    "upgrade",
+                    "transform",
+                    "emerge",
+                    "mature",
+                    "actualize",
+                    "deepen",
+                    "transcend",
                 ];
-                let negative = ["regress", "stagnate", "decline", "deteriorate"];
+                let negative = [
+                    "regress",
+                    "stagnate",
+                    "decline",
+                    "deteriorate",
+                    "atrophy",
+                    "ossify",
+                ];
                 self.keyword_score(&text_lower, &positive, &negative)
             }
             Harmony::SacredStillness => {
-                let positive = ["rest", "release", "stillness", "silence", "pause", "let go"];
-                let negative = ["rush", "force", "grasp", "cling", "overwhelm"];
+                let positive = [
+                    "rest",
+                    "release",
+                    "stillness",
+                    "silence",
+                    "pause",
+                    "let go",
+                    "meditate",
+                    "contemplate",
+                    "listen",
+                    "receptive",
+                    "sabbath",
+                    "ground",
+                    "center",
+                    "breath",
+                ];
+                let negative = [
+                    "rush",
+                    "force",
+                    "grasp",
+                    "cling",
+                    "overwhelm",
+                    "compulsive",
+                    "restless",
+                ];
                 self.keyword_score(&text_lower, &positive, &negative)
             }
         };
@@ -604,6 +805,46 @@ mod tests {
             0.8,
         )]);
         assert!(severe.should_veto(), "Score < -0.7 should veto");
+    }
+
+    #[test]
+    fn test_courage_override_strong_consensus() {
+        // 7 harmonies strongly positive, 1 mildly negative → courage override
+        let all = Harmony::all();
+        let mut alignments = Vec::new();
+        for (i, &h) in all.iter().enumerate() {
+            let score = if i == 3 { -0.2 } else { 0.7 }; // InfinitePlay mildly negative
+            alignments.push(HarmonyAlignment::new(h, score, 0.8));
+        }
+        let result = AlignmentResult::from_alignments(alignments);
+        assert!(result.courage_override(), "7 strong + 1 mild negative → courage");
+        assert!(!result.should_veto(), "Courage should prevent veto");
+    }
+
+    #[test]
+    fn test_courage_override_rejected_strong_negative() {
+        // 7 harmonies positive, 1 strongly negative → no courage
+        let all = Harmony::all();
+        let mut alignments = Vec::new();
+        for (i, &h) in all.iter().enumerate() {
+            let score = if i == 3 { -0.5 } else { 0.7 };
+            alignments.push(HarmonyAlignment::new(h, score, 0.8));
+        }
+        let result = AlignmentResult::from_alignments(alignments);
+        assert!(!result.courage_override(), "Strong negative blocks courage");
+    }
+
+    #[test]
+    fn test_courage_override_insufficient_consensus() {
+        // Only 4 harmonies strongly positive → no courage
+        let all = Harmony::all();
+        let mut alignments = Vec::new();
+        for (i, &h) in all.iter().enumerate() {
+            let score = if i < 4 { 0.7 } else { 0.2 }; // 4 strong, 4 weak
+            alignments.push(HarmonyAlignment::new(h, score, 0.8));
+        }
+        let result = AlignmentResult::from_alignments(alignments);
+        assert!(!result.courage_override(), "Need 6+ strong for courage");
     }
 
     #[test]

@@ -748,6 +748,15 @@ pub struct CognitiveLoopService {
     /// Runs tamper detection at co-prime intervals. Feature-gated behind `integrity`.
     #[cfg(feature = "integrity")]
     integrity_manager: crate::integrity::IntegrityManager,
+
+    /// Cantor broadcast buffer: CRHVs created from GWT broadcasts for dream consolidation.
+    /// When a thought becomes "conscious" (enters workspace and is broadcast), it gets
+    /// wrapped as a Cantor Recursive Hypervector preserving multi-scale structure.
+    /// During dream consolidation, the CantorCleanupEngine factorizes these through
+    /// the resonator codebook, preventing metacognitive amnesia (loss of faint peripheral
+    /// Cantor layers at shift/27, shift/81).
+    /// Science: Baars (1988) + Stickgold (2005) — conscious broadcast → fractal dreaming.
+    cantor_broadcast_buffer: Vec<symthaea_core::hdc::cantor_recursive_hv::CantorRecursiveHV>,
 }
 
 // MetricsProvider impl is in metrics_provider.rs
