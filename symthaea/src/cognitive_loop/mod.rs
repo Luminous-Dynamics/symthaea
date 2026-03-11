@@ -156,6 +156,7 @@ pub(crate) mod self_model_tier;
 pub(crate) mod social_manager;
 pub(crate) mod substrate_manager;
 pub(crate) mod subsystem_trait;
+#[allow(dead_code)] // Registry of tuning constants — many reserved for future wiring
 pub(crate) mod thresholds;
 pub(crate) mod virtual_body;
 pub(crate) mod voice_coherence_bridge;
