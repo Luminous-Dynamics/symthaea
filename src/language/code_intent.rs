@@ -16,7 +16,7 @@ use std::collections::HashMap;
 
 use symthaea_core::hdc::ContinuousHV;
 
-use super::code_parser::EntityKind;
+pub use super::code_parser::EntityKind;
 use crate::mind::structured_thought::EpistemicStatus;
 
 /// What the user wants to do with code
