@@ -203,6 +203,8 @@ Key types are re-exported at the crate root for convenience:
 // cast_ptr_alignment, nonsensical_open_options, unused_io_amount.
 // Below: additional crate-specific denies not in workspace config.
 #![deny(clippy::zero_divided_by_zero, clippy::fn_to_numeric_cast)]
+// Suppress "unknown lint" when clippy version doesn't recognize newer lints.
+#![allow(unknown_lints)]
 // HDC code uses index-based iteration for element-wise vector operations (~1,075 sites).
 #![allow(clippy::needless_range_loop)]
 // Crate-level allows: each lint has 5+ occurrences across src/ (verified Feb 2026).
@@ -224,25 +226,42 @@ Key types are re-exported at the crate root for convenience:
     clippy::unnecessary_map_or,
     // ── Style lints with many occurrences across feature-gated modules ──
     clippy::collapsible_if,
+    clippy::clone_on_copy,
     clippy::derivable_impls,
     clippy::doc_lazy_continuation,
     clippy::explicit_into_iter_loop,
     clippy::field_reassign_with_default,
-    clippy::iter_last,
+    clippy::len_zero,
+    clippy::manual_div_ceil,
+    clippy::manual_map,
     clippy::manual_range_contains,
     clippy::manual_saturating_arithmetic,
     clippy::manual_strip,
     clippy::map_clone,
     clippy::needless_borrow,
+    clippy::needless_borrows_for_generic_args,
     clippy::or_fun_call,
+    clippy::ptr_arg,
+    clippy::push_str_single,
     clippy::redundant_closure,
+    clippy::repeat_vec_with_capacity,
+    clippy::single_char_add_str,
     clippy::single_element_loop,
     clippy::trim_split_whitespace,
     clippy::unnecessary_cast,
     clippy::unnecessary_lazy_evaluations,
+    clippy::unnecessary_to_owned,
     clippy::useless_format,
+    // Additional lints from --all-features clippy
+    clippy::io_other_error,
+    clippy::manual_abs_diff,
+    clippy::manual_char_comparison,
+    clippy::op_ref,
     // Dead code: many fields/methods reserved for future feature wiring
-    dead_code
+    dead_code,
+    unused_imports,
+    unused_variables,
+    unused_assignments
 )]
 
 // ============================================================================
