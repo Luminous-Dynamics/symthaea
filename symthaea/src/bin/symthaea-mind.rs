@@ -53,7 +53,7 @@ struct MindStatus {
 impl From<MindState> for MindStatus {
     fn from(s: MindState) -> Self {
         Self {
-            phi: s.phi,
+            phi: s.consciousness_level,
             meta_awareness: s.meta_awareness,
             cognitive_load: s.cognitive_load,
             total_cycles: s.total_cycles,

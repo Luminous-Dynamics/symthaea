@@ -678,6 +678,73 @@ pub struct PhonemizedWord {
     pub pos_tag: Option<String>,
 }
 
+/// Configuration for a voice conversation session.
+///
+/// Used by the service binary to configure the voice interface.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VoiceConfig {
+    /// Voice ID (index into available voice models)
+    pub voice_id: u8,
+    /// Whether to enable LTC-driven pacing
+    pub ltc_pacing: bool,
+    /// Sample rate for audio
+    pub sample_rate: u32,
+}
+
+impl Default for VoiceConfig {
+    fn default() -> Self {
+        Self {
+            voice_id: 0,
+            ltc_pacing: true,
+            sample_rate: 24000,
+        }
+    }
+}
+
+/// Voice conversation session combining STT (listen) and TTS (speak).
+///
+/// Wraps the voice output pipeline and provides a simple listen/speak API
+/// for the service binary's conversational voice turns.
+pub struct VoiceConversation {
+    /// Voice output for TTS
+    voice_output: VoiceOutput,
+    /// Configuration
+    _config: VoiceConfig,
+}
+
+impl VoiceConversation {
+    /// Create a new voice conversation from config.
+    pub fn new(config: VoiceConfig) -> Result<Self> {
+        let voice_config = VoiceOutputConfig {
+            sample_rate: config.sample_rate,
+            voice_id: config.voice_id as usize,
+            ..VoiceOutputConfig::default()
+        };
+        let mut voice_output = VoiceOutput::new(voice_config);
+        voice_output.initialize()?;
+        Ok(Self {
+            voice_output,
+            _config: config,
+        })
+    }
+
+    /// Listen for user speech input (STT).
+    ///
+    /// Currently returns a placeholder — real STT integration requires
+    /// the `stt` feature and an audio input device.
+    pub fn listen(&mut self) -> Result<String> {
+        // STT is not yet wired; return empty to indicate no speech captured.
+        Ok(String::new())
+    }
+
+    /// Speak text aloud via TTS.
+    pub fn speak(&mut self, text: &str) -> Result<()> {
+        let _samples = self.voice_output.synthesize(text)?;
+        // In a real implementation, samples would be played via audio output.
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -33,6 +33,7 @@
 //! - Uncertainty: Slower rate, longer pauses between phrases
 
 use std::io::{self, Write};
+use std::sync::Arc;
 use std::time::Instant;
 
 use anyhow::Result;
@@ -169,7 +170,7 @@ impl ReplState {
             std::time::Duration::from_secs(2),
             std::time::Duration::from_secs(120),
         );
-        let llm = LLMOrgan::with_backend(llm_config, Box::new(ollama_backend));
+        let llm = LLMOrgan::with_backend(llm_config, Arc::new(ollama_backend));
 
         // Initialize action policy (restrictive by default)
         let policy = PolicyBundle::restrictive();
@@ -407,6 +408,9 @@ impl ReplState {
             match backend {
                 TemporalBackend::CfC => "Closed-form Continuous-time (matrix-based)",
                 TemporalBackend::HdcLtcUnified => "HDC-LTC Unified (hypervector-based)",
+                TemporalBackend::HierarchicalCfC => {
+                    "Hierarchical CfC (multi-scale temporal processing)"
+                }
             }
         );
 
@@ -500,8 +504,9 @@ impl ReplState {
         let risk = action.risk_tier();
 
         // Validate against policy
+        let current_phi = self.cognitive.consciousness_snapshot().consciousness_level as f64;
         if let Some(ref sandbox) = self.sandbox {
-            if let Err(e) = action.validate(&self.policy, sandbox) {
+            if let Err(e) = action.validate(&self.policy, sandbox, current_phi) {
                 return format!(
                     "[BLOCKED] Action '{}' violates policy: {:?}\n\
                      Risk: {:?}, Destructiveness: {:?}",
