@@ -2264,6 +2264,79 @@ pub const GOAL_PRIORITY_EXPLORATION_THRESHOLD: f32 = 0.3;
 pub const RESONATOR_SIMILARITY_PRIME_THRESHOLD: f32 = 0.3;
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// CONSCIOUSNESS STATE LEVEL
+// Science: Baars (2005) — consciousness states form a hierarchy;
+// higher states support faster learning, lower states need protective dampening.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Consciousness state level above which LR receives a boost.
+/// Basis: Dehaene & Changeux (2011) — high global ignition → enhanced plasticity.
+pub const CONSCIOUSNESS_STATE_HIGH_THRESHOLD: f64 = 0.7;
+
+/// LR boost scale when consciousness state is high.
+pub const CONSCIOUSNESS_STATE_HIGH_LR_SCALE: f32 = 1.04;
+
+/// Consciousness state level below which LR is dampened for protection.
+/// Basis: Tononi (2004) — low Phi → fragmented processing → reduce LR.
+pub const CONSCIOUSNESS_STATE_LOW_THRESHOLD: f64 = 0.2;
+
+/// LR dampen scale when consciousness state is low.
+pub const CONSCIOUSNESS_STATE_LOW_LR_DAMPEN: f32 = 0.95;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LIVING MIND VITALITY & COHERENCE
+// Science: Thompson (2007) — cognitive vitality correlates with confidence;
+// low vitality signals resource depletion requiring conservative behavior.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Living mind vitality above this → confidence boost (system is thriving).
+/// Basis: Di Paolo (2005) — high adaptivity → justified confidence.
+pub const LIVING_MIND_VITALITY_HIGH_THRESHOLD: f64 = 0.6;
+
+/// Confidence boost when vitality is high.
+pub const LIVING_MIND_VITALITY_CONFIDENCE_BOOST: f32 = 0.008;
+
+/// Living mind vitality below this → dampen LR (resource-depleted).
+/// Basis: Sterling (2012) — allostatic overload → protective downregulation.
+pub const LIVING_MIND_VITALITY_LOW_THRESHOLD: f64 = 0.2;
+
+/// LR dampen when vitality is critically low.
+pub const LIVING_MIND_VITALITY_LOW_LR_DAMPEN: f32 = 0.96;
+
+/// Living mind coherence above this → exploration is stable (reduce).
+/// Basis: Kelso (1995) — high phase coherence → stable attractor → reduce search.
+pub const LIVING_MIND_COHERENCE_HIGH_THRESHOLD: f64 = 0.7;
+
+/// Exploration dampen when coherence is high (already in stable state).
+pub const LIVING_MIND_COHERENCE_HIGH_EXPLORE_DAMPEN: f32 = 0.98;
+
+/// Living mind coherence below this → exploration boost (seek new attractors).
+/// Basis: Friston (2010) — low coherence = high surprise → explore.
+pub const LIVING_MIND_COHERENCE_LOW_THRESHOLD: f64 = 0.3;
+
+/// Exploration boost when coherence is low.
+pub const LIVING_MIND_COHERENCE_LOW_EXPLORE_BOOST: f32 = 0.012;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MCTS PLAN EFFECTIVENESS (BEHAVIORAL)
+// Science: Silver (2016) — planning quality should modulate confidence in decisions.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// MCTS plan effectiveness above this → high confidence in reasoning.
+/// Basis: Huys (2015) — effective tree search → justified confidence.
+pub const MCTS_EFFECTIVENESS_HIGH_THRESHOLD: f32 = 0.6;
+
+/// Confidence boost when MCTS plans are highly effective.
+pub const MCTS_EFFECTIVENESS_CONFIDENCE_BOOST: f32 = 0.01;
+
+/// MCTS plan effectiveness below this → dampen confidence, boost exploration.
+/// Basis: Daw (2005) — poor model-based planning → switch to model-free exploration.
+pub const MCTS_EFFECTIVENESS_LOW_THRESHOLD: f32 = 0.2;
+
+/// Exploration boost when MCTS planning is ineffective.
+pub const MCTS_EFFECTIVENESS_LOW_EXPLORE_BOOST: f32 = 0.015;
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // TESTS
 // ═══════════════════════════════════════════════════════════════════════════════
 

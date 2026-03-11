@@ -521,15 +521,22 @@ impl CognitiveLoopService {
                     // Drain the buffer — each CRHV gets cleaned and rebuilt
                     let crhvs: Vec<_> = self.cantor_broadcast_buffer.drain(..).collect();
                     for crhv in &crhvs {
-                        let _cleaned = engine.cleanup(crhv);
-                        // The cleanup itself is the consolidation — it strengthens
-                        // codebook-aligned layers and preserves failed (novel) ones.
+                        let result = engine.cleanup(crhv);
+                        // Closed-loop: high-quality cleanups grow the codebook.
+                        // Science: Born & Wilhelm (2012) — sleep consolidation strengthens
+                        // representations that survive replay without degradation.
+                        if result.quality > 0.7 {
+                            let label =
+                                format!("dream_consolidated_{}", engine.cleanups_performed);
+                            engine.learn(&label, &result.cleaned);
+                        }
                     }
 
                     tracing::debug!(
                         cleanups = engine.cleanups_performed,
                         layers_cleaned = engine.layers_cleaned,
                         layers_failed = engine.layers_failed,
+                        codebook_size = engine.codebook.len(),
                         "Cantor dream consolidation complete"
                     );
                 } else {

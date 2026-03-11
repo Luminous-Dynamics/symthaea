@@ -107,6 +107,28 @@ impl HarmonyBasis {
         }
     }
 
+    /// Build a harmony basis from pre-computed dense vectors.
+    ///
+    /// When a dense encoder (Qwen3, BGE-M3, etc.) is available, the caller
+    /// encodes `HARMONY_KEYWORDS` once at init time and projects each through
+    /// `HdcBridge::project_continuous()` → `ContinuousHV`. This ensures the
+    /// basis vectors live in the same JL-projected semantic subspace as
+    /// scenario embeddings, eliminating the domain mismatch between n-gram
+    /// and contextual encodings.
+    ///
+    /// Falls back to `HarmonyBasis::new(dim)` if dimension mismatches.
+    pub fn with_dense_vectors(dim: usize, vectors: [ContinuousHV; N_HARMONIES]) -> Self {
+        let valid = vectors.iter().all(|v| v.dim() == dim);
+        if !valid {
+            tracing::warn!(
+                "Dense harmony vectors have wrong dimension (expected {dim}), \
+                 falling back to TextHdcEncoder"
+            );
+            return Self::new(dim);
+        }
+        Self { vectors, dim }
+    }
+
     /// Project a scenario HV onto the N_HARMONIES harmony axes (cosine similarity).
     ///
     /// Returns coordinates in `[-1, 1]^N_HARMONIES` where each component is the
@@ -727,6 +749,155 @@ mod tests {
             lc.value < 0.3,
             "Negative mean should yield low LoveCoherence, got {}",
             lc.value
+        );
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Interaction matrix multi-cycle learning tests
+    // ════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_interaction_matrix_learning() {
+        // Phase 1: Synergy buildup — co-activate harmonies 0 & 1 for 200 cycles
+        let mut matrix = HarmonyInteractionMatrix::default();
+        let synergy_coords = [0.8, 0.9, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+        for _ in 0..200 {
+            matrix.observe(&synergy_coords, 0.05);
+        }
+        assert!(
+            matrix.weights[0][1] > 0.9,
+            "200 synergy cycles should push weight near 1.0, got {}",
+            matrix.weights[0][1]
+        );
+        assert_eq!(matrix.observation_count, 200);
+
+        // Phase 2: Tension — activate 2, suppress 3 for 200 cycles
+        let tension_coords = [0.0, 0.0, 0.7, -0.5, 0.0, 0.0, 0.0, 0.0];
+        // First check: synergy decays gradually, not instantly
+        let synergy_before = matrix.weights[0][1];
+        for _ in 0..10 {
+            matrix.observe(&tension_coords, 0.05);
+        }
+        let synergy_after_10 = matrix.weights[0][1];
+        assert!(
+            synergy_after_10 < synergy_before,
+            "Neutral input should gradually decay synergy: before={synergy_before}, after={synergy_after_10}"
+        );
+        assert!(
+            synergy_after_10 > 0.3,
+            "10 neutral cycles should not fully destroy synergy, got {synergy_after_10}"
+        );
+
+        // Continue tension learning
+        for _ in 0..190 {
+            matrix.observe(&tension_coords, 0.05);
+        }
+        assert!(
+            matrix.weights[2][3] < -0.9,
+            "200 tension cycles should push weight near -1.0, got {}",
+            matrix.weights[2][3]
+        );
+        assert_eq!(matrix.observation_count, 400);
+
+        // Phase 3: Learning rate matters — slower rate = less change
+        let mut slow_matrix = HarmonyInteractionMatrix::default();
+        let mut fast_matrix = HarmonyInteractionMatrix::default();
+        let coords = [0.5, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+        for _ in 0..50 {
+            slow_matrix.observe(&coords, 0.01);
+            fast_matrix.observe(&coords, 0.05);
+        }
+        assert!(
+            fast_matrix.weights[0][1] > slow_matrix.weights[0][1],
+            "Fast LR ({}) should learn more than slow LR ({})",
+            fast_matrix.weights[0][1],
+            slow_matrix.weights[0][1]
+        );
+
+        // Phase 4: Symmetry preservation after learning
+        for i in 0..N_HARMONIES {
+            for j in 0..N_HARMONIES {
+                assert!(
+                    (matrix.weights[i][j] - matrix.weights[j][i]).abs() < f64::EPSILON,
+                    "Symmetry broken at [{i}][{j}]: {} != {}",
+                    matrix.weights[i][j],
+                    matrix.weights[j][i]
+                );
+            }
+        }
+
+        // Phase 5: apply() reflects learned weights — synergistic pair boosts each other
+        let test_coords = [0.5, 0.5, 0.5, 0.5, 0.0, 0.0, 0.0, 0.0];
+        let applied = matrix.apply(&test_coords, 0.15);
+        // Harmonies 0 & 1 (synergy) should be boosted
+        assert!(
+            applied[0] > test_coords[0],
+            "Synergistic harmony 0 should be boosted: {} > {}",
+            applied[0],
+            test_coords[0]
+        );
+        // Harmonies 2 & 3 (tension) — harmony 2 should be pulled down by negative-3
+        // and harmony 3 should be pulled down by negative-2
+        assert!(
+            applied[2] < test_coords[2] || applied[3] < test_coords[3],
+            "Tensioned pair should show suppression: applied[2]={}, applied[3]={}",
+            applied[2],
+            applied[3]
+        );
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Dense-encoder HarmonyBasis tests
+    // ════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_with_dense_vectors_basic() {
+        let dim = 256;
+        let encoder = TextHdcEncoder::with_sentiment(dim, 3, 0.5, 0.2);
+        let vectors: Vec<ContinuousHV> = HARMONY_KEYWORDS
+            .iter()
+            .map(|kw| encoder.encode(kw))
+            .collect();
+        let arr: [ContinuousHV; N_HARMONIES] = vectors.try_into().unwrap();
+        let basis = HarmonyBasis::with_dense_vectors(dim, arr);
+        assert_eq!(basis.dim, dim);
+        assert_eq!(basis.vectors.len(), N_HARMONIES);
+    }
+
+    #[test]
+    fn test_with_dense_vectors_dimension_mismatch_fallback() {
+        let dim = 256;
+        let wrong_dim = 128;
+        let vectors: [ContinuousHV; N_HARMONIES] =
+            [(); N_HARMONIES].map(|_| ContinuousHV::random(wrong_dim, 42));
+        let basis = HarmonyBasis::with_dense_vectors(dim, vectors);
+        assert_eq!(basis.dim, dim);
+        assert_eq!(basis.vectors[0].dim(), dim);
+    }
+
+    #[test]
+    fn test_dense_basis_projection_coherent() {
+        let dim = 512;
+        let encoder = TextHdcEncoder::with_sentiment(dim, 3, 0.5, 0.2);
+        let vectors: Vec<ContinuousHV> = HARMONY_KEYWORDS
+            .iter()
+            .map(|kw| encoder.encode(kw))
+            .collect();
+        let arr: [ContinuousHV; N_HARMONIES] = vectors.try_into().unwrap();
+        let basis = HarmonyBasis::with_dense_vectors(dim, arr);
+
+        let care_hv = encoder.encode("help nurture protect care compassion");
+        let coords = basis.project(&care_hv);
+
+        // PanSentientFlourishing (idx 1) should be in top 2
+        let mut sorted: Vec<(usize, f64)> =
+            coords.iter().copied().enumerate().collect();
+        sorted.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        let top_2: Vec<usize> = sorted.iter().take(2).map(|(i, _)| *i).collect();
+        assert!(
+            top_2.contains(&1),
+            "Care words should project onto PanSentientFlourishing, top-2: {:?}",
+            top_2
         );
     }
 }

@@ -86,10 +86,42 @@ impl Config {
     }
 }
 
+/// Per-token modulation signal from the CfC cognitive loop.
+///
+/// Allows the continuous-time CfC dynamics to steer the LSSM's
+/// discretization at a sub-token level. Both CfC and Mamba share the
+/// ODE form ḣ = Ah + Bx, so this modulation is mathematically natural.
+///
+/// When `delta_scale` > 1.0, the SSM takes larger temporal steps (faster
+/// dynamics, more responsive to input). When < 1.0, it takes smaller steps
+/// (more conservative, relies more on memory). `b_scale` modulates how
+/// strongly new input enters the hidden state.
+#[derive(Clone, Debug)]
+pub struct CfcModulation {
+    /// Multiplicative scale on Δ (step-size) after softplus.
+    /// 1.0 = no effect. Range: [0.1, 10.0] clamped internally.
+    pub delta_scale: f32,
+    /// Multiplicative scale on B (input matrix).
+    /// 1.0 = no effect. Range: [0.1, 10.0] clamped internally.
+    pub b_scale: f32,
+}
+
+impl Default for CfcModulation {
+    fn default() -> Self {
+        Self {
+            delta_scale: 1.0,
+            b_scale: 1.0,
+        }
+    }
+}
+
 pub struct State {
     pub hs: Vec<Tensor>,
     pub prev_xs: Vec<[Tensor; D_CONV]>,
     pub pos: usize,
+    /// Per-token CfC modulation signal. Applied to all layers.
+    /// Reset to None after each forward pass.
+    pub cfc_modulation: Option<CfcModulation>,
 }
 
 impl State {
@@ -106,6 +138,7 @@ impl State {
             hs,
             prev_xs,
             pos: 0,
+            cfc_modulation: None,
         })
     }
 
@@ -277,9 +310,22 @@ impl MambaBlock {
 
         let delta = delta.apply(&self.dt_proj)?;
         // softplus
-        let delta = (delta.exp()? + 1.)?.log()?;
+        let mut delta = (delta.exp()? + 1.)?.log()?;
         let a = self.a_log.to_dtype(delta.dtype())?.exp()?.neg()?;
         let d = self.d.to_dtype(delta.dtype())?;
+
+        // Apply CfC modulation: scale Δ and B based on cognitive state
+        let mut b = b;
+        if let Some(ref modulation) = state.cfc_modulation {
+            let ds = modulation.delta_scale.clamp(0.1, 10.0) as f64;
+            if (ds - 1.0).abs() > 1e-6 {
+                delta = (delta * ds)?;
+            }
+            let bs = modulation.b_scale.clamp(0.1, 10.0) as f64;
+            if (bs - 1.0).abs() > 1e-6 {
+                b = (b * bs)?;
+            }
+        }
 
         // Selective scan: h_t = Ab h_{t-1} + Bb x_t
         let delta = delta
@@ -363,6 +409,7 @@ impl Model {
             xs = layer.forward(&xs, state)?
         }
         state.pos += 1;
+        state.cfc_modulation = None; // Consume per-token modulation
         xs.apply(&self.norm_f)?.apply(&self.lm_head)
     }
 
@@ -381,6 +428,7 @@ impl Model {
             xs = layer.forward(&xs, state)?;
         }
         state.pos += 1;
+        state.cfc_modulation = None; // Consume per-token modulation
         xs.apply(&self.norm_f)?.apply(&self.lm_head)
     }
 
@@ -395,6 +443,7 @@ impl Model {
             xs = layer.forward(&xs, state)?;
         }
         state.pos += 1;
+        state.cfc_modulation = None; // Consume per-token modulation
         Ok(xs)
     }
 

@@ -39,6 +39,12 @@ const ENERGY_TIER2_LLM_CALL: f32 = 10.0;
 const ENERGY_LLM_RETRY: f32 = 8.0;
 const ENERGY_AUTO_FIX: f32 = 0.5;
 
+/// Maximum distinct error patterns to track before evicting old ones
+const MAX_ERROR_PATTERNS: usize = 128;
+
+/// How many times an error must recur before flagging for pattern evolution
+const ERROR_PATTERN_EVOLUTION_THRESHOLD: usize = 3;
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // OBJECTIVE → SPEC MAPPING
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -83,6 +89,12 @@ pub struct LessonOutcome {
     pub distillation_eligible: bool,
     /// Metabolic energy spent on this lesson
     pub energy_spent: f32,
+    /// Predicted quality before committing energy (Item #1: Lookahead)
+    pub predicted_quality: Option<f32>,
+    /// Actual quality computed after execution
+    pub actual_quality: f32,
+    /// Whether the prediction was a hallucination (predicted high, actual low)
+    pub was_hallucination: bool,
 }
 
 impl LessonOutcome {
@@ -218,6 +230,12 @@ pub struct SessionSummary {
     pub total_energy_spent: f32,
     /// Per-objective outcomes
     pub outcomes: Vec<LessonOutcome>,
+    /// Average prediction error across lessons with predictions
+    pub avg_prediction_error: f32,
+    /// Fraction of predictions that were hallucinations
+    pub hallucination_rate: f32,
+    /// Number of error patterns ready for native pattern evolution
+    pub error_patterns_learned: usize,
 }
 
 impl SessionSummary {
@@ -660,6 +678,233 @@ fn lesson(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// PREDICTION TRACKER (Item #1: Lookahead + Reality Check)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Lightweight quality predictor for code generation lessons.
+///
+/// Tracks per-objective success rates and calibrates predictions using EMA
+/// of prediction errors. Feeds into the full LookaheadEngine when available.
+pub struct PredictionTracker {
+    /// Per-objective-prefix success rate (EMA)
+    objective_rates: HashMap<String, f32>,
+    /// Global prediction error EMA (|predicted - actual|)
+    error_ema: f32,
+    /// Total predictions made
+    prediction_count: usize,
+    /// Hallucination count (predicted >= 0.7, actual < 0.3)
+    hallucination_count: usize,
+}
+
+impl PredictionTracker {
+    pub fn new() -> Self {
+        Self {
+            objective_rates: HashMap::new(),
+            error_ema: 0.0,
+            prediction_count: 0,
+            hallucination_count: 0,
+        }
+    }
+
+    /// Predict quality for a given objective (0.0-1.0).
+    ///
+    /// Returns the EMA success rate for this objective prefix,
+    /// or 0.7 (optimistic prior) if no history exists.
+    pub fn predict(&self, objective_id: &str) -> f32 {
+        let prefix = objective_prefix(objective_id);
+        *self.objective_rates.get(&prefix).unwrap_or(&0.7)
+    }
+
+    /// Record an actual outcome and update calibration.
+    pub fn record(&mut self, objective_id: &str, predicted: f32, actual: f32) {
+        let prefix = objective_prefix(objective_id);
+        let alpha = 0.3; // EMA decay
+
+        // Update per-objective rate
+        let rate = self.objective_rates.entry(prefix).or_insert(0.7);
+        *rate = *rate * (1.0 - alpha) + actual * alpha;
+
+        // Update global error EMA
+        let error = (predicted - actual).abs();
+        self.error_ema = self.error_ema * (1.0 - alpha) + error * alpha;
+
+        self.prediction_count += 1;
+
+        // Hallucination: predicted high (≥0.7) but actual was low (<0.3)
+        if predicted >= 0.7 && actual < 0.3 {
+            self.hallucination_count += 1;
+        }
+    }
+
+    /// Average prediction error (EMA).
+    pub fn avg_error(&self) -> f32 {
+        self.error_ema
+    }
+
+    /// Fraction of predictions that were hallucinations.
+    pub fn hallucination_rate(&self) -> f32 {
+        if self.prediction_count == 0 {
+            0.0
+        } else {
+            self.hallucination_count as f32 / self.prediction_count as f32
+        }
+    }
+
+    /// Total predictions made.
+    pub fn prediction_count(&self) -> usize {
+        self.prediction_count
+    }
+}
+
+/// Extract objective prefix for grouping (e.g., "codegen_simple_arithmetic" → "codegen_simple").
+fn objective_prefix(id: &str) -> String {
+    let parts: Vec<&str> = id.splitn(3, '_').collect();
+    if parts.len() >= 2 {
+        format!("{}_{}", parts[0], parts[1])
+    } else {
+        id.to_string()
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ERROR PATTERN TRACKER (Item #3: Error-Driven Pattern Evolution)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// A recurring compiler error pattern.
+#[derive(Debug, Clone)]
+pub struct ErrorPattern {
+    /// Normalized error key (paths/line numbers stripped)
+    pub error_key: String,
+    /// Auto-fix hint (if one worked)
+    pub fix_hint: Option<String>,
+    /// Number of times this error has occurred
+    pub occurrences: usize,
+    /// Whether this has been evolved into a native pattern
+    pub evolved: bool,
+}
+
+/// Tracks recurring compiler errors across lessons.
+///
+/// When an error recurs enough times (ERROR_PATTERN_EVOLUTION_THRESHOLD),
+/// it's flagged as ready for native pattern evolution — meaning the emitter
+/// should learn to avoid this class of error entirely.
+pub struct ErrorPatternTracker {
+    patterns: HashMap<String, ErrorPattern>,
+}
+
+impl ErrorPatternTracker {
+    pub fn new() -> Self {
+        Self {
+            patterns: HashMap::new(),
+        }
+    }
+
+    /// Record compiler errors from a lesson execution.
+    pub fn record(&mut self, errors: &[String], fix_hint: Option<&str>) {
+        for error in errors {
+            let key = normalize_error(error);
+            if key.is_empty() {
+                continue;
+            }
+            let entry = self.patterns.entry(key.clone()).or_insert(ErrorPattern {
+                error_key: key,
+                fix_hint: None,
+                occurrences: 0,
+                evolved: false,
+            });
+            entry.occurrences += 1;
+            if entry.fix_hint.is_none() {
+                entry.fix_hint = fix_hint.map(|s| s.to_string());
+            }
+        }
+
+        // Evict oldest if over capacity
+        while self.patterns.len() > MAX_ERROR_PATTERNS {
+            if let Some(min_key) = self
+                .patterns
+                .iter()
+                .filter(|(_, p)| !p.evolved)
+                .min_by_key(|(_, p)| p.occurrences)
+                .map(|(k, _)| k.clone())
+            {
+                self.patterns.remove(&min_key);
+            } else {
+                break;
+            }
+        }
+    }
+
+    /// Patterns that have reached the evolution threshold but haven't been evolved yet.
+    pub fn ready_for_evolution(&self) -> Vec<&ErrorPattern> {
+        self.patterns
+            .values()
+            .filter(|p| p.occurrences >= ERROR_PATTERN_EVOLUTION_THRESHOLD && !p.evolved)
+            .collect()
+    }
+
+    /// Mark a pattern as evolved into the native emitter.
+    pub fn mark_evolved(&mut self, error_key: &str) {
+        if let Some(p) = self.patterns.get_mut(error_key) {
+            p.evolved = true;
+        }
+    }
+
+    /// Total tracked patterns.
+    pub fn len(&self) -> usize {
+        self.patterns.len()
+    }
+
+    /// Number of evolved patterns.
+    pub fn evolved_count(&self) -> usize {
+        self.patterns.values().filter(|p| p.evolved).count()
+    }
+
+    /// All tracked patterns.
+    pub fn patterns(&self) -> impl Iterator<Item = &ErrorPattern> {
+        self.patterns.values()
+    }
+}
+
+/// Normalize a compiler error for stable pattern matching.
+///
+/// Strips file paths, line numbers, and column numbers to find the
+/// structural error pattern.
+fn normalize_error(error: &str) -> String {
+    // Strip paths like /tmp/xxx/main.rs:123:45
+    let re_path = regex::Regex::new(r"[/\\][\w./\\-]+\.rs:\d+:\d+").unwrap();
+    let s = re_path.replace_all(error, "<SRC>");
+    // Strip standalone line:col references
+    let re_linecol = regex::Regex::new(r"\b\d+:\d+\b").unwrap();
+    let s = re_linecol.replace_all(&s, "<POS>");
+    s.trim().to_string()
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DISTILLATION RECORD (Item #4: SSM Distillation Prep)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Rich distillation record for Broca SSM training data.
+///
+/// Goes beyond the simple (purpose, source, quality) triple to include
+/// metadata needed for curriculum-aware training: objective provenance,
+/// whether the code was native-only, retry count, etc.
+#[derive(Debug, Clone)]
+pub struct DistillationRecord {
+    /// What the code does (human-readable purpose)
+    pub purpose: String,
+    /// The generated source code
+    pub source: String,
+    /// Quality score (0.0-1.0)
+    pub quality: f32,
+    /// Curriculum objective that produced this
+    pub objective_id: String,
+    /// Whether this was generated purely by native emission (no LLM)
+    pub native_only: bool,
+    /// Total retries (auto-fix + LLM) needed
+    pub total_retries: usize,
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // CODE LEARNING ENGINE
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -676,6 +921,12 @@ pub struct CodeLearningEngine {
     budget: MetabolicBudget,
     /// Optional LLM prompt generator for Tier 2 fallback
     llm_prompt_fn: Option<Box<dyn Fn(&CodeSpec, &[String]) -> String + Send>>,
+    /// Quality prediction tracker (Item #1)
+    predictions: PredictionTracker,
+    /// Recurring error pattern tracker (Item #3)
+    error_tracker: ErrorPatternTracker,
+    /// Rich distillation records for Broca SSM (Item #4)
+    distillation_records: Vec<DistillationRecord>,
 }
 
 impl CodeLearningEngine {
@@ -692,6 +943,9 @@ impl CodeLearningEngine {
             past_examples: Vec::new(),
             budget: MetabolicBudget::default_session(),
             llm_prompt_fn: None,
+            predictions: PredictionTracker::new(),
+            error_tracker: ErrorPatternTracker::new(),
+            distillation_records: Vec::new(),
         }
     }
 
@@ -705,6 +959,9 @@ impl CodeLearningEngine {
             past_examples: Vec::new(),
             budget: MetabolicBudget::default_session(),
             llm_prompt_fn: None,
+            predictions: PredictionTracker::new(),
+            error_tracker: ErrorPatternTracker::new(),
+            distillation_records: Vec::new(),
         }
     }
 
@@ -747,6 +1004,9 @@ impl CodeLearningEngine {
             return LessonOutcome::budget_exhausted(&lesson.objective_id);
         }
 
+        // Item #1: Predict quality before committing energy
+        let predicted_quality = self.predictions.predict(&lesson.objective_id);
+
         // 1. Build intent and context
         let intent = CodeIntent::Create {
             target: CodeTarget::new("code_learning", EntityKind::Module),
@@ -780,7 +1040,19 @@ impl CodeLearningEngine {
         let mut exec_result = self.execute_lesson(&source, lesson.test_source.as_deref());
 
         while !exec_result.compiled && retries < MAX_RETRIES {
-            if let Some(fixed) = try_auto_fix(&source, &exec_result.compile_errors) {
+            // Item #3: Track errors before attempting fix
+            let fix_applied = try_auto_fix(&source, &exec_result.compile_errors);
+            // Item #3: Track errors (fix_hint is "auto-fix applied" if a fix was found)
+            self.error_tracker.record(
+                &exec_result.compile_errors,
+                if fix_applied.is_some() {
+                    Some("auto-fix")
+                } else {
+                    None
+                },
+            );
+
+            if let Some(fixed) = fix_applied {
                 source = fixed;
                 retries += 1;
                 energy_spent += ENERGY_AUTO_FIX;
@@ -825,6 +1097,21 @@ impl CodeLearningEngine {
             && exec_result.tests_failed == 0
             && generated.plan_coverage >= MIN_PLAN_COVERAGE;
 
+        // Item #1: Compute actual quality and reality-check the prediction
+        let actual_quality = if !exec_result.compiled {
+            0.0
+        } else if exec_result.tests_failed > 0 {
+            let total = exec_result.tests_passed + exec_result.tests_failed;
+            exec_result.tests_passed as f32 / total as f32 * 0.5 // max 0.5 for partial
+        } else {
+            1.0 - (retries as f32 + llm_retries as f32) * 0.1 // small penalty per retry
+        }
+        .clamp(0.0, 1.0);
+
+        let was_hallucination = predicted_quality >= 0.7 && actual_quality < 0.3;
+        self.predictions
+            .record(&lesson.objective_id, predicted_quality, actual_quality);
+
         let outcome = LessonOutcome {
             objective_id: lesson.objective_id.clone(),
             source: source.clone(),
@@ -839,6 +1126,9 @@ impl CodeLearningEngine {
             llm_retries_used: llm_retries,
             distillation_eligible,
             energy_spent,
+            predicted_quality: Some(predicted_quality),
+            actual_quality,
+            was_hallucination,
         };
 
         // 7. Cache successes for distillation and few-shot context
@@ -847,7 +1137,17 @@ impl CodeLearningEngine {
                 self.generator.distillation_target(&lesson.spec, &generated)
             {
                 self.distillation_cache
-                    .push((lesson.spec.purpose.clone(), src, quality));
+                    .push((lesson.spec.purpose.clone(), src.clone(), quality));
+
+                // Item #4: Build rich distillation record
+                self.distillation_records.push(DistillationRecord {
+                    purpose: lesson.spec.purpose.clone(),
+                    source: src,
+                    quality,
+                    objective_id: lesson.objective_id.clone(),
+                    native_only: !used_llm,
+                    total_retries: retries + llm_retries,
+                });
             }
             // Add to past examples (capped at 16)
             if self.past_examples.len() < 16 {
@@ -974,6 +1274,12 @@ impl CodeLearningEngine {
             summary.avg_plan_coverage = total_coverage / summary.lessons_attempted as f32;
         }
 
+        // Item #1: Prediction calibration stats
+        summary.avg_prediction_error = self.predictions.avg_error();
+        summary.hallucination_rate = self.predictions.hallucination_rate();
+        // Item #3: Error patterns ready for evolution
+        summary.error_patterns_learned = self.error_tracker.ready_for_evolution().len();
+
         summary
     }
 
@@ -1000,6 +1306,71 @@ impl CodeLearningEngine {
     pub fn reset_budget(&mut self) {
         self.budget = MetabolicBudget::default_session();
     }
+
+    // ── Item #1: Prediction accessors ────────────────────────────────────
+
+    /// Get the prediction tracker.
+    pub fn predictions(&self) -> &PredictionTracker {
+        &self.predictions
+    }
+
+    /// Average prediction error across all lessons.
+    pub fn avg_prediction_error(&self) -> f32 {
+        self.predictions.avg_error()
+    }
+
+    /// Fraction of predictions that were hallucinations.
+    pub fn hallucination_rate(&self) -> f32 {
+        self.predictions.hallucination_rate()
+    }
+
+    // ── Item #3: Error pattern accessors ─────────────────────────────────
+
+    /// Get the error pattern tracker.
+    pub fn error_tracker(&self) -> &ErrorPatternTracker {
+        &self.error_tracker
+    }
+
+    /// Error patterns ready for evolution into native emitter patterns.
+    pub fn error_patterns_ready_for_evolution(&self) -> Vec<&ErrorPattern> {
+        self.error_tracker.ready_for_evolution()
+    }
+
+    // ── Item #4: Distillation record accessors ───────────────────────────
+
+    /// Get the rich distillation records.
+    pub fn distillation_records(&self) -> &[DistillationRecord] {
+        &self.distillation_records
+    }
+
+    /// Export distillation records as JSONL (one JSON object per line).
+    pub fn export_distillation_jsonl(&self) -> String {
+        let mut output = String::new();
+        for record in &self.distillation_records {
+            let escaped_source = record
+                .source
+                .replace('\\', "\\\\")
+                .replace('"', "\\\"")
+                .replace('\n', "\\n");
+            let line = format!(
+                r#"{{"purpose":"{}","source":"{}","quality":{:.3},"objective":"{}","native_only":{},"retries":{}}}"#,
+                record.purpose,
+                escaped_source,
+                record.quality,
+                record.objective_id,
+                record.native_only,
+                record.total_retries,
+            );
+            output.push_str(&line);
+            output.push('\n');
+        }
+        output
+    }
+
+    /// Save distillation records to a JSONL file.
+    pub fn save_distillation(&self, path: &std::path::Path) -> std::io::Result<()> {
+        std::fs::write(path, self.export_distillation_jsonl())
+    }
 }
 
 impl LessonOutcome {
@@ -1019,6 +1390,9 @@ impl LessonOutcome {
             llm_retries_used: 0,
             distillation_eligible: false,
             energy_spent: 0.0,
+            predicted_quality: None,
+            actual_quality: 0.0,
+            was_hallucination: false,
         }
     }
 }
@@ -1256,6 +1630,9 @@ mod tests {
             llm_retries_used: 0,
             distillation_eligible: true,
             energy_spent: 1.0,
+            predicted_quality: Some(0.7),
+            actual_quality: 1.0,
+            was_hallucination: false,
         };
         assert_eq!(success.mastery_signal(), 1.0);
 
@@ -1281,8 +1658,8 @@ mod tests {
             lessons_passed: 6,
             ..Default::default()
         };
-        assert_eq!(summary.compile_rate(), 80.0);
-        assert_eq!(summary.pass_rate(), 60.0);
+        assert!((summary.compile_rate() - 80.0).abs() < 0.01);
+        assert!((summary.pass_rate() - 60.0).abs() < 0.01);
     }
 
     #[test]
@@ -1417,5 +1794,179 @@ mod tests {
             summary.total_energy_spent,
             summary.lessons_attempted,
         );
+    }
+
+    // ── Item #1: Prediction tracker tests ────────────────────────────────
+
+    #[test]
+    fn test_prediction_tracker_initial_prior() {
+        let tracker = PredictionTracker::new();
+        // Unknown objective should return optimistic prior
+        assert_eq!(tracker.predict("codegen_unknown_foo"), 0.7);
+        assert_eq!(tracker.prediction_count(), 0);
+        assert_eq!(tracker.hallucination_rate(), 0.0);
+    }
+
+    #[test]
+    fn test_prediction_tracker_learns_from_outcomes() {
+        let mut tracker = PredictionTracker::new();
+        // Record several successes
+        for _ in 0..5 {
+            tracker.record("codegen_simple_add", 0.7, 1.0);
+        }
+        // Prediction should move toward 1.0
+        let pred = tracker.predict("codegen_simple_add");
+        assert!(
+            pred > 0.8,
+            "Prediction should be high after successes, got {pred}"
+        );
+    }
+
+    #[test]
+    fn test_prediction_tracker_detects_hallucinations() {
+        let mut tracker = PredictionTracker::new();
+        // Predicted high (0.7), actual low (0.0) = hallucination
+        tracker.record("codegen_hard_thing", 0.7, 0.0);
+        assert_eq!(tracker.hallucination_rate(), 1.0);
+
+        // Record a non-hallucination
+        tracker.record("codegen_hard_thing", 0.5, 0.8);
+        assert_eq!(tracker.hallucination_rate(), 0.5);
+    }
+
+    #[test]
+    fn test_prediction_in_session() {
+        let mut engine = make_engine();
+        let summary = engine.run_session(TIER1_OBJECTIVES);
+        // After a full session, predictions should be calibrated
+        assert!(
+            engine.predictions().prediction_count() >= 12,
+            "Should have 12+ predictions, got {}",
+            engine.predictions().prediction_count(),
+        );
+        // Simulation mode = all succeed, so hallucination rate should be 0
+        assert_eq!(
+            summary.hallucination_rate, 0.0,
+            "No hallucinations in simulation mode"
+        );
+    }
+
+    // ── Item #3: Error pattern tracker tests ─────────────────────────────
+
+    #[test]
+    fn test_error_pattern_tracker_basic() {
+        let mut tracker = ErrorPatternTracker::new();
+        assert_eq!(tracker.len(), 0);
+
+        tracker.record(
+            &["error[E0308]: mismatched types at /tmp/x.rs:1:5".to_string()],
+            None,
+        );
+        assert_eq!(tracker.len(), 1);
+        assert!(tracker.ready_for_evolution().is_empty());
+    }
+
+    #[test]
+    fn test_error_pattern_reaches_threshold() {
+        let mut tracker = ErrorPatternTracker::new();
+        let error = "error[E0308]: mismatched types at /tmp/x.rs:1:5".to_string();
+
+        for _ in 0..ERROR_PATTERN_EVOLUTION_THRESHOLD {
+            tracker.record(&[error.clone()], Some("add type annotation"));
+        }
+
+        let ready = tracker.ready_for_evolution();
+        assert_eq!(ready.len(), 1, "One pattern should be ready for evolution");
+        assert_eq!(ready[0].occurrences, ERROR_PATTERN_EVOLUTION_THRESHOLD);
+        assert!(ready[0].fix_hint.is_some());
+    }
+
+    #[test]
+    fn test_error_pattern_mark_evolved() {
+        let mut tracker = ErrorPatternTracker::new();
+        let error = "error[E0308]: mismatched types".to_string();
+        for _ in 0..3 {
+            tracker.record(&[error.clone()], None);
+        }
+
+        let key = tracker.ready_for_evolution()[0].error_key.clone();
+        tracker.mark_evolved(&key);
+
+        assert!(tracker.ready_for_evolution().is_empty());
+        assert_eq!(tracker.evolved_count(), 1);
+    }
+
+    #[test]
+    fn test_normalize_error_strips_paths() {
+        let raw = "error[E0308]: mismatched types at /tmp/code_abc123/main.rs:42:10";
+        let norm = normalize_error(raw);
+        assert!(!norm.contains("/tmp/"));
+        assert!(!norm.contains("42:10"));
+        assert!(norm.contains("E0308"));
+    }
+
+    #[test]
+    fn test_session_tracks_error_patterns() {
+        let mut engine = make_engine();
+        let summary = engine.run_session(TIER1_OBJECTIVES);
+        // In simulation mode, all compile — no errors to track
+        assert_eq!(
+            summary.error_patterns_learned, 0,
+            "No error patterns in simulation mode"
+        );
+    }
+
+    // ── Item #4: Distillation record tests ───────────────────────────────
+
+    #[test]
+    fn test_distillation_records_populated() {
+        let mut engine = make_engine();
+        let _summary = engine.run_session(TIER1_OBJECTIVES);
+        // Simulation mode: all pass, so all should produce distillation records
+        assert!(
+            !engine.distillation_records().is_empty(),
+            "Should have distillation records after session"
+        );
+        for record in engine.distillation_records() {
+            assert!(record.quality > 0.0);
+            assert!(record.native_only, "Simulation mode uses no LLM");
+            assert!(!record.purpose.is_empty());
+            assert!(!record.source.is_empty());
+        }
+    }
+
+    #[test]
+    fn test_distillation_jsonl_export() {
+        let mut engine = make_engine();
+        let _summary = engine.run_session(TIER1_OBJECTIVES);
+        let jsonl = engine.export_distillation_jsonl();
+        assert!(!jsonl.is_empty());
+        // Each line should be valid-ish JSON
+        for line in jsonl.lines() {
+            assert!(line.starts_with('{'));
+            assert!(line.ends_with('}'));
+            assert!(line.contains("\"purpose\""));
+            assert!(line.contains("\"quality\""));
+        }
+    }
+
+    #[test]
+    fn test_distillation_save_to_file() {
+        let mut engine = make_engine();
+        let _summary = engine.run_session(TIER1_OBJECTIVES);
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        engine.save_distillation(tmp.path()).unwrap();
+        let contents = std::fs::read_to_string(tmp.path()).unwrap();
+        assert!(!contents.is_empty());
+    }
+
+    #[test]
+    fn test_objective_prefix() {
+        assert_eq!(
+            objective_prefix("codegen_simple_arithmetic"),
+            "codegen_simple"
+        );
+        assert_eq!(objective_prefix("codegen_string_ops"), "codegen_string");
+        assert_eq!(objective_prefix("solo"), "solo");
     }
 }

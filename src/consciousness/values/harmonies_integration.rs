@@ -560,6 +560,98 @@ mod tests {
     }
 
     #[test]
+    fn test_topology_feedback_to_harmonies() {
+        let mut integrator = HarmoniesIntegrator::default();
+
+        // ── Path A: Blind spot boost ──
+        // Harmony 0 has zero variance → blind spot
+        let mut variance = [0.1; N_HARMONIES];
+        variance[0] = 0.0;
+
+        integrator.apply_topology_feedback_with_kl(&variance, 3, 0.5, 0.3);
+
+        let rc_weight = *integrator
+            .config
+            .harmony_weights
+            .get(&Harmony::ResonantCoherence)
+            .unwrap();
+        assert!(
+            rc_weight > 1.0,
+            "Blind spot (variance=0) should boost weight, got {rc_weight}"
+        );
+
+        // ── Path B: Dominant attenuation (low KL, low completeness) ──
+        for h in Harmony::all() {
+            integrator.config.harmony_weights.insert(h, 1.0);
+        }
+        let uniform_variance = [0.1; N_HARMONIES];
+        // dominant=2, completeness=0.5 (<0.8), kl=0.3 (<=0.5) → attenuate
+        integrator.apply_topology_feedback_with_kl(&uniform_variance, 2, 0.5, 0.3);
+
+        let dominant_weight = *integrator
+            .config
+            .harmony_weights
+            .get(&Harmony::all()[2])
+            .unwrap();
+        assert!(
+            dominant_weight < 1.0,
+            "Dominant axis with low completeness & low KL should be attenuated, got {dominant_weight}"
+        );
+        // Non-dominant harmonies should be unchanged
+        let other_weight = *integrator
+            .config
+            .harmony_weights
+            .get(&Harmony::all()[5])
+            .unwrap();
+        assert!(
+            (other_weight - 1.0_f32).abs() < f32::EPSILON,
+            "Non-dominant, non-blind-spot harmony should be unchanged, got {other_weight}"
+        );
+
+        // ── Path C: High KL anchoring ──
+        for h in Harmony::all() {
+            integrator.config.harmony_weights.insert(h, 1.0);
+        }
+        // dominant=4, completeness=0.5 (doesn't matter), kl=0.8 (>0.5) → anchor/boost
+        integrator.apply_topology_feedback_with_kl(&uniform_variance, 4, 0.5, 0.8);
+
+        let anchored_weight = *integrator
+            .config
+            .harmony_weights
+            .get(&Harmony::all()[4])
+            .unwrap();
+        assert!(
+            anchored_weight > 1.0,
+            "Dominant axis with high KL should be anchored (boosted), got {anchored_weight}"
+        );
+
+        // ── Path D: Multi-step accumulation — blind spot boost compounds ──
+        for h in Harmony::all() {
+            integrator.config.harmony_weights.insert(h, 1.0);
+        }
+        let mut blind_spot_variance = [0.1; N_HARMONIES];
+        blind_spot_variance[6] = 0.0; // harmony 6 is a persistent blind spot
+
+        for _ in 0..10 {
+            integrator.apply_topology_feedback_with_kl(&blind_spot_variance, 0, 0.9, 0.1);
+        }
+
+        let boosted = *integrator
+            .config
+            .harmony_weights
+            .get(&Harmony::all()[6])
+            .unwrap();
+        assert!(
+            boosted > 1.5,
+            "10 rounds of blind spot boost should compound significantly, got {boosted}"
+        );
+        assert!(
+            boosted <= 2.0,
+            "Weight should be clamped at 2.0, got {boosted}"
+        );
+    }
+
+    #[test]
     fn test_valued_action_builder() {
         let action = ValuedAction::new("test", "description", ContinuousHV::random(512, 42))
             .with_outcome("positive outcome")

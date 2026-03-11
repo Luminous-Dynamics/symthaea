@@ -875,12 +875,29 @@ impl CognitiveLoopService {
                 } else {
                     None
                 };
-                super::ethics_engine::EthicsEngine::with_anomaly_config(
+                // Dense HarmonyBasis: encode HARMONY_KEYWORDS via Qwen3 + HdcBridge
+                // so basis vectors live in the same JL-projected semantic subspace as
+                // scenario embeddings. Eliminates the n-gram ↔ contextual domain mismatch.
+                #[cfg(feature = "semantic-encoder")]
+                let dense_basis: Option<
+                    std::sync::Arc<crate::hdc::harmony_basis::HarmonyBasis>,
+                > = if enable_semantic_encoder {
+                    Self::build_dense_harmony_basis(engine_ma.dim())
+                } else {
+                    None
+                };
+                #[cfg(not(feature = "semantic-encoder"))]
+                let dense_basis: Option<
+                    std::sync::Arc<crate::hdc::harmony_basis::HarmonyBasis>,
+                > = None;
+
+                super::ethics_engine::EthicsEngine::with_anomaly_config_and_basis(
                     engine_mp,
                     engine_ma,
                     engine_ve,
                     engine_hi,
                     moral_anomaly_config.clone(),
+                    dense_basis,
                 )
             },
             kosmic_song: crate::mycelix::KosmicSong::default(),
@@ -946,6 +963,77 @@ impl CognitiveLoopService {
                 im
             },
         })
+    }
+
+    /// Build a dense-encoded HarmonyBasis by encoding HARMONY_KEYWORDS through
+    /// the Qwen3 embedder and projecting each via HdcBridge to ContinuousHV.
+    ///
+    /// One-time init cost (~8 embeddings). The result lives in the same
+    /// JL-projected semantic subspace as runtime scenario embeddings.
+    #[cfg(feature = "semantic-encoder")]
+    fn build_dense_harmony_basis(
+        dim: usize,
+    ) -> Option<std::sync::Arc<crate::hdc::harmony_basis::HarmonyBasis>> {
+        use crate::hdc::harmony_basis::{HarmonyBasis, HARMONY_KEYWORDS};
+        use symthaea_core::hdc::ContinuousHV;
+        use symthaea_types::N_HARMONIES;
+
+        let qwen_config = symthaea_embeddings::Qwen3Config::simulated();
+        let mut embedder = match symthaea_embeddings::Qwen3Embedder::new(qwen_config) {
+            Ok(e) => e,
+            Err(e) => {
+                tracing::warn!(
+                    "Failed to create Qwen3 embedder for dense HarmonyBasis: {e}"
+                );
+                return None;
+            }
+        };
+
+        let bridge = symthaea_embeddings::HdcBridge::with_config(
+            symthaea_embeddings::BridgeConfig {
+                input_dim: symthaea_embeddings::QWEN3_DIMENSION,
+                output_dim: dim,
+                ..Default::default()
+            },
+        );
+
+        // Encode all 8 harmony keyword strings in batch
+        let keyword_refs: Vec<&str> = HARMONY_KEYWORDS.iter().copied().collect();
+        let batch_result = match embedder.embed_batch(&keyword_refs) {
+            Ok(results) => results,
+            Err(e) => {
+                tracing::warn!("Failed to batch-encode harmony keywords: {e}");
+                return None;
+            }
+        };
+
+        if batch_result.len() != N_HARMONIES {
+            tracing::warn!(
+                "Expected {N_HARMONIES} embeddings, got {}; falling back to n-gram basis",
+                batch_result.len()
+            );
+            return None;
+        }
+
+        // Project each dense embedding through HdcBridge → ContinuousHV
+        let mut vectors: Vec<ContinuousHV> = Vec::with_capacity(N_HARMONIES);
+        for result in &batch_result {
+            let projected = bridge.project_continuous(&result.embedding);
+            vectors.push(ContinuousHV::from_slice(&projected));
+        }
+
+        let arr: [ContinuousHV; N_HARMONIES] = vectors.try_into().unwrap_or_else(
+            |_| [(); N_HARMONIES].map(|_| ContinuousHV::zero(dim)),
+        );
+
+        let basis = HarmonyBasis::with_dense_vectors(dim, arr);
+        tracing::info!(
+            "Dense HarmonyBasis built: {} keywords × {}D via Qwen3 + HdcBridge",
+            N_HARMONIES,
+            dim
+        );
+
+        Some(std::sync::Arc::new(basis))
     }
 
     /// Get the current temporal backend type

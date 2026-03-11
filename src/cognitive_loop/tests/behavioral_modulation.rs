@@ -243,3 +243,51 @@ fn different_profiles_all_produce_valid_lr() {
         }
     }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 7. SESSION 18: Orphaned Signal Wiring
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn consciousness_state_level_modulation_wiring() {
+    let mut svc = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+    let results = run_cycles(&mut svc, 50, "consciousness state check");
+    let fires = count_true(&results, |m| m.consciousness_state_modulated);
+    assert!(
+        fires <= results.len(),
+        "consciousness_state_modulated wiring exists: {fires}"
+    );
+}
+
+#[test]
+fn living_mind_vitality_modulation_wiring() {
+    let mut svc = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+    let results = run_cycles(&mut svc, 50, "vitality check");
+    let fires = count_true(&results, |m| m.living_mind_vitality_modulated);
+    assert!(
+        fires <= results.len(),
+        "living_mind_vitality_modulated wiring exists: {fires}"
+    );
+}
+
+#[test]
+fn living_mind_coherence_modulation_wiring() {
+    let mut svc = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+    let results = run_cycles(&mut svc, 50, "coherence check");
+    let fires = count_true(&results, |m| m.living_mind_coherence_modulated);
+    assert!(
+        fires <= results.len(),
+        "living_mind_coherence_modulated wiring exists: {fires}"
+    );
+}
+
+#[test]
+fn mcts_effectiveness_modulation_wiring() {
+    let mut svc = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+    let results = run_cycles(&mut svc, 50, "mcts effectiveness check");
+    let fires = count_true(&results, |m| m.mcts_effectiveness_modulated);
+    assert!(
+        fires <= results.len(),
+        "mcts_effectiveness_modulated wiring exists: {fires}"
+    );
+}

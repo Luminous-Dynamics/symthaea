@@ -181,6 +181,15 @@ impl ContinuousHV {
     /// - Self-inverse: A⊗A ≈ 1
     /// - Preserves similarity: sim(A⊗C, B⊗C) = sim(A, B)
     ///
+    /// Non-commutative temporal binding: ρ(self) ⊙ other.
+    ///
+    /// Cyclic permutation + Hadamard product for continuous domain.
+    /// `a.bind_temporal(&b) ≠ b.bind_temporal(&a)`, encoding temporal order.
+    #[inline]
+    pub fn bind_temporal(&self, other: &Self) -> Self {
+        self.permute(1).bind(other)
+    }
+
     /// # Performance
     /// Uses SIMD acceleration when the `simd` feature is enabled (4x+ speedup).
     #[inline]

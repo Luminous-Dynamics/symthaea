@@ -66,6 +66,12 @@ use super::thresholds::{
     TRUST_DECAY_FACTOR, TRUST_SIGNAL_MIDPOINT, TRUST_SIGNAL_RATE, UNIFIED_QUALITY_AGREEMENT_WEIGHT,
     UNIFIED_QUALITY_ANOMALY_WEIGHT, UNIFIED_QUALITY_PREDICTION_WEIGHT,
     VALUE_CACHE_HIT_CONFIDENCE_SCALE, VALUE_CACHE_HIT_CONFIDENCE_THRESHOLD,
+    CONSCIOUSNESS_STATE_HIGH_THRESHOLD, CONSCIOUSNESS_STATE_HIGH_LR_SCALE,
+    CONSCIOUSNESS_STATE_LOW_THRESHOLD, CONSCIOUSNESS_STATE_LOW_LR_DAMPEN,
+    LIVING_MIND_VITALITY_HIGH_THRESHOLD, LIVING_MIND_VITALITY_CONFIDENCE_BOOST,
+    LIVING_MIND_VITALITY_LOW_THRESHOLD, LIVING_MIND_VITALITY_LOW_LR_DAMPEN,
+    LIVING_MIND_COHERENCE_HIGH_THRESHOLD, LIVING_MIND_COHERENCE_HIGH_EXPLORE_DAMPEN,
+    LIVING_MIND_COHERENCE_LOW_THRESHOLD, LIVING_MIND_COHERENCE_LOW_EXPLORE_BOOST,
 };
 use super::{CognitiveLoopService, CycleState};
 
@@ -1485,6 +1491,61 @@ impl CognitiveLoopService {
             {
                 self.scale_exploration("multi_obj_frontier_converged", MULTI_OBJ_FRONTIER_DAMPEN);
             }
+        }
+
+        // ─── Consciousness State Level → LR ──────────────────────────────
+        // Dehaene & Changeux (2011) — high global ignition → enhanced plasticity.
+        // Tononi (2004) — low Phi / fragmented processing → protective dampening.
+        if self.stats.total_cycles > 15 {
+            if consciousness_state_level > CONSCIOUSNESS_STATE_HIGH_THRESHOLD {
+                self.scale_lr("consciousness_state_high", CONSCIOUSNESS_STATE_HIGH_LR_SCALE);
+            } else if consciousness_state_level < CONSCIOUSNESS_STATE_LOW_THRESHOLD
+                && consciousness_state_level > 0.0
+            {
+                self.scale_lr("consciousness_state_low", CONSCIOUSNESS_STATE_LOW_LR_DAMPEN);
+            }
+        }
+
+        // ─── Living Mind Vitality → Confidence + LR ─────────────────────────
+        // Di Paolo (2005) — high adaptivity → justified confidence.
+        // Sterling (2012) — allostatic overload → protective downregulation.
+        if self.stats.total_cycles > 15 {
+            if living_mind_vitality > LIVING_MIND_VITALITY_HIGH_THRESHOLD {
+                self.adjust_confidence(
+                    "living_mind_vitality_high",
+                    LIVING_MIND_VITALITY_CONFIDENCE_BOOST,
+                );
+            } else if living_mind_vitality < LIVING_MIND_VITALITY_LOW_THRESHOLD
+                && living_mind_vitality > 0.0
+            {
+                self.scale_lr("living_mind_vitality_low", LIVING_MIND_VITALITY_LOW_LR_DAMPEN);
+            }
+        }
+
+        // ─── Living Mind Coherence → Exploration ────────────────────────────
+        // Kelso (1995) — high phase coherence → stable attractor → reduce search.
+        // Friston (2010) — low coherence = high surprise → explore.
+        if self.stats.total_cycles > 15 {
+            if living_mind_coherence > LIVING_MIND_COHERENCE_HIGH_THRESHOLD {
+                self.scale_exploration(
+                    "living_mind_coherence_high",
+                    LIVING_MIND_COHERENCE_HIGH_EXPLORE_DAMPEN,
+                );
+            } else if living_mind_coherence < LIVING_MIND_COHERENCE_LOW_THRESHOLD
+                && living_mind_coherence > 0.0
+            {
+                self.adjust_exploration(
+                    "living_mind_coherence_low",
+                    LIVING_MIND_COHERENCE_LOW_EXPLORE_BOOST,
+                );
+            }
+        }
+
+        // ── Governance → Neuromod + Learning (Phase C, interval 37) ─────
+        #[cfg(feature = "mycelix")]
+        {
+            self.apply_governance_neuromod();
+            self.process_governance_learning();
         }
 
         FeedbackPhaseResult {

@@ -162,6 +162,15 @@ impl BinaryHV {
         Self(super::simd_ops::bind_simd(&self.0, &other.0))
     }
 
+    /// Non-commutative temporal binding: ρ(self) ⊕ other.
+    ///
+    /// Cyclic permutation breaks XOR commutativity so that
+    /// `a.bind_temporal(&b) ≠ b.bind_temporal(&a)`, encoding temporal order.
+    #[inline]
+    pub fn bind_temporal(&self, other: &Self) -> Self {
+        self.permute(1).bind(other)
+    }
+
     /// Bind two vectors using scalar implementation (for comparison/testing)
     #[inline]
     pub fn bind_scalar(&self, other: &Self) -> Self {

@@ -206,6 +206,14 @@ pub struct MoralAnomalyConfig {
     /// A slow adversarial drift over hours that would evade an EMA baseline
     /// cannot evade a windowed baseline with bounded memory.
     pub convergence_baseline_window: usize,
+    /// Exponential decay rate for baseline window observations (default: 0.0).
+    ///
+    /// Controls forgetting of old baseline observations. The weight of an
+    /// observation at age `k` (0=newest) is `exp(-rate * k)`.
+    /// - 0.0: uniform weighting (no decay, backward-compatible)
+    /// - 0.05: gentle decay, ~60% weight at age 10
+    /// - 0.1: moderate decay, ~37% weight at age 10
+    pub baseline_decay_rate: f64,
 }
 
 impl Default for MoralAnomalyConfig {
@@ -241,6 +249,7 @@ impl Default for MoralAnomalyConfig {
             convergence_spectral_gap_threshold: 0.3,
             convergence_decay_lambda: 1.0,
             convergence_baseline_window: 100,
+            baseline_decay_rate: 0.0,
         }
     }
 }
@@ -1560,12 +1569,10 @@ impl MoralTopology {
                 }
             }
             let recent_sim = if w_sum > 0.0 { sim_sum / w_sum } else { 0.0 };
-            let baseline_sim = if !self.baseline_similarity_window.is_empty() {
-                self.baseline_similarity_window.iter().sum::<f64>()
-                    / self.baseline_similarity_window.len() as f64
-            } else {
-                0.0
-            };
+            let baseline_sim = Self::baseline_weighted_mean(
+                &self.baseline_similarity_window,
+                ac.baseline_decay_rate,
+            );
             let sim_anomaly = recent_sim - baseline_sim;
             let sim_sev =
                 (sim_anomaly / ac.convergence_similarity_threshold.max(1e-9)).clamp(0.0, 1.0);
@@ -1601,12 +1608,10 @@ impl MoralTopology {
                         -p * p.ln()
                     })
                     .sum();
-                let base_ent = if !self.baseline_entropy_window.is_empty() {
-                    self.baseline_entropy_window.iter().sum::<f64>()
-                        / self.baseline_entropy_window.len() as f64
-                } else {
-                    0.0
-                };
+                let base_ent = Self::baseline_weighted_mean(
+                    &self.baseline_entropy_window,
+                    ac.baseline_decay_rate,
+                );
                 let decline = if base_ent > 1e-9 {
                     ((base_ent - ent) / base_ent).max(0.0)
                 } else {
@@ -1740,6 +1745,30 @@ impl MoralTopology {
     ///    Hazardous convergence typically suppresses care/consent dimensions.
     ///
     /// Convergence fires when **any two of three** signals exceed their thresholds.
+    /// Compute a recency-weighted mean of a sliding window.
+    ///
+    /// With `decay_rate == 0.0`, this is a plain uniform average (backward-compatible).
+    /// With `decay_rate > 0.0`, recent observations are weighted exponentially more:
+    /// `w(age) = exp(-decay_rate * age)` where age 0 is the newest observation.
+    fn baseline_weighted_mean(window: &VecDeque<f64>, decay_rate: f64) -> f64 {
+        if window.is_empty() {
+            return 0.0;
+        }
+        if decay_rate <= 0.0 {
+            return window.iter().sum::<f64>() / window.len() as f64;
+        }
+        let n = window.len();
+        let mut wsum = 0.0f64;
+        let mut wtot = 0.0f64;
+        for (i, &v) in window.iter().enumerate() {
+            let age = (n - 1 - i) as f64;
+            let w = (-decay_rate * age).exp();
+            wsum += v * w;
+            wtot += w;
+        }
+        wsum / wtot.max(1e-12)
+    }
+
     /// Severity is the mean of all three normalized signals (0.0–1.0).
     ///
     /// Science: Persistent homology on autobiographical moral manifold detects
@@ -1787,12 +1816,10 @@ impl MoralTopology {
             self.baseline_similarity_window.pop_front();
         }
 
-        let baseline_similarity = if self.baseline_similarity_window.is_empty() {
-            0.0
-        } else {
-            self.baseline_similarity_window.iter().sum::<f64>()
-                / self.baseline_similarity_window.len() as f64
-        };
+        let baseline_similarity = Self::baseline_weighted_mean(
+            &self.baseline_similarity_window,
+            ac.baseline_decay_rate,
+        );
         let similarity_anomaly = recent_similarity - baseline_similarity;
 
         // ── Signal 2: Harmony entropy decline ────────────────────────────
@@ -1837,12 +1864,10 @@ impl MoralTopology {
         if self.baseline_entropy_window.len() > win_cap {
             self.baseline_entropy_window.pop_front();
         }
-        let baseline_entropy = if self.baseline_entropy_window.is_empty() {
-            0.0
-        } else {
-            self.baseline_entropy_window.iter().sum::<f64>()
-                / self.baseline_entropy_window.len() as f64
-        };
+        let baseline_entropy = Self::baseline_weighted_mean(
+            &self.baseline_entropy_window,
+            ac.baseline_decay_rate,
+        );
 
         let entropy_decline_rate = if baseline_entropy > 1e-9 {
             ((baseline_entropy - recent_entropy) / baseline_entropy).max(0.0)
@@ -1871,12 +1896,10 @@ impl MoralTopology {
         if self.baseline_flourishing_window.len() > win_cap {
             self.baseline_flourishing_window.pop_front();
         }
-        let baseline_flourishing = if self.baseline_flourishing_window.is_empty() {
-            0.0
-        } else {
-            self.baseline_flourishing_window.iter().sum::<f64>()
-                / self.baseline_flourishing_window.len() as f64
-        };
+        let baseline_flourishing = Self::baseline_weighted_mean(
+            &self.baseline_flourishing_window,
+            ac.baseline_decay_rate,
+        );
 
         // Flourishing deficit: how far below the floor relative to baseline
         let flourishing_deficit = if baseline_flourishing > 1e-9 {
@@ -1936,12 +1959,10 @@ impl MoralTopology {
         if self.baseline_spectral_gap_window.len() > win_cap {
             self.baseline_spectral_gap_window.pop_front();
         }
-        let baseline_spectral_gap = if self.baseline_spectral_gap_window.is_empty() {
-            0.0
-        } else {
-            self.baseline_spectral_gap_window.iter().sum::<f64>()
-                / self.baseline_spectral_gap_window.len() as f64
-        };
+        let baseline_spectral_gap = Self::baseline_weighted_mean(
+            &self.baseline_spectral_gap_window,
+            ac.baseline_decay_rate,
+        );
         let spectral_gap_decline = if baseline_spectral_gap > 1e-9 {
             ((baseline_spectral_gap - spectral_gap) / baseline_spectral_gap).max(0.0)
         } else {
@@ -5250,5 +5271,54 @@ mod tests {
         let restored: MoralTopologySnapshot = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(restored.scenario_counter, pre_scenario_counter);
         assert_eq!(restored.audit_log.len(), pre_audit_len);
+    }
+
+    // ── Forgetting Curve Tests ─────────────────────────────────────
+
+    #[test]
+    fn test_weighted_mean_zero_decay_is_uniform() {
+        let window: VecDeque<f64> = vec![1.0, 2.0, 3.0, 4.0, 5.0].into();
+        let mean = MoralTopology::baseline_weighted_mean(&window, 0.0);
+        assert!((mean - 3.0).abs() < 1e-12, "Zero decay should give uniform average, got {mean}");
+    }
+
+    #[test]
+    fn test_weighted_mean_with_decay_favors_recent() {
+        let window: VecDeque<f64> = vec![1.0, 2.0, 3.0, 4.0, 5.0].into();
+        let uniform = MoralTopology::baseline_weighted_mean(&window, 0.0);
+        let decayed = MoralTopology::baseline_weighted_mean(&window, 0.5);
+        // With decay, mean should be pulled toward recent (higher) values
+        assert!(
+            decayed > uniform,
+            "Decayed mean ({decayed:.4}) should exceed uniform ({uniform:.4})"
+        );
+    }
+
+    #[test]
+    fn test_weighted_mean_strong_decay_nearly_last() {
+        let window: VecDeque<f64> = vec![0.0, 0.0, 0.0, 0.0, 100.0].into();
+        let mean = MoralTopology::baseline_weighted_mean(&window, 10.0);
+        // With very strong decay, should be nearly 100.0
+        assert!(
+            mean > 95.0,
+            "Strong decay should nearly equal last element, got {mean:.4}"
+        );
+    }
+
+    #[test]
+    fn test_weighted_mean_empty_window() {
+        let window: VecDeque<f64> = VecDeque::new();
+        assert!((MoralTopology::baseline_weighted_mean(&window, 0.0)).abs() < 1e-12);
+        assert!((MoralTopology::baseline_weighted_mean(&window, 1.0)).abs() < 1e-12);
+    }
+
+    #[test]
+    fn test_forgetting_curve_default_no_behavior_change() {
+        // With default decay_rate=0.0, behavior should be identical to old code
+        let config = MoralAnomalyConfig::default();
+        assert!(
+            config.baseline_decay_rate == 0.0,
+            "Default decay rate must be 0.0 for backward compatibility"
+        );
     }
 }

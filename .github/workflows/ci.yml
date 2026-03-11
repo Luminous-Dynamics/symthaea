@@ -110,7 +110,7 @@ jobs:
           datacenter,experiment-planner,strategic-materials,critical-minerals,\
           advanced-manufacturing,building-systems,design-production,\
           mycelix,unstable-examples"
-          cargo clippy --lib --bins --features "$CI_FEATURES" -- -D warnings
+          cargo clippy --features "$CI_FEATURES" -- -D warnings
 
   test:
     name: Test (default features)
@@ -240,7 +240,7 @@ jobs:
           datacenter,experiment-planner,strategic-materials,critical-minerals,\
           advanced-manufacturing,building-systems,design-production,\
           mycelix,unstable-examples"
-          cargo test --lib --features "$CI_FEATURES"
+          cargo test --features "$CI_FEATURES"
 
   test-feature-matrix-critical:
     name: Test Feature Matrix (core/web_research/pathology)
@@ -345,7 +345,7 @@ jobs:
             cmake
 
       - name: Test with feature ${{ matrix.features }}
-        run: cargo test --lib --features "${{ matrix.features }}" || cargo test --lib --features "${{ matrix.features }}"
+        run: cargo test --features "${{ matrix.features }}" || cargo test --features "${{ matrix.features }}"
 
   psych-bench:
     name: Psych-Bench Regression

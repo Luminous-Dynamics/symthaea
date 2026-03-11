@@ -147,6 +147,13 @@ pub trait MambaBackend: Send {
     /// Enable LoRA adapters on the model layers (Improvement D).
     /// Default: no-op.
     fn enable_lora(&mut self, _rank: usize, _alpha: f32, _lr: f32) {}
+
+    /// Set per-token CfC modulation for the next forward pass.
+    ///
+    /// `delta_scale` modulates the SSM step-size Δ (temporal evolution speed).
+    /// `b_scale` modulates the input matrix B (input sensitivity).
+    /// Both default to 1.0 (no modulation). Consumed after each forward pass.
+    fn set_cfc_modulation(&mut self, _delta_scale: f32, _b_scale: f32) {}
 }
 
 /// Wrapper around candle-transformers' Mamba model with Symthaea integration.
@@ -301,42 +308,47 @@ impl MambaWrapper {
 
     /// Inject an initial context vector into the SSM hidden state.
     ///
-    /// Encodes the context as a pseudo-embedding and runs one forward pass
-    /// to prime Mamba's hidden states. This is how the HDC thought projection
-    /// "steers" Mamba before generation begins.
+    /// Feeds the 768D context vector directly through Mamba's layers as a
+    /// continuous embedding (soft token), using `forward_embeds`. This is
+    /// the proper way to initialize Mamba's SSM state from the HDC thought
+    /// projection — the context vector flows through all 24 layers, building
+    /// up hidden state (h₀) naturally via the SSM equations.
+    ///
+    /// Optionally warms the conv1d history first for better initial dynamics.
     pub fn inject_initial_context(&mut self, context: &[f32]) -> Result<()> {
-        // Reset state before injection
         self.reset();
 
-        // Find the token whose embedding best matches the context vector
-        // by using BOS token to prime, then modulate the hidden states directly.
-        // Pragmatic approach: run BOS token through forward to initialize states,
-        // then scale the hidden states by the context magnitude/direction.
-        let bos_id = self.tokenizer.token_to_id("<|endoftext|>").unwrap_or(0);
-        let _logits = self.forward_one_token(bos_id)?;
-
-        // Modulate hidden states with context signal
-        // Each layer's hidden state gets a projection of the context
         let d_model = self.config.d_model;
-        let context_len = context.len().min(d_model);
+        let mut ctx = context.to_vec();
+        ctx.resize(d_model, 0.0); // Pad or truncate to d_model
 
-        for hs in &mut self.state.hs {
-            let hs_shape = hs.shape().clone();
-            let hs_flat: Vec<f32> = hs.flatten_all()?.to_vec1()?;
-            let mut modulated = hs_flat.clone();
+        let embed = Tensor::from_vec(ctx, (1, d_model), &self.device)?
+            .to_dtype(DType::F32)?;
 
-            // Add context signal to the hidden state (additive modulation)
-            // Scale down to avoid disrupting the SSM dynamics
-            let scale = 0.1;
-            for (i, m) in modulated.iter_mut().enumerate() {
-                let ctx_val = context[i % context_len];
-                *m += ctx_val * scale;
-            }
+        // Warm conv1d history with the context summary
+        self.model
+            .warmstart_conv_history(&embed, &mut self.state)?;
 
-            *hs = Tensor::from_vec(modulated, hs_shape, &self.device)?;
-        }
+        // Run the context through all layers as a soft token
+        // This builds h₀ naturally via the SSM equations: h = exp(ΔA)h + ΔBx
+        let _logits = self.model.forward_embeds(&embed, &mut self.state)?;
 
         Ok(())
+    }
+
+    /// Set per-token CfC modulation for the next forward pass.
+    ///
+    /// The CfC cognitive loop calls this before each token generation to
+    /// steer Mamba's dynamics. `delta_scale` modulates the SSM step-size
+    /// (how much temporal evolution per token), `b_scale` modulates how
+    /// strongly new input enters the hidden state.
+    ///
+    /// Modulation is consumed (reset to None) after each forward pass.
+    pub fn set_cfc_modulation(&mut self, delta_scale: f32, b_scale: f32) {
+        self.state.cfc_modulation = Some(crate::mamba_model::CfcModulation {
+            delta_scale,
+            b_scale,
+        });
     }
 
     /// Scale all hidden states by a biological modulation factor.
@@ -730,6 +742,10 @@ impl MambaBackend for MambaWrapper {
         if let Err(e) = MambaWrapper::enable_lora(self, rank, alpha, lr) {
             tracing::error!("Failed to enable LoRA: {e}");
         }
+    }
+
+    fn set_cfc_modulation(&mut self, delta_scale: f32, b_scale: f32) {
+        MambaWrapper::set_cfc_modulation(self, delta_scale, b_scale)
     }
 }
 
