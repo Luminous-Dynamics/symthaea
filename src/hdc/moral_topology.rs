@@ -5235,9 +5235,7 @@ mod tests {
         assert_eq!(topo2.scenario_counter(), pre_scenario_counter);
         assert_eq!(topo2.detection_cycle, pre_detection_cycle);
         assert_eq!(topo2.audit_log().len(), pre_audit_len);
-        assert!(
-            (topo2.fingerprint_velocity() - pre_fingerprint_velocity).abs() < 1e-12
-        );
+        assert!((topo2.fingerprint_velocity() - pre_fingerprint_velocity).abs() < 1e-12);
 
         // Verify audit log integrity survives serialization
         if !topo2.audit_log().is_empty() {
@@ -5249,8 +5247,7 @@ mod tests {
 
         // JSON roundtrip
         let json = serde_json::to_string(&snap).expect("serialize");
-        let restored: MoralTopologySnapshot =
-            serde_json::from_str(&json).expect("deserialize");
+        let restored: MoralTopologySnapshot = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(restored.scenario_counter, pre_scenario_counter);
         assert_eq!(restored.audit_log.len(), pre_audit_len);
     }

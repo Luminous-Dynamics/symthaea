@@ -186,8 +186,14 @@ impl CognitiveLoopService {
                 kosmic_coherence: feedback.ethics.kosmic_coherence,
                 // Soul telemetry
                 soul_coherence: self.soul.as_ref().map_or(0.0, |s| s.stats().soul_coherence),
-                soul_growth_potential: self.soul.as_ref().map_or(0.0, |s| s.self_model().current_assessment.growth_potential),
-                soul_avg_value_alignment: self.soul.as_ref().map_or(0.0, |s| s.stats().avg_value_alignment),
+                soul_growth_potential: self
+                    .soul
+                    .as_ref()
+                    .map_or(0.0, |s| s.self_model().current_assessment.growth_potential),
+                soul_avg_value_alignment: self
+                    .soul
+                    .as_ref()
+                    .map_or(0.0, |s| s.stats().avg_value_alignment),
                 moral_topo_beta_0: self.ethics_engine.moral_topology().last_summary().beta_0,
                 moral_topo_beta_1: self.ethics_engine.moral_topology().last_summary().beta_1,
                 moral_topo_beta_2: self.ethics_engine.moral_topology().last_summary().beta_2,

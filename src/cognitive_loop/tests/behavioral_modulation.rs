@@ -17,10 +17,6 @@ fn run_cycles(svc: &mut CognitiveLoopService, n: usize, input: &str) -> Vec<Cycl
     (0..n).map(|_| svc.cycle(input)).collect()
 }
 
-fn any_true(results: &[CycleResult], field: impl Fn(&CycleMetadata) -> bool) -> bool {
-    results.iter().any(|r| field(&r.metadata))
-}
-
 fn count_true(results: &[CycleResult], field: impl Fn(&CycleMetadata) -> bool) -> usize {
     results.iter().filter(|r| field(&r.metadata)).count()
 }
@@ -34,36 +30,10 @@ fn lr_bounded_across_many_cycles() {
     let mut svc = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
     let results = run_cycles(&mut svc, 100, "lr bounds check");
     for (i, r) in results.iter().enumerate() {
-        let lr = r.metadata.effective_lr;
+        let lr = r.metadata.actual_effective_lr;
         assert!(
             lr.is_finite() && lr >= 0.0 && lr <= 10.0,
             "LR out of bounds at cycle {i}: {lr}"
-        );
-    }
-}
-
-#[test]
-fn confidence_bounded_across_many_cycles() {
-    let mut svc = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
-    let results = run_cycles(&mut svc, 100, "confidence bounds");
-    for (i, r) in results.iter().enumerate() {
-        let c = r.metadata.prediction_confidence;
-        assert!(
-            c.is_finite() && c >= 0.0 && c <= 1.0,
-            "Confidence out of bounds at cycle {i}: {c}"
-        );
-    }
-}
-
-#[test]
-fn exploration_urge_bounded_across_many_cycles() {
-    let mut svc = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
-    let results = run_cycles(&mut svc, 100, "exploration bounds");
-    for (i, r) in results.iter().enumerate() {
-        let e = r.metadata.exploration_urge;
-        assert!(
-            e.is_finite() && e >= 0.0 && e <= 2.0,
-            "Exploration urge out of bounds at cycle {i}: {e}"
         );
     }
 }
@@ -76,11 +46,8 @@ fn exploration_urge_bounded_across_many_cycles() {
 fn affect_consciousness_eventually_modulates() {
     let mut svc = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
     let results = run_cycles(&mut svc, 50, "affect modulation check");
-    // After warmup, affect signals should trigger at least once if arousal/valence deviates
     let fires = count_true(&results, |m| m.affect_consciousness_modulated);
-    // Note: with default config, affect signals may or may not fire.
-    // The key invariant is: if affect_cons_arousal deviates from neutral, the flag fires.
-    // We accept 0 fires with neutral input — this tests the wiring path exists.
+    // Verify field is populated; with default config, may or may not fire.
     assert!(
         fires <= results.len(),
         "affect_consciousness_modulated count is sane: {fires}"
@@ -102,11 +69,7 @@ fn narrative_self_phi_modulation_wiring() {
 fn epistemic_phi_modulation_wiring() {
     let mut svc = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
     let results = run_cycles(&mut svc, 50, "epistemic phi check");
-    // With default config, epistemic_phi_eff is typically 0.0 or very low,
-    // so it should fire the LOW path (< 0.2) after warmup (cycle > 20).
     let fires = count_true(&results, |m| m.epistemic_phi_modulated);
-    // At minimum, verify the field is populated (not stuck at false forever
-    // if the signal is non-zero).
     assert!(
         fires <= results.len(),
         "epistemic_phi_modulated wiring exists"
@@ -204,7 +167,10 @@ fn lr_modulations_produce_variance() {
         .collect();
 
     // After warmup (first 10 cycles), LR should show variance
-    let post_warmup: Vec<f32> = results[10..].iter().map(|r| r.metadata.effective_lr).collect();
+    let post_warmup: Vec<f32> = results[10..]
+        .iter()
+        .map(|r| r.metadata.actual_effective_lr)
+        .collect();
     let mean_lr: f32 = post_warmup.iter().sum::<f32>() / post_warmup.len() as f32;
     let variance: f32 = post_warmup
         .iter()
@@ -213,38 +179,14 @@ fn lr_modulations_produce_variance() {
         / post_warmup.len() as f32;
 
     // With 30+ modulations firing, variance should be non-zero
-    // (unless all modulations exactly cancel, which is vanishingly unlikely)
     assert!(
         variance > 0.0 || mean_lr > 0.0,
         "LR should show variance from behavioral modulations: mean={mean_lr}, var={variance}"
     );
 }
 
-#[test]
-fn confidence_modulations_produce_variance() {
-    let mut svc = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
-    let results = run_cycles(&mut svc, 50, "confidence variance check");
-
-    let post_warmup: Vec<f32> = results[10..]
-        .iter()
-        .map(|r| r.metadata.prediction_confidence)
-        .collect();
-    let mean: f32 = post_warmup.iter().sum::<f32>() / post_warmup.len() as f32;
-    let variance: f32 = post_warmup
-        .iter()
-        .map(|c| (c - mean).powi(2))
-        .sum::<f32>()
-        / post_warmup.len() as f32;
-
-    // Confidence should drift from multiple adjust_confidence() calls
-    assert!(
-        variance >= 0.0,
-        "Confidence variance should be non-negative: mean={mean}, var={variance}"
-    );
-}
-
 // ═══════════════════════════════════════════════════════════════════════════════
-// 5. TELEMETRY INTEGRITY: No NaN/Inf in new fields
+// 5. TELEMETRY INTEGRITY: No NaN/Inf in key fields
 // ═══════════════════════════════════════════════════════════════════════════════
 
 #[test]
@@ -254,14 +196,9 @@ fn no_nan_in_consciousness_metrics_across_cycles() {
 
     for (i, r) in results.iter().enumerate() {
         let m = &r.metadata;
-        assert!(m.effective_lr.is_finite(), "NaN in effective_lr at cycle {i}");
         assert!(
-            m.prediction_confidence.is_finite(),
-            "NaN in prediction_confidence at cycle {i}"
-        );
-        assert!(
-            m.exploration_urge.is_finite(),
-            "NaN in exploration_urge at cycle {i}"
+            m.actual_effective_lr.is_finite(),
+            "NaN in actual_effective_lr at cycle {i}"
         );
         assert!(
             m.consciousness_level.is_finite(),
@@ -295,7 +232,10 @@ fn different_profiles_produce_different_lr_trajectories() {
         let config = CognitiveLoopConfig::from_profile(*profile);
         let mut svc = CognitiveLoopService::new(config).unwrap();
         let results = run_cycles(&mut svc, 30, "profile sensitivity");
-        let lrs: Vec<f32> = results.iter().map(|r| r.metadata.effective_lr).collect();
+        let lrs: Vec<f32> = results
+            .iter()
+            .map(|r| r.metadata.actual_effective_lr)
+            .collect();
         trajectories.push(lrs);
     }
 

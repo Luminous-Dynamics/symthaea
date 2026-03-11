@@ -666,7 +666,10 @@ mod tests {
             lc.value
         );
         assert!(lc.diversity_factor > 0.9, "Uniform coords = max diversity");
-        assert!(lc.tension_ratio < f64::EPSILON, "Default matrix has no tension");
+        assert!(
+            lc.tension_ratio < f64::EPSILON,
+            "Default matrix has no tension"
+        );
     }
 
     #[test]
@@ -717,10 +720,7 @@ mod tests {
         let matrix = HarmonyInteractionMatrix::default();
         let coords = [-0.5; N_HARMONIES];
         let lc = matrix.love_coherence(&coords);
-        assert!(
-            lc.harmony_mean < 0.0,
-            "Negative coords → negative mean"
-        );
+        assert!(lc.harmony_mean < 0.0, "Negative coords → negative mean");
         assert!(
             lc.value < 0.3,
             "Negative mean should yield low LoveCoherence, got {}",

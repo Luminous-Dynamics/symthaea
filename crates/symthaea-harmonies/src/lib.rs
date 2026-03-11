@@ -370,14 +370,7 @@ impl EightHarmonies {
                     "heal",
                 ];
                 let negative = [
-                    "harm",
-                    "hurt",
-                    "damage",
-                    "destroy",
-                    "exploit",
-                    "neglect",
-                    "abuse",
-                    "oppress",
+                    "harm", "hurt", "damage", "destroy", "exploit", "neglect", "abuse", "oppress",
                 ];
                 self.keyword_score(&text_lower, &positive, &negative)
             }
@@ -397,13 +390,7 @@ impl EightHarmonies {
                     "rigor",
                 ];
                 let negative = [
-                    "ignore",
-                    "deny",
-                    "foolish",
-                    "reckless",
-                    "dogmatic",
-                    "blindly",
-                    "suppress",
+                    "ignore", "deny", "foolish", "reckless", "dogmatic", "blindly", "suppress",
                 ];
                 self.keyword_score(&text_lower, &positive, &negative)
             }
@@ -451,13 +438,7 @@ impl EightHarmonies {
                     "participate",
                 ];
                 let negative = [
-                    "isolate",
-                    "separate",
-                    "alone",
-                    "divide",
-                    "sever",
-                    "exclude",
-                    "alienate",
+                    "isolate", "separate", "alone", "divide", "sever", "exclude", "alienate",
                 ];
                 self.keyword_score(&text_lower, &positive, &negative)
             }
@@ -817,7 +798,10 @@ mod tests {
             alignments.push(HarmonyAlignment::new(h, score, 0.8));
         }
         let result = AlignmentResult::from_alignments(alignments);
-        assert!(result.courage_override(), "7 strong + 1 mild negative → courage");
+        assert!(
+            result.courage_override(),
+            "7 strong + 1 mild negative → courage"
+        );
         assert!(!result.should_veto(), "Courage should prevent veto");
     }
 

@@ -263,15 +263,58 @@ impl TextHdcEncoder {
         // Prevents "kill the process", "broke the build", "fake data for
         // testing" from triggering moral alarm.
         let technical_context: HashSet<String> = [
-            "process", "thread", "server", "build", "test", "testing",
-            "pipeline", "job", "session", "connection", "container",
-            "instance", "daemon", "service", "task", "worker", "node",
-            "module", "function", "method", "class", "branch", "commit",
-            "binary", "file", "directory", "package", "crate", "deploy",
-            "debug", "compile", "runtime", "mock", "stub", "fixture",
-            "benchmark", "profile", "signal", "socket", "port", "api",
-            "endpoint", "request", "response", "query", "cache", "buffer",
-            "data", "database", "table", "schema", "migration",
+            "process",
+            "thread",
+            "server",
+            "build",
+            "test",
+            "testing",
+            "pipeline",
+            "job",
+            "session",
+            "connection",
+            "container",
+            "instance",
+            "daemon",
+            "service",
+            "task",
+            "worker",
+            "node",
+            "module",
+            "function",
+            "method",
+            "class",
+            "branch",
+            "commit",
+            "binary",
+            "file",
+            "directory",
+            "package",
+            "crate",
+            "deploy",
+            "debug",
+            "compile",
+            "runtime",
+            "mock",
+            "stub",
+            "fixture",
+            "benchmark",
+            "profile",
+            "signal",
+            "socket",
+            "port",
+            "api",
+            "endpoint",
+            "request",
+            "response",
+            "query",
+            "cache",
+            "buffer",
+            "data",
+            "database",
+            "table",
+            "schema",
+            "migration",
         ]
         .iter()
         .map(|s| s.to_string())
@@ -359,12 +402,10 @@ impl TextHdcEncoder {
         let mut found_any = false;
 
         // Check once whether any technical context word appears in the text
-        let has_technical_context = text_lower
-            .split_whitespace()
-            .any(|w| {
-                let clean = w.trim_matches(|c: char| !c.is_alphanumeric());
-                self.technical_context.contains(clean)
-            });
+        let has_technical_context = text_lower.split_whitespace().any(|w| {
+            let clean = w.trim_matches(|c: char| !c.is_alphanumeric());
+            self.technical_context.contains(clean)
+        });
 
         // Attenuation factor for bad_words when technical context is present
         let neg_scale: f32 = if has_technical_context { 0.5 } else { 1.0 };

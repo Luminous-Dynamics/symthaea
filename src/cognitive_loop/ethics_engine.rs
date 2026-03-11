@@ -526,9 +526,7 @@ impl EthicsEngine {
         // ── Love Coherence: emergent macro-state of harmony resonance ────
         // Not a 9th harmony but the *topology* of the 8D manifold when all
         // harmonies vibrate in synergy. Gates confidence, not capability.
-        let love_coherence = self
-            .interaction_matrix
-            .love_coherence(&harmony_coordinates);
+        let love_coherence = self.interaction_matrix.love_coherence(&harmony_coordinates);
         self.cache.last_love_coherence = love_coherence.value;
 
         // Love coherence → confidence modulation (gate confidence, not capability)

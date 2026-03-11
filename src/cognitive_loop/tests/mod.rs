@@ -8,6 +8,7 @@
 
 #[allow(clippy::field_reassign_with_default)]
 mod accessors_and_types;
+mod behavioral_modulation;
 mod core;
 mod crucible_integration;
 mod cycle_properties;
@@ -22,4 +23,3 @@ mod phase_results;
 mod proptest_cross_coupling;
 mod proptest_substrate;
 mod subsystems;
-mod behavioral_modulation;

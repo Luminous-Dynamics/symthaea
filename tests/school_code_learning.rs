@@ -131,16 +131,13 @@ fn tier1_full_session() {
     eprintln!("  Avg plan coverage: {:.3}", summary.avg_plan_coverage);
     eprintln!("  Total retries: {}", summary.total_retries);
     eprintln!("  Total energy: {:.1}", summary.total_energy_spent);
-    eprintln!(
-        "  Distillation eligible: {}",
-        summary.distillation_eligible,
-    );
-    eprintln!(
-        "  Distillation cache: {}",
-        engine.distillation_count(),
-    );
+    eprintln!("  Distillation eligible: {}", summary.distillation_eligible,);
+    eprintln!("  Distillation cache: {}", engine.distillation_count(),);
 
-    assert!(summary.lessons_attempted >= 12, "Should run all 12 Tier 1 lessons");
+    assert!(
+        summary.lessons_attempted >= 12,
+        "Should run all 12 Tier 1 lessons"
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -191,7 +188,10 @@ fn tier3_algorithms_with_llm() {
 
     for outcome in &summary.outcomes {
         if !outcome.compiled {
-            eprintln!("  FAILED {} — source:\n{}", outcome.objective_id, outcome.source);
+            eprintln!(
+                "  FAILED {} — source:\n{}",
+                outcome.objective_id, outcome.source
+            );
         }
     }
 }
@@ -205,15 +205,21 @@ fn budget_limits_session() {
     let encoder = CodeHDEncoder::new(256);
     let generator = CodeGenerator::new(encoder);
     // Budget for exactly 3 native lessons (3.0 energy, reserve = 0.6)
-    let mut engine = CodeLearningEngine::with_real_execution(generator)
-        .with_budget(MetabolicBudget::new(3.5));
+    let mut engine =
+        CodeLearningEngine::with_real_execution(generator).with_budget(MetabolicBudget::new(3.5));
 
     let summary = engine.run_session(TIER1_OBJECTIVES);
 
     eprintln!("=== Budget-Limited Session ===");
-    eprintln!("  Attempted: {} (budget should limit this)", summary.lessons_attempted);
+    eprintln!(
+        "  Attempted: {} (budget should limit this)",
+        summary.lessons_attempted
+    );
     eprintln!("  Energy spent: {:.1}", summary.total_energy_spent);
-    eprintln!("  Budget utilization: {:.0}%", engine.budget().utilization() * 100.0);
+    eprintln!(
+        "  Budget utilization: {:.0}%",
+        engine.budget().utilization() * 100.0
+    );
 
     assert!(
         summary.lessons_attempted <= 4,
