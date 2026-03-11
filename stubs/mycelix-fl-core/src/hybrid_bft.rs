@@ -169,7 +169,7 @@ pub fn hybrid_trimmed_mean(
         gated_count,
         surviving_count,
         total_weight,
-        trimmed_indices: trimmed_indices,
+        trimmed_indices,
     })
 }
 
