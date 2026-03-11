@@ -227,7 +227,7 @@ fn epistemic_phi_modulation_signal_finite() {
     let results = run_cycles(&mut svc, 50, "epistemic phi check");
     for (i, r) in results.iter().enumerate() {
         assert!(
-            r.metadata.epistemic_phi_eff.is_finite(),
+            r.metadata.quality.epistemic_phi_eff.is_finite(),
             "NaN epistemic_phi_eff at cycle {i}"
         );
     }
