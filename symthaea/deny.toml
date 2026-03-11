@@ -37,16 +37,6 @@ name = "ring"
 expression = "MIT AND ISC AND OpenSSL"
 license-files = [{ path = "LICENSE", hash = 0xbd0eed23 }]
 
-# serde_core is an internal crate of serde, same license (MIT OR Apache-2.0)
-# cargo-deny may not parse its license expression correctly
-[[licenses.clarify]]
-name = "serde_core"
-expression = "MIT OR Apache-2.0"
-license-files = [{ path = "LICENSE-MIT", hash = 0xb5518783 }]
-
-[[licenses.exceptions]]
-name = "serde_core"
-allow = ["MIT", "Apache-2.0"]
 
 [bans]
 multiple-versions = "warn"
