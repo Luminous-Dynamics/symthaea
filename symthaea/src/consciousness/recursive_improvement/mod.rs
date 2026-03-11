@@ -53,6 +53,7 @@ pub mod constraint_gate;
 pub mod dream_feedback;
 pub mod magi_integration;
 pub mod persistence;
+pub mod resolution;
 pub mod runtime;
 pub mod world_prediction;
 
