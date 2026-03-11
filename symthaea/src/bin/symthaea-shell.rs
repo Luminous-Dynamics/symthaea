@@ -655,6 +655,7 @@ impl App {
     }
 
     /// Create an App with deterministic RNG from a genesis seed.
+    #[allow(dead_code)]
     fn from_genesis(genesis: &symthaea_core::genesis::GenesisSeed, label: &str) -> Self {
         let mut app = Self::new();
         app.viz_rng = Some(genesis.domain(&format!("{label}::shell_viz")));
@@ -665,7 +666,7 @@ impl App {
     fn init_state_manager() -> Option<StateManager> {
         // Use XDG state directory: ~/.local/state/symthaea
         let state_dir = dirs::state_dir()
-            .or_else(|| dirs::data_local_dir())
+            .or_else(dirs::data_local_dir)
             .unwrap_or_else(|| PathBuf::from("/tmp"))
             .join("symthaea");
 
