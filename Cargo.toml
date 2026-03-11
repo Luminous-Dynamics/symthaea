@@ -647,7 +647,7 @@ required-features = ["code_generation"]
 
 [[example]]
 name = "causal_tower_test"
-required-features = ["benchmarks"]
+required-features = ["unstable-examples"]
 
 [[example]]
 name = "conscious_ollama_demo"
@@ -694,7 +694,7 @@ required-features = ["unstable-examples"]
 
 [[example]]
 name = "quick_primitives"
-required-features = ["benchmarks"]
+required-features = ["unstable-examples"]
 
 [[example]]
 name = "meta_conscious_ollama_demo"
@@ -710,7 +710,7 @@ required-features = ["unstable-examples"]
 
 [[example]]
 name = "error_analysis"
-required-features = ["benchmarks"]
+required-features = ["unstable-examples"]
 
 [[example]]
 name = "dual_metric_comparison"
@@ -788,7 +788,7 @@ required-features = ["unstable-examples"]
 
 [[example]]
 name = "unified_causal_test"
-required-features = ["benchmarks"]
+required-features = ["unstable-examples"]
 
 [[example]]
 name = "hdc_ltc_primitives_demo"
