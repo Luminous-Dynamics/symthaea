@@ -307,11 +307,19 @@ impl ConsciousnessEngine {
         } else {
             0.0
         };
+        // Cantor metacognitive depth → consciousness coupling
+        // High self-similarity (deep strange loops) boosts consciousness ±3%.
+        // Neutral at depth 0.5 — below dampens, above amplifies.
+        // Science: Hofstadter (1979) — strange loops; Metzinger (2003) — self-model richness.
+        let cantor_depth_factor = (input.cantor_metacognitive_depth - 0.5)
+            * super::super::thresholds::CANTOR_CONSCIOUSNESS_MODULATION;
+
         unified_consciousness = (unified_consciousness
             + sht_2a_boost as f64
             + gaba_a_dampen as f64
             + entropy_factor
-            + moral_dampen)
+            + moral_dampen
+            + cantor_depth_factor)
             .clamp(0.0, 1.0);
 
         let total_us = total_start.elapsed().as_micros() as u64;

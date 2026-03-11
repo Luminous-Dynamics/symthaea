@@ -761,6 +761,20 @@ pub struct CognitiveLoopService {
     /// Cantor layers at shift/27, shift/81).
     /// Science: Baars (1988) + Stickgold (2005) — conscious broadcast → fractal dreaming.
     cantor_broadcast_buffer: Vec<symthaea_core::hdc::cantor_recursive_hv::CantorRecursiveHV>,
+
+    /// Persistent Cantor cleanup engine: codebook accumulates across dream cycles.
+    /// Unlike the previous ephemeral approach (rebuild each dream), this engine retains
+    /// learned representations so dream consolidation genuinely strengthens memories
+    /// over the brain's lifetime.
+    /// Science: Born & Wilhelm (2012) — sleep spindle replay strengthens stable traces;
+    ///          Walker (2009) — offline consolidation requires persistent memory stores.
+    cantor_cleanup_engine: symthaea_core::hdc::cantor_resonator_cleanup::CantorCleanupEngine,
+
+    /// Last GWT activation strength, used for adaptive CRHV depth.
+    /// Stronger activations (higher workspace competition score) produce deeper fractals.
+    /// Science: Dehaene et al. (2006) — ignition strength varies with stimulus salience;
+    ///          stronger ignition recruits more recurrent cortical layers.
+    cantor_last_activation: f32,
 }
 
 // MetricsProvider impl is in metrics_provider.rs

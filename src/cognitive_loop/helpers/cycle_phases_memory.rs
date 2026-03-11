@@ -488,64 +488,59 @@ impl CognitiveLoopService {
             }
         }
 
-        // Track 3h: Cantor dream consolidation — cleanup buffered CRHVs through resonator codebook
+        // Track 3h: Cantor dream consolidation — cleanup buffered CRHVs through persistent engine
         // Science: Stickgold (2005) — sleep replay extracts gist; Hobson (2009) — dreaming
         // consolidates multi-level representations. CantorCleanupEngine unbinds each Cantor
         // layer, cleans against the codebook, and rebuilds — preserving faint peripheral
         // layers (shift/27, shift/81) that standard flat cleanup would strip.
         // This prevents "metacognitive amnesia" — loss of subtle associative structure.
+        //
+        // PERSISTENT ENGINE: Unlike the previous ephemeral approach, the CantorCleanupEngine
+        // lives on CLS and accumulates codebook entries across dream cycles. Each dream
+        // refreshes the codebook from resonator memory AND retains prior consolidated entries.
+        // Science: Walker (2009) — memory consolidation requires stable, long-lived stores;
+        //          Diekelmann & Born (2010) — repeated replay progressively strengthens traces.
         if !self.cantor_broadcast_buffer.is_empty() {
+            // Refresh persistent engine's codebook from resonator memory (additive — new entries
+            // supplement existing consolidated knowledge rather than replacing it)
             if let Some(ref res_mem) = self.resonator_memory {
-                if !res_mem.resonator.codebooks.is_empty() {
-                    use symthaea_core::hdc::cantor_resonator_cleanup::{
-                        CantorCleanupConfig, CantorCleanupEngine,
-                    };
-
-                    let mut engine = CantorCleanupEngine::new(CantorCleanupConfig::default());
-
-                    // Populate Cantor codebook from resonator's continuous-domain codebook.
-                    // Threshold continuous vectors to binary for CRHV-compatible cleanup.
-                    for cb in &res_mem.resonator.codebooks {
-                        for (label, continuous_vec) in &cb.symbols {
-                            let mut bytes = [0u8; 2048];
-                            for (i, &val) in continuous_vec.iter().enumerate() {
-                                if i / 8 < 2048 && val > 0.0 {
-                                    bytes[i / 8] |= 1 << (i % 8);
-                                }
+                for cb in &res_mem.resonator.codebooks {
+                    for (label, continuous_vec) in &cb.symbols {
+                        let mut bytes = [0u8; 2048];
+                        for (i, &val) in continuous_vec.iter().enumerate() {
+                            if i / 8 < 2048 && val > 0.0 {
+                                bytes[i / 8] |= 1 << (i % 8);
                             }
-                            let bhv = symthaea_core::hdc::BinaryHV(bytes);
-                            engine.codebook.add(label, bhv);
                         }
+                        let bhv = symthaea_core::hdc::BinaryHV(bytes);
+                        self.cantor_cleanup_engine.codebook.add(label, bhv);
                     }
-
-                    // Drain the buffer — each CRHV gets cleaned and rebuilt
-                    let crhvs: Vec<_> = self.cantor_broadcast_buffer.drain(..).collect();
-                    for crhv in &crhvs {
-                        let result = engine.cleanup(crhv);
-                        // Closed-loop: high-quality cleanups grow the codebook.
-                        // Science: Born & Wilhelm (2012) — sleep consolidation strengthens
-                        // representations that survive replay without degradation.
-                        if result.quality > 0.7 {
-                            let label =
-                                format!("dream_consolidated_{}", engine.cleanups_performed);
-                            engine.learn(&label, &result.cleaned);
-                        }
-                    }
-
-                    tracing::debug!(
-                        cleanups = engine.cleanups_performed,
-                        layers_cleaned = engine.layers_cleaned,
-                        layers_failed = engine.layers_failed,
-                        codebook_size = engine.codebook.len(),
-                        "Cantor dream consolidation complete"
-                    );
-                } else {
-                    // No codebook entries yet — just clear buffer to prevent unbounded growth
-                    self.cantor_broadcast_buffer.clear();
                 }
-            } else {
-                self.cantor_broadcast_buffer.clear();
             }
+
+            // Drain the buffer — each CRHV gets cleaned and rebuilt
+            let crhvs: Vec<_> = self.cantor_broadcast_buffer.drain(..).collect();
+            for crhv in &crhvs {
+                let result = self.cantor_cleanup_engine.cleanup(crhv);
+                // Closed-loop: high-quality cleanups grow the codebook permanently.
+                // Science: Born & Wilhelm (2012) — sleep consolidation strengthens
+                // representations that survive replay without degradation.
+                if result.quality > crate::cognitive_loop::thresholds::CANTOR_DREAM_QUALITY_THRESHOLD {
+                    let label = format!(
+                        "dream_consolidated_{}",
+                        self.cantor_cleanup_engine.cleanups_performed
+                    );
+                    self.cantor_cleanup_engine.learn(&label, &result.cleaned);
+                }
+            }
+
+            tracing::debug!(
+                cleanups = self.cantor_cleanup_engine.cleanups_performed,
+                layers_cleaned = self.cantor_cleanup_engine.layers_cleaned,
+                layers_failed = self.cantor_cleanup_engine.layers_failed,
+                codebook_size = self.cantor_cleanup_engine.codebook.len(),
+                "Cantor dream consolidation complete (persistent engine)"
+            );
         }
 
         // Track 4d: Adaptive replay scheduling — modulate interval based on error volatility

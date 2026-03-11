@@ -57,6 +57,51 @@ impl ModelManifest {
     pub fn expected_hash(&self, path: &Path) -> Option<&str> {
         self.hashes.get(path).map(|s| s.as_str())
     }
+
+    /// Generate a manifest by scanning a directory for safetensors files
+    /// and computing their SHA-256 hashes.
+    #[cfg(feature = "neural-bridge")]
+    pub fn from_directory(dir: &Path) -> Result<Self> {
+        let mut manifest = Self::new();
+        if !dir.is_dir() {
+            anyhow::bail!(
+                "model_integrity: not a directory: {}",
+                dir.display()
+            );
+        }
+        for entry in std::fs::read_dir(dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.extension().map_or(false, |ext| ext == "safetensors") {
+                let hash = compute_model_hash(&path)?;
+                manifest.insert(path, hash);
+            }
+        }
+        Ok(manifest)
+    }
+
+    /// Serialize manifest to JSON for storage.
+    pub fn to_json(&self) -> Result<String> {
+        let map: std::collections::BTreeMap<String, &str> = self
+            .hashes
+            .iter()
+            .map(|(p, h)| (p.display().to_string(), h.as_str()))
+            .collect();
+        serde_json::to_string_pretty(&map)
+            .map_err(|e| anyhow::anyhow!("model_integrity: JSON serialization failed: {e}"))
+    }
+
+    /// Deserialize manifest from JSON.
+    pub fn from_json(json: &str) -> Result<Self> {
+        let map: std::collections::BTreeMap<String, String> =
+            serde_json::from_str(json)
+                .map_err(|e| anyhow::anyhow!("model_integrity: JSON parse failed: {e}"))?;
+        let mut manifest = Self::new();
+        for (path, hash) in map {
+            manifest.insert(PathBuf::from(path), hash);
+        }
+        Ok(manifest)
+    }
 }
 
 /// Compute the SHA-256 hash of a file and return it as a lowercase hex string.
