@@ -27,9 +27,7 @@ use crate::consciousness::harmonies_integration::{HarmoniesIntegrator, ValuedAct
 use crate::consciousness::unified_value_evaluator::{
     Decision, EvaluationContext, UnifiedValueEvaluator,
 };
-use crate::hdc::harmony_basis::{
-    HarmonyBasis, HarmonyInteractionMatrix, LoveCoherence, MoralFreeEnergy,
-};
+use crate::hdc::harmony_basis::{HarmonyBasis, HarmonyInteractionMatrix, MoralFreeEnergy};
 use crate::hdc::moral_algebra::{DeontologicalVerdict, MoralAlgebra, MoralVerdict};
 use crate::hdc::moral_parser::MoralParser;
 use crate::hdc::moral_topology::{
@@ -128,6 +126,7 @@ pub(crate) enum EthicalVerdict {
 }
 
 /// Input snapshot for the ethics engine.
+#[allow(dead_code)] // compressed_state reserved for Stage 2+3 harmony integration
 pub(crate) struct EthicsEngineInput<'a> {
     /// Input text for moral parsing
     pub input: &'a str,
