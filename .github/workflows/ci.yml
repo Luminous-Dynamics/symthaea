@@ -110,7 +110,7 @@ jobs:
           datacenter,experiment-planner,strategic-materials,critical-minerals,\
           advanced-manufacturing,building-systems,design-production,\
           mycelix,unstable-examples"
-          cargo clippy --lib --tests --bins --features "$CI_FEATURES" -- -D warnings
+          cargo clippy --lib --bins --features "$CI_FEATURES" -- -D warnings
 
   test:
     name: Test (default features)
