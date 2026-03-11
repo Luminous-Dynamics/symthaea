@@ -111,7 +111,12 @@ fn tier1_collections_compiles() {
 
 #[test]
 fn tier1_full_session() {
-    let mut engine = make_real_engine();
+    let encoder = CodeHDEncoder::new(256);
+    let generator = CodeGenerator::new(encoder);
+    // Use a generous budget so all 12 lessons can run even with LLM fallback
+    let mut engine = CodeLearningEngine::with_real_execution(generator)
+        .with_llm_prompt(default_llm_prompt)
+        .with_budget(MetabolicBudget::new(500.0));
     let summary = engine.run_session(TIER1_OBJECTIVES);
 
     eprintln!("=== Tier 1 Full Session Summary ===");
@@ -137,7 +142,8 @@ fn tier1_full_session() {
 
     assert!(
         summary.lessons_attempted >= 12,
-        "Should run all 12 Tier 1 lessons"
+        "Should run all 12 Tier 1 lessons, got {}",
+        summary.lessons_attempted,
     );
 }
 

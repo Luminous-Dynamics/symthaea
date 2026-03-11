@@ -127,9 +127,9 @@ pub mod responses {
     }
 
     /// Create an Error response
-    pub fn error(code: &str, message: &str) -> Response {
+    pub fn error(code: i32, message: &str) -> Response {
         Response::Error {
-            code: code.to_string(),
+            code,
             message: message.to_string(),
         }
     }

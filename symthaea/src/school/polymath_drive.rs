@@ -2,6 +2,7 @@
 
 use anyhow::Result;
 use rand::seq::SliceRandom;
+use rand::SeedableRng;
 use serde_json::json;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -86,7 +87,7 @@ pub async fn run_polymath_collisions(
     }
 
     let mut domain_keys: Vec<String> = domains.keys().cloned().collect();
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rngs::StdRng::from_rng(rand::thread_rng()).expect("seeding StdRng");
 
     for _ in 0..config.collisions {
         let mut chosen: Option<(&LearningObjective, &LearningObjective, f32)> = None;
