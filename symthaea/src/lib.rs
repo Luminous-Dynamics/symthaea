@@ -221,7 +221,28 @@ Key types are re-exported at the crate root for convenience:
     clippy::cloned_ref_to_slice_refs,
     clippy::doc_overindented_list_items,
     clippy::manual_is_multiple_of,
-    clippy::unnecessary_map_or
+    clippy::unnecessary_map_or,
+    // ── Style lints with many occurrences across feature-gated modules ──
+    clippy::collapsible_if,
+    clippy::derivable_impls,
+    clippy::doc_lazy_continuation,
+    clippy::explicit_into_iter_loop,
+    clippy::field_reassign_with_default,
+    clippy::iter_last,
+    clippy::manual_range_contains,
+    clippy::manual_saturating_arithmetic,
+    clippy::manual_strip,
+    clippy::map_clone,
+    clippy::needless_borrow,
+    clippy::or_fun_call,
+    clippy::redundant_closure,
+    clippy::single_element_loop,
+    clippy::trim_split_whitespace,
+    clippy::unnecessary_cast,
+    clippy::unnecessary_lazy_evaluations,
+    clippy::useless_format,
+    // Dead code: many fields/methods reserved for future feature wiring
+    dead_code
 )]
 
 // ============================================================================
