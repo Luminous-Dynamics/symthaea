@@ -270,48 +270,44 @@ impl CantorCleanupEngine {
         let recovered_base = crhv.unbind_base();
 
         // Step 2: Clean the recovered base against the codebook.
-        let (cleaned_base, base_cleaned) = if let Some((label, sim, clean)) =
-            self.codebook.cleanup(&recovered_base)
-        {
-            let accepted = sim >= self.config.acceptance_threshold;
-            layer_results.push(LayerCleanupResult {
-                level: 0,
-                shift: 0,
-                codebook_similarity: sim,
-                accepted,
-                iterations: 1, // Direct lookup, not iterative
-            });
-            total_iterations += 1;
+        let (cleaned_base, base_cleaned) =
+            if let Some((label, sim, clean)) = self.codebook.cleanup(&recovered_base) {
+                let accepted = sim >= self.config.acceptance_threshold;
+                layer_results.push(LayerCleanupResult {
+                    level: 0,
+                    shift: 0,
+                    codebook_similarity: sim,
+                    accepted,
+                    iterations: 1, // Direct lookup, not iterative
+                });
+                total_iterations += 1;
 
-            if accepted {
-                self.layers_cleaned += 1;
-                (clean, true)
-            } else {
-                self.layers_failed += 1;
-                if self.config.preserve_failed_layers {
-                    (recovered_base, false)
+                if accepted {
+                    self.layers_cleaned += 1;
+                    (clean, true)
                 } else {
-                    (recovered_base, false)
+                    self.layers_failed += 1;
+                    if self.config.preserve_failed_layers {
+                        (recovered_base, false)
+                    } else {
+                        (recovered_base, false)
+                    }
                 }
-            }
-        } else {
-            // No codebook entries — can't clean, preserve as-is
-            layer_results.push(LayerCleanupResult {
-                level: 0,
-                shift: 0,
-                codebook_similarity: 0.0,
-                accepted: false,
-                iterations: 0,
-            });
-            (recovered_base, false)
-        };
+            } else {
+                // No codebook entries — can't clean, preserve as-is
+                layer_results.push(LayerCleanupResult {
+                    level: 0,
+                    shift: 0,
+                    codebook_similarity: 0.0,
+                    accepted: false,
+                    iterations: 0,
+                });
+                (recovered_base, false)
+            };
 
         // Step 3: Rebuild the CRHV from the (possibly cleaned) base.
         // Use the original depth so the fractal structure is preserved identically.
-        let rebuilt = CantorRecursiveHV::from_base_with_depth(
-            cleaned_base,
-            crhv.depth,
-        );
+        let rebuilt = CantorRecursiveHV::from_base_with_depth(cleaned_base, crhv.depth);
 
         // Step 4: Verify each layer of the rebuilt CRHV.
         // Since all layers derive from the same base via permutation,
@@ -382,8 +378,7 @@ impl CantorCleanupEngine {
             layers_failed: self.layers_failed,
             codebook_size: self.codebook.len(),
             success_rate: if self.layers_cleaned + self.layers_failed > 0 {
-                self.layers_cleaned as f32
-                    / (self.layers_cleaned + self.layers_failed) as f32
+                self.layers_cleaned as f32 / (self.layers_cleaned + self.layers_failed) as f32
             } else {
                 0.0
             },
@@ -436,7 +431,11 @@ mod tests {
         let result = engine.cleanup(&original);
 
         assert!(result.base_cleaned);
-        assert!(result.quality > 0.9, "Quality should be high for exact match, got {}", result.quality);
+        assert!(
+            result.quality > 0.9,
+            "Quality should be high for exact match, got {}",
+            result.quality
+        );
         // The cleaned base should match the original base exactly
         assert!(
             result.cleaned.base.similarity(&original.base) > 0.99,
@@ -459,7 +458,12 @@ mod tests {
             crhv.scales.len(),
             "Scale count must be preserved"
         );
-        for (i, (orig, cleaned)) in crhv.scales.iter().zip(result.cleaned.scales.iter()).enumerate() {
+        for (i, (orig, cleaned)) in crhv
+            .scales
+            .iter()
+            .zip(result.cleaned.scales.iter())
+            .enumerate()
+        {
             assert_eq!(orig, cleaned, "Scale {} mismatch", i);
         }
     }
@@ -514,7 +518,10 @@ mod tests {
 
         // Random vectors have ~0.5 similarity, well below 0.8 threshold
         assert!(!result.base_cleaned, "Should reject poor match");
-        assert_eq!(result.quality, 0.0, "Quality should be 0 for rejected cleanup");
+        assert_eq!(
+            result.quality, 0.0,
+            "Quality should be 0 for rejected cleanup"
+        );
     }
 
     #[test]
@@ -608,7 +615,8 @@ mod tests {
             assert!(
                 *sim > 0.9,
                 "Scale '{}' similarity dropped to {} after cleanup",
-                name, sim
+                name,
+                sim
             );
         }
     }
@@ -628,7 +636,8 @@ mod tests {
         assert!(
             (cleaned_self_sim - original_self_sim).abs() < 0.05,
             "Self-similarity changed too much: {} -> {}",
-            original_self_sim, cleaned_self_sim
+            original_self_sim,
+            cleaned_self_sim
         );
     }
 }

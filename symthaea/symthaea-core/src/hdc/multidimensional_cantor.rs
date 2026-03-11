@@ -506,7 +506,11 @@ impl Cantor4dHv {
             }
         }
 
-        if count == 0 { 0.0 } else { total_sim / count as f32 }
+        if count == 0 {
+            0.0
+        } else {
+            total_sim / count as f32
+        }
     }
 }
 
@@ -699,16 +703,32 @@ mod tests {
 
         // All dimensions should produce vectors of equal length
         // BinaryHV is fixed-size (16,384 bits = 2048 bytes), all same dimension
-        assert_eq!(BinaryHV::DIM, BinaryHV::DIM, "Semantic and causal should have same dimension");
+        assert_eq!(
+            BinaryHV::DIM,
+            BinaryHV::DIM,
+            "Semantic and causal should have same dimension"
+        );
 
         let sim_sc = semantic.similarity(&causal);
         let sim_st = semantic.similarity(&temporal);
         let sim_ct = causal.similarity(&temporal);
 
         // Similarities should be valid (in [0, 1])
-        assert!(sim_sc >= 0.0 && sim_sc <= 1.0, "Similarity should be in [0,1], got {}", sim_sc);
-        assert!(sim_st >= 0.0 && sim_st <= 1.0, "Similarity should be in [0,1], got {}", sim_st);
-        assert!(sim_ct >= 0.0 && sim_ct <= 1.0, "Similarity should be in [0,1], got {}", sim_ct);
+        assert!(
+            sim_sc >= 0.0 && sim_sc <= 1.0,
+            "Similarity should be in [0,1], got {}",
+            sim_sc
+        );
+        assert!(
+            sim_st >= 0.0 && sim_st <= 1.0,
+            "Similarity should be in [0,1], got {}",
+            sim_st
+        );
+        assert!(
+            sim_ct >= 0.0 && sim_ct <= 1.0,
+            "Similarity should be in [0,1], got {}",
+            sim_ct
+        );
 
         println!("Semantic vs Causal: {:.4}", sim_sc);
         println!("Semantic vs Temporal: {:.4}", sim_st);
@@ -722,7 +742,9 @@ mod tests {
         let low_consciousness = Cantor4dHv::with_consciousness(base, 3, 0.1);
         let high_consciousness = Cantor4dHv::with_consciousness(base, 3, 0.9);
 
-        let sim = low_consciousness.vector.similarity(&high_consciousness.vector);
+        let sim = low_consciousness
+            .vector
+            .similarity(&high_consciousness.vector);
         println!("Low vs High consciousness similarity: {:.4}", sim);
 
         // They should be somewhat different due to consciousness weighting
@@ -738,14 +760,25 @@ mod tests {
         let b = Cantor4dHv::new(base_b, 3);
 
         let gradient = a.consciousness_gradient_similarity(&b);
-        assert!(!gradient.is_empty(), "Gradient should produce at least one data point");
+        assert!(
+            !gradient.is_empty(),
+            "Gradient should produce at least one data point"
+        );
 
         println!("Consciousness gradient similarity:");
         for (w, sim) in &gradient {
             assert!(w.is_finite(), "Weight should be finite");
-            assert!(*w >= 0.0 && *w <= 1.0, "Weight should be in [0,1], got {}", w);
+            assert!(
+                *w >= 0.0 && *w <= 1.0,
+                "Weight should be in [0,1], got {}",
+                w
+            );
             assert!(sim.is_finite(), "Similarity should be finite");
-            assert!(*sim >= 0.0 && *sim <= 1.0, "Similarity should be in [0,1], got {}", sim);
+            assert!(
+                *sim >= 0.0 && *sim <= 1.0,
+                "Similarity should be in [0,1], got {}",
+                sim
+            );
             println!("  W={:.2}: {:.4}", w, sim);
         }
     }
@@ -764,9 +797,21 @@ mod tests {
         let sim_op = origin.similarity(&pole);
         let sim_ep = equator.similarity(&pole);
 
-        assert!(sim_oe >= 0.0 && sim_oe <= 1.0, "Similarity should be in [0,1], got {}", sim_oe);
-        assert!(sim_op >= 0.0 && sim_op <= 1.0, "Similarity should be in [0,1], got {}", sim_op);
-        assert!(sim_ep >= 0.0 && sim_ep <= 1.0, "Similarity should be in [0,1], got {}", sim_ep);
+        assert!(
+            sim_oe >= 0.0 && sim_oe <= 1.0,
+            "Similarity should be in [0,1], got {}",
+            sim_oe
+        );
+        assert!(
+            sim_op >= 0.0 && sim_op <= 1.0,
+            "Similarity should be in [0,1], got {}",
+            sim_op
+        );
+        assert!(
+            sim_ep >= 0.0 && sim_ep <= 1.0,
+            "Similarity should be in [0,1], got {}",
+            sim_ep
+        );
 
         println!("Origin vs Equator: {:.4}", sim_oe);
         println!("Origin vs Pole: {:.4}", sim_op);

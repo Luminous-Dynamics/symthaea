@@ -606,6 +606,71 @@ pub fn try_auto_fix(source: &str, errors: &[String]) -> Option<String> {
         if err_lower.contains("consider giving this closure") && err_lower.contains("return type") {
             // Can't auto-fix without more context
         }
+
+        // Missing #[derive(Debug)] — very common with LLM-generated structs
+        // Error: "`MyStruct` doesn't implement `Debug`"
+        if (err_lower.contains("doesn't implement") || err_lower.contains("does not implement"))
+            && err_lower.contains("debug")
+        {
+            if let Some(type_name) = extract_between(error, "`", "`") {
+                // Find "struct TypeName" and prepend #[derive(Debug)]
+                let struct_pattern = format!("struct {}", type_name);
+                if let Some(pos) = fixed.find(&struct_pattern) {
+                    // Check if #[derive(...)] already exists on the line above
+                    let before = &fixed[..pos];
+                    if !before.ends_with("]\n") && !before.contains(&format!("#[derive(Debug")) {
+                        fixed.insert_str(pos, "#[derive(Debug, Clone)]\n");
+                        any_fix = true;
+                    }
+                }
+            }
+        }
+
+        // Missing Display impl — "doesn't implement `std::fmt::Display`"
+        if (err_lower.contains("doesn't implement") || err_lower.contains("does not implement"))
+            && err_lower.contains("display")
+        {
+            // If the error mentions a custom type, we can't auto-fix Display.
+            // But if the code uses `.to_string()` on something that needs Display,
+            // try wrapping with format!("{:?}") instead.
+        }
+
+        // Missing Clone/Copy — "cannot move out of"
+        if err_lower.contains("cannot move out of") {
+            // Try adding .clone() — crude but often works
+            if let Some(var) = extract_between(error, "`", "`") {
+                let var_clean = var.trim_start_matches('*');
+                // Only clone if the variable is used, not a field access
+                if !var_clean.contains('.') {
+                    let use_pattern = format!("{}", var_clean);
+                    // Don't blindly add .clone() — too risky without line info
+                }
+            }
+        }
+
+        // Lifetime error: "missing lifetime specifier"
+        if err_lower.contains("missing lifetime specifier")
+            && err_lower.contains("expected named lifetime")
+        {
+            // Add 'a lifetime to &str returns — common LLM mistake
+            // e.g. fn foo(s: &str) -> &str → fn foo(s: &str) -> &str (needs lifetime)
+            // This is too context-dependent to auto-fix safely
+        }
+
+        // Dead code warning treated as error (deny(dead_code))
+        if err_lower.contains("unused") && err_lower.contains("function") {
+            // Prefix function with _ or add #[allow(dead_code)]
+            if let Some(fn_name) = extract_between(error, "`", "`") {
+                let fn_pattern = format!("fn {}", fn_name);
+                if let Some(pos) = fixed.find(&fn_pattern) {
+                    let before = &fixed[..pos];
+                    if !before.ends_with("#[allow(dead_code)]\n") {
+                        fixed.insert_str(pos, "#[allow(dead_code)]\n");
+                        any_fix = true;
+                    }
+                }
+            }
+        }
     }
 
     // Check for missing common imports and prepend them
@@ -797,5 +862,57 @@ mod tests {
         let result = executor.evaluate_nix("1 + 1");
         // Nix eval succeeds (real or simulated depending on env)
         assert!(result.compiled);
+    }
+
+    #[test]
+    fn test_auto_fix_missing_derive_debug() {
+        let source = "struct Worker {\n    id: usize,\n}\nfn main() { let w = Worker { id: 1 }; println!(\"{:?}\", w); }";
+        let errors = vec!["`Worker` doesn't implement `Debug`".to_string()];
+        let fixed = try_auto_fix(source, &errors);
+        assert!(fixed.is_some());
+        let fixed = fixed.unwrap();
+        assert!(fixed.contains("#[derive(Debug, Clone)]"));
+        assert!(fixed.contains("struct Worker"));
+    }
+
+    #[test]
+    fn test_auto_fix_missing_mut() {
+        let source = "fn main() { let v = vec![1, 2]; v.push(3); }";
+        let errors = vec!["cannot borrow `v` as mutable".to_string()];
+        let fixed = try_auto_fix(source, &errors);
+        assert!(fixed.is_some());
+        assert!(fixed.unwrap().contains("let mut v"));
+    }
+
+    #[test]
+    fn test_auto_fix_missing_import() {
+        let source = "fn main() { let m: HashMap<String, i32> = HashMap::new(); }";
+        let errors = vec!["cannot find type `HashMap` in this scope".to_string()];
+        let fixed = try_auto_fix(source, &errors);
+        assert!(fixed.is_some());
+        assert!(fixed.unwrap().contains("use std::collections::HashMap;"));
+    }
+
+    #[test]
+    fn test_auto_fix_unused_function() {
+        let source = "fn helper() -> i32 { 42 }\nfn main() {}";
+        let errors = vec!["unused function: `helper`".to_string()];
+        let fixed = try_auto_fix(source, &errors);
+        assert!(fixed.is_some());
+        assert!(fixed.unwrap().contains("#[allow(dead_code)]"));
+    }
+
+    #[test]
+    fn test_auto_fix_no_errors_returns_none() {
+        let source = "fn main() {}";
+        let errors: Vec<String> = vec![];
+        assert!(try_auto_fix(source, &errors).is_none());
+    }
+
+    #[test]
+    fn test_auto_fix_unknown_error_returns_none() {
+        let source = "fn main() {}";
+        let errors = vec!["some unknown error we can't fix".to_string()];
+        assert!(try_auto_fix(source, &errors).is_none());
     }
 }

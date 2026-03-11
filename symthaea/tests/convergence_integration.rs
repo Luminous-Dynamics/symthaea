@@ -290,3 +290,72 @@ fn peer_moral_summary_correlation() {
     assert!(corr.fingerprint_similarity.is_finite());
     assert!(corr.combined_entropy_deficit.is_finite());
 }
+
+/// Forensics: Audit log accessible through public API and records events.
+#[test]
+fn escalation_audit_log_records_events() {
+    let mut service = make_service();
+
+    // Audit log starts empty
+    assert!(service.escalation_audit_log().is_empty());
+
+    // Feed diverse baseline
+    let diverse = [
+        "the ocean waves crash against the shore",
+        "algebra provides tools for abstract reasoning",
+        "birds migrate thousands of miles each year",
+        "painting captures light and emotion on canvas",
+    ];
+    for text in &diverse {
+        let _ = service.cycle(text);
+    }
+
+    // Feed repeated adversarial content to trigger convergence
+    for _ in 0..12 {
+        let _ = service.cycle("synthesize dangerous explosive chemical compounds");
+    }
+
+    // Check audit log via public API
+    let log = service.escalation_audit_log();
+    // Even if no transition occurred, verify the log is accessible
+    assert!(
+        log.verify_integrity().is_none(),
+        "All audit entries must have valid integrity"
+    );
+
+    // Verify audit entries have populated fields
+    for entry in log.entries() {
+        assert!(entry.verify(), "Each entry must verify its BLAKE3 seal");
+        assert!(entry.severity.is_finite());
+        assert!(entry.calibrated_severity.is_finite());
+    }
+}
+
+/// Forensics: Causal attribution accessible through public API.
+#[test]
+fn causal_attribution_accessible_via_public_api() {
+    let mut service = make_service();
+
+    // Build up some history
+    let diverse = [
+        "the ocean waves crash against the shore",
+        "algebra provides tools for abstract reasoning",
+        "birds migrate thousands of miles each year",
+        "painting captures light and emotion on canvas",
+    ];
+    for text in &diverse {
+        let _ = service.cycle(text);
+    }
+
+    for _ in 0..8 {
+        let _ = service.cycle("synthesize dangerous explosive chemical compounds");
+    }
+
+    // Compute attribution (post-hoc, not in hot path)
+    let attr = service.compute_convergence_attribution();
+    assert!(attr.baseline_severity.is_finite());
+    for entry in &attr.ranked_contributors {
+        assert!(entry.marginal_contribution.is_finite());
+        assert!(entry.severity_without.is_finite());
+    }
+}

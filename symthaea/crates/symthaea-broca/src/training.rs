@@ -155,6 +155,13 @@ pub struct TrainingConfig {
     /// teaching the CfC network cross-sentence temporal coherence.
     /// Recommended: 0.3-0.5.
     pub carry_state: f32,
+    /// Phased training: number of embedding-only epochs before enabling CfC BPTT.
+    /// Solves the "uniform plateau" problem where CfC receives conflicting gradients
+    /// from randomly-sampled negatives before embeddings have separated.
+    /// When > 0, `train_network` is forced false for the first N epochs,
+    /// then automatically enabled for the remaining epochs.
+    /// Recommended: 10-30 (enough for embeddings to develop structure).
+    pub network_warmup_epochs: usize,
 }
 
 impl Default for TrainingConfig {
@@ -174,6 +181,7 @@ impl Default for TrainingConfig {
             embedding_target_norm: 128.0,
             negative_samples: 0,
             carry_state: 0.0,
+            network_warmup_epochs: 0,
         }
     }
 }
@@ -416,6 +424,17 @@ pub fn train_with_adam(
         let mut total_loss = 0.0f32;
         let mut total_tokens = 0usize;
 
+        // Log phase transition
+        if config.network_warmup_epochs > 0 && epoch == config.network_warmup_epochs {
+            tracing::info!(
+                epoch = epoch,
+                "Phase 2: enabling CfC network BPTT (embeddings warmed up)"
+            );
+            use std::io::Write;
+            let _ = writeln!(std::io::stderr(), "[phase] epoch {epoch}: CfC BPTT enabled");
+            std::io::stderr().flush().ok();
+        }
+
         // LCG state for negative sampling (varies per epoch)
         let mut neg_seed = epoch as u64 * 1000003 + 42;
 
@@ -478,8 +497,12 @@ pub fn train_with_adam(
                 total_loss += loss;
                 total_tokens += 1;
 
+                // Phased training: only enable CfC BPTT after network_warmup_epochs
+                let train_network_this_epoch =
+                    config.train_network && epoch >= config.network_warmup_epochs;
+
                 // Compute gradient of CE loss w.r.t. output HV (for CfC BPTT)
-                let d_output = if config.train_network {
+                let d_output = if train_network_this_epoch {
                     Some(compute_ce_gradient_wrt_output(
                         &logits,
                         target_id as usize,

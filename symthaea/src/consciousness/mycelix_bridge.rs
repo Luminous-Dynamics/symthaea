@@ -675,6 +675,239 @@ impl MycelixBridge {
         }
     }
 
+    // ========================================================================
+    // GOVERNANCE EVENT GENERATION (Phase 1-2 bridge wiring)
+    // ========================================================================
+
+    /// Record a governance outcome from a completed tally.
+    ///
+    /// Creates a [`GovernanceOutcome`] and a [`GovernanceEvent::TallyCompleted`],
+    /// ready for injection into the CognitiveLoopService's GovernanceManager.
+    /// The caller (Symthaea facade or network handler) is responsible for calling
+    /// `cls.inject_governance_event()` and `cls.inject_governance_outcome()`.
+    #[cfg(feature = "mycelix")]
+    pub fn record_governance_outcome(
+        &self,
+        proposal_id: &str,
+        passed: bool,
+        collective_phi: f64,
+        my_vote: Option<&Vote>,
+    ) -> (
+        crate::cognitive_loop::managers::governance_manager::GovernanceEvent,
+        crate::cognitive_loop::managers::governance_manager::GovernanceOutcome,
+    ) {
+        use crate::cognitive_loop::managers::governance_manager::{
+            GovernanceEvent, GovernanceEventKind, GovernanceOutcome,
+        };
+
+        let event = GovernanceEvent {
+            kind: GovernanceEventKind::TallyCompleted {
+                passed,
+                collective_phi,
+            },
+            proposal_id: Some(proposal_id.to_string()),
+            timestamp_secs: now_secs(),
+        };
+
+        // Determine vote alignment
+        let my_vote_aligned = my_vote.map(|v| {
+            let voted_yes = matches!(v.value, VoteValue::StrongYes | VoteValue::Yes);
+            (voted_yes && passed) || (!voted_yes && !passed)
+        });
+
+        let value_alignment_score = my_vote.map(|v| v.alignment.overall_score).unwrap_or(0.5);
+
+        let harmonic_resonance = my_vote.map(|v| v.alignment.authenticity).unwrap_or(0.5);
+
+        let outcome = GovernanceOutcome {
+            proposal_id: proposal_id.to_string(),
+            passed,
+            my_vote_aligned,
+            value_alignment_score,
+            harmonic_resonance,
+        };
+
+        (event, outcome)
+    }
+
+    /// Create a governance event from a vote cast.
+    #[cfg(feature = "mycelix")]
+    pub fn create_vote_event(
+        &self,
+        vote: &Vote,
+        voter_phi: f64,
+    ) -> crate::cognitive_loop::managers::governance_manager::GovernanceEvent {
+        use crate::cognitive_loop::managers::governance_manager::{
+            GovernanceEvent, GovernanceEventKind,
+        };
+
+        let vote_value = match vote.value {
+            VoteValue::StrongYes => 1.0,
+            VoteValue::Yes => 0.5,
+            VoteValue::Abstain => 0.0,
+            VoteValue::No => -0.5,
+            VoteValue::StrongNo => -1.0,
+        };
+
+        GovernanceEvent {
+            kind: GovernanceEventKind::VoteCast {
+                voter_phi,
+                vote_value,
+            },
+            proposal_id: Some(vote.proposal_id.clone()),
+            timestamp_secs: now_secs(),
+        }
+    }
+
+    /// Create a governance event for an emergency declaration.
+    #[cfg(feature = "mycelix")]
+    pub fn create_emergency_event(
+        &self,
+    ) -> crate::cognitive_loop::managers::governance_manager::GovernanceEvent {
+        use crate::cognitive_loop::managers::governance_manager::{
+            GovernanceEvent, GovernanceEventKind,
+        };
+        GovernanceEvent {
+            kind: GovernanceEventKind::EmergencyDeclared,
+            proposal_id: None,
+            timestamp_secs: now_secs(),
+        }
+    }
+
+    /// Create a governance event for a reciprocity pledge.
+    #[cfg(feature = "mycelix")]
+    pub fn create_reciprocity_event(
+        &self,
+        amount: f64,
+    ) -> crate::cognitive_loop::managers::governance_manager::GovernanceEvent {
+        use crate::cognitive_loop::managers::governance_manager::{
+            GovernanceEvent, GovernanceEventKind,
+        };
+        GovernanceEvent {
+            kind: GovernanceEventKind::ReciprocityPledge { amount },
+            proposal_id: None,
+            timestamp_secs: now_secs(),
+        }
+    }
+
+    /// Create a governance event for a reputation change.
+    #[cfg(feature = "mycelix")]
+    pub fn create_reputation_event(
+        &self,
+        delta: f64,
+    ) -> crate::cognitive_loop::managers::governance_manager::GovernanceEvent {
+        use crate::cognitive_loop::managers::governance_manager::{
+            GovernanceEvent, GovernanceEventKind,
+        };
+        GovernanceEvent {
+            kind: GovernanceEventKind::ReputationChanged { delta },
+            proposal_id: None,
+            timestamp_secs: now_secs(),
+        }
+    }
+
+    /// Create a governance event for a justice dispute.
+    #[cfg(feature = "mycelix")]
+    pub fn create_dispute_event(
+        &self,
+        involves_self: bool,
+    ) -> crate::cognitive_loop::managers::governance_manager::GovernanceEvent {
+        use crate::cognitive_loop::managers::governance_manager::{
+            GovernanceEvent, GovernanceEventKind,
+        };
+        GovernanceEvent {
+            kind: GovernanceEventKind::JusticeDispute { involves_self },
+            proposal_id: None,
+            timestamp_secs: now_secs(),
+        }
+    }
+
+    // ========================================================================
+    // EPISTEMIC GATING (Phase 4)
+    // ========================================================================
+
+    /// Check if a proposal should be escalated based on epistemic blind spots.
+    ///
+    /// If the proposal touches domains where the community has collective
+    /// blind spots, the required consciousness tier is escalated.
+    /// Returns `None` if no escalation is needed, or `Some(tier)` with the
+    /// minimum required escalation tier.
+    #[cfg(feature = "mycelix")]
+    pub fn epistemic_escalation_check(
+        &self,
+        proposal_domains: &[String],
+        mesh: &crate::mycelix::epistemic_mesh::EpistemicMesh,
+    ) -> Option<crate::mycelix::epistemic_mesh::EscalationTier> {
+        mesh.proposal_escalation_required(proposal_domains)
+    }
+
+    /// Submit a proposal with epistemic gating.
+    ///
+    /// Like `submit_proposal()`, but additionally checks the EpistemicMesh
+    /// for blind-spot domains. If the proposal touches collective blind spots,
+    /// a higher consciousness tier is required.
+    #[cfg(feature = "mycelix")]
+    pub fn submit_proposal_with_epistemic_gate(
+        &mut self,
+        proposal: &Proposal,
+        consciousness: ConsciousnessSnapshot,
+        affective_state: AffectiveSystemsState,
+        proposal_domains: &[String],
+        mesh: Option<&crate::mycelix::epistemic_mesh::EpistemicMesh>,
+    ) -> Result<SubmissionResult, BridgeError> {
+        // Check epistemic escalation first
+        if let Some(mesh) = mesh {
+            if let Some(tier) = mesh.proposal_escalation_required(proposal_domains) {
+                use crate::mycelix::epistemic_mesh::EscalationTier;
+                let required_phi = match tier {
+                    EscalationTier::Citizen => GOV_VOTING,         // 0.4
+                    EscalationTier::Steward => GOV_CONSTITUTIONAL, // 0.6
+                    EscalationTier::Guardian => 0.8,               // Emergency-level
+                };
+                if consciousness.phi < required_phi {
+                    return Err(BridgeError::InsufficientConsciousness {
+                        current: consciousness.phi,
+                        required: required_phi,
+                        action: format!(
+                            "submit proposal touching blind-spot domains (escalated to {:?})",
+                            tier
+                        ),
+                    });
+                }
+            }
+        }
+
+        // Proceed with normal submission
+        self.submit_proposal(proposal, consciousness, affective_state)
+    }
+
+    // ========================================================================
+    // COLLECTIVE PHI (Phase 3) — extraction helpers
+    // ========================================================================
+
+    /// Extract the 6D consciousness vector components from a snapshot.
+    ///
+    /// Returns `(consciousness_level, meta_awareness, coherence, care_activation,
+    ///           harmonic_alignment, epistemic_confidence)` — the six dimensions
+    /// expected by `mycelix_bridge_common::collective_phi::AgentConsciousnessVector`.
+    ///
+    /// The caller (e.g., the Mycelix coordinator zome or a bridge adapter) constructs
+    /// the `AgentConsciousnessVector` from these values. This avoids a direct dependency
+    /// on `mycelix-bridge-common` from the symthaea crate.
+    #[cfg(feature = "mycelix")]
+    pub fn extract_consciousness_vector(
+        snapshot: &ConsciousnessSnapshot,
+    ) -> (f64, f64, f64, f64, f64, f64) {
+        (
+            snapshot.phi,
+            snapshot.meta_awareness,
+            snapshot.coherence,
+            snapshot.care_activation,
+            snapshot.quality_score(),
+            snapshot.self_model_accuracy,
+        )
+    }
+
     /// Get bridge statistics
     pub fn stats(&self) -> BridgeStats {
         BridgeStats {
@@ -1132,6 +1365,151 @@ mod tests {
         assert!(matches!(
             result,
             Err(BridgeError::InsufficientConsciousness { .. })
+        ));
+    }
+
+    #[cfg(feature = "mycelix")]
+    #[test]
+    fn test_record_governance_outcome_aligned_pass() {
+        let bridge = MycelixBridge::new("test-agent");
+        let vote = Vote {
+            proposal_id: "p1".into(),
+            voter: "test-agent".into(),
+            value: VoteValue::Yes,
+            consciousness: ConsciousnessSnapshot::new(0.5, 0.6, 0.7, 0.8, 0.5, 0.6),
+            alignment: ValueAlignmentResult {
+                overall_score: 0.8,
+                harmony_scores: HashMap::new(),
+                violations: vec![],
+                authenticity: 0.9,
+                recommendation: GovernanceRecommendation::Support,
+            },
+            timestamp: 0,
+        };
+
+        let (event, outcome) = bridge.record_governance_outcome("p1", true, 0.7, Some(&vote));
+        assert!(matches!(
+            event.kind,
+            crate::cognitive_loop::managers::governance_manager::GovernanceEventKind::TallyCompleted {
+                passed: true,
+                ..
+            }
+        ));
+        assert_eq!(outcome.my_vote_aligned, Some(true)); // voted yes, passed
+        assert!((outcome.value_alignment_score - 0.8).abs() < 1e-6);
+    }
+
+    #[cfg(feature = "mycelix")]
+    #[test]
+    fn test_epistemic_escalation_blocks_low_phi() {
+        use crate::mycelix::epistemic_mesh::{EpistemicMesh, EpistemicSummary};
+        use crate::mycelix::gis::IgnoranceType;
+
+        // Create mesh where "climate" is a blind spot (4/5 agents uncertain)
+        let summaries = vec![
+            EpistemicSummary {
+                agent_id: "a1".into(),
+                dominant_ignorance: IgnoranceType::KnownUnknown,
+                domain_expertise: vec![],
+                blind_spots: vec!["climate".into()],
+            },
+            EpistemicSummary {
+                agent_id: "a2".into(),
+                dominant_ignorance: IgnoranceType::KnownUnknown,
+                domain_expertise: vec![],
+                blind_spots: vec!["climate".into()],
+            },
+            EpistemicSummary {
+                agent_id: "a3".into(),
+                dominant_ignorance: IgnoranceType::KnownUnknown,
+                domain_expertise: vec![],
+                blind_spots: vec!["climate".into()],
+            },
+            EpistemicSummary {
+                agent_id: "a4".into(),
+                dominant_ignorance: IgnoranceType::KnownUnknown,
+                domain_expertise: vec![],
+                blind_spots: vec!["climate".into()],
+            },
+            EpistemicSummary {
+                agent_id: "a5".into(),
+                dominant_ignorance: IgnoranceType::Known,
+                domain_expertise: vec![],
+                blind_spots: vec![],
+            },
+        ];
+        let mesh = EpistemicMesh::new(summaries);
+
+        let mut bridge = MycelixBridge::new("test-agent");
+        let proposal = Proposal {
+            id: "p1".into(),
+            title: "Climate action".into(),
+            description: "Climate proposal".into(),
+            proposer: "agent-1".into(),
+            created_at: 0,
+            proposal_type: ProposalType::Standard,
+            required_phi: 0.3,
+        };
+
+        // Phi 0.5 — normally enough for Standard, but climate is blind spot
+        // with severity 0.8 → Guardian tier → needs 0.8
+        let consciousness = ConsciousnessSnapshot::new(0.5, 0.6, 0.7, 0.8, 0.5, 0.6);
+        let affective = AffectiveSystemsState::default();
+
+        let result = bridge.submit_proposal_with_epistemic_gate(
+            &proposal,
+            consciousness,
+            affective,
+            &["climate".into()],
+            Some(&mesh),
+        );
+        assert!(
+            matches!(result, Err(BridgeError::InsufficientConsciousness { .. })),
+            "Blind-spot domain should escalate consciousness requirement"
+        );
+    }
+
+    #[cfg(feature = "mycelix")]
+    #[test]
+    fn test_extract_consciousness_vector() {
+        let snapshot = ConsciousnessSnapshot::new(0.5, 0.6, 0.7, 0.8, 0.5, 0.6);
+        let (phi, meta, coherence, care, _quality, _epistemic) =
+            MycelixBridge::extract_consciousness_vector(&snapshot);
+        assert!((phi - 0.5).abs() < 1e-6);
+        assert!((meta - 0.6).abs() < 1e-6);
+        assert!((coherence - 0.8).abs() < 1e-6);
+        assert!((care - 0.6).abs() < 1e-6);
+    }
+
+    #[cfg(feature = "mycelix")]
+    #[test]
+    fn test_create_event_helpers() {
+        let bridge = MycelixBridge::new("test-agent");
+
+        let emergency = bridge.create_emergency_event();
+        assert!(matches!(
+            emergency.kind,
+            crate::cognitive_loop::managers::governance_manager::GovernanceEventKind::EmergencyDeclared
+        ));
+
+        let reciprocity = bridge.create_reciprocity_event(10.0);
+        assert!(matches!(
+            reciprocity.kind,
+            crate::cognitive_loop::managers::governance_manager::GovernanceEventKind::ReciprocityPledge { amount }
+            if (amount - 10.0).abs() < 1e-6
+        ));
+
+        let dispute = bridge.create_dispute_event(true);
+        assert!(matches!(
+            dispute.kind,
+            crate::cognitive_loop::managers::governance_manager::GovernanceEventKind::JusticeDispute { involves_self: true }
+        ));
+
+        let rep = bridge.create_reputation_event(-0.5);
+        assert!(matches!(
+            rep.kind,
+            crate::cognitive_loop::managers::governance_manager::GovernanceEventKind::ReputationChanged { delta }
+            if (delta - (-0.5)).abs() < 1e-6
         ));
     }
 }

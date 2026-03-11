@@ -191,9 +191,10 @@ impl OllamaBackend {
     /// Create a new Ollama backend with default settings.
     ///
     /// Connects to `http://localhost:11434` with a model determined by the
-    /// `SYMTHAEA_LLM_MODEL` environment variable, falling back to `gemma3:1b`.
+    /// `SYMTHAEA_LLM_MODEL` environment variable, falling back to `qwen2.5-coder:7b`.
     pub fn new() -> Self {
-        let model = std::env::var("SYMTHAEA_LLM_MODEL").unwrap_or_else(|_| "gemma3:1b".to_string());
+        let model =
+            std::env::var("SYMTHAEA_LLM_MODEL").unwrap_or_else(|_| "qwen2.5-coder:7b".to_string());
         Self::with_config("http://localhost:11434", &model)
     }
 
@@ -683,7 +684,7 @@ mod tests {
     fn test_ollama_backend_default_config() {
         let backend = OllamaBackend::new();
         assert_eq!(backend.base_url, "http://localhost:11434");
-        // Model comes from SYMTHAEA_LLM_MODEL env var or defaults to "gemma3:1b".
+        // Model comes from SYMTHAEA_LLM_MODEL env var or defaults to "qwen2.5-coder:7b".
         // Don't assert exact value — parallel tests may set the env var.
         assert!(!backend.model.is_empty());
     }

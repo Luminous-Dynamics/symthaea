@@ -1072,6 +1072,27 @@ pub struct CycleMetadata {
     /// Whether narrative self-phi modulated confidence or exploration.
     #[serde(default)]
     pub narrative_self_phi_modulated: bool,
+    /// Whether epistemic phi drove confidence modulation.
+    #[serde(default)]
+    pub epistemic_phi_modulated: bool,
+    /// Whether phenomenal binding strength modulated LR or exploration.
+    #[serde(default)]
+    pub phenomenal_binding_modulated: bool,
+    /// Whether temporal coherence score modulated confidence or exploration.
+    #[serde(default)]
+    pub temporal_coherence_modulated: bool,
+    /// Whether holographic unity modulated LR or confidence.
+    #[serde(default)]
+    pub holographic_unity_modulated: bool,
+    /// Whether harmonies alignment modulated exploration or confidence.
+    #[serde(default)]
+    pub harmonies_alignment_modulated: bool,
+    /// Whether consciousness gradient modulated LR.
+    #[serde(default)]
+    pub consciousness_gradient_lr_modulated: bool,
+    /// Whether value cache hit rate modulated confidence.
+    #[serde(default)]
+    pub value_cache_confidence_modulated: bool,
 
     // ── Session 14: Late Consciousness Feedback ──────────────────────────
     /// Whether living mind vitality modulated confidence.
@@ -1494,6 +1515,19 @@ pub struct EthicalTelemetry {
     /// Name of matched hazard signature template (e.g. "weaponization"), if any.
     #[serde(default)]
     pub moral_matched_hazard: Option<String>,
+    /// Current escalation level from the topological immune system.
+    /// Log (default) → Warn → Throttle → Block.
+    #[serde(default)]
+    pub moral_escalation_level: crate::hdc::moral_topology::EscalationLevel,
+    /// Number of entries in the escalation audit log.
+    #[serde(default)]
+    pub moral_audit_log_len: usize,
+    /// Fingerprint velocity: rate of directional change in harmony space.
+    #[serde(default)]
+    pub moral_fingerprint_velocity: f64,
+    /// Wasserstein distance between current and previous persistence diagrams.
+    #[serde(default)]
+    pub moral_persistence_distance: f64,
     /// Harmony entropy (moral breadth): Shannon entropy of harmony variance distribution.
     /// Range: [0, ln(8)] ≈ [0, 2.08]. Higher = broader moral engagement.
     #[serde(default)]
