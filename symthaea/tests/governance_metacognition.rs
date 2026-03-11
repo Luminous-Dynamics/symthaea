@@ -14,10 +14,8 @@
 
 #![cfg(feature = "mycelix")]
 
-use symthaea::cognitive_loop::managers::governance_manager::{
-    GovernanceEvent, GovernanceEventKind, GovernanceOutcome,
-};
 use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
+use symthaea::cognitive_loop::{GovernanceEvent, GovernanceEventKind, GovernanceOutcome};
 
 // ── Helper ──────────────────────────────────────────────────────────
 

@@ -168,6 +168,9 @@ pub(crate) mod physics_integration;
 #[cfg(feature = "physics-bridge")]
 pub use physics_integration::ParetoContext;
 
+#[cfg(feature = "mycelix")]
+pub use managers::governance_manager::{GovernanceEvent, GovernanceEventKind, GovernanceOutcome};
+
 pub mod calibration;
 
 #[cfg(feature = "nurture")]
