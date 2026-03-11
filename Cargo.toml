@@ -457,7 +457,7 @@ wasm-sandbox = ["dep:wasmtime"]
 
 # ── Example & module build gates ───────────────────────────────────
 # These gate cfg blocks in src/ code and/or examples.
-school_learning = []            # Anticipatory curriculum learning (CfC lookahead, mastery tracking)
+school_learning = ["code_generation"]  # Anticipatory curriculum learning (CfC lookahead, mastery tracking)
 benchmarks = []                 # Causal validation benchmarks (used by examples/)
 integration_module = []         # Integration module (cfg-gated in lib.rs)
 observability_module = ["dep:symthaea-observability"]  # Observability (cfg-gated in gwt_integration + lib.rs)
