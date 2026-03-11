@@ -1317,7 +1317,7 @@ fn calculate_completion_confidence(partial: &str, full: &str) -> f32 {
 
 /// Generate command preview for multi-step operations
 fn generate_command_preview(command: &str) -> Option<CommandPreview> {
-    use symthaea::action::classify_command_destructiveness;
+    use symthaea::action::{classify_command_destructiveness, DestructivenessLevel};
 
     let parts: Vec<&str> = command.split_whitespace().collect();
     if parts.is_empty() {

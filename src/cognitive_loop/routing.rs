@@ -10,6 +10,143 @@ use serde::{Deserialize, Serialize};
 use crate::dynamics::temporal_signatures::ConsciousnessPattern;
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// CODE TASK DETECTION - Identifies code-related inputs
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Type of code task detected from natural language input
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CodeTaskType {
+    /// Write new code from scratch
+    Create,
+    /// Fix or debug existing code
+    Debug,
+    /// Improve existing code structure
+    Refactor,
+    /// Explain code concepts
+    Explain,
+    /// Not a code task
+    None,
+}
+
+/// Detects whether natural language input is a code-related task
+///
+/// Uses keyword-based heuristics to classify input text as code tasks
+/// with a confidence score.
+#[derive(Debug, Clone)]
+pub struct CodeTaskDetector {
+    /// Keywords that strongly indicate code tasks
+    code_keywords: Vec<&'static str>,
+    /// Keywords that indicate debugging
+    debug_keywords: Vec<&'static str>,
+    /// Keywords that indicate refactoring
+    refactor_keywords: Vec<&'static str>,
+}
+
+impl CodeTaskDetector {
+    /// Create a new code task detector
+    pub fn new() -> Self {
+        Self {
+            code_keywords: vec![
+                "function",
+                "code",
+                "implement",
+                "write",
+                "create",
+                "class",
+                "struct",
+                "module",
+                "program",
+                "script",
+                "algorithm",
+                "compile",
+                "rust",
+                "python",
+                "javascript",
+                "typescript",
+                "java",
+                "```",
+                "fn ",
+                "def ",
+                "import",
+                "crate",
+            ],
+            debug_keywords: vec![
+                "debug", "fix", "bug", "error", "crash", "panic", "fail", "broken", "issue",
+            ],
+            refactor_keywords: vec![
+                "refactor",
+                "improve",
+                "optimize",
+                "clean",
+                "restructure",
+                "simplify",
+                "efficient",
+            ],
+        }
+    }
+
+    /// Detect whether input text is a code task
+    ///
+    /// Returns `(is_code_task, confidence)` where confidence is 0.0 to 1.0
+    pub fn detect(&self, input: &str) -> (bool, f32) {
+        let lower = input.to_lowercase();
+        let mut score = 0.0f32;
+
+        for &kw in &self.code_keywords {
+            if lower.contains(kw) {
+                score += 0.3;
+            }
+        }
+        for &kw in &self.debug_keywords {
+            if lower.contains(kw) {
+                score += 0.25;
+            }
+        }
+        for &kw in &self.refactor_keywords {
+            if lower.contains(kw) {
+                score += 0.25;
+            }
+        }
+
+        let confidence = score.min(1.0);
+        (confidence >= 0.3, confidence)
+    }
+
+    /// Detect the specific type of code task
+    pub fn detect_task_type(&self, input: &str) -> CodeTaskType {
+        let lower = input.to_lowercase();
+
+        if self.debug_keywords.iter().any(|&kw| lower.contains(kw)) {
+            return CodeTaskType::Debug;
+        }
+        if self.refactor_keywords.iter().any(|&kw| lower.contains(kw)) {
+            return CodeTaskType::Refactor;
+        }
+
+        let has_code_kw = self.code_keywords.iter().any(|&kw| lower.contains(kw));
+
+        if lower.contains("explain") || lower.contains("how does") || lower.contains("what is") {
+            if has_code_kw {
+                return CodeTaskType::Explain;
+            }
+            return CodeTaskType::None;
+        }
+
+        if has_code_kw {
+            return CodeTaskType::Create;
+        }
+
+        CodeTaskType::None
+    }
+}
+
+impl Default for CodeTaskDetector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // THALAMIC ROUTING - Cognitive Depth Selection
 // ═══════════════════════════════════════════════════════════════════════════════
 

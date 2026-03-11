@@ -37,10 +37,12 @@
 
 pub mod frame;
 pub mod optical_flow;
+pub mod rhythm_detector;
 pub mod source;
 pub mod temporal_features;
 
 pub use frame::{Frame, FrameFormat};
 pub use optical_flow::{MotionVector, OpticalFlow};
+pub use rhythm_detector::{LtcRhythmConfig, LtcRhythmDetector, RhythmDetection};
 pub use source::{MockPattern, MockVideoSource, VideoSource, VideoSourceConfig, WebcamSource};
 pub use temporal_features::{TemporalFeatureExtractor, TemporalFeatures};
