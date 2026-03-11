@@ -120,8 +120,8 @@ impl CrucibleEngine {
 
         // Update prior via EMA
         let alpha = if self.prior_count == 0 { 1.0 } else { 0.1 };
-        for i in 0..N_HARMONIES {
-            self.prior[i] = self.prior[i] * (1.0 - alpha) + coords[i] * alpha;
+        for (i, &c) in coords.iter().enumerate().take(N_HARMONIES) {
+            self.prior[i] = self.prior[i] * (1.0 - alpha) + c * alpha;
         }
         self.prior_count += 1;
 

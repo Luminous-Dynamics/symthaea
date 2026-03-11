@@ -105,6 +105,10 @@ harness = false
 name = "orthogonal_init_bench"
 harness = false
 
+[[bench]]
+name = "cantor_cleanup_bench"
+harness = false
+
 [features]
 default = ["simd", "parallel"]
 embeddings = []       # Enable embedding model integration

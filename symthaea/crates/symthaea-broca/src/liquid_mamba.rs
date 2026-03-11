@@ -323,14 +323,14 @@ impl Default for LiquidMambaConfig {
             enable_ema: false,
             ema_decay: 0.999,
             deep_projection: false,
-            temporal_projection: false,
+            temporal_projection: true,
             learned_pos_enc: false,
             temporal_stride: 0,
-            temporal_directional_loss: false,
-            temporal_smoothness_weight: 0.0,
-            temporal_rank_reg_weight: 0.0,
-            temporal_chunk_budget: 0,
-            temporal_learned_attention: false,
+            temporal_directional_loss: true,
+            temporal_smoothness_weight: 0.02,
+            temporal_rank_reg_weight: 0.005,
+            temporal_chunk_budget: 16,
+            temporal_learned_attention: true,
             surprise_gradient_alpha: 0.5,
             grad_clip: 1.0,
             token_pe_sim_threshold: 0.3,
@@ -667,10 +667,14 @@ impl LiquidMambaGenerator {
             let mut token_pe_boost: f32 = 0.0;
 
             for pos in 0..max_tokens {
-                // 7a. Biological delta modulation
+                // 7a. Biological delta modulation via CfC → SSM coupling
+                // Instead of bluntly scaling hidden states, modulate Δ (step-size)
+                // and B (input sensitivity) at the SSM equation level.
                 if self.config.enable_liquid_delta {
                     let scale = self.biological_state_scale();
-                    self.mamba.scale_hidden_states(scale)?;
+                    // delta_scale: CfC tiredness → smaller temporal steps (more conservative)
+                    // b_scale: same signal modulates input sensitivity
+                    self.mamba.set_cfc_modulation(scale, scale.sqrt());
                 }
 
                 // 7b. Forward one token through Mamba

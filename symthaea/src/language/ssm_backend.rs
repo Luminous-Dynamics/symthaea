@@ -283,7 +283,7 @@ pub fn thought_to_channels(thought: &StructuredThought, mood_temperature: f32) -
 /// by epistemic, emotional, and coherence constraints.
 #[cfg(feature = "liquid-mamba")]
 pub struct LiquidMambaBackend {
-    generator: Mutex<symthaea_broca::LiquidMambaGenerator>,
+    generator: std::sync::Arc<Mutex<symthaea_broca::LiquidMambaGenerator>>,
 }
 
 #[cfg(feature = "liquid-mamba")]
@@ -312,7 +312,7 @@ impl LiquidMambaBackend {
         }
 
         Ok(Self {
-            generator: Mutex::new(generator),
+            generator: std::sync::Arc::new(Mutex::new(generator)),
         })
     }
 }
@@ -361,13 +361,19 @@ impl std::fmt::Debug for LiquidMambaBackend {
 impl LLMBackend for LiquidMambaBackend {
     async fn generate(&self, prompt: &str, _params: &GenerationParams) -> Result<String> {
         let channels = channels_from_prompt(prompt);
-        let mut gen = self
-            .generator
-            .lock()
-            .map_err(|e| anyhow::anyhow!("lock poisoned: {e}"))?;
-        let result = gen.generate(&channels);
-        gen.distill_step(&channels, &result);
-        Ok(result.text)
+        let gen = self.generator.clone();
+        // Offload Mamba's CPU-heavy inference to a blocking thread so the
+        // async runtime (and the 50Hz cognitive loop) continues ticking.
+        tokio::task::spawn_blocking(move || {
+            let mut gen = gen
+                .lock()
+                .map_err(|e| anyhow::anyhow!("lock poisoned: {e}"))?;
+            let result = gen.generate(&channels);
+            gen.distill_step(&channels, &result);
+            Ok(result.text)
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!("spawn_blocking join error: {e}"))?
     }
 
     async fn generate_streaming(
@@ -376,6 +382,9 @@ impl LLMBackend for LiquidMambaBackend {
         _params: &GenerationParams,
         on_token: &mut (dyn for<'a> FnMut(&'a str) + Send),
     ) -> Result<String> {
+        // Streaming must stay synchronous since `on_token` is a mutable callback
+        // that can't cross thread boundaries. The streaming path is typically
+        // used for interactive display, not within the 50Hz loop.
         let channels = channels_from_prompt(prompt);
         let mut gen = self
             .generator
@@ -510,6 +519,36 @@ impl DirectThoughtBackend for LiquidMambaBackend {
         let result = gen.generate(channels);
         gen.distill_step(channels, &result);
         Ok(result.text)
+    }
+}
+
+/// Async-friendly generation that doesn't block the cognitive loop.
+///
+/// Use this from the 50Hz pipeline: submit thought → CfC keeps ticking →
+/// result arrives when Mamba finishes. The CfcModulation parameters
+/// are frozen at submission time (snapshot semantics).
+#[cfg(feature = "liquid-mamba")]
+impl LiquidMambaBackend {
+    /// Non-blocking generation: spawns Mamba inference on a blocking thread
+    /// and returns a future that resolves when text is ready.
+    ///
+    /// The cognitive loop can continue at 50Hz while this runs. The
+    /// `CfcModulation` (Δ and B scaling) is set before spawning.
+    pub async fn generate_async(
+        &self,
+        channels: ThoughtChannels,
+    ) -> Result<symthaea_broca::GenerationResult> {
+        let gen = self.generator.clone();
+        tokio::task::spawn_blocking(move || {
+            let mut gen = gen
+                .lock()
+                .map_err(|e| anyhow::anyhow!("lock poisoned: {e}"))?;
+            let result = gen.generate(&channels);
+            gen.distill_step(&channels, &result);
+            Ok(result)
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!("spawn_blocking join error: {e}"))?
     }
 }
 
