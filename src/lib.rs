@@ -235,7 +235,7 @@ Key types are re-exported at the crate root for convenience:
     clippy::manual_div_ceil,
     clippy::manual_map,
     clippy::manual_range_contains,
-    clippy::manual_saturating_arithmetic,
+    clippy::manual_saturating_arithmetic, // pre-1.93 name
     clippy::manual_strip,
     clippy::map_clone,
     clippy::needless_borrow,
@@ -251,12 +251,18 @@ Key types are re-exported at the crate root for convenience:
     clippy::unnecessary_cast,
     clippy::unnecessary_lazy_evaluations,
     clippy::unnecessary_to_owned,
+    clippy::useless_conversion,
     clippy::useless_format,
-    // Additional lints from --all-features clippy
+    // Additional lints from --all-features clippy (exact names from CI)
+    clippy::double_ended_iterator_last,
+    clippy::implicit_saturating_sub,
     clippy::io_other_error,
     clippy::manual_abs_diff,
-    clippy::manual_char_comparison,
+    clippy::manual_pattern_char_comparison,
+    clippy::manual_repeat_n,
     clippy::op_ref,
+    clippy::unused_enumerate_index,
+    clippy::unwrap_or_default,
     // Dead code: many fields/methods reserved for future feature wiring
     dead_code,
     unused_imports,
