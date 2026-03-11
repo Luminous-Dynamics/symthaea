@@ -791,6 +791,15 @@ pub struct CycleMetadata {
     #[serde(default)]
     pub gwt_perception_broadcasts: u32,
 
+    // ── Cantor Fractal Telemetry ─────────────────────────────────────────
+    /// Metacognitive depth: self-similarity of most recent GWT-promoted CRHV.
+    /// Science: Hofstadter (1979) — strange loops; Metzinger (2003) — self-model depth.
+    #[serde(default)]
+    pub cantor_metacognitive_depth: f32,
+    /// Number of CRHVs pending dream consolidation in the broadcast buffer.
+    #[serde(default)]
+    pub cantor_buffer_occupancy: u32,
+
     // ── Social Coherence Telemetry ──────────────────────────────────────
     /// Current social trust level (0.0–1.0) from Mind module's SocialCoherence.
     #[serde(default)]
@@ -1093,6 +1102,20 @@ pub struct CycleMetadata {
     /// Whether value cache hit rate modulated confidence.
     #[serde(default)]
     pub value_cache_confidence_modulated: bool,
+
+    // ── Session 18: Orphaned Signal Behavioral Wiring ────────────────────
+    /// Whether consciousness state level modulated LR this cycle.
+    #[serde(default)]
+    pub consciousness_state_modulated: bool,
+    /// Whether living mind vitality modulated confidence or LR this cycle.
+    #[serde(default)]
+    pub living_mind_vitality_modulated: bool,
+    /// Whether living mind coherence modulated exploration this cycle.
+    #[serde(default)]
+    pub living_mind_coherence_modulated: bool,
+    /// Whether MCTS plan effectiveness modulated confidence or exploration this cycle.
+    #[serde(default)]
+    pub mcts_effectiveness_modulated: bool,
 
     // ── Session 14: Late Consciousness Feedback ──────────────────────────
     /// Whether living mind vitality modulated confidence.

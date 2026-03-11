@@ -187,6 +187,13 @@ impl CognitiveLoopService {
             }
         }
 
+                #[cfg(feature = "mycelix")]
+                if self.governance_mgr.should_run(cycle_num, urgency_u8) {
+                    let governance_output = self.governance_mgr.process(snapshot);
+                    self.subsystem_collector
+                        .record("governance_manager", governance_output);
+                }
+
         // ── Phase 17: Self-model accuracy tracking ───────────────────────
         let self_model_accuracy = self.carryover.learning.self_model_accuracy;
         if let Some((made_at, pred_confidence, pred_urgency)) =

@@ -785,6 +785,52 @@ impl CognitiveLoopService {
                 self.stats.total_cycles > 20 && vchr > VALUE_CACHE_HIT_CONFIDENCE_THRESHOLD;
         }
 
+        // ── Session 18: Orphaned Signal Behavioral Wiring Telemetry ──
+        {
+            use crate::cognitive_loop::thresholds::{
+                CONSCIOUSNESS_STATE_HIGH_THRESHOLD, CONSCIOUSNESS_STATE_LOW_THRESHOLD,
+                LIVING_MIND_COHERENCE_HIGH_THRESHOLD, LIVING_MIND_COHERENCE_LOW_THRESHOLD,
+                LIVING_MIND_VITALITY_HIGH_THRESHOLD, LIVING_MIND_VITALITY_LOW_THRESHOLD,
+                MCTS_EFFECTIVENESS_HIGH_THRESHOLD, MCTS_EFFECTIVENESS_LOW_THRESHOLD,
+            };
+            let csl = feedback.consciousness.consciousness_state_level;
+            metadata.consciousness_state_modulated = self.stats.total_cycles > 15
+                && (csl > CONSCIOUSNESS_STATE_HIGH_THRESHOLD
+                    || (csl > 0.0 && csl < CONSCIOUSNESS_STATE_LOW_THRESHOLD));
+            let lmv = feedback.self_model.living_mind_vitality;
+            metadata.living_mind_vitality_modulated = self.stats.total_cycles > 15
+                && (lmv > LIVING_MIND_VITALITY_HIGH_THRESHOLD
+                    || (lmv > 0.0 && lmv < LIVING_MIND_VITALITY_LOW_THRESHOLD));
+            let lmc = feedback.self_model.living_mind_coherence;
+            metadata.living_mind_coherence_modulated = self.stats.total_cycles > 15
+                && (lmc > LIVING_MIND_COHERENCE_HIGH_THRESHOLD
+                    || (lmc > 0.0 && lmc < LIVING_MIND_COHERENCE_LOW_THRESHOLD));
+            let mpe = dynamics.reasoning.mcts_plan_effectiveness;
+            metadata.mcts_effectiveness_modulated = self.stats.total_cycles > 15
+                && (mpe > MCTS_EFFECTIVENESS_HIGH_THRESHOLD
+                    || (mpe > 0.0 && mpe < MCTS_EFFECTIVENESS_LOW_THRESHOLD));
+
+            // ─── MCTS Plan Effectiveness → Confidence + Exploration ─────────
+            // Huys (2015) — effective tree search → justified confidence.
+            // Daw (2005) — poor model-based planning → switch to model-free exploration.
+            if self.stats.total_cycles > 15 {
+                use crate::cognitive_loop::thresholds::{
+                    MCTS_EFFECTIVENESS_CONFIDENCE_BOOST, MCTS_EFFECTIVENESS_LOW_EXPLORE_BOOST,
+                };
+                if mpe > MCTS_EFFECTIVENESS_HIGH_THRESHOLD {
+                    self.adjust_confidence(
+                        "mcts_effectiveness_high",
+                        MCTS_EFFECTIVENESS_CONFIDENCE_BOOST,
+                    );
+                } else if mpe > 0.0 && mpe < MCTS_EFFECTIVENESS_LOW_THRESHOLD {
+                    self.adjust_exploration(
+                        "mcts_effectiveness_low",
+                        MCTS_EFFECTIVENESS_LOW_EXPLORE_BOOST,
+                    );
+                }
+            }
+        }
+
         // ── GWT handler telemetry ──
         metadata.gwt_memory_consolidation_requested = self
             .gwt_mgr
@@ -794,6 +840,14 @@ impl CognitiveLoopService {
             self.gwt_mgr
                 .perception_count
                 .swap(0, std::sync::atomic::Ordering::Relaxed) as u32;
+
+        // ── Cantor fractal telemetry ──
+        metadata.cantor_buffer_occupancy = self.cantor_broadcast_buffer.len() as u32;
+        metadata.cantor_metacognitive_depth = self
+            .cantor_broadcast_buffer
+            .last()
+            .map(|crhv| crhv.self_similarity())
+            .unwrap_or(0.0);
 
         // ── GWT-triggered memory consolidation (Dehaene & Changeux 2011) ──
         // When global workspace broadcasts, record current state for episodic
