@@ -145,8 +145,10 @@ struct SentinelDemo {
 
 impl SentinelDemo {
     fn new(config: DemoConfig) -> Self {
-        let mut ltc_config = LtcRhythmConfig::default();
-        ltc_config.dt_ms = 1000.0 / config.fps as f32;
+        let ltc_config = LtcRhythmConfig {
+            dt_ms: 1000.0 / config.fps as f32,
+            ..Default::default()
+        };
 
         let patterns = get_patterns(config.complex_mode);
 
@@ -460,14 +462,14 @@ impl SentinelDemo {
             let first_char = cmd.chars().next();
 
             match first_char {
-                Some(c @ 'A'..='F') => {
-                    // Learn pattern A-F
-                    self.run_learning(c)?;
-                }
                 Some('D') if cmd == "D" => {
                     self.running.store(true, Ordering::Relaxed);
                     self.run_detection()?;
                     println!("\n\n   Detection stopped.");
+                }
+                Some(c @ 'A'..='F') => {
+                    // Learn pattern A-F
+                    self.run_learning(c)?;
                 }
                 Some('S') => {
                     self.show_network_summary();
