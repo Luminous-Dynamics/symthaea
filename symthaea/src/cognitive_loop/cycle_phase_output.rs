@@ -848,6 +848,12 @@ impl CognitiveLoopService {
             .last()
             .map(|crhv| crhv.self_similarity())
             .unwrap_or(0.0);
+        metadata.cantor_codebook_size = self.cantor_cleanup_engine.codebook.len() as u32;
+        metadata.cantor_last_depth = self
+            .cantor_broadcast_buffer
+            .last()
+            .map(|crhv| crhv.depth as u8)
+            .unwrap_or(0);
 
         // ── GWT-triggered memory consolidation (Dehaene & Changeux 2011) ──
         // When global workspace broadcasts, record current state for episodic

@@ -138,6 +138,14 @@ pub(crate) struct ConsciousnessEngineInput<'a> {
     /// Replaces the hardcoded Recursion=0.5 in ConsciousnessEquationV2.
     /// Defaults to 0.5 when meta_cognition is disabled (backward compat).
     pub hot_depth: f64,
+
+    // ── Cantor metacognitive depth → consciousness coupling ─────────
+    /// Self-similarity of the most recent GWT-promoted CRHV [0.0, 1.0].
+    /// Higher values indicate richer fractal self-reference structure (strange loops).
+    /// Modulates unified consciousness ±3%: deep self-similarity → richer experience.
+    /// Science: Hofstadter (1979) — strange loops as substrate of consciousness;
+    ///          Metzinger (2003) — self-model depth correlates with phenomenal richness.
+    pub cantor_metacognitive_depth: f64,
 }
 
 /// Dynamic weights for the unified consciousness computation.

@@ -365,6 +365,12 @@ pub struct MycelixBridge {
     proposal_cache: HashMap<String, (ValueAlignmentResult, Instant)>,
     /// Cache TTL
     cache_ttl: Duration,
+    /// Pending governance events for CLS injection
+    #[cfg(feature = "mycelix")]
+    pending_gov_events: Vec<crate::cognitive_loop::managers::governance_manager::GovernanceEvent>,
+    /// Pending governance outcomes for CLS injection
+    #[cfg(feature = "mycelix")]
+    pending_gov_outcomes: Vec<crate::cognitive_loop::managers::governance_manager::GovernanceOutcome>,
 }
 
 impl MycelixBridge {
@@ -378,6 +384,10 @@ impl MycelixBridge {
             agent_id: agent_id.into(),
             proposal_cache: HashMap::new(),
             cache_ttl: Duration::from_secs(60),
+            #[cfg(feature = "mycelix")]
+            pending_gov_events: Vec::new(),
+            #[cfg(feature = "mycelix")]
+            pending_gov_outcomes: Vec::new(),
         }
     }
 
@@ -391,6 +401,10 @@ impl MycelixBridge {
             agent_id: agent_id.into(),
             proposal_cache: HashMap::new(),
             cache_ttl: Duration::from_secs(60),
+            #[cfg(feature = "mycelix")]
+            pending_gov_events: Vec::new(),
+            #[cfg(feature = "mycelix")]
+            pending_gov_outcomes: Vec::new(),
         }
     }
 
@@ -687,7 +701,7 @@ impl MycelixBridge {
     /// `cls.inject_governance_event()` and `cls.inject_governance_outcome()`.
     #[cfg(feature = "mycelix")]
     pub fn record_governance_outcome(
-        &self,
+        &mut self,
         proposal_id: &str,
         passed: bool,
         collective_phi: f64,
@@ -727,13 +741,17 @@ impl MycelixBridge {
             harmonic_resonance,
         };
 
+        // Queue for CLS injection
+        self.pending_gov_events.push(event.clone());
+        self.pending_gov_outcomes.push(outcome.clone());
+
         (event, outcome)
     }
 
     /// Create a governance event from a vote cast.
     #[cfg(feature = "mycelix")]
     pub fn create_vote_event(
-        &self,
+        &mut self,
         vote: &Vote,
         voter_phi: f64,
     ) -> crate::cognitive_loop::managers::governance_manager::GovernanceEvent {
@@ -749,77 +767,115 @@ impl MycelixBridge {
             VoteValue::StrongNo => -1.0,
         };
 
-        GovernanceEvent {
+        let event = GovernanceEvent {
             kind: GovernanceEventKind::VoteCast {
                 voter_phi,
                 vote_value,
             },
             proposal_id: Some(vote.proposal_id.clone()),
             timestamp_secs: now_secs(),
-        }
+        };
+        self.pending_gov_events.push(event.clone());
+        event
     }
 
     /// Create a governance event for an emergency declaration.
     #[cfg(feature = "mycelix")]
     pub fn create_emergency_event(
-        &self,
+        &mut self,
     ) -> crate::cognitive_loop::managers::governance_manager::GovernanceEvent {
         use crate::cognitive_loop::managers::governance_manager::{
             GovernanceEvent, GovernanceEventKind,
         };
-        GovernanceEvent {
+        let event = GovernanceEvent {
             kind: GovernanceEventKind::EmergencyDeclared,
             proposal_id: None,
             timestamp_secs: now_secs(),
-        }
+        };
+        self.pending_gov_events.push(event.clone());
+        event
     }
 
     /// Create a governance event for a reciprocity pledge.
     #[cfg(feature = "mycelix")]
     pub fn create_reciprocity_event(
-        &self,
+        &mut self,
         amount: f64,
     ) -> crate::cognitive_loop::managers::governance_manager::GovernanceEvent {
         use crate::cognitive_loop::managers::governance_manager::{
             GovernanceEvent, GovernanceEventKind,
         };
-        GovernanceEvent {
+        let event = GovernanceEvent {
             kind: GovernanceEventKind::ReciprocityPledge { amount },
             proposal_id: None,
             timestamp_secs: now_secs(),
-        }
+        };
+        self.pending_gov_events.push(event.clone());
+        event
     }
 
     /// Create a governance event for a reputation change.
     #[cfg(feature = "mycelix")]
     pub fn create_reputation_event(
-        &self,
+        &mut self,
         delta: f64,
     ) -> crate::cognitive_loop::managers::governance_manager::GovernanceEvent {
         use crate::cognitive_loop::managers::governance_manager::{
             GovernanceEvent, GovernanceEventKind,
         };
-        GovernanceEvent {
+        let event = GovernanceEvent {
             kind: GovernanceEventKind::ReputationChanged { delta },
             proposal_id: None,
             timestamp_secs: now_secs(),
-        }
+        };
+        self.pending_gov_events.push(event.clone());
+        event
     }
 
     /// Create a governance event for a justice dispute.
     #[cfg(feature = "mycelix")]
     pub fn create_dispute_event(
-        &self,
+        &mut self,
         involves_self: bool,
     ) -> crate::cognitive_loop::managers::governance_manager::GovernanceEvent {
         use crate::cognitive_loop::managers::governance_manager::{
             GovernanceEvent, GovernanceEventKind,
         };
-        GovernanceEvent {
+        let event = GovernanceEvent {
             kind: GovernanceEventKind::JusticeDispute { involves_self },
             proposal_id: None,
             timestamp_secs: now_secs(),
-        }
+        };
+        self.pending_gov_events.push(event.clone());
+        event
+    }
+
+    // ========================================================================
+    // EVENT QUEUE (Bridge → CLS injection)
+    // ========================================================================
+
+    /// Push an arbitrary governance event into the bridge queue.
+    #[cfg(feature = "mycelix")]
+    pub fn push_governance_event(
+        &mut self,
+        event: crate::cognitive_loop::managers::governance_manager::GovernanceEvent,
+    ) {
+        self.pending_gov_events.push(event);
+    }
+
+    /// Drain all pending governance events and outcomes.
+    /// Returns `(events, outcomes)` — caller injects them into CLS.
+    #[cfg(feature = "mycelix")]
+    pub fn drain_pending_governance(
+        &mut self,
+    ) -> (
+        Vec<crate::cognitive_loop::managers::governance_manager::GovernanceEvent>,
+        Vec<crate::cognitive_loop::managers::governance_manager::GovernanceOutcome>,
+    ) {
+        (
+            std::mem::take(&mut self.pending_gov_events),
+            std::mem::take(&mut self.pending_gov_outcomes),
+        )
     }
 
     // ========================================================================
@@ -1371,7 +1427,7 @@ mod tests {
     #[cfg(feature = "mycelix")]
     #[test]
     fn test_record_governance_outcome_aligned_pass() {
-        let bridge = MycelixBridge::new("test-agent");
+        let mut bridge = MycelixBridge::new("test-agent");
         let vote = Vote {
             proposal_id: "p1".into(),
             voter: "test-agent".into(),
@@ -1484,7 +1540,7 @@ mod tests {
     #[cfg(feature = "mycelix")]
     #[test]
     fn test_create_event_helpers() {
-        let bridge = MycelixBridge::new("test-agent");
+        let mut bridge = MycelixBridge::new("test-agent");
 
         let emergency = bridge.create_emergency_event();
         assert!(matches!(
@@ -1511,5 +1567,15 @@ mod tests {
             crate::cognitive_loop::managers::governance_manager::GovernanceEventKind::ReputationChanged { delta }
             if (delta - (-0.5)).abs() < 1e-6
         ));
+
+        // Verify drain collects all 4 events
+        let (events, outcomes) = bridge.drain_pending_governance();
+        assert_eq!(events.len(), 4, "4 events should be queued");
+        assert_eq!(outcomes.len(), 0, "no outcomes from create_* methods");
+
+        // After drain, queue is empty
+        let (events2, outcomes2) = bridge.drain_pending_governance();
+        assert_eq!(events2.len(), 0);
+        assert_eq!(outcomes2.len(), 0);
     }
 }

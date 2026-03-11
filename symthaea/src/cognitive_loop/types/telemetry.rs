@@ -799,6 +799,13 @@ pub struct CycleMetadata {
     /// Number of CRHVs pending dream consolidation in the broadcast buffer.
     #[serde(default)]
     pub cantor_buffer_occupancy: u32,
+    /// Number of entries in the persistent Cantor cleanup codebook.
+    /// Grows over the brain's lifetime as dream consolidation strengthens traces.
+    #[serde(default)]
+    pub cantor_codebook_size: u32,
+    /// Depth of the most recent CRHV (adaptive: 2–7 based on GWT activation).
+    #[serde(default)]
+    pub cantor_last_depth: u8,
 
     // ── Social Coherence Telemetry ──────────────────────────────────────
     /// Current social trust level (0.0–1.0) from Mind module's SocialCoherence.

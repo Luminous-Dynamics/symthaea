@@ -724,6 +724,12 @@ impl CognitiveLoopService {
                         normalized_depth * self.substrate_manager.hot_capability(&self.config)
                     })
                     .unwrap_or(0.5), // preserve backward compat when disabled
+                // Cantor metacognitive depth: self-similarity of latest broadcast CRHV
+                cantor_metacognitive_depth: self
+                    .cantor_broadcast_buffer
+                    .last()
+                    .map(|crhv| crhv.self_similarity() as f64)
+                    .unwrap_or(0.5), // neutral when no broadcasts yet
             },
         );
         self.consciousness_engine

@@ -70,6 +70,24 @@ pub const QUANTUM_COHERENCE_BOOST_SCALE: f32 = 0.2;
 /// Basis: Baars (2005) — global workspace broadcast increases confidence.
 pub const GWT_BROADCAST_CONFIDENCE_BOOST: f32 = 0.03;
 
+/// Cantor CRHV minimum depth (weakest GWT activation → shallowest fractal).
+/// Basis: Dehaene et al. (2006) — minimum ignition recruits ~2 cortical layers.
+pub const CANTOR_DEPTH_MIN: usize = 2;
+
+/// Cantor CRHV maximum depth (strongest GWT activation → deepest fractal).
+/// Basis: Dehaene et al. (2006) — full ignition recruits ~7 cortical layers.
+pub const CANTOR_DEPTH_MAX: usize = 7;
+
+/// Cantor metacognitive depth → consciousness modulation strength (±).
+/// At depth extremes (0 or 1), consciousness is modulated by ±this value.
+/// Neutral at depth 0.5. Basis: Hofstadter (1979) — strange loop depth.
+pub const CANTOR_CONSCIOUSNESS_MODULATION: f64 = 0.06;
+
+/// Cantor dream consolidation quality threshold for codebook feedback.
+/// CRHVs cleaned above this quality get learned into the persistent codebook.
+/// Basis: Born & Wilhelm (2012) — only stable replay traces consolidate.
+pub const CANTOR_DREAM_QUALITY_THRESHOLD: f32 = 0.7;
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // FEP / ACTIVE INFERENCE
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -3065,5 +3083,36 @@ mod tests {
             RESONATOR_SIMILARITY_PRIME_THRESHOLD > 0.0
                 && RESONATOR_SIMILARITY_PRIME_THRESHOLD < 1.0
         );
+    }
+
+    #[test]
+    fn test_consciousness_state_level_params() {
+        assert!(CONSCIOUSNESS_STATE_LOW_THRESHOLD < CONSCIOUSNESS_STATE_HIGH_THRESHOLD);
+        assert!(CONSCIOUSNESS_STATE_HIGH_LR_SCALE > 1.0, "High state should boost LR");
+        assert!(CONSCIOUSNESS_STATE_LOW_LR_DAMPEN < 1.0, "Low state should dampen LR");
+    }
+
+    #[test]
+    fn test_living_mind_vitality_params() {
+        assert!(LIVING_MIND_VITALITY_LOW_THRESHOLD < LIVING_MIND_VITALITY_HIGH_THRESHOLD);
+        assert!(LIVING_MIND_VITALITY_CONFIDENCE_BOOST > 0.0);
+        assert!(LIVING_MIND_VITALITY_LOW_LR_DAMPEN < 1.0, "Low vitality should dampen LR");
+    }
+
+    #[test]
+    fn test_living_mind_coherence_params() {
+        assert!(LIVING_MIND_COHERENCE_LOW_THRESHOLD < LIVING_MIND_COHERENCE_HIGH_THRESHOLD);
+        assert!(
+            LIVING_MIND_COHERENCE_HIGH_EXPLORE_DAMPEN < 1.0,
+            "High coherence should dampen exploration"
+        );
+        assert!(LIVING_MIND_COHERENCE_LOW_EXPLORE_BOOST > 0.0);
+    }
+
+    #[test]
+    fn test_mcts_effectiveness_behavioral_params() {
+        assert!(MCTS_EFFECTIVENESS_LOW_THRESHOLD < MCTS_EFFECTIVENESS_HIGH_THRESHOLD);
+        assert!(MCTS_EFFECTIVENESS_CONFIDENCE_BOOST > 0.0);
+        assert!(MCTS_EFFECTIVENESS_LOW_EXPLORE_BOOST > 0.0);
     }
 }

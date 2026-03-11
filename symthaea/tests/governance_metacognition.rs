@@ -3,11 +3,13 @@
 // ==================================================================================
 //
 // Verifies the complete Symthaea-Mycelix metacognitive integration:
-//   1. Governance events flow into CLS and produce stable cycles
-//   2. Governance outcomes are processed without crashes
-//   3. Epistemic mesh detects blind spots and escalates proposals
-//   4. KosmicSong credentials reflect governance identity
-//   5. Collective identity derives community mode
+//   1. Governance events flow into CLS, are processed, and queue drains
+//   2. Governance outcomes produce learning signals (reward EMA)
+//   3. Neuromodulatory contagion affects the bath (NE, Oxy, DA, etc.)
+//   4. Epistemic mesh detects blind spots and escalates proposals
+//   5. KosmicSong credentials reflect governance identity
+//   6. Collective identity derives community mode
+//   7. Bridge event queue accumulates and drains correctly
 //
 // Requires: --features mycelix
 // ==================================================================================
@@ -17,7 +19,7 @@
 use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
 use symthaea::cognitive_loop::{GovernanceEvent, GovernanceEventKind, GovernanceOutcome};
 
-// ── Helper ──────────────────────────────────────────────────────────
+// ── Helpers ─────────────────────────────────────────────────────────
 
 fn create_service() -> CognitiveLoopService {
     CognitiveLoopService::new(CognitiveLoopConfig {
@@ -35,7 +37,14 @@ fn make_event(kind: GovernanceEventKind) -> GovernanceEvent {
     }
 }
 
-// ── Test 1: Emergency event processed without crash ─────────────────
+/// Run enough cycles past interval 37 to guarantee processing.
+fn run_past_interval(service: &mut CognitiveLoopService, label: &str, n: usize) {
+    for i in 0..n {
+        service.cycle(&format!("{} {}", label, i));
+    }
+}
+
+// ── Test 1: Emergency event processed — queue drains + NE affected ──
 
 #[test]
 fn test_governance_emergency_processed_stably() {
@@ -43,21 +52,26 @@ fn test_governance_emergency_processed_stably() {
 
     // Inject emergency event
     service.inject_governance_event(make_event(GovernanceEventKind::EmergencyDeclared));
+    assert_eq!(service.governance_pending_count(), 1);
 
     // Run enough cycles for interval 37 to fire and neuromod to apply
-    for i in 0..50 {
-        let result = service.cycle(&format!("governance cycle {}", i));
-        assert!(result.prediction_error >= 0.0);
-        assert!(result.prediction_error <= 1.0);
-    }
+    run_past_interval(&mut service, "governance", 50);
 
+    // Queue should be drained
+    assert_eq!(service.governance_pending_count(), 0, "Events should be drained after processing");
     assert_eq!(service.stats().total_cycles, 50);
+
+    // NE baseline should have been nudged by emergency event
+    // bath_state_vector: [DA, NE, 5HT, ACh, GABA, Glu, Oxy, ECB, Ado]
+    let bath = service.bath_state_vector();
+    // NE (index 1) should be above default 0.5 (emergency nudges +0.05)
+    assert!(bath[1] >= 0.5, "NE should be >= 0.5 after emergency: {}", bath[1]);
 }
 
-// ── Test 2: Reciprocity pledges processed ───────────────────────────
+// ── Test 2: Reciprocity pledges produce oxytocin ─────────────────
 
 #[test]
-fn test_reciprocity_pledges_processed() {
+fn test_reciprocity_pledges_produce_oxytocin() {
     let mut service = create_service();
 
     // Inject 5 reciprocity pledges
@@ -66,25 +80,26 @@ fn test_reciprocity_pledges_processed() {
             amount: 1.0,
         }));
     }
+    assert_eq!(service.governance_pending_count(), 5);
 
-    // Run cycles to process
-    for i in 0..50 {
-        service.cycle(&format!("reciprocity {}", i));
-    }
+    run_past_interval(&mut service, "reciprocity", 50);
 
+    assert_eq!(service.governance_pending_count(), 0);
     assert_eq!(service.stats().total_cycles, 50);
+
+    // Oxy (index 6) should reflect reciprocity injections
+    let bath = service.bath_state_vector();
+    assert!(bath[6] >= 0.5, "Oxy should be >= 0.5 after reciprocity pledges: {}", bath[6]);
 }
 
-// ── Test 3: Aligned outcome processed stably ────────────────────────
+// ── Test 3: Aligned outcome produces positive reward ─────────────
 
 #[test]
-fn test_aligned_outcome_processed() {
+fn test_aligned_outcome_produces_reward() {
     let mut service = create_service();
 
-    // Run a few baseline cycles
-    for i in 0..10 {
-        service.cycle(&format!("baseline {}", i));
-    }
+    // Run baseline cycles
+    run_past_interval(&mut service, "baseline", 10);
 
     // Inject a positive aligned outcome
     service.inject_governance_outcome(GovernanceOutcome {
@@ -96,23 +111,24 @@ fn test_aligned_outcome_processed() {
     });
 
     // Run enough cycles for GovernanceManager (interval 37) to process
-    for i in 0..50 {
-        let result = service.cycle(&format!("post-outcome {}", i));
-        assert!(result.prediction_error >= 0.0);
-    }
+    run_past_interval(&mut service, "post-outcome", 50);
 
     assert_eq!(service.stats().total_cycles, 60);
+    // Aligned positive outcome should produce positive reward EMA
+    assert!(
+        service.governance_reward_ema() > 0.0,
+        "Aligned pass should produce positive reward EMA: {}",
+        service.governance_reward_ema()
+    );
 }
 
-// ── Test 4: Misaligned outcome processed stably ─────────────────────
+// ── Test 4: Misaligned outcome produces negative reward ──────────
 
 #[test]
-fn test_misaligned_outcome_processed() {
+fn test_misaligned_outcome_produces_negative_reward() {
     let mut service = create_service();
 
-    for i in 0..10 {
-        service.cycle(&format!("baseline {}", i));
-    }
+    run_past_interval(&mut service, "baseline", 10);
 
     // Inject a negative misaligned outcome
     service.inject_governance_outcome(GovernanceOutcome {
@@ -123,15 +139,18 @@ fn test_misaligned_outcome_processed() {
         harmonic_resonance: 0.1,
     });
 
-    for i in 0..50 {
-        service.cycle(&format!("post-misalign {}", i));
-    }
+    run_past_interval(&mut service, "post-misalign", 50);
 
     // System should remain stable even with negative governance signals
     assert_eq!(service.stats().total_cycles, 60);
+    assert!(
+        service.governance_reward_ema() < 0.0,
+        "Misaligned outcome should produce negative reward EMA: {}",
+        service.governance_reward_ema()
+    );
 }
 
-// ── Test 5: Epistemic mesh blind spot detection ─────────────────────
+// ── Test 5: Epistemic mesh blind spot detection ─────────────────
 
 #[test]
 fn test_epistemic_mesh_blind_spot_escalation() {
@@ -187,7 +206,7 @@ fn test_epistemic_mesh_blind_spot_escalation() {
     assert!(boost > 1.0, "Expert should get boost: {}", boost);
 }
 
-// ── Test 6: KosmicSong governance credential ────────────────────────
+// ── Test 6: KosmicSong governance credential ────────────────────
 
 #[test]
 fn test_kosmic_song_governance_credential() {
@@ -199,7 +218,7 @@ fn test_kosmic_song_governance_credential() {
     assert!(cred.maturation_signal >= 0.0);
 }
 
-// ── Test 7: Collective identity from credentials ────────────────────
+// ── Test 7: Collective identity from credentials ────────────────
 
 #[test]
 fn test_collective_identity_from_credentials() {
@@ -262,6 +281,7 @@ fn test_full_governance_loop_50_cycles() {
         passed: true,
         collective_phi: 0.7,
     }));
+    assert_eq!(service.governance_pending_count(), 5);
 
     // Phase 2: Inject governance outcomes
     service.inject_governance_outcome(GovernanceOutcome {
@@ -294,8 +314,42 @@ fn test_full_governance_loop_50_cycles() {
 
     // Verify system is stable after governance processing
     assert_eq!(service.stats().total_cycles, 50);
+    assert_eq!(service.governance_pending_count(), 0, "All events should be processed");
+    // Reward EMA should have been updated by outcomes
+    let reward = service.governance_reward_ema();
+    assert!(reward != 0.0, "Reward EMA should be non-zero after outcomes: {}", reward);
     assert!(
         service.stats().avg_prediction_error >= 0.0,
         "Average PE should remain non-negative"
     );
+}
+
+// ── Test 9: Bridge event queue accumulates and drains ────────────
+
+#[test]
+fn test_bridge_event_queue_drains() {
+    use symthaea::consciousness::mycelix_bridge::MycelixBridge;
+
+    let mut bridge = MycelixBridge::new("test-agent");
+
+    // Create events through bridge (they auto-queue)
+    let _emergency = bridge.create_emergency_event();
+    let _reciprocity = bridge.create_reciprocity_event(5.0);
+    let _dispute = bridge.create_dispute_event(true);
+
+    // Drain from bridge
+    let (events, outcomes) = bridge.drain_pending_governance();
+    assert_eq!(events.len(), 3, "3 events should be queued");
+    assert_eq!(outcomes.len(), 0, "No outcomes from event creation");
+
+    // Inject into CLS
+    let mut service = create_service();
+    for event in events {
+        service.inject_governance_event(event);
+    }
+    assert_eq!(service.governance_pending_count(), 3);
+
+    // Process
+    run_past_interval(&mut service, "bridge-drain", 50);
+    assert_eq!(service.governance_pending_count(), 0, "Events should be processed after 50 cycles");
 }

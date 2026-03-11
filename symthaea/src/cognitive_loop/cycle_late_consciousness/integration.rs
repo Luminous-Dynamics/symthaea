@@ -22,7 +22,7 @@ impl CognitiveLoopService {
         // Urgency-gated: Critical=always, Normal=every 2nd, Cruise=every 4th
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
-        let (gwt_broadcast, gwt_coalition_size) =
+        let (gwt_broadcast, gwt_coalition_size, gwt_activation) =
             if ctx.urgency.should_run(self.stats.total_cycles, 1, 2, 4) {
                 if let Some(ref mut gwt) = self.gwt_mgr.gwt {
                     let activation = (1.0 - ctx.prediction_error as f64).clamp(0.0, 1.0);
@@ -48,12 +48,12 @@ impl CognitiveLoopService {
                         .as_ref()
                         .map(|c| c.members.len() as u32)
                         .unwrap_or(0);
-                    (result.broadcast_occurred, coalition_size)
+                    (result.broadcast_occurred, coalition_size, activation as f32)
                 } else {
-                    (false, 0)
+                    (false, 0, 0.0)
                 }
             } else {
-                (false, 0)
+                (false, 0, self.cantor_last_activation)
             };
 
         // Store GWT state in carryover for cross-domain coupling (next cycle)
@@ -75,8 +75,20 @@ impl CognitiveLoopService {
             // via CantorCleanupEngine, preventing metacognitive amnesia.
             // Science: Dehaene (2014) — ignition creates multi-scale cortical resonance;
             //          Hobson (2009) — dreaming consolidates multi-level representations.
+            //
+            // ADAPTIVE DEPTH: Stronger GWT activations produce deeper fractals.
+            // activation ∈ [0,1] maps to depth ∈ [2,7]:
+            //   - Weak broadcast (act~0.2): depth 2 (base + shift/3)
+            //   - Medium broadcast (act~0.5): depth 4 (base + shift/3 + shift/9 + shift/27)
+            //   - Strong broadcast (act~1.0): depth 7 (full recursive self-similarity)
+            // Science: Dehaene et al. (2006) — ignition strength ∝ recruited cortical layers.
             use symthaea_core::hdc::cantor_recursive_hv::CantorRecursiveHV;
-            let crhv = CantorRecursiveHV::from_base_with_depth(ctx.hv16_cached, 4);
+            self.cantor_last_activation = gwt_activation;
+            use crate::cognitive_loop::thresholds::{CANTOR_DEPTH_MAX, CANTOR_DEPTH_MIN};
+            let depth_range = CANTOR_DEPTH_MAX - CANTOR_DEPTH_MIN;
+            let adaptive_depth =
+                CANTOR_DEPTH_MIN + (gwt_activation * depth_range as f32).round() as usize;
+            let crhv = CantorRecursiveHV::from_base_with_depth(ctx.hv16_cached, adaptive_depth);
             // Cap at 32 to bound memory — oldest broadcasts evicted first (ring semantics)
             if self.cantor_broadcast_buffer.len() >= 32 {
                 self.cantor_broadcast_buffer.remove(0);

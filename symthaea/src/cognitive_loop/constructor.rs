@@ -908,6 +908,10 @@ impl CognitiveLoopService {
             #[cfg(feature = "mycelix")]
             governance_mgr: super::managers::GovernanceManager::default(),
             cantor_broadcast_buffer: Vec::with_capacity(32),
+            cantor_cleanup_engine: symthaea_core::hdc::cantor_resonator_cleanup::CantorCleanupEngine::new(
+                symthaea_core::hdc::cantor_resonator_cleanup::CantorCleanupConfig::default(),
+            ),
+            cantor_last_activation: 0.0,
             #[cfg(feature = "integrity")]
             integrity_manager: {
                 let mut im = crate::integrity::IntegrityManager::new();
