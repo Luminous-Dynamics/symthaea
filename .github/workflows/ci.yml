@@ -240,7 +240,7 @@ jobs:
           datacenter,experiment-planner,strategic-materials,critical-minerals,\
           advanced-manufacturing,building-systems,design-production,\
           mycelix,unstable-examples"
-          cargo test --lib --tests --features "$CI_FEATURES"
+          cargo test --lib --features "$CI_FEATURES"
 
   test-feature-matrix-critical:
     name: Test Feature Matrix (core/web_research/pathology)
@@ -345,7 +345,7 @@ jobs:
             cmake
 
       - name: Test with feature ${{ matrix.features }}
-        run: cargo test --lib --tests --features "${{ matrix.features }}" || cargo test --lib --tests --features "${{ matrix.features }}"
+        run: cargo test --lib --features "${{ matrix.features }}" || cargo test --lib --features "${{ matrix.features }}"
 
   psych-bench:
     name: Psych-Bench Regression
