@@ -2208,6 +2208,62 @@ pub const HOLOGRAPHIC_UNITY_HIGH_CONFIDENCE_SCALE: f32 = 0.005;
 pub const EPISTEMIC_CONFLICT_EXPLORE_SCALE: f32 = 0.015;
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// HARMONIES ALIGNMENT
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Low harmonies alignment → explore to find value-congruent actions.
+/// Basis: Schwartz (2012) — value incongruence signals need for behavioral adjustment.
+pub const HARMONIES_MISALIGNMENT_THRESHOLD: f32 = 0.3;
+
+/// Exploration boost when harmonies are misaligned.
+pub const HARMONIES_MISALIGNMENT_EXPLORE_BOOST: f32 = 0.02;
+
+/// High harmonies alignment → boost confidence (value-congruent action).
+/// Basis: Schwartz (2012) — value congruence strengthens self-efficacy.
+pub const HARMONIES_ALIGNED_THRESHOLD: f32 = 0.7;
+
+/// Confidence boost when harmonies are well-aligned.
+pub const HARMONIES_ALIGNED_CONFIDENCE_BOOST: f32 = 0.01;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// VALUE CACHE HIT RATE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Cache hit rate above this → boost confidence (learned patterns match).
+/// Basis: Logan (1988) — instance-based automaticity from repeated retrieval.
+pub const VALUE_CACHE_HIT_CONFIDENCE_THRESHOLD: f32 = 0.6;
+
+/// Confidence boost scale for high cache hit rate.
+pub const VALUE_CACHE_HIT_CONFIDENCE_SCALE: f32 = 0.02;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CONSCIOUSNESS GRADIENT
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Consciousness gradient magnitude above this → dampen LR for stability.
+/// Basis: Baars (2005) — global workspace transitions require stabilization.
+pub const CONSCIOUSNESS_GRADIENT_THRESHOLD: f64 = 0.15;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// GOAL PRIORITY
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Goal priority above this → boost LR for goal-directed learning.
+/// Basis: Locke & Latham (2002) — high-priority goals enhance learning motivation.
+pub const GOAL_PRIORITY_LR_THRESHOLD: f32 = 0.5;
+
+/// Goal priority above this → boost exploration in goal pursuit direction.
+pub const GOAL_PRIORITY_EXPLORATION_THRESHOLD: f32 = 0.3;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// RESONATOR SIMILARITY
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Resonator best match similarity above this → prime working memory.
+/// Basis: Nosofsky (1988) — exemplar-based recognition priming threshold.
+pub const RESONATOR_SIMILARITY_PRIME_THRESHOLD: f32 = 0.3;
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // TESTS
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -2896,5 +2952,45 @@ mod tests {
             "Low unity must dampen LR"
         );
         assert!(HOLOGRAPHIC_UNITY_HIGH_CONFIDENCE_SCALE > 0.0);
+    }
+
+    #[test]
+    fn test_harmonies_alignment_params() {
+        assert!(HARMONIES_MISALIGNMENT_THRESHOLD < HARMONIES_ALIGNED_THRESHOLD);
+        assert!(HARMONIES_MISALIGNMENT_EXPLORE_BOOST > 0.0);
+        assert!(HARMONIES_ALIGNED_CONFIDENCE_BOOST > 0.0);
+    }
+
+    #[test]
+    fn test_value_cache_hit_params() {
+        assert!(
+            VALUE_CACHE_HIT_CONFIDENCE_THRESHOLD > 0.0
+                && VALUE_CACHE_HIT_CONFIDENCE_THRESHOLD < 1.0
+        );
+        assert!(VALUE_CACHE_HIT_CONFIDENCE_SCALE > 0.0);
+    }
+
+    #[test]
+    fn test_consciousness_gradient_params() {
+        assert!(CONSCIOUSNESS_GRADIENT_THRESHOLD > 0.0);
+        assert!(
+            CONSCIOUSNESS_GRADIENT_LR_SCALE < 1.0,
+            "Gradient should dampen LR"
+        );
+    }
+
+    #[test]
+    fn test_goal_priority_params() {
+        assert!(GOAL_PRIORITY_EXPLORATION_THRESHOLD < GOAL_PRIORITY_LR_THRESHOLD);
+        assert!(GOAL_PRIORITY_EXPLORATION_THRESHOLD > 0.0);
+        assert!(GOAL_PRIORITY_LR_THRESHOLD < 1.0);
+    }
+
+    #[test]
+    fn test_resonator_similarity_params() {
+        assert!(
+            RESONATOR_SIMILARITY_PRIME_THRESHOLD > 0.0
+                && RESONATOR_SIMILARITY_PRIME_THRESHOLD < 1.0
+        );
     }
 }

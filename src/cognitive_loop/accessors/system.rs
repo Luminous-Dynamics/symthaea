@@ -170,6 +170,39 @@ impl CognitiveLoopService {
         self.ethics_engine.moral_topology().fingerprint_velocity()
     }
 
+    /// Whether the topological immune system is currently blocking requests.
+    ///
+    /// Returns `true` when the escalation level has reached `Block` — the
+    /// highest severity tier. The facade should check this after each cycle
+    /// to decide whether to suppress or attenuate the response.
+    ///
+    /// Resets to `false` at the start of each cycle when the escalation
+    /// policy de-escalates (via cooldown).
+    pub fn is_request_blocked(&self) -> bool {
+        self.convergence_escalation_level() == crate::hdc::moral_topology::EscalationLevel::Block
+    }
+
+    /// Access the escalation audit log (immutable).
+    ///
+    /// Contains a bounded, append-only record of every escalation transition
+    /// and convergence detection event. Each entry is sealed with BLAKE3 for
+    /// tamper evidence.
+    pub fn escalation_audit_log(&self) -> &crate::hdc::moral_topology::EscalationAuditLog {
+        self.ethics_engine.moral_topology().audit_log()
+    }
+
+    /// Compute causal attribution for the current convergence window.
+    ///
+    /// Leave-one-out analysis that identifies which requests contributed most
+    /// to the current convergence severity. **Expensive** — O(N) convergence
+    /// detections where N is window size. Call only after an alert fires,
+    /// never in the hot path.
+    pub fn compute_convergence_attribution(&self) -> crate::hdc::moral_topology::CausalAttribution {
+        self.ethics_engine
+            .moral_topology()
+            .compute_causal_attribution()
+    }
+
     /// Evaluate temporal prediction horizon accuracy from the vision manifold.
     #[cfg(feature = "vision-manifold")]
     pub fn vision_evaluate_horizons(&self) -> Option<symthaea_vision_manifold::HorizonAccuracy> {

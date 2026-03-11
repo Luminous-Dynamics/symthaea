@@ -232,6 +232,21 @@ impl CognitiveLoopService {
                 moral_trajectory_convergence: moral_anomaly_report.trajectory_convergence,
                 moral_convergence_severity: moral_anomaly_report.convergence_severity,
                 moral_matched_hazard: moral_anomaly_report.matched_hazard.clone(),
+                moral_escalation_level: self
+                    .ethics_engine
+                    .moral_topology()
+                    .escalation_policy()
+                    .current_level(),
+                moral_audit_log_len: self.ethics_engine.moral_topology().audit_log().len(),
+                moral_fingerprint_velocity: self
+                    .ethics_engine
+                    .moral_topology()
+                    .fingerprint_velocity(),
+                moral_persistence_distance: self
+                    .ethics_engine
+                    .moral_topology()
+                    .last_convergence_report()
+                    .persistence_distance,
                 moral_anomaly_response_applied: self.config.enable_moral_anomaly_response
                     && self.ethics_engine.last_topology_fresh()
                     && moral_anomaly_report.anomaly_score > 0.0,
@@ -715,6 +730,49 @@ impl CognitiveLoopService {
             metadata.narrative_self_phi_modulated = self.stats.total_cycles > 15
                 && (nsp > NARRATIVE_SELF_PHI_CONFIDENCE_THRESHOLD
                     || (nsp > 0.0 && nsp < NARRATIVE_SELF_PHI_LOW_THRESHOLD));
+        }
+
+        // ── Session 16: Orphaned Signal Telemetry ──
+        {
+            use crate::cognitive_loop::thresholds::{
+                EPISTEMIC_PHI_HIGH_THRESHOLD, EPISTEMIC_PHI_LOW_THRESHOLD,
+                HOLOGRAPHIC_UNITY_HIGH_THRESHOLD, HOLOGRAPHIC_UNITY_LOW_THRESHOLD,
+                PHENOMENAL_BINDING_HIGH_THRESHOLD, PHENOMENAL_BINDING_LOW_THRESHOLD,
+                TEMPORAL_COHERENCE_HIGH_THRESHOLD, TEMPORAL_COHERENCE_LOW_THRESHOLD,
+            };
+            let ep = feedback.reasoning.epistemic_phi_eff;
+            metadata.epistemic_phi_modulated = self.stats.total_cycles > 20
+                && (ep > EPISTEMIC_PHI_HIGH_THRESHOLD
+                    || (ep > 0.0 && ep < EPISTEMIC_PHI_LOW_THRESHOLD));
+            let pb = feedback.self_model.phenomenal_binding_strength;
+            metadata.phenomenal_binding_modulated = self.stats.total_cycles > 15
+                && ((pb > 0.0 && pb < PHENOMENAL_BINDING_LOW_THRESHOLD)
+                    || pb > PHENOMENAL_BINDING_HIGH_THRESHOLD);
+            let tc = feedback.self_model.temporal_coherence_score;
+            metadata.temporal_coherence_modulated = self.stats.total_cycles > 15
+                && (tc > TEMPORAL_COHERENCE_HIGH_THRESHOLD
+                    || (tc > 0.0 && tc < TEMPORAL_COHERENCE_LOW_THRESHOLD));
+            let hu = feedback.consciousness.holographic_unity;
+            metadata.holographic_unity_modulated = self.stats.total_cycles > 20
+                && ((hu > 0.0 && hu < HOLOGRAPHIC_UNITY_LOW_THRESHOLD)
+                    || hu > HOLOGRAPHIC_UNITY_HIGH_THRESHOLD);
+        }
+
+        // ── Session 17: Affective/Harmonics/Gradient Telemetry ──
+        {
+            use crate::cognitive_loop::thresholds::{
+                CONSCIOUSNESS_GRADIENT_THRESHOLD, HARMONIES_ALIGNED_THRESHOLD,
+                HARMONIES_MISALIGNMENT_THRESHOLD, VALUE_CACHE_HIT_CONFIDENCE_THRESHOLD,
+            };
+            let ha = feedback.ethics.harmonies_alignment;
+            metadata.harmonies_alignment_modulated = self.stats.total_cycles > 15
+                && (ha < HARMONIES_MISALIGNMENT_THRESHOLD || ha > HARMONIES_ALIGNED_THRESHOLD);
+            let cg = feedback.consciousness.consciousness_gradient_magnitude;
+            metadata.consciousness_gradient_lr_modulated =
+                self.stats.total_cycles > 15 && cg > CONSCIOUSNESS_GRADIENT_THRESHOLD;
+            let vchr = feedback.ethics.value_cache_hit_rate;
+            metadata.value_cache_confidence_modulated =
+                self.stats.total_cycles > 20 && vchr > VALUE_CACHE_HIT_CONFIDENCE_THRESHOLD;
         }
 
         // ── GWT handler telemetry ──

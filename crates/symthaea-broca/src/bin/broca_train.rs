@@ -106,6 +106,7 @@ fn main() {
         embedding_target_norm: opts.embedding_target_norm,
         negative_samples: opts.negative_samples,
         carry_state: opts.carry_state,
+        network_warmup_epochs: opts.network_warmup_epochs,
     };
 
     tracing::info!(
@@ -119,6 +120,7 @@ fn main() {
         embedding_norm = opts.embedding_target_norm,
         negative_samples = opts.negative_samples,
         carry_state = opts.carry_state,
+        network_warmup_epochs = opts.network_warmup_epochs,
         diagnostics = opts.diagnostics,
         "Starting training"
     );
@@ -246,6 +248,8 @@ struct TrainOpts {
     negative_samples: usize,
     /// Probability of carrying CfC state between pairs (default: 0.0).
     carry_state: f32,
+    /// Embedding-only epochs before enabling CfC BPTT (default: 0).
+    network_warmup_epochs: usize,
 }
 
 fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
@@ -268,6 +272,7 @@ fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
         embedding_target_norm: 128.0,
         negative_samples: 0,
         carry_state: 0.0,
+        network_warmup_epochs: 0,
     };
 
     let mut i = 1;
@@ -384,6 +389,14 @@ fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
                     .parse()
                     .map_err(|_| "--carry-state must be a float 0.0-1.0")?;
             }
+            "--network-warmup" => {
+                i += 1;
+                opts.network_warmup_epochs = args
+                    .get(i)
+                    .ok_or("--network-warmup requires a number")?
+                    .parse()
+                    .map_err(|_| "--network-warmup must be a non-negative integer")?;
+            }
             "--help" | "-h" => {
                 print_usage();
                 process::exit(0);
@@ -424,5 +437,6 @@ fn print_usage() {
     eprintln!("  --embedding-norm F   Target embedding L2 norm, 0=off (default: 128.0)");
     eprintln!("  --negative-samples N Sampled softmax negatives, 0=full (default: 0)");
     eprintln!("  --carry-state F      CfC state carry probability 0-1 (default: 0.0)");
+    eprintln!("  --network-warmup N   Embedding-only epochs before CfC BPTT (default: 0)");
     eprintln!("  --help, -h           Show this help message");
 }

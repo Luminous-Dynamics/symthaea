@@ -27,8 +27,17 @@ use crate::language::code_intent::{CodeIntent, CodeSpec, CodeTarget};
 /// Maximum auto-fix retry attempts per generation
 const MAX_RETRIES: usize = 3;
 
+/// Maximum LLM retry attempts when feeding back compiler errors
+const MAX_LLM_RETRIES: usize = 2;
+
 /// Minimum plan coverage to consider a generation "good enough" for mastery
 const MIN_PLAN_COVERAGE: f32 = 0.5;
+
+/// Energy cost thresholds for metabolic budgeting
+const ENERGY_TIER1_NATIVE: f32 = 1.0;
+const ENERGY_TIER2_LLM_CALL: f32 = 10.0;
+const ENERGY_LLM_RETRY: f32 = 8.0;
+const ENERGY_AUTO_FIX: f32 = 0.5;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // OBJECTIVE → SPEC MAPPING
@@ -68,8 +77,12 @@ pub struct LessonOutcome {
     pub phi_score: f32,
     /// Whether this was a Tier 2 (LLM-assisted) generation
     pub used_llm: bool,
+    /// Number of LLM retries with error feedback
+    pub llm_retries_used: usize,
     /// Eligible for distillation into Broca SSM
     pub distillation_eligible: bool,
+    /// Metabolic energy spent on this lesson
+    pub energy_spent: f32,
 }
 
 impl LessonOutcome {
@@ -93,6 +106,95 @@ impl LessonOutcome {
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// METABOLIC ENERGY BUDGET
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Metabolic energy budget for a learning session.
+///
+/// Models the cognitive cost of code generation: native emission is cheap,
+/// LLM calls are expensive, retries add up. The agent should prefer native
+/// patterns when possible and only invoke the LLM for genuinely hard tasks.
+///
+/// Inspired by biological metabolic constraints: the brain uses ~20% of
+/// the body's energy despite being ~2% of its mass. Cognitive effort is
+/// a limited resource that should be allocated wisely.
+#[derive(Debug, Clone)]
+pub struct MetabolicBudget {
+    /// Total energy available for this session
+    pub total_budget: f32,
+    /// Energy spent so far
+    pub spent: f32,
+    /// Energy reserved for critical tasks (can't be spent on easy ones)
+    pub reserved: f32,
+}
+
+impl MetabolicBudget {
+    /// Create a new budget with the given total energy.
+    pub fn new(total: f32) -> Self {
+        Self {
+            total_budget: total,
+            spent: 0.0,
+            reserved: total * 0.2, // Reserve 20% for hard tasks
+        }
+    }
+
+    /// Default budget for a learning session (~20 lessons).
+    pub fn default_session() -> Self {
+        // Budget: 20 native + 5 LLM calls + 3 retries = ~100 energy units
+        Self::new(100.0)
+    }
+
+    /// Available energy (total - spent - reserved)
+    pub fn available(&self) -> f32 {
+        (self.total_budget - self.spent - self.reserved).max(0.0)
+    }
+
+    /// Available including reserves (for critical tasks)
+    pub fn available_with_reserves(&self) -> f32 {
+        (self.total_budget - self.spent).max(0.0)
+    }
+
+    /// Whether we can afford a native generation
+    pub fn can_afford_native(&self) -> bool {
+        self.available() >= ENERGY_TIER1_NATIVE
+    }
+
+    /// Whether we can afford an LLM call (dips into reserves if needed)
+    pub fn can_afford_llm(&self) -> bool {
+        self.available_with_reserves() >= ENERGY_TIER2_LLM_CALL
+    }
+
+    /// Record energy expenditure
+    pub fn spend(&mut self, amount: f32) {
+        self.spent += amount;
+    }
+
+    /// Fraction of budget consumed (0.0 - 1.0+)
+    pub fn utilization(&self) -> f32 {
+        if self.total_budget > 0.0 {
+            self.spent / self.total_budget
+        } else {
+            1.0
+        }
+    }
+
+    /// Efficiency: mastery gained per unit energy spent
+    pub fn efficiency(&self, mastery_gained: f32) -> f32 {
+        if self.spent > 0.0 {
+            mastery_gained / self.spent
+        } else {
+            0.0
+        }
+    }
+}
+
+impl Default for MetabolicBudget {
+    fn default() -> Self {
+        Self::default_session()
+    }
+}
+
 /// Summary of a full learning session across multiple objectives.
 #[derive(Debug, Clone, Default)]
 pub struct SessionSummary {
@@ -104,12 +206,16 @@ pub struct SessionSummary {
     pub lessons_passed: usize,
     /// Total auto-fix retries across all lessons
     pub total_retries: usize,
+    /// Total LLM retries across all lessons
+    pub total_llm_retries: usize,
     /// Average surprise across all lessons
     pub avg_surprise: f32,
     /// Average plan coverage
     pub avg_plan_coverage: f32,
     /// Lessons eligible for distillation
     pub distillation_eligible: usize,
+    /// Total metabolic energy spent
+    pub total_energy_spent: f32,
     /// Per-objective outcomes
     pub outcomes: Vec<LessonOutcome>,
 }
@@ -566,6 +672,10 @@ pub struct CodeLearningEngine {
     distillation_cache: Vec<(String, String, f32)>,
     /// Past successful examples for few-shot context
     past_examples: Vec<(String, String)>,
+    /// Metabolic energy budget for the current session
+    budget: MetabolicBudget,
+    /// Optional LLM prompt generator for Tier 2 fallback
+    llm_prompt_fn: Option<Box<dyn Fn(&CodeSpec, &[String]) -> String + Send>>,
 }
 
 impl CodeLearningEngine {
@@ -580,6 +690,8 @@ impl CodeLearningEngine {
             lesson_bank: build_lesson_bank(),
             distillation_cache: Vec::new(),
             past_examples: Vec::new(),
+            budget: MetabolicBudget::default_session(),
+            llm_prompt_fn: None,
         }
     }
 
@@ -591,11 +703,50 @@ impl CodeLearningEngine {
             lesson_bank: build_lesson_bank(),
             distillation_cache: Vec::new(),
             past_examples: Vec::new(),
+            budget: MetabolicBudget::default_session(),
+            llm_prompt_fn: None,
         }
     }
 
+    /// Set a custom metabolic budget for this session.
+    pub fn with_budget(mut self, budget: MetabolicBudget) -> Self {
+        self.budget = budget;
+        self
+    }
+
+    /// Set the LLM prompt generator for Tier 2 fallback.
+    ///
+    /// The function receives (spec, compiler_errors) and returns a prompt string.
+    /// When set, lessons that produce `todo!()` will call this to get LLM-generated code.
+    pub fn with_llm_prompt(
+        mut self,
+        prompt_fn: impl Fn(&CodeSpec, &[String]) -> String + Send + 'static,
+    ) -> Self {
+        self.llm_prompt_fn = Some(Box::new(prompt_fn));
+        self
+    }
+
+    /// Get the current metabolic budget state.
+    pub fn budget(&self) -> &MetabolicBudget {
+        &self.budget
+    }
+
     /// Run a single lesson through the full pipeline.
+    ///
+    /// Pipeline:
+    /// 1. Generate via native emitter (Tier 1) — cost: 1.0 energy
+    /// 2. If source contains `todo!()` and LLM is available — cost: 10.0 energy
+    /// 3. Compile and auto-fix loop — cost: 0.5 per retry
+    /// 4. If compilation still fails, LLM retry with error feedback — cost: 8.0 per retry
+    /// 5. Record mastery and cache distillation targets
     pub fn run_lesson(&mut self, lesson: &CodeLesson) -> LessonOutcome {
+        let mut energy_spent = 0.0;
+
+        // Check budget before starting
+        if !self.budget.can_afford_native() {
+            return LessonOutcome::budget_exhausted(&lesson.objective_id);
+        }
+
         // 1. Build intent and context
         let intent = CodeIntent::Create {
             target: CodeTarget::new("code_learning"),
@@ -607,33 +758,72 @@ impl CodeLearningEngine {
             ..Default::default()
         };
 
-        // 2. Generate code
+        // 2. Generate code (Tier 1: native emission)
         let generated = self.generator.generate(&intent, &context);
         let mut source = generated.source.clone();
-        let mut retries = 0;
+        energy_spent += ENERGY_TIER1_NATIVE;
 
-        // 3. Execute and retry loop
+        // 3. If native emitter yields todo!(), try LLM fallback (Tier 2)
+        let mut used_llm = false;
+        let mut llm_retries = 0;
+
+        if source.contains("todo!(") || source.contains("unimplemented!()") {
+            if let Some(llm_source) = self.try_llm_generation(&lesson.spec, &[]) {
+                source = llm_source;
+                used_llm = true;
+                energy_spent += ENERGY_TIER2_LLM_CALL;
+            }
+        }
+
+        // 4. Execute and auto-fix retry loop
+        let mut retries = 0;
         let mut exec_result = self.execute_lesson(&source, lesson.test_source.as_deref());
 
         while !exec_result.compiled && retries < MAX_RETRIES {
-            // Try auto-fix
             if let Some(fixed) = try_auto_fix(&source, &exec_result.compile_errors) {
                 source = fixed;
                 retries += 1;
+                energy_spent += ENERGY_AUTO_FIX;
                 exec_result = self.execute_lesson(&source, lesson.test_source.as_deref());
             } else {
                 break;
             }
         }
 
-        // 4. Check for todo!() — indicates Tier 2 (LLM) would be needed
-        let used_llm = source.contains("todo!()") || source.contains("unimplemented!()");
+        // 5. If still failing and we have LLM, retry with error feedback
+        if !exec_result.compiled && self.llm_prompt_fn.is_some() && self.budget.can_afford_llm() {
+            while !exec_result.compiled && llm_retries < MAX_LLM_RETRIES {
+                if let Some(llm_source) =
+                    self.try_llm_generation(&lesson.spec, &exec_result.compile_errors)
+                {
+                    source = llm_source;
+                    used_llm = true;
+                    llm_retries += 1;
+                    energy_spent += ENERGY_LLM_RETRY;
+                    exec_result = self.execute_lesson(&source, lesson.test_source.as_deref());
 
-        // 5. Build outcome
+                    // Also try auto-fix on LLM output
+                    if !exec_result.compiled {
+                        if let Some(fixed) = try_auto_fix(&source, &exec_result.compile_errors) {
+                            source = fixed;
+                            energy_spent += ENERGY_AUTO_FIX;
+                            exec_result =
+                                self.execute_lesson(&source, lesson.test_source.as_deref());
+                        }
+                    }
+                } else {
+                    break;
+                }
+            }
+        }
+
+        // Record energy spent
+        self.budget.spend(energy_spent);
+
+        // 6. Build outcome
         let distillation_eligible = exec_result.compiled
             && exec_result.tests_failed == 0
-            && generated.plan_coverage >= MIN_PLAN_COVERAGE
-            && !used_llm;
+            && generated.plan_coverage >= MIN_PLAN_COVERAGE;
 
         let outcome = LessonOutcome {
             objective_id: lesson.objective_id.clone(),
@@ -646,10 +836,12 @@ impl CodeLearningEngine {
             plan_coverage: generated.plan_coverage,
             phi_score: generated.phi_score,
             used_llm,
+            llm_retries_used: llm_retries,
             distillation_eligible,
+            energy_spent,
         };
 
-        // 6. Cache successes for distillation and few-shot context
+        // 7. Cache successes for distillation and few-shot context
         if distillation_eligible {
             if let Some((_, src, quality)) =
                 self.generator.distillation_target(&lesson.spec, &generated)
@@ -665,6 +857,72 @@ impl CodeLearningEngine {
         }
 
         outcome
+    }
+
+    /// Try to generate code via the LLM prompt function.
+    ///
+    /// Returns `Some(source)` if the LLM was called and produced output,
+    /// `None` if no LLM is configured or the call failed.
+    fn try_llm_generation(&self, spec: &CodeSpec, errors: &[String]) -> Option<String> {
+        let prompt_fn = self.llm_prompt_fn.as_ref()?;
+        let prompt = prompt_fn(spec, errors);
+        if prompt.is_empty() {
+            return None;
+        }
+        // The prompt is ready — the caller must use an async runtime to
+        // actually call the LLM. For now, we return the prompt as a marker
+        // that indicates LLM should be invoked. The actual async call
+        // happens in the integration test / runner.
+        //
+        // In synchronous mode, we use a blocking Ollama HTTP call.
+        self.call_ollama_sync(&prompt)
+    }
+
+    /// Synchronous Ollama call for the learning loop.
+    ///
+    /// Uses `curl` via `std::process::Command` — avoids needing reqwest's
+    /// blocking feature. Acceptable for batch learning where latency doesn't
+    /// matter (each call takes 5-30s anyway for a 7B model).
+    fn call_ollama_sync(&self, prompt: &str) -> Option<String> {
+        let model =
+            std::env::var("SYMTHAEA_LLM_MODEL").unwrap_or_else(|_| "qwen2.5-coder:7b".to_string());
+
+        // Escape the prompt for JSON embedding
+        let escaped_prompt = prompt
+            .replace('\\', "\\\\")
+            .replace('"', "\\\"")
+            .replace('\n', "\\n");
+
+        let body = format!(
+            r#"{{"model":"{}","prompt":"{}","stream":false,"options":{{"temperature":0.3,"num_predict":1024}}}}"#,
+            model, escaped_prompt
+        );
+
+        let output = std::process::Command::new("curl")
+            .args([
+                "-s",
+                "--max-time",
+                "120",
+                "-X",
+                "POST",
+                "http://localhost:11434/api/generate",
+                "-H",
+                "Content-Type: application/json",
+                "-d",
+                &body,
+            ])
+            .output()
+            .ok()?;
+
+        if !output.status.success() {
+            return None;
+        }
+
+        let response_str = String::from_utf8(output.stdout).ok()?;
+        let json: serde_json::Value = serde_json::from_str(&response_str).ok()?;
+        let text = json.get("response")?.as_str()?;
+
+        extract_code_block(text)
     }
 
     /// Run all lessons for a given objective.
@@ -686,6 +944,10 @@ impl CodeLearningEngine {
         let mut total_coverage = 0.0;
 
         for obj_id in objective_ids {
+            // Check budget before starting each objective
+            if !self.budget.can_afford_native() {
+                break;
+            }
             let outcomes = self.run_objective(obj_id);
             for outcome in outcomes {
                 summary.lessons_attempted += 1;
@@ -699,6 +961,8 @@ impl CodeLearningEngine {
                     summary.distillation_eligible += 1;
                 }
                 summary.total_retries += outcome.retries_used;
+                summary.total_llm_retries += outcome.llm_retries_used;
+                summary.total_energy_spent += outcome.energy_spent;
                 total_surprise += outcome.surprise;
                 total_coverage += outcome.plan_coverage;
                 summary.outcomes.push(outcome);
@@ -730,6 +994,115 @@ impl CodeLearningEngine {
 
     fn execute_lesson(&mut self, source: &str, test_source: Option<&str>) -> ExecutionResult {
         self.executor.execute_rust(source, test_source)
+    }
+
+    /// Reset the metabolic budget for a new session.
+    pub fn reset_budget(&mut self) {
+        self.budget = MetabolicBudget::default_session();
+    }
+}
+
+impl LessonOutcome {
+    /// Create a "budget exhausted" outcome — skipped due to energy constraints.
+    fn budget_exhausted(objective_id: &str) -> Self {
+        Self {
+            objective_id: objective_id.to_string(),
+            source: String::new(),
+            compiled: false,
+            tests_passed: 0,
+            tests_failed: 0,
+            surprise: 1.0,
+            retries_used: 0,
+            plan_coverage: 0.0,
+            phi_score: 0.0,
+            used_llm: false,
+            llm_retries_used: 0,
+            distillation_eligible: false,
+            energy_spent: 0.0,
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LLM PROMPT GENERATION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Default LLM prompt generator for Tier 2 code generation.
+///
+/// Produces a focused prompt that includes the function signature, purpose,
+/// and any compiler errors from a previous attempt.
+pub fn default_llm_prompt(spec: &CodeSpec, errors: &[String]) -> String {
+    let mut prompt = String::with_capacity(512);
+    prompt.push_str("Write a Rust function. Output ONLY the function code, no explanation.\n\n");
+
+    if let Some(sig) = &spec.signature {
+        prompt.push_str(&format!("Signature: {}\n", sig));
+    }
+    prompt.push_str(&format!("Purpose: {}\n", spec.purpose));
+
+    if !spec.constraints.is_empty() {
+        prompt.push_str("Constraints:\n");
+        for c in &spec.constraints {
+            prompt.push_str(&format!("- {}\n", c));
+        }
+    }
+
+    if !spec.examples.is_empty() {
+        prompt.push_str("Examples:\n");
+        for (input, output) in &spec.examples {
+            prompt.push_str(&format!("  {} -> {}\n", input, output));
+        }
+    }
+
+    if !errors.is_empty() {
+        prompt.push_str("\nPrevious attempt had these compiler errors. Fix them:\n");
+        for (i, err) in errors.iter().enumerate().take(5) {
+            prompt.push_str(&format!("{}. {}\n", i + 1, err));
+        }
+    }
+
+    prompt
+}
+
+/// Extract a code block from LLM output.
+///
+/// Handles ```rust ... ```, ``` ... ```, or raw code.
+fn extract_code_block(text: &str) -> Option<String> {
+    // Try ```rust ... ``` first
+    if let Some(start) = text.find("```rust") {
+        let code_start = start + 7;
+        // Skip optional newline after ```rust
+        let code_start = if text[code_start..].starts_with('\n') {
+            code_start + 1
+        } else {
+            code_start
+        };
+        if let Some(end) = text[code_start..].find("```") {
+            return Some(text[code_start..code_start + end].trim().to_string());
+        }
+    }
+
+    // Try ``` ... ```
+    if let Some(start) = text.find("```") {
+        let code_start = start + 3;
+        let code_start = if text[code_start..].starts_with('\n') {
+            code_start + 1
+        } else {
+            code_start
+        };
+        if let Some(end) = text[code_start..].find("```") {
+            return Some(text[code_start..code_start + end].trim().to_string());
+        }
+    }
+
+    // No code block — return raw text if it looks like code
+    let trimmed = text.trim();
+    if trimmed.contains("fn ") || trimmed.contains("struct ") || trimmed.contains("impl ") {
+        Some(trimmed.to_string())
+    } else if !trimmed.is_empty() {
+        Some(trimmed.to_string())
+    } else {
+        None
     }
 }
 
@@ -880,7 +1253,9 @@ mod tests {
             plan_coverage: 1.0,
             phi_score: 0.5,
             used_llm: false,
+            llm_retries_used: 0,
             distillation_eligible: true,
+            energy_spent: 1.0,
         };
         assert_eq!(success.mastery_signal(), 1.0);
 
@@ -915,5 +1290,132 @@ mod tests {
         let engine = make_engine();
         assert_eq!(engine.distillation_count(), 0);
         assert!(engine.distillation_cache().is_empty());
+    }
+
+    // ── Metabolic budget tests ──────────────────────────────────────────
+
+    #[test]
+    fn test_metabolic_budget_default() {
+        let budget = MetabolicBudget::default_session();
+        assert_eq!(budget.total_budget, 100.0);
+        assert_eq!(budget.spent, 0.0);
+        assert_eq!(budget.reserved, 20.0); // 20% reserved
+        assert!(budget.can_afford_native());
+        assert!(budget.can_afford_llm());
+    }
+
+    #[test]
+    fn test_metabolic_budget_spending() {
+        let mut budget = MetabolicBudget::new(50.0);
+        assert_eq!(budget.available(), 40.0); // 50 - 0 - 10 (20% reserve)
+
+        budget.spend(30.0);
+        assert_eq!(budget.available(), 10.0);
+        assert!(budget.can_afford_native()); // 10 >= 1.0
+
+        budget.spend(10.0);
+        assert_eq!(budget.available(), 0.0);
+        assert!(!budget.can_afford_native()); // 0 < 1.0
+        assert!(budget.can_afford_llm()); // 10 reserve >= 10 LLM cost
+    }
+
+    #[test]
+    fn test_metabolic_budget_exhaustion() {
+        let mut budget = MetabolicBudget::new(50.0);
+        budget.spend(50.0);
+        assert!(!budget.can_afford_native());
+        assert!(!budget.can_afford_llm());
+        assert!(budget.utilization() >= 1.0);
+    }
+
+    #[test]
+    fn test_metabolic_budget_efficiency() {
+        let mut budget = MetabolicBudget::new(100.0);
+        budget.spend(20.0);
+        // 0.5 mastery / 20 energy = 0.025 efficiency
+        assert!((budget.efficiency(0.5) - 0.025).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_budget_exhausted_outcome() {
+        let outcome = LessonOutcome::budget_exhausted("test_obj");
+        assert!(!outcome.compiled);
+        assert_eq!(outcome.surprise, 1.0);
+        assert_eq!(outcome.energy_spent, 0.0);
+        assert!(!outcome.distillation_eligible);
+    }
+
+    #[test]
+    fn test_session_respects_budget() {
+        let encoder = CodeHDEncoder::new(256);
+        let generator = CodeGenerator::new(encoder);
+        // Tiny budget: only enough for 2 native generations
+        let mut engine = CodeLearningEngine::new(generator).with_budget(MetabolicBudget::new(2.5));
+
+        let summary = engine.run_session(TIER1_OBJECTIVES);
+        // Should stop early due to budget
+        assert!(
+            summary.lessons_attempted <= 3,
+            "Budget should limit lessons, got {}",
+            summary.lessons_attempted,
+        );
+    }
+
+    // ── LLM prompt tests ────────────────────────────────────────────────
+
+    #[test]
+    fn test_default_llm_prompt_basic() {
+        let spec = CodeSpec::new("rust", "fibonacci", "Compute fibonacci numbers")
+            .with_signature("fn fibonacci(n: u32) -> u64");
+        let prompt = default_llm_prompt(&spec, &[]);
+        assert!(prompt.contains("fn fibonacci(n: u32) -> u64"));
+        assert!(prompt.contains("Compute fibonacci"));
+        assert!(!prompt.contains("compiler errors"));
+    }
+
+    #[test]
+    fn test_default_llm_prompt_with_errors() {
+        let spec = CodeSpec::new("rust", "test", "test function");
+        let errors = vec!["error[E0308]: mismatched types".to_string()];
+        let prompt = default_llm_prompt(&spec, &errors);
+        assert!(prompt.contains("compiler errors"));
+        assert!(prompt.contains("E0308"));
+    }
+
+    // ── Code block extraction tests ─────────────────────────────────────
+
+    #[test]
+    fn test_extract_code_block_rust_fenced() {
+        let text = "Here's the code:\n```rust\nfn add(a: i32, b: i32) -> i32 { a + b }\n```\nDone.";
+        let code = extract_code_block(text).unwrap();
+        assert!(code.contains("fn add"));
+        assert!(!code.contains("```"));
+    }
+
+    #[test]
+    fn test_extract_code_block_plain_fenced() {
+        let text = "```\nfn foo() {}\n```";
+        let code = extract_code_block(text).unwrap();
+        assert!(code.contains("fn foo"));
+    }
+
+    #[test]
+    fn test_extract_code_block_raw() {
+        let text = "fn bar(x: i32) -> i32 { x * 2 }";
+        let code = extract_code_block(text).unwrap();
+        assert!(code.contains("fn bar"));
+    }
+
+    #[test]
+    fn test_energy_tracking_in_session() {
+        let mut engine = make_engine();
+        let summary = engine.run_session(TIER1_OBJECTIVES);
+        // Each lesson costs at least ENERGY_TIER1_NATIVE (1.0)
+        assert!(
+            summary.total_energy_spent >= summary.lessons_attempted as f32,
+            "Energy {} should be >= lessons {}",
+            summary.total_energy_spent,
+            summary.lessons_attempted,
+        );
     }
 }

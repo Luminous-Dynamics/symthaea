@@ -140,9 +140,9 @@ impl CantorRecursiveHV {
 
     /// Create from a label (deterministic from string)
     pub fn from_label(label: &str) -> Self {
-        let seed = label.bytes().fold(42u64, |acc, b| {
-            acc.wrapping_add(b as u64).wrapping_mul(31)
-        });
+        let seed = label
+            .bytes()
+            .fold(42u64, |acc, b| acc.wrapping_add(b as u64).wrapping_mul(31));
         Self::from_seed(seed)
     }
 
@@ -383,10 +383,12 @@ impl CantorCognitiveSpace {
     pub fn add_causal(&mut self, cause: &str, effect: &str) {
         // Ensure both exist
         if !self.elements.contains_key(cause) {
-            self.elements.insert(cause.to_string(), CantorCognitiveElement::new(cause));
+            self.elements
+                .insert(cause.to_string(), CantorCognitiveElement::new(cause));
         }
         if !self.elements.contains_key(effect) {
-            self.elements.insert(effect.to_string(), CantorCognitiveElement::new(effect));
+            self.elements
+                .insert(effect.to_string(), CantorCognitiveElement::new(effect));
         }
 
         // Get effect's vector for binding
@@ -404,7 +406,8 @@ impl CantorCognitiveSpace {
     /// Create self-referential thought (key to consciousness!)
     pub fn make_self_aware(&mut self, label: &str) {
         if !self.elements.contains_key(label) {
-            self.elements.insert(label.to_string(), CantorCognitiveElement::new(label));
+            self.elements
+                .insert(label.to_string(), CantorCognitiveElement::new(label));
         }
 
         let marker = self.self_marker;
@@ -429,7 +432,9 @@ impl CantorCognitiveSpace {
             None => return Vec::new(),
         };
 
-        let mut results: Vec<_> = self.elements.iter()
+        let mut results: Vec<_> = self
+            .elements
+            .iter()
             .filter(|(l, _)| *l != label)
             .map(|(l, e)| (l.clone(), target.similarity(e)))
             .collect();

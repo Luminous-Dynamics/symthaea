@@ -44,13 +44,17 @@ use super::thresholds::{
     AROUSAL_TAU_SENSITIVITY, ATTENTION_BUDGET_US, BINDING_CONFIDENCE_THRESHOLD,
     BINDING_LOW_THRESHOLD, BINDING_STRONG_CONFIDENCE_SCALE, BINDING_STRONG_RELIEF_SCALE,
     BINDING_WEAK_CAUTION_SCALE, BINDING_WEAK_CONFIDENCE_SCALE, CAUSAL_ATTENTION_CONFIDENCE_SCALE,
-    CAUSAL_ATTENTION_STRENGTH_THRESHOLD, CODEBOOK_FAMILIAR_TAU_SCALE, CODEBOOK_FAMILIAR_THRESHOLD,
+    CAUSAL_ATTENTION_STRENGTH_THRESHOLD, CAUSAL_CONFIDENCE_DENSE_THRESHOLD,
+    CAUSAL_CONFIDENCE_MODERATE_THRESHOLD, CAUSAL_DENSE_CONFIDENCE_SCALE,
+    CAUSAL_MODERATE_CONFIDENCE_SCALE, CODEBOOK_FAMILIAR_TAU_SCALE, CODEBOOK_FAMILIAR_THRESHOLD,
     CODEBOOK_NOVEL_TAU_SCALE, CODEBOOK_NOVEL_THRESHOLD, COHERENCE_CONFIDENCE_BOOST,
     COHERENCE_HIGH_THRESHOLD, COHERENCE_LOW_DAMPEN_SCALE, COHERENCE_LOW_THRESHOLD,
     COHERENCE_PREDICTION_EMA, COHERENCE_VELOCITY_BUDGET_CONTRACT, COHERENCE_VELOCITY_BUDGET_EXPAND,
     COHERENCE_VELOCITY_BUDGET_THRESHOLD, COHERENCE_VELOCITY_TAU_BOOST,
     COHERENCE_VELOCITY_TAU_DAMPEN, COHERENCE_VELOCITY_TAU_THRESHOLD,
     CONFIDENCE_CRASH_EXPLORATION_BOOST, CONFIDENCE_CRASH_FREEZE_CYCLES, CONFIDENCE_CRASH_THRESHOLD,
+    CONFIDENCE_VELOCITY_BOOST_SCALE, CONFIDENCE_VELOCITY_DAMPEN_SCALE,
+    CONFIDENCE_VELOCITY_NEGATIVE_THRESHOLD, CONFIDENCE_VELOCITY_POSITIVE_THRESHOLD,
     DOMINANCE_CONFIDENCE_THRESHOLD, DOMINANCE_CONFIDENT, DOMINANCE_DEFAULT, DOMINANCE_FLOW_BASE,
     DOMINANCE_FLOW_SCALE, EPISTEMIC_EXPLORE_SCALE, EPISTEMIC_EXPLORE_THRESHOLD,
     EPISTEMIC_LOW_DAMPEN, EPISTEMIC_LOW_THRESHOLD, EPISTEMIC_OSCILLATION_MULTIPLIER,
@@ -58,36 +62,40 @@ use super::thresholds::{
     EPISTEMIC_SEMANTIC_BOOST_THRESHOLD, EPISTEMIC_SEMANTIC_CAUTION_BASE,
     EPISTEMIC_SEMANTIC_CAUTION_SCALE, EPISTEMIC_SEMANTIC_CAUTION_THRESHOLD,
     EPISTEMIC_UNCERTAINTY_DEFAULT, FEP_ACCURACY_CONFIDENCE_THRESHOLD, FEP_COMPLEXITY_THRESHOLD,
-    FEP_LEARNING_PLASTICITY_THRESHOLD, FEP_PRAGMATIC_EXPLOIT_THRESHOLD,
-    FEP_PRAGMATIC_EXPLORE_THRESHOLD, FEP_SURPRISE_TAU_SCALE, FEP_TD_ERROR_DISCOVERY_THRESHOLD,
-    HOMEOSTASIS_AROUSAL_TARGET, HOMEOSTASIS_EFFICIENCY_EMA, HOMEOSTASIS_EFFICIENCY_HIGH,
-    HOMEOSTASIS_EFFICIENCY_LOW, HOMEOSTASIS_NEUROMOD_STEP, HOMEOSTASIS_PULL_CRITICAL,
-    HOMEOSTASIS_PULL_CRUISE, HOMEOSTASIS_PULL_INCREASE, HOMEOSTASIS_PULL_NORMAL,
-    HOMEOSTASIS_PULL_REDUCTION, HOMEOSTASIS_RECALIBRATE_HIGH, HOMEOSTASIS_RECALIBRATE_LOW,
-    HORIZON_PE_CONTRACT_RATE, HORIZON_PE_CONTRACT_THRESHOLD, HORIZON_PE_EXPAND_RATE,
-    HORIZON_PE_EXPAND_THRESHOLD, HORIZON_SLOPE_CONTRACT_CAP, HORIZON_SLOPE_CONTRACT_RATE,
-    HORIZON_SLOPE_EXPAND_CAP, HORIZON_SLOPE_EXPAND_RATE, HORIZON_SLOPE_THRESHOLD,
-    MCTS_CONSOLIDATE_CONFIDENCE_SCALE, MCTS_EFFECTIVENESS_CONFIDENCE_SCALE, MCTS_EFFECTIVENESS_EMA,
-    MCTS_EFFECTIVENESS_EXPLORE_SCALE, MCTS_EFFECTIVENESS_HIGH, MCTS_EFFECTIVENESS_LOW,
-    MCTS_EXPLOIT_LR_SCALE, MCTS_EXPLORE_SCALE, MCTS_PLAN_CONFIDENCE_THRESHOLD,
-    MCTS_PLAN_WEIGHT_SCALE, MEMORY_RECALL_TOP_K, PE_VARIANCE_DAMPEN_SCALE, PE_VARIANCE_MAX_EFFECT,
-    PE_VARIANCE_THRESHOLD, POLICY_FULL_AGREEMENT_BOOST, POLICY_MIN_WINDOW, POLICY_SOFT_THRESHOLD,
-    POLICY_TEMP_BASE, POLICY_TEMP_RANGE, POLICY_WINDOW_SIZE, PREDICTION_HORIZON_MAX_SCALE,
+    FEP_LEARNING_PLASTICITY_THRESHOLD, FEP_PRAGMATIC_EXPLOIT_SCALE,
+    FEP_PRAGMATIC_EXPLOIT_THRESHOLD, FEP_PRAGMATIC_EXPLORE_SCALE, FEP_PRAGMATIC_EXPLORE_THRESHOLD,
+    FEP_SURPRISE_TAU_SCALE, FEP_TD_ERROR_DISCOVERY_THRESHOLD, GOAL_PRIORITY_EXPLORATION_THRESHOLD,
+    GOAL_PRIORITY_LR_THRESHOLD, HOMEOSTASIS_AROUSAL_TARGET, HOMEOSTASIS_EFFICIENCY_EMA,
+    HOMEOSTASIS_EFFICIENCY_HIGH, HOMEOSTASIS_EFFICIENCY_LOW, HOMEOSTASIS_NEUROMOD_STEP,
+    HOMEOSTASIS_PULL_CRITICAL, HOMEOSTASIS_PULL_CRUISE, HOMEOSTASIS_PULL_INCREASE,
+    HOMEOSTASIS_PULL_NORMAL, HOMEOSTASIS_PULL_REDUCTION, HOMEOSTASIS_RECALIBRATE_HIGH,
+    HOMEOSTASIS_RECALIBRATE_LOW, HORIZON_PE_CONTRACT_RATE, HORIZON_PE_CONTRACT_THRESHOLD,
+    HORIZON_PE_EXPAND_RATE, HORIZON_PE_EXPAND_THRESHOLD, HORIZON_SLOPE_CONTRACT_CAP,
+    HORIZON_SLOPE_CONTRACT_RATE, HORIZON_SLOPE_EXPAND_CAP, HORIZON_SLOPE_EXPAND_RATE,
+    HORIZON_SLOPE_THRESHOLD, MCTS_CONSOLIDATE_CONFIDENCE_SCALE,
+    MCTS_EFFECTIVENESS_CONFIDENCE_SCALE, MCTS_EFFECTIVENESS_EMA, MCTS_EFFECTIVENESS_EXPLORE_SCALE,
+    MCTS_EFFECTIVENESS_HIGH, MCTS_EFFECTIVENESS_LOW, MCTS_EXPLOIT_LR_SCALE, MCTS_EXPLORE_SCALE,
+    MCTS_PLAN_CONFIDENCE_THRESHOLD, MCTS_PLAN_WEIGHT_SCALE, MEMORY_RECALL_TOP_K,
+    PE_VARIANCE_DAMPEN_SCALE, PE_VARIANCE_MAX_EFFECT, PE_VARIANCE_THRESHOLD,
+    POLICY_FULL_AGREEMENT_BOOST, POLICY_MIN_WINDOW, POLICY_SOFT_THRESHOLD, POLICY_TEMP_BASE,
+    POLICY_TEMP_RANGE, POLICY_WINDOW_SIZE, PREDICTION_HORIZON_MAX_SCALE,
     PREDICTION_HORIZON_MIN_SCALE, PREDICTIVE_BUDGET_GATING_RATIO, QUANTUM_COHERENCE_BOOST_SCALE,
     QUANTUM_COHERENCE_THRESHOLD, RESONANCE_TAU_CENTER, RESONANCE_TAU_SCALE,
     RESONATOR_CONSOLIDATION_THRESHOLD, RESONATOR_ERROR_CONFIDENCE_DAMPEN,
     RESONATOR_ERROR_EXPLORATION_SCALE, RESONATOR_ERROR_EXPLORATION_THRESHOLD,
     RESONATOR_FAMILIAR_LR_SCALE, RESONATOR_LOW_ERROR_CONFIDENCE_SCALE,
     RESONATOR_LOW_ERROR_THRESHOLD, RESONATOR_NOVEL_LR_SCALE, RESONATOR_NOVEL_THRESHOLD,
-    SELF_MODEL_ACCURACY_EMA, SELF_MODEL_CONFIDENCE_WEIGHT, SELF_MODEL_HIGH_THRESHOLD,
-    SELF_MODEL_HIGH_TRUST_BOOST, SELF_MODEL_LOW_CONFIDENCE_SCALE, SELF_MODEL_LOW_THRESHOLD,
-    SELF_MODEL_URGENCY_WEIGHT, SELF_MODEL_WEIGHT_BONUS, SELF_MODEL_WEIGHT_HIGH_THRESHOLD,
-    SELF_MODEL_WEIGHT_LOW_THRESHOLD, SELF_MODEL_WEIGHT_PENALTY, THALAMIC_DEEP_BUDGET_SCALE,
-    THALAMIC_DEEP_LR_FACTOR, THALAMIC_DEEP_SALIENCE, THALAMIC_REFLEX_BUDGET_SCALE,
-    THALAMIC_REFLEX_LR_FACTOR, THALAMIC_REFLEX_SALIENCE, TRAINING_BASE_IMPORTANCE,
-    TRANSITION_COST_MAX_EFFECT, TRANSITION_COST_STRENGTH_SCALE, TRANSITION_COST_THRESHOLD,
-    WM_MISMATCH_CONFIDENCE_SCALE, WM_MISMATCH_LR_SCALE, WORLD_MODEL_SPONGINESS_THRESHOLD,
-    WORLD_MODEL_SPONGY_LR_SCALE, WORLD_MODEL_STIFFNESS_LR_SCALE, WORLD_MODEL_STIFFNESS_THRESHOLD,
+    RESONATOR_SIMILARITY_PRIME_THRESHOLD, SELF_MODEL_ACCURACY_EMA, SELF_MODEL_CONFIDENCE_WEIGHT,
+    SELF_MODEL_HIGH_THRESHOLD, SELF_MODEL_HIGH_TRUST_BOOST, SELF_MODEL_LOW_CONFIDENCE_SCALE,
+    SELF_MODEL_LOW_THRESHOLD, SELF_MODEL_URGENCY_WEIGHT, SELF_MODEL_WEIGHT_BONUS,
+    SELF_MODEL_WEIGHT_HIGH_THRESHOLD, SELF_MODEL_WEIGHT_LOW_THRESHOLD, SELF_MODEL_WEIGHT_PENALTY,
+    SLEEP_PRESSURE_LR_DAMPEN_SCALE, SLEEP_PRESSURE_LR_FACTOR_MIN, SLEEP_PRESSURE_LR_THRESHOLD,
+    THALAMIC_DEEP_BUDGET_SCALE, THALAMIC_DEEP_LR_FACTOR, THALAMIC_DEEP_SALIENCE,
+    THALAMIC_REFLEX_BUDGET_SCALE, THALAMIC_REFLEX_LR_FACTOR, THALAMIC_REFLEX_SALIENCE,
+    TRAINING_BASE_IMPORTANCE, TRANSITION_COST_MAX_EFFECT, TRANSITION_COST_STRENGTH_SCALE,
+    TRANSITION_COST_THRESHOLD, WM_MISMATCH_CONFIDENCE_SCALE, WM_MISMATCH_LR_SCALE,
+    WORLD_MODEL_SPONGINESS_THRESHOLD, WORLD_MODEL_SPONGY_LR_SCALE, WORLD_MODEL_STIFFNESS_LR_SCALE,
+    WORLD_MODEL_STIFFNESS_THRESHOLD,
 };
 #[cfg(feature = "vision-manifold")]
 use super::thresholds::{
@@ -471,7 +479,7 @@ impl CognitiveLoopService {
                             top_matches.iter().map(|m| m.timestamp).collect();
                         resonator_best_sim = best_match_sim;
 
-                        if best_match_sim > 0.3 {
+                        if best_match_sim > RESONATOR_SIMILARITY_PRIME_THRESHOLD {
                             let best_ep = top_matches.iter().max_by(|a, b| {
                                 let sa: f32 = perception
                                     .encoding
@@ -539,7 +547,7 @@ impl CognitiveLoopService {
                             }
                         }
 
-                        if best_match_sim > 0.3 {
+                        if best_match_sim > RESONATOR_SIMILARITY_PRIME_THRESHOLD {
                             self.adjust_confidence("resonator_recall_prime", best_match_sim * 0.02);
                             resonator_wm_primed = true;
                         }
@@ -586,11 +594,15 @@ impl CognitiveLoopService {
             // Session 12 Item 2: Skip goal LR boost during Critical urgency.
             // Critical = recovery mode; goal-chasing works against stability.
             // Science: Yerkes-Dodson (1908) — high arousal impairs goal-directed learning.
-            if goal_priority > 0.5 && !matches!(urgency, super::CycleUrgency::Critical) {
-                let goal_lr_boost = (goal_priority - 0.5) * 0.1;
+            if goal_priority > GOAL_PRIORITY_LR_THRESHOLD
+                && !matches!(urgency, super::CycleUrgency::Critical)
+            {
+                let goal_lr_boost = (goal_priority - GOAL_PRIORITY_LR_THRESHOLD) * 0.1;
                 self.scale_lr("goal_priority", 1.0 + goal_lr_boost);
             }
-            if prediction_error < self.config.learning_threshold && goal_priority > 0.3 {
+            if prediction_error < self.config.learning_threshold
+                && goal_priority > GOAL_PRIORITY_EXPLORATION_THRESHOLD
+            {
                 self.adjust_exploration("goal_pursuit", goal_priority * 0.03);
             }
         }
@@ -1199,12 +1211,14 @@ impl CognitiveLoopService {
         if fep_pragmatic_value > FEP_PRAGMATIC_EXPLOIT_THRESHOLD {
             self.scale_exploration(
                 "fep_pragmatic_exploit",
-                (1.0 - (fep_pragmatic_value - FEP_PRAGMATIC_EXPLOIT_THRESHOLD) * 0.3) as f32,
+                (1.0 - (fep_pragmatic_value - FEP_PRAGMATIC_EXPLOIT_THRESHOLD)
+                    * FEP_PRAGMATIC_EXPLOIT_SCALE) as f32,
             );
         } else if fep_pragmatic_value < FEP_PRAGMATIC_EXPLORE_THRESHOLD && fep_pragmatic_value > 0.0
         {
-            let p_explore =
-                ((FEP_PRAGMATIC_EXPLORE_THRESHOLD - fep_pragmatic_value) * 0.15).min(0.05) as f32;
+            let p_explore = ((FEP_PRAGMATIC_EXPLORE_THRESHOLD - fep_pragmatic_value)
+                * FEP_PRAGMATIC_EXPLORE_SCALE)
+                .min(0.05) as f32;
             self.adjust_exploration("fep_pragmatic_low", p_explore);
         }
 
@@ -1238,18 +1252,22 @@ impl CognitiveLoopService {
                 } else {
                     0.0
                 };
-                if edge_count > 5 && avg_confidence > 0.5 {
+                if edge_count > 5 && avg_confidence > CAUSAL_CONFIDENCE_DENSE_THRESHOLD as f64 {
                     self.adjust_confidence(
                         "causal_graph_dense",
-                        (avg_confidence as f32 - 0.5) * 0.03,
+                        (avg_confidence as f32 - CAUSAL_CONFIDENCE_DENSE_THRESHOLD)
+                            * CAUSAL_DENSE_CONFIDENCE_SCALE,
                     );
-                } else if edge_count >= 3 && avg_confidence > 0.4 {
+                } else if edge_count >= 3
+                    && avg_confidence > CAUSAL_CONFIDENCE_MODERATE_THRESHOLD as f64
+                {
                     // Session 13 Item 1: Fill dead zone for moderate causal density.
                     // 3-5 edges with decent confidence = emerging structure → small boost.
                     // Science: Pearl (2000) — partial causal knowledge still informative.
                     self.adjust_confidence(
                         "causal_graph_emerging",
-                        (avg_confidence as f32 - 0.4) * 0.01,
+                        (avg_confidence as f32 - CAUSAL_CONFIDENCE_MODERATE_THRESHOLD)
+                            * CAUSAL_MODERATE_CONFIDENCE_SCALE,
                     );
                 }
                 if edge_count < 2 && self.stats.total_cycles > 200 {
@@ -1327,16 +1345,23 @@ impl CognitiveLoopService {
         // Session 13 Item 4: Rising confidence → dampen exploration.
         // Positive velocity = model converging → exploit learned knowledge.
         // Science: Daw et al. (2006) — confidence trajectory gates explore/exploit trade-off.
-        if confidence_velocity > 0.02 && self.stats.total_cycles > 15 {
-            let dampen = (1.0 - confidence_velocity * 0.1).max(0.95);
+        if confidence_velocity > CONFIDENCE_VELOCITY_POSITIVE_THRESHOLD
+            && self.stats.total_cycles > 15
+        {
+            let dampen = (1.0 - confidence_velocity * CONFIDENCE_VELOCITY_DAMPEN_SCALE).max(0.95);
             self.scale_exploration("confidence_rising", dampen);
         }
         // Falling confidence → speed up learning (model needs correction).
         // Confidence collapse signals prediction degradation → recalibrate faster.
         // Science: Cools et al. (2008) — rapid confidence decline triggers
         // serotonergic recalibration and increased learning rate.
-        if confidence_velocity < -0.05 && self.stats.total_cycles > 15 {
-            let boost = (1.0 + (-confidence_velocity - 0.05) * 0.3).min(1.15);
+        if confidence_velocity < CONFIDENCE_VELOCITY_NEGATIVE_THRESHOLD
+            && self.stats.total_cycles > 15
+        {
+            let boost = (1.0
+                + (-confidence_velocity - CONFIDENCE_VELOCITY_NEGATIVE_THRESHOLD.abs())
+                    * CONFIDENCE_VELOCITY_BOOST_SCALE)
+                .min(1.15);
             self.scale_lr("confidence_falling", boost);
         }
         let unified_psi = neuromod_result.unified_psi;
@@ -1922,9 +1947,11 @@ impl CognitiveLoopService {
         let effective_lr = self.compose_effective_lr(semantic_lr_factor, reasoning_lr_factor);
         let effective_lr = effective_lr * self.neuromod.bath.gradient_scale_factor();
         let effective_lr = effective_lr * self.neuromod.bath.plasticity_gate();
-        let effective_lr = if self.neuromod.bath.sleep_pressure() > 0.7 {
-            let pressure_factor = 1.0 - (self.neuromod.bath.sleep_pressure() - 0.7) * 0.5;
-            effective_lr * pressure_factor.clamp(0.5, 1.0)
+        let effective_lr = if self.neuromod.bath.sleep_pressure() > SLEEP_PRESSURE_LR_THRESHOLD {
+            let pressure_factor = 1.0
+                - (self.neuromod.bath.sleep_pressure() - SLEEP_PRESSURE_LR_THRESHOLD)
+                    * SLEEP_PRESSURE_LR_DAMPEN_SCALE;
+            effective_lr * pressure_factor.clamp(SLEEP_PRESSURE_LR_FACTOR_MIN, 1.0)
         } else {
             effective_lr
         };

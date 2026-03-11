@@ -100,10 +100,10 @@ impl CollectiveKosmicSong {
 
 /// Detect community mode from harmony distribution.
 fn detect_community_mode(counts: &[u32; 8]) -> CommunityMode {
-    // Index mapping (from HarmonicProfile):
-    // 0: ResonantCoherence, 1: IntegralWisdom, 2: PanSentientFlourishing
-    // 3: SacredReciprocity, 4: EvolutionaryProgression, 5: InfinitePlay
-    // 6: RadicalTransparency, 7: SacredStillness
+    // Index mapping (from harmony_to_index, matches symthaea_types declaration order):
+    // 0: ResonantCoherence, 1: PanSentientFlourishing, 2: IntegralWisdom
+    // 3: InfinitePlay, 4: UniversalInterconnectedness, 5: SacredReciprocity
+    // 6: EvolutionaryProgression, 7: SacredStillness
 
     let play = counts[3]; // InfinitePlay
     let care = counts[1]; // PanSentientFlourishing

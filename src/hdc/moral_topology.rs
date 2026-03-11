@@ -2787,6 +2787,28 @@ pub struct MoralTopologySnapshot {
     pub adaptive_state: AdaptiveAnomalyState,
     pub last_summary: MoralTopologySummary,
     pub prev_summary: MoralTopologySummary,
+    // ── Forensics state (added for cross-session persistence) ──────────
+    /// Escalation audit log (BLAKE3-sealed entries).
+    #[serde(default)]
+    pub audit_log: EscalationAuditLog,
+    /// Monotonic scenario counter.
+    #[serde(default)]
+    pub scenario_counter: u64,
+    /// Detection cycle counter.
+    #[serde(default)]
+    pub detection_cycle: u64,
+    /// Scenario IDs in the current sliding window.
+    #[serde(default)]
+    pub window_scenario_ids: Vec<u64>,
+    /// Escalation policy state (current level + cooldown).
+    #[serde(default)]
+    pub escalation_policy: EscalationPolicy,
+    /// Previous trajectory fingerprint (for velocity computation).
+    #[serde(default)]
+    pub prev_fingerprint: [f64; N_HARMONIES],
+    /// Last computed fingerprint velocity.
+    #[serde(default)]
+    pub fingerprint_velocity: f64,
 }
 
 impl MoralTopology {
@@ -2807,6 +2829,13 @@ impl MoralTopology {
             adaptive_state: self.adaptive_state.clone(),
             last_summary: self.last_summary.clone(),
             prev_summary: self.prev_summary.clone(),
+            audit_log: self.audit_log.clone(),
+            scenario_counter: self.scenario_counter,
+            detection_cycle: self.detection_cycle,
+            window_scenario_ids: self.window_scenario_ids.iter().copied().collect(),
+            escalation_policy: self.escalation_policy.clone(),
+            prev_fingerprint: self.prev_fingerprint,
+            fingerprint_velocity: self.fingerprint_velocity,
         }
     }
 
@@ -2824,6 +2853,13 @@ impl MoralTopology {
         self.adaptive_state = snap.adaptive_state.clone();
         self.last_summary = snap.last_summary.clone();
         self.prev_summary = snap.prev_summary.clone();
+        self.audit_log = snap.audit_log.clone();
+        self.scenario_counter = snap.scenario_counter;
+        self.detection_cycle = snap.detection_cycle;
+        self.window_scenario_ids = snap.window_scenario_ids.iter().copied().collect();
+        self.escalation_policy = snap.escalation_policy.clone();
+        self.prev_fingerprint = snap.prev_fingerprint;
+        self.fingerprint_velocity = snap.fingerprint_velocity;
     }
 }
 

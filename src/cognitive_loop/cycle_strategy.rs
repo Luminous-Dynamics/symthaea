@@ -551,6 +551,9 @@ impl CognitiveLoopService {
         if ethics_output.lr_factor != 1.0 {
             self.scale_lr("ethics_engine", ethics_output.lr_factor);
         }
+        // Reset escalation block flag each cycle — re-applied below if still warranted.
+        self.stats.escalation_blocked = false;
+
         // Anomaly response: corrective feedback when moral anomalies detected (opt-in).
         // Gate on topology_fresh to prevent N× over-correction from stale anomaly flags
         // between topology analyses (cadence can be 30–120 cycles).
@@ -593,6 +596,55 @@ impl CognitiveLoopService {
                     "moral_anomaly_convergence",
                     1.0 + (lr_conv - 1.0) * conv_severity,
                 );
+            }
+
+            // ── Escalation enforcement ──────────────────────────────────
+            // The EscalationPolicy produces 4 levels. The convergence LR
+            // dampening above handles proportional response; here we enforce
+            // the discrete escalation tiers for graduated defense.
+            let esc_level = self
+                .ethics_engine
+                .moral_topology()
+                .escalation_policy()
+                .current_level();
+            match esc_level {
+                crate::hdc::moral_topology::EscalationLevel::Log => {}
+                crate::hdc::moral_topology::EscalationLevel::Warn => {
+                    tracing::warn!(
+                        target: "cognitive_loop::immune",
+                        severity = report.convergence_severity,
+                        hazard = ?report.matched_hazard,
+                        "Topological immune system: WARN — elevated convergence"
+                    );
+                    self.stats.escalation_warn_count += 1;
+                }
+                crate::hdc::moral_topology::EscalationLevel::Throttle => {
+                    tracing::warn!(
+                        target: "cognitive_loop::immune",
+                        severity = report.convergence_severity,
+                        hazard = ?report.matched_hazard,
+                        "Topological immune system: THROTTLE — reducing exploration"
+                    );
+                    self.adjust_exploration("escalation_throttle", -0.15);
+                    self.adjust_confidence("escalation_throttle", -0.1);
+                    self.stats.escalation_warn_count += 1;
+                    self.stats.escalation_throttle_count += 1;
+                }
+                crate::hdc::moral_topology::EscalationLevel::Block => {
+                    tracing::error!(
+                        target: "cognitive_loop::immune",
+                        severity = report.convergence_severity,
+                        hazard = ?report.matched_hazard,
+                        "Topological immune system: BLOCK — request rejected"
+                    );
+                    self.stats.escalation_blocked = true;
+                    self.adjust_exploration("escalation_block", -0.3);
+                    self.adjust_confidence("escalation_block", -0.2);
+                    self.scale_lr("escalation_block", 0.05);
+                    self.stats.escalation_warn_count += 1;
+                    self.stats.escalation_throttle_count += 1;
+                    self.stats.escalation_block_count += 1;
+                }
             }
         }
         self.carryover.quality.last_value_score = ethics_output.value_score;

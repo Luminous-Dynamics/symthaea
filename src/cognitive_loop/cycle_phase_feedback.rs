@@ -13,39 +13,59 @@ use super::phase_results::{
     FbReasoning, FbSelfModel, FbSupport, FeedbackPhaseResult, PerceptionPhaseResult,
 };
 use super::thresholds::{
-    AGREEMENT_COHERENCE_VELOCITY_THRESHOLD, AGREEMENT_CONFIDENCE_COUPLING_SCALE,
-    AGREEMENT_CONFIDENCE_COUPLING_THRESHOLD, AGREEMENT_CRITICAL_CAUTION_SCALE,
-    AGREEMENT_CRITICAL_THRESHOLD, AGREEMENT_EMA_DECAY, AGREEMENT_HIGH_CONFIDENCE_SCALE,
-    AGREEMENT_LOW_CONFIDENCE_SCALE, AGREEMENT_LOW_EXPLORATION_SCALE,
-    AGREEMENT_VELOCITY_DROP_EXPLORATION, AGREEMENT_VELOCITY_DROP_LR,
-    AGREEMENT_VELOCITY_DROP_THRESHOLD, ATTENTION_BUDGET_GATED_LR_SCALE, CAUSAL_URGENCY_CONFIDENCE,
-    COMPOUND_INSTABILITY_ERROR_SLOPE, COMPOUND_INSTABILITY_EXPLORATION,
-    COMPOUND_INSTABILITY_LR_SCALE, COMPOUND_INSTABILITY_VELOCITY, CONTEXT_PHI_SCALE_BASE,
-    CONTEXT_PHI_SCALE_RANGE, CROSS_MODULE_AGREEMENT_HIGH, CROSS_MODULE_AGREEMENT_LOW,
-    CROSS_MODULE_VARIANCE_AMPLIFICATION, EMPATHIC_TONE_RATE_SCALE, EMPATHIC_TONE_THRESHOLD,
-    ENTROPY_LR_MIN, ENTROPY_LR_RANGE, EPISTEMIC_APPROVAL_LR_SCALE, EPISTEMIC_APPROVAL_THRESHOLD,
-    EPISTEMIC_CAUTION_SCALE, EPISTEMIC_CAUTION_THRESHOLD, EPISTEMIC_REJECTION_CONFIDENCE_SCALE,
-    EPISTEMIC_REJECTION_LR_SCALE, EPISTEMIC_TRUST_SCALE, EPISTEMIC_TRUST_THRESHOLD,
-    EVOLUTION_NEGATIVE_EXPLORATION_MAX, EVOLUTION_NEGATIVE_EXPLORATION_SCALE,
-    EVOLUTION_PHI_THRESHOLD, EVOLUTION_POSITIVE_CONFIDENCE_MAX,
-    EVOLUTION_POSITIVE_CONFIDENCE_SCALE, HARMONIC_ALL_CLEAR_BOOST, HARMONIC_INTERFERENCE_DAMPEN,
-    HARMONIC_INTERFERENCE_MAX_COUNT, HARMONIC_INTERFERENCE_MAX_DAMPEN,
-    KOSMIC_HIGH_COHERENCE_CONFIDENCE_BOOST, KOSMIC_HIGH_COHERENCE_THRESHOLD,
-    KOSMIC_LOW_COHERENCE_EXPLORATION_DAMPEN, KOSMIC_LOW_COHERENCE_THRESHOLD, KOSMIC_SONG_INTERVAL,
-    LOVE_RESONANCE_CONFIDENCE_SCALE, LOVE_RESONANCE_LR_FRACTION, LOVE_RESONANCE_THRESHOLD,
-    LOW_QUALITY_EXPLORATION_DAMPEN, PHI_DIVERGENCE_MAX, PHI_DIVERGENCE_SCALE,
-    PHI_DIVERGENCE_THRESHOLD, PHI_RELATIONAL_OXY_SCALE, PHI_RELATIONAL_OXY_THRESHOLD,
-    QUALITY_EMA_DECAY, QUALITY_HIGH_LR_SCALE, QUALITY_LR_CLAMP_MAX, QUALITY_LR_CLAMP_MIN,
-    REASONING_CHAIN_BOOST_SCALE, REASONING_CHAIN_CONFIDENCE_THRESHOLD, REST_BINDING_DAMPEN,
-    REST_COHERENCE_WEIGHT, REST_MODULATION_BINDING_FRAC, REST_MODULATION_COHERENCE_FRAC,
-    SOCIAL_LR_BASE, SOCIAL_LR_RANGE, SPEECH_RATE_CLAMP_MAX, SPEECH_RATE_CLAMP_MIN,
-    STRUCTURAL_BOTTLENECK_LR_SCALE, STRUCTURAL_BOTTLENECK_THRESHOLD,
-    STRUCTURAL_EMERGENCE_CONFIDENCE_BOOST, STRUCTURAL_EMERGENCE_CONFIDENCE_THRESHOLD,
-    SUBSYSTEM_LR_FACTOR_MAX, SUBSYSTEM_LR_FACTOR_MIN, TEMPORAL_CHAIN_DEEP_LR_SCALE,
-    TEMPORAL_CHAIN_DEEP_THRESHOLD, TEMPORAL_CHAIN_SHALLOW_LR_SCALE,
-    TEMPORAL_CHAIN_SHALLOW_THRESHOLD, TOM_ACCURACY_HIGH, TOM_ACCURACY_LOW, TOM_ACCURACY_SCALE,
+    AFFECT_AROUSAL_HIGH_LR_SCALE, AFFECT_AROUSAL_HIGH_THRESHOLD, AFFECT_AROUSAL_LOW_EXPLORE_DAMPEN,
+    AFFECT_AROUSAL_LOW_THRESHOLD, AFFECT_VALENCE_NEGATIVE_EXPLORE_BOOST,
+    AFFECT_VALENCE_NEGATIVE_THRESHOLD, AFFECT_VALENCE_POSITIVE_CONFIDENCE_BOOST,
+    AFFECT_VALENCE_POSITIVE_THRESHOLD, AGREEMENT_COHERENCE_VELOCITY_THRESHOLD,
+    AGREEMENT_CONFIDENCE_COUPLING_SCALE, AGREEMENT_CONFIDENCE_COUPLING_THRESHOLD,
+    AGREEMENT_CRITICAL_CAUTION_SCALE, AGREEMENT_CRITICAL_THRESHOLD, AGREEMENT_EMA_DECAY,
+    AGREEMENT_HIGH_CONFIDENCE_SCALE, AGREEMENT_LOW_CONFIDENCE_SCALE,
+    AGREEMENT_LOW_EXPLORATION_SCALE, AGREEMENT_VELOCITY_DROP_EXPLORATION,
+    AGREEMENT_VELOCITY_DROP_LR, AGREEMENT_VELOCITY_DROP_THRESHOLD, ATTENTION_BUDGET_GATED_LR_SCALE,
+    CAUSAL_URGENCY_CONFIDENCE, COMPOUND_INSTABILITY_ERROR_SLOPE, COMPOUND_INSTABILITY_EXPLORATION,
+    COMPOUND_INSTABILITY_LR_SCALE, COMPOUND_INSTABILITY_VELOCITY, CONSCIOUSNESS_GRADIENT_LR_SCALE,
+    CONSCIOUSNESS_GRADIENT_THRESHOLD, CONTEXT_PHI_SCALE_BASE, CONTEXT_PHI_SCALE_RANGE,
+    CROSS_MODULE_AGREEMENT_HIGH, CROSS_MODULE_AGREEMENT_LOW, CROSS_MODULE_VARIANCE_AMPLIFICATION,
+    EMPATHIC_TONE_RATE_SCALE, EMPATHIC_TONE_THRESHOLD, ENTROPY_LR_MIN, ENTROPY_LR_RANGE,
+    EPISTEMIC_APPROVAL_LR_SCALE, EPISTEMIC_APPROVAL_THRESHOLD, EPISTEMIC_CAUTION_SCALE,
+    EPISTEMIC_CAUTION_THRESHOLD, EPISTEMIC_CONFLICT_EXPLORE_SCALE,
+    EPISTEMIC_PHI_HIGH_CONFIDENCE_SCALE, EPISTEMIC_PHI_HIGH_THRESHOLD,
+    EPISTEMIC_PHI_LOW_CONFIDENCE_SCALE, EPISTEMIC_PHI_LOW_THRESHOLD,
+    EPISTEMIC_REJECTION_CONFIDENCE_SCALE, EPISTEMIC_REJECTION_LR_SCALE, EPISTEMIC_TRUST_SCALE,
+    EPISTEMIC_TRUST_THRESHOLD, EVOLUTION_NEGATIVE_EXPLORATION_MAX,
+    EVOLUTION_NEGATIVE_EXPLORATION_SCALE, EVOLUTION_PHI_THRESHOLD,
+    EVOLUTION_POSITIVE_CONFIDENCE_MAX, EVOLUTION_POSITIVE_CONFIDENCE_SCALE,
+    HARMONIC_ALL_CLEAR_BOOST, HARMONIC_INTERFERENCE_DAMPEN, HARMONIC_INTERFERENCE_MAX_COUNT,
+    HARMONIC_INTERFERENCE_MAX_DAMPEN, HARMONIES_ALIGNED_CONFIDENCE_BOOST,
+    HARMONIES_ALIGNED_THRESHOLD, HARMONIES_MISALIGNMENT_EXPLORE_BOOST,
+    HARMONIES_MISALIGNMENT_THRESHOLD, HOLOGRAPHIC_UNITY_HIGH_CONFIDENCE_SCALE,
+    HOLOGRAPHIC_UNITY_HIGH_THRESHOLD, HOLOGRAPHIC_UNITY_LOW_LR_DAMPEN,
+    HOLOGRAPHIC_UNITY_LOW_THRESHOLD, KOSMIC_HIGH_COHERENCE_CONFIDENCE_BOOST,
+    KOSMIC_HIGH_COHERENCE_THRESHOLD, KOSMIC_LOW_COHERENCE_EXPLORATION_DAMPEN,
+    KOSMIC_LOW_COHERENCE_THRESHOLD, KOSMIC_SONG_INTERVAL, LOVE_RESONANCE_CONFIDENCE_SCALE,
+    LOVE_RESONANCE_LR_FRACTION, LOVE_RESONANCE_THRESHOLD, LOW_QUALITY_EXPLORATION_DAMPEN,
+    NARRATIVE_SELF_PHI_CONFIDENCE_SCALE, NARRATIVE_SELF_PHI_CONFIDENCE_THRESHOLD,
+    NARRATIVE_SELF_PHI_LOW_EXPLORE_BOOST, NARRATIVE_SELF_PHI_LOW_THRESHOLD,
+    PHENOMENAL_BINDING_HIGH_LR_DAMPEN, PHENOMENAL_BINDING_HIGH_THRESHOLD,
+    PHENOMENAL_BINDING_LOW_EXPLORE_BOOST, PHENOMENAL_BINDING_LOW_THRESHOLD, PHI_DIVERGENCE_MAX,
+    PHI_DIVERGENCE_SCALE, PHI_DIVERGENCE_THRESHOLD, PHI_RELATIONAL_OXY_SCALE,
+    PHI_RELATIONAL_OXY_THRESHOLD, PIPELINE_CONSCIOUSNESS_CAUTION_SCALE,
+    PIPELINE_CONSCIOUSNESS_HIGH_THRESHOLD, PIPELINE_CONSCIOUSNESS_LOW_THRESHOLD,
+    PIPELINE_CONSCIOUSNESS_RELAX_SCALE, QUALITY_EMA_DECAY, QUALITY_HIGH_LR_SCALE,
+    QUALITY_LR_CLAMP_MAX, QUALITY_LR_CLAMP_MIN, REASONING_CHAIN_BOOST_SCALE,
+    REASONING_CHAIN_CONFIDENCE_THRESHOLD, REST_BINDING_DAMPEN, REST_COHERENCE_WEIGHT,
+    REST_MODULATION_BINDING_FRAC, REST_MODULATION_COHERENCE_FRAC, SOCIAL_LR_BASE, SOCIAL_LR_RANGE,
+    SPEECH_RATE_CLAMP_MAX, SPEECH_RATE_CLAMP_MIN, STRUCTURAL_BOTTLENECK_LR_SCALE,
+    STRUCTURAL_BOTTLENECK_THRESHOLD, STRUCTURAL_EMERGENCE_CONFIDENCE_BOOST,
+    STRUCTURAL_EMERGENCE_CONFIDENCE_THRESHOLD, SUBSYSTEM_LR_FACTOR_MAX, SUBSYSTEM_LR_FACTOR_MIN,
+    TEMPORAL_CHAIN_DEEP_LR_SCALE, TEMPORAL_CHAIN_DEEP_THRESHOLD, TEMPORAL_CHAIN_SHALLOW_LR_SCALE,
+    TEMPORAL_CHAIN_SHALLOW_THRESHOLD, TEMPORAL_COHERENCE_CONFIDENCE_SCALE,
+    TEMPORAL_COHERENCE_HIGH_THRESHOLD, TEMPORAL_COHERENCE_LOW_EXPLORE_BOOST,
+    TEMPORAL_COHERENCE_LOW_THRESHOLD, THETA_PHASE_ADVANCE, THETA_PHI_MODULATION_AMPLITUDE,
+    THETA_PHI_SMOOTH_ALPHA, TOM_ACCURACY_HIGH, TOM_ACCURACY_LOW, TOM_ACCURACY_SCALE,
     TRUST_DECAY_FACTOR, TRUST_SIGNAL_MIDPOINT, TRUST_SIGNAL_RATE, UNIFIED_QUALITY_AGREEMENT_WEIGHT,
     UNIFIED_QUALITY_ANOMALY_WEIGHT, UNIFIED_QUALITY_PREDICTION_WEIGHT,
+    VALUE_CACHE_HIT_CONFIDENCE_SCALE, VALUE_CACHE_HIT_CONFIDENCE_THRESHOLD,
 };
 use super::{CognitiveLoopService, CycleState};
 
@@ -401,7 +421,7 @@ impl CognitiveLoopService {
         // Science: Dehaene (2014) — global workspace ignition requires integrated processing.
         self.carryover.quality.last_pipeline_consciousness = pipeline_consciousness;
         let _pipeline_consciousness_gated = if pipeline_consciousness
-            > PIPELINE_CONSCIOUSNESS_HIGH_THRESHOLD
+            > PIPELINE_CONSCIOUSNESS_HIGH_THRESHOLD as f64
             && self.stats.total_cycles > 15
         {
             self.scale_threshold(
@@ -409,7 +429,7 @@ impl CognitiveLoopService {
                 PIPELINE_CONSCIOUSNESS_RELAX_SCALE,
             );
             true
-        } else if pipeline_consciousness < PIPELINE_CONSCIOUSNESS_LOW_THRESHOLD
+        } else if pipeline_consciousness < PIPELINE_CONSCIOUSNESS_LOW_THRESHOLD as f64
             && pipeline_consciousness > 0.0
             && self.stats.total_cycles > 15
         {
@@ -1324,6 +1344,100 @@ impl CognitiveLoopService {
             let boost = ((holographic_unity - HOLOGRAPHIC_UNITY_HIGH_THRESHOLD)
                 * HOLOGRAPHIC_UNITY_HIGH_CONFIDENCE_SCALE as f64) as f32;
             self.adjust_confidence("holographic_unity_high", boost);
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // SESSION 17: AFFECTIVE + NARRATIVE + HARMONICS WIRING
+        // Re-wire couplings removed by other sessions; add new harmonic feedback.
+        // ═══════════════════════════════════════════════════════════════════════
+
+        // Item 1: Affective consciousness arousal → LR/exploration modulation.
+        // High arousal accelerates learning; low arousal dampens exploration.
+        // Science: Yerkes-Dodson (1908) — inverted-U arousal-performance relationship.
+        if affect_cons_arousal > AFFECT_AROUSAL_HIGH_THRESHOLD && self.stats.total_cycles > 10 {
+            self.scale_lr("affect_high_arousal", AFFECT_AROUSAL_HIGH_LR_SCALE);
+        } else if affect_cons_arousal < AFFECT_AROUSAL_LOW_THRESHOLD
+            && affect_cons_arousal > 0.0
+            && self.stats.total_cycles > 10
+        {
+            self.scale_exploration("affect_low_arousal", AFFECT_AROUSAL_LOW_EXPLORE_DAMPEN);
+        }
+
+        // Item 2: Affective consciousness valence → exploration/confidence modulation.
+        // Negative valence boosts exploration (search for better states);
+        // positive valence boosts confidence (current approach is working).
+        // Science: Fredrickson (2001) — broaden-and-build; negative affect narrows → explore.
+        if affect_cons_valence < AFFECT_VALENCE_NEGATIVE_THRESHOLD && self.stats.total_cycles > 10 {
+            self.adjust_exploration(
+                "affect_negative_valence",
+                AFFECT_VALENCE_NEGATIVE_EXPLORE_BOOST,
+            );
+        } else if affect_cons_valence > AFFECT_VALENCE_POSITIVE_THRESHOLD
+            && self.stats.total_cycles > 10
+        {
+            self.adjust_confidence(
+                "affect_positive_valence",
+                AFFECT_VALENCE_POSITIVE_CONFIDENCE_BOOST,
+            );
+        }
+
+        // Item 3: Narrative self-phi → confidence/exploration coupling.
+        // High narrative coherence = stable identity → ground confidence.
+        // Low narrative coherence = fragmented self → explore for integration.
+        // Science: Gallagher (2000) — narrative self-model supports action coherence.
+        if narrative_gwt_self_psi > NARRATIVE_SELF_PHI_CONFIDENCE_THRESHOLD
+            && self.stats.total_cycles > 15
+        {
+            let boost = ((narrative_gwt_self_psi - NARRATIVE_SELF_PHI_CONFIDENCE_THRESHOLD)
+                * NARRATIVE_SELF_PHI_CONFIDENCE_SCALE as f64) as f32;
+            self.adjust_confidence("narrative_self_coherent", boost);
+        } else if narrative_gwt_self_psi > 0.0
+            && narrative_gwt_self_psi < NARRATIVE_SELF_PHI_LOW_THRESHOLD
+            && self.stats.total_cycles > 15
+        {
+            self.adjust_exploration(
+                "narrative_self_fragmented",
+                NARRATIVE_SELF_PHI_LOW_EXPLORE_BOOST,
+            );
+        }
+
+        // Item 4: Harmonies alignment → exploration modulation.
+        // Low alignment = value misalignment → explore to find aligned actions.
+        // High alignment = value-congruent → boost confidence.
+        // Science: Schwartz (2012) — value congruence strengthens self-efficacy.
+        if harmonies_alignment < HARMONIES_MISALIGNMENT_THRESHOLD
+            && harmonies_alignment > 0.0
+            && self.stats.total_cycles > 15
+        {
+            self.adjust_exploration("harmony_misaligned", HARMONIES_MISALIGNMENT_EXPLORE_BOOST);
+        } else if harmonies_alignment > HARMONIES_ALIGNED_THRESHOLD && self.stats.total_cycles > 15
+        {
+            self.adjust_confidence("harmony_aligned", HARMONIES_ALIGNED_CONFIDENCE_BOOST);
+        }
+
+        // Item 5: Value cache hit rate → confidence recovery.
+        // High cache hit = pattern recognition working → confident in predictions.
+        // Science: Logan (1988) — instance-based automaticity from repeated retrieval.
+        if value_cache_hit_rate > VALUE_CACHE_HIT_CONFIDENCE_THRESHOLD
+            && self.stats.total_cycles > 20
+        {
+            self.adjust_confidence(
+                "value_cache_high",
+                (value_cache_hit_rate - VALUE_CACHE_HIT_CONFIDENCE_THRESHOLD)
+                    * VALUE_CACHE_HIT_CONFIDENCE_SCALE,
+            );
+        }
+
+        // Item 6: Consciousness gradient magnitude → stability-aware LR modulation.
+        // Large gradient = consciousness shifting rapidly → dampen LR for stability.
+        // Science: Baars (2005) — global workspace transitions require stabilization.
+        if consciousness_gradient_magnitude > CONSCIOUSNESS_GRADIENT_THRESHOLD
+            && self.stats.total_cycles > 15
+        {
+            self.scale_lr(
+                "consciousness_gradient_high",
+                CONSCIOUSNESS_GRADIENT_LR_SCALE,
+            );
         }
 
         FeedbackPhaseResult {

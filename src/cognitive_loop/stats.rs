@@ -550,6 +550,20 @@ pub struct LoopStats {
     pub broca_generation_count: u64,
 
     // ═══════════════════════════════════════════════════════════════════════════
+    // TOPOLOGICAL IMMUNE SYSTEM
+    // ═══════════════════════════════════════════════════════════════════════════
+    /// Whether the topological immune system is currently blocking requests.
+    /// Set by escalation enforcement when `EscalationLevel::Block` is active.
+    /// The facade should check this to reject or attenuate the current response.
+    pub escalation_blocked: bool,
+    /// Cumulative count of cycles where escalation was at Warn or higher.
+    pub escalation_warn_count: u64,
+    /// Cumulative count of cycles where escalation was at Throttle or higher.
+    pub escalation_throttle_count: u64,
+    /// Cumulative count of cycles where escalation reached Block.
+    pub escalation_block_count: u64,
+
+    // ═══════════════════════════════════════════════════════════════════════════
     // SEMANTIC ENCODER STATS (Background Qwen3 → HdcBridge telemetry)
     // ═══════════════════════════════════════════════════════════════════════════
     /// Cosine similarity between trigram BinaryHV and semantic BinaryHV.
