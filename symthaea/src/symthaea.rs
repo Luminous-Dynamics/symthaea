@@ -762,8 +762,6 @@ impl Symthaea {
         Ok(instance)
     }
 
-    /// Create a Symthaea instance with a custom Liquid-Mamba configuration.
-    ///
     // NOTE: `with_liquid_mamba_config()` removed — zero callers, dead code (Mar 2026).
 
     /// Create a Symthaea instance with persistent database storage.
@@ -799,7 +797,6 @@ impl Symthaea {
         self.database.as_ref().map(Arc::clone)
     }
 
-    /// Feed MCTS plan confidence from the reasoning engine into code generation.
     // NOTE: `feed_mcts_plan_confidence()` removed — zero callers, dead code (Mar 2026).
 
     /// Attach the power SSM sensor (INA219 or simulated) to the sensor registry.

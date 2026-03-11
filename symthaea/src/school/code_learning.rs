@@ -21,8 +21,8 @@
 use std::collections::HashMap;
 
 use crate::language::code_executor::{try_auto_fix, CodeExecutor, ExecutionResult};
-use crate::language::code_generator::{CodeContext, CodeGenerator, GeneratedCode};
-use crate::language::code_intent::{CodeIntent, CodeSpec, CodeTarget};
+use crate::language::code_generator::{CodeContext, CodeGenerator};
+use crate::language::code_intent::{CodeIntent, CodeSpec, CodeTarget, EntityKind};
 
 /// Maximum auto-fix retry attempts per generation
 const MAX_RETRIES: usize = 3;
@@ -749,7 +749,7 @@ impl CodeLearningEngine {
 
         // 1. Build intent and context
         let intent = CodeIntent::Create {
-            target: CodeTarget::new("code_learning"),
+            target: CodeTarget::new("code_learning", EntityKind::Module),
             spec: lesson.spec.clone(),
         };
 

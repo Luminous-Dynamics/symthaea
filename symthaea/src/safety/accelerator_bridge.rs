@@ -10,9 +10,9 @@
 
 use super::agent::{SafetyAgent, SafetyAssessment, SafetyLevel, SafetyMetrics};
 use super::gate::{safety_gate, SafetyGateResult};
-use symthaea_physics::accelerator::{
-    AcceleratorFepAction, AcceleratorOutput, AcceleratorSafetyLevel,
-};
+#[cfg(test)]
+use symthaea_physics::accelerator::AcceleratorFepAction;
+use symthaea_physics::accelerator::{AcceleratorOutput, AcceleratorSafetyLevel};
 
 /// Adapter that translates Accelerator outputs into Safety Agent inputs.
 pub struct AcceleratorSafetyAdapter {

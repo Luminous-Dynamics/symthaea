@@ -1268,7 +1268,7 @@ impl MultiTheoryConsciousness {
         }
 
         // 4. Submit to global workspace
-        let workspace_id = self.workspace.submit(
+        let _workspace_id = self.workspace.submit(
             SubsystemId::Language,
             input.to_string(),
             primes.to_vec(),

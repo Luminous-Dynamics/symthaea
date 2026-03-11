@@ -53,7 +53,7 @@ pub struct CandleBackend {
 }
 
 impl CandleBackend {
-    pub fn new(model_id: &str, revision: &str, file_name: &str) -> Result<Self> {
+    pub fn new(model_id: &str, _revision: &str, file_name: &str) -> Result<Self> {
         let device = Device::Cpu; // Default to CPU for 6W edge logic, can be optimized later
         let api = Api::new()?;
         let repo = api.repo(Repo::model(model_id.to_string()));

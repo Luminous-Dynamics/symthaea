@@ -306,7 +306,7 @@ impl BertLayerExtractor {
         // Intermediate layer extraction requires upstream candle-transformers changes
         // to expose encoder layers publicly (tracked upstream, not forked yet).
 
-        let extended_mask = Self::get_extended_attention_mask(&attention_mask)?;
+        let _extended_mask = Self::get_extended_attention_mask(&attention_mask)?;
 
         // Access the encoder layers directly through the model's encoder field
         // This requires modifying how we interact with the model

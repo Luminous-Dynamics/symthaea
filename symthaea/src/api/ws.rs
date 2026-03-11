@@ -18,7 +18,7 @@ use std::sync::Arc;
 use symthaea_core::hdc::consciousness_topology::PersistentFeature;
 use tokio::sync::Mutex;
 
-use crate::hdc::moral_topology::{ConvergenceExplanation, PersistenceDiagram, SignalBreakdown};
+use crate::hdc::moral_topology::{ConvergenceExplanation, PersistenceDiagram};
 use symthaea_types::N_HARMONIES;
 
 use super::demo_runner::DemoRunner;

@@ -856,17 +856,17 @@ pub const TRAINING_MAX_IMPORTANCE: f32 = 2.0;
 // VALIDATION
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// Validate all threshold ordering and non-overlap constraints.
-///
-/// Panics with a descriptive message if any invariant is violated.
-/// Called once at startup (via `CognitiveLoopService::new()`) to catch
-/// configuration errors early.
-///
-/// # Invariants
-///
-/// 1. `MORAL_CONCERN_THRESHOLD < 0 < MORAL_BENEFIT_THRESHOLD`
-/// 2. `FEP_LR_DECAY ∈ (0, 1)` (must actually decay)
-/// 3. `POLICY_SOFT_THRESHOLD ∈ (0, 1)` (valid probability)
+// Validate all threshold ordering and non-overlap constraints.
+//
+// Panics with a descriptive message if any invariant is violated.
+// Called once at startup (via `CognitiveLoopService::new()`) to catch
+// configuration errors early.
+//
+// # Invariants
+//
+// 1. `MORAL_CONCERN_THRESHOLD < 0 < MORAL_BENEFIT_THRESHOLD`
+// 2. `FEP_LR_DECAY ∈ (0, 1)` (must actually decay)
+// 3. `POLICY_SOFT_THRESHOLD ∈ (0, 1)` (valid probability)
 // ═══════════════════════════════════════════════════════════════════════════════
 // KOSMIC SONG (Unified Identity Synthesis)
 // ═══════════════════════════════════════════════════════════════════════════════

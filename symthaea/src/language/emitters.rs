@@ -846,7 +846,7 @@ fn infer_rust_body(
 fn infer_composed_body(
     purpose: &str,
     params: &[(String, String)],
-    return_type: Option<&str>,
+    _return_type: Option<&str>,
 ) -> Option<String> {
     if params.is_empty() {
         return None;
@@ -980,7 +980,6 @@ fn infer_composed_body(
                     ", "
                 };
                 iter_chain.push(format!(".collect::<Vec<_>>()"));
-                needs_collect = false;
                 // Return the join expression
                 let dedup_line = if needs_dedup {
                     "\n    tmp.dedup();"
