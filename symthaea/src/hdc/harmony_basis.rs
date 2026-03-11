@@ -674,17 +674,19 @@ mod tests {
 
     #[test]
     fn test_love_coherence_single_axis() {
-        // Only one harmony active → low diversity
+        // Strongly peaked: one harmony at 1.0, rest strongly negative → low diversity
+        // (softmax at temperature=1.0 requires large separation for peaking)
         let matrix = HarmonyInteractionMatrix::default();
-        let coords = [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+        let coords = [5.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0];
         let lc = matrix.love_coherence(&coords);
         assert!(
             lc.diversity_factor < 0.7,
             "Single-axis domination should have low diversity, got {}",
             lc.diversity_factor
         );
+        // harmony_mean is negative (5 - 7) / 8 = -0.25, so mean_01 < 0.5
         assert!(
-            lc.value < 0.5,
+            lc.value < 0.3,
             "Single-axis should yield lower LoveCoherence, got {}",
             lc.value
         );

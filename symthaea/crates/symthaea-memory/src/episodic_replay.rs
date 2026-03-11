@@ -1002,6 +1002,48 @@ impl EpisodicMemory {
             .collect()
     }
 
+    /// Retrieve episodes most similar to a given semantic embedding.
+    ///
+    /// Returns up to `top_k` `(Episode, f32)` pairs sorted by descending
+    /// cosine similarity.  Only episodes that carry a semantic embedding are
+    /// considered.  Returns an empty `Vec` when the store is empty or no
+    /// episodes have embeddings.
+    pub fn retrieve_by_embedding_similarity(
+        &self,
+        query: &[f32],
+        top_k: usize,
+    ) -> Vec<(Episode, f32)> {
+        if query.is_empty() {
+            return Vec::new();
+        }
+        let query_norm: f32 = query.iter().map(|x| x * x).sum::<f32>().sqrt();
+        if query_norm < 1e-12 {
+            return Vec::new();
+        }
+
+        let mut scored: Vec<(Episode, f32)> = self
+            .episodes
+            .iter()
+            .filter_map(|pe| {
+                let emb = pe.episode.semantic_embedding.as_ref()?;
+                if emb.len() != query.len() {
+                    return None;
+                }
+                let dot: f32 = emb.iter().zip(query.iter()).map(|(a, b)| a * b).sum();
+                let emb_norm: f32 = emb.iter().map(|x| x * x).sum::<f32>().sqrt();
+                if emb_norm < 1e-12 {
+                    return None;
+                }
+                let sim = dot / (emb_norm * query_norm);
+                Some((pe.episode.clone(), sim))
+            })
+            .collect();
+
+        scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        scored.truncate(top_k);
+        scored
+    }
+
     /// The Art of Forgetting: Causal Pruning.
     ///
     /// Removes episodes whose survival value falls below the threshold.
