@@ -105,7 +105,7 @@ impl LanguageController {
     /// Create a new controller from a genesis seed and config.
     pub fn new(genesis: &GenesisSeed, config: &LanguageControllerConfig) -> Self {
         let neuron_config = UnifiedConfig {
-            tau_base: 0.02,                   // 20ms — matches token generation rate
+            tau_base: 0.02,                    // 20ms — matches token generation rate
             backbone_tau: config.backbone_tau, // Configurable state dependency for coherent sequences
             dimension: HDC_DIMENSION,
             learning_rate: config.learning_rate,

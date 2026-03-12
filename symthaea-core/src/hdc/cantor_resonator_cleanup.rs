@@ -157,12 +157,7 @@ impl BinaryCodebook {
     /// Returns `true` if the vector was added, `false` if rejected as duplicate.
     /// Prevents codebook degradation from repeated similar broadcasts.
     /// Science: Hopfield (1982) — decorrelated patterns maximize associative capacity.
-    pub fn add_if_diverse(
-        &mut self,
-        label: &str,
-        vector: BinaryHV,
-        max_similarity: f32,
-    ) -> bool {
+    pub fn add_if_diverse(&mut self, label: &str, vector: BinaryHV, max_similarity: f32) -> bool {
         // Check if label already exists (update in place)
         if self.entries.iter().any(|(l, _)| l == label) {
             self.add(label, vector);
@@ -225,7 +220,10 @@ impl BinaryCodebook {
 
     /// Count entries whose label starts with the given prefix.
     pub fn count_by_prefix(&self, prefix: &str) -> usize {
-        self.entries.iter().filter(|(l, _)| l.starts_with(prefix)).count()
+        self.entries
+            .iter()
+            .filter(|(l, _)| l.starts_with(prefix))
+            .count()
     }
 }
 

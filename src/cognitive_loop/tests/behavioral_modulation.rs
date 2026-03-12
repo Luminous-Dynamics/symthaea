@@ -131,8 +131,14 @@ fn living_mind_signals_zero_without_feature() {
     for (i, r) in results.iter().enumerate() {
         let m = &r.metadata;
         // Raw signals should be finite (even if 0.0)
-        assert!(m.living_mind_vitality.is_finite(), "NaN vitality at cycle {i}");
-        assert!(m.living_mind_coherence.is_finite(), "NaN coherence at cycle {i}");
+        assert!(
+            m.living_mind_vitality.is_finite(),
+            "NaN vitality at cycle {i}"
+        );
+        assert!(
+            m.living_mind_coherence.is_finite(),
+            "NaN coherence at cycle {i}"
+        );
 
         // When signal is 0.0, the > 0.0 guard prevents modulation from firing
         if m.living_mind_vitality == 0.0 {
@@ -310,10 +316,22 @@ fn no_nan_in_consciousness_metrics_across_cycles() {
 
     for (i, r) in results.iter().enumerate() {
         let m = &r.metadata;
-        assert!(m.actual_effective_lr.is_finite(), "NaN in actual_effective_lr at cycle {i}");
-        assert!(m.consciousness_level.is_finite(), "NaN in consciousness_level at cycle {i}");
-        assert!(m.holographic_unity.is_finite(), "NaN in holographic_unity at cycle {i}");
-        assert!(m.holographic_binding.is_finite(), "NaN in holographic_binding at cycle {i}");
+        assert!(
+            m.actual_effective_lr.is_finite(),
+            "NaN in actual_effective_lr at cycle {i}"
+        );
+        assert!(
+            m.consciousness_level.is_finite(),
+            "NaN in consciousness_level at cycle {i}"
+        );
+        assert!(
+            m.holographic_unity.is_finite(),
+            "NaN in holographic_unity at cycle {i}"
+        );
+        assert!(
+            m.holographic_binding.is_finite(),
+            "NaN in holographic_binding at cycle {i}"
+        );
     }
 }
 

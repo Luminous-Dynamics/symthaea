@@ -23,9 +23,12 @@ use crate::generator::BrocaGenerator;
 use crate::tokenizer::BpeTokenizer;
 
 /// A single training pair: thought channels + target text.
+///
+/// The `channels` field uses `Vec<f32>` for backward compatibility with both
+/// legacy 20-channel and current 24-channel JSONL training data.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TrainingPair {
-    pub channels: [f32; 20],
+    pub channels: Vec<f32>,
     pub target_text: String,
     #[serde(default)]
     pub target_ids: Vec<u32>,
@@ -36,10 +39,27 @@ impl TrainingPair {
     pub fn new(channels: ThoughtChannels, target_text: String, tokenizer: &BpeTokenizer) -> Self {
         let target_ids = tokenizer.encode(&target_text);
         Self {
-            channels: channels.channels,
+            channels: channels.channels.to_vec(),
             target_text,
             target_ids,
         }
+    }
+
+    /// Convert channels to ThoughtChannels, padding legacy 20-channel data with defaults.
+    pub fn to_thought_channels(&self) -> ThoughtChannels {
+        use crate::encoder::{LEGACY_NUM_CHANNELS, NEW_CHANNEL_DEFAULTS, NUM_CHANNELS};
+        let mut tc = ThoughtChannels::default();
+        let n = self.channels.len().min(NUM_CHANNELS);
+        tc.channels[..n].copy_from_slice(&self.channels[..n]);
+        // If legacy data (< 24 channels), fill new channels with defaults
+        if self.channels.len() < NUM_CHANNELS {
+            for i in self.channels.len()..NUM_CHANNELS {
+                if i >= LEGACY_NUM_CHANNELS {
+                    tc.channels[i] = NEW_CHANNEL_DEFAULTS[i - LEGACY_NUM_CHANNELS];
+                }
+            }
+        }
+        tc
     }
 }
 
@@ -487,9 +507,7 @@ pub fn train_with_adam(
                 continue;
             }
 
-            let channels = ThoughtChannels {
-                channels: pair.channels,
-            };
+            let channels = pair.to_thought_channels();
             let thought_hv = generator.encoder().encode(&channels);
 
             // Reset controller for this sequence (unless carrying state)
@@ -1019,7 +1037,7 @@ pub fn generate_curriculum(tokenizer: &BpeTokenizer) -> TrainingDataset {
         let prompt = thought_to_prompt(thought);
         let ids = tokenizer.encode(&prompt);
         dataset.pairs.push(TrainingPair {
-            channels: thought.channels,
+            channels: thought.channels.to_vec(),
             target_text: prompt,
             target_ids: ids,
         });
@@ -1045,9 +1063,7 @@ pub fn compute_validation_loss(
             continue;
         }
 
-        let channels = ThoughtChannels {
-            channels: pair.channels,
-        };
+        let channels = pair.to_thought_channels();
         let thought_hv = generator.encoder().encode(&channels);
         generator.controller_mut().reset();
 
@@ -1123,7 +1139,7 @@ mod tests {
         let channels = ThoughtChannels::default();
         let pair = TrainingPair::new(channels, "hello world".to_string(), &tok);
         assert!(!pair.target_ids.is_empty());
-        assert_eq!(pair.channels.len(), 20);
+        assert_eq!(pair.channels.len(), crate::encoder::NUM_CHANNELS);
     }
 
     #[test]

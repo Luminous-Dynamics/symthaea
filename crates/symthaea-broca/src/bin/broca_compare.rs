@@ -132,9 +132,7 @@ fn main() {
     let mut lm_results = Vec::new();
 
     for (i, pair) in dataset.pairs.iter().take(sample_count).enumerate() {
-        let channels = ThoughtChannels {
-            channels: pair.channels,
-        };
+        let channels = pair.to_thought_channels();
         let intent_idx = dominant_intent(&pair.channels);
         let intent_name = INTENT_NAMES[intent_idx];
 
@@ -220,7 +218,7 @@ struct SampleResult {
     elapsed_ms: f32,
 }
 
-fn dominant_intent(channels: &[f32; 20]) -> usize {
+fn dominant_intent(channels: &[f32]) -> usize {
     (0..8)
         .max_by(|&a, &b| channels[a].total_cmp(&channels[b]))
         .unwrap_or(7)

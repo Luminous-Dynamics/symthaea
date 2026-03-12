@@ -39,12 +39,18 @@ fn test_recovery_from_sustained_high_error() {
 
     // System should have adapted — not crashed
     let stats = service.stats();
-    assert!(stats.avg_prediction_error.is_finite(), "PE should remain finite after stress");
+    assert!(
+        stats.avg_prediction_error.is_finite(),
+        "PE should remain finite after stress"
+    );
     assert!(stats.total_cycles == 150, "All cycles should complete");
 
     // Prediction confidence should have decreased but not collapsed to exactly 0
     let post_confidence = service.prediction_confidence();
-    assert!(post_confidence.is_finite(), "Confidence should remain finite");
+    assert!(
+        post_confidence.is_finite(),
+        "Confidence should remain finite"
+    );
     assert!(post_confidence >= 0.0, "Confidence should not go negative");
 
     // Recovery: feed consistent input and observe error decrease
@@ -75,7 +81,10 @@ fn test_buffer_saturation_no_panic() {
     // Run 200 cycles — buffer will saturate immediately and must evict
     for i in 0..200 {
         let result = service.cycle(&format!("cycle {i}"));
-        assert!(result.prediction_error.is_finite(), "PE finite at cycle {i}");
+        assert!(
+            result.prediction_error.is_finite(),
+            "PE finite at cycle {i}"
+        );
     }
 
     let stats = service.stats();
@@ -98,7 +107,10 @@ fn test_empty_input_starvation() {
 
     for _ in 0..100 {
         let result = service.cycle("");
-        assert!(result.prediction_error.is_finite(), "PE must stay finite on empty input");
+        assert!(
+            result.prediction_error.is_finite(),
+            "PE must stay finite on empty input"
+        );
         assert!(
             result.metadata.pipeline_consciousness.is_finite(),
             "Consciousness must stay finite on empty input"
@@ -187,16 +199,25 @@ fn test_extreme_input_length() {
     // 100KB input
     let long_input = "word ".repeat(20_000);
     let result = service.cycle(&long_input);
-    assert!(result.prediction_error.is_finite(), "Long input should not cause NaN");
+    assert!(
+        result.prediction_error.is_finite(),
+        "Long input should not cause NaN"
+    );
 
     // Single character
     let result = service.cycle("a");
-    assert!(result.prediction_error.is_finite(), "Tiny input should not cause NaN");
+    assert!(
+        result.prediction_error.is_finite(),
+        "Tiny input should not cause NaN"
+    );
 
     // Unicode stress
     let unicode_input = "🧠💡🔬🧬🌊".repeat(100);
     let result = service.cycle(&unicode_input);
-    assert!(result.prediction_error.is_finite(), "Unicode input should not cause NaN");
+    assert!(
+        result.prediction_error.is_finite(),
+        "Unicode input should not cause NaN"
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

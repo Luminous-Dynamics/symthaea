@@ -52,6 +52,7 @@ impl Proposition {
     }
 
     /// Negate
+    #[allow(clippy::should_implement_trait)]
     pub fn not(self) -> Self {
         Proposition::Not(Box::new(self))
     }
@@ -103,8 +104,10 @@ impl Proposition {
                 vars.insert(name.clone());
             }
             Proposition::Not(p) => p.collect_vars(vars),
-            Proposition::And(p, q) | Proposition::Or(p, q) |
-            Proposition::Implies(p, q) | Proposition::Iff(p, q) => {
+            Proposition::And(p, q)
+            | Proposition::Or(p, q)
+            | Proposition::Implies(p, q)
+            | Proposition::Iff(p, q) => {
                 p.collect_vars(vars);
                 q.collect_vars(vars);
             }
@@ -380,9 +383,7 @@ impl LogicEngine {
     /// DPLL SAT solver for CNF formulas.
     ///
     /// Returns Some(assignment) if satisfiable, None if unsatisfiable.
-    pub fn dpll_sat(
-        prop: &Proposition,
-    ) -> (Option<HashMap<String, bool>>, ProofResult) {
+    pub fn dpll_sat(prop: &Proposition) -> (Option<HashMap<String, bool>>, ProofResult) {
         let clauses = Self::to_cnf(prop);
         let vars: Vec<String> = {
             let mut v: Vec<String> = prop.variables().into_iter().collect();
@@ -400,9 +401,9 @@ impl LogicEngine {
             proof_steps: steps,
             phi: if result { 0.4 } else { 0.3 },
             description: if result {
-                format!("SAT: satisfying assignment found")
+                "SAT: satisfying assignment found".to_string()
             } else {
-                format!("UNSAT: no satisfying assignment exists")
+                "UNSAT: no satisfying assignment exists".to_string()
             },
         };
 
@@ -502,11 +503,8 @@ impl LogicEngine {
                     return None;
                 }
                 // Remove the false literal from the clause
-                let new_clause: Vec<(String, bool)> = clause
-                    .iter()
-                    .filter(|(v, _)| v != var)
-                    .cloned()
-                    .collect();
+                let new_clause: Vec<(String, bool)> =
+                    clause.iter().filter(|(v, _)| v != var).cloned().collect();
                 Some(new_clause)
             })
             .collect()
@@ -515,10 +513,7 @@ impl LogicEngine {
     // ─── Natural Deduction ───────────────────────────────────────────────
 
     /// Modus Ponens: from P and P → Q, derive Q
-    pub fn modus_ponens(
-        premise: &Proposition,
-        implication: &Proposition,
-    ) -> Option<ProofResult> {
+    pub fn modus_ponens(premise: &Proposition, implication: &Proposition) -> Option<ProofResult> {
         if let Proposition::Implies(p, q) = implication {
             if **p == *premise {
                 return Some(ProofResult {
@@ -583,7 +578,10 @@ impl LogicEngine {
                             },
                         ],
                         phi: 0.4,
-                        description: format!("Modus Tollens: {} and {} → {}", neg_conclusion, implication, result),
+                        description: format!(
+                            "Modus Tollens: {} and {} → {}",
+                            neg_conclusion, implication, result
+                        ),
                     });
                 }
             }
@@ -592,10 +590,7 @@ impl LogicEngine {
     }
 
     /// Hypothetical Syllogism: from P → Q and Q → R, derive P → R
-    pub fn hypothetical_syllogism(
-        impl1: &Proposition,
-        impl2: &Proposition,
-    ) -> Option<ProofResult> {
+    pub fn hypothetical_syllogism(impl1: &Proposition, impl2: &Proposition) -> Option<ProofResult> {
         if let (Proposition::Implies(p, q1), Proposition::Implies(q2, r)) = (impl1, impl2) {
             if **q1 == **q2 {
                 let result = p.clone().implies(*r.clone());
@@ -622,7 +617,10 @@ impl LogicEngine {
                         },
                     ],
                     phi: 0.5,
-                    description: format!("Hypothetical Syllogism: {} and {} → {}", impl1, impl2, result),
+                    description: format!(
+                        "Hypothetical Syllogism: {} and {} → {}",
+                        impl1, impl2, result
+                    ),
                 });
             }
         }
@@ -634,10 +632,7 @@ impl LogicEngine {
     /// Robinson's unification algorithm.
     ///
     /// Returns a most general unifier (MGU) if the terms can be unified.
-    pub fn unify(
-        t1: &FOLTerm,
-        t2: &FOLTerm,
-    ) -> Option<HashMap<String, FOLTerm>> {
+    pub fn unify(t1: &FOLTerm, t2: &FOLTerm) -> Option<HashMap<String, FOLTerm>> {
         let mut subst = HashMap::new();
         if Self::unify_recursive(t1, t2, &mut subst) {
             Some(subst)
@@ -646,11 +641,7 @@ impl LogicEngine {
         }
     }
 
-    fn unify_recursive(
-        t1: &FOLTerm,
-        t2: &FOLTerm,
-        subst: &mut HashMap<String, FOLTerm>,
-    ) -> bool {
+    fn unify_recursive(t1: &FOLTerm, t2: &FOLTerm, subst: &mut HashMap<String, FOLTerm>) -> bool {
         let t1 = Self::apply_subst(t1, subst);
         let t2 = Self::apply_subst(t2, subst);
 
@@ -931,7 +922,11 @@ mod tests {
         let q_enc = q.encode();
         // Different propositions should have different encodings
         let sim = p_enc.similarity(&q_enc);
-        assert!(sim < 0.6, "Different atoms should have low similarity: {}", sim);
+        assert!(
+            sim < 0.6,
+            "Different atoms should have low similarity: {}",
+            sim
+        );
     }
 
     #[test]
@@ -941,6 +936,10 @@ mod tests {
         let pq = p.clone().and(q.clone());
         let pq2 = p.or(q);
         let sim = pq.encode().similarity(&pq2.encode());
-        assert!(sim < 0.6, "AND vs OR should have different encodings: {}", sim);
+        assert!(
+            sim < 0.6,
+            "AND vs OR should have different encodings: {}",
+            sim
+        );
     }
 }

@@ -636,11 +636,21 @@ impl LiquidMambaGenerator {
                 ctx
             };
 
-            // 4. Compute max tokens (consciousness-gated)
+            // 4. Compute max tokens (consciousness-gated, then time-pressure-adjusted)
             let max_tokens = if self.config.enable_consciousness_gating {
-                consciousness_gated_max_tokens(self.config.max_tokens, channels.psi())
+                let psi_tokens =
+                    consciousness_gated_max_tokens(self.config.max_tokens, channels.psi());
+                crate::gating::time_pressure_adjusted_max_tokens(
+                    psi_tokens,
+                    channels.time_pressure(),
+                    self.config.gating_config.time_pressure_max_reduction,
+                )
             } else {
-                self.config.max_tokens
+                crate::gating::time_pressure_adjusted_max_tokens(
+                    self.config.max_tokens,
+                    channels.time_pressure(),
+                    self.config.gating_config.time_pressure_max_reduction,
+                )
             };
 
             // 5. Update arousal from channels
@@ -692,7 +702,11 @@ impl LiquidMambaGenerator {
                 if self.config.enable_gating {
                     let effective_epistemic =
                         (channels.epistemic_ordinal() + token_pe_boost).clamp(0.0, 4.0);
-                    self.epistemic_gate.apply(&mut logits, effective_epistemic);
+                    self.epistemic_gate.apply_with_familiarity(
+                        &mut logits,
+                        effective_epistemic,
+                        channels.domain_familiarity(),
+                    );
                 }
 
                 // 7d. Emotional modulation
@@ -2412,7 +2426,7 @@ mod tests {
 
         // Simulate a distill step that triggers multi-position
         let channels = ThoughtChannels {
-            channels: [0.5; 20],
+            channels: [0.5; crate::encoder::NUM_CHANNELS],
         };
         let thought_hv = gen.encoder().encode(&channels);
         let tp = gen.temporal_proj().unwrap();
@@ -2448,7 +2462,7 @@ mod tests {
 
         // Run a generate + distill cycle — should work same as before
         let channels = ThoughtChannels {
-            channels: [0.3; 20],
+            channels: [0.3; crate::encoder::NUM_CHANNELS],
         };
         let result = gen.generate(&channels);
         gen.distill_step(&channels, &result);
@@ -2512,7 +2526,7 @@ mod tests {
 
         // Run enough distill steps to trigger gradient application
         let channels = ThoughtChannels {
-            channels: [0.5; 20],
+            channels: [0.5; crate::encoder::NUM_CHANNELS],
         };
         for _ in 0..5 {
             let result = gen.generate(&channels);

@@ -82,7 +82,12 @@ impl CognitiveLoopService {
                                             .sqrt()
                                             * projected.iter().map(|x| x * x).sum::<f32>().sqrt())
                                         .max(1e-8);
-                                        dot / denom
+                                        let sim = dot / denom;
+                                        if sim.is_finite() {
+                                            sim.clamp(-1.0, 1.0)
+                                        } else {
+                                            0.0
+                                        }
                                     })
                                     .fold(0.0f32, f32::max);
                                 // High resonator match → boost importance (consolidation-worthy)
@@ -359,8 +364,14 @@ impl CognitiveLoopService {
                     .apply_affective_modulation(affective_arousal as f64, affective_valence as f64);
             }
             let state = mind.process(&ctx.hv16_cached);
-            self.carryover.consciousness.predictive_phi_modulation = state.phi_modulation;
-            (state.free_energy, state.phi_modulation)
+            // Smooth predictive phi modulation with previous-cycle value.
+            // Friston (2010): precision estimates should evolve gradually to
+            // maintain hierarchical model stability.
+            let prev_mod = self.carryover.consciousness.predictive_phi_modulation;
+            let alpha = crate::cognitive_loop::thresholds::PREDICTIVE_PHI_MODULATION_SMOOTHING;
+            let smoothed_mod = state.phi_modulation * (1.0 - alpha) + prev_mod * alpha;
+            self.carryover.consciousness.predictive_phi_modulation = smoothed_mod;
+            (state.free_energy, smoothed_mod)
         } else {
             (0.0, 1.0)
         };

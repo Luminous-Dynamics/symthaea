@@ -13,8 +13,7 @@
 
 use crate::hdc::binary_hv::BinaryHV;
 use crate::hdc::primitive_system::seed_from_name;
-use serde::{Deserialize, Serialize};
-use std::collections::{BinaryHeap, HashMap, HashSet, VecDeque};
+use std::collections::{BinaryHeap, HashSet, VecDeque};
 
 // ─── Graph Type ──────────────────────────────────────────────────────────────
 
@@ -259,12 +258,7 @@ impl Graph {
         }
     }
 
-    fn dfs_cycle_undirected(
-        &self,
-        u: usize,
-        parent: usize,
-        visited: &mut Vec<bool>,
-    ) -> bool {
+    fn dfs_cycle_undirected(&self, u: usize, parent: usize, visited: &mut Vec<bool>) -> bool {
         visited[u] = true;
         for &(v, _) in &self.adj[u] {
             if !visited[v] {
@@ -360,7 +354,7 @@ impl PartialEq for DijkstraEntry {
 impl Eq for DijkstraEntry {}
 impl PartialOrd for DijkstraEntry {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.dist.partial_cmp(&other.dist)
+        Some(self.cmp(other))
     }
 }
 impl Ord for DijkstraEntry {

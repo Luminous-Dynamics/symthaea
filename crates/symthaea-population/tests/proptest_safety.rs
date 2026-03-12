@@ -7,18 +7,21 @@
 //! - Kinship symmetry: kinship(a, b) == kinship(b, a)
 
 use proptest::prelude::*;
-use symthaea_population::{
-    ethical_balance, evaluate_decision_ethics, GovernanceTier, MatingPair,
-    PopulationDecision, BreedingStrategy, GeneticRescuePlan,
-    Population, Individual, BiologicalSex,
-};
 use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
+use symthaea_population::{
+    ethical_balance, evaluate_decision_ethics, BiologicalSex, BreedingStrategy, GeneticRescuePlan,
+    GovernanceTier, Individual, MatingPair, Population, PopulationDecision,
+};
 
 fn make_population(n: usize) -> Population {
     let individuals: Vec<Individual> = (0..n)
         .map(|i| Individual {
             id: i as u64,
-            sex: if i % 2 == 0 { BiologicalSex::Female } else { BiologicalSex::Male },
+            sex: if i % 2 == 0 {
+                BiologicalSex::Female
+            } else {
+                BiologicalSex::Male
+            },
             genotypes: vec![],
             genome_hv: ContinuousHV::random(HDC_DIMENSION, i as u64 * 137),
             generation: 0,
@@ -39,11 +42,17 @@ fn arb_decision() -> impl Strategy<Value = PopulationDecision> {
     prop_oneof![
         (0_u64..1000, 0_u64..1000).prop_map(|(a, b)| {
             PopulationDecision::ApprovePairing(MatingPair {
-                parent_a: a, parent_b: b, kinship: 0.05, hla_complementarity: 0.8,
+                parent_a: a,
+                parent_b: b,
+                kinship: 0.05,
+                hla_complementarity: 0.8,
             })
         }),
         (1_usize..1000, 1_u32..100).prop_map(|(size, gen)| {
-            PopulationDecision::SetGrowthTarget { size, generation: gen }
+            PopulationDecision::SetGrowthTarget {
+                size,
+                generation: gen,
+            }
         }),
         (1_usize..20, 1_u32..50).prop_map(|(migrants, gen)| {
             PopulationDecision::ApproveGeneticRescue(GeneticRescuePlan {
@@ -53,8 +62,12 @@ fn arb_decision() -> impl Strategy<Value = PopulationDecision> {
                 expected_heterozygosity_gain: 0.05,
             })
         }),
-        Just(PopulationDecision::ModifyStrategy(BreedingStrategy::MinimumKinship)),
-        Just(PopulationDecision::OverrideAiRecommendation("safety".to_string())),
+        Just(PopulationDecision::ModifyStrategy(
+            BreedingStrategy::MinimumKinship
+        )),
+        Just(PopulationDecision::OverrideAiRecommendation(
+            "safety".to_string()
+        )),
     ]
 }
 

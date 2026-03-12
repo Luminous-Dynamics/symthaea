@@ -273,8 +273,7 @@ impl OptimizationEngine {
                     // Shrink
                     for i in 1..=n {
                         for j in 0..n {
-                            simplex[i][j] =
-                                simplex[0][j] + sigma * (simplex[i][j] - simplex[0][j]);
+                            simplex[i][j] = simplex[0][j] + sigma * (simplex[i][j] - simplex[0][j]);
                         }
                         values[i] = f(&simplex[i]);
                     }
@@ -393,7 +392,11 @@ impl OptimizationEngine {
             let c1 = 1e-4;
 
             for _ in 0..20 {
-                let x_new: Vec<f64> = x.iter().zip(r.iter()).map(|(xi, ri)| xi - step * ri).collect();
+                let x_new: Vec<f64> = x
+                    .iter()
+                    .zip(r.iter())
+                    .map(|(xi, ri)| xi - step * ri)
+                    .collect();
                 if f(&x_new) <= fx + c1 * step * (-descent) {
                     break;
                 }
@@ -401,7 +404,11 @@ impl OptimizationEngine {
             }
 
             // Update
-            let x_new: Vec<f64> = x.iter().zip(r.iter()).map(|(xi, ri)| xi - step * ri).collect();
+            let x_new: Vec<f64> = x
+                .iter()
+                .zip(r.iter())
+                .map(|(xi, ri)| xi - step * ri)
+                .collect();
             let g_new = grad(&x_new);
 
             let s: Vec<f64> = x_new.iter().zip(x.iter()).map(|(a, b)| a - b).collect();
@@ -482,14 +489,22 @@ impl OptimizationEngine {
                         .iter()
                         .map(|c| {
                             let cv = c(&xp_plus);
-                            if cv > 0.0 { penalty * cv * cv } else { 0.0 }
+                            if cv > 0.0 {
+                                penalty * cv * cv
+                            } else {
+                                0.0
+                            }
                         })
                         .sum();
                     let pen_minus: f64 = constraints
                         .iter()
                         .map(|c| {
                             let cv = c(&xp_minus);
-                            if cv > 0.0 { penalty * cv * cv } else { 0.0 }
+                            if cv > 0.0 {
+                                penalty * cv * cv
+                            } else {
+                                0.0
+                            }
                         })
                         .sum();
                     g[i] += (pen_plus - pen_minus) / (2.0 * eps);
@@ -752,26 +767,26 @@ mod tests {
             0.5,
             1e-10,
         );
-        assert!(result.fx < 1.0, "Should find near-global minimum, got f={}", result.fx);
+        assert!(
+            result.fx < 1.0,
+            "Should find near-global minimum, got f={}",
+            result.fx
+        );
     }
 
     // ── Encoding ─────────────────────────────────────────────────────────
 
     #[test]
     fn test_encoding_different_optima() {
-        let r1 = OptimizationEngine::nelder_mead(
-            &|x: &[f64]| (x[0] - 1.0).powi(2),
-            &[5.0],
-            1.0,
-            1e-8,
-        );
-        let r2 = OptimizationEngine::nelder_mead(
-            &|x: &[f64]| (x[0] - 10.0).powi(2),
-            &[5.0],
-            1.0,
-            1e-8,
-        );
+        let r1 =
+            OptimizationEngine::nelder_mead(&|x: &[f64]| (x[0] - 1.0).powi(2), &[5.0], 1.0, 1e-8);
+        let r2 =
+            OptimizationEngine::nelder_mead(&|x: &[f64]| (x[0] - 10.0).powi(2), &[5.0], 1.0, 1e-8);
         let sim = r1.encoding.similarity(&r2.encoding);
-        assert!(sim < 0.6, "Different optima should have different encodings: {}", sim);
+        assert!(
+            sim < 0.6,
+            "Different optima should have different encodings: {}",
+            sim
+        );
     }
 }

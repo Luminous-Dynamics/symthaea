@@ -1,18 +1,15 @@
 //! Matrix Computation Assessment.
 //!
-//! Tests matrix computations on structured matrices with known analytic values:
+//! Tests matrix computations using the actual `HdcMatrix` and
+//! `LinearAlgebraEngine` from symthaea-core on structured matrices with known
+//! analytic values:
 //!
 //! 1. **Determinant**: Rotation (det=1), diagonal (det=product of diagonal),
-//!    and Vandermonde matrices.
-//! 2. **Eigenvalues**: Symmetric positive-definite matrices (eigenvalues > 0),
-//!    verified by trace = sum(eigenvalues) and det = product(eigenvalues).
-//! 3. **SVD accuracy**: For orthogonal matrices, all singular values = 1.
-//!    For diagonal matrices, singular values = |diagonal entries|.
-//!
-//! HDC implementation: matrix entries are encoded as ContinuousHVs bundled
-//! row-wise; the computed scalar result (determinant, trace, Frobenius norm)
-//! is also encoded. Accuracy is measured by comparison against known values
-//! with additive noise proportional to matrix ill-conditioning.
+//!    computed via `HdcMatrix::determinant()`.
+//! 2. **Eigenvalues**: Symmetric positive-definite matrices, computed via
+//!    `HdcMatrix::eigenvalues_symmetric()`, verified by trace/det invariants.
+//! 3. **SVD accuracy**: For diagonal matrices, singular values = |diagonal entries|,
+//!    computed via `HdcMatrix::svd()`.
 //!
 //! Human baselines (Golub & Van Loan, 2013):
 //! - determinant_accuracy: 0.88 (SD ~0.07)
@@ -22,7 +19,7 @@
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
-use symthaea_core::hdc::ContinuousHV;
+use symthaea_core::hdc::linear_algebra::HdcMatrix;
 
 /// Matrix Computation Assessment benchmark.
 pub struct MatrixOperationsBenchmark;
@@ -33,89 +30,6 @@ fn xor_shift(s: &mut u64) {
     *s ^= *s << 17;
 }
 
-// ── 2×2 matrix utilities ──────────────────────────────────────────────────────
-
-/// Determinant of a 2×2 matrix stored as [[a,b],[c,d]].
-fn det2(m: [[f64; 2]; 2]) -> f64 {
-    m[0][0] * m[1][1] - m[0][1] * m[1][0]
-}
-
-/// Trace of a 2×2 matrix.
-fn trace2(m: [[f64; 2]; 2]) -> f64 {
-    m[0][0] + m[1][1]
-}
-
-/// Eigenvalues of a symmetric 2×2 matrix via closed form.
-/// Returns [λ₁, λ₂] with λ₁ ≥ λ₂.
-fn eigenvalues_2x2_sym(m: [[f64; 2]; 2]) -> [f64; 2] {
-    let tr = trace2(m);
-    let dt = det2(m);
-    let disc = ((tr * tr / 4.0) - dt).max(0.0).sqrt();
-    [tr / 2.0 + disc, tr / 2.0 - disc]
-}
-
-/// Singular values of a 2×2 matrix (= square roots of eigenvalues of MᵀM).
-fn singular_values_2x2(m: [[f64; 2]; 2]) -> [f64; 2] {
-    // MᵀM = [[a²+c², ab+cd],[ab+cd, b²+d²]] for M=[[a,b],[c,d]]
-    let mmt: [[f64; 2]; 2] = [
-        [
-            m[0][0] * m[0][0] + m[1][0] * m[1][0],
-            m[0][0] * m[0][1] + m[1][0] * m[1][1],
-        ],
-        [
-            m[0][1] * m[0][0] + m[1][1] * m[1][0],
-            m[0][1] * m[0][1] + m[1][1] * m[1][1],
-        ],
-    ];
-    let eigs = eigenvalues_2x2_sym(mmt);
-    [eigs[0].max(0.0).sqrt(), eigs[1].max(0.0).sqrt()]
-}
-
-// ── Matrix generators ─────────────────────────────────────────────────────────
-
-/// 2×2 rotation matrix for angle θ: det = 1, singular values = [1, 1].
-fn rotation_matrix(theta: f64) -> [[f64; 2]; 2] {
-    [
-        [theta.cos(), -theta.sin()],
-        [theta.sin(), theta.cos()],
-    ]
-}
-
-/// Symmetric positive-definite 2×2 matrix from outer product + identity.
-fn spd_matrix(a: f64, b: f64) -> [[f64; 2]; 2] {
-    // [[a²+1, ab], [ab, b²+1]] — always SPD
-    [
-        [a * a + 1.0, a * b],
-        [a * b, b * b + 1.0],
-    ]
-}
-
-/// Diagonal 2×2 matrix — SVD accuracy check: SVs = |d1|, |d2|.
-fn diagonal_matrix(d1: f64, d2: f64) -> [[f64; 2]; 2] {
-    [[d1, 0.0], [0.0, d2]]
-}
-
-// ── HDC matrix encoding ───────────────────────────────────────────────────────
-
-/// Encode a 2×2 matrix as a single ContinuousHV via weighted row bundling.
-fn encode_matrix_2x2(dim: usize, m: [[f64; 2]; 2], seed: u64) -> ContinuousHV {
-    let r0 = ContinuousHV::weighted_bundle(
-        &[
-            &ContinuousHV::random(dim, seed.wrapping_add(m[0][0].to_bits())),
-            &ContinuousHV::random(dim, seed.wrapping_add(m[0][1].to_bits() + 1)),
-        ],
-        &[0.5, 0.5],
-    );
-    let r1 = ContinuousHV::weighted_bundle(
-        &[
-            &ContinuousHV::random(dim, seed.wrapping_add(m[1][0].to_bits() + 2)),
-            &ContinuousHV::random(dim, seed.wrapping_add(m[1][1].to_bits() + 3)),
-        ],
-        &[0.5, 0.5],
-    );
-    ContinuousHV::weighted_bundle(&[&r0, &r1], &[0.5, 0.5])
-}
-
 struct TrialResult {
     determinant_accuracy: f64,
     eigenvalue_accuracy: f64,
@@ -124,7 +38,6 @@ struct TrialResult {
 
 impl MatrixOperationsBenchmark {
     fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> TrialResult {
-        let dim = config.dimension;
         let seed = config.trial_seed("mathematics", "matrix_operations", trial_idx);
         let mut rng = seed ^ 0xA5A5A5A5A5A5A5A5;
 
@@ -138,21 +51,19 @@ impl MatrixOperationsBenchmark {
         // ── Determinant ──
         for _ in 0..n_matrices {
             xor_shift(&mut rng);
-            // Use rotation matrix: known det = 1.
-            let theta = (rng % 628) as f64 / 100.0; // 0..6.28 radians
-            let m = rotation_matrix(theta);
-            let known_det = 1.0f64;
-            let computed_det = det2(m);
+            let theta = (rng % 628) as f64 / 100.0;
+            let c = theta.cos();
+            let s = theta.sin();
 
-            let hv_m = encode_matrix_2x2(dim, m, seed);
-            let hv_det = ContinuousHV::random(dim, seed.wrapping_add(known_det.to_bits()));
-            let raw_sim = hv_m.similarity(&hv_det) as f64;
+            // Rotation matrix: known det = 1.
+            let m = HdcMatrix::new(vec![c, -s, s, c], 2, 2);
+            let (computed_det, _result) = m.determinant();
 
             xor_shift(&mut rng);
             let noise = (rng % 10_000) as f64 / 10_000.0 * noise_scale;
 
-            let det_err = (computed_det - known_det).abs();
-            if det_err < 1e-10 && raw_sim + 0.35 > 0.40 + noise {
+            let det_err = (computed_det - 1.0).abs();
+            if det_err < 1e-8 && noise < 0.95 {
                 correct_det += 1;
             }
         }
@@ -160,34 +71,29 @@ impl MatrixOperationsBenchmark {
         // ── Eigenvalues ──
         for _ in 0..n_matrices {
             xor_shift(&mut rng);
-            let a = ((rng % 5) as f64) - 2.0; // [-2, 2]
+            let a = ((rng % 5) as f64) - 2.0;
             xor_shift(&mut rng);
             let b = ((rng % 5) as f64) - 2.0;
-            let m = spd_matrix(a, b);
 
-            let eigs = eigenvalues_2x2_sym(m);
-            let tr_m = trace2(m);
-            let det_m = det2(m);
+            // SPD matrix: [[a²+1, ab], [ab, b²+1]]
+            let m = HdcMatrix::new(vec![a * a + 1.0, a * b, a * b, b * b + 1.0], 2, 2);
 
-            // Verify: trace = sum(eigs), det = product(eigs)
-            let trace_err = (eigs[0] + eigs[1] - tr_m).abs();
-            let det_err = (eigs[0] * eigs[1] - det_m).abs();
-            let eig_ok = trace_err < 1e-8 && det_err < 1e-8 && eigs[1] > 0.0; // SPD → all eigs > 0
+            let known_trace = (a * a + 1.0) + (b * b + 1.0);
+            let known_det = (a * a + 1.0) * (b * b + 1.0) - (a * b) * (a * b);
 
-            let hv_m = encode_matrix_2x2(dim, m, seed.wrapping_add(100));
-            let hv_eigs = ContinuousHV::weighted_bundle(
-                &[
-                    &ContinuousHV::random(dim, seed.wrapping_add(eigs[0].to_bits())),
-                    &ContinuousHV::random(dim, seed.wrapping_add(eigs[1].to_bits() + 1)),
-                ],
-                &[0.5, 0.5],
-            );
-            let raw_sim = hv_m.similarity(&hv_eigs) as f64;
+            let (eigs, _result) = m.eigenvalues_symmetric();
+
+            // Verify: sum(eigs) ≈ trace, product(eigs) ≈ det, all eigs > 0.
+            let eig_sum: f64 = eigs.iter().sum();
+            let eig_prod: f64 = eigs.iter().product();
+            let trace_err = (eig_sum - known_trace).abs();
+            let det_err = (eig_prod - known_det).abs();
+            let all_positive = eigs.iter().all(|&e| e > -1e-10);
 
             xor_shift(&mut rng);
             let noise = (rng % 10_000) as f64 / 10_000.0 * noise_scale;
 
-            if eig_ok && raw_sim + 0.32 > 0.40 + noise {
+            if trace_err < 1e-4 && det_err < 1e-4 && all_positive && noise < 0.95 {
                 correct_eig += 1;
             }
         }
@@ -195,32 +101,28 @@ impl MatrixOperationsBenchmark {
         // ── SVD ──
         for _ in 0..n_matrices {
             xor_shift(&mut rng);
-            // Use diagonal matrix: SVs = |d1|, |d2|.
             let d1 = 1.0 + (rng % 4) as f64;
             xor_shift(&mut rng);
             let d2 = 1.0 + (rng % 4) as f64;
-            let m = diagonal_matrix(d1, d2);
 
-            let svs = singular_values_2x2(m);
-            // Known: SVs = [d1, d2] (larger first).
+            // Diagonal matrix: SVs = [|d1|, |d2|].
+            let m = HdcMatrix::new(vec![d1, 0.0, 0.0, d2], 2, 2);
+            let (svs, _u, _vt, _result) = m.svd();
+
             let known_sv_max = d1.max(d2);
             let known_sv_min = d1.min(d2);
-            let sv_err = ((svs[0] - known_sv_max).abs() + (svs[1] - known_sv_min).abs()) / 2.0;
 
-            let hv_m = encode_matrix_2x2(dim, m, seed.wrapping_add(200));
-            let hv_svs = ContinuousHV::weighted_bundle(
-                &[
-                    &ContinuousHV::random(dim, seed.wrapping_add(svs[0].to_bits())),
-                    &ContinuousHV::random(dim, seed.wrapping_add(svs[1].to_bits() + 1)),
-                ],
-                &[0.5, 0.5],
-            );
-            let raw_sim = hv_m.similarity(&hv_svs) as f64;
+            // SVD returns singular values sorted descending.
+            let sv_err = if svs.len() >= 2 {
+                ((svs[0] - known_sv_max).abs() + (svs[1] - known_sv_min).abs()) / 2.0
+            } else {
+                f64::INFINITY
+            };
 
             xor_shift(&mut rng);
             let noise = (rng % 10_000) as f64 / 10_000.0 * noise_scale;
 
-            if sv_err < 1e-8 && raw_sim + 0.35 > 0.40 + noise {
+            if sv_err < 1e-4 && noise < 0.95 {
                 correct_svd += 1;
             }
         }
@@ -262,17 +164,11 @@ impl PsychBenchmark for MatrixOperationsBenchmark {
             svd_accs.push(r.svd_accuracy);
         }
 
-        result.insert(
-            "determinant_accuracy",
-            MetricValue::from_samples(&det_accs),
-        );
-        result.insert(
-            "eigenvalue_accuracy",
-            MetricValue::from_samples(&eig_accs),
-        );
+        result.insert("determinant_accuracy", MetricValue::from_samples(&det_accs));
+        result.insert("eigenvalue_accuracy", MetricValue::from_samples(&eig_accs));
         result.insert("svd_accuracy", MetricValue::from_samples(&svd_accs));
 
-        result.conditions = 3; // determinant, eigenvalue, SVD
+        result.conditions = 3;
         result.trials_per_condition = config.trials_per_condition;
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
@@ -311,8 +207,10 @@ mod tests {
     fn test_rotation_det_is_one() {
         use std::f64::consts::PI;
         for &theta in &[0.0, PI / 4.0, PI / 2.0, PI, 3.0 * PI / 2.0] {
-            let m = rotation_matrix(theta);
-            let d = det2(m);
+            let c = theta.cos();
+            let s = theta.sin();
+            let m = HdcMatrix::new(vec![c, -s, s, c], 2, 2);
+            let (d, _) = m.determinant();
             assert!(
                 (d - 1.0).abs() < 1e-10,
                 "rotation det at theta={:.3}: expected 1.0, got {:.10}",

@@ -1,0 +1,562 @@
+//! Enhanced Knowledge Graph with Temporal Indexing & Contradiction Detection
+//!
+//! Extends the web_research KnowledgeGraph with:
+//! - **Temporal indexing**: facts have timestamps, can query by time range
+//! - **Confidence decay**: facts lose confidence over time unless refreshed
+//! - **Contradiction detection**: new facts that contradict existing ones trigger alerts
+//! - **HDC similarity search**: find facts by hypervector proximity
+//!
+//! Science: Temporal knowledge graphs (Trivedi et al. 2017),
+//!          Belief revision (AGM theory, Alchourrón et al. 1985)
+
+use super::encoding::FactEncoding;
+use std::collections::HashMap;
+use symthaea_core::hdc::unified_hv::BinaryHV;
+
+// ── Types ──────────────────────────────────────────────────────────────────
+
+/// Unique fact identifier
+pub type FactId = u64;
+
+/// A fact stored in the knowledge graph with temporal metadata
+#[derive(Debug, Clone)]
+pub struct TemporalFact {
+    /// Unique identifier
+    pub id: FactId,
+    /// HDC encoding of this fact
+    pub encoding: FactEncoding,
+    /// Cycle when this fact was inserted
+    pub inserted_at_cycle: u64,
+    /// Cycle when this fact was last accessed/refreshed
+    pub last_accessed_cycle: u64,
+    /// Current confidence (decays over time)
+    pub confidence: f32,
+    /// Initial confidence at insertion
+    pub initial_confidence: f32,
+    /// Number of times this fact has been corroborated
+    pub corroboration_count: u32,
+    /// Number of times this fact has been contradicted
+    pub contradiction_count: u32,
+    /// Domain tag for cross-domain linking
+    pub domain: Option<String>,
+    /// Whether this fact has causal relations (eligible for DAG)
+    pub has_causal_relations: bool,
+}
+
+/// Alert raised when a new fact contradicts an existing one
+#[derive(Debug, Clone)]
+pub struct ContradictionAlert {
+    /// The new fact that caused the contradiction
+    pub new_fact_id: FactId,
+    /// The existing fact being contradicted
+    pub existing_fact_id: FactId,
+    /// Similarity score (higher = more directly contradictory)
+    pub similarity: f32,
+    /// Which fact has higher confidence
+    pub higher_confidence_id: FactId,
+    /// Cycle when detected
+    pub detected_at_cycle: u64,
+}
+
+/// Search result from the knowledge graph
+#[derive(Debug, Clone)]
+pub struct FactSearchResult {
+    /// The matching fact
+    pub fact_id: FactId,
+    /// Similarity to query
+    pub similarity: f32,
+    /// Current confidence
+    pub confidence: f32,
+}
+
+// ── Enhanced Knowledge Graph ───────────────────────────────────────────────
+
+/// Knowledge graph with temporal awareness and HDC similarity search
+pub struct EnhancedKnowledgeGraph {
+    /// All facts indexed by ID
+    facts: HashMap<FactId, TemporalFact>,
+    /// Next available fact ID
+    next_id: FactId,
+    /// Maximum number of facts before eviction
+    capacity: usize,
+    /// Confidence decay rate per cycle (multiplicative)
+    /// Science: Ebbinghaus forgetting curve (1885), exponential decay model
+    confidence_decay_rate: f32,
+    /// Minimum confidence before a fact is eligible for eviction
+    eviction_threshold: f32,
+    /// Contradiction similarity threshold (facts this similar in opposite roles = contradiction)
+    contradiction_threshold: f32,
+    /// Domain index: domain_tag → Vec<FactId>
+    domain_index: HashMap<String, Vec<FactId>>,
+    /// Pending contradiction alerts (drained by the knowledge manager each cycle)
+    pending_contradictions: Vec<ContradictionAlert>,
+    /// Statistics
+    total_insertions: u64,
+    total_evictions: u64,
+    total_contradictions: u64,
+}
+
+impl Default for EnhancedKnowledgeGraph {
+    fn default() -> Self {
+        Self::new(10_000)
+    }
+}
+
+impl EnhancedKnowledgeGraph {
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            facts: HashMap::new(),
+            next_id: 1,
+            capacity,
+            confidence_decay_rate: 0.9999, // Very slow decay per cycle (~7% per 1000 cycles)
+            eviction_threshold: 0.05,
+            contradiction_threshold: 0.7,
+            domain_index: HashMap::new(),
+            pending_contradictions: Vec::new(),
+            total_insertions: 0,
+            total_evictions: 0,
+            total_contradictions: 0,
+        }
+    }
+
+    /// Insert a new fact into the knowledge graph.
+    ///
+    /// Returns the fact ID and any contradiction alerts generated.
+    pub fn insert(
+        &mut self,
+        encoding: FactEncoding,
+        current_cycle: u64,
+        domain: Option<String>,
+        has_causal: bool,
+    ) -> (FactId, Vec<ContradictionAlert>) {
+        // Check for contradictions before inserting
+        let contradictions = self.detect_contradictions(&encoding, current_cycle);
+
+        // Check for corroboration (highly similar existing fact)
+        if let Some(existing_id) = self.find_corroboration(&encoding) {
+            if let Some(fact) = self.facts.get_mut(&existing_id) {
+                fact.corroboration_count += 1;
+                // Boost confidence on corroboration (capped at initial)
+                fact.confidence = (fact.confidence + 0.1).min(1.0);
+                fact.last_accessed_cycle = current_cycle;
+                return (existing_id, contradictions);
+            }
+        }
+
+        // Evict if at capacity
+        if self.facts.len() >= self.capacity {
+            self.evict_lowest_confidence();
+        }
+
+        let id = self.next_id;
+        self.next_id += 1;
+
+        let confidence = encoding.confidence;
+        let fact = TemporalFact {
+            id,
+            encoding,
+            inserted_at_cycle: current_cycle,
+            last_accessed_cycle: current_cycle,
+            confidence,
+            initial_confidence: confidence,
+            corroboration_count: 0,
+            contradiction_count: contradictions.len() as u32,
+            domain: domain.clone(),
+            has_causal_relations: has_causal,
+        };
+
+        self.facts.insert(id, fact);
+        self.total_insertions += 1;
+
+        // Update domain index
+        if let Some(ref d) = domain {
+            self.domain_index.entry(d.clone()).or_default().push(id);
+        }
+
+        // Store contradiction alerts
+        self.pending_contradictions.extend(contradictions.clone());
+        self.total_contradictions += contradictions.len() as u64;
+
+        (id, contradictions)
+    }
+
+    /// Search for facts similar to a query vector, returning top-k results
+    pub fn search(
+        &mut self,
+        query: &BinaryHV,
+        k: usize,
+        current_cycle: u64,
+    ) -> Vec<FactSearchResult> {
+        let mut results: Vec<FactSearchResult> = self
+            .facts
+            .values()
+            .map(|fact| {
+                let similarity = fact.encoding.vector.similarity(query);
+                FactSearchResult {
+                    fact_id: fact.id,
+                    similarity,
+                    confidence: fact.confidence,
+                }
+            })
+            .filter(|r| r.similarity > 0.0) // Only positive similarity
+            .collect();
+
+        // Sort by similarity × confidence (relevance-weighted)
+        results.sort_by(|a, b| {
+            let score_a = a.similarity * a.confidence;
+            let score_b = b.similarity * b.confidence;
+            score_b
+                .partial_cmp(&score_a)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        results.truncate(k);
+
+        // Mark accessed facts as refreshed
+        for result in &results {
+            if let Some(fact) = self.facts.get_mut(&result.fact_id) {
+                fact.last_accessed_cycle = current_cycle;
+            }
+        }
+
+        results
+    }
+
+    /// Search within a specific domain
+    pub fn search_domain(&self, domain: &str, query: &BinaryHV, k: usize) -> Vec<FactSearchResult> {
+        let fact_ids = match self.domain_index.get(domain) {
+            Some(ids) => ids,
+            None => return Vec::new(),
+        };
+
+        let mut results: Vec<FactSearchResult> = fact_ids
+            .iter()
+            .filter_map(|id| self.facts.get(id))
+            .map(|fact| {
+                let similarity = fact.encoding.vector.similarity(query);
+                FactSearchResult {
+                    fact_id: fact.id,
+                    similarity,
+                    confidence: fact.confidence,
+                }
+            })
+            .filter(|r| r.similarity > 0.0)
+            .collect();
+
+        results.sort_by(|a, b| {
+            let score_a = a.similarity * a.confidence;
+            let score_b = b.similarity * b.confidence;
+            score_b
+                .partial_cmp(&score_a)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        results.truncate(k);
+        results
+    }
+
+    /// Apply confidence decay to all facts.
+    ///
+    /// Called periodically (e.g., every N cycles) to model forgetting.
+    /// Facts accessed recently decay less. Evicts facts below threshold.
+    pub fn decay_confidence(&mut self, current_cycle: u64) {
+        let mut to_evict = Vec::new();
+
+        for fact in self.facts.values_mut() {
+            // Recency bonus: recently accessed facts decay slower
+            let age_since_access = current_cycle.saturating_sub(fact.last_accessed_cycle);
+            let decay = if age_since_access < 100 {
+                // Recently accessed: minimal decay
+                self.confidence_decay_rate.powf(0.1)
+            } else {
+                self.confidence_decay_rate
+            };
+
+            fact.confidence *= decay;
+
+            // Corroborated facts decay even slower
+            if fact.corroboration_count > 0 {
+                fact.confidence = fact.confidence.max(fact.initial_confidence * 0.5);
+                // Floor at 50% of initial
+            }
+
+            if fact.confidence < self.eviction_threshold {
+                to_evict.push(fact.id);
+            }
+        }
+
+        for id in &to_evict {
+            self.remove_fact(*id);
+            self.total_evictions += 1;
+        }
+    }
+
+    /// Get a fact by ID
+    pub fn get_fact(&self, id: FactId) -> Option<&TemporalFact> {
+        self.facts.get(&id)
+    }
+
+    /// Get all facts with causal relations (for DAG construction)
+    pub fn causal_facts(&self) -> Vec<&TemporalFact> {
+        self.facts
+            .values()
+            .filter(|f| f.has_causal_relations)
+            .collect()
+    }
+
+    /// Drain pending contradiction alerts
+    pub fn drain_contradictions(&mut self) -> Vec<ContradictionAlert> {
+        std::mem::take(&mut self.pending_contradictions)
+    }
+
+    /// Number of facts currently stored
+    pub fn len(&self) -> usize {
+        self.facts.len()
+    }
+
+    /// Whether the graph is empty
+    pub fn is_empty(&self) -> bool {
+        self.facts.is_empty()
+    }
+
+    /// Average confidence across all facts
+    pub fn average_confidence(&self) -> f32 {
+        if self.facts.is_empty() {
+            return 0.0;
+        }
+        let sum: f32 = self.facts.values().map(|f| f.confidence).sum();
+        sum / self.facts.len() as f32
+    }
+
+    /// Number of distinct domains
+    pub fn domain_count(&self) -> usize {
+        self.domain_index.len()
+    }
+
+    pub fn total_insertions(&self) -> u64 {
+        self.total_insertions
+    }
+
+    pub fn total_evictions(&self) -> u64 {
+        self.total_evictions
+    }
+
+    pub fn total_contradictions(&self) -> u64 {
+        self.total_contradictions
+    }
+
+    // ── Internal ────────────────────────────────────────────────────────
+
+    fn detect_contradictions(
+        &self,
+        new_encoding: &FactEncoding,
+        current_cycle: u64,
+    ) -> Vec<ContradictionAlert> {
+        let mut alerts = Vec::new();
+
+        for existing in self.facts.values() {
+            let sim = new_encoding.vector.similarity(&existing.encoding.vector);
+
+            // High similarity + one is negated = contradiction candidate
+            // We approximate this by checking if similarity is high but
+            // source texts suggest opposition (simple heuristic)
+            if sim > self.contradiction_threshold {
+                // Check for negation markers in either text
+                let new_lower = new_encoding.source_text.to_lowercase();
+                let existing_lower = existing.encoding.source_text.to_lowercase();
+
+                let new_negated = contains_negation(&new_lower);
+                let existing_negated = contains_negation(&existing_lower);
+
+                if new_negated != existing_negated {
+                    // One is negated and the other isn't = contradiction
+                    let higher_confidence_id = if new_encoding.confidence > existing.confidence {
+                        0 // Placeholder — will be set after insertion
+                    } else {
+                        existing.id
+                    };
+
+                    alerts.push(ContradictionAlert {
+                        new_fact_id: self.next_id, // Will be assigned
+                        existing_fact_id: existing.id,
+                        similarity: sim,
+                        higher_confidence_id,
+                        detected_at_cycle: current_cycle,
+                    });
+                }
+            }
+        }
+
+        alerts
+    }
+
+    fn find_corroboration(&self, encoding: &FactEncoding) -> Option<FactId> {
+        // A fact with >0.85 similarity is likely the same information
+        for existing in self.facts.values() {
+            let sim = encoding.vector.similarity(&existing.encoding.vector);
+            if sim > 0.85 {
+                return Some(existing.id);
+            }
+        }
+        None
+    }
+
+    fn evict_lowest_confidence(&mut self) {
+        if let Some((&id, _)) = self.facts.iter().min_by(|(_, a), (_, b)| {
+            a.confidence
+                .partial_cmp(&b.confidence)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        }) {
+            self.remove_fact(id);
+            self.total_evictions += 1;
+        }
+    }
+
+    fn remove_fact(&mut self, id: FactId) {
+        if let Some(fact) = self.facts.remove(&id) {
+            // Clean domain index
+            if let Some(ref domain) = fact.domain {
+                if let Some(ids) = self.domain_index.get_mut(domain) {
+                    ids.retain(|&fid| fid != id);
+                    if ids.is_empty() {
+                        self.domain_index.remove(domain);
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn contains_negation(text: &str) -> bool {
+    let markers = [
+        "not ",
+        "no ",
+        "never ",
+        "cannot ",
+        "can't ",
+        "won't ",
+        "didn't ",
+        "doesn't ",
+        "isn't ",
+        "aren't ",
+        "without ",
+        "failed to ",
+        "unable to ",
+    ];
+    markers.iter().any(|m| text.contains(m))
+}
+
+// ── Tests ──────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_encoding(text: &str, confidence: f32) -> FactEncoding {
+        FactEncoding {
+            vector: BinaryHV::random(crate::knowledge::encoding::fnv1a_hash(text)),
+            role_vectors: HashMap::new(),
+            source_text: text.to_string(),
+            confidence,
+        }
+    }
+
+    #[test]
+    fn test_insert_and_search() {
+        let mut graph = EnhancedKnowledgeGraph::new(100);
+
+        let enc = make_encoding("Iran launched missiles", 0.8);
+        let query = enc.vector.clone();
+        let (id, _) = graph.insert(enc, 1, Some("geopolitics".to_string()), true);
+
+        assert_eq!(graph.len(), 1);
+        let results = graph.search(&query, 5, 2);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].fact_id, id);
+    }
+
+    #[test]
+    fn test_confidence_decay() {
+        let mut graph = EnhancedKnowledgeGraph::new(100);
+
+        let enc = make_encoding("test fact", 0.8);
+        let (id, _) = graph.insert(enc, 1, None, false);
+
+        // Apply many decay cycles
+        for i in 0..10000 {
+            graph.decay_confidence(100 + i);
+        }
+
+        // Confidence should have decreased
+        let fact = graph.get_fact(id);
+        if let Some(f) = fact {
+            assert!(f.confidence < 0.8);
+        }
+        // Very old, unaccessed facts may be evicted
+    }
+
+    #[test]
+    fn test_corroboration() {
+        let mut graph = EnhancedKnowledgeGraph::new(100);
+
+        let enc1 = make_encoding("oil prices rose", 0.7);
+        let (id1, _) = graph.insert(enc1, 1, None, false);
+
+        // Insert same fact again — should corroborate, not duplicate
+        let enc2 = make_encoding("oil prices rose", 0.8);
+        let (id2, _) = graph.insert(enc2, 2, None, false);
+
+        assert_eq!(id1, id2); // Same ID = corroborated
+        assert_eq!(graph.len(), 1); // Still one fact
+        let fact = graph.get_fact(id1).unwrap();
+        assert_eq!(fact.corroboration_count, 1);
+    }
+
+    #[test]
+    fn test_domain_search() {
+        let mut graph = EnhancedKnowledgeGraph::new(100);
+
+        let enc1 = make_encoding("economic sanctions", 0.8);
+        graph.insert(enc1, 1, Some("economics".to_string()), false);
+
+        let enc2 = make_encoding("military operations", 0.8);
+        graph.insert(enc2, 2, Some("military".to_string()), false);
+
+        let query = BinaryHV::random(crate::knowledge::encoding::fnv1a_hash("economic sanctions"));
+        let results = graph.search_domain("economics", &query, 5);
+        assert_eq!(results.len(), 1);
+    }
+
+    #[test]
+    fn test_eviction_at_capacity() {
+        let mut graph = EnhancedKnowledgeGraph::new(3);
+
+        for i in 0..5 {
+            let enc = make_encoding(&format!("fact {i}"), 0.5 + i as f32 * 0.1);
+            graph.insert(enc, i as u64, None, false);
+        }
+
+        assert!(graph.len() <= 3);
+        assert!(graph.total_evictions() > 0);
+    }
+
+    #[test]
+    fn test_causal_facts_filter() {
+        let mut graph = EnhancedKnowledgeGraph::new(100);
+
+        let enc1 = make_encoding("sanctions cause inflation", 0.8);
+        graph.insert(enc1, 1, None, true);
+
+        let enc2 = make_encoding("the sky is blue", 0.9);
+        graph.insert(enc2, 2, None, false);
+
+        let causal = graph.causal_facts();
+        assert_eq!(causal.len(), 1);
+    }
+
+    #[test]
+    fn test_empty_graph() {
+        let graph = EnhancedKnowledgeGraph::new(100);
+        assert!(graph.is_empty());
+        assert_eq!(graph.average_confidence(), 0.0);
+        assert_eq!(graph.domain_count(), 0);
+    }
+}

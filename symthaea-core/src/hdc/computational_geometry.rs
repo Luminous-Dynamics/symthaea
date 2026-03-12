@@ -104,9 +104,7 @@ impl GeometryEngine {
         // Find the lowest point (leftmost if tie)
         let mut lowest = 0;
         for i in 1..pts.len() {
-            if pts[i].y < pts[lowest].y
-                || (pts[i].y == pts[lowest].y && pts[i].x < pts[lowest].x)
-            {
+            if pts[i].y < pts[lowest].y || (pts[i].y == pts[lowest].y && pts[i].x < pts[lowest].x) {
                 lowest = i;
             }
         }
@@ -172,10 +170,7 @@ impl GeometryEngine {
     }
 
     fn on_segment(p: &Point2D, q: &Point2D, r: &Point2D) -> bool {
-        r.x >= p.x.min(q.x)
-            && r.x <= p.x.max(q.x)
-            && r.y >= p.y.min(q.y)
-            && r.y <= p.y.max(q.y)
+        r.x >= p.x.min(q.x) && r.x <= p.x.max(q.x) && r.y >= p.y.min(q.y) && r.y <= p.y.max(q.y)
     }
 
     /// Point-in-polygon test (ray casting)
@@ -401,6 +396,10 @@ mod tests {
         let p1 = Point2D::new(1.0, 2.0);
         let p2 = Point2D::new(3.0, 4.0);
         let sim = p1.encode().similarity(&p2.encode());
-        assert!(sim < 0.6, "Different points should have different encodings: {}", sim);
+        assert!(
+            sim < 0.6,
+            "Different points should have different encodings: {}",
+            sim
+        );
     }
 }

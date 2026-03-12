@@ -102,10 +102,11 @@
 pub mod assessment;
 pub mod code_curriculum;
 pub mod curriculum;
-pub mod math_curriculum;
 #[cfg(feature = "web_research_module")]
 pub mod curriculum_extender;
 pub mod curriculum_loader;
+#[cfg(feature = "mathematics")]
+pub mod math_curriculum;
 pub mod objective;
 pub mod polymath_drive;
 pub mod reality_check;

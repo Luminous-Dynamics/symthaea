@@ -485,6 +485,83 @@ impl ScientificMethodEngine {
     }
 }
 
+// ─── MathService Bridge ──────────────────────────────────────────────────────
+
+/// Bridge between scientific method and the cognitive loop's math service.
+///
+/// When `scientific_method` feature is enabled (which implies `mathematics`),
+/// the engine can delegate numerical computations to MathService and use the
+/// results as evidence for or against hypotheses.
+impl ScientificMethodEngine {
+    /// Run a numerical experiment: compute f(params) via MathService statistics,
+    /// compare to predicted value, and update the hypothesis.
+    ///
+    /// `data` is fed to `MathService::compute_statistics`, and the resulting
+    /// mean is compared against `predicted_value` as the observed evidence.
+    /// Returns the experiment and the MathResponse for downstream use.
+    pub fn numerical_experiment(
+        &mut self,
+        math_service: &mut crate::cognitive_loop::math_service::MathService,
+        hypothesis_id: usize,
+        data: &[f64],
+        predicted_value: f64,
+    ) -> Option<(
+        Experiment,
+        crate::cognitive_loop::math_service::MathResponse,
+    )> {
+        let math_response = math_service.compute_statistics(data);
+        let observed = math_response.numerical_result.unwrap_or(0.0);
+
+        let experiment = self.test_hypothesis(hypothesis_id, observed, predicted_value)?;
+        Some((experiment, math_response))
+    }
+
+    /// Run a Bayesian experiment: use MathService's regression to test whether
+    /// data supports a linear hypothesis, then update beliefs based on R².
+    ///
+    /// High R² (good fit) → observed ≈ 1.0 (confirming); low R² → observed ≈ 0.0.
+    pub fn regression_experiment(
+        &mut self,
+        math_service: &mut crate::cognitive_loop::math_service::MathService,
+        hypothesis_id: usize,
+        x: &[f64],
+        y: &[f64],
+    ) -> Option<(
+        Experiment,
+        crate::cognitive_loop::math_service::MathResponse,
+    )> {
+        let math_response = math_service.linear_regression(x, y);
+        let r_squared = math_response.numerical_result.unwrap_or(0.0);
+
+        let predicted = self.predict(hypothesis_id);
+        let experiment = self.test_hypothesis(hypothesis_id, r_squared, predicted)?;
+        Some((experiment, math_response))
+    }
+
+    /// Run a root-finding experiment: test whether f has a root in [a, b].
+    ///
+    /// If root finding converges (confidence > 0.5), evidence supports the
+    /// hypothesis; otherwise it weakens it.
+    pub fn root_experiment<F: Fn(f64) -> f64>(
+        &mut self,
+        math_service: &mut crate::cognitive_loop::math_service::MathService,
+        hypothesis_id: usize,
+        f: &F,
+        a: f64,
+        b: f64,
+    ) -> Option<(
+        Experiment,
+        crate::cognitive_loop::math_service::MathResponse,
+    )> {
+        let math_response = math_service.find_root(f, a, b);
+        let evidence = math_response.confidence; // 0.99 if converged, 0.3 if not
+
+        let predicted = self.predict(hypothesis_id);
+        let experiment = self.test_hypothesis(hypothesis_id, evidence, predicted)?;
+        Some((experiment, math_response))
+    }
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 /// Encode a text string as a BinaryHV by hashing word-level seeds and
@@ -798,6 +875,78 @@ mod tests {
         assert_eq!(
             HypothesisStatus::from_posterior(0.11),
             HypothesisStatus::Inconclusive
+        );
+    }
+
+    // ── 16. MathService bridge: numerical experiment ───────────────────
+
+    #[test]
+    fn test_numerical_experiment_updates_posterior() {
+        let mut engine = ScientificMethodEngine::new();
+        let mut math = crate::cognitive_loop::math_service::MathService::new();
+
+        let hid = engine.hypothesize("Mean temperature is 37°C", 0.5);
+        let initial = engine.predict(hid);
+
+        // Provide data with mean ≈ 37.0, predicted 0.5 → big surprise → shift posterior
+        let result = engine.numerical_experiment(&mut math, hid, &[36.8, 37.0, 37.2], initial);
+        assert!(result.is_some());
+
+        let (exp, math_resp) = result.unwrap();
+        assert!(exp.surprise >= 0.0);
+        assert!(math_resp.phi > 0.0);
+        assert_eq!(math.telemetry().problems_solved, 1);
+
+        // Posterior should have moved from initial
+        let updated = engine.hypothesis(hid).unwrap().posterior;
+        assert!(
+            (updated - initial).abs() > 1e-6,
+            "posterior should shift: initial={initial}, updated={updated}"
+        );
+    }
+
+    // ── 17. MathService bridge: regression experiment ──────────────────
+
+    #[test]
+    fn test_regression_experiment() {
+        let mut engine = ScientificMethodEngine::new();
+        let mut math = crate::cognitive_loop::math_service::MathService::new();
+
+        let hid = engine.hypothesize("Y varies linearly with X", 0.5);
+
+        // Perfect linear data: y = 2x + 1, R² = 1.0
+        let x = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+        let y = vec![3.0, 5.0, 7.0, 9.0, 11.0];
+
+        let result = engine.regression_experiment(&mut math, hid, &x, &y);
+        assert!(result.is_some());
+
+        let (exp, math_resp) = result.unwrap();
+        // R² ≈ 1.0 should be the observed value
+        let r_sq = math_resp.numerical_result.unwrap();
+        assert!((r_sq - 1.0).abs() < 1e-6, "R² should be 1.0, got {r_sq}");
+        assert!(exp.phi > 0.0);
+    }
+
+    // ── 18. MathService bridge: root experiment ────────────────────────
+
+    #[test]
+    fn test_root_experiment() {
+        let mut engine = ScientificMethodEngine::new();
+        let mut math = crate::cognitive_loop::math_service::MathService::new();
+
+        let hid = engine.hypothesize("f(x) = x² - 4 has a root in [0, 3]", 0.5);
+
+        let result = engine.root_experiment(&mut math, hid, &|x: f64| x * x - 4.0, 0.0, 3.0);
+        assert!(result.is_some());
+
+        let (_exp, math_resp) = result.unwrap();
+        // Should find root at x=2
+        let root = math_resp.numerical_result.unwrap();
+        assert!((root - 2.0).abs() < 1e-8, "Root should be 2.0, got {root}");
+        assert!(
+            math_resp.multipath_verified,
+            "should be multi-path verified"
         );
     }
 }

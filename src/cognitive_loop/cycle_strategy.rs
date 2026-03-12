@@ -539,6 +539,7 @@ impl CognitiveLoopService {
                 compressed_state: &compressed_state,
                 stillness_boost,
                 semantic_embedding: semantic_emb_ref,
+                action_hv: Some(&hv16_cached),
             });
         module_timings.ethics_engine = ethics_output.total_us;
         module_timings.ethics_engine_moral = ethics_output.moral_us;
@@ -553,6 +554,32 @@ impl CognitiveLoopService {
         }
         // Reset escalation block flag each cycle — re-applied below if still warranted.
         self.stats.escalation_blocked = false;
+
+        // CANTOR → HARMONY SYNERGY: Post-hoc nudge harmony coordinates from fractal state.
+        // (1) Self-similarity → Sacred Stillness (index 7): deep self-reference = contemplation.
+        //     Science: Varela et al. (1991) — autopoietic self-reference as consciousness substrate.
+        // (2) Resonance boost → Universal Interconnectedness (index 4): fractal choir = unity.
+        {
+            use crate::cognitive_loop::thresholds::{
+                CANTOR_HARMONY_INTERCONNECT_SCALE, CANTOR_HARMONY_STILLNESS_SCALE,
+            };
+            let meta_depth = self
+                .cantor_broadcast_buffer
+                .last()
+                .map(|crhv| crhv.self_similarity() as f64)
+                .unwrap_or(0.0);
+            if meta_depth > 0.5 {
+                let stillness_delta = (meta_depth - 0.5) * CANTOR_HARMONY_STILLNESS_SCALE;
+                self.ethics_engine
+                    .nudge_harmony_coordinate(7, stillness_delta);
+            }
+            if self.cantor_resonance_boost > 0.1 {
+                let interconnect_delta =
+                    self.cantor_resonance_boost as f64 * CANTOR_HARMONY_INTERCONNECT_SCALE;
+                self.ethics_engine
+                    .nudge_harmony_coordinate(4, interconnect_delta);
+            }
+        }
 
         // Anomaly response: corrective feedback when moral anomalies detected (opt-in).
         // Gate on topology_fresh to prevent N× over-correction from stale anomaly flags

@@ -380,8 +380,10 @@ impl CognitiveLoopService {
     /// Poll a MycelixBridge for pending governance events and outcomes.
     ///
     /// Drains the bridge's internal event/outcome queues and injects them into
-    /// the GovernanceManager. Call this each cycle (or periodically) to keep the
-    /// governance subsystem synchronized with bridge activity.
+    /// the GovernanceManager. **External-facing**: call from the host application
+    /// or Symthaea facade between cycles to keep governance synchronized with
+    /// Holochain network activity. Not called internally by the cycle — the bridge
+    /// is owned externally.
     #[cfg(feature = "mycelix")]
     pub fn poll_bridge_governance(
         &mut self,
@@ -394,6 +396,62 @@ impl CognitiveLoopService {
         for outcome in outcomes {
             self.governance_mgr.inject_outcome(outcome);
         }
+    }
+
+    /// Override the epistemic mesh with collective network data.
+    ///
+    /// Call from the host application after aggregating EpistemicSummary vectors
+    /// from the Mycelix network. Once set, the external mesh is **persistent** —
+    /// it will NOT be overwritten by the local single-agent fallback. To revert
+    /// to local-only, call `clear_governance_external_mesh()`.
+    #[cfg(feature = "mycelix")]
+    pub fn set_governance_epistemic_mesh(
+        &mut self,
+        mesh: crate::mycelix::epistemic_mesh::EpistemicMesh,
+    ) {
+        self.governance_mgr.set_epistemic_mesh(mesh);
+    }
+
+    /// Override the community mode with collective identity data.
+    ///
+    /// Call from the host application after computing CollectiveKosmicSong from
+    /// the network. Overrides the single-agent fallback.
+    #[cfg(feature = "mycelix")]
+    pub fn set_governance_community_mode(
+        &mut self,
+        mode: crate::mycelix::collective_identity::CommunityMode,
+    ) {
+        self.governance_mgr.set_community_mode(mode);
+    }
+
+    /// Current community mode (if known).
+    #[cfg(feature = "mycelix")]
+    pub fn governance_community_mode(
+        &self,
+    ) -> Option<crate::mycelix::collective_identity::CommunityMode> {
+        self.governance_mgr.community_mode()
+    }
+
+    /// Extract the 6D consciousness vector for collective Phi computation
+    /// from a CycleResult's metadata.
+    ///
+    /// Returns `(consciousness_level, meta_awareness, coherence, care_activation,
+    ///           quality_score, epistemic_confidence)` — suitable for constructing
+    /// an `AgentConsciousnessVector` for the collective_phi engine.
+    ///
+    /// Usage: call after `cycle()` and pass the result metadata.
+    #[cfg(feature = "mycelix")]
+    pub fn governance_consciousness_vector(
+        metadata: &crate::cognitive_loop::CycleMetadata,
+    ) -> (f64, f64, f64, f64, f64, f64) {
+        (
+            metadata.consciousness_level,
+            metadata.actual_effective_lr, // meta-awareness proxy (learning rate = adaptive awareness)
+            metadata.consciousness_level * 0.8, // coherence proxy
+            metadata.consciousness_level * 0.6, // care activation proxy
+            metadata.consciousness_level * 0.9, // quality proxy
+            metadata.actual_effective_lr.min(1.0), // epistemic confidence proxy
+        )
     }
 
     /// Record a predicted outcome alignment for a governance proposal.
@@ -441,15 +499,42 @@ impl CognitiveLoopService {
         let completed = self.governance_mgr.drain_completed();
         if !completed.is_empty() {
             if let Some(ref mut bus) = self.experience_bus {
-                for outcome in &completed {
+                for (outcome, gov_pe) in &completed {
+                    // Generate deterministic HDV from governance outcome content via BLAKE3 XOF.
+                    // 256 floats in [-1,1] — compact but retrievable by similarity.
+                    let gov_hdv = {
+                        let content = format!(
+                            "gov:{}:{}:{:.4}:{:.4}",
+                            outcome.proposal_id,
+                            outcome.passed,
+                            outcome.value_alignment_score,
+                            outcome.harmonic_resonance,
+                        );
+                        let mut hasher = blake3::Hasher::new();
+                        hasher.update(content.as_bytes());
+                        let mut xof = hasher.finalize_xof();
+                        let mut embedding = vec![0f32; 256];
+                        for val in &mut embedding {
+                            let mut buf = [0u8; 4];
+                            xof.fill(&mut buf);
+                            *val = (i32::from_le_bytes(buf) as f32) / (i32::MAX as f32);
+                        }
+                        embedding
+                    };
+                    // Use governance prediction error for dream consolidation priority:
+                    // high PE → surprising outcome → prioritized during sleep consolidation.
+                    let pe_for_memory = *gov_pe as f32;
+                    // Salience scales with PE: surprising outcomes are more memorable.
+                    let salience =
+                        if outcome.passed { 0.7 } else { 0.5 } + (pe_for_memory * 0.3).min(0.3);
                     let memory = crate::experience::memory::EpisodicMemory {
                         id: format!("gov-{}", outcome.proposal_id),
                         timestamp: self.stats.total_cycles as u64,
-                        hdv_embedding: Vec::new(), // governance has no HDV
+                        hdv_embedding: gov_hdv,
                         thought_primitives: vec!["governance_outcome".to_string()],
                         context_hash: outcome.proposal_id.clone(),
                         user_id: None,
-                        prediction_error: outcome.value_alignment_score as f32,
+                        prediction_error: pe_for_memory,
                         uncertainty: if outcome.my_vote_aligned.is_some() {
                             0.2
                         } else {
@@ -461,7 +546,7 @@ impl CognitiveLoopService {
                         } else {
                             0.3
                         },
-                        salience: if outcome.passed { 0.7 } else { 0.5 },
+                        salience,
                         kosmic_snapshot: None,
                         outcome: None,
                         input_summary: format!(
@@ -470,8 +555,8 @@ impl CognitiveLoopService {
                             if outcome.passed { "passed" } else { "failed" }
                         ),
                         output_summary: format!(
-                            "alignment={:.2}, resonance={:.2}",
-                            outcome.value_alignment_score, outcome.harmonic_resonance
+                            "alignment={:.2}, resonance={:.2}, pe={:.3}",
+                            outcome.value_alignment_score, outcome.harmonic_resonance, gov_pe,
                         ),
                     };
                     bus.record_experience(memory);

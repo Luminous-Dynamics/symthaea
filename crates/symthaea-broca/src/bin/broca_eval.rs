@@ -122,10 +122,7 @@ fn main() {
 
         for i in 0..opts.sample_count.min(thoughts.len()) {
             let channels = &thoughts[(i * step) % thoughts.len()];
-            let tc = ThoughtChannels {
-                channels: channels.channels,
-            };
-            let result = generator.generate(&tc);
+            let result = generator.generate(channels);
 
             let intent_idx = (0..8)
                 .max_by(|&a, &b| channels.channels[a].total_cmp(&channels.channels[b]))

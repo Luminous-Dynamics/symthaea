@@ -46,7 +46,7 @@ fn make_input<'a>(
         moral_anomaly_score: 0.0,
         hot_depth: 0.5,
         cantor_metacognitive_depth: 0.5,
-            governance_collective_phi: 0.0,
+        governance_collective_phi: 0.0,
     }
 }
 
@@ -283,7 +283,7 @@ fn test_high_sht_2a_boosts_consciousness() {
         moral_anomaly_score: 0.0,
         hot_depth: 0.5,
         cantor_metacognitive_depth: 0.5,
-            governance_collective_phi: 0.0,
+        governance_collective_phi: 0.0,
     };
     let out_base = engine.measure(&input_baseline);
 
@@ -326,7 +326,7 @@ fn test_high_gaba_a_dampens_consciousness() {
         moral_anomaly_score: 0.0,
         hot_depth: 0.5,
         cantor_metacognitive_depth: 0.5,
-            governance_collective_phi: 0.0,
+        governance_collective_phi: 0.0,
     };
     let out_base = engine.measure(&input_baseline);
 
@@ -369,7 +369,7 @@ fn test_attractor_depresses_consciousness() {
         moral_anomaly_score: 0.0,
         hot_depth: 0.5,
         cantor_metacognitive_depth: 0.5,
-            governance_collective_phi: 0.0,
+        governance_collective_phi: 0.0,
     };
     let out_no = engine.measure(&input_no_attractor);
 
@@ -413,7 +413,7 @@ fn test_bath_modulation_clamped() {
         moral_anomaly_score: 0.0,
         hot_depth: 0.5,
         cantor_metacognitive_depth: 0.5,
-            governance_collective_phi: 0.0,
+        governance_collective_phi: 0.0,
     };
     let out = engine.measure(&input);
     assert!(

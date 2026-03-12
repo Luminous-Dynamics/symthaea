@@ -46,7 +46,9 @@ impl CognitiveLoopService {
             self.scale_exploration("startup_warmup", explore_ramp);
 
             // S17-5: Adaptive warmup exit. Smith (2018).
-            if self.stats.total_cycles >= super::super::thresholds::ADAPTIVE_WARMUP_MIN_CYCLES as usize {
+            if self.stats.total_cycles
+                >= super::super::thresholds::ADAPTIVE_WARMUP_MIN_CYCLES as usize
+            {
                 let grad = self.carryover.quality.prev_gradient_magnitude;
                 let ema = self.carryover.history.consciousness_ema;
                 if grad < super::super::thresholds::ADAPTIVE_WARMUP_GRADIENT_THRESHOLD

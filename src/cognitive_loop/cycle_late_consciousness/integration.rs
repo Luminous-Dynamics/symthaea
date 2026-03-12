@@ -88,7 +88,27 @@ impl CognitiveLoopService {
             let depth_range = CANTOR_DEPTH_MAX - CANTOR_DEPTH_MIN;
             let adaptive_depth =
                 CANTOR_DEPTH_MIN + (gwt_activation * depth_range as f32).round() as usize;
-            let crhv = CantorRecursiveHV::from_base_with_depth(ctx.hv16_cached, adaptive_depth);
+
+            // RADIAL CANTOR PROMOTION: When cross-modal binding is strong (previous cycle),
+            // wrap the broadcast in RadialCantor geometry instead of flat CRHV.
+            // RadialCantor applies concentric band structure that preserves perceptual
+            // hierarchy (core = abstract, periphery = contextual).
+            // Science: Treisman & Gelade (1980) — feature integration requires binding;
+            //          strong binding justifies geometric structure in the representation.
+            let binding_strength = self.carryover.quality.last_phenomenal_binding as f32;
+            let crhv = if binding_strength
+                > crate::cognitive_loop::thresholds::CANTOR_RADIAL_BINDING_THRESHOLD
+            {
+                use symthaea_core::hdc::multidimensional_cantor::RadialCantorHV;
+                let radial = RadialCantorHV::new(
+                    ctx.hv16_cached,
+                    crate::cognitive_loop::thresholds::CANTOR_RADIAL_BANDS,
+                );
+                // Wrap the radial vector as a CRHV (preserves pipeline compatibility)
+                CantorRecursiveHV::from_base_with_depth(radial.vector, adaptive_depth)
+            } else {
+                CantorRecursiveHV::from_base_with_depth(ctx.hv16_cached, adaptive_depth)
+            };
             // Cap at 32 to bound memory — oldest broadcasts evicted first (ring semantics)
             if self.cantor_broadcast_buffer.len() >= 32 {
                 self.cantor_broadcast_buffer.remove(0);
@@ -129,6 +149,26 @@ impl CognitiveLoopService {
                     self.adjust_confidence(
                         "cantor_resonance",
                         crate::cognitive_loop::thresholds::CANTOR_RESONANCE_CONFIDENCE_BOOST
+                            * self.cantor_resonance_boost,
+                    );
+                }
+                // CANTOR → EXPLORATION: Surprise drives exploration, resonance drives exploitation.
+                // Science: Sutton & Barto (2018) — surprise-driven explore/exploit tradeoff.
+                if self.cantor_dream_surprise
+                    > crate::cognitive_loop::thresholds::CANTOR_SURPRISE_EXPLORATION_THRESHOLD
+                {
+                    self.adjust_exploration(
+                        "cantor_dream_surprise",
+                        crate::cognitive_loop::thresholds::CANTOR_SURPRISE_EXPLORATION_BOOST
+                            * self.cantor_dream_surprise,
+                    );
+                }
+                if self.cantor_resonance_boost
+                    > crate::cognitive_loop::thresholds::CANTOR_RESONANCE_EXPLORATION_DAMPEN_THRESHOLD
+                {
+                    self.adjust_exploration(
+                        "cantor_resonance_exploit",
+                        crate::cognitive_loop::thresholds::CANTOR_RESONANCE_EXPLORATION_DAMPEN
                             * self.cantor_resonance_boost,
                     );
                 }

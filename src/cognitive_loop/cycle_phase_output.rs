@@ -781,20 +781,156 @@ impl CognitiveLoopService {
                 && self.stats.total_cycles > 20;
             metadata.exploration_decay_applied = self.stats.total_cycles > 30;
             let prev_grad = self.carryover.quality.prev_gradient_magnitude;
-            let accel =
-                (feedback.consciousness.consciousness_gradient_magnitude - prev_grad).abs();
+            let accel = (feedback.consciousness.consciousness_gradient_magnitude - prev_grad).abs();
             metadata.consciousness_accel_active =
                 accel > CONSCIOUSNESS_ACCEL_THRESHOLD && self.stats.total_cycles > 20;
             metadata.adaptive_warmup_early_exit = self.carryover.quality.adaptive_warmup_exited
-                && self.stats.total_cycles
-                    <= super::thresholds::STARTUP_WARMUP_CYCLES;
-            metadata.proposal_saturation_active =
-                self.feedback_state.lr_proposal_count() >= PROPOSAL_SATURATION_THRESHOLD
-                    && self.stats.total_cycles > 15;
+                && self.stats.total_cycles <= super::thresholds::STARTUP_WARMUP_CYCLES;
+            metadata.proposal_saturation_active = self.feedback_state.lr_proposal_count()
+                >= PROPOSAL_SATURATION_THRESHOLD
+                && self.stats.total_cycles > 15;
             let phi = self.stats.unified_psi as f64;
             metadata.phi_gated_lr_floor_active =
                 phi < PHI_GATED_LR_FLOOR_THRESHOLD && phi > 0.0 && self.stats.total_cycles > 20;
             metadata.rhythmic_exploration_active = self.stats.total_cycles > 30;
+        }
+
+        // ── Session 18: Predictive Coding & Metacognitive Refinement Telemetry ──
+        {
+            use super::thresholds::{
+                CONFIDENCE_CALIBRATION_DRIFT_THRESHOLD, EXPLORE_EXPLOIT_WINDOW,
+                GRADIENT_SIGN_FLIP_THRESHOLD, GRADIENT_SIGN_WINDOW,
+                METACOGNITIVE_SURPRISE_THRESHOLD, PE_VARIANCE_DAMPING_THRESHOLD,
+                PROPOSAL_CONFLICT_THRESHOLD,
+            };
+            metadata.pe_variance_damping_active = self.carryover.quality.pe_variance_ema
+                > PE_VARIANCE_DAMPING_THRESHOLD
+                && self.stats.total_cycles > 20;
+            let cal_count = self.carryover.quality.confidence_calibration_count;
+            metadata.confidence_calibration_drift = if cal_count > 0 {
+                (self.carryover.quality.confidence_calibration_bias / cal_count as f32).abs()
+            } else {
+                0.0
+            };
+            let current_lr = self.feedback_state.cycle_start_lr() as f32;
+            let lr_delta = (current_lr - self.carryover.quality.lr_momentum_ema).abs();
+            metadata.lr_momentum_active =
+                lr_delta > super::thresholds::LR_MOMENTUM_MAX_DELTA && self.stats.total_cycles > 10;
+            let actual = self.stats.unified_psi as f64;
+            let predicted = self.carryover.quality.prev_metacognitive_prediction;
+            metadata.metacognitive_surprise_active = (actual - predicted).abs()
+                > METACOGNITIVE_SURPRISE_THRESHOLD
+                && self.stats.total_cycles > 15;
+            metadata.sleep_pressure = self.carryover.quality.sleep_pressure;
+            let grad_hist = &mut self.carryover.quality.gradient_sign_history;
+            metadata.gradient_sign_flip_active = if grad_hist.len() >= GRADIENT_SIGN_WINDOW {
+                let flips = grad_hist
+                    .make_contiguous()
+                    .windows(2)
+                    .filter(|w| w[0] != w[1])
+                    .count();
+                flips as f32 / (grad_hist.len() - 1) as f32 > GRADIENT_SIGN_FLIP_THRESHOLD
+            } else {
+                false
+            };
+            let ee_hist = &self.carryover.quality.explore_exploit_history;
+            metadata.explore_exploit_balance = if ee_hist.len() >= EXPLORE_EXPLOIT_WINDOW {
+                ee_hist.iter().filter(|&&b| b).count() as f32 / ee_hist.len() as f32
+            } else {
+                0.5
+            };
+            metadata.proposal_conflict_detected =
+                self.feedback_state.learning_rate.conflict_ratio() > PROPOSAL_CONFLICT_THRESHOLD
+                    && self.stats.total_cycles > 15;
+        }
+
+        // ── Session 19: Embodied Cognition & Environmental Coupling Telemetry ──
+        {
+            use super::thresholds::{
+                AROUSAL_LR_BOOST_THRESHOLD, AROUSAL_OVERAROUSAL_THRESHOLD, ATTENTION_BUDGET_MAX,
+                ENV_PREDICTABILITY_WINDOW, FATIGUE_THRESHOLD, NOVELTY_LOW_THRESHOLD,
+                READINESS_FATIGUE_WEIGHT, READINESS_PE_WEIGHT, READINESS_SLEEP_WEIGHT,
+            };
+            let arousal = self.carryover.history.body_arousal;
+            metadata.arousal_lr_modulated = self.stats.total_cycles > 15
+                && (arousal > AROUSAL_OVERAROUSAL_THRESHOLD
+                    || arousal > AROUSAL_LR_BOOST_THRESHOLD);
+            metadata.novelty_habituation_active = self.carryover.quality.novelty_ema
+                < NOVELTY_LOW_THRESHOLD
+                && self.stats.total_cycles > 20;
+            metadata.fatigue_level = self.carryover.quality.fatigue;
+            metadata.recovery_detected = self.carryover.quality.consecutive_recovery_cycles
+                >= super::thresholds::RECOVERY_CYCLES_NEEDED;
+            let pred_hist = &self.carryover.quality.prediction_success_history;
+            metadata.env_predictability = if pred_hist.len() >= ENV_PREDICTABILITY_WINDOW {
+                pred_hist.iter().filter(|&&b| b).count() as f32 / pred_hist.len() as f32
+            } else {
+                0.5
+            };
+            metadata.attention_budget_exceeded =
+                self.feedback_state.total_proposals() > ATTENTION_BUDGET_MAX;
+            metadata.readiness_score = self.carryover.quality.last_readiness_score;
+            metadata.flow_state_active = self.carryover.quality.in_flow_state;
+        }
+
+        // ── Session 20: Measurement & Consolidation Telemetry ──
+        {
+            metadata.unified_readiness_score = self.carryover.quality.last_readiness_score;
+            // Count unique proposal sources across all 4 channels as activation count.
+            let mut sources = std::collections::HashSet::new();
+            for ap in self.feedback_state.confidence.proposals() {
+                sources.insert(ap.source);
+            }
+            for ap in self.feedback_state.learning_rate.proposals() {
+                sources.insert(ap.source);
+            }
+            for ap in self.feedback_state.exploration.proposals() {
+                sources.insert(ap.source);
+            }
+            for ap in self.feedback_state.threshold.proposals() {
+                sources.insert(ap.source);
+            }
+            metadata.mechanism_activation_count = sources.len() as u32;
+            // Accumulate lifetime activation counts.
+            for source in &sources {
+                *self
+                    .carryover
+                    .quality
+                    .mechanism_activations
+                    .entry(source)
+                    .or_insert(0) += 1;
+            }
+            // Detect if compound dampening would have been severe pre-consolidation.
+            metadata.compound_dampening_prevented = self.carryover.quality.last_readiness_score
+                < 0.5
+                && self.feedback_state.learning_rate.len() > 5;
+        }
+
+        // ── Session 21: Housekeeping & Measurement Telemetry ──
+        {
+            // LR proposal source count and dominant source.
+            let lr_proposals = self.feedback_state.learning_rate.proposals();
+            metadata.lr_proposal_source_count = lr_proposals.len() as u32;
+            // Find dominant LR source by absolute magnitude.
+            let mut max_mag: f64 = 0.0;
+            let mut dominant = "";
+            for ap in lr_proposals {
+                let mag = match ap.proposal {
+                    crate::cognitive_loop::feedback_state::FeedbackProposal::Add(v) => v.abs(),
+                    crate::cognitive_loop::feedback_state::FeedbackProposal::Scale(v) => {
+                        (v - 1.0).abs()
+                    }
+                    crate::cognitive_loop::feedback_state::FeedbackProposal::Set(v) => v.abs(),
+                };
+                if mag > max_mag {
+                    max_mag = mag;
+                    dominant = ap.source;
+                }
+            }
+            metadata.lr_dominant_source = dominant.to_string();
+            // Sleep pressure recovery state.
+            metadata.sleep_pressure_recovering = self.carryover.quality.last_readiness_score > 0.9
+                && !self.carryover.quality.in_consolidation;
         }
 
         // ── Session 17: Affective/Harmonics/Gradient Telemetry ──
@@ -885,6 +1021,25 @@ impl CognitiveLoopService {
             .unwrap_or(0);
         metadata.cantor_dream_surprise = self.cantor_dream_surprise;
         metadata.cantor_resonance_boost = self.cantor_resonance_boost;
+
+        // Populate depth histogram from codebook labels ("d{N}_...")
+        // Depth range 2-7 maps to histogram indices 0-5
+        for d in 2..=7usize {
+            metadata.cantor_depth_histogram[d - 2] =
+                self.cantor_cleanup_engine
+                    .codebook
+                    .count_by_prefix(&format!("d{d}_")) as u32;
+        }
+
+        // ── Motor output bridge telemetry ──
+        metadata.motor_bridge_active = self.motor_output_bridge.is_some();
+        if let Some(ref result) = self.last_motor_result {
+            metadata.motor_action_executed = true;
+            metadata.motor_action_success = result.success;
+            metadata.motor_action_type = result.action_type.map(|at| at as u8).unwrap_or(255);
+            metadata.motor_prediction_error = result.prediction_error;
+            metadata.motor_phi_used = self.last_motor_phi;
+        }
 
         // ── GWT-triggered memory consolidation (Dehaene & Changeux 2011) ──
         // When global workspace broadcasts, record current state for episodic
@@ -1008,6 +1163,30 @@ impl CognitiveLoopService {
                 .map(|o| o.confidence_delta as f64)
                 .unwrap_or(0.0);
             metadata.governance_collective_phi = self.governance_mgr.last_collective_phi();
+            metadata.governance_blind_spot_count = self.governance_mgr.blind_spot_count();
+            metadata.governance_max_blind_spot_severity =
+                self.governance_mgr.max_blind_spot_severity();
+            metadata.governance_community_mode = self
+                .governance_mgr
+                .community_mode()
+                .map(|m| format!("{:?}", m))
+                .unwrap_or_default();
+            metadata.governance_harmonic_delta_max = self.governance_mgr.last_harmonic_delta_max();
+            metadata.governance_epistemic_agents = self.governance_mgr.epistemic_agent_count();
+            metadata.governance_lr_boost = self.governance_mgr.last_lr_boost();
+        }
+
+        // Knowledge engine telemetry
+        if let Some(ref km) = self.knowledge_manager {
+            let telem = km.telemetry();
+            let signals = km.signals();
+            metadata.knowledge_graph_size = telem.graph_size;
+            metadata.knowledge_avg_confidence = telem.avg_confidence;
+            metadata.knowledge_causal_edges = telem.causal_edge_count;
+            metadata.knowledge_uncertainty = signals.uncertainty;
+            metadata.knowledge_novelty = signals.novelty;
+            metadata.knowledge_contradictions = telem.contradictions_detected;
+            metadata.knowledge_ontology_size = telem.ontology_size;
         }
 
         // Physics bridge telemetry
@@ -1088,6 +1267,15 @@ impl CognitiveLoopService {
                 .map(|m| m.last_telemetry().clone());
         }
 
+        // Canvas living topology telemetry
+        #[cfg(feature = "canvas")]
+        {
+            metadata.canvas = self
+                .canvas_manager
+                .as_ref()
+                .map(|m| m.last_telemetry().clone());
+        }
+
         metadata.weight_convergence_state = feedback.consciousness.convergence_state.clone();
         if feedback.consciousness.convergence_state == "Converged" && self.convergence_cycle == 0 {
             self.convergence_cycle = self.stats.total_cycles;
@@ -1108,6 +1296,33 @@ impl CognitiveLoopService {
                     topo.beta_0
                 );
             }
+        }
+
+        // ── Math Service telemetry ──
+        {
+            metadata.math_detected = perception.math.math_detected;
+            if let Some(pt) = perception.math.problem_type {
+                metadata.math_problem_type = format!("{:?}", pt);
+            }
+            // Use dynamics-phase solver results (richer than perception-phase classification)
+            if dynamics.math.solved {
+                metadata.math_phi = dynamics.math.phi;
+                metadata.math_confidence = dynamics.math.confidence;
+            } else {
+                metadata.math_phi = perception.math.phi;
+                metadata.math_confidence = perception.math.confidence;
+            }
+            let mt = self.math_service.telemetry();
+            metadata.math_problems_solved = mt.problems_solved;
+            metadata.math_avg_phi = mt.average_phi;
+            // Solver dispatch telemetry
+            metadata.math_solved = dynamics.math.solved;
+            metadata.math_multipath_verified = dynamics.math.multipath_verified;
+            metadata.math_answer = dynamics.math.answer.clone();
+            if let Some(ref caveat) = dynamics.math.epistemic_caveat {
+                metadata.math_epistemic_caveat = caveat.clone();
+            }
+            metadata.math_error_bound = dynamics.math.error_bound.unwrap_or(0.0);
         }
 
         // ── Nurture/attachment telemetry ──
@@ -1420,6 +1635,8 @@ impl CognitiveLoopService {
             wisdom_hv: perception.encoding.hv16_cached,
             #[cfg(feature = "ssm_language")]
             language_output: self.last_broca_text.take(),
+            #[cfg(feature = "canvas")]
+            canvas_svg: self.last_canvas_svg.take(),
             #[cfg(feature = "identity")]
             signed_output,
             #[cfg(feature = "identity")]
@@ -1494,21 +1711,15 @@ mod tests {
     #[test]
     fn test_convergence_cycle_captured_and_persists() {
         let mut svc = make_service();
-        // Initially convergence_cycle should be 0
         let result = svc.cycle("convergence init");
-        assert_eq!(
-            result.metadata.convergence_cycle, 0,
-            "convergence_cycle should start at 0"
-        );
+        assert_eq!(result.metadata.convergence_cycle, 0);
 
-        // Run enough cycles to potentially reach convergence (steady input → weights stabilize)
         let mut first_convergence_cycle = 0usize;
         for i in 0..200 {
             let result = svc.cycle("steady input for convergence");
             if result.metadata.convergence_cycle > 0 && first_convergence_cycle == 0 {
                 first_convergence_cycle = result.metadata.convergence_cycle;
             }
-            // Once captured, it should persist
             if first_convergence_cycle > 0 {
                 assert_eq!(
                     result.metadata.convergence_cycle, first_convergence_cycle,
@@ -1516,8 +1727,191 @@ mod tests {
                 );
             }
         }
-        // Note: convergence may or may not be reached in 200 cycles depending on
-        // the dynamics. If it was reached, we verified persistence above.
-        // The key invariant is: once set, it never changes.
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // METADATA INTEGRITY: Key fields finite and bounded across cycles
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    fn run_cycles(
+        svc: &mut CognitiveLoopService,
+        n: usize,
+        input: &str,
+    ) -> Vec<super::super::CycleResult> {
+        (0..n).map(|_| svc.cycle(input)).collect()
+    }
+
+    #[test]
+    fn output_pe_variance_non_negative() {
+        let mut svc = make_service();
+        let results = run_cycles(&mut svc, 50, "pe variance");
+        for (i, r) in results.iter().enumerate() {
+            let v = r.metadata.pe_variance;
+            assert!(
+                v.is_finite() && v >= 0.0,
+                "pe_variance must be >= 0.0 at cycle {i}: {v}"
+            );
+        }
+    }
+
+    #[test]
+    fn output_consciousness_layer_disagreement_non_negative() {
+        let mut svc = make_service();
+        let results = run_cycles(&mut svc, 50, "layer disagreement");
+        for (i, r) in results.iter().enumerate() {
+            let d = r.metadata.consciousness_layer_disagreement;
+            assert!(
+                d.is_finite() && d >= 0.0,
+                "layer disagreement must be >= 0.0 at cycle {i}: {d}"
+            );
+        }
+    }
+
+    #[test]
+    fn output_thought_vector_finite_across_many_cycles() {
+        let mut svc = make_service();
+        let inputs = ["alpha input", "beta pattern", "gamma event"];
+        for i in 0..60 {
+            let result = svc.cycle(inputs[i % inputs.len()]);
+            assert_eq!(result.thought_vector.len(), 32);
+            for (j, &v) in result.thought_vector.iter().enumerate() {
+                assert!(v.is_finite(), "thought_vector[{j}] NaN at cycle {i}: {v}");
+            }
+        }
+    }
+
+    #[test]
+    fn output_social_fields_finite() {
+        let mut svc = make_service();
+        let results = run_cycles(&mut svc, 30, "social check");
+        for (i, r) in results.iter().enumerate() {
+            let m = &r.metadata;
+            assert!(
+                m.social_trust_current.is_finite(),
+                "NaN social_trust at cycle {i}"
+            );
+            assert!(
+                m.social_cooperation_current.is_finite(),
+                "NaN social_cooperation at cycle {i}"
+            );
+            assert!(
+                m.social_prediction_accuracy.is_finite(),
+                "NaN social_pred_acc at cycle {i}"
+            );
+        }
+    }
+
+    #[test]
+    fn output_warmup_gated_bools_false_early() {
+        let mut svc = make_service();
+        let results = run_cycles(&mut svc, 10, "warmup gate");
+        for (i, r) in results.iter().enumerate() {
+            let m = &r.metadata;
+            assert!(!m.tom_exploration_triggered, "tom_exploration at cycle {i}");
+            assert!(!m.compound_instability, "compound_instability at cycle {i}");
+            assert!(
+                !m.confidence_rising_dampen,
+                "confidence_rising at cycle {i}"
+            );
+        }
+    }
+
+    #[test]
+    fn output_proposal_conflict_ratio_bounded() {
+        let mut svc = make_service();
+        let results = run_cycles(&mut svc, 50, "conflict ratio");
+        for (i, r) in results.iter().enumerate() {
+            let cr = r.metadata.proposal_conflict_ratio;
+            assert!(
+                cr.is_finite() && cr >= 0.0 && cr <= 1.0,
+                "conflict_ratio out of [0,1] at cycle {i}: {cr}"
+            );
+        }
+    }
+
+    #[test]
+    fn output_smoothed_epistemic_uncertainty_finite() {
+        let mut svc = make_service();
+        let results = run_cycles(&mut svc, 50, "epistemic ema");
+        for (i, r) in results.iter().enumerate() {
+            let seu = r.metadata.smoothed_epistemic_uncertainty;
+            assert!(
+                seu.is_finite(),
+                "smoothed_epistemic_uncertainty NaN at cycle {i}"
+            );
+        }
+    }
+
+    #[test]
+    fn output_reasoning_telemetry_finite() {
+        let mut svc = make_service();
+        let results = run_cycles(&mut svc, 30, "reasoning telem");
+        for (i, r) in results.iter().enumerate() {
+            let re = &r.metadata.reasoning_engine_telemetry;
+            assert!(
+                re.phi_eff_raw.is_finite(),
+                "NaN re.phi_eff_raw at cycle {i}"
+            );
+            assert!(re.phi_eff.is_finite(), "NaN re.phi_eff at cycle {i}");
+            assert!(re.gamma.is_finite(), "NaN re.gamma at cycle {i}");
+            assert!(
+                re.reliability.is_finite(),
+                "NaN re.reliability at cycle {i}"
+            );
+        }
+    }
+
+    #[test]
+    fn output_no_nan_in_critical_fields_100_cycles() {
+        let mut svc = make_service();
+        let inputs = [
+            "novel stimulus",
+            "familiar pattern",
+            "surprising event",
+            "calm consolidation",
+        ];
+        for i in 0..100 {
+            let r = svc.cycle(inputs[i % inputs.len()]);
+            let m = &r.metadata;
+            assert!(m.cycle_duration_us > 0, "zero duration at cycle {i}");
+            assert!(
+                !m.selected_strategy.is_empty(),
+                "empty strategy at cycle {i}"
+            );
+            assert!(m.pe_variance.is_finite(), "NaN pe_variance at cycle {i}");
+            assert!(
+                m.consciousness_level.is_finite(),
+                "NaN consciousness at cycle {i}"
+            );
+            assert!(
+                m.consciousness_layer_disagreement.is_finite(),
+                "NaN disagreement at cycle {i}"
+            );
+            assert!(
+                m.proposal_conflict_ratio.is_finite(),
+                "NaN conflict at cycle {i}"
+            );
+            assert!(
+                m.smoothed_epistemic_uncertainty.is_finite(),
+                "NaN epistemic at cycle {i}"
+            );
+            assert_eq!(r.thought_vector.len(), 32);
+            for (j, &v) in r.thought_vector.iter().enumerate() {
+                assert!(v.is_finite(), "NaN thought_vector[{j}] at cycle {i}");
+            }
+        }
+    }
+
+    #[test]
+    fn output_module_timings_consistent_across_cycles() {
+        let mut svc = make_service();
+        let results = run_cycles(&mut svc, 20, "timing consistency");
+        for (i, r) in results.iter().enumerate() {
+            let t = &r.metadata.module_timings_us;
+            assert!(
+                t.core_hdc_encode > 0 || t.core_cfc_step > 0 || t.temporal_consciousness > 0,
+                "All core timings zero at cycle {i}"
+            );
+        }
     }
 }

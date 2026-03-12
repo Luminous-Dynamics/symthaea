@@ -364,9 +364,10 @@ impl FeedbackState {
         self.last_threshold_integration = Some(thresh_result);
 
         // Session 9 Item 2: Dampening streak freeze — if all 4 channels were dampened
-        // for 3+ consecutive cycles, freeze feedback to cycle-start values for 1 cycle.
+        // for N+ consecutive cycles, freeze feedback to cycle-start values for 1 cycle.
         // Science: Turrigiano (2008) — homeostatic plasticity includes brief synaptic silencing.
-        if consecutive_full_dampen >= 3 {
+        use super::thresholds::CONSENSUS_FREEZE_STREAK_THRESHOLD;
+        if consecutive_full_dampen >= CONSENSUS_FREEZE_STREAK_THRESHOLD {
             self.feedback_dampened_count = 0; // Reset streak by not dampening
             self.last_consensus = Some(ConsensusResult {
                 consensus_confidence: base_confidence,
@@ -826,7 +827,10 @@ mod tests {
         collector.propose("buggy", FeedbackProposal::Scale(0.0));
         let result = collector.integrate(1.0, 0.0, 2.0);
         assert!(result.effective.is_finite(), "Zero scale caused NaN/Inf");
-        assert!((result.effective - 1.0).abs() < 1e-10, "Zero scale should be filtered, leaving base");
+        assert!(
+            (result.effective - 1.0).abs() < 1e-10,
+            "Zero scale should be filtered, leaving base"
+        );
     }
 
     #[test]
@@ -835,7 +839,10 @@ mod tests {
         collector.propose("buggy", FeedbackProposal::Scale(-0.5));
         collector.propose("valid", FeedbackProposal::Scale(1.1));
         let result = collector.integrate(1.0, 0.0, 2.0);
-        assert!(result.effective.is_finite(), "Negative scale caused NaN/Inf");
+        assert!(
+            result.effective.is_finite(),
+            "Negative scale caused NaN/Inf"
+        );
         // Only valid scale (1.1) should apply: geo_mean of [1.1] = 1.1
         assert!((result.effective - 1.1).abs() < 1e-10);
     }
@@ -858,7 +865,10 @@ mod tests {
         collector.propose("c", FeedbackProposal::Scale(f64::NAN));
         let result = collector.integrate(0.75, 0.0, 1.0);
         assert!(result.effective.is_finite());
-        assert!((result.effective - 0.75).abs() < 1e-10, "All invalid scales → base unchanged");
+        assert!(
+            (result.effective - 0.75).abs() < 1e-10,
+            "All invalid scales → base unchanged"
+        );
         assert_eq!(result.n_scales, 3); // count is raw, not filtered
     }
 
@@ -944,7 +954,10 @@ mod tests {
             collector.propose("subsys", FeedbackProposal::Add(delta));
         }
         let result = collector.integrate(0.5, 0.0, 1.0);
-        assert!((result.effective - 0.5).abs() < 1e-10, "100 balanced adds should cancel");
+        assert!(
+            (result.effective - 0.5).abs() < 1e-10,
+            "100 balanced adds should cancel"
+        );
         assert_eq!(result.n_adds, 100);
     }
 
@@ -959,7 +972,10 @@ mod tests {
         }
         let result = collector.integrate(1.0, 0.0, 2.0);
         assert!(result.effective.is_finite());
-        assert!((result.effective - 1.0).abs() < 0.01, "Balanced scales should roughly cancel");
+        assert!(
+            (result.effective - 1.0).abs() < 0.01,
+            "Balanced scales should roughly cancel"
+        );
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -972,12 +988,20 @@ mod tests {
         state.begin_cycle();
         state.snapshot_cycle_start(0.5, 1.0, 0.3, 1.0);
         state.confidence.propose("test", FeedbackProposal::Add(0.2));
-        state.learning_rate.propose("test", FeedbackProposal::Add(0.5));
+        state
+            .learning_rate
+            .propose("test", FeedbackProposal::Add(0.5));
 
         // consecutive_full_dampen >= 3 → freeze to cycle-start
         let consensus = state.end_cycle_ext(0.5, 1.0, 0.3, 1.0, 3, false, 0.0);
-        assert!((consensus.consensus_confidence - 0.5).abs() < 1e-10, "Streak freeze should return base confidence");
-        assert!((consensus.consensus_lr - 1.0).abs() < 1e-10, "Streak freeze should return base LR");
+        assert!(
+            (consensus.consensus_confidence - 0.5).abs() < 1e-10,
+            "Streak freeze should return base confidence"
+        );
+        assert!(
+            (consensus.consensus_lr - 1.0).abs() < 1e-10,
+            "Streak freeze should return base LR"
+        );
         assert!((consensus.consensus_exploration - 0.3).abs() < 1e-10);
         assert!((consensus.consensus_threshold - 1.0).abs() < 1e-10);
     }
@@ -992,7 +1016,10 @@ mod tests {
         // consecutive_full_dampen = 2 (below 3) → normal integration
         let consensus = state.end_cycle_ext(0.5, 1.0, 0.3, 1.0, 2, false, 0.0);
         // Should NOT be frozen — confidence should reflect the Add(0.1)
-        assert!(consensus.consensus_confidence > 0.5, "Below-streak should allow integration");
+        assert!(
+            consensus.consensus_confidence > 0.5,
+            "Below-streak should allow integration"
+        );
     }
 
     #[test]
@@ -1029,7 +1056,10 @@ mod tests {
     #[test]
     fn test_signal_diversity_no_proposals() {
         let state = FeedbackState::new();
-        assert!((state.signal_diversity() - 1.0).abs() < 1e-6, "Empty → 1.0 (vacuously diverse)");
+        assert!(
+            (state.signal_diversity() - 1.0).abs() < 1e-6,
+            "Empty → 1.0 (vacuously diverse)"
+        );
     }
 
     #[test]
@@ -1037,8 +1067,12 @@ mod tests {
         let mut state = FeedbackState::new();
         state.confidence.propose("same", FeedbackProposal::Add(0.1));
         state.confidence.propose("same", FeedbackProposal::Add(0.2));
-        state.learning_rate.propose("same", FeedbackProposal::Scale(1.1));
-        state.exploration.propose("same", FeedbackProposal::Add(0.05));
+        state
+            .learning_rate
+            .propose("same", FeedbackProposal::Scale(1.1));
+        state
+            .exploration
+            .propose("same", FeedbackProposal::Add(0.05));
         // 1 unique source / 4 total = 0.25
         assert!((state.signal_diversity() - 0.25).abs() < 1e-6);
     }
@@ -1048,7 +1082,9 @@ mod tests {
         let mut state = FeedbackState::new();
         state.confidence.propose("a", FeedbackProposal::Add(0.1));
         state.confidence.propose("b", FeedbackProposal::Add(0.2));
-        state.learning_rate.propose("c", FeedbackProposal::Scale(1.1));
+        state
+            .learning_rate
+            .propose("c", FeedbackProposal::Scale(1.1));
         // 3 unique / 3 total = 1.0
         assert!((state.signal_diversity() - 1.0).abs() < 1e-6);
     }
@@ -1067,9 +1103,15 @@ mod tests {
     #[test]
     fn test_dominant_source_single_winner() {
         let mut state = FeedbackState::new();
-        state.confidence.propose("dominant", FeedbackProposal::Add(0.1));
-        state.confidence.propose("dominant", FeedbackProposal::Add(0.2));
-        state.confidence.propose("minor", FeedbackProposal::Add(0.05));
+        state
+            .confidence
+            .propose("dominant", FeedbackProposal::Add(0.1));
+        state
+            .confidence
+            .propose("dominant", FeedbackProposal::Add(0.2));
+        state
+            .confidence
+            .propose("minor", FeedbackProposal::Add(0.05));
         assert_eq!(state.dominant_source(), "dominant");
         // 2/3 ≈ 0.6667
         assert!((state.dominant_source_concentration() - 2.0 / 3.0).abs() < 1e-4);
@@ -1088,7 +1130,9 @@ mod tests {
         state.snapshot_cycle_start(0.5, 1.0, 0.3, 1.0);
         state.confidence.propose("a", FeedbackProposal::Add(0.1));
         state.confidence.propose("b", FeedbackProposal::Add(0.2));
-        state.learning_rate.propose("c", FeedbackProposal::Scale(1.1));
+        state
+            .learning_rate
+            .propose("c", FeedbackProposal::Scale(1.1));
         state.end_cycle(0.5, 1.0, 0.3, 1.0);
         assert_eq!(state.feedback_signals_high_water, 3);
 
@@ -1097,7 +1141,10 @@ mod tests {
         state.snapshot_cycle_start(0.5, 1.0, 0.3, 1.0);
         state.confidence.propose("a", FeedbackProposal::Add(0.1));
         state.end_cycle(0.5, 1.0, 0.3, 1.0);
-        assert_eq!(state.feedback_signals_high_water, 3, "High-water should not decrease");
+        assert_eq!(
+            state.feedback_signals_high_water, 3,
+            "High-water should not decrease"
+        );
 
         // Cycle 3: 5 proposals → high-water updates to 5
         state.begin_cycle();

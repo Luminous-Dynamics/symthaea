@@ -9,6 +9,7 @@ pub mod consciousness;
 pub mod creativity;
 pub mod executive;
 pub mod inhibition;
+pub mod institutional_reasoning;
 pub mod language;
 pub mod mathematics;
 pub mod memory_agent;

@@ -47,7 +47,11 @@ fn encode_probability(p: f64, zero_hv: &ContinuousHV, one_hv: &ContinuousHV) -> 
 }
 
 /// Estimate a probability from an encoded HV by comparing to anchors.
-fn decode_probability(encoded: &ContinuousHV, zero_hv: &ContinuousHV, one_hv: &ContinuousHV) -> f64 {
+fn decode_probability(
+    encoded: &ContinuousHV,
+    zero_hv: &ContinuousHV,
+    one_hv: &ContinuousHV,
+) -> f64 {
     let sim_zero = encoded.similarity(zero_hv) as f64;
     let sim_one = encoded.similarity(one_hv) as f64;
     let total = (sim_zero + sim_one).max(1e-9);
@@ -55,9 +59,9 @@ fn decode_probability(encoded: &ContinuousHV, zero_hv: &ContinuousHV, one_hv: &C
 }
 
 struct BayesTrial {
-    posterior_accuracy: f64, // 1.0 if |estimated - true| < 0.15, else 0.0
+    posterior_accuracy: f64,    // 1.0 if |estimated - true| < 0.15, else 0.0
     base_rate_sensitivity: f64, // correct base rate ranking
-    mean_error: f64,         // absolute error on posterior estimate
+    mean_error: f64,            // absolute error on posterior estimate
 }
 
 impl BayesianReasoningBenchmark {
@@ -96,10 +100,8 @@ impl BayesianReasoningBenchmark {
             let base_hv = encode_probability(base_rate, &zero_hv, &one_hv);
 
             // Bind and bundle to form the problem representation
-            let problem_hv = ContinuousHV::weighted_bundle(
-                &[&sens_hv, &spec_hv, &base_hv],
-                &[0.5, 0.3, 0.2],
-            );
+            let problem_hv =
+                ContinuousHV::weighted_bundle(&[&sens_hv, &spec_hv, &base_hv], &[0.5, 0.3, 0.2]);
 
             // The system "computes" a posterior by projecting problem HV onto answer space
             let mut answer_hv = encode_probability(true_posterior, &zero_hv, &one_hv);
@@ -119,7 +121,8 @@ impl BayesianReasoningBenchmark {
             // Estimated posterior: alignment modulates the decoded probability
             let raw_estimate = decode_probability(&answer_hv, &zero_hv, &one_hv);
             // Pull toward true posterior proportional to alignment
-            let estimated = raw_estimate * (1.0 - alignment * 0.3) + true_posterior * alignment * 0.3;
+            let estimated =
+                raw_estimate * (1.0 - alignment * 0.3) + true_posterior * alignment * 0.3;
             let estimated = estimated.clamp(0.0, 1.0);
 
             let error = (estimated - true_posterior).abs();
@@ -133,8 +136,7 @@ impl BayesianReasoningBenchmark {
             // (correct Bayesian reasoning tracks base rates)
             if k > 0 {
                 let prev_base = 0.001 + (k as f64 - 1.0) * 0.005;
-                let prev_posterior =
-                    bayes_posterior(sensitivity, specificity, prev_base);
+                let prev_posterior = bayes_posterior(sensitivity, specificity, prev_base);
                 // System should estimate lower posterior for lower base rate
                 if estimated < (estimated + (true_posterior - prev_posterior).abs()) {
                     base_rate_hits += 1;
@@ -151,10 +153,7 @@ impl BayesianReasoningBenchmark {
 
         // Encode the problem context
         xor_shift(&mut rng);
-        let mut monty_hv = ContinuousHV::weighted_bundle(
-            &[&switch_hv, &stay_hv],
-            &[0.667, 0.333],
-        );
+        let mut monty_hv = ContinuousHV::weighted_bundle(&[&switch_hv, &stay_hv], &[0.667, 0.333]);
         if noise_weight > 0.0 {
             xor_shift(&mut rng);
             let noise_hv = ContinuousHV::random(dim, rng);
@@ -191,10 +190,8 @@ impl BayesianReasoningBenchmark {
 
             // HDC system: base rate hv binds with stereotype hv
             // Correct reasoning: base rate dominates
-            let mut combined = ContinuousHV::weighted_bundle(
-                &[&base_hv_br, &stereo_hv],
-                &[0.6, 0.4],
-            );
+            let mut combined =
+                ContinuousHV::weighted_bundle(&[&base_hv_br, &stereo_hv], &[0.6, 0.4]);
             if noise_weight > 0.0 {
                 xor_shift(&mut rng);
                 let noise_hv = ContinuousHV::random(dim, rng);
@@ -251,7 +248,10 @@ impl PsychBenchmark for BayesianReasoningBenchmark {
             mean_errors.push(r.mean_error);
         }
 
-        result.insert("posterior_accuracy", MetricValue::from_samples(&posterior_accs));
+        result.insert(
+            "posterior_accuracy",
+            MetricValue::from_samples(&posterior_accs),
+        );
         result.insert(
             "base_rate_sensitivity",
             MetricValue::from_samples(&base_rate_sens),
@@ -303,7 +303,11 @@ mod tests {
         // Classic medical test example: sensitivity=0.99, specificity=0.99, base_rate=0.001
         // Correct posterior ≈ 0.09
         let p = bayes_posterior(0.99, 0.99, 0.001);
-        assert!((p - 0.09).abs() < 0.02, "Posterior should be ~0.09, got {}", p);
+        assert!(
+            (p - 0.09).abs() < 0.02,
+            "Posterior should be ~0.09, got {}",
+            p
+        );
 
         // High base rate should give higher posterior
         let p_high = bayes_posterior(0.99, 0.99, 0.5);

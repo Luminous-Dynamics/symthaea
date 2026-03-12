@@ -414,4 +414,82 @@ impl CognitiveLoopService {
     pub fn has_motor_bridge(&self) -> bool {
         self.motor_output_bridge.is_some()
     }
+
+    /// Get the math service for dispatching mathematical queries.
+    pub fn math_service(&self) -> &super::super::math_service::MathService {
+        &self.math_service
+    }
+
+    /// Get a mutable reference to the math service.
+    pub fn math_service_mut(&mut self) -> &mut super::super::math_service::MathService {
+        &mut self.math_service
+    }
+
+    /// Get the math service telemetry.
+    pub fn math_telemetry(&self) -> &super::super::math_service::MathServiceTelemetry {
+        self.math_service.telemetry()
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // KNOWLEDGE ENGINE ACCESSORS
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// Whether the knowledge engine is active.
+    pub fn has_knowledge_engine(&self) -> bool {
+        self.knowledge_manager.is_some()
+    }
+
+    /// Get a reference to the knowledge manager (if enabled).
+    pub fn knowledge_manager(&self) -> Option<&crate::knowledge::KnowledgeManager> {
+        self.knowledge_manager.as_ref()
+    }
+
+    /// Get a mutable reference to the knowledge manager (if enabled).
+    pub fn knowledge_manager_mut(&mut self) -> Option<&mut crate::knowledge::KnowledgeManager> {
+        self.knowledge_manager.as_mut()
+    }
+
+    /// Get the latest knowledge telemetry (if enabled).
+    pub fn knowledge_telemetry(&self) -> Option<&crate::knowledge::KnowledgeTelemetry> {
+        self.knowledge_manager.as_ref().map(|km| km.telemetry())
+    }
+
+    /// Get the latest knowledge signals (if enabled).
+    pub fn knowledge_signals(&self) -> Option<&crate::knowledge::KnowledgeSignals> {
+        self.knowledge_manager.as_ref().map(|km| km.signals())
+    }
+
+    /// Register a custom entity in the knowledge extractor.
+    pub fn register_knowledge_entity(
+        &mut self,
+        text: &str,
+        entity_type: crate::knowledge::EntityType,
+    ) {
+        if let Some(ref mut km) = self.knowledge_manager {
+            km.register_entity(text, entity_type);
+        }
+    }
+
+    /// Compose an HDC query from semantic role-term pairs and search the knowledge graph.
+    pub fn knowledge_search(
+        &mut self,
+        role_terms: &[(crate::knowledge::extraction::SemanticRole, &str)],
+        k: usize,
+    ) -> Vec<crate::knowledge::graph::FactSearchResult> {
+        if let Some(ref mut km) = self.knowledge_manager {
+            let query = km.compose_query(role_terms);
+            km.search_with_vector(&query, k)
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// Trace causal chains from a starting concept through the knowledge causal bridge.
+    pub fn knowledge_causal_chain(&self, start: &str, max_depth: usize) -> Vec<Vec<String>> {
+        if let Some(ref km) = self.knowledge_manager {
+            km.trace_causal_chain(start, max_depth)
+        } else {
+            Vec::new()
+        }
+    }
 }

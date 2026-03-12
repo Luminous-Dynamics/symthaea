@@ -117,7 +117,10 @@ pub struct FftResult {
 impl FftResult {
     /// Power spectrum (|X[k]|²)
     pub fn power_spectrum(&self) -> Vec<f64> {
-        self.spectrum.iter().map(|c| c.magnitude_squared()).collect()
+        self.spectrum
+            .iter()
+            .map(|c| c.magnitude_squared())
+            .collect()
     }
 
     /// Magnitude spectrum (|X[k]|)
@@ -400,7 +403,11 @@ mod tests {
             .map(|(i, _)| i + 1)
             .unwrap();
 
-        assert_eq!(peak_idx, freq as usize, "Peak should be at frequency {}", freq);
+        assert_eq!(
+            peak_idx, freq as usize,
+            "Peak should be at frequency {}",
+            freq
+        );
     }
 
     #[test]

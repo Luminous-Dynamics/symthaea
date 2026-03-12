@@ -397,8 +397,12 @@ impl TimeAwareBinder {
             let n_hi = (dur_alpha * 10.0).round() as usize;
             let n_lo = 10 - n_hi;
             let mut copies = Vec::with_capacity(10);
-            for _ in 0..n_lo { copies.push(self.duration_basis[dur_lo]); }
-            for _ in 0..n_hi { copies.push(self.duration_basis[dur_hi]); }
+            for _ in 0..n_lo {
+                copies.push(self.duration_basis[dur_lo]);
+            }
+            for _ in 0..n_hi {
+                copies.push(self.duration_basis[dur_hi]);
+            }
             bundle(&copies)
         };
 
@@ -410,8 +414,12 @@ impl TimeAwareBinder {
             let n_hi = (int_alpha * 10.0).round() as usize;
             let n_lo = 10 - n_hi;
             let mut copies = Vec::with_capacity(10);
-            for _ in 0..n_lo { copies.push(self.intensity_basis[int_lo]); }
-            for _ in 0..n_hi { copies.push(self.intensity_basis[int_hi]); }
+            for _ in 0..n_lo {
+                copies.push(self.intensity_basis[int_lo]);
+            }
+            for _ in 0..n_hi {
+                copies.push(self.intensity_basis[int_hi]);
+            }
             bundle(&copies)
         };
 

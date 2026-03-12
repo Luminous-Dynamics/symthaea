@@ -211,13 +211,10 @@ impl ProofConstructionBenchmark {
         ];
         // Contingent formulas as foils
         xor_shift(&mut rng);
-        let contingents = [
-            ContinuousHV::random(dim, rng),
-            {
-                xor_shift(&mut rng);
-                ContinuousHV::random(dim, rng)
-            },
-        ];
+        let contingents = [ContinuousHV::random(dim, rng), {
+            xor_shift(&mut rng);
+            ContinuousHV::random(dim, rng)
+        }];
 
         let mut taut_hits = 0u32;
         let mut taut_total = 0u32;
@@ -376,7 +373,10 @@ impl PsychBenchmark for ProofConstructionBenchmark {
             "contradiction_accuracy",
             MetricValue::from_samples(&contr_accs),
         );
-        result.insert("derivation_accuracy", MetricValue::from_samples(&deriv_accs));
+        result.insert(
+            "derivation_accuracy",
+            MetricValue::from_samples(&deriv_accs),
+        );
 
         result.conditions = 3; // tautology, contradiction, derivation
         result.trials_per_condition = config.trials_per_condition;

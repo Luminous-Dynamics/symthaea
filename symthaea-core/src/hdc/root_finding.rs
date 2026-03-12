@@ -419,10 +419,7 @@ impl RootFindingEngine {
             false
         };
 
-        let best_root = converged
-            .first()
-            .map(|p| p.root)
-            .unwrap_or(paths[0].root);
+        let best_root = converged.first().map(|p| p.root).unwrap_or(paths[0].root);
 
         let base_phi: f64 = paths.iter().filter(|p| p.converged).map(|p| p.phi).sum();
         let agreement_bonus = if agreement { 0.5 } else { 0.0 };
@@ -450,7 +447,7 @@ impl RootFindingEngine {
             1.0 / (1.0 + residual.abs().log10().abs() / 15.0)
         };
         let method_bonus = match method {
-            RootMethod::Bisection => 0.0,   // Simple, guaranteed
+            RootMethod::Bisection => 0.0,     // Simple, guaranteed
             RootMethod::NewtonRaphson => 0.1, // Fast but needs derivative
             RootMethod::Brent => 0.05,        // Best of both worlds
         };
@@ -511,12 +508,7 @@ mod tests {
 
     #[test]
     fn test_newton_sqrt2() {
-        let result = RootFindingEngine::newton_raphson(
-            &|x| x * x - 2.0,
-            &|x| 2.0 * x,
-            1.5,
-            TOL,
-        );
+        let result = RootFindingEngine::newton_raphson(&|x| x * x - 2.0, &|x| 2.0 * x, 1.5, TOL);
         assert!(result.converged);
         assert!((result.root - std::f64::consts::SQRT_2).abs() < 1e-10);
         // Newton should converge faster than bisection
@@ -526,12 +518,8 @@ mod tests {
     #[test]
     fn test_newton_cube_root() {
         // x³ - 27 = 0 → x = 3
-        let result = RootFindingEngine::newton_raphson(
-            &|x| x * x * x - 27.0,
-            &|x| 3.0 * x * x,
-            2.0,
-            TOL,
-        );
+        let result =
+            RootFindingEngine::newton_raphson(&|x| x * x * x - 27.0, &|x| 3.0 * x * x, 2.0, TOL);
         assert!(result.converged);
         assert!((result.root - 3.0).abs() < 1e-10);
     }
@@ -539,12 +527,8 @@ mod tests {
     #[test]
     fn test_newton_exp() {
         // e^x - 3x = 0, root near 1.512
-        let result = RootFindingEngine::newton_raphson(
-            &|x| x.exp() - 3.0 * x,
-            &|x| x.exp() - 3.0,
-            1.0,
-            TOL,
-        );
+        let result =
+            RootFindingEngine::newton_raphson(&|x| x.exp() - 3.0 * x, &|x| x.exp() - 3.0, 1.0, TOL);
         assert!(result.converged);
         assert!(result.residual.abs() < 1e-8);
     }
@@ -561,12 +545,7 @@ mod tests {
     #[test]
     fn test_brent_transcendental() {
         // sin(x) = x/2, root near 1.895
-        let result = RootFindingEngine::brent(
-            &|x| x.sin() - x / 2.0,
-            0.1,
-            3.0,
-            TOL,
-        );
+        let result = RootFindingEngine::brent(&|x| x.sin() - x / 2.0, 0.1, 3.0, TOL);
         assert!(result.converged);
         let verify = result.root.sin() - result.root / 2.0;
         assert!(verify.abs() < 1e-8);
@@ -575,12 +554,7 @@ mod tests {
     #[test]
     fn test_brent_polynomial_degree4() {
         // x^4 - 5x^2 + 4 = 0 → roots at ±1, ±2
-        let result = RootFindingEngine::brent(
-            &|x| x.powi(4) - 5.0 * x * x + 4.0,
-            0.5,
-            1.5,
-            TOL,
-        );
+        let result = RootFindingEngine::brent(&|x| x.powi(4) - 5.0 * x * x + 4.0, 0.5, 1.5, TOL);
         assert!(result.converged);
         assert!((result.root - 1.0).abs() < 1e-8);
     }
@@ -635,12 +609,7 @@ mod tests {
     #[test]
     fn test_very_close_roots() {
         // (x-1)*(x-1.001) near x=1
-        let result = RootFindingEngine::brent(
-            &|x| (x - 1.0) * (x - 1.001),
-            0.5,
-            1.0005,
-            TOL,
-        );
+        let result = RootFindingEngine::brent(&|x| (x - 1.0) * (x - 1.001), 0.5, 1.0005, TOL);
         assert!(result.converged);
         assert!((result.root - 1.0).abs() < 1e-6);
     }
@@ -649,12 +618,7 @@ mod tests {
     fn test_phi_increases_with_speed() {
         // Easy root (linear) should have higher phi than hard root
         let easy = RootFindingEngine::bisection(&|x| x - 5.0, 0.0, 10.0, TOL);
-        let hard = RootFindingEngine::bisection(
-            &|x| x.powi(10) - 1.0,
-            0.5,
-            1.5,
-            TOL,
-        );
+        let hard = RootFindingEngine::bisection(&|x| x.powi(10) - 1.0, 0.5, 1.5, TOL);
         // Both should converge
         assert!(easy.converged);
         assert!(hard.converged);
@@ -668,6 +632,10 @@ mod tests {
         let r2 = RootFindingEngine::bisection(&|x| x - 5.0, 3.0, 7.0, TOL);
         // Different roots should have different encodings
         let sim = r1.encoding.similarity(&r2.encoding);
-        assert!(sim < 0.6, "Different roots should have low similarity: {}", sim);
+        assert!(
+            sim < 0.6,
+            "Different roots should have low similarity: {}",
+            sim
+        );
     }
 }

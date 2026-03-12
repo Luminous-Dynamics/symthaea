@@ -236,7 +236,10 @@ impl MotorOutputBridge {
         }
 
         // 3. Decode action type from parameters[0]
-        let action_type = match motor_params.first().and_then(|&v| ActionType::from_param(v)) {
+        let action_type = match motor_params
+            .first()
+            .and_then(|&v| ActionType::from_param(v))
+        {
             Some(at) => at,
             None => {
                 return MotorOutputResult::skipped("No valid action type in motor parameters");
@@ -262,7 +265,10 @@ impl MotorOutputBridge {
         };
 
         // 5. Resolve through registry → ActionIR
-        let action_ir = match self.registry.resolve(action_type.registry_key(), &action_context) {
+        let action_ir = match self
+            .registry
+            .resolve(action_type.registry_key(), &action_context)
+        {
             Ok(ir) => ir,
             Err(e) => {
                 return MotorOutputResult::failure(
@@ -346,7 +352,10 @@ mod tests {
         // Phi below threshold → skipped
         let result = bridge.execute(&[0.0], 0.8, 0.1, &request);
         assert!(!result.success);
-        assert!(result.error.unwrap().contains("below motor output threshold"));
+        assert!(result
+            .error
+            .unwrap()
+            .contains("below motor output threshold"));
     }
 
     #[test]

@@ -528,8 +528,7 @@ impl CognitiveLoopService {
             // This prevents shallow broadcasts from crowding out rare deep fractals.
             // Science: He et al. (2016) — residual learning preserves information
             // at different abstraction levels; each depth is a distinct abstraction.
-            let codebook_cap =
-                crate::cognitive_loop::thresholds::CANTOR_CODEBOOK_MAX_ENTRIES;
+            let codebook_cap = crate::cognitive_loop::thresholds::CANTOR_CODEBOOK_MAX_ENTRIES;
             if self.cantor_cleanup_engine.codebook.len() > codebook_cap * 3 / 4 {
                 // Count entries per depth stratum (encoded in label as "d{depth}_...")
                 let mut depth_counts = [0usize; 8]; // depths 0-7
@@ -569,8 +568,7 @@ impl CognitiveLoopService {
                     // Depth-stratified label: "d{depth}_dream_consolidated_{N}"
                     let label = format!(
                         "d{}_dream_consolidated_{}",
-                        crhv.depth,
-                        self.cantor_cleanup_engine.cleanups_performed
+                        crhv.depth, self.cantor_cleanup_engine.cleanups_performed
                     );
                     self.cantor_cleanup_engine.codebook.add_if_diverse(
                         &label,

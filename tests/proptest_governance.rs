@@ -26,11 +26,10 @@ fn arb_event_kind() -> impl Strategy<Value = GovernanceEventKind> {
     prop_oneof![
         Just(GovernanceEventKind::ProposalCreated),
         Just(GovernanceEventKind::EmergencyDeclared),
-        (0.0..1.0f64, -1.0..1.0f64)
-            .prop_map(|(phi, val)| GovernanceEventKind::VoteCast {
-                voter_phi: phi,
-                vote_value: val,
-            }),
+        (0.0..1.0f64, -1.0..1.0f64).prop_map(|(phi, val)| GovernanceEventKind::VoteCast {
+            voter_phi: phi,
+            vote_value: val,
+        }),
         prop::bool::ANY.prop_map(|b| GovernanceEventKind::TallyCompleted {
             passed: b,
             collective_phi: 0.5,
@@ -169,5 +168,56 @@ proptest! {
             prop_assert!(r.metadata.consciousness_level >= 0.0);
             prop_assert!(r.metadata.consciousness_level <= 1.0);
         }
+    }
+
+    /// Harmonic deltas stay bounded under random event sequences + mode switches.
+    #[test]
+    fn prop_harmonic_deltas_bounded(
+        events in prop::collection::vec(arb_event(), 0..15),
+        outcomes in prop::collection::vec(arb_outcome(), 0..10),
+    ) {
+        let mut svc = make_service();
+        for e in events {
+            svc.inject_governance_event(e);
+        }
+        for o in outcomes {
+            svc.inject_governance_outcome(o);
+        }
+        // Run enough cycles for governance to process multiple times
+        for _ in 0..80 {
+            let r = svc.cycle("harmonic stability");
+            let delta_max = r.metadata.governance_harmonic_delta_max;
+            prop_assert!(
+                delta_max.is_finite(),
+                "harmonic delta max not finite: {}",
+                delta_max,
+            );
+            prop_assert!(
+                delta_max < 10.0,
+                "harmonic delta max too large: {} (expected < 10.0)",
+                delta_max,
+            );
+        }
+    }
+
+    /// Community mode is always populated after governance processes.
+    #[test]
+    fn prop_community_mode_always_set(
+        events in prop::collection::vec(arb_event(), 1..5),
+    ) {
+        let mut svc = make_service();
+        for e in events {
+            svc.inject_governance_event(e);
+        }
+        // Run past governance interval (37) + some cycles
+        for _ in 0..50 {
+            let _ = svc.cycle("community mode check");
+        }
+        let r = svc.cycle("final check");
+        let mode = &r.metadata.governance_community_mode;
+        prop_assert!(
+            !mode.is_empty(),
+            "Community mode should be set after governance processes"
+        );
     }
 }

@@ -50,6 +50,21 @@ impl PrimitiveSystem {
             consciousness_domain.clone(),
         );
 
+        // Institutional domain — for derived geopolitical/sociological composites.
+        // Uses the existing "institutional" domain registered by init_institutional_primitives.
+        // We create a local clone for the DerivationSpec closures below.
+        let institutional_domain =
+            self.domains
+                .get("institutional")
+                .cloned()
+                .unwrap_or_else(|| {
+                    DomainManifold::new(
+                        "institutional",
+                        PrimitiveTier::Strategic,
+                        "Institutional structures, geopolitical entities, and legal systems",
+                    )
+                });
+
         // === DERIVATION SPECS ===
         // Collect all derivations with their parent dependencies
 
@@ -200,6 +215,66 @@ impl PrimitiveSystem {
                 domain: consciousness_domain.clone(),
                 definition: "Cognition about cognition: awareness of mental processes",
                 derivation_expr: "INTROSPECTION ^ SELF",
+            },
+            // === Institutional/Geopolitical Composites ===
+            // Nation-states and institutions are composite concepts, NOT irreducible primes.
+            // They decompose into sociological atoms — removing a component yields meaningful
+            // analysis (e.g., remove LEGITIMACY from AUTHORITY → revolution scenario).
+            DerivationSpec {
+                name: "TERRITORY", parents: vec!["SPACE", "BOUNDARY", "SOVEREIGNTY"],
+                tier: PrimitiveTier::Strategic, domain_name: "institutional",
+                domain: institutional_domain.clone(),
+                definition: "Bounded spatial region under sovereign authority claim",
+                derivation_expr: "SPACE ^ BOUNDARY ^ SOVEREIGNTY",
+            },
+            DerivationSpec {
+                name: "INSTITUTION", parents: vec!["NORM", "AUTHORITY", "PERSIST"],
+                tier: PrimitiveTier::Strategic, domain_name: "institutional",
+                domain: institutional_domain.clone(),
+                definition: "Persistent normative structure with recognized authority (survives agent turnover)",
+                derivation_expr: "NORM ^ AUTHORITY ^ PERSIST",
+            },
+            DerivationSpec {
+                name: "LAW", parents: vec!["NORM", "ENFORCEMENT", "JURISDICTION"],
+                tier: PrimitiveTier::Strategic, domain_name: "institutional",
+                domain: institutional_domain.clone(),
+                definition: "Enforceable norm within a jurisdiction (codified obligation with consequences)",
+                derivation_expr: "NORM ^ ENFORCEMENT ^ JURISDICTION",
+            },
+            DerivationSpec {
+                name: "TAXATION", parents: vec!["OBLIGATION", "AUTHORITY", "EXCHANGE"],
+                tier: PrimitiveTier::Strategic, domain_name: "institutional",
+                domain: institutional_domain.clone(),
+                definition: "Compulsory transfer of value from population to authority",
+                derivation_expr: "OBLIGATION ^ AUTHORITY ^ EXCHANGE",
+            },
+            DerivationSpec {
+                name: "REGULATION", parents: vec!["LAW", "COMPLIANCE"],
+                tier: PrimitiveTier::Strategic, domain_name: "institutional",
+                domain: institutional_domain.clone(),
+                definition: "Rules governing conduct within a domain, requiring conformity (GDPR, HIPAA, FATF)",
+                derivation_expr: "LAW ^ COMPLIANCE",
+            },
+            DerivationSpec {
+                name: "FIAT_CURRENCY", parents: vec!["VALUE_SUBJECTIVE", "AUTHORITY", "TRUST_ECONOMIC", "MONOPOLY"],
+                tier: PrimitiveTier::Strategic, domain_name: "institutional",
+                domain: institutional_domain.clone(),
+                definition: "Medium of exchange backed by sovereign authority (not intrinsic value)",
+                derivation_expr: "VALUE_SUBJECTIVE ^ AUTHORITY ^ TRUST_ECONOMIC ^ MONOPOLY",
+            },
+            DerivationSpec {
+                name: "NATION_STATE", parents: vec!["SOVEREIGNTY", "INSTITUTION", "ENFORCEMENT", "POPULATION"],
+                tier: PrimitiveTier::Strategic, domain_name: "institutional",
+                domain: institutional_domain.clone(),
+                definition: "Sovereign institutional structure with enforcement over a population (Westphalian entity)",
+                derivation_expr: "SOVEREIGNTY ^ INSTITUTION ^ ENFORCEMENT ^ POPULATION",
+            },
+            DerivationSpec {
+                name: "DIPLOMATIC_RELATION", parents: vec!["TREATY", "RECIPROCATE", "SOVEREIGNTY"],
+                tier: PrimitiveTier::Strategic, domain_name: "institutional",
+                domain: institutional_domain.clone(),
+                definition: "Mutual recognition and negotiated cooperation between sovereign entities",
+                derivation_expr: "TREATY ^ RECIPROCATE ^ SOVEREIGNTY",
             },
         ];
 

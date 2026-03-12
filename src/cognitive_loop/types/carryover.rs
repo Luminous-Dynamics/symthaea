@@ -268,9 +268,27 @@ pub(crate) struct QualityMetrics {
     /// Whether currently in consolidation mode.
     pub(crate) in_consolidation: bool,
     /// Ring buffer of recent consciousness gradient signs (true = positive).
-    pub(crate) gradient_sign_history: Vec<bool>,
+    pub(crate) gradient_sign_history: std::collections::VecDeque<bool>,
     /// Ring buffer of recent explore vs exploit decisions (true = explore-biased).
-    pub(crate) explore_exploit_history: Vec<bool>,
+    pub(crate) explore_exploit_history: std::collections::VecDeque<bool>,
+    // ── Session 19: Embodied Cognition & Environmental Coupling ─────────
+    /// Last computed readiness score (0.3–1.0), for telemetry.
+    pub(crate) last_readiness_score: f32,
+    /// Novelty EMA (0.0–1.0): how novel recent inputs are.
+    pub(crate) novelty_ema: f32,
+    /// Fatigue (0.0–1.0): cognitive resource depletion.
+    pub(crate) fatigue: f32,
+    /// Consecutive low-effort stable cycles (for recovery detection).
+    pub(crate) consecutive_recovery_cycles: u32,
+    /// Ring buffer of recent prediction successes (true = accurate).
+    pub(crate) prediction_success_history: std::collections::VecDeque<bool>,
+    /// Consecutive cycles with high cross-module agreement (for flow detection).
+    pub(crate) consecutive_high_agreement: u32,
+    /// Whether currently in flow/resonance state.
+    pub(crate) in_flow_state: bool,
+    // ── Session 20: Measurement & Consolidation ─────────────────────────
+    /// Cumulative activation counts for each named mechanism (lifetime, not per-cycle).
+    pub(crate) mechanism_activations: std::collections::HashMap<&'static str, u32>,
 }
 
 impl Default for QualityMetrics {
@@ -323,8 +341,16 @@ impl Default for QualityMetrics {
             prev_metacognitive_prediction: 0.0,
             sleep_pressure: 0.0,
             in_consolidation: false,
-            gradient_sign_history: Vec::new(),
-            explore_exploit_history: Vec::new(),
+            gradient_sign_history: std::collections::VecDeque::new(),
+            explore_exploit_history: std::collections::VecDeque::new(),
+            last_readiness_score: 1.0,
+            novelty_ema: 0.5,
+            fatigue: 0.0,
+            consecutive_recovery_cycles: 0,
+            prediction_success_history: std::collections::VecDeque::new(),
+            consecutive_high_agreement: 0,
+            in_flow_state: false,
+            mechanism_activations: std::collections::HashMap::new(),
         }
     }
 }

@@ -14191,6 +14191,7 @@ dependencies = [
  "sha3",
  "strsim",
  "symthaea-broca",
+ "symthaea-canvas",
  "symthaea-causal-reasoning",
  "symthaea-cell-foundry",
  "symthaea-consciousness-equation",
@@ -14279,6 +14280,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-canvas"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "symthaea-causal-reasoning"
 version = "0.1.0"
 dependencies = [
@@ -14291,6 +14300,7 @@ dependencies = [
 name = "symthaea-cell-foundry"
 version = "0.1.0"
 dependencies = [
+ "proptest",
  "rand 0.8.5",
  "serde",
  "serde_json",
@@ -14375,6 +14385,7 @@ dependencies = [
 name = "symthaea-ectogenesis"
 version = "0.1.0"
 dependencies = [
+ "proptest",
  "rand 0.8.5",
  "serde",
  "serde_json",
@@ -14489,6 +14500,7 @@ dependencies = [
 name = "symthaea-genomics"
 version = "0.1.0"
 dependencies = [
+ "proptest",
  "rand 0.8.5",
  "serde",
  "serde_json",
@@ -14633,6 +14645,7 @@ dependencies = [
 name = "symthaea-nurture"
 version = "0.1.0"
 dependencies = [
+ "proptest",
  "rand 0.8.5",
  "serde",
  "serde_json",
@@ -14715,6 +14728,7 @@ dependencies = [
 name = "symthaea-population"
 version = "0.1.0"
 dependencies = [
+ "proptest",
  "rand 0.8.5",
  "serde",
  "serde_json",
@@ -14729,6 +14743,7 @@ dependencies = [
  "chrono",
  "criterion",
  "csv",
+ "proptest",
  "rand 0.8.5",
  "rayon",
  "serde",

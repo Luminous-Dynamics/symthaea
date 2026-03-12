@@ -139,8 +139,8 @@ impl CognitiveLoopService {
         //   - Dampens NE (reduces alerting/scanning, shifts to focused mode)
         // Only fires when we have recent broadcast data.
         if let Some(last_crhv) = self.cantor_broadcast_buffer.last() {
-            let depth_norm = last_crhv.depth as f32
-                / crate::cognitive_loop::thresholds::CANTOR_DEPTH_MAX as f32;
+            let depth_norm =
+                last_crhv.depth as f32 / crate::cognitive_loop::thresholds::CANTOR_DEPTH_MAX as f32;
             if depth_norm > 0.3 {
                 let ach_base = self.neuromod.bath.acetylcholine.baseline_val();
                 let ach_nudge =
@@ -168,6 +168,46 @@ impl CognitiveLoopService {
             Ok(p) => p,
             Err(blocked) => return *blocked,
         };
+
+        // ── Knowledge Engine: extract, encode, store, search ────────────
+        // Runs between perception and dynamics so knowledge signals are
+        // available for the reasoning engine and FEP active inference.
+        // Science: top-down knowledge priming (Bar 2004), predictive coding
+        if let Some(ref mut km) = self.knowledge_manager {
+            let cycle_id = self.stats.total_cycles;
+            let (_telem, signals) = km.process(input, cycle_id as u64);
+
+            // Knowledge uncertainty → dampen epistemic confidence
+            // High uncertainty = we don't know about this topic → caution
+            if signals.uncertainty > 0.5 {
+                self.carryover.quality.last_epistemic_confidence *=
+                    1.0 - 0.2 * (signals.uncertainty - 0.5) as f32;
+            }
+
+            // Knowledge contradiction → boost prediction error (surprise)
+            // Contradictions indicate our model is wrong → heightened learning
+            if signals.contradiction_signal > 0.0 {
+                let ne_base = self.neuromod.bath.noradrenaline.baseline_val();
+                self.neuromod
+                    .bath
+                    .noradrenaline
+                    .set_baseline(ne_base + 0.02 * signals.contradiction_signal as f32);
+            }
+
+            // Knowledge relevance → boost confidence (we know about this)
+            if signals.relevance > 0.3 {
+                self.carryover.quality.last_epistemic_confidence =
+                    (self.carryover.quality.last_epistemic_confidence
+                        + 0.1 * signals.relevance as f32)
+                        .min(1.0);
+            }
+
+            // Knowledge novelty → boost exploration drive
+            if signals.novelty > 0.6 {
+                self.carryover.quality.last_exploration_bonus +=
+                    0.05 * (signals.novelty - 0.6) as f32;
+            }
+        }
 
         // ═══════════════════════════════════════════════════════════════════
         // PHASE 2: DYNAMICS

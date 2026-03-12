@@ -89,7 +89,7 @@ fn estimate_mean_from_hv(
     let sim_high = encoded.similarity(high_hv) as f64;
     let total = (sim_low + sim_high).max(1e-9);
     let t = sim_high / total; // weight toward high anchor → higher mean
-    // Map t ∈ [0,1] → [center-spread, center+spread]
+                              // Map t ∈ [0,1] → [center-spread, center+spread]
     (center - spread) + t * 2.0 * spread
 }
 
@@ -102,11 +102,7 @@ enum DistShape {
 }
 
 /// Generate a dataset with a specific distribution shape.
-fn generate_shaped_dataset(
-    rng: &mut u64,
-    n: usize,
-    shape: DistShape,
-) -> (Vec<f64>, DistShape) {
+fn generate_shaped_dataset(rng: &mut u64, n: usize, shape: DistShape) -> (Vec<f64>, DistShape) {
     let mut samples = Vec::with_capacity(n);
     match shape {
         DistShape::Uniform => {
@@ -203,8 +199,7 @@ impl StatisticalInferenceBenchmark {
                 );
             }
 
-            let estimated_mean =
-                estimate_mean_from_hv(&encoded, &low_hv, &high_hv, center, spread);
+            let estimated_mean = estimate_mean_from_hv(&encoded, &low_hv, &high_hv, center, spread);
             let range = spread * 2.0;
             let frac_error = (estimated_mean - true_mean).abs() / range.max(1e-9);
             total_mean_error += frac_error.min(1.0);
@@ -223,8 +218,7 @@ impl StatisticalInferenceBenchmark {
 
             let (high_samples, _, true_high_var) =
                 generate_dataset(&mut rng, 30, center, high_spread);
-            let (low_samples, _, true_low_var) =
-                generate_dataset(&mut rng, 30, center, low_spread);
+            let (low_samples, _, true_low_var) = generate_dataset(&mut rng, 30, center, low_spread);
 
             // Encode both and check spread by measuring HV diversity
             let enc_high_seed = rng;
@@ -256,7 +250,11 @@ impl StatisticalInferenceBenchmark {
         let variance_estimation_accuracy = variance_hits as f64 / variance_trials as f64;
 
         // ── Part 3: Distribution Shape Classification ──
-        let shapes = [DistShape::Uniform, DistShape::RightSkewed, DistShape::LeftSkewed];
+        let shapes = [
+            DistShape::Uniform,
+            DistShape::RightSkewed,
+            DistShape::LeftSkewed,
+        ];
         let mut class_hits = 0u32;
         let class_trials = 9u32; // 3 per shape
         for shape in &shapes {
@@ -357,7 +355,9 @@ mod tests {
         let result = StatisticalInferenceBenchmark.run(&test_config());
         assert!(result.metrics.contains_key("mean_estimation_error"));
         assert!(result.metrics.contains_key("variance_estimation_accuracy"));
-        assert!(result.metrics.contains_key("distribution_classification_accuracy"));
+        assert!(result
+            .metrics
+            .contains_key("distribution_classification_accuracy"));
     }
 
     #[test]

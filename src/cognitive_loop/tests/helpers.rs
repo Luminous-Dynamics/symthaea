@@ -638,3 +638,143 @@ fn test_all_consciousness_methods_write_timings() {
     // All methods execute without panic — that's the key assertion
     // Timing fields are written (they may be 0µs on fast machines, so we just verify no panic)
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// cosine_f32: numerical correctness, edge cases, NaN safety
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn cosine_f32_identical_vectors_returns_one() {
+    let a = vec![1.0f32, 2.0, 3.0, 4.0];
+    let sim = super::super::helpers::cosine_f32(&a, &a);
+    assert!(
+        (sim - 1.0).abs() < 1e-5,
+        "identical vectors should have cosine 1.0, got {sim}"
+    );
+}
+
+#[test]
+fn cosine_f32_opposite_vectors_returns_neg_one() {
+    let a = vec![1.0f32, 2.0, 3.0];
+    let b: Vec<f32> = a.iter().map(|x| -x).collect();
+    let sim = super::super::helpers::cosine_f32(&a, &b);
+    assert!(
+        (sim - (-1.0)).abs() < 1e-5,
+        "opposite vectors should have cosine -1.0, got {sim}"
+    );
+}
+
+#[test]
+fn cosine_f32_orthogonal_vectors_returns_zero() {
+    let a = vec![1.0f32, 0.0, 0.0];
+    let b = vec![0.0f32, 1.0, 0.0];
+    let sim = super::super::helpers::cosine_f32(&a, &b);
+    assert!(
+        sim.abs() < 1e-5,
+        "orthogonal vectors should have cosine 0.0, got {sim}"
+    );
+}
+
+#[test]
+fn cosine_f32_mismatched_lengths_returns_zero() {
+    let a = vec![1.0f32, 2.0];
+    let b = vec![1.0f32, 2.0, 3.0];
+    let sim = super::super::helpers::cosine_f32(&a, &b);
+    assert!(
+        sim.abs() < f32::EPSILON,
+        "mismatched lengths should return 0.0, got {sim}"
+    );
+}
+
+#[test]
+fn cosine_f32_zero_vector_returns_zero() {
+    let a = vec![0.0f32; 8];
+    let b = vec![1.0f32, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
+    let sim = super::super::helpers::cosine_f32(&a, &b);
+    assert!(
+        sim.abs() < 1e-5,
+        "zero vector should have cosine 0.0, got {sim}"
+    );
+}
+
+#[test]
+fn cosine_f32_both_zero_vectors_returns_zero() {
+    let a = vec![0.0f32; 16];
+    let b = vec![0.0f32; 16];
+    let sim = super::super::helpers::cosine_f32(&a, &b);
+    assert!(
+        sim.is_finite(),
+        "both zero vectors should produce finite result, got {sim}"
+    );
+}
+
+#[test]
+fn cosine_f32_empty_vectors_returns_zero() {
+    let sim = super::super::helpers::cosine_f32(&[], &[]);
+    // Empty same-length: scalar path runs, dot=0, norms=0, denom=1e-10 → 0.0
+    assert!(
+        sim.is_finite(),
+        "empty vectors should produce finite result"
+    );
+}
+
+#[test]
+fn cosine_f32_result_always_in_neg1_to_1() {
+    // Test with various vector sizes to exercise both scalar and potential SIMD paths
+    for size in [1, 3, 7, 8, 9, 15, 16, 17, 31, 32, 64, 128] {
+        let a: Vec<f32> = (0..size).map(|i| (i as f32 * 0.7).sin()).collect();
+        let b: Vec<f32> = (0..size).map(|i| (i as f32 * 1.3).cos()).collect();
+        let sim = super::super::helpers::cosine_f32(&a, &b);
+        assert!(
+            sim >= -1.0 && sim <= 1.0 && sim.is_finite(),
+            "cosine out of [-1,1] for size {size}: {sim}"
+        );
+    }
+}
+
+#[test]
+fn cosine_f32_nan_input_produces_finite_or_zero() {
+    // NaN inputs should not propagate unchecked (denom guard: max(1e-10))
+    let a = vec![1.0f32, f32::NAN, 3.0];
+    let b = vec![1.0f32, 2.0, 3.0];
+    let sim = super::super::helpers::cosine_f32(&a, &b);
+    // NaN arithmetic is NaN, but clamped to [-1,1] — result may be NaN or clamped.
+    // Key: the function should not panic.
+    let _ = sim; // No panic = success
+}
+
+#[test]
+fn cosine_f32_very_large_values_no_overflow() {
+    let a = vec![f32::MAX / 2.0; 4];
+    let b = vec![f32::MAX / 2.0; 4];
+    let sim = super::super::helpers::cosine_f32(&a, &b);
+    // May overflow to Inf in dot/norms but clamp catches it
+    assert!(
+        sim >= -1.0 && sim <= 1.0,
+        "large values should clamp to [-1,1], got {sim}"
+    );
+}
+
+#[test]
+fn cosine_f32_subnormal_values_no_panic() {
+    let a = vec![f32::MIN_POSITIVE; 8];
+    let b = vec![f32::MIN_POSITIVE; 8];
+    let sim = super::super::helpers::cosine_f32(&a, &b);
+    assert!(
+        sim.is_finite(),
+        "subnormal values should produce finite result, got {sim}"
+    );
+}
+
+#[test]
+fn cosine_f32_scalar_matches_known_value() {
+    // cos(45°) = 1/√2 ≈ 0.7071
+    let a = vec![1.0f32, 0.0];
+    let b = vec![1.0f32, 1.0];
+    let sim = super::super::helpers::cosine_f32(&a, &b);
+    let expected = 1.0 / 2.0f32.sqrt();
+    assert!(
+        (sim - expected).abs() < 1e-5,
+        "expected {expected}, got {sim}"
+    );
+}

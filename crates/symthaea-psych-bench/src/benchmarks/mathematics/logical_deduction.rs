@@ -78,11 +78,7 @@ struct ArgumentEncoding {
     distractor_hv: ContinuousHV,
 }
 
-fn encode_argument(
-    arg_type: ArgumentType,
-    dim: usize,
-    seed: u64,
-) -> ArgumentEncoding {
+fn encode_argument(arg_type: ArgumentType, dim: usize, seed: u64) -> ArgumentEncoding {
     let p = ContinuousHV::random(dim, seed.wrapping_add(1));
     let q = ContinuousHV::random(dim, seed.wrapping_add(2));
     let r = ContinuousHV::random(dim, seed.wrapping_add(3));
@@ -101,8 +97,7 @@ fn encode_argument(
     match arg_type {
         ArgumentType::ModusPonens => {
             // Premises: P→Q, P. Conclusion: Q
-            let premise_hv =
-                ContinuousHV::weighted_bundle(&[&p_implies_q, &p], &[0.6, 0.4]);
+            let premise_hv = ContinuousHV::weighted_bundle(&[&p_implies_q, &p], &[0.6, 0.4]);
             ArgumentEncoding {
                 premise_hv,
                 conclusion_hv: q,
@@ -111,8 +106,7 @@ fn encode_argument(
         }
         ArgumentType::ModusTollens => {
             // Premises: P→Q, ¬Q. Conclusion: ¬P
-            let premise_hv =
-                ContinuousHV::weighted_bundle(&[&p_implies_q, &neg_q], &[0.6, 0.4]);
+            let premise_hv = ContinuousHV::weighted_bundle(&[&p_implies_q, &neg_q], &[0.6, 0.4]);
             ArgumentEncoding {
                 premise_hv,
                 conclusion_hv: neg_p,
@@ -144,8 +138,7 @@ fn encode_argument(
         }
         ArgumentType::DenyingAntecedent => {
             // Invalid: Premises: P→Q, ¬P. Supposed conclusion: ¬Q
-            let premise_hv =
-                ContinuousHV::weighted_bundle(&[&p_implies_q, &neg_p], &[0.6, 0.4]);
+            let premise_hv = ContinuousHV::weighted_bundle(&[&p_implies_q, &neg_p], &[0.6, 0.4]);
             ArgumentEncoding {
                 premise_hv,
                 conclusion_hv: neg_q.clone(), // claimed (invalid) conclusion

@@ -13,8 +13,8 @@ use serde::{Deserialize, Serialize};
 use crate::controller::{LanguageController, LanguageControllerConfig};
 use crate::encoder::{ThoughtChannels, ThoughtLanguageEncoder};
 use crate::gating::{
-    consciousness_gated_max_tokens, CoherenceFeedback, EmotionalModulator, EpistemicGate,
-    GatingConfig,
+    confidence_adjusted_veto_threshold, consciousness_gated_max_tokens, CoherenceFeedback,
+    EmotionalModulator, EpistemicGate, GatingConfig,
 };
 use crate::tokenizer::BpeTokenizer;
 
@@ -98,6 +98,21 @@ pub struct GatingTraceEntry {
     pub binding_weight: f32,
     /// Whether veto was triggered at this position.
     pub veto_triggered: bool,
+    /// Epistemic logit adjustment applied at this position.
+    /// Represents the hedging boost magnitude for the current epistemic level.
+    /// 0.0 when epistemic gating is disabled or epistemic level is Certain/Probable.
+    pub epistemic_boost: f32,
+    /// Emotional modulation logit adjustment at this position.
+    /// Represents the maximum boost magnitude from arousal/valence/warmth effects.
+    /// 0.0 when emotional modulation is disabled or no thresholds are exceeded.
+    pub emotional_boost: f32,
+    /// Max token reduction from time pressure (0.0 if not applicable).
+    /// Expressed as the fraction of base tokens removed (e.g., 0.3 means 30% reduction).
+    pub time_pressure_reduction: f32,
+    /// Adjusted veto threshold from response confidence.
+    /// Lower values mean the system is more tolerant of coherence drift.
+    /// Equal to the base veto threshold when coherence feedback is disabled.
+    pub confidence_veto_threshold: f32,
 }
 
 /// Result of a single generation.
@@ -253,11 +268,23 @@ impl BrocaGenerator {
         let thought_hv_original = self.encoder.encode(channels);
         let mut thought_hv = thought_hv_original.clone();
 
-        // 2. Compute max tokens (consciousness-gated)
-        let max_tokens = if self.config.enable_consciousness_gating {
+        // 2. Compute max tokens (consciousness-gated, then time-pressure-adjusted)
+        let pre_pressure_tokens = if self.config.enable_consciousness_gating {
             consciousness_gated_max_tokens(self.config.gating.base_max_tokens, channels.psi())
         } else {
             self.config.gating.base_max_tokens
+        };
+        let max_tokens = crate::gating::time_pressure_adjusted_max_tokens(
+            pre_pressure_tokens,
+            channels.time_pressure(),
+            self.config.gating.time_pressure_max_reduction,
+        );
+
+        // Time pressure reduction as a fraction of pre-pressure tokens removed
+        let time_pressure_reduction = if pre_pressure_tokens > 0 {
+            1.0 - (max_tokens as f32 / pre_pressure_tokens as f32)
+        } else {
+            0.0
         };
 
         // 3. Optionally reset controller state (skip for multi-turn continuity)
@@ -296,19 +323,68 @@ impl BrocaGenerator {
                 apply_repetition_penalty(&mut logits, &tokens, rep_penalty);
             }
 
-            // Apply gating
-            if self.config.enable_epistemic_gate {
-                self.epistemic_gate
-                    .apply(&mut logits, channels.epistemic_ordinal());
-            }
+            // Apply gating and compute audit trail values
+            let this_epistemic_boost = if self.config.enable_epistemic_gate {
+                let ordinal = channels.epistemic_ordinal();
+                self.epistemic_gate.apply(&mut logits, ordinal);
+                // Compute representative boost magnitude for the trace
+                if ordinal > 3.5 {
+                    self.config.gating.unknown_hedging_boost
+                        * self.config.gating.ood_boost_multiplier
+                } else if ordinal > 2.5 {
+                    self.config.gating.unknown_hedging_boost
+                } else if ordinal > 1.5 {
+                    self.config.gating.uncertain_hedging_boost
+                } else {
+                    0.0
+                }
+            } else {
+                0.0
+            };
 
-            if self.config.enable_emotional_modulation {
+            let this_emotional_boost = if self.config.enable_emotional_modulation {
                 self.emotional_modulator.apply(&mut logits, channels, pos);
-            }
+                // Compute maximum boost magnitude from arousal/valence/warmth effects
+                let arousal = channels.arousal();
+                let valence = channels.valence();
+                let warmth = channels.warmth();
+                let cfg = &self.config.gating;
+                let mut max_boost = 0.0f32;
+                if arousal > cfg.high_arousal_threshold && pos > cfg.arousal_position_threshold {
+                    let boost =
+                        (arousal - cfg.high_arousal_threshold) * cfg.arousal_boost_multiplier;
+                    max_boost = max_boost.max(boost);
+                    // arousal × negative valence interaction
+                    if valence < cfg.negative_valence_threshold {
+                        let interaction = (arousal - cfg.high_arousal_threshold)
+                            * (-valence - (-cfg.negative_valence_threshold))
+                            * cfg.valence_boost_multiplier;
+                        max_boost = max_boost.max(interaction);
+                    }
+                }
+                if valence < cfg.negative_valence_threshold {
+                    let boost = (-valence - (-cfg.negative_valence_threshold))
+                        * cfg.valence_boost_multiplier;
+                    max_boost = max_boost.max(boost);
+                }
+                if warmth < cfg.low_warmth_threshold {
+                    let penalty =
+                        (cfg.low_warmth_threshold - warmth) * cfg.warmth_penalty_multiplier;
+                    max_boost = max_boost.max(penalty.abs());
+                }
+                max_boost
+            } else {
+                0.0
+            };
 
             // Coherence feedback: scale thought HV to strengthen binding when coherence drifts
             let mut this_binding_weight = 1.0f32;
             let mut this_veto = false;
+            let this_confidence_veto_threshold = confidence_adjusted_veto_threshold(
+                self.config.gating.veto_threshold,
+                channels.response_confidence(),
+                self.config.gating.confidence_veto_scale,
+            );
             if self.config.enable_coherence_feedback {
                 let output_hv = self.controller.output_hv();
                 let binding_weight = self.coherence_feedback.update(&output_hv, &thought_hv);
@@ -333,7 +409,10 @@ impl BrocaGenerator {
                 // Semantic veto: mid-sentence self-correction
                 // Gated by: min position, max vetoes, refractory period
                 if self.config.enable_semantic_veto
-                    && self.coherence_feedback.should_veto()
+                    && self.coherence_feedback.should_veto_with_confidence(
+                        channels.response_confidence(),
+                        self.config.gating.confidence_veto_scale,
+                    )
                     && pos > min_veto_pos
                     && veto_count < max_vetoes
                     && tokens_since_veto >= veto_refractory
@@ -348,9 +427,11 @@ impl BrocaGenerator {
                     self.controller.reset();
                     // Re-inject thought context: do a forward step with <thought> token
                     // so the CfC network recovers the thought context before continuing
-                    let _ = self
-                        .controller
-                        .forward_step(&thought_hv_original, self.tokenizer.thought_id, 0);
+                    let _ = self.controller.forward_step(
+                        &thought_hv_original,
+                        self.tokenizer.thought_id,
+                        0,
+                    );
                     // Restore thought_hv from original (undo any drift scaling)
                     thought_hv = thought_hv_original.clone();
                 }
@@ -361,6 +442,10 @@ impl BrocaGenerator {
                 coherence: self.coherence_feedback.coherence(),
                 binding_weight: this_binding_weight,
                 veto_triggered: this_veto,
+                epistemic_boost: this_epistemic_boost,
+                emotional_boost: this_emotional_boost,
+                time_pressure_reduction,
+                confidence_veto_threshold: this_confidence_veto_threshold,
             });
 
             tokens_since_veto += 1;
@@ -976,10 +1061,7 @@ mod tests {
             );
             // At most max_vetoes (1) hesitation markers
             let veto_count = result.text.matches("-- wait,").count();
-            assert!(
-                veto_count <= 1,
-                "max_vetoes=1 but got {veto_count} vetoes"
-            );
+            assert!(veto_count <= 1, "max_vetoes=1 but got {veto_count} vetoes");
         }
         // Either way, should not crash
         assert!(result.num_tokens > 0 || result.eos_terminated);
@@ -1035,7 +1117,7 @@ mod tests {
             "Gating trace should have one entry per generated token"
         );
 
-        // Each entry should have finite coherence
+        // Each entry should have finite coherence and new audit fields
         for entry in &result.gating_trace {
             assert!(
                 entry.coherence.is_finite(),
@@ -1044,6 +1126,34 @@ mod tests {
             assert!(
                 entry.binding_weight >= 1.0 - 1e-6,
                 "Binding weight should be >= 1.0"
+            );
+            assert!(
+                entry.epistemic_boost.is_finite(),
+                "Epistemic boost should be finite"
+            );
+            assert!(
+                entry.emotional_boost.is_finite(),
+                "Emotional boost should be finite"
+            );
+            assert!(
+                entry.emotional_boost >= 0.0,
+                "Emotional boost should be non-negative"
+            );
+            assert!(
+                entry.time_pressure_reduction.is_finite(),
+                "Time pressure reduction should be finite"
+            );
+            assert!(
+                entry.time_pressure_reduction >= 0.0,
+                "Time pressure reduction should be non-negative"
+            );
+            assert!(
+                entry.confidence_veto_threshold.is_finite(),
+                "Confidence veto threshold should be finite"
+            );
+            assert!(
+                entry.confidence_veto_threshold >= 0.0,
+                "Confidence veto threshold should be non-negative"
             );
         }
     }
@@ -1148,6 +1258,73 @@ mod tests {
         assert_eq!(
             result1.token_ids, result3.token_ids,
             "Fresh generation should reproduce first result"
+        );
+    }
+
+    #[test]
+    fn test_generate_continuing_differs_from_fresh() {
+        let genesis = test_genesis();
+        let config = test_config();
+
+        // Fresh generator → generate() to establish CfC state
+        let mut gen = BrocaGenerator::new(&genesis, config.clone());
+        let channels = ThoughtChannels::with_intent(1);
+        let _warm_up = gen.generate(&channels);
+
+        // generate_continuing() builds on the CfC state left by warm_up
+        let continuing_result = gen.generate_continuing(&channels);
+
+        // Fresh generator → generate() with no prior state
+        let mut gen_fresh = BrocaGenerator::new(&genesis, config);
+        let fresh_result = gen_fresh.generate(&channels);
+
+        // The continuing result should differ from a fresh generation because
+        // generate_continuing() inherits CfC temporal state from the warm-up,
+        // while the fresh generator starts from zeroed CfC state.
+        assert_ne!(
+            continuing_result.token_ids, fresh_result.token_ids,
+            "generate_continuing() should produce different output than a fresh generate() \
+             because it inherits CfC state from prior generation"
+        );
+    }
+
+    #[test]
+    fn test_context_accumulation_changes_output() {
+        let genesis = test_genesis();
+        let config = test_config();
+        let mut gen = BrocaGenerator::new(&genesis, config);
+
+        let channels = ThoughtChannels::with_intent(1);
+
+        // Initial generation resets state
+        let _initial = gen.generate(&channels);
+
+        // Successive continuing generations should evolve (CfC state accumulates)
+        let cont1 = gen.generate_continuing(&channels);
+        let cont2 = gen.generate_continuing(&channels);
+        let cont3 = gen.generate_continuing(&channels);
+
+        // All should produce tokens
+        assert!(
+            cont1.num_tokens > 0,
+            "First continuing should produce tokens"
+        );
+        assert!(
+            cont2.num_tokens > 0,
+            "Second continuing should produce tokens"
+        );
+        assert!(
+            cont3.num_tokens > 0,
+            "Third continuing should produce tokens"
+        );
+
+        // At least two of the three continuing generations should differ,
+        // demonstrating that CfC state accumulation produces evolving output
+        let all_same = cont1.token_ids == cont2.token_ids && cont2.token_ids == cont3.token_ids;
+        assert!(
+            !all_same,
+            "Multiple generate_continuing() calls should produce evolving outputs \
+             as CfC temporal state accumulates, but all three were identical"
         );
     }
 

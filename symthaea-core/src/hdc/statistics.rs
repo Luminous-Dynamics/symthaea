@@ -196,9 +196,7 @@ impl Distribution {
                 if x < 0.0 {
                     return 0.0;
                 }
-                beta.powf(*alpha) / gamma_function(*alpha)
-                    * x.powf(alpha - 1.0)
-                    * (-beta * x).exp()
+                beta.powf(*alpha) / gamma_function(*alpha) * x.powf(alpha - 1.0) * (-beta * x).exp()
             }
         }
     }
@@ -294,10 +292,12 @@ impl Distribution {
         };
         let type_hv = BinaryHV::random(seed_from_name(dist_name));
         let mean_hv = BinaryHV::random(seed_from_name(&format!(
-            "MEAN_{}", self.mean_val().to_bits()
+            "MEAN_{}",
+            self.mean_val().to_bits()
         )));
         let var_hv = BinaryHV::random(seed_from_name(&format!(
-            "VAR_{}", self.variance_val().to_bits()
+            "VAR_{}",
+            self.variance_val().to_bits()
         )));
         type_hv.bind(&mean_hv).bind(&var_hv)
     }
@@ -346,15 +346,10 @@ pub fn two_sample_t_test(data1: &[f64], data2: &[f64], alpha: f64) -> Hypothesis
     let s1 = sample_variance(data1);
     let s2 = sample_variance(data2);
 
-    let sp = ((((n1 - 1.0) * s1 + (n2 - 1.0) * s2) / (n1 + n2 - 2.0))
-        * (1.0 / n1 + 1.0 / n2))
-    .sqrt();
+    let sp =
+        ((((n1 - 1.0) * s1 + (n2 - 1.0) * s2) / (n1 + n2 - 2.0)) * (1.0 / n1 + 1.0 / n2)).sqrt();
 
-    let t = if sp > 1e-15 {
-        (m1 - m2) / sp
-    } else {
-        0.0
-    };
+    let t = if sp > 1e-15 { (m1 - m2) / sp } else { 0.0 };
 
     let p_value = 2.0 * (1.0 - normal_cdf(t.abs()));
 
@@ -375,13 +370,7 @@ pub fn chi_squared_test(observed: &[f64], expected: &[f64], alpha: f64) -> Hypot
     let chi2: f64 = observed
         .iter()
         .zip(expected.iter())
-        .map(|(o, e)| {
-            if *e > 1e-15 {
-                (o - e).powi(2) / e
-            } else {
-                0.0
-            }
-        })
+        .map(|(o, e)| if *e > 1e-15 { (o - e).powi(2) / e } else { 0.0 })
         .sum();
 
     let df = (observed.len() - 1) as f64;
@@ -495,7 +484,12 @@ pub fn pearson_correlation(x: &[f64], y: &[f64]) -> f64 {
     let mx = mean(x);
     let my = mean(y);
 
-    let cov: f64 = x.iter().zip(y.iter()).map(|(a, b)| (a - mx) * (b - my)).sum::<f64>() / n;
+    let cov: f64 = x
+        .iter()
+        .zip(y.iter())
+        .map(|(a, b)| (a - mx) * (b - my))
+        .sum::<f64>()
+        / n;
     let sx = std_dev(x);
     let sy = std_dev(y);
 
@@ -544,7 +538,11 @@ pub fn linear_regression(x: &[f64], y: &[f64]) -> LinearRegressionResult {
     let my = mean(y);
 
     let sxx: f64 = x.iter().map(|xi| (xi - mx).powi(2)).sum();
-    let sxy: f64 = x.iter().zip(y.iter()).map(|(xi, yi)| (xi - mx) * (yi - my)).sum();
+    let sxy: f64 = x
+        .iter()
+        .zip(y.iter())
+        .map(|(xi, yi)| (xi - mx) * (yi - my))
+        .sum();
 
     let slope = if sxx > 1e-15 { sxy / sxx } else { 0.0 };
     let intercept = my - slope * mx;
@@ -627,15 +625,15 @@ fn gamma_function(x: f64) -> f64 {
         let x = x - 1.0;
         let g = 7.0;
         let c = [
-            0.99999999999980993,
-            676.5203681218851,
-            -1259.1392167224028,
-            771.32342877765313,
-            -176.61502916214059,
-            12.507343278686905,
-            -0.13857109526572012,
-            9.9843695780195716e-6,
-            1.5056327351493116e-7,
+            0.999_999_999_999_810,
+            676.520_368_121_885_1,
+            -1259.139_216_722_403,
+            771.323_428_777_653_1,
+            -176.615_029_162_140_6,
+            12.507_343_278_686_905,
+            -0.138_571_095_265_720,
+            9.984_369_578_019_572e-6,
+            1.505_632_735_149_312e-7,
         ];
 
         let mut sum = c[0];
@@ -707,7 +705,10 @@ mod tests {
 
     #[test]
     fn test_normal_pdf() {
-        let n = Distribution::Normal { mu: 0.0, sigma: 1.0 };
+        let n = Distribution::Normal {
+            mu: 0.0,
+            sigma: 1.0,
+        };
         // PDF at 0 should be 1/√(2π)
         let expected = 1.0 / (2.0 * std::f64::consts::PI).sqrt();
         assert!((n.pdf(0.0) - expected).abs() < TOL);
@@ -715,7 +716,10 @@ mod tests {
 
     #[test]
     fn test_normal_cdf_symmetry() {
-        let n = Distribution::Normal { mu: 0.0, sigma: 1.0 };
+        let n = Distribution::Normal {
+            mu: 0.0,
+            sigma: 1.0,
+        };
         assert!((n.cdf(0.0) - 0.5).abs() < TOL);
         // CDF(-x) + CDF(x) ≈ 1
         assert!((n.cdf(-1.0) + n.cdf(1.0) - 1.0).abs() < 0.01);
@@ -723,7 +727,10 @@ mod tests {
 
     #[test]
     fn test_normal_mean_var() {
-        let n = Distribution::Normal { mu: 5.0, sigma: 3.0 };
+        let n = Distribution::Normal {
+            mu: 5.0,
+            sigma: 3.0,
+        };
         assert!((n.mean_val() - 5.0).abs() < TOL);
         assert!((n.variance_val() - 9.0).abs() < TOL);
     }
@@ -769,16 +776,28 @@ mod tests {
 
     #[test]
     fn test_beta_mean() {
-        let b = Distribution::Beta { alpha: 2.0, beta: 5.0 };
+        let b = Distribution::Beta {
+            alpha: 2.0,
+            beta: 5.0,
+        };
         assert!((b.mean_val() - 2.0 / 7.0).abs() < TOL);
     }
 
     #[test]
     fn test_distribution_encoding() {
-        let n1 = Distribution::Normal { mu: 0.0, sigma: 1.0 };
-        let n2 = Distribution::Normal { mu: 10.0, sigma: 2.0 };
+        let n1 = Distribution::Normal {
+            mu: 0.0,
+            sigma: 1.0,
+        };
+        let n2 = Distribution::Normal {
+            mu: 10.0,
+            sigma: 2.0,
+        };
         let sim = n1.encode().similarity(&n2.encode());
-        assert!(sim < 0.6, "Different distributions should have low similarity");
+        assert!(
+            sim < 0.6,
+            "Different distributions should have low similarity"
+        );
     }
 
     // ── Hypothesis testing ───────────────────────────────────────────────
@@ -823,7 +842,10 @@ mod tests {
         let result = normal_normal_update(0.0, 1.0, 5.0, 1.0, 10);
         // Posterior should be pulled toward data mean (5.0)
         if let Distribution::Normal { mu, sigma } = &result.posterior {
-            assert!(*mu > 0.0 && *mu < 5.0, "Posterior mean should be between prior and data");
+            assert!(
+                *mu > 0.0 && *mu < 5.0,
+                "Posterior mean should be between prior and data"
+            );
             assert!(*sigma < 1.0, "Posterior should be more precise than prior");
         } else {
             panic!("Expected Normal posterior");

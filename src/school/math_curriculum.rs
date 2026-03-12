@@ -742,7 +742,7 @@ impl MathCurriculum {
         // If the count exceeds half the number of mastered HVs, the output
         // bit is 1; otherwise 0.
         let threshold = mastered.len() as u32;
-        let mut counts = [0u32; 2048]; // one counter per byte
+        let mut counts = [0u32; 16384]; // one counter per bit (2048 bytes × 8 bits)
 
         for hv in &mastered {
             for (byte_idx, &byte) in hv.0.iter().enumerate() {
@@ -766,6 +766,42 @@ impl MathCurriculum {
         }
 
         BinaryHV(result)
+    }
+
+    /// Update mastery based on MathService telemetry.
+    ///
+    /// Maps problem types to objective IDs and marks objectives as mastered
+    /// when the corresponding solver has been exercised enough times (threshold = 3).
+    /// This bridges the MathService solver feedback into the School's mastery tracking.
+    pub fn update_from_telemetry(&mut self, by_type: &std::collections::HashMap<String, usize>) {
+        // Problem type → objective IDs mapping
+        let mappings: &[(&str, &[usize])] = &[
+            ("LinearSystem", &[10]),           // math_linear_systems
+            ("RootFinding", &[12]),            // math_quadratic_equations
+            ("Integration", &[17]),            // math_integration
+            ("MatrixAnalysis", &[20, 21]),     // math_matrices_linear_algebra, math_eigenvalues
+            ("Statistics", &[16]),             // math_descriptive_statistics
+            ("Optimization", &[31]),           // math_convex_optimization
+            ("SignalAnalysis", &[40]),         // math_fourier_analysis
+            ("Logic", &[18]),                  // math_logic_propositional
+            ("ConstraintSatisfaction", &[34]), // math_constraint_satisfaction
+            ("Geometry", &[8]),                // math_coordinate_plane
+            ("GraphTheory", &[19]),            // math_graph_intro
+            ("DifferentialEquation", &[32]),   // math_ode_systems
+        ];
+
+        let mastery_threshold = 3;
+        for (type_name, obj_ids) in mappings {
+            if let Some(&count) = by_type.get(*type_name) {
+                if count >= mastery_threshold {
+                    for &id in *obj_ids {
+                        if let Some(obj) = self.objectives.get_mut(id) {
+                            obj.mastered = true;
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -1034,28 +1070,34 @@ pub fn math_curriculum() -> Curriculum {
         )
         // ── Tier 3: Intermediate ────────────────────────────────────────
         .with_objective(
-            LearningObjective::new("math_matrices_linear_algebra", "Matrices and Linear Algebra")
-                .with_description(
-                    "Perform matrix multiplication, transposition, inversion; solve Ax = b \
+            LearningObjective::new(
+                "math_matrices_linear_algebra",
+                "Matrices and Linear Algebra",
+            )
+            .with_description(
+                "Perform matrix multiplication, transposition, inversion; solve Ax = b \
                      via Gaussian elimination and LU decomposition.",
-                )
-                .with_domain(Domain::Mathematics)
-                .with_difficulty(Difficulty::Intermediate)
-                .with_prerequisites(TIER2_IDS)
-                .with_tags(&["math", "linear-algebra", "matrices", "gaussian"])
-                .with_estimated_minutes(60),
+            )
+            .with_domain(Domain::Mathematics)
+            .with_difficulty(Difficulty::Intermediate)
+            .with_prerequisites(TIER2_IDS)
+            .with_tags(&["math", "linear-algebra", "matrices", "gaussian"])
+            .with_estimated_minutes(60),
         )
         .with_objective(
-            LearningObjective::new("math_eigenvalues_eigenvectors", "Eigenvalues and Eigenvectors")
-                .with_description(
-                    "Compute eigenvalues and eigenvectors of square matrices; diagonalise \
+            LearningObjective::new(
+                "math_eigenvalues_eigenvectors",
+                "Eigenvalues and Eigenvectors",
+            )
+            .with_description(
+                "Compute eigenvalues and eigenvectors of square matrices; diagonalise \
                      symmetric matrices; apply the spectral theorem.",
-                )
-                .with_domain(Domain::Mathematics)
-                .with_difficulty(Difficulty::Intermediate)
-                .with_prerequisites(&["math_matrices_linear_algebra"])
-                .with_tags(&["math", "linear-algebra", "eigenvalues", "spectral"])
-                .with_estimated_minutes(60),
+            )
+            .with_domain(Domain::Mathematics)
+            .with_difficulty(Difficulty::Intermediate)
+            .with_prerequisites(&["math_matrices_linear_algebra"])
+            .with_tags(&["math", "linear-algebra", "eigenvalues", "spectral"])
+            .with_estimated_minutes(60),
         )
         .with_objective(
             LearningObjective::new("math_differentiation", "Differentiation")
@@ -1082,19 +1124,22 @@ pub fn math_curriculum() -> Curriculum {
                 .with_estimated_minutes(60),
         )
         .with_objective(
-            LearningObjective::new(
-                "math_multivariable_calculus",
-                "Multivariable Calculus",
-            )
-            .with_description(
-                "Compute partial derivatives, gradients, divergence, and curl; apply \
+            LearningObjective::new("math_multivariable_calculus", "Multivariable Calculus")
+                .with_description(
+                    "Compute partial derivatives, gradients, divergence, and curl; apply \
                  the chain rule and Jacobian to multivariable functions.",
-            )
-            .with_domain(Domain::Mathematics)
-            .with_difficulty(Difficulty::Intermediate)
-            .with_prerequisites(&["math_differentiation", "math_matrices_linear_algebra"])
-            .with_tags(&["math", "calculus", "gradient", "jacobian", "partial-derivatives"])
-            .with_estimated_minutes(75),
+                )
+                .with_domain(Domain::Mathematics)
+                .with_difficulty(Difficulty::Intermediate)
+                .with_prerequisites(&["math_differentiation", "math_matrices_linear_algebra"])
+                .with_tags(&[
+                    "math",
+                    "calculus",
+                    "gradient",
+                    "jacobian",
+                    "partial-derivatives",
+                ])
+                .with_estimated_minutes(75),
         )
         .with_objective(
             LearningObjective::new("math_bayes_theorem", "Bayes' Theorem")
@@ -1181,7 +1226,13 @@ pub fn math_curriculum() -> Curriculum {
                     "math_multivariable_calculus",
                     "math_eigenvalues_eigenvectors",
                 ])
-                .with_tags(&["math", "optimisation", "gradient-descent", "kkt", "lagrangian"])
+                .with_tags(&[
+                    "math",
+                    "optimisation",
+                    "gradient-descent",
+                    "kkt",
+                    "lagrangian",
+                ])
                 .with_estimated_minutes(75),
         )
         .with_objective(
@@ -1192,10 +1243,7 @@ pub fn math_curriculum() -> Curriculum {
                 )
                 .with_domain(Domain::Mathematics)
                 .with_difficulty(Difficulty::Advanced)
-                .with_prerequisites(&[
-                    "math_integration",
-                    "math_eigenvalues_eigenvectors",
-                ])
+                .with_prerequisites(&["math_integration", "math_eigenvalues_eigenvectors"])
                 .with_tags(&["math", "ode", "differential-equations", "laplace"])
                 .with_estimated_minutes(75),
         )
@@ -1223,7 +1271,13 @@ pub fn math_curriculum() -> Curriculum {
             .with_domain(Domain::Mathematics)
             .with_difficulty(Difficulty::Advanced)
             .with_prerequisites(&["math_graph_intro", "math_logic_propositional"])
-            .with_tags(&["math", "csp", "constraint", "backtracking", "arc-consistency"])
+            .with_tags(&[
+                "math",
+                "csp",
+                "constraint",
+                "backtracking",
+                "arc-consistency",
+            ])
             .with_estimated_minutes(60),
         )
         .with_objective(
@@ -1278,7 +1332,13 @@ pub fn math_curriculum() -> Curriculum {
                     "math_integration",
                     "math_matrices_linear_algebra",
                 ])
-                .with_tags(&["math", "numerical", "newton-raphson", "runge-kutta", "quadrature"])
+                .with_tags(&[
+                    "math",
+                    "numerical",
+                    "newton-raphson",
+                    "runge-kutta",
+                    "quadrature",
+                ])
                 .with_estimated_minutes(75),
         )
         .with_objective(
@@ -1294,7 +1354,13 @@ pub fn math_curriculum() -> Curriculum {
                     "math_svd_matrix_decomp",
                     "math_hypothesis_testing",
                 ])
-                .with_tags(&["math", "ml", "gradient-descent", "backprop", "bias-variance"])
+                .with_tags(&[
+                    "math",
+                    "ml",
+                    "gradient-descent",
+                    "backprop",
+                    "bias-variance",
+                ])
                 .with_estimated_minutes(90),
         )
         // ── Tier 5: Expert ──────────────────────────────────────────────
@@ -1319,7 +1385,13 @@ pub fn math_curriculum() -> Curriculum {
                 .with_domain(Domain::Mathematics)
                 .with_difficulty(Difficulty::Expert)
                 .with_prerequisites(&["math_fourier_analysis"])
-                .with_tags(&["math", "wavelets", "haar", "multi-resolution", "compression"])
+                .with_tags(&[
+                    "math",
+                    "wavelets",
+                    "haar",
+                    "multi-resolution",
+                    "compression",
+                ])
                 .with_estimated_minutes(90),
         )
         .with_objective(
@@ -1349,13 +1421,7 @@ pub fn math_curriculum() -> Curriculum {
                 .with_domain(Domain::Mathematics)
                 .with_difficulty(Difficulty::Expert)
                 .with_prerequisites(&["math_proof_techniques", "math_abstract_algebra_groups"])
-                .with_tags(&[
-                    "math",
-                    "formal-verification",
-                    "lean",
-                    "coq",
-                    "type-theory",
-                ])
+                .with_tags(&["math", "formal-verification", "lean", "coq", "type-theory"])
                 .with_estimated_minutes(120),
         )
         .with_objective(
@@ -1391,7 +1457,13 @@ pub fn math_curriculum() -> Curriculum {
                 .with_domain(Domain::Mathematics)
                 .with_difficulty(Difficulty::Expert)
                 .with_prerequisites(&["math_fourier_analysis", "math_topology_intro"])
-                .with_tags(&["math", "functional-analysis", "hilbert", "banach", "operator"])
+                .with_tags(&[
+                    "math",
+                    "functional-analysis",
+                    "hilbert",
+                    "banach",
+                    "operator",
+                ])
                 .with_estimated_minutes(120),
         )
         .with_objective(
@@ -1403,7 +1475,13 @@ pub fn math_curriculum() -> Curriculum {
                 .with_domain(Domain::Mathematics)
                 .with_difficulty(Difficulty::Expert)
                 .with_prerequisites(&["math_proof_techniques", "math_stochastic_processes"])
-                .with_tags(&["math", "measure-theory", "lebesgue", "sigma-algebra", "radon-nikodym"])
+                .with_tags(&[
+                    "math",
+                    "measure-theory",
+                    "lebesgue",
+                    "sigma-algebra",
+                    "radon-nikodym",
+                ])
                 .with_estimated_minutes(120),
         )
         .with_objective(
@@ -1430,7 +1508,12 @@ pub fn math_curriculum() -> Curriculum {
                 .with_domain(Domain::Mathematics)
                 .with_difficulty(Difficulty::Expert)
                 .with_prerequisites(&["math_ml_math_foundations", "math_numerical_stability"])
-                .with_tags(&["math", "symbolic-regression", "sindy", "genetic-programming"])
+                .with_tags(&[
+                    "math",
+                    "symbolic-regression",
+                    "sindy",
+                    "genetic-programming",
+                ])
                 .with_estimated_minutes(90),
         )
         .build()
@@ -1451,22 +1534,25 @@ pub fn math_curriculum_advanced() -> Curriculum {
         .with_prerequisite_curriculum(CURRICULUM_ID)
         .with_tags(&["math", "advanced", "expert", "synthesis"])
         .with_objective(
-            LearningObjective::new("math_hdc_geometry", "Geometry of Hyperdimensional Computing")
-                .with_description(
-                    "Derive concentration-of-measure results for random binary hypervectors; \
+            LearningObjective::new(
+                "math_hdc_geometry",
+                "Geometry of Hyperdimensional Computing",
+            )
+            .with_description(
+                "Derive concentration-of-measure results for random binary hypervectors; \
                      understand why Hamming distance approximates cosine similarity at high \
                      dimension and its implications for HDC binding capacity.",
-                )
-                .with_domain(Domain::Mathematics)
-                .with_difficulty(Difficulty::Expert)
-                .with_tags(&[
-                    "math",
-                    "hdc",
-                    "measure-concentration",
-                    "high-dimensional",
-                    "geometry",
-                ])
-                .with_estimated_minutes(90),
+            )
+            .with_domain(Domain::Mathematics)
+            .with_difficulty(Difficulty::Expert)
+            .with_tags(&[
+                "math",
+                "hdc",
+                "measure-concentration",
+                "high-dimensional",
+                "geometry",
+            ])
+            .with_estimated_minutes(90),
         )
         .with_objective(
             LearningObjective::new(
@@ -1480,7 +1566,13 @@ pub fn math_curriculum_advanced() -> Curriculum {
             )
             .with_domain(Domain::Mathematics)
             .with_difficulty(Difficulty::Expert)
-            .with_tags(&["math", "iit", "phi", "information-geometry", "consciousness"])
+            .with_tags(&[
+                "math",
+                "iit",
+                "phi",
+                "information-geometry",
+                "consciousness",
+            ])
             .with_estimated_minutes(120),
         )
         .with_objective(
@@ -1495,7 +1587,13 @@ pub fn math_curriculum_advanced() -> Curriculum {
             )
             .with_domain(Domain::Mathematics)
             .with_difficulty(Difficulty::Expert)
-            .with_tags(&["math", "category-theory", "denotational", "monads", "curry-howard"])
+            .with_tags(&[
+                "math",
+                "category-theory",
+                "denotational",
+                "monads",
+                "curry-howard",
+            ])
             .with_estimated_minutes(120),
         )
         .with_objective(
@@ -1507,7 +1605,13 @@ pub fn math_curriculum_advanced() -> Curriculum {
                 )
                 .with_domain(Domain::Mathematics)
                 .with_difficulty(Difficulty::Expert)
-                .with_tags(&["math", "privacy", "differential-privacy", "laplace", "renyi"])
+                .with_tags(&[
+                    "math",
+                    "privacy",
+                    "differential-privacy",
+                    "laplace",
+                    "renyi",
+                ])
                 .with_estimated_minutes(90),
         )
         .with_objective(

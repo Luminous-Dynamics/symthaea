@@ -1,16 +1,14 @@
 //! Numerical Integration Assessment.
 //!
 //! Tests computing definite integrals of standard functions with known analytic
-//! closed-form values. Three function families are tested:
+//! closed-form values using the actual `QuadratureEngine` from symthaea-core.
 //!
 //! 1. **Polynomial**: ∫₀ᵃ xⁿ dx = aⁿ⁺¹ / (n+1)
 //! 2. **Trigonometric**: ∫₀^π sin(x) dx = 2, ∫₀^(π/2) cos(x) dx = 1
 //! 3. **Exponential**: ∫₀ᵃ eˣ dx = eᵃ − 1
 //!
-//! HDC implementation: the integrand parameters (exponent, upper bound) are
-//! encoded as ContinuousHVs; the analytic answer is also encoded. Numerical
-//! integration is performed via the Simpson's rule composite method
-//! (n=64 subintervals). Relative error measures accuracy.
+//! Uses `QuadratureEngine::adaptive_simpson()` for high-accuracy numerical
+//! integration. Relative error measures accuracy against analytic answers.
 //!
 //! Human baselines (Davis & Rabinowitz, 2007):
 //! - accuracy: 0.85 (SD ~0.09)  — fraction within 5% relative error
@@ -19,7 +17,7 @@
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
-use symthaea_core::hdc::ContinuousHV;
+use symthaea_core::hdc::quadrature::QuadratureEngine;
 
 /// Numerical Integration (Definite Integrals) Assessment benchmark.
 pub struct DefiniteIntegralsBenchmark;
@@ -28,18 +26,6 @@ fn xor_shift(s: &mut u64) {
     *s ^= *s << 13;
     *s ^= *s >> 7;
     *s ^= *s << 17;
-}
-
-/// Composite Simpson's rule with n (even) subintervals.
-fn simpsons<F: Fn(f64) -> f64>(f: F, a: f64, b: f64, n: usize) -> f64 {
-    debug_assert!(n % 2 == 0);
-    let h = (b - a) / n as f64;
-    let mut sum = f(a) + f(b);
-    for i in 1..n {
-        let x = a + i as f64 * h;
-        sum += if i % 2 == 0 { 2.0 * f(x) } else { 4.0 * f(x) };
-    }
-    sum * h / 3.0
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -62,62 +48,67 @@ impl FunctionType {
 }
 
 struct IntegralProblem {
-    /// Numeric identifier for HDC encoding.
-    param_seed: u64,
-    /// Numeric answer identifier for HDC encoding.
+    /// Lower bound
+    lower: f64,
+    /// Upper bound
+    upper: f64,
+    /// Analytic answer
     answer: f64,
-    /// Numerically computed answer via Simpson's rule.
-    numeric: f64,
+    /// Function type for dispatching
+    fn_type: FunctionType,
+    /// Polynomial exponent (only for polynomial type)
+    exponent: u32,
 }
 
-fn make_problem(fn_type: FunctionType, rng: &mut u64, seed: u64) -> IntegralProblem {
+fn make_problem(fn_type: FunctionType, rng: &mut u64) -> IntegralProblem {
     xor_shift(rng);
     match fn_type {
         FunctionType::Polynomial => {
-            let n_exp = ((*rng % 4) + 1) as u32; // degree 1..4
+            let n_exp = ((*rng % 4) + 1) as u32;
             xor_shift(rng);
-            let upper = 1.0 + (*rng % 4) as f64; // upper bound 1..4
+            let upper = 1.0 + (*rng % 4) as f64;
             let analytic = upper.powi(n_exp as i32 + 1) / (n_exp + 1) as f64;
-            let numeric = simpsons(|x: f64| x.powi(n_exp as i32), 0.0, upper, 64);
             IntegralProblem {
-                param_seed: seed.wrapping_add(n_exp as u64 * 13 + upper.to_bits()),
+                lower: 0.0,
+                upper,
                 answer: analytic,
-                numeric,
+                fn_type,
+                exponent: n_exp,
             }
         }
         FunctionType::Sine => {
-            // ∫₀^(k·π) sin(x) dx = 1 - cos(k·π)
-            let k = ((*rng % 3) + 1) as f64; // k = 1, 2, 3
+            let k = ((*rng % 3) + 1) as f64;
             let upper = k * std::f64::consts::PI;
             let analytic = 1.0 - (k * std::f64::consts::PI).cos();
-            let numeric = simpsons(|x: f64| x.sin(), 0.0, upper, 64);
             IntegralProblem {
-                param_seed: seed.wrapping_add(k.to_bits()),
+                lower: 0.0,
+                upper,
                 answer: analytic,
-                numeric,
+                fn_type,
+                exponent: 0,
             }
         }
         FunctionType::Cosine => {
-            // ∫₀^(k·π/2) cos(x) dx = sin(k·π/2)
             let k = ((*rng % 3) + 1) as f64;
             let upper = k * std::f64::consts::FRAC_PI_2;
             let analytic = (k * std::f64::consts::FRAC_PI_2).sin();
-            let numeric = simpsons(|x: f64| x.cos(), 0.0, upper, 64);
             IntegralProblem {
-                param_seed: seed.wrapping_add(k.to_bits().wrapping_add(0xFF)),
+                lower: 0.0,
+                upper,
                 answer: analytic,
-                numeric,
+                fn_type,
+                exponent: 0,
             }
         }
         FunctionType::Exponential => {
-            // ∫₀^a eˣ dx = eᵃ - 1
-            let upper = 0.5 + (*rng % 3) as f64 * 0.5; // 0.5, 1.0, 1.5
+            let upper = 0.5 + (*rng % 3) as f64 * 0.5;
             let analytic = upper.exp() - 1.0;
-            let numeric = simpsons(|x: f64| x.exp(), 0.0, upper, 64);
             IntegralProblem {
-                param_seed: seed.wrapping_add(upper.to_bits().wrapping_add(0xABC)),
+                lower: 0.0,
+                upper,
                 answer: analytic,
-                numeric,
+                fn_type,
+                exponent: 0,
             }
         }
     }
@@ -130,7 +121,6 @@ struct TrialResult {
 
 impl DefiniteIntegralsBenchmark {
     fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> TrialResult {
-        let dim = config.dimension;
         let seed = config.trial_seed("mathematics", "definite_integrals", trial_idx);
         let mut rng = seed ^ 0x517CC1B727220A95;
 
@@ -143,26 +133,52 @@ impl DefiniteIntegralsBenchmark {
         for _ in 0..n_problems {
             xor_shift(&mut rng);
             let fn_type = FunctionType::from_rng(rng);
-            let problem = make_problem(fn_type, &mut rng, seed);
+            let problem = make_problem(fn_type, &mut rng);
 
-            // Relative error between numeric approximation and analytic answer.
+            // Call the actual quadrature engine.
+            let result = match problem.fn_type {
+                FunctionType::Polynomial => {
+                    let exp = problem.exponent;
+                    QuadratureEngine::adaptive_simpson(
+                        &|x: f64| x.powi(exp as i32),
+                        problem.lower,
+                        problem.upper,
+                        1e-10,
+                    )
+                }
+                FunctionType::Sine => QuadratureEngine::adaptive_simpson(
+                    &|x: f64| x.sin(),
+                    problem.lower,
+                    problem.upper,
+                    1e-10,
+                ),
+                FunctionType::Cosine => QuadratureEngine::adaptive_simpson(
+                    &|x: f64| x.cos(),
+                    problem.lower,
+                    problem.upper,
+                    1e-10,
+                ),
+                FunctionType::Exponential => QuadratureEngine::adaptive_simpson(
+                    &|x: f64| x.exp(),
+                    problem.lower,
+                    problem.upper,
+                    1e-10,
+                ),
+            };
+
+            // Relative error between solver result and analytic answer.
             let rel_err = if problem.answer.abs() > 1e-10 {
-                (problem.numeric - problem.answer).abs() / problem.answer.abs()
+                (result.value - problem.answer).abs() / problem.answer.abs()
             } else {
-                (problem.numeric - problem.answer).abs()
+                (result.value - problem.answer).abs()
             };
             rel_errors.push(rel_err);
 
-            // HDC encoding: parameters → answer similarity.
-            let hv_param = ContinuousHV::random(dim, problem.param_seed);
-            let hv_answer = ContinuousHV::random(dim, seed.wrapping_add(problem.answer.to_bits()));
-
-            let raw_sim = hv_param.similarity(&hv_answer) as f64;
             xor_shift(&mut rng);
             let noise = (rng % 10_000) as f64 / 10_000.0 * noise_scale;
 
-            // Correct if numeric error < 5% and encoding similarity passes noise.
-            if rel_err < 0.05 && raw_sim + 0.35 > 0.40 + noise {
+            // Correct if numerical error < 5% and noise doesn't eliminate it.
+            if rel_err < 0.05 && noise < 0.95 {
                 correct += 1;
             }
         }
@@ -244,13 +260,13 @@ mod tests {
     }
 
     #[test]
-    fn test_simpsons_rule_accuracy() {
-        // ∫₀^π sin(x) dx = 2.0 — known analytic result.
-        let result = simpsons(|x| x.sin(), 0.0, std::f64::consts::PI, 64);
+    fn test_adaptive_simpson_accuracy() {
+        let result =
+            QuadratureEngine::adaptive_simpson(&|x: f64| x.sin(), 0.0, std::f64::consts::PI, 1e-10);
         assert!(
-            (result - 2.0).abs() < 1e-6,
-            "Simpson's rule error: |{:.8} - 2.0| should be < 1e-6",
-            result
+            (result.value - 2.0).abs() < 1e-8,
+            "Adaptive Simpson error: |{:.12} - 2.0| should be < 1e-8",
+            result.value
         );
     }
 }

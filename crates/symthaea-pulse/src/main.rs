@@ -270,6 +270,54 @@ pub struct GovernanceInfo {
     /// Rolling 30-cycle history of reward EMA for sparkline.
     #[serde(default)]
     pub reward_history: Vec<f64>,
+    /// Number of collective blind spots.
+    #[serde(default)]
+    pub blind_spot_count: usize,
+    /// Maximum blind spot severity (0.0–1.0).
+    #[serde(default)]
+    pub max_blind_spot_severity: f64,
+    /// Community mode label.
+    #[serde(default)]
+    pub community_mode: String,
+    /// Max absolute harmonic delta.
+    #[serde(default)]
+    pub harmonic_delta_max: f64,
+    /// Number of agents in epistemic mesh.
+    #[serde(default)]
+    pub epistemic_agents: usize,
+    /// LR boost from governance prediction error.
+    #[serde(default)]
+    pub lr_boost: f64,
+}
+
+/// Knowledge engine telemetry for Pulse visualization.
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+pub struct KnowledgeInfo {
+    /// Total facts in knowledge graph.
+    pub graph_size: u32,
+    /// Average confidence across stored facts.
+    pub avg_confidence: f32,
+    /// Number of causal edges discovered.
+    pub causal_edges: u32,
+    /// Number of causal nodes.
+    pub causal_nodes: u32,
+    /// Learned primitives in adaptive ontology.
+    pub ontology_size: u32,
+    /// Average ontology utility.
+    pub avg_ontology_utility: f64,
+    /// Number of domain tags.
+    pub domain_count: u32,
+    /// Current uncertainty signal (0-1).
+    pub uncertainty: f64,
+    /// Current novelty signal (0-1).
+    pub novelty: f64,
+    /// Number of contradictions detected this session.
+    pub contradictions: u32,
+    /// Best search similarity this cycle.
+    pub best_similarity: f32,
+    /// Rolling 30-cycle history of uncertainty for sparkline.
+    #[serde(default)]
+    pub uncertainty_history: Vec<f64>,
 }
 
 /// Full JSON-serializable pulse snapshot for comparison mode.
@@ -289,6 +337,8 @@ pub struct PulseSnapshot {
     pub cantor: CantorInfo,
     #[serde(default)]
     pub governance: GovernanceInfo,
+    #[serde(default)]
+    pub knowledge: KnowledgeInfo,
 }
 
 /// Computed delta between two pulse snapshots for the comparison view.
@@ -1110,6 +1160,26 @@ fn main() -> Result<()> {
             confidence_delta: m.governance_confidence_delta,
             collective_phi: m.governance_collective_phi,
             reward_history: Vec::new(),
+            blind_spot_count: m.governance_blind_spot_count,
+            max_blind_spot_severity: m.governance_max_blind_spot_severity,
+            community_mode: m.governance_community_mode.clone(),
+            harmonic_delta_max: m.governance_harmonic_delta_max,
+            epistemic_agents: m.governance_epistemic_agents,
+            lr_boost: m.governance_lr_boost,
+        },
+        knowledge: KnowledgeInfo {
+            graph_size: m.knowledge_graph_size,
+            avg_confidence: m.knowledge_avg_confidence,
+            causal_edges: m.knowledge_causal_edges,
+            causal_nodes: 0,
+            ontology_size: m.knowledge_ontology_size,
+            avg_ontology_utility: 0.0,
+            domain_count: 0,
+            uncertainty: m.knowledge_uncertainty,
+            novelty: m.knowledge_novelty,
+            contradictions: m.knowledge_contradictions,
+            best_similarity: 0.0,
+            uncertainty_history: Vec::new(),
         },
     };
 
@@ -1249,10 +1319,12 @@ fn main() -> Result<()> {
             // Run more measurement cycles
             let mut watch_sparkline: Vec<SparklinePoint> = Vec::with_capacity(measurement);
             let mut watch_result = None;
+            let mut watch_reward_history: Vec<f64> = Vec::with_capacity(measurement);
             for i in 0..measurement {
                 let input = inputs[(cycle_count + i) % inputs.len()];
                 let result = service.cycle(input);
                 let wm = &result.metadata;
+                watch_reward_history.push(wm.governance_reward_ema);
                 watch_sparkline.push(SparklinePoint {
                     consciousness: wm.consciousness_level,
                     prediction_error: result.prediction_error,
@@ -1372,7 +1444,27 @@ fn main() -> Result<()> {
                     pending_outcomes: wm.governance_pending_outcomes,
                     confidence_delta: wm.governance_confidence_delta,
                     collective_phi: wm.governance_collective_phi,
-                    reward_history: Vec::new(),
+                    reward_history: watch_reward_history,
+                    blind_spot_count: wm.governance_blind_spot_count,
+                    max_blind_spot_severity: wm.governance_max_blind_spot_severity,
+                    community_mode: wm.governance_community_mode.clone(),
+                    harmonic_delta_max: wm.governance_harmonic_delta_max,
+                    epistemic_agents: wm.governance_epistemic_agents,
+                    lr_boost: wm.governance_lr_boost,
+                },
+                knowledge: KnowledgeInfo {
+                    graph_size: wm.knowledge_graph_size,
+                    avg_confidence: wm.knowledge_avg_confidence,
+                    causal_edges: wm.knowledge_causal_edges,
+                    causal_nodes: 0,
+                    ontology_size: wm.knowledge_ontology_size,
+                    avg_ontology_utility: 0.0,
+                    domain_count: 0,
+                    uncertainty: wm.knowledge_uncertainty,
+                    novelty: wm.knowledge_novelty,
+                    contradictions: wm.knowledge_contradictions,
+                    best_similarity: 0.0,
+                    uncertainty_history: Vec::new(),
                 },
             };
 
@@ -1542,6 +1634,7 @@ mod tests {
             integrity: IntegrityInfo::default(),
             cantor: CantorInfo::default(),
             governance: GovernanceInfo::default(),
+            knowledge: KnowledgeInfo::default(),
         }
     }
 

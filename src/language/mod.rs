@@ -38,6 +38,9 @@ pub mod openai_backend;
 #[cfg(feature = "ssm_language")]
 pub mod ssm_backend;
 
+// Intelligent code generation dispatch (consciousness-routed backend selection)
+pub mod intelligent_dispatcher;
+
 // Code understanding & generation (Phase: Consciousness-Aware Code)
 #[cfg(feature = "code_generation")]
 pub mod code_domain_plugin;

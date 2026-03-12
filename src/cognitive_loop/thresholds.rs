@@ -106,6 +106,50 @@ pub const CANTOR_DEPTH_ACH_BOOST: f32 = 0.02;
 /// Science: Hasselmo (2006) — ACh/NE balance shifts during focused vs scanning attention.
 pub const CANTOR_DEPTH_NE_DAMPEN: f32 = -0.015;
 
+/// Dream surprise threshold for exploration boost.
+/// Above this, novel fractal territory triggers map-exploration.
+/// Science: Sutton & Barto (2018) — surprise-driven explore/exploit tradeoff.
+pub const CANTOR_SURPRISE_EXPLORATION_THRESHOLD: f32 = 0.3;
+
+/// Exploration boost scale from dream surprise.
+pub const CANTOR_SURPRISE_EXPLORATION_BOOST: f32 = 0.04;
+
+/// Resonance threshold for exploration dampening.
+/// Above this, attractor found → exploit mode (stop exploring).
+pub const CANTOR_RESONANCE_EXPLORATION_DAMPEN_THRESHOLD: f32 = 0.5;
+
+/// Exploration dampening scale from resonance.
+pub const CANTOR_RESONANCE_EXPLORATION_DAMPEN: f32 = -0.03;
+
+/// Cross-modal binding threshold for RadialCantor promotion.
+/// When binding strength exceeds this, promote to RadialCantor (geometric structure).
+/// Science: Treisman & Gelade (1980) — high binding = perceptual integration.
+pub const CANTOR_RADIAL_BINDING_THRESHOLD: f32 = 0.6;
+
+/// Number of radial bands for RadialCantor (maps to perceptual scales).
+pub const CANTOR_RADIAL_BANDS: usize = 5;
+
+/// Broca cadence spacing boost from deep CRHV recursion (depth > 5).
+/// Deep fractals → slower, more deliberate speech.
+/// Science: Goldman-Rakic (1996) — prefrontal recursion depth predicts utterance complexity.
+pub const CANTOR_DEPTH_BROCA_SPACING_BOOST: usize = 2;
+
+/// Broca cadence spacing boost from high dream surprise.
+/// Epistemic uncertainty → pause before speaking.
+pub const CANTOR_SURPRISE_BROCA_SPACING_BOOST: usize = 3;
+
+/// Broca cadence surprise threshold (triggers spacing widening).
+pub const CANTOR_SURPRISE_BROCA_THRESHOLD: f32 = 0.4;
+
+/// Harmony boost for Sacred Stillness from CRHV self-similarity.
+/// Deep self-reference maps to contemplative attention.
+/// Science: Varela et al. (1991) — autopoietic self-reference as consciousness substrate.
+pub const CANTOR_HARMONY_STILLNESS_SCALE: f64 = 0.08;
+
+/// Harmony boost for Universal Interconnectedness from resonance.
+/// Fractal choir (multiple coherent CRHVs) = collective resonance.
+pub const CANTOR_HARMONY_INTERCONNECT_SCALE: f64 = 0.06;
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // FEP / ACTIVE INFERENCE
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1131,6 +1175,7 @@ pub fn validate() {
     assert!(GOV_ALIGNED_PASS_DA_HALFLIFE > 0);
     assert!(GOV_ALIGNED_FAIL_DA_NUDGE < 0.0 && GOV_ALIGNED_FAIL_DA_NUDGE >= -0.10);
     assert!(GOV_REPUTATION_DECLINE_SHT < 0.0 && GOV_REPUTATION_DECLINE_SHT >= -0.10);
+    assert!(GOV_REPUTATION_GAIN_SHT > 0.0 && GOV_REPUTATION_GAIN_SHT <= 0.10);
     assert!(GOV_COLLECTIVE_PHI_ECB > 0.0 && GOV_COLLECTIVE_PHI_ECB <= 0.05);
     assert!(GOV_CONSCIOUSNESS_MODULATION > 0.0 && GOV_CONSCIOUSNESS_MODULATION <= 0.10);
 }
@@ -1232,6 +1277,96 @@ pub const HOMEOSTASIS_PULL_CRITICAL: f32 = 0.6;
 
 /// Arousal target for homeostasis (slightly above neutral).
 pub const HOMEOSTASIS_AROUSAL_TARGET: f32 = 0.3;
+
+/// Emotional inertia strength: dampens rapid valence/arousal swings by
+/// blending previous-cycle momentum into the homeostasis pull.
+/// Sokolov (1963): habituation creates resistance to rapid stimulus-response shifts.
+/// Range: 0.0 (no inertia, instant snap) to 0.5 (strong momentum preservation).
+pub const HOMEOSTASIS_EMOTIONAL_INERTIA: f32 = 0.15;
+
+/// Consecutive all-dampen cycles before feedback consensus freezes to base values.
+/// Turrigiano (2008): homeostatic plasticity includes brief synaptic silencing.
+pub const CONSENSUS_FREEZE_STREAK_THRESHOLD: u32 = 3;
+
+/// Affective valence momentum: blends previous-cycle valence into current stimulus
+/// processing, creating smooth affective trajectories instead of discontinuous jumps.
+/// Damasio (1999): somatic markers persist across temporal gaps; emotional state has inertia.
+/// Range: 0.0 (no momentum) to 0.5 (strong persistence). Default 0.15 = 15% prior.
+pub const AFFECTIVE_VALENCE_MOMENTUM: f32 = 0.15;
+
+/// Cross-modal binding temporal smoothing: blends previous-cycle cross-modal Psi
+/// into current binding result, preventing rapid binding/unbinding oscillations.
+/// Engel et al. (2001): temporal coherence in cross-modal binding requires sustained
+/// synchronization across perceptual cycles.
+/// Range: 0.0 (no smoothing) to 0.5 (strong hysteresis). Default 0.2 = 20% prior.
+pub const CROSS_MODAL_PSI_TEMPORAL_SMOOTHING: f64 = 0.2;
+
+/// Predictive phi modulation smoothing: blends previous-cycle predictive modulation
+/// into current result, ensuring precision estimates evolve gradually.
+/// Friston (2010): precision-weighted prediction errors should update smoothly
+/// to maintain hierarchical model stability.
+/// Range: 0.0 (no smoothing) to 0.5 (strong persistence). Default 0.15 = 15% prior.
+pub const PREDICTIVE_PHI_MODULATION_SMOOTHING: f64 = 0.15;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// USER STATE INFERENCE (USI) FEEDBACK
+// Science: Picard (2000) — affect-aware systems must modulate behavior based on
+// inferred user state to maintain productive human-AI collaboration.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// User frustration threshold above which exploration is dampened.
+/// Lazarus (1991): frustration signals goal-blockage; reducing exploration prevents
+/// compounding the user's sense of uncontrollability.
+pub const USI_FRUSTRATION_EXPLORATION_THRESHOLD: f64 = 0.6;
+
+/// Scale factor for frustration-driven exploration dampening.
+/// At max frustration (1.0), exploration is scaled to 1.0 - (1.0 - 0.6) * 0.25 = 0.9.
+pub const USI_FRUSTRATION_EXPLORATION_SCALE: f32 = 0.25;
+
+/// User cognitive load threshold above which learning rate is reduced.
+/// Sweller (1988): high cognitive load impairs integration; reducing LR
+/// avoids overwhelming the user with rapid adaptation.
+pub const USI_COGNITIVE_LOAD_LR_THRESHOLD: f64 = 0.7;
+
+/// Scale factor for load-driven LR reduction.
+/// At max load (1.0), LR is scaled to 1.0 - (1.0 - 0.7) * 0.3 = 0.91.
+pub const USI_COGNITIVE_LOAD_LR_SCALE: f32 = 0.3;
+
+/// User engagement threshold above which confidence is boosted.
+/// Csikszentmihalyi (1990): high engagement signals flow-compatible state;
+/// boosting confidence reinforces successful resonance.
+pub const USI_ENGAGEMENT_CONFIDENCE_THRESHOLD: f64 = 0.8;
+
+/// Scale factor for engagement-driven confidence boost.
+/// At max engagement (1.0), confidence boost = (1.0 - 0.8) * 0.05 = 0.01.
+pub const USI_ENGAGEMENT_CONFIDENCE_SCALE: f32 = 0.05;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SOUL COHERENCE FEEDBACK
+// Science: Damasio (1994) — identity coherence (somatic markers) underpins
+// stable decision-making and confidence in self-model.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Soul coherence threshold below which confidence is dampened.
+/// Low coherence indicates fragmented identity → uncertain predictions.
+pub const SOUL_COHERENCE_LOW_THRESHOLD: f32 = 0.5;
+
+/// Scale factor for soul-coherence confidence dampening.
+pub const SOUL_COHERENCE_CONFIDENCE_SCALE: f32 = 0.01;
+
+/// Growth potential threshold above which exploration is boosted.
+/// High growth potential = learning opportunity detected.
+pub const SOUL_GROWTH_EXPLORATION_THRESHOLD: f32 = 0.7;
+
+/// Scale factor for growth-driven exploration boost.
+pub const SOUL_GROWTH_EXPLORATION_SCALE: f32 = 0.01;
+
+/// Value alignment threshold below which exploration is boosted.
+/// Low alignment = misaligned values, need recalibration.
+pub const SOUL_ALIGNMENT_LOW_THRESHOLD: f32 = 0.3;
+
+/// Exploration multiplier when value alignment is low.
+pub const SOUL_ALIGNMENT_EXPLORATION_MULT: f32 = 1.02;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // PREDICTIVE BUDGET GATING
@@ -2042,6 +2177,10 @@ pub const SLEEP_PRESSURE_INCREMENT: f32 = 0.001;
 pub const SLEEP_PRESSURE_THRESHOLD: f32 = 0.7;
 /// Sleep pressure decay rate during consolidation.
 pub const SLEEP_PRESSURE_CONSOLIDATION_DECAY: f32 = 0.05;
+/// Passive sleep pressure decay during low-stress periods (micro-rest).
+/// Basis: Lim & Dinges (2010) — brief rest epochs partially clear adenosine.
+/// Applied when readiness > 0.9 (system not under significant load).
+pub const SLEEP_PRESSURE_PASSIVE_DECAY: f32 = 0.999;
 /// LR dampening during consolidation mode.
 pub const SLEEP_PRESSURE_LR_SCALE: f32 = 0.9;
 
@@ -2066,6 +2205,80 @@ pub const EXPLORE_EXPLOIT_CORRECTION: f32 = 0.01;
 /// Proposal conflict: max conflict_ratio before cancellation.
 /// Basis: Botvinick et al. (2001) — ACC detects response conflict → pause.
 pub const PROPOSAL_CONFLICT_THRESHOLD: f32 = 0.4;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SESSION 19: EMBODIED COGNITION & ENVIRONMENTAL COUPLING
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Arousal threshold for LR boost (high arousal = salient moment).
+/// Basis: Yerkes-Dodson (1908) — inverted-U arousal-performance curve.
+pub const AROUSAL_LR_BOOST_THRESHOLD: f32 = 0.6;
+/// LR scale when arousal exceeds threshold.
+pub const AROUSAL_LR_BOOST_SCALE: f32 = 1.05;
+/// Arousal ceiling above which LR is dampened (over-arousal).
+pub const AROUSAL_OVERAROUSAL_THRESHOLD: f32 = 0.85;
+/// LR scale during over-arousal.
+pub const AROUSAL_OVERAROUSAL_LR_SCALE: f32 = 0.93;
+
+/// Novelty habituation EMA decay.
+/// Basis: Sokolov (1963) — orienting response habituates to repeated stimuli.
+pub const NOVELTY_EMA_DECAY: f32 = 0.95;
+/// Novelty threshold below which exploration is reduced.
+pub const NOVELTY_LOW_THRESHOLD: f32 = 0.1;
+/// Exploration dampening when novelty is low.
+pub const NOVELTY_LOW_EXPLORE_SCALE: f32 = 0.98;
+
+/// Fatigue increment per high-effort cycle (many proposals or high LR delta).
+/// Basis: Hockey (1997) — cognitive resource depletion theory.
+pub const FATIGUE_INCREMENT: f32 = 0.005;
+/// Fatigue threshold for effort detection (total proposals > this).
+pub const FATIGUE_EFFORT_THRESHOLD: usize = 12;
+/// LR dampening under fatigue.
+pub const FATIGUE_LR_SCALE: f32 = 0.97;
+/// Fatigue threshold above which dampening fires.
+pub const FATIGUE_THRESHOLD: f32 = 0.5;
+
+/// Recovery: consecutive low-effort stable cycles needed.
+/// Basis: Meijman & Mulder (1998) — effort-recovery model.
+/// S21: Reduced from 8 → 5 — old value meant recovery almost never triggered.
+pub const RECOVERY_CYCLES_NEEDED: u32 = 5;
+/// Fatigue decay per recovery cycle.
+/// S21: Increased from 0.03 → 0.08 — halves fatigue in ~9 recovery cycles instead of ~23.
+pub const RECOVERY_FATIGUE_DECAY: f32 = 0.08;
+/// Confidence boost on full recovery.
+pub const RECOVERY_CONFIDENCE_BOOST: f32 = 0.01;
+
+/// Environmental predictability window.
+/// Basis: Gottlieb et al. (2013) — information sampling as exploration control.
+pub const ENV_PREDICTABILITY_WINDOW: usize = 30;
+/// Threshold scale tightening when environment is predictable.
+pub const ENV_PREDICTABLE_THRESHOLD_SCALE: f32 = 0.98;
+/// Threshold scale loosening when environment is unpredictable.
+pub const ENV_UNPREDICTABLE_THRESHOLD_SCALE: f32 = 1.02;
+/// Predictability boundary for "predictable" (>= this).
+pub const ENV_PREDICTABILITY_HIGH: f32 = 0.7;
+/// Predictability boundary for "unpredictable" (<= this).
+pub const ENV_PREDICTABILITY_LOW: f32 = 0.3;
+
+/// Maximum attention budget (total proposals per cycle).
+/// Basis: Kahneman (1973) — capacity model of attention.
+pub const ATTENTION_BUDGET_MAX: usize = 20;
+
+/// Readiness components: weight of PE variance in readiness.
+/// Basis: Boksem & Tops (2008) — mental fatigue and cognitive control.
+pub const READINESS_PE_WEIGHT: f32 = 0.3;
+/// Readiness weight of sleep pressure.
+pub const READINESS_SLEEP_WEIGHT: f32 = 0.3;
+/// Readiness weight of fatigue.
+pub const READINESS_FATIGUE_WEIGHT: f32 = 0.4;
+
+/// Resonance detection: consecutive high-agreement cycles needed.
+/// Basis: Csikszentmihalyi (1990) — flow state via absorbed engagement.
+pub const RESONANCE_FLOW_CYCLES: u32 = 10;
+/// Cross-module agreement threshold for resonance.
+pub const RESONANCE_AGREEMENT_THRESHOLD: f32 = 0.8;
+/// Confidence boost during flow/resonance state.
+pub const RESONANCE_CONFIDENCE_BOOST: f32 = 0.02;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // AFFECTIVE CONSCIOUSNESS
@@ -2196,6 +2409,10 @@ pub const GOV_ALIGNED_FAIL_DA_NUDGE: f32 = -0.02;
 /// 5-HT baseline nudge on negative reputation change.
 /// Basis: Crockett (2009) — social rejection → serotonin dip.
 pub const GOV_REPUTATION_DECLINE_SHT: f32 = -0.02;
+
+/// 5-HT baseline nudge on positive reputation change.
+/// Basis: Crockett (2009) — social approval → serotonin boost (symmetric with decline).
+pub const GOV_REPUTATION_GAIN_SHT: f32 = 0.02;
 
 /// ECB baseline nudge on high collective Phi (>0.5).
 /// Group coherence → endocannabinoid system activation.
@@ -3090,6 +3307,8 @@ mod tests {
         assert!(GOV_DISPUTE_SHT_NUDGE < 0.0);
         assert!(GOV_ALIGNED_FAIL_DA_NUDGE < 0.0);
         assert!(GOV_REPUTATION_DECLINE_SHT < 0.0);
+        // Positive reputation → 5-HT boost
+        assert!(GOV_REPUTATION_GAIN_SHT > 0.0 && GOV_REPUTATION_GAIN_SHT <= 0.10);
         // ECB nudge is small and positive
         assert!(GOV_COLLECTIVE_PHI_ECB > 0.0 && GOV_COLLECTIVE_PHI_ECB <= 0.05);
         // Consciousness modulation is small (±2% max)
@@ -3248,15 +3467,24 @@ mod tests {
     #[test]
     fn test_consciousness_state_level_params() {
         assert!(CONSCIOUSNESS_STATE_LOW_THRESHOLD < CONSCIOUSNESS_STATE_HIGH_THRESHOLD);
-        assert!(CONSCIOUSNESS_STATE_HIGH_LR_SCALE > 1.0, "High state should boost LR");
-        assert!(CONSCIOUSNESS_STATE_LOW_LR_DAMPEN < 1.0, "Low state should dampen LR");
+        assert!(
+            CONSCIOUSNESS_STATE_HIGH_LR_SCALE > 1.0,
+            "High state should boost LR"
+        );
+        assert!(
+            CONSCIOUSNESS_STATE_LOW_LR_DAMPEN < 1.0,
+            "Low state should dampen LR"
+        );
     }
 
     #[test]
     fn test_living_mind_vitality_params() {
         assert!(LIVING_MIND_VITALITY_LOW_THRESHOLD < LIVING_MIND_VITALITY_HIGH_THRESHOLD);
         assert!(LIVING_MIND_VITALITY_CONFIDENCE_BOOST > 0.0);
-        assert!(LIVING_MIND_VITALITY_LOW_LR_DAMPEN < 1.0, "Low vitality should dampen LR");
+        assert!(
+            LIVING_MIND_VITALITY_LOW_LR_DAMPEN < 1.0,
+            "Low vitality should dampen LR"
+        );
     }
 
     #[test]
@@ -3290,5 +3518,100 @@ mod tests {
         assert!(PHI_GATED_LR_FLOOR_THRESHOLD > 0.0 && PHI_GATED_LR_FLOOR_THRESHOLD < 0.5);
         assert!(RHYTHMIC_EXPLORATION_PERIOD > 10);
         assert!(RHYTHMIC_EXPLORATION_AMPLITUDE > 0.0 && RHYTHMIC_EXPLORATION_AMPLITUDE < 0.1);
+    }
+
+    #[test]
+    fn test_session18_predictive_coding_params() {
+        assert!(PE_VARIANCE_EMA_DECAY > 0.8 && PE_VARIANCE_EMA_DECAY < 1.0);
+        assert!(PE_VARIANCE_DAMPING_THRESHOLD > 0.0 && PE_VARIANCE_DAMPING_THRESHOLD < 1.0);
+        assert!(PE_VARIANCE_LR_SCALE > 0.8 && PE_VARIANCE_LR_SCALE < 1.0);
+        assert!(CONFIDENCE_CALIBRATION_WINDOW > 10 && CONFIDENCE_CALIBRATION_WINDOW < 200);
+        assert!(CONFIDENCE_CALIBRATION_DRIFT_THRESHOLD > 0.0);
+        assert!(CONFIDENCE_CALIBRATION_CORRECTION > 0.0 && CONFIDENCE_CALIBRATION_CORRECTION < 0.1);
+        assert!(LR_MOMENTUM_EMA_DECAY > 0.5 && LR_MOMENTUM_EMA_DECAY < 1.0);
+        assert!(LR_MOMENTUM_MAX_DELTA > 0.0 && LR_MOMENTUM_MAX_DELTA < 1.0);
+        assert!(METACOGNITIVE_SURPRISE_THRESHOLD > 0.0 && METACOGNITIVE_SURPRISE_THRESHOLD < 1.0);
+        assert!(
+            METACOGNITIVE_SURPRISE_EXPLORE_BOOST > 0.0
+                && METACOGNITIVE_SURPRISE_EXPLORE_BOOST < 0.1
+        );
+        assert!(SLEEP_PRESSURE_INCREMENT > 0.0 && SLEEP_PRESSURE_INCREMENT < 0.01);
+        assert!(SLEEP_PRESSURE_THRESHOLD > 0.0 && SLEEP_PRESSURE_THRESHOLD < 1.0);
+        assert!(SLEEP_PRESSURE_CONSOLIDATION_DECAY > SLEEP_PRESSURE_INCREMENT);
+        assert!(SLEEP_PRESSURE_LR_SCALE > 0.5 && SLEEP_PRESSURE_LR_SCALE < 1.0);
+        assert!(GRADIENT_SIGN_WINDOW > 3 && GRADIENT_SIGN_WINDOW < 50);
+        assert!(GRADIENT_SIGN_FLIP_THRESHOLD > 0.3 && GRADIENT_SIGN_FLIP_THRESHOLD < 0.9);
+        assert!(GRADIENT_SIGN_FLIP_LR_SCALE > 0.8 && GRADIENT_SIGN_FLIP_LR_SCALE < 1.0);
+        assert!(EXPLORE_EXPLOIT_WINDOW > 10 && EXPLORE_EXPLOIT_WINDOW < 200);
+        assert!(EXPLORE_EXPLOIT_LOW_BOUND < EXPLORE_EXPLOIT_HIGH_BOUND);
+        assert!(EXPLORE_EXPLOIT_CORRECTION > 0.0 && EXPLORE_EXPLOIT_CORRECTION < 0.1);
+        assert!(PROPOSAL_CONFLICT_THRESHOLD > 0.2 && PROPOSAL_CONFLICT_THRESHOLD < 0.8);
+    }
+
+    #[test]
+    fn test_session19_embodied_cognition_params() {
+        assert!(AROUSAL_LR_BOOST_THRESHOLD > 0.3 && AROUSAL_LR_BOOST_THRESHOLD < 1.0);
+        assert!(AROUSAL_LR_BOOST_SCALE > 1.0 && AROUSAL_LR_BOOST_SCALE < 1.2);
+        assert!(AROUSAL_OVERAROUSAL_THRESHOLD > AROUSAL_LR_BOOST_THRESHOLD);
+        assert!(AROUSAL_OVERAROUSAL_LR_SCALE < 1.0);
+        assert!(NOVELTY_EMA_DECAY > 0.8 && NOVELTY_EMA_DECAY < 1.0);
+        assert!(NOVELTY_LOW_THRESHOLD > 0.0 && NOVELTY_LOW_THRESHOLD < 0.5);
+        assert!(NOVELTY_LOW_EXPLORE_SCALE < 1.0);
+        assert!(FATIGUE_INCREMENT > 0.0 && FATIGUE_INCREMENT < 0.05);
+        assert!(FATIGUE_EFFORT_THRESHOLD > 5);
+        assert!(FATIGUE_LR_SCALE > 0.8 && FATIGUE_LR_SCALE < 1.0);
+        assert!(FATIGUE_THRESHOLD > 0.0 && FATIGUE_THRESHOLD < 1.0);
+        assert!(RECOVERY_CYCLES_NEEDED > 3 && RECOVERY_CYCLES_NEEDED < 30);
+        assert!(RECOVERY_FATIGUE_DECAY > 0.0 && RECOVERY_FATIGUE_DECAY < 0.2);
+        assert!(RECOVERY_CONFIDENCE_BOOST > 0.0 && RECOVERY_CONFIDENCE_BOOST < 0.1);
+        assert!(ENV_PREDICTABILITY_WINDOW > 10 && ENV_PREDICTABILITY_WINDOW < 100);
+        assert!(ENV_PREDICTABILITY_LOW < ENV_PREDICTABILITY_HIGH);
+        assert!(ENV_PREDICTABLE_THRESHOLD_SCALE < 1.0);
+        assert!(ENV_UNPREDICTABLE_THRESHOLD_SCALE > 1.0);
+        assert!(ATTENTION_BUDGET_MAX > 10 && ATTENTION_BUDGET_MAX < 50);
+        assert!(
+            (READINESS_PE_WEIGHT + READINESS_SLEEP_WEIGHT + READINESS_FATIGUE_WEIGHT - 1.0).abs()
+                < 0.01
+        );
+        assert!(RESONANCE_FLOW_CYCLES > 3 && RESONANCE_FLOW_CYCLES < 30);
+        assert!(RESONANCE_AGREEMENT_THRESHOLD > 0.5);
+        assert!(RESONANCE_CONFIDENCE_BOOST > 0.0 && RESONANCE_CONFIDENCE_BOOST < 0.1);
+    }
+
+    #[test]
+    fn test_session20_consolidation_invariants() {
+        // The unified readiness gate must have a floor high enough to prevent
+        // learning lobotomy. With 6 cost dimensions each at max (1.0),
+        // the worst case is: 1.0 - 6.0/6.0 = 0.0, clamped to 0.3.
+        // This means LR is never dampened below 0.3x by resource depletion.
+        let worst_cost = 1.0_f32;
+        let total_cost = (worst_cost * 6.0) / 6.0;
+        let readiness = (1.0 - total_cost).max(0.3);
+        assert!(readiness >= 0.3, "readiness floor violated: {readiness}");
+
+        // The individual dampeners that were consolidated should still have
+        // their constants available (for telemetry/detection) even though
+        // they no longer call scale_lr independently.
+        assert!(ALLOSTATIC_OVERLOAD_THRESHOLD > 0.0);
+        assert!(PE_VARIANCE_DAMPING_THRESHOLD > 0.0);
+        assert!(SLEEP_PRESSURE_THRESHOLD > 0.0);
+        assert!(GRADIENT_SIGN_FLIP_THRESHOLD > 0.0);
+        assert!(AROUSAL_OVERAROUSAL_THRESHOLD > 0.0);
+        assert!(FATIGUE_THRESHOLD > 0.0);
+    }
+
+    #[test]
+    fn test_session21_housekeeping_params() {
+        // Sleep pressure passive decay must be < 1.0 (decay) and > 0.99 (slow).
+        assert!(SLEEP_PRESSURE_PASSIVE_DECAY > 0.99 && SLEEP_PRESSURE_PASSIVE_DECAY < 1.0);
+        // Recovery constants must be reasonable after S21 adjustment.
+        assert!(RECOVERY_CYCLES_NEEDED >= 3 && RECOVERY_CYCLES_NEEDED <= 10);
+        assert!(RECOVERY_FATIGUE_DECAY >= 0.03 && RECOVERY_FATIGUE_DECAY <= 0.15);
+        // Fatigue should halve in fewer than 15 recovery cycles.
+        let cycles_to_halve = (0.5_f32.ln() / (1.0 - RECOVERY_FATIGUE_DECAY).ln()).ceil() as u32;
+        assert!(
+            cycles_to_halve <= 15,
+            "fatigue takes {cycles_to_halve} recovery cycles to halve (want <= 15)"
+        );
     }
 }

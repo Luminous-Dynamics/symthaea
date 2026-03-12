@@ -294,7 +294,10 @@ impl HdcMatrix {
             self.rows, self.cols, other.rows, other.cols
         ));
         result.add_step(
-            &format!("O(n³) multiply with {} multiplications", self.rows * other.cols * self.cols),
+            &format!(
+                "O(n³) multiply with {} multiplications",
+                self.rows * other.cols * self.cols
+            ),
             "multiply",
             0.2,
         );
@@ -371,17 +374,13 @@ impl HdcMatrix {
                 for j in 0..n {
                     let idx_k = k * n + j;
                     let idx_m = max_row * n + j;
-                    let tmp = u_data[idx_k];
-                    u_data[idx_k] = u_data[idx_m];
-                    u_data[idx_m] = tmp;
+                    u_data.swap(idx_k, idx_m);
                 }
                 // Also swap L rows for columns already done
                 for j in 0..k {
                     let idx_k = k * n + j;
                     let idx_m = max_row * n + j;
-                    let tmp = l_data[idx_k];
-                    l_data[idx_k] = l_data[idx_m];
-                    l_data[idx_m] = tmp;
+                    l_data.swap(idx_k, idx_m);
                 }
             }
 
@@ -553,11 +552,7 @@ impl HdcMatrix {
                 }
             }
 
-            result.add_step(
-                &format!("Householder reflection {}", k),
-                "householder",
-                0.1,
-            );
+            result.add_step(&format!("Householder reflection {}", k), "householder", 0.1);
         }
 
         let r = HdcMatrix::new(r_data, m, n);
@@ -574,11 +569,7 @@ impl HdcMatrix {
 
         let qt = q.transpose();
         let qtb_data: Vec<f64> = (0..qt.rows)
-            .map(|i| {
-                (0..qt.cols)
-                    .map(|j| qt.get(i, j) * b.data[j])
-                    .sum::<f64>()
-            })
+            .map(|i| (0..qt.cols).map(|j| qt.get(i, j) * b.data[j]).sum::<f64>())
             .collect();
 
         // Back substitution: Rx = Q^T b
@@ -634,7 +625,11 @@ impl HdcMatrix {
             }
 
             result.add_step(
-                &format!("Cholesky column {} (L[{0},{0}] = {:.6})", j, l_data[j * n + j]),
+                &format!(
+                    "Cholesky column {} (L[{0},{0}] = {:.6})",
+                    j,
+                    l_data[j * n + j]
+                ),
                 "cholesky",
                 0.1,
             );
@@ -650,7 +645,10 @@ impl HdcMatrix {
 
     /// Power iteration to find the dominant eigenvalue and eigenvector
     pub fn power_iteration(&self, tol: f64) -> (f64, HdcVector, LinAlgResult) {
-        assert!(self.is_square(), "Eigendecomposition requires square matrix");
+        assert!(
+            self.is_square(),
+            "Eigendecomposition requires square matrix"
+        );
         let n = self.rows;
         let mut result = LinAlgResult::new(format!("{}x{} power iteration", n, n));
 
@@ -687,7 +685,11 @@ impl HdcMatrix {
 
             if (new_eigenvalue - eigenvalue).abs() < tol {
                 result.add_step(
-                    &format!("Converged after {} iterations (λ = {:.8})", iter + 1, new_eigenvalue),
+                    &format!(
+                        "Converged after {} iterations (λ = {:.8})",
+                        iter + 1,
+                        new_eigenvalue
+                    ),
                     "power_iter",
                     0.2,
                 );
@@ -709,7 +711,8 @@ impl HdcMatrix {
     pub fn eigenvalues_symmetric(&self) -> (Vec<f64>, LinAlgResult) {
         assert!(self.is_square(), "Eigenvalues require square matrix");
         let n = self.rows;
-        let mut result = LinAlgResult::new(format!("{}x{} symmetric eigenvalues (QR algorithm)", n, n));
+        let mut result =
+            LinAlgResult::new(format!("{}x{} symmetric eigenvalues (QR algorithm)", n, n));
 
         let mut a = self.clone();
 
@@ -806,7 +809,10 @@ impl HdcMatrix {
         // U = A V Σ^{-1}
         let (av, _) = self.mul(&v);
         let mut u_data = vec![0.0; self.rows * self.rows];
-        let rank = singular_values.iter().filter(|&&s| s > DEFAULT_TOLERANCE).count();
+        let rank = singular_values
+            .iter()
+            .filter(|&&s| s > DEFAULT_TOLERANCE)
+            .count();
         for j in 0..rank {
             let inv_sigma = 1.0 / singular_values[j];
             for i in 0..self.rows {
@@ -820,7 +826,11 @@ impl HdcMatrix {
 
         let u = HdcMatrix::new(u_data, self.rows, self.rows);
         result.add_step(
-            &format!("SVD computed: {} singular values, rank = {}", singular_values.len(), rank),
+            &format!(
+                "SVD computed: {} singular values, rank = {}",
+                singular_values.len(),
+                rank
+            ),
             "svd",
             0.3,
         );
@@ -1127,11 +1137,7 @@ mod tests {
 
     #[test]
     fn test_determinant_3x3() {
-        let a = HdcMatrix::from_rows(&[
-            &[6.0, 1.0, 1.0],
-            &[4.0, -2.0, 5.0],
-            &[2.0, 8.0, 7.0],
-        ]);
+        let a = HdcMatrix::from_rows(&[&[6.0, 1.0, 1.0], &[4.0, -2.0, 5.0], &[2.0, 8.0, 7.0]]);
         let (det, _) = a.determinant();
         // det = 6(-14-40) - 1(28-10) + 1(32+4) = -306
         assert!(approx_eq(det, -306.0));
@@ -1155,11 +1161,7 @@ mod tests {
 
     #[test]
     fn test_lu_decompose() {
-        let a = HdcMatrix::from_rows(&[
-            &[2.0, 3.0, 1.0],
-            &[4.0, 7.0, 5.0],
-            &[6.0, 18.0, 11.0],
-        ]);
+        let a = HdcMatrix::from_rows(&[&[2.0, 3.0, 1.0], &[4.0, 7.0, 5.0], &[6.0, 18.0, 11.0]]);
         let (l, u, perm, _sign, result) = a.lu_decompose();
 
         // Verify PA = LU
@@ -1169,7 +1171,12 @@ mod tests {
                 assert!(
                     approx_eq(a.get(perm[i], j), lu.get(i, j)),
                     "PA[{},{}] = {} != LU[{},{}] = {}",
-                    i, j, a.get(perm[i], j), i, j, lu.get(i, j)
+                    i,
+                    j,
+                    a.get(perm[i], j),
+                    i,
+                    j,
+                    lu.get(i, j)
                 );
             }
         }
@@ -1191,11 +1198,7 @@ mod tests {
 
     #[test]
     fn test_solve_3x3() {
-        let a = HdcMatrix::from_rows(&[
-            &[2.0, 1.0, -1.0],
-            &[-3.0, -1.0, 2.0],
-            &[-2.0, 1.0, 2.0],
-        ]);
+        let a = HdcMatrix::from_rows(&[&[2.0, 1.0, -1.0], &[-3.0, -1.0, 2.0], &[-2.0, 1.0, 2.0]]);
         let b = HdcVector::new(vec![8.0, -11.0, -3.0]);
         let (x, _) = a.solve(&b);
         assert!(approx_eq(x.data[0], 2.0));
@@ -1219,11 +1222,7 @@ mod tests {
 
     #[test]
     fn test_qr_decompose() {
-        let a = HdcMatrix::from_rows(&[
-            &[1.0, -1.0, 4.0],
-            &[1.0, 4.0, -2.0],
-            &[1.0, 4.0, 2.0],
-        ]);
+        let a = HdcMatrix::from_rows(&[&[1.0, -1.0, 4.0], &[1.0, 4.0, -2.0], &[1.0, 4.0, 2.0]]);
         let (q, r, result) = a.qr_decompose();
 
         // Q should be orthogonal: Q^T Q ≈ I
@@ -1235,7 +1234,10 @@ mod tests {
                 assert!(
                     (qtq.get(i, j) - expected).abs() < 1e-6,
                     "Q^TQ[{},{}] = {} != {}",
-                    i, j, qtq.get(i, j), expected
+                    i,
+                    j,
+                    qtq.get(i, j),
+                    expected
                 );
             }
         }
@@ -1246,7 +1248,9 @@ mod tests {
                 assert!(
                     r.get(i, j).abs() < 1e-6,
                     "R[{},{}] = {} should be 0",
-                    i, j, r.get(i, j)
+                    i,
+                    j,
+                    r.get(i, j)
                 );
             }
         }
@@ -1258,7 +1262,12 @@ mod tests {
                 assert!(
                     (qr.get(i, j) - a.get(i, j)).abs() < 1e-6,
                     "QR[{},{}] = {} != A[{},{}] = {}",
-                    i, j, qr.get(i, j), i, j, a.get(i, j)
+                    i,
+                    j,
+                    qr.get(i, j),
+                    i,
+                    j,
+                    a.get(i, j)
                 );
             }
         }
@@ -1294,7 +1303,12 @@ mod tests {
                 assert!(
                     (llt.get(i, j) - a.get(i, j)).abs() < 1e-6,
                     "LL^T[{},{}] = {} != A[{},{}] = {}",
-                    i, j, llt.get(i, j), i, j, a.get(i, j)
+                    i,
+                    j,
+                    llt.get(i, j),
+                    i,
+                    j,
+                    a.get(i, j)
                 );
             }
         }
@@ -1314,7 +1328,11 @@ mod tests {
         // Symmetric matrix with known eigenvalues 5, 1
         let a = HdcMatrix::from_rows(&[&[3.0, 2.0], &[2.0, 3.0]]);
         let (eigenvalue, eigenvector, _) = a.power_iteration(1e-10);
-        assert!((eigenvalue - 5.0).abs() < 1e-6, "Expected ~5, got {}", eigenvalue);
+        assert!(
+            (eigenvalue - 5.0).abs() < 1e-6,
+            "Expected ~5, got {}",
+            eigenvalue
+        );
         // Eigenvector should be proportional to [1, 1]
         let ratio = eigenvector.data[0] / eigenvector.data[1];
         assert!((ratio - 1.0).abs() < 1e-6);
@@ -1332,11 +1350,7 @@ mod tests {
 
     #[test]
     fn test_eigenvalues_diagonal() {
-        let a = HdcMatrix::from_rows(&[
-            &[4.0, 0.0, 0.0],
-            &[0.0, 2.0, 0.0],
-            &[0.0, 0.0, 7.0],
-        ]);
+        let a = HdcMatrix::from_rows(&[&[4.0, 0.0, 0.0], &[0.0, 2.0, 0.0], &[0.0, 0.0, 7.0]]);
         let (eigenvalues, _) = a.eigenvalues_symmetric();
         let mut ev = eigenvalues.clone();
         ev.sort_by(|a, b| b.partial_cmp(a).unwrap());
@@ -1348,11 +1362,7 @@ mod tests {
     #[test]
     fn test_eigen_symmetric_3x3() {
         // Known symmetric matrix
-        let a = HdcMatrix::from_rows(&[
-            &[2.0, -1.0, 0.0],
-            &[-1.0, 2.0, -1.0],
-            &[0.0, -1.0, 2.0],
-        ]);
+        let a = HdcMatrix::from_rows(&[&[2.0, -1.0, 0.0], &[-1.0, 2.0, -1.0], &[0.0, -1.0, 2.0]]);
         let (eigenvalues, eigenvectors, result) = a.eigen_symmetric();
         assert_eq!(eigenvalues.len(), 3);
 
@@ -1364,7 +1374,9 @@ mod tests {
             }
             let v_vec = HdcVector::new(v.clone());
             let norm = v_vec.norm();
-            if norm < 1e-10 { continue; }
+            if norm < 1e-10 {
+                continue;
+            }
 
             // Av
             let mut av = vec![0.0; 3];
@@ -1379,7 +1391,11 @@ mod tests {
                 assert!(
                     (av[i] - expected).abs() < 1e-4,
                     "Av[{}] = {} != λv[{}] = {} (λ={})",
-                    i, av[i], i, expected, eigenvalues[j]
+                    i,
+                    av[i],
+                    i,
+                    expected,
+                    eigenvalues[j]
                 );
             }
         }
@@ -1400,10 +1416,7 @@ mod tests {
 
     #[test]
     fn test_svd_diagonal() {
-        let a = HdcMatrix::from_rows(&[
-            &[3.0, 0.0],
-            &[0.0, 5.0],
-        ]);
+        let a = HdcMatrix::from_rows(&[&[3.0, 0.0], &[0.0, 5.0]]);
         let (mut sv, _, _, _) = a.svd();
         sv.sort_by(|a, b| b.partial_cmp(a).unwrap());
         assert!((sv[0] - 5.0).abs() < 1e-6);
@@ -1414,11 +1427,7 @@ mod tests {
 
     #[test]
     fn test_rank() {
-        let a = HdcMatrix::from_rows(&[
-            &[1.0, 2.0, 3.0],
-            &[4.0, 5.0, 6.0],
-            &[7.0, 8.0, 9.0],
-        ]);
+        let a = HdcMatrix::from_rows(&[&[1.0, 2.0, 3.0], &[4.0, 5.0, 6.0], &[7.0, 8.0, 9.0]]);
         assert_eq!(a.rank(), 2); // Rank 2 (last row = 2*row2 - row1)
     }
 
@@ -1433,7 +1442,10 @@ mod tests {
                 assert!(
                     (product.get(i, j) - expected).abs() < 1e-6,
                     "A*A^-1[{},{}] = {} != {}",
-                    i, j, product.get(i, j), expected
+                    i,
+                    j,
+                    product.get(i, j),
+                    expected
                 );
             }
         }
@@ -1467,7 +1479,11 @@ mod tests {
         let b = HdcMatrix::from_rows(&[&[5.0, 6.0], &[7.0, 8.0]]);
         // Different matrices should produce different encodings
         let sim = a.encoding.similarity(&b.encoding);
-        assert!(sim < 0.6, "Different matrices should have low similarity: {}", sim);
+        assert!(
+            sim < 0.6,
+            "Different matrices should have low similarity: {}",
+            sim
+        );
     }
 
     #[test]
@@ -1511,10 +1527,8 @@ mod tests {
     #[test]
     fn test_rotation_matrix() {
         let theta = std::f64::consts::PI / 4.0; // 45 degrees
-        let rot = HdcMatrix::from_rows(&[
-            &[theta.cos(), -theta.sin()],
-            &[theta.sin(), theta.cos()],
-        ]);
+        let rot =
+            HdcMatrix::from_rows(&[&[theta.cos(), -theta.sin()], &[theta.sin(), theta.cos()]]);
 
         // Rotation matrix should have det = 1
         let (det, _) = rot.determinant();

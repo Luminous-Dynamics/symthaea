@@ -218,6 +218,7 @@ impl DifferentialEquationsEngine {
     /// * `y_b`      — Dirichlet value at t = b
     /// * `slope_lo`, `slope_hi` — bracket for the unknown initial slope y'(a)
     /// * `n_steps`  — IVP steps for each shooting trial
+    #[allow(clippy::too_many_arguments)]
     pub fn solve_bvp_shooting(
         f2d: fn(f64, &[f64]) -> Vec<f64>,
         a: f64,

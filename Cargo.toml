@@ -54,6 +54,7 @@ members = [
     "crates/symthaea-pulse",
     "crates/symthaea-spore",
     "crates/symthaea-crucible",
+    "crates/symthaea-canvas",
 ]
 
 [workspace.dependencies]
@@ -185,6 +186,9 @@ symthaea-physics-bridge = { path = "crates/symthaea-physics-bridge", optional = 
 
 # Symthaea Broca - SSM Language Center: CfC-HDC autoregressive thought-to-text generation
 symthaea-broca = { path = "crates/symthaea-broca", optional = true }
+
+# Symthaea Canvas - Living topology UI: cognitive geometry → SVG
+symthaea-canvas = { path = "crates/symthaea-canvas", optional = true }
 
 # Symthaea Nix - Conscious NixOS mind (HDC + active inference)
 symthaea-nix = { path = "crates/symthaea-nix", optional = true }
@@ -432,6 +436,7 @@ hal = ["dep:symthaea-hal", "humanoid"]    # Hardware abstraction layer (PCA9685 
 ssm-power = ["dep:symthaea-ssm", "mesh", "school_learning"]  # Diagonal SSM sensor integration (power stream)
 ssm-power-hal = ["ssm-power", "hal", "symthaea-hal/linux", "dep:linux-embedded-hal"]
 ssm_language = ["dep:symthaea-broca"]          # Native CfC-HDC language center (SSM Broca's area)
+canvas = ["dep:symthaea-canvas"]               # Living topology UI: cognitive geometry → animated SVG
 liquid-mamba = ["ssm_language", "symthaea-broca/mamba"]  # Liquid-Mamba fusion: pre-trained Mamba SSM + HDC consciousness gating
 humanoid-mujoco = ["humanoid", "symthaea-humanoid/mujoco"]  # Humanoid with MuJoCo physics
 humanoid-viewer = ["humanoid-mujoco", "symthaea-humanoid/viewer"]  # Humanoid with MuJoCo viewer
@@ -459,6 +464,8 @@ wasm-sandbox = ["dep:wasmtime"]
 # ── Example & module build gates ───────────────────────────────────
 # These gate cfg blocks in src/ code and/or examples.
 school_learning = ["code_generation"]  # Anticipatory curriculum learning (CfC lookahead, mastery tracking)
+mathematics = []                       # MathService cognitive loop dispatcher + scientific method engine
+scientific_method = ["mathematics"]    # Hypothesis-test-update scientific reasoning cycle
 benchmarks = []                 # Causal validation benchmarks (used by examples/)
 integration_module = []         # Integration module (cfg-gated in lib.rs)
 observability_module = ["dep:symthaea-observability"]  # Observability (cfg-gated in gwt_integration + lib.rs)

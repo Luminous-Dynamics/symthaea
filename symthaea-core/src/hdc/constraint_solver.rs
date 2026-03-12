@@ -15,7 +15,6 @@
 
 use crate::hdc::binary_hv::BinaryHV;
 use crate::hdc::primitive_system::seed_from_name;
-use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet, VecDeque};
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -44,7 +43,12 @@ impl std::fmt::Debug for Constraint {
             Self::Equal(a, b) => f.debug_tuple("Equal").field(a).field(b).finish(),
             Self::Sum(v, t) => f.debug_tuple("Sum").field(v).field(t).finish(),
             Self::NotEqual(v, val) => f.debug_tuple("NotEqual").field(v).field(val).finish(),
-            Self::Binary(a, b, _) => f.debug_tuple("Binary").field(a).field(b).field(&"<fn>").finish(),
+            Self::Binary(a, b, _) => f
+                .debug_tuple("Binary")
+                .field(a)
+                .field(b)
+                .field(&"<fn>")
+                .finish(),
         }
     }
 }
@@ -79,12 +83,10 @@ impl Constraint {
                     _ => true, // Not yet assigned
                 }
             }
-            Constraint::Equal(a, b) => {
-                match (assignment.get(a), assignment.get(b)) {
-                    (Some(va), Some(vb)) => va == vb,
-                    _ => true,
-                }
-            }
+            Constraint::Equal(a, b) => match (assignment.get(a), assignment.get(b)) {
+                (Some(va), Some(vb)) => va == vb,
+                _ => true,
+            },
             Constraint::Sum(vars, target) => {
                 if vars.iter().all(|v| assignment.contains_key(v)) {
                     let sum: i64 = vars.iter().map(|v| assignment[v]).sum();
@@ -93,18 +95,14 @@ impl Constraint {
                     true // Not all assigned yet
                 }
             }
-            Constraint::NotEqual(v, val) => {
-                match assignment.get(v) {
-                    Some(va) => va != val,
-                    None => true,
-                }
-            }
-            Constraint::Binary(a, b, check) => {
-                match (assignment.get(a), assignment.get(b)) {
-                    (Some(va), Some(vb)) => check(*va, *vb),
-                    _ => true,
-                }
-            }
+            Constraint::NotEqual(v, val) => match assignment.get(v) {
+                Some(va) => va != val,
+                None => true,
+            },
+            Constraint::Binary(a, b, check) => match (assignment.get(a), assignment.get(b)) {
+                (Some(va), Some(vb)) => check(*va, *vb),
+                _ => true,
+            },
         }
     }
 }
@@ -300,6 +298,7 @@ impl CSPSolver {
         false
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn backtrack_all(
         variables: &[String],
         idx: usize,
@@ -350,10 +349,7 @@ impl CSPSolver {
     ///
     /// Removes values from domains that can never participate in a solution
     /// by propagating binary constraints.
-    fn ac3(
-        domains: &mut HashMap<String, Vec<i64>>,
-        constraints: &[Constraint],
-    ) {
+    fn ac3(domains: &mut HashMap<String, Vec<i64>>, constraints: &[Constraint]) {
         // Build arc queue from binary constraints
         let mut queue: VecDeque<(String, String)> = VecDeque::new();
 
@@ -478,11 +474,7 @@ impl CSPSolver {
     }
 
     /// Create a graph coloring problem
-    pub fn graph_coloring(
-        edges: &[(usize, usize)],
-        n_vertices: usize,
-        n_colors: usize,
-    ) -> CSP {
+    pub fn graph_coloring(edges: &[(usize, usize)], n_vertices: usize, n_colors: usize) -> CSP {
         let variables: Vec<String> = (0..n_vertices).map(|i| format!("V{}", i)).collect();
         let domain: Vec<i64> = (0..n_colors as i64).collect();
         let mut domains = HashMap::new();
@@ -568,7 +560,11 @@ mod tests {
     fn test_4_queens_all_solutions() {
         let csp = CSPSolver::n_queens(4);
         let result = CSPSolver::solve_all(&csp);
-        assert_eq!(result.all_solutions.len(), 2, "4-Queens has exactly 2 solutions");
+        assert_eq!(
+            result.all_solutions.len(),
+            2,
+            "4-Queens has exactly 2 solutions"
+        );
     }
 
     // ── Graph Coloring ───────────────────────────────────────────────────
@@ -621,10 +617,7 @@ mod tests {
 
         let csp = CSP {
             domains,
-            constraints: vec![Constraint::Sum(
-                vec!["X".to_string(), "Y".to_string()],
-                10,
-            )],
+            constraints: vec![Constraint::Sum(vec!["X".to_string(), "Y".to_string()], 10)],
             variables: vec!["X".to_string(), "Y".to_string()],
         };
 
@@ -642,10 +635,7 @@ mod tests {
 
         let csp = CSP {
             domains,
-            constraints: vec![Constraint::LessThan(
-                "X".to_string(),
-                "Y".to_string(),
-            )],
+            constraints: vec![Constraint::LessThan("X".to_string(), "Y".to_string())],
             variables: vec!["X".to_string(), "Y".to_string()],
         };
 
@@ -710,6 +700,10 @@ mod tests {
         let enc2 = CSPSolver::encode_solution(&assignment2);
 
         let sim = enc.similarity(&enc2);
-        assert!(sim < 0.6, "Different solutions should have different encodings: {}", sim);
+        assert!(
+            sim < 0.6,
+            "Different solutions should have different encodings: {}",
+            sim
+        );
     }
 }

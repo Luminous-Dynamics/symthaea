@@ -12,8 +12,11 @@
 
 use serde::{Deserialize, Serialize};
 use symthaea_core::hdc::binary_hv::BinaryHV;
+use symthaea_core::hdc::computational_geometry::{GeometryEngine, Point2D, Polygon};
 use symthaea_core::hdc::constraint_solver::{CSPSolver, CSP};
+use symthaea_core::hdc::differential_equations::DifferentialEquationsEngine;
 use symthaea_core::hdc::fft::FftEngine;
+use symthaea_core::hdc::graph_theory::Graph;
 use symthaea_core::hdc::linear_algebra::{HdcMatrix, HdcVector, LinearAlgebraEngine};
 use symthaea_core::hdc::logic_engine::{LogicEngine, Proposition};
 use symthaea_core::hdc::optimization::OptimizationEngine;
@@ -25,7 +28,7 @@ use symthaea_core::hdc::statistics;
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 /// Classification of a math problem type
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum MathProblemType {
     /// Solve Ax = b
     LinearSystem,
@@ -45,6 +48,12 @@ pub enum MathProblemType {
     Logic,
     /// Constraint satisfaction
     ConstraintSatisfaction,
+    /// Geometry (convex hull, point-in-polygon, etc.)
+    Geometry,
+    /// Graph theory (shortest path, MST, coloring)
+    GraphTheory,
+    /// Differential equations (IVP, BVP, PDE)
+    DifferentialEquation,
     /// General arithmetic
     Arithmetic,
     /// Unknown
@@ -152,6 +161,15 @@ impl MathService {
     pub fn classify_problem(text: &str) -> MathProblemType {
         let lower = text.to_lowercase();
 
+        // DE check must precede generic "solve equation" since DE texts contain both keywords
+        if lower.contains("differential equation")
+            || lower.contains("ode")
+            || lower.contains("pde")
+            || lower.contains("initial value")
+            || lower.contains("boundary value")
+        {
+            return MathProblemType::DifferentialEquation;
+        }
         if lower.contains("solve") && (lower.contains("system") || lower.contains("equation")) {
             if lower.contains("matrix") || lower.contains("linear system") {
                 return MathProblemType::LinearSystem;
@@ -167,8 +185,12 @@ impl MathService {
         if lower.contains("root") || lower.contains("zero") {
             return MathProblemType::RootFinding;
         }
-        if lower.contains("mean") || lower.contains("variance") || lower.contains("probabilit")
-            || lower.contains("distribut") || lower.contains("bayesian") || lower.contains("hypothesis")
+        if lower.contains("mean")
+            || lower.contains("variance")
+            || lower.contains("probabilit")
+            || lower.contains("distribut")
+            || lower.contains("bayesian")
+            || lower.contains("hypothesis")
             || lower.contains("regression")
         {
             return MathProblemType::Statistics;
@@ -179,18 +201,43 @@ impl MathService {
         if lower.contains("fft") || lower.contains("fourier") || lower.contains("spectrum") {
             return MathProblemType::SignalAnalysis;
         }
-        if lower.contains("satisf") || lower.contains("tautolog") || lower.contains("prove")
-            || lower.contains("logic") || lower.contains("proposition")
+        if lower.contains("satisf")
+            || lower.contains("tautolog")
+            || lower.contains("prove")
+            || lower.contains("logic")
+            || lower.contains("proposition")
         {
             return MathProblemType::Logic;
         }
-        if lower.contains("constraint") || lower.contains("n-queen") || lower.contains("sudoku")
+        if lower.contains("constraint")
+            || lower.contains("n-queen")
+            || lower.contains("sudoku")
             || lower.contains("color")
         {
             return MathProblemType::ConstraintSatisfaction;
         }
-        if lower.contains("add") || lower.contains("multiply") || lower.contains("subtract")
-            || lower.contains("divide") || lower.contains("factorial")
+        if lower.contains("convex hull")
+            || lower.contains("polygon")
+            || lower.contains("geometry")
+            || lower.contains("triangle")
+            || lower.contains("area")
+        {
+            return MathProblemType::Geometry;
+        }
+        if lower.contains("graph")
+            || lower.contains("shortest path")
+            || lower.contains("spanning tree")
+            || lower.contains("bfs")
+            || lower.contains("dfs")
+            || lower.contains("topological")
+        {
+            return MathProblemType::GraphTheory;
+        }
+        if lower.contains("add")
+            || lower.contains("multiply")
+            || lower.contains("subtract")
+            || lower.contains("divide")
+            || lower.contains("factorial")
         {
             return MathProblemType::Arithmetic;
         }
@@ -272,7 +319,10 @@ impl MathService {
             multipath_verified: false,
             problem_type: MathProblemType::Statistics,
             epistemic_caveat: if data.len() < 30 {
-                Some(format!("Small sample (n={}); estimates may be unstable", data.len()))
+                Some(format!(
+                    "Small sample (n={}); estimates may be unstable",
+                    data.len()
+                ))
             } else {
                 None
             },
@@ -295,7 +345,9 @@ impl MathService {
         self.record_solve(MathProblemType::Statistics, result.phi);
 
         let encoding = BinaryHV::random(seed_from_name(&format!(
-            "REGR_{}_{}", result.slope.to_bits(), result.intercept.to_bits()
+            "REGR_{}_{}",
+            result.slope.to_bits(),
+            result.intercept.to_bits()
         )));
 
         let response = MathResponse {
@@ -308,7 +360,10 @@ impl MathService {
             multipath_verified: false,
             problem_type: MathProblemType::Statistics,
             epistemic_caveat: if result.r_squared < 0.5 {
-                Some(format!("Weak fit (R²={:.3}); linear model may be inappropriate", result.r_squared))
+                Some(format!(
+                    "Weak fit (R²={:.3}); linear model may be inappropriate",
+                    result.r_squared
+                ))
             } else {
                 None
             },
@@ -325,11 +380,25 @@ impl MathService {
         let tt = LogicEngine::truth_table(prop);
 
         let answer = if is_taut {
-            format!("{} is a TAUTOLOGY ({}/{} rows true)", prop, tt.satisfying_count, tt.rows.len())
+            format!(
+                "{} is a TAUTOLOGY ({}/{} rows true)",
+                prop,
+                tt.satisfying_count,
+                tt.rows.len()
+            )
         } else if tt.is_contradiction {
-            format!("{} is a CONTRADICTION (0/{} rows true)", prop, tt.rows.len())
+            format!(
+                "{} is a CONTRADICTION (0/{} rows true)",
+                prop,
+                tt.rows.len()
+            )
         } else {
-            format!("{} is CONTINGENT ({}/{} rows true)", prop, tt.satisfying_count, tt.rows.len())
+            format!(
+                "{} is CONTINGENT ({}/{} rows true)",
+                prop,
+                tt.satisfying_count,
+                tt.rows.len()
+            )
         };
 
         let phi = tt.phi;
@@ -386,6 +455,331 @@ impl MathService {
         response
     }
 
+    /// Find a root of f(x) = 0 using Brent's method, multi-path verified with bisection
+    pub fn find_root<F: Fn(f64) -> f64>(&mut self, f: &F, a: f64, b: f64) -> MathResponse {
+        let tol = 1e-10;
+        let brent_result = RootFindingEngine::brent(f, a, b, tol);
+        let bisect_result = RootFindingEngine::bisection(f, a, b, tol);
+
+        // Multi-path: if both converge and agree within tolerance, verified
+        let agreement = (brent_result.root - bisect_result.root).abs();
+        let multipath_verified =
+            brent_result.converged && bisect_result.converged && agreement < 1e-6;
+
+        // Use Brent as primary (faster convergence), boost phi if verified
+        let phi = if multipath_verified {
+            (brent_result.phi + bisect_result.phi) / 2.0 * 1.2
+        } else {
+            brent_result.phi
+        };
+        self.record_solve(MathProblemType::RootFinding, phi);
+        self.telemetry.verification_rate = {
+            let total = self.telemetry.problems_solved as f64;
+            let prev = self.telemetry.verification_rate * (total - 1.0).max(0.0);
+            (prev + if multipath_verified { 1.0 } else { 0.0 }) / total
+        };
+
+        let response = MathResponse {
+            answer: format!(
+                "Root: {:.10} (residual: {:.2e})",
+                brent_result.root, brent_result.residual
+            ),
+            numerical_result: Some(brent_result.root),
+            vector_result: None,
+            encoding: brent_result.encoding,
+            phi,
+            confidence: if multipath_verified {
+                0.99
+            } else if brent_result.converged {
+                0.9
+            } else {
+                0.3
+            },
+            multipath_verified,
+            problem_type: MathProblemType::RootFinding,
+            epistemic_caveat: if !brent_result.converged {
+                Some("Root finding did not converge within tolerance".into())
+            } else {
+                None
+            },
+            error_bound: Some(brent_result.residual.abs()),
+        };
+        self.store_episode(&response, "root_finding");
+        response
+    }
+
+    /// Compute a definite integral ∫[a,b] f(x) dx, multi-path verified (Simpson vs Gauss-Legendre)
+    pub fn integrate<F: Fn(f64) -> f64>(&mut self, f: &F, a: f64, b: f64) -> MathResponse {
+        let simpson = QuadratureEngine::adaptive_simpson(f, a, b, 1e-10);
+        let gauss = QuadratureEngine::gauss_legendre(f, a, b, 10);
+
+        // Multi-path: if both methods agree within tolerance, verified
+        let agreement = (simpson.value - gauss.value).abs();
+        let multipath_verified = agreement < 1e-6;
+
+        let phi = if multipath_verified {
+            (simpson.phi + gauss.phi) / 2.0 * 1.2
+        } else {
+            simpson.phi
+        };
+        self.record_solve(MathProblemType::Integration, phi);
+        self.telemetry.verification_rate = {
+            let total = self.telemetry.problems_solved as f64;
+            let prev = self.telemetry.verification_rate * (total - 1.0).max(0.0);
+            (prev + if multipath_verified { 1.0 } else { 0.0 }) / total
+        };
+
+        let response = MathResponse {
+            answer: format!("∫[{:.4},{:.4}] = {:.10}", a, b, simpson.value),
+            numerical_result: Some(simpson.value),
+            vector_result: None,
+            encoding: simpson.encoding,
+            phi,
+            confidence: if multipath_verified { 0.99 } else { 0.9 },
+            multipath_verified,
+            problem_type: MathProblemType::Integration,
+            epistemic_caveat: if !multipath_verified {
+                Some(format!(
+                    "Simpson vs Gauss-Legendre disagreement: {:.2e}",
+                    agreement
+                ))
+            } else {
+                None
+            },
+            error_bound: simpson.error_estimate,
+        };
+        self.store_episode(&response, "integration");
+        response
+    }
+
+    /// Minimize an objective function f(x) using Nelder-Mead
+    pub fn optimize<F: Fn(&[f64]) -> f64>(&mut self, f: &F, initial: &[f64]) -> MathResponse {
+        let result = OptimizationEngine::nelder_mead(f, initial, 1.0, 1e-8);
+        let phi = result.phi;
+        self.record_solve(MathProblemType::Optimization, phi);
+
+        let answer = format!(
+            "Optimum: [{}] → f = {:.8}",
+            result
+                .x
+                .iter()
+                .map(|v| format!("{:.6}", v))
+                .collect::<Vec<_>>()
+                .join(", "),
+            result.fx
+        );
+
+        let response = MathResponse {
+            answer,
+            numerical_result: Some(result.fx),
+            vector_result: Some(result.x),
+            encoding: result.encoding,
+            phi,
+            confidence: if result.converged { 0.9 } else { 0.4 },
+            multipath_verified: false,
+            problem_type: MathProblemType::Optimization,
+            epistemic_caveat: if !result.converged {
+                Some("Optimization did not converge; result may be a local minimum".into())
+            } else {
+                None
+            },
+            error_bound: None,
+        };
+        self.store_episode(&response, "optimization");
+        response
+    }
+
+    /// Compute FFT of a real signal
+    pub fn compute_fft(&mut self, signal: &[f64]) -> MathResponse {
+        let result = FftEngine::fft(signal);
+        let spectrum = result.power_spectrum();
+        let phi = result.phi;
+        self.record_solve(MathProblemType::SignalAnalysis, phi);
+
+        let response = MathResponse {
+            answer: format!(
+                "FFT: {} points, dominant freq bin: {}",
+                signal.len(),
+                spectrum
+                    .iter()
+                    .enumerate()
+                    .skip(1)
+                    .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
+                    .map(|(i, _)| i)
+                    .unwrap_or(0)
+            ),
+            numerical_result: Some(spectrum.iter().sum::<f64>()),
+            vector_result: Some(spectrum),
+            encoding: result.encoding,
+            phi,
+            confidence: 0.99,
+            multipath_verified: false,
+            problem_type: MathProblemType::SignalAnalysis,
+            epistemic_caveat: if signal.len() & (signal.len() - 1) != 0 {
+                Some("Input length not a power of 2; zero-padded internally".into())
+            } else {
+                None
+            },
+            error_bound: None,
+        };
+        self.store_episode(&response, "fft");
+        response
+    }
+
+    /// Solve a constraint satisfaction problem
+    pub fn solve_csp(&mut self, csp: &CSP) -> MathResponse {
+        let result = CSPSolver::solve(csp);
+        let phi = result.phi;
+        self.record_solve(MathProblemType::ConstraintSatisfaction, phi);
+
+        let answer = if result.solved {
+            let assignment: Vec<String> = result
+                .solution
+                .iter()
+                .flat_map(|s| s.iter())
+                .map(|(k, v)| format!("{}={}", k, v))
+                .collect();
+            format!("SATISFIABLE: {{{}}}", assignment.join(", "))
+        } else {
+            "UNSATISFIABLE".to_string()
+        };
+
+        let response = MathResponse {
+            answer,
+            numerical_result: Some(if result.solved { 1.0 } else { 0.0 }),
+            vector_result: None,
+            encoding: result.encoding,
+            phi,
+            confidence: 1.0,
+            multipath_verified: false,
+            problem_type: MathProblemType::ConstraintSatisfaction,
+            epistemic_caveat: if result.backtracks > 1000 {
+                Some(format!("Heavy search: {} backtracks", result.backtracks))
+            } else {
+                None
+            },
+            error_bound: None,
+        };
+        self.store_episode(&response, "csp");
+        response
+    }
+
+    /// Compute convex hull of 2D points
+    pub fn convex_hull(&mut self, points: &[(f64, f64)]) -> MathResponse {
+        let pts: Vec<Point2D> = points.iter().map(|&(x, y)| Point2D { x, y }).collect();
+        let hull = GeometryEngine::convex_hull(&pts);
+
+        let phi = 0.3 + 0.01 * hull.len() as f64;
+        self.record_solve(MathProblemType::Geometry, phi);
+
+        let encoding = BinaryHV::random(seed_from_name(&format!("HULL_{}", hull.len())));
+
+        let response = MathResponse {
+            answer: format!(
+                "Convex hull: {} vertices from {} input points",
+                hull.len(),
+                points.len()
+            ),
+            numerical_result: Some(hull.len() as f64),
+            vector_result: Some(hull.iter().flat_map(|p| vec![p.x, p.y]).collect()),
+            encoding,
+            phi,
+            confidence: 0.99,
+            multipath_verified: false,
+            problem_type: MathProblemType::Geometry,
+            epistemic_caveat: None,
+            error_bound: None,
+        };
+        self.store_episode(&response, "convex_hull");
+        response
+    }
+
+    /// Find shortest path in a weighted graph using Dijkstra's algorithm
+    pub fn shortest_path(
+        &mut self,
+        n: usize,
+        edges: &[(usize, usize, f64)],
+        source: usize,
+    ) -> MathResponse {
+        let mut graph = Graph::new(n, false);
+        for &(u, v, w) in edges {
+            graph.add_weighted_edge(u, v, w);
+        }
+        let (distances, _predecessors) = graph.dijkstra(source);
+
+        let phi = 0.35 + 0.005 * n as f64;
+        self.record_solve(MathProblemType::GraphTheory, phi);
+
+        let encoding = BinaryHV::random(seed_from_name(&format!("DIJKSTRA_{}", n)));
+
+        let response = MathResponse {
+            answer: format!(
+                "Dijkstra from node {}: reachable {} of {} nodes",
+                source,
+                distances.iter().filter(|d| d.is_finite()).count(),
+                n,
+            ),
+            numerical_result: None,
+            vector_result: Some(distances),
+            encoding,
+            phi,
+            confidence: 0.99,
+            multipath_verified: false,
+            problem_type: MathProblemType::GraphTheory,
+            epistemic_caveat: None,
+            error_bound: None,
+        };
+        self.store_episode(&response, "shortest_path");
+        response
+    }
+
+    /// Solve an initial value problem (ODE system)
+    pub fn solve_ode(
+        &mut self,
+        f: fn(f64, &[f64]) -> Vec<f64>,
+        t_span: (f64, f64),
+        y0: &[f64],
+        n_steps: usize,
+    ) -> MathResponse {
+        use symthaea_core::hdc::differential_equations::ODESystem;
+        let system = ODESystem { f, dim: y0.len() };
+        let result =
+            DifferentialEquationsEngine::solve_ivp(&system, t_span.0, t_span.1, y0, n_steps);
+        let final_state = result.final_state().to_vec();
+
+        let phi = 0.4 + 0.01 * result.steps as f64;
+        self.record_solve(MathProblemType::DifferentialEquation, phi);
+
+        let encoding = BinaryHV::random(seed_from_name(&format!(
+            "ODE_{}_{}",
+            y0.len(),
+            result.steps
+        )));
+
+        let response = MathResponse {
+            answer: format!(
+                "ODE solved: {} steps, final state: [{}]",
+                result.steps,
+                final_state
+                    .iter()
+                    .map(|v| format!("{:.6}", v))
+                    .collect::<Vec<_>>()
+                    .join(", "),
+            ),
+            numerical_result: Some(result.t_end()),
+            vector_result: Some(final_state),
+            encoding,
+            phi,
+            confidence: 0.9,
+            multipath_verified: false,
+            problem_type: MathProblemType::DifferentialEquation,
+            epistemic_caveat: Some("Numerical ODE solution; accuracy depends on step size".into()),
+            error_bound: Some((t_span.1 - t_span.0) / n_steps as f64),
+        };
+        self.store_episode(&response, "ode_solve");
+        response
+    }
+
     /// Get service telemetry
     pub fn telemetry(&self) -> &MathServiceTelemetry {
         &self.telemetry
@@ -409,6 +803,108 @@ impl MathService {
             .filter(|(_, sim)| *sim > 0.1)
             .map(|(i, _)| &self.memory[*i])
             .collect()
+    }
+
+    /// Find root using Phi-guided proof search (Phase 7a).
+    ///
+    /// Tries Brent, bisection, and Newton-Raphson (when derivative is available),
+    /// then selects the result with the highest Phi. Multi-path agreement between
+    /// the top-2 results further boosts Phi by 20%.
+    ///
+    /// Science: Dehaene (2007) — mathematical elegance correlates with neural
+    /// integration; Rota (1997) — beauty in mathematics as information compression.
+    pub fn find_root_phi_guided<F: Fn(f64) -> f64>(
+        &mut self,
+        f: &F,
+        a: f64,
+        b: f64,
+    ) -> MathResponse {
+        let tol = 1e-10;
+        let brent = RootFindingEngine::brent(f, a, b, tol);
+        let bisect = RootFindingEngine::bisection(f, a, b, tol);
+        // Numerical derivative for Newton-Raphson (central difference)
+        let df = |x: f64| {
+            let h = 1e-8;
+            (f(x + h) - f(x - h)) / (2.0 * h)
+        };
+        let newton = RootFindingEngine::newton_raphson(f, &df, (a + b) / 2.0, tol);
+
+        // Collect converged results with their Phi
+        let mut candidates: Vec<(f64, f64, f64, bool, symthaea_core::hdc::binary_hv::BinaryHV)> =
+            Vec::new(); // (root, phi, residual, converged, encoding)
+        if brent.converged {
+            candidates.push((
+                brent.root,
+                brent.phi,
+                brent.residual,
+                true,
+                brent.encoding.clone(),
+            ));
+        }
+        if bisect.converged {
+            candidates.push((
+                bisect.root,
+                bisect.phi,
+                bisect.residual,
+                true,
+                bisect.encoding.clone(),
+            ));
+        }
+        if newton.converged {
+            candidates.push((
+                newton.root,
+                newton.phi,
+                newton.residual,
+                true,
+                newton.encoding.clone(),
+            ));
+        }
+
+        // If no method converged, fall back to Brent
+        if candidates.is_empty() {
+            return self.find_root(f, a, b);
+        }
+
+        // Sort by Phi descending — prefer the most elegant solution
+        candidates.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        let best = &candidates[0];
+
+        // Multi-path: check if top-2 agree → boost Phi
+        let multipath_verified =
+            candidates.len() >= 2 && (candidates[0].0 - candidates[1].0).abs() < 1e-6;
+        let phi = if multipath_verified {
+            best.1 * 1.2
+        } else {
+            best.1
+        };
+
+        self.record_solve(MathProblemType::RootFinding, phi);
+
+        let response = MathResponse {
+            answer: format!(
+                "Root: {:.10} (residual: {:.2e}, {} methods converged, Phi-guided)",
+                best.0,
+                best.2,
+                candidates.len()
+            ),
+            numerical_result: Some(best.0),
+            vector_result: None,
+            encoding: best.4.clone(),
+            phi,
+            confidence: if multipath_verified {
+                0.99
+            } else if candidates.len() >= 2 {
+                0.95
+            } else {
+                0.9
+            },
+            multipath_verified,
+            problem_type: MathProblemType::RootFinding,
+            epistemic_caveat: None,
+            error_bound: Some(best.2.abs()),
+        };
+        self.store_episode(&response, "root_phi_guided");
+        response
     }
 
     /// Rank multiple candidate solutions by Phi (Phase 7a: prefer elegant solutions).
@@ -442,7 +938,11 @@ impl MathService {
                 .memory
                 .iter()
                 .enumerate()
-                .min_by(|a, b| a.1.phi.partial_cmp(&b.1.phi).unwrap_or(std::cmp::Ordering::Equal))
+                .min_by(|a, b| {
+                    a.1.phi
+                        .partial_cmp(&b.1.phi)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                })
                 .map(|(i, _)| i)
             {
                 if response.phi > self.memory[min_idx].phi {
@@ -455,8 +955,7 @@ impl MathService {
 
         let problem_encoding = BinaryHV::random(seed_from_name(&format!(
             "PROB_{}_{}",
-            description,
-            self.telemetry.problems_solved
+            description, self.telemetry.problems_solved
         )));
 
         self.memory.push(MathEpisode {
@@ -529,12 +1028,7 @@ mod tests {
     fn test_solve_linear_system() {
         let mut service = MathService::new();
         // x + 2y = 5, 3x + 4y = 11 → x=1, y=2
-        let response = service.solve_linear_system(
-            &[1.0, 2.0, 3.0, 4.0],
-            2,
-            2,
-            &[5.0, 11.0],
-        );
+        let response = service.solve_linear_system(&[1.0, 2.0, 3.0, 4.0], 2, 2, &[5.0, 11.0]);
         let x = response.vector_result.unwrap();
         assert!((x[0] - 1.0).abs() < 1e-6);
         assert!((x[1] - 2.0).abs() < 1e-6);
@@ -632,10 +1126,240 @@ mod tests {
             epistemic_caveat: None,
             error_bound: None,
         };
-        let r2 = MathResponse { phi: 0.9, ..r1.clone() };
-        let r3 = MathResponse { phi: 0.1, ..r1.clone() };
+        let r2 = MathResponse {
+            phi: 0.9,
+            ..r1.clone()
+        };
+        let r3 = MathResponse {
+            phi: 0.1,
+            ..r1.clone()
+        };
         let ranked = MathService::rank_by_phi(&[r1, r2, r3]);
         assert_eq!(ranked[0].0, 1); // r2 has highest phi
         assert_eq!(ranked[2].0, 2); // r3 has lowest phi
+    }
+
+    // ── Integration tests: full pipeline ──────────────────────────────
+
+    #[test]
+    fn test_classify_new_problem_types() {
+        assert_eq!(
+            MathService::classify_problem("compute the convex hull of these points"),
+            MathProblemType::Geometry
+        );
+        assert_eq!(
+            MathService::classify_problem("find the shortest path in this graph"),
+            MathProblemType::GraphTheory
+        );
+        assert_eq!(
+            MathService::classify_problem("solve this differential equation with initial value"),
+            MathProblemType::DifferentialEquation
+        );
+    }
+
+    #[test]
+    fn test_full_pipeline_classify_and_solve() {
+        let mut service = MathService::new();
+
+        // 1. Classify: "solve the linear system matrix A with b"
+        let problem_type =
+            MathService::classify_problem("solve the linear system Ax=b with matrix");
+        assert_eq!(problem_type, MathProblemType::LinearSystem);
+
+        // 2. Route to solver: x + y = 3, x - y = 1 → x=2, y=1
+        let response = service.solve_linear_system(&[1.0, 1.0, 1.0, -1.0], 2, 2, &[3.0, 1.0]);
+
+        // 3. Verify response has all consciousness metadata
+        assert!(response.phi > 0.0, "Phi should be positive");
+        assert!(response.confidence > 0.0, "Confidence should be positive");
+        assert_eq!(response.problem_type, MathProblemType::LinearSystem);
+
+        let x = response.vector_result.unwrap();
+        assert!(
+            (x[0] - 2.0).abs() < 1e-6,
+            "x[0] should be 2.0, got {}",
+            x[0]
+        );
+        assert!(
+            (x[1] - 1.0).abs() < 1e-6,
+            "x[1] should be 1.0, got {}",
+            x[1]
+        );
+
+        // 4. Verify telemetry was updated
+        assert_eq!(service.telemetry().problems_solved, 1);
+        assert!(service.telemetry().average_phi > 0.0);
+
+        // 5. Verify episode stored in memory
+        assert_eq!(service.memory().len(), 1);
+        assert_eq!(
+            service.memory()[0].problem_type,
+            MathProblemType::LinearSystem
+        );
+    }
+
+    #[test]
+    fn test_pipeline_root_finding() {
+        let mut service = MathService::new();
+
+        // Find root of x² - 4 = 0 in [0, 3] → should find x=2
+        let response = service.find_root(&|x: f64| x * x - 4.0, 0.0, 3.0);
+        assert!(response.confidence > 0.5);
+        let root = response.numerical_result.unwrap();
+        assert!(
+            (root - 2.0).abs() < 1e-8,
+            "Root should be 2.0, got {}",
+            root
+        );
+    }
+
+    #[test]
+    fn test_pipeline_integration() {
+        let mut service = MathService::new();
+
+        // ∫₀^π sin(x) dx = 2
+        let response = service.integrate(&|x: f64| x.sin(), 0.0, std::f64::consts::PI);
+        let val = response.numerical_result.unwrap();
+        assert!(
+            (val - 2.0).abs() < 1e-6,
+            "Integral should be 2.0, got {}",
+            val
+        );
+    }
+
+    #[test]
+    fn test_pipeline_optimization() {
+        let mut service = MathService::new();
+
+        // Minimize (x-3)² + (y-4)² → optimum at [3, 4]
+        let response = service.optimize(
+            &|x: &[f64]| (x[0] - 3.0).powi(2) + (x[1] - 4.0).powi(2),
+            &[0.0, 0.0],
+        );
+        let x = response.vector_result.unwrap();
+        assert!(
+            (x[0] - 3.0).abs() < 0.1,
+            "x should be near 3.0, got {}",
+            x[0]
+        );
+        assert!(
+            (x[1] - 4.0).abs() < 0.1,
+            "y should be near 4.0, got {}",
+            x[1]
+        );
+    }
+
+    #[test]
+    fn test_pipeline_fft() {
+        let mut service = MathService::new();
+        let signal: Vec<f64> = (0..64)
+            .map(|i| (2.0 * std::f64::consts::PI * i as f64 / 64.0).sin())
+            .collect();
+        let response = service.compute_fft(&signal);
+        assert!(response.vector_result.is_some());
+        assert!(response.phi > 0.0);
+    }
+
+    #[test]
+    fn test_pipeline_convex_hull() {
+        let mut service = MathService::new();
+        let points = vec![(0.0, 0.0), (1.0, 0.0), (0.5, 1.0), (0.5, 0.3)];
+        let response = service.convex_hull(&points);
+        // 4 points, hull should have 3 vertices (interior point excluded)
+        let n_hull = response.numerical_result.unwrap() as usize;
+        assert!(
+            n_hull >= 3 && n_hull <= 4,
+            "Hull should have 3-4 vertices, got {}",
+            n_hull
+        );
+    }
+
+    #[test]
+    fn test_pipeline_shortest_path() {
+        let mut service = MathService::new();
+        // Triangle: 0→1 (weight 1), 1→2 (weight 2), 0→2 (weight 10)
+        let edges = vec![(0, 1, 1.0), (1, 2, 2.0), (0, 2, 10.0)];
+        let response = service.shortest_path(3, &edges, 0);
+        let dists = response.vector_result.unwrap();
+        assert!((dists[0] - 0.0).abs() < 1e-10);
+        assert!((dists[1] - 1.0).abs() < 1e-10);
+        assert!(
+            (dists[2] - 3.0).abs() < 1e-10,
+            "Path 0→1→2 costs 3, got {}",
+            dists[2]
+        );
+    }
+
+    #[test]
+    fn test_pipeline_ode() {
+        let mut service = MathService::new();
+        // dy/dt = -y, y(0) = 1 → y(1) = e^{-1} ≈ 0.368
+        fn decay(_t: f64, y: &[f64]) -> Vec<f64> {
+            vec![-y[0]]
+        }
+        let response = service.solve_ode(decay, (0.0, 1.0), &[1.0], 1000);
+        let y_final = response.vector_result.unwrap();
+        let expected = (-1.0f64).exp();
+        assert!(
+            (y_final[0] - expected).abs() < 0.01,
+            "y(1) should be ~{:.4}, got {:.4}",
+            expected,
+            y_final[0]
+        );
+    }
+
+    #[test]
+    fn test_multi_problem_telemetry() {
+        let mut service = MathService::new();
+
+        // Solve multiple problem types
+        service.compute_statistics(&[1.0, 2.0, 3.0, 4.0, 5.0]);
+        service.solve_linear_system(&[1.0, 0.0, 0.0, 1.0], 2, 2, &[3.0, 4.0]);
+        service.find_root(&|x: f64| x - 1.0, 0.0, 2.0);
+
+        let telem = service.telemetry();
+        assert_eq!(telem.problems_solved, 3);
+        assert!(telem.by_type.contains_key("Statistics"));
+        assert!(telem.by_type.contains_key("LinearSystem"));
+        assert!(telem.by_type.contains_key("RootFinding"));
+        assert!(telem.average_phi > 0.0);
+
+        // Memory should have 3 episodes
+        assert_eq!(service.memory().len(), 3);
+    }
+
+    #[test]
+    fn test_phi_guided_root_finding() {
+        let mut service = MathService::new();
+
+        // x² - 4 = 0 in [0, 3] → root at x=2
+        let response = service.find_root_phi_guided(&|x: f64| x * x - 4.0, 0.0, 3.0);
+        let root = response.numerical_result.unwrap();
+        assert!(
+            (root - 2.0).abs() < 1e-8,
+            "Root should be 2.0, got {}",
+            root
+        );
+        assert!(response.answer.contains("Phi-guided"));
+        assert!(response.confidence >= 0.9);
+        // With 3 methods converging to the same root, should be multi-path verified
+        assert!(response.multipath_verified, "3 methods → should verify");
+        // Phi should be boosted by multi-path agreement
+        assert!(response.phi > 0.0);
+    }
+
+    #[test]
+    fn test_phi_guided_selects_highest_phi() {
+        let mut service = MathService::new();
+
+        // sin(x) = 0 in [2, 4] → root at π ≈ 3.14159
+        let response = service.find_root_phi_guided(&|x: f64| x.sin(), 2.0, 4.0);
+        let root = response.numerical_result.unwrap();
+        assert!(
+            (root - std::f64::consts::PI).abs() < 1e-6,
+            "Root should be π, got {}",
+            root
+        );
+        assert!(response.answer.contains("methods converged"));
     }
 }

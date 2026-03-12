@@ -173,7 +173,7 @@ fn queens_solved(violations: u32) -> bool {
 }
 
 struct ConstraintTrial {
-    queens_4: f64,  // 1.0 if solved, 0.0 otherwise
+    queens_4: f64, // 1.0 if solved, 0.0 otherwise
     queens_6: f64,
     queens_8: f64,
     solve_time: f64, // mean ticks across all 3 problems
@@ -190,10 +190,12 @@ impl ConstraintPuzzlesBenchmark {
         let (v4, t4) = hdc_queens_search(4, dim, seed, &mut rng, noise_weight, 60);
 
         // N=6: 4 solutions, moderate search space
-        let (v6, t6) = hdc_queens_search(6, dim, seed.wrapping_add(1000), &mut rng, noise_weight, 120);
+        let (v6, t6) =
+            hdc_queens_search(6, dim, seed.wrapping_add(1000), &mut rng, noise_weight, 120);
 
         // N=8: 92 solutions, harder search space
-        let (v8, t8) = hdc_queens_search(8, dim, seed.wrapping_add(2000), &mut rng, noise_weight, 200);
+        let (v8, t8) =
+            hdc_queens_search(8, dim, seed.wrapping_add(2000), &mut rng, noise_weight, 200);
 
         ConstraintTrial {
             queens_4: if queens_solved(v4) { 1.0 } else { 0.0 },

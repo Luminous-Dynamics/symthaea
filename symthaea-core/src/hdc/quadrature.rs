@@ -93,11 +93,7 @@ fn gauss_legendre_nodes(n: usize) -> (Vec<f64>, Vec<f64>) {
         ),
         3 => (
             vec![-0.7745966692414834, 0.0, 0.7745966692414834],
-            vec![
-                0.5555555555555556,
-                0.8888888888888888,
-                0.5555555555555556,
-            ],
+            vec![0.5555555555555556, 0.8888888888888888, 0.5555555555555556],
         ),
         4 => (
             vec![
@@ -115,64 +111,64 @@ fn gauss_legendre_nodes(n: usize) -> (Vec<f64>, Vec<f64>) {
         ),
         5 => (
             vec![
-                -0.9061798459386640,
-                -0.5384693101056831,
+                -0.906_179_845_938_664,
+                -0.538_469_310_105_683,
                 0.0,
-                0.5384693101056831,
-                0.9061798459386640,
+                0.538_469_310_105_683,
+                0.906_179_845_938_664,
             ],
             vec![
-                0.2369268850561891,
-                0.4786286704993665,
-                0.5688888888888889,
-                0.4786286704993665,
-                0.2369268850561891,
+                0.236_926_885_056_189_1,
+                0.478_628_670_499_366_5,
+                0.568_888_888_888_889,
+                0.478_628_670_499_366_5,
+                0.236_926_885_056_189_1,
             ],
         ),
         7 => (
             vec![
-                -0.9491079123427585,
-                -0.7415311855993945,
-                -0.4058451513773972,
+                -0.949_107_912_342_759,
+                -0.741_531_185_599_394,
+                -0.405_845_151_377_397,
                 0.0,
-                0.4058451513773972,
-                0.7415311855993945,
-                0.9491079123427585,
+                0.405_845_151_377_397,
+                0.741_531_185_599_394,
+                0.949_107_912_342_759,
             ],
             vec![
-                0.1294849661688697,
-                0.2797053914892767,
-                0.3818300505051189,
-                0.4179591836734694,
-                0.3818300505051189,
-                0.2797053914892767,
-                0.1294849661688697,
+                0.129_484_966_168_870,
+                0.279_705_391_489_277,
+                0.381_830_050_505_119,
+                0.417_959_183_673_469,
+                0.381_830_050_505_119,
+                0.279_705_391_489_277,
+                0.129_484_966_168_870,
             ],
         ),
         10 => (
             vec![
-                -0.9739065285171717,
-                -0.8650633666889845,
-                -0.6794095682990244,
-                -0.4333953941292472,
-                -0.1488743389816312,
-                0.1488743389816312,
-                0.4333953941292472,
-                0.6794095682990244,
-                0.8650633666889845,
-                0.9739065285171717,
+                -0.973_906_528_517_172,
+                -0.865_063_366_688_985,
+                -0.679_409_568_299_024,
+                -0.433_395_394_129_247,
+                -0.148_874_338_981_631,
+                0.148_874_338_981_631,
+                0.433_395_394_129_247,
+                0.679_409_568_299_024,
+                0.865_063_366_688_985,
+                0.973_906_528_517_172,
             ],
             vec![
-                0.0666713443086881,
-                0.1494513491505806,
-                0.2190863625159820,
-                0.2692667193099963,
-                0.2955242247147529,
-                0.2955242247147529,
-                0.2692667193099963,
-                0.2190863625159820,
-                0.1494513491505806,
-                0.0666713443086881,
+                0.066_671_344_308_688,
+                0.149_451_349_150_581,
+                0.219_086_362_515_982,
+                0.269_266_719_309_996,
+                0.295_524_224_714_753,
+                0.295_524_224_714_753,
+                0.269_266_719_309_996,
+                0.219_086_362_515_982,
+                0.149_451_349_150_581,
+                0.066_671_344_308_688,
             ],
         ),
         _ => gauss_legendre_nodes(5), // Default fallback
@@ -405,7 +401,9 @@ impl QuadratureEngine {
         let int_prim = BinaryHV::random(seed_from_name("INTEGRAL_NUMERIC"));
         let val_hv = BinaryHV::random(seed_from_name(&format!("INT_VAL_{}", value.to_bits())));
         let bounds_hv = BinaryHV::random(seed_from_name(&format!(
-            "BOUNDS_{}_{}", a.to_bits(), b.to_bits()
+            "BOUNDS_{}_{}",
+            a.to_bits(),
+            b.to_bits()
         )));
         int_prim.bind(&val_hv).bind(&bounds_hv)
     }
@@ -452,12 +450,7 @@ mod tests {
     #[test]
     fn test_simpson_sin() {
         // ∫[0,π] sin(x) dx = 2
-        let result = QuadratureEngine::simpson(
-            &|x| x.sin(),
-            0.0,
-            std::f64::consts::PI,
-            100,
-        );
+        let result = QuadratureEngine::simpson(&|x| x.sin(), 0.0, std::f64::consts::PI, 100);
         assert!(
             (result.value - 2.0).abs() < 1e-6,
             "Simpson sin: got {}, expected 2.0, err={}",
@@ -494,12 +487,8 @@ mod tests {
     #[test]
     fn test_gauss_trig() {
         // ∫[0,π/2] cos(x) dx = 1
-        let result = QuadratureEngine::gauss_legendre(
-            &|x| x.cos(),
-            0.0,
-            std::f64::consts::FRAC_PI_2,
-            5,
-        );
+        let result =
+            QuadratureEngine::gauss_legendre(&|x| x.cos(), 0.0, std::f64::consts::FRAC_PI_2, 5);
         assert!((result.value - 1.0).abs() < TOL);
     }
 
@@ -508,12 +497,7 @@ mod tests {
     #[test]
     fn test_adaptive_gaussian() {
         // ∫[-∞,∞] e^(-x²) dx = √π, but we approximate with [-5,5]
-        let result = QuadratureEngine::adaptive_simpson(
-            &|x| (-x * x).exp(),
-            -5.0,
-            5.0,
-            1e-10,
-        );
+        let result = QuadratureEngine::adaptive_simpson(&|x| (-x * x).exp(), -5.0, 5.0, 1e-10);
         let expected = std::f64::consts::PI.sqrt();
         assert!(
             (result.value - expected).abs() < 1e-8,
@@ -538,12 +522,8 @@ mod tests {
     #[test]
     fn test_adaptive_sharp_peak() {
         // ∫[0,1] 1/(1+100x²) dx — sharp peak at 0
-        let result = QuadratureEngine::adaptive_simpson(
-            &|x| 1.0 / (1.0 + 100.0 * x * x),
-            0.0,
-            1.0,
-            1e-8,
-        );
+        let result =
+            QuadratureEngine::adaptive_simpson(&|x| 1.0 / (1.0 + 100.0 * x * x), 0.0, 1.0, 1e-8);
         // Expected: (1/10) * arctan(10) ≈ 0.14711
         let expected = (10.0_f64).atan() / 10.0;
         assert!(
@@ -606,12 +586,7 @@ mod tests {
 
     #[test]
     fn test_multipath_integration() {
-        let result = QuadratureEngine::integrate_multipath(
-            &|x| x * x,
-            0.0,
-            1.0,
-            1e-10,
-        );
+        let result = QuadratureEngine::integrate_multipath(&|x| x * x, 0.0, 1.0, 1e-10);
         assert!((result.value - 1.0 / 3.0).abs() < 1e-8);
         // Should have agreement bonus
         assert!(result.phi > 0.5);

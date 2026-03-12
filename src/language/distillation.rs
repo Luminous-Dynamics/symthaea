@@ -66,7 +66,7 @@ impl DistillationCollector {
         }
 
         let pair = TrainingPair {
-            channels: channels.channels,
+            channels: channels.channels.to_vec(),
             target_text: text.to_string(),
             target_ids: Vec::new(), // Will be tokenized during training
         };

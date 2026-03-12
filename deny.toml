@@ -24,6 +24,8 @@ allow = [
     "CC0-1.0",
     "OpenSSL",
     "MPL-2.0",
+    "AGPL-3.0-or-later",
+    "AGPL-3.0-only",
     "Unlicense",
     "CDLA-Permissive-2.0",
     "OFL-1.1",

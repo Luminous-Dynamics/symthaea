@@ -480,6 +480,7 @@ pub mod api;
 // Scientific Method: hypothesis-test-update cycle (Phase 4b math plan)
 // Wires HDC encoding, Bayesian statistics, and propositional logic into a
 // scientific reasoning engine.
+#[cfg(feature = "scientific_method")]
 pub mod scientific_method;
 
 // Web Research: Epistemic verification and autonomous research
@@ -493,6 +494,8 @@ pub mod scientific_method;
 // integrator, meta_learning. See docs/developer/WEB_RESEARCH_INTEGRATION_GUIDE.md.
 #[cfg(feature = "web_research_module")]
 pub mod web_research;
+
+pub mod knowledge;
 
 // ============================================================================
 // Re-exports for Convenience

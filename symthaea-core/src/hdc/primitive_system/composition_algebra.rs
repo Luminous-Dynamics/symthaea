@@ -346,11 +346,136 @@ impl CompositionAlgebra {
         }
         Ok(count)
     }
+
+    /// Query what happens when a component is removed from a composite.
+    ///
+    /// Unbinds the `removed` component from `composite` via XOR (self-inverse),
+    /// then finds the nearest named axiom to the residual. Returns the name of
+    /// the nearest axiom, the similarity score, and the residual encoding.
+    ///
+    /// # Example
+    /// ```ignore
+    /// // "What happens when you remove LEGITIMACY from LEGITIMATE_GOVERNANCE?"
+    /// let (nearest, sim, _) = algebra.query_transition(
+    ///     "LEGITIMATE_GOVERNANCE", "LEGITIMACY", system
+    /// ).unwrap();
+    /// // nearest ≈ "REVOLUTION" (authority without legitimacy)
+    /// ```
+    pub fn query_transition(
+        &self,
+        composite: &str,
+        removed: &str,
+        system: &PrimitiveSystem,
+    ) -> Result<(String, f32, BinaryHV), CompositionAlgebraError> {
+        let composite_hv = self
+            .get_encoding(composite, system)
+            .ok_or_else(|| CompositionAlgebraError::NotFound(composite.to_string()))?;
+        let removed_hv = self
+            .get_encoding(removed, system)
+            .ok_or_else(|| CompositionAlgebraError::NotFound(removed.to_string()))?;
+
+        // XOR is its own inverse: A ^ B ^ B = A
+        // So (A ^ B ^ C) ^ B = A ^ C — removes B from the composite.
+        let residual = composite_hv.bind(&removed_hv);
+
+        // Find nearest axiom/composition (excluding the composite itself)
+        let mut best_name = String::new();
+        let mut best_sim: f32 = -1.0;
+
+        for (name, comp) in &self.compositions {
+            if name == composite {
+                continue;
+            }
+            let sim = residual.similarity(&comp.encoding);
+            if sim > best_sim {
+                best_sim = sim;
+                best_name = name.clone();
+            }
+        }
+
+        if best_name.is_empty() {
+            return Err(CompositionAlgebraError::ParseError(
+                "no compositions to compare against".to_string(),
+            ));
+        }
+
+        Ok((best_name, best_sim, residual))
+    }
+
+    /// Rank all compositions by similarity to a given encoding.
+    ///
+    /// Returns a sorted list of (name, similarity) pairs, most similar first.
+    /// Useful for understanding what a residual "looks like" after unbinding.
+    pub fn rank_by_similarity(&self, target: &BinaryHV) -> Vec<(String, f32)> {
+        let mut ranked: Vec<(String, f32)> = self
+            .compositions
+            .iter()
+            .map(|(name, comp)| (name.clone(), target.similarity(&comp.encoding)))
+            .collect();
+        ranked.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        ranked
+    }
 }
 
 impl Default for CompositionAlgebra {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl CompositionAlgebra {
+    /// Load pre-defined institutional causal axioms into the algebra.
+    ///
+    /// These encode state transitions and decomposition analyses for
+    /// institutional entities. Each axiom captures a "what happens when
+    /// you remove/add a component" relationship:
+    ///
+    /// - **REVOLUTION**: Authority without legitimacy (AUTHORITY with LEGITIMACY removed)
+    /// - **FAILED_STATE**: Nation-state with enforcement collapsed
+    /// - **BORDER_DISPUTE**: Overlapping sovereignty claims
+    /// - **LEGITIMATE_GOVERNANCE**: Authority grounded in consent
+    /// - **REGULATORY_CAPTURE**: When regulated entities capture the regulator
+    /// - **TRADE_AGREEMENT**: Bilateral treaty with economic exchange
+    /// - **ECONOMIC_SANCTION**: Punitive constraint on economic exchange
+    /// - **CIVIL_DISOBEDIENCE**: Population rejecting compliance without enforcement collapse
+    ///
+    /// Returns the number of axioms successfully loaded (skips any whose
+    /// parent primitives are missing from the system).
+    pub fn load_institutional_axioms(&mut self, system: &PrimitiveSystem) -> usize {
+        let axioms = [
+            // State transitions: "what happens when you remove a component?"
+            ("REVOLUTION", "AUTHORITY ^ ENFORCEMENT ^ PROHIBITION"),
+            // Authority maintained through force and prohibition rather than consent.
+            // This is what remains when LEGITIMACY is absent from governance.
+            ("FAILED_STATE", "SOVEREIGNTY ^ POPULATION"),
+            // Sovereignty claim persists but enforcement has collapsed.
+            // Territory remains claimed but ungoverned.
+            ("BORDER_DISPUTE", "SOVEREIGNTY ^ OVERLAPS"),
+            // Two sovereignty claims with topological overlap.
+            // Uses OVERLAPS (Tier 3 topology) — shared spatial parts.
+            ("LEGITIMATE_GOVERNANCE", "AUTHORITY ^ LEGITIMACY ^ TRUST"),
+            // Full authority stack: recognized, accepted, trusted.
+            // Uses TRUST (Tier 4 social) — belief in cooperation.
+            ("REGULATORY_CAPTURE", "REGULATION ^ DEFECT"),
+            // Regulatory body subverted by regulated entity.
+            // Uses DEFECT (Tier 4 game theory) — self-interested deviation.
+            ("TRADE_AGREEMENT", "TREATY ^ EXCHANGE ^ RECIPROCATE"),
+            // Bilateral trade treaty with reciprocal obligations.
+            ("ECONOMIC_SANCTION", "SANCTION ^ EXCHANGE ^ PROHIBITION"),
+            // Punitive restriction on economic exchange.
+            // Uses PROHIBITION (morality domain) — forbidden action.
+            ("CIVIL_DISOBEDIENCE", "POPULATION ^ PROHIBITION ^ COOPERATE"),
+            // Collective refusal to comply without violent enforcement challenge.
+            // Population + prohibition + cooperate = organized peaceful resistance.
+        ];
+
+        let mut loaded = 0;
+        for (name, expr) in &axioms {
+            if self.define(name, expr, system).is_ok() {
+                loaded += 1;
+            }
+        }
+        loaded
     }
 }
 

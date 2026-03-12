@@ -50,6 +50,12 @@ pub struct EvalResult {
     pub intent_scores: HashMap<String, IntentScore>,
     /// Number of samples evaluated.
     pub num_samples: usize,
+    /// Contrastive intent score: avg pairwise edit distance between intent outputs.
+    /// Higher = intents produce more differentiated text (desirable).
+    pub contrastive_intent_score: Option<f32>,
+    /// Hallucination rate: fraction of generations where coherence dropped below
+    /// threshold for 3+ consecutive tokens (from gating trace).
+    pub hallucination_rate: Option<f32>,
 }
 
 /// Per-intent quality metrics.
@@ -73,7 +79,7 @@ const INTENT_NAMES: [&str; 8] = [
 ];
 
 /// Identify the active intent from channels (argmax of channels 0..8).
-fn active_intent(channels: &[f32; 20]) -> &'static str {
+fn active_intent(channels: &[f32]) -> &'static str {
     let idx = (0..8)
         .max_by(|&a, &b| channels[a].total_cmp(&channels[b]))
         .unwrap_or(7);
@@ -142,9 +148,7 @@ pub fn evaluate(generator: &mut BrocaGenerator, config: &EvalConfig) -> EvalResu
             continue;
         }
 
-        let channels = ThoughtChannels {
-            channels: pair.channels,
-        };
+        let channels = pair.to_thought_channels();
         let intent = active_intent(&pair.channels).to_string();
 
         // --- Perplexity: teacher-forced forward pass ---
@@ -250,12 +254,41 @@ pub fn evaluate(generator: &mut BrocaGenerator, config: &EvalConfig) -> EvalResu
         );
     }
 
+    // Compute contrastive intent score: generate one sample per intent,
+    // measure pairwise normalized edit distance
+    let contrastive_score = {
+        let mut intent_texts: Vec<String> = Vec::new();
+        for i in 0..8 {
+            let channels = ThoughtChannels::with_intent(i);
+            let result = generator.generate(&channels);
+            intent_texts.push(result.text.clone());
+        }
+        Some(contrastive_intent_score(&intent_texts))
+    };
+
+    // Compute hallucination rate from gating traces
+    let hallucination_rate = if gen_count > 0 {
+        let mut hallucination_count = 0usize;
+        for pair in config.dataset.pairs.iter().take(gen_count) {
+            let channels = pair.to_thought_channels();
+            let result = generator.generate(&channels);
+            if result.hallucination_flag {
+                hallucination_count += 1;
+            }
+        }
+        Some(hallucination_count as f32 / gen_count as f32)
+    } else {
+        None
+    };
+
     EvalResult {
         perplexity,
         english_word_ratio: english_word_ratio_avg,
         avg_coherence,
         intent_scores,
         num_samples: config.dataset.len(),
+        contrastive_intent_score: contrastive_score,
+        hallucination_rate,
     }
 }
 
@@ -270,6 +303,13 @@ pub fn format_eval_report(result: &EvalResult) -> String {
         result.english_word_ratio
     ));
     s.push_str(&format!("Avg coherence:     {:.4}\n", result.avg_coherence));
+
+    if let Some(contrastive) = result.contrastive_intent_score {
+        s.push_str(&format!("Contrastive:       {:.4}\n", contrastive));
+    }
+    if let Some(halluc) = result.hallucination_rate {
+        s.push_str(&format!("Hallucination:     {:.4}\n", halluc));
+    }
 
     if !result.intent_scores.is_empty() {
         s.push_str("\n--- Per-Intent Breakdown ---\n");
@@ -449,6 +489,42 @@ fn hedging_ratio(text: &str) -> f32 {
     hedging_count as f32 / words.len() as f32
 }
 
+/// Compute pairwise contrastive intent score.
+///
+/// Given texts generated for each of the 8 intents, computes the average
+/// normalized distance between all pairs using Jaccard distance on character sets.
+/// Higher scores mean the generator produces meaningfully different outputs for
+/// different intents. Returns 0.0-1.0 where 1.0 = maximally different.
+pub fn contrastive_intent_score(intent_texts: &[String]) -> f32 {
+    if intent_texts.len() < 2 {
+        return 0.0;
+    }
+    let mut total_distance = 0.0f32;
+    let mut pair_count = 0usize;
+    for i in 0..intent_texts.len() {
+        for j in (i + 1)..intent_texts.len() {
+            let a = &intent_texts[i];
+            let b = &intent_texts[j];
+            let a_chars: std::collections::HashSet<char> = a.chars().collect();
+            let b_chars: std::collections::HashSet<char> = b.chars().collect();
+            let intersection = a_chars.intersection(&b_chars).count();
+            let union = a_chars.union(&b_chars).count();
+            let jaccard = if union > 0 {
+                intersection as f32 / union as f32
+            } else {
+                1.0
+            };
+            total_distance += 1.0 - jaccard;
+            pair_count += 1;
+        }
+    }
+    if pair_count > 0 {
+        total_distance / pair_count as f32
+    } else {
+        0.0
+    }
+}
+
 /// Compute English word ratio using Mamba's GPT-2 tokenizer.
 ///
 /// A token counts as "English" if it decodes to a multi-character alphabetic string
@@ -511,9 +587,7 @@ pub fn evaluate_liquid_mamba(
             continue;
         }
 
-        let channels = ThoughtChannels {
-            channels: pair.channels,
-        };
+        let channels = pair.to_thought_channels();
         let intent = active_intent(&pair.channels).to_string();
 
         // --- Perplexity: teacher-forced through frozen Mamba ---
@@ -693,6 +767,8 @@ pub fn evaluate_liquid_mamba(
         avg_coherence,
         intent_scores,
         num_samples: config.dataset.len(),
+        contrastive_intent_score: None,
+        hallucination_rate: None,
     };
 
     // --- Consciousness gating test ---
@@ -750,16 +826,12 @@ fn consciousness_gating_test(
 
     for pair in dataset.pairs.iter().take(sample_size) {
         // Generate with Certain epistemic (0.0)
-        let mut certain_channels = ThoughtChannels {
-            channels: pair.channels,
-        };
+        let mut certain_channels = pair.to_thought_channels();
         certain_channels.set_epistemic(0.0);
         let certain_result = gen.generate(&certain_channels);
 
         // Generate with Unknown epistemic (3.0)
-        let mut unknown_channels = ThoughtChannels {
-            channels: pair.channels,
-        };
+        let mut unknown_channels = pair.to_thought_channels();
         unknown_channels.set_epistemic(3.0);
         let unknown_result = gen.generate(&unknown_channels);
 
@@ -1197,6 +1269,8 @@ mod tests {
             avg_coherence: 0.5,
             intent_scores,
             num_samples: 10,
+            contrastive_intent_score: None,
+            hallucination_rate: None,
         };
 
         let report = format_eval_report(&result);
@@ -1249,6 +1323,37 @@ mod tests {
         assert_eq!(intent2, "Acknowledge");
     }
 
+    #[test]
+    fn test_contrastive_intent_score_identical() {
+        let texts: Vec<String> = (0..8).map(|_| "hello world".to_string()).collect();
+        let score = contrastive_intent_score(&texts);
+        assert!(
+            score < 0.01,
+            "Identical texts should have near-zero contrastive score: {score}"
+        );
+    }
+
+    #[test]
+    fn test_contrastive_intent_score_different() {
+        let texts = vec![
+            "alpha beta gamma".to_string(),
+            "one two three".to_string(),
+            "dog cat fish".to_string(),
+            "sun moon star".to_string(),
+        ];
+        let score = contrastive_intent_score(&texts);
+        assert!(
+            score > 0.3,
+            "Different texts should have high contrastive score: {score}"
+        );
+    }
+
+    #[test]
+    fn test_contrastive_intent_score_empty() {
+        assert_eq!(contrastive_intent_score(&[]), 0.0);
+        assert_eq!(contrastive_intent_score(&["single".to_string()]), 0.0);
+    }
+
     #[cfg(feature = "mamba")]
     mod liquid_mamba_tests {
         use super::*;
@@ -1281,6 +1386,8 @@ mod tests {
                     avg_coherence: 0.3,
                     intent_scores: HashMap::new(),
                     num_samples: 5,
+                    contrastive_intent_score: None,
+                    hallucination_rate: None,
                 },
                 avg_semantic_pe: 0.72,
                 avg_effective_rank: 18.5,
@@ -1384,6 +1491,8 @@ mod tests {
                     avg_coherence: 0.1,
                     intent_scores: HashMap::new(),
                     num_samples: 1,
+                    contrastive_intent_score: None,
+                    hallucination_rate: None,
                 },
                 avg_semantic_pe: 0.9,
                 avg_effective_rank: 2.0,

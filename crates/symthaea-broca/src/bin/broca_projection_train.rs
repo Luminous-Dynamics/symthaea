@@ -16,7 +16,7 @@ use std::io::Write;
 use std::process;
 
 use symthaea_broca::checkpoint::ProjectionCheckpoint;
-use symthaea_broca::encoder::ThoughtChannels;
+
 use symthaea_broca::liquid_mamba::{LiquidMambaConfig, LiquidMambaGenerator};
 use symthaea_broca::training::TrainingDataset;
 
@@ -195,9 +195,7 @@ fn main() {
             .iter()
             .take(200) // Use up to 200 samples for covariance
             .map(|pair| {
-                let channels = ThoughtChannels {
-                    channels: pair.channels,
-                };
+                let channels = pair.to_thought_channels();
                 gen.encoder().encode(&channels)
             })
             .collect();
@@ -229,9 +227,7 @@ fn main() {
             .iter()
             .take(50) // Diverse subset — 50 thoughts → 1,225 pairs
             .map(|pair| {
-                let channels = ThoughtChannels {
-                    channels: pair.channels,
-                };
+                let channels = pair.to_thought_channels();
                 gen.encoder().encode(&channels)
             })
             .collect();
@@ -297,9 +293,7 @@ fn main() {
         let num_samples = dataset.pairs.len();
 
         for (i, pair) in dataset.pairs.iter().enumerate() {
-            let channels = ThoughtChannels {
-                channels: pair.channels,
-            };
+            let channels = pair.to_thought_channels();
 
             // Generate through full Mamba inference
             let result = gen.generate(&channels);
@@ -359,11 +353,7 @@ fn main() {
             .pairs
             .iter()
             .take(10)
-            .map(|p| {
-                gen.encoder().encode(&ThoughtChannels {
-                    channels: p.channels,
-                })
-            })
+            .map(|p| gen.encoder().encode(&p.to_thought_channels()))
             .collect();
         let avg_rank = if let Some(tp) = gen.temporal_proj() {
             tp.effective_rank(&rank_samples)
