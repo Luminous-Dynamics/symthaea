@@ -148,6 +148,140 @@ pub fn validate_cached_credential(entry: &CachedCredentialEntry) -> Result<(), S
 }
 
 // ============================================================================
+// Jurisdiction constraint entry
+// ============================================================================
+
+/// Jurisdictional constraint applied to a geographic zone or regulatory domain.
+///
+/// Models nation-states and regulatory bodies as **environmental constraints**
+/// on the peer-to-peer network — tags applied to geographic clusters, NOT root
+/// nodes that own the network. A jurisdiction constraint is a localized set of
+/// rules that physical nodes happen to sit inside.
+///
+/// ## Design Philosophy
+///
+/// Nation-states are shared human conventions with real physical consequences.
+/// In Mycelix, they are modeled the same way emergencies use `OperationalZone`:
+/// as environmental facts that constrain operations, not authorities that
+/// control the DHT.
+///
+/// ## Example
+///
+/// ```ignore
+/// JurisdictionConstraintEntry {
+///     zone_id: "eu-gdpr-zone-1".into(),
+///     zone_polygon: vec![(35.0, -10.0), (71.0, -10.0), (71.0, 40.0), (35.0, 40.0)],
+///     regulatory_tags: vec!["gdpr".into(), "right_to_erasure".into()],
+///     fiat_zone: Some("EUR".into()),
+///     enforcement_risk: 0.85, // High — EU actively enforces GDPR
+///     authority_did: Some("did:mycelix:eu-dpa-collective".into()),
+///     description: "European Union GDPR enforcement zone".into(),
+///     created_at: Timestamp::now()?,
+///     last_validated: Timestamp::now()?,
+/// }
+/// ```
+#[derive(Clone, PartialEq, Serialize, Deserialize, Debug, SerializedBytes)]
+pub struct JurisdictionConstraintEntry {
+    /// Unique identifier for this jurisdiction zone
+    pub zone_id: String,
+    /// GIS polygon vertices (lat, lon) defining the geographic boundary.
+    /// Empty = non-geographic jurisdiction (e.g., internet-only regulation).
+    pub zone_polygon: Vec<(f64, f64)>,
+    /// Regulatory tags that apply within this zone (e.g., "gdpr", "hipaa", "fatf_travel_rule").
+    /// Nodes and actions within the zone must check these tags for compliance.
+    pub regulatory_tags: Vec<String>,
+    /// Fiat currency zone identifier (ISO 4217), if applicable.
+    pub fiat_zone: Option<String>,
+    /// Enforcement risk [0.0, 1.0]: probability that violations are actively prosecuted.
+    /// 0.0 = unenforced, 1.0 = actively and consistently enforced.
+    pub enforcement_risk: f64,
+    /// DID of the authority that asserts this jurisdiction (e.g., a regulatory body).
+    /// `None` = community-asserted (crowdsourced geographic tagging).
+    pub authority_did: Option<String>,
+    /// Human-readable description of this jurisdiction constraint.
+    pub description: String,
+    /// When this constraint was first created.
+    pub created_at: Timestamp,
+    /// When this constraint was last validated/confirmed as active.
+    pub last_validated: Timestamp,
+}
+
+impl TryFrom<&Entry> for JurisdictionConstraintEntry {
+    type Error = WasmError;
+    fn try_from(entry: &Entry) -> Result<Self, Self::Error> {
+        match entry {
+            Entry::App(bytes) => {
+                let sb = SerializedBytes::from(UnsafeBytes::from(bytes.bytes().to_vec()));
+                <Self as TryFrom<SerializedBytes>>::try_from(sb)
+                    .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))
+            }
+            _ => Err(wasm_error!(WasmErrorInner::Guest(
+                "Not an app entry".into(),
+            ))),
+        }
+    }
+}
+
+/// Validate a jurisdiction constraint entry.
+///
+/// Returns `Ok(())` if valid, or `Err(reason)` if invalid.
+pub fn validate_jurisdiction_constraint(
+    entry: &JurisdictionConstraintEntry,
+) -> Result<(), String> {
+    if entry.zone_id.is_empty() {
+        return Err("Zone ID cannot be empty".into());
+    }
+    if entry.zone_id.len() > 256 {
+        return Err("Zone ID must be 256 characters or fewer".into());
+    }
+    if entry.zone_polygon.len() > 1000 {
+        return Err("Zone polygon cannot have more than 1000 vertices".into());
+    }
+    // Validate polygon vertices are valid coordinates
+    for (lat, lon) in &entry.zone_polygon {
+        if !lat.is_finite() || !lon.is_finite() {
+            return Err("Polygon vertices must have finite coordinates".into());
+        }
+        if *lat < -90.0 || *lat > 90.0 {
+            return Err(format!("Latitude {} out of range [-90, 90]", lat));
+        }
+        if *lon < -180.0 || *lon > 180.0 {
+            return Err(format!("Longitude {} out of range [-180, 180]", lon));
+        }
+    }
+    if entry.regulatory_tags.is_empty() {
+        return Err("At least one regulatory tag is required".into());
+    }
+    if entry.regulatory_tags.len() > 50 {
+        return Err("Cannot have more than 50 regulatory tags".into());
+    }
+    for tag in &entry.regulatory_tags {
+        if tag.is_empty() {
+            return Err("Regulatory tags cannot be empty strings".into());
+        }
+        if tag.len() > 128 {
+            return Err(format!(
+                "Regulatory tag '{}...' exceeds 128 character limit",
+                &tag[..32.min(tag.len())]
+            ));
+        }
+    }
+    if !entry.enforcement_risk.is_finite()
+        || entry.enforcement_risk < 0.0
+        || entry.enforcement_risk > 1.0
+    {
+        return Err(format!(
+            "Enforcement risk must be in [0.0, 1.0], got {}",
+            entry.enforcement_risk
+        ));
+    }
+    if entry.description.len() > 4096 {
+        return Err("Description must be 4096 characters or fewer".into());
+    }
+    Ok(())
+}
+
+// ============================================================================
 // Validation helpers
 // ============================================================================
 
@@ -688,5 +822,175 @@ mod tests {
         let q2: BridgeQueryEntry = serde_json::from_slice(&bytes).unwrap();
         assert_eq!(q2.domain.len(), 1024);
         assert_eq!(q, q2);
+    }
+
+    // ---- JurisdictionConstraintEntry validation ----
+
+    fn make_jurisdiction() -> JurisdictionConstraintEntry {
+        JurisdictionConstraintEntry {
+            zone_id: "eu-gdpr-zone-1".into(),
+            zone_polygon: vec![
+                (35.0, -10.0),
+                (71.0, -10.0),
+                (71.0, 40.0),
+                (35.0, 40.0),
+            ],
+            regulatory_tags: vec!["gdpr".into(), "right_to_erasure".into()],
+            fiat_zone: Some("EUR".into()),
+            enforcement_risk: 0.85,
+            authority_did: Some("did:mycelix:eu-dpa-collective".into()),
+            description: "European Union GDPR enforcement zone".into(),
+            created_at: Timestamp::from_micros(1_000_000),
+            last_validated: Timestamp::from_micros(2_000_000),
+        }
+    }
+
+    #[test]
+    fn jurisdiction_valid() {
+        let j = make_jurisdiction();
+        assert!(validate_jurisdiction_constraint(&j).is_ok());
+    }
+
+    #[test]
+    fn jurisdiction_serde_roundtrip() {
+        let j = make_jurisdiction();
+        let bytes = serde_json::to_vec(&j).unwrap();
+        let j2: JurisdictionConstraintEntry = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(j, j2);
+    }
+
+    #[test]
+    fn jurisdiction_empty_zone_id_rejected() {
+        let mut j = make_jurisdiction();
+        j.zone_id = "".into();
+        let err = validate_jurisdiction_constraint(&j).unwrap_err();
+        assert!(err.contains("Zone ID cannot be empty"));
+    }
+
+    #[test]
+    fn jurisdiction_long_zone_id_rejected() {
+        let mut j = make_jurisdiction();
+        j.zone_id = "z".repeat(257);
+        let err = validate_jurisdiction_constraint(&j).unwrap_err();
+        assert!(err.contains("256"));
+    }
+
+    #[test]
+    fn jurisdiction_too_many_polygon_vertices() {
+        let mut j = make_jurisdiction();
+        j.zone_polygon = (0..1001).map(|i| (i as f64 * 0.01, 0.0)).collect();
+        let err = validate_jurisdiction_constraint(&j).unwrap_err();
+        assert!(err.contains("1000"));
+    }
+
+    #[test]
+    fn jurisdiction_empty_polygon_accepted() {
+        let mut j = make_jurisdiction();
+        j.zone_polygon = vec![];
+        assert!(validate_jurisdiction_constraint(&j).is_ok());
+    }
+
+    #[test]
+    fn jurisdiction_invalid_latitude() {
+        let mut j = make_jurisdiction();
+        j.zone_polygon = vec![(91.0, 0.0)];
+        let err = validate_jurisdiction_constraint(&j).unwrap_err();
+        assert!(err.contains("Latitude"));
+    }
+
+    #[test]
+    fn jurisdiction_invalid_longitude() {
+        let mut j = make_jurisdiction();
+        j.zone_polygon = vec![(0.0, 181.0)];
+        let err = validate_jurisdiction_constraint(&j).unwrap_err();
+        assert!(err.contains("Longitude"));
+    }
+
+    #[test]
+    fn jurisdiction_nan_coordinates_rejected() {
+        let mut j = make_jurisdiction();
+        j.zone_polygon = vec![(f64::NAN, 0.0)];
+        let err = validate_jurisdiction_constraint(&j).unwrap_err();
+        assert!(err.contains("finite"));
+    }
+
+    #[test]
+    fn jurisdiction_no_regulatory_tags_rejected() {
+        let mut j = make_jurisdiction();
+        j.regulatory_tags = vec![];
+        let err = validate_jurisdiction_constraint(&j).unwrap_err();
+        assert!(err.contains("At least one"));
+    }
+
+    #[test]
+    fn jurisdiction_empty_tag_rejected() {
+        let mut j = make_jurisdiction();
+        j.regulatory_tags = vec!["gdpr".into(), "".into()];
+        let err = validate_jurisdiction_constraint(&j).unwrap_err();
+        assert!(err.contains("empty strings"));
+    }
+
+    #[test]
+    fn jurisdiction_long_tag_rejected() {
+        let mut j = make_jurisdiction();
+        j.regulatory_tags = vec!["t".repeat(129)];
+        let err = validate_jurisdiction_constraint(&j).unwrap_err();
+        assert!(err.contains("128"));
+    }
+
+    #[test]
+    fn jurisdiction_too_many_tags_rejected() {
+        let mut j = make_jurisdiction();
+        j.regulatory_tags = (0..51).map(|i| format!("tag_{i}")).collect();
+        let err = validate_jurisdiction_constraint(&j).unwrap_err();
+        assert!(err.contains("50"));
+    }
+
+    #[test]
+    fn jurisdiction_enforcement_nan_rejected() {
+        let mut j = make_jurisdiction();
+        j.enforcement_risk = f64::NAN;
+        assert!(validate_jurisdiction_constraint(&j).is_err());
+    }
+
+    #[test]
+    fn jurisdiction_enforcement_out_of_range() {
+        let mut j = make_jurisdiction();
+        j.enforcement_risk = 1.01;
+        assert!(validate_jurisdiction_constraint(&j).is_err());
+
+        j.enforcement_risk = -0.01;
+        assert!(validate_jurisdiction_constraint(&j).is_err());
+    }
+
+    #[test]
+    fn jurisdiction_enforcement_boundaries_accepted() {
+        let mut j = make_jurisdiction();
+        j.enforcement_risk = 0.0;
+        assert!(validate_jurisdiction_constraint(&j).is_ok());
+        j.enforcement_risk = 1.0;
+        assert!(validate_jurisdiction_constraint(&j).is_ok());
+    }
+
+    #[test]
+    fn jurisdiction_long_description_rejected() {
+        let mut j = make_jurisdiction();
+        j.description = "d".repeat(4097);
+        let err = validate_jurisdiction_constraint(&j).unwrap_err();
+        assert!(err.contains("4096"));
+    }
+
+    #[test]
+    fn jurisdiction_optional_fields_none() {
+        let mut j = make_jurisdiction();
+        j.fiat_zone = None;
+        j.authority_did = None;
+        assert!(validate_jurisdiction_constraint(&j).is_ok());
+
+        // Serde roundtrip with None fields
+        let bytes = serde_json::to_vec(&j).unwrap();
+        let j2: JurisdictionConstraintEntry = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(j2.fiat_zone, None);
+        assert_eq!(j2.authority_did, None);
     }
 }

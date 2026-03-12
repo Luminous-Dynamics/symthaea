@@ -340,11 +340,13 @@ pub fn import_credential_from_csv(
     // Build the credential creation input from CSV row data
     let now = sys_time()?;
     let now_str = format!("{}", now.as_micros());
-    let batch_did = format!("did:mycelix:batch:{}", input.batch_id);
+    let caller = agent_info()?.agent_initial_pubkey;
+    let caller_did = format!("did:mycelix:{}", caller);
+    let batch_ref = format!("did:mycelix:batch:{}", input.batch_id);
 
     let credential_input = CreateAcademicCredentialInput {
         issuer: InstitutionalIssuer {
-            id: batch_did.clone(),
+            id: caller_did.clone(),
             name: "Legacy Import".to_string(),
             issuer_type: vec!["LegacyImportSource".to_string()],
             image: None,
@@ -371,7 +373,7 @@ pub fn import_credential_from_csv(
         },
         dns_did: DnsDid {
             domain: "legacy-import.local".to_string(),
-            did: batch_did.clone(),
+            did: batch_ref.clone(),
             txt_record: String::new(),
             dnssec: DnssecStatus::Unknown,
             last_verified: now,
@@ -383,7 +385,7 @@ pub fn import_credential_from_csv(
         proof: AcademicProof {
             proof_type: "LegacyImport".to_string(),
             created: now_str,
-            verification_method: format!("{}#import-key", batch_did),
+            verification_method: format!("{}#import-key", batch_ref),
             proof_purpose: "assertionMethod".to_string(),
             proof_value: "legacy-import-no-cryptographic-proof".to_string(),
             cryptosuite: None,

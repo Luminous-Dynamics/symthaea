@@ -1,0 +1,35 @@
+version: 2
+updates:
+  - package-ecosystem: "cargo"
+    directories:
+      - "/mycelix-commons"
+      - "/mycelix-civic"
+      - "/mycelix-hearth"
+      - "/mycelix-finance"
+      - "/mycelix-identity"
+      - "/mycelix-governance"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+    ignore:
+      # Holochain ecosystem pins
+      - dependency-name: "wasmtime*"
+      - dependency-name: "bytes"
+        versions: [">=2.0.0"]
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "ci"
+
+  - package-ecosystem: "npm"
+    directory: "/mycelix-workspace/sdk-ts"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "typescript"

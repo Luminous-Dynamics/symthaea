@@ -141,13 +141,17 @@ fn string_to_entry_hash(s: &str) -> EntryHash {
 
 /// Get MFA summary for a DID via cross-zome call
 fn get_mfa_summary_for_did(did: &str) -> ExternResult<Option<MfaSummary>> {
-    let response = call(
+    // Cross-zome call may error if DID has no MFA state; treat as None.
+    let response = match call(
         CallTargetCell::Local,
         ZomeName::new("mfa"),
         FunctionName::new("get_mfa_summary"),
         None,
         did.to_string(),
-    )?;
+    ) {
+        Ok(resp) => resp,
+        Err(_) => return Ok(None),
+    };
 
     match response {
         ZomeCallResponse::Ok(result) => {
@@ -450,13 +454,18 @@ fn verify_did_exists(did: &str) -> ExternResult<bool> {
     }
 
     // Call did_registry zome to resolve the DID
-    let response = call(
+    // resolve_did may error if the DID contains an invalid agent pub key;
+    // treat that as "does not exist" rather than propagating the error.
+    let response = match call(
         CallTargetCell::Local,
         ZomeName::new("did_registry"),
         FunctionName::new("resolve_did"),
         None,
         did.to_string(),
-    )?;
+    ) {
+        Ok(resp) => resp,
+        Err(_) => return Ok(false),
+    };
 
     // Check if the DID exists (resolve_did returns Option<Record>)
     match response {
@@ -529,13 +538,17 @@ fn get_did_details(did: &str) -> ExternResult<Option<DidDocumentData>> {
     }
 
     // Call did_registry zome to resolve the DID
-    let response = call(
+    // resolve_did may error on invalid agent key format; treat as "not found".
+    let response = match call(
         CallTargetCell::Local,
         ZomeName::new("did_registry"),
         FunctionName::new("resolve_did"),
         None,
         did.to_string(),
-    )?;
+    ) {
+        Ok(resp) => resp,
+        Err(_) => return Ok(None),
+    };
 
     match response {
         ZomeCallResponse::Ok(result) => {

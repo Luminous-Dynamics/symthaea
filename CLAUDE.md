@@ -40,28 +40,33 @@ Full rules: @.claude/rules/DEVELOPMENT.md
 ### Luminous Nix
 - **Path**: 11-meta-consciousness/luminous-nix/
 - **Status**: v0.4.0-dev, security complete
+- **Code**: ~715K lines Rust (~437K code), ~58K TS/JS (web dashboard, GUI)
+- **Features**: Causal graph learning (~210 patterns), observability (9 Prometheus metrics), CLI/TUI/daemon
 
 ### The Substrate
 - **Quick ref**: @THE_SUBSTRATE_QUICKREF.md
 - **Full roadmap**: @THE_SUBSTRATE_ROADMAP.md (load when needed)
 
 ### Symthaea (Holographic Liquid Brain)
-- **Path**: `symthaea/` (main crate), `symthaea-core/`, 45 sub-crates in `symthaea/crates/`, 18 genesis-mission crates
-- **Status**: v0.5.0, ~985K lines Rust (~778K code), ~3,735+ tests (main crate), 65+ workspace members
+- **Path**: `symthaea/` (main crate), `symthaea-core/`, 52 sub-crates in `symthaea/crates/`
+- **Status**: v1.9.0, ~1,130K lines Rust (~897K code, tokei-verified), ~7,315 tests (main crate src/+tests/), 55 workspace members, 21,516 tests workspace-wide
 - **Core**: HDC (16,384D) + IIT/Phi + LTC/CfC + Active Inference + 12-region Actor Brain
-- **Architecture**: Predictive coding loop — HDC encode → CfC evolve → predict → learn (50Hz)
+- **Architecture**: Predictive coding loop — HDC encode → CfC evolve → predict → learn (~31Hz measured, 20Hz budget)
 - **Key entry points**:
   - `src/symthaea.rs` — public facade (8-phase pipeline: perception → cognition → translation)
   - `src/cognitive_loop/cycle.rs` — core cognitive pipeline with rayon-parallel post-processing
   - `symthaea-core/src/hdc/hdc_ltc_unified.rs` — unified HDC-LTC neuron (O(1) closed-form temporal jumps)
 - **Build**: `cargo test --lib` (default features), `cargo test --all-features`
-- **CI**: `symthaea-ci.yml` (GREEN) — fmt, clippy, test, docs, 39 feature matrix, 45 sub-crates
-- **Features**: 88 feature flags (default=[]), key flags: `reasoning_engine`, `identity`, `neural-bridge`, `lancedb-backend`
-- **Integration status**: Core pipeline fully wired with surprise exploration, prefrontal gating, meta-cognition, reasoning engine (7-step cycle with Phi/gating/planning), moral algebra, CycleMetadata telemetry, social coherence (ToM in Mind module). ~25% of `src/` modules remain structural/disconnected (iroh P2P, some consciousness subsystems).
+- **CI**: `symthaea-ci.yml` (GREEN) — fmt, clippy, test, docs, 49 feature matrix, 52 sub-crates
+- **Features**: 98 feature flags (default=[]), key flags: `reasoning_engine`, `identity`, `neural-bridge`, `lancedb-backend`, `ssm_language`, `integrity`
+- **Broca language pipeline**: Native CfC-HDC thought-to-text generation (`crates/symthaea-broca/`, 21K LOC, 229+ tests). 20-channel ThoughtEncoder → 16,384D HDC binding → autoregressive generation with epistemic gating (physically prevents hallucination at logit level), semantic veto (mid-sentence self-correction), Liquid-Mamba fusion backend. Feature: `ssm_language`
+- **Integration status**: Core pipeline fully wired with surprise exploration, prefrontal gating, meta-cognition, reasoning engine (7-step cycle with Phi/gating/planning), moral algebra, CycleMetadata telemetry, social coherence (ToM in Mind module), Broca language center (adaptive cadence, quality EMA, consciousness-gated generation). ~25% of `src/` modules remain structural/disconnected (iroh P2P, some consciousness subsystems).
 - **Sub-crate pattern**: `pub use symthaea_X as module_name;` in consciousness/mod.rs for zero API changes
 
-### Mycelix Fractal Architecture (7-role unified hApp)
+### Mycelix Fractal Architecture (16-cluster unified hApp)
 Fractal CivOS with 5 tiers, consolidated into cluster DNAs (single DNA = cross-domain `call(CallTargetCell::Local, ...)`):
+
+**Core clusters:**
 
 | Cluster | Path | Domains | Zomes | Tests |
 |---------|------|---------|-------|-------|
@@ -69,15 +74,55 @@ Fractal CivOS with 5 tiers, consolidated into cluster DNAs (single DNA = cross-d
 | **mycelix-civic** | `mycelix-civic/` | justice, emergency, media | 16 (15 domain + 1 bridge) | 2,273 |
 | **mycelix-hearth** | `mycelix-hearth/` | kinship, gratitude, care, autonomy, decisions, stories, milestones, rhythms, emergency, resources | 12 (11 domain + 1 bridge) | 1,023 |
 | **mycelix-identity** | `mycelix-identity/` | DID registry, MFA, trust credentials, verifiable credentials, recovery | 9 | 23+ unit, 100+ sweettest |
-| **mycelix-governance** | `mycelix-governance/` | proposals, voting, threshold-signing (DKG), councils, constitution, execution | 7 | 44+ unit, 130+ sweettest |
+| **mycelix-governance** | `mycelix-governance/` | proposals, voting, threshold-signing (DKG), councils, constitution, execution | 7 | 44+ unit, 156+ sweettest |
 | **mycelix-personal** | `mycelix-personal/` | identity vault, health vault, credential wallet | 4 (3 domain + 1 bridge) | 20 |
 | **mycelix-attribution** | `mycelix-attribution/` | dependency registry, usage receipts, reciprocity | 3 | 17 |
 
-- **Shared types**: `crates/mycelix-bridge-entry-types/` (DHT entries), `crates/mycelix-bridge-common/` (coordinator dispatch + cross-cluster + consciousness gating)
+**Additional clusters:**
+
+| Cluster | Path | Zomes | Status |
+|---------|------|-------|--------|
+| **mycelix-finance** | `mycelix-finance/` | 8 (payments SAP/TEND/MYCEL, treasury, staking, recognition) | Built |
+| **mycelix-health** | `mycelix-health/` | 7 MVP (FHIR R4, differential privacy, federated ML) | Built |
+| **mycelix-mail** | `mycelix-mail/` | 12 (PQC-encrypted decentralized email) | Built |
+| **mycelix-supplychain** | `mycelix-supplychain/` | 8 (provenance tracking) | Built |
+| **mycelix-marketplace** | `mycelix-marketplace/` | 8 (arbitration) | Built |
+| **mycelix-knowledge** | `mycelix-knowledge/` | — | Built |
+| **mycelix-edunet** | `mycelix-edunet/` | 10 | Built |
+| **mycelix-music** | `mycelix-music/` | 8 | Scaffolded |
+| **mycelix-energy** | `mycelix-energy/` | 11 | Scaffolded |
+| **mycelix-climate** | `mycelix-climate/` | 6 | Scaffolded |
+| **mycelix-space** | `mycelix-space/` | — | Early |
+| **mycelix-desci** | `mycelix-desci/` | REST API (Actix-web) | 141 integration tests |
+| **mycelix-core** | `mycelix-core/` | 0TML federated learning research | 62 FL tests |
+
+- **Total**: 123+ zomes, ~785K lines Rust (~643K code, tokei-verified), 14 built hApp bundles
+- **Shared types**: `crates/mycelix-bridge-entry-types/` (DHT entries), `crates/mycelix-bridge-common/` (coordinator dispatch + cross-cluster + consciousness gating, 289 tests)
 - **Cross-cluster bridge**: All clusters via `CallTargetCell::OtherRole` (unified hApp: `mycelix-workspace/happs/mycelix-unified-happ.yaml`)
 - **Consciousness gating**: 4D profile (identity/reputation/community/engagement) → 5 tiers (Observer→Guardian) → progressive vote weights
+- **SDKs**: Rust (18 modules, ~50K LOC, 1,036+ tests), TypeScript (37 modules, ~226K LOC, 6,316 tests), Python, WASM
+- **Dashboards**: LUCID (SvelteKit + Tauri, 40+ components, 95% Symthaea bridge), Observatory (SvelteKit)
 - **Build**: `just build-commons` / `just build-civic` (or `cargo build --release --target wasm32-unknown-unknown`)
-- **Tests**: 8,600+ Rust workspace tests across clusters + 212 bridge-common + 996 SDK Rust + 6,650+ SDK TS
+- **Tests**: 8,600+ Rust workspace tests across clusters + 289 bridge-common + 1,036 SDK Rust + 6,316 SDK TS
+
+### Kosmic Lab
+- **Path**: `kosmic-lab/`
+- **Code**: ~1.14M lines Rust, ~3.89M lines TS/JS
+- **Scope**: Multi-domain knowledge integration and consciousness research
+
+---
+
+## Verified Monorepo Metrics (tokei, 2026-03-12)
+Excluding `target/`, `node_modules/`, `venv/`, build artifacts:
+
+| Language | Files | Lines | Code |
+|----------|-------|-------|------|
+| Rust | 5,048 | 2,702,431 | 2,154,128 |
+| TypeScript/JavaScript | 1,108 | 448,860 | 315,416 |
+| Python | 1,390 | 461,063 | 351,664 |
+| Svelte/HTML/CSS | 68 | 30,151 | 26,315 |
+| Nix | 67 | 7,176 | 5,510 |
+| **Total** | **7,690** | **3,651,726** | **2,854,603** |
 
 ---
 

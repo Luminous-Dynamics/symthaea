@@ -42,9 +42,15 @@ Decentralized coordination where no single entity accumulates optimization power
 
 | Cluster | Path | Domains | Zomes | Tests |
 |---------|------|---------|-------|-------|
-| **Commons** | `mycelix-commons/` | property, housing, care, mutual aid, water, food, transport | 35 | 4,126 |
-| **Civic** | `mycelix-civic/` | justice, emergency, media | 16 | 2,030 |
-| **Bridge** | `crates/mycelix-bridge-common/` | cross-cluster coordination | 1 | 55 |
+| **Commons** | `mycelix-commons/` | property, housing, care, mutual aid, water, food, transport | 35 | 5,276 |
+| **Civic** | `mycelix-civic/` | justice, emergency, media | 16 | 2,273 |
+| **Hearth** | `mycelix-hearth/` | kinship, gratitude, care, autonomy, decisions, stories | 12 | 1,023 |
+| **Finance** | `mycelix-finance/` | payments, treasury, staking, recognition | 8 | 349 |
+| **Identity** | `mycelix-identity/` | DID, MFA, credentials, recovery | 9 | 100+ |
+| **Governance** | `mycelix-governance/` | proposals, voting, DKG, councils | 7 | 495 |
+| **Personal** | `mycelix-personal/` | identity vault, health vault, credential wallet | 4 | 20 |
+| **Attribution** | `mycelix-attribution/` | dependency registry, usage receipts | 3 | 17 |
+| **Bridge** | `crates/mycelix-bridge-common/` | cross-cluster coordination | 1 | 289 |
 
 Governance requires multi-dimensional community trust that decays over time. Protocol-level constraints (consent, resource caps, Byzantine tolerance to 34%) are enforced at the DHT layer, not by regulation that can be lobbied away.
 
@@ -101,4 +107,10 @@ cargo run --features api_module --example symthaea-demo
 
 ## License
 
-Dual-licensed under the [Sacred Reciprocity License v4.0](LICENSE) and [MIT](LICENSE-MIT).
+This monorepo is licensed under the [Business Source License 1.1](LICENSE). Non-production use (research, evaluation, testing, development, education) is permitted. Production use requires a commercial license.
+
+The BSL automatically converts to Apache License 2.0 on 2029-03-06.
+
+Individual projects have their own licenses:
+- **Symthaea**: [AGPL-3.0-or-later](symthaea/LICENSE) — open source with network copyleft
+- **Mycelix**: [Apache-2.0](mycelix-workspace/LICENSE) — permissive, patent-granting

@@ -538,10 +538,12 @@ pub fn fulfill_attestation(
         }
     }
 
-    // Issue the trust credential (subject self-attests in response to request)
+    // Issue the trust credential (caller attests in response to request)
+    let caller = agent_info()?.agent_initial_pubkey;
+    let caller_did = format!("did:mycelix:{}", caller);
     let credential_record = issue_trust_credential(IssueTrustCredentialInput {
         subject_did: input.subject_did.clone(),
-        issuer_did: input.subject_did.clone(), // Self-attestation
+        issuer_did: caller_did, // Caller issues the credential
         kvector_commitment: input.kvector_commitment,
         range_proof: input.range_proof,
         trust_score_lower: input.trust_score_lower,
@@ -667,25 +669,37 @@ pub fn get_pending_requests(subject_did: String) -> ExternResult<Vec<Record>> {
         )));
     }
     let now = sys_time()?;
-    let subject_hash = anchor_hash(&format!("requests:{}", subject_did))?;
-    let links = get_links(
-        LinkQuery::try_new(subject_hash, LinkTypes::SubjectToRequest)?,
-        GetStrategy::default(),
-    )?;
 
+    // Use chain query to get the latest version of each AttestationRequest
+    // (link-based lookup returns the original action hash, missing updates)
+    let filter = ChainQueryFilter::new()
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::AttestationRequest,
+        )?))
+        .include_entries(true);
+
+    let records = query(filter)?;
+
+    // Track seen IDs to only keep the latest version of each request
+    let mut seen_ids = std::collections::HashSet::new();
     let mut pending = Vec::new();
-    for link in links {
-        let ah = ActionHash::try_from(link.target)
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(ah, GetOptions::default())? {
-            if let Some(req) = record
-                .entry()
-                .to_app_option::<AttestationRequest>()
-                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+
+    // Chain query returns chronological order; iterate in reverse to see latest first
+    for record in records.into_iter().rev() {
+        if let Some(req) = record
+            .entry()
+            .to_app_option::<AttestationRequest>()
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        {
+            if seen_ids.contains(&req.id) {
+                continue; // Already processed a newer version
+            }
+            seen_ids.insert(req.id.clone());
+            if req.subject_did == subject_did
+                && req.status == AttestationStatus::Pending
+                && now < req.expires_at
             {
-                if req.status == AttestationStatus::Pending && now < req.expires_at {
-                    pending.push(record);
-                }
+                pending.push(record);
             }
         }
     }
@@ -793,8 +807,9 @@ pub fn verify_credential(credential_id: String) -> ExternResult<VerificationResu
             .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
         {
             if cred.id == credential_id {
+                // Keep the latest version (chain query returns chronological order,
+                // update_entry appends a newer record with the same ID)
                 found_cred = Some(cred);
-                break;
             }
         }
     }

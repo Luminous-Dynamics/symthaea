@@ -26,6 +26,9 @@ integrity:
     - name: councils_integrity
       path: "../target/wasm32-unknown-unknown/release/councils_integrity.wasm"
 
+    - name: jurisdiction_integrity
+      path: "../target/wasm32-unknown-unknown/release/jurisdiction_integrity.wasm"
+
 coordinator:
   zomes:
     - name: proposals
@@ -68,3 +71,8 @@ coordinator:
       dependencies:
         - name: councils_integrity
         - name: proposals_integrity
+
+    - name: jurisdiction
+      path: "../target/wasm32-unknown-unknown/release/jurisdiction.wasm"
+      dependencies:
+        - name: jurisdiction_integrity

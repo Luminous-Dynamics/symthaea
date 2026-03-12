@@ -1,0 +1,15 @@
+[package]
+name = "jurisdiction_integrity"
+version = "0.1.0"
+edition = "2021"
+description = "Governance jurisdiction constraints integrity zome"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+hdi = { workspace = true }
+holochain_serialized_bytes = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+mycelix-bridge-entry-types = { path = "../../../../crates/mycelix-bridge-entry-types" }

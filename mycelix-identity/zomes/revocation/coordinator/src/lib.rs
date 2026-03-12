@@ -242,6 +242,15 @@ pub fn reinstate_credential(input: ReinstateInput) -> ExternResult<Record> {
         &EntryTypes::RevocationEntry(reinstated),
     )?;
 
+    // Create a new link so check_revocation_status finds the reinstated entry
+    let credential_hash = string_to_entry_hash(&input.credential_id);
+    create_link(
+        credential_hash,
+        action_hash.clone(),
+        LinkTypes::CredentialToRevocation,
+        (),
+    )?;
+
     get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find reinstated entry".into()
     )))

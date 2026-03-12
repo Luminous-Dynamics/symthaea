@@ -1,0 +1,16 @@
+[package]
+name = "jurisdiction"
+version = "0.1.0"
+edition = "2021"
+description = "Governance jurisdiction constraints coordinator zome"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+hdk = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+jurisdiction_integrity = { path = "../integrity" }
+governance-utils = { workspace = true }
+getrandom_03 = { workspace = true }

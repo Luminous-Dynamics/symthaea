@@ -186,7 +186,7 @@ echo
 # are standalone-specific and maintained there.
 
 info "=== Preserving standalone-specific files ==="
-ok "CLAUDE.md, README.md, .github/, .gitmodules are standalone-only (not synced)"
+ok "CLAUDE.md, README.md, LICENSE, .github/, .gitmodules are standalone-only (not synced)"
 echo
 
 # --- Post-sync cargo check (finance cluster as sanity check) -----------------
