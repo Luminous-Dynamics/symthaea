@@ -12,11 +12,14 @@ mod behavioral_modulation;
 mod core;
 mod crucible_integration;
 mod cycle_properties;
+mod dream_pipeline;
+mod error_recovery;
 mod feedback;
 mod helpers;
 #[allow(clippy::field_reassign_with_default)]
 mod integration;
 mod managers;
+mod memory_pipeline;
 #[allow(clippy::field_reassign_with_default)]
 mod phase_coverage;
 mod phase_results;

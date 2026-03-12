@@ -52,3 +52,6 @@ pub mod adapter;
 pub mod benchmarks;
 pub mod harness;
 pub mod wm;
+
+#[cfg(test)]
+mod proptest_math_benchmarks;

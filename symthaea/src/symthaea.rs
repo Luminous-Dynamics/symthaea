@@ -415,6 +415,10 @@ pub struct Symthaea {
     /// Feeds into code generation to modulate plan ambition.
     #[cfg(feature = "code_generation")]
     last_mcts_plan_confidence: f32,
+    /// Codebase memory: HDC-encoded AST index for semantic code search.
+    /// Populated by `index_project()`, queried during code generation for context.
+    #[cfg(feature = "code_generation")]
+    code_memory: crate::hdc::code_memory::CodebaseMemory,
 
     // ── Nociception: Pain & Infrastructure Health ──────────────────────
     /// Somatic error bridge: drains infrastructure errors → felt stress.
@@ -743,6 +747,10 @@ impl Symthaea {
             error_pattern_memory: Vec::new(),
             #[cfg(feature = "code_generation")]
             last_mcts_plan_confidence: 0.0,
+            #[cfg(feature = "code_generation")]
+            code_memory: crate::hdc::code_memory::CodebaseMemory::new(
+                crate::hdc::code_encoder::CodeHDEncoder::new(hdc_dim),
+            ),
             somatic_bridge,
             pain_tx,
             task_supervisor,
@@ -983,6 +991,10 @@ impl Symthaea {
             error_pattern_memory: Vec::new(),
             #[cfg(feature = "code_generation")]
             last_mcts_plan_confidence: 0.0,
+            #[cfg(feature = "code_generation")]
+            code_memory: crate::hdc::code_memory::CodebaseMemory::new(
+                crate::hdc::code_encoder::CodeHDEncoder::new(hdc_dim),
+            ),
             somatic_bridge,
             pain_tx,
             task_supervisor,
@@ -3774,6 +3786,257 @@ impl Symthaea {
         } else {
             set_cognitive_stride(4); // Balanced resolution
         }
+    }
+
+    // ── CodebaseMemory Integration ──────────────────────────────────────
+
+    /// Index a project directory into CodebaseMemory for semantic code search.
+    ///
+    /// Walks the directory tree (respecting common ignore patterns), parses each
+    /// source file, and encodes its AST into HDC vectors. After indexing, the
+    /// code generator can query for relevant functions/types when generating new code.
+    ///
+    /// Returns `(files_indexed, parse_errors)`.
+    #[cfg(feature = "code_generation")]
+    pub fn index_project(&mut self, root: &std::path::Path) -> (usize, usize) {
+        use crate::language::parser_registry::ParserRegistry;
+
+        let mut parser_registry = ParserRegistry::new();
+        let mut files_indexed = 0usize;
+        let mut parse_errors = 0usize;
+        let start = std::time::Instant::now();
+
+        // Collect source files recursively (skip hidden, target, node_modules, etc.)
+        let mut stack = vec![root.to_path_buf()];
+        while let Some(dir) = stack.pop() {
+            let entries = match std::fs::read_dir(&dir) {
+                Ok(e) => e,
+                Err(_) => continue,
+            };
+            for entry in entries.filter_map(|e| e.ok()) {
+                let name = entry.file_name();
+                let name_str = name.to_string_lossy();
+                if name_str.starts_with('.')
+                    || name_str == "target"
+                    || name_str == "node_modules"
+                    || name_str == "venv"
+                    || name_str == "__pycache__"
+                {
+                    continue;
+                }
+                let path = entry.path();
+                if path.is_dir() {
+                    stack.push(path);
+                } else if path.is_file() {
+                    let filename = path.file_name().and_then(|n| n.to_str());
+                    // Quick extension check before reading file
+                    if filename.is_none() {
+                        continue;
+                    }
+                    let ext = path.extension().and_then(|e| e.to_str());
+                    let is_parseable = matches!(ext, Some("rs") | Some("py") | Some("nix"));
+                    if !is_parseable {
+                        continue;
+                    }
+                    match std::fs::read_to_string(&path) {
+                        Ok(source) => match parser_registry.parse(&source, None, filename) {
+                            Ok(parsed) => {
+                                self.code_memory.index_file(&path, &parsed);
+                                files_indexed += 1;
+                            }
+                            Err(_) => parse_errors += 1,
+                        },
+                        Err(_) => parse_errors += 1,
+                    }
+                }
+            }
+        }
+
+        let elapsed = start.elapsed();
+        tracing::info!(
+            target: "symthaea::code_memory",
+            files = files_indexed,
+            errors = parse_errors,
+            functions = self.code_memory.function_count(),
+            types = self.code_memory.type_count(),
+            elapsed_ms = elapsed.as_millis(),
+            "Project indexed"
+        );
+
+        (files_indexed, parse_errors)
+    }
+
+    /// Query the codebase memory for functions/types similar to a natural language query.
+    ///
+    /// Returns up to `top_k` matches with similarity scores. Requires prior `index_project()`.
+    #[cfg(feature = "code_generation")]
+    pub fn query_codebase(
+        &self,
+        query: &str,
+        top_k: usize,
+    ) -> Vec<crate::hdc::code_memory::CodeMatch> {
+        let query_hv = self.code_memory.encoder().encode_name(query);
+        self.code_memory.query(&query_hv, top_k)
+    }
+
+    /// Get the codebase coherence score (0.0 = fragmented, 1.0 = highly cohesive).
+    #[cfg(feature = "code_generation")]
+    pub fn codebase_coherence(&self) -> f32 {
+        self.code_memory.codebase_coherence()
+    }
+
+    /// Access the code memory directly for advanced queries.
+    #[cfg(feature = "code_generation")]
+    pub fn code_memory(&self) -> &crate::hdc::code_memory::CodebaseMemory {
+        &self.code_memory
+    }
+
+    /// Run a coding task through the consciousness-gated agentic loop.
+    ///
+    /// This is the primary entry point for coding AI functionality. It:
+    /// 1. Queries `CodebaseMemory` for relevant context (if indexed)
+    /// 2. Creates a `CodingAgent` with the project's working directory
+    /// 3. Feeds codebase context into the agent's generation prompts
+    /// 4. Runs the multi-step loop (understand → plan → generate → test → fix)
+    /// 5. Records the outcome for backend stats learning
+    ///
+    /// Call `index_project()` first for codebase-aware generation.
+    #[cfg(feature = "code_generation")]
+    pub fn run_coding_task(&mut self, task: &str) -> crate::coding_agent::AgentResult {
+        use crate::coding_agent::{CodingAgent, CodingAgentConfig};
+
+        let working_dir = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+
+        let config = CodingAgentConfig {
+            working_dir: working_dir.clone(),
+            ..Default::default()
+        };
+
+        let mut agent = CodingAgent::new(config).unwrap_or_else(|e| {
+            tracing::error!(target: "symthaea::coding", error = %e, "Failed to create CodingAgent");
+            // Fallback: create with default config (will use current dir)
+            CodingAgent::new(CodingAgentConfig::default()).expect("CodingAgent default must work")
+        });
+
+        // Query CodebaseMemory for relevant context
+        let context: Vec<String> = self
+            .query_codebase(task, 5)
+            .into_iter()
+            .map(|m| {
+                format!(
+                    "// {}::{} (similarity: {:.2})\n// file: {}",
+                    m.kind,
+                    m.name,
+                    m.similarity,
+                    m.path.display()
+                )
+            })
+            .collect();
+
+        if !context.is_empty() {
+            tracing::info!(
+                target: "symthaea::coding",
+                matches = context.len(),
+                "Injecting codebase context into agent"
+            );
+            agent.set_code_context(context);
+        }
+
+        // Run the agent
+        let result = agent.run(task);
+
+        // Record outcome into error pattern memory for future generations
+        if let Some(false) = result.tests_passed {
+            for err in &result.errors {
+                if err.len() > 10 {
+                    // Extract a short pattern from the error
+                    let pattern = err.chars().take(120).collect::<String>();
+                    self.error_pattern_memory.push((pattern, task.to_string()));
+                    // Cap error memory at 64 entries
+                    if self.error_pattern_memory.len() > 64 {
+                        self.error_pattern_memory.remove(0);
+                    }
+                }
+            }
+        }
+
+        // Cache successful generations
+        if result.tests_passed == Some(true) && !result.files_modified.is_empty() {
+            self.code_generation_cache
+                .push((task.to_string(), format!("{:?}", result.files_modified)));
+            if self.code_generation_cache.len() > 32 {
+                self.code_generation_cache.remove(0);
+            }
+        }
+
+        tracing::info!(
+            target: "symthaea::coding",
+            task = task,
+            iterations = result.iterations_used,
+            files = result.files_modified.len(),
+            phase = %result.final_phase,
+            tiers = ?result.generation_tiers,
+            energy = result.total_energy,
+            "Coding task complete"
+        );
+
+        result
+    }
+
+    /// Run a coding task with a custom configuration.
+    #[cfg(feature = "code_generation")]
+    pub fn run_coding_task_with_config(
+        &mut self,
+        task: &str,
+        config: crate::coding_agent::CodingAgentConfig,
+    ) -> crate::coding_agent::AgentResult {
+        use crate::coding_agent::CodingAgent;
+
+        let mut agent = CodingAgent::new(config)
+            .unwrap_or_else(|_| CodingAgent::new(Default::default()).expect("default agent"));
+
+        let context: Vec<String> = self
+            .query_codebase(task, 5)
+            .into_iter()
+            .map(|m| {
+                format!(
+                    "// {}::{} (similarity: {:.2})\n// file: {}",
+                    m.kind,
+                    m.name,
+                    m.similarity,
+                    m.path.display()
+                )
+            })
+            .collect();
+
+        if !context.is_empty() {
+            agent.set_code_context(context);
+        }
+
+        let result = agent.run(task);
+
+        // Same outcome recording as run_coding_task
+        if let Some(false) = result.tests_passed {
+            for err in &result.errors {
+                if err.len() > 10 {
+                    let pattern = err.chars().take(120).collect::<String>();
+                    self.error_pattern_memory.push((pattern, task.to_string()));
+                    if self.error_pattern_memory.len() > 64 {
+                        self.error_pattern_memory.remove(0);
+                    }
+                }
+            }
+        }
+
+        if result.tests_passed == Some(true) && !result.files_modified.is_empty() {
+            self.code_generation_cache
+                .push((task.to_string(), format!("{:?}", result.files_modified)));
+            if self.code_generation_cache.len() > 32 {
+                self.code_generation_cache.remove(0);
+            }
+        }
+
+        result
     }
 }
 

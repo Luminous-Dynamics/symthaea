@@ -147,6 +147,7 @@ pub(crate) mod gwt_manager;
 mod helpers;
 pub(crate) mod managers;
 mod moral;
+pub mod motor_output_bridge;
 pub(crate) mod neuromod_manager;
 pub(crate) mod neuromodulators;
 mod phase_results;
@@ -164,6 +165,9 @@ pub(crate) mod voice_coherence_bridge;
 #[cfg(feature = "ssm_language")]
 pub(crate) mod broca_bridge;
 
+#[cfg(feature = "canvas")]
+pub(crate) mod canvas_bridge;
+
 #[cfg(feature = "physics-bridge")]
 pub(crate) mod physics_integration;
 #[cfg(feature = "physics-bridge")]
@@ -173,6 +177,7 @@ pub use physics_integration::ParetoContext;
 pub use managers::governance_manager::{GovernanceEvent, GovernanceEventKind, GovernanceOutcome};
 
 pub mod calibration;
+pub mod math_service;
 
 #[cfg(feature = "nurture")]
 pub mod nurture_bridge;
@@ -612,6 +617,16 @@ pub struct CognitiveLoopService {
     #[cfg(feature = "ssm_language")]
     pub(crate) last_broca_text: Option<String>,
 
+    /// Canvas living topology: consciousness-driven SVG generation.
+    /// When enabled via `canvas` feature, generates real-time topology SVGs
+    /// from cognitive telemetry with EMA-smoothed aesthetic mapping.
+    #[cfg(feature = "canvas")]
+    pub(crate) canvas_manager: Option<canvas_bridge::CanvasManager>,
+
+    /// Most recent canvas SVG, drained into `CycleResult.canvas_svg` each cycle.
+    #[cfg(feature = "canvas")]
+    pub(crate) last_canvas_svg: Option<String>,
+
     /// Buffer of PsiAttestationRecords ready for governance bridge consumption.
     /// Populated when `config.enable_psi_attestation` is true.
     /// Capacity bound: attestation_buffer_capacity (max 256) — evict before push.
@@ -655,6 +670,12 @@ pub struct CognitiveLoopService {
     /// When present, records per-cycle consciousness, performance, and safety metrics
     /// for external monitoring dashboards.
     metrics_collector: Option<crate::infrastructure::MetricsCollector>,
+
+    /// Knowledge engine: general-purpose reasoning infrastructure.
+    /// Extracts structured facts from input, encodes as HDC vectors, stores in a
+    /// temporal knowledge graph, builds causal DAG edges, and grows adaptive ontology.
+    /// Science: Kanerva (2009) HDC, Pearl (2009) Causality, Carey (2009) conceptual change.
+    knowledge_manager: Option<crate::knowledge::KnowledgeManager>,
 
     /// Experience integration bus for principled signal tracking and harmonic reasoning.
     /// Bridges cognitive loop signals to Eight Harmonies wisdom system.
@@ -775,6 +796,40 @@ pub struct CognitiveLoopService {
     /// Science: Dehaene et al. (2006) — ignition strength varies with stimulus salience;
     ///          stronger ignition recruits more recurrent cortical layers.
     cantor_last_activation: f32,
+
+    /// EMA of dream consolidation surprise (|pre_ss − post_ss|).
+    /// High surprise signals the codebook is encountering novel fractal structure.
+    /// Science: Friston (2010) — free-energy surprise drives plasticity updates;
+    ///          unexpected outcomes signal model inadequacy requiring learning.
+    cantor_dream_surprise: f32,
+
+    /// Resonance boost from coherent CRHV pairs in the broadcast buffer.
+    /// When multiple CRHVs share high similarity (>0.8), the resulting coalition
+    /// amplifies workspace integration — a "fractal choir" effect.
+    /// Science: Edelman & Tononi (2000) — reentrant cortical signaling
+    ///          creates dynamic coalitions; Singer (1999) — binding by synchrony.
+    cantor_resonance_boost: f32,
+
+    /// Motor output bridge: translates FEP MotorOutput commands into real-world
+    /// actions (file I/O, shell commands, tests) via SimpleExecutor.
+    /// When `None`, MotorOutput commands are no-ops (default behavior).
+    motor_output_bridge: Option<motor_output_bridge::MotorOutputBridge>,
+
+    /// Pending motor action request (string data for the next MotorOutput dispatch).
+    /// Set externally before a cycle to provide path/content/args for motor commands.
+    pub(crate) pending_motor_request: Option<motor_output_bridge::MotorActionRequest>,
+
+    /// Last motor output result for FEP feedback.
+    pub(crate) last_motor_result: Option<motor_output_bridge::MotorOutputResult>,
+
+    /// Phi value used for motor gating in the most recent motor execution (telemetry).
+    pub(crate) last_motor_phi: f64,
+
+    /// Math Service: unified math dispatcher routing queries to Phase 1-3 solvers
+    /// (linear algebra, root finding, quadrature, statistics, optimization, FFT,
+    /// logic engine, constraint solver, geometry, graphs, differential equations).
+    /// Tracks telemetry and stores solved-problem episodes for analogical retrieval.
+    math_service: math_service::MathService,
 }
 
 // MetricsProvider impl is in metrics_provider.rs

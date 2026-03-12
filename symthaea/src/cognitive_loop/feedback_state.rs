@@ -155,11 +155,23 @@ impl ProposalCollector {
             let avg_delta: f64 = adds.iter().map(|(_, d)| d).sum::<f64>() / adds.len() as f64;
             value += avg_delta;
         }
-        // Geometric mean of multiplicative proposals
+        // Geometric mean of multiplicative proposals.
+        // Guard: filter out non-positive scale factors (ln(0) = -inf, ln(<0) = NaN).
+        // Science: scale factors represent multiplicative modulation and must be > 0.
         if !scales.is_empty() {
-            let log_sum: f64 = scales.iter().map(|(_, f)| f.ln()).sum::<f64>();
-            let geo_mean = (log_sum / scales.len() as f64).exp();
-            value *= geo_mean;
+            let valid_scales: Vec<f64> = scales
+                .iter()
+                .map(|(_, f)| *f)
+                .filter(|f| *f > 0.0 && f.is_finite())
+                .collect();
+            if !valid_scales.is_empty() {
+                let log_sum: f64 = valid_scales.iter().map(|f| f.ln()).sum::<f64>();
+                let geo_mean = (log_sum / valid_scales.len() as f64).exp();
+                if geo_mean.is_finite() {
+                    value *= geo_mean;
+                }
+                // else: overflow/underflow in exp() — skip scaling entirely
+            }
         }
 
         value = value.clamp(clamp_min, clamp_max);
@@ -352,9 +364,10 @@ impl FeedbackState {
         self.last_threshold_integration = Some(thresh_result);
 
         // Session 9 Item 2: Dampening streak freeze — if all 4 channels were dampened
-        // for 3+ consecutive cycles, freeze feedback to cycle-start values for 1 cycle.
+        // for N+ consecutive cycles, freeze feedback to cycle-start values for 1 cycle.
         // Science: Turrigiano (2008) — homeostatic plasticity includes brief synaptic silencing.
-        if consecutive_full_dampen >= 3 {
+        use super::thresholds::CONSENSUS_FREEZE_STREAK_THRESHOLD;
+        if consecutive_full_dampen >= CONSENSUS_FREEZE_STREAK_THRESHOLD {
             self.feedback_dampened_count = 0; // Reset streak by not dampening
             self.last_consensus = Some(ConsensusResult {
                 consensus_confidence: base_confidence,
@@ -579,6 +592,11 @@ impl FeedbackState {
         ratios.iter().sum::<f32>() / 4.0
     }
 
+    /// Number of LR proposals collected this cycle.
+    pub fn lr_proposal_count(&self) -> u32 {
+        self.learning_rate.len() as u32
+    }
+
     /// Count distinct source names across all 4 channels.
     /// Science: Dehaene (2014) — healthy cognition requires multi-source consensus.
     pub fn distinct_source_count(&self) -> usize {
@@ -797,6 +815,345 @@ mod tests {
         let collector = ProposalCollector::new();
         let dump = collector.dump_proposals();
         assert!(dump.is_empty());
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // EDGE CASES: Scale proposals with non-positive values
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_zero_scale_factor_does_not_nan() {
+        let mut collector = ProposalCollector::new();
+        collector.propose("buggy", FeedbackProposal::Scale(0.0));
+        let result = collector.integrate(1.0, 0.0, 2.0);
+        assert!(result.effective.is_finite(), "Zero scale caused NaN/Inf");
+        assert!(
+            (result.effective - 1.0).abs() < 1e-10,
+            "Zero scale should be filtered, leaving base"
+        );
+    }
+
+    #[test]
+    fn test_negative_scale_factor_does_not_nan() {
+        let mut collector = ProposalCollector::new();
+        collector.propose("buggy", FeedbackProposal::Scale(-0.5));
+        collector.propose("valid", FeedbackProposal::Scale(1.1));
+        let result = collector.integrate(1.0, 0.0, 2.0);
+        assert!(
+            result.effective.is_finite(),
+            "Negative scale caused NaN/Inf"
+        );
+        // Only valid scale (1.1) should apply: geo_mean of [1.1] = 1.1
+        assert!((result.effective - 1.1).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_inf_scale_factor_filtered() {
+        let mut collector = ProposalCollector::new();
+        collector.propose("buggy", FeedbackProposal::Scale(f64::INFINITY));
+        collector.propose("valid", FeedbackProposal::Scale(0.9));
+        let result = collector.integrate(1.0, 0.0, 2.0);
+        assert!(result.effective.is_finite());
+        assert!((result.effective - 0.9).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_all_invalid_scales_leaves_base() {
+        let mut collector = ProposalCollector::new();
+        collector.propose("a", FeedbackProposal::Scale(0.0));
+        collector.propose("b", FeedbackProposal::Scale(-1.0));
+        collector.propose("c", FeedbackProposal::Scale(f64::NAN));
+        let result = collector.integrate(0.75, 0.0, 1.0);
+        assert!(result.effective.is_finite());
+        assert!(
+            (result.effective - 0.75).abs() < 1e-10,
+            "All invalid scales → base unchanged"
+        );
+        assert_eq!(result.n_scales, 3); // count is raw, not filtered
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // EDGE CASES: Conflict ratio
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_conflict_ratio_unanimous_positive() {
+        let mut collector = ProposalCollector::new();
+        collector.propose("a", FeedbackProposal::Add(0.1));
+        collector.propose("b", FeedbackProposal::Add(0.2));
+        collector.propose("c", FeedbackProposal::Add(0.05));
+        assert!((collector.conflict_ratio() - 0.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_conflict_ratio_unanimous_negative() {
+        let mut collector = ProposalCollector::new();
+        collector.propose("a", FeedbackProposal::Add(-0.1));
+        collector.propose("b", FeedbackProposal::Add(-0.2));
+        assert!((collector.conflict_ratio() - 0.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_conflict_ratio_maximally_split() {
+        let mut collector = ProposalCollector::new();
+        collector.propose("a", FeedbackProposal::Add(0.1));
+        collector.propose("b", FeedbackProposal::Add(-0.1));
+        // 1 positive, 1 negative → minority=1, total=2 → 0.5
+        assert!((collector.conflict_ratio() - 0.5).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_conflict_ratio_ignores_scale_and_set() {
+        let mut collector = ProposalCollector::new();
+        collector.propose("a", FeedbackProposal::Scale(0.9));
+        collector.propose("b", FeedbackProposal::Set(0.5));
+        // No Add proposals → conflict ratio = 0.0
+        assert!((collector.conflict_ratio() - 0.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_conflict_ratio_single_add() {
+        let mut collector = ProposalCollector::new();
+        collector.propose("a", FeedbackProposal::Add(0.1));
+        // < 2 adds → 0.0
+        assert!((collector.conflict_ratio() - 0.0).abs() < 1e-6);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // EDGE CASES: Single proposals
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_single_add_applied_without_averaging() {
+        let mut collector = ProposalCollector::new();
+        collector.propose("only", FeedbackProposal::Add(0.1));
+        let result = collector.integrate(0.5, 0.0, 1.0);
+        // avg of [0.1] = 0.1
+        assert!((result.effective - 0.6).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_single_scale_applied_directly() {
+        let mut collector = ProposalCollector::new();
+        collector.propose("only", FeedbackProposal::Scale(2.0));
+        let result = collector.integrate(0.3, 0.0, 1.0);
+        // geo_mean of [2.0] = 2.0, 0.3 * 2.0 = 0.6
+        assert!((result.effective - 0.6).abs() < 1e-10);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // EDGE CASES: Saturation (many proposals)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_100_adds_averaged_correctly() {
+        let mut collector = ProposalCollector::new();
+        for i in 0..100 {
+            // Alternate +0.01 and -0.01 → avg ≈ 0.0
+            let delta = if i % 2 == 0 { 0.01 } else { -0.01 };
+            collector.propose("subsys", FeedbackProposal::Add(delta));
+        }
+        let result = collector.integrate(0.5, 0.0, 1.0);
+        assert!(
+            (result.effective - 0.5).abs() < 1e-10,
+            "100 balanced adds should cancel"
+        );
+        assert_eq!(result.n_adds, 100);
+    }
+
+    #[test]
+    fn test_100_scales_geometric_mean() {
+        let mut collector = ProposalCollector::new();
+        // 50 × 1.02 and 50 × 0.98 → geo_mean ≈ (1.02^50 × 0.98^50)^(1/100)
+        // = (1.02 × 0.98)^(50/100) = 0.9996^0.5 ≈ 0.9998
+        for i in 0..100 {
+            let factor = if i % 2 == 0 { 1.02 } else { 0.98 };
+            collector.propose("subsys", FeedbackProposal::Scale(factor));
+        }
+        let result = collector.integrate(1.0, 0.0, 2.0);
+        assert!(result.effective.is_finite());
+        assert!(
+            (result.effective - 1.0).abs() < 0.01,
+            "Balanced scales should roughly cancel"
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // EDGE CASES: FeedbackState dampening
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_streak_freeze_returns_base_values() {
+        let mut state = FeedbackState::new();
+        state.begin_cycle();
+        state.snapshot_cycle_start(0.5, 1.0, 0.3, 1.0);
+        state.confidence.propose("test", FeedbackProposal::Add(0.2));
+        state
+            .learning_rate
+            .propose("test", FeedbackProposal::Add(0.5));
+
+        // consecutive_full_dampen >= 3 → freeze to cycle-start
+        let consensus = state.end_cycle_ext(0.5, 1.0, 0.3, 1.0, 3, false, 0.0);
+        assert!(
+            (consensus.consensus_confidence - 0.5).abs() < 1e-10,
+            "Streak freeze should return base confidence"
+        );
+        assert!(
+            (consensus.consensus_lr - 1.0).abs() < 1e-10,
+            "Streak freeze should return base LR"
+        );
+        assert!((consensus.consensus_exploration - 0.3).abs() < 1e-10);
+        assert!((consensus.consensus_threshold - 1.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_streak_below_threshold_allows_integration() {
+        let mut state = FeedbackState::new();
+        state.begin_cycle();
+        state.snapshot_cycle_start(0.5, 1.0, 0.3, 1.0);
+        state.confidence.propose("test", FeedbackProposal::Add(0.1));
+
+        // consecutive_full_dampen = 2 (below 3) → normal integration
+        let consensus = state.end_cycle_ext(0.5, 1.0, 0.3, 1.0, 2, false, 0.0);
+        // Should NOT be frozen — confidence should reflect the Add(0.1)
+        assert!(
+            consensus.consensus_confidence > 0.5,
+            "Below-streak should allow integration"
+        );
+    }
+
+    #[test]
+    fn test_flow_relaxation_widens_divergence_threshold() {
+        let mut state = FeedbackState::new();
+        state.begin_cycle();
+        state.snapshot_cycle_start(0.5, 1.0, 0.3, 1.0);
+        // Large add that would trigger dampening under normal threshold (0.3)
+        // but not under flow threshold (0.5)
+        state.confidence.propose("test", FeedbackProposal::Add(0.2));
+
+        // With flow: divergence_threshold = 0.5, ratio = |0.7-0.5|/0.5 = 0.4 < 0.5
+        let consensus_flow = state.end_cycle_ext(0.5, 1.0, 0.3, 1.0, 0, true, 0.8);
+
+        state.begin_cycle();
+        state.snapshot_cycle_start(0.5, 1.0, 0.3, 1.0);
+        state.confidence.propose("test", FeedbackProposal::Add(0.2));
+
+        // Without flow: divergence_threshold = 0.3, ratio = 0.4 > 0.3 → dampened
+        let consensus_noflow = state.end_cycle_ext(0.5, 1.0, 0.3, 1.0, 0, false, 0.0);
+
+        // Flow should allow more divergence
+        assert!(
+            (consensus_flow.consensus_confidence - 0.7).abs()
+                <= (consensus_noflow.consensus_confidence - 0.7).abs(),
+            "Flow relaxation should allow the proposal through more easily"
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // EDGE CASES: Signal diversity
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_signal_diversity_no_proposals() {
+        let state = FeedbackState::new();
+        assert!(
+            (state.signal_diversity() - 1.0).abs() < 1e-6,
+            "Empty → 1.0 (vacuously diverse)"
+        );
+    }
+
+    #[test]
+    fn test_signal_diversity_single_source_many_proposals() {
+        let mut state = FeedbackState::new();
+        state.confidence.propose("same", FeedbackProposal::Add(0.1));
+        state.confidence.propose("same", FeedbackProposal::Add(0.2));
+        state
+            .learning_rate
+            .propose("same", FeedbackProposal::Scale(1.1));
+        state
+            .exploration
+            .propose("same", FeedbackProposal::Add(0.05));
+        // 1 unique source / 4 total = 0.25
+        assert!((state.signal_diversity() - 0.25).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_signal_diversity_all_unique() {
+        let mut state = FeedbackState::new();
+        state.confidence.propose("a", FeedbackProposal::Add(0.1));
+        state.confidence.propose("b", FeedbackProposal::Add(0.2));
+        state
+            .learning_rate
+            .propose("c", FeedbackProposal::Scale(1.1));
+        // 3 unique / 3 total = 1.0
+        assert!((state.signal_diversity() - 1.0).abs() < 1e-6);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // EDGE CASES: Dominant source
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_dominant_source_empty() {
+        let state = FeedbackState::new();
+        assert_eq!(state.dominant_source(), "");
+        assert!((state.dominant_source_concentration() - 0.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_dominant_source_single_winner() {
+        let mut state = FeedbackState::new();
+        state
+            .confidence
+            .propose("dominant", FeedbackProposal::Add(0.1));
+        state
+            .confidence
+            .propose("dominant", FeedbackProposal::Add(0.2));
+        state
+            .confidence
+            .propose("minor", FeedbackProposal::Add(0.05));
+        assert_eq!(state.dominant_source(), "dominant");
+        // 2/3 ≈ 0.6667
+        assert!((state.dominant_source_concentration() - 2.0 / 3.0).abs() < 1e-4);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // EDGE CASES: High-water mark
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_high_water_mark_tracks_maximum() {
+        let mut state = FeedbackState::new();
+
+        // Cycle 1: 3 proposals
+        state.begin_cycle();
+        state.snapshot_cycle_start(0.5, 1.0, 0.3, 1.0);
+        state.confidence.propose("a", FeedbackProposal::Add(0.1));
+        state.confidence.propose("b", FeedbackProposal::Add(0.2));
+        state
+            .learning_rate
+            .propose("c", FeedbackProposal::Scale(1.1));
+        state.end_cycle(0.5, 1.0, 0.3, 1.0);
+        assert_eq!(state.feedback_signals_high_water, 3);
+
+        // Cycle 2: 1 proposal (lower) → high-water stays at 3
+        state.begin_cycle();
+        state.snapshot_cycle_start(0.5, 1.0, 0.3, 1.0);
+        state.confidence.propose("a", FeedbackProposal::Add(0.1));
+        state.end_cycle(0.5, 1.0, 0.3, 1.0);
+        assert_eq!(
+            state.feedback_signals_high_water, 3,
+            "High-water should not decrease"
+        );
+
+        // Cycle 3: 5 proposals → high-water updates to 5
+        state.begin_cycle();
+        state.snapshot_cycle_start(0.5, 1.0, 0.3, 1.0);
+        for _ in 0..5 {
+            state.confidence.propose("x", FeedbackProposal::Add(0.01));
+        }
+        state.end_cycle(0.5, 1.0, 0.3, 1.0);
+        assert_eq!(state.feedback_signals_high_water, 5);
     }
 
     /// Verify that consensus writebacks routed through `store_consensus_for_next_cycle`

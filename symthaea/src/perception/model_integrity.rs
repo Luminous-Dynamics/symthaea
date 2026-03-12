@@ -64,10 +64,7 @@ impl ModelManifest {
     pub fn from_directory(dir: &Path) -> Result<Self> {
         let mut manifest = Self::new();
         if !dir.is_dir() {
-            anyhow::bail!(
-                "model_integrity: not a directory: {}",
-                dir.display()
-            );
+            anyhow::bail!("model_integrity: not a directory: {}", dir.display());
         }
         for entry in std::fs::read_dir(dir)? {
             let entry = entry?;
@@ -93,9 +90,8 @@ impl ModelManifest {
 
     /// Deserialize manifest from JSON.
     pub fn from_json(json: &str) -> Result<Self> {
-        let map: std::collections::BTreeMap<String, String> =
-            serde_json::from_str(json)
-                .map_err(|e| anyhow::anyhow!("model_integrity: JSON parse failed: {e}"))?;
+        let map: std::collections::BTreeMap<String, String> = serde_json::from_str(json)
+            .map_err(|e| anyhow::anyhow!("model_integrity: JSON parse failed: {e}"))?;
         let mut manifest = Self::new();
         for (path, hash) in map {
             manifest.insert(PathBuf::from(path), hash);

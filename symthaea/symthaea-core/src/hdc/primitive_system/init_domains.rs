@@ -9,6 +9,7 @@
 //! - Economic/Value primitives
 //! - Linguistic/Semiotic primitives
 //! - Social/Moral primitives
+//! - Institutional/Geopolitical primitives
 
 use super::{
     seed_from_name, BindingRule, DomainManifold, Primitive, PrimitiveSystem, PrimitiveTier,
@@ -806,6 +807,192 @@ impl PrimitiveSystem {
             pattern: vec![PrimitiveTier::Strategic, PrimitiveTier::MetaCognitive],
             result_tier: PrimitiveTier::MetaCognitive,
             example: "OBLIGATION ⊗ REFLECTION → moral judgment".to_string(),
+        });
+    }
+
+    /// Initialize Institutional/Geopolitical Primitives
+    ///
+    /// Models sociological entities (nation-states, institutions, legal systems) as
+    /// **environmental constraints and causal objects**, NOT as foundational or supreme
+    /// primitives. Nation-states are composite hypervectors formed by binding underlying
+    /// sociological concepts — they are "drivers, not kernel."
+    ///
+    /// ## Design Philosophy
+    ///
+    /// Nation-states are shared human conventions with very real physical consequences.
+    /// They are modeled with the same causal rigor as physical phenomena: a firewall
+    /// deterministically blocks packets, sanctions freeze assets at the banking layer,
+    /// export controls physically prevent shipments.
+    ///
+    /// ## Base Primitives (irreducible atoms of institutional reality)
+    ///
+    /// - AUTHORITY: Recognized capacity to direct action within a scope
+    /// - LEGITIMACY: Socially constructed basis for authority acceptance
+    /// - SOVEREIGNTY: Exclusive authority claim over a territory
+    /// - ENFORCEMENT: Capacity to impose consequences for rule violations
+    /// - JURISDICTION: Scope within which authority applies (spatial/temporal/domain)
+    /// - POPULATION: Collective of agents subject to a governance structure
+    /// - MONOPOLY: Exclusive control over a resource or capability
+    /// - COMPLIANCE: Conformity with rules imposed by an authority
+    /// - TREATY: Binding agreement between sovereign entities
+    /// - SANCTION: Punitive constraint imposed by authority on target
+    ///
+    /// ## Derived Composites (in init_derived)
+    ///
+    /// - TERRITORY = SPACE ⊗ BOUNDARY ⊗ SOVEREIGNTY
+    /// - INSTITUTION = NORM ⊗ AUTHORITY ⊗ PERSIST
+    /// - LAW = NORM ⊗ ENFORCEMENT ⊗ JURISDICTION
+    /// - TAXATION = OBLIGATION ⊗ AUTHORITY ⊗ EXCHANGE
+    /// - REGULATION = CONSTRAINT ⊗ LAW ⊗ COMPLIANCE
+    /// - FIAT_CURRENCY = VALUE_SUBJECTIVE ⊗ AUTHORITY ⊗ TRUST_ECONOMIC ⊗ MONOPOLY
+    /// - NATION_STATE = SOVEREIGNTY ⊗ INSTITUTION ⊗ ENFORCEMENT ⊗ POPULATION
+    /// - FAILED_STATE = NATION_STATE with LEGITIMACY → 0 (decomposition analysis)
+    /// - BORDER_DISPUTE = SOVEREIGNTY ⊗ OVERLAPS (topological overlap of claims)
+    pub(super) fn init_institutional_primitives(&mut self) {
+        let institutional_domain = DomainManifold::new(
+            "institutional",
+            PrimitiveTier::Strategic,
+            "Institutional structures, geopolitical entities, and legal systems",
+        );
+
+        // === AUTHORITY & LEGITIMACY ===
+        // The two irreducible components of institutional power.
+        // Authority without legitimacy = tyranny. Legitimacy without authority = aspiration.
+
+        let authority = Primitive::base(
+            "AUTHORITY",
+            PrimitiveTier::Strategic,
+            "institutional",
+            institutional_domain.embed(BinaryHV::random(seed_from_name("AUTHORITY"))),
+            "Capacity: recognized power to direct action within a scope",
+        );
+
+        let legitimacy = Primitive::base(
+            "LEGITIMACY",
+            PrimitiveTier::Strategic,
+            "institutional",
+            institutional_domain.embed(BinaryHV::random(seed_from_name("LEGITIMACY"))),
+            "Property: socially constructed basis for authority acceptance (consent, tradition, charisma, rational-legal)",
+        );
+
+        // === SOVEREIGNTY & JURISDICTION ===
+        // Spatial and domain-scoped authority claims.
+
+        let sovereignty = Primitive::base(
+            "SOVEREIGNTY",
+            PrimitiveTier::Strategic,
+            "institutional",
+            institutional_domain.embed(BinaryHV::random(seed_from_name("SOVEREIGNTY"))),
+            "Claim: exclusive supreme authority over a bounded domain (Westphalian principle)",
+        );
+
+        let jurisdiction = Primitive::base(
+            "JURISDICTION",
+            PrimitiveTier::Strategic,
+            "institutional",
+            institutional_domain.embed(BinaryHV::random(seed_from_name("JURISDICTION"))),
+            "Scope: spatial, temporal, or domain bounds within which authority applies",
+        );
+
+        // === ENFORCEMENT & COMPLIANCE ===
+        // The coercive and cooperative dimensions of institutional power.
+
+        let enforcement = Primitive::base(
+            "ENFORCEMENT",
+            PrimitiveTier::Strategic,
+            "institutional",
+            institutional_domain.embed(BinaryHV::random(seed_from_name("ENFORCEMENT"))),
+            "Capacity: ability to impose consequences for rule violations (fines, imprisonment, sanctions)",
+        );
+
+        let compliance = Primitive::base(
+            "COMPLIANCE",
+            PrimitiveTier::Strategic,
+            "institutional",
+            institutional_domain.embed(BinaryHV::random(seed_from_name("COMPLIANCE"))),
+            "State: conformity with rules imposed by an authority (GDPR, HIPAA, FATF)",
+        );
+
+        // === COLLECTIVE ENTITIES ===
+
+        let population = Primitive::base(
+            "POPULATION",
+            PrimitiveTier::Strategic,
+            "institutional",
+            institutional_domain.embed(BinaryHV::random(seed_from_name("POPULATION"))),
+            "Collective: agents subject to a common governance structure",
+        );
+
+        let monopoly = Primitive::base(
+            "MONOPOLY",
+            PrimitiveTier::Strategic,
+            "institutional",
+            institutional_domain.embed(BinaryHV::random(seed_from_name("MONOPOLY"))),
+            "Structure: exclusive control over a resource, capability, or market",
+        );
+
+        // === INTER-INSTITUTIONAL RELATIONS ===
+
+        let treaty = Primitive::base(
+            "TREATY",
+            PrimitiveTier::Strategic,
+            "institutional",
+            institutional_domain.embed(BinaryHV::random(seed_from_name("TREATY"))),
+            "Agreement: binding compact between sovereign entities (mutual obligations)",
+        );
+
+        let sanction = Primitive::base(
+            "SANCTION",
+            PrimitiveTier::Strategic,
+            "institutional",
+            institutional_domain.embed(BinaryHV::random(seed_from_name("SANCTION"))),
+            "Constraint: punitive measure imposed by authority on target (trade, financial, diplomatic)",
+        );
+
+        // Register domain and primitives
+        self.domains
+            .insert("institutional".to_string(), institutional_domain);
+
+        for primitive in [
+            authority,
+            legitimacy,
+            sovereignty,
+            jurisdiction,
+            enforcement,
+            compliance,
+            population,
+            monopoly,
+            treaty,
+            sanction,
+        ] {
+            let name = primitive.name.clone();
+            let tier = primitive.tier;
+            self.primitives.insert(name.clone(), primitive);
+            self.by_tier.entry(tier).or_default().push(name);
+        }
+
+        // Binding rules
+        self.binding_rules.push(BindingRule {
+            name: "institutional_structure".to_string(),
+            pattern: vec![PrimitiveTier::Strategic, PrimitiveTier::Strategic],
+            result_tier: PrimitiveTier::Strategic,
+            example: "AUTHORITY ⊗ LEGITIMACY → legitimate governance".to_string(),
+        });
+
+        self.binding_rules.push(BindingRule {
+            name: "institutional_constraint".to_string(),
+            pattern: vec![PrimitiveTier::Strategic, PrimitiveTier::Physical],
+            result_tier: PrimitiveTier::Strategic,
+            example: "SOVEREIGNTY ⊗ SPACE → territorial claim (causal constraint on physical infrastructure)"
+                .to_string(),
+        });
+
+        self.binding_rules.push(BindingRule {
+            name: "institutional_geometric".to_string(),
+            pattern: vec![PrimitiveTier::Strategic, PrimitiveTier::Geometric],
+            result_tier: PrimitiveTier::Strategic,
+            example: "JURISDICTION ⊗ BOUNDARY → jurisdictional boundary (regulatory zone)"
+                .to_string(),
         });
     }
 }

@@ -201,6 +201,7 @@ impl PrimitiveSystem {
         system.init_economic_primitives();
         system.init_linguistic_primitives();
         system.init_social_moral_primitives();
+        system.init_institutional_primitives();
 
         // Initialize Tier 6: Temporal primitives (Allen's Interval Algebra extended)
         system.init_tier6_temporal();

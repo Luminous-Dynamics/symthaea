@@ -469,6 +469,11 @@ impl CognitiveLoopService {
 
         let enable_visualization = config.enable_visualization;
         let enable_soul_alignment = config.enable_soul_alignment;
+        let enable_knowledge_engine = config.enable_knowledge_engine;
+        let knowledge_graph_capacity = config.knowledge_graph_capacity;
+        let knowledge_causal_capacity = config.knowledge_causal_capacity;
+        let knowledge_search_top_k = config.knowledge_search_top_k;
+        let knowledge_ontology_max = config.knowledge_ontology_max;
 
         Ok(Self {
             config,
@@ -784,6 +789,10 @@ impl CognitiveLoopService {
             },
             #[cfg(feature = "ssm_language")]
             last_broca_text: None,
+            #[cfg(feature = "canvas")]
+            canvas_manager: Some(super::canvas_bridge::CanvasManager::new()),
+            #[cfg(feature = "canvas")]
+            last_canvas_svg: None,
             psi_attestation_buffer: std::collections::VecDeque::with_capacity(attestation_buf_cap),
             policy_agreement_window: std::collections::VecDeque::with_capacity(20),
             master_equation: MasterConsciousnessEquation::default(),
@@ -801,6 +810,23 @@ impl CognitiveLoopService {
             biorhythm_mgr: super::biorhythm_manager::BiorhythmManager::new(timezone_offset_hours),
             phi_attention_gate: Some(crate::attention::PhiAttentionGate::default_gate()),
             metrics_collector: Some(crate::infrastructure::MetricsCollector::new()),
+            knowledge_manager: if enable_knowledge_engine {
+                let km_config = crate::knowledge::manager::KnowledgeManagerConfig {
+                    graph_capacity: knowledge_graph_capacity,
+                    causal_capacity: knowledge_causal_capacity,
+                    search_top_k: knowledge_search_top_k,
+                    ontology_config: crate::knowledge::adaptive_ontology::AdaptiveOntologyConfig {
+                        max_primitives: knowledge_ontology_max,
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                };
+                let mut km = crate::knowledge::KnowledgeManager::new(km_config);
+                km.bootstrap_entities();
+                Some(km)
+            } else {
+                None
+            },
             experience_bus: Some(crate::experience::ExperienceBus::with_defaults()),
             #[cfg(feature = "school_learning")]
             school_bridge: None,
@@ -908,10 +934,15 @@ impl CognitiveLoopService {
             #[cfg(feature = "mycelix")]
             governance_mgr: super::managers::GovernanceManager::default(),
             cantor_broadcast_buffer: Vec::with_capacity(32),
-            cantor_cleanup_engine: symthaea_core::hdc::cantor_resonator_cleanup::CantorCleanupEngine::new(
-                symthaea_core::hdc::cantor_resonator_cleanup::CantorCleanupConfig::default(),
-            ),
+            cantor_cleanup_engine: {
+                use symthaea_core::hdc::cantor_resonator_cleanup::*;
+                CantorCleanupEngine::with_codebook_capacity(
+                    super::thresholds::CANTOR_CODEBOOK_MAX_ENTRIES,
+                )
+            },
             cantor_last_activation: 0.0,
+            cantor_dream_surprise: 0.0,
+            cantor_resonance_boost: 0.0,
             #[cfg(feature = "integrity")]
             integrity_manager: {
                 let mut im = crate::integrity::IntegrityManager::new();
@@ -960,12 +991,20 @@ impl CognitiveLoopService {
                     0.125,
                     0.125,
                 ]);
+                // Register governance thresholds for integrity monitoring
+                #[cfg(feature = "mycelix")]
+                im.register_governance_thresholds();
                 // Apply substrate tau factor for temporal consistency scaling (#3)
                 im.set_substrate_tau_factor(substrate_tau_for_integrity);
                 // Install panic hook for crash forensics — dumps integrity snapshot to disk
                 crate::integrity::install_panic_hook();
                 im
             },
+            motor_output_bridge: None,
+            pending_motor_request: None,
+            last_motor_result: None,
+            last_motor_phi: 0.0,
+            math_service: super::math_service::MathService::new(),
         })
     }
 
@@ -986,20 +1025,17 @@ impl CognitiveLoopService {
         let mut embedder = match symthaea_embeddings::Qwen3Embedder::new(qwen_config) {
             Ok(e) => e,
             Err(e) => {
-                tracing::warn!(
-                    "Failed to create Qwen3 embedder for dense HarmonyBasis: {e}"
-                );
+                tracing::warn!("Failed to create Qwen3 embedder for dense HarmonyBasis: {e}");
                 return None;
             }
         };
 
-        let bridge = symthaea_embeddings::HdcBridge::with_config(
-            symthaea_embeddings::BridgeConfig {
+        let bridge =
+            symthaea_embeddings::HdcBridge::with_config(symthaea_embeddings::BridgeConfig {
                 input_dim: symthaea_embeddings::QWEN3_DIMENSION,
                 output_dim: dim,
                 ..Default::default()
-            },
-        );
+            });
 
         // Encode all 8 harmony keyword strings in batch
         let keyword_refs: Vec<&str> = HARMONY_KEYWORDS.iter().copied().collect();
@@ -1026,9 +1062,9 @@ impl CognitiveLoopService {
             vectors.push(ContinuousHV::from_slice(&projected));
         }
 
-        let arr: [ContinuousHV; N_HARMONIES] = vectors.try_into().unwrap_or_else(
-            |_| [(); N_HARMONIES].map(|_| ContinuousHV::zero(dim)),
-        );
+        let arr: [ContinuousHV; N_HARMONIES] = vectors
+            .try_into()
+            .unwrap_or_else(|_| [(); N_HARMONIES].map(|_| ContinuousHV::zero(dim)));
 
         let basis = HarmonyBasis::with_dense_vectors(dim, arr);
         tracing::info!(

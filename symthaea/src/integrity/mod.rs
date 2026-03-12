@@ -536,6 +536,37 @@ impl IntegrityManager {
         );
     }
 
+    /// Register governance neuromodulatory threshold constants for attestation.
+    ///
+    /// These control the neurochemical response to governance events (emergency → NE,
+    /// reciprocity → oxytocin, etc.). Tampering could silently distort the embodied
+    /// governance experience — e.g., suppressing the emergency NE surge.
+    #[cfg(feature = "mycelix")]
+    pub fn register_governance_thresholds(&mut self) {
+        use crate::cognitive_loop::thresholds;
+        let constants: Vec<f32> = vec![
+            thresholds::GOV_NEUROMOD_FLOOR,
+            thresholds::GOV_EMERGENCY_NE_NUDGE,
+            thresholds::GOV_RECIPROCITY_OXY_DOSE,
+            thresholds::GOV_RECIPROCITY_OXY_CAP,
+            thresholds::GOV_RECIPROCITY_OXY_HALFLIFE as f32,
+            thresholds::GOV_DISPUTE_NE_NUDGE,
+            thresholds::GOV_DISPUTE_SHT_NUDGE,
+            thresholds::GOV_ALIGNED_PASS_DA_DOSE,
+            thresholds::GOV_ALIGNED_PASS_DA_HALFLIFE as f32,
+            thresholds::GOV_ALIGNED_FAIL_DA_NUDGE,
+            thresholds::GOV_REPUTATION_DECLINE_SHT,
+            thresholds::GOV_COLLECTIVE_PHI_ECB,
+            thresholds::GOV_CONSCIOUSNESS_MODULATION as f32,
+        ];
+        let hash = attestation::blake3_hash_f32_slice(&constants);
+        self.attestation.register(
+            "governance_thresholds",
+            hash,
+            Box::new(move || attestation::blake3_hash_f32_slice(&constants)),
+        );
+    }
+
     /// Verify live safety thresholds against the registered baseline.
     ///
     /// Called from the cognitive cycle with current threshold values. This catches

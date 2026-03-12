@@ -833,6 +833,17 @@ impl ProsodyFeatures {
         }
     }
 
+    /// Probabilistic YIN (PYIN) pitch detection.
+    ///
+    /// Uses the cumulative mean normalized difference function d'(tau)
+    /// instead of raw autocorrelation, with absolute thresholding for
+    /// candidate selection and parabolic interpolation for sub-sample
+    /// accuracy.
+    ///
+    /// Reference: de Cheveigne & Kawahara (2002), "YIN, a fundamental
+    /// frequency estimator for speech and music"; Mauch & Dixon (2014),
+    /// "pYIN: A Fundamental Frequency Estimator Using Probabilistic
+    /// Thresholds".
     fn detect_pitch(audio: &[f32], sample_rate: u32) -> f32 {
         let min_lag = sample_rate as usize / 500; // Max 500 Hz
         let max_lag = sample_rate as usize / 50; // Min 50 Hz
@@ -841,22 +852,91 @@ impl ProsodyFeatures {
             return 0.0;
         }
 
-        let mut best_lag = 0;
-        let mut best_corr = 0.0;
+        let n = audio.len().min(max_lag * 2);
 
-        for lag in min_lag..max_lag.min(audio.len() / 2) {
-            let mut corr = 0.0;
-            for i in 0..audio.len() - lag {
-                corr += audio[i] * audio[i + lag];
+        // Step 1: Compute the difference function d(tau)
+        let mut diff = vec![0.0f32; max_lag + 1];
+        for tau in 1..=max_lag.min(n / 2) {
+            let mut sum = 0.0f32;
+            for j in 0..(n - tau) {
+                let delta = audio[j] - audio[j + tau];
+                sum += delta * delta;
             }
-            if corr > best_corr {
-                best_corr = corr;
-                best_lag = lag;
+            diff[tau] = sum;
+        }
+
+        // Step 2: Cumulative mean normalized difference function d'(tau)
+        // d'(0) = 1 by definition; d'(tau) = d(tau) / ((1/tau) * sum(d(j), j=1..tau))
+        let mut cmnd = vec![0.0f32; max_lag + 1];
+        cmnd[0] = 1.0;
+        let mut running_sum = 0.0f32;
+        for tau in 1..=max_lag.min(n / 2) {
+            running_sum += diff[tau];
+            if running_sum > 0.0 {
+                cmnd[tau] = diff[tau] * tau as f32 / running_sum;
+            } else {
+                cmnd[tau] = 1.0;
             }
         }
 
-        if best_lag > 0 {
-            sample_rate as f32 / best_lag as f32
+        // Step 3: Absolute threshold candidate selection (PYIN)
+        // Select the first lag whose d'(tau) dips below the threshold.
+        // Use multiple thresholds and pick the candidate with the best
+        // (lowest) d'(tau) among those that pass any threshold.
+        const PYIN_THRESHOLDS: [f32; 3] = [0.10, 0.15, 0.20];
+
+        let search_max = max_lag.min(n / 2);
+        let mut best_lag: usize = 0;
+        let mut best_score = f32::MAX;
+
+        for &thresh in &PYIN_THRESHOLDS {
+            // Find first tau in range that dips below threshold
+            for tau in min_lag..search_max {
+                if cmnd[tau] < thresh {
+                    // Found a candidate — check if it's a local minimum
+                    if tau + 1 < search_max && cmnd[tau] <= cmnd[tau + 1] {
+                        if cmnd[tau] < best_score {
+                            best_score = cmnd[tau];
+                            best_lag = tau;
+                        }
+                        break; // Take first dip per threshold (YIN convention)
+                    }
+                }
+            }
+        }
+
+        // Fallback: if no candidate passed threshold, find global minimum
+        if best_lag == 0 {
+            for tau in min_lag..search_max {
+                if cmnd[tau] < best_score {
+                    best_score = cmnd[tau];
+                    best_lag = tau;
+                }
+            }
+        }
+
+        // Reject if the best score is too high (unvoiced)
+        if best_lag == 0 || best_score > 0.50 {
+            return 0.0;
+        }
+
+        // Step 4: Parabolic interpolation for sub-sample accuracy
+        let lag_f = if best_lag > min_lag && best_lag + 1 < search_max {
+            let alpha = cmnd[best_lag - 1];
+            let beta = cmnd[best_lag];
+            let gamma = cmnd[best_lag + 1];
+            let denom = 2.0 * (alpha - 2.0 * beta + gamma);
+            if denom.abs() > 1e-10 {
+                best_lag as f32 + (alpha - gamma) / denom
+            } else {
+                best_lag as f32
+            }
+        } else {
+            best_lag as f32
+        };
+
+        if lag_f > 0.0 {
+            sample_rate as f32 / lag_f
         } else {
             0.0
         }

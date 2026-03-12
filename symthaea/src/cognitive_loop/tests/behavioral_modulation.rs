@@ -131,8 +131,14 @@ fn living_mind_signals_zero_without_feature() {
     for (i, r) in results.iter().enumerate() {
         let m = &r.metadata;
         // Raw signals should be finite (even if 0.0)
-        assert!(m.living_mind_vitality.is_finite(), "NaN vitality at cycle {i}");
-        assert!(m.living_mind_coherence.is_finite(), "NaN coherence at cycle {i}");
+        assert!(
+            m.living_mind_vitality.is_finite(),
+            "NaN vitality at cycle {i}"
+        );
+        assert!(
+            m.living_mind_coherence.is_finite(),
+            "NaN coherence at cycle {i}"
+        );
 
         // When signal is 0.0, the > 0.0 guard prevents modulation from firing
         if m.living_mind_vitality == 0.0 {
@@ -221,7 +227,7 @@ fn epistemic_phi_modulation_signal_finite() {
     let results = run_cycles(&mut svc, 50, "epistemic phi check");
     for (i, r) in results.iter().enumerate() {
         assert!(
-            r.metadata.epistemic_phi_eff.is_finite(),
+            r.metadata.quality.epistemic_phi_eff.is_finite(),
             "NaN epistemic_phi_eff at cycle {i}"
         );
     }
@@ -310,10 +316,22 @@ fn no_nan_in_consciousness_metrics_across_cycles() {
 
     for (i, r) in results.iter().enumerate() {
         let m = &r.metadata;
-        assert!(m.actual_effective_lr.is_finite(), "NaN in actual_effective_lr at cycle {i}");
-        assert!(m.consciousness_level.is_finite(), "NaN in consciousness_level at cycle {i}");
-        assert!(m.holographic_unity.is_finite(), "NaN in holographic_unity at cycle {i}");
-        assert!(m.holographic_binding.is_finite(), "NaN in holographic_binding at cycle {i}");
+        assert!(
+            m.actual_effective_lr.is_finite(),
+            "NaN in actual_effective_lr at cycle {i}"
+        );
+        assert!(
+            m.consciousness_level.is_finite(),
+            "NaN in consciousness_level at cycle {i}"
+        );
+        assert!(
+            m.holographic_unity.is_finite(),
+            "NaN in holographic_unity at cycle {i}"
+        );
+        assert!(
+            m.holographic_binding.is_finite(),
+            "NaN in holographic_binding at cycle {i}"
+        );
     }
 }
 
@@ -373,17 +391,18 @@ fn different_profiles_all_produce_valid_lr() {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 #[test]
-fn no_modulations_during_warmup() {
-    // All modulation bools are gated by `total_cycles > 15`.
-    // Cycles 0-15 should have zero modulation bools set.
+fn no_modulations_during_early_warmup() {
+    // Most modulation bools are gated by `total_cycles > 15`, but some
+    // (binding_attention) gate at `> 10`. During the first 10 cycles,
+    // no modulations should fire.
     let mut svc = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
-    let results = run_cycles(&mut svc, 16, "warmup gate");
+    let results = run_cycles(&mut svc, 10, "warmup gate");
 
     for (i, r) in results.iter().enumerate() {
         let total = total_modulations_fired(&r.metadata);
         assert_eq!(
             total, 0,
-            "Cycle {i} (warmup) fired {total} modulations — expected 0"
+            "Cycle {i} (early warmup) fired {total} modulations — expected 0"
         );
     }
 }

@@ -174,7 +174,12 @@ impl CognitiveLoopService {
                     norm_b += b * b;
                 }
                 let denom = (norm_a.sqrt() * norm_b.sqrt()).max(1e-10);
-                total_sim += (dot / denom).clamp(0.0, 1.0);
+                let sim = dot / denom;
+                total_sim += if sim.is_finite() {
+                    sim.clamp(0.0, 1.0)
+                } else {
+                    0.0
+                };
                 pairs += 1;
             }
         }

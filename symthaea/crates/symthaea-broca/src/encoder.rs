@@ -27,33 +27,41 @@ use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
 
 /// Number of thought channels.
-pub const NUM_CHANNELS: usize = 20;
+pub const NUM_CHANNELS: usize = 24;
+
+/// Number of channels in legacy (v2) training data format.
+pub const LEGACY_NUM_CHANNELS: usize = 20;
 
 /// Number of thermometer coding levels.
 const DEFAULT_NUM_LEVELS: usize = 32;
 
 /// Channel names for genesis seeding.
 const CHANNEL_NAMES: [&str; NUM_CHANNELS] = [
-    "intent_acknowledge",
-    "intent_answer",
-    "intent_clarify",
-    "intent_propose",
-    "intent_uncertainty",
-    "intent_reflect",
-    "intent_continue",
-    "intent_unknown",
-    "epistemic_status",
-    "valence",
-    "arousal",
-    "warmth",
-    "psi",
-    "meta_awareness",
-    "coherence",
-    "relationship_stage",
-    "trust",
-    "mood_temperature",
-    "has_computed_answer",
-    "concept_count",
+    "intent_acknowledge",  // 0
+    "intent_answer",       // 1
+    "intent_clarify",      // 2
+    "intent_propose",      // 3
+    "intent_uncertainty",  // 4
+    "intent_reflect",      // 5
+    "intent_continue",     // 6
+    "intent_unknown",      // 7
+    "epistemic_status",    // 8
+    "valence",             // 9
+    "arousal",             // 10
+    "warmth",              // 11
+    "psi",                 // 12
+    "meta_awareness",      // 13
+    "coherence",           // 14
+    "relationship_stage",  // 15
+    "trust",               // 16
+    "mood_temperature",    // 17
+    "has_computed_answer", // 18
+    "concept_count",       // 19
+    // New channels (v3)
+    "time_pressure",       // 20: urgency/deadline proximity (0=relaxed, 1=urgent)
+    "domain_familiarity",  // 21: how well-known the topic is (0=novel, 1=expert)
+    "social_context",      // 22: formality of interaction (0=intimate, 1=formal)
+    "response_confidence", // 23: confidence in the generated response (0=unsure, 1=confident)
 ];
 
 /// Channel ranges [min, max] for normalization to [0, 1].
@@ -78,6 +86,19 @@ const CHANNEL_RANGES: [[f32; 2]; NUM_CHANNELS] = [
     [0.5, 2.0],  // mood_temperature
     [0.0, 1.0],  // has_computed_answer
     [0.0, 10.0], // concept_count
+    // New channels (v3)
+    [0.0, 1.0], // time_pressure
+    [0.0, 1.0], // domain_familiarity
+    [0.0, 1.0], // social_context
+    [0.0, 1.0], // response_confidence
+];
+
+/// Default values for the 4 new channels (used when loading legacy 20-channel data).
+pub const NEW_CHANNEL_DEFAULTS: [f32; 4] = [
+    0.0, // time_pressure: relaxed
+    0.5, // domain_familiarity: mid
+    0.5, // social_context: mid
+    0.5, // response_confidence: mid
 ];
 
 /// Decoupled thought state: 20 scalar channels extracted from StructuredThought.
@@ -94,7 +115,7 @@ impl Default for ThoughtChannels {
         Self {
             channels: [
                 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, // intent: Unknown
-                3.0, // epistemic: Unknown
+                1.0, // epistemic: Probable (not Unknown — avoids overly pessimistic default)
                 0.0, // valence: neutral
                 0.5, // arousal: mid
                 0.5, // warmth: mid
@@ -106,6 +127,11 @@ impl Default for ThoughtChannels {
                 1.0, // mood_temperature: neutral
                 0.0, // has_computed_answer: false
                 0.0, // concept_count: none
+                // New channels (v3)
+                0.0, // time_pressure: relaxed
+                0.5, // domain_familiarity: mid
+                0.5, // social_context: mid
+                0.5, // response_confidence: mid
             ],
         }
     }
@@ -173,6 +199,51 @@ impl ThoughtChannels {
     /// Get coherence.
     pub fn coherence(&self) -> f32 {
         self.channels[14]
+    }
+
+    /// Set contextual channels (new v3 channels).
+    pub fn set_context(
+        &mut self,
+        time_pressure: f32,
+        domain_familiarity: f32,
+        social_context: f32,
+        response_confidence: f32,
+    ) {
+        self.channels[20] = time_pressure.clamp(0.0, 1.0);
+        self.channels[21] = domain_familiarity.clamp(0.0, 1.0);
+        self.channels[22] = social_context.clamp(0.0, 1.0);
+        self.channels[23] = response_confidence.clamp(0.0, 1.0);
+    }
+
+    /// Get time pressure (0=relaxed, 1=urgent).
+    pub fn time_pressure(&self) -> f32 {
+        self.channels[20]
+    }
+
+    /// Get domain familiarity (0=novel, 1=expert).
+    pub fn domain_familiarity(&self) -> f32 {
+        self.channels[21]
+    }
+
+    /// Get social context (0=intimate, 1=formal).
+    pub fn social_context(&self) -> f32 {
+        self.channels[22]
+    }
+
+    /// Get response confidence (0=unsure, 1=confident).
+    pub fn response_confidence(&self) -> f32 {
+        self.channels[23]
+    }
+
+    /// Construct from a legacy 20-channel array, padding new channels with defaults.
+    pub fn from_legacy(legacy: &[f32; LEGACY_NUM_CHANNELS]) -> Self {
+        let mut channels = [0.0f32; NUM_CHANNELS];
+        channels[..LEGACY_NUM_CHANNELS].copy_from_slice(legacy);
+        channels[20] = NEW_CHANNEL_DEFAULTS[0];
+        channels[21] = NEW_CHANNEL_DEFAULTS[1];
+        channels[22] = NEW_CHANNEL_DEFAULTS[2];
+        channels[23] = NEW_CHANNEL_DEFAULTS[3];
+        Self { channels }
     }
 }
 

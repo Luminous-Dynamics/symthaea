@@ -6,15 +6,15 @@ Thank you for your interest in contributing to Symthaea! This document provides 
 
 ### Prerequisites
 
-- Rust 1.75+ (stable)
+- Rust 1.82+ (stable)
 - Optional: Nix for reproducible development environment
 
 ### Development Setup
 
 ```bash
 # Clone the repository
-git clone https://github.com/Luminous-Dynamics/symthaea-hlb.git
-cd symthaea-hlb
+git clone https://github.com/Luminous-Dynamics/symthaea.git
+cd symthaea
 
 # Using Nix (recommended)
 nix develop
@@ -122,6 +122,10 @@ Current feature categories:
 - Open an issue for bugs or feature requests
 - Check existing documentation in `docs/`
 - Review [HONEST_STATUS.md](docs/HONEST_STATUS.md) for project status
+
+## License
+
+By contributing, you agree that your contributions will be licensed under the AGPL-3.0-or-later license.
 
 ## Code of Conduct
 

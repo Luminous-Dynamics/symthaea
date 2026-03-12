@@ -10,7 +10,8 @@
 use std::time::Instant;
 
 use super::phase_results::{
-    PercEncoding, PercExploration, PercMoral, PercStrategy, PercUrgency, PerceptionPhaseResult,
+    PercEncoding, PercExploration, PercMath, PercMoral, PercStrategy, PercUrgency,
+    PerceptionPhaseResult,
 };
 use super::{CognitiveLoopService, CycleResult, ModuleTimings};
 
@@ -60,6 +61,25 @@ impl CognitiveLoopService {
         let (moral_score, moral_concern_detected, moral_judgment) =
             self.run_moral_phase(input, input_negation_polarity);
         module_timings.moral_algebra = _t.elapsed().as_micros() as u64;
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // PHASE 0.4b: Math Intent Detection (classify input for solver routing)
+        // ═══════════════════════════════════════════════════════════════════════
+        let _t = Instant::now();
+        let math_result = {
+            let problem_type = super::math_service::MathService::classify_problem(input);
+            if problem_type != super::math_service::MathProblemType::Unknown {
+                PercMath {
+                    math_detected: true,
+                    problem_type: Some(problem_type),
+                    phi: 0.0,        // Populated during dynamics phase if solved
+                    confidence: 0.0, // Populated during dynamics phase if solved
+                }
+            } else {
+                PercMath::default()
+            }
+        };
+        module_timings.math_service = _t.elapsed().as_micros() as u64;
 
         // ═══════════════════════════════════════════════════════════════════════
         // PHASE 0.5: Strategy Selection (extracted to cycle_strategy.rs)
@@ -348,6 +368,7 @@ impl CognitiveLoopService {
                 error_slope: encoding.error_slope,
                 oscillation_ratio: encoding.oscillation_ratio,
             },
+            math: math_result,
             startup_suppressed,
             startup_warmup_progress,
             negation_detected,
@@ -436,6 +457,35 @@ mod tests {
         let mut timings = ModuleTimings::default();
         let _ = svc.phase_perception("moral timing", Instant::now(), &mut timings);
         assert!(timings.moral_algebra < 10_000_000);
+    }
+
+    #[test]
+    fn perception_detects_math_intent() {
+        let mut svc = make_service();
+        let mut timings = ModuleTimings::default();
+        let result = svc
+            .phase_perception("solve the linear system Ax=b", Instant::now(), &mut timings)
+            .unwrap();
+        assert!(result.math.math_detected, "should detect math intent");
+        assert_eq!(
+            result.math.problem_type,
+            Some(crate::cognitive_loop::math_service::MathProblemType::LinearSystem)
+        );
+        assert!(
+            timings.math_service < 10_000_000,
+            "math service timing should be recorded"
+        );
+    }
+
+    #[test]
+    fn perception_no_math_for_normal_input() {
+        let mut svc = make_service();
+        let mut timings = ModuleTimings::default();
+        let result = svc
+            .phase_perception("hello world", Instant::now(), &mut timings)
+            .unwrap();
+        assert!(!result.math.math_detected);
+        assert!(result.math.problem_type.is_none());
     }
 
     #[test]

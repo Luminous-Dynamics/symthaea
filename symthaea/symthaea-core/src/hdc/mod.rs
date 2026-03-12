@@ -332,17 +332,24 @@ pub mod bootstrapping; // Cognitive bootstrapping - primitives to reasoning task
 pub mod calculus;
 pub mod celegans_connectome; // Revolutionary #100: C. elegans connectome validation (302 neurons)
 pub mod complex; // Complex number support (ℂ) with HDC encoding
+pub mod computational_geometry; // Geometry: convex hull, intersection, point-in-polygon, area
 #[cfg(test)]
 mod consciousness_e2e_tests;
 #[cfg(test)]
 mod consciousness_fast_tests;
+pub mod constraint_solver; // CSP solver: AC-3, backtracking, N-Queens, graph coloring
 #[cfg(test)]
 mod cross_bridge_integration_tests;
+pub mod differential_equations; // ODE/PDE solvers: RK4, shooting, heat eq, wave eq
+pub mod fft; // Fast Fourier Transform: Cooley-Tukey radix-2, convolution
 pub mod foundations;
+pub mod graph_theory; // Graph algorithms: BFS, DFS, Dijkstra, MST, coloring, combinatorics
 pub mod hv_pool;
 pub mod incremental_hv; // O(k) incremental bundling (10-100x faster for updates)
 pub mod integer; // Integer arithmetic (ℤ) - extends natural numbers with sign
+pub mod linear_algebra; // General linear algebra: LU, QR, Cholesky, eigendecomposition, SVD
 pub mod liquid_holocell; // Atomic primitive unit: Liquid Holocell with dilation
+pub mod logic_engine; // Propositional & FOL logic: SAT (DPLL), natural deduction, unification
 pub mod lsh_index; // LSH index for fast approximate similarity search (heap-optimized)
 pub mod lsh_simhash; // SimHash for binary vectors (Hamming distance)
 pub mod lsh_similarity; // Adaptive LSH-backed similarity search (Session 7C)
@@ -352,6 +359,7 @@ mod math_integration_tests;
 pub mod native_similarity; // O(1) XOR+popcount similarity search (consciousness-native)
 pub mod number_theory;
 pub mod numeric_tower; // Unified numeric tower (N -> Z -> Q -> R) with auto-promotion
+pub mod optimization; // Optimization: gradient descent, Nelder-Mead, L-BFGS
 #[cfg(feature = "parallel")]
 pub mod parallel_hv; // Rayon parallel batch operations (7x faster on 8 cores)
 #[cfg(test)]
@@ -360,9 +368,12 @@ pub mod primitive_dashboard; // Real-time primitive usage monitoring
 pub mod primitive_system; // Ontological primitives system with 7 semantic domains
 #[cfg(test)]
 mod proptest_consciousness;
+pub mod quadrature; // Numerical integration: Simpson, Gauss-Legendre, adaptive
 pub mod rational;
 pub mod real_arithmetic;
+pub mod root_finding; // Root finding: bisection, Newton-Raphson, Brent
 pub mod sparse_hv; // Sparse HDC for memory-efficient low-density vectors
+pub mod statistics; // Statistics & probability: distributions, hypothesis testing, Bayesian inference
 pub mod ucl_cross_domain_frames; // UCL cross-domain semantic frames (TRADE, CONFLICT, FEEDBACK_LOOP, etc.) // Thread-local memory pools for BinaryHV/ContinuousHV (10-100x faster allocation)
 
 // Property-based tests for HDC invariants

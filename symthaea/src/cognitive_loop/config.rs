@@ -579,6 +579,32 @@ pub struct CognitiveLoopConfig {
     /// Default: 0.0 (UTC). Set to `auto_detect_timezone()` for system locale.
     #[serde(default)]
     pub timezone_offset_hours: f64,
+
+    // ── Knowledge Engine ────────────────────────────────────────────────
+    /// Enable the knowledge engine for general-purpose reasoning.
+    /// When true, the cognitive loop extracts structured facts from input,
+    /// encodes them as HDC vectors, stores in a temporal knowledge graph,
+    /// builds causal DAG edges from extracted relations, and grows an
+    /// adaptive ontology of learned primitives.
+    /// Science: Kanerva (2009) HDC, Pearl (2009) Causality, Carey (2009) conceptual change.
+    #[serde(default)]
+    pub enable_knowledge_engine: bool,
+
+    /// Maximum facts in the knowledge graph (default: 10,000).
+    #[serde(default = "default_knowledge_graph_capacity")]
+    pub knowledge_graph_capacity: usize,
+
+    /// Maximum causal edges in the causal bridge (default: 5,000).
+    #[serde(default = "default_knowledge_causal_capacity")]
+    pub knowledge_causal_capacity: usize,
+
+    /// How many top-k search results to return per query (default: 5).
+    #[serde(default = "default_knowledge_search_top_k")]
+    pub knowledge_search_top_k: usize,
+
+    /// Maximum learned primitives in the adaptive ontology (default: 500).
+    #[serde(default = "default_knowledge_ontology_max")]
+    pub knowledge_ontology_max: usize,
 }
 
 impl Default for CognitiveLoopConfig {
@@ -691,8 +717,26 @@ impl Default for CognitiveLoopConfig {
             #[cfg(feature = "foveation")]
             foveation_max_dispatches: 3,
             timezone_offset_hours: 0.0,
+            enable_knowledge_engine: false,
+            knowledge_graph_capacity: 10_000,
+            knowledge_causal_capacity: 5_000,
+            knowledge_search_top_k: 5,
+            knowledge_ontology_max: 500,
         }
     }
+}
+
+fn default_knowledge_graph_capacity() -> usize {
+    10_000
+}
+fn default_knowledge_causal_capacity() -> usize {
+    5_000
+}
+fn default_knowledge_search_top_k() -> usize {
+    5
+}
+fn default_knowledge_ontology_max() -> usize {
+    500
 }
 
 impl CognitiveLoopConfig {

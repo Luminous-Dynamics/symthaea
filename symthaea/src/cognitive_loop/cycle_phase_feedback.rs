@@ -24,7 +24,9 @@ use super::thresholds::{
     AGREEMENT_VELOCITY_DROP_LR, AGREEMENT_VELOCITY_DROP_THRESHOLD, ATTENTION_BUDGET_GATED_LR_SCALE,
     CAUSAL_URGENCY_CONFIDENCE, COMPOUND_INSTABILITY_ERROR_SLOPE, COMPOUND_INSTABILITY_EXPLORATION,
     COMPOUND_INSTABILITY_LR_SCALE, COMPOUND_INSTABILITY_VELOCITY, CONSCIOUSNESS_GRADIENT_LR_SCALE,
-    CONSCIOUSNESS_GRADIENT_THRESHOLD, CONTEXT_PHI_SCALE_BASE, CONTEXT_PHI_SCALE_RANGE,
+    CONSCIOUSNESS_GRADIENT_THRESHOLD, CONSCIOUSNESS_STATE_HIGH_LR_SCALE,
+    CONSCIOUSNESS_STATE_HIGH_THRESHOLD, CONSCIOUSNESS_STATE_LOW_LR_DAMPEN,
+    CONSCIOUSNESS_STATE_LOW_THRESHOLD, CONTEXT_PHI_SCALE_BASE, CONTEXT_PHI_SCALE_RANGE,
     CROSS_MODULE_AGREEMENT_HIGH, CROSS_MODULE_AGREEMENT_LOW, CROSS_MODULE_VARIANCE_AMPLIFICATION,
     EMPATHIC_TONE_RATE_SCALE, EMPATHIC_TONE_THRESHOLD, ENTROPY_LR_MIN, ENTROPY_LR_RANGE,
     EPISTEMIC_APPROVAL_LR_SCALE, EPISTEMIC_APPROVAL_THRESHOLD, EPISTEMIC_CAUTION_SCALE,
@@ -42,10 +44,14 @@ use super::thresholds::{
     HOLOGRAPHIC_UNITY_HIGH_THRESHOLD, HOLOGRAPHIC_UNITY_LOW_LR_DAMPEN,
     HOLOGRAPHIC_UNITY_LOW_THRESHOLD, KOSMIC_HIGH_COHERENCE_CONFIDENCE_BOOST,
     KOSMIC_HIGH_COHERENCE_THRESHOLD, KOSMIC_LOW_COHERENCE_EXPLORATION_DAMPEN,
-    KOSMIC_LOW_COHERENCE_THRESHOLD, KOSMIC_SONG_INTERVAL, LOVE_RESONANCE_CONFIDENCE_SCALE,
-    LOVE_RESONANCE_LR_FRACTION, LOVE_RESONANCE_THRESHOLD, LOW_QUALITY_EXPLORATION_DAMPEN,
-    MULTI_OBJ_FRONTIER_DAMPEN, MULTI_OBJ_FRONTIER_EXPLORE_SCALE, MULTI_OBJ_FRONTIER_LARGE,
-    MULTI_OBJ_FRONTIER_SMALL, NARRATIVE_SELF_PHI_CONFIDENCE_SCALE,
+    KOSMIC_LOW_COHERENCE_THRESHOLD, KOSMIC_SONG_INTERVAL,
+    LIVING_MIND_COHERENCE_HIGH_EXPLORE_DAMPEN, LIVING_MIND_COHERENCE_HIGH_THRESHOLD,
+    LIVING_MIND_COHERENCE_LOW_EXPLORE_BOOST, LIVING_MIND_COHERENCE_LOW_THRESHOLD,
+    LIVING_MIND_VITALITY_CONFIDENCE_BOOST, LIVING_MIND_VITALITY_HIGH_THRESHOLD,
+    LIVING_MIND_VITALITY_LOW_LR_DAMPEN, LIVING_MIND_VITALITY_LOW_THRESHOLD,
+    LOVE_RESONANCE_CONFIDENCE_SCALE, LOVE_RESONANCE_LR_FRACTION, LOVE_RESONANCE_THRESHOLD,
+    LOW_QUALITY_EXPLORATION_DAMPEN, MULTI_OBJ_FRONTIER_DAMPEN, MULTI_OBJ_FRONTIER_EXPLORE_SCALE,
+    MULTI_OBJ_FRONTIER_LARGE, MULTI_OBJ_FRONTIER_SMALL, NARRATIVE_SELF_PHI_CONFIDENCE_SCALE,
     NARRATIVE_SELF_PHI_CONFIDENCE_THRESHOLD, NARRATIVE_SELF_PHI_LOW_EXPLORE_BOOST,
     NARRATIVE_SELF_PHI_LOW_THRESHOLD, PHENOMENAL_BINDING_HIGH_LR_DAMPEN,
     PHENOMENAL_BINDING_HIGH_THRESHOLD, PHENOMENAL_BINDING_LOW_EXPLORE_BOOST,
@@ -66,12 +72,6 @@ use super::thresholds::{
     TRUST_DECAY_FACTOR, TRUST_SIGNAL_MIDPOINT, TRUST_SIGNAL_RATE, UNIFIED_QUALITY_AGREEMENT_WEIGHT,
     UNIFIED_QUALITY_ANOMALY_WEIGHT, UNIFIED_QUALITY_PREDICTION_WEIGHT,
     VALUE_CACHE_HIT_CONFIDENCE_SCALE, VALUE_CACHE_HIT_CONFIDENCE_THRESHOLD,
-    CONSCIOUSNESS_STATE_HIGH_THRESHOLD, CONSCIOUSNESS_STATE_HIGH_LR_SCALE,
-    CONSCIOUSNESS_STATE_LOW_THRESHOLD, CONSCIOUSNESS_STATE_LOW_LR_DAMPEN,
-    LIVING_MIND_VITALITY_HIGH_THRESHOLD, LIVING_MIND_VITALITY_CONFIDENCE_BOOST,
-    LIVING_MIND_VITALITY_LOW_THRESHOLD, LIVING_MIND_VITALITY_LOW_LR_DAMPEN,
-    LIVING_MIND_COHERENCE_HIGH_THRESHOLD, LIVING_MIND_COHERENCE_HIGH_EXPLORE_DAMPEN,
-    LIVING_MIND_COHERENCE_LOW_THRESHOLD, LIVING_MIND_COHERENCE_LOW_EXPLORE_BOOST,
 };
 use super::{CognitiveLoopService, CycleState};
 
@@ -730,6 +730,11 @@ impl CognitiveLoopService {
                     .last()
                     .map(|crhv| crhv.self_similarity() as f64)
                     .unwrap_or(0.5), // neutral when no broadcasts yet
+                // Governance collective Phi: inter-agent consciousness integration
+                #[cfg(feature = "mycelix")]
+                governance_collective_phi: self.governance_mgr.last_collective_phi(),
+                #[cfg(not(feature = "mycelix"))]
+                governance_collective_phi: 0.0, // neutral when governance disabled
             },
         );
         self.consciousness_engine
@@ -935,22 +940,34 @@ impl CognitiveLoopService {
             )
         });
         if let Some((soul_coherence, growth_potential, avg_value_alignment)) = soul_snapshot {
+            use super::thresholds::{
+                SOUL_ALIGNMENT_EXPLORATION_MULT, SOUL_ALIGNMENT_LOW_THRESHOLD,
+                SOUL_COHERENCE_CONFIDENCE_SCALE, SOUL_COHERENCE_LOW_THRESHOLD,
+                SOUL_GROWTH_EXPLORATION_SCALE, SOUL_GROWTH_EXPLORATION_THRESHOLD,
+            };
             // Low soul coherence → dampen confidence (fragmented identity)
-            if soul_coherence < 0.5 && self.stats.total_cycles > 20 {
-                self.adjust_confidence("soul_low_coherence", -0.01 * (0.5 - soul_coherence));
+            // Damasio (1994): identity fragmentation undermines decision quality
+            if soul_coherence < SOUL_COHERENCE_LOW_THRESHOLD && self.stats.total_cycles > 20 {
+                self.adjust_confidence(
+                    "soul_low_coherence",
+                    -SOUL_COHERENCE_CONFIDENCE_SCALE
+                        * (SOUL_COHERENCE_LOW_THRESHOLD - soul_coherence),
+                );
             }
 
             // High growth potential → boost exploration (learning opportunity)
-            if growth_potential > 0.7 && self.stats.total_cycles > 15 {
-                self.adjust_exploration("soul_growth_potential", 0.01 * (growth_potential - 0.7));
+            if growth_potential > SOUL_GROWTH_EXPLORATION_THRESHOLD && self.stats.total_cycles > 15
+            {
+                self.adjust_exploration(
+                    "soul_growth_potential",
+                    SOUL_GROWTH_EXPLORATION_SCALE
+                        * (growth_potential - SOUL_GROWTH_EXPLORATION_THRESHOLD),
+                );
             }
 
             // Low value alignment trend → boost exploration (misaligned, need recalibration)
-            if avg_value_alignment < 0.3 && self.stats.total_cycles > 30 {
-                self.scale_exploration(
-                    "soul_low_alignment",
-                    1.02, // Slight exploration boost
-                );
+            if avg_value_alignment < SOUL_ALIGNMENT_LOW_THRESHOLD && self.stats.total_cycles > 30 {
+                self.scale_exploration("soul_low_alignment", SOUL_ALIGNMENT_EXPLORATION_MULT);
             }
         }
 
@@ -1011,25 +1028,36 @@ impl CognitiveLoopService {
             )
         });
         if let Some((frustration, cognitive_load_level, engagement)) = usi_vals {
+            use super::thresholds::{
+                USI_COGNITIVE_LOAD_LR_SCALE, USI_COGNITIVE_LOAD_LR_THRESHOLD,
+                USI_ENGAGEMENT_CONFIDENCE_SCALE, USI_ENGAGEMENT_CONFIDENCE_THRESHOLD,
+                USI_FRUSTRATION_EXPLORATION_SCALE, USI_FRUSTRATION_EXPLORATION_THRESHOLD,
+            };
             // High frustration → dampen exploration (user is struggling)
-            if frustration > 0.6 {
+            // Lazarus (1991): frustration = goal-blockage signal
+            if frustration > USI_FRUSTRATION_EXPLORATION_THRESHOLD {
                 self.scale_exploration(
                     "user_frustration",
-                    1.0 - (frustration as f32 - 0.6) * 0.25, // 0.9 at max frustration
+                    1.0 - (frustration as f32 - USI_FRUSTRATION_EXPLORATION_THRESHOLD as f32)
+                        * USI_FRUSTRATION_EXPLORATION_SCALE,
                 );
             }
             // High cognitive load → reduce learning rate (prevent overload)
-            if cognitive_load_level > 0.7 {
+            // Sweller (1988): cognitive load theory
+            if cognitive_load_level > USI_COGNITIVE_LOAD_LR_THRESHOLD {
                 self.scale_lr(
                     "user_cognitive_load",
-                    1.0 - (cognitive_load_level as f32 - 0.7) * 0.3, // 0.91 at max load
+                    1.0 - (cognitive_load_level as f32 - USI_COGNITIVE_LOAD_LR_THRESHOLD as f32)
+                        * USI_COGNITIVE_LOAD_LR_SCALE,
                 );
             }
             // High engagement → boost confidence slightly
-            if engagement > 0.8 {
+            // Csikszentmihalyi (1990): flow-compatible state
+            if engagement > USI_ENGAGEMENT_CONFIDENCE_THRESHOLD {
                 self.adjust_confidence(
                     "user_engagement",
-                    (engagement as f32 - 0.8) * 0.05, // up to 0.01 boost
+                    (engagement as f32 - USI_ENGAGEMENT_CONFIDENCE_THRESHOLD as f32)
+                        * USI_ENGAGEMENT_CONFIDENCE_SCALE,
                 );
             }
         }
@@ -1504,7 +1532,10 @@ impl CognitiveLoopService {
         // Tononi (2004) — low Phi / fragmented processing → protective dampening.
         if self.stats.total_cycles > 15 {
             if consciousness_state_level > CONSCIOUSNESS_STATE_HIGH_THRESHOLD {
-                self.scale_lr("consciousness_state_high", CONSCIOUSNESS_STATE_HIGH_LR_SCALE);
+                self.scale_lr(
+                    "consciousness_state_high",
+                    CONSCIOUSNESS_STATE_HIGH_LR_SCALE,
+                );
             } else if consciousness_state_level < CONSCIOUSNESS_STATE_LOW_THRESHOLD
                 && consciousness_state_level > 0.0
             {
@@ -1524,7 +1555,10 @@ impl CognitiveLoopService {
             } else if living_mind_vitality < LIVING_MIND_VITALITY_LOW_THRESHOLD
                 && living_mind_vitality > 0.0
             {
-                self.scale_lr("living_mind_vitality_low", LIVING_MIND_VITALITY_LOW_LR_DAMPEN);
+                self.scale_lr(
+                    "living_mind_vitality_low",
+                    LIVING_MIND_VITALITY_LOW_LR_DAMPEN,
+                );
             }
         }
 
@@ -1547,7 +1581,502 @@ impl CognitiveLoopService {
             }
         }
 
-        // ── Governance → Neuromod + Learning (Phase C, interval 37) ─────
+        // ═══════════════════════════════════════════════════════════════════
+        // Session 16 Items 1, 2, 4 (behavioral — completes S16)
+        // ═══════════════════════════════════════════════════════════════════
+
+        // S16-1: Temporal binding → exploration/LR. Buzsáki (2002).
+        {
+            use super::thresholds::{
+                TEMPORAL_BINDING_DAMPEN_THRESHOLD, TEMPORAL_BINDING_EXPLORE_SCALE,
+                TEMPORAL_BINDING_EXPLORE_THRESHOLD, TEMPORAL_BINDING_LOW_LR_SCALE,
+            };
+            let tb = perception.encoding.temporal_binding_strength;
+            if tb < TEMPORAL_BINDING_EXPLORE_THRESHOLD && self.stats.total_cycles > 15 {
+                let boost =
+                    (TEMPORAL_BINDING_EXPLORE_THRESHOLD - tb) * TEMPORAL_BINDING_EXPLORE_SCALE;
+                self.adjust_exploration("temporal_binding_low", boost);
+                self.scale_lr("temporal_binding_low", TEMPORAL_BINDING_LOW_LR_SCALE);
+            } else if tb > TEMPORAL_BINDING_DAMPEN_THRESHOLD && self.stats.total_cycles > 15 {
+                self.scale_exploration("temporal_binding_high", 0.98);
+            }
+        }
+
+        // S16-2: Consciousness gradient → stability recovery. Oizumi (2014).
+        {
+            use super::thresholds::{
+                CONSCIOUSNESS_GRADIENT_CAUTION_THRESHOLD, CONSCIOUSNESS_GRADIENT_LR_SCALE,
+                CONSCIOUSNESS_GRADIENT_RECOVERY_BOOST, CONSCIOUSNESS_GRADIENT_STABLE_CYCLES,
+            };
+            if consciousness_gradient_magnitude > CONSCIOUSNESS_GRADIENT_CAUTION_THRESHOLD
+                && self.stats.total_cycles > 15
+            {
+                self.scale_lr("gradient_caution", CONSCIOUSNESS_GRADIENT_LR_SCALE);
+                self.carryover.quality.consecutive_stable_gradient = 0;
+            } else if consciousness_gradient_magnitude < 0.01 {
+                self.carryover.quality.consecutive_stable_gradient = self
+                    .carryover
+                    .quality
+                    .consecutive_stable_gradient
+                    .saturating_add(1);
+                if self.carryover.quality.consecutive_stable_gradient
+                    > CONSCIOUSNESS_GRADIENT_STABLE_CYCLES
+                    && self.stats.total_cycles > 20
+                {
+                    self.adjust_confidence(
+                        "gradient_stable_recovery",
+                        CONSCIOUSNESS_GRADIENT_RECOVERY_BOOST,
+                    );
+                }
+            } else {
+                self.carryover.quality.consecutive_stable_gradient = 0;
+            }
+        }
+
+        // S16-4: Epistemic rejection streak → recalibration. Berlyne (1960).
+        if !epistemic_gate_approved {
+            self.carryover.quality.consecutive_epistemic_rejections = self
+                .carryover
+                .quality
+                .consecutive_epistemic_rejections
+                .saturating_add(1);
+        } else {
+            self.carryover.quality.consecutive_epistemic_rejections = 0;
+        }
+        if self.carryover.quality.consecutive_epistemic_rejections
+            >= super::thresholds::EPISTEMIC_REJECTION_STREAK_THRESHOLD
+            && self.stats.total_cycles > 20
+        {
+            self.adjust_exploration(
+                "epistemic_streak_recal",
+                super::thresholds::EPISTEMIC_REJECTION_STREAK_EXPLORE,
+            );
+            self.scale_threshold(
+                "epistemic_streak_recal",
+                super::thresholds::EPISTEMIC_REJECTION_STREAK_THRESHOLD_RELAX,
+            );
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
+        // Session 17: Adaptive Homeostasis & Emergent Dynamics
+        // ═══════════════════════════════════════════════════════════════════
+
+        // S17-1: Allostatic load → cognitive budget. McEwen (1998).
+        {
+            use super::thresholds::{
+                ALLOSTATIC_LOAD_DECAY, ALLOSTATIC_LOAD_INCREMENT,
+                ALLOSTATIC_OVERLOAD_EXPLORE_BOOST, ALLOSTATIC_OVERLOAD_LR_SCALE,
+                ALLOSTATIC_OVERLOAD_THRESHOLD,
+            };
+            self.carryover.quality.allostatic_load *= ALLOSTATIC_LOAD_DECAY;
+            if self.carryover.history.consciousness_ema < 0.2
+                && self.carryover.history.consciousness_ema > 0.0
+            {
+                self.carryover.quality.allostatic_load += ALLOSTATIC_LOAD_INCREMENT;
+            }
+            if perception.urgency.urgency == super::CycleUrgency::Critical {
+                self.carryover.quality.allostatic_load += ALLOSTATIC_LOAD_INCREMENT;
+            }
+            if self.carryover.quality.consecutive_full_dampen > 0 {
+                self.carryover.quality.allostatic_load += ALLOSTATIC_LOAD_INCREMENT * 0.5;
+            }
+            self.carryover.quality.allostatic_load =
+                self.carryover.quality.allostatic_load.clamp(0.0, 1.0);
+            if self.carryover.quality.allostatic_load > ALLOSTATIC_OVERLOAD_THRESHOLD
+                && self.stats.total_cycles > 20
+            {
+                // S20: LR dampening moved to unified readiness gate.
+                self.adjust_exploration("allostatic_overload", ALLOSTATIC_OVERLOAD_EXPLORE_BOOST);
+            }
+        }
+
+        // S17-3: Exploration decay schedule. Sutton & Barto (2018).
+        {
+            use super::thresholds::{EXPLORATION_DECAY_BASELINE, EXPLORATION_DECAY_FACTOR};
+            if self.stats.total_cycles > 30 {
+                let current = self.curiosity_drive.exploration_urge as f32;
+                let decayed = EXPLORATION_DECAY_BASELINE
+                    + (current - EXPLORATION_DECAY_BASELINE) * EXPLORATION_DECAY_FACTOR;
+                self.curiosity_drive.exploration_urge = decayed as f64;
+            }
+        }
+
+        // S17-4: Consciousness coherence velocity (2nd derivative). Friston (2010).
+        {
+            use super::thresholds::{
+                CONSCIOUSNESS_ACCEL_CONFIDENCE_SCALE, CONSCIOUSNESS_ACCEL_LR_SCALE,
+                CONSCIOUSNESS_ACCEL_THRESHOLD,
+            };
+            let prev_grad = self.carryover.quality.prev_gradient_magnitude;
+            let acceleration = (consciousness_gradient_magnitude - prev_grad).abs();
+            self.carryover.quality.prev_gradient_magnitude = consciousness_gradient_magnitude;
+            if acceleration > CONSCIOUSNESS_ACCEL_THRESHOLD && self.stats.total_cycles > 20 {
+                self.scale_lr("consciousness_accel", CONSCIOUSNESS_ACCEL_LR_SCALE);
+                self.scale_confidence("consciousness_accel", CONSCIOUSNESS_ACCEL_CONFIDENCE_SCALE);
+            }
+        }
+
+        // S17-6: Proposal saturation detection. Simon (1956).
+        {
+            use super::thresholds::{PROPOSAL_SATURATION_LR_SCALE, PROPOSAL_SATURATION_THRESHOLD};
+            let lr_count = self.feedback_state.lr_proposal_count();
+            if lr_count >= PROPOSAL_SATURATION_THRESHOLD && self.stats.total_cycles > 15 {
+                self.scale_lr("proposal_saturation", PROPOSAL_SATURATION_LR_SCALE);
+            }
+        }
+
+        // S17-7: Phi-gated LR floor. Tononi (2004).
+        {
+            use super::thresholds::{PHI_GATED_LR_FLOOR_SCALE, PHI_GATED_LR_FLOOR_THRESHOLD};
+            let phi = self.stats.unified_psi as f64;
+            if phi < PHI_GATED_LR_FLOOR_THRESHOLD && phi > 0.0 && self.stats.total_cycles > 20 {
+                self.scale_lr("phi_gated_lr_floor", PHI_GATED_LR_FLOOR_SCALE);
+            }
+        }
+
+        // S17-8: Rhythmic exploration oscillation. Lisman & Jensen (2013).
+        {
+            use super::thresholds::{RHYTHMIC_EXPLORATION_AMPLITUDE, RHYTHMIC_EXPLORATION_PERIOD};
+            if self.stats.total_cycles > 30 {
+                let phase = (self.stats.total_cycles as f32 / RHYTHMIC_EXPLORATION_PERIOD as f32)
+                    * std::f32::consts::TAU;
+                let osc = phase.sin() * RHYTHMIC_EXPLORATION_AMPLITUDE;
+                self.adjust_exploration("rhythmic_oscillation", osc);
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
+        // Session 18: Predictive Coding & Metacognitive Refinement
+        // ═══════════════════════════════════════════════════════════════════
+
+        // S18-1: PE variance tracking → LR dampening. Clark (2013).
+        {
+            use super::thresholds::PE_VARIANCE_EMA_DECAY;
+            let pe = consciousness_gradient_magnitude as f32;
+            let pe_sq = pe * pe;
+            self.carryover.quality.pe_variance_ema = PE_VARIANCE_EMA_DECAY
+                * self.carryover.quality.pe_variance_ema
+                + (1.0 - PE_VARIANCE_EMA_DECAY) * pe_sq;
+            // S20: LR dampening moved to unified readiness gate.
+            // PE variance EMA still tracked for readiness computation.
+        }
+
+        // S18-2: Confidence calibration drift. Keren & Teigen (2004).
+        {
+            use super::thresholds::{
+                CONFIDENCE_CALIBRATION_CORRECTION, CONFIDENCE_CALIBRATION_DRIFT_THRESHOLD,
+                CONFIDENCE_CALIBRATION_WINDOW,
+            };
+            let predicted_conf = self.feedback_state.cycle_start_confidence() as f32;
+            let actual_quality = cross_module_agreement as f32;
+            let error = predicted_conf - actual_quality;
+            self.carryover.quality.confidence_calibration_bias += error;
+            self.carryover.quality.confidence_calibration_count += 1;
+            if self.carryover.quality.confidence_calibration_count
+                >= CONFIDENCE_CALIBRATION_WINDOW as u32
+            {
+                let avg_bias = self.carryover.quality.confidence_calibration_bias
+                    / self.carryover.quality.confidence_calibration_count as f32;
+                if avg_bias.abs() > CONFIDENCE_CALIBRATION_DRIFT_THRESHOLD {
+                    let correction = -avg_bias.signum() * CONFIDENCE_CALIBRATION_CORRECTION;
+                    self.adjust_confidence("calibration_drift", correction);
+                }
+                self.carryover.quality.confidence_calibration_bias = 0.0;
+                self.carryover.quality.confidence_calibration_count = 0;
+            }
+        }
+
+        // S18-3: LR momentum smoothing. Kingma & Ba (2015).
+        {
+            use super::thresholds::{LR_MOMENTUM_EMA_DECAY, LR_MOMENTUM_MAX_DELTA};
+            let current_lr = self.feedback_state.cycle_start_lr() as f32;
+            let prev_ema = self.carryover.quality.lr_momentum_ema;
+            let delta = current_lr - prev_ema;
+            let clamped = delta.clamp(-LR_MOMENTUM_MAX_DELTA, LR_MOMENTUM_MAX_DELTA);
+            let smoothed = prev_ema + clamped;
+            self.carryover.quality.lr_momentum_ema = LR_MOMENTUM_EMA_DECAY
+                * self.carryover.quality.lr_momentum_ema
+                + (1.0 - LR_MOMENTUM_EMA_DECAY) * smoothed;
+        }
+
+        // S18-4: Metacognitive surprise → exploration boost. Fleming & Dolan (2012).
+        {
+            use super::thresholds::{
+                METACOGNITIVE_SURPRISE_EXPLORE_BOOST, METACOGNITIVE_SURPRISE_THRESHOLD,
+            };
+            let actual = self.stats.unified_psi as f64;
+            let predicted = self.carryover.quality.prev_metacognitive_prediction;
+            let surprise = (actual - predicted).abs();
+            if surprise > METACOGNITIVE_SURPRISE_THRESHOLD && self.stats.total_cycles > 15 {
+                self.adjust_exploration(
+                    "metacognitive_surprise",
+                    METACOGNITIVE_SURPRISE_EXPLORE_BOOST,
+                );
+            }
+            // Update prediction: simple EMA of consciousness level
+            self.carryover.quality.prev_metacognitive_prediction = 0.9 * predicted + 0.1 * actual;
+        }
+
+        // S18-5: Sleep pressure accumulation. Tononi & Cirelli (2006).
+        {
+            use super::thresholds::{
+                SLEEP_PRESSURE_CONSOLIDATION_DECAY, SLEEP_PRESSURE_INCREMENT,
+                SLEEP_PRESSURE_THRESHOLD,
+            };
+            if self.carryover.quality.in_consolidation {
+                self.carryover.quality.sleep_pressure -= SLEEP_PRESSURE_CONSOLIDATION_DECAY;
+                if self.carryover.quality.sleep_pressure <= 0.0 {
+                    self.carryover.quality.sleep_pressure = 0.0;
+                    self.carryover.quality.in_consolidation = false;
+                }
+                // S20: LR dampening moved to unified readiness gate.
+            } else {
+                // S21: Passive micro-rest recovery. Lim & Dinges (2010) — brief rest
+                // periods partially dissipate sleep pressure even without full consolidation.
+                // When readiness is high (low overall stress), pressure decays slowly.
+                if self.carryover.quality.last_readiness_score > 0.9 {
+                    self.carryover.quality.sleep_pressure *=
+                        super::thresholds::SLEEP_PRESSURE_PASSIVE_DECAY;
+                } else {
+                    self.carryover.quality.sleep_pressure += SLEEP_PRESSURE_INCREMENT;
+                }
+                if self.carryover.quality.sleep_pressure >= SLEEP_PRESSURE_THRESHOLD {
+                    self.carryover.quality.in_consolidation = true;
+                }
+            }
+            self.carryover.quality.sleep_pressure =
+                self.carryover.quality.sleep_pressure.clamp(0.0, 1.0);
+        }
+
+        // S18-6: Gradient sign consistency → oscillation dampening. Schaul et al. (2013).
+        {
+            use super::thresholds::GRADIENT_SIGN_WINDOW;
+            let grad = consciousness_gradient_magnitude;
+            let sign = grad >= 0.0;
+            let history = &mut self.carryover.quality.gradient_sign_history;
+            history.push_back(sign);
+            while history.len() > GRADIENT_SIGN_WINDOW {
+                history.pop_front();
+            }
+            // S21: Pruned empty if-block — readiness gate computes flip_ratio directly.
+        }
+
+        // S18-7: Exploration-exploitation balance. Cohen et al. (2007).
+        {
+            use super::thresholds::{
+                EXPLORE_EXPLOIT_CORRECTION, EXPLORE_EXPLOIT_HIGH_BOUND, EXPLORE_EXPLOIT_LOW_BOUND,
+                EXPLORE_EXPLOIT_WINDOW,
+            };
+            let explore_biased = self.feedback_state.cycle_start_exploration() > 0.5;
+            let history = &mut self.carryover.quality.explore_exploit_history;
+            history.push_back(explore_biased);
+            while history.len() > EXPLORE_EXPLOIT_WINDOW {
+                history.pop_front();
+            }
+            if history.len() >= EXPLORE_EXPLOIT_WINDOW && self.stats.total_cycles > 30 {
+                let explore_count = history.iter().filter(|&&b| b).count();
+                let ratio = explore_count as f32 / history.len() as f32;
+                if ratio < EXPLORE_EXPLOIT_LOW_BOUND {
+                    self.adjust_exploration("explore_exploit_balance", EXPLORE_EXPLOIT_CORRECTION);
+                } else if ratio > EXPLORE_EXPLOIT_HIGH_BOUND {
+                    self.adjust_exploration("explore_exploit_balance", -EXPLORE_EXPLOIT_CORRECTION);
+                }
+            }
+        }
+
+        // S18-8: Proposal conflict detection. Botvinick et al. (2001).
+        {
+            use super::thresholds::PROPOSAL_CONFLICT_THRESHOLD;
+            let lr_conflict = self.feedback_state.learning_rate.conflict_ratio();
+            if lr_conflict > PROPOSAL_CONFLICT_THRESHOLD && self.stats.total_cycles > 15 {
+                // High conflict = subsystems disagree → cancel LR proposals, hold steady.
+                self.scale_lr("conflict_cancellation", 1.0);
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
+        // Session 19: Embodied Cognition & Environmental Coupling
+        // ═══════════════════════════════════════════════════════════════════
+
+        // S19-1: Arousal-gated learning. Yerkes-Dodson (1908).
+        {
+            use super::thresholds::{
+                AROUSAL_LR_BOOST_SCALE, AROUSAL_LR_BOOST_THRESHOLD, AROUSAL_OVERAROUSAL_THRESHOLD,
+            };
+            // S21: Pruned empty over-arousal branch — readiness gate handles dampening.
+            // Only the boost path remains.
+            if self.stats.total_cycles > 15
+                && body_arousal > AROUSAL_LR_BOOST_THRESHOLD
+                && body_arousal <= AROUSAL_OVERAROUSAL_THRESHOLD
+            {
+                self.scale_lr("arousal_boost", AROUSAL_LR_BOOST_SCALE);
+            }
+        }
+
+        // S19-2: Novelty habituation. Sokolov (1963).
+        {
+            use super::thresholds::{
+                NOVELTY_EMA_DECAY, NOVELTY_LOW_EXPLORE_SCALE, NOVELTY_LOW_THRESHOLD,
+            };
+            // Use consciousness gradient as proxy for input novelty.
+            let novelty_signal = consciousness_gradient_magnitude.abs() as f32;
+            self.carryover.quality.novelty_ema = NOVELTY_EMA_DECAY
+                * self.carryover.quality.novelty_ema
+                + (1.0 - NOVELTY_EMA_DECAY) * novelty_signal.min(1.0);
+            if self.carryover.quality.novelty_ema < NOVELTY_LOW_THRESHOLD
+                && self.stats.total_cycles > 20
+            {
+                self.scale_exploration("novelty_low", NOVELTY_LOW_EXPLORE_SCALE);
+            }
+        }
+
+        // S19-3: Fatigue accumulation. Hockey (1997).
+        {
+            use super::thresholds::{
+                FATIGUE_EFFORT_THRESHOLD, FATIGUE_INCREMENT, FATIGUE_THRESHOLD,
+            };
+            let total_props = self.feedback_state.total_proposals();
+            if total_props > FATIGUE_EFFORT_THRESHOLD {
+                self.carryover.quality.fatigue += FATIGUE_INCREMENT;
+                self.carryover.quality.consecutive_recovery_cycles = 0;
+            }
+            self.carryover.quality.fatigue = self.carryover.quality.fatigue.clamp(0.0, 1.0);
+            // S20: LR dampening moved to unified readiness gate.
+            // Fatigue state still tracked for readiness computation.
+        }
+
+        // S19-4: Recovery detection. Meijman & Mulder (1998).
+        {
+            use super::thresholds::{
+                FATIGUE_EFFORT_THRESHOLD, RECOVERY_CONFIDENCE_BOOST, RECOVERY_CYCLES_NEEDED,
+                RECOVERY_FATIGUE_DECAY,
+            };
+            let total_props = self.feedback_state.total_proposals();
+            let stable = consciousness_gradient_magnitude.abs() < 0.05;
+            if total_props <= FATIGUE_EFFORT_THRESHOLD && stable {
+                self.carryover.quality.consecutive_recovery_cycles += 1;
+                if self.carryover.quality.consecutive_recovery_cycles >= RECOVERY_CYCLES_NEEDED {
+                    self.carryover.quality.fatigue =
+                        (self.carryover.quality.fatigue - RECOVERY_FATIGUE_DECAY).max(0.0);
+                    if self.carryover.quality.fatigue < 0.1 {
+                        self.adjust_confidence("recovery_boost", RECOVERY_CONFIDENCE_BOOST);
+                    }
+                }
+            } else {
+                self.carryover.quality.consecutive_recovery_cycles = 0;
+            }
+        }
+
+        // S19-5: Environmental predictability. Gottlieb et al. (2013).
+        {
+            use super::thresholds::{
+                ENV_PREDICTABILITY_HIGH, ENV_PREDICTABILITY_LOW, ENV_PREDICTABILITY_WINDOW,
+                ENV_PREDICTABLE_THRESHOLD_SCALE, ENV_UNPREDICTABLE_THRESHOLD_SCALE,
+            };
+            let pred_ok = consciousness_gradient_magnitude.abs() < 0.1;
+            let history = &mut self.carryover.quality.prediction_success_history;
+            history.push_back(pred_ok);
+            while history.len() > ENV_PREDICTABILITY_WINDOW {
+                history.pop_front();
+            }
+            if history.len() >= ENV_PREDICTABILITY_WINDOW && self.stats.total_cycles > 30 {
+                let success_rate =
+                    history.iter().filter(|&&b| b).count() as f32 / history.len() as f32;
+                if success_rate >= ENV_PREDICTABILITY_HIGH {
+                    self.scale_threshold("env_predictable", ENV_PREDICTABLE_THRESHOLD_SCALE);
+                } else if success_rate <= ENV_PREDICTABILITY_LOW {
+                    self.scale_threshold("env_unpredictable", ENV_UNPREDICTABLE_THRESHOLD_SCALE);
+                }
+            }
+        }
+
+        // S19-6: Attention allocation budget. Kahneman (1973).
+        // (Telemetry-only flag — actual budget enforcement happens in proposal integration.)
+        // Logged in output phase.
+
+        // S20: Unified Readiness Gate — SOLE resource-depletion LR dampener.
+        // Consolidates: allostatic overload (S17-1), PE variance (S18-1),
+        // sleep pressure (S18-5), gradient oscillation (S18-6),
+        // over-arousal (S19-1), fatigue (S19-3), and readiness (S19-7).
+        // Science: Boksem & Tops (2008) — mental fatigue impairs cognitive control.
+        // Design: single bounded gate prevents compound cascade (was 0.95^6 ≈ 0.74 worst-case,
+        // now clamped to [0.3, 1.0]).
+        {
+            use super::thresholds::{
+                ALLOSTATIC_OVERLOAD_THRESHOLD, AROUSAL_OVERAROUSAL_THRESHOLD,
+                GRADIENT_SIGN_FLIP_THRESHOLD, GRADIENT_SIGN_WINDOW,
+            };
+            // 6 cost dimensions, each 0.0–1.0, weighted equally (1/6).
+            let pe_cost = self.carryover.quality.pe_variance_ema.min(1.0);
+            let sleep_cost = self.carryover.quality.sleep_pressure;
+            let fatigue_cost = self.carryover.quality.fatigue;
+            let allostatic_cost =
+                if self.carryover.quality.allostatic_load > ALLOSTATIC_OVERLOAD_THRESHOLD {
+                    ((self.carryover.quality.allostatic_load - ALLOSTATIC_OVERLOAD_THRESHOLD)
+                        / (1.0 - ALLOSTATIC_OVERLOAD_THRESHOLD).max(0.01))
+                    .clamp(0.0, 1.0)
+                } else {
+                    0.0
+                };
+            let arousal_cost = if body_arousal > AROUSAL_OVERAROUSAL_THRESHOLD {
+                ((body_arousal - AROUSAL_OVERAROUSAL_THRESHOLD)
+                    / (1.0 - AROUSAL_OVERAROUSAL_THRESHOLD).max(0.01))
+                .clamp(0.0, 1.0)
+            } else {
+                0.0
+            };
+            let grad_hist = &mut self.carryover.quality.gradient_sign_history;
+            let oscillation_cost = if grad_hist.len() >= GRADIENT_SIGN_WINDOW {
+                let flips = grad_hist
+                    .make_contiguous()
+                    .windows(2)
+                    .filter(|w| w[0] != w[1])
+                    .count();
+                let flip_ratio = flips as f32 / (grad_hist.len() - 1) as f32;
+                if flip_ratio > GRADIENT_SIGN_FLIP_THRESHOLD {
+                    ((flip_ratio - GRADIENT_SIGN_FLIP_THRESHOLD)
+                        / (1.0 - GRADIENT_SIGN_FLIP_THRESHOLD).max(0.01))
+                    .clamp(0.0, 1.0)
+                } else {
+                    0.0
+                }
+            } else {
+                0.0
+            };
+            let total_cost = (pe_cost
+                + sleep_cost
+                + fatigue_cost
+                + allostatic_cost
+                + arousal_cost
+                + oscillation_cost)
+                / 6.0;
+            let readiness = (1.0 - total_cost).clamp(0.3, 1.0);
+            // Store for telemetry.
+            self.carryover.quality.last_readiness_score = readiness;
+            if readiness < 0.95 && self.stats.total_cycles > 20 {
+                self.scale_lr("unified_readiness", readiness);
+            }
+        }
+
+        // S19-8: Resonance/flow detection. Csikszentmihalyi (1990).
+        {
+            use super::thresholds::{
+                RESONANCE_AGREEMENT_THRESHOLD, RESONANCE_CONFIDENCE_BOOST, RESONANCE_FLOW_CYCLES,
+            };
+            if cross_module_agreement as f32 >= RESONANCE_AGREEMENT_THRESHOLD {
+                self.carryover.quality.consecutive_high_agreement += 1;
+            } else {
+                self.carryover.quality.consecutive_high_agreement = 0;
+                self.carryover.quality.in_flow_state = false;
+            }
+            if self.carryover.quality.consecutive_high_agreement >= RESONANCE_FLOW_CYCLES {
+                self.carryover.quality.in_flow_state = true;
+                self.adjust_confidence("flow_resonance", RESONANCE_CONFIDENCE_BOOST);
+            }
+        }
+
+        // ── Governance → Neuromod + Learning (Phase C, every cycle) ──────
+        // Events are queued at interval 37 in Phase B; neuromod + learning applied every cycle.
         #[cfg(feature = "mycelix")]
         {
             self.apply_governance_neuromod();

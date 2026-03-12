@@ -283,7 +283,12 @@ impl CognitiveLoopService {
             if let Some(ref mut ac) = self.primitive_tier.affective_consciousness {
                 ac.decay(0.05);
                 if self.stats.total_cycles % (11 * interval_mult) == 0 {
-                    let valence = 1.0 - 2.0 * prediction_error;
+                    // Blend with previous-cycle valence for affective momentum.
+                    // Damasio (1999): somatic markers persist; emotion has inertia.
+                    let raw_valence = 1.0 - 2.0 * prediction_error;
+                    let prev_valence = self.carryover.quality.last_affective_valence;
+                    let momentum = super::thresholds::AFFECTIVE_VALENCE_MOMENTUM;
+                    let valence = raw_valence * (1.0 - momentum) + prev_valence * momentum;
                     let base_affect = crate::consciousness::affective_consciousness::CoreAffect {
                         valence,
                         arousal: prediction_error.abs().clamp(0.0, 1.0),

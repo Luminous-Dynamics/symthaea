@@ -34,19 +34,29 @@ impl CognitiveLoopService {
         } else {
             1.0
         };
-        if startup_suppressed {
+        if startup_suppressed && !self.carryover.quality.adaptive_warmup_exited {
             self.stats.startup_suppressed_cycles += 1;
             // Ramp learning rate from 20% → 100% over warmup period
             let lr_scale = 0.2 + 0.8 * startup_warmup_progress;
             self.stats.adaptive_learning_rate *= lr_scale;
             // Session 16 Item 3: Startup exploration ramp.
-            // Instead of flat suppression, ramp from STARTUP_EXPLORATION_INITIAL to 1.0.
-            // Early cycles get heavily constrained; later warmup cycles less so.
-            // Science: Hopfield (1982) — settling time requires graded exploration.
             let explore_ramp = super::super::thresholds::STARTUP_EXPLORATION_INITIAL
                 + (1.0 - super::super::thresholds::STARTUP_EXPLORATION_INITIAL)
                     * startup_warmup_progress;
             self.scale_exploration("startup_warmup", explore_ramp);
+
+            // S17-5: Adaptive warmup exit. Smith (2018).
+            if self.stats.total_cycles
+                >= super::super::thresholds::ADAPTIVE_WARMUP_MIN_CYCLES as usize
+            {
+                let grad = self.carryover.quality.prev_gradient_magnitude;
+                let ema = self.carryover.history.consciousness_ema;
+                if grad < super::super::thresholds::ADAPTIVE_WARMUP_GRADIENT_THRESHOLD
+                    && ema > super::super::thresholds::ADAPTIVE_WARMUP_EMA_THRESHOLD
+                {
+                    self.carryover.quality.adaptive_warmup_exited = true;
+                }
+            }
         }
 
         // Session 16 Item 6: Consciousness EMA → learning rate initialization bias.

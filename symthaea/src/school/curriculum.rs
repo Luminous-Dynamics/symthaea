@@ -203,6 +203,14 @@ pub enum CurriculumType {
 
     /// Advanced code generation: composition, property tests, LLM integration
     CodeGenerationAdvanced,
+
+    /// Mathematics: arithmetic through linear algebra, statistics, formal logic
+    #[cfg(feature = "mathematics")]
+    Mathematics,
+
+    /// Advanced mathematics: Fourier analysis, optimization, formal verification
+    #[cfg(feature = "mathematics")]
+    MathematicsAdvanced,
 }
 
 impl CurriculumType {
@@ -222,6 +230,10 @@ impl CurriculumType {
             CurriculumType::Holochain => "Holochain Development",
             CurriculumType::CodeGeneration => "Code Generation",
             CurriculumType::CodeGenerationAdvanced => "Advanced Code Generation",
+            #[cfg(feature = "mathematics")]
+            CurriculumType::Mathematics => "Mathematics",
+            #[cfg(feature = "mathematics")]
+            CurriculumType::MathematicsAdvanced => "Advanced Mathematics",
         }
     }
 
@@ -252,6 +264,14 @@ impl CurriculumType {
             }
             CurriculumType::CodeGenerationAdvanced => {
                 "Master pattern composition, property testing, and LLM integration"
+            }
+            #[cfg(feature = "mathematics")]
+            CurriculumType::Mathematics => {
+                "Progressive mathematics from arithmetic through linear algebra, statistics, and logic"
+            }
+            #[cfg(feature = "mathematics")]
+            CurriculumType::MathematicsAdvanced => {
+                "Expert mathematics: Fourier analysis, optimization, formal verification"
             }
         }
     }
@@ -306,6 +326,12 @@ impl Curriculum {
             CurriculumType::CodeGeneration => super::code_curriculum::code_generation_curriculum(),
             CurriculumType::CodeGenerationAdvanced => {
                 super::code_curriculum::code_generation_advanced_curriculum()
+            }
+            #[cfg(feature = "mathematics")]
+            CurriculumType::Mathematics => super::math_curriculum::math_curriculum(),
+            #[cfg(feature = "mathematics")]
+            CurriculumType::MathematicsAdvanced => {
+                super::math_curriculum::math_curriculum_advanced()
             }
         }
     }

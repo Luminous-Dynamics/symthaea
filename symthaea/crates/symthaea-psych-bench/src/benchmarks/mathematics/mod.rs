@@ -1,0 +1,28 @@
+//! Mathematics benchmark suite.
+//!
+//! Ten benchmarks covering core mathematical cognition domains:
+//! arithmetic, linear algebra, polynomial analysis, numerical integration,
+//! matrix computation, statistical inference, Bayesian reasoning, logical
+//! deduction, constraint satisfaction, and proof construction.
+
+pub mod arithmetic_word_problems;
+pub mod bayesian_reasoning;
+pub mod constraint_puzzles;
+pub mod definite_integrals;
+pub mod linear_system_solving;
+pub mod logical_deduction;
+pub mod matrix_operations;
+pub mod polynomial_roots;
+pub mod proof_construction;
+pub mod statistical_inference;
+
+pub use arithmetic_word_problems::ArithmeticWordProblemsBenchmark;
+pub use bayesian_reasoning::BayesianReasoningBenchmark;
+pub use constraint_puzzles::ConstraintPuzzlesBenchmark;
+pub use definite_integrals::DefiniteIntegralsBenchmark;
+pub use linear_system_solving::LinearSystemSolvingBenchmark;
+pub use logical_deduction::LogicalDeductionBenchmark;
+pub use matrix_operations::MatrixOperationsBenchmark;
+pub use polynomial_roots::PolynomialRootsBenchmark;
+pub use proof_construction::ProofConstructionBenchmark;
+pub use statistical_inference::StatisticalInferenceBenchmark;

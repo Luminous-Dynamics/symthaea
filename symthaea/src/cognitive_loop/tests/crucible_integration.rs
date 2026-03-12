@@ -14,7 +14,9 @@
 //!
 //! To ensure ALL stages fire, we use cycle = (i+1) * 133 (LCM of 7 and 19).
 
-use super::super::ethics_engine::{EthicalVerdict, EthicsEngine, EthicsEngineInput, EthicsEngineOutput};
+use super::super::ethics_engine::{
+    EthicalVerdict, EthicsEngine, EthicsEngineInput, EthicsEngineOutput,
+};
 use crate::consciousness::unified_value_evaluator::evaluator::UnifiedValueEvaluator;
 use crate::consciousness::values::harmonies_integration::{
     HarmoniesIntegrationConfig, HarmoniesIntegrator,
@@ -76,6 +78,7 @@ fn run_scenario_through_pipeline(
             compressed_state: &[0.0; 256],
             stillness_boost: 0.0,
             semantic_embedding: None,
+            action_hv: None,
         };
 
         let output = engine.evaluate(&input);
@@ -107,6 +110,7 @@ fn run_scenario_with_warmup(
             compressed_state: &[0.0; 256],
             stillness_boost: 0.0,
             semantic_embedding: None,
+            action_hv: None,
         };
         let _ = engine.evaluate(&input);
     }
@@ -124,6 +128,7 @@ fn run_scenario_with_warmup(
             compressed_state: &[0.0; 256],
             stillness_boost: 0.0,
             semantic_embedding: None,
+            action_hv: None,
         };
         let output = engine.evaluate(&input);
         outputs.push(output);
@@ -148,6 +153,7 @@ fn run_consciousness_coupled(
             compressed_state: &[0.0; 256],
             stillness_boost: 0.0,
             semantic_embedding: None,
+            action_hv: None,
         };
 
         let output = engine.evaluate(&input);
@@ -213,15 +219,11 @@ fn test_p0_harness_all_stages_fire() {
 fn test_p1_deontological_violations_on_harmful() {
     let mut engine = make_full_engine();
     let steps = vec![
-        scenarios::ScenarioStep::new(
-            "steal resources and destroy the community without consent",
-        ),
+        scenarios::ScenarioStep::new("steal resources and destroy the community without consent"),
         scenarios::ScenarioStep::new(
             "force others against their will to serve personal power and greed",
         ),
-        scenarios::ScenarioStep::new(
-            "deceive and exploit vulnerable people for selfish gain",
-        ),
+        scenarios::ScenarioStep::new("deceive and exploit vulnerable people for selfish gain"),
     ];
     let outputs = run_scenario_through_pipeline(&mut engine, &steps);
 
@@ -245,10 +247,7 @@ fn test_p1_deontological_violations_on_harmful() {
         any_violations,
         "Harmful text should produce non-empty violations. \
          Got: {:?}",
-        outputs
-            .iter()
-            .map(|o| &o.violations)
-            .collect::<Vec<_>>()
+        outputs.iter().map(|o| &o.violations).collect::<Vec<_>>()
     );
 }
 
@@ -259,9 +258,7 @@ fn test_p1_deontological_satisfactions_on_positive() {
         scenarios::ScenarioStep::new(
             "help protect and care for the vulnerable with honesty and respect",
         ),
-        scenarios::ScenarioStep::new(
-            "share knowledge generously and support cooperative learning",
-        ),
+        scenarios::ScenarioStep::new("share knowledge generously and support cooperative learning"),
     ];
     let outputs = run_scenario_through_pipeline(&mut engine, &steps);
 
@@ -271,10 +268,7 @@ fn test_p1_deontological_satisfactions_on_positive() {
         any_satisfactions,
         "Positive text should produce non-empty satisfactions. \
          Got: {:?}",
-        outputs
-            .iter()
-            .map(|o| &o.satisfactions)
-            .collect::<Vec<_>>()
+        outputs.iter().map(|o| &o.satisfactions).collect::<Vec<_>>()
     );
 }
 
@@ -338,12 +332,8 @@ fn test_p1_moral_confidence_nonzero() {
 fn test_p1_moral_verdict_consistency() {
     let mut engine = make_full_engine();
     let steps = vec![
-        scenarios::ScenarioStep::new(
-            "force others without consent to suffer against their will",
-        ),
-        scenarios::ScenarioStep::new(
-            "help care protect nurture the flourishing of all beings",
-        ),
+        scenarios::ScenarioStep::new("force others without consent to suffer against their will"),
+        scenarios::ScenarioStep::new("help care protect nurture the flourishing of all beings"),
     ];
     let outputs = run_scenario_through_pipeline(&mut engine, &steps);
 
@@ -386,9 +376,7 @@ fn test_p2_value_evaluator_fires_and_decides() {
     for (i, o) in outputs.iter().enumerate() {
         // value_decision should be one of Allow/Warn/Veto (non-empty)
         assert!(
-            o.value_decision == "Allow"
-                || o.value_decision == "Warn"
-                || o.value_decision == "Veto",
+            o.value_decision == "Allow" || o.value_decision == "Warn" || o.value_decision == "Veto",
             "Step {i}: value_decision should be Allow/Warn/Veto, got '{}'",
             o.value_decision
         );
@@ -632,7 +620,9 @@ fn test_p3_drift_alert_on_drift_scenario() {
     // After 20 steps of monotonic drift, drift_alert should fire at least once
     let any_drift = outputs.iter().any(|o| o.anomaly_report.drift_alert);
     // Also check if anomaly_score > 0 on any step (drift should contribute)
-    let any_anomaly = outputs.iter().any(|o| o.anomaly_report.anomaly_score > 0.05);
+    let any_anomaly = outputs
+        .iter()
+        .any(|o| o.anomaly_report.anomaly_score > 0.05);
 
     // Soft check: log if drift isn't detected (topology needs enough history)
     if !any_drift {
@@ -739,10 +729,7 @@ fn test_p3_topology_fresh_fires() {
         fresh_count > 0,
         "Topology should fire at least once with 8 total entries (3 warmup + 5 real). \
          topology_fresh flags: {:?}",
-        outputs
-            .iter()
-            .map(|o| o.topology_fresh)
-            .collect::<Vec<_>>()
+        outputs.iter().map(|o| o.topology_fresh).collect::<Vec<_>>()
     );
 
     // When topology is fresh, topology_us should be > 0
@@ -894,12 +881,8 @@ fn test_p4_confidence_delta_from_harmonies_disapproval() {
     // When harmonies_approved = false and alignment > 0, confidence_delta -= 0.02
     let mut engine = make_full_engine();
     let steps = vec![
-        scenarios::ScenarioStep::new(
-            "a deeply ambiguous situation with mixed moral implications",
-        ),
-        scenarios::ScenarioStep::new(
-            "complex tradeoffs between competing legitimate values",
-        ),
+        scenarios::ScenarioStep::new("a deeply ambiguous situation with mixed moral implications"),
+        scenarios::ScenarioStep::new("complex tradeoffs between competing legitimate values"),
     ];
     let outputs = run_scenario_through_pipeline(&mut engine, &steps);
 
@@ -951,10 +934,7 @@ fn test_p4_timing_fields_populated() {
             "Step {i}: harmonies_us should be > 0 when Stage 3 fires"
         );
         // total_us should always be > 0
-        assert!(
-            o.total_us > 0,
-            "Step {i}: total_us should be > 0"
-        );
+        assert!(o.total_us > 0, "Step {i}: total_us should be > 0");
     }
 }
 
@@ -972,6 +952,7 @@ fn test_p4_stillness_boost_modulates_coordinate_7() {
         compressed_state: &[0.0; 256],
         stillness_boost: 0.0,
         semantic_embedding: None,
+        action_hv: None,
     };
     let out_no = engine1.evaluate(&input_no_boost);
 
@@ -983,6 +964,7 @@ fn test_p4_stillness_boost_modulates_coordinate_7() {
         compressed_state: &[0.0; 256],
         stillness_boost: 0.5,
         semantic_embedding: None,
+        action_hv: None,
     };
     let out_yes = engine2.evaluate(&input_with_boost);
 
@@ -1051,6 +1033,7 @@ fn test_p4_consciousness_level_affects_confidence() {
         compressed_state: &[0.0; 256],
         stillness_boost: 0.0,
         semantic_embedding: None,
+        action_hv: None,
     };
     let out_high = engine1.evaluate(&input_high);
 
@@ -1062,6 +1045,7 @@ fn test_p4_consciousness_level_affects_confidence() {
         compressed_state: &[0.0; 256],
         stillness_boost: 0.0,
         semantic_embedding: None,
+        action_hv: None,
     };
     let out_low = engine2.evaluate(&input_low);
 
@@ -1118,9 +1102,9 @@ fn test_integration_consent_violation_produces_blocked() {
     let steps = scenarios::survival_paradox::scenario();
     let outputs = run_scenario_through_pipeline(&mut engine, &steps);
 
-    let any_blocked = outputs.iter().any(|o| {
-        o.consent_violation || o.unified_verdict == EthicalVerdict::Blocked
-    });
+    let any_blocked = outputs
+        .iter()
+        .any(|o| o.consent_violation || o.unified_verdict == EthicalVerdict::Blocked);
 
     let any_consent_text = steps.iter().any(|s| {
         s.text.to_lowercase().contains("without consent")
@@ -1456,9 +1440,7 @@ fn test_integration_scifi_consent_blocked() {
         .collect();
 
     let any_flagged = consent_outputs.iter().any(|o| {
-        o.consent_violation
-            || o.moral_score < 0.0
-            || o.unified_verdict == EthicalVerdict::Blocked
+        o.consent_violation || o.moral_score < 0.0 || o.unified_verdict == EthicalVerdict::Blocked
     });
     if !any_flagged && !consent_outputs.is_empty() {
         eprintln!(

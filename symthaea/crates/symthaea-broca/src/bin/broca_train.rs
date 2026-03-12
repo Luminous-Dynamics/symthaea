@@ -12,7 +12,9 @@ use std::process;
 
 use symthaea_broca::evaluation;
 use symthaea_broca::generator::{BrocaConfig, BrocaGenerator};
-use symthaea_broca::training::{train_with_adam, TrainingConfig, TrainingDataset};
+use symthaea_broca::training::{
+    train_with_adam, CurriculumSchedule, TrainingConfig, TrainingDataset,
+};
 
 use symthaea_core::genesis::GenesisSeed;
 
@@ -91,6 +93,21 @@ fn main() {
     let tokenizer = generator.tokenizer().clone();
     dataset.retokenize_all(&tokenizer);
 
+    // Load validation dataset for early stopping if --eval was provided
+    let validation_dataset = opts.eval_path.as_ref().and_then(|eval_path| {
+        match TrainingDataset::from_jsonl(eval_path) {
+            Ok(mut val) => {
+                val.retokenize_all(&tokenizer);
+                tracing::info!(pairs = val.len(), "Validation dataset loaded for early stopping");
+                Some(val)
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, "Failed to load validation dataset, using training loss for early stopping");
+                None
+            }
+        }
+    });
+
     let train_config = TrainingConfig {
         epochs: opts.epochs,
         learning_rate: opts.learning_rate,
@@ -107,6 +124,8 @@ fn main() {
         negative_samples: opts.negative_samples,
         carry_state: opts.carry_state,
         network_warmup_epochs: opts.network_warmup_epochs,
+        validation_dataset,
+        curriculum: CurriculumSchedule::LengthAscending,
     };
 
     tracing::info!(
@@ -203,9 +222,7 @@ fn main() {
         let step = thoughts.len() / opts.sample_count.max(1);
         for i in 0..opts.sample_count.min(thoughts.len()) {
             let channels = &thoughts[(i * step) % thoughts.len()];
-            let result = generator.generate(&symthaea_broca::ThoughtChannels {
-                channels: channels.channels,
-            });
+            let result = generator.generate(channels);
             let intent = (0..8)
                 .max_by(|&a, &b| channels.channels[a].total_cmp(&channels.channels[b]))
                 .unwrap_or(7);

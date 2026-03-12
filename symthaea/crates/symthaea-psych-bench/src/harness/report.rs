@@ -578,6 +578,86 @@ impl BenchmarkReport {
             // Substrate Transfer
             ("transfer_fidelity", "transfer_fidelity", &bl.substrate),
             ("phi_preservation", "phi_preservation", &bl.substrate),
+            // Mathematics domain
+            ("accuracy", "arithmetic_accuracy", &bl.mathematics),
+            (
+                "accuracy_2x2",
+                "linear_system_accuracy_2x2",
+                &bl.mathematics,
+            ),
+            (
+                "accuracy_3x3",
+                "linear_system_accuracy_3x3",
+                &bl.mathematics,
+            ),
+            (
+                "accuracy_quadratic",
+                "polynomial_quadratic_accuracy",
+                &bl.mathematics,
+            ),
+            (
+                "accuracy_cubic",
+                "polynomial_cubic_accuracy",
+                &bl.mathematics,
+            ),
+            (
+                "determinant_accuracy",
+                "determinant_accuracy",
+                &bl.mathematics,
+            ),
+            (
+                "eigenvalue_accuracy",
+                "eigenvalue_accuracy",
+                &bl.mathematics,
+            ),
+            (
+                "posterior_accuracy",
+                "bayesian_posterior_accuracy",
+                &bl.mathematics,
+            ),
+            ("valid_accuracy", "logical_valid_accuracy", &bl.mathematics),
+            (
+                "invalid_accuracy",
+                "logical_invalid_accuracy",
+                &bl.mathematics,
+            ),
+            (
+                "queens_4_accuracy",
+                "constraint_queens_4_accuracy",
+                &bl.mathematics,
+            ),
+            (
+                "queens_8_accuracy",
+                "constraint_queens_8_accuracy",
+                &bl.mathematics,
+            ),
+            ("tautology_accuracy", "tautology_accuracy", &bl.mathematics),
+            (
+                "derivation_accuracy",
+                "derivation_accuracy",
+                &bl.mathematics,
+            ),
+            // Institutional Reasoning
+            (
+                "institutional_decomposition_accuracy",
+                "institutional_decomposition_accuracy",
+                &bl.institutional_reasoning,
+            ),
+            (
+                "institutional_axiom_discrimination",
+                "institutional_axiom_discrimination",
+                &bl.institutional_reasoning,
+            ),
+            (
+                "institutional_recovery_fidelity",
+                "institutional_recovery_fidelity",
+                &bl.institutional_reasoning,
+            ),
+            (
+                "institutional_cross_domain_coherence",
+                "institutional_cross_domain_coherence",
+                &bl.institutional_reasoning,
+            ),
         ];
 
         for (metric_key, baseline_key, baselines) in &mappings {
@@ -1128,6 +1208,8 @@ impl BenchmarkReport {
             || benchmark.contains("Binding")
             || benchmark.contains("Speech")
             || benchmark.contains("Substrate")
+            || benchmark.contains("Mathematics")
+            || benchmark.contains("InstitutionalReasoning")
         {
             comps
         } else {
@@ -1516,6 +1598,19 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("ProprioceptiveDrift") => "drift_difference",
         b if b.contains("PhonemeDiscrimination") => "categorical_perception_index",
         b if b.contains("Substrate") && b.contains("Transfer") => "transfer_fidelity",
+        // Mathematics domain
+        b if b.contains("ArithmeticWordProblem") => "accuracy",
+        b if b.contains("LinearSystemSolving") => "accuracy_2x2",
+        b if b.contains("PolynomialRoots") => "accuracy_quadratic",
+        b if b.contains("DefiniteIntegral") => "accuracy",
+        b if b.contains("MatrixOperations") => "determinant_accuracy",
+        b if b.contains("StatisticalInference") => "variance_estimation_accuracy",
+        b if b.contains("BayesianReasoning") => "posterior_accuracy",
+        b if b.contains("LogicalDeduction") => "overall_accuracy",
+        b if b.contains("ConstraintPuzzle") => "queens_4_accuracy",
+        b if b.contains("ProofConstruction") => "tautology_accuracy",
+        // Institutional Reasoning domain
+        b if b.contains("InstitutionalReasoning") => "institutional_decomposition_accuracy",
         _ => "overall_accuracy",
     }
 }

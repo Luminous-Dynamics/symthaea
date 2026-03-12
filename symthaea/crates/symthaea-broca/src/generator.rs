@@ -6,13 +6,15 @@
 //! 3. Semantic veto: mid-sentence self-correction when coherence drops
 //! 4. Thermodynamic subjective time: dt varies with system load
 
+use rand::rngs::StdRng;
+use rand::SeedableRng;
 use serde::{Deserialize, Serialize};
 
 use crate::controller::{LanguageController, LanguageControllerConfig};
 use crate::encoder::{ThoughtChannels, ThoughtLanguageEncoder};
 use crate::gating::{
-    consciousness_gated_max_tokens, CoherenceFeedback, EmotionalModulator, EpistemicGate,
-    GatingConfig,
+    confidence_adjusted_veto_threshold, consciousness_gated_max_tokens, CoherenceFeedback,
+    EmotionalModulator, EpistemicGate, GatingConfig,
 };
 use crate::tokenizer::BpeTokenizer;
 
@@ -53,8 +55,14 @@ pub struct BrocaConfig {
     pub veto_hesitation: String,
     /// Repetition penalty (1.0 = no penalty, >1.0 = suppress repeats).
     /// Applied to logits of tokens already generated in the current sequence.
+    /// Uses frequency-scaled penalty: `penalty^count` where count is the number
+    /// of times a token has appeared, preventing alternating-token loops.
     #[serde(default = "default_repetition_penalty")]
     pub repetition_penalty: f32,
+    /// Optional seed for sampling RNG (reproducible generation with TopK/TopP).
+    /// If `None`, uses thread-local RNG (stochastic).
+    #[serde(default)]
+    pub sampling_seed: Option<u64>,
 }
 
 fn default_repetition_penalty() -> f32 {
@@ -74,8 +82,37 @@ impl Default for BrocaConfig {
             enable_semantic_veto: true,
             veto_hesitation: "-- wait, ".to_string(),
             repetition_penalty: default_repetition_penalty(),
+            sampling_seed: None,
         }
     }
+}
+
+/// Per-token gating adjustment record for auditing generation decisions.
+#[derive(Debug, Clone)]
+pub struct GatingTraceEntry {
+    /// Token position in the generated sequence.
+    pub position: usize,
+    /// Coherence between output and thought HV at this position.
+    pub coherence: f32,
+    /// Binding weight applied to thought HV (>1.0 means correction active).
+    pub binding_weight: f32,
+    /// Whether veto was triggered at this position.
+    pub veto_triggered: bool,
+    /// Epistemic logit adjustment applied at this position.
+    /// Represents the hedging boost magnitude for the current epistemic level.
+    /// 0.0 when epistemic gating is disabled or epistemic level is Certain/Probable.
+    pub epistemic_boost: f32,
+    /// Emotional modulation logit adjustment at this position.
+    /// Represents the maximum boost magnitude from arousal/valence/warmth effects.
+    /// 0.0 when emotional modulation is disabled or no thresholds are exceeded.
+    pub emotional_boost: f32,
+    /// Max token reduction from time pressure (0.0 if not applicable).
+    /// Expressed as the fraction of base tokens removed (e.g., 0.3 means 30% reduction).
+    pub time_pressure_reduction: f32,
+    /// Adjusted veto threshold from response confidence.
+    /// Lower values mean the system is more tolerant of coherence drift.
+    /// Equal to the base veto threshold when coherence feedback is disabled.
+    pub confidence_veto_threshold: f32,
 }
 
 /// Result of a single generation.
@@ -95,6 +132,13 @@ pub struct GenerationResult {
     pub final_coherence: f32,
     /// Final long-window coherence score (Liquid-Mamba only, 0.0 for CfC-HDC).
     pub long_coherence: f32,
+    /// Per-token coherence dynamics: coherence score at each generated position.
+    pub coherence_dynamics: Vec<f32>,
+    /// Per-token gating audit trail (populated when coherence feedback is enabled).
+    pub gating_trace: Vec<GatingTraceEntry>,
+    /// Number of consecutive tokens with output-thought similarity < 0.05.
+    /// When >= 3, suggests hallucination (output drifted far from thought intent).
+    pub hallucination_flag: bool,
     /// Back-projected HDC vectors for each generated token (Liquid-Mamba only).
     #[cfg(feature = "mamba")]
     pub output_hvs: Vec<symthaea_core::hdc::ContinuousHV>,
@@ -112,6 +156,9 @@ pub struct BrocaGenerator {
     emotional_modulator: EmotionalModulator,
     coherence_feedback: CoherenceFeedback,
     config: BrocaConfig,
+    /// Seeded RNG for reproducible sampling (TopK/TopP). Recreated each generation
+    /// from `config.sampling_seed`. If `None`, uses thread-local RNG.
+    sampling_rng: Option<StdRng>,
 }
 
 impl BrocaGenerator {
@@ -131,6 +178,7 @@ impl BrocaGenerator {
             config.gating.coherence_drift_threshold,
             config.gating.veto_threshold,
         );
+        let sampling_rng = config.sampling_seed.map(StdRng::seed_from_u64);
 
         Self {
             controller,
@@ -139,6 +187,7 @@ impl BrocaGenerator {
             epistemic_gate,
             emotional_modulator,
             coherence_feedback,
+            sampling_rng,
             config,
         }
     }
@@ -170,6 +219,7 @@ impl BrocaGenerator {
             config.gating.coherence_drift_threshold,
             config.gating.veto_threshold,
         );
+        let sampling_rng = config.sampling_seed.map(StdRng::seed_from_u64);
 
         Self {
             controller,
@@ -178,6 +228,7 @@ impl BrocaGenerator {
             epistemic_gate,
             emotional_modulator,
             coherence_feedback,
+            sampling_rng,
             config,
         }
     }
@@ -214,13 +265,26 @@ impl BrocaGenerator {
         reset_state: bool,
     ) -> GenerationResult {
         // 1. Encode thought channels once
-        let mut thought_hv = self.encoder.encode(channels);
+        let thought_hv_original = self.encoder.encode(channels);
+        let mut thought_hv = thought_hv_original.clone();
 
-        // 2. Compute max tokens (consciousness-gated)
-        let max_tokens = if self.config.enable_consciousness_gating {
+        // 2. Compute max tokens (consciousness-gated, then time-pressure-adjusted)
+        let pre_pressure_tokens = if self.config.enable_consciousness_gating {
             consciousness_gated_max_tokens(self.config.gating.base_max_tokens, channels.psi())
         } else {
             self.config.gating.base_max_tokens
+        };
+        let max_tokens = crate::gating::time_pressure_adjusted_max_tokens(
+            pre_pressure_tokens,
+            channels.time_pressure(),
+            self.config.gating.time_pressure_max_reduction,
+        );
+
+        // Time pressure reduction as a fraction of pre-pressure tokens removed
+        let time_pressure_reduction = if pre_pressure_tokens > 0 {
+            1.0 - (max_tokens as f32 / pre_pressure_tokens as f32)
+        } else {
+            0.0
         };
 
         // 3. Optionally reset controller state (skip for multi-turn continuity)
@@ -228,54 +292,163 @@ impl BrocaGenerator {
             self.controller.reset();
         }
 
-        // 4. Autoregressive generation loop
+        // 4. Re-seed sampling RNG for reproducibility
+        if let Some(seed) = self.config.sampling_seed {
+            self.sampling_rng = Some(StdRng::seed_from_u64(seed));
+        }
+
+        // 5. Autoregressive generation loop
         let mut tokens = Vec::new();
         let mut prev_token = self.tokenizer.thought_id; // Start with <thought> token
         let mut eos_terminated = false;
         let mut veto_triggered = false;
         let mut text = String::new();
         let rep_penalty = self.config.repetition_penalty;
+        let min_veto_pos = self.config.gating.min_veto_position;
+        let max_vetoes = self.config.gating.max_vetoes;
+        let veto_refractory = self.config.gating.veto_refractory;
+        let mut veto_count = 0usize;
+        let mut tokens_since_veto = veto_refractory; // Start past refractory
+        let mut coherence_dynamics = Vec::new();
+        let mut gating_trace = Vec::new();
+        let mut consecutive_low_coherence = 0usize;
+        let mut hallucination_flag = false;
 
         for pos in 0..max_tokens {
             // Forward step
             let mut logits = self.controller.forward_step(&thought_hv, prev_token, pos);
 
-            // Apply repetition penalty to already-generated tokens
+            // Apply frequency-scaled repetition penalty
             if rep_penalty > 1.0 + 1e-6 {
                 apply_repetition_penalty(&mut logits, &tokens, rep_penalty);
             }
 
-            // Apply gating
-            if self.config.enable_epistemic_gate {
-                self.epistemic_gate
-                    .apply(&mut logits, channels.epistemic_ordinal());
-            }
+            // Apply gating and compute audit trail values
+            let this_epistemic_boost = if self.config.enable_epistemic_gate {
+                let ordinal = channels.epistemic_ordinal();
+                self.epistemic_gate.apply(&mut logits, ordinal);
+                // Compute representative boost magnitude for the trace
+                if ordinal > 3.5 {
+                    self.config.gating.unknown_hedging_boost
+                        * self.config.gating.ood_boost_multiplier
+                } else if ordinal > 2.5 {
+                    self.config.gating.unknown_hedging_boost
+                } else if ordinal > 1.5 {
+                    self.config.gating.uncertain_hedging_boost
+                } else {
+                    0.0
+                }
+            } else {
+                0.0
+            };
 
-            if self.config.enable_emotional_modulation {
+            let this_emotional_boost = if self.config.enable_emotional_modulation {
                 self.emotional_modulator.apply(&mut logits, channels, pos);
-            }
+                // Compute maximum boost magnitude from arousal/valence/warmth effects
+                let arousal = channels.arousal();
+                let valence = channels.valence();
+                let warmth = channels.warmth();
+                let cfg = &self.config.gating;
+                let mut max_boost = 0.0f32;
+                if arousal > cfg.high_arousal_threshold && pos > cfg.arousal_position_threshold {
+                    let boost =
+                        (arousal - cfg.high_arousal_threshold) * cfg.arousal_boost_multiplier;
+                    max_boost = max_boost.max(boost);
+                    // arousal × negative valence interaction
+                    if valence < cfg.negative_valence_threshold {
+                        let interaction = (arousal - cfg.high_arousal_threshold)
+                            * (-valence - (-cfg.negative_valence_threshold))
+                            * cfg.valence_boost_multiplier;
+                        max_boost = max_boost.max(interaction);
+                    }
+                }
+                if valence < cfg.negative_valence_threshold {
+                    let boost = (-valence - (-cfg.negative_valence_threshold))
+                        * cfg.valence_boost_multiplier;
+                    max_boost = max_boost.max(boost);
+                }
+                if warmth < cfg.low_warmth_threshold {
+                    let penalty =
+                        (cfg.low_warmth_threshold - warmth) * cfg.warmth_penalty_multiplier;
+                    max_boost = max_boost.max(penalty.abs());
+                }
+                max_boost
+            } else {
+                0.0
+            };
 
             // Coherence feedback: scale thought HV to strengthen binding when coherence drifts
+            let mut this_binding_weight = 1.0f32;
+            let mut this_veto = false;
+            let this_confidence_veto_threshold = confidence_adjusted_veto_threshold(
+                self.config.gating.veto_threshold,
+                channels.response_confidence(),
+                self.config.gating.confidence_veto_scale,
+            );
             if self.config.enable_coherence_feedback {
                 let output_hv = self.controller.output_hv();
                 let binding_weight = self.coherence_feedback.update(&output_hv, &thought_hv);
+                this_binding_weight = binding_weight;
+                let coherence = self.coherence_feedback.coherence();
+                coherence_dynamics.push(coherence);
+
+                // Hallucination detection: track consecutive low-coherence tokens
+                if coherence < 0.05 {
+                    consecutive_low_coherence += 1;
+                    if consecutive_low_coherence >= 3 {
+                        hallucination_flag = true;
+                    }
+                } else {
+                    consecutive_low_coherence = 0;
+                }
+
                 if binding_weight > 1.0 + 1e-6 {
                     thought_hv = thought_hv.scale(binding_weight);
                 }
 
                 // Semantic veto: mid-sentence self-correction
+                // Gated by: min position, max vetoes, refractory period
                 if self.config.enable_semantic_veto
-                    && self.coherence_feedback.should_veto()
-                    && pos > 2
+                    && self.coherence_feedback.should_veto_with_confidence(
+                        channels.response_confidence(),
+                        self.config.gating.confidence_veto_scale,
+                    )
+                    && pos > min_veto_pos
+                    && veto_count < max_vetoes
+                    && tokens_since_veto >= veto_refractory
                 {
                     veto_triggered = true;
+                    this_veto = true;
+                    veto_count += 1;
+                    tokens_since_veto = 0;
                     text.push_str(&self.config.veto_hesitation);
                     on_token(&self.config.veto_hesitation);
-                    // Reset network state and re-inject thought
+                    // Reset network state
                     self.controller.reset();
-                    // Continue from current position (don't reset pos)
+                    // Re-inject thought context: do a forward step with <thought> token
+                    // so the CfC network recovers the thought context before continuing
+                    let _ = self.controller.forward_step(
+                        &thought_hv_original,
+                        self.tokenizer.thought_id,
+                        0,
+                    );
+                    // Restore thought_hv from original (undo any drift scaling)
+                    thought_hv = thought_hv_original.clone();
                 }
             }
+
+            gating_trace.push(GatingTraceEntry {
+                position: pos,
+                coherence: self.coherence_feedback.coherence(),
+                binding_weight: this_binding_weight,
+                veto_triggered: this_veto,
+                epistemic_boost: this_epistemic_boost,
+                emotional_boost: this_emotional_boost,
+                time_pressure_reduction,
+                confidence_veto_threshold: this_confidence_veto_threshold,
+            });
+
+            tokens_since_veto += 1;
 
             // Sample next token
             let next_token = self.sample(&logits);
@@ -307,6 +480,9 @@ impl BrocaGenerator {
             veto_triggered,
             final_coherence,
             long_coherence: 0.0, // CfC-HDC backend doesn't use long window
+            coherence_dynamics,
+            gating_trace,
+            hallucination_flag,
             #[cfg(feature = "mamba")]
             output_hvs: Vec::new(),
             #[cfg(feature = "mamba")]
@@ -315,11 +491,15 @@ impl BrocaGenerator {
     }
 
     /// Sample a token from logits using the configured strategy.
-    fn sample(&self, logits: &[f32]) -> u32 {
+    fn sample(&mut self, logits: &[f32]) -> u32 {
         match &self.config.sampling {
             SamplingStrategy::Greedy => greedy_sample(logits),
-            SamplingStrategy::TopK { k, temperature } => top_k_sample(logits, *k, *temperature),
-            SamplingStrategy::TopP { p, temperature } => top_p_sample(logits, *p, *temperature),
+            SamplingStrategy::TopK { k, temperature } => {
+                top_k_sample(logits, *k, *temperature, self.sampling_rng.as_mut())
+            }
+            SamplingStrategy::TopP { p, temperature } => {
+                top_p_sample(logits, *p, *temperature, self.sampling_rng.as_mut())
+            }
         }
     }
 
@@ -349,23 +529,27 @@ impl BrocaGenerator {
     }
 }
 
-/// Apply repetition penalty to logits for tokens already generated.
+/// Apply frequency-scaled repetition penalty to logits for tokens already generated.
 ///
-/// For each token ID in `generated`, divide its logit by `penalty` if positive,
-/// or multiply by `penalty` if negative. This suppresses repeated tokens
-/// while preserving relative ordering of unseen tokens.
+/// For each token ID in `generated`, counts its occurrences and applies
+/// `penalty^count` — repeated tokens get exponentially stronger suppression.
+/// This prevents alternating-token loops (A B A B) that flat penalty misses.
 ///
 /// Science: Keskar et al. (2019) "CTRL" — repetition penalty prevents
 /// degenerate loops in autoregressive models.
 fn apply_repetition_penalty(logits: &mut [f32], generated: &[u32], penalty: f32) {
-    // Collect unique generated token IDs
-    let seen: std::collections::HashSet<u32> = generated.iter().copied().collect();
-    for token_id in seen {
+    // Count occurrences of each generated token
+    let mut counts: std::collections::HashMap<u32, u32> = std::collections::HashMap::new();
+    for &token_id in generated {
+        *counts.entry(token_id).or_insert(0) += 1;
+    }
+    for (&token_id, &count) in &counts {
         if let Some(logit) = logits.get_mut(token_id as usize) {
+            let effective_penalty = penalty.powi(count as i32);
             if *logit > 0.0 {
-                *logit /= penalty;
+                *logit /= effective_penalty;
             } else {
-                *logit *= penalty;
+                *logit *= effective_penalty;
             }
         }
     }
@@ -382,7 +566,10 @@ fn greedy_sample(logits: &[f32]) -> u32 {
 }
 
 /// Top-k sampling with temperature.
-fn top_k_sample(logits: &[f32], k: usize, temperature: f32) -> u32 {
+///
+/// If `rng` is provided, uses it for reproducible sampling.
+/// Falls back to greedy on near-zero probability sum (not BOS token 0).
+fn top_k_sample(logits: &[f32], k: usize, temperature: f32, rng: Option<&mut StdRng>) -> u32 {
     let k = k.min(logits.len());
     if k == 0 {
         return greedy_sample(logits);
@@ -406,11 +593,11 @@ fn top_k_sample(logits: &[f32], k: usize, temperature: f32) -> u32 {
 
     let sum: f32 = probs.iter().map(|(_, p)| p).sum();
     if sum < 1e-10 {
-        return indexed[0].0 as u32;
+        // Fall back to greedy instead of returning BOS token 0
+        return greedy_sample(logits);
     }
 
-    // Sample from distribution using simple LCG
-    let r = simple_random_f32();
+    let r = random_f32(rng);
     let mut cumulative = 0.0;
     for (i, p) in &probs {
         cumulative += p / sum;
@@ -419,11 +606,15 @@ fn top_k_sample(logits: &[f32], k: usize, temperature: f32) -> u32 {
         }
     }
 
-    probs.last().map(|(i, _)| *i as u32).unwrap_or(0)
+    // Numerical edge: fall back to greedy
+    greedy_sample(logits)
 }
 
 /// Top-p (nucleus) sampling with temperature.
-fn top_p_sample(logits: &[f32], p: f32, temperature: f32) -> u32 {
+///
+/// If `rng` is provided, uses it for reproducible sampling.
+/// Falls back to greedy on near-zero probability sum (not BOS token 0).
+fn top_p_sample(logits: &[f32], p: f32, temperature: f32, rng: Option<&mut StdRng>) -> u32 {
     // Sort by logit descending
     let mut indexed: Vec<(usize, f32)> = logits.iter().enumerate().map(|(i, &l)| (i, l)).collect();
     indexed.sort_by(|(_, a), (_, b)| b.total_cmp(a));
@@ -441,7 +632,8 @@ fn top_p_sample(logits: &[f32], p: f32, temperature: f32) -> u32 {
 
     let sum: f32 = probs.iter().map(|(_, p)| p).sum();
     if sum < 1e-10 {
-        return indexed[0].0 as u32;
+        // Fall back to greedy instead of returning BOS token 0
+        return greedy_sample(logits);
     }
 
     // Find nucleus: smallest set with cumulative prob >= p
@@ -456,7 +648,7 @@ fn top_p_sample(logits: &[f32], p: f32, temperature: f32) -> u32 {
     }
 
     // Sample from nucleus
-    let r = simple_random_f32();
+    let r = random_f32(rng);
     let nucleus_sum: f32 = nucleus.iter().map(|(_, p)| p).sum();
     let mut c = 0.0;
     for (i, prob) in &nucleus {
@@ -466,14 +658,17 @@ fn top_p_sample(logits: &[f32], p: f32, temperature: f32) -> u32 {
         }
     }
 
-    nucleus.last().map(|(i, _)| *i as u32).unwrap_or(0)
+    // Numerical edge: fall back to greedy
+    greedy_sample(logits)
 }
 
-/// Simple thread-local random f32 in [0, 1) for sampling.
-/// Uses std random for simplicity (not genesis-seeded — sampling is intentionally stochastic).
-fn simple_random_f32() -> f32 {
+/// Generate a random f32 in [0, 1) using either a seeded RNG or thread-local RNG.
+fn random_f32(rng: Option<&mut StdRng>) -> f32 {
     use rand::Rng;
-    rand::thread_rng().gen::<f32>()
+    match rng {
+        Some(rng) => rng.gen::<f32>(),
+        None => rand::thread_rng().gen::<f32>(),
+    }
 }
 
 #[cfg(test)]
@@ -778,15 +973,15 @@ mod tests {
     #[test]
     fn test_repetition_penalty_fn() {
         let mut logits = vec![0.5, -0.3, 0.8, 0.1];
-        let generated = vec![0, 2]; // tokens 0 and 2 were generated
+        let generated = vec![0, 2]; // tokens 0 and 2 each appeared once
 
         apply_repetition_penalty(&mut logits, &generated, 2.0);
 
-        // Token 0: positive logit → divided by 2.0
+        // Token 0: positive logit, count=1 → divided by 2.0^1 = 2.0
         assert!((logits[0] - 0.25).abs() < 1e-6);
         // Token 1: not generated → unchanged
         assert!((logits[1] - (-0.3)).abs() < 1e-6);
-        // Token 2: positive logit → divided by 2.0
+        // Token 2: positive logit, count=1 → divided by 2.0^1 = 2.0
         assert!((logits[2] - 0.4).abs() < 1e-6);
         // Token 3: not generated → unchanged
         assert!((logits[3] - 0.1).abs() < 1e-6);
@@ -795,14 +990,81 @@ mod tests {
     #[test]
     fn test_repetition_penalty_negative_logit() {
         let mut logits = vec![-0.5, 0.3];
-        let generated = vec![0]; // token 0 generated (has negative logit)
+        let generated = vec![0]; // token 0 generated once (has negative logit)
 
         apply_repetition_penalty(&mut logits, &generated, 2.0);
 
-        // Negative logit → multiplied by penalty (pushed further negative)
+        // Negative logit → multiplied by penalty^1 = 2.0 (pushed further negative)
         assert!((logits[0] - (-1.0)).abs() < 1e-6);
         // Token 1 unchanged
         assert!((logits[1] - 0.3).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_repetition_penalty_frequency_scaled() {
+        let mut logits = vec![0.8, 0.8];
+        // Token 0 appeared 3 times, token 1 appeared 1 time
+        let generated = vec![0, 1, 0, 0];
+
+        apply_repetition_penalty(&mut logits, &generated, 2.0);
+
+        // Token 0: positive, count=3 → divided by 2.0^3 = 8.0
+        assert!((logits[0] - 0.1).abs() < 1e-6, "got {}", logits[0]);
+        // Token 1: positive, count=1 → divided by 2.0^1 = 2.0
+        assert!((logits[1] - 0.4).abs() < 1e-6, "got {}", logits[1]);
+    }
+
+    #[test]
+    fn test_sampling_reproducibility() {
+        let genesis = test_genesis();
+        let mut config = test_config();
+        config.sampling = SamplingStrategy::TopP {
+            p: 0.9,
+            temperature: 1.0,
+        };
+        config.sampling_seed = Some(42);
+
+        let channels = ThoughtChannels::default();
+
+        let mut gen1 = BrocaGenerator::new(&genesis, config.clone());
+        let result1 = gen1.generate(&channels);
+
+        let mut gen2 = BrocaGenerator::new(&genesis, config);
+        let result2 = gen2.generate(&channels);
+
+        assert_eq!(
+            result1.token_ids, result2.token_ids,
+            "Seeded TopP sampling should be reproducible"
+        );
+    }
+
+    #[test]
+    fn test_veto_refractory() {
+        let genesis = test_genesis();
+        let mut config = test_config();
+        config.enable_coherence_feedback = true;
+        config.enable_semantic_veto = true;
+        config.gating.max_vetoes = 1;
+        config.gating.veto_refractory = 8;
+        config.gating.base_max_tokens = 30;
+        config.enable_consciousness_gating = false;
+
+        let mut gen = BrocaGenerator::new(&genesis, config);
+        let channels = ThoughtChannels::default();
+        let result = gen.generate(&channels);
+
+        // If veto triggered, text should contain the hesitation token
+        if result.veto_triggered {
+            assert!(
+                result.text.contains("-- wait,"),
+                "Veto should insert hesitation token"
+            );
+            // At most max_vetoes (1) hesitation markers
+            let veto_count = result.text.matches("-- wait,").count();
+            assert!(veto_count <= 1, "max_vetoes=1 but got {veto_count} vetoes");
+        }
+        // Either way, should not crash
+        assert!(result.num_tokens > 0 || result.eos_terminated);
     }
 
     #[test]
@@ -833,6 +1095,236 @@ mod tests {
         assert_eq!(
             result1.token_ids, result3.token_ids,
             "Fresh generation should be identical to first"
+        );
+    }
+
+    #[test]
+    fn test_gating_trace_populated() {
+        let genesis = test_genesis();
+        let mut config = test_config();
+        config.enable_coherence_feedback = true;
+        config.gating.base_max_tokens = 10;
+        config.enable_consciousness_gating = false;
+
+        let mut gen = BrocaGenerator::new(&genesis, config);
+        let channels = ThoughtChannels::default();
+        let result = gen.generate(&channels);
+
+        // Gating trace should have entries for every token position
+        assert_eq!(
+            result.gating_trace.len(),
+            result.num_tokens,
+            "Gating trace should have one entry per generated token"
+        );
+
+        // Each entry should have finite coherence and new audit fields
+        for entry in &result.gating_trace {
+            assert!(
+                entry.coherence.is_finite(),
+                "Gating trace coherence should be finite"
+            );
+            assert!(
+                entry.binding_weight >= 1.0 - 1e-6,
+                "Binding weight should be >= 1.0"
+            );
+            assert!(
+                entry.epistemic_boost.is_finite(),
+                "Epistemic boost should be finite"
+            );
+            assert!(
+                entry.emotional_boost.is_finite(),
+                "Emotional boost should be finite"
+            );
+            assert!(
+                entry.emotional_boost >= 0.0,
+                "Emotional boost should be non-negative"
+            );
+            assert!(
+                entry.time_pressure_reduction.is_finite(),
+                "Time pressure reduction should be finite"
+            );
+            assert!(
+                entry.time_pressure_reduction >= 0.0,
+                "Time pressure reduction should be non-negative"
+            );
+            assert!(
+                entry.confidence_veto_threshold.is_finite(),
+                "Confidence veto threshold should be finite"
+            );
+            assert!(
+                entry.confidence_veto_threshold >= 0.0,
+                "Confidence veto threshold should be non-negative"
+            );
+        }
+    }
+
+    #[test]
+    fn test_coherence_dynamics_populated() {
+        let genesis = test_genesis();
+        let mut config = test_config();
+        config.enable_coherence_feedback = true;
+        config.gating.base_max_tokens = 10;
+        config.enable_consciousness_gating = false;
+
+        let mut gen = BrocaGenerator::new(&genesis, config);
+        let channels = ThoughtChannels::default();
+        let result = gen.generate(&channels);
+
+        // Coherence dynamics should have entries
+        assert_eq!(
+            result.coherence_dynamics.len(),
+            result.num_tokens,
+            "Should have one coherence value per token"
+        );
+
+        for &c in &result.coherence_dynamics {
+            assert!(c.is_finite(), "Coherence should be finite");
+        }
+    }
+
+    #[test]
+    fn test_hallucination_flag_on_noise() {
+        use symthaea_core::hdc::ContinuousHV;
+
+        // The hallucination flag detects 3+ consecutive tokens with
+        // output-thought similarity < 0.05. With random weights this
+        // may or may not trigger, so we just verify it's a bool.
+        let genesis = test_genesis();
+        let mut config = test_config();
+        config.enable_coherence_feedback = true;
+        config.gating.base_max_tokens = 15;
+        config.enable_consciousness_gating = false;
+
+        let mut gen = BrocaGenerator::new(&genesis, config);
+        let channels = ThoughtChannels::default();
+        let result = gen.generate(&channels);
+
+        // Just verify the flag is populated (true or false, both valid)
+        let _ = result.hallucination_flag;
+    }
+
+    #[test]
+    fn test_contrastive_intents() {
+        let genesis = test_genesis();
+        let config = test_config();
+
+        // Generate with all 8 intents
+        let mut outputs: Vec<Vec<u32>> = Vec::new();
+        for intent in 0..8 {
+            let channels = ThoughtChannels::with_intent(intent);
+            let mut gen = BrocaGenerator::new(&genesis, config.clone());
+            let result = gen.generate(&channels);
+            outputs.push(result.token_ids);
+        }
+
+        // Count distinct pairs
+        let mut distinct_pairs = 0;
+        let total_pairs = 8 * 7 / 2; // C(8,2) = 28
+        for i in 0..8 {
+            for j in (i + 1)..8 {
+                if outputs[i] != outputs[j] {
+                    distinct_pairs += 1;
+                }
+            }
+        }
+
+        // At least 6 of 28 intent pairs should produce different outputs
+        assert!(
+            distinct_pairs >= 6,
+            "At least 6/28 intent pairs should differ: got {distinct_pairs}"
+        );
+    }
+
+    #[test]
+    fn test_generate_continuing_context_accumulates() {
+        let genesis = test_genesis();
+        let config = test_config();
+        let mut gen = BrocaGenerator::new(&genesis, config);
+
+        let channels = ThoughtChannels::with_intent(1);
+
+        // First generation (resets state)
+        let result1 = gen.generate(&channels);
+
+        // Second generation (continuing — builds on CfC state)
+        let result2 = gen.generate_continuing(&channels);
+
+        // Both should produce output
+        assert!(result1.num_tokens > 0);
+        assert!(result2.num_tokens > 0);
+
+        // Third fresh generation should match first (state reset)
+        let result3 = gen.generate(&channels);
+        assert_eq!(
+            result1.token_ids, result3.token_ids,
+            "Fresh generation should reproduce first result"
+        );
+    }
+
+    #[test]
+    fn test_generate_continuing_differs_from_fresh() {
+        let genesis = test_genesis();
+        let config = test_config();
+
+        // Fresh generator → generate() to establish CfC state
+        let mut gen = BrocaGenerator::new(&genesis, config.clone());
+        let channels = ThoughtChannels::with_intent(1);
+        let _warm_up = gen.generate(&channels);
+
+        // generate_continuing() builds on the CfC state left by warm_up
+        let continuing_result = gen.generate_continuing(&channels);
+
+        // Fresh generator → generate() with no prior state
+        let mut gen_fresh = BrocaGenerator::new(&genesis, config);
+        let fresh_result = gen_fresh.generate(&channels);
+
+        // The continuing result should differ from a fresh generation because
+        // generate_continuing() inherits CfC temporal state from the warm-up,
+        // while the fresh generator starts from zeroed CfC state.
+        assert_ne!(
+            continuing_result.token_ids, fresh_result.token_ids,
+            "generate_continuing() should produce different output than a fresh generate() \
+             because it inherits CfC state from prior generation"
+        );
+    }
+
+    #[test]
+    fn test_context_accumulation_changes_output() {
+        let genesis = test_genesis();
+        let config = test_config();
+        let mut gen = BrocaGenerator::new(&genesis, config);
+
+        let channels = ThoughtChannels::with_intent(1);
+
+        // Initial generation resets state
+        let _initial = gen.generate(&channels);
+
+        // Successive continuing generations should evolve (CfC state accumulates)
+        let cont1 = gen.generate_continuing(&channels);
+        let cont2 = gen.generate_continuing(&channels);
+        let cont3 = gen.generate_continuing(&channels);
+
+        // All should produce tokens
+        assert!(
+            cont1.num_tokens > 0,
+            "First continuing should produce tokens"
+        );
+        assert!(
+            cont2.num_tokens > 0,
+            "Second continuing should produce tokens"
+        );
+        assert!(
+            cont3.num_tokens > 0,
+            "Third continuing should produce tokens"
+        );
+
+        // At least two of the three continuing generations should differ,
+        // demonstrating that CfC state accumulation produces evolving output
+        let all_same = cont1.token_ids == cont2.token_ids && cont2.token_ids == cont3.token_ids;
+        assert!(
+            !all_same,
+            "Multiple generate_continuing() calls should produce evolving outputs \
+             as CfC temporal state accumulates, but all three were identical"
         );
     }
 

@@ -386,6 +386,9 @@ pub mod integration;
 // Action (depends on consciousness module - now enabled)
 pub mod action;
 
+// Coding Agent: multi-step consciousness-gated coding loop
+pub mod coding_agent;
+
 // Partnership (enabled - 0 errors)
 pub mod partnership;
 
@@ -474,6 +477,12 @@ pub mod repl;
 #[cfg(feature = "api_module")]
 pub mod api;
 
+// Scientific Method: hypothesis-test-update cycle (Phase 4b math plan)
+// Wires HDC encoding, Bayesian statistics, and propositional logic into a
+// scientific reasoning engine.
+#[cfg(feature = "scientific_method")]
+pub mod scientific_method;
+
 // Web Research: Epistemic verification and autonomous research
 //
 // This module provides three-level epistemic consciousness:
@@ -485,6 +494,8 @@ pub mod api;
 // integrator, meta_learning. See docs/developer/WEB_RESEARCH_INTEGRATION_GUIDE.md.
 #[cfg(feature = "web_research_module")]
 pub mod web_research;
+
+pub mod knowledge;
 
 // ============================================================================
 // Re-exports for Convenience

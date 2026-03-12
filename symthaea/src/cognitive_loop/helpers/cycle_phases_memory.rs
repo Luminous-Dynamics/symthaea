@@ -520,25 +520,82 @@ impl CognitiveLoopService {
 
             // Drain the buffer — each CRHV gets cleaned and rebuilt
             let crhvs: Vec<_> = self.cantor_broadcast_buffer.drain(..).collect();
-            for crhv in &crhvs {
-                let result = self.cantor_cleanup_engine.cleanup(crhv);
-                // Closed-loop: high-quality cleanups grow the codebook permanently.
-                // Science: Born & Wilhelm (2012) — sleep consolidation strengthens
-                // representations that survive replay without degradation.
-                if result.quality > crate::cognitive_loop::thresholds::CANTOR_DREAM_QUALITY_THRESHOLD {
-                    let label = format!(
-                        "dream_consolidated_{}",
-                        self.cantor_cleanup_engine.cleanups_performed
-                    );
-                    self.cantor_cleanup_engine.learn(&label, &result.cleaned);
+            let mut dream_surprise_sum = 0.0f32;
+            let mut dream_count = 0u32;
+
+            // DEPTH-STRATIFIED EVICTION: Before adding new entries, if the codebook
+            // is near capacity, evict from the most crowded depth stratum.
+            // This prevents shallow broadcasts from crowding out rare deep fractals.
+            // Science: He et al. (2016) — residual learning preserves information
+            // at different abstraction levels; each depth is a distinct abstraction.
+            let codebook_cap = crate::cognitive_loop::thresholds::CANTOR_CODEBOOK_MAX_ENTRIES;
+            if self.cantor_cleanup_engine.codebook.len() > codebook_cap * 3 / 4 {
+                // Count entries per depth stratum (encoded in label as "d{depth}_...")
+                let mut depth_counts = [0usize; 8]; // depths 0-7
+                for d in 0..8 {
+                    depth_counts[d] = self
+                        .cantor_cleanup_engine
+                        .codebook
+                        .count_by_prefix(&format!("d{d}_"));
+                }
+                // Find most crowded stratum
+                let max_stratum = depth_counts
+                    .iter()
+                    .enumerate()
+                    .max_by_key(|(_, &c)| c)
+                    .map(|(i, _)| i)
+                    .unwrap_or(0);
+                // Evict oldest entry from that stratum (FIFO — first match removed)
+                if depth_counts[max_stratum] > 2 {
+                    let prefix = format!("d{max_stratum}_");
+                    self.cantor_cleanup_engine.codebook.evict_by_prefix(&prefix);
                 }
             }
 
+            for crhv in &crhvs {
+                let pre_ss = crhv.self_similarity();
+                let result = self.cantor_cleanup_engine.cleanup(crhv);
+                let post_ss = result.cleaned.self_similarity();
+                dream_surprise_sum += (pre_ss - post_ss).abs();
+                dream_count += 1;
+                // Closed-loop: high-quality cleanups grow the codebook permanently,
+                // but only if the new entry is sufficiently different from existing ones.
+                // Science: Born & Wilhelm (2012) — sleep consolidation strengthens
+                // representations that survive replay without degradation.
+                if result.quality
+                    > crate::cognitive_loop::thresholds::CANTOR_DREAM_QUALITY_THRESHOLD
+                {
+                    // Depth-stratified label: "d{depth}_dream_consolidated_{N}"
+                    let label = format!(
+                        "d{}_dream_consolidated_{}",
+                        crhv.depth, self.cantor_cleanup_engine.cleanups_performed
+                    );
+                    self.cantor_cleanup_engine.codebook.add_if_diverse(
+                        &label,
+                        result.cleaned.base,
+                        crate::cognitive_loop::thresholds::CANTOR_CODEBOOK_DIVERSITY_THRESHOLD,
+                    );
+                }
+            }
+            // Update dream surprise EMA — Friston (2010): surprise drives plasticity.
+            if dream_count > 0 {
+                let batch_surprise = dream_surprise_sum / dream_count as f32;
+                let decay = crate::cognitive_loop::thresholds::CANTOR_SURPRISE_EMA_DECAY;
+                self.cantor_dream_surprise =
+                    decay * self.cantor_dream_surprise + (1.0 - decay) * batch_surprise;
+            }
+            // Feed surprise into FEP learning signal — novel fractal structure
+            // indicates model inadequacy requiring plasticity boost.
+            if self.cantor_dream_surprise > 0.01 {
+                self.fep.learning_signal += self.cantor_dream_surprise * 0.2;
+                self.fep.learning_signal = self.fep.learning_signal.clamp(-1.0, 1.0);
+            }
             tracing::debug!(
                 cleanups = self.cantor_cleanup_engine.cleanups_performed,
                 layers_cleaned = self.cantor_cleanup_engine.layers_cleaned,
                 layers_failed = self.cantor_cleanup_engine.layers_failed,
                 codebook_size = self.cantor_cleanup_engine.codebook.len(),
+                dream_surprise = self.cantor_dream_surprise,
                 "Cantor dream consolidation complete (persistent engine)"
             );
         }

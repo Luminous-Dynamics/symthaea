@@ -71,7 +71,12 @@ fn cosine_f32_scalar(a: &[f32], b: &[f32]) -> f32 {
         norm_b += y * y;
     }
     let denom = (norm_a.sqrt() * norm_b.sqrt()).max(1e-10);
-    (dot / denom).clamp(-1.0, 1.0)
+    let result = dot / denom;
+    if result.is_finite() {
+        result.clamp(-1.0, 1.0)
+    } else {
+        0.0
+    }
 }
 
 #[cfg(all(target_arch = "x86_64", feature = "simd"))]
@@ -108,7 +113,12 @@ unsafe fn cosine_f32_avx2(a: &[f32], b: &[f32]) -> f32 {
         norm_b += bv * bv;
     }
     let denom = (norm_a.sqrt() * norm_b.sqrt()).max(1e-10);
-    (dot_total / denom).clamp(-1.0, 1.0)
+    let result = dot_total / denom;
+    if result.is_finite() {
+        result.clamp(-1.0, 1.0)
+    } else {
+        0.0
+    }
 }
 
 #[cfg(all(target_arch = "x86_64", feature = "simd"))]
@@ -254,6 +264,8 @@ impl CognitiveLoopService {
             wisdom_hv: symthaea_core::hdc::phi_topology_validation::real_hv_to_hv16(&hdv),
             #[cfg(feature = "ssm_language")]
             language_output: None,
+            #[cfg(feature = "canvas")]
+            canvas_svg: None,
             #[cfg(feature = "identity")]
             signed_output,
             #[cfg(feature = "identity")]
@@ -418,6 +430,8 @@ impl CognitiveLoopService {
             wisdom_hv: symthaea_core::hdc::phi_topology_validation::real_hv_to_hv16(hdv),
             #[cfg(feature = "ssm_language")]
             language_output: None,
+            #[cfg(feature = "canvas")]
+            canvas_svg: None,
             #[cfg(feature = "identity")]
             signed_output: None,
             #[cfg(feature = "identity")]

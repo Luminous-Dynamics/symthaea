@@ -31,13 +31,22 @@ pub struct BrocaConsciousnessSignals {
 // Re-export telemetry type from the types module.
 pub use super::types::BrocaGenerationTelemetry;
 
-/// Manager wrapping BrocaGenerator with consciousness gating.
+/// Manager wrapping BrocaGenerator with consciousness gating and multi-turn context.
 #[cfg(feature = "ssm_language")]
 pub struct BrocaManager {
     generator: BrocaGenerator,
     pub(crate) last_telemetry: BrocaGenerationTelemetry,
     /// Minimum consciousness level required to generate (default 0.1).
     pub(crate) consciousness_threshold: f32,
+    /// Multi-turn context: number of recent generations to carry state for.
+    /// When > 0, uses `generate_continuing()` after the first generation,
+    /// preserving CfC temporal context across turns.
+    pub(crate) multi_turn_depth: usize,
+    /// Number of generations since last state reset.
+    turn_count: usize,
+    /// Conversation context HVs from recent turns, used to bias thought encoding.
+    /// Stored as a ring buffer of up to `multi_turn_depth` HDC vectors.
+    context_window: std::collections::VecDeque<symthaea_core::hdc::ContinuousHV>,
 }
 
 #[cfg(feature = "ssm_language")]
@@ -58,6 +67,9 @@ impl BrocaManager {
             generator,
             last_telemetry: BrocaGenerationTelemetry::default(),
             consciousness_threshold: 0.1,
+            multi_turn_depth: 0,
+            turn_count: 0,
+            context_window: std::collections::VecDeque::new(),
         }
     }
 
@@ -126,7 +138,18 @@ impl BrocaManager {
             signals.coherence,
         );
 
-        let result = self.generator.generate(&channels);
+        // Multi-turn context: use generate_continuing() after the first turn
+        // to preserve CfC temporal context
+        let result = if self.multi_turn_depth > 0 && self.turn_count > 0 {
+            self.generator.generate_continuing(&channels)
+        } else {
+            self.generator.generate(&channels)
+        };
+        self.turn_count += 1;
+        // Reset turn count when we exceed the context depth
+        if self.multi_turn_depth > 0 && self.turn_count >= self.multi_turn_depth {
+            self.turn_count = 0;
+        }
 
         let elapsed = start.elapsed();
 
@@ -180,5 +203,61 @@ impl BrocaManager {
     /// Get a mutable reference to the underlying generator (for training).
     pub fn generator_mut(&mut self) -> &mut BrocaGenerator {
         &mut self.generator
+    }
+
+    /// Set multi-turn context depth (0 = disabled).
+    ///
+    /// When > 0, the first generation resets CfC state, and subsequent
+    /// generations within the window use `generate_continuing()` to
+    /// preserve temporal context from prior turns.
+    pub fn set_multi_turn_depth(&mut self, depth: usize) {
+        self.multi_turn_depth = depth;
+        self.turn_count = 0;
+    }
+
+    /// Reset the turn counter (force next generation to reset CfC state).
+    pub fn reset_context(&mut self) {
+        self.turn_count = 0;
+        self.context_window.clear();
+    }
+
+    /// Inject conversation history as context for topic persistence.
+    ///
+    /// Encodes each recent turn string into an HDC vector via the generator's
+    /// encoder and stores them in the context window. On subsequent generations,
+    /// these context HVs are bundled with the thought HV to bias generation
+    /// toward conversational continuity.
+    pub fn inject_conversation_context(&mut self, recent_turns: &[String]) {
+        use symthaea_core::hdc::ContinuousHV;
+
+        self.context_window.clear();
+        let max_context = if self.multi_turn_depth > 0 {
+            self.multi_turn_depth
+        } else {
+            4 // Default context window if multi-turn not explicitly set
+        };
+
+        // Encode each turn into an HDC vector via token encoding + bundling
+        for turn in recent_turns.iter().rev().take(max_context) {
+            let token_ids = self.generator.tokenizer().encode(turn);
+            if token_ids.is_empty() {
+                continue;
+            }
+            // Bundle token embeddings to get a turn-level HV
+            let all_embs = self.generator.controller().token_embeddings();
+            let embs: Vec<&ContinuousHV> = token_ids
+                .iter()
+                .filter_map(|&id| all_embs.get(id as usize))
+                .collect();
+            if !embs.is_empty() {
+                let turn_hv = ContinuousHV::bundle(&embs);
+                self.context_window.push_front(turn_hv);
+            }
+        }
+    }
+
+    /// Get the number of context vectors currently stored.
+    pub fn context_depth(&self) -> usize {
+        self.context_window.len()
     }
 }

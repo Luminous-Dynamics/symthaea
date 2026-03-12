@@ -23,9 +23,12 @@ use crate::generator::BrocaGenerator;
 use crate::tokenizer::BpeTokenizer;
 
 /// A single training pair: thought channels + target text.
+///
+/// The `channels` field uses `Vec<f32>` for backward compatibility with both
+/// legacy 20-channel and current 24-channel JSONL training data.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TrainingPair {
-    pub channels: [f32; 20],
+    pub channels: Vec<f32>,
     pub target_text: String,
     #[serde(default)]
     pub target_ids: Vec<u32>,
@@ -36,10 +39,27 @@ impl TrainingPair {
     pub fn new(channels: ThoughtChannels, target_text: String, tokenizer: &BpeTokenizer) -> Self {
         let target_ids = tokenizer.encode(&target_text);
         Self {
-            channels: channels.channels,
+            channels: channels.channels.to_vec(),
             target_text,
             target_ids,
         }
+    }
+
+    /// Convert channels to ThoughtChannels, padding legacy 20-channel data with defaults.
+    pub fn to_thought_channels(&self) -> ThoughtChannels {
+        use crate::encoder::{LEGACY_NUM_CHANNELS, NEW_CHANNEL_DEFAULTS, NUM_CHANNELS};
+        let mut tc = ThoughtChannels::default();
+        let n = self.channels.len().min(NUM_CHANNELS);
+        tc.channels[..n].copy_from_slice(&self.channels[..n]);
+        // If legacy data (< 24 channels), fill new channels with defaults
+        if self.channels.len() < NUM_CHANNELS {
+            for i in self.channels.len()..NUM_CHANNELS {
+                if i >= LEGACY_NUM_CHANNELS {
+                    tc.channels[i] = NEW_CHANNEL_DEFAULTS[i - LEGACY_NUM_CHANNELS];
+                }
+            }
+        }
+        tc
     }
 }
 
@@ -114,6 +134,19 @@ impl TrainingDataset {
     }
 }
 
+/// Curriculum learning schedule for training.
+#[derive(Debug, Clone, Default)]
+pub enum CurriculumSchedule {
+    /// No curriculum — train on pairs in dataset order.
+    #[default]
+    None,
+    /// Sort pairs by target length ascending — short sequences first.
+    /// Helps CfC learn temporal dynamics before long-range dependencies.
+    LengthAscending,
+    /// Group pairs by intent (channels 0-7 argmax) and train each group in turn.
+    IntentGrouped,
+}
+
 /// Training configuration.
 #[derive(Debug, Clone)]
 pub struct TrainingConfig {
@@ -162,6 +195,11 @@ pub struct TrainingConfig {
     /// then automatically enabled for the remaining epochs.
     /// Recommended: 10-30 (enough for embeddings to develop structure).
     pub network_warmup_epochs: usize,
+    /// Optional validation dataset for computing validation loss.
+    /// When set, validation loss is reported each epoch and used for early stopping.
+    pub validation_dataset: Option<TrainingDataset>,
+    /// Curriculum learning schedule.
+    pub curriculum: CurriculumSchedule,
 }
 
 impl Default for TrainingConfig {
@@ -182,6 +220,8 @@ impl Default for TrainingConfig {
             negative_samples: 0,
             carry_state: 0.0,
             network_warmup_epochs: 0,
+            validation_dataset: None,
+            curriculum: CurriculumSchedule::default(),
         }
     }
 }
@@ -193,6 +233,8 @@ pub struct EpochMetrics {
     pub avg_loss: f32,
     pub num_tokens: usize,
     pub num_pairs: usize,
+    /// Validation loss (if validation_dataset provided).
+    pub validation_loss: Option<f32>,
 }
 
 /// Gradient flow diagnostics: tracks per-step L2 norms, clipping events,
@@ -420,6 +462,27 @@ pub fn train_with_adam(
     let use_sampled = config.negative_samples > 0;
     let vocab_size = generator.tokenizer().vocab_size();
 
+    // Pre-compute curriculum ordering (indices into dataset)
+    let curriculum_order: Vec<usize> = match &config.curriculum {
+        CurriculumSchedule::None => (0..dataset.pairs.len()).collect(),
+        CurriculumSchedule::LengthAscending => {
+            let mut indices: Vec<usize> = (0..dataset.pairs.len()).collect();
+            indices.sort_by_key(|&i| dataset.pairs[i].target_ids.len());
+            indices
+        }
+        CurriculumSchedule::IntentGrouped => {
+            let mut indices: Vec<usize> = (0..dataset.pairs.len()).collect();
+            indices.sort_by_key(|&i| {
+                // Argmax of intent channels 0-7
+                let channels = &dataset.pairs[i].channels;
+                (0..8)
+                    .max_by(|&a, &b| channels[a].total_cmp(&channels[b]))
+                    .unwrap_or(7)
+            });
+            indices
+        }
+    };
+
     for epoch in 0..config.epochs {
         let mut total_loss = 0.0f32;
         let mut total_tokens = 0usize;
@@ -438,14 +501,13 @@ pub fn train_with_adam(
         // LCG state for negative sampling (varies per epoch)
         let mut neg_seed = epoch as u64 * 1000003 + 42;
 
-        for (pair_idx, pair) in dataset.pairs.iter().enumerate() {
+        for (pair_idx, &dataset_idx) in curriculum_order.iter().enumerate() {
+            let pair = &dataset.pairs[dataset_idx];
             if pair.target_ids.is_empty() {
                 continue;
             }
 
-            let channels = ThoughtChannels {
-                channels: pair.channels,
-            };
+            let channels = pair.to_thought_channels();
             let thought_hv = generator.encoder().encode(&channels);
 
             // Reset controller for this sequence (unless carrying state)
@@ -563,14 +625,26 @@ pub fn train_with_adam(
             0.0
         };
 
+        // Compute validation loss if validation dataset is provided
+        let validation_loss = if let Some(ref val_dataset) = config.validation_dataset {
+            let val_loss = compute_validation_loss(generator, val_dataset, config.bptt_window);
+            Some(val_loss)
+        } else {
+            None
+        };
+
         metrics.push(EpochMetrics {
             epoch,
             avg_loss,
             num_tokens: total_tokens,
             num_pairs: dataset.len(),
+            validation_loss,
         });
 
         if (epoch + 1) % config.report_interval.max(1) == 0 || epoch == 0 {
+            let val_str = validation_loss
+                .map(|v| format!(" val_loss={v:.6}"))
+                .unwrap_or_default();
             tracing::info!(
                 epoch = epoch,
                 avg_loss = avg_loss,
@@ -581,7 +655,7 @@ pub fn train_with_adam(
             use std::io::Write;
             let _ = writeln!(
                 std::io::stderr(),
-                "[epoch] {epoch}/{} loss={avg_loss:.6} tokens={total_tokens}",
+                "[epoch] {epoch}/{} loss={avg_loss:.6}{val_str} tokens={total_tokens}",
                 config.epochs,
             );
             std::io::stderr().flush().ok();
@@ -599,10 +673,11 @@ pub fn train_with_adam(
                 .normalize_embeddings(config.embedding_target_norm);
         }
 
-        // Early stopping check
+        // Early stopping: use validation loss if available, otherwise training loss
+        let stopping_loss = validation_loss.unwrap_or(avg_loss);
         if config.patience > 0 {
-            if avg_loss < best_loss - 1e-6 {
-                best_loss = avg_loss;
+            if stopping_loss < best_loss - 1e-6 {
+                best_loss = stopping_loss;
                 patience_counter = 0;
             } else {
                 patience_counter += 1;
@@ -962,13 +1037,55 @@ pub fn generate_curriculum(tokenizer: &BpeTokenizer) -> TrainingDataset {
         let prompt = thought_to_prompt(thought);
         let ids = tokenizer.encode(&prompt);
         dataset.pairs.push(TrainingPair {
-            channels: thought.channels,
+            channels: thought.channels.to_vec(),
             target_text: prompt,
             target_ids: ids,
         });
     }
 
     dataset
+}
+
+/// Compute average cross-entropy loss on a validation dataset (no weight updates).
+///
+/// Uses teacher-forced forward pass through the CfC network, computing loss
+/// at each position. Returns the average per-token loss.
+pub fn compute_validation_loss(
+    generator: &mut BrocaGenerator,
+    dataset: &TrainingDataset,
+    bptt_window: usize,
+) -> f32 {
+    let mut total_loss = 0.0f32;
+    let mut total_tokens = 0usize;
+
+    for pair in &dataset.pairs {
+        if pair.target_ids.is_empty() {
+            continue;
+        }
+
+        let channels = pair.to_thought_channels();
+        let thought_hv = generator.encoder().encode(&channels);
+        generator.controller_mut().reset();
+
+        let mut prev_token = generator.tokenizer().thought_id;
+        let window_end = pair.target_ids.len().min(bptt_window);
+
+        for (pos, &target_id) in pair.target_ids[..window_end].iter().enumerate() {
+            let logits = generator
+                .controller_mut()
+                .forward_step(&thought_hv, prev_token, pos);
+            let loss = cross_entropy_loss(&logits, target_id as usize);
+            total_loss += loss;
+            total_tokens += 1;
+            prev_token = target_id;
+        }
+    }
+
+    if total_tokens > 0 {
+        total_loss / total_tokens as f32
+    } else {
+        0.0
+    }
 }
 
 /// Write a curriculum dataset to a JSONL file.
@@ -1022,7 +1139,7 @@ mod tests {
         let channels = ThoughtChannels::default();
         let pair = TrainingPair::new(channels, "hello world".to_string(), &tok);
         assert!(!pair.target_ids.is_empty());
-        assert_eq!(pair.channels.len(), 20);
+        assert_eq!(pair.channels.len(), crate::encoder::NUM_CHANNELS);
     }
 
     #[test]
@@ -1560,5 +1677,114 @@ mod tests {
                 "Loss should be finite with carry_state"
             );
         }
+    }
+
+    #[test]
+    fn test_curriculum_length_ascending() {
+        let genesis = test_genesis();
+        let config = test_config();
+        let mut gen = BrocaGenerator::new(&genesis, config);
+
+        let tok = gen.tokenizer().clone();
+        let mut dataset = TrainingDataset::default();
+        let channels = ThoughtChannels::default();
+        // Varying lengths: short, medium, long
+        dataset.push(TrainingPair::new(channels, "hi".to_string(), &tok));
+        dataset.push(TrainingPair::new(
+            channels,
+            "hello world this is a longer sentence".to_string(),
+            &tok,
+        ));
+        dataset.push(TrainingPair::new(channels, "test".to_string(), &tok));
+
+        let train_config = TrainingConfig {
+            epochs: 3,
+            learning_rate: 0.01,
+            bptt_window: 16,
+            curriculum: CurriculumSchedule::LengthAscending,
+            ..Default::default()
+        };
+
+        let metrics = train(&mut gen, &dataset, &train_config);
+        assert_eq!(metrics.len(), 3);
+        for m in &metrics {
+            assert!(m.avg_loss.is_finite(), "Loss should be finite");
+        }
+    }
+
+    #[test]
+    fn test_validation_loss_computation() {
+        let genesis = test_genesis();
+        let config = test_config();
+        let mut gen = BrocaGenerator::new(&genesis, config);
+
+        let tok = gen.tokenizer().clone();
+        let mut train_dataset = TrainingDataset::default();
+        let mut val_dataset = TrainingDataset::default();
+        let channels = ThoughtChannels::default();
+
+        for _ in 0..5 {
+            train_dataset.push(TrainingPair::new(channels, "hello".to_string(), &tok));
+        }
+        for _ in 0..2 {
+            val_dataset.push(TrainingPair::new(channels, "world".to_string(), &tok));
+        }
+
+        let train_config = TrainingConfig {
+            epochs: 5,
+            learning_rate: 0.01,
+            bptt_window: 8,
+            validation_dataset: Some(val_dataset),
+            ..Default::default()
+        };
+
+        let (metrics, _, _) = train_with_adam(&mut gen, &train_dataset, &train_config, None);
+        assert_eq!(metrics.len(), 5);
+
+        // All epochs should have validation loss
+        for m in &metrics {
+            assert!(
+                m.validation_loss.is_some(),
+                "Should have validation loss when dataset is provided"
+            );
+            assert!(
+                m.validation_loss.unwrap().is_finite(),
+                "Validation loss should be finite"
+            );
+        }
+    }
+
+    #[test]
+    fn test_early_stopping_with_validation() {
+        let genesis = test_genesis();
+        let config = test_config();
+        let mut gen = BrocaGenerator::new(&genesis, config);
+
+        let tok = gen.tokenizer().clone();
+        let mut train_dataset = TrainingDataset::default();
+        let mut val_dataset = TrainingDataset::default();
+        let channels = ThoughtChannels::default();
+
+        train_dataset.push(TrainingPair::new(channels, "a".to_string(), &tok));
+        val_dataset.push(TrainingPair::new(channels, "b".to_string(), &tok));
+
+        let train_config = TrainingConfig {
+            epochs: 100,
+            learning_rate: 1e-8, // Tiny LR → no improvement → early stop
+            bptt_window: 8,
+            patience: 3,
+            use_adam: false,
+            warmup_fraction: 0.0,
+            train_network: false,
+            validation_dataset: Some(val_dataset),
+            ..Default::default()
+        };
+
+        let metrics = train(&mut gen, &train_dataset, &train_config);
+        assert!(
+            metrics.len() < 100,
+            "Early stopping should trigger with validation: got {} epochs",
+            metrics.len()
+        );
     }
 }

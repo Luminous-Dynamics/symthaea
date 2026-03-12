@@ -28,6 +28,8 @@ use super::super::subsystem_trait::{
     output_flags, CognitiveSubsystem, CycleSnapshot, SubsystemOutput,
 };
 use super::super::thresholds;
+use crate::mycelix::collective_identity::CommunityMode;
+use crate::mycelix::epistemic_mesh::EpistemicMesh;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // EVENT TYPES
@@ -112,12 +114,24 @@ pub struct GovernanceManager {
     predicted_outcomes: HashMap<String, (f64, u64)>, // (predicted_alignment, cycle_recorded)
     /// Latest reward signal for external consumption.
     latest_reward: Option<f32>,
-    /// Completed outcomes ready for episodic recording.
-    completed_outcomes: Vec<GovernanceOutcome>,
+    /// Completed outcomes ready for episodic recording, paired with governance PE.
+    completed_outcomes: Vec<(GovernanceOutcome, f64)>,
     /// Running tally of reciprocity oxytocin this cycle (for cap enforcement).
     cycle_reciprocity_oxy: f32,
     /// Current cycle number (set from snapshot each process()).
     current_cycle: u64,
+    /// Last collective Phi observed from a TallyCompleted event.
+    last_collective_phi: f64,
+    /// Latest epistemic mesh snapshot from the network (updated externally).
+    epistemic_mesh: Option<EpistemicMesh>,
+    /// Latest community mode from collective identity (updated externally).
+    community_mode: Option<CommunityMode>,
+    /// Snapshot of max |harmonic_delta| from last process() — survives take_harmonic_deltas().
+    last_harmonic_delta_max: f64,
+    /// Whether an external (multi-agent) mesh was set — prevents local fallback overwrite.
+    external_mesh_set: bool,
+    /// Latest governance LR boost from prediction error (for telemetry).
+    last_lr_boost: f64,
 }
 
 impl Default for GovernanceManager {
@@ -134,6 +148,12 @@ impl Default for GovernanceManager {
             completed_outcomes: Vec::new(),
             cycle_reciprocity_oxy: 0.0,
             current_cycle: 0,
+            last_harmonic_delta_max: 0.0,
+            last_collective_phi: 0.0,
+            epistemic_mesh: None,
+            community_mode: None,
+            external_mesh_set: false,
+            last_lr_boost: 1.0,
         }
     }
 }
@@ -148,8 +168,23 @@ impl GovernanceManager {
     }
 
     /// Inject a governance outcome for learning feedback.
+    ///
+    /// Clamps `value_alignment_score` to [0, 1] and `harmonic_resonance` to [-1, 1]
+    /// on injection to prevent NaN/Inf propagation from malformed outcomes.
     pub fn inject_outcome(&mut self, outcome: GovernanceOutcome) {
-        self.outcome_history.push_back(outcome);
+        let mut o = outcome;
+        // Guard against NaN/Inf — clamp or zero out
+        o.value_alignment_score = if o.value_alignment_score.is_finite() {
+            o.value_alignment_score.clamp(0.0, 1.0)
+        } else {
+            0.5 // safe default
+        };
+        o.harmonic_resonance = if o.harmonic_resonance.is_finite() {
+            o.harmonic_resonance.clamp(-1.0, 1.0)
+        } else {
+            0.0 // safe default
+        };
+        self.outcome_history.push_back(o);
         while self.outcome_history.len() > Self::MAX_OUTCOMES {
             self.outcome_history.pop_front();
         }
@@ -180,13 +215,101 @@ impl GovernanceManager {
         self.outcome_history.len()
     }
 
+    /// Number of pending outcomes awaiting processing.
+    pub fn pending_outcome_count(&self) -> usize {
+        self.completed_outcomes.len()
+    }
+
+    /// Last collective Phi from a governance tally.
+    pub fn last_collective_phi(&self) -> f64 {
+        self.last_collective_phi
+    }
+
+    /// Update the epistemic mesh snapshot from network aggregation.
+    ///
+    /// External (multi-agent) meshes are marked as such and will NOT be
+    /// overwritten by the local single-agent fallback in the cognitive cycle.
+    /// Only call `set_local_epistemic_mesh()` for the cycle-internal fallback.
+    pub fn set_epistemic_mesh(&mut self, mesh: EpistemicMesh) {
+        self.epistemic_mesh = Some(mesh);
+        self.external_mesh_set = true;
+    }
+
+    /// Set the local single-agent epistemic fallback. Only applied when no
+    /// external mesh has been provided via `set_epistemic_mesh()`.
+    pub fn set_local_epistemic_mesh(&mut self, mesh: EpistemicMesh) {
+        if !self.external_mesh_set {
+            self.epistemic_mesh = Some(mesh);
+        }
+    }
+
+    /// Whether an external (multi-agent) epistemic mesh is active.
+    pub fn has_external_mesh(&self) -> bool {
+        self.external_mesh_set
+    }
+
+    /// Update the community mode from collective identity aggregation.
+    pub fn set_community_mode(&mut self, mode: CommunityMode) {
+        self.community_mode = Some(mode);
+    }
+
+    /// Current community mode, if known.
+    pub fn community_mode(&self) -> Option<CommunityMode> {
+        self.community_mode
+    }
+
+    /// Number of collective blind spots (0 if no mesh).
+    pub fn blind_spot_count(&self) -> usize {
+        self.epistemic_mesh
+            .as_ref()
+            .map(|m| m.blind_spots().len())
+            .unwrap_or(0)
+    }
+
+    /// Maximum blind spot severity (0.0 if no blind spots).
+    pub fn max_blind_spot_severity(&self) -> f64 {
+        self.epistemic_mesh
+            .as_ref()
+            .map(|m| {
+                m.blind_spots()
+                    .iter()
+                    .map(|bs| bs.severity)
+                    .fold(0.0f64, f64::max)
+            })
+            .unwrap_or(0.0)
+    }
+
+    /// Number of agents in the epistemic mesh (0 if no mesh).
+    pub fn epistemic_agent_count(&self) -> usize {
+        self.epistemic_mesh
+            .as_ref()
+            .map(|m| m.agent_count())
+            .unwrap_or(0)
+    }
+
+    /// Peek at harmonic deltas (non-consuming, for telemetry).
+    pub fn harmonic_deltas(&self) -> &[f64; 8] {
+        &self.harmonic_deltas
+    }
+
+    /// Max |harmonic delta| from last process() — survives take_harmonic_deltas().
+    pub fn last_harmonic_delta_max(&self) -> f64 {
+        self.last_harmonic_delta_max
+    }
+
+    /// LR boost from governance prediction error (1.0 = no boost).
+    pub fn last_lr_boost(&self) -> f64 {
+        self.last_lr_boost
+    }
+
     // ── Phase 2: Learning Methods ──────────────────────────────────────
 
     /// Maximum prediction entries (evict oldest on overflow).
     const PREDICTION_MAX_ENTRIES: usize = 128;
 
     /// Prediction TTL in cycles (evict stale predictions).
-    const PREDICTION_TTL_CYCLES: u64 = 1000;
+    /// 5000 cycles ≈ 100s at 50Hz — ample time for governance tallies.
+    const PREDICTION_TTL_CYCLES: u64 = 5000;
 
     /// Record a predicted outcome alignment for a proposal.
     /// Called when casting a vote, recording what we expect to happen.
@@ -218,8 +341,8 @@ impl GovernanceManager {
         self.latest_reward.take()
     }
 
-    /// Drain completed outcomes for episodic recording.
-    pub fn drain_completed(&mut self) -> Vec<GovernanceOutcome> {
+    /// Drain completed outcomes for episodic recording, with their governance prediction errors.
+    pub fn drain_completed(&mut self) -> Vec<(GovernanceOutcome, f64)> {
         std::mem::take(&mut self.completed_outcomes)
     }
 
@@ -255,6 +378,7 @@ impl GovernanceManager {
         // 3. LR modulation from governance PE (high PE → boost learning)
         let lr_boost = 1.0 + (prediction_error * 0.3).min(0.5);
         output.lr_modulation = output.lr_modulation.max(1.0) * lr_boost;
+        self.last_lr_boost = lr_boost;
 
         // 4. Accumulate harmonic deltas from harmonic_resonance
         // Distribute resonance across all harmonies proportionally
@@ -272,8 +396,9 @@ impl GovernanceManager {
         self.reward_ema = self.reward_ema * 0.9 + reward * 0.1;
         self.latest_reward = Some(reward as f32);
 
-        // 7. Store for episodic recording
-        self.completed_outcomes.push(outcome.clone());
+        // 7. Store for episodic recording with governance PE
+        self.completed_outcomes
+            .push((outcome.clone(), prediction_error));
     }
 
     /// Queue a neuromod injection with floor check.
@@ -330,6 +455,9 @@ impl GovernanceManager {
                 passed,
                 collective_phi,
             } => {
+                // Track last collective phi for telemetry and consciousness coupling
+                self.last_collective_phi = *collective_phi;
+
                 // High collective phi → ECB baseline nudge (group coherence)
                 if *collective_phi > 0.5 {
                     self.queue_baseline("endocannabinoid", thresholds::GOV_COLLECTIVE_PHI_ECB);
@@ -348,9 +476,12 @@ impl GovernanceManager {
             }
 
             GovernanceEventKind::ReputationChanged { delta } => {
-                if *delta < 0.0 {
+                if *delta < -0.01 {
                     // Crockett 2009: social rejection → 5-HT dip
                     self.queue_baseline("serotonin", thresholds::GOV_REPUTATION_DECLINE_SHT);
+                } else if *delta > 0.01 {
+                    // Crockett 2009: social approval → 5-HT boost (symmetric)
+                    self.queue_baseline("serotonin", thresholds::GOV_REPUTATION_GAIN_SHT);
                 }
             }
 
@@ -461,6 +592,51 @@ impl CognitiveSubsystem for GovernanceManager {
             output.lr_modulation =
                 output.lr_modulation.max(1.0) * (1.0 + (tally_count as f64 * 0.02).min(0.1));
         }
+
+        // ── Epistemic mesh: blind spots → exploration boost ─────────────
+        if let Some(ref mesh) = self.epistemic_mesh {
+            if mesh.has_blind_spots() {
+                // Collective ignorance drives exploration (Friston 2010)
+                let max_severity = mesh
+                    .blind_spots()
+                    .iter()
+                    .map(|bs| bs.severity)
+                    .fold(0.0f64, f64::max);
+                output.exploration_delta += max_severity * 0.05; // up to +0.05
+                output.flags |= output_flags::REQUEST_EXPLORATION;
+            }
+        }
+
+        // ── Community mode: influence harmony weight deltas ─────────────
+        if let Some(mode) = self.community_mode {
+            // Community mode gently biases harmonic emphasis (±0.005 per cycle)
+            let bias = 0.005;
+            match mode {
+                CommunityMode::Exploratory => {
+                    self.harmonic_deltas[3] += bias; // InfinitePlay
+                    self.harmonic_deltas[4] += bias; // UniversalInterconnectedness
+                }
+                CommunityMode::Protective => {
+                    self.harmonic_deltas[1] += bias; // PanSentientFlourishing
+                    self.harmonic_deltas[5] += bias; // SacredReciprocity
+                }
+                CommunityMode::Creative => {
+                    self.harmonic_deltas[3] += bias; // InfinitePlay
+                    self.harmonic_deltas[6] += bias; // EvolutionaryProgression
+                }
+                CommunityMode::Reflective => {
+                    self.harmonic_deltas[7] += bias; // SacredStillness
+                    self.harmonic_deltas[2] += bias; // IntegralWisdom
+                }
+            }
+        }
+
+        // Snapshot max |delta| for telemetry (survives take_harmonic_deltas)
+        self.last_harmonic_delta_max = self
+            .harmonic_deltas
+            .iter()
+            .map(|d| d.abs())
+            .fold(0.0f64, f64::max);
 
         output
     }
@@ -737,6 +913,95 @@ mod tests {
         assert!(
             baselines.is_empty(),
             "Non-self dispute should produce no neuromod effect"
+        );
+    }
+
+    #[test]
+    fn test_epistemic_blind_spots_boost_exploration() {
+        use crate::mycelix::epistemic_mesh::{EpistemicMesh, EpistemicSummary};
+        use crate::mycelix::gis::IgnoranceType;
+
+        let mut mgr = GovernanceManager::default();
+
+        // Create a mesh with a severe blind spot
+        let summaries = vec![
+            EpistemicSummary {
+                agent_id: "a1".into(),
+                dominant_ignorance: IgnoranceType::KnownUnknown,
+                domain_expertise: vec![],
+                blind_spots: vec!["quantum".into()],
+            },
+            EpistemicSummary {
+                agent_id: "a2".into(),
+                dominant_ignorance: IgnoranceType::KnownUnknown,
+                domain_expertise: vec![],
+                blind_spots: vec!["quantum".into()],
+            },
+        ];
+        mgr.set_epistemic_mesh(EpistemicMesh::new(summaries));
+
+        // Need at least one event to avoid early return
+        mgr.inject_event(make_event(GovernanceEventKind::ProposalCreated));
+        let output = mgr.process(&default_snapshot());
+
+        assert!(
+            output.exploration_delta > 0.0,
+            "Blind spots should boost exploration: {}",
+            output.exploration_delta
+        );
+        assert!(output.flags & output_flags::REQUEST_EXPLORATION != 0);
+    }
+
+    #[test]
+    fn test_community_mode_biases_harmonics() {
+        let mut mgr = GovernanceManager::default();
+        mgr.set_community_mode(CommunityMode::Protective);
+
+        // Need at least one event
+        mgr.inject_event(make_event(GovernanceEventKind::ProposalCreated));
+        mgr.process(&default_snapshot());
+
+        let deltas = mgr.take_harmonic_deltas();
+        // Protective biases PanSentientFlourishing (1) and SacredReciprocity (5)
+        assert!(
+            deltas[1] > 0.0,
+            "Protective mode should bias PanSentientFlourishing: {}",
+            deltas[1]
+        );
+        assert!(
+            deltas[5] > 0.0,
+            "Protective mode should bias SacredReciprocity: {}",
+            deltas[5]
+        );
+        // Other harmonies should be unaffected
+        assert!(
+            deltas[3].abs() < 1e-10,
+            "InfinitePlay should not be biased in Protective mode"
+        );
+    }
+
+    #[test]
+    fn test_completed_outcomes_carry_prediction_error() {
+        let mut mgr = GovernanceManager::default();
+        // Predict outcome alignment
+        mgr.predict_outcome("p1".into(), 0.9);
+        // Actual outcome has very different alignment → high PE
+        mgr.inject_outcome(GovernanceOutcome {
+            proposal_id: "p1".into(),
+            passed: true,
+            my_vote_aligned: Some(true),
+            value_alignment_score: 0.1,
+            harmonic_resonance: 0.5,
+        });
+        mgr.process(&default_snapshot());
+
+        let completed = mgr.drain_completed();
+        assert_eq!(completed.len(), 1);
+        let (_outcome, pe) = &completed[0];
+        assert!(
+            *pe > 0.5,
+            "High prediction error expected: predicted=0.9, actual=0.1, got PE={}",
+            pe
         );
     }
 

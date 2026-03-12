@@ -52,6 +52,19 @@ pub(super) struct PercExploration {
     pub(super) exploration_action: Option<String>,
 }
 
+/// Math intent detection results.
+#[derive(Default)]
+pub(super) struct PercMath {
+    /// Whether math intent was detected in the input
+    pub(super) math_detected: bool,
+    /// Classified problem type (if detected)
+    pub(super) problem_type: Option<crate::cognitive_loop::math_service::MathProblemType>,
+    /// Phi from the math computation (0.0 if no math)
+    pub(super) phi: f64,
+    /// Confidence in the math result (0.0 if no math)
+    pub(super) confidence: f64,
+}
+
 /// Urgency classification and prediction.
 pub(super) struct PercUrgency {
     pub(super) urgency: CycleUrgency,
@@ -70,6 +83,7 @@ pub(super) struct PerceptionPhaseResult {
     pub(super) strategy: PercStrategy,
     pub(super) exploration: PercExploration,
     pub(super) urgency: PercUrgency,
+    pub(super) math: PercMath,
     pub(super) startup_suppressed: bool,
     pub(super) startup_warmup_progress: f32,
     pub(super) negation_detected: f32,
@@ -203,6 +217,25 @@ pub(super) struct DynNeuromod {
     pub(super) phasic_da_replay_boost: usize,
 }
 
+/// Math solver dispatch results from dynamics phase.
+#[derive(Default)]
+pub(super) struct DynMath {
+    /// Whether a math solver was dispatched this cycle
+    pub(super) solved: bool,
+    /// Phi from the solver (0.0 if not solved)
+    pub(super) phi: f64,
+    /// Confidence from the solver (0.0 if not solved)
+    pub(super) confidence: f64,
+    /// Whether multi-path verification succeeded
+    pub(super) multipath_verified: bool,
+    /// Human-readable answer (empty if not solved)
+    pub(super) answer: String,
+    /// Epistemic caveat from the solver (None if N/A)
+    pub(super) epistemic_caveat: Option<String>,
+    /// Error bound on numerical result (None if N/A)
+    pub(super) error_bound: Option<f64>,
+}
+
 /// Result of the dynamics phase (Phases A–12).
 #[derive(Default)]
 pub(super) struct DynamicsPhaseResult {
@@ -214,6 +247,7 @@ pub(super) struct DynamicsPhaseResult {
     pub(super) homeostasis: DynHomeostasis,
     pub(super) guidance: DynGuidance,
     pub(super) neuromod: DynNeuromod,
+    pub(super) math: DynMath,
     pub(super) binding_threshold_mod: f32,
     pub(super) binding_confidence_mod: f32,
     pub(super) epistemic_semantic_lr_mod: f32,

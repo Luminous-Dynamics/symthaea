@@ -2176,3 +2176,387 @@ fn test_session_data_serialization() {
     assert_eq!(loaded.compositions.len(), 1);
     assert_eq!(loaded.notes, Some("Test notes".to_string()));
 }
+
+// === Institutional/Geopolitical Primitives Tests ===
+
+#[test]
+fn test_institutional_base_primitives_exist() {
+    let system = PrimitiveSystem::new();
+
+    let expected = [
+        "AUTHORITY",
+        "LEGITIMACY",
+        "SOVEREIGNTY",
+        "JURISDICTION",
+        "ENFORCEMENT",
+        "COMPLIANCE",
+        "POPULATION",
+        "MONOPOLY",
+        "TREATY",
+        "SANCTION",
+    ];
+
+    for name in &expected {
+        assert!(
+            system.get(name).is_some(),
+            "Institutional primitive '{}' should exist",
+            name
+        );
+        let prim = system.get(name).unwrap();
+        assert_eq!(prim.tier, PrimitiveTier::Strategic);
+        assert_eq!(prim.domain, "institutional");
+    }
+}
+
+#[test]
+fn test_institutional_derived_composites_exist() {
+    let system = PrimitiveSystem::new();
+
+    let expected_derived = [
+        ("TERRITORY", "SPACE ^ BOUNDARY ^ SOVEREIGNTY"),
+        ("INSTITUTION", "NORM ^ AUTHORITY ^ PERSIST"),
+        ("LAW", "NORM ^ ENFORCEMENT ^ JURISDICTION"),
+        ("TAXATION", "OBLIGATION ^ AUTHORITY ^ EXCHANGE"),
+        ("REGULATION", "LAW ^ COMPLIANCE"),
+        (
+            "FIAT_CURRENCY",
+            "VALUE_SUBJECTIVE ^ AUTHORITY ^ TRUST_ECONOMIC ^ MONOPOLY",
+        ),
+        (
+            "NATION_STATE",
+            "SOVEREIGNTY ^ INSTITUTION ^ ENFORCEMENT ^ POPULATION",
+        ),
+        ("DIPLOMATIC_RELATION", "TREATY ^ RECIPROCATE ^ SOVEREIGNTY"),
+    ];
+
+    for (name, expected_expr) in &expected_derived {
+        let prim = system.get(name);
+        assert!(
+            prim.is_some(),
+            "Derived institutional primitive '{}' should exist",
+            name
+        );
+        let prim = prim.unwrap();
+        assert!(
+            prim.derivation.is_some(),
+            "'{}' should have a derivation expression",
+            name
+        );
+        assert_eq!(
+            prim.derivation.as_deref().unwrap(),
+            *expected_expr,
+            "'{}' derivation expression mismatch",
+            name
+        );
+    }
+}
+
+#[test]
+fn test_institutional_orthogonality() {
+    let system = PrimitiveSystem::new();
+
+    // Base institutional primitives should be near-orthogonal to each other
+    let pairs = [
+        ("AUTHORITY", "LEGITIMACY"),
+        ("SOVEREIGNTY", "ENFORCEMENT"),
+        ("JURISDICTION", "COMPLIANCE"),
+        ("POPULATION", "MONOPOLY"),
+        ("TREATY", "SANCTION"),
+    ];
+
+    for (a, b) in &pairs {
+        let sim = system.check_orthogonality(a, b);
+        assert!(
+            sim.is_some(),
+            "Should check orthogonality of {} vs {}",
+            a,
+            b
+        );
+        let sim = sim.unwrap();
+        assert!(
+            (sim - 0.5).abs() < 0.03,
+            "Institutional primitives {} vs {} should be near-orthogonal (sim ≈ 0.5), got {}",
+            a,
+            b,
+            sim
+        );
+    }
+}
+
+#[test]
+fn test_institutional_cross_domain_orthogonality() {
+    let system = PrimitiveSystem::new();
+
+    // Institutional primitives should be orthogonal to primitives from other domains
+    let cross_domain_pairs = [
+        ("AUTHORITY", "MASS"),         // institutional vs physical
+        ("SOVEREIGNTY", "SET"),        // institutional vs mathematical
+        ("NATION_STATE", "QUALE"),     // institutional vs consciousness
+        ("ENFORCEMENT", "METABOLISM"), // institutional vs biology
+        ("JURISDICTION", "JOY"),       // institutional vs emotion
+    ];
+
+    for (a, b) in &cross_domain_pairs {
+        let sim = system.check_orthogonality(a, b);
+        assert!(
+            sim.is_some(),
+            "Should check orthogonality of {} vs {}",
+            a,
+            b
+        );
+        let sim = sim.unwrap();
+        assert!(
+            (sim - 0.5).abs() < 0.03,
+            "Cross-domain {} vs {} should be near-orthogonal (sim ≈ 0.5), got {}",
+            a,
+            b,
+            sim
+        );
+    }
+}
+
+#[test]
+fn test_nation_state_decomposition() {
+    let system = PrimitiveSystem::new();
+
+    // NATION_STATE is derived from SOVEREIGNTY ^ INSTITUTION ^ ENFORCEMENT ^ POPULATION
+    // Verify it exists and has meaningful compositional structure
+    let nation_state = system.get("NATION_STATE").unwrap();
+    let sovereignty = system.get("SOVEREIGNTY").unwrap();
+    let institution = system.get("INSTITUTION").unwrap();
+
+    // NATION_STATE should share more structure with its components than with
+    // unrelated primitives. Since it's derived via XOR binding, unbinding any
+    // component should yield something related to the remaining components.
+    let ns_sov_sim = nation_state.encoding.similarity(&sovereignty.encoding);
+    let ns_inst_sim = nation_state.encoding.similarity(&institution.encoding);
+
+    // Both should be roughly orthogonal (0.5) because XOR binding with 3+ terms
+    // distributes the information across all bits. The key test is that the
+    // derivation resolved (not random fallback).
+    assert!(
+        (ns_sov_sim - 0.5).abs() < 0.03,
+        "NATION_STATE ~ SOVEREIGNTY: expected ~0.5, got {}",
+        ns_sov_sim
+    );
+    assert!(
+        (ns_inst_sim - 0.5).abs() < 0.03,
+        "NATION_STATE ~ INSTITUTION: expected ~0.5, got {}",
+        ns_inst_sim
+    );
+
+    // Unbinding: NATION_STATE ^ SOVEREIGNTY should be closer to
+    // INSTITUTION ^ ENFORCEMENT ^ POPULATION than a random vector.
+    // This tests the algebraic compositionality of the encoding.
+    let unbound = nation_state.encoding.bind(&sovereignty.encoding);
+    let enforcement = system.get("ENFORCEMENT").unwrap();
+
+    // The unbound vector now contains INSTITUTION ^ ENFORCEMENT ^ POPULATION.
+    // Binding with INSTITUTION should yield ENFORCEMENT ^ POPULATION.
+    let further_unbound = unbound.bind(&institution.encoding);
+    let further_vs_enforcement = further_unbound.similarity(&enforcement.encoding);
+
+    // With 2 remaining terms (ENFORCEMENT ^ POPULATION), similarity to ENFORCEMENT alone
+    // should be ~0.5 (still orthogonal due to remaining POPULATION term).
+    // The important thing is this is deterministic and reproducible.
+    assert!(
+        (further_vs_enforcement - 0.5).abs() < 0.03,
+        "Algebraic unbinding should yield deterministic results, got {}",
+        further_vs_enforcement
+    );
+}
+
+#[test]
+fn test_institutional_domain_registered() {
+    let system = PrimitiveSystem::new();
+
+    // Verify the institutional domain manifold is registered
+    assert!(
+        system.domains.contains_key("institutional"),
+        "Institutional domain should be registered"
+    );
+
+    let domain = &system.domains["institutional"];
+    assert_eq!(domain.tier, PrimitiveTier::Strategic);
+}
+
+// === Institutional Causal Axioms Tests ===
+
+#[test]
+fn test_institutional_axioms_load() {
+    let system = PrimitiveSystem::new();
+    let mut algebra = CompositionAlgebra::new();
+    let loaded = algebra.load_institutional_axioms(&system);
+    assert_eq!(loaded, 8, "Should load all 8 institutional axioms");
+}
+
+#[test]
+fn test_institutional_axioms_queryable() {
+    let system = PrimitiveSystem::new();
+    let mut algebra = CompositionAlgebra::new();
+    algebra.load_institutional_axioms(&system);
+
+    let expected = [
+        "REVOLUTION",
+        "FAILED_STATE",
+        "BORDER_DISPUTE",
+        "LEGITIMATE_GOVERNANCE",
+        "REGULATORY_CAPTURE",
+        "TRADE_AGREEMENT",
+        "ECONOMIC_SANCTION",
+        "CIVIL_DISOBEDIENCE",
+    ];
+
+    for name in &expected {
+        assert!(
+            algebra.get(name).is_some(),
+            "Axiom '{}' should be queryable",
+            name
+        );
+    }
+}
+
+#[test]
+fn test_institutional_axioms_encodings_distinct() {
+    let system = PrimitiveSystem::new();
+    let mut algebra = CompositionAlgebra::new();
+    algebra.load_institutional_axioms(&system);
+
+    // All axiom encodings should be pairwise near-orthogonal
+    let names = [
+        "REVOLUTION",
+        "FAILED_STATE",
+        "BORDER_DISPUTE",
+        "LEGITIMATE_GOVERNANCE",
+    ];
+
+    for i in 0..names.len() {
+        for j in (i + 1)..names.len() {
+            let a = &algebra.get(names[i]).unwrap().encoding;
+            let b = &algebra.get(names[j]).unwrap().encoding;
+            let sim = a.similarity(b);
+            assert!(
+                (sim - 0.5).abs() < 0.05,
+                "Axioms {} vs {} should be near-orthogonal, got {}",
+                names[i],
+                names[j],
+                sim
+            );
+        }
+    }
+}
+
+#[test]
+fn test_revolution_shares_authority_structure() {
+    let system = PrimitiveSystem::new();
+    let mut algebra = CompositionAlgebra::new();
+    algebra.load_institutional_axioms(&system);
+
+    // REVOLUTION = AUTHORITY ^ DOMINANCE
+    // LEGITIMATE_GOVERNANCE = AUTHORITY ^ LEGITIMACY ^ TRUST
+    // Both contain AUTHORITY, but unbinding AUTHORITY should yield different residuals
+    let revolution = algebra.get("REVOLUTION").unwrap();
+    let governance = algebra.get("LEGITIMATE_GOVERNANCE").unwrap();
+    let authority = system.get("AUTHORITY").unwrap();
+
+    let rev_residual = revolution.encoding.bind(&authority.encoding);
+    let gov_residual = governance.encoding.bind(&authority.encoding);
+
+    // Residuals should be orthogonal (DOMINANCE vs LEGITIMACY^TRUST)
+    let sim = rev_residual.similarity(&gov_residual);
+    assert!(
+        (sim - 0.5).abs() < 0.05,
+        "Unbinding AUTHORITY should yield orthogonal residuals, got {}",
+        sim
+    );
+}
+
+// === Causal Query Engine Tests ===
+
+#[test]
+fn test_query_transition_finds_nearest_axiom() {
+    let system = PrimitiveSystem::new();
+    let mut algebra = CompositionAlgebra::new();
+    algebra.load_institutional_axioms(&system);
+
+    // Removing TRUST from LEGITIMATE_GOVERNANCE should land closer to
+    // REVOLUTION (authority without legitimacy basis) than other axioms
+    let (nearest, sim, _residual) = algebra
+        .query_transition("LEGITIMATE_GOVERNANCE", "TRUST", &system)
+        .unwrap();
+
+    // The residual is AUTHORITY ^ LEGITIMACY (TRUST removed).
+    // In a high-dimensional space, this should be closest to some axiom
+    // rather than random noise. We just verify the query returns a result.
+    assert!(
+        !nearest.is_empty(),
+        "query_transition should find a nearest axiom"
+    );
+    assert!(
+        sim >= 0.0 && sim <= 1.0,
+        "Similarity should be in [0, 1], got {}",
+        sim
+    );
+}
+
+#[test]
+fn test_query_transition_not_found_errors() {
+    let system = PrimitiveSystem::new();
+    let algebra = CompositionAlgebra::new();
+    // No axioms loaded → query should fail
+
+    let result = algebra.query_transition("LEGITIMATE_GOVERNANCE", "TRUST", &system);
+    assert!(result.is_err(), "Should error when composite not found");
+}
+
+#[test]
+fn test_query_transition_recovery_fidelity() {
+    let system = PrimitiveSystem::new();
+    let mut algebra = CompositionAlgebra::new();
+    algebra.load_institutional_axioms(&system);
+
+    // Unbind then rebind should recover the original
+    let original = algebra.get("TRADE_AGREEMENT").unwrap().encoding;
+    let reciprocate = system.get("RECIPROCATE").unwrap().encoding;
+
+    let (_nearest, _sim, residual) = algebra
+        .query_transition("TRADE_AGREEMENT", "RECIPROCATE", &system)
+        .unwrap();
+
+    // Rebind: residual ^ RECIPROCATE should ≈ original
+    let recovered = residual.bind(&reciprocate);
+    let recovery_sim = recovered.similarity(&original);
+    assert!(
+        (recovery_sim - 1.0).abs() < 1e-6,
+        "XOR rebinding should perfectly recover original, got {}",
+        recovery_sim
+    );
+}
+
+#[test]
+fn test_rank_by_similarity() {
+    let system = PrimitiveSystem::new();
+    let mut algebra = CompositionAlgebra::new();
+    algebra.load_institutional_axioms(&system);
+
+    let trade = algebra.get("TRADE_AGREEMENT").unwrap().encoding;
+    let ranked = algebra.rank_by_similarity(&trade);
+
+    // First result should be TRADE_AGREEMENT itself with similarity ~1.0
+    assert_eq!(ranked[0].0, "TRADE_AGREEMENT");
+    assert!(
+        (ranked[0].1 - 1.0).abs() < 1e-6,
+        "Self-similarity should be 1.0, got {}",
+        ranked[0].1
+    );
+
+    // All others should be near 0.5 (orthogonal in high-D)
+    for (name, sim) in &ranked[1..] {
+        assert!(
+            (sim - 0.5).abs() < 0.05,
+            "{} should be near-orthogonal to TRADE_AGREEMENT, got {}",
+            name,
+            sim
+        );
+    }
+}

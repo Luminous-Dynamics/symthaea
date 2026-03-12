@@ -314,12 +314,24 @@ impl ConsciousnessEngine {
         let cantor_depth_factor = (input.cantor_metacognitive_depth - 0.5)
             * super::super::thresholds::CANTOR_CONSCIOUSNESS_MODULATION;
 
+        // Governance collective Phi → consciousness coupling
+        // High collective integration during governance → social consciousness boost ±2%.
+        // Neutral at 0.0 (no governance data) — only applies when mycelix feature is active.
+        // Science: Woolley et al. (2010) — collective intelligence factor from social sensitivity.
+        let governance_phi_factor = if input.governance_collective_phi > 0.01 {
+            (input.governance_collective_phi - 0.5)
+                * super::super::thresholds::GOV_CONSCIOUSNESS_MODULATION
+        } else {
+            0.0
+        };
+
         unified_consciousness = (unified_consciousness
             + sht_2a_boost as f64
             + gaba_a_dampen as f64
             + entropy_factor
             + moral_dampen
-            + cantor_depth_factor)
+            + cantor_depth_factor
+            + governance_phi_factor)
             .clamp(0.0, 1.0);
 
         let total_us = total_start.elapsed().as_micros() as u64;

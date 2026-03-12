@@ -70,6 +70,19 @@ pub struct ProsodyContext {
     pub is_focus: bool,
     /// Pitch accent type for stressed syllables.
     pub pitch_accent: PitchAccent,
+    /// Whether this phoneme is at a syllable onset (for syllable-aligned prosody).
+    /// When true, prosodic changes (pitch accent, stress boost) take full effect.
+    /// When false (mid-syllable), these changes are interpolated from the onset value.
+    pub is_syllable_onset: bool,
+    /// Progress through the current syllable (0.0 → 1.0).
+    /// Used to smoothly interpolate prosodic changes from onset across the syllable.
+    pub syllable_progress: f32,
+    /// Source type of the previous phoneme (for CV transition bandwidth widening).
+    /// `None` if this is the first phoneme or unknown.
+    pub prev_source_type: Option<SourceType>,
+    /// Source type of the next phoneme (for VC transition bandwidth widening).
+    /// `None` if this is the last phoneme or unknown.
+    pub next_source_type: Option<SourceType>,
 }
 
 impl Default for ProsodyContext {
@@ -85,8 +98,91 @@ impl Default for ProsodyContext {
             phrase_progress: 0.0,
             is_focus: false,
             pitch_accent: PitchAccent::None,
+            is_syllable_onset: true,
+            syllable_progress: 0.0,
+            prev_source_type: None,
+            next_source_type: None,
         }
     }
+}
+
+/// Detect syllable boundaries from a phoneme sequence.
+///
+/// Syllable boundaries are placed at vowel energy peaks: each vowel nucleus
+/// (ARPABET vowel phoneme) starts a new syllable. Consonants preceding a vowel
+/// belong to the following syllable's onset, and consonants following a vowel
+/// belong to the current syllable's coda.
+///
+/// Returns a list of `(syllable_start_index, stress)` pairs, where
+/// `syllable_start_index` is the index into the phoneme sequence where the
+/// syllable onset begins (the first consonant before the vowel, or the vowel
+/// itself if no onset consonant), and `stress` is extracted from the vowel's
+/// ARPABET stress digit (0, 1, or 2).
+///
+/// # Example
+/// ```
+/// use symthaea_vocal_tract::pipeline::detect_syllable_boundaries;
+/// let phonemes = &["B", "AH1", "T", "ER0"];
+/// let boundaries = detect_syllable_boundaries(phonemes);
+/// assert_eq!(boundaries.len(), 2);
+/// assert_eq!(boundaries[0], (0, 1)); // "B-AH1" syllable starts at 0, stress=1
+/// assert_eq!(boundaries[1], (2, 0)); // "T-ER0" syllable starts at 2, stress=0
+/// ```
+pub fn detect_syllable_boundaries(phonemes: &[&str]) -> Vec<(usize, u8)> {
+    if phonemes.is_empty() {
+        return Vec::new();
+    }
+
+    let mut boundaries = Vec::new();
+    let mut onset_start: Option<usize> = None;
+
+    for (i, &ph) in phonemes.iter().enumerate() {
+        let manner = phoneme_manner_class(ph);
+
+        if manner == MannerClass::Vowel {
+            // Extract stress digit from ARPABET (e.g., "AH1" → 1)
+            let stress = ph.chars().last().and_then(|c| c.to_digit(10)).unwrap_or(0) as u8;
+
+            // Syllable onset: first consonant before this vowel (if any)
+            let start = onset_start.unwrap_or(i);
+            boundaries.push((start, stress));
+            onset_start = None;
+        } else if boundaries.is_empty() && onset_start.is_none() {
+            // Consonant before first vowel — potential onset
+            onset_start = Some(i);
+        } else if onset_start.is_none() {
+            // Consonant after a vowel — could be coda or next onset.
+            // Maximal Onset Principle: assign to next syllable when possible.
+            onset_start = Some(i);
+        }
+    }
+
+    // Handle trailing consonants (no following vowel — they're coda of last syllable)
+    // No new boundary needed; they belong to the previous syllable.
+
+    boundaries
+}
+
+/// Check if an ARPABET phoneme is a vowel (has higher energy than consonants).
+///
+/// Vowels serve as syllable nuclei and are the anchor points for prosodic
+/// changes like pitch accent and stress.
+pub fn is_vowel_phoneme(phoneme: &str) -> bool {
+    phoneme_manner_class(phoneme) == MannerClass::Vowel
+}
+
+/// Check if an ARPABET phoneme is a consonant.
+pub fn is_consonant_phoneme(phoneme: &str) -> bool {
+    let manner = phoneme_manner_class(phoneme);
+    matches!(
+        manner,
+        MannerClass::Stop
+            | MannerClass::Fricative
+            | MannerClass::Nasal
+            | MannerClass::Affricate
+            | MannerClass::Glide
+            | MannerClass::Liquid
+    )
 }
 
 impl ProsodyContext {
@@ -125,24 +221,33 @@ impl ProsodyContext {
         // Declination: F0 baseline drops 15% within each phrase
         let declination = 1.0 - 0.15 * self.phrase_progress;
 
-        // Pitch accent shapes (applied within stressed syllables)
+        // Pitch accent shapes: snapped to syllable onset for syllable-aligned prosody.
+        // When syllable_progress has been explicitly set (> 0), use it instead of
+        // phoneme_progress so accents span the entire syllable, not just one phoneme.
+        // Falls back to phoneme_progress for backward compatibility.
+        let accent_progress = if self.syllable_progress > 0.0 {
+            self.syllable_progress
+        } else {
+            self.phoneme_progress
+        };
+
         let accent_contour = match self.pitch_accent {
             PitchAccent::None => 1.0,
             PitchAccent::High => {
                 // Rise to peak at 40% of syllable, sustain
-                if self.phoneme_progress < 0.4 {
-                    1.0 + 0.15 * (self.phoneme_progress / 0.4)
+                if accent_progress < 0.4 {
+                    1.0 + 0.15 * (accent_progress / 0.4)
                 } else {
                     1.15
                 }
             }
             PitchAccent::RiseHigh => {
                 // Starts low, rises sharply to peak at 60%
-                1.0 + 0.20 * (self.phoneme_progress / 0.6).min(1.0)
+                1.0 + 0.20 * (accent_progress / 0.6).min(1.0)
             }
             PitchAccent::FallLow => {
                 // Starts high, falls to low
-                1.10 - 0.15 * self.phoneme_progress
+                1.10 - 0.15 * accent_progress
             }
         };
 
@@ -225,6 +330,65 @@ impl ProsodyContext {
                 frame.b3 *= 1.3;
             }
             _ => {}
+        }
+
+        // Consonant-vowel (CV) and vowel-consonant (VC) transition bandwidth
+        // widening: during transitions between consonants and vowels, formant
+        // bandwidths increase 20-40% to model the articulatory instability at
+        // manner-class boundaries.
+        let is_vowel_like = matches!(frame.source_type, SourceType::Vowel | SourceType::Liquid);
+        let is_consonant = matches!(
+            frame.source_type,
+            SourceType::Stop | SourceType::Fricative | SourceType::Nasal | SourceType::Affricate
+        );
+
+        let prev_is_consonant = self.prev_source_type.map_or(false, |st| {
+            matches!(
+                st,
+                SourceType::Stop
+                    | SourceType::Fricative
+                    | SourceType::Nasal
+                    | SourceType::Affricate
+            )
+        });
+        let prev_is_vowel = self.prev_source_type.map_or(false, |st| {
+            matches!(st, SourceType::Vowel | SourceType::Liquid)
+        });
+        let next_is_consonant = self.next_source_type.map_or(false, |st| {
+            matches!(
+                st,
+                SourceType::Stop
+                    | SourceType::Fricative
+                    | SourceType::Nasal
+                    | SourceType::Affricate
+            )
+        });
+        let next_is_vowel = self.next_source_type.map_or(false, |st| {
+            matches!(st, SourceType::Vowel | SourceType::Liquid)
+        });
+
+        // Detect CV or VC transition: current phoneme borders a different manner class
+        let in_cv_transition =
+            (is_vowel_like && prev_is_consonant) || (is_consonant && next_is_vowel);
+        let in_vc_transition =
+            (is_vowel_like && next_is_consonant) || (is_consonant && prev_is_vowel);
+
+        if in_cv_transition || in_vc_transition {
+            // Widen bandwidth 20-40% depending on transition phase:
+            // - At phoneme boundaries (progress near 0 or 1): 40% widening
+            // - Mid-phoneme: 20% widening (trailing off from transition)
+            let boundary_proximity = if in_cv_transition {
+                // CV: widest at onset (phoneme_progress near 0)
+                1.0 - self.phoneme_progress.min(1.0)
+            } else {
+                // VC: widest at release (phoneme_progress near 1)
+                self.phoneme_progress.min(1.0)
+            };
+            // Interpolate between 20% and 40% widening based on proximity
+            let widen_factor = 1.20 + 0.20 * boundary_proximity;
+            frame.b1 *= widen_factor;
+            frame.b2 *= widen_factor;
+            frame.b3 *= widen_factor;
         }
     }
 }

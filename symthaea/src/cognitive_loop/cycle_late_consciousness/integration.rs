@@ -88,12 +88,91 @@ impl CognitiveLoopService {
             let depth_range = CANTOR_DEPTH_MAX - CANTOR_DEPTH_MIN;
             let adaptive_depth =
                 CANTOR_DEPTH_MIN + (gwt_activation * depth_range as f32).round() as usize;
-            let crhv = CantorRecursiveHV::from_base_with_depth(ctx.hv16_cached, adaptive_depth);
+
+            // RADIAL CANTOR PROMOTION: When cross-modal binding is strong (previous cycle),
+            // wrap the broadcast in RadialCantor geometry instead of flat CRHV.
+            // RadialCantor applies concentric band structure that preserves perceptual
+            // hierarchy (core = abstract, periphery = contextual).
+            // Science: Treisman & Gelade (1980) — feature integration requires binding;
+            //          strong binding justifies geometric structure in the representation.
+            let binding_strength = self.carryover.quality.last_phenomenal_binding as f32;
+            let crhv = if binding_strength
+                > crate::cognitive_loop::thresholds::CANTOR_RADIAL_BINDING_THRESHOLD
+            {
+                use symthaea_core::hdc::multidimensional_cantor::RadialCantorHV;
+                let radial = RadialCantorHV::new(
+                    ctx.hv16_cached,
+                    crate::cognitive_loop::thresholds::CANTOR_RADIAL_BANDS,
+                );
+                // Wrap the radial vector as a CRHV (preserves pipeline compatibility)
+                CantorRecursiveHV::from_base_with_depth(radial.vector, adaptive_depth)
+            } else {
+                CantorRecursiveHV::from_base_with_depth(ctx.hv16_cached, adaptive_depth)
+            };
             // Cap at 32 to bound memory — oldest broadcasts evicted first (ring semantics)
             if self.cantor_broadcast_buffer.len() >= 32 {
                 self.cantor_broadcast_buffer.remove(0);
             }
             self.cantor_broadcast_buffer.push(crhv);
+
+            // RESONANCE COUPLING: Detect coherent CRHV pairs in the buffer.
+            // When multiple fractal representations share high base-vector similarity,
+            // they form a "resonant coalition" that amplifies workspace integration.
+            // Science: Edelman & Tononi (2000) — reentrant signaling creates dynamic
+            //          neural coalitions; Singer (1999) — binding by synchrony.
+            let buf = &self.cantor_broadcast_buffer;
+            if buf.len() >= 2 {
+                let threshold =
+                    crate::cognitive_loop::thresholds::CANTOR_RESONANCE_SIMILARITY_THRESHOLD;
+                let mut resonant_pairs = 0u32;
+                let n = buf.len();
+                // Compare last 8 entries (recent window) to avoid O(n²) over full buffer
+                let window_start = n.saturating_sub(8);
+                for i in window_start..n {
+                    for j in (i + 1)..n {
+                        if buf[i].base.similarity(&buf[j].base) > threshold {
+                            resonant_pairs += 1;
+                        }
+                    }
+                }
+                // Normalize: max pairs in window of 8 = C(8,2) = 28
+                let max_pairs = {
+                    let w = (n - window_start) as u32;
+                    w * (w - 1) / 2
+                };
+                self.cantor_resonance_boost = if max_pairs > 0 {
+                    (resonant_pairs as f32 / max_pairs as f32).min(1.0)
+                } else {
+                    0.0
+                };
+                if self.cantor_resonance_boost > 0.1 {
+                    self.adjust_confidence(
+                        "cantor_resonance",
+                        crate::cognitive_loop::thresholds::CANTOR_RESONANCE_CONFIDENCE_BOOST
+                            * self.cantor_resonance_boost,
+                    );
+                }
+                // CANTOR → EXPLORATION: Surprise drives exploration, resonance drives exploitation.
+                // Science: Sutton & Barto (2018) — surprise-driven explore/exploit tradeoff.
+                if self.cantor_dream_surprise
+                    > crate::cognitive_loop::thresholds::CANTOR_SURPRISE_EXPLORATION_THRESHOLD
+                {
+                    self.adjust_exploration(
+                        "cantor_dream_surprise",
+                        crate::cognitive_loop::thresholds::CANTOR_SURPRISE_EXPLORATION_BOOST
+                            * self.cantor_dream_surprise,
+                    );
+                }
+                if self.cantor_resonance_boost
+                    > crate::cognitive_loop::thresholds::CANTOR_RESONANCE_EXPLORATION_DAMPEN_THRESHOLD
+                {
+                    self.adjust_exploration(
+                        "cantor_resonance_exploit",
+                        crate::cognitive_loop::thresholds::CANTOR_RESONANCE_EXPLORATION_DAMPEN
+                            * self.cantor_resonance_boost,
+                    );
+                }
+            }
         }
 
         module_timings.gwt = _t.elapsed().as_micros() as u64;

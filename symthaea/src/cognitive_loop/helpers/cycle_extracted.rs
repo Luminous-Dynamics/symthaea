@@ -99,6 +99,8 @@ impl CognitiveLoopService {
             wisdom_hv: symthaea_core::hdc::BinaryHV([0u8; 2048]),
             #[cfg(feature = "ssm_language")]
             language_output: None,
+            #[cfg(feature = "canvas")]
+            canvas_svg: None,
             #[cfg(feature = "identity")]
             signed_output: None,
             #[cfg(feature = "identity")]
@@ -631,7 +633,13 @@ impl CognitiveLoopService {
                     binder.update_modality(Modality::Affective, affective_hv);
                 }
                 let strength = binder.bind().map(|r| r.strength).unwrap_or(0.0);
-                let phi = binder.cross_modal_psi();
+                let raw_phi = binder.cross_modal_psi();
+                // Temporal smoothing: blend with previous-cycle psi to prevent
+                // rapid binding/unbinding oscillations.
+                // Engel et al. (2001): cross-modal binding requires sustained synchronization.
+                let prev_phi = self.carryover.consciousness.cross_modal_psi;
+                let alpha = super::super::thresholds::CROSS_MODAL_PSI_TEMPORAL_SMOOTHING;
+                let phi = raw_phi * (1.0 - alpha) + prev_phi * alpha;
                 self.carryover.consciousness.cross_modal_psi = phi;
                 (strength, phi)
             } else {

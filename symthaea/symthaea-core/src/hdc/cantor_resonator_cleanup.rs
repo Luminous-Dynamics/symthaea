@@ -152,6 +152,27 @@ impl BinaryCodebook {
         self.entries.push((label.to_string(), vector));
     }
 
+    /// Add a vector only if it's sufficiently different from all existing entries.
+    ///
+    /// Returns `true` if the vector was added, `false` if rejected as duplicate.
+    /// Prevents codebook degradation from repeated similar broadcasts.
+    /// Science: Hopfield (1982) — decorrelated patterns maximize associative capacity.
+    pub fn add_if_diverse(&mut self, label: &str, vector: BinaryHV, max_similarity: f32) -> bool {
+        // Check if label already exists (update in place)
+        if self.entries.iter().any(|(l, _)| l == label) {
+            self.add(label, vector);
+            return true;
+        }
+        // Reject if too similar to any existing entry
+        for (_, existing) in &self.entries {
+            if vector.similarity(existing) > max_similarity {
+                return false;
+            }
+        }
+        self.add(label, vector);
+        true
+    }
+
     /// Find nearest codebook entry to a query vector
     ///
     /// Returns (label, similarity, cleaned_vector)
@@ -184,6 +205,25 @@ impl BinaryCodebook {
     /// Check if empty
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
+    }
+
+    /// Evict the first entry whose label starts with the given prefix.
+    /// Returns `true` if an entry was evicted.
+    pub fn evict_by_prefix(&mut self, prefix: &str) -> bool {
+        if let Some(pos) = self.entries.iter().position(|(l, _)| l.starts_with(prefix)) {
+            self.entries.remove(pos);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Count entries whose label starts with the given prefix.
+    pub fn count_by_prefix(&self, prefix: &str) -> usize {
+        self.entries
+            .iter()
+            .filter(|(l, _)| l.starts_with(prefix))
+            .count()
     }
 }
 
@@ -598,6 +638,28 @@ mod tests {
         codebook.add("d", BinaryHV::random(4));
         assert_eq!(codebook.len(), 3);
         assert!(codebook.cleanup(&BinaryHV::random(1)).is_some()); // Can still find something
+    }
+
+    #[test]
+    fn test_codebook_diversity_rejects_duplicates() {
+        let mut codebook = BinaryCodebook::new(100);
+
+        let v1 = BinaryHV::random(1);
+        assert!(codebook.add_if_diverse("a", v1, 0.9));
+        assert_eq!(codebook.len(), 1);
+
+        // Same vector should be rejected (similarity = 1.0 > 0.9)
+        assert!(!codebook.add_if_diverse("b", v1, 0.9));
+        assert_eq!(codebook.len(), 1);
+
+        // Totally different vector should be accepted
+        let v2 = BinaryHV::random(2);
+        assert!(codebook.add_if_diverse("c", v2, 0.9));
+        assert_eq!(codebook.len(), 2);
+
+        // Same label updates in place regardless of similarity
+        assert!(codebook.add_if_diverse("a", BinaryHV::random(3), 0.9));
+        assert_eq!(codebook.len(), 2);
     }
 
     #[test]

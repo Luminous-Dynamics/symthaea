@@ -41,6 +41,13 @@ pub const CANONICAL_HEDGING_WORDS: &[&str] = &[
     "unclear",
     "could",
     "seem",
+    "tend",
+    "arguably",
+    "supposedly",
+    "tentatively",
+    "roughly",
+    "approximately",
+    "potentially",
 ];
 
 /// Canonical factual-assertion words suppressed under epistemic uncertainty.
@@ -60,13 +67,22 @@ pub const CANONICAL_FACTUAL_WORDS: &[&str] = &[
 ];
 
 /// Canonical out-of-domain response words.
-pub const CANONICAL_OOD_WORDS: &[&str] = &["outside", "beyond", "cannot", "unable"];
+pub const CANONICAL_OOD_WORDS: &[&str] = &[
+    "outside",
+    "beyond",
+    "cannot",
+    "unable",
+    "irrelevant",
+    "inapplicable",
+];
 
 /// Canonical sentence-ending tokens for emotional modulation.
 pub const CANONICAL_SENTENCE_ENDINGS: &[&str] = &[". ", "! ", "? ", "...", "\n"];
 
 /// Canonical informal words suppressed under low warmth.
-pub const CANONICAL_INFORMAL_WORDS: &[&str] = &["gonna", "wanna", "gotta", "kinda", "sorta"];
+pub const CANONICAL_INFORMAL_WORDS: &[&str] = &[
+    "gonna", "wanna", "gotta", "kinda", "sorta", "dunno", "lemme",
+];
 
 /// Canonical softening words boosted under negative valence.
 pub const CANONICAL_SOFTENING_WORDS: &[&str] = &["unfortunately", "sorry", "however", "although"];
@@ -99,6 +115,46 @@ pub struct GatingConfig {
     /// Semantic veto threshold — coherence below this triggers mid-sentence correction.
     #[serde(default = "default_veto_threshold")]
     pub veto_threshold: f32,
+    /// Minimum token position before veto can fire (prevents early false vetoes).
+    #[serde(default = "default_min_veto_position")]
+    pub min_veto_position: usize,
+    /// Maximum number of vetoes per generation (prevents veto loops).
+    #[serde(default = "default_max_vetoes")]
+    pub max_vetoes: usize,
+    /// Refractory period after veto (tokens to suppress further vetoes).
+    #[serde(default = "default_veto_refractory")]
+    pub veto_refractory: usize,
+    /// Arousal boost multiplier for sentence endings under high arousal.
+    #[serde(default = "default_arousal_boost_multiplier")]
+    pub arousal_boost_multiplier: f32,
+    /// Warmth penalty multiplier for informal tokens under low warmth.
+    #[serde(default = "default_warmth_penalty_multiplier")]
+    pub warmth_penalty_multiplier: f32,
+    /// Negative valence threshold below which softening language is boosted.
+    #[serde(default = "default_negative_valence_threshold")]
+    pub negative_valence_threshold: f32,
+    /// Valence boost multiplier for softening tokens under negative valence.
+    #[serde(default = "default_valence_boost_multiplier")]
+    pub valence_boost_multiplier: f32,
+    /// OOD boost multiplier for out-of-domain response tokens.
+    #[serde(default = "default_ood_boost_multiplier")]
+    pub ood_boost_multiplier: f32,
+    /// Maximum fraction of base_max_tokens that time_pressure can reduce (0.0-1.0).
+    /// At time_pressure=1.0, max tokens = base * (1 - this value). Default 0.5 (50% reduction).
+    #[serde(default = "default_time_pressure_max_reduction")]
+    pub time_pressure_max_reduction: f32,
+    /// Multiplier controlling how much domain_familiarity reduces hedging boost (0.0-1.0).
+    /// At domain_familiarity=1.0, hedging boost is scaled by (1 - this value). Default 1.0 (full reduction).
+    #[serde(default = "default_domain_familiarity_hedging_scale")]
+    pub domain_familiarity_hedging_scale: f32,
+    /// Multiplier controlling how much social_context amplifies warmth penalty (0.0+).
+    /// Warmth penalty is scaled by (1 + social_context * this value). Default 1.0.
+    #[serde(default = "default_social_context_formality_scale")]
+    pub social_context_formality_scale: f32,
+    /// Maximum fraction of veto threshold reduction from response_confidence (0.0-1.0).
+    /// At confidence=1.0, veto threshold is scaled by (1 - this value). Default 0.3.
+    #[serde(default = "default_confidence_veto_scale")]
+    pub confidence_veto_scale: f32,
 }
 
 impl Default for GatingConfig {
@@ -120,12 +176,72 @@ impl Default for GatingConfig {
             // constantly early in generation (CfC output similarity is naturally
             // low for the first few tokens), producing "-- wait," after every word.
             veto_threshold: 0.15,
+            min_veto_position: 2,
+            max_vetoes: 1,
+            veto_refractory: 8,
+            arousal_boost_multiplier: 3.0,
+            warmth_penalty_multiplier: -5.0,
+            negative_valence_threshold: -0.3,
+            valence_boost_multiplier: 2.0,
+            ood_boost_multiplier: 2.0,
+            time_pressure_max_reduction: 0.5,
+            domain_familiarity_hedging_scale: 1.0,
+            social_context_formality_scale: 1.0,
+            confidence_veto_scale: 0.3,
         }
     }
 }
 
 fn default_veto_threshold() -> f32 {
     0.15
+}
+
+fn default_min_veto_position() -> usize {
+    2
+}
+
+fn default_max_vetoes() -> usize {
+    1
+}
+
+fn default_veto_refractory() -> usize {
+    8
+}
+
+fn default_arousal_boost_multiplier() -> f32 {
+    3.0
+}
+
+fn default_warmth_penalty_multiplier() -> f32 {
+    -5.0
+}
+
+fn default_negative_valence_threshold() -> f32 {
+    -0.3
+}
+
+fn default_valence_boost_multiplier() -> f32 {
+    2.0
+}
+
+fn default_ood_boost_multiplier() -> f32 {
+    2.0
+}
+
+fn default_time_pressure_max_reduction() -> f32 {
+    0.5
+}
+
+fn default_domain_familiarity_hedging_scale() -> f32 {
+    1.0
+}
+
+fn default_social_context_formality_scale() -> f32 {
+    1.0
+}
+
+fn default_confidence_veto_scale() -> f32 {
+    0.3
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -213,11 +329,31 @@ impl EpistemicGate {
     /// Apply epistemic gating to logits in-place.
     ///
     /// - epistemic ordinal: 0=Certain, 1=Probable, 2=Uncertain, 3=Unknown, 4=OutOfDomain
+    /// - domain_familiarity: 0=novel, 1=expert — scales hedging boost down for familiar domains
     pub fn apply(&self, logits: &mut [f32], epistemic_ordinal: f32) {
+        self.apply_with_familiarity(logits, epistemic_ordinal, 0.0);
+    }
+
+    /// Apply epistemic gating with domain familiarity context.
+    ///
+    /// When `domain_familiarity` is high (expert domain), hedging boost is reduced —
+    /// the system is more willing to make direct assertions about well-known topics.
+    pub fn apply_with_familiarity(
+        &self,
+        logits: &mut [f32],
+        epistemic_ordinal: f32,
+        domain_familiarity: f32,
+    ) {
         if epistemic_ordinal < 1.5 {
             // Certain or Probable: no modification
             return;
         }
+
+        // Domain familiarity reduces hedging boost — familiar domains need less hedging.
+        // familiarity_scale: 1.0 (novel domain, full hedging) → ~0.0 (expert domain, minimal hedging)
+        let df = domain_familiarity.clamp(0.0, 1.0);
+        let familiarity_scale =
+            1.0 - df * self.config.domain_familiarity_hedging_scale.clamp(0.0, 1.0);
 
         if epistemic_ordinal > 3.5 {
             // OutOfDomain: suppress all content tokens, boost OOD tokens
@@ -228,12 +364,14 @@ impl EpistemicGate {
             }
             for &id in &self.ood_token_ids {
                 if let Some(l) = logits.get_mut(id as usize) {
-                    *l += self.config.unknown_hedging_boost * 2.0;
+                    *l += self.config.unknown_hedging_boost
+                        * self.config.ood_boost_multiplier
+                        * familiarity_scale;
                 }
             }
             for &id in &self.hedging_token_ids {
                 if let Some(l) = logits.get_mut(id as usize) {
-                    *l += self.config.unknown_hedging_boost;
+                    *l += self.config.unknown_hedging_boost * familiarity_scale;
                 }
             }
             return;
@@ -248,7 +386,7 @@ impl EpistemicGate {
             }
             for &id in &self.hedging_token_ids {
                 if let Some(l) = logits.get_mut(id as usize) {
-                    *l += self.config.unknown_hedging_boost;
+                    *l += self.config.unknown_hedging_boost * familiarity_scale;
                 }
             }
         } else {
@@ -260,7 +398,7 @@ impl EpistemicGate {
             }
             for &id in &self.hedging_token_ids {
                 if let Some(l) = logits.get_mut(id as usize) {
-                    *l += self.config.uncertain_hedging_boost;
+                    *l += self.config.uncertain_hedging_boost * familiarity_scale;
                 }
             }
         }
@@ -342,7 +480,8 @@ impl EmotionalModulator {
         if arousal > self.config.high_arousal_threshold
             && position > self.config.arousal_position_threshold
         {
-            let boost = (arousal - self.config.high_arousal_threshold) * 3.0;
+            let boost = (arousal - self.config.high_arousal_threshold)
+                * self.config.arousal_boost_multiplier;
             for &id in &self.sentence_end_ids {
                 if let Some(l) = logits.get_mut(id as usize) {
                     *l += boost;
@@ -350,9 +489,36 @@ impl EmotionalModulator {
             }
         }
 
-        // Low warmth → suppress informal tokens
+        // Arousal × valence interaction: high arousal + negative valence →
+        // boost both sentence endings AND softening (urgent-but-careful tone)
+        if arousal > self.config.high_arousal_threshold
+            && valence < self.config.negative_valence_threshold
+            && position > self.config.arousal_position_threshold
+        {
+            let interaction_boost = (arousal - self.config.high_arousal_threshold)
+                * (-valence - (-self.config.negative_valence_threshold))
+                * self.config.valence_boost_multiplier;
+            for &id in &self.sentence_end_ids {
+                if let Some(l) = logits.get_mut(id as usize) {
+                    *l += interaction_boost * 0.5;
+                }
+            }
+            for &id in &self.softening_ids {
+                if let Some(l) = logits.get_mut(id as usize) {
+                    *l += interaction_boost;
+                }
+            }
+        }
+
+        // Low warmth → suppress informal tokens.
+        // Social context amplifies this: formal contexts (social_context→1.0) apply
+        // stronger penalty even at moderate warmth levels.
+        let social = channels.social_context().clamp(0.0, 1.0);
+        let formality_scale = 1.0 + social * self.config.social_context_formality_scale;
         if warmth < self.config.low_warmth_threshold {
-            let penalty = (self.config.low_warmth_threshold - warmth) * -5.0;
+            let penalty = (self.config.low_warmth_threshold - warmth)
+                * self.config.warmth_penalty_multiplier
+                * formality_scale;
             for &id in &self.informal_ids {
                 if let Some(l) = logits.get_mut(id as usize) {
                     *l += penalty;
@@ -361,8 +527,9 @@ impl EmotionalModulator {
         }
 
         // Negative valence → boost softening language
-        if valence < -0.3 {
-            let boost = (-valence - 0.3) * 2.0;
+        if valence < self.config.negative_valence_threshold {
+            let boost = (-valence - (-self.config.negative_valence_threshold))
+                * self.config.valence_boost_multiplier;
             for &id in &self.softening_ids {
                 if let Some(l) = logits.get_mut(id as usize) {
                     *l += boost;
@@ -431,6 +598,23 @@ impl CoherenceFeedback {
         self.veto_triggered
     }
 
+    /// Whether a semantic veto should be triggered, adjusted for response confidence.
+    ///
+    /// Higher confidence raises the bar for vetoing — the system tolerates lower
+    /// coherence when it is confident in its response.
+    pub fn should_veto_with_confidence(
+        &self,
+        response_confidence: f32,
+        confidence_scale: f32,
+    ) -> bool {
+        let effective_threshold = confidence_adjusted_veto_threshold(
+            self.veto_threshold,
+            response_confidence,
+            confidence_scale,
+        );
+        self.current_coherence < effective_threshold
+    }
+
     /// Current coherence score.
     pub fn coherence(&self) -> f32 {
         self.current_coherence
@@ -447,6 +631,48 @@ pub fn consciousness_gated_max_tokens(base_max: usize, psi: f32) -> usize {
     let psi = if psi.is_finite() { psi } else { 0.5 };
     let factor = 0.5 + psi.clamp(0.0, 1.0);
     ((base_max as f32) * factor) as usize
+}
+
+/// Compute time-pressure-adjusted max tokens.
+///
+/// `max_tokens = base * (1 - time_pressure * max_reduction)`
+///
+/// At time_pressure=0.0 (relaxed), full token budget.
+/// At time_pressure=1.0 (urgent), reduced by `max_reduction` fraction.
+/// NaN time_pressure is treated as 0.0 (no reduction).
+pub fn time_pressure_adjusted_max_tokens(
+    base_max: usize,
+    time_pressure: f32,
+    max_reduction: f32,
+) -> usize {
+    let tp = if time_pressure.is_finite() {
+        time_pressure.clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    let reduction = tp * max_reduction.clamp(0.0, 1.0);
+    let factor = 1.0 - reduction;
+    ((base_max as f32) * factor).max(1.0) as usize
+}
+
+/// Compute the effective veto threshold adjusted by response confidence.
+///
+/// `effective_threshold = base_threshold * (1 - confidence * scale)`
+///
+/// Higher confidence → lower veto threshold → more tolerant of lower coherence.
+/// This lets confident responses proceed even with somewhat lower coherence scores.
+pub fn confidence_adjusted_veto_threshold(
+    base_threshold: f32,
+    response_confidence: f32,
+    confidence_scale: f32,
+) -> f32 {
+    let rc = if response_confidence.is_finite() {
+        response_confidence.clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    let scale = confidence_scale.clamp(0.0, 1.0);
+    base_threshold * (1.0 - rc * scale)
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -587,7 +813,7 @@ mod tests {
 
     #[test]
     fn test_canonical_hedging_words_complete() {
-        assert_eq!(CANONICAL_HEDGING_WORDS.len(), 18);
+        assert_eq!(CANONICAL_HEDGING_WORDS.len(), 25);
         // No duplicates
         let mut seen = std::collections::HashSet::new();
         for word in CANONICAL_HEDGING_WORDS {
@@ -810,6 +1036,292 @@ mod tests {
     fn test_consciousness_gated_verbosity_zero_base() {
         assert_eq!(consciousness_gated_max_tokens(0, 0.5), 0);
         assert_eq!(consciousness_gated_max_tokens(0, 1.0), 0);
+    }
+
+    #[test]
+    fn test_all_magic_numbers_configurable() {
+        let tok = test_tokenizer();
+
+        // Non-default config should produce different gating behavior
+        let custom_config = GatingConfig {
+            arousal_boost_multiplier: 10.0,
+            warmth_penalty_multiplier: -20.0,
+            negative_valence_threshold: -0.1,
+            valence_boost_multiplier: 8.0,
+            ood_boost_multiplier: 5.0,
+            min_veto_position: 10,
+            max_vetoes: 3,
+            veto_refractory: 16,
+            ..Default::default()
+        };
+
+        let default_mod = EmotionalModulator::new(&tok, &GatingConfig::default());
+        let custom_mod = EmotionalModulator::new(&tok, &custom_config);
+
+        // High arousal scenario — custom multiplier should produce larger boost
+        let mut channels = ThoughtChannels::default();
+        channels.set_emotion(-0.5, 0.9, 0.1);
+
+        let mut logits_default = vec![0.5; tok.vocab_size()];
+        let mut logits_custom = vec![0.5; tok.vocab_size()];
+        default_mod.apply(&mut logits_default, &channels, 15);
+        custom_mod.apply(&mut logits_custom, &channels, 15);
+
+        // Custom config should produce different results
+        assert_ne!(
+            logits_default, logits_custom,
+            "Non-default config should produce different gating"
+        );
+    }
+
+    #[test]
+    fn test_arousal_valence_interaction() {
+        let tok = test_tokenizer();
+        let config = test_config();
+        let modulator = EmotionalModulator::new(&tok, &config);
+
+        // High arousal + negative valence → interaction term active
+        let mut channels = ThoughtChannels::default();
+        channels.set_emotion(-0.7, 0.9, 0.5);
+
+        let mut logits = vec![0.5; tok.vocab_size()];
+        modulator.apply(&mut logits, &channels, 15);
+
+        // Softening words should get extra boost from interaction
+        // (beyond what negative valence alone provides)
+        let mut channels_calm = ThoughtChannels::default();
+        channels_calm.set_emotion(-0.7, 0.3, 0.5); // same valence, low arousal
+
+        let mut logits_calm = vec![0.5; tok.vocab_size()];
+        modulator.apply(&mut logits_calm, &channels_calm, 15);
+
+        // Check that at least one softening token got a larger boost
+        // with high arousal + negative valence
+        let mut found_interaction = false;
+        for &word in CANONICAL_SOFTENING_WORDS {
+            let id = tok.token_id(word);
+            if id != tok.unk_id {
+                if logits[id as usize] > logits_calm[id as usize] + 1e-6 {
+                    found_interaction = true;
+                    break;
+                }
+            }
+        }
+        // If no softening words resolved, the test is vacuous — but that's fine
+        // since we're testing in the module where the words are accessible
+        assert!(
+            found_interaction,
+            "High arousal + negative valence should boost softening more than low arousal"
+        );
+    }
+
+    // =========================================================================
+    // New channel tests: domain_familiarity, social_context, time_pressure,
+    // response_confidence
+    // =========================================================================
+
+    #[test]
+    fn test_domain_familiarity_reduces_hedging() {
+        let tok = test_tokenizer();
+        let config = test_config();
+        let gate = EpistemicGate::new(&tok, &config);
+
+        // Novel domain (familiarity=0) — full hedging boost
+        let mut logits_novel = vec![0.5; tok.vocab_size()];
+        gate.apply_with_familiarity(&mut logits_novel, 3.0, 0.0); // Unknown, novel
+
+        // Expert domain (familiarity=1) — reduced hedging boost
+        let mut logits_expert = vec![0.5; tok.vocab_size()];
+        gate.apply_with_familiarity(&mut logits_expert, 3.0, 1.0); // Unknown, expert
+
+        // Hedging tokens should be boosted more in novel domain than expert domain
+        let mut found_difference = false;
+        for &word in CANONICAL_HEDGING_WORDS {
+            let id = tok.token_id(word);
+            if id != tok.unk_id {
+                let novel_boost = logits_novel[id as usize] - 0.5;
+                let expert_boost = logits_expert[id as usize] - 0.5;
+                if novel_boost > expert_boost + 1e-6 {
+                    found_difference = true;
+                    // Expert should still have non-negative boost (just smaller)
+                    assert!(
+                        expert_boost >= -1e-6,
+                        "Expert domain hedging boost should be non-negative, got {expert_boost}"
+                    );
+                    break;
+                }
+            }
+        }
+        assert!(
+            found_difference,
+            "Domain familiarity should reduce hedging boost for expert domains"
+        );
+    }
+
+    #[test]
+    fn test_domain_familiarity_does_not_affect_factual_penalty() {
+        let tok = test_tokenizer();
+        let config = test_config();
+        let gate = EpistemicGate::new(&tok, &config);
+
+        // Factual penalties should be the same regardless of familiarity
+        let mut logits_novel = vec![0.5; tok.vocab_size()];
+        gate.apply_with_familiarity(&mut logits_novel, 3.0, 0.0);
+
+        let mut logits_expert = vec![0.5; tok.vocab_size()];
+        gate.apply_with_familiarity(&mut logits_expert, 3.0, 1.0);
+
+        for &word in CANONICAL_FACTUAL_WORDS {
+            let id = tok.token_id(word);
+            if id != tok.unk_id {
+                assert!(
+                    (logits_novel[id as usize] - logits_expert[id as usize]).abs() < 1e-6,
+                    "Factual penalty for '{}' should not differ by familiarity",
+                    word
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_social_context_increases_formality() {
+        // Use a tokenizer that has informal words by adding them to the vocab
+        let mut tok = test_tokenizer();
+        let informal_ids: Vec<u32> = CANONICAL_INFORMAL_WORDS
+            .iter()
+            .map(|w| {
+                let id = tok.token_id(w);
+                if id == tok.unk_id {
+                    tok.add_token(w)
+                } else {
+                    id
+                }
+            })
+            .collect();
+
+        let config = test_config();
+        let modulator = EmotionalModulator::new(&tok, &config);
+
+        // Low warmth + intimate context (social_context=0)
+        let mut channels_intimate = ThoughtChannels::default();
+        channels_intimate.set_emotion(0.0, 0.5, 0.1); // low warmth
+        channels_intimate.set_context(0.0, 0.5, 0.0, 0.5); // intimate
+
+        let mut logits_intimate = vec![0.5; tok.vocab_size()];
+        modulator.apply(&mut logits_intimate, &channels_intimate, 15);
+
+        // Low warmth + formal context (social_context=1)
+        let mut channels_formal = ThoughtChannels::default();
+        channels_formal.set_emotion(0.0, 0.5, 0.1); // same low warmth
+        channels_formal.set_context(0.0, 0.5, 1.0, 0.5); // formal
+
+        let mut logits_formal = vec![0.5; tok.vocab_size()];
+        modulator.apply(&mut logits_formal, &channels_formal, 15);
+
+        // Informal tokens should be penalized more in formal context
+        let mut found_difference = false;
+        for &id in &informal_ids {
+            let intimate_val = logits_intimate[id as usize];
+            let formal_val = logits_formal[id as usize];
+            // warmth_penalty_multiplier is negative, so lower logit = stronger penalty
+            if formal_val < intimate_val - 1e-6 {
+                found_difference = true;
+                break;
+            }
+        }
+        assert!(
+            found_difference,
+            "Formal social context should increase informal token penalty"
+        );
+    }
+
+    #[test]
+    fn test_time_pressure_effect() {
+        // No time pressure: full budget
+        let full = time_pressure_adjusted_max_tokens(100, 0.0, 0.5);
+        assert_eq!(full, 100, "No time pressure should give full tokens");
+
+        // Max time pressure: 50% reduction
+        let urgent = time_pressure_adjusted_max_tokens(100, 1.0, 0.5);
+        assert_eq!(urgent, 50, "Max time pressure should halve tokens");
+
+        // Mid time pressure: 25% reduction
+        let mid = time_pressure_adjusted_max_tokens(100, 0.5, 0.5);
+        assert_eq!(mid, 75, "Mid time pressure should reduce by 25%");
+
+        // NaN time pressure: treated as no pressure
+        let nan = time_pressure_adjusted_max_tokens(100, f32::NAN, 0.5);
+        assert_eq!(nan, 100, "NaN time pressure should give full tokens");
+
+        // Zero base: always 1 (min)
+        let min_tokens = time_pressure_adjusted_max_tokens(1, 1.0, 1.0);
+        assert!(min_tokens >= 1, "Should never produce 0 tokens");
+    }
+
+    #[test]
+    fn test_confidence_adjusted_veto_threshold() {
+        // No confidence: threshold unchanged
+        let t0 = confidence_adjusted_veto_threshold(0.15, 0.0, 0.3);
+        assert!(
+            (t0 - 0.15).abs() < 1e-6,
+            "Zero confidence should not change threshold"
+        );
+
+        // Full confidence with 0.3 scale: threshold reduced by 30%
+        let t1 = confidence_adjusted_veto_threshold(0.15, 1.0, 0.3);
+        let expected = 0.15 * 0.7;
+        assert!(
+            (t1 - expected).abs() < 1e-6,
+            "Full confidence should reduce threshold by scale factor, got {t1} expected {expected}"
+        );
+
+        // NaN confidence: treated as 0
+        let t_nan = confidence_adjusted_veto_threshold(0.15, f32::NAN, 0.3);
+        assert!(
+            (t_nan - 0.15).abs() < 1e-6,
+            "NaN confidence should not change threshold"
+        );
+    }
+
+    #[test]
+    fn test_confidence_veto_integration() {
+        // CoherenceFeedback with coherence at exactly the veto threshold
+        let mut feedback = CoherenceFeedback::with_veto_threshold(0.3, 0.15);
+
+        let genesis = symthaea_core::genesis::GenesisSeed::from_phrase("test-confidence-veto");
+        let a = symthaea_core::hdc::ContinuousHV::from_genesis(
+            &genesis,
+            "a",
+            symthaea_core::hdc::HDC_DIMENSION,
+        );
+        let b = symthaea_core::hdc::ContinuousHV::from_genesis(
+            &genesis,
+            "b",
+            symthaea_core::hdc::HDC_DIMENSION,
+        );
+
+        // Near-orthogonal HVs → low coherence → should veto without confidence
+        feedback.update(&a, &b);
+        assert!(
+            feedback.should_veto(),
+            "Low coherence should trigger veto without confidence adjustment"
+        );
+
+        // With high confidence, veto threshold is lowered — but near-zero coherence
+        // should still veto even with confidence (threshold only reduces by 30%)
+        let veto_with_confidence = feedback.should_veto_with_confidence(1.0, 0.3);
+        // Near-orthogonal coherence (~0.0) is below even the reduced threshold (0.15 * 0.7 = 0.105)
+        assert!(
+            veto_with_confidence,
+            "Near-zero coherence should still veto even with high confidence"
+        );
+
+        // Self-similar HVs → high coherence → should not veto
+        feedback.update(&a, &a);
+        assert!(
+            !feedback.should_veto_with_confidence(0.0, 0.3),
+            "High coherence should not veto"
+        );
     }
 
     #[cfg(feature = "mamba")]

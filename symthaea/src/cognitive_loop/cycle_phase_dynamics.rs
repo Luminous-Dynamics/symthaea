@@ -36,7 +36,7 @@ use std::time::Instant;
 
 use super::helpers;
 use super::phase_results::{
-    DynAttention, DynCore, DynFep, DynGuidance, DynHomeostasis, DynNeuromod, DynReasoning,
+    DynAttention, DynCore, DynFep, DynGuidance, DynHomeostasis, DynMath, DynNeuromod, DynReasoning,
     DynResonator, DynamicsPhaseResult, PerceptionPhaseResult,
 };
 use super::thresholds::{
@@ -66,13 +66,13 @@ use super::thresholds::{
     FEP_PRAGMATIC_EXPLOIT_THRESHOLD, FEP_PRAGMATIC_EXPLORE_SCALE, FEP_PRAGMATIC_EXPLORE_THRESHOLD,
     FEP_SURPRISE_TAU_SCALE, FEP_TD_ERROR_DISCOVERY_THRESHOLD, GOAL_PRIORITY_EXPLORATION_THRESHOLD,
     GOAL_PRIORITY_LR_THRESHOLD, HOMEOSTASIS_AROUSAL_TARGET, HOMEOSTASIS_EFFICIENCY_EMA,
-    HOMEOSTASIS_EFFICIENCY_HIGH, HOMEOSTASIS_EFFICIENCY_LOW, HOMEOSTASIS_NEUROMOD_STEP,
-    HOMEOSTASIS_PULL_CRITICAL, HOMEOSTASIS_PULL_CRUISE, HOMEOSTASIS_PULL_INCREASE,
-    HOMEOSTASIS_PULL_NORMAL, HOMEOSTASIS_PULL_REDUCTION, HOMEOSTASIS_RECALIBRATE_HIGH,
-    HOMEOSTASIS_RECALIBRATE_LOW, HORIZON_PE_CONTRACT_RATE, HORIZON_PE_CONTRACT_THRESHOLD,
-    HORIZON_PE_EXPAND_RATE, HORIZON_PE_EXPAND_THRESHOLD, HORIZON_SLOPE_CONTRACT_CAP,
-    HORIZON_SLOPE_CONTRACT_RATE, HORIZON_SLOPE_EXPAND_CAP, HORIZON_SLOPE_EXPAND_RATE,
-    HORIZON_SLOPE_THRESHOLD, MCTS_CONSOLIDATE_CONFIDENCE_SCALE,
+    HOMEOSTASIS_EFFICIENCY_HIGH, HOMEOSTASIS_EFFICIENCY_LOW, HOMEOSTASIS_EMOTIONAL_INERTIA,
+    HOMEOSTASIS_NEUROMOD_STEP, HOMEOSTASIS_PULL_CRITICAL, HOMEOSTASIS_PULL_CRUISE,
+    HOMEOSTASIS_PULL_INCREASE, HOMEOSTASIS_PULL_NORMAL, HOMEOSTASIS_PULL_REDUCTION,
+    HOMEOSTASIS_RECALIBRATE_HIGH, HOMEOSTASIS_RECALIBRATE_LOW, HORIZON_PE_CONTRACT_RATE,
+    HORIZON_PE_CONTRACT_THRESHOLD, HORIZON_PE_EXPAND_RATE, HORIZON_PE_EXPAND_THRESHOLD,
+    HORIZON_SLOPE_CONTRACT_CAP, HORIZON_SLOPE_CONTRACT_RATE, HORIZON_SLOPE_EXPAND_CAP,
+    HORIZON_SLOPE_EXPAND_RATE, HORIZON_SLOPE_THRESHOLD, MCTS_CONSOLIDATE_CONFIDENCE_SCALE,
     MCTS_EFFECTIVENESS_CONFIDENCE_SCALE, MCTS_EFFECTIVENESS_EMA, MCTS_EFFECTIVENESS_EXPLORE_SCALE,
     MCTS_EFFECTIVENESS_HIGH, MCTS_EFFECTIVENESS_LOW, MCTS_EXPLOIT_LR_SCALE, MCTS_EXPLORE_SCALE,
     MCTS_PLAN_CONFIDENCE_THRESHOLD, MCTS_PLAN_WEIGHT_SCALE, MEMORY_RECALL_TOP_K,
@@ -184,9 +184,65 @@ impl CognitiveLoopService {
                     self.subsystem_collector
                         .record("perception_manager", perception_output);
                 }
+
+                // ── Governance Manager (interval 37, co-prime) ──────────
+                #[cfg(feature = "mycelix")]
+                if self.governance_mgr.should_run(cycle_num, urgency_u8) {
+                    // Derive local community mode from experience bus KosmicSong as
+                    // single-agent fallback. External bridge can override via accessors.
+                    if let Some(ref bus) = self.experience_bus {
+                        use crate::experience::kosmic_state::KosmicMode;
+                        use crate::mycelix::collective_identity::CommunityMode;
+
+                        // Map local KosmicMode → CommunityMode
+                        let mode = match bus.kosmic_state.dominant_mode {
+                            KosmicMode::Playful | KosmicMode::Connecting => {
+                                CommunityMode::Exploratory
+                            }
+                            KosmicMode::Nurturing | KosmicMode::Giving => CommunityMode::Protective,
+                            KosmicMode::Growing => CommunityMode::Creative,
+                            KosmicMode::Contemplative
+                            | KosmicMode::Resting
+                            | KosmicMode::Integrating => CommunityMode::Reflective,
+                            KosmicMode::Balanced => CommunityMode::Reflective,
+                        };
+                        self.governance_mgr.set_community_mode(mode);
+
+                        // Local epistemic summary from GIS dark spots
+                        let ks = &bus.kosmic_state;
+                        let blind_spots: Vec<String> = ks
+                            .gis_state
+                            .dark_spots
+                            .iter()
+                            .map(|ds| ds.topic_hash.clone())
+                            .collect();
+                        use crate::experience::kosmic_state::GisType;
+                        use crate::mycelix::gis::IgnoranceType;
+                        let gis_type = match ks.gis_state.current_type {
+                            GisType::KnownKnown => IgnoranceType::Known,
+                            GisType::KnownUnknown => IgnoranceType::KnownUnknown,
+                            GisType::UnknownKnown => IgnoranceType::Known, // tacit knowledge
+                            GisType::UnknownUnknown => IgnoranceType::Unknown,
+                            GisType::StrategicIgnorance => IgnoranceType::KnownUnknown,
+                        };
+                        let summary = crate::mycelix::epistemic_mesh::EpistemicSummary {
+                            agent_id: "local".to_string(),
+                            dominant_ignorance: gis_type,
+                            domain_expertise: vec![],
+                            blind_spots,
+                        };
+                        let mesh =
+                            crate::mycelix::epistemic_mesh::EpistemicMesh::new(vec![summary]);
+                        // Use set_local — will NOT overwrite an externally-set multi-agent mesh.
+                        self.governance_mgr.set_local_epistemic_mesh(mesh);
+                    }
+
+                    let governance_output = self.governance_mgr.process(snapshot);
+                    self.subsystem_collector
+                        .record("governance_manager", governance_output);
+                }
             }
         }
-
 
         // ── Phase 17: Self-model accuracy tracking ───────────────────────
         let self_model_accuracy = self.carryover.learning.self_model_accuracy;
@@ -1335,6 +1391,69 @@ impl CognitiveLoopService {
         );
 
         // ═══════════════════════════════════════════════════════════════════════
+        // 10d.8 Math Solver Dispatch
+        // When perception detected a math intent, dispatch to the appropriate
+        // solver engine. The result's Phi feeds into consciousness coupling and
+        // the confidence modulates epistemic state.
+        // Science: Dehaene (2011) — number sense as a core cognitive module;
+        //          Lakoff & Núñez (2000) — mathematical reasoning is embodied.
+        // ═══════════════════════════════════════════════════════════════════════
+        let math_result = if perception.math.math_detected {
+            let _t = Instant::now();
+            // Dispatch solver based on classified problem type.
+            // Currently: descriptive statistics on any extracted numbers from input.
+            // Future: parse parameters from NL input for typed dispatch.
+            let numbers: Vec<f64> = input
+                .split_whitespace()
+                .filter_map(|w| {
+                    w.trim_matches(|c: char| !c.is_ascii_digit() && c != '.' && c != '-')
+                        .parse::<f64>()
+                        .ok()
+                })
+                .collect();
+
+            let response = if !numbers.is_empty() {
+                Some(self.math_service.compute_statistics(&numbers))
+            } else {
+                None
+            };
+
+            let dm = if let Some(ref resp) = response {
+                // Math Phi → consciousness coupling: boost prediction confidence
+                // when math produces high-Phi verified results.
+                if resp.multipath_verified && resp.phi > 0.3 {
+                    self.adjust_confidence("math_verified", 0.02);
+                }
+                // Epistemic caveat → dampen confidence (honest uncertainty).
+                if resp.epistemic_caveat.is_some() {
+                    self.scale_confidence("math_epistemic_caveat", 0.98);
+                }
+                // Math Phi → DA nudge (reward signal for successful problem solving).
+                // Science: Schultz (1997) — unexpected reward prediction error → DA burst.
+                if resp.phi > 0.5 {
+                    let da_base = self.neuromod.bath.dopamine.baseline_val();
+                    self.neuromod.bath.dopamine.set_baseline(da_base + 0.01);
+                }
+
+                DynMath {
+                    solved: true,
+                    phi: resp.phi,
+                    confidence: resp.confidence,
+                    multipath_verified: resp.multipath_verified,
+                    answer: resp.answer.clone(),
+                    epistemic_caveat: resp.epistemic_caveat.clone(),
+                    error_bound: resp.error_bound,
+                }
+            } else {
+                DynMath::default()
+            };
+            module_timings.math_service += _t.elapsed().as_micros() as u64;
+            dm
+        } else {
+            DynMath::default()
+        };
+
+        // ═══════════════════════════════════════════════════════════════════════
         // NEUROMODULATOR BATH + PSI SYNTHESIS (extracted to cycle_neuromod_phase.rs)
         // ═══════════════════════════════════════════════════════════════════════
         let neuromod_result = self.run_neuromodulator_and_psi_phase(prediction_error, coherence);
@@ -1448,7 +1567,40 @@ impl CognitiveLoopService {
                         self.fep.world_model.reset();
                     }
                 }
-                MotorCommandType::MotorOutput | MotorCommandType::NoOp => {}
+                MotorCommandType::MotorOutput => {
+                    if let Some(ref mut bridge) = self.motor_output_bridge {
+                        let request = self.pending_motor_request.take().unwrap_or_default();
+                        // Use actual consciousness level for Phi gating,
+                        // falling back to coherence if not yet computed.
+                        // Coherence alone is a poor Phi proxy — it measures voice
+                        // resonator stability, not integrated information (Tononi 2004).
+                        let motor_phi = if self.carryover.history.consciousness_level > 0.0 {
+                            self.carryover.history.consciousness_level
+                        } else {
+                            coherence as f64
+                        };
+                        let result = bridge.execute(
+                            &enhanced_result.motor_command.parameters,
+                            enhanced_result.motor_command.confidence,
+                            motor_phi,
+                            &request,
+                        );
+
+                        // Feed outcome back as FEP observation
+                        let obs_value = if result.success { 0.9 } else { 0.1 };
+                        let motor_obs = symthaea_fep::Observation::from_consciousness_state(
+                            obs_value,
+                            result.prediction_error,
+                            motor_phi,
+                            effective_lr as f64,
+                        );
+                        self.fep.agent.perceive(&motor_obs);
+
+                        self.last_motor_phi = motor_phi;
+                        self.last_motor_result = Some(result);
+                    }
+                }
+                MotorCommandType::NoOp => {}
             }
 
             if self.fep.learning_signal > FEP_LEARNING_PLASTICITY_THRESHOLD
@@ -2213,22 +2365,89 @@ impl CognitiveLoopService {
             } else {
                 0
             };
+            // Governance urgency → Broca cadence modulation.
+            // High governance activity (pending events) → widen spacing (focus on deliberation).
+            // Low collective_phi → cautious generation (epistemic humility).
+            #[cfg(feature = "mycelix")]
+            let governance_spacing_boost = {
+                let pending = self.governance_mgr.pending_event_count();
+                let phi = self.governance_mgr.last_collective_phi();
+                let urgency_boost: usize = if pending > 3 { 2 } else { 0 };
+                let phi_boost: usize = if phi > 0.01 && phi < 0.3 { 2 } else { 0 };
+                urgency_boost + phi_boost
+            };
+            #[cfg(not(feature = "mycelix"))]
+            let governance_spacing_boost: usize = 0;
+            // Cantor fractal depth → Broca cadence: deep recursion = deliberate speech.
+            // Science: Goldman-Rakic (1996) — prefrontal recursion depth → utterance complexity.
+            let cantor_spacing_boost = {
+                use crate::cognitive_loop::thresholds::{
+                    CANTOR_DEPTH_BROCA_SPACING_BOOST, CANTOR_SURPRISE_BROCA_SPACING_BOOST,
+                    CANTOR_SURPRISE_BROCA_THRESHOLD,
+                };
+                let depth_boost = if self
+                    .cantor_broadcast_buffer
+                    .last()
+                    .map(|crhv| crhv.depth > 5)
+                    .unwrap_or(false)
+                {
+                    CANTOR_DEPTH_BROCA_SPACING_BOOST
+                } else {
+                    0
+                };
+                let surprise_boost = if self.cantor_dream_surprise > CANTOR_SURPRISE_BROCA_THRESHOLD
+                {
+                    CANTOR_SURPRISE_BROCA_SPACING_BOOST
+                } else {
+                    0
+                };
+                depth_boost + surprise_boost
+            };
             let broca_min_spacing = if self.stats.tom_prediction_mismatch_ema > 0.5 {
-                5 + fatigue_spacing_boost // more frequent when user model is inaccurate
+                5 + fatigue_spacing_boost + governance_spacing_boost + cantor_spacing_boost
             } else {
-                7 + fatigue_spacing_boost // default spacing
+                7 + fatigue_spacing_boost + governance_spacing_boost + cantor_spacing_boost
             };
             let broca_should_generate = broca_psi > 0.4
                 && broca_novelty
                 && self.stats.total_cycles % broca_min_spacing != 0;
             if broca_should_generate {
+                // Community mode → Broca tone modulation:
+                //   Exploratory = speculative (higher arousal, lower warmth)
+                //   Protective = cautious (lower arousal, higher warmth)
+                //   Creative = enthusiastic (higher valence, moderate arousal)
+                //   Reflective = measured (lower arousal, neutral warmth)
+                #[cfg(feature = "mycelix")]
+                let (mode_valence_nudge, mode_arousal_nudge, mode_warmth) = {
+                    match self.governance_mgr.community_mode() {
+                        Some(crate::mycelix::collective_identity::CommunityMode::Exploratory) => {
+                            (0.0, 0.05, 0.4)
+                        }
+                        Some(crate::mycelix::collective_identity::CommunityMode::Protective) => {
+                            (0.0, -0.05, 0.7)
+                        }
+                        Some(crate::mycelix::collective_identity::CommunityMode::Creative) => {
+                            (0.05, 0.03, 0.5)
+                        }
+                        Some(crate::mycelix::collective_identity::CommunityMode::Reflective) => {
+                            (0.0, -0.03, 0.5)
+                        }
+                        None => (0.0, 0.0, 0.5),
+                    }
+                };
+                #[cfg(not(feature = "mycelix"))]
+                let (mode_valence_nudge, mode_arousal_nudge, mode_warmth) =
+                    (0.0f32, 0.0f32, 0.5f32);
+
                 // Generate in a scoped borrow, then apply feedback outside
                 let broca_feedback = if let Some(ref mut broca) = self.broca_manager {
                     let signals = super::broca_bridge::BrocaConsciousnessSignals {
                         epistemic_confidence: self.carryover.quality.last_epistemic_confidence,
-                        emotional_valence: self.emotion_contagion.prosody_valence(),
-                        emotional_arousal: self.emotion_contagion.prosody_arousal(),
-                        emotional_warmth: 0.5,
+                        emotional_valence: self.emotion_contagion.prosody_valence()
+                            + mode_valence_nudge,
+                        emotional_arousal: self.emotion_contagion.prosody_arousal()
+                            + mode_arousal_nudge,
+                        emotional_warmth: mode_warmth,
                         consciousness_level: broca_psi,
                         meta_awareness: self.carryover.learning.self_model_accuracy as f32,
                         coherence,
@@ -2538,6 +2757,7 @@ impl CognitiveLoopService {
                 guiding_question,
                 dominant_harmonic,
             },
+            math: math_result,
             neuromod: DynNeuromod {
                 neuromod_attention_alloc,
                 ne_reorienting_boost,
@@ -2573,10 +2793,29 @@ impl CognitiveLoopService {
     }
 
     /// Apply emotional homeostasis: pull valence toward neutral, arousal toward target.
+    ///
+    /// Incorporates emotional inertia from the previous cycle: rapid valence/arousal
+    /// shifts are dampened by blending in the prior state, creating smoother
+    /// emotional trajectories that resist oscillation.
+    /// Science: Sokolov (1963) — habituation creates resistance to rapid shifts;
+    /// Cannon (1929) — homeostatic regulation must be gradual to avoid overshoot.
+    ///
     /// Returns (valence_pull, arousal_pull, pull_strength).
     fn apply_emotional_homeostasis(&mut self) -> (f32, f32, f32) {
         let curr_v = self.emotion_contagion.valence;
         let curr_a = self.emotion_contagion.prosody_arousal();
+
+        // Emotional inertia: resist rapid swings by blending toward previous state.
+        // This closes the feedback loop — last_emotion_valence/arousal (written at
+        // cycle end) are now read back to create momentum resistance.
+        let prev_v = self.carryover.history.last_emotion_valence;
+        let prev_a = self.carryover.history.last_emotion_arousal;
+        let inertia = HOMEOSTASIS_EMOTIONAL_INERTIA;
+
+        // Blend current emotion toward previous: dampens rapid changes.
+        // When inertia=0.15: 85% current + 15% previous — mild smoothing.
+        let smoothed_v = curr_v * (1.0 - inertia) + prev_v * inertia;
+        let smoothed_a = curr_a * (1.0 - inertia) + prev_a * inertia;
 
         let pull_mult = match self.carryover.urgency.urgency {
             super::CycleUrgency::Cruise => HOMEOSTASIS_PULL_CRUISE,
@@ -2584,15 +2823,16 @@ impl CognitiveLoopService {
             super::CycleUrgency::Critical => HOMEOSTASIS_PULL_CRITICAL,
         };
 
-        let v_pull = -curr_v * 0.05 * pull_mult;
-        let a_pull = (HOMEOSTASIS_AROUSAL_TARGET - curr_a) * 0.05 * pull_mult;
-        self.emotion_contagion.valence = (curr_v + v_pull).clamp(-1.0, 1.0);
+        let v_pull = -smoothed_v * 0.05 * pull_mult;
+        let a_pull = (HOMEOSTASIS_AROUSAL_TARGET - smoothed_a) * 0.05 * pull_mult;
+        self.emotion_contagion.valence = (smoothed_v + v_pull).clamp(-1.0, 1.0);
 
         self.stats.avg_valence_homeostasis =
             self.stats.avg_valence_homeostasis * 0.95 + v_pull.abs() * 0.05;
 
+        // Store for next cycle's inertia computation.
         self.carryover.history.last_emotion_valence = self.emotion_contagion.valence;
-        self.carryover.history.last_emotion_arousal = curr_a;
+        self.carryover.history.last_emotion_arousal = smoothed_a;
 
         (v_pull, a_pull, pull_mult)
     }
@@ -2601,11 +2841,19 @@ impl CognitiveLoopService {
 #[cfg(test)]
 #[allow(clippy::field_reassign_with_default)]
 mod tests {
-    use crate::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
+    use crate::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService, CycleResult};
 
     fn make_service() -> CognitiveLoopService {
         CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap()
     }
+
+    fn run_cycles(svc: &mut CognitiveLoopService, n: usize, input: &str) -> Vec<CycleResult> {
+        (0..n).map(|_| svc.cycle(input)).collect()
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // EXISTING TESTS
+    // ═══════════════════════════════════════════════════════════════════════════
 
     #[test]
     fn dynamics_produces_finite_cfc_output() {
@@ -2662,6 +2910,229 @@ mod tests {
         let result = svc.cycle("no learning");
         if !result.learning_occurred {
             assert_eq!(result.metadata.actual_effective_lr, 0.0);
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // DELTA_T CHAIN STABILITY: Verify tau products stay finite & bounded
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn dynamics_delta_t_finite_across_many_cycles() {
+        // The delta_t chain multiplies 9 factors. After 50 cycles with varied input,
+        // the resulting CfC outputs must remain finite — no NaN/Inf propagation.
+        let mut svc = make_service();
+        let inputs = [
+            "novel surprising stimulus",
+            "familiar repeated pattern",
+            "emotional high-arousal event",
+            "calm consolidation phase",
+            "ambiguous uncertain signal",
+        ];
+        for i in 0..50 {
+            let result = svc.cycle(inputs[i % inputs.len()]);
+            for (j, &v) in result.output.iter().enumerate() {
+                assert!(
+                    v.is_finite(),
+                    "CfC output[{j}] not finite at cycle {i}: {v}"
+                );
+            }
+            assert!(
+                result.prediction_error.is_finite(),
+                "PE not finite at cycle {i}"
+            );
+        }
+    }
+
+    #[test]
+    fn dynamics_cfc_output_bounded_magnitude() {
+        // CfC outputs should not explode to extreme magnitudes. Verify they stay
+        // within a reasonable range across 30 cycles (the exact range depends on
+        // the network, but ±100 is conservative for normalized HDC inputs).
+        let mut svc = make_service();
+        let results = run_cycles(&mut svc, 30, "magnitude check");
+        for (i, r) in results.iter().enumerate() {
+            for (j, &v) in r.output.iter().enumerate() {
+                assert!(
+                    v.abs() < 100.0,
+                    "CfC output[{j}] at cycle {i} has extreme magnitude: {v}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn dynamics_prediction_error_bounded_after_warmup() {
+        // After warmup (15 cycles), prediction error should stabilize. It can be
+        // noisy early but should converge. Verify it stays in [0, 5] range.
+        let mut svc = make_service();
+        let results = run_cycles(&mut svc, 40, "pe stability");
+        for (i, r) in results.iter().enumerate().skip(15) {
+            assert!(
+                r.prediction_error >= 0.0 && r.prediction_error < 5.0,
+                "PE out of expected range at cycle {i}: {}",
+                r.prediction_error
+            );
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // NUMERICAL STABILITY: FEP, EMA, and cascading computations
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn dynamics_fep_fields_stay_finite_over_many_cycles() {
+        // FEP accuracy, complexity, surprise are EMA-updated each cycle.
+        // Verify no NaN accumulation over 50 cycles.
+        let mut svc = make_service();
+        let results = run_cycles(&mut svc, 50, "fep stability");
+        for (i, r) in results.iter().enumerate() {
+            let fep = &r.metadata.fep;
+            assert!(
+                fep.fep_accuracy.is_finite(),
+                "NaN fep_accuracy at cycle {i}"
+            );
+            assert!(
+                fep.fep_complexity.is_finite(),
+                "NaN fep_complexity at cycle {i}"
+            );
+            assert!(
+                fep.fep_surprise.is_finite(),
+                "NaN fep_surprise at cycle {i}"
+            );
+            assert!(
+                fep.fep_td_error.is_finite(),
+                "NaN fep_td_error at cycle {i}"
+            );
+        }
+    }
+
+    #[test]
+    fn dynamics_homeostasis_efficiency_stays_bounded() {
+        // Homeostasis efficiency is EMA-clamped to [0.5, 1.5]. Verify this holds
+        // across many cycles with varied input that drives different valence dynamics.
+        let mut svc = make_service();
+        let inputs = [
+            "positive valence stimulus",
+            "negative valence stimulus",
+            "neutral observation",
+        ];
+        for i in 0..60 {
+            let result = svc.cycle(inputs[i % inputs.len()]);
+            let eff = result.metadata.homeostasis_efficiency;
+            assert!(
+                eff.is_finite() && eff >= 0.5 && eff <= 1.5,
+                "Homeostasis efficiency out of [0.5, 1.5] at cycle {i}: {eff}"
+            );
+        }
+    }
+
+    #[test]
+    fn dynamics_prediction_coherence_finite() {
+        // Prediction coherence is computed every 11 cycles.
+        // Verify the EMA'd value stays finite.
+        let mut svc = make_service();
+        let results = run_cycles(&mut svc, 33, "coherence check");
+        for (i, r) in results.iter().enumerate() {
+            let coh = r.metadata.prediction_coherence;
+            assert!(
+                coh.is_finite(),
+                "prediction_coherence NaN at cycle {i}: {coh}"
+            );
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // MULTI-CYCLE CASCADE: EMA drift and velocity fields
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn dynamics_velocity_fields_finite_after_warmup() {
+        // Coherence velocity, confidence velocity, and quality EMA fields are
+        // computed as cycle-to-cycle deltas. Verify they don't drift to NaN/Inf.
+        let mut svc = make_service();
+        let results = run_cycles(&mut svc, 50, "velocity check");
+        for (i, r) in results.iter().enumerate() {
+            let q = &r.metadata.quality;
+            assert!(
+                q.coherence_velocity.is_finite(),
+                "coherence_velocity NaN at cycle {i}"
+            );
+        }
+    }
+
+    #[test]
+    fn dynamics_consciousness_level_finite_and_bounded() {
+        // consciousness_level is the integrated consciousness score.
+        // Verify it stays in [0, 1] and finite across cycles.
+        let mut svc = make_service();
+        let results = run_cycles(&mut svc, 50, "consciousness bounded");
+        for (i, r) in results.iter().enumerate() {
+            let cl = r.metadata.consciousness_level;
+            assert!(
+                cl.is_finite() && cl >= 0.0 && cl <= 1.0,
+                "consciousness_level out of [0,1] at cycle {i}: {cl}"
+            );
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // LEARNING RATE INTERACTION: Dynamics → feedback LR cascade
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn dynamics_effective_lr_finite_under_varied_input() {
+        // The effective LR is computed from PE, plasticity, and modulation factors.
+        // Verify it stays finite and non-negative across varied inputs.
+        let mut svc = make_service();
+        let inputs = [
+            "completely novel input alpha",
+            "partially familiar pattern beta",
+            "well-known repeated gamma",
+        ];
+        for i in 0..60 {
+            let result = svc.cycle(inputs[i % inputs.len()]);
+            let lr = result.metadata.actual_effective_lr;
+            assert!(
+                lr.is_finite() && lr >= 0.0,
+                "effective_lr not valid at cycle {i}: {lr}"
+            );
+        }
+    }
+
+    #[test]
+    fn dynamics_no_nan_in_key_metadata_across_100_cycles() {
+        // Stress test: run 100 cycles and verify critical metadata fields stay finite.
+        // This exercises long-running EMA accumulation and cross-cycle carryover.
+        let mut svc = make_service();
+        for i in 0..100 {
+            let result = svc.cycle("stress test nan check");
+            let m = &result.metadata;
+            assert!(m.actual_effective_lr.is_finite(), "NaN LR at cycle {i}");
+            assert!(
+                m.consciousness_level.is_finite(),
+                "NaN consciousness at cycle {i}"
+            );
+            assert!(
+                m.prediction_coherence.is_finite(),
+                "NaN pred_coherence at cycle {i}"
+            );
+            assert!(
+                m.holographic_unity.is_finite(),
+                "NaN holographic_unity at cycle {i}"
+            );
+            assert!(
+                m.holographic_binding.is_finite(),
+                "NaN holographic_binding at cycle {i}"
+            );
+            assert!(
+                m.homeostasis_efficiency.is_finite(),
+                "NaN homeostasis at cycle {i}"
+            );
+            assert!(result.prediction_error.is_finite(), "NaN PE at cycle {i}");
+            for (j, &v) in result.output.iter().enumerate() {
+                assert!(v.is_finite(), "NaN output[{j}] at cycle {i}");
+            }
         }
     }
 }

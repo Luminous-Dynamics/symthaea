@@ -45,6 +45,8 @@ fn make_input<'a>(
         moral_drift: 0.0,
         moral_anomaly_score: 0.0,
         hot_depth: 0.5,
+        cantor_metacognitive_depth: 0.5,
+        governance_collective_phi: 0.0,
     }
 }
 
@@ -137,6 +139,8 @@ fn test_equation_v2_feedback_deltas() {
             moral_drift: 0.0,
             moral_anomaly_score: 0.0,
             hot_depth: 0.5,
+            cantor_metacognitive_depth: 0.5,
+            governance_collective_phi: 0.0,
         };
         let output = engine.measure(&input);
 
@@ -206,6 +210,8 @@ fn test_low_consciousness_boosts_exploration() {
             moral_drift: 0.0,
             moral_anomaly_score: 0.0,
             hot_depth: 0.5,
+            cantor_metacognitive_depth: 0.5,
+            governance_collective_phi: 0.0,
         };
         let output = engine.measure(&input);
 
@@ -276,6 +282,8 @@ fn test_high_sht_2a_boosts_consciousness() {
         moral_drift: 0.0,
         moral_anomaly_score: 0.0,
         hot_depth: 0.5,
+        cantor_metacognitive_depth: 0.5,
+        governance_collective_phi: 0.0,
     };
     let out_base = engine.measure(&input_baseline);
 
@@ -317,6 +325,8 @@ fn test_high_gaba_a_dampens_consciousness() {
         moral_drift: 0.0,
         moral_anomaly_score: 0.0,
         hot_depth: 0.5,
+        cantor_metacognitive_depth: 0.5,
+        governance_collective_phi: 0.0,
     };
     let out_base = engine.measure(&input_baseline);
 
@@ -358,6 +368,8 @@ fn test_attractor_depresses_consciousness() {
         moral_drift: 0.0,
         moral_anomaly_score: 0.0,
         hot_depth: 0.5,
+        cantor_metacognitive_depth: 0.5,
+        governance_collective_phi: 0.0,
     };
     let out_no = engine.measure(&input_no_attractor);
 
@@ -400,6 +412,8 @@ fn test_bath_modulation_clamped() {
         moral_drift: 0.0,
         moral_anomaly_score: 0.0,
         hot_depth: 0.5,
+        cantor_metacognitive_depth: 0.5,
+        governance_collective_phi: 0.0,
     };
     let out = engine.measure(&input);
     assert!(
@@ -987,6 +1001,8 @@ fn test_substrate_feasibility_affects_consciousness() {
             moral_drift: 0.0,
             moral_anomaly_score: 0.0,
             hot_depth: 0.5,
+            cantor_metacognitive_depth: 0.5,
+            governance_collective_phi: 0.0,
         };
         out_full = Some(engine1.measure(&input_full));
 
@@ -1071,6 +1087,8 @@ fn test_reduced_substrate_capabilities_lower_consciousness() {
             moral_drift: 0.0,
             moral_anomaly_score: 0.0,
             hot_depth: 0.5,
+            cantor_metacognitive_depth: 0.5,
+            governance_collective_phi: 0.0,
         };
         out_bio = Some(engine_bio.measure(&input_bio));
 

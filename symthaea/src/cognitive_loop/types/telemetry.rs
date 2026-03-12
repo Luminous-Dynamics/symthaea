@@ -806,6 +806,38 @@ pub struct CycleMetadata {
     /// Depth of the most recent CRHV (adaptive: 2–7 based on GWT activation).
     #[serde(default)]
     pub cantor_last_depth: u8,
+    /// EMA of dream consolidation surprise (self-similarity delta).
+    /// Non-zero values indicate the codebook is actively learning from novel fractal structure.
+    #[serde(default)]
+    pub cantor_dream_surprise: f32,
+    /// Resonance boost from coherent CRHV pairs in the broadcast buffer.
+    /// Non-zero when multiple GWT-promoted fractals form a "resonant coalition".
+    #[serde(default)]
+    pub cantor_resonance_boost: f32,
+    /// Depth histogram: entries per CRHV depth stratum (depths 2-7, indices 0-5).
+    /// Reflects diversity of fractal abstraction levels in the codebook.
+    #[serde(default)]
+    pub cantor_depth_histogram: [u32; 6],
+
+    // ── Motor Output Bridge Telemetry ───────────────────────────────────
+    /// Whether the motor output bridge executed an action this cycle.
+    #[serde(default)]
+    pub motor_action_executed: bool,
+    /// Whether the motor action succeeded (false if skipped or failed).
+    #[serde(default)]
+    pub motor_action_success: bool,
+    /// Action type index that was executed (0–7, 255 = none).
+    #[serde(default = "default_motor_action_type")]
+    pub motor_action_type: u8,
+    /// Phi value used for motor gating this cycle (0.0 when bridge inactive).
+    #[serde(default)]
+    pub motor_phi_used: f64,
+    /// Motor prediction error (0.0 = matched expectation, 1.0 = total surprise).
+    #[serde(default)]
+    pub motor_prediction_error: f64,
+    /// Whether the motor bridge is installed and available.
+    #[serde(default)]
+    pub motor_bridge_active: bool,
 
     // ── Social Coherence Telemetry ──────────────────────────────────────
     /// Current social trust level (0.0–1.0) from Mind module's SocialCoherence.
@@ -866,6 +898,12 @@ pub struct CycleMetadata {
     /// Broca SSM language generation telemetry (None when ssm_language feature disabled or not active).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub broca: Option<BrocaGenerationTelemetry>,
+
+    // ── Canvas Living Topology Telemetry ─────────────────────────────────
+    /// Canvas SVG generation telemetry (None when canvas feature disabled or not active).
+    #[cfg(feature = "canvas")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub canvas: Option<super::canvas_bridge::CanvasTelemetry>,
 
     // ── Adaptive Dynamics Telemetry (Sessions 2-4) ───────────────────────
     /// Epistemic uncertainty: prediction disagreement across horizons (0.0–1.0).
@@ -1186,6 +1224,200 @@ pub struct CycleMetadata {
     /// Whether error oscillation bifurcation response fired.
     #[serde(default)]
     pub error_bifurcation_response: bool,
+
+    // ── Session 17: Adaptive Homeostasis & Emergent Dynamics ─────────────
+    /// Whether allostatic overload reduced cognitive budget.
+    #[serde(default)]
+    pub allostatic_overload_active: bool,
+    /// Current allostatic load (0.0–1.0).
+    #[serde(default)]
+    pub allostatic_load: f32,
+    /// Whether exploration decay was applied.
+    #[serde(default)]
+    pub exploration_decay_applied: bool,
+    /// Whether consciousness acceleration triggered dampening.
+    #[serde(default)]
+    pub consciousness_accel_active: bool,
+    /// Whether adaptive warmup exited early due to stability.
+    #[serde(default)]
+    pub adaptive_warmup_early_exit: bool,
+    /// Whether proposal saturation triggered wait-and-see.
+    #[serde(default)]
+    pub proposal_saturation_active: bool,
+    /// Whether Phi-gated LR floor dampened learning rate.
+    #[serde(default)]
+    pub phi_gated_lr_floor_active: bool,
+    /// Whether rhythmic exploration oscillation was active.
+    #[serde(default)]
+    pub rhythmic_exploration_active: bool,
+
+    // ── Session 18: Predictive Coding & Metacognitive Refinement ───────────
+    /// Whether PE variance dampened learning rate.
+    #[serde(default)]
+    pub pe_variance_damping_active: bool,
+    /// Current confidence calibration drift magnitude.
+    #[serde(default)]
+    pub confidence_calibration_drift: f32,
+    /// Whether LR momentum smoothing clipped a delta.
+    #[serde(default)]
+    pub lr_momentum_active: bool,
+    /// Whether metacognitive surprise boosted exploration.
+    #[serde(default)]
+    pub metacognitive_surprise_active: bool,
+    /// Current sleep pressure (0.0–1.0).
+    #[serde(default)]
+    pub sleep_pressure: f32,
+    /// Whether gradient sign flip dampening fired.
+    #[serde(default)]
+    pub gradient_sign_flip_active: bool,
+    /// Exploration-exploitation balance ratio (0.0–1.0, 0.5 = balanced).
+    #[serde(default)]
+    pub explore_exploit_balance: f32,
+    /// Whether proposal conflict cancellation occurred.
+    #[serde(default)]
+    pub proposal_conflict_detected: bool,
+
+    // ── Session 19: Embodied Cognition & Environmental Coupling ────────────
+    /// Whether arousal-gated LR modulation fired.
+    #[serde(default)]
+    pub arousal_lr_modulated: bool,
+    /// Whether novelty habituation dampened exploration.
+    #[serde(default)]
+    pub novelty_habituation_active: bool,
+    /// Current fatigue level (0.0–1.0).
+    #[serde(default)]
+    pub fatigue_level: f32,
+    /// Whether recovery was detected (fatigue clearing).
+    #[serde(default)]
+    pub recovery_detected: bool,
+    /// Environmental predictability (0.0–1.0).
+    #[serde(default)]
+    pub env_predictability: f32,
+    /// Whether attention budget was exceeded.
+    #[serde(default)]
+    pub attention_budget_exceeded: bool,
+    /// Readiness score (0.0–1.0, composite of PE/sleep/fatigue).
+    #[serde(default)]
+    pub readiness_score: f32,
+    /// Whether flow/resonance state is active.
+    #[serde(default)]
+    pub flow_state_active: bool,
+
+    // ── Session 20: Measurement & Consolidation ───────────────────────────
+    /// Unified readiness score (0.3–1.0), the sole resource-depletion LR gate.
+    #[serde(default)]
+    pub unified_readiness_score: f32,
+    /// Number of distinct mechanism activations this cycle.
+    #[serde(default)]
+    pub mechanism_activation_count: u32,
+    /// Whether compound dampening would have crushed LR below 0.3 (pre-consolidation).
+    #[serde(default)]
+    pub compound_dampening_prevented: bool,
+
+    // ── Session 21: Housekeeping & Measurement ──────────────────────────────
+    /// Number of distinct LR proposal sources this cycle (contribution breadth).
+    #[serde(default)]
+    pub lr_proposal_source_count: u32,
+    /// Dominant LR proposal source name (highest magnitude contribution).
+    #[serde(default)]
+    pub lr_dominant_source: String,
+    /// Whether sleep pressure passive recovery is active (readiness > 0.9).
+    #[serde(default)]
+    pub sleep_pressure_recovering: bool,
+
+    // ── Governance telemetry (feature: mycelix) ─────────────────────────────
+    /// Governance reward EMA — running average of governance outcome rewards.
+    /// Positive = aligned outcomes, negative = misaligned. 0.0 when no outcomes.
+    #[serde(default)]
+    pub governance_reward_ema: f64,
+    /// Number of governance events pending in the GovernanceManager queue.
+    #[serde(default)]
+    pub governance_pending_events: usize,
+    /// Number of governance outcomes pending processing.
+    #[serde(default)]
+    pub governance_pending_outcomes: usize,
+    /// Cumulative governance confidence delta this cycle (from SubsystemOutput).
+    #[serde(default)]
+    pub governance_confidence_delta: f64,
+    /// Last collective Phi observed from a governance tally (0.0 if none).
+    #[serde(default)]
+    pub governance_collective_phi: f64,
+    /// Number of collective blind spots detected by the epistemic mesh.
+    #[serde(default)]
+    pub governance_blind_spot_count: usize,
+    /// Maximum blind spot severity (0.0–1.0). Higher = more agents uncertain.
+    #[serde(default)]
+    pub governance_max_blind_spot_severity: f64,
+    /// Community mode label (e.g. "Exploratory", "Protective", "Creative", "Reflective").
+    #[serde(default)]
+    pub governance_community_mode: String,
+    /// Maximum absolute harmonic delta this cycle (governance influence on harmonies).
+    #[serde(default)]
+    pub governance_harmonic_delta_max: f64,
+    /// Number of agents in the epistemic mesh (0 = no mesh data).
+    #[serde(default)]
+    pub governance_epistemic_agents: usize,
+    /// LR boost from governance prediction error (1.0 = no boost, >1.0 = high PE boosted learning).
+    #[serde(default)]
+    pub governance_lr_boost: f64,
+
+    // ── Knowledge Engine Telemetry ──────────────────────────────────────
+    /// Number of facts in the knowledge graph (0 if engine disabled).
+    #[serde(default)]
+    pub knowledge_graph_size: u32,
+    /// Average confidence across stored knowledge facts.
+    #[serde(default)]
+    pub knowledge_avg_confidence: f32,
+    /// Number of causal edges discovered.
+    #[serde(default)]
+    pub knowledge_causal_edges: u32,
+    /// Knowledge uncertainty signal (0.0 = fully known, 1.0 = unknown territory).
+    #[serde(default)]
+    pub knowledge_uncertainty: f64,
+    /// Knowledge novelty signal (0.0 = familiar, 1.0 = completely novel).
+    #[serde(default)]
+    pub knowledge_novelty: f64,
+    /// Number of contradictions detected this cycle.
+    #[serde(default)]
+    pub knowledge_contradictions: u32,
+    /// Number of learned primitives in the adaptive ontology.
+    #[serde(default)]
+    pub knowledge_ontology_size: u32,
+
+    // ── Math Service Telemetry ──────────────────────────────────────────
+    /// Whether math intent was detected in this cycle's input.
+    #[serde(default)]
+    pub math_detected: bool,
+    /// Classified math problem type (empty if no math detected).
+    #[serde(default)]
+    pub math_problem_type: String,
+    /// Phi from the math computation (0.0 if no math).
+    #[serde(default)]
+    pub math_phi: f64,
+    /// Epistemic confidence in the math result (0.0 if no math).
+    #[serde(default)]
+    pub math_confidence: f64,
+    /// Total math problems solved since startup.
+    #[serde(default)]
+    pub math_problems_solved: usize,
+    /// Average Phi across all math solutions.
+    #[serde(default)]
+    pub math_avg_phi: f64,
+    /// Whether the math solver was dispatched this cycle.
+    #[serde(default)]
+    pub math_solved: bool,
+    /// Whether multi-path verification succeeded for this cycle's math problem.
+    #[serde(default)]
+    pub math_multipath_verified: bool,
+    /// Human-readable answer from the math solver (empty if not solved).
+    #[serde(default)]
+    pub math_answer: String,
+    /// Epistemic caveat from the math solver (e.g., "small sample", "did not converge").
+    #[serde(default)]
+    pub math_epistemic_caveat: String,
+    /// Error bound on the numerical result (0.0 if N/A).
+    #[serde(default)]
+    pub math_error_bound: f64,
 }
 
 fn default_response_profile() -> String {
@@ -1198,6 +1430,10 @@ fn default_one_f32() -> f32 {
 
 fn default_half_f32() -> f32 {
     0.5
+}
+
+fn default_motor_action_type() -> u8 {
+    255
 }
 
 /// Vision manifold telemetry snapshot for CycleMetadata.
@@ -1829,6 +2065,8 @@ pub struct ModuleTimings {
     pub ethics_engine_value: u64,
     /// Ethics engine sub-component: Harmonies integrator
     pub ethics_engine_harmonies: u64,
+    /// Math service: intent classification + solver dispatch
+    pub math_service: u64,
     // ── Mid-cycle sections (Session 10 instrumentation) ──
     /// World model: sensory update + stiffness/level-error feedback
     pub world_model: u64,

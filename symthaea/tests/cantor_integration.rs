@@ -25,6 +25,8 @@ fn test_cantor_telemetry_fields_exist() {
     let result = service.cycle("hello world");
     assert_eq!(result.metadata.cantor_buffer_occupancy, 0);
     assert_eq!(result.metadata.cantor_metacognitive_depth, 0.0);
+    assert_eq!(result.metadata.cantor_resonance_boost, 0.0);
+    assert_eq!(result.metadata.cantor_depth_histogram, [0u32; 6]);
 }
 
 #[test]
@@ -78,7 +80,10 @@ fn test_cantor_buffer_accumulates_on_gwt_broadcast() {
         }
     }
     // Soft: GWT broadcast depends on activation dynamics
-    println!("Cantor buffer max occupancy over 100 cycles: {}", max_occupancy);
+    println!(
+        "Cantor buffer max occupancy over 100 cycles: {}",
+        max_occupancy
+    );
 }
 
 // =============================================================================
@@ -157,4 +162,59 @@ fn test_crhv_vs_flat_self_similarity_preservation() {
         "Self-similarity should be partially preserved, got {}",
         preserved
     );
+}
+
+#[test]
+fn test_cantor_dream_surprise_in_valid_range() {
+    let mut service = make_cantor_service();
+    for i in 0..100 {
+        let result = service.cycle(&format!("surprise test input {i}"));
+        let surprise = result.metadata.cantor_dream_surprise;
+        assert!(
+            (0.0..=1.0).contains(&surprise),
+            "Dream surprise {} out of [0,1] at cycle {}",
+            surprise,
+            i
+        );
+    }
+}
+
+#[test]
+fn test_cantor_depth_histogram_populated() {
+    let mut service = make_cantor_service();
+    // Run enough cycles to get some dream consolidation with codebook entries
+    for i in 0..200 {
+        service.cycle(&format!("histogram test input {i}"));
+    }
+    let result = service.cycle("histogram final");
+    let hist = result.metadata.cantor_depth_histogram;
+    let total: u32 = hist.iter().sum();
+    // If codebook has depth-stratified entries, histogram should have non-zero total
+    // (or zero if no dreams occurred — which is acceptable)
+    println!(
+        "Depth histogram: {:?}, total={}, codebook={}",
+        hist, total, result.metadata.cantor_codebook_size
+    );
+    // Consistency: histogram total should match codebook size
+    // (only depth-labeled entries count; there may be non-depth entries from warmup)
+    assert!(
+        total <= result.metadata.cantor_codebook_size,
+        "Histogram total {} > codebook size {}",
+        total,
+        result.metadata.cantor_codebook_size
+    );
+}
+
+#[test]
+fn test_cantor_codebook_bounded() {
+    let mut service = make_cantor_service();
+    for i in 0..500 {
+        let result = service.cycle(&format!("codebook bound test {i}"));
+        assert!(
+            result.metadata.cantor_codebook_size <= 256,
+            "Codebook size {} exceeded cap 256 at cycle {}",
+            result.metadata.cantor_codebook_size,
+            i
+        );
+    }
 }

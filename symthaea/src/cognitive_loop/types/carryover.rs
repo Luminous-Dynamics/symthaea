@@ -245,6 +245,50 @@ pub(crate) struct QualityMetrics {
     /// Last KosmicSong coherence score (0.0-1.0, cached from last synthesis).
     /// Synthesis of Phi × HarmonicAlignment × MoralClarity.
     pub(crate) last_kosmic_coherence: f32,
+    // ── Session 17: Adaptive Homeostasis ──────────────────────────────────
+    /// Allostatic load (0.0–1.0): cumulative stress burden.
+    pub(crate) allostatic_load: f32,
+    /// Previous consciousness gradient magnitude (for 2nd derivative).
+    pub(crate) prev_gradient_magnitude: f64,
+    /// Whether adaptive warmup has exited (stability-based).
+    pub(crate) adaptive_warmup_exited: bool,
+    // ── Session 18: Predictive Coding & Metacognitive Refinement ────────
+    /// EMA of prediction error squared (variance tracking).
+    pub(crate) pe_variance_ema: f32,
+    /// Confidence calibration: running sum of (predicted - actual) over window.
+    pub(crate) confidence_calibration_bias: f32,
+    /// Confidence calibration: count of samples in current window.
+    pub(crate) confidence_calibration_count: u32,
+    /// LR momentum: EMA of recent effective LR.
+    pub(crate) lr_momentum_ema: f32,
+    /// Previous metacognitive prediction (expected consciousness level).
+    pub(crate) prev_metacognitive_prediction: f64,
+    /// Sleep pressure (0.0–1.0): accumulated synaptic load.
+    pub(crate) sleep_pressure: f32,
+    /// Whether currently in consolidation mode.
+    pub(crate) in_consolidation: bool,
+    /// Ring buffer of recent consciousness gradient signs (true = positive).
+    pub(crate) gradient_sign_history: std::collections::VecDeque<bool>,
+    /// Ring buffer of recent explore vs exploit decisions (true = explore-biased).
+    pub(crate) explore_exploit_history: std::collections::VecDeque<bool>,
+    // ── Session 19: Embodied Cognition & Environmental Coupling ─────────
+    /// Last computed readiness score (0.3–1.0), for telemetry.
+    pub(crate) last_readiness_score: f32,
+    /// Novelty EMA (0.0–1.0): how novel recent inputs are.
+    pub(crate) novelty_ema: f32,
+    /// Fatigue (0.0–1.0): cognitive resource depletion.
+    pub(crate) fatigue: f32,
+    /// Consecutive low-effort stable cycles (for recovery detection).
+    pub(crate) consecutive_recovery_cycles: u32,
+    /// Ring buffer of recent prediction successes (true = accurate).
+    pub(crate) prediction_success_history: std::collections::VecDeque<bool>,
+    /// Consecutive cycles with high cross-module agreement (for flow detection).
+    pub(crate) consecutive_high_agreement: u32,
+    /// Whether currently in flow/resonance state.
+    pub(crate) in_flow_state: bool,
+    // ── Session 20: Measurement & Consolidation ─────────────────────────
+    /// Cumulative activation counts for each named mechanism (lifetime, not per-cycle).
+    pub(crate) mechanism_activations: std::collections::HashMap<&'static str, u32>,
 }
 
 impl Default for QualityMetrics {
@@ -287,6 +331,26 @@ impl Default for QualityMetrics {
             consecutive_epistemic_rejections: 0,
             consecutive_stable_gradient: 0,
             last_kosmic_coherence: 0.5,
+            allostatic_load: 0.0,
+            prev_gradient_magnitude: 0.0,
+            adaptive_warmup_exited: false,
+            pe_variance_ema: 0.0,
+            confidence_calibration_bias: 0.0,
+            confidence_calibration_count: 0,
+            lr_momentum_ema: 1.0,
+            prev_metacognitive_prediction: 0.0,
+            sleep_pressure: 0.0,
+            in_consolidation: false,
+            gradient_sign_history: std::collections::VecDeque::new(),
+            explore_exploit_history: std::collections::VecDeque::new(),
+            last_readiness_score: 1.0,
+            novelty_ema: 0.5,
+            fatigue: 0.0,
+            consecutive_recovery_cycles: 0,
+            prediction_success_history: std::collections::VecDeque::new(),
+            consecutive_high_agreement: 0,
+            in_flow_state: false,
+            mechanism_activations: std::collections::HashMap::new(),
         }
     }
 }

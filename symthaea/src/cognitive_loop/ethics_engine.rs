@@ -1,6 +1,6 @@
 //! # Unified Ethics Engine
 //!
-//! Wraps the 3 independent ethics systems into a single coherent engine
+//! Wraps the independent ethics systems into a single coherent engine
 //! with clear data flow and unified output.
 //!
 //! ## Systems (Pipeline Architecture)
@@ -10,10 +10,26 @@
 //! | 1 | MoralParser + MoralAlgebra | 7 cycles | HDC moral algebra (Luo & Lakoff 2019) |
 //! | 2 | UnifiedValueEvaluator | 19 cycles | Value alignment (Panksepp 1998) |
 //! | 3 | HarmoniesIntegrator | 19 cycles | Eight Harmonies (Schwartz 2012) |
+//! | 4 | MoralTopology | adaptive | Persistent homology (Carlsson 2009) |
+//! | 5 | InstitutionalComplianceCheck | 23 cycles | HDC institutional primitives |
+//!
+//! ## Stage 5: Institutional Compliance Check
+//!
+//! Encodes regulatory/jurisdictional constraints as HDC vectors and computes
+//! similarity against action embeddings. When an action crosses a jurisdictional
+//! boundary or triggers a regulatory keyword, the compliance check produces
+//! `compliance_flags` (e.g., "requires_gdpr", "sanctions_risk") and a
+//! `compliance_risk` score that can escalate the unified verdict to Caution.
+//!
+//! Nation-states are **not** hardcoded entities — they are composite HDC
+//! vectors derived from the PrimitiveSystem's institutional domain (SOVEREIGNTY
+//! ⊗ INSTITUTION ⊗ ENFORCEMENT ⊗ POPULATION). The compliance check works by
+//! projecting action text onto these institutional vectors and measuring
+//! similarity to known constraint patterns.
 //!
 //! ## Design Principles
 //!
-//! 1. **Pipeline**: moral parse → value gate → harmonies check → unified verdict
+//! 1. **Pipeline**: moral parse → value gate → harmonies check → topology → compliance → unified verdict
 //! 2. **No direct field mutation**: Returns `EthicsEngineOutput` with proposed deltas
 //! 3. **Preserves co-prime intervals**: Each subsystem fires at its original rate
 //! 4. **Backward compatible**: All existing carryover fields populated
@@ -21,6 +37,8 @@
 use std::sync::Arc;
 use std::time::Instant;
 
+use symthaea_core::hdc::binary_hv::BinaryHV;
+use symthaea_core::hdc::primitive_system::PrimitiveSystem;
 use symthaea_core::hdc::ContinuousHV;
 
 use crate::consciousness::harmonies_integration::{HarmoniesIntegrator, ValuedAction};
@@ -35,6 +53,222 @@ use crate::hdc::moral_topology::{
     MoralTopologySummary,
 };
 use symthaea_types::N_HARMONIES;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// STAGE 5: Institutional Compliance Checker
+//
+// Uses HDC institutional primitives from PrimitiveSystem to detect when actions
+// cross jurisdictional boundaries or trigger regulatory constraints. Nation-states
+// are composite hypervectors, NOT hardcoded entities.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Specification for loading an external regulatory constraint.
+///
+/// Used by `InstitutionalComplianceChecker::load_external_constraints()` to
+/// add jurisdiction-specific constraints at runtime (e.g., from Mycelix DHT).
+#[derive(Debug, Clone)]
+pub(crate) struct ExternalConstraintSpec {
+    /// Human-readable flag name (e.g., "gdpr_data_residency")
+    pub flag: String,
+    /// Names of primitives/compositions to XOR-bind into the constraint encoding.
+    /// E.g., ["JURISDICTION", "COMPLIANCE"] → JURISDICTION ⊗ COMPLIANCE
+    pub primitive_names: Vec<String>,
+    /// Similarity threshold override (defaults to 0.53 if None)
+    pub threshold: Option<f32>,
+}
+
+/// A regulatory constraint encoded as an HDC pattern.
+///
+/// Each constraint binds a jurisdiction primitive (e.g., SOVEREIGNTY ⊗ BOUNDARY)
+/// with domain-specific keywords to create a detector vector. When an action's
+/// HDC encoding is similar to a constraint vector, the flag is raised.
+#[derive(Debug, Clone)]
+struct RegulatoryConstraint {
+    /// Human-readable flag name (e.g., "data_sovereignty", "sanctions_risk")
+    flag: String,
+    /// HDC encoding of this constraint pattern
+    encoding: BinaryHV,
+    /// Similarity threshold above which this constraint is triggered.
+    /// Higher = more specific match required.
+    threshold: f32,
+}
+
+/// Institutional compliance checker using HDC primitive composition.
+///
+/// Encodes regulatory/jurisdictional constraints as composite BinaryHV vectors
+/// derived from the PrimitiveSystem's institutional domain primitives. Actions
+/// are checked against these constraints via cosine similarity.
+#[derive(Debug)]
+struct InstitutionalComplianceChecker {
+    /// Known regulatory constraints to check against
+    constraints: Vec<RegulatoryConstraint>,
+}
+
+impl InstitutionalComplianceChecker {
+    /// Build the compliance checker from the global PrimitiveSystem.
+    ///
+    /// Creates constraint detectors by composing institutional primitives:
+    /// - Data sovereignty: JURISDICTION ⊗ COMPLIANCE (GDPR, data residency)
+    /// - Sanctions risk: SANCTION ⊗ ENFORCEMENT (trade/financial sanctions)
+    /// - Export control: MONOPOLY ⊗ ENFORCEMENT (controlled goods)
+    /// - Tax obligation: TAXATION (compulsory value transfer)
+    /// - Treaty obligation: TREATY ⊗ COMPLIANCE (international agreements)
+    fn new() -> Self {
+        let system = PrimitiveSystem::global();
+
+        let mut constraints = Vec::new();
+
+        // Data sovereignty: actions involving data + jurisdiction
+        if let (Some(jurisdiction), Some(compliance)) =
+            (system.get("JURISDICTION"), system.get("COMPLIANCE"))
+        {
+            constraints.push(RegulatoryConstraint {
+                flag: "data_sovereignty".to_string(),
+                encoding: jurisdiction.encoding.bind(&compliance.encoding),
+                threshold: 0.53,
+            });
+        }
+
+        // Sanctions risk: punitive constraints from authorities
+        if let (Some(sanction), Some(enforcement)) =
+            (system.get("SANCTION"), system.get("ENFORCEMENT"))
+        {
+            constraints.push(RegulatoryConstraint {
+                flag: "sanctions_risk".to_string(),
+                encoding: sanction.encoding.bind(&enforcement.encoding),
+                threshold: 0.53,
+            });
+        }
+
+        // Export control: monopoly on controlled goods + enforcement
+        if let (Some(monopoly), Some(enforcement)) =
+            (system.get("MONOPOLY"), system.get("ENFORCEMENT"))
+        {
+            constraints.push(RegulatoryConstraint {
+                flag: "export_control".to_string(),
+                encoding: monopoly.encoding.bind(&enforcement.encoding),
+                threshold: 0.53,
+            });
+        }
+
+        // Tax obligation: compulsory value transfer
+        if let Some(taxation) = system.get("TAXATION") {
+            constraints.push(RegulatoryConstraint {
+                flag: "tax_obligation".to_string(),
+                encoding: taxation.encoding,
+                threshold: 0.53,
+            });
+        }
+
+        // Treaty obligation: international agreements requiring compliance
+        if let (Some(treaty), Some(compliance)) = (system.get("TREATY"), system.get("COMPLIANCE")) {
+            constraints.push(RegulatoryConstraint {
+                flag: "treaty_obligation".to_string(),
+                encoding: treaty.encoding.bind(&compliance.encoding),
+                threshold: 0.53,
+            });
+        }
+
+        Self { constraints }
+    }
+
+    /// Check an action (as HDC-encoded BinaryHV) against all known constraints.
+    ///
+    /// Returns (risk_score, triggered_flags).
+    /// Risk score is the maximum similarity across all constraints, clamped to [0, 1].
+    fn check(&self, action_hv: &BinaryHV) -> (f32, Vec<String>) {
+        let mut max_risk: f32 = 0.0;
+        let mut flags = Vec::new();
+
+        for constraint in &self.constraints {
+            let sim = action_hv.similarity(&constraint.encoding);
+            // Similarity is fraction of matching bits [0, 1].
+            // 0.5 = orthogonal (random), >0.53 = meaningful overlap.
+            if sim > constraint.threshold {
+                let risk = ((sim - 0.5) * 4.0).clamp(0.0, 1.0);
+                if risk > max_risk {
+                    max_risk = risk;
+                }
+                flags.push(constraint.flag.clone());
+            }
+        }
+
+        (max_risk, flags)
+    }
+
+    /// Load external regulatory constraints (e.g., from Mycelix JurisdictionConstraintEntry).
+    ///
+    /// Each constraint is defined by a flag name and a list of primitive/composition names
+    /// that are XOR-bound together to create the constraint encoding.
+    /// Returns the number of constraints successfully loaded (skips any with missing primitives).
+    fn load_external_constraints(&mut self, constraints: &[ExternalConstraintSpec]) -> usize {
+        let system = PrimitiveSystem::global();
+        let mut loaded = 0;
+
+        for spec in constraints {
+            // Build encoding by XOR-binding all named primitives
+            let mut encoding: Option<BinaryHV> = None;
+            let mut all_found = true;
+
+            for prim_name in &spec.primitive_names {
+                if let Some(prim) = system.get(prim_name) {
+                    encoding = Some(match encoding {
+                        Some(existing) => existing.bind(&prim.encoding),
+                        None => prim.encoding,
+                    });
+                } else {
+                    all_found = false;
+                    break;
+                }
+            }
+
+            if all_found {
+                if let Some(enc) = encoding {
+                    self.constraints.push(RegulatoryConstraint {
+                        flag: spec.flag.clone(),
+                        encoding: enc,
+                        threshold: spec.threshold.unwrap_or(0.53),
+                    });
+                    loaded += 1;
+                }
+            }
+        }
+
+        loaded
+    }
+
+    /// Clear all loaded constraints and reload from defaults.
+    fn reload_defaults(&mut self) {
+        *self = Self::new();
+    }
+
+    /// Encode action text as BinaryHV using simple n-gram hashing.
+    ///
+    /// This is a lightweight encoder for institutional compliance checking.
+    /// The moral algebra's full text encoder is used for Stage 1; this
+    /// provides a fast BinaryHV for constraint similarity checks.
+    fn encode_text(&self, text: &str) -> BinaryHV {
+        let lower = text.to_lowercase();
+        let words: Vec<&str> = lower.split_whitespace().collect();
+
+        if words.is_empty() {
+            return BinaryHV::zero();
+        }
+
+        let word_hvs: Vec<BinaryHV> = words
+            .iter()
+            .enumerate()
+            .map(|(i, word)| {
+                let word_hv =
+                    BinaryHV::random(symthaea_core::hdc::primitive_system::seed_from_name(word));
+                // Position-encode: permute by position to capture word order
+                word_hv.permute(i)
+            })
+            .collect();
+
+        BinaryHV::bundle(&word_hvs)
+    }
+}
 
 /// Unified output from the ethics engine.
 #[derive(Debug, Clone)]
@@ -107,10 +341,19 @@ pub(crate) struct EthicsEngineOutput {
     /// High = system is simultaneously rigorous, playful, and co-creative.
     pub love_coherence: f64,
 
+    // ── Stage 5: Institutional Compliance ──────────────────────────────
+    /// Compliance risk score [0.0, 1.0]. 0 = no institutional constraints detected.
+    pub compliance_risk: f32,
+    /// Regulatory/jurisdictional flags triggered (e.g., "data_sovereignty", "sanctions_risk")
+    pub compliance_flags: Vec<String>,
+    /// Whether institutional compliance check was freshly computed this cycle.
+    pub compliance_fresh: bool,
+
     // ── Timing ─────────────────────────────────────────────────────────
     pub moral_us: u64,
     pub value_us: u64,
     pub harmonies_us: u64,
+    pub compliance_us: u64,
     pub total_us: u64,
 }
 
@@ -145,6 +388,10 @@ pub(crate) struct EthicsEngineInput<'a> {
     /// When present, used instead of N-gram TextHdcEncoder for moral topology scenarios,
     /// giving genuine semantic resolution to trajectory convergence detection.
     pub semantic_embedding: Option<&'a [f32]>,
+    /// Pre-computed BinaryHV encoding of the input (from TextEncoder → real_hv_to_hv16).
+    /// When present, Stage 5 compliance checker uses this instead of its own n-gram encoder,
+    /// giving genuine semantic grounding to institutional constraint matching.
+    pub action_hv: Option<&'a BinaryHV>,
 }
 
 /// Result of Stage 1 moral evaluation only.
@@ -175,8 +422,11 @@ pub(crate) struct EthicsEngine {
     // ── Stage 4: Moral topology (persistent homology) ──────────────────
     moral_topology: MoralTopology,
 
-    // ── Stage 5: Harmony interaction matrix (synergies/tensions) ──────
+    // ── Stage 3b: Harmony interaction matrix (synergies/tensions) ──────
     interaction_matrix: HarmonyInteractionMatrix,
+
+    // ── Stage 5: Institutional compliance checker ──────────────────────
+    compliance_checker: InstitutionalComplianceChecker,
 
     // ── Cached values ──────────────────────────────────────────────────
     cache: EthicsEngineCache,
@@ -211,6 +461,10 @@ struct EthicsEngineCache {
     /// Count of consecutive cycles where Infinite Play (idx 3) has high
     /// Hebbian synergy, suggesting base weight 0.09 may be too low.
     play_hebbian_upweight_count: u64,
+    /// Cached compliance risk from last Stage 5 evaluation.
+    last_compliance_risk: f32,
+    /// Cached compliance flags from last Stage 5 evaluation.
+    last_compliance_flags: Vec<String>,
 }
 
 impl Default for EthicsEngineCache {
@@ -230,6 +484,8 @@ impl Default for EthicsEngineCache {
             last_topology_fresh: false,
             last_love_coherence: 0.0,
             play_hebbian_upweight_count: 0,
+            last_compliance_risk: 0.0,
+            last_compliance_flags: Vec::new(),
         }
     }
 }
@@ -290,8 +546,7 @@ impl EthicsEngine {
         dense_basis: Option<Arc<HarmonyBasis>>,
     ) -> Self {
         let dim = moral_algebra.dim();
-        let shared_basis =
-            dense_basis.unwrap_or_else(|| Arc::new(HarmonyBasis::new(dim)));
+        let shared_basis = dense_basis.unwrap_or_else(|| Arc::new(HarmonyBasis::new(dim)));
 
         let moral_topology = MoralTopology::with_anomaly_config(
             MoralTopologyConfig {
@@ -313,6 +568,7 @@ impl EthicsEngine {
         });
 
         let interaction_matrix = HarmonyInteractionMatrix::from_basis(&shared_basis);
+        let compliance_checker = InstitutionalComplianceChecker::new();
 
         let initial_cadence = anomaly_config.initial_cadence;
         Self {
@@ -322,6 +578,7 @@ impl EthicsEngine {
             harmonies_integrator,
             moral_topology,
             interaction_matrix,
+            compliance_checker,
             cache: EthicsEngineCache {
                 last_harmonies_approved: true,
                 topology_cadence: initial_cadence,
@@ -675,6 +932,46 @@ impl EthicsEngine {
             unified_verdict
         };
 
+        // ═══════════════════════════════════════════════════════════════════
+        // STAGE 5: Institutional Compliance Check — HDC jurisdiction matching
+        // Every 23 cycles (co-prime with 7, 19, 97)
+        //
+        // Encodes action text as BinaryHV and checks similarity against
+        // institutional constraint vectors (JURISDICTION ⊗ COMPLIANCE, etc.)
+        // ═══════════════════════════════════════════════════════════════════
+        let t = Instant::now();
+        let (compliance_risk, compliance_flags, compliance_fresh) =
+            if input.cycle % 23 == 0 && input.cycle > 0 {
+                // Prefer the pre-computed BinaryHV from the cognitive loop's HDC encoder
+                // (genuine semantic encoding) over lightweight n-gram hashing.
+                let fallback;
+                let action_hv = match input.action_hv {
+                    Some(hv) => hv,
+                    None => {
+                        fallback = self.compliance_checker.encode_text(input.input);
+                        &fallback
+                    }
+                };
+                let (risk, flags) = self.compliance_checker.check(action_hv);
+                self.cache.last_compliance_risk = risk;
+                self.cache.last_compliance_flags = flags.clone();
+                (risk, flags, true)
+            } else {
+                (
+                    self.cache.last_compliance_risk,
+                    self.cache.last_compliance_flags.clone(),
+                    false,
+                )
+            };
+        let compliance_us = t.elapsed().as_micros() as u64;
+
+        // Compliance escalation: high institutional risk → Caution
+        let unified_verdict = if compliance_risk > 0.7 && unified_verdict == EthicalVerdict::Safe {
+            EthicalVerdict::Caution
+        } else {
+            unified_verdict
+        };
+
         let total_us = total_start.elapsed().as_micros() as u64;
 
         // Clamp lr_factor
@@ -701,11 +998,15 @@ impl EthicsEngine {
             harmony_coordinates,
             moral_free_energy,
             love_coherence: love_coherence.value,
+            compliance_risk,
+            compliance_flags,
+            compliance_fresh,
             topology_us,
             topology_fresh,
             moral_us,
             value_us,
             harmonies_us,
+            compliance_us,
             total_us,
         }
     }
@@ -880,6 +1181,38 @@ impl EthicsEngine {
         self.interaction_matrix.observation_count = non_default as u64;
     }
 
+    /// Nudge a specific harmony coordinate in the cached state.
+    ///
+    /// Used by cross-system couplings (e.g. Cantor fractal → Sacred Stillness)
+    /// that operate after `evaluate()` returns. The nudge is clamped to [-1, 1].
+    pub fn nudge_harmony_coordinate(&mut self, index: usize, delta: f64) {
+        if index < N_HARMONIES {
+            self.cache.last_harmony_coordinates[index] =
+                (self.cache.last_harmony_coordinates[index] + delta).clamp(-1.0, 1.0);
+        }
+    }
+
+    /// Access cached compliance risk from last Stage 5 evaluation.
+    pub fn last_compliance_risk(&self) -> f32 {
+        self.cache.last_compliance_risk
+    }
+
+    /// Access cached compliance flags from last Stage 5 evaluation.
+    pub fn last_compliance_flags(&self) -> &[String] {
+        &self.cache.last_compliance_flags
+    }
+
+    /// Load additional regulatory constraints from external specifications.
+    ///
+    /// Use this to add jurisdiction-specific constraints at runtime, e.g., from
+    /// Mycelix JurisdictionConstraintEntry records. Each spec defines a flag name,
+    /// the primitive names to compose, and an optional threshold.
+    ///
+    /// Returns the number of constraints successfully loaded.
+    pub fn load_external_constraints(&mut self, specs: &[ExternalConstraintSpec]) -> usize {
+        self.compliance_checker.load_external_constraints(specs)
+    }
+
     /// Bidirectional feedback: exploration outcome modulates FE→exploration gain.
     ///
     /// After an FE-driven exploration boost, the prediction error outcome tells
@@ -951,6 +1284,7 @@ mod tests {
             compressed_state: &[0.0; 256],
             stillness_boost: 0.0,
             semantic_embedding: None,
+            action_hv: None,
         }
     }
 
@@ -1008,6 +1342,7 @@ mod tests {
             compressed_state: &[0.0; 256],
             stillness_boost: 0.0,
             semantic_embedding: None,
+            action_hv: None,
         };
         let output = engine.evaluate(&input);
 
@@ -1028,6 +1363,7 @@ mod tests {
             compressed_state: &[0.0; 256],
             stillness_boost: 0.0,
             semantic_embedding: None,
+            action_hv: None,
         };
         let output = engine.evaluate(&input);
 
@@ -1055,6 +1391,7 @@ mod tests {
             compressed_state: &[0.5; 256],
             stillness_boost: 0.0,
             semantic_embedding: None,
+            action_hv: None,
         };
         let output = engine.evaluate(&input);
 
@@ -1249,6 +1586,7 @@ mod tests {
             compressed_state: &[0.0; 256],
             stillness_boost: 0.0,
             semantic_embedding: None,
+            action_hv: None,
         };
         let output = engine.evaluate(&input);
         // With no value evaluator or harmonies, verdict depends on moral_score
@@ -1278,6 +1616,7 @@ mod tests {
             compressed_state: &[0.0; 256],
             stillness_boost: 0.0,
             semantic_embedding: None,
+            action_hv: None,
         };
         let output = engine.evaluate(&input);
         if output.consent_violation {
@@ -1380,6 +1719,7 @@ mod tests {
                 compressed_state: &[0.0; 256],
                 stillness_boost: 0.0,
                 semantic_embedding: None,
+                action_hv: None,
             };
             let output = engine.evaluate(&input);
             assert!(
@@ -1443,6 +1783,79 @@ mod tests {
     // P0: Anomaly report field checks
     // =========================================================================
 
+    // =========================================================================
+    // Stage 5: Institutional compliance checks
+    // =========================================================================
+
+    #[test]
+    fn test_compliance_checker_constructs() {
+        let checker = InstitutionalComplianceChecker::new();
+        assert!(
+            !checker.constraints.is_empty(),
+            "Compliance checker should have constraints from PrimitiveSystem"
+        );
+        // Should have 5 constraint patterns
+        assert_eq!(checker.constraints.len(), 5);
+    }
+
+    #[test]
+    fn test_compliance_output_fields_present() {
+        let mut engine = make_engine();
+        let input = make_input(23); // cycle 23 triggers compliance (23 % 23 == 0)
+        let output = engine.evaluate(&input);
+        assert!(output.compliance_risk >= 0.0 && output.compliance_risk <= 1.0);
+        assert!(output.compliance_fresh);
+    }
+
+    #[test]
+    fn test_compliance_skipped_off_cadence() {
+        let mut engine = make_engine();
+        let input = make_input(8); // cycle 8: not divisible by 23
+        let output = engine.evaluate(&input);
+        assert!(!output.compliance_fresh);
+        assert_eq!(output.compliance_risk, 0.0);
+    }
+
+    #[test]
+    fn test_compliance_risk_bounded_across_cycles() {
+        let mut engine = make_engine();
+        for c in 0..100 {
+            let input = make_input(c);
+            let output = engine.evaluate(&input);
+            assert!(
+                output.compliance_risk >= 0.0 && output.compliance_risk <= 1.0,
+                "compliance_risk should be in [0, 1], got {} at cycle {}",
+                output.compliance_risk,
+                c
+            );
+        }
+    }
+
+    #[test]
+    fn test_compliance_text_encoder_deterministic() {
+        let checker = InstitutionalComplianceChecker::new();
+        let hv1 = checker.encode_text("deploy data to eu server");
+        let hv2 = checker.encode_text("deploy data to eu server");
+        assert_eq!(
+            hv1.similarity(&hv2),
+            1.0,
+            "Same text should produce identical encoding"
+        );
+    }
+
+    #[test]
+    fn test_compliance_different_texts_orthogonal() {
+        let checker = InstitutionalComplianceChecker::new();
+        let hv1 = checker.encode_text("deploy data to eu server");
+        let hv2 = checker.encode_text("help someone learn mathematics");
+        let sim = hv1.similarity(&hv2);
+        assert!(
+            (sim - 0.5).abs() < 0.1,
+            "Unrelated texts should be roughly orthogonal, got {}",
+            sim
+        );
+    }
+
     #[test]
     fn test_anomaly_score_bounded() {
         let mut engine = make_engine();
@@ -1462,5 +1875,107 @@ mod tests {
                 "anomaly_score should be in [0, 1], got {score} at cycle {c}"
             );
         }
+    }
+
+    // =========================================================================
+    // Stage 5: Action HV wiring (thought vector → compliance)
+    // =========================================================================
+
+    #[test]
+    fn test_compliance_uses_action_hv_when_provided() {
+        let mut engine = make_engine();
+
+        // Create a BinaryHV that is very similar to a known constraint
+        let system = PrimitiveSystem::global();
+        let jurisdiction = system.get("JURISDICTION").unwrap();
+        let compliance_prim = system.get("COMPLIANCE").unwrap();
+        let constraint_hv = jurisdiction.encoding.bind(&compliance_prim.encoding);
+
+        // Provide this as the action_hv — should trigger data_sovereignty flag
+        let input = EthicsEngineInput {
+            input: "irrelevant text",
+            cycle: 23,
+            unified_psi: 0.5,
+            compressed_state: &[0.0; 256],
+            stillness_boost: 0.0,
+            semantic_embedding: None,
+            action_hv: Some(&constraint_hv),
+        };
+        let output = engine.evaluate(&input);
+        assert!(output.compliance_fresh);
+        // The action_hv IS the constraint pattern, so risk should be maximal
+        assert!(
+            output.compliance_risk > 0.5,
+            "Exact constraint pattern should trigger high risk, got {}",
+            output.compliance_risk
+        );
+        assert!(
+            output
+                .compliance_flags
+                .contains(&"data_sovereignty".to_string()),
+            "Should flag data_sovereignty when action_hv matches constraint"
+        );
+    }
+
+    #[test]
+    fn test_compliance_falls_back_to_text_encoding() {
+        let mut engine = make_engine();
+
+        // No action_hv → falls back to encode_text()
+        let input = EthicsEngineInput {
+            input: "checking jurisdiction compliance for data transfer",
+            cycle: 23,
+            unified_psi: 0.5,
+            compressed_state: &[0.0; 256],
+            stillness_boost: 0.0,
+            semantic_embedding: None,
+            action_hv: None,
+        };
+        let output = engine.evaluate(&input);
+        assert!(output.compliance_fresh);
+        // Text encoding is a weak signal — risk should be low
+        assert!(
+            output.compliance_risk.is_finite(),
+            "Compliance risk should be finite"
+        );
+    }
+
+    // =========================================================================
+    // Stage 5: Dynamic constraint loading
+    // =========================================================================
+
+    #[test]
+    fn test_external_constraint_loading() {
+        let mut engine = make_engine();
+
+        let specs = vec![ExternalConstraintSpec {
+            flag: "gdpr_data_residency".to_string(),
+            primitive_names: vec!["JURISDICTION".to_string(), "SOVEREIGNTY".to_string()],
+            threshold: Some(0.55),
+        }];
+
+        let loaded = engine.load_external_constraints(&specs);
+        assert_eq!(loaded, 1, "Should load 1 external constraint");
+
+        // Checker now has 5 defaults + 1 external = 6
+        assert_eq!(engine.compliance_checker.constraints.len(), 6);
+    }
+
+    #[test]
+    fn test_external_constraint_missing_primitive_skipped() {
+        let mut engine = make_engine();
+
+        let specs = vec![ExternalConstraintSpec {
+            flag: "nonexistent_constraint".to_string(),
+            primitive_names: vec![
+                "JURISDICTION".to_string(),
+                "TOTALLY_FAKE_PRIMITIVE".to_string(),
+            ],
+            threshold: None,
+        }];
+
+        let loaded = engine.load_external_constraints(&specs);
+        assert_eq!(loaded, 0, "Should skip constraint with missing primitive");
+        assert_eq!(engine.compliance_checker.constraints.len(), 5);
     }
 }
