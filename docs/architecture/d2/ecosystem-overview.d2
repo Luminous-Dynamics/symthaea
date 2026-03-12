@@ -1,0 +1,141 @@
+# Luminous Dynamics Ecosystem Overview
+# Professional Tier 1 Diagram
+
+direction: right
+
+title: {
+  label: Luminous Dynamics Ecosystem
+  near: top-center
+  shape: text
+  style.font-size: 24
+  style.bold: true
+}
+
+symthaea: Symthaea {
+  label: "Symthaea\nHolographic Liquid Brain\n~985K LOC Rust | 50Hz Cognitive Loop"
+  style.fill: "#1a1a2e"
+  style.stroke: "#00d4ff"
+  style.font-color: "#e0e0e0"
+  style.border-radius: 12
+
+  core: Core Engine {
+    style.fill: "#16213e"
+    style.stroke: "#0f3460"
+    hdc: HDC Encoder\n16,384-bit BinaryHV {style.fill: "#0f3460"; style.font-color: "#00d4ff"}
+    cfc: CfC/LTC Network\nO(1) Temporal Prediction {style.fill: "#0f3460"; style.font-color: "#00d4ff"}
+    fep: FEP Active Inference\nFree Energy Minimization {style.fill: "#0f3460"; style.font-color: "#00d4ff"}
+    phi: IIT Phi\nSpectral MIP Finder {style.fill: "#0f3460"; style.font-color: "#00d4ff"}
+
+    hdc -> cfc: encode
+    cfc -> fep: predict
+    fep -> phi: integrate
+    phi -> hdc: feedback {style.stroke-dash: 5}
+  }
+
+  subsystems: Subsystems {
+    style.fill: "#16213e"
+    style.stroke: "#0f3460"
+    neuromod: 9-Transmitter\nNeuromod Bath {style.fill: "#1a1a40"; style.font-color: "#ff6b9d"}
+    broca: Broca SSM\nLanguage Center {style.fill: "#1a1a40"; style.font-color: "#c084fc"}
+    memory: 4-Tier Memory\nEpisodic/Semantic/Working {style.fill: "#1a1a40"; style.font-color: "#fbbf24"}
+    reasoning: Reasoning Engine\n7-Step Conscious {style.fill: "#1a1a40"; style.font-color: "#34d399"}
+    harmonies: Eight Harmonies\nMoral Topology {style.fill: "#1a1a40"; style.font-color: "#f97316"}
+    integrity: Integrity\nBLAKE3 Attestation {style.fill: "#1a1a40"; style.font-color: "#ef4444"}
+  }
+
+  substrate: Substrate Independence {
+    style.fill: "#16213e"
+    style.stroke: "#0f3460"
+    style.font-color: "#a78bfa"
+    label: "8 Substrates | 9D Requirements\nValidation Overlay (Honest Confidence)"
+  }
+}
+
+mycelix: Mycelix {
+  label: "Mycelix\nFractal CivOS\n8,600+ Tests | 10 DNA Roles"
+  style.fill: "#1a2e1a"
+  style.stroke: "#00ff88"
+  style.font-color: "#e0e0e0"
+  style.border-radius: 12
+
+  clusters: Cluster DNAs {
+    style.fill: "#1e3a1e"
+    style.stroke: "#2d5a2d"
+    identity: Identity\n9 zomes | DID + MFA {style.fill: "#2d5a2d"; style.font-color: "#00ff88"}
+    governance: Governance\n7 zomes | DKG + Voting {style.fill: "#2d5a2d"; style.font-color: "#00ff88"}
+    commons: Commons\n35 zomes | Land + Care {style.fill: "#2d5a2d"; style.font-color: "#00ff88"}
+    civic: Civic\n16 zomes | Justice + Emergency {style.fill: "#2d5a2d"; style.font-color: "#00ff88"}
+    hearth: Hearth\n12 zomes | Family + Rhythms {style.fill: "#2d5a2d"; style.font-color: "#00ff88"}
+    finance: Finance\n7 zomes | MYCEL/SAP/TEND {style.fill: "#2d5a2d"; style.font-color: "#00ff88"}
+    personal: Personal\n4 zomes | Sovereign Vaults {style.fill: "#2d5a2d"; style.font-color: "#00ff88"}
+    attribution: Attribution\n3 zomes | Reciprocity {style.fill: "#2d5a2d"; style.font-color: "#00ff88"}
+  }
+
+  gating: Consciousness Gating {
+    style.fill: "#1e3a1e"
+    style.stroke: "#2d5a2d"
+    style.font-color: "#fbbf24"
+    label: "4D Profile (Identity/Reputation/Community/Engagement)\n5 Tiers: Observer -> Participant -> Citizen -> Steward -> Guardian"
+  }
+
+  health: Health DNA {
+    style.fill: "#2d5a2d"
+    style.font-color: "#00ff88"
+    label: "Health Records\n(Standalone DNA)"
+  }
+}
+
+nix: Luminous Nix {
+  label: "Luminous Nix\nNixOS Configuration Intelligence\n30.2K LOC | 427+ Tests"
+  style.fill: "#2e1a2e"
+  style.stroke: "#c084fc"
+  style.font-color: "#e0e0e0"
+  style.border-radius: 12
+
+  pipeline: Nix Pipeline {
+    style.fill: "#3a1e3a"
+    style.stroke: "#5a2d5a"
+    causal: Causal Graph\n~210 NixOS Patterns {style.fill: "#5a2d5a"; style.font-color: "#c084fc"}
+    observe: Observability\n9 Prometheus Metrics {style.fill: "#5a2d5a"; style.font-color: "#c084fc"}
+  }
+}
+
+infra: Infrastructure {
+  style.fill: "#2e2e1a"
+  style.stroke: "#fbbf24"
+  style.font-color: "#e0e0e0"
+  style.border-radius: 12
+
+  atlas: Terra Atlas\natlas.luminousdynamics.io {style.fill: "#3a3a1e"; style.font-color: "#fbbf24"}
+  pulse: Pulse Dashboard\nHTML Telemetry {style.fill: "#3a3a1e"; style.font-color: "#fbbf24"}
+  spore: Spore WASM\nBrowser Deployment {style.fill: "#3a3a1e"; style.font-color: "#fbbf24"}
+  bench: Psych-Bench\n14 Cognitive Domains {style.fill: "#3a3a1e"; style.font-color: "#fbbf24"}
+}
+
+# Cross-system connections
+symthaea.core -> mycelix.gating: consciousness\ncredentials {
+  style.stroke: "#fbbf24"
+  style.stroke-dash: 5
+}
+symthaea.core -> nix.pipeline: NixPipelineHook\n(feature: nix-mind) {
+  style.stroke: "#c084fc"
+  style.stroke-dash: 5
+}
+mycelix.clusters.governance -> symthaea.subsystems.harmonies: moral\nalignment {
+  style.stroke: "#f97316"
+  style.stroke-dash: 5
+}
+symthaea.core -> infra.pulse: CycleMetadata\ntelemetry {
+  style.stroke: "#00d4ff"
+}
+symthaea.core -> infra.spore: WASM\ncompile {
+  style.stroke: "#00d4ff"
+}
+infra.bench -> symthaea.subsystems.neuromod: z-score\ncalibration {
+  style.stroke: "#ff6b9d"
+  style.stroke-dash: 3
+}
+nix.pipeline.causal -> symthaea.subsystems.reasoning: causal\nsurprise {
+  style.stroke: "#c084fc"
+  style.stroke-dash: 3
+}

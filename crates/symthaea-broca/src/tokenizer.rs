@@ -40,6 +40,8 @@ pub struct BpeTokenizer {
     pub unk_id: u32,
     pub thought_id: u32,
     vocab_size: usize,
+    /// Maximum number of BPE merge passes (default 10).
+    max_bpe_merge_passes: usize,
 }
 
 impl BpeTokenizer {
@@ -81,6 +83,7 @@ impl BpeTokenizer {
             unk_id,
             thought_id,
             vocab_size,
+            max_bpe_merge_passes: 10,
         })
     }
 
@@ -302,6 +305,7 @@ impl BpeTokenizer {
             unk_id: 3,
             thought_id: 4,
             vocab_size,
+            max_bpe_merge_passes: 10,
         }
     }
 
@@ -340,7 +344,13 @@ impl BpeTokenizer {
             unk_id,
             thought_id,
             vocab_size,
+            max_bpe_merge_passes: 10,
         }
+    }
+
+    /// Set the maximum number of BPE merge passes.
+    pub fn set_max_bpe_merge_passes(&mut self, passes: usize) {
+        self.max_bpe_merge_passes = passes;
     }
 
     /// Get the BPE merge rules.
@@ -470,8 +480,8 @@ impl BpeTokenizer {
             return;
         }
 
-        // Apply merges iteratively (up to 10 passes)
-        for _pass in 0..10 {
+        // Apply merges iteratively (up to max_bpe_merge_passes passes)
+        for _pass in 0..self.max_bpe_merge_passes {
             let mut changed = false;
             let mut i = 0;
             while i + 1 < tokens.len() {

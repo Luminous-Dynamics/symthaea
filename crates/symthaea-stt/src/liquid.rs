@@ -362,11 +362,61 @@ impl TimeAwareBinder {
         symbol.bind(duration_hv).bind(intensity_hv)
     }
 
-    /// Bind with interpolation between bins (smoother)
+    /// Bind with interpolation between adjacent bins (smoother).
+    ///
+    /// Instead of snapping to the nearest bin, computes a weighted blend of the
+    /// two adjacent bin HVs via majority-vote bundling, proportional to the
+    /// fractional position. This produces smoother acoustic property
+    /// representation, resolving long/short vowel distinctions that fall
+    /// between discrete bin boundaries.
     pub fn bind_smooth(&self, symbol: &HV16, duration: f32, intensity: f32) -> HV16 {
-        // For now, just use discrete binding
-        // TODO: Implement fractional binding with weighted bundling
-        self.bind(symbol, duration, intensity)
+        use crate::hdc::bundle;
+
+        // Quantize duration (log scale: 10ms to 10s) to fractional bin
+        let duration_clamped = duration.clamp(0.01, 10.0);
+        let duration_log = (duration_clamped / 0.01).ln() / (10.0 / 0.01_f32).ln();
+        let duration_frac = duration_log * (self.n_duration_bins - 1) as f32;
+        let dur_lo = (duration_frac.floor() as usize).min(self.n_duration_bins - 1);
+        let dur_hi = (dur_lo + 1).min(self.n_duration_bins - 1);
+        let dur_alpha = duration_frac - duration_frac.floor();
+
+        // Quantize intensity (linear: 0 to 1) to fractional bin
+        let intensity_clamped = intensity.clamp(0.0, 1.0);
+        let intensity_frac = intensity_clamped * (self.n_intensity_bins - 1) as f32;
+        let int_lo = (intensity_frac.floor() as usize).min(self.n_intensity_bins - 1);
+        let int_hi = (int_lo + 1).min(self.n_intensity_bins - 1);
+        let int_alpha = intensity_frac - intensity_frac.floor();
+
+        // Weighted majority-vote interpolation for binary HVs:
+        // Repeat each basis vector proportionally (10 total copies) and bundle.
+        let dur_hv = if dur_lo == dur_hi || dur_alpha < 0.05 {
+            self.duration_basis[dur_lo]
+        } else if dur_alpha > 0.95 {
+            self.duration_basis[dur_hi]
+        } else {
+            let n_hi = (dur_alpha * 10.0).round() as usize;
+            let n_lo = 10 - n_hi;
+            let mut copies = Vec::with_capacity(10);
+            for _ in 0..n_lo { copies.push(self.duration_basis[dur_lo]); }
+            for _ in 0..n_hi { copies.push(self.duration_basis[dur_hi]); }
+            bundle(&copies)
+        };
+
+        let int_hv = if int_lo == int_hi || int_alpha < 0.05 {
+            self.intensity_basis[int_lo]
+        } else if int_alpha > 0.95 {
+            self.intensity_basis[int_hi]
+        } else {
+            let n_hi = (int_alpha * 10.0).round() as usize;
+            let n_lo = 10 - n_hi;
+            let mut copies = Vec::with_capacity(10);
+            for _ in 0..n_lo { copies.push(self.intensity_basis[int_lo]); }
+            for _ in 0..n_hi { copies.push(self.intensity_basis[int_hi]); }
+            bundle(&copies)
+        };
+
+        // Triple binding: symbol ⊗ duration_interp ⊗ intensity_interp
+        symbol.bind(&dur_hv).bind(&int_hv)
     }
 }
 

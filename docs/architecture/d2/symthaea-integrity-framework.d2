@@ -1,0 +1,162 @@
+# Symthaea Integrity Framework — BLAKE3 Attestation & Tamper Detection
+# Professional Tier 1 Diagram
+
+direction: down
+
+title: {
+  label: Integrity Framework — Attestation, Canaries & Safety Escalation
+  near: top-center
+  shape: text
+  style.font-size: 24
+  style.bold: true
+}
+
+# ═══════════════════════════════════════════
+# STARTUP REGISTRATION
+# ═══════════════════════════════════════════
+registration: Startup Registration {
+  style.fill: "#1a1a2e"
+  style.stroke: "#818cf8"
+  style.font-color: "#c7d2fe"
+  style.border-radius: 8
+
+  safety: "Safety Thresholds\n(BLAKE3 hash)" {style.fill: "#312e81"; style.font-color: "#c7d2fe"}
+  consciousness: "Consciousness Weights\n(BLAKE3 hash)" {style.fill: "#312e81"; style.font-color: "#c7d2fe"}
+  receptor: "Receptor Sensitivities\n(BLAKE3 hash)" {style.fill: "#312e81"; style.font-color: "#c7d2fe"}
+  moral: "Moral Topology Constants\n(BLAKE3 hash)" {style.fill: "#312e81"; style.font-color: "#c7d2fe"}
+  selftest: "Self-Test\nassert hash == initial_hash" {
+    style.fill: "#4338ca"
+    style.font-color: "#a5b4fc"
+    style.stroke: "#818cf8"
+  }
+
+  safety -> selftest
+  consciousness -> selftest
+  receptor -> selftest
+  moral -> selftest
+}
+
+# ═══════════════════════════════════════════
+# EACH CYCLE: tick()
+# ═══════════════════════════════════════════
+tick: Per-Cycle Integrity Tick {
+  style.fill: "#0f0f1e"
+  style.stroke: "#6366f1"
+  style.font-color: "#e0e0e0"
+  style.border-radius: 12
+
+  attestation: Attestation Verification {
+    style.fill: "#1e3a5f"
+    style.stroke: "#3b82f6"
+    style.font-color: "#93c5fd"
+    label: "Live re-hash of registered constants\nJittered intervals (+/-10% deterministic)\nhash(cycle + seed) for unpredictability"
+  }
+
+  canaries: 6 Behavioral Canaries {
+    style.fill: "#14532d"
+    style.stroke: "#22c55e"
+    style.font-color: "#86efac"
+    label: "Co-prime intervals: 103, 107, 109, 113, 127, 131\n1. Threshold ordering invariant\n2. BLAKE3 self-consistency\n3. FPU precision (IEEE 754)\n4. Consciousness equation sanity\n5. Moral algebra invariant\n6. HDC encoding consistency"
+  }
+
+  temporal: Temporal Consistency {
+    style.fill: "#78350f"
+    style.stroke: "#f59e0b"
+    style.font-color: "#fde68a"
+    label: "Monotonic cycle counter\nmin_cycle_duration check\n(substrate tau_factor scaled)"
+  }
+}
+
+# ═══════════════════════════════════════════
+# FAILURE TRACKING
+# ═══════════════════════════════════════════
+tracking: Failure Tracking {
+  style.fill: "#1a1a2e"
+  style.stroke: "#818cf8"
+  style.font-color: "#c7d2fe"
+  style.border-radius: 8
+
+  per_attestation: "Per-Attestation\nconsecutive_failures" {style.fill: "#312e81"; style.font-color: "#c7d2fe"}
+  global: "global_failure_streak\n(merged attestation + canary)" {
+    style.fill: "#312e81"
+    style.font-color: "#c7d2fe"
+    style.stroke: "#818cf8"
+  }
+}
+
+event_log: "Event Log Ring Buffer\nVecDeque cap 64" {style.fill: "#312e81"; style.font-color: "#c7d2fe"}
+
+# ═══════════════════════════════════════════
+# SEVERITY PIPELINE
+# ═══════════════════════════════════════════
+severity: Unified Severity Pipeline {
+  style.fill: "#3a1e1e"
+  style.stroke: "#f87171"
+  style.font-color: "#fecaca"
+  style.border-radius: 8
+
+  clean: Clean {
+    style.fill: "#14532d"
+    style.font-color: "#86efac"
+    label: "0 failures\nconfidence = 1.0\nNormal operation"
+  }
+  warning: Warning (Drift) {
+    style.fill: "#78350f"
+    style.font-color: "#fde68a"
+    label: "1-2 consecutive failures\nconfidence = 0.5\nConsciousness discounted"
+  }
+  critical: Critical (Corruption) {
+    style.fill: "#7f1d1d"
+    style.font-color: "#fca5a5"
+    style.stroke: "#ef4444"
+    label: "3+ consecutive failures\nconfidence = 0.1\nNRC-level safety escalation\nintegrity_critical -> SafetyAgent"
+  }
+
+  clean -> warning: "1 failure" {style.stroke: "#f59e0b"}
+  warning -> critical: "3+ failures" {style.stroke: "#ef4444"; style.stroke-width: 2}
+  warning -> clean: "clean tick\n(resets)" {style.stroke: "#22c55e"; style.stroke-dash: 3}
+  critical -> clean: "clean tick\n(resets)" {style.stroke: "#22c55e"; style.stroke-dash: 3}
+}
+
+# ═══════════════════════════════════════════
+# DOWNSTREAM EFFECTS
+# ═══════════════════════════════════════════
+effects: Downstream Effects {
+  style.fill: "#1e3a2e"
+  style.stroke: "#22c55e"
+  style.font-color: "#86efac"
+  style.border-radius: 8
+
+  consciousness_discount: "Consciousness Discount\nC_final = C_raw x integrity_confidence" {
+    style.fill: "#14532d"
+    style.font-color: "#86efac"
+  }
+  safety_escalation: "Safety Escalation\nintegrity_critical -> NRC level" {
+    style.fill: "#14532d"
+    style.font-color: "#86efac"
+  }
+  telemetry: "IntegrityTelemetry\nin CycleMetadata" {
+    style.fill: "#14532d"
+    style.font-color: "#86efac"
+  }
+  pulse: "Pulse Dashboard\nShield status card + sparkline" {
+    style.fill: "#14532d"
+    style.font-color: "#86efac"
+  }
+  snapshot: "Snapshot Export\nBLAKE3-signed binary blob\n(crash forensics)" {
+    style.fill: "#14532d"
+    style.font-color: "#86efac"
+  }
+}
+
+# ═══════════════════════════════════════════
+# FLOW
+# ═══════════════════════════════════════════
+registration -> tick: "registered hashes" {style.stroke: "#818cf8"}
+tick.attestation -> tracking.per_attestation {style.stroke: "#3b82f6"}
+tick.canaries -> tracking.global {style.stroke: "#22c55e"}
+tick.temporal -> tracking.global {style.stroke: "#f59e0b"; style.stroke-dash: 3}
+tracking.per_attestation -> tracking.global: merge {style.stroke: "#818cf8"}
+tracking -> event_log {style.stroke: "#818cf8"; style.stroke-dash: 3}
+tracking.global -> severity {style.stroke: "#f87171"; style.stroke-width: 2}
+severity -> effects {style.stroke: "#22c55e"; style.stroke-width: 2}

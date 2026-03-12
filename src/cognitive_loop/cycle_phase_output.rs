@@ -768,6 +768,34 @@ impl CognitiveLoopService {
                     || hu > HOLOGRAPHIC_UNITY_HIGH_THRESHOLD);
         }
 
+        // ── Session 17: Adaptive Homeostasis & Emergent Dynamics Telemetry ──
+        {
+            use super::thresholds::{
+                ALLOSTATIC_OVERLOAD_THRESHOLD, CONSCIOUSNESS_ACCEL_THRESHOLD,
+                PHI_GATED_LR_FLOOR_THRESHOLD, PROPOSAL_SATURATION_THRESHOLD,
+            };
+            metadata.allostatic_load = self.carryover.quality.allostatic_load;
+            metadata.allostatic_overload_active = self.carryover.quality.allostatic_load
+                > ALLOSTATIC_OVERLOAD_THRESHOLD
+                && self.stats.total_cycles > 20;
+            metadata.exploration_decay_applied = self.stats.total_cycles > 30;
+            let prev_grad = self.carryover.quality.prev_gradient_magnitude;
+            let accel =
+                (feedback.consciousness.consciousness_gradient_magnitude - prev_grad).abs();
+            metadata.consciousness_accel_active =
+                accel > CONSCIOUSNESS_ACCEL_THRESHOLD && self.stats.total_cycles > 20;
+            metadata.adaptive_warmup_early_exit = self.carryover.quality.adaptive_warmup_exited
+                && self.stats.total_cycles
+                    <= super::thresholds::STARTUP_WARMUP_CYCLES;
+            metadata.proposal_saturation_active =
+                self.feedback_state.lr_proposal_count() >= PROPOSAL_SATURATION_THRESHOLD
+                    && self.stats.total_cycles > 15;
+            let phi = self.stats.unified_psi as f64;
+            metadata.phi_gated_lr_floor_active =
+                phi < PHI_GATED_LR_FLOOR_THRESHOLD && phi > 0.0 && self.stats.total_cycles > 20;
+            metadata.rhythmic_exploration_active = self.stats.total_cycles > 30;
+        }
+
         // ── Session 17: Affective/Harmonics/Gradient Telemetry ──
         {
             use crate::cognitive_loop::thresholds::{
@@ -854,6 +882,8 @@ impl CognitiveLoopService {
             .last()
             .map(|crhv| crhv.depth as u8)
             .unwrap_or(0);
+        metadata.cantor_dream_surprise = self.cantor_dream_surprise;
+        metadata.cantor_resonance_boost = self.cantor_resonance_boost;
 
         // ── GWT-triggered memory consolidation (Dehaene & Changeux 2011) ──
         // When global workspace broadcasts, record current state for episodic
@@ -963,6 +993,20 @@ impl CognitiveLoopService {
             if ic < 1.0 {
                 metadata.consciousness_level *= ic as f64;
             }
+        }
+
+        // Governance telemetry
+        #[cfg(feature = "mycelix")]
+        {
+            metadata.governance_reward_ema = self.governance_mgr.reward_ema();
+            metadata.governance_pending_events = self.governance_mgr.pending_event_count();
+            metadata.governance_pending_outcomes = self.governance_mgr.pending_outcome_count();
+            metadata.governance_confidence_delta = self
+                .subsystem_collector
+                .get("governance_manager")
+                .map(|o| o.confidence_delta as f64)
+                .unwrap_or(0.0);
+            metadata.governance_collective_phi = self.governance_mgr.last_collective_phi();
         }
 
         // Physics bridge telemetry

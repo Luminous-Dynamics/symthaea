@@ -12,7 +12,7 @@ use std::process;
 
 use symthaea_broca::evaluation;
 use symthaea_broca::generator::{BrocaConfig, BrocaGenerator};
-use symthaea_broca::training::{train_with_adam, TrainingConfig, TrainingDataset};
+use symthaea_broca::training::{train_with_adam, CurriculumSchedule, TrainingConfig, TrainingDataset};
 
 use symthaea_core::genesis::GenesisSeed;
 
@@ -107,6 +107,8 @@ fn main() {
         negative_samples: opts.negative_samples,
         carry_state: opts.carry_state,
         network_warmup_epochs: opts.network_warmup_epochs,
+        validation_dataset: None,
+        curriculum: CurriculumSchedule::None,
     };
 
     tracing::info!(

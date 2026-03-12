@@ -212,6 +212,7 @@ INDIVIDUAL_FILES=(
     "LICENSE"
     "CHANGELOG.md"
     "CONTRIBUTING.md"
+    "SECURITY.md"
     "SAFETY.md"
 )
 

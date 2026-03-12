@@ -146,6 +146,15 @@ pub(crate) struct ConsciousnessEngineInput<'a> {
     /// Science: Hofstadter (1979) — strange loops as substrate of consciousness;
     ///          Metzinger (2003) — self-model depth correlates with phenomenal richness.
     pub cantor_metacognitive_depth: f64,
+
+    // ── Governance collective Phi → consciousness coupling ──────────
+    /// Collective Phi from the most recent governance tally [0.0, 1.0].
+    /// Measures inter-agent consciousness integration during democratic deliberation.
+    /// Modulates unified consciousness ±2%: high collective_phi → richer social consciousness.
+    /// Neutral at 0.0 (no governance data). Only active with feature `mycelix`.
+    /// Science: Haidt (2012) — shared moral reasoning amplifies collective intelligence;
+    ///          Woolley et al. (2010) — collective intelligence emerges from social sensitivity.
+    pub governance_collective_phi: f64,
 }
 
 /// Dynamic weights for the unified consciousness computation.

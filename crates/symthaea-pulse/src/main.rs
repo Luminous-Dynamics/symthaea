@@ -233,6 +233,45 @@ impl Default for IntegrityInfo {
     }
 }
 
+/// Cantor fractal HDC subsystem telemetry for pulse visualization.
+#[derive(Serialize, Deserialize, Default, Clone)]
+pub struct CantorInfo {
+    /// Number of CRHVs pending dream consolidation.
+    pub buffer_occupancy: u32,
+    /// Codebook size (persistent entries from dream consolidation).
+    pub codebook_size: u32,
+    /// Codebook capacity (max entries before eviction).
+    pub codebook_capacity: u32,
+    /// Depth of most recent CRHV (adaptive: 2–7).
+    pub last_depth: u8,
+    /// Self-similarity (metacognitive depth) of most recent CRHV.
+    pub metacognitive_depth: f32,
+    /// Dream consolidation surprise EMA.
+    pub dream_surprise: f32,
+    /// Resonance boost from coherent CRHV pairs.
+    pub resonance_boost: f32,
+    /// Rolling depth histogram (counts per depth 2–7).
+    pub depth_histogram: [u32; 6],
+}
+
+/// Governance status for the Pulse card (feature: mycelix).
+#[derive(Serialize, Deserialize, Default, Clone)]
+pub struct GovernanceInfo {
+    /// Exponential moving average of governance reward signal.
+    pub reward_ema: f64,
+    /// Number of pending governance events.
+    pub pending_events: usize,
+    /// Number of pending governance outcomes.
+    pub pending_outcomes: usize,
+    /// Confidence delta from last governance processing.
+    pub confidence_delta: f64,
+    /// Collective Phi from the most recent tally.
+    pub collective_phi: f64,
+    /// Rolling 30-cycle history of reward EMA for sparkline.
+    #[serde(default)]
+    pub reward_history: Vec<f64>,
+}
+
 /// Full JSON-serializable pulse snapshot for comparison mode.
 #[derive(Serialize, Deserialize)]
 pub struct PulseSnapshot {
@@ -246,6 +285,10 @@ pub struct PulseSnapshot {
     pub sparkline: Vec<SparklinePoint>,
     #[serde(default)]
     pub integrity: IntegrityInfo,
+    #[serde(default)]
+    pub cantor: CantorInfo,
+    #[serde(default)]
+    pub governance: GovernanceInfo,
 }
 
 /// Computed delta between two pulse snapshots for the comparison view.
@@ -1050,6 +1093,24 @@ fn main() -> Result<()> {
             global_failure_streak: m.integrity.global_failure_streak,
             confidence_history: m.integrity.confidence_history.clone(),
         },
+        cantor: CantorInfo {
+            buffer_occupancy: m.cantor_buffer_occupancy,
+            codebook_size: m.cantor_codebook_size,
+            codebook_capacity: 256,
+            last_depth: m.cantor_last_depth,
+            metacognitive_depth: m.cantor_metacognitive_depth,
+            dream_surprise: m.cantor_dream_surprise,
+            resonance_boost: m.cantor_resonance_boost,
+            depth_histogram: [0; 6], // populated from codebook labels in watch mode
+        },
+        governance: GovernanceInfo {
+            reward_ema: m.governance_reward_ema,
+            pending_events: m.governance_pending_events,
+            pending_outcomes: m.governance_pending_outcomes,
+            confidence_delta: m.governance_confidence_delta,
+            collective_phi: m.governance_collective_phi,
+            reward_history: Vec::new(),
+        },
     };
 
     if let Some(json_path) = &args.json {
@@ -1295,6 +1356,24 @@ fn main() -> Result<()> {
                     global_failure_streak: wm.integrity.global_failure_streak,
                     confidence_history: wm.integrity.confidence_history.clone(),
                 },
+                cantor: CantorInfo {
+                    buffer_occupancy: wm.cantor_buffer_occupancy,
+                    codebook_size: wm.cantor_codebook_size,
+                    codebook_capacity: 256,
+                    last_depth: wm.cantor_last_depth,
+                    metacognitive_depth: wm.cantor_metacognitive_depth,
+                    dream_surprise: wm.cantor_dream_surprise,
+                    resonance_boost: wm.cantor_resonance_boost,
+                    depth_histogram: [0; 6],
+                },
+                governance: GovernanceInfo {
+                    reward_ema: wm.governance_reward_ema,
+                    pending_events: wm.governance_pending_events,
+                    pending_outcomes: wm.governance_pending_outcomes,
+                    confidence_delta: wm.governance_confidence_delta,
+                    collective_phi: wm.governance_collective_phi,
+                    reward_history: Vec::new(),
+                },
             };
 
             // Delta against previous snapshot
@@ -1461,6 +1540,8 @@ mod tests {
                 make_sparkline_point(0.42, 0.33, 3.14),
             ],
             integrity: IntegrityInfo::default(),
+            cantor: CantorInfo::default(),
+            governance: GovernanceInfo::default(),
         }
     }
 

@@ -1816,8 +1816,10 @@ impl MoralTopology {
             self.baseline_similarity_window.pop_front();
         }
 
-        let baseline_similarity =
-            Self::baseline_weighted_mean(&self.baseline_similarity_window, ac.baseline_decay_rate);
+        let baseline_similarity = Self::baseline_weighted_mean(
+            &self.baseline_similarity_window,
+            ac.baseline_decay_rate,
+        );
         let similarity_anomaly = recent_similarity - baseline_similarity;
 
         // ── Signal 2: Harmony entropy decline ────────────────────────────
@@ -1862,8 +1864,10 @@ impl MoralTopology {
         if self.baseline_entropy_window.len() > win_cap {
             self.baseline_entropy_window.pop_front();
         }
-        let baseline_entropy =
-            Self::baseline_weighted_mean(&self.baseline_entropy_window, ac.baseline_decay_rate);
+        let baseline_entropy = Self::baseline_weighted_mean(
+            &self.baseline_entropy_window,
+            ac.baseline_decay_rate,
+        );
 
         let entropy_decline_rate = if baseline_entropy > 1e-9 {
             ((baseline_entropy - recent_entropy) / baseline_entropy).max(0.0)
@@ -1892,8 +1896,10 @@ impl MoralTopology {
         if self.baseline_flourishing_window.len() > win_cap {
             self.baseline_flourishing_window.pop_front();
         }
-        let baseline_flourishing =
-            Self::baseline_weighted_mean(&self.baseline_flourishing_window, ac.baseline_decay_rate);
+        let baseline_flourishing = Self::baseline_weighted_mean(
+            &self.baseline_flourishing_window,
+            ac.baseline_decay_rate,
+        );
 
         // Flourishing deficit: how far below the floor relative to baseline
         let flourishing_deficit = if baseline_flourishing > 1e-9 {
@@ -5273,10 +5279,7 @@ mod tests {
     fn test_weighted_mean_zero_decay_is_uniform() {
         let window: VecDeque<f64> = vec![1.0, 2.0, 3.0, 4.0, 5.0].into();
         let mean = MoralTopology::baseline_weighted_mean(&window, 0.0);
-        assert!(
-            (mean - 3.0).abs() < 1e-12,
-            "Zero decay should give uniform average, got {mean}"
-        );
+        assert!((mean - 3.0).abs() < 1e-12, "Zero decay should give uniform average, got {mean}");
     }
 
     #[test]

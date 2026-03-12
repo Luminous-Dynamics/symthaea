@@ -10,6 +10,7 @@ pub mod creativity;
 pub mod executive;
 pub mod inhibition;
 pub mod language;
+pub mod mathematics;
 pub mod memory_agent;
 pub mod metacognition;
 pub mod motor;

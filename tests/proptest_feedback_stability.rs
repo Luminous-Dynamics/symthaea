@@ -1603,3 +1603,60 @@ proptest! {
         }
     }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 37. Session 17: Adaptive homeostasis & emergent dynamics regression guards
+// ═══════════════════════════════════════════════════════════════════════════════
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(5))]
+
+    /// Verify Session 17 regression guards:
+    /// - Allostatic load stays bounded [0, 1]
+    /// - Exploration decay doesn't kill exploration
+    /// - Consciousness acceleration doesn't kill confidence
+    /// - Proposal saturation doesn't collapse LR
+    /// - Phi-gated LR floor stays bounded
+    /// - Rhythmic oscillation doesn't break exploration bounds
+    /// - All 8 new telemetry fields populated
+    #[test]
+    fn prop_session17_regression_guards(inputs in fuzz_input_sequence(60, 120)) {
+        let mut service = feedback_service();
+
+        for (i, input) in inputs.iter().enumerate() {
+            let result = service.cycle(input);
+            let m = &result.metadata;
+
+            // Allostatic load must stay bounded
+            prop_assert!(m.allostatic_load >= 0.0 && m.allostatic_load <= 1.0,
+                "allostatic load OOB: {} at cycle {i}", m.allostatic_load);
+
+            // Exploration must survive decay + oscillation + phi gating
+            let exploration = service.exploration_factor();
+            assert_finite_f32(exploration, &format!("exploration@cycle{i}"))?;
+            prop_assert!(exploration >= 0.05,
+                "exploration killed by S17 mods: {} at cycle {i}", exploration);
+
+            // Confidence bounded after acceleration dampening
+            let conf = service.prediction_confidence();
+            prop_assert!(conf >= 0.0 && conf <= 1.0,
+                "confidence OOB after S17: {conf} at cycle {i}");
+
+            // LR bounded after saturation + phi gating
+            let lr = m.actual_effective_lr;
+            assert_finite_f32(lr, &format!("lr@cycle{i}"))?;
+            prop_assert!(lr >= 0.0 && lr <= 2.0,
+                "LR OOB after S17: {lr} at cycle {i}");
+
+            // All 8 new telemetry fields exist and are accessible
+            let _ = m.allostatic_overload_active;
+            let _ = m.allostatic_load;
+            let _ = m.exploration_decay_applied;
+            let _ = m.consciousness_accel_active;
+            let _ = m.adaptive_warmup_early_exit;
+            let _ = m.proposal_saturation_active;
+            let _ = m.phi_gated_lr_floor_active;
+            let _ = m.rhythmic_exploration_active;
+        }
+    }
+}

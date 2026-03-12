@@ -908,11 +908,15 @@ impl CognitiveLoopService {
             #[cfg(feature = "mycelix")]
             governance_mgr: super::managers::GovernanceManager::default(),
             cantor_broadcast_buffer: Vec::with_capacity(32),
-            cantor_cleanup_engine:
-                symthaea_core::hdc::cantor_resonator_cleanup::CantorCleanupEngine::new(
-                    symthaea_core::hdc::cantor_resonator_cleanup::CantorCleanupConfig::default(),
-                ),
+            cantor_cleanup_engine: {
+                use symthaea_core::hdc::cantor_resonator_cleanup::*;
+                CantorCleanupEngine::with_codebook_capacity(
+                    super::thresholds::CANTOR_CODEBOOK_MAX_ENTRIES,
+                )
+            },
             cantor_last_activation: 0.0,
+            cantor_dream_surprise: 0.0,
+            cantor_resonance_boost: 0.0,
             #[cfg(feature = "integrity")]
             integrity_manager: {
                 let mut im = crate::integrity::IntegrityManager::new();
@@ -961,12 +965,18 @@ impl CognitiveLoopService {
                     0.125,
                     0.125,
                 ]);
+                // Register governance thresholds for integrity monitoring
+                #[cfg(feature = "mycelix")]
+                im.register_governance_thresholds();
                 // Apply substrate tau factor for temporal consistency scaling (#3)
                 im.set_substrate_tau_factor(substrate_tau_for_integrity);
                 // Install panic hook for crash forensics — dumps integrity snapshot to disk
                 crate::integrity::install_panic_hook();
                 im
             },
+            motor_output_bridge: None,
+            pending_motor_request: None,
+            last_motor_result: None,
         })
     }
 
@@ -987,20 +997,23 @@ impl CognitiveLoopService {
         let mut embedder = match symthaea_embeddings::Qwen3Embedder::new(qwen_config) {
             Ok(e) => e,
             Err(e) => {
-                tracing::warn!("Failed to create Qwen3 embedder for dense HarmonyBasis: {e}");
+                tracing::warn!(
+                    "Failed to create Qwen3 embedder for dense HarmonyBasis: {e}"
+                );
                 return None;
             }
         };
 
-        let bridge =
-            symthaea_embeddings::HdcBridge::with_config(symthaea_embeddings::BridgeConfig {
+        let bridge = symthaea_embeddings::HdcBridge::with_config(
+            symthaea_embeddings::BridgeConfig {
                 input_dim: symthaea_embeddings::QWEN3_DIMENSION,
                 output_dim: dim,
                 ..Default::default()
-            });
+            },
+        );
 
         // Encode all 8 harmony keyword strings in batch
-        let keyword_refs: Vec<&str> = HARMONY_KEYWORDS.to_vec();
+        let keyword_refs: Vec<&str> = HARMONY_KEYWORDS.iter().copied().collect();
         let batch_result = match embedder.embed_batch(&keyword_refs) {
             Ok(results) => results,
             Err(e) => {
@@ -1024,9 +1037,9 @@ impl CognitiveLoopService {
             vectors.push(ContinuousHV::from_slice(&projected));
         }
 
-        let arr: [ContinuousHV; N_HARMONIES] = vectors
-            .try_into()
-            .unwrap_or_else(|_| [(); N_HARMONIES].map(|_| ContinuousHV::zero(dim)));
+        let arr: [ContinuousHV; N_HARMONIES] = vectors.try_into().unwrap_or_else(
+            |_| [(); N_HARMONIES].map(|_| ContinuousHV::zero(dim)),
+        );
 
         let basis = HarmonyBasis::with_dense_vectors(dim, arr);
         tracing::info!(

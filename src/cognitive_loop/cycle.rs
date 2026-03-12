@@ -133,6 +133,33 @@ impl CognitiveLoopService {
             }
         }
 
+        // Cantor fractal depth → neuromodulator coupling (Hasselmo 2006)
+        // Deep CRHV recursion signals focused recurrent processing:
+        //   - Boosts ACh (sustained attention, cortical recurrence)
+        //   - Dampens NE (reduces alerting/scanning, shifts to focused mode)
+        // Only fires when we have recent broadcast data.
+        if let Some(last_crhv) = self.cantor_broadcast_buffer.last() {
+            let depth_norm = last_crhv.depth as f32
+                / crate::cognitive_loop::thresholds::CANTOR_DEPTH_MAX as f32;
+            if depth_norm > 0.3 {
+                let ach_base = self.neuromod.bath.acetylcholine.baseline_val();
+                let ach_nudge =
+                    crate::cognitive_loop::thresholds::CANTOR_DEPTH_ACH_BOOST * depth_norm;
+                self.neuromod
+                    .bath
+                    .acetylcholine
+                    .set_baseline(ach_base + ach_nudge);
+
+                let ne_base = self.neuromod.bath.noradrenaline.baseline_val();
+                let ne_nudge =
+                    crate::cognitive_loop::thresholds::CANTOR_DEPTH_NE_DAMPEN * depth_norm;
+                self.neuromod
+                    .bath
+                    .noradrenaline
+                    .set_baseline(ne_base + ne_nudge);
+            }
+        }
+
         // ═══════════════════════════════════════════════════════════════════
         // PHASE 1: PERCEPTION
         // Safety checks, encoding, moral evaluation, strategy, urgency

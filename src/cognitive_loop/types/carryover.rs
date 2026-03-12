@@ -245,6 +245,13 @@ pub(crate) struct QualityMetrics {
     /// Last KosmicSong coherence score (0.0-1.0, cached from last synthesis).
     /// Synthesis of Phi × HarmonicAlignment × MoralClarity.
     pub(crate) last_kosmic_coherence: f32,
+    // ── Session 17: Adaptive Homeostasis ──────────────────────────────────
+    /// Allostatic load (0.0–1.0): cumulative stress burden.
+    pub(crate) allostatic_load: f32,
+    /// Previous consciousness gradient magnitude (for 2nd derivative).
+    pub(crate) prev_gradient_magnitude: f64,
+    /// Whether adaptive warmup has exited (stability-based).
+    pub(crate) adaptive_warmup_exited: bool,
 }
 
 impl Default for QualityMetrics {
@@ -287,6 +294,9 @@ impl Default for QualityMetrics {
             consecutive_epistemic_rejections: 0,
             consecutive_stable_gradient: 0,
             last_kosmic_coherence: 0.5,
+            allostatic_load: 0.0,
+            prev_gradient_magnitude: 0.0,
+            adaptive_warmup_exited: false,
         }
     }
 }

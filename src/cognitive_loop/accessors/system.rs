@@ -378,4 +378,40 @@ impl CognitiveLoopService {
     pub fn inject_vision_frame(&mut self, frame: Vec<u8>) {
         self.vision_frame_buffer = Some(frame);
     }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // MOTOR OUTPUT BRIDGE
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// Install a motor output bridge for real-world action execution.
+    /// When set, FEP `MotorOutput` commands will be dispatched through
+    /// the bridge → ActionRegistry → SimpleExecutor pipeline.
+    pub fn set_motor_output_bridge(
+        &mut self,
+        bridge: super::super::motor_output_bridge::MotorOutputBridge,
+    ) {
+        self.motor_output_bridge = Some(bridge);
+    }
+
+    /// Set the pending motor action request (path, content, args).
+    /// Consumed on the next cycle when a MotorOutput command fires.
+    pub fn set_motor_request(
+        &mut self,
+        request: super::super::motor_output_bridge::MotorActionRequest,
+    ) {
+        self.pending_motor_request = Some(request);
+    }
+
+    /// Take the last motor output result (if any).
+    /// Returns `None` if no MotorOutput was dispatched in the last cycle.
+    pub fn take_motor_result(
+        &mut self,
+    ) -> Option<super::super::motor_output_bridge::MotorOutputResult> {
+        self.last_motor_result.take()
+    }
+
+    /// Whether a motor output bridge is installed.
+    pub fn has_motor_bridge(&self) -> bool {
+        self.motor_output_bridge.is_some()
+    }
 }

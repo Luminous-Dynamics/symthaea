@@ -94,6 +94,45 @@ impl CognitiveLoopService {
                 self.cantor_broadcast_buffer.remove(0);
             }
             self.cantor_broadcast_buffer.push(crhv);
+
+            // RESONANCE COUPLING: Detect coherent CRHV pairs in the buffer.
+            // When multiple fractal representations share high base-vector similarity,
+            // they form a "resonant coalition" that amplifies workspace integration.
+            // Science: Edelman & Tononi (2000) — reentrant signaling creates dynamic
+            //          neural coalitions; Singer (1999) — binding by synchrony.
+            let buf = &self.cantor_broadcast_buffer;
+            if buf.len() >= 2 {
+                let threshold =
+                    crate::cognitive_loop::thresholds::CANTOR_RESONANCE_SIMILARITY_THRESHOLD;
+                let mut resonant_pairs = 0u32;
+                let n = buf.len();
+                // Compare last 8 entries (recent window) to avoid O(n²) over full buffer
+                let window_start = n.saturating_sub(8);
+                for i in window_start..n {
+                    for j in (i + 1)..n {
+                        if buf[i].base.similarity(&buf[j].base) > threshold {
+                            resonant_pairs += 1;
+                        }
+                    }
+                }
+                // Normalize: max pairs in window of 8 = C(8,2) = 28
+                let max_pairs = {
+                    let w = (n - window_start) as u32;
+                    w * (w - 1) / 2
+                };
+                self.cantor_resonance_boost = if max_pairs > 0 {
+                    (resonant_pairs as f32 / max_pairs as f32).min(1.0)
+                } else {
+                    0.0
+                };
+                if self.cantor_resonance_boost > 0.1 {
+                    self.adjust_confidence(
+                        "cantor_resonance",
+                        crate::cognitive_loop::thresholds::CANTOR_RESONANCE_CONFIDENCE_BOOST
+                            * self.cantor_resonance_boost,
+                    );
+                }
+            }
         }
 
         module_timings.gwt = _t.elapsed().as_micros() as u64;

@@ -1,0 +1,912 @@
+#![allow(dead_code)]
+
+//! # Statistics & Probability Engine
+//!
+//! Probability distributions, descriptive statistics, hypothesis testing,
+//! Bayesian inference, and regression — all with HDC encoding and Phi coupling.
+//!
+//! ## Capabilities
+//!
+//! - **Descriptive**: mean, variance, std, median, quartiles, skewness, kurtosis
+//! - **Distributions**: PDF, CDF, sampling, moments for 8 families
+//! - **Hypothesis testing**: t-test, chi-squared goodness-of-fit
+//! - **Bayesian inference**: conjugate priors (Normal-Normal, Beta-Binomial)
+//! - **Correlation**: Pearson, Spearman rank
+//! - **Linear regression**: y = ax + b via least-squares
+
+use crate::hdc::binary_hv::BinaryHV;
+use crate::hdc::primitive_system::seed_from_name;
+use serde::{Deserialize, Serialize};
+
+// ─── Descriptive Statistics ──────────────────────────────────────────────────
+
+/// Compute the mean of a slice
+pub fn mean(data: &[f64]) -> f64 {
+    if data.is_empty() {
+        return 0.0;
+    }
+    data.iter().sum::<f64>() / data.len() as f64
+}
+
+/// Compute the variance (population)
+pub fn variance(data: &[f64]) -> f64 {
+    if data.len() < 2 {
+        return 0.0;
+    }
+    let m = mean(data);
+    data.iter().map(|x| (x - m).powi(2)).sum::<f64>() / data.len() as f64
+}
+
+/// Compute the sample variance (Bessel-corrected)
+pub fn sample_variance(data: &[f64]) -> f64 {
+    if data.len() < 2 {
+        return 0.0;
+    }
+    let m = mean(data);
+    data.iter().map(|x| (x - m).powi(2)).sum::<f64>() / (data.len() - 1) as f64
+}
+
+/// Standard deviation (population)
+pub fn std_dev(data: &[f64]) -> f64 {
+    variance(data).sqrt()
+}
+
+/// Median
+pub fn median(data: &[f64]) -> f64 {
+    if data.is_empty() {
+        return 0.0;
+    }
+    let mut sorted = data.to_vec();
+    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    let n = sorted.len();
+    if n % 2 == 0 {
+        (sorted[n / 2 - 1] + sorted[n / 2]) / 2.0
+    } else {
+        sorted[n / 2]
+    }
+}
+
+/// Quartiles (Q1, Q2/median, Q3)
+pub fn quartiles(data: &[f64]) -> (f64, f64, f64) {
+    let mut sorted = data.to_vec();
+    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    let n = sorted.len();
+    let q2 = median(data);
+
+    let lower = &sorted[..n / 2];
+    let upper = if n % 2 == 0 {
+        &sorted[n / 2..]
+    } else {
+        &sorted[n / 2 + 1..]
+    };
+
+    let q1 = if lower.is_empty() { q2 } else { median(lower) };
+    let q3 = if upper.is_empty() { q2 } else { median(upper) };
+
+    (q1, q2, q3)
+}
+
+/// Skewness (Fisher-Pearson)
+pub fn skewness(data: &[f64]) -> f64 {
+    let n = data.len() as f64;
+    if n < 3.0 {
+        return 0.0;
+    }
+    let m = mean(data);
+    let s = std_dev(data);
+    if s < 1e-15 {
+        return 0.0;
+    }
+    let m3: f64 = data.iter().map(|x| ((x - m) / s).powi(3)).sum::<f64>() / n;
+    m3
+}
+
+/// Excess kurtosis
+pub fn kurtosis(data: &[f64]) -> f64 {
+    let n = data.len() as f64;
+    if n < 4.0 {
+        return 0.0;
+    }
+    let m = mean(data);
+    let s = std_dev(data);
+    if s < 1e-15 {
+        return 0.0;
+    }
+    let m4: f64 = data.iter().map(|x| ((x - m) / s).powi(4)).sum::<f64>() / n;
+    m4 - 3.0
+}
+
+// ─── Probability Distributions ───────────────────────────────────────────────
+
+/// Distribution families
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum Distribution {
+    /// Normal(μ, σ²)
+    Normal { mu: f64, sigma: f64 },
+    /// Uniform(a, b)
+    Uniform { a: f64, b: f64 },
+    /// Bernoulli(p)
+    Bernoulli { p: f64 },
+    /// Binomial(n, p)
+    Binomial { n: u64, p: f64 },
+    /// Poisson(λ)
+    Poisson { lambda: f64 },
+    /// Exponential(λ)
+    Exponential { lambda: f64 },
+    /// Beta(α, β)
+    Beta { alpha: f64, beta: f64 },
+    /// Gamma(α, β)
+    Gamma { alpha: f64, beta: f64 },
+}
+
+impl Distribution {
+    /// Probability density/mass function
+    pub fn pdf(&self, x: f64) -> f64 {
+        match self {
+            Distribution::Normal { mu, sigma } => {
+                let z = (x - mu) / sigma;
+                (-0.5 * z * z).exp() / (sigma * (2.0 * std::f64::consts::PI).sqrt())
+            }
+            Distribution::Uniform { a, b } => {
+                if x >= *a && x <= *b {
+                    1.0 / (b - a)
+                } else {
+                    0.0
+                }
+            }
+            Distribution::Bernoulli { p } => {
+                if (x - 1.0).abs() < 1e-10 {
+                    *p
+                } else if x.abs() < 1e-10 {
+                    1.0 - p
+                } else {
+                    0.0
+                }
+            }
+            Distribution::Binomial { n, p } => {
+                let k = x.round() as u64;
+                if k > *n || x < 0.0 {
+                    return 0.0;
+                }
+                let coeff = binomial_coefficient(*n, k);
+                coeff as f64 * p.powi(k as i32) * (1.0 - p).powi((*n - k) as i32)
+            }
+            Distribution::Poisson { lambda } => {
+                let k = x.round() as u64;
+                if x < 0.0 {
+                    return 0.0;
+                }
+                (-lambda).exp() * lambda.powi(k as i32) / factorial(k) as f64
+            }
+            Distribution::Exponential { lambda } => {
+                if x < 0.0 {
+                    0.0
+                } else {
+                    lambda * (-lambda * x).exp()
+                }
+            }
+            Distribution::Beta { alpha, beta } => {
+                if x < 0.0 || x > 1.0 {
+                    return 0.0;
+                }
+                let b_val = beta_function(*alpha, *beta);
+                x.powf(alpha - 1.0) * (1.0 - x).powf(beta - 1.0) / b_val
+            }
+            Distribution::Gamma { alpha, beta } => {
+                if x < 0.0 {
+                    return 0.0;
+                }
+                beta.powf(*alpha) / gamma_function(*alpha)
+                    * x.powf(alpha - 1.0)
+                    * (-beta * x).exp()
+            }
+        }
+    }
+
+    /// Cumulative distribution function
+    pub fn cdf(&self, x: f64) -> f64 {
+        match self {
+            Distribution::Normal { mu, sigma } => {
+                0.5 * (1.0 + erf((x - mu) / (sigma * std::f64::consts::SQRT_2)))
+            }
+            Distribution::Uniform { a, b } => {
+                if x < *a {
+                    0.0
+                } else if x > *b {
+                    1.0
+                } else {
+                    (x - a) / (b - a)
+                }
+            }
+            Distribution::Exponential { lambda } => {
+                if x < 0.0 {
+                    0.0
+                } else {
+                    1.0 - (-lambda * x).exp()
+                }
+            }
+            _ => {
+                // Numerical CDF via trapezoidal rule for distributions without closed form
+                let lower = self.mean_val() - 6.0 * self.std_val();
+                let upper = x;
+                if upper <= lower {
+                    return 0.0;
+                }
+                let n = 1000;
+                let h = (upper - lower) / n as f64;
+                let mut sum = 0.0;
+                for i in 0..n {
+                    let x0 = lower + i as f64 * h;
+                    let x1 = x0 + h;
+                    sum += (self.pdf(x0) + self.pdf(x1)) / 2.0 * h;
+                }
+                sum.max(0.0).min(1.0)
+            }
+        }
+    }
+
+    /// Mean
+    pub fn mean_val(&self) -> f64 {
+        match self {
+            Distribution::Normal { mu, .. } => *mu,
+            Distribution::Uniform { a, b } => (a + b) / 2.0,
+            Distribution::Bernoulli { p } => *p,
+            Distribution::Binomial { n, p } => *n as f64 * p,
+            Distribution::Poisson { lambda } => *lambda,
+            Distribution::Exponential { lambda } => 1.0 / lambda,
+            Distribution::Beta { alpha, beta } => alpha / (alpha + beta),
+            Distribution::Gamma { alpha, beta } => alpha / beta,
+        }
+    }
+
+    /// Variance
+    pub fn variance_val(&self) -> f64 {
+        match self {
+            Distribution::Normal { sigma, .. } => sigma * sigma,
+            Distribution::Uniform { a, b } => (b - a).powi(2) / 12.0,
+            Distribution::Bernoulli { p } => p * (1.0 - p),
+            Distribution::Binomial { n, p } => *n as f64 * p * (1.0 - p),
+            Distribution::Poisson { lambda } => *lambda,
+            Distribution::Exponential { lambda } => 1.0 / (lambda * lambda),
+            Distribution::Beta { alpha, beta } => {
+                (alpha * beta) / ((alpha + beta).powi(2) * (alpha + beta + 1.0))
+            }
+            Distribution::Gamma { alpha, beta } => alpha / (beta * beta),
+        }
+    }
+
+    /// Standard deviation
+    pub fn std_val(&self) -> f64 {
+        self.variance_val().sqrt()
+    }
+
+    /// HDC encoding of the distribution
+    pub fn encode(&self) -> BinaryHV {
+        let dist_name = match self {
+            Distribution::Normal { .. } => "DIST_NORMAL",
+            Distribution::Uniform { .. } => "DIST_UNIFORM",
+            Distribution::Bernoulli { .. } => "DIST_BERNOULLI",
+            Distribution::Binomial { .. } => "DIST_BINOMIAL",
+            Distribution::Poisson { .. } => "DIST_POISSON",
+            Distribution::Exponential { .. } => "DIST_EXPONENTIAL",
+            Distribution::Beta { .. } => "DIST_BETA",
+            Distribution::Gamma { .. } => "DIST_GAMMA",
+        };
+        let type_hv = BinaryHV::random(seed_from_name(dist_name));
+        let mean_hv = BinaryHV::random(seed_from_name(&format!(
+            "MEAN_{}", self.mean_val().to_bits()
+        )));
+        let var_hv = BinaryHV::random(seed_from_name(&format!(
+            "VAR_{}", self.variance_val().to_bits()
+        )));
+        type_hv.bind(&mean_hv).bind(&var_hv)
+    }
+}
+
+// ─── Hypothesis Testing ──────────────────────────────────────────────────────
+
+/// Result of a hypothesis test
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HypothesisTestResult {
+    pub test_name: String,
+    pub test_statistic: f64,
+    pub p_value: f64,
+    pub reject: bool,
+    pub confidence_level: f64,
+    pub phi: f64,
+}
+
+/// One-sample t-test: test if mean equals μ₀
+pub fn one_sample_t_test(data: &[f64], mu0: f64, alpha: f64) -> HypothesisTestResult {
+    let n = data.len() as f64;
+    let m = mean(data);
+    let s = sample_variance(data).sqrt();
+    let t = (m - mu0) / (s / n.sqrt());
+    let df = n - 1.0;
+
+    // Approximate p-value using normal approximation (good for df > 30)
+    let p_value = 2.0 * (1.0 - normal_cdf(t.abs()));
+
+    HypothesisTestResult {
+        test_name: "One-sample t-test".to_string(),
+        test_statistic: t,
+        p_value,
+        reject: p_value < alpha,
+        confidence_level: 1.0 - alpha,
+        phi: if p_value < alpha { 0.3 } else { 0.1 },
+    }
+}
+
+/// Two-sample t-test (equal variances assumed)
+pub fn two_sample_t_test(data1: &[f64], data2: &[f64], alpha: f64) -> HypothesisTestResult {
+    let n1 = data1.len() as f64;
+    let n2 = data2.len() as f64;
+    let m1 = mean(data1);
+    let m2 = mean(data2);
+    let s1 = sample_variance(data1);
+    let s2 = sample_variance(data2);
+
+    let sp = ((((n1 - 1.0) * s1 + (n2 - 1.0) * s2) / (n1 + n2 - 2.0))
+        * (1.0 / n1 + 1.0 / n2))
+    .sqrt();
+
+    let t = if sp > 1e-15 {
+        (m1 - m2) / sp
+    } else {
+        0.0
+    };
+
+    let p_value = 2.0 * (1.0 - normal_cdf(t.abs()));
+
+    HypothesisTestResult {
+        test_name: "Two-sample t-test".to_string(),
+        test_statistic: t,
+        p_value,
+        reject: p_value < alpha,
+        confidence_level: 1.0 - alpha,
+        phi: if p_value < alpha { 0.3 } else { 0.1 },
+    }
+}
+
+/// Chi-squared goodness-of-fit test
+pub fn chi_squared_test(observed: &[f64], expected: &[f64], alpha: f64) -> HypothesisTestResult {
+    assert_eq!(observed.len(), expected.len());
+
+    let chi2: f64 = observed
+        .iter()
+        .zip(expected.iter())
+        .map(|(o, e)| {
+            if *e > 1e-15 {
+                (o - e).powi(2) / e
+            } else {
+                0.0
+            }
+        })
+        .sum();
+
+    let df = (observed.len() - 1) as f64;
+    // Approximate p-value using Wilson-Hilferty normal approximation
+    let z = (chi2 / df).powf(1.0 / 3.0) - (1.0 - 2.0 / (9.0 * df));
+    let z = z / (2.0 / (9.0 * df)).sqrt();
+    let p_value = 1.0 - normal_cdf(z);
+
+    HypothesisTestResult {
+        test_name: "Chi-squared goodness-of-fit".to_string(),
+        test_statistic: chi2,
+        p_value,
+        reject: p_value < alpha,
+        confidence_level: 1.0 - alpha,
+        phi: if p_value < alpha { 0.3 } else { 0.1 },
+    }
+}
+
+// ─── Bayesian Inference ──────────────────────────────────────────────────────
+
+/// Result of Bayesian posterior update
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BayesianResult {
+    pub prior: Distribution,
+    pub posterior: Distribution,
+    pub description: String,
+    pub phi: f64,
+    pub encoding: BinaryHV,
+}
+
+/// Normal-Normal conjugate update.
+/// Prior: N(μ₀, σ₀²), Likelihood: N(x̄, σ²/n) → Posterior: N(μ₁, σ₁²)
+pub fn normal_normal_update(
+    prior_mu: f64,
+    prior_sigma: f64,
+    data_mean: f64,
+    data_sigma: f64,
+    n: usize,
+) -> BayesianResult {
+    let prior_precision = 1.0 / (prior_sigma * prior_sigma);
+    let likelihood_precision = n as f64 / (data_sigma * data_sigma);
+
+    let posterior_precision = prior_precision + likelihood_precision;
+    let posterior_mu =
+        (prior_precision * prior_mu + likelihood_precision * data_mean) / posterior_precision;
+    let posterior_sigma = (1.0 / posterior_precision).sqrt();
+
+    let prior = Distribution::Normal {
+        mu: prior_mu,
+        sigma: prior_sigma,
+    };
+    let posterior = Distribution::Normal {
+        mu: posterior_mu,
+        sigma: posterior_sigma,
+    };
+
+    let encoding = prior.encode().bind(&posterior.encode());
+
+    BayesianResult {
+        prior,
+        posterior,
+        description: format!(
+            "Normal-Normal update: N({:.3}, {:.3}²) → N({:.3}, {:.3}²) after {} observations",
+            prior_mu, prior_sigma, posterior_mu, posterior_sigma, n
+        ),
+        phi: 0.3 + 0.1 * (n as f64).ln().min(2.0),
+        encoding,
+    }
+}
+
+/// Beta-Binomial conjugate update.
+/// Prior: Beta(α, β), observe k successes in n trials → Posterior: Beta(α+k, β+n-k)
+pub fn beta_binomial_update(
+    prior_alpha: f64,
+    prior_beta: f64,
+    successes: u64,
+    trials: u64,
+) -> BayesianResult {
+    let posterior_alpha = prior_alpha + successes as f64;
+    let posterior_beta = prior_beta + (trials - successes) as f64;
+
+    let prior = Distribution::Beta {
+        alpha: prior_alpha,
+        beta: prior_beta,
+    };
+    let posterior = Distribution::Beta {
+        alpha: posterior_alpha,
+        beta: posterior_beta,
+    };
+
+    let encoding = prior.encode().bind(&posterior.encode());
+
+    BayesianResult {
+        prior,
+        posterior,
+        description: format!(
+            "Beta-Binomial update: Beta({:.1}, {:.1}) → Beta({:.1}, {:.1}) after {}/{} successes",
+            prior_alpha, prior_beta, posterior_alpha, posterior_beta, successes, trials
+        ),
+        phi: 0.3 + 0.1 * (trials as f64).ln().min(2.0),
+        encoding,
+    }
+}
+
+// ─── Correlation ─────────────────────────────────────────────────────────────
+
+/// Pearson correlation coefficient
+pub fn pearson_correlation(x: &[f64], y: &[f64]) -> f64 {
+    assert_eq!(x.len(), y.len());
+    let n = x.len() as f64;
+    let mx = mean(x);
+    let my = mean(y);
+
+    let cov: f64 = x.iter().zip(y.iter()).map(|(a, b)| (a - mx) * (b - my)).sum::<f64>() / n;
+    let sx = std_dev(x);
+    let sy = std_dev(y);
+
+    if sx < 1e-15 || sy < 1e-15 {
+        0.0
+    } else {
+        cov / (sx * sy)
+    }
+}
+
+/// Spearman rank correlation
+pub fn spearman_correlation(x: &[f64], y: &[f64]) -> f64 {
+    let rx = rank(x);
+    let ry = rank(y);
+    pearson_correlation(&rx, &ry)
+}
+
+fn rank(data: &[f64]) -> Vec<f64> {
+    let n = data.len();
+    let mut indexed: Vec<(usize, f64)> = data.iter().enumerate().map(|(i, &v)| (i, v)).collect();
+    indexed.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+    let mut ranks = vec![0.0; n];
+    for (rank, &(idx, _)) in indexed.iter().enumerate() {
+        ranks[idx] = (rank + 1) as f64;
+    }
+    ranks
+}
+
+// ─── Linear Regression ──────────────────────────────────────────────────────
+
+/// Result of a linear regression y = a + bx
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LinearRegressionResult {
+    pub intercept: f64,
+    pub slope: f64,
+    pub r_squared: f64,
+    pub residual_std: f64,
+    pub phi: f64,
+}
+
+/// Simple linear regression: y = a + bx (least-squares)
+pub fn linear_regression(x: &[f64], y: &[f64]) -> LinearRegressionResult {
+    assert_eq!(x.len(), y.len());
+    let n = x.len() as f64;
+    let mx = mean(x);
+    let my = mean(y);
+
+    let sxx: f64 = x.iter().map(|xi| (xi - mx).powi(2)).sum();
+    let sxy: f64 = x.iter().zip(y.iter()).map(|(xi, yi)| (xi - mx) * (yi - my)).sum();
+
+    let slope = if sxx > 1e-15 { sxy / sxx } else { 0.0 };
+    let intercept = my - slope * mx;
+
+    // R²
+    let ss_res: f64 = x
+        .iter()
+        .zip(y.iter())
+        .map(|(xi, yi)| {
+            let predicted = intercept + slope * xi;
+            (yi - predicted).powi(2)
+        })
+        .sum();
+    let ss_tot: f64 = y.iter().map(|yi| (yi - my).powi(2)).sum();
+    let r_squared = if ss_tot > 1e-15 {
+        1.0 - ss_res / ss_tot
+    } else {
+        1.0
+    };
+
+    let residual_std = if n > 2.0 {
+        (ss_res / (n - 2.0)).sqrt()
+    } else {
+        0.0
+    };
+
+    LinearRegressionResult {
+        intercept,
+        slope,
+        r_squared,
+        residual_std,
+        phi: 0.2 + 0.3 * r_squared,
+    }
+}
+
+// ─── Helper Functions ────────────────────────────────────────────────────────
+
+/// Error function (Abramowitz and Stegun approximation)
+fn erf(x: f64) -> f64 {
+    let a1 = 0.254829592;
+    let a2 = -0.284496736;
+    let a3 = 1.421413741;
+    let a4 = -1.453152027;
+    let a5 = 1.061405429;
+    let p = 0.3275911;
+
+    let sign = if x >= 0.0 { 1.0 } else { -1.0 };
+    let x = x.abs();
+    let t = 1.0 / (1.0 + p * x);
+    let y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * (-x * x).exp();
+    sign * y
+}
+
+/// Normal CDF using error function
+fn normal_cdf(x: f64) -> f64 {
+    0.5 * (1.0 + erf(x / std::f64::consts::SQRT_2))
+}
+
+fn factorial(n: u64) -> u64 {
+    (1..=n).product::<u64>().max(1)
+}
+
+fn binomial_coefficient(n: u64, k: u64) -> u64 {
+    if k > n {
+        return 0;
+    }
+    let k = k.min(n - k);
+    let mut result: u64 = 1;
+    for i in 0..k {
+        result = result * (n - i) / (i + 1);
+    }
+    result
+}
+
+/// Lanczos approximation of the gamma function
+fn gamma_function(x: f64) -> f64 {
+    if x < 0.5 {
+        std::f64::consts::PI / ((std::f64::consts::PI * x).sin() * gamma_function(1.0 - x))
+    } else {
+        let x = x - 1.0;
+        let g = 7.0;
+        let c = [
+            0.99999999999980993,
+            676.5203681218851,
+            -1259.1392167224028,
+            771.32342877765313,
+            -176.61502916214059,
+            12.507343278686905,
+            -0.13857109526572012,
+            9.9843695780195716e-6,
+            1.5056327351493116e-7,
+        ];
+
+        let mut sum = c[0];
+        for (i, &ci) in c.iter().enumerate().skip(1) {
+            sum += ci / (x + i as f64);
+        }
+
+        let t = x + g + 0.5;
+        (2.0 * std::f64::consts::PI).sqrt() * t.powf(x + 0.5) * (-t).exp() * sum
+    }
+}
+
+/// Beta function: B(a,b) = Γ(a)Γ(b)/Γ(a+b)
+fn beta_function(a: f64, b: f64) -> f64 {
+    gamma_function(a) * gamma_function(b) / gamma_function(a + b)
+}
+
+// ─── Tests ───────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const TOL: f64 = 1e-6;
+
+    // ── Descriptive statistics ───────────────────────────────────────────
+
+    #[test]
+    fn test_mean() {
+        assert!((mean(&[1.0, 2.0, 3.0, 4.0, 5.0]) - 3.0).abs() < TOL);
+        assert!((mean(&[10.0]) - 10.0).abs() < TOL);
+    }
+
+    #[test]
+    fn test_variance() {
+        let data = vec![2.0, 4.0, 4.0, 4.0, 5.0, 5.0, 7.0, 9.0];
+        assert!((variance(&data) - 4.0).abs() < TOL);
+    }
+
+    #[test]
+    fn test_std_dev() {
+        let data = vec![2.0, 4.0, 4.0, 4.0, 5.0, 5.0, 7.0, 9.0];
+        assert!((std_dev(&data) - 2.0).abs() < TOL);
+    }
+
+    #[test]
+    fn test_median() {
+        assert!((median(&[1.0, 3.0, 5.0]) - 3.0).abs() < TOL);
+        assert!((median(&[1.0, 2.0, 3.0, 4.0]) - 2.5).abs() < TOL);
+    }
+
+    #[test]
+    fn test_quartiles() {
+        let data = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
+        let (q1, q2, q3) = quartiles(&data);
+        assert!((q2 - 4.5).abs() < TOL);
+        assert!(q1 < q2);
+        assert!(q2 < q3);
+    }
+
+    #[test]
+    fn test_skewness_symmetric() {
+        // Symmetric distribution should have ~0 skewness
+        let data: Vec<f64> = (0..100).map(|i| (i as f64 - 50.0)).collect();
+        assert!(skewness(&data).abs() < 0.1);
+    }
+
+    // ── Distributions ────────────────────────────────────────────────────
+
+    #[test]
+    fn test_normal_pdf() {
+        let n = Distribution::Normal { mu: 0.0, sigma: 1.0 };
+        // PDF at 0 should be 1/√(2π)
+        let expected = 1.0 / (2.0 * std::f64::consts::PI).sqrt();
+        assert!((n.pdf(0.0) - expected).abs() < TOL);
+    }
+
+    #[test]
+    fn test_normal_cdf_symmetry() {
+        let n = Distribution::Normal { mu: 0.0, sigma: 1.0 };
+        assert!((n.cdf(0.0) - 0.5).abs() < TOL);
+        // CDF(-x) + CDF(x) ≈ 1
+        assert!((n.cdf(-1.0) + n.cdf(1.0) - 1.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_normal_mean_var() {
+        let n = Distribution::Normal { mu: 5.0, sigma: 3.0 };
+        assert!((n.mean_val() - 5.0).abs() < TOL);
+        assert!((n.variance_val() - 9.0).abs() < TOL);
+    }
+
+    #[test]
+    fn test_uniform_pdf() {
+        let u = Distribution::Uniform { a: 0.0, b: 1.0 };
+        assert!((u.pdf(0.5) - 1.0).abs() < TOL);
+        assert!((u.pdf(-0.1) - 0.0).abs() < TOL);
+        assert!((u.pdf(1.1) - 0.0).abs() < TOL);
+    }
+
+    #[test]
+    fn test_exponential_properties() {
+        let e = Distribution::Exponential { lambda: 2.0 };
+        assert!((e.mean_val() - 0.5).abs() < TOL);
+        assert!((e.variance_val() - 0.25).abs() < TOL);
+        assert!((e.cdf(0.0) - 0.0).abs() < TOL);
+        assert!((e.cdf(f64::INFINITY) - 1.0).abs() < TOL);
+    }
+
+    #[test]
+    fn test_bernoulli() {
+        let b = Distribution::Bernoulli { p: 0.7 };
+        assert!((b.pdf(1.0) - 0.7).abs() < TOL);
+        assert!((b.pdf(0.0) - 0.3).abs() < TOL);
+        assert!((b.mean_val() - 0.7).abs() < TOL);
+    }
+
+    #[test]
+    fn test_binomial_properties() {
+        let b = Distribution::Binomial { n: 10, p: 0.5 };
+        assert!((b.mean_val() - 5.0).abs() < TOL);
+        assert!((b.variance_val() - 2.5).abs() < TOL);
+    }
+
+    #[test]
+    fn test_poisson() {
+        let p = Distribution::Poisson { lambda: 4.0 };
+        assert!((p.mean_val() - 4.0).abs() < TOL);
+        assert!((p.variance_val() - 4.0).abs() < TOL);
+    }
+
+    #[test]
+    fn test_beta_mean() {
+        let b = Distribution::Beta { alpha: 2.0, beta: 5.0 };
+        assert!((b.mean_val() - 2.0 / 7.0).abs() < TOL);
+    }
+
+    #[test]
+    fn test_distribution_encoding() {
+        let n1 = Distribution::Normal { mu: 0.0, sigma: 1.0 };
+        let n2 = Distribution::Normal { mu: 10.0, sigma: 2.0 };
+        let sim = n1.encode().similarity(&n2.encode());
+        assert!(sim < 0.6, "Different distributions should have low similarity");
+    }
+
+    // ── Hypothesis testing ───────────────────────────────────────────────
+
+    #[test]
+    fn test_one_sample_t_test() {
+        // Data clearly centered at 5, test against μ=5
+        let data: Vec<f64> = vec![4.8, 5.1, 5.0, 4.9, 5.2, 5.0, 4.9, 5.1];
+        let result = one_sample_t_test(&data, 5.0, 0.05);
+        assert!(!result.reject, "Should not reject H0: μ=5");
+    }
+
+    #[test]
+    fn test_one_sample_t_test_reject() {
+        // Data centered at 10, test against μ=5
+        let data: Vec<f64> = vec![9.5, 10.2, 10.1, 9.8, 10.3, 10.0, 9.9, 10.1];
+        let result = one_sample_t_test(&data, 5.0, 0.05);
+        assert!(result.reject, "Should reject H0: μ=5");
+    }
+
+    #[test]
+    fn test_two_sample_t_test() {
+        let data1: Vec<f64> = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+        let data2: Vec<f64> = vec![10.0, 11.0, 12.0, 13.0, 14.0];
+        let result = two_sample_t_test(&data1, &data2, 0.05);
+        assert!(result.reject, "Clearly different means");
+    }
+
+    #[test]
+    fn test_chi_squared() {
+        // Fair die: observed ≈ expected
+        let observed = vec![16.0, 18.0, 17.0, 15.0, 17.0, 17.0];
+        let expected = vec![16.67, 16.67, 16.67, 16.67, 16.67, 16.67];
+        let result = chi_squared_test(&observed, &expected, 0.05);
+        assert!(!result.reject, "Fair die should not be rejected");
+    }
+
+    // ── Bayesian inference ───────────────────────────────────────────────
+
+    #[test]
+    fn test_normal_normal_update() {
+        let result = normal_normal_update(0.0, 1.0, 5.0, 1.0, 10);
+        // Posterior should be pulled toward data mean (5.0)
+        if let Distribution::Normal { mu, sigma } = &result.posterior {
+            assert!(*mu > 0.0 && *mu < 5.0, "Posterior mean should be between prior and data");
+            assert!(*sigma < 1.0, "Posterior should be more precise than prior");
+        } else {
+            panic!("Expected Normal posterior");
+        }
+    }
+
+    #[test]
+    fn test_beta_binomial_update() {
+        // Uniform prior Beta(1,1), observe 7/10 successes
+        let result = beta_binomial_update(1.0, 1.0, 7, 10);
+        if let Distribution::Beta { alpha, beta } = &result.posterior {
+            assert!((alpha - 8.0).abs() < TOL);
+            assert!((beta - 4.0).abs() < TOL);
+            // Posterior mean = 8/12 ≈ 0.667
+            assert!((result.posterior.mean_val() - 8.0 / 12.0).abs() < TOL);
+        } else {
+            panic!("Expected Beta posterior");
+        }
+    }
+
+    // ── Correlation ──────────────────────────────────────────────────────
+
+    #[test]
+    fn test_pearson_perfect() {
+        let x = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+        let y = vec![2.0, 4.0, 6.0, 8.0, 10.0];
+        assert!((pearson_correlation(&x, &y) - 1.0).abs() < TOL);
+    }
+
+    #[test]
+    fn test_pearson_negative() {
+        let x = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+        let y = vec![10.0, 8.0, 6.0, 4.0, 2.0];
+        assert!((pearson_correlation(&x, &y) - (-1.0)).abs() < TOL);
+    }
+
+    #[test]
+    fn test_spearman_correlation() {
+        let x = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+        let y = vec![2.0, 4.0, 6.0, 8.0, 10.0];
+        assert!((spearman_correlation(&x, &y) - 1.0).abs() < TOL);
+    }
+
+    // ── Linear regression ────────────────────────────────────────────────
+
+    #[test]
+    fn test_linear_regression_perfect() {
+        let x = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+        let y = vec![3.0, 5.0, 7.0, 9.0, 11.0]; // y = 1 + 2x
+        let result = linear_regression(&x, &y);
+        assert!((result.slope - 2.0).abs() < TOL);
+        assert!((result.intercept - 1.0).abs() < TOL);
+        assert!((result.r_squared - 1.0).abs() < TOL);
+    }
+
+    #[test]
+    fn test_linear_regression_noisy() {
+        let x = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+        let y = vec![2.1, 3.9, 6.2, 7.8, 10.1]; // ~2x with noise
+        let result = linear_regression(&x, &y);
+        assert!((result.slope - 2.0).abs() < 0.2);
+        assert!(result.r_squared > 0.95);
+    }
+
+    // ── Helper functions ─────────────────────────────────────────────────
+
+    #[test]
+    fn test_erf() {
+        assert!(erf(0.0).abs() < TOL);
+        assert!((erf(f64::INFINITY) - 1.0).abs() < TOL);
+        // erf(1) ≈ 0.8427
+        assert!((erf(1.0) - 0.8427).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_gamma_function() {
+        // Γ(1) = 1
+        assert!((gamma_function(1.0) - 1.0).abs() < TOL);
+        // Γ(2) = 1
+        assert!((gamma_function(2.0) - 1.0).abs() < TOL);
+        // Γ(5) = 4! = 24
+        assert!((gamma_function(5.0) - 24.0).abs() < 0.001);
+        // Γ(0.5) = √π
+        assert!((gamma_function(0.5) - std::f64::consts::PI.sqrt()).abs() < TOL);
+    }
+}

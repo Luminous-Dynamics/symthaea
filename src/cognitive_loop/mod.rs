@@ -156,6 +156,7 @@ pub(crate) mod self_model_tier;
 pub(crate) mod social_manager;
 pub(crate) mod substrate_manager;
 pub(crate) mod subsystem_trait;
+pub mod motor_output_bridge;
 #[allow(dead_code)] // Registry of tuning constants — many reserved for future wiring
 pub(crate) mod thresholds;
 pub(crate) mod virtual_body;
@@ -173,6 +174,7 @@ pub use physics_integration::ParetoContext;
 pub use managers::governance_manager::{GovernanceEvent, GovernanceEventKind, GovernanceOutcome};
 
 pub mod calibration;
+pub mod math_service;
 
 #[cfg(feature = "nurture")]
 pub mod nurture_bridge;
@@ -775,6 +777,31 @@ pub struct CognitiveLoopService {
     /// Science: Dehaene et al. (2006) — ignition strength varies with stimulus salience;
     ///          stronger ignition recruits more recurrent cortical layers.
     cantor_last_activation: f32,
+
+    /// EMA of dream consolidation surprise (|pre_ss − post_ss|).
+    /// High surprise signals the codebook is encountering novel fractal structure.
+    /// Science: Friston (2010) — free-energy surprise drives plasticity updates;
+    ///          unexpected outcomes signal model inadequacy requiring learning.
+    cantor_dream_surprise: f32,
+
+    /// Resonance boost from coherent CRHV pairs in the broadcast buffer.
+    /// When multiple CRHVs share high similarity (>0.8), the resulting coalition
+    /// amplifies workspace integration — a "fractal choir" effect.
+    /// Science: Edelman & Tononi (2000) — reentrant cortical signaling
+    ///          creates dynamic coalitions; Singer (1999) — binding by synchrony.
+    cantor_resonance_boost: f32,
+
+    /// Motor output bridge: translates FEP MotorOutput commands into real-world
+    /// actions (file I/O, shell commands, tests) via SimpleExecutor.
+    /// When `None`, MotorOutput commands are no-ops (default behavior).
+    motor_output_bridge: Option<motor_output_bridge::MotorOutputBridge>,
+
+    /// Pending motor action request (string data for the next MotorOutput dispatch).
+    /// Set externally before a cycle to provide path/content/args for motor commands.
+    pub(crate) pending_motor_request: Option<motor_output_bridge::MotorActionRequest>,
+
+    /// Last motor output result for FEP feedback.
+    pub(crate) last_motor_result: Option<motor_output_bridge::MotorOutputResult>,
 }
 
 // MetricsProvider impl is in metrics_provider.rs

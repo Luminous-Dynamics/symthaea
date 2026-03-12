@@ -88,6 +88,24 @@ pub const CANTOR_CONSCIOUSNESS_MODULATION: f64 = 0.06;
 /// Basis: Born & Wilhelm (2012) — only stable replay traces consolidate.
 pub const CANTOR_DREAM_QUALITY_THRESHOLD: f32 = 0.7;
 
+/// Minimum pairwise similarity for two CRHVs to be considered "resonant".
+/// Science: Edelman & Tononi (2000) — reentrant signaling amplifies coherent coalitions.
+pub const CANTOR_RESONANCE_SIMILARITY_THRESHOLD: f32 = 0.8;
+
+/// Confidence boost when resonance is detected among broadcast CRHVs.
+/// Resonant fractal patterns indicate stable attractor formation.
+pub const CANTOR_RESONANCE_CONFIDENCE_BOOST: f32 = 0.02;
+
+/// ACh baseline nudge per unit of normalized CRHV depth (depth/DEPTH_MAX).
+/// Deep recursion → focused recurrent processing → cholinergic engagement.
+/// Science: Hasselmo (2006) — ACh gates recurrent processing depth in cortex.
+pub const CANTOR_DEPTH_ACH_BOOST: f32 = 0.02;
+
+/// NE baseline nudge (negative) per unit of normalized CRHV depth.
+/// Deep recursion → reduced alerting (focused attention replaces scanning).
+/// Science: Hasselmo (2006) — ACh/NE balance shifts during focused vs scanning attention.
+pub const CANTOR_DEPTH_NE_DAMPEN: f32 = -0.015;
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // FEP / ACTIVE INFERENCE
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1114,6 +1132,7 @@ pub fn validate() {
     assert!(GOV_ALIGNED_FAIL_DA_NUDGE < 0.0 && GOV_ALIGNED_FAIL_DA_NUDGE >= -0.10);
     assert!(GOV_REPUTATION_DECLINE_SHT < 0.0 && GOV_REPUTATION_DECLINE_SHT >= -0.10);
     assert!(GOV_COLLECTIVE_PHI_ECB > 0.0 && GOV_COLLECTIVE_PHI_ECB <= 0.05);
+    assert!(GOV_CONSCIOUSNESS_MODULATION > 0.0 && GOV_CONSCIOUSNESS_MODULATION <= 0.10);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1933,6 +1952,57 @@ pub const ERROR_OSCILLATION_BIFURCATION_LR: f32 = 0.9;
 pub const ERROR_OSCILLATION_BIFURCATION_EXPLORE: f32 = 0.03;
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// SESSION 17: ADAPTIVE HOMEOSTASIS & EMERGENT DYNAMICS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Allostatic load decay per cycle.
+/// Basis: McEwen (1998) — allostatic load accumulates under stress, decays during recovery.
+pub const ALLOSTATIC_LOAD_DECAY: f32 = 0.995;
+/// Allostatic load increment per dampening event.
+pub const ALLOSTATIC_LOAD_INCREMENT: f32 = 0.02;
+/// Allostatic load threshold above which cognitive budget is reduced.
+/// Basis: McEwen (2007) — allostatic overload impairs cognition.
+pub const ALLOSTATIC_OVERLOAD_THRESHOLD: f32 = 0.6;
+/// LR dampening during allostatic overload.
+pub const ALLOSTATIC_OVERLOAD_LR_SCALE: f32 = 0.95;
+/// Exploration boost during allostatic overload (seek recovery).
+pub const ALLOSTATIC_OVERLOAD_EXPLORE_BOOST: f32 = 0.02;
+/// Exploration decay factor per cycle.
+/// Basis: Sutton & Barto (2018) — epsilon decay prevents exploration drift.
+pub const EXPLORATION_DECAY_FACTOR: f32 = 0.998;
+/// Exploration baseline that decay converges toward.
+pub const EXPLORATION_DECAY_BASELINE: f32 = 0.5;
+/// Consciousness gradient acceleration threshold (2nd derivative).
+/// Basis: Friston (2010) — generalized coordinates track higher-order dynamics.
+pub const CONSCIOUSNESS_ACCEL_THRESHOLD: f64 = 0.05;
+/// LR dampening for high consciousness acceleration.
+pub const CONSCIOUSNESS_ACCEL_LR_SCALE: f32 = 0.95;
+/// Confidence dampening for high consciousness acceleration.
+pub const CONSCIOUSNESS_ACCEL_CONFIDENCE_SCALE: f32 = 0.98;
+/// Adaptive warmup exit: consciousness gradient below this = stable.
+/// Basis: Smith (2018) — super-convergence via stability-based warmup exit.
+pub const ADAPTIVE_WARMUP_GRADIENT_THRESHOLD: f64 = 0.02;
+/// Adaptive warmup exit: consciousness EMA must exceed this.
+pub const ADAPTIVE_WARMUP_EMA_THRESHOLD: f64 = 0.1;
+/// Minimum warmup cycles before adaptive exit can trigger.
+pub const ADAPTIVE_WARMUP_MIN_CYCLES: u32 = 15;
+/// Maximum proposal sources per channel before saturation triggers.
+/// Basis: Simon (1956) — bounded rationality under information overload.
+pub const PROPOSAL_SATURATION_THRESHOLD: u32 = 8;
+/// LR dampening during proposal saturation (wait-and-see).
+pub const PROPOSAL_SATURATION_LR_SCALE: f32 = 0.97;
+/// Phi threshold below which LR floor is raised.
+/// Basis: Tononi (2004) — low Phi = fragmented → cautious learning.
+pub const PHI_GATED_LR_FLOOR_THRESHOLD: f64 = 0.1;
+/// LR dampening when Phi is below floor threshold.
+pub const PHI_GATED_LR_FLOOR_SCALE: f32 = 0.93;
+/// Rhythmic exploration oscillation period in cycles.
+/// Basis: Lisman & Jensen (2013) — theta-gamma coupling alternates explore/exploit.
+pub const RHYTHMIC_EXPLORATION_PERIOD: u32 = 100;
+/// Rhythmic exploration oscillation amplitude.
+pub const RHYTHMIC_EXPLORATION_AMPLITUDE: f32 = 0.02;
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // AFFECTIVE CONSCIOUSNESS
 // Science: Barrett (2017) — affect is the primary driver of cognition.
 // Damasio (1999) — somatic markers (valence/arousal) guide all decisions.
@@ -2065,6 +2135,11 @@ pub const GOV_REPUTATION_DECLINE_SHT: f32 = -0.02;
 /// ECB baseline nudge on high collective Phi (>0.5).
 /// Group coherence → endocannabinoid system activation.
 pub const GOV_COLLECTIVE_PHI_ECB: f32 = 0.01;
+
+/// Collective Phi → consciousness modulation strength (±2%).
+/// High collective Phi boosts unified consciousness via social integration.
+/// Basis: Woolley et al. (2010) — collective intelligence factor.
+pub const GOV_CONSCIOUSNESS_MODULATION: f64 = 0.04; // ±2% at extremes (0.04 × 0.5 = 0.02)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // FEP PRAGMATIC VALUE MODULATION
@@ -2353,6 +2428,24 @@ pub const MCTS_EFFECTIVENESS_LOW_THRESHOLD: f32 = 0.2;
 
 /// Exploration boost when MCTS planning is ineffective.
 pub const MCTS_EFFECTIVENESS_LOW_EXPLORE_BOOST: f32 = 0.015;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CANTOR FRACTAL RESONATOR
+// Science: Mandelbrot (1982) — fractal self-similarity enables hierarchical
+// pattern recognition. Codebook stores diverse exemplars for resonance.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Maximum entries in the Cantor resonator codebook.
+pub const CANTOR_CODEBOOK_MAX_ENTRIES: usize = 256;
+
+/// Maximum cosine similarity allowed when adding new codebook entries.
+/// Entries with similarity > this to any existing entry are rejected (too redundant).
+/// Science: Hopfield (1982) — decorrelated patterns maximize associative memory capacity.
+pub const CANTOR_CODEBOOK_DIVERSITY_THRESHOLD: f32 = 0.92;
+
+/// EMA decay for Cantor dream surprise tracking.
+/// Science: Friston (2010) — surprise drives plasticity updates.
+pub const CANTOR_SURPRISE_EMA_DECAY: f32 = 0.85;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TESTS
@@ -2934,6 +3027,8 @@ mod tests {
         assert!(GOV_REPUTATION_DECLINE_SHT < 0.0);
         // ECB nudge is small and positive
         assert!(GOV_COLLECTIVE_PHI_ECB > 0.0 && GOV_COLLECTIVE_PHI_ECB <= 0.05);
+        // Consciousness modulation is small (±2% max)
+        assert!(GOV_CONSCIOUSNESS_MODULATION > 0.0 && GOV_CONSCIOUSNESS_MODULATION <= 0.10);
     }
 
     #[test]
@@ -3088,24 +3183,15 @@ mod tests {
     #[test]
     fn test_consciousness_state_level_params() {
         assert!(CONSCIOUSNESS_STATE_LOW_THRESHOLD < CONSCIOUSNESS_STATE_HIGH_THRESHOLD);
-        assert!(
-            CONSCIOUSNESS_STATE_HIGH_LR_SCALE > 1.0,
-            "High state should boost LR"
-        );
-        assert!(
-            CONSCIOUSNESS_STATE_LOW_LR_DAMPEN < 1.0,
-            "Low state should dampen LR"
-        );
+        assert!(CONSCIOUSNESS_STATE_HIGH_LR_SCALE > 1.0, "High state should boost LR");
+        assert!(CONSCIOUSNESS_STATE_LOW_LR_DAMPEN < 1.0, "Low state should dampen LR");
     }
 
     #[test]
     fn test_living_mind_vitality_params() {
         assert!(LIVING_MIND_VITALITY_LOW_THRESHOLD < LIVING_MIND_VITALITY_HIGH_THRESHOLD);
         assert!(LIVING_MIND_VITALITY_CONFIDENCE_BOOST > 0.0);
-        assert!(
-            LIVING_MIND_VITALITY_LOW_LR_DAMPEN < 1.0,
-            "Low vitality should dampen LR"
-        );
+        assert!(LIVING_MIND_VITALITY_LOW_LR_DAMPEN < 1.0, "Low vitality should dampen LR");
     }
 
     #[test]
@@ -3123,5 +3209,21 @@ mod tests {
         assert!(MCTS_EFFECTIVENESS_LOW_THRESHOLD < MCTS_EFFECTIVENESS_HIGH_THRESHOLD);
         assert!(MCTS_EFFECTIVENESS_CONFIDENCE_BOOST > 0.0);
         assert!(MCTS_EFFECTIVENESS_LOW_EXPLORE_BOOST > 0.0);
+    }
+
+    #[test]
+    fn test_session17_adaptive_homeostasis_params() {
+        assert!(ALLOSTATIC_LOAD_DECAY > 0.9 && ALLOSTATIC_LOAD_DECAY < 1.0);
+        assert!(ALLOSTATIC_LOAD_INCREMENT > 0.0 && ALLOSTATIC_LOAD_INCREMENT < 0.1);
+        assert!(ALLOSTATIC_OVERLOAD_THRESHOLD > 0.0 && ALLOSTATIC_OVERLOAD_THRESHOLD < 1.0);
+        assert!(ALLOSTATIC_OVERLOAD_LR_SCALE < 1.0);
+        assert!(EXPLORATION_DECAY_FACTOR > 0.9 && EXPLORATION_DECAY_FACTOR < 1.0);
+        assert!(CONSCIOUSNESS_ACCEL_THRESHOLD > 0.0);
+        assert!(CONSCIOUSNESS_ACCEL_LR_SCALE < 1.0);
+        assert!((ADAPTIVE_WARMUP_MIN_CYCLES as usize) < STARTUP_WARMUP_CYCLES);
+        assert!(PROPOSAL_SATURATION_THRESHOLD > 3);
+        assert!(PHI_GATED_LR_FLOOR_THRESHOLD > 0.0 && PHI_GATED_LR_FLOOR_THRESHOLD < 0.5);
+        assert!(RHYTHMIC_EXPLORATION_PERIOD > 10);
+        assert!(RHYTHMIC_EXPLORATION_AMPLITUDE > 0.0 && RHYTHMIC_EXPLORATION_AMPLITUDE < 0.1);
     }
 }

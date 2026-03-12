@@ -546,6 +546,105 @@ impl PrimitiveSystem {
             "Unbounded quantity, larger than any finite number",
         );
 
+        // === LINEAR ALGEBRA PRIMITIVES ===
+
+        let matrix = Primitive::base(
+            "MATRIX",
+            PrimitiveTier::Mathematical,
+            "mathematics",
+            math_domain.embed(BinaryHV::random(seed_from_name("MATRIX"))),
+            "Rectangular array of numbers (rows × columns)",
+        );
+
+        let vector = Primitive::base(
+            "VECTOR",
+            PrimitiveTier::Mathematical,
+            "mathematics",
+            math_domain.embed(BinaryHV::random(seed_from_name("VECTOR"))),
+            "Ordered sequence of numbers in a linear space",
+        );
+
+        let determinant = Primitive::derived(
+            "DETERMINANT",
+            PrimitiveTier::Mathematical,
+            "mathematics",
+            math_domain.embed(BinaryHV::random(seed_from_name("DETERMINANT"))),
+            "Scalar: signed volume scaling factor of a matrix",
+            "MATRIX → scalar (product of LU diagonal × sign)",
+        );
+
+        let eigenvalue = Primitive::derived(
+            "EIGENVALUE",
+            PrimitiveTier::Mathematical,
+            "mathematics",
+            math_domain.embed(BinaryHV::random(seed_from_name("EIGENVALUE"))),
+            "Scalar λ where Av = λv for eigenvector v",
+            "DETERMINANT(A - λI) = 0",
+        );
+
+        let transpose = Primitive::base(
+            "TRANSPOSE",
+            PrimitiveTier::Mathematical,
+            "mathematics",
+            math_domain.embed(BinaryHV::random(seed_from_name("TRANSPOSE"))),
+            "Matrix reflection: swap rows and columns (A^T)",
+        );
+
+        // === ROOT FINDING PRIMITIVE ===
+
+        let root = Primitive::base(
+            "ROOT",
+            PrimitiveTier::Mathematical,
+            "mathematics",
+            math_domain.embed(BinaryHV::random(seed_from_name("ROOT"))),
+            "Value x where f(x) = 0 (zero of a function)",
+        );
+
+        // === NUMERICAL INTEGRATION PRIMITIVE ===
+
+        let integral_numeric = Primitive::derived(
+            "INTEGRAL_NUMERIC",
+            PrimitiveTier::Mathematical,
+            "mathematics",
+            math_domain.embed(BinaryHV::random(seed_from_name("INTEGRAL_NUMERIC"))),
+            "Numerical approximation of definite integral ∫[a,b] f(x) dx",
+            "Quadrature: Simpson / Gauss-Legendre / Adaptive",
+        );
+
+        // === LOGIC PRIMITIVES (Phase 3) ===
+
+        let forall = Primitive::base(
+            "FORALL",
+            PrimitiveTier::Mathematical,
+            "logic",
+            logic_domain.embed(BinaryHV::random(seed_from_name("FORALL"))),
+            "Universal quantifier: ∀x. P(x) — for all x, P holds",
+        );
+
+        let exists = Primitive::base(
+            "EXISTS",
+            PrimitiveTier::Mathematical,
+            "logic",
+            logic_domain.embed(BinaryHV::random(seed_from_name("EXISTS"))),
+            "Existential quantifier: ∃x. P(x) — there exists x such that P holds",
+        );
+
+        let satisfies = Primitive::base(
+            "SATISFIES",
+            PrimitiveTier::Mathematical,
+            "logic",
+            logic_domain.embed(BinaryHV::random(seed_from_name("SATISFIES"))),
+            "Satisfaction relation: assignment makes formula true",
+        );
+
+        let constraint = Primitive::base(
+            "CONSTRAINT",
+            PrimitiveTier::Mathematical,
+            "mathematics",
+            math_domain.embed(BinaryHV::random(seed_from_name("CONSTRAINT"))),
+            "Restriction on variable values in a CSP",
+        );
+
         // === REGISTER ALL PRIMITIVES ===
 
         self.domains.insert("mathematics".to_string(), math_domain);
@@ -592,6 +691,17 @@ impl PrimitiveSystem {
             convergence,
             continuity,
             infinity,
+            matrix,
+            vector,
+            determinant,
+            eigenvalue,
+            transpose,
+            root,
+            integral_numeric,
+            forall,
+            exists,
+            satisfies,
+            constraint,
         ] {
             let name = primitive.name.clone();
             let tier = primitive.tier;

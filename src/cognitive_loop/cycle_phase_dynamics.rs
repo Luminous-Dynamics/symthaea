@@ -184,8 +184,17 @@ impl CognitiveLoopService {
                     self.subsystem_collector
                         .record("perception_manager", perception_output);
                 }
+
+                // ── Governance Manager (interval 37, co-prime) ──────────
+                #[cfg(feature = "mycelix")]
+                if self.governance_mgr.should_run(cycle_num, urgency_u8) {
+                    let governance_output = self.governance_mgr.process(snapshot);
+                    self.subsystem_collector
+                        .record("governance_manager", governance_output);
+                }
             }
         }
+
 
         // ── Phase 17: Self-model accuracy tracking ───────────────────────
         let self_model_accuracy = self.carryover.learning.self_model_accuracy;
@@ -1447,7 +1456,34 @@ impl CognitiveLoopService {
                         self.fep.world_model.reset();
                     }
                 }
-                MotorCommandType::MotorOutput | MotorCommandType::NoOp => {}
+                MotorCommandType::MotorOutput => {
+                    if let Some(ref mut bridge) = self.motor_output_bridge {
+                        let request = self
+                            .pending_motor_request
+                            .take()
+                            .unwrap_or_default();
+                        let result = bridge.execute(
+                            &enhanced_result.motor_command.parameters,
+                            enhanced_result.motor_command.confidence,
+                            coherence as f64, // Use coherence as Phi proxy
+                            &request,
+                        );
+
+                        // Feed outcome back as FEP observation
+                        let obs_value = if result.success { 0.9 } else { 0.1 };
+                        let motor_obs =
+                            symthaea_fep::Observation::from_consciousness_state(
+                                obs_value,
+                                result.prediction_error,
+                                coherence as f64,
+                                effective_lr as f64,
+                            );
+                        self.fep.agent.perceive(&motor_obs);
+
+                        self.last_motor_result = Some(result);
+                    }
+                }
+                MotorCommandType::NoOp => {}
             }
 
             if self.fep.learning_signal > FEP_LEARNING_PLASTICITY_THRESHOLD
@@ -2212,10 +2248,23 @@ impl CognitiveLoopService {
             } else {
                 0
             };
+            // Governance urgency → Broca cadence modulation.
+            // High governance activity (pending events) → widen spacing (focus on deliberation).
+            // Low collective_phi → cautious generation (epistemic humility).
+            #[cfg(feature = "mycelix")]
+            let governance_spacing_boost = {
+                let pending = self.governance_mgr.pending_event_count();
+                let phi = self.governance_mgr.last_collective_phi();
+                let urgency_boost: usize = if pending > 3 { 2 } else { 0 };
+                let phi_boost: usize = if phi > 0.01 && phi < 0.3 { 2 } else { 0 };
+                urgency_boost + phi_boost
+            };
+            #[cfg(not(feature = "mycelix"))]
+            let governance_spacing_boost: usize = 0;
             let broca_min_spacing = if self.stats.tom_prediction_mismatch_ema > 0.5 {
-                5 + fatigue_spacing_boost // more frequent when user model is inaccurate
+                5 + fatigue_spacing_boost + governance_spacing_boost // more frequent when user model is inaccurate
             } else {
-                7 + fatigue_spacing_boost // default spacing
+                7 + fatigue_spacing_boost + governance_spacing_boost // default spacing
             };
             let broca_should_generate = broca_psi > 0.4
                 && broca_novelty
@@ -2600,11 +2649,19 @@ impl CognitiveLoopService {
 #[cfg(test)]
 #[allow(clippy::field_reassign_with_default)]
 mod tests {
-    use crate::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
+    use crate::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService, CycleResult};
 
     fn make_service() -> CognitiveLoopService {
         CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap()
     }
+
+    fn run_cycles(svc: &mut CognitiveLoopService, n: usize, input: &str) -> Vec<CycleResult> {
+        (0..n).map(|_| svc.cycle(input)).collect()
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // EXISTING TESTS
+    // ═══════════════════════════════════════════════════════════════════════════
 
     #[test]
     fn dynamics_produces_finite_cfc_output() {
@@ -2661,6 +2718,208 @@ mod tests {
         let result = svc.cycle("no learning");
         if !result.learning_occurred {
             assert_eq!(result.metadata.actual_effective_lr, 0.0);
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // DELTA_T CHAIN STABILITY: Verify tau products stay finite & bounded
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn dynamics_delta_t_finite_across_many_cycles() {
+        // The delta_t chain multiplies 9 factors. After 50 cycles with varied input,
+        // the resulting CfC outputs must remain finite — no NaN/Inf propagation.
+        let mut svc = make_service();
+        let inputs = [
+            "novel surprising stimulus",
+            "familiar repeated pattern",
+            "emotional high-arousal event",
+            "calm consolidation phase",
+            "ambiguous uncertain signal",
+        ];
+        for i in 0..50 {
+            let result = svc.cycle(inputs[i % inputs.len()]);
+            for (j, &v) in result.output.iter().enumerate() {
+                assert!(
+                    v.is_finite(),
+                    "CfC output[{j}] not finite at cycle {i}: {v}"
+                );
+            }
+            assert!(
+                result.prediction_error.is_finite(),
+                "PE not finite at cycle {i}"
+            );
+        }
+    }
+
+    #[test]
+    fn dynamics_cfc_output_bounded_magnitude() {
+        // CfC outputs should not explode to extreme magnitudes. Verify they stay
+        // within a reasonable range across 30 cycles (the exact range depends on
+        // the network, but ±100 is conservative for normalized HDC inputs).
+        let mut svc = make_service();
+        let results = run_cycles(&mut svc, 30, "magnitude check");
+        for (i, r) in results.iter().enumerate() {
+            for (j, &v) in r.output.iter().enumerate() {
+                assert!(
+                    v.abs() < 100.0,
+                    "CfC output[{j}] at cycle {i} has extreme magnitude: {v}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn dynamics_prediction_error_bounded_after_warmup() {
+        // After warmup (15 cycles), prediction error should stabilize. It can be
+        // noisy early but should converge. Verify it stays in [0, 5] range.
+        let mut svc = make_service();
+        let results = run_cycles(&mut svc, 40, "pe stability");
+        for (i, r) in results.iter().enumerate().skip(15) {
+            assert!(
+                r.prediction_error >= 0.0 && r.prediction_error < 5.0,
+                "PE out of expected range at cycle {i}: {}",
+                r.prediction_error
+            );
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // NUMERICAL STABILITY: FEP, EMA, and cascading computations
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn dynamics_fep_fields_stay_finite_over_many_cycles() {
+        // FEP accuracy, complexity, surprise are EMA-updated each cycle.
+        // Verify no NaN accumulation over 50 cycles.
+        let mut svc = make_service();
+        let results = run_cycles(&mut svc, 50, "fep stability");
+        for (i, r) in results.iter().enumerate() {
+            let fep = &r.metadata.fep;
+            assert!(fep.fep_accuracy.is_finite(), "NaN fep_accuracy at cycle {i}");
+            assert!(
+                fep.fep_complexity.is_finite(),
+                "NaN fep_complexity at cycle {i}"
+            );
+            assert!(fep.fep_surprise.is_finite(), "NaN fep_surprise at cycle {i}");
+            assert!(
+                fep.fep_td_error.is_finite(),
+                "NaN fep_td_error at cycle {i}"
+            );
+        }
+    }
+
+    #[test]
+    fn dynamics_homeostasis_efficiency_stays_bounded() {
+        // Homeostasis efficiency is EMA-clamped to [0.5, 1.5]. Verify this holds
+        // across many cycles with varied input that drives different valence dynamics.
+        let mut svc = make_service();
+        let inputs = [
+            "positive valence stimulus",
+            "negative valence stimulus",
+            "neutral observation",
+        ];
+        for i in 0..60 {
+            let result = svc.cycle(inputs[i % inputs.len()]);
+            let eff = result.metadata.homeostasis_efficiency;
+            assert!(
+                eff.is_finite() && eff >= 0.5 && eff <= 1.5,
+                "Homeostasis efficiency out of [0.5, 1.5] at cycle {i}: {eff}"
+            );
+        }
+    }
+
+    #[test]
+    fn dynamics_prediction_coherence_finite() {
+        // Prediction coherence is computed every 11 cycles.
+        // Verify the EMA'd value stays finite.
+        let mut svc = make_service();
+        let results = run_cycles(&mut svc, 33, "coherence check");
+        for (i, r) in results.iter().enumerate() {
+            let coh = r.metadata.prediction_coherence;
+            assert!(
+                coh.is_finite(),
+                "prediction_coherence NaN at cycle {i}: {coh}"
+            );
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // MULTI-CYCLE CASCADE: EMA drift and velocity fields
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn dynamics_velocity_fields_finite_after_warmup() {
+        // Coherence velocity, confidence velocity, and quality EMA fields are
+        // computed as cycle-to-cycle deltas. Verify they don't drift to NaN/Inf.
+        let mut svc = make_service();
+        let results = run_cycles(&mut svc, 50, "velocity check");
+        for (i, r) in results.iter().enumerate() {
+            let q = &r.metadata.quality;
+            assert!(
+                q.coherence_velocity.is_finite(),
+                "coherence_velocity NaN at cycle {i}"
+            );
+        }
+    }
+
+    #[test]
+    fn dynamics_consciousness_level_finite_and_bounded() {
+        // consciousness_level is the integrated consciousness score.
+        // Verify it stays in [0, 1] and finite across cycles.
+        let mut svc = make_service();
+        let results = run_cycles(&mut svc, 50, "consciousness bounded");
+        for (i, r) in results.iter().enumerate() {
+            let cl = r.metadata.consciousness_level;
+            assert!(
+                cl.is_finite() && cl >= 0.0 && cl <= 1.0,
+                "consciousness_level out of [0,1] at cycle {i}: {cl}"
+            );
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // LEARNING RATE INTERACTION: Dynamics → feedback LR cascade
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn dynamics_effective_lr_finite_under_varied_input() {
+        // The effective LR is computed from PE, plasticity, and modulation factors.
+        // Verify it stays finite and non-negative across varied inputs.
+        let mut svc = make_service();
+        let inputs = [
+            "completely novel input alpha",
+            "partially familiar pattern beta",
+            "well-known repeated gamma",
+        ];
+        for i in 0..60 {
+            let result = svc.cycle(inputs[i % inputs.len()]);
+            let lr = result.metadata.actual_effective_lr;
+            assert!(
+                lr.is_finite() && lr >= 0.0,
+                "effective_lr not valid at cycle {i}: {lr}"
+            );
+        }
+    }
+
+    #[test]
+    fn dynamics_no_nan_in_key_metadata_across_100_cycles() {
+        // Stress test: run 100 cycles and verify critical metadata fields stay finite.
+        // This exercises long-running EMA accumulation and cross-cycle carryover.
+        let mut svc = make_service();
+        for i in 0..100 {
+            let result = svc.cycle("stress test nan check");
+            let m = &result.metadata;
+            assert!(m.actual_effective_lr.is_finite(), "NaN LR at cycle {i}");
+            assert!(m.consciousness_level.is_finite(), "NaN consciousness at cycle {i}");
+            assert!(m.prediction_coherence.is_finite(), "NaN pred_coherence at cycle {i}");
+            assert!(m.holographic_unity.is_finite(), "NaN holographic_unity at cycle {i}");
+            assert!(m.holographic_binding.is_finite(), "NaN holographic_binding at cycle {i}");
+            assert!(m.homeostasis_efficiency.is_finite(), "NaN homeostasis at cycle {i}");
+            assert!(result.prediction_error.is_finite(), "NaN PE at cycle {i}");
+            for (j, &v) in result.output.iter().enumerate() {
+                assert!(v.is_finite(), "NaN output[{j}] at cycle {i}");
+            }
         }
     }
 }

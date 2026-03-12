@@ -330,6 +330,17 @@ pub mod arithmetic; // Modular arithmetic (re-exports arithmetic_engine)
 pub mod arithmetic_engine; // Revolutionary: True mathematical cognition via HDC
 pub mod bootstrapping; // Cognitive bootstrapping - primitives to reasoning tasks
 pub mod calculus;
+pub mod linear_algebra; // General linear algebra: LU, QR, Cholesky, eigendecomposition, SVD
+pub mod quadrature; // Numerical integration: Simpson, Gauss-Legendre, adaptive
+pub mod root_finding; // Root finding: bisection, Newton-Raphson, Brent
+pub mod differential_equations; // ODE/PDE solvers: RK4, shooting, heat eq, wave eq
+pub mod statistics; // Statistics & probability: distributions, hypothesis testing, Bayesian inference
+pub mod optimization; // Optimization: gradient descent, Nelder-Mead, L-BFGS
+pub mod fft; // Fast Fourier Transform: Cooley-Tukey radix-2, convolution
+pub mod logic_engine; // Propositional & FOL logic: SAT (DPLL), natural deduction, unification
+pub mod constraint_solver; // CSP solver: AC-3, backtracking, N-Queens, graph coloring
+pub mod computational_geometry; // Geometry: convex hull, intersection, point-in-polygon, area
+pub mod graph_theory; // Graph algorithms: BFS, DFS, Dijkstra, MST, coloring, combinatorics
 pub mod celegans_connectome; // Revolutionary #100: C. elegans connectome validation (302 neurons)
 pub mod complex; // Complex number support (ℂ) with HDC encoding
 #[cfg(test)]

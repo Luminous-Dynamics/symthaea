@@ -322,10 +322,12 @@ impl MambaWrapper {
         let mut ctx = context.to_vec();
         ctx.resize(d_model, 0.0); // Pad or truncate to d_model
 
-        let embed = Tensor::from_vec(ctx, (1, d_model), &self.device)?.to_dtype(DType::F32)?;
+        let embed = Tensor::from_vec(ctx, (1, d_model), &self.device)?
+            .to_dtype(DType::F32)?;
 
         // Warm conv1d history with the context summary
-        self.model.warmstart_conv_history(&embed, &mut self.state)?;
+        self.model
+            .warmstart_conv_history(&embed, &mut self.state)?;
 
         // Run the context through all layers as a soft token
         // This builds h₀ naturally via the SSM equations: h = exp(ΔA)h + ΔBx

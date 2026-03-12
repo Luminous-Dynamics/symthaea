@@ -102,6 +102,7 @@
 pub mod assessment;
 pub mod code_curriculum;
 pub mod curriculum;
+pub mod math_curriculum;
 #[cfg(feature = "web_research_module")]
 pub mod curriculum_extender;
 pub mod curriculum_loader;

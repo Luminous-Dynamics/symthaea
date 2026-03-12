@@ -41,6 +41,13 @@ pub const CANONICAL_HEDGING_WORDS: &[&str] = &[
     "unclear",
     "could",
     "seem",
+    "tend",
+    "arguably",
+    "supposedly",
+    "tentatively",
+    "roughly",
+    "approximately",
+    "potentially",
 ];
 
 /// Canonical factual-assertion words suppressed under epistemic uncertainty.
@@ -60,13 +67,17 @@ pub const CANONICAL_FACTUAL_WORDS: &[&str] = &[
 ];
 
 /// Canonical out-of-domain response words.
-pub const CANONICAL_OOD_WORDS: &[&str] = &["outside", "beyond", "cannot", "unable"];
+pub const CANONICAL_OOD_WORDS: &[&str] = &[
+    "outside", "beyond", "cannot", "unable", "irrelevant", "inapplicable",
+];
 
 /// Canonical sentence-ending tokens for emotional modulation.
 pub const CANONICAL_SENTENCE_ENDINGS: &[&str] = &[". ", "! ", "? ", "...", "\n"];
 
 /// Canonical informal words suppressed under low warmth.
-pub const CANONICAL_INFORMAL_WORDS: &[&str] = &["gonna", "wanna", "gotta", "kinda", "sorta"];
+pub const CANONICAL_INFORMAL_WORDS: &[&str] = &[
+    "gonna", "wanna", "gotta", "kinda", "sorta", "dunno", "lemme",
+];
 
 /// Canonical softening words boosted under negative valence.
 pub const CANONICAL_SOFTENING_WORDS: &[&str] = &["unfortunately", "sorry", "however", "although"];
@@ -99,6 +110,30 @@ pub struct GatingConfig {
     /// Semantic veto threshold — coherence below this triggers mid-sentence correction.
     #[serde(default = "default_veto_threshold")]
     pub veto_threshold: f32,
+    /// Minimum token position before veto can fire (prevents early false vetoes).
+    #[serde(default = "default_min_veto_position")]
+    pub min_veto_position: usize,
+    /// Maximum number of vetoes per generation (prevents veto loops).
+    #[serde(default = "default_max_vetoes")]
+    pub max_vetoes: usize,
+    /// Refractory period after veto (tokens to suppress further vetoes).
+    #[serde(default = "default_veto_refractory")]
+    pub veto_refractory: usize,
+    /// Arousal boost multiplier for sentence endings under high arousal.
+    #[serde(default = "default_arousal_boost_multiplier")]
+    pub arousal_boost_multiplier: f32,
+    /// Warmth penalty multiplier for informal tokens under low warmth.
+    #[serde(default = "default_warmth_penalty_multiplier")]
+    pub warmth_penalty_multiplier: f32,
+    /// Negative valence threshold below which softening language is boosted.
+    #[serde(default = "default_negative_valence_threshold")]
+    pub negative_valence_threshold: f32,
+    /// Valence boost multiplier for softening tokens under negative valence.
+    #[serde(default = "default_valence_boost_multiplier")]
+    pub valence_boost_multiplier: f32,
+    /// OOD boost multiplier for out-of-domain response tokens.
+    #[serde(default = "default_ood_boost_multiplier")]
+    pub ood_boost_multiplier: f32,
 }
 
 impl Default for GatingConfig {
@@ -120,12 +155,52 @@ impl Default for GatingConfig {
             // constantly early in generation (CfC output similarity is naturally
             // low for the first few tokens), producing "-- wait," after every word.
             veto_threshold: 0.15,
+            min_veto_position: 2,
+            max_vetoes: 1,
+            veto_refractory: 8,
+            arousal_boost_multiplier: 3.0,
+            warmth_penalty_multiplier: -5.0,
+            negative_valence_threshold: -0.3,
+            valence_boost_multiplier: 2.0,
+            ood_boost_multiplier: 2.0,
         }
     }
 }
 
 fn default_veto_threshold() -> f32 {
     0.15
+}
+
+fn default_min_veto_position() -> usize {
+    2
+}
+
+fn default_max_vetoes() -> usize {
+    1
+}
+
+fn default_veto_refractory() -> usize {
+    8
+}
+
+fn default_arousal_boost_multiplier() -> f32 {
+    3.0
+}
+
+fn default_warmth_penalty_multiplier() -> f32 {
+    -5.0
+}
+
+fn default_negative_valence_threshold() -> f32 {
+    -0.3
+}
+
+fn default_valence_boost_multiplier() -> f32 {
+    2.0
+}
+
+fn default_ood_boost_multiplier() -> f32 {
+    2.0
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -228,7 +303,7 @@ impl EpistemicGate {
             }
             for &id in &self.ood_token_ids {
                 if let Some(l) = logits.get_mut(id as usize) {
-                    *l += self.config.unknown_hedging_boost * 2.0;
+                    *l += self.config.unknown_hedging_boost * self.config.ood_boost_multiplier;
                 }
             }
             for &id in &self.hedging_token_ids {
@@ -342,7 +417,8 @@ impl EmotionalModulator {
         if arousal > self.config.high_arousal_threshold
             && position > self.config.arousal_position_threshold
         {
-            let boost = (arousal - self.config.high_arousal_threshold) * 3.0;
+            let boost =
+                (arousal - self.config.high_arousal_threshold) * self.config.arousal_boost_multiplier;
             for &id in &self.sentence_end_ids {
                 if let Some(l) = logits.get_mut(id as usize) {
                     *l += boost;
@@ -350,9 +426,31 @@ impl EmotionalModulator {
             }
         }
 
+        // Arousal × valence interaction: high arousal + negative valence →
+        // boost both sentence endings AND softening (urgent-but-careful tone)
+        if arousal > self.config.high_arousal_threshold
+            && valence < self.config.negative_valence_threshold
+            && position > self.config.arousal_position_threshold
+        {
+            let interaction_boost = (arousal - self.config.high_arousal_threshold)
+                * (-valence - (-self.config.negative_valence_threshold))
+                * self.config.valence_boost_multiplier;
+            for &id in &self.sentence_end_ids {
+                if let Some(l) = logits.get_mut(id as usize) {
+                    *l += interaction_boost * 0.5;
+                }
+            }
+            for &id in &self.softening_ids {
+                if let Some(l) = logits.get_mut(id as usize) {
+                    *l += interaction_boost;
+                }
+            }
+        }
+
         // Low warmth → suppress informal tokens
         if warmth < self.config.low_warmth_threshold {
-            let penalty = (self.config.low_warmth_threshold - warmth) * -5.0;
+            let penalty =
+                (self.config.low_warmth_threshold - warmth) * self.config.warmth_penalty_multiplier;
             for &id in &self.informal_ids {
                 if let Some(l) = logits.get_mut(id as usize) {
                     *l += penalty;
@@ -361,8 +459,9 @@ impl EmotionalModulator {
         }
 
         // Negative valence → boost softening language
-        if valence < -0.3 {
-            let boost = (-valence - 0.3) * 2.0;
+        if valence < self.config.negative_valence_threshold {
+            let boost =
+                (-valence - (-self.config.negative_valence_threshold)) * self.config.valence_boost_multiplier;
             for &id in &self.softening_ids {
                 if let Some(l) = logits.get_mut(id as usize) {
                     *l += boost;
@@ -587,7 +686,7 @@ mod tests {
 
     #[test]
     fn test_canonical_hedging_words_complete() {
-        assert_eq!(CANONICAL_HEDGING_WORDS.len(), 18);
+        assert_eq!(CANONICAL_HEDGING_WORDS.len(), 25);
         // No duplicates
         let mut seen = std::collections::HashSet::new();
         for word in CANONICAL_HEDGING_WORDS {
@@ -810,6 +909,83 @@ mod tests {
     fn test_consciousness_gated_verbosity_zero_base() {
         assert_eq!(consciousness_gated_max_tokens(0, 0.5), 0);
         assert_eq!(consciousness_gated_max_tokens(0, 1.0), 0);
+    }
+
+    #[test]
+    fn test_all_magic_numbers_configurable() {
+        let tok = test_tokenizer();
+
+        // Non-default config should produce different gating behavior
+        let custom_config = GatingConfig {
+            arousal_boost_multiplier: 10.0,
+            warmth_penalty_multiplier: -20.0,
+            negative_valence_threshold: -0.1,
+            valence_boost_multiplier: 8.0,
+            ood_boost_multiplier: 5.0,
+            min_veto_position: 10,
+            max_vetoes: 3,
+            veto_refractory: 16,
+            ..Default::default()
+        };
+
+        let default_mod = EmotionalModulator::new(&tok, &GatingConfig::default());
+        let custom_mod = EmotionalModulator::new(&tok, &custom_config);
+
+        // High arousal scenario — custom multiplier should produce larger boost
+        let mut channels = ThoughtChannels::default();
+        channels.set_emotion(-0.5, 0.9, 0.1);
+
+        let mut logits_default = vec![0.5; tok.vocab_size()];
+        let mut logits_custom = vec![0.5; tok.vocab_size()];
+        default_mod.apply(&mut logits_default, &channels, 15);
+        custom_mod.apply(&mut logits_custom, &channels, 15);
+
+        // Custom config should produce different results
+        assert_ne!(
+            logits_default, logits_custom,
+            "Non-default config should produce different gating"
+        );
+    }
+
+    #[test]
+    fn test_arousal_valence_interaction() {
+        let tok = test_tokenizer();
+        let config = test_config();
+        let modulator = EmotionalModulator::new(&tok, &config);
+
+        // High arousal + negative valence → interaction term active
+        let mut channels = ThoughtChannels::default();
+        channels.set_emotion(-0.7, 0.9, 0.5);
+
+        let mut logits = vec![0.5; tok.vocab_size()];
+        modulator.apply(&mut logits, &channels, 15);
+
+        // Softening words should get extra boost from interaction
+        // (beyond what negative valence alone provides)
+        let mut channels_calm = ThoughtChannels::default();
+        channels_calm.set_emotion(-0.7, 0.3, 0.5); // same valence, low arousal
+
+        let mut logits_calm = vec![0.5; tok.vocab_size()];
+        modulator.apply(&mut logits_calm, &channels_calm, 15);
+
+        // Check that at least one softening token got a larger boost
+        // with high arousal + negative valence
+        let mut found_interaction = false;
+        for &word in CANONICAL_SOFTENING_WORDS {
+            let id = tok.token_id(word);
+            if id != tok.unk_id {
+                if logits[id as usize] > logits_calm[id as usize] + 1e-6 {
+                    found_interaction = true;
+                    break;
+                }
+            }
+        }
+        // If no softening words resolved, the test is vacuous — but that's fine
+        // since we're testing in the module where the words are accessible
+        assert!(
+            found_interaction,
+            "High arousal + negative valence should boost softening more than low arousal"
+        );
     }
 
     #[cfg(feature = "mamba")]

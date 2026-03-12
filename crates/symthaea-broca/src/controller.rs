@@ -38,6 +38,27 @@ pub struct LanguageControllerConfig {
     pub dt_per_token: f32,
     /// Temperature scaling for logits before softmax/sampling.
     pub logit_temperature: f32,
+    /// CfC backbone time constant — controls state dependency for sequence coherence.
+    #[serde(default = "default_backbone_tau")]
+    pub backbone_tau: f32,
+    /// Gradient attenuation factor for earlier layers during BPTT (stability).
+    #[serde(default = "default_gradient_attenuation")]
+    pub gradient_attenuation: f32,
+    /// Vocab size threshold above which logit computation is parallelized.
+    #[serde(default = "default_parallel_threshold")]
+    pub parallel_threshold: usize,
+}
+
+fn default_backbone_tau() -> f32 {
+    0.3
+}
+
+fn default_gradient_attenuation() -> f32 {
+    0.5
+}
+
+fn default_parallel_threshold() -> usize {
+    128
 }
 
 impl Default for LanguageControllerConfig {
@@ -50,6 +71,9 @@ impl Default for LanguageControllerConfig {
             max_seq_len: 512,
             dt_per_token: 0.02, // 20ms per token step
             logit_temperature: 1.0,
+            backbone_tau: default_backbone_tau(),
+            gradient_attenuation: default_gradient_attenuation(),
+            parallel_threshold: default_parallel_threshold(),
         }
     }
 }
@@ -81,8 +105,8 @@ impl LanguageController {
     /// Create a new controller from a genesis seed and config.
     pub fn new(genesis: &GenesisSeed, config: &LanguageControllerConfig) -> Self {
         let neuron_config = UnifiedConfig {
-            tau_base: 0.02,    // 20ms — matches token generation rate
-            backbone_tau: 0.3, // Moderate state dependency for coherent sequences
+            tau_base: 0.02,                   // 20ms — matches token generation rate
+            backbone_tau: config.backbone_tau, // Configurable state dependency for coherent sequences
             dimension: HDC_DIMENSION,
             learning_rate: config.learning_rate,
             ..UnifiedConfig::default()
@@ -127,7 +151,7 @@ impl LanguageController {
     /// Parallelized with rayon for large vocabularies.
     pub fn compute_logits(&self, output_hv: &ContinuousHV) -> Vec<f32> {
         #[cfg(feature = "parallel")]
-        if self.token_embeddings.len() > 128 {
+        if self.token_embeddings.len() > self.config.parallel_threshold {
             // Parallel for large vocabularies
             return self
                 .token_embeddings
@@ -446,7 +470,7 @@ impl LanguageController {
 
             // Apply to layer 0 with reduced LR (gradient attenuation for stability)
             let layer0_input = self.network.layer_input(0, &input_hv);
-            let d_prev_scaled = d_prev.scale(0.5); // Attenuate for stability
+            let d_prev_scaled = d_prev.scale(self.config.gradient_attenuation);
             if let Some(layer) = self.network.layer_mut(0) {
                 let inv_n0 = 1.0
                     / if layer.is_empty() {
@@ -458,7 +482,7 @@ impl LanguageController {
                 for neuron in layer.iter_mut() {
                     let target = neuron.state().subtract(&d_per_n0);
                     let grads = neuron.backward(&layer0_input, &target, dt);
-                    neuron.apply_gradients(&grads, network_lr * 0.5);
+                    neuron.apply_gradients(&grads, network_lr * self.config.gradient_attenuation);
                 }
             }
         }

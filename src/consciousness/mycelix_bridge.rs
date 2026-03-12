@@ -370,8 +370,7 @@ pub struct MycelixBridge {
     pending_gov_events: Vec<crate::cognitive_loop::managers::governance_manager::GovernanceEvent>,
     /// Pending governance outcomes for CLS injection
     #[cfg(feature = "mycelix")]
-    pending_gov_outcomes:
-        Vec<crate::cognitive_loop::managers::governance_manager::GovernanceOutcome>,
+    pending_gov_outcomes: Vec<crate::cognitive_loop::managers::governance_manager::GovernanceOutcome>,
 }
 
 impl MycelixBridge {

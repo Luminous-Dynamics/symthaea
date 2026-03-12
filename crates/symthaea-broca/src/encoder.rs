@@ -94,7 +94,7 @@ impl Default for ThoughtChannels {
         Self {
             channels: [
                 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, // intent: Unknown
-                3.0, // epistemic: Unknown
+                1.0, // epistemic: Probable (not Unknown — avoids overly pessimistic default)
                 0.0, // valence: neutral
                 0.5, // arousal: mid
                 0.5, // warmth: mid

@@ -16,8 +16,8 @@ use symthaea_psych_bench::harness::cognitive_profile::CognitiveProfile;
 use symthaea_types::N_HARMONIES;
 
 use crate::{
-    Anomaly, IntegrityInfo, MoralCompass, Narrative, NeuroBath, PulseDelta, PulseSnapshot,
-    SparklinePoint, SubstrateInfo, Vitals,
+    Anomaly, CantorInfo, GovernanceInfo, IntegrityInfo, MoralCompass, Narrative, NeuroBath,
+    PulseDelta, PulseSnapshot, SparklinePoint, SubstrateInfo, Vitals,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -453,6 +453,8 @@ pub fn generate_pulse_html(
     write_butlin_pane(&mut html, butlin);
     write_substrate_pane(&mut html, substrate);
     write_integrity_pane(&mut html, &current.integrity);
+    write_governance_pane(&mut html, &current.governance);
+    write_cantor_pane(&mut html, &current.cantor);
     write_narrative_pane(&mut html, narrative);
     if !timeline.is_empty() {
         write_timeline_pane(&mut html, timeline, current);
@@ -1960,6 +1962,187 @@ fn write_integrity_pane(html: &mut String, integrity: &IntegrityInfo) {
             } else {
                 "ies"
             },
+        );
+    }
+
+    html.push_str("</div>\n");
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Pane 7c: Governance Metacognition
+// ═══════════════════════════════════════════════════════════════════════════════
+
+fn write_governance_pane(html: &mut String, gov: &GovernanceInfo) {
+    // Only show when governance is active (any non-default data)
+    let active = gov.reward_ema.abs() > 1e-10
+        || gov.pending_events > 0
+        || gov.pending_outcomes > 0
+        || gov.collective_phi > 1e-10;
+
+    let (status_label, status_color) = if !active {
+        ("DORMANT", "#8a9a8a")
+    } else if gov.pending_events > 5 {
+        ("ACTIVE", "#e8c547") // photonic gold — high activity
+    } else {
+        ("LISTENING", "#7ec8a0") // living green — quiet monitoring
+    };
+
+    let _ = write!(
+        html,
+        r##"<div class="pane">
+<h2>Governance</h2>
+<div style="text-align:center;margin-bottom:12px">
+  <span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:{color};box-shadow:0 0 12px {color};margin-right:8px;vertical-align:middle"></span>
+  <span style="color:{color};font-weight:bold;font-size:1.1em;vertical-align:middle">{label}</span>
+</div>
+<table style="width:100%;font-size:0.88em">
+<tr><td>Reward EMA</td><td style="text-align:right;color:{reward_color}">{reward:+.4}</td></tr>
+<tr><td>Pending Events</td><td style="text-align:right">{events}</td></tr>
+<tr><td>Pending Outcomes</td><td style="text-align:right">{outcomes}</td></tr>
+<tr><td>Confidence &Delta;</td><td style="text-align:right">{conf:+.4}</td></tr>
+<tr><td>Collective &Phi;</td><td style="text-align:right;color:{phi_color}">{phi:.3}</td></tr>
+</table>
+"##,
+        color = status_color,
+        label = status_label,
+        reward_color = if gov.reward_ema > 0.01 {
+            "#7ec8a0"
+        } else if gov.reward_ema < -0.01 {
+            "#c76b5a"
+        } else {
+            "#8a9a8a"
+        },
+        reward = gov.reward_ema,
+        events = gov.pending_events,
+        outcomes = gov.pending_outcomes,
+        conf = gov.confidence_delta,
+        phi_color = if gov.collective_phi > 0.5 {
+            "#e8c547"
+        } else if gov.collective_phi > 0.3 {
+            "#7ec8a0"
+        } else {
+            "#8a9a8a"
+        },
+        phi = gov.collective_phi,
+    );
+
+    // Reward EMA sparkline (30-cycle rolling)
+    if !gov.reward_history.is_empty() {
+        let sparkline: String = gov
+            .reward_history
+            .iter()
+            .map(|&r| {
+                if r > 0.05 {
+                    '\u{2588}' // Full block — strong positive
+                } else if r > 0.01 {
+                    '\u{2584}' // Lower half — mild positive
+                } else if r > -0.01 {
+                    '\u{2582}' // Lower quarter — neutral
+                } else {
+                    '\u{2581}' // Lower eighth — negative
+                }
+            })
+            .collect();
+        let _ = write!(
+            html,
+            r#"<div style="font-family:monospace;font-size:0.75em;color:#8a9a8a;margin-top:8px;letter-spacing:1px" title="30-cycle reward EMA: full=positive, low=negative">{sparkline}</div>"#,
+            sparkline = sparkline,
+        );
+    }
+
+    html.push_str("</div>\n");
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Pane 7d: Cantor Fractal HDC
+// ═══════════════════════════════════════════════════════════════════════════════
+
+fn write_cantor_pane(html: &mut String, cantor: &CantorInfo) {
+    let occupancy_pct = if cantor.codebook_capacity > 0 {
+        (cantor.codebook_size as f32 / cantor.codebook_capacity as f32 * 100.0).min(100.0)
+    } else {
+        0.0
+    };
+    let occupancy_color = if occupancy_pct >= 90.0 {
+        "#c76b5a" // autumn rust — near capacity
+    } else if occupancy_pct >= 60.0 {
+        "#e8c547" // photonic gold — moderate
+    } else {
+        "#7ec8a0" // living green — healthy
+    };
+    let resonance_color = if cantor.resonance_boost > 0.3 {
+        "#e8c547"
+    } else if cantor.resonance_boost > 0.1 {
+        "#7ec8a0"
+    } else {
+        "#8a9a8a"
+    };
+
+    let _ = write!(
+        html,
+        r##"<div class="pane">
+<h2>Cantor Fractals</h2>
+<table style="width:100%;font-size:0.88em">
+<tr><td>Buffer</td><td style="text-align:right">{buffer}/32</td></tr>
+<tr><td>Codebook</td><td style="text-align:right;color:{occ_color}">{cb_size}/{cb_cap} ({occ_pct:.0}%)</td></tr>
+<tr><td>Last Depth</td><td style="text-align:right">{depth}</td></tr>
+<tr><td>Meta-depth</td><td style="text-align:right">{meta:.3}</td></tr>
+<tr><td>Surprise</td><td style="text-align:right">{surprise:.4}</td></tr>
+<tr><td>Resonance</td><td style="text-align:right;color:{res_color}">{resonance:.3}</td></tr>
+</table>
+"##,
+        buffer = cantor.buffer_occupancy,
+        occ_color = occupancy_color,
+        cb_size = cantor.codebook_size,
+        cb_cap = cantor.codebook_capacity,
+        occ_pct = occupancy_pct,
+        depth = cantor.last_depth,
+        meta = cantor.metacognitive_depth,
+        surprise = cantor.dream_surprise,
+        res_color = resonance_color,
+        resonance = cantor.resonance_boost,
+    );
+
+    // Codebook occupancy bar
+    let _ = write!(
+        html,
+        r#"<div style="margin:8px 0">
+<div style="font-size:0.75em;color:#8a9a8a;margin-bottom:4px">Codebook Occupancy</div>
+<div style="background:rgba(107,125,107,0.2);border-radius:4px;height:12px;overflow:hidden">
+<div style="width:{pct}%;height:100%;background:{color};border-radius:4px;transition:width 0.5s"></div>
+</div></div>"#,
+        pct = occupancy_pct,
+        color = occupancy_color,
+    );
+
+    // Depth histogram (depths 2–7)
+    let max_count = cantor.depth_histogram.iter().max().copied().unwrap_or(1).max(1);
+    html.push_str(
+        r#"<div style="margin-top:8px"><div style="font-size:0.75em;color:#8a9a8a;margin-bottom:4px">Depth Distribution</div><div style="display:flex;align-items:flex-end;height:40px;gap:3px">"#,
+    );
+    for (i, &count) in cantor.depth_histogram.iter().enumerate() {
+        let height_pct = (count as f32 / max_count as f32 * 100.0).max(2.0);
+        let depth = i + 2;
+        let _ = write!(
+            html,
+            r#"<div style="flex:1;display:flex;flex-direction:column;align-items:center">
+<div style="width:100%;height:{h}%;background:rgba(126,200,160,0.6);border-radius:2px 2px 0 0;min-height:2px" title="depth {d}: {c} entries"></div>
+<div style="font-size:0.65em;color:#8a9a8a;margin-top:2px">{d}</div>
+</div>"#,
+            h = height_pct,
+            d = depth,
+            c = count,
+        );
+    }
+    html.push_str("</div></div>\n");
+
+    // Resonance indicator (breathing glow when active)
+    if cantor.resonance_boost > 0.05 {
+        let _ = write!(
+            html,
+            r#"<div style="text-align:center;margin-top:8px;font-size:0.8em;color:{color}">Fractal Choir: {boost:.0}%</div>"#,
+            color = resonance_color,
+            boost = cantor.resonance_boost * 100.0,
         );
     }
 

@@ -377,6 +377,25 @@ impl CognitiveLoopService {
         self.governance_mgr.inject_outcome(outcome);
     }
 
+    /// Poll a MycelixBridge for pending governance events and outcomes.
+    ///
+    /// Drains the bridge's internal event/outcome queues and injects them into
+    /// the GovernanceManager. Call this each cycle (or periodically) to keep the
+    /// governance subsystem synchronized with bridge activity.
+    #[cfg(feature = "mycelix")]
+    pub fn poll_bridge_governance(
+        &mut self,
+        bridge: &mut crate::consciousness::mycelix_bridge::MycelixBridge,
+    ) {
+        let (events, outcomes) = bridge.drain_pending_governance();
+        for event in events {
+            self.governance_mgr.inject_event(event);
+        }
+        for outcome in outcomes {
+            self.governance_mgr.inject_outcome(outcome);
+        }
+    }
+
     /// Record a predicted outcome alignment for a governance proposal.
     ///
     /// Call this when casting a vote to enable governance prediction error
@@ -418,10 +437,47 @@ impl CognitiveLoopService {
             }
         }
 
-        // 3. Drain completed outcomes (available for external episodic recording)
-        let _completed = self.governance_mgr.drain_completed();
-        // Note: episodic recording via experience_bus.record() would go here
-        // when the Experience type supports governance episodes.
+        // 3. Drain completed outcomes and record as episodic memories
+        let completed = self.governance_mgr.drain_completed();
+        if !completed.is_empty() {
+            if let Some(ref mut bus) = self.experience_bus {
+                for outcome in &completed {
+                    let memory = crate::experience::memory::EpisodicMemory {
+                        id: format!("gov-{}", outcome.proposal_id),
+                        timestamp: self.stats.total_cycles as u64,
+                        hdv_embedding: Vec::new(), // governance has no HDV
+                        thought_primitives: vec!["governance_outcome".to_string()],
+                        context_hash: outcome.proposal_id.clone(),
+                        user_id: None,
+                        prediction_error: outcome.value_alignment_score as f32,
+                        uncertainty: if outcome.my_vote_aligned.is_some() {
+                            0.2
+                        } else {
+                            0.8
+                        },
+                        coherence: outcome.harmonic_resonance as f32,
+                        confidence: if outcome.my_vote_aligned == Some(true) {
+                            0.8
+                        } else {
+                            0.3
+                        },
+                        salience: if outcome.passed { 0.7 } else { 0.5 },
+                        kosmic_snapshot: None,
+                        outcome: None,
+                        input_summary: format!(
+                            "Governance: proposal {} {}",
+                            outcome.proposal_id,
+                            if outcome.passed { "passed" } else { "failed" }
+                        ),
+                        output_summary: format!(
+                            "alignment={:.2}, resonance={:.2}",
+                            outcome.value_alignment_score, outcome.harmonic_resonance
+                        ),
+                    };
+                    bus.record_experience(memory);
+                }
+            }
+        }
     }
 
     /// Apply pending neuromodulatory effects from governance events.

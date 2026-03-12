@@ -22,4 +22,5 @@ mod phase_coverage;
 mod phase_results;
 mod proptest_cross_coupling;
 mod proptest_substrate;
+mod error_recovery;
 mod subsystems;

@@ -555,6 +555,9 @@ impl LiquidMambaGenerator {
                     veto_triggered: false,
                     final_coherence: 0.0,
                     long_coherence: 0.0,
+                    coherence_dynamics: Vec::new(),
+                    gating_trace: Vec::new(),
+                    hallucination_flag: false,
                     output_hvs: Vec::new(),
                     semantic_pe: 0.0,
                 }
@@ -584,6 +587,9 @@ impl LiquidMambaGenerator {
                     veto_triggered: false,
                     final_coherence: 0.0,
                     long_coherence: 0.0,
+                    coherence_dynamics: Vec::new(),
+                    gating_trace: Vec::new(),
+                    hallucination_flag: false,
                     output_hvs: Vec::new(),
                     semantic_pe: 0.0,
                 }
@@ -767,6 +773,9 @@ impl LiquidMambaGenerator {
                         veto_triggered,
                         final_coherence: coherence_monitor.current_coherence(),
                         long_coherence: long_coherence_monitor.current_coherence(),
+                        coherence_dynamics: Vec::new(),
+                        gating_trace: Vec::new(),
+                        hallucination_flag: false,
                         output_hvs,
                         semantic_pe,
                     });
@@ -792,6 +801,9 @@ impl LiquidMambaGenerator {
                 veto_triggered,
                 final_coherence: coherence_monitor.current_coherence(),
                 long_coherence: long_coherence_monitor.current_coherence(),
+                coherence_dynamics: Vec::new(),
+                gating_trace: Vec::new(),
+                hallucination_flag: false,
                 output_hvs,
                 semantic_pe,
             })

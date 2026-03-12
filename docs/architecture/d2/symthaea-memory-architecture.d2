@@ -1,0 +1,166 @@
+# Symthaea Memory Architecture — 4-Tier System
+# Professional Tier 1 Diagram
+
+direction: down
+
+title: {
+  label: Symthaea Memory Architecture — 4-Tier Cognitive Memory
+  near: top-center
+  shape: text
+  style.font-size: 24
+  style.bold: true
+}
+
+# ═══════════════════════════════════════════
+# COGNITIVE LOOP INPUT
+# ═══════════════════════════════════════════
+input: Cognitive Cycle Input {
+  shape: parallelogram
+  style.fill: "#374151"
+  style.font-color: "#e5e7eb"
+  label: |md
+    HDC-encoded perception (16,384D BinaryHV)
+    + Prediction Error + Phi Score
+  |
+}
+
+# ═══════════════════════════════════════════
+# TIER 1: WORKING MEMORY
+# ═══════════════════════════════════════════
+working: Tier 1 — Working Memory {
+  style.fill: "#7f1d1d"
+  style.stroke: "#ef4444"
+  style.font-color: "#fca5a5"
+  style.border-radius: 8
+
+  capacity: "Capacity: 7 +/- 2 items" {style.fill: "#991b1b"; style.font-color: "#fecaca"}
+  decay: "Decay: 0.9 / step\n(activation-based)" {style.fill: "#991b1b"; style.font-color: "#fecaca"}
+  gwt: "GWT Broadcast\n(Global Workspace)" {style.fill: "#991b1b"; style.font-color: "#fecaca"}
+
+  capacity -> decay -> gwt
+}
+
+# ═══════════════════════════════════════════
+# TIER 2: EPISODIC MEMORY
+# ═══════════════════════════════════════════
+episodic: Tier 2 — Episodic Memory {
+  style.fill: "#78350f"
+  style.stroke: "#f59e0b"
+  style.font-color: "#fde68a"
+  style.border-radius: 8
+
+  queue: "Phi-Weighted Priority Queue\nCapacity: 1,000 episodes" {style.fill: "#92400e"; style.font-color: "#fde68a"}
+  consolidation: "Consolidation Pressure\n(sleep / dream engine)" {style.fill: "#92400e"; style.font-color: "#fde68a"}
+  replay: "Episodic Replay\n(HippocampusBridge)" {style.fill: "#92400e"; style.font-color: "#fde68a"}
+
+  queue -> consolidation -> replay
+}
+
+# ═══════════════════════════════════════════
+# TIER 3: SEMANTIC MEMORY
+# ═══════════════════════════════════════════
+semantic: Tier 3 — Semantic Memory {
+  style.fill: "#14532d"
+  style.stroke: "#22c55e"
+  style.font-color: "#86efac"
+  style.border-radius: 8
+
+  ring: "Ring Buffer Storage\nLong-term knowledge" {style.fill: "#166534"; style.font-color: "#86efac"}
+  lr: "PE-Modulated LR\n(Prediction Error drives learning)" {style.fill: "#166534"; style.font-color: "#86efac"}
+  similarity: "HDC Similarity Lookup\nHamming distance search" {style.fill: "#166534"; style.font-color: "#86efac"}
+
+  ring -> lr -> similarity
+}
+
+# ═══════════════════════════════════════════
+# TIER 4: PERSISTENT MEMORY
+# ═══════════════════════════════════════════
+persistent: Tier 4 — Persistent Memory {
+  style.fill: "#312e81"
+  style.stroke: "#818cf8"
+  style.font-color: "#c7d2fe"
+  style.border-radius: 8
+
+  sqlite: "SQLite BLOB\n2048-byte BinaryHV" {style.fill: "#3730a3"; style.font-color: "#c7d2fe"}
+  lancedb: "LanceDB (optional)\nVector similarity search" {style.fill: "#3730a3"; style.font-color: "#c7d2fe"}
+
+  sqlite -> lancedb: "optional\nbackend" {style.stroke-dash: 3}
+}
+
+# ═══════════════════════════════════════════
+# RESONATOR MEMORY (Cross-cutting)
+# ═══════════════════════════════════════════
+resonator: Resonator Memory {
+  style.fill: "#4a1942"
+  style.stroke: "#c084fc"
+  style.font-color: "#e9d5ff"
+  style.border-radius: 8
+  label: |md
+    **Factorized Hypervectors**
+    content (x) valence (x) phi_level
+    Codebook growth in feedback phase
+    Reconsolidation on retrieval
+  |
+}
+
+# ═══════════════════════════════════════════
+# MEMORY COORDINATOR
+# ═══════════════════════════════════════════
+coordinator: Memory Coordinator {
+  shape: hexagon
+  style.fill: "#1e3a5f"
+  style.stroke: "#3b82f6"
+  style.font-color: "#93c5fd"
+  label: |md
+    Cross-tier signal broadcaster
+    Graduation gating
+    (MemoryManager, interval 11)
+  |
+}
+
+# ═══════════════════════════════════════════
+# RETRIEVAL PIPELINE
+# ═══════════════════════════════════════════
+retrieval: 2-Pass Retrieval {
+  style.fill: "#3a2e1e"
+  style.stroke: "#f59e0b"
+  style.font-color: "#fde68a"
+  style.border-radius: 8
+
+  project: "Pass 1: Project\nDimensionality reduction" {style.fill: "#78350f"; style.font-color: "#fde68a"}
+  hamming: "Pass 2: Hamming\nDistance top-k" {style.fill: "#78350f"; style.font-color: "#fde68a"}
+  reconsolidate: "Reconsolidation\n(modify on retrieval)" {style.fill: "#78350f"; style.font-color: "#fde68a"}
+
+  project -> hamming -> reconsolidate
+}
+
+# ═══════════════════════════════════════════
+# FLOW
+# ═══════════════════════════════════════════
+input -> working: encode {style.stroke: "#ef4444"}
+
+working -> episodic: "high-Phi events\npromoted" {
+  style.stroke: "#f59e0b"
+  style.stroke-width: 2
+}
+episodic -> semantic: "consolidation\n(dream engine)" {
+  style.stroke: "#22c55e"
+  style.stroke-width: 2
+}
+semantic -> persistent: "long-term\nstorage" {
+  style.stroke: "#818cf8"
+  style.stroke-width: 2
+}
+
+resonator -> working: factored recall {style.stroke: "#c084fc"; style.stroke-dash: 3}
+resonator -> episodic: factored recall {style.stroke: "#c084fc"; style.stroke-dash: 3}
+
+coordinator -> working {style.stroke: "#3b82f6"; style.stroke-dash: 3}
+coordinator -> episodic {style.stroke: "#3b82f6"; style.stroke-dash: 3}
+coordinator -> semantic {style.stroke: "#3b82f6"; style.stroke-dash: 3}
+coordinator -> persistent {style.stroke: "#3b82f6"; style.stroke-dash: 3}
+
+working -> retrieval: query {style.stroke: "#f59e0b"; style.stroke-dash: 3}
+episodic -> retrieval: query {style.stroke: "#f59e0b"; style.stroke-dash: 3}
+semantic -> retrieval: query {style.stroke: "#f59e0b"; style.stroke-dash: 3}
+persistent -> retrieval: query {style.stroke: "#f59e0b"; style.stroke-dash: 3}

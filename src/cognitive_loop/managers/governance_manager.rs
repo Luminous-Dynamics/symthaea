@@ -118,6 +118,8 @@ pub struct GovernanceManager {
     cycle_reciprocity_oxy: f32,
     /// Current cycle number (set from snapshot each process()).
     current_cycle: u64,
+    /// Last collective Phi observed from a TallyCompleted event.
+    last_collective_phi: f64,
 }
 
 impl Default for GovernanceManager {
@@ -134,6 +136,7 @@ impl Default for GovernanceManager {
             completed_outcomes: Vec::new(),
             cycle_reciprocity_oxy: 0.0,
             current_cycle: 0,
+            last_collective_phi: 0.0,
         }
     }
 }
@@ -178,6 +181,16 @@ impl GovernanceManager {
     /// Number of recorded outcomes.
     pub fn outcome_count(&self) -> usize {
         self.outcome_history.len()
+    }
+
+    /// Number of pending outcomes awaiting processing.
+    pub fn pending_outcome_count(&self) -> usize {
+        self.completed_outcomes.len()
+    }
+
+    /// Last collective Phi from a governance tally.
+    pub fn last_collective_phi(&self) -> f64 {
+        self.last_collective_phi
     }
 
     // ── Phase 2: Learning Methods ──────────────────────────────────────
@@ -330,6 +343,9 @@ impl GovernanceManager {
                 passed,
                 collective_phi,
             } => {
+                // Track last collective phi for telemetry and consciousness coupling
+                self.last_collective_phi = *collective_phi;
+
                 // High collective phi → ECB baseline nudge (group coherence)
                 if *collective_phi > 0.5 {
                     self.queue_baseline("endocannabinoid", thresholds::GOV_COLLECTIVE_PHI_ECB);

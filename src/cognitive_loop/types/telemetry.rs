@@ -806,6 +806,14 @@ pub struct CycleMetadata {
     /// Depth of the most recent CRHV (adaptive: 2–7 based on GWT activation).
     #[serde(default)]
     pub cantor_last_depth: u8,
+    /// EMA of dream consolidation surprise (self-similarity delta).
+    /// Non-zero values indicate the codebook is actively learning from novel fractal structure.
+    #[serde(default)]
+    pub cantor_dream_surprise: f32,
+    /// Resonance boost from coherent CRHV pairs in the broadcast buffer.
+    /// Non-zero when multiple GWT-promoted fractals form a "resonant coalition".
+    #[serde(default)]
+    pub cantor_resonance_boost: f32,
 
     // ── Social Coherence Telemetry ──────────────────────────────────────
     /// Current social trust level (0.0–1.0) from Mind module's SocialCoherence.
@@ -1186,6 +1194,50 @@ pub struct CycleMetadata {
     /// Whether error oscillation bifurcation response fired.
     #[serde(default)]
     pub error_bifurcation_response: bool,
+
+    // ── Session 17: Adaptive Homeostasis & Emergent Dynamics ─────────────
+    /// Whether allostatic overload reduced cognitive budget.
+    #[serde(default)]
+    pub allostatic_overload_active: bool,
+    /// Current allostatic load (0.0–1.0).
+    #[serde(default)]
+    pub allostatic_load: f32,
+    /// Whether exploration decay was applied.
+    #[serde(default)]
+    pub exploration_decay_applied: bool,
+    /// Whether consciousness acceleration triggered dampening.
+    #[serde(default)]
+    pub consciousness_accel_active: bool,
+    /// Whether adaptive warmup exited early due to stability.
+    #[serde(default)]
+    pub adaptive_warmup_early_exit: bool,
+    /// Whether proposal saturation triggered wait-and-see.
+    #[serde(default)]
+    pub proposal_saturation_active: bool,
+    /// Whether Phi-gated LR floor dampened learning rate.
+    #[serde(default)]
+    pub phi_gated_lr_floor_active: bool,
+    /// Whether rhythmic exploration oscillation was active.
+    #[serde(default)]
+    pub rhythmic_exploration_active: bool,
+
+    // ── Governance telemetry (feature: mycelix) ─────────────────────────────
+    /// Governance reward EMA — running average of governance outcome rewards.
+    /// Positive = aligned outcomes, negative = misaligned. 0.0 when no outcomes.
+    #[serde(default)]
+    pub governance_reward_ema: f64,
+    /// Number of governance events pending in the GovernanceManager queue.
+    #[serde(default)]
+    pub governance_pending_events: usize,
+    /// Number of governance outcomes pending processing.
+    #[serde(default)]
+    pub governance_pending_outcomes: usize,
+    /// Cumulative governance confidence delta this cycle (from SubsystemOutput).
+    #[serde(default)]
+    pub governance_confidence_delta: f64,
+    /// Last collective Phi observed from a governance tally (0.0 if none).
+    #[serde(default)]
+    pub governance_collective_phi: f64,
 }
 
 fn default_response_profile() -> String {

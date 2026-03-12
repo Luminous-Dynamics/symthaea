@@ -78,10 +78,7 @@ fn test_cantor_buffer_accumulates_on_gwt_broadcast() {
         }
     }
     // Soft: GWT broadcast depends on activation dynamics
-    println!(
-        "Cantor buffer max occupancy over 100 cycles: {}",
-        max_occupancy
-    );
+    println!("Cantor buffer max occupancy over 100 cycles: {}", max_occupancy);
 }
 
 // =============================================================================
@@ -160,4 +157,33 @@ fn test_crhv_vs_flat_self_similarity_preservation() {
         "Self-similarity should be partially preserved, got {}",
         preserved
     );
+}
+
+#[test]
+fn test_cantor_dream_surprise_in_valid_range() {
+    let mut service = make_cantor_service();
+    for i in 0..100 {
+        let result = service.cycle(&format!("surprise test input {i}"));
+        let surprise = result.metadata.cantor_dream_surprise;
+        assert!(
+            (0.0..=1.0).contains(&surprise),
+            "Dream surprise {} out of [0,1] at cycle {}",
+            surprise,
+            i
+        );
+    }
+}
+
+#[test]
+fn test_cantor_codebook_bounded() {
+    let mut service = make_cantor_service();
+    for i in 0..500 {
+        let result = service.cycle(&format!("codebook bound test {i}"));
+        assert!(
+            result.metadata.cantor_codebook_size <= 256,
+            "Codebook size {} exceeded cap 256 at cycle {}",
+            result.metadata.cantor_codebook_size,
+            i
+        );
+    }
 }

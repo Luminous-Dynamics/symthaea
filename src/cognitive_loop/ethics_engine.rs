@@ -290,7 +290,8 @@ impl EthicsEngine {
         dense_basis: Option<Arc<HarmonyBasis>>,
     ) -> Self {
         let dim = moral_algebra.dim();
-        let shared_basis = dense_basis.unwrap_or_else(|| Arc::new(HarmonyBasis::new(dim)));
+        let shared_basis =
+            dense_basis.unwrap_or_else(|| Arc::new(HarmonyBasis::new(dim)));
 
         let moral_topology = MoralTopology::with_anomaly_config(
             MoralTopologyConfig {
