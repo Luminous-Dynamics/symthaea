@@ -545,13 +545,14 @@ impl CognitiveLoopService {
                     .iter()
                     .map(|(_, v)| *v)
                     .fold(f64::NEG_INFINITY, f64::max);
-                let (min_name, min_val) = active_layers
+                if let Some((min_name, min_val)) = active_layers
                     .iter()
                     .copied()
                     .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
-                    .unwrap();
-                metadata.consciousness_layer_disagreement = max_val - min_val;
-                metadata.consciousness_weakest_layer = min_name.to_string();
+                {
+                    metadata.consciousness_layer_disagreement = max_val - min_val;
+                    metadata.consciousness_weakest_layer = min_name.to_string();
+                }
             }
         }
 

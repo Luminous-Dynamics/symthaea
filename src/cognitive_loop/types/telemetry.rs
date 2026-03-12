@@ -1221,6 +1221,32 @@ pub struct CycleMetadata {
     #[serde(default)]
     pub rhythmic_exploration_active: bool,
 
+    // ── Session 18: Predictive Coding & Metacognitive Refinement ───────────
+    /// Whether PE variance dampened learning rate.
+    #[serde(default)]
+    pub pe_variance_damping_active: bool,
+    /// Current confidence calibration drift magnitude.
+    #[serde(default)]
+    pub confidence_calibration_drift: f32,
+    /// Whether LR momentum smoothing clipped a delta.
+    #[serde(default)]
+    pub lr_momentum_active: bool,
+    /// Whether metacognitive surprise boosted exploration.
+    #[serde(default)]
+    pub metacognitive_surprise_active: bool,
+    /// Current sleep pressure (0.0–1.0).
+    #[serde(default)]
+    pub sleep_pressure: f32,
+    /// Whether gradient sign flip dampening fired.
+    #[serde(default)]
+    pub gradient_sign_flip_active: bool,
+    /// Exploration-exploitation balance ratio (0.0–1.0, 0.5 = balanced).
+    #[serde(default)]
+    pub explore_exploit_balance: f32,
+    /// Whether proposal conflict cancellation occurred.
+    #[serde(default)]
+    pub proposal_conflict_detected: bool,
+
     // ── Governance telemetry (feature: mycelix) ─────────────────────────────
     /// Governance reward EMA — running average of governance outcome rewards.
     /// Positive = aligned outcomes, negative = misaligned. 0.0 when no outcomes.

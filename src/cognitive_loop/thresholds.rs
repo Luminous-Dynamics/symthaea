@@ -2003,6 +2003,71 @@ pub const RHYTHMIC_EXPLORATION_PERIOD: u32 = 100;
 pub const RHYTHMIC_EXPLORATION_AMPLITUDE: f32 = 0.02;
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// SESSION 18: PREDICTIVE CODING & METACOGNITIVE REFINEMENT
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// EMA decay for prediction error variance tracking.
+/// Basis: Clark (2013) — prediction error precision weighting.
+pub const PE_VARIANCE_EMA_DECAY: f32 = 0.95;
+/// PE variance threshold above which LR is dampened.
+/// High variance = noisy environment → cautious learning.
+pub const PE_VARIANCE_DAMPING_THRESHOLD: f32 = 0.3;
+/// LR scale when PE variance exceeds threshold.
+pub const PE_VARIANCE_LR_SCALE: f32 = 0.95;
+
+/// Confidence calibration window (cycles).
+/// Basis: Keren & Teigen (2004) — metacognitive calibration.
+pub const CONFIDENCE_CALIBRATION_WINDOW: usize = 50;
+/// Confidence calibration drift threshold (overconfident or underconfident).
+pub const CONFIDENCE_CALIBRATION_DRIFT_THRESHOLD: f32 = 0.15;
+/// Confidence correction scale per cycle when drift detected.
+pub const CONFIDENCE_CALIBRATION_CORRECTION: f32 = 0.01;
+
+/// EMA decay for learning rate momentum.
+/// Basis: Kingma & Ba (2015) — Adam-style momentum smoothing.
+pub const LR_MOMENTUM_EMA_DECAY: f32 = 0.9;
+/// Maximum LR change per cycle (dampens abrupt swings).
+pub const LR_MOMENTUM_MAX_DELTA: f32 = 0.15;
+
+/// Metacognitive surprise threshold (predicted vs actual outcome divergence).
+/// Basis: Fleming & Dolan (2012) — metacognitive prediction errors.
+pub const METACOGNITIVE_SURPRISE_THRESHOLD: f64 = 0.2;
+/// Exploration boost on metacognitive surprise.
+pub const METACOGNITIVE_SURPRISE_EXPLORE_BOOST: f32 = 0.03;
+
+/// Sleep pressure increment per active cycle.
+/// Basis: Tononi & Cirelli (2006) — synaptic homeostasis hypothesis.
+pub const SLEEP_PRESSURE_INCREMENT: f32 = 0.001;
+/// Sleep pressure threshold that triggers consolidation mode.
+pub const SLEEP_PRESSURE_THRESHOLD: f32 = 0.7;
+/// Sleep pressure decay rate during consolidation.
+pub const SLEEP_PRESSURE_CONSOLIDATION_DECAY: f32 = 0.05;
+/// LR dampening during consolidation mode.
+pub const SLEEP_PRESSURE_LR_SCALE: f32 = 0.9;
+
+/// Window for gradient sign consistency tracking.
+/// Basis: Schaul et al. (2013) — sign-based learning rate adaptation.
+pub const GRADIENT_SIGN_WINDOW: usize = 10;
+/// Fraction of sign flips above which = oscillating.
+pub const GRADIENT_SIGN_FLIP_THRESHOLD: f32 = 0.6;
+/// LR dampening when gradient is oscillating.
+pub const GRADIENT_SIGN_FLIP_LR_SCALE: f32 = 0.95;
+
+/// Exploration-exploitation balance window.
+/// Basis: Cohen et al. (2007) — tonic dopamine sets explore/exploit balance.
+pub const EXPLORE_EXPLOIT_WINDOW: usize = 50;
+/// Acceptable imbalance range (0.3–0.7 = balanced).
+pub const EXPLORE_EXPLOIT_LOW_BOUND: f32 = 0.3;
+/// Upper bound of acceptable balance.
+pub const EXPLORE_EXPLOIT_HIGH_BOUND: f32 = 0.7;
+/// Homeostatic correction strength.
+pub const EXPLORE_EXPLOIT_CORRECTION: f32 = 0.01;
+
+/// Proposal conflict: max conflict_ratio before cancellation.
+/// Basis: Botvinick et al. (2001) — ACC detects response conflict → pause.
+pub const PROPOSAL_CONFLICT_THRESHOLD: f32 = 0.4;
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // AFFECTIVE CONSCIOUSNESS
 // Science: Barrett (2017) — affect is the primary driver of cognition.
 // Damasio (1999) — somatic markers (valence/arousal) guide all decisions.

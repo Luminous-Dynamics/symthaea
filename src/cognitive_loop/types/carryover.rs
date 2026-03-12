@@ -252,6 +252,25 @@ pub(crate) struct QualityMetrics {
     pub(crate) prev_gradient_magnitude: f64,
     /// Whether adaptive warmup has exited (stability-based).
     pub(crate) adaptive_warmup_exited: bool,
+    // ── Session 18: Predictive Coding & Metacognitive Refinement ────────
+    /// EMA of prediction error squared (variance tracking).
+    pub(crate) pe_variance_ema: f32,
+    /// Confidence calibration: running sum of (predicted - actual) over window.
+    pub(crate) confidence_calibration_bias: f32,
+    /// Confidence calibration: count of samples in current window.
+    pub(crate) confidence_calibration_count: u32,
+    /// LR momentum: EMA of recent effective LR.
+    pub(crate) lr_momentum_ema: f32,
+    /// Previous metacognitive prediction (expected consciousness level).
+    pub(crate) prev_metacognitive_prediction: f64,
+    /// Sleep pressure (0.0–1.0): accumulated synaptic load.
+    pub(crate) sleep_pressure: f32,
+    /// Whether currently in consolidation mode.
+    pub(crate) in_consolidation: bool,
+    /// Ring buffer of recent consciousness gradient signs (true = positive).
+    pub(crate) gradient_sign_history: Vec<bool>,
+    /// Ring buffer of recent explore vs exploit decisions (true = explore-biased).
+    pub(crate) explore_exploit_history: Vec<bool>,
 }
 
 impl Default for QualityMetrics {
@@ -297,6 +316,15 @@ impl Default for QualityMetrics {
             allostatic_load: 0.0,
             prev_gradient_magnitude: 0.0,
             adaptive_warmup_exited: false,
+            pe_variance_ema: 0.0,
+            confidence_calibration_bias: 0.0,
+            confidence_calibration_count: 0,
+            lr_momentum_ema: 1.0,
+            prev_metacognitive_prediction: 0.0,
+            sleep_pressure: 0.0,
+            in_consolidation: false,
+            gradient_sign_history: Vec::new(),
+            explore_exploit_history: Vec::new(),
         }
     }
 }
