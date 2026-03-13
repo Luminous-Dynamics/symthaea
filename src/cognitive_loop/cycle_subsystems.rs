@@ -414,8 +414,13 @@ impl CognitiveLoopService {
         module_timings.epistemic_gate = _t.elapsed().as_micros() as u64;
 
         // FEEDBACK: Low epistemic confidence reduces prediction confidence
-        if epistemic_gate_confidence < 0.3 && !epistemic_gate_approved {
-            self.adjust_confidence("epistemic_gate_low", -0.03);
+        {
+            use super::thresholds::{EPISTEMIC_GATE_LOW_PENALTY, EPISTEMIC_GATE_LOW_THRESHOLD};
+            if epistemic_gate_confidence < EPISTEMIC_GATE_LOW_THRESHOLD
+                && !epistemic_gate_approved
+            {
+                self.adjust_confidence("epistemic_gate_low", -EPISTEMIC_GATE_LOW_PENALTY);
+            }
         }
 
         // ═══════════════════════════════════════════════════════════════════════

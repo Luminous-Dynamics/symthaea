@@ -255,7 +255,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
         let (affective_valence, affective_arousal) =
-            if let Some(ref mut bridge) = self.affective_bridge {
+            if let Some(ref mut bridge) = self.consciousness_state.affective_bridge {
                 let moral_score = self
                     .last_moral_judgment
                     .as_ref()
@@ -278,7 +278,7 @@ impl CognitiveLoopService {
             };
 
         // FEEDBACK: Positive affect broadens exploration (Fredrickson 2001 broaden-and-build)
-        if affective_valence > 0.2 && self.affective_bridge.is_some() {
+        if affective_valence > 0.2 && self.consciousness_state.affective_bridge.is_some() {
             self.curiosity_drive.boredom *= 1.05;
         }
         // FEEDBACK: Arousal gates learning consolidation (Russell 1980 VAD model)
@@ -357,9 +357,9 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
         let (predictive_free_energy, predictive_psi_modulation) = if let Some(ref mut mind) =
-            self.predictive_mind
+            self.consciousness_state.predictive_mind
         {
-            if self.affective_bridge.is_some() {
+            if self.consciousness_state.affective_bridge.is_some() {
                 mind.precision
                     .apply_affective_modulation(affective_arousal as f64, affective_valence as f64);
             }
