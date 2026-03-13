@@ -914,6 +914,24 @@ impl CognitiveLoopService {
         if let Err(e) = self.temporal_network.step(&input_array, delta_t) {
             tracing::warn!(error = %e, "CfC temporal step failed — continuing with stale state");
         }
+
+        // Phase 3: Scale-limited CfC hidden state masking.
+        // When substrate has fewer computational units than biological (negative
+        // scale_pressure), mask out a fraction of hidden state dimensions.
+        // Science: Berry & Srivastava (2018) — HDC capacity ~ D^(5/3).
+        if self.config.enable_substrate_encoding_noise {
+            let frac = self.substrate_manager.effective_dim_fraction();
+            if frac < 1.0 {
+                if let Ok(mut state) = self.temporal_network.read_state() {
+                    let mask_start = (frac * state.len() as f32) as usize;
+                    for h in state.as_slice_mut().unwrap_or(&mut [])[mask_start..].iter_mut() {
+                        *h = 0.0;
+                    }
+                    let _ = self.temporal_network.inject(&state);
+                }
+            }
+        }
+
         module_timings.core_cfc_step = _t_core.elapsed().as_micros() as u64;
 
         // 5. Get multi-scale predictions

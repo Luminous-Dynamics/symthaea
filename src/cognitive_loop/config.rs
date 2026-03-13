@@ -804,8 +804,7 @@ impl CognitiveLoopConfig {
         self.enable_substrate_encoding_noise = true;
         self.enable_validation_overlay = true;
         self.enable_energy_budget = true;
-        self.substrate_transition_alpha =
-            super::thresholds::SUBSTRATE_TRANSITION_ALPHA_SIMULATION;
+        self.substrate_transition_alpha = super::thresholds::SUBSTRATE_TRANSITION_ALPHA_SIMULATION;
         self
     }
 }

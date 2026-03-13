@@ -86,7 +86,6 @@ pub(crate) struct SubstrateManager {
     per_region_feasibility: HashMap<CorticalRegion, f32>,
 
     // ── Phase 3: Transition smoothing ────────────────────────────────────
-
     /// Target effective feasibility after transition (for EMA blending).
     target_effective_feasibility: f64,
 
@@ -166,7 +165,47 @@ impl SubstrateManager {
         ));
         self.recompute_effective_feasibility(config);
         self.recompute_substrate_dynamics(config);
+
+        // Phase 3: recalculate energy for new substrate
+        let energy_per_op = canonical.energy_per_operation();
+        self.energy_per_cycle = energy_per_op * SUBSTRATE_OPS_PER_CYCLE;
+        let bio_energy = SubstrateType::BiologicalNeurons.energy_per_operation();
+        self.energy_throughput_multiplier = (bio_energy / energy_per_op).clamp(0.1, 100.0) as f32;
+
+        // Phase 3: set transition targets (smoothing via tick_transition)
+        self.target_effective_feasibility = self.effective_feasibility;
+        self.target_tau_factor = self.tau_factor;
+
+        // Phase 3: record transition history
+        let record = SubstrateTransitionRecord {
+            cycle: 0, // caller should set via reconfigure_substrate_at_cycle
+            from: old_type,
+            to: canonical,
+            old_feasibility: old,
+            new_feasibility: self.feasibility,
+        };
+        self.transition_history.push_back(record);
+        if self.transition_history.len() > SUBSTRATE_TRANSITION_HISTORY_CAP {
+            self.transition_history.pop_front();
+        }
+        self.current_substrate = canonical;
+
         (old, self.feasibility)
+    }
+
+    /// Reconfigure substrate with cycle number for transition history.
+    pub fn reconfigure_substrate_at_cycle(
+        &mut self,
+        config: &mut CognitiveLoopConfig,
+        substrate: SubstrateType,
+        cycle: u64,
+    ) -> (f64, f64) {
+        let result = self.reconfigure_substrate(config, substrate);
+        // Patch the cycle number on the most recent transition record
+        if let Some(record) = self.transition_history.back_mut() {
+            record.cycle = cycle;
+        }
+        result
     }
 
     /// Switch to a substrate composition at runtime, recomputing feasibility.
@@ -263,15 +302,53 @@ impl SubstrateManager {
     /// second, so energy per wall-clock tick scales with tau_factor.
     pub fn tick_energy(&mut self, config: &CognitiveLoopConfig) {
         if !config.enable_energy_budget {
+            self.last_energy_spent = 0.0;
             return;
         }
         let speed_adjusted_energy = self.energy_per_cycle * self.tau_factor as f64;
         self.total_energy_spent += speed_adjusted_energy;
+        self.last_energy_spent = speed_adjusted_energy;
         if let Some(budget) = config.energy_budget_joules_per_sec {
             if self.total_energy_spent > budget {
                 self.consciousness_viable = false;
             }
         }
+    }
+
+    /// Smooth transition dynamics via EMA blending each cycle.
+    ///
+    /// When `substrate_transition_alpha` < 1.0, effective_feasibility and
+    /// tau_factor blend gradually toward their targets after a substrate switch.
+    /// This models the imperfect fidelity of substrate transfer (Bostrom 2003).
+    pub fn tick_transition(&mut self, config: &CognitiveLoopConfig) {
+        let alpha = config.substrate_transition_alpha;
+        if alpha >= 1.0 {
+            return; // Instant switching — no smoothing needed
+        }
+        // EMA blend: current += alpha × (target − current)
+        self.effective_feasibility +=
+            alpha as f64 * (self.target_effective_feasibility - self.effective_feasibility);
+        self.tau_factor += alpha * (self.target_tau_factor - self.tau_factor);
+    }
+
+    /// Compute effective HDC/CfC dimensionality fraction for this substrate.
+    ///
+    /// Returns 1.0 for substrates at or above biological scale (positive scale_pressure).
+    /// Returns < 1.0 for scale-constrained substrates (negative scale_pressure),
+    /// clamped to [SUBSTRATE_MIN_DIM_FRACTION, 1.0].
+    ///
+    /// Science: Berry & Srivastava (2018) — HDC capacity scales with D^(5/3).
+    pub fn effective_dim_fraction(&self) -> f32 {
+        if self.scale_pressure >= 0.0 {
+            return 1.0;
+        }
+        (1.0 + self.scale_pressure / SUBSTRATE_SCALE_DIM_DIVISOR)
+            .clamp(SUBSTRATE_MIN_DIM_FRACTION, 1.0)
+    }
+
+    /// Access the transition history log.
+    pub fn transition_history(&self) -> &VecDeque<SubstrateTransitionRecord> {
+        &self.transition_history
     }
 
     /// Returns true when substrate feasibility is too low for full consciousness.
@@ -393,6 +470,11 @@ impl SubstrateManager {
             substrate_scale_pressure: self.scale_pressure,
             per_region_feasibility: per_region,
             substrate_encoding_noise: encoding_noise,
+            total_energy_spent: self.total_energy_spent,
+            energy_this_cycle: self.last_energy_spent,
+            energy_throughput_multiplier: self.energy_throughput_multiplier,
+            effective_dim_fraction: self.effective_dim_fraction(),
+            transition_count: self.transition_history.len(),
         }
     }
 
