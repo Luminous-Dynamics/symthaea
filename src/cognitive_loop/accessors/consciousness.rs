@@ -14,25 +14,25 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════
 
         /// Get current consciousness pattern classification
-        pub fn consciousness_pattern(&self) -> (ConsciousnessPattern, f32) { self.voice_coherence.temporal.classify_state() }
+        pub fn consciousness_pattern(&self) -> (ConsciousnessPattern, f32) { self.language_comm.voice_coherence.temporal.classify_state() }
 
         /// Get full temporal state summary
-        pub fn temporal_state_summary(&self) -> TemporalStateSummary { self.voice_coherence.temporal.summary() }
+        pub fn temporal_state_summary(&self) -> TemporalStateSummary { self.language_comm.voice_coherence.temporal.summary() }
     }
 
     // ========== Consciousness Snapshot ==========
 
     /// Get a complete snapshot of current consciousness state
     pub fn consciousness_snapshot(&self) -> ConsciousnessSnapshot {
-        let (pattern, pattern_confidence) = self.voice_coherence.temporal.classify_state();
-        let temporal_summary = self.voice_coherence.temporal.summary();
+        let (pattern, pattern_confidence) = self.language_comm.voice_coherence.temporal.classify_state();
+        let temporal_summary = self.language_comm.voice_coherence.temporal.summary();
         let reflection_summary = self.self_model_tier.self_reflection.summary();
         let thresholds = self.self_model_tier.self_reflection.get_thresholds();
         let (emotion_nudge, _) = self.emotion_contagion.pattern_nudge();
 
         let consciousness_level = ConsciousnessSnapshot::compute_consciousness_level(
             self.prediction_confidence as f32,
-            self.voice_coherence.bridge.smoothed_coherence(),
+            self.language_comm.voice_coherence.bridge.smoothed_coherence(),
             self.flow_state.intensity,
             pattern_confidence,
         );
@@ -74,7 +74,7 @@ impl CognitiveLoopService {
             flow_threshold: thresholds.flow_error,
             boredom_threshold: thresholds.boredom,
             trust_threshold: thresholds.trust,
-            temporal_coherence: self.voice_coherence.bridge.smoothed_coherence(),
+            temporal_coherence: self.language_comm.voice_coherence.bridge.smoothed_coherence(),
             tau_mean: temporal_summary.features.mean,
             tau_trend: temporal_summary.features.trend,
             cognitive_depth: self.cognitive_depth,
@@ -138,10 +138,10 @@ impl CognitiveLoopService {
 
     /// Get current consciousness level (0.0 to 1.0)
     pub fn consciousness_level(&self) -> f32 {
-        let (_, pattern_confidence) = self.voice_coherence.temporal.classify_state();
+        let (_, pattern_confidence) = self.language_comm.voice_coherence.temporal.classify_state();
         ConsciousnessSnapshot::compute_consciousness_level(
             self.prediction_confidence as f32,
-            self.voice_coherence.bridge.smoothed_coherence(),
+            self.language_comm.voice_coherence.bridge.smoothed_coherence(),
             self.flow_state.intensity,
             pattern_confidence,
         )
@@ -149,12 +149,12 @@ impl CognitiveLoopService {
 
     /// Check if current state matches a specific consciousness pattern
     pub fn is_consciousness_state(&self, pattern: ConsciousnessPattern) -> bool {
-        self.voice_coherence.temporal.is_state(pattern)
+        self.language_comm.voice_coherence.temporal.is_state(pattern)
     }
 
     /// Get similarity to a specific consciousness pattern
     pub fn consciousness_pattern_similarity(&self, pattern: ConsciousnessPattern) -> f32 {
-        self.voice_coherence.temporal.similarity_to(pattern)
+        self.language_comm.voice_coherence.temporal.similarity_to(pattern)
     }
 
     // ═══════════════════════════════════════════════════════════════════════

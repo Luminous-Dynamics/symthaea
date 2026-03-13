@@ -272,7 +272,7 @@ This bridge enables hybrid architectures where CfC modules handle temporal dynam
 \label{sec:experiments}
 %═══════════════════════════════════════════════════════════════════════════════
 
-We evaluate the Unified HDC-LTC architecture across four domains: speech processing, letter recognition, biomedical signal classification, and real-time control. The core architecture uses $D = 16{,}384$ (as described in Section~\ref{sec:method}); individual benchmarks use $D = 4{,}096$ unless otherwise noted, with tanh activation, $\tau_0 = 100$ms, and gradient clip 1.0 (5.0 for classification). We evaluate on both real-world datasets (ISOLET, MNIST) and synthetic benchmarks designed to isolate specific capabilities. Implementation is in Rust (open-source, \symthaea{} library, $\sim$343K LOC). Fig.~\ref{fig:benchmarks} summarizes the key results.
+We evaluate the Unified HDC-LTC architecture across four domains: speech processing, letter recognition, biomedical signal classification, and real-time control. The core architecture uses $D = 16{,}384$ (as described in Section~\ref{sec:method}); individual benchmarks use $D = 4{,}096$ unless otherwise noted, with tanh activation, $\tau_0 = 100$ms, and gradient clip 1.0 (5.0 for classification). We evaluate on both real-world datasets (ISOLET, MNIST) and synthetic benchmarks designed to isolate specific capabilities. Implementation is in Rust (open-source, \symthaea{} library, ${\sim}928$K LOC). Fig.~\ref{fig:benchmarks} summarizes the key results.
 
 \begin{figure}[t]
 \centering
@@ -401,7 +401,7 @@ The key insight is that binding is $O(D)$ (element-wise) versus $O(n^2)$ for mat
 
 We introduced the Unified HDC-LTC neuron, the first architecture combining hyperdimensional computing with continuous-time neural dynamics. By replacing weight matrices with weight hypervectors and matrix multiplication with HDC binding, we achieve a system where temporal evolution and symbolic representation are unified in a single algebraic framework. The closed-form solution enables O(1) temporal jumps regardless of time horizon, with empirical validation across speech, letter recognition, biomedical, and control tasks.
 
-The architecture is implemented in Rust as part of the open-source \symthaea{} library (\url{https://github.com/luminous-dynamics/symthaea}) with $\sim$343K lines of code and $>$5,000 tests. We believe the combination of HDC's representational power with CfC's temporal dynamics opens a new direction in neural architecture design---one where computing, memory, and time are unified in a single high-dimensional algebraic space.
+The architecture is implemented in Rust as part of the open-source \symthaea{} library (\url{https://github.com/luminous-dynamics/symthaea}) with ${\sim}928$K lines of code and $>$21,000 tests. We believe the combination of HDC's representational power with CfC's temporal dynamics opens a new direction in neural architecture design---one where computing, memory, and time are unified in a single high-dimensional algebraic space.
 
 %═══════════════════════════════════════════════════════════════════════════════
 % REFERENCES

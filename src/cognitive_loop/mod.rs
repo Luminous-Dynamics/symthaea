@@ -129,6 +129,7 @@ pub(crate) mod biorhythm_manager;
 pub(crate) mod consciousness_engine;
 pub(crate) mod consciousness_monitor_tier;
 pub(crate) mod consciousness_state_manager;
+pub(crate) mod ethics_values_manager;
 mod constructor;
 mod cycle;
 mod cycle_consciousness;
@@ -157,6 +158,8 @@ pub(crate) mod primitive_tier;
 pub(crate) mod self_model_tier;
 pub(crate) mod social_manager;
 pub(crate) mod substrate_manager;
+pub(crate) mod language_comm_manager;
+pub(crate) mod vision_sensory_manager;
 pub use substrate_manager::SubstrateTransitionRecord;
 pub(crate) mod subsystem_trait;
 #[allow(dead_code)] // Registry of tuning constants — many reserved for future wiring
@@ -303,8 +306,8 @@ pub struct CognitiveLoopService {
     /// Is currently consolidating (background learning)
     is_consolidating: bool,
 
-    /// Voice-coherence bridge: CfC coherence + voice feedback + temporal signatures.
-    voice_coherence: voice_coherence_bridge::VoiceCoherenceBridge,
+    /// Language & communication: voice coherence, Broca, user state.
+    pub(crate) language_comm: language_comm_manager::LanguageAndCommunicationManager,
 
     /// Current adaptive behavior based on consciousness state
     adaptive_behavior: AdaptiveBehavior,
@@ -455,8 +458,9 @@ pub struct CognitiveLoopService {
     // MORAL ALGEBRA: Compositional Ethical Reasoning
     // (MoralParser + MoralAlgebra now owned by EthicsEngine)
     // ═══════════════════════════════════════════════════════════════════════
-    /// Last moral evaluation result (for tracking and learning)
-    last_moral_judgment: Option<MoralJudgmentSummary>,
+    /// Ethics and values manager: groups moral judgment, contextual weights,
+    /// phi-attention routing, negation detection, and soul alignment.
+    pub(crate) ethics_values: ethics_values_manager::EthicsAndValuesManager,
 
     /// Primitive-Belief Bridge: maps 9-tier primitives to active inference beliefs
     /// Computes per-tier prediction errors and TD signals for learning
@@ -502,14 +506,7 @@ pub struct CognitiveLoopService {
     /// Science: Treisman (1996), Friston (2010), Tononi (2004), Russell (1980).
     pub(crate) consciousness_state: consciousness_state_manager::ConsciousnessStateManager,
 
-    /// Contextual harmony weighting for domain-aware ethical reasoning.
-    contextual_weights: Option<crate::consciousness::contextual_weights::ContextualWeights>,
-
-    /// Phi-weighted attention routing with adaptive thresholds.
-    phi_attention: Option<crate::consciousness::phi_attention::AdaptiveThresholds>,
-
-    /// Negation detector for moral/value text preprocessing.
-    negation_detector: Option<crate::consciousness::negation_detector::NegationDetector>,
+    // contextual_weights, phi_attention, negation_detector moved to ethics_values_manager
 
     /// All primitive-consciousness-gated subsystems, grouped into a single manager.
     /// See `primitive_tier::PrimitiveTierManager` for field list.
@@ -552,10 +549,7 @@ pub struct CognitiveLoopService {
     /// urgency hysteresis, MCE boost, etc.). Reset via `CycleCarryover::default()`.
     carryover: CycleCarryover,
 
-    /// Soul: Eight Harmonies value alignment for moral evaluation.
-    /// When present, evaluates action alignment against core values
-    /// and integrates experiences for long-term value learning.
-    soul: Option<crate::soul::Soul>,
+    // soul moved to ethics_values_manager
 
     /// Attention visualizer for debugging attention flow.
     /// When present, captures attention snapshots each cycle for
@@ -565,23 +559,20 @@ pub struct CognitiveLoopService {
     /// Social manager: social signals + phi-dyad + partner model + ring buffers.
     pub(crate) social_mgr: SocialManager,
 
-    /// User state inference for adaptive response generation.
-    /// When enabled, infers user cognitive load, frustration, and engagement from input text.
-    user_state: Option<crate::user_state_inference::UserStateInference>,
+    // user_state moved to language_comm_manager
 
     /// Resonant speech generator: adapts response complexity to user cognitive load.
     /// Uses neuromod bath signals + USI to determine response profile each cycle.
     /// Science: Ritter et al. (2019) — adaptive complexity reduces cognitive overload.
     resonant_speech: crate::resonant_speech::ResonantSpeech,
 
-    /// Physiology coherence field — consciousness integration via hormone modulation.
-    /// Tracks coherence state, applies hormone effects from neuromod bath each cycle.
-    coherence_field: Option<crate::physiology::CoherenceField>,
+    /// Streaming inference engine: CfC-based real-time inference with batching.
+    /// Pushes perception encodings each cycle, polls outputs for downstream use.
+    /// Config: batch_accumulation=1, max_latency=32ms (cycle-aligned).
+    streaming_inference: Option<crate::inference::StreamingInference>,
 
-    /// Virtual body adapter for embodied cognition.
-    /// When enabled, maps cognitive signals to interoceptive states and produces
-    /// a phi_modulation factor that scales consciousness from somatic feedback.
-    virtual_body: Option<virtual_body::VirtualBody>,
+    /// Vision & sensory: coherence field, virtual body, vision, foveation.
+    pub(crate) vision_sensory: vision_sensory_manager::VisionAndSensoryManager,
 
     /// Nurture/attachment bridge — Bowlby attachment -> neuromodulator modulation.
     /// When enabled, models caregiver presence/absence and modulates oxytocin, NE,
@@ -589,33 +580,9 @@ pub struct CognitiveLoopService {
     #[cfg(feature = "nurture")]
     pub(crate) nurture_attachment: Option<nurture_bridge::NurtureAttachmentBridge>,
 
-    /// Vision bridge: frame → attention-boosted HDC encoding.
-    #[cfg(feature = "vision-manifold")]
-    pub(super) vision_bridge: Option<symthaea_vision_manifold::VisionBridge>,
-    /// Latest frame buffer for vision processing (injected externally or from mock).
-    #[cfg(feature = "vision-manifold")]
-    pub(super) vision_frame_buffer: Option<Vec<u8>>,
+    // vision_bridge, vision_frame_buffer, cross_manifold_predictor, foveation_manager moved to vision_sensory_manager
 
-    /// Cross-manifold predictor: vision→cognitive Hebbian mapping.
-    #[cfg(feature = "vision-manifold")]
-    pub(super) cross_manifold_predictor: Option<symthaea_vision_manifold::CrossManifoldPredictor>,
-
-    /// Foveation bridge: dorsal surprise → ventral recognition dispatch.
-    /// When enabled, receives salient patches from vision manifold and dispatches
-    /// background ventral recognition, feeding results into GWT.
-    #[cfg(feature = "foveation")]
-    pub(super) foveation_manager: Option<std::sync::Mutex<symthaea_foveation::FoveationManager>>,
-
-    /// Broca SSM language center: consciousness-gated thought-to-text.
-    /// When enabled via `ssm_language` feature + `enable_broca_language` config,
-    /// generates text from HDC-encoded thoughts with epistemic/emotional gating.
-    #[cfg(feature = "ssm_language")]
-    pub(crate) broca_manager: Option<broca_bridge::BrocaManager>,
-
-    /// Most recent Broca-generated text, drained into `CycleResult.language_output`
-    /// each cycle. `None` when Broca is disabled or gated by low consciousness.
-    #[cfg(feature = "ssm_language")]
-    pub(crate) last_broca_text: Option<String>,
+    // broca_manager, last_broca_text moved to language_comm_manager
 
     /// Canvas living topology: consciousness-driven SVG generation.
     /// When enabled via `canvas` feature, generates real-time topology SVGs
@@ -672,6 +639,11 @@ pub struct CognitiveLoopService {
     /// temporal knowledge graph, builds causal DAG edges, and grows adaptive ontology.
     /// Science: Kanerva (2009) HDC, Pearl (2009) Causality, Carey (2009) conceptual change.
     knowledge_manager: Option<crate::knowledge::KnowledgeManager>,
+
+    /// Last assembled reasoning context from the knowledge engine.
+    /// Contains grounded facts, causal chains, and epistemic state.
+    /// Populated after knowledge engine processes each cycle's input.
+    last_reasoning_context: Option<crate::knowledge::ReasoningContext>,
 
     /// Experience integration bus for principled signal tracking and harmonic reasoning.
     /// Bridges cognitive loop signals to Eight Harmonies wisdom system.
@@ -764,6 +736,10 @@ pub struct CognitiveLoopService {
     /// exploration. Implements CognitiveSubsystem at interval 37. Feature-gated behind `mycelix`.
     #[cfg(feature = "mycelix")]
     governance_mgr: managers::GovernanceManager,
+
+    /// Swarm Manager: Peer consciousness signals → social buffering, affective contagion,
+    /// collective Φ modulation. Implements CognitiveSubsystem at interval 41.
+    swarm_manager: managers::SwarmManager,
 
     /// Integrity Manager: BLAKE3 attestation, temporal consistency, behavioral canaries.
     /// Runs tamper detection at co-prime intervals. Feature-gated behind `integrity`.

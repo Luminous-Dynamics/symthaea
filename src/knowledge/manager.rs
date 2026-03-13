@@ -22,6 +22,7 @@ use super::causal_bridge::CausalKnowledgeBridge;
 use super::encoding::KnowledgeEncoder;
 use super::extraction::{EntityType, KnowledgeExtractor};
 use super::graph::{ContradictionAlert, EnhancedKnowledgeGraph, FactSearchResult};
+use super::persistence::{CausalEdgeRecord, FactRecord, KnowledgePersistence};
 use std::collections::VecDeque;
 use symthaea_core::hdc::unified_hv::BinaryHV;
 
@@ -100,6 +101,12 @@ pub struct KnowledgeManagerConfig {
     /// Processing interval: run extraction every N cycles (1 = every cycle)
     /// Science: reduce overhead by amortizing extraction over multiple cycles
     pub processing_interval: u64,
+    /// Path to SQLite database for persistent knowledge storage.
+    /// When set, facts and causal edges are saved periodically and loaded on startup.
+    /// Science: Ebbinghaus (1885) — cross-session consolidation.
+    pub db_path: Option<String>,
+    /// Save interval: persist knowledge every N cycles (default: 500).
+    pub save_interval: u64,
 }
 
 impl Default for KnowledgeManagerConfig {
@@ -112,6 +119,8 @@ impl Default for KnowledgeManagerConfig {
             decay_interval: 100,
             ontology_config: AdaptiveOntologyConfig::default(),
             processing_interval: 1,
+            db_path: None,
+            save_interval: 500,
         }
     }
 }
@@ -146,6 +155,8 @@ pub struct KnowledgeManager {
     bootstrap_done: bool,
     /// Last causal chain depth traced during search (for signal emission)
     last_causal_depth: usize,
+    /// Optional SQLite persistence layer
+    persistence: Option<KnowledgePersistence>,
 }
 
 impl Default for KnowledgeManager {
@@ -156,9 +167,46 @@ impl Default for KnowledgeManager {
 
 impl KnowledgeManager {
     pub fn new(config: KnowledgeManagerConfig) -> Self {
-        let graph = EnhancedKnowledgeGraph::new(config.graph_capacity);
-        let causal_bridge = CausalKnowledgeBridge::new(config.causal_capacity);
+        let mut graph = EnhancedKnowledgeGraph::new(config.graph_capacity);
+        let mut causal_bridge = CausalKnowledgeBridge::new(config.causal_capacity);
         let ontology = AdaptiveOntology::new(config.ontology_config.clone());
+
+        // Initialize persistence and load existing knowledge if DB path is configured
+        let persistence = config.db_path.as_ref().map(|path| {
+            let mut p = KnowledgePersistence::new(path);
+            // Load persisted facts into the graph
+            if let Ok(records) = p.load_facts() {
+                for record in &records {
+                    graph.import_fact_record(record);
+                }
+                if !records.is_empty() {
+                    tracing::info!(
+                        target: "knowledge::persistence",
+                        facts = records.len(),
+                        "Loaded persisted knowledge facts"
+                    );
+                }
+            }
+            // Load persisted causal edges
+            if let Ok(edges) = p.load_causal_edges() {
+                for edge in &edges {
+                    causal_bridge.import_edge(
+                        &edge.cause,
+                        &edge.effect,
+                        edge.strength,
+                        edge.is_inhibitory,
+                    );
+                }
+                if !edges.is_empty() {
+                    tracing::info!(
+                        target: "knowledge::persistence",
+                        edges = edges.len(),
+                        "Loaded persisted causal edges"
+                    );
+                }
+            }
+            p
+        });
 
         Self {
             config,
@@ -174,6 +222,7 @@ impl KnowledgeManager {
             last_search_results: Vec::new(),
             bootstrap_done: false,
             last_causal_depth: 0,
+            persistence,
         }
     }
 
@@ -442,6 +491,11 @@ impl KnowledgeManager {
         }
         self.ontology.maybe_prune(current_cycle);
 
+        // 7b. Periodic persistence: save facts + causal edges
+        if current_cycle > 0 && current_cycle % self.config.save_interval == 0 {
+            self.persist_snapshot();
+        }
+
         // Fill remaining telemetry
         telem.graph_size = self.graph.len() as u32;
         telem.avg_confidence = self.graph.average_confidence();
@@ -510,6 +564,97 @@ impl KnowledgeManager {
     /// Trace causal chains from a starting concept
     pub fn trace_causal_chain(&self, start: &str, max_depth: usize) -> Vec<Vec<String>> {
         self.causal_bridge.trace_chain(start, max_depth)
+    }
+
+    /// Consolidate and forget: prune low-confidence non-causal facts,
+    /// strengthen causal facts. Called during dream/rest phases.
+    /// Science: Stickgold (2005) — sleep-dependent memory consolidation.
+    pub fn consolidate_and_forget(&mut self) -> (usize, usize) {
+        let pruned = self.graph.prune_low_confidence(
+            crate::cognitive_loop::thresholds::KNOWLEDGE_FORGET_CONFIDENCE_THRESHOLD,
+        );
+        let consolidated = self.graph.strengthen_causal_facts(
+            crate::cognitive_loop::thresholds::KNOWLEDGE_CONSOLIDATION_BOOST,
+        );
+        // Persist surviving facts after consolidation
+        if pruned > 0 || consolidated > 0 {
+            self.persist_snapshot();
+        }
+        (pruned, consolidated)
+    }
+
+    /// Query the knowledge engine for grounded facts and causal chains.
+    /// Used by cross-module consumers (Broca, EthicsEngine).
+    pub fn query(&mut self, text: &str) -> super::reasoning_context::KnowledgeQueryResult {
+        self.do_search(text);
+        let grounding_score = if self.last_search_results.is_empty() {
+            0.0
+        } else {
+            let avg_sim: f64 = self
+                .last_search_results
+                .iter()
+                .map(|r| r.similarity as f64)
+                .sum::<f64>()
+                / self.last_search_results.len() as f64;
+            let certainty = 1.0 - self.last_signals.uncertainty;
+            (avg_sim * 0.6 + certainty * 0.4).clamp(0.0, 1.0)
+        };
+        let facts: Vec<super::reasoning_context::GroundedFact> = self
+            .last_search_results
+            .iter()
+            .map(|r| super::reasoning_context::GroundedFact {
+                text: r.source_text.clone(),
+                confidence: r.confidence,
+                similarity: r.similarity,
+                domain: r.domain.clone(),
+                is_causal: r.is_causal,
+            })
+            .collect();
+
+        // Trace causal chains for extracted entities
+        let extracted = self.extractor.extract(text);
+        let mut causal_chains = Vec::new();
+        for fact in &extracted {
+            for entity in &fact.entities {
+                let chains = self
+                    .causal_bridge
+                    .trace_chain(&entity.text.to_lowercase(), 5);
+                for chain in chains {
+                    if !chain.is_empty() {
+                        causal_chains.push(super::reasoning_context::CausalChain {
+                            root: entity.text.to_lowercase(),
+                            steps: chain.clone(),
+                            depth: chain.len(),
+                        });
+                    }
+                }
+            }
+        }
+
+        super::reasoning_context::KnowledgeQueryResult {
+            facts,
+            causal_chains,
+            grounding_score,
+        }
+    }
+
+    /// Get mutable access to the graph (for consolidation).
+    pub fn graph_mut(&mut self) -> &mut EnhancedKnowledgeGraph {
+        &mut self.graph
+    }
+
+    /// Persist current knowledge state to SQLite (if configured).
+    fn persist_snapshot(&mut self) {
+        if let Some(ref mut persistence) = self.persistence {
+            let fact_records = self.graph.export_fact_records();
+            if let Err(e) = persistence.save_facts(&fact_records) {
+                tracing::warn!(target: "knowledge::persistence", "Save facts failed: {e}");
+            }
+            let edge_records = self.causal_bridge.export_edge_records();
+            if let Err(e) = persistence.save_causal_edges(&edge_records) {
+                tracing::warn!(target: "knowledge::persistence", "Save edges failed: {e}");
+            }
+        }
     }
 
     // ── Internal ────────────────────────────────────────────────────────

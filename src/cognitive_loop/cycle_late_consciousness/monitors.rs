@@ -207,7 +207,7 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         let (body_psi_modulation, body_valence, body_arousal) =
             if ctx.urgency.should_run(self.stats.total_cycles, 1, 1, 2) {
-                if let Some(ref mut body) = self.virtual_body {
+                if let Some(ref mut body) = self.vision_sensory.virtual_body {
                     let signals = crate::cognitive_loop::virtual_body::CognitiveSignals {
                         prediction_error: ctx.prediction_error,
                         coherence: ctx.coherence,
@@ -257,6 +257,7 @@ impl CognitiveLoopService {
         let (affective_valence, affective_arousal) =
             if let Some(ref mut bridge) = self.consciousness_state.affective_bridge {
                 let moral_score = self
+                    .ethics_values
                     .last_moral_judgment
                     .as_ref()
                     .map(|j| j.moral_score)
@@ -291,7 +292,7 @@ impl CognitiveLoopService {
         // USER STATE INFERENCE: Infer cognitive load, frustration, engagement
         // Runs every cycle (lightweight: keyword detection + rolling averages)
         // ═══════════════════════════════════════════════════════════════════════
-        if let Some(ref mut usi) = self.user_state {
+        if let Some(ref mut usi) = self.language_comm.user_state {
             let had_error = ctx.prediction_error > 0.8;
             usi.process(ctx.input, had_error);
         }
@@ -516,7 +517,7 @@ impl CognitiveLoopService {
         // Observes current Phi and gates expensive actions by consciousness level.
         // Science: Dehaene (2014) — conscious access enables flexible routing
         // ═══════════════════════════════════════════════════════════════════════
-        let (psi_attention_avg, phi_suppress) = if let Some(ref mut phi_attn) = self.phi_attention {
+        let (psi_attention_avg, phi_suppress) = if let Some(ref mut phi_attn) = self.ethics_values.phi_attention {
             phi_attn.observe(ctx.unified_psi as f32);
             let suppress = !phi_attn.allows_action(
                 crate::consciousness::phi_attention::ActionType::StateModifying,

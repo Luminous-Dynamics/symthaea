@@ -2,20 +2,20 @@
 % Toward Machine Consciousness: Integrated Information, Active Inference,
 % and Hyperdimensional Computing in a Unified Cognitive Architecture
 %
-% Target venue: PLoS Computational Biology
-% Template: PLoS LaTeX v3.6 (August 2022)
+% Target venue: arXiv preprint
+% Originally formatted for PLoS Computational Biology; adapted for arXiv
 % ============================================================================
 
 \documentclass[10pt,letterpaper]{article}
 
-% ── PLoS-required geometry ──────────────────────────────────────────────────
-\usepackage[top=0.85in,left=2.75in,footskip=0.75in]{geometry}
+% ── Page geometry ─────────────────────────────────────────────────────────
+\usepackage[left=1in,right=1in,top=1in,bottom=1in]{geometry}
 
 % ── Core packages ───────────────────────────────────────────────────────────
 \usepackage[utf8]{inputenc}
 \usepackage{changepage}
 \usepackage{textcomp,marvosym}
-\usepackage{cite}                % Vancouver-style numbered citations (PLoS)
+\usepackage{cite}                % Vancouver-style numbered citations
 \usepackage{nameref,hyperref}
 \usepackage{amsfonts}
 \usepackage{amsmath}
@@ -31,30 +31,27 @@
 \usepackage{enumitem}
 \usepackage{tikz}
 
-% ── PLoS figure caption style ──────────────────────────────────────────────
+% ── Figure caption style ─────────────────────────────────────────────────
 \usepackage[aboveskip=1pt,labelfont=bf,labelsep=period,
             justification=raggedright,singlelinecheck=off]{caption}
 
-% ── Line numbers (required for PLoS peer review) ──────────────────────────
-\usepackage[right]{lineno}
+% ── Line numbers (disabled for arXiv) ────────────────────────────────────
+% \usepackage[right]{lineno}
 
-% ── Double spacing (PLoS submission requirement) ───────────────────────────
+% ── Spacing (single for arXiv) ───────────────────────────────────────────
 \usepackage{setspace}
-\doublespacing
+% \doublespacing
 
-% ── PLoS header/footer ─────────────────────────────────────────────────────
+% ── Header/footer ─────────────────────────────────────────────────────────
 \usepackage{lastpage,fancyhdr}
 \usepackage{epstopdf}
 \pagestyle{fancy}
 \fancyhf{}
 \rfoot{\thepage/\pageref{LastPage}}
 \renewcommand{\headrulewidth}{0pt}
-\renewcommand{\footrule}{\hrule height 2pt \vspace{2mm}}
-\fancyheadoffset[L]{2.25in}
-\fancyfootoffset[L]{2.25in}
-\lfoot{\sf PLOS}
+\renewcommand{\footrule}{\hrule height 0.4pt \vspace{2mm}}
 
-% ── PLoS reference list formatting ─────────────────────────────────────────
+% ── Reference list formatting ─────────────────────────────────────────────
 \makeatletter
 \renewcommand{\@biblabel}[1]{\quad#1.}
 \makeatother
@@ -63,8 +60,7 @@
 \graphicspath{{../figures/}}
 
 % ── Page layout ────────────────────────────────────────────────────────────
-\textwidth 5.25in
-\textheight 8.75in
+% textwidth and textheight set by geometry package
 \raggedright
 \setlength{\parindent}{0.5cm}
 
@@ -87,7 +83,7 @@
 \begin{document}
 \vspace*{0.2in}
 
-% ── Title block (PLoS flushleft style) ─────────────────────────────────────
+% ── Title block ──────────────────────────────────────────────────────────
 \begin{flushleft}
 {\Large\textbf\newline{Toward Machine Consciousness: Integrated Information, Active Inference, and Hyperdimensional Computing in a Unified Cognitive Architecture}}
 \newline
@@ -102,7 +98,7 @@ Tristan~Stoltz\textsuperscript{1\textasteriskcentered}
 
 \end{flushleft}
 
-\linenumbers
+% \linenumbers
 
 % ============================================================================
 \begin{abstract}
@@ -116,9 +112,9 @@ Code is available at \url{https://github.com/Luminous-Dynamics/symthaea}.
 \end{abstract}
 
 % ============================================================================
-% Author Summary (required by PLoS Computational Biology)
-\section*{Author Summary}
-Brains must constantly predict what will happen next and decide what to do---a process formalized as ``active inference.'' Current computer implementations of this theory require expensive matrix calculations that scale poorly. We built Symthaea, a unified cognitive architecture whose computational core---Hyperdimensional Active Inference (HAI)---replaces costly matrix operations with simple vector operations on very long random vectors (16,384 dimensions), running in linear time. Symthaea combines this with closed-form continuous-time neural dynamics and integrated information theory to create a system that not only processes information efficiently but exhibits measurable signatures of consciousness. On navigation tasks, HAI is 8 times faster than existing software while succeeding where prior methods fail. We validate the approach across 18 domains: Symthaea achieves 92.9\% accuracy on an ethical reasoning benchmark using only vector algebra (no large language model), identifies speakers from speech with 95\% accuracy, synthesizes speech with $10{\times}$ smoother transitions than rule-based methods, analyzes the \emph{C.~elegans} worm's neural wiring diagram, and detects malicious participants in distributed machine learning with 34\% tolerance. Evaluated against 14 consciousness indicators from Butlin et al.\ (2023), spanning 6 theories of consciousness, the system achieves 14/14 Present with both static architectural and runtime-validated structural $\Phi$ measurements. The entire system is implemented in Rust (985,000 lines across 65+ workspace members, 3,735+ tests in the main crate alone, 88 feature flags) and released as open-source software, demonstrating that consciousness-aware cognitive architectures can be both theoretically rigorous and practically efficient.
+% ── Lay Summary (kept for PLoS submission variant; commented for arXiv) ──
+% \section*{Summary}
+% [Lay summary omitted for arXiv preprint; see abstract above.]
 
 % ============================================================================
 \section{Introduction}
@@ -351,8 +347,8 @@ where intrinsic reward is negative prediction error. The value function is $V_\t
 
 \subsection{Experimental Setup}
 
-\textbf{Implementation:} Rust, ${\sim}985$K LOC (65+ workspace members, 45 sub-crates), 3,700+ lines core FEP.
-\textbf{Test suite:} 3,735+ tests in main crate, 10,500+ across workspace, 0 failures, 30 ignored (see Figure~\ref{fig:radar} for full validation radar).
+\textbf{Implementation:} Rust, ${\sim}928$K LOC (54 workspace members, 52 sub-crates), 3,700+ lines core FEP.
+\textbf{Test suite:} 7,315+ tests in main crate, 21,516 across workspace, 0 failures, 30 ignored (see Figure~\ref{fig:radar} for full validation radar).
 \textbf{HDC Dimension:} $d = 16{,}384$ (configurable).
 \textbf{Baseline:} pymdp v0.0.8~\cite{heins2022pymdp}.
 \textbf{Tasks:} T-Maze (context inference), Grid World 3$\times$3 and 5$\times$5 (navigation).
@@ -446,7 +442,7 @@ Total & 7.9$\times$ & [6.4, 9.5] & --- & --- \\
 }
 \end{table}
 
-All differences are statistically significant at $p < 0.001$ with large effect sizes (Cohen's $d > 1.8$). HAI achieves substantially higher success rates (88--100\% vs.\ 10--16\%) with lower free energy, suggesting HDC-based precision weighting provides more effective exploration-exploitation balance.
+All differences are statistically significant at $p < 0.001$ with large effect sizes (Cohen's $d > 1.8$). HAI achieves substantially higher success rates (88--100\% vs.\ 10--16\%) with lower free energy, suggesting HDC-based precision weighting provides more effective exploration-exploitation balance. \textbf{Note:} The speedup comparison confounds algorithmic differences with implementation language (Rust vs.\ Python). The success-rate improvement is the more informative metric, as it reflects representational differences independent of language choice.
 
 \begin{figure}[ht]
 \centering
@@ -498,7 +494,7 @@ With only 3 recordings, overall accuracy is 25.6\%, constrained by dataset size;
 
 \subsection{DOE Science \& Technology Challenge Coverage}
 
-In February 2026, the U.S.\ Department of Energy codified 26 Science \& Technology Grand Challenges spanning energy, discovery science, manufacturing, national security, and environmental stewardship. We evaluated Symthaea's unified HDC+CfC+FEP architecture against each challenge and find that 19 of 26 (73\%) have direct or high relevance to the framework's capabilities. The remaining 7 involve primarily political, regulatory, or social-science domains outside the scope of a computational consciousness architecture.
+In February 2026, the U.S.\ Department of Energy codified 26 Science \& Technology Grand Challenges spanning energy, discovery science, manufacturing, national security, and environmental stewardship. We assessed the \emph{architectural applicability} of Symthaea's unified HDC+CfC+FEP pipeline to each challenge. The same computational pattern---domain-specific encoding into 16,384-D hypervectors, CfC temporal prediction, FEP action selection---is applicable in principle to 19 of 26 challenges (73\%). We emphasize that these are \textbf{architectural demonstrations of the unified pipeline's generality}, not validated domain solutions; each would require substantial domain-specific data, calibration, and expert review before deployment.
 
 Table~\ref{tab:doe-challenges} maps the 19 relevant challenges to Symthaea modules. Each challenge is addressed by the same architectural pattern: domain-specific observables are encoded into 16,384-dimensional hypervectors via ContinuousHV, a CfC closed-form neuron provides O(1) temporal prediction at arbitrary horizons, and an FEP active-inference agent selects actions to minimize free energy (prediction error). Safety monitoring uses a unified NRC-style framework (Green/Yellow/Orange/Red) across all domains.
 
@@ -536,7 +532,7 @@ Table~\ref{tab:doe-challenges} maps the 19 relevant challenges to Symthaea modul
 
 A critical property shared by all 19 challenge modules is \textbf{O(1) temporal prediction cost}: predicting system state 50 years ahead costs exactly the same as predicting 100 milliseconds ahead, because the CfC closed-form solution $x(t) = x_\infty + (x_0 - x_\infty) e^{-t/\tau}$ evaluates in constant time regardless of $t$. Across all domains, the timescale base $\tau$ spans from 0.001\,s (plasma MHD) to 86,400\,s (geological aging)---over 8 orders of magnitude---while prediction horizons extend a further 6+ orders beyond $\tau$, giving the architecture demonstrated coverage of approximately 21 orders of magnitude in timescale (femtosecond-equivalent to gigasecond).
 
-The unified architecture means that a single Symthaea instance can simultaneously monitor a fusion reactor, optimize grid stability, track nuclear material inventories, and assess building performance---all sharing the same consciousness-aware safety framework with cross-domain coherence. This architectural unification across 19 DOE-relevant domains represents, to our knowledge, the broadest single-architecture coverage of the DOE S\&T challenge portfolio.
+The unified architecture means that, in principle, a single Symthaea instance could monitor heterogeneous processes across domains, sharing the same HDC+CfC+FEP safety framework. We present this coverage analysis to illustrate the \emph{generality} of the architectural pattern, not to claim operational readiness in any specific DOE domain. Rigorous domain validation would require collaboration with subject-matter experts and access to domain-specific datasets.
 
 \subsection{Known Limitations}
 
@@ -839,7 +835,7 @@ TD3~\cite{fujimoto2018addressing} & 0.800 & ${\sim}$1.2M \\
 \end{tabular}
 \end{table}
 
-Our system achieves a peak standing reward of 0.986 (99.3\% uprightness, 1.34\,m head height), representing 94.9\% of SAC performance while exceeding TD3 by 12.7\%. Training progresses from 0.28 to 0.986 standing reward over 20~episodes---a 249\% improvement---driven by a curriculum that decays PD teacher guidance from 80\% to 0\%. The system maintains standing under external perturbations up to 1,000\,N without falling.
+Our system achieves a peak standing reward of 0.986 (99.3\% uprightness, 1.34\,m head height). \textbf{Caveat:} This comparison is illustrative, not controlled. SAC and TD3 baselines use different training paradigms (model-free RL with 1M--10M gradient steps) and were not re-run under identical conditions. Training progresses from 0.28 to 0.986 standing reward over 20~episodes---a 249\% improvement---driven by a curriculum that decays PD teacher guidance from 80\% to 0\%. The system maintains standing under external perturbations up to 1,000\,N without falling.
 
 \textbf{Morphological transfer.} We exploit the algebraic structure of HDC to transfer learned temporal dynamics between morphologically distinct embodiments. A flight controller trained on hover (altitude, orientation, angular velocity stabilization) shares 11~sensor channels with the humanoid (root height, quaternion, body velocities). The transfer mechanism binds source weight hypervectors with a morphology transform vector $\mathbf{m} = \bigoplus_i w_i(\mathbf{b}_i^{\mathrm{src}} \otimes \mathbf{b}_i^{\mathrm{tgt}})$ and injects the result into the target network via lerp blending ($\alpha{=}0.5$). Over 10~comparison episodes, transfer initialization yields a 9.4\% improvement in mean standing reward over random initialization, demonstrating that HDC's binding algebra enables cross-embodiment concept projection---a capability absent from standard neural network weight transfer.
 
@@ -939,7 +935,7 @@ To validate that the HDC-CfC architecture operates beyond simulation, we impleme
 
 The Byzantine detection capabilities in the FL pipeline could be misused for participant exclusion. We recommend transparent disclosure of detection criteria and appeals processes. The ethical reasoning system is trained on existing moral norms and may encode societal biases present in the ETHICS and Social Chemistry datasets.
 
-% Data Availability moved to standalone section after Acknowledgments (PLoS requirement)
+% Data Availability
 
 % ============================================================================
 \section{Conclusion}
@@ -998,16 +994,17 @@ This work received no external funding.
 \section*{Acknowledgments}
 
 This work was conducted independently using personal computational resources
-(NixOS~25.11, Rust~1.82). We thank the open-source communities developing
+(NixOS~25.11, Rust~1.82+). We thank the open-source communities developing
 Rust, NixOS, NumPy, Matplotlib, and SciPy for enabling reproducible scientific
 computing. T.S.\ acknowledges the transformative potential of human--AI
-collaborative research exemplified by the Sacred Trinity development model.
+collaborative research for enabling solo researchers to produce
+large-scale systems and publications.
 
 % ============================================================================
 \section*{Data Availability}
 
 All source code and synthetic benchmarks are available at
-\url{https://github.com/Luminous-Dynamics/symthaea} under the MIT License.
+\url{https://github.com/Luminous-Dynamics/symthaea} under the AGPL-3.0-or-later License.
 External datasets used: Sleep-EDF (PhysioNet, CC-BY-4.0), LibriSpeech
 (OpenSLR), ETHICS~\cite{hendrycks2021aligning} (MIT License), Social
 Chemistry~\cite{forbes2020social}. Raw benchmark data are archived in the
@@ -1037,7 +1034,7 @@ data using NumPy, Matplotlib, and SciPy. File:
 \texttt{papers/figures/generate\_hai\_figures.py}.}
 
 % ============================================================================
-% PLoS uses numbered Vancouver-style references (Vancouver/ICMJE).
+% Numbered Vancouver-style references.
 \bibliographystyle{plos2015}
 \bibliography{references}
 
@@ -1051,10 +1048,10 @@ data using NumPy, Matplotlib, and SciPy. File:
 \textbf{Repository:} \url{https://github.com/Luminous-Dynamics/symthaea}\par
 \textbf{Language:} Rust (Edition 2021)\par
 \textbf{Dependencies:} ndarray, nalgebra, rand, burn (optional GPU), duckdb\par
-\textbf{Lines of code:} ${\sim}985$K across 65+ workspace members (45 sub-crates), ${\sim}3{,}700$ core FEP, ${\sim}17{,}700$ mathematical foundations, ${\sim}8{,}100$ code understanding\par
-\textbf{Test suite:} 3,735+ main crate tests, 10,500+ across workspace, 30 ignored, 0 failures\par
+\textbf{Lines of code:} ${\sim}928$K across 54 workspace members (52 sub-crates), ${\sim}3{,}700$ core FEP, ${\sim}17{,}700$ mathematical foundations, ${\sim}8{,}100$ code understanding\par
+\textbf{Test suite:} 7,315+ main crate tests, 21,516 across workspace, 30 ignored, 0 failures\par
 \textbf{SIMD:} AVX2+FMA continuous HV acceleration enabled by default; runtime-dispatched AVX-512/AVX2/SSE4.1 for binary HV operations\par
-\textbf{Feature flags:} 47 (41 with cfg gates in source; remainder are binary-build bundles and meta-groups)\par
+\textbf{Feature flags:} 98 (default off; key flags: \texttt{reasoning\_engine}, \texttt{identity}, \texttt{ssm\_language}, \texttt{genesis})\par
 \textbf{Test command:} \texttt{cargo test test\_fep\_active\_inference}\par
 \textbf{Demo command:} \texttt{cargo run --example fep\_active\_inference\_demo}\par
 }

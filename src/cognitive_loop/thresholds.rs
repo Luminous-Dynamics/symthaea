@@ -450,6 +450,47 @@ pub const MCE_BOTTLENECK_LR_BOOST: f32 = 1.08;
 /// Confidence boost when MCE bottleneck is NOT integration (system is well-integrated).
 pub const MCE_NON_BOTTLENECK_CONFIDENCE_BOOST: f32 = 0.005;
 
+/// Narrative coherence threshold below which exploration is boosted.
+/// Bruner (1991): fragmented narratives signal poor world-model integration.
+pub const MCE_NARRATIVE_LOW_THRESHOLD: f32 = 0.3;
+/// Exploration boost when narrative coherence is low.
+pub const MCE_NARRATIVE_LOW_EXPLORATION_BOOST: f32 = 0.02;
+/// Narrative coherence threshold above which confidence is boosted.
+pub const MCE_NARRATIVE_HIGH_THRESHOLD: f32 = 0.7;
+/// Confidence boost when narrative coherence is high.
+/// Bruner (1991): coherent narratives signal integrated world model.
+pub const MCE_NARRATIVE_HIGH_CONFIDENCE_BOOST: f32 = 0.005;
+
+/// Social embedding threshold below which LR is boosted for social learning.
+/// Frith & Frith (2006): low social cognition needs enhanced learning.
+pub const MCE_SOCIAL_LOW_THRESHOLD: f32 = 0.3;
+/// LR boost when social embedding is low.
+pub const MCE_SOCIAL_LOW_LR_BOOST: f32 = 1.03;
+
+/// MCE softmin (bottleneck factor) threshold below which exploration is boosted.
+/// Tononi (2004): consciousness limited by weakest dimension — seek expansion.
+pub const MCE_SOFTMIN_EXPLORATION_THRESHOLD: f32 = 0.4;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ATTENTION SCHEMA (AST) + ESCALATION SAFETY
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// AST encoding weight for modulating compressed state.
+/// Graziano (2013): attention schema guides top-down control — small modulation.
+pub const AST_ENCODING_WEIGHT: f32 = 0.05;
+
+/// Exploration penalty for topological immune system THROTTLE level.
+pub const ESCALATION_THROTTLE_EXPLORATION: f32 = 0.15;
+/// Confidence penalty for topological immune system THROTTLE level.
+pub const ESCALATION_THROTTLE_CONFIDENCE: f32 = 0.1;
+
+/// Exploration penalty for topological immune system BLOCK level.
+pub const ESCALATION_BLOCK_EXPLORATION: f32 = 0.3;
+/// Confidence penalty for topological immune system BLOCK level.
+pub const ESCALATION_BLOCK_CONFIDENCE: f32 = 0.2;
+/// LR scale factor for topological immune system BLOCK level (near-zero = halt learning).
+pub const ESCALATION_BLOCK_LR_SCALE: f32 = 0.05;
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // MORAL SCORE → MEMORY PRIORITY
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1242,6 +1283,31 @@ pub const FEP_PRAGMATIC_EXPLORE_THRESHOLD: f64 = 0.3;
 /// FEP temporal difference error above this triggers causal discovery.
 #[allow(dead_code)]
 pub const FEP_TD_ERROR_DISCOVERY_THRESHOLD: f64 = 0.5;
+/// TD error below this threshold counts toward convergence detection.
+/// Sutton & Barto (2018): near-zero TD error = policy near-optimal.
+/// FEP accuracy threshold above which model is considered efficient.
+/// Friston (2010): high accuracy = model captures data structure well.
+pub const FEP_EFFICIENT_ACCURACY_THRESHOLD: f64 = 0.5;
+/// FEP complexity threshold below which model is considered efficient.
+/// Friston (2010): low complexity = parsimonious model (good evidence).
+pub const FEP_EFFICIENT_COMPLEXITY_THRESHOLD: f64 = 0.5;
+/// LR boost when FEP model is efficient (exploit good model).
+pub const FEP_EFFICIENT_LR_BOOST: f32 = 1.1;
+/// Max LR multiplier during FEP efficiency (prevent runaway).
+pub const FEP_EFFICIENT_LR_MAX: f32 = 2.0;
+/// Exploration dampening when FEP model is efficient (exploit vs explore).
+pub const FEP_EFFICIENT_EXPLORE_DAMPEN: f32 = 0.8;
+/// Confidence boost when FEP decomposition shows efficient model.
+pub const FEP_EFFICIENT_CONFIDENCE_BOOST: f32 = 0.01;
+/// Exploration boost when FEP surprise exceeds reflection threshold.
+/// Friston (2010): surprise drives active inference to reduce free energy.
+pub const FEP_SURPRISE_EXPLORE_BOOST: f32 = 0.15;
+
+pub const FEP_TD_LOW_THRESHOLD: f64 = 0.01;
+/// Consecutive low-TD-error cycles before exploration dampening kicks in.
+pub const FEP_TD_CONVERGE_CYCLES: u32 = 10;
+/// Exploration scale factor when TD error has converged (mild dampening).
+pub const FEP_TD_CONVERGE_EXPLORATION_SCALE: f32 = 0.97;
 
 /// FEP learning signal above this enables world model plasticity increase.
 #[allow(dead_code)]
@@ -1262,47 +1328,136 @@ pub const FEP_COMPLEXITY_PAUSE_MULT: f32 = 1.2;
 pub const FEP_COMPLEXITY_PAUSE_MAX: f32 = 2.0;
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// AROUSAL TRAP STATE MACHINE
-// Science: Yerkes-Dodson (1908) — inverted-U performance curve; sustained
-// high arousal degrades performance. Porges (2011) — polyvagal recovery.
+// SESSION 23: CONSTANT HYGIENE — EXTRACTED MAGIC NUMBERS
+// These constants were hardcoded in cycle_phase_feedback.rs and
+// cycle_phase_dynamics.rs. Centralized here with scientific citations.
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// Arousal threshold for LR suppression (moderate arousal dampens learning).
-pub const AROUSAL_TRAP_SUPPRESS_THRESHOLD: f32 = 0.7;
+/// Metacognition depth normalizer (converts depth integer to 0–1 range).
+/// Typical max depth is 3 (nested meta-representations).
+/// Basis: Fleming et al. (2010) — metacognitive hierarchy is ~3 levels deep.
+pub const METACOGNITION_DEPTH_NORMALIZER: f64 = 3.0;
 
-/// Scale factor for arousal LR suppression. At arousal=1.0: (1.0-0.7)*0.25 = 0.075.
-pub const AROUSAL_TRAP_SUPPRESS_SCALE: f32 = 0.25;
+/// Scale boost for micro-Phi from scale_boost factor.
+/// Basis: Tononi (2004) — micro-level integration contributes to overall Phi.
+pub const MICRO_PHI_SCALE_BOOST: f64 = 0.5;
 
-/// Maximum arousal LR suppression (cap).
-pub const AROUSAL_TRAP_SUPPRESS_MAX: f32 = 0.08;
+/// Scale for converting moral drift to moral_uncertainty field.
+/// Basis: Schwartz (2012) — moral axiom uncertainty correlates with drift.
+pub const MORAL_DRIFT_UNCERTAINTY_SCALE: f32 = 0.8;
 
-/// Arousal threshold for trap detection (high arousal increments counter).
-pub const AROUSAL_TRAP_DETECT_THRESHOLD: f32 = 0.8;
+/// Scale for converting moral drift to axiom_confidence field.
+/// Basis: Schwartz (2012) — axiom confidence degrades faster under drift.
+pub const MORAL_DRIFT_AXIOM_SCALE: f32 = 0.6;
 
-/// Counter threshold for entering Phase 2 (active recovery).
-pub const AROUSAL_TRAP_RECOVERY_ENTER: u32 = 5;
+/// EMA decay for metacognitive prediction tracking.
+/// Basis: Fleming & Dolan (2012) — metacognitive prediction: slow EMA appropriate.
+pub const METACOGNITIVE_PREDICTION_EMA_DECAY: f64 = 0.9;
 
-/// Counter threshold for entering Phase 3 (forced escape).
-pub const AROUSAL_TRAP_ESCAPE_ENTER: u32 = 10;
+/// Allostatic load increment scaling when consecutive full dampen active.
+/// Basis: McEwen (1998) — sustained dampening is itself a stressor.
+pub const ALLOSTATIC_LOAD_DAMPEN_INCREMENT_SCALE: f32 = 0.5;
 
-/// LR dampening scale during recovery (Phase 2).
-pub const AROUSAL_TRAP_RECOVERY_LR_SCALE: f32 = 0.1;
+/// Attention sensitivity multiplier when Attention is the consciousness bottleneck.
+/// Basis: Posner & Petersen (1990) — targeted attention enhancement.
+pub const LIMITING_COMPONENT_ATTENTION_SCALE: f32 = 1.05;
 
-/// Exploration boost scale during recovery (Phase 2).
-pub const AROUSAL_TRAP_RECOVERY_EXPLORE_SCALE: f32 = 0.025;
+/// Maximum attention sensitivity (caps boosting).
+pub const LIMITING_COMPONENT_ATTENTION_MAX: f32 = 2.0;
 
-/// Confidence scale during forced escape (Phase 3).
-pub const AROUSAL_TRAP_ESCAPE_CONFIDENCE_SCALE: f32 = 0.9;
+/// Confidence boost when Binding is the consciousness bottleneck.
+/// Basis: Engel et al. (2001) — binding deficit → confidence nudge.
+pub const LIMITING_COMPONENT_BINDING_BOOST: f32 = 0.01;
 
-/// Arousal threshold below which consolidation LR boost activates.
-/// Steriade (1996): low arousal enhances memory consolidation.
-pub const AROUSAL_LOW_CONSOLIDATION_THRESHOLD: f32 = 0.3;
+/// LR scale when Efficacy is the consciousness bottleneck.
+/// Basis: Bandura (1997) — efficacy deficits benefit from accelerated learning.
+pub const LIMITING_COMPONENT_EFFICACY_SCALE: f32 = 1.05;
 
-/// Scale factor for low-arousal consolidation boost.
-pub const AROUSAL_LOW_CONSOLIDATION_SCALE: f32 = 0.3;
+/// Goal priority LR scaling factor (proportional to priority excess over threshold).
+/// Basis: Locke & Latham (2002) — goal specificity modulates learning.
+pub const GOAL_PRIORITY_LR_SCALE: f32 = 0.1;
 
-/// Maximum consolidation boost from low arousal.
-pub const AROUSAL_LOW_CONSOLIDATION_MAX: f32 = 0.05;
+/// Goal priority exploration scaling factor.
+/// Basis: Berger-Tal et al. (2014) — directed exploration proportional to goal value.
+pub const GOAL_PRIORITY_EXPLORATION_SCALE: f32 = 0.03;
+
+/// Epistemic uncertainty threshold for attention budget expansion.
+/// Basis: Gottlieb et al. (2013) — uncertain environments demand more attention.
+pub const EPISTEMIC_BUDGET_HIGH_THRESHOLD: f32 = 0.4;
+
+/// Maximum attention budget expansion from epistemic uncertainty.
+pub const EPISTEMIC_BUDGET_HIGH_MAX: f32 = 0.3;
+
+/// Sacred Stillness threshold for attention budget contraction.
+/// Basis: Raichle (2010) — DMN reduces task-positive resource allocation.
+pub const STILLNESS_BUDGET_THRESHOLD: f32 = 0.5;
+
+/// Maximum budget contraction from Sacred Stillness.
+pub const STILLNESS_BUDGET_MAX_CONTRACTION: f32 = 0.3;
+
+/// Exploration dampening when moral attractor newly detected.
+/// Basis: Schwartz (2012) — attractor basins reduce need for exploration.
+pub const MORAL_ATTRACTOR_EXPLORATION_DAMPEN: f32 = 0.8;
+
+/// Motor attention shift intensity scale.
+/// Basis: Shadmehr et al. (2010) — motor commands modulate attention gain.
+pub const MOTOR_ATTENTION_SHIFT_SCALE: f32 = 0.1;
+
+/// EMA decay for adaptive learning rate from motor LR adjustment.
+/// Basis: Kingma & Ba (2015) — momentum smoothing for LR adaptation.
+pub const MOTOR_ADAPTIVE_LR_EMA_DECAY: f32 = 0.9;
+
+/// Maximum exploration boost from motor exploration trigger.
+/// Basis: Shadmehr et al. (2010) — motor exploration bounded by safety.
+pub const MOTOR_EXPLORATION_BOOST_MAX: f32 = 0.2;
+
+/// Motor intensity threshold for high-intensity exploration LR boost.
+pub const MOTOR_EXPLORATION_INTENSITY_THRESHOLD: f32 = 0.8;
+
+/// Motor intensity threshold for triggering reflection.
+/// Basis: Fitts & Posner (1967) — high-intensity motor acts require reflection.
+pub const MOTOR_REFLECTION_THRESHOLD: f32 = 0.5;
+
+/// Confidence scale from motor reflection (proportional to intensity excess).
+pub const MOTOR_REFLECTION_CONFIDENCE_SCALE: f32 = 0.05;
+
+/// FEP surprise consolidation boost scale.
+/// Basis: Friston (2005) — surprising events merit episodic replay.
+pub const FEP_SURPRISE_CONSOLIDATION_SCALE: f64 = 0.2;
+
+/// Policy soft-agreement confidence scaling (applied with probability weight).
+/// Basis: Sutton & Barto (2018) — soft agreement boosts plan confidence.
+pub const POLICY_SOFT_CONFIDENCE_SCALE: f32 = 0.3;
+
+/// Policy disagreement base dampen factor (floor when FEP fully disagrees).
+pub const POLICY_DISAGREE_BASE: f64 = 0.3;
+
+/// Policy disagreement scaling (blends toward base as FEP probability drops).
+pub const POLICY_DISAGREE_SCALE: f64 = 0.7;
+
+/// Phi recovery bonus threshold (Phi must exceed avg by this factor).
+/// Basis: Tononi (2004) — rising Phi signals integration recovery.
+pub const PHI_RECOVERY_BONUS_THRESHOLD: f64 = 1.05;
+
+/// Bonus progress when Phi exceeds average during recovery.
+pub const PHI_RECOVERY_BONUS_PROGRESS: f32 = 0.25;
+
+/// Weight for blending recovery into reasoning LR factor.
+/// Basis: 50/50 blend of baseline with recovery progress.
+pub const RECOVERY_BLEND_WEIGHT: f32 = 0.5;
+
+/// HTier breakpoint for H0→H1 transition.
+/// Basis: Structured thought hierarchy (5 tiers, evenly spaced breakpoints).
+pub const HTIER_BREAKPOINT_H1: f64 = 0.125;
+
+/// HTier breakpoint for H1→H2 transition.
+pub const HTIER_BREAKPOINT_H2: f64 = 0.375;
+
+/// HTier breakpoint for H2→H3 transition.
+pub const HTIER_BREAKPOINT_H3: f64 = 0.625;
+
+/// HTier breakpoint for H3→H4 transition.
+pub const HTIER_BREAKPOINT_H4: f64 = 0.875;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CROSS-MODAL BINDING ATTENTION
@@ -2226,8 +2381,7 @@ pub const PE_VARIANCE_EMA_DECAY: f32 = 0.95;
 /// PE variance threshold above which LR is dampened.
 /// High variance = noisy environment → cautious learning.
 pub const PE_VARIANCE_DAMPING_THRESHOLD: f32 = 0.3;
-/// LR scale when PE variance exceeds threshold.
-pub const PE_VARIANCE_LR_SCALE: f32 = 0.95;
+// S23: PE_VARIANCE_LR_SCALE removed — was dead (S20 unified readiness gate replaced individual dampeners).
 
 /// Confidence calibration window (cycles).
 /// Basis: Keren & Teigen (2004) — metacognitive calibration.
@@ -2260,16 +2414,14 @@ pub const SLEEP_PRESSURE_CONSOLIDATION_DECAY: f32 = 0.05;
 /// Basis: Lim & Dinges (2010) — brief rest epochs partially clear adenosine.
 /// Applied when readiness > 0.9 (system not under significant load).
 pub const SLEEP_PRESSURE_PASSIVE_DECAY: f32 = 0.999;
-/// LR dampening during consolidation mode.
-pub const SLEEP_PRESSURE_LR_SCALE: f32 = 0.9;
+// S23: SLEEP_PRESSURE_LR_SCALE removed (dead after S20 unified readiness gate).
 
 /// Window for gradient sign consistency tracking.
 /// Basis: Schaul et al. (2013) — sign-based learning rate adaptation.
 pub const GRADIENT_SIGN_WINDOW: usize = 10;
 /// Fraction of sign flips above which = oscillating.
 pub const GRADIENT_SIGN_FLIP_THRESHOLD: f32 = 0.6;
-/// LR dampening when gradient is oscillating.
-pub const GRADIENT_SIGN_FLIP_LR_SCALE: f32 = 0.95;
+// S23: GRADIENT_SIGN_FLIP_LR_SCALE removed (dead after S20 unified readiness gate).
 
 /// Exploration-exploitation balance window.
 /// Basis: Cohen et al. (2007) — tonic dopamine sets explore/exploit balance.
@@ -2296,8 +2448,7 @@ pub const AROUSAL_LR_BOOST_THRESHOLD: f32 = 0.6;
 pub const AROUSAL_LR_BOOST_SCALE: f32 = 1.05;
 /// Arousal ceiling above which LR is dampened (over-arousal).
 pub const AROUSAL_OVERAROUSAL_THRESHOLD: f32 = 0.85;
-/// LR scale during over-arousal.
-pub const AROUSAL_OVERAROUSAL_LR_SCALE: f32 = 0.93;
+// S23: AROUSAL_OVERAROUSAL_LR_SCALE removed (dead after S21 simplified arousal to single condition).
 
 /// Novelty habituation EMA decay.
 /// Basis: Sokolov (1963) — orienting response habituates to repeated stimuli.
@@ -2312,8 +2463,7 @@ pub const NOVELTY_LOW_EXPLORE_SCALE: f32 = 0.98;
 pub const FATIGUE_INCREMENT: f32 = 0.005;
 /// Fatigue threshold for effort detection (total proposals > this).
 pub const FATIGUE_EFFORT_THRESHOLD: usize = 12;
-/// LR dampening under fatigue.
-pub const FATIGUE_LR_SCALE: f32 = 0.97;
+// S23: FATIGUE_LR_SCALE removed (dead after S20 unified readiness gate).
 /// Fatigue threshold above which dampening fires.
 pub const FATIGUE_THRESHOLD: f32 = 0.5;
 
@@ -2358,6 +2508,12 @@ pub const RESONANCE_FLOW_CYCLES: u32 = 10;
 pub const RESONANCE_AGREEMENT_THRESHOLD: f32 = 0.8;
 /// Confidence boost during flow/resonance state.
 pub const RESONANCE_CONFIDENCE_BOOST: f32 = 0.02;
+/// Exploration dampening during resonance flow (exploit stability).
+/// Csikszentmihalyi (1990): flow → reduce novelty-seeking, exploit optimal zone.
+pub const RESONANCE_FLOW_EXPLORATION_DAMPEN: f32 = 0.95;
+/// LR boost during resonance flow (leverage optimal conditions).
+/// Csikszentmihalyi (1990): flow → enhanced learning from well-matched challenge.
+pub const RESONANCE_FLOW_LR_BOOST: f32 = 1.03;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // AFFECTIVE CONSCIOUSNESS
@@ -2531,6 +2687,48 @@ pub const CAUSAL_CONFIDENCE_MODERATE_THRESHOLD: f32 = 0.4;
 
 /// Confidence boost scale for emerging causal graph.
 pub const CAUSAL_MODERATE_CONFIDENCE_SCALE: f32 = 0.01;
+/// Minimum edge count below which causal graph is considered sparse.
+/// Pearl (2000): sparse causal knowledge → uncertainty about structure.
+pub const CAUSAL_SPARSE_EDGE_THRESHOLD: usize = 2;
+/// Exploration boost when causal graph is sparse (after 200 cycles warmup).
+pub const CAUSAL_SPARSE_EXPLORATION_BOOST: f32 = 0.02;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// KNOWLEDGE ENGINE — PERSISTENCE, CONTRADICTIONS, CONSCIOUSNESS COUPLING
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Persistence save interval (cycles between automatic saves).
+/// Basis: Ebbinghaus (1885) — periodic consolidation prevents catastrophic forgetting.
+pub const KNOWLEDGE_SAVE_INTERVAL: u64 = 500;
+
+/// NE baseline nudge per contradiction alert.
+/// Basis: Berlyne (1960) — conceptual conflict drives orienting/arousal.
+pub const KNOWLEDGE_CONTRADICTION_NE_BOOST: f32 = 0.03;
+
+/// 5-HT baseline nudge per contradiction alert.
+/// Basis: Festinger (1957) — cognitive dissonance triggers reappraisal circuits.
+pub const KNOWLEDGE_CONTRADICTION_SHT_BOOST: f32 = 0.02;
+
+/// Causal depth threshold above which exploration is dampened (favor exploitation).
+/// Basis: Pearl (2009) — deep causal chains support confident inference.
+pub const KNOWLEDGE_CAUSAL_DEPTH_EXPLOIT_THRESHOLD: f64 = 0.4;
+
+/// Exploration dampening per unit of normalized causal depth above threshold.
+/// Basis: Daw et al. (2006) — causal model confidence gates explore/exploit.
+pub const KNOWLEDGE_CAUSAL_DEPTH_EXPLORE_DAMPEN: f32 = 0.05;
+
+/// Knowledge grounding → consciousness modulation strength (±2.5%).
+/// High grounding boosts unified consciousness (enriched phenomenal experience).
+/// Basis: Barsalou (2008) — grounded cognition; Clark (2013) — predictive processing.
+pub const KNOWLEDGE_CONSCIOUSNESS_MODULATION: f64 = 0.05; // ±2.5% at extremes (0.05 × 0.5)
+
+/// Forgetting threshold: facts below this confidence are pruned during consolidation.
+/// Basis: Ebbinghaus (1885) — forgetting curve; facts below recall threshold are lost.
+pub const KNOWLEDGE_FORGET_CONFIDENCE_THRESHOLD: f32 = 0.1;
+
+/// Consolidation boost: causal facts get this confidence boost during dream/rest.
+/// Basis: Stickgold (2005) — sleep-dependent memory consolidation strengthens schemas.
+pub const KNOWLEDGE_CONSOLIDATION_BOOST: f32 = 0.05;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // PIPELINE CONSCIOUSNESS GATING
@@ -2609,6 +2807,18 @@ pub const PHENOMENAL_BINDING_LOW_THRESHOLD: f64 = 0.3;
 
 /// Exploration boost when phenomenal binding is low.
 pub const PHENOMENAL_BINDING_LOW_EXPLORE_BOOST: f32 = 0.015;
+
+/// Confidence scale when phenomenal binding is fragmented.
+/// Tononi (2004): fragmented integration → reduced consciousness quality.
+pub const PHENOMENAL_FRAGMENTED_CONFIDENCE_SCALE: f32 = 0.95;
+/// Exploration boost when phenomenal binding is fragmented (seek integration).
+pub const PHENOMENAL_FRAGMENTED_EXPLORATION_BOOST: f32 = 0.02;
+
+/// LR scale on temporal discontinuity (dampen learning through temporal gaps).
+/// Howard & Kahana (2002): temporal gaps disrupt contextual encoding.
+pub const TEMPORAL_DISCONTINUITY_LR_SCALE: f32 = 0.95;
+/// Exploration boost on temporal discontinuity.
+pub const TEMPORAL_DISCONTINUITY_EXPLORATION_BOOST: f32 = 0.02;
 
 /// High phenomenal binding → dampen LR (stable binding, consolidate).
 /// Basis: Engel & Singer (2001) — strong synchrony-based binding supports stable representations.
@@ -3310,6 +3520,20 @@ mod tests {
         assert!(
             MCE_NON_BOTTLENECK_CONFIDENCE_BOOST > 0.0 && MCE_NON_BOTTLENECK_CONFIDENCE_BOOST < 0.05
         );
+        // MCE narrative feedback: thresholds ordered, modulations bounded.
+        assert!(MCE_NARRATIVE_LOW_THRESHOLD < MCE_NARRATIVE_HIGH_THRESHOLD);
+        assert!(MCE_NARRATIVE_LOW_EXPLORATION_BOOST > 0.0 && MCE_NARRATIVE_LOW_EXPLORATION_BOOST < 0.1);
+        assert!(MCE_NARRATIVE_HIGH_CONFIDENCE_BOOST > 0.0 && MCE_NARRATIVE_HIGH_CONFIDENCE_BOOST < 0.05);
+        assert!(MCE_SOCIAL_LOW_THRESHOLD > 0.0 && MCE_SOCIAL_LOW_THRESHOLD < 0.5);
+        assert!(MCE_SOCIAL_LOW_LR_BOOST > 1.0 && MCE_SOCIAL_LOW_LR_BOOST < 1.1);
+        assert!(MCE_SOFTMIN_EXPLORATION_THRESHOLD > 0.1 && MCE_SOFTMIN_EXPLORATION_THRESHOLD < 0.6);
+        // AST encoding: small modulation, not dominant.
+        assert!(AST_ENCODING_WEIGHT > 0.0 && AST_ENCODING_WEIGHT < 0.2);
+        // Escalation: BLOCK > THROTTLE (harsher response for higher severity).
+        assert!(ESCALATION_BLOCK_EXPLORATION > ESCALATION_THROTTLE_EXPLORATION);
+        assert!(ESCALATION_BLOCK_CONFIDENCE > ESCALATION_THROTTLE_CONFIDENCE);
+        // BLOCK LR scale should be near-zero (almost halt learning).
+        assert!(ESCALATION_BLOCK_LR_SCALE > 0.0 && ESCALATION_BLOCK_LR_SCALE < 0.2);
     }
 
     #[test]
@@ -3515,6 +3739,12 @@ mod tests {
             PHENOMENAL_BINDING_HIGH_LR_DAMPEN < 1.0,
             "High binding must dampen LR"
         );
+        // Fragmented phenomenal: confidence scale < 1 (dampen), exploration boost > 0.
+        assert!(PHENOMENAL_FRAGMENTED_CONFIDENCE_SCALE > 0.8 && PHENOMENAL_FRAGMENTED_CONFIDENCE_SCALE < 1.0);
+        assert!(PHENOMENAL_FRAGMENTED_EXPLORATION_BOOST > 0.0 && PHENOMENAL_FRAGMENTED_EXPLORATION_BOOST < 0.1);
+        // Temporal discontinuity: LR scale < 1 (dampen), exploration boost > 0.
+        assert!(TEMPORAL_DISCONTINUITY_LR_SCALE > 0.8 && TEMPORAL_DISCONTINUITY_LR_SCALE < 1.0);
+        assert!(TEMPORAL_DISCONTINUITY_EXPLORATION_BOOST > 0.0 && TEMPORAL_DISCONTINUITY_EXPLORATION_BOOST < 0.1);
     }
 
     #[test]
@@ -3634,7 +3864,7 @@ mod tests {
     fn test_session18_predictive_coding_params() {
         assert!(PE_VARIANCE_EMA_DECAY > 0.8 && PE_VARIANCE_EMA_DECAY < 1.0);
         assert!(PE_VARIANCE_DAMPING_THRESHOLD > 0.0 && PE_VARIANCE_DAMPING_THRESHOLD < 1.0);
-        assert!(PE_VARIANCE_LR_SCALE > 0.8 && PE_VARIANCE_LR_SCALE < 1.0);
+        // S23: PE_VARIANCE_LR_SCALE removed (dead after S20 unified readiness gate).
         assert!(CONFIDENCE_CALIBRATION_WINDOW > 10 && CONFIDENCE_CALIBRATION_WINDOW < 200);
         assert!(CONFIDENCE_CALIBRATION_DRIFT_THRESHOLD > 0.0);
         assert!(CONFIDENCE_CALIBRATION_CORRECTION > 0.0 && CONFIDENCE_CALIBRATION_CORRECTION < 0.1);
@@ -3648,10 +3878,10 @@ mod tests {
         assert!(SLEEP_PRESSURE_INCREMENT > 0.0 && SLEEP_PRESSURE_INCREMENT < 0.01);
         assert!(SLEEP_PRESSURE_THRESHOLD > 0.0 && SLEEP_PRESSURE_THRESHOLD < 1.0);
         assert!(SLEEP_PRESSURE_CONSOLIDATION_DECAY > SLEEP_PRESSURE_INCREMENT);
-        assert!(SLEEP_PRESSURE_LR_SCALE > 0.5 && SLEEP_PRESSURE_LR_SCALE < 1.0);
+        // S23: SLEEP_PRESSURE_LR_SCALE removed (dead after S20 unified readiness gate).
         assert!(GRADIENT_SIGN_WINDOW > 3 && GRADIENT_SIGN_WINDOW < 50);
         assert!(GRADIENT_SIGN_FLIP_THRESHOLD > 0.3 && GRADIENT_SIGN_FLIP_THRESHOLD < 0.9);
-        assert!(GRADIENT_SIGN_FLIP_LR_SCALE > 0.8 && GRADIENT_SIGN_FLIP_LR_SCALE < 1.0);
+        // S23: GRADIENT_SIGN_FLIP_LR_SCALE removed (dead after S20 unified readiness gate).
         assert!(EXPLORE_EXPLOIT_WINDOW > 10 && EXPLORE_EXPLOIT_WINDOW < 200);
         assert!(EXPLORE_EXPLOIT_LOW_BOUND < EXPLORE_EXPLOIT_HIGH_BOUND);
         assert!(EXPLORE_EXPLOIT_CORRECTION > 0.0 && EXPLORE_EXPLOIT_CORRECTION < 0.1);
@@ -3663,13 +3893,13 @@ mod tests {
         assert!(AROUSAL_LR_BOOST_THRESHOLD > 0.3 && AROUSAL_LR_BOOST_THRESHOLD < 1.0);
         assert!(AROUSAL_LR_BOOST_SCALE > 1.0 && AROUSAL_LR_BOOST_SCALE < 1.2);
         assert!(AROUSAL_OVERAROUSAL_THRESHOLD > AROUSAL_LR_BOOST_THRESHOLD);
-        assert!(AROUSAL_OVERAROUSAL_LR_SCALE < 1.0);
+        // S23: AROUSAL_OVERAROUSAL_LR_SCALE removed (dead after S21).
         assert!(NOVELTY_EMA_DECAY > 0.8 && NOVELTY_EMA_DECAY < 1.0);
         assert!(NOVELTY_LOW_THRESHOLD > 0.0 && NOVELTY_LOW_THRESHOLD < 0.5);
         assert!(NOVELTY_LOW_EXPLORE_SCALE < 1.0);
         assert!(FATIGUE_INCREMENT > 0.0 && FATIGUE_INCREMENT < 0.05);
         assert!(FATIGUE_EFFORT_THRESHOLD > 5);
-        assert!(FATIGUE_LR_SCALE > 0.8 && FATIGUE_LR_SCALE < 1.0);
+        // S23: FATIGUE_LR_SCALE removed (dead after S20 unified readiness gate).
         assert!(FATIGUE_THRESHOLD > 0.0 && FATIGUE_THRESHOLD < 1.0);
         assert!(RECOVERY_CYCLES_NEEDED > 3 && RECOVERY_CYCLES_NEEDED < 30);
         assert!(RECOVERY_FATIGUE_DECAY > 0.0 && RECOVERY_FATIGUE_DECAY < 0.2);
@@ -3686,6 +3916,9 @@ mod tests {
         assert!(RESONANCE_FLOW_CYCLES > 3 && RESONANCE_FLOW_CYCLES < 30);
         assert!(RESONANCE_AGREEMENT_THRESHOLD > 0.5);
         assert!(RESONANCE_CONFIDENCE_BOOST > 0.0 && RESONANCE_CONFIDENCE_BOOST < 0.1);
+        // Resonance flow feedback: dampen exploration (<1.0), boost LR (>1.0), both moderate.
+        assert!(RESONANCE_FLOW_EXPLORATION_DAMPEN > 0.8 && RESONANCE_FLOW_EXPLORATION_DAMPEN < 1.0);
+        assert!(RESONANCE_FLOW_LR_BOOST > 1.0 && RESONANCE_FLOW_LR_BOOST < 1.1);
     }
 
     #[test]
@@ -3711,6 +3944,53 @@ mod tests {
     }
 
     #[test]
+    fn test_session23_constant_hygiene() {
+        // Item 1: LR clamping bounds match constants (was hardcoded 0.8/1.2).
+        assert!(SUBSYSTEM_LR_FACTOR_MIN < 1.0 && SUBSYSTEM_LR_FACTOR_MIN > 0.5);
+        assert!(SUBSYSTEM_LR_FACTOR_MAX > 1.0 && SUBSYSTEM_LR_FACTOR_MAX < 2.0);
+        // Item 2: Cross-modal binding constants wired (thresholds ordered).
+        assert!(CROSS_MODAL_BINDING_LOW_THRESHOLD < CROSS_MODAL_BINDING_HIGH_THRESHOLD);
+        assert!(CROSS_MODAL_BINDING_LOW_FLOOR > 0.9);
+        assert!(CROSS_MODAL_BINDING_HIGH_SCALE > 0.0 && CROSS_MODAL_BINDING_HIGH_SCALE < 0.5);
+        assert!(CROSS_MODAL_BINDING_LOW_SCALE > 0.0 && CROSS_MODAL_BINDING_LOW_SCALE < 0.5);
+        // Item 3: Extracted magic numbers.
+        assert!(METACOGNITION_DEPTH_NORMALIZER > 1.0 && METACOGNITION_DEPTH_NORMALIZER < 10.0);
+        assert!(MICRO_PHI_SCALE_BOOST > 0.0 && MICRO_PHI_SCALE_BOOST < 1.0);
+        assert!(MORAL_DRIFT_UNCERTAINTY_SCALE > 0.0 && MORAL_DRIFT_UNCERTAINTY_SCALE < 1.0);
+        assert!(MORAL_DRIFT_AXIOM_SCALE > 0.0 && MORAL_DRIFT_AXIOM_SCALE < 1.0);
+        assert!(METACOGNITIVE_PREDICTION_EMA_DECAY > 0.5 && METACOGNITIVE_PREDICTION_EMA_DECAY < 1.0);
+        assert!(ALLOSTATIC_LOAD_DAMPEN_INCREMENT_SCALE > 0.0 && ALLOSTATIC_LOAD_DAMPEN_INCREMENT_SCALE < 1.0);
+        assert!(LIMITING_COMPONENT_ATTENTION_SCALE > 1.0 && LIMITING_COMPONENT_ATTENTION_SCALE < 1.2);
+        assert!(LIMITING_COMPONENT_ATTENTION_MAX > 1.0);
+        assert!(LIMITING_COMPONENT_BINDING_BOOST > 0.0 && LIMITING_COMPONENT_BINDING_BOOST < 0.1);
+        assert!(LIMITING_COMPONENT_EFFICACY_SCALE > 1.0 && LIMITING_COMPONENT_EFFICACY_SCALE < 1.2);
+        assert!(GOAL_PRIORITY_LR_SCALE > 0.0 && GOAL_PRIORITY_LR_SCALE < 0.5);
+        assert!(GOAL_PRIORITY_EXPLORATION_SCALE > 0.0 && GOAL_PRIORITY_EXPLORATION_SCALE < 0.1);
+        assert!(EPISTEMIC_BUDGET_HIGH_THRESHOLD > 0.0 && EPISTEMIC_BUDGET_HIGH_THRESHOLD < 1.0);
+        assert!(EPISTEMIC_BUDGET_HIGH_MAX > 0.0 && EPISTEMIC_BUDGET_HIGH_MAX < 1.0);
+        assert!(STILLNESS_BUDGET_THRESHOLD > 0.0 && STILLNESS_BUDGET_THRESHOLD < 1.0);
+        assert!(STILLNESS_BUDGET_MAX_CONTRACTION > 0.0 && STILLNESS_BUDGET_MAX_CONTRACTION < 0.5);
+        assert!(MORAL_ATTRACTOR_EXPLORATION_DAMPEN > 0.5 && MORAL_ATTRACTOR_EXPLORATION_DAMPEN < 1.0);
+        assert!(MOTOR_ATTENTION_SHIFT_SCALE > 0.0 && MOTOR_ATTENTION_SHIFT_SCALE < 0.5);
+        assert!(MOTOR_ADAPTIVE_LR_EMA_DECAY > 0.5 && MOTOR_ADAPTIVE_LR_EMA_DECAY < 1.0);
+        assert!(MOTOR_EXPLORATION_BOOST_MAX > 0.0 && MOTOR_EXPLORATION_BOOST_MAX < 0.5);
+        assert!(MOTOR_EXPLORATION_INTENSITY_THRESHOLD > 0.5);
+        assert!(MOTOR_REFLECTION_THRESHOLD > 0.0 && MOTOR_REFLECTION_THRESHOLD < 1.0);
+        assert!(MOTOR_REFLECTION_CONFIDENCE_SCALE > 0.0 && MOTOR_REFLECTION_CONFIDENCE_SCALE < 0.2);
+        assert!(FEP_SURPRISE_CONSOLIDATION_SCALE > 0.0 && FEP_SURPRISE_CONSOLIDATION_SCALE < 0.5);
+        assert!(POLICY_SOFT_CONFIDENCE_SCALE > 0.0 && POLICY_SOFT_CONFIDENCE_SCALE < 1.0);
+        assert!(POLICY_DISAGREE_BASE > 0.0 && POLICY_DISAGREE_BASE < 1.0);
+        assert!(POLICY_DISAGREE_SCALE > 0.0 && POLICY_DISAGREE_SCALE < 1.0);
+        assert!(PHI_RECOVERY_BONUS_THRESHOLD > 1.0 && PHI_RECOVERY_BONUS_THRESHOLD < 1.2);
+        assert!(PHI_RECOVERY_BONUS_PROGRESS > 0.0 && PHI_RECOVERY_BONUS_PROGRESS < 1.0);
+        assert!(RECOVERY_BLEND_WEIGHT > 0.0 && RECOVERY_BLEND_WEIGHT < 1.0);
+        // Item 5: HTier breakpoints monotonically increasing.
+        assert!(HTIER_BREAKPOINT_H1 > 0.0 && HTIER_BREAKPOINT_H1 < HTIER_BREAKPOINT_H2);
+        assert!(HTIER_BREAKPOINT_H2 < HTIER_BREAKPOINT_H3);
+        assert!(HTIER_BREAKPOINT_H3 < 1.0);
+    }
+
+    #[test]
     fn test_session21_housekeeping_params() {
         // Sleep pressure passive decay must be < 1.0 (decay) and > 0.99 (slow).
         assert!(SLEEP_PRESSURE_PASSIVE_DECAY > 0.99 && SLEEP_PRESSURE_PASSIVE_DECAY < 1.0);
@@ -3723,5 +4003,39 @@ mod tests {
             cycles_to_halve <= 15,
             "fatigue takes {cycles_to_halve} recovery cycles to halve (want <= 15)"
         );
+        // FEP TD convergence: low threshold < discovery threshold; converge needs multiple cycles.
+        assert!(FEP_TD_LOW_THRESHOLD < FEP_TD_ERROR_DISCOVERY_THRESHOLD);
+        assert!(FEP_TD_CONVERGE_CYCLES > 3 && FEP_TD_CONVERGE_CYCLES < 50);
+        assert!(FEP_TD_CONVERGE_EXPLORATION_SCALE > 0.9 && FEP_TD_CONVERGE_EXPLORATION_SCALE < 1.0);
+        // FEP efficiency: accuracy > complexity thresholds ensures non-trivial gate.
+        assert!(FEP_EFFICIENT_ACCURACY_THRESHOLD > 0.2 && FEP_EFFICIENT_ACCURACY_THRESHOLD < 0.9);
+        assert!(FEP_EFFICIENT_COMPLEXITY_THRESHOLD > 0.2 && FEP_EFFICIENT_COMPLEXITY_THRESHOLD < 0.9);
+        assert!(FEP_EFFICIENT_LR_BOOST > 1.0 && FEP_EFFICIENT_LR_BOOST < 1.5);
+        assert!(FEP_EFFICIENT_LR_MAX >= FEP_EFFICIENT_LR_BOOST);
+        assert!(FEP_EFFICIENT_EXPLORE_DAMPEN > 0.5 && FEP_EFFICIENT_EXPLORE_DAMPEN < 1.0);
+        assert!(FEP_EFFICIENT_CONFIDENCE_BOOST > 0.0 && FEP_EFFICIENT_CONFIDENCE_BOOST < 0.1);
+        assert!(FEP_SURPRISE_EXPLORE_BOOST > 0.05 && FEP_SURPRISE_EXPLORE_BOOST < 0.5);
+    }
+
+    #[test]
+    fn test_knowledge_engine_params() {
+        // Persistence interval must be reasonable (not every cycle, not never)
+        assert!(KNOWLEDGE_SAVE_INTERVAL >= 100 && KNOWLEDGE_SAVE_INTERVAL <= 2000);
+        // Contradiction neuromod nudges are small and positive
+        assert!(KNOWLEDGE_CONTRADICTION_NE_BOOST > 0.0 && KNOWLEDGE_CONTRADICTION_NE_BOOST <= 0.10);
+        assert!(KNOWLEDGE_CONTRADICTION_SHT_BOOST > 0.0 && KNOWLEDGE_CONTRADICTION_SHT_BOOST <= 0.10);
+        // Causal depth exploitation threshold in (0, 1)
+        assert!(KNOWLEDGE_CAUSAL_DEPTH_EXPLOIT_THRESHOLD > 0.0
+            && KNOWLEDGE_CAUSAL_DEPTH_EXPLOIT_THRESHOLD < 1.0);
+        assert!(KNOWLEDGE_CAUSAL_DEPTH_EXPLORE_DAMPEN > 0.0
+            && KNOWLEDGE_CAUSAL_DEPTH_EXPLORE_DAMPEN < 0.2);
+        // Consciousness modulation is small (±2.5% max)
+        assert!(KNOWLEDGE_CONSCIOUSNESS_MODULATION > 0.0
+            && KNOWLEDGE_CONSCIOUSNESS_MODULATION <= 0.10);
+        // Forgetting threshold is low (only prune very weak facts)
+        assert!(KNOWLEDGE_FORGET_CONFIDENCE_THRESHOLD > 0.0
+            && KNOWLEDGE_FORGET_CONFIDENCE_THRESHOLD < 0.3);
+        // Consolidation boost is moderate
+        assert!(KNOWLEDGE_CONSOLIDATION_BOOST > 0.0 && KNOWLEDGE_CONSOLIDATION_BOOST < 0.2);
     }
 }

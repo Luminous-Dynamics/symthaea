@@ -326,7 +326,7 @@ impl CognitiveLoopService {
         // - Memory coordinator needs &mut phi_episodic_replay after replay completes
         let _t = Instant::now();
         if let Some(ref mut replay) = self.phi_episodic_replay {
-            let coherence_summary = self.voice_coherence.bridge.summary();
+            let coherence_summary = self.language_comm.voice_coherence.bridge.summary();
             let current_phi = coherence_summary.smoothed_coherence as f64;
 
             let input_hv =
@@ -614,7 +614,7 @@ impl CognitiveLoopService {
 
         // Memory coordinator: broadcast signals and process graduations
         {
-            let coord_phi = self.voice_coherence.bridge.smoothed_coherence() as f64;
+            let coord_phi = self.language_comm.voice_coherence.bridge.smoothed_coherence() as f64;
             let coord_coherence = coherence as f64;
             self.memory_coordinator.update_signals_with_sigma(
                 coord_phi,

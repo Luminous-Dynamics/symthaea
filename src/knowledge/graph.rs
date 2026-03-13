@@ -67,7 +67,7 @@ pub struct FactSearchResult {
     pub similarity: f32,
     /// Current confidence
     pub confidence: f32,
-    /// Source text of the fact (for human readability and reasoning context)
+    /// Source text of the fact (for reasoning context)
     pub source_text: String,
     /// Domain tag (if any)
     pub domain: Option<String>,
@@ -353,6 +353,99 @@ impl EnhancedKnowledgeGraph {
 
     pub fn total_contradictions(&self) -> u64 {
         self.total_contradictions
+    }
+
+    /// Import a persisted fact record back into the graph.
+    /// Used during startup to restore from SQLite.
+    pub fn import_fact_record(&mut self, record: &super::persistence::FactRecord) {
+        if self.facts.len() >= self.capacity {
+            self.evict_lowest_confidence();
+        }
+        let id = self.next_id;
+        self.next_id += 1;
+
+        let vector = if record.vector_bytes.len() == 2048 {
+            let mut arr = [0u8; 2048];
+            arr.copy_from_slice(&record.vector_bytes);
+            BinaryHV(arr)
+        } else {
+            BinaryHV::random(0) // fallback for corrupt records
+        };
+        let encoding = FactEncoding {
+            vector,
+            role_vectors: std::collections::HashMap::new(),
+            source_text: record.source_text.clone(),
+            confidence: record.confidence,
+        };
+
+        let fact = TemporalFact {
+            id,
+            encoding,
+            inserted_at_cycle: record.cycle,
+            last_accessed_cycle: record.cycle,
+            confidence: record.confidence,
+            initial_confidence: record.confidence,
+            corroboration_count: 0,
+            contradiction_count: 0,
+            domain: record.domain.clone(),
+            has_causal_relations: record.is_causal,
+        };
+
+        if let Some(ref d) = record.domain {
+            self.domain_index.entry(d.clone()).or_default().push(id);
+        }
+        self.facts.insert(id, fact);
+        self.total_insertions += 1;
+    }
+
+    /// Export all facts as persistence records.
+    pub fn export_fact_records(&self) -> Vec<super::persistence::FactRecord> {
+        self.facts
+            .values()
+            .map(|f| super::persistence::FactRecord {
+                vector_bytes: f.encoding.vector.0.to_vec(),
+                source_text: f.encoding.source_text.clone(),
+                confidence: f.confidence,
+                domain: f.domain.clone(),
+                cycle: f.inserted_at_cycle,
+                is_causal: f.has_causal_relations,
+            })
+            .collect()
+    }
+
+    /// Prune facts below a confidence threshold, protecting causal facts.
+    /// Returns count of facts pruned.
+    /// Science: Ebbinghaus (1885) — forgetting curve.
+    pub fn prune_low_confidence(&mut self, threshold: f32) -> usize {
+        let to_prune: Vec<FactId> = self
+            .facts
+            .iter()
+            .filter(|(_, f)| f.confidence < threshold && !f.has_causal_relations)
+            .map(|(&id, _)| id)
+            .collect();
+        let count = to_prune.len();
+        for id in to_prune {
+            self.remove_fact(id);
+            self.total_evictions += 1;
+        }
+        count
+    }
+
+    /// Strengthen facts that participate in causal chains.
+    /// Returns count of facts strengthened.
+    /// Science: Stickgold (2005) — sleep consolidation strengthens schemas.
+    pub fn strengthen_causal_facts(&mut self, boost: f32) -> usize {
+        let mut count = 0;
+        for fact in self.facts.values_mut() {
+            if fact.has_causal_relations {
+                let new_conf = (fact.confidence + boost).min(fact.initial_confidence);
+                if new_conf > fact.confidence {
+                    fact.confidence = new_conf;
+                    count += 1;
+                }
+            }
+        }
+        count
     }
 
     // ── Internal ────────────────────────────────────────────────────────

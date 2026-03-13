@@ -113,7 +113,7 @@ impl CognitiveLoopService {
     /// Uses temporal signature pattern, prosody valence, and average prediction
     /// error to select Reflex / Cortical / DeepThought processing depth.
     pub(in crate::cognitive_loop) fn update_cognitive_depth(&mut self) {
-        let prior_pattern = self.voice_coherence.temporal.classify_state().0;
+        let prior_pattern = self.language_comm.voice_coherence.temporal.classify_state().0;
         let prior_valence = self.emotion_contagion.prosody_valence();
         let prior_error = self.stats.avg_prediction_error;
         self.cognitive_depth =
@@ -127,7 +127,7 @@ impl CognitiveLoopService {
     /// Returns 0.0 if no negation detector is configured.
     /// Science: Wason (1959) — negation processing in human reasoning.
     pub(in crate::cognitive_loop) fn detect_negation_polarity(&self, input: &str) -> f32 {
-        if let Some(ref detector) = self.negation_detector {
+        if let Some(ref detector) = self.ethics_values.negation_detector {
             detector
                 .get_polarity(input, "harmful")
                 .max(detector.get_polarity(input, "dangerous"))
@@ -175,7 +175,7 @@ impl CognitiveLoopService {
     /// contextual weights, and value feedback.
     ///
     /// Returns `(moral_score, moral_concern_detected, moral_judgment)`.
-    /// The judgment is cached in `self.last_moral_judgment` for throttled reuse.
+    /// The judgment is cached in `self.ethics_values.last_moral_judgment` for throttled reuse.
     pub(in crate::cognitive_loop) fn run_moral_phase(
         &mut self,
         input: &str,
@@ -184,6 +184,7 @@ impl CognitiveLoopService {
         // Throttled evaluation: re-evaluate on interval or new input
         let moral_judgment = if self.stats.total_cycles % MORAL_EVAL_INTERVAL == 1
             || self
+                .ethics_values
                 .last_moral_judgment
                 .as_ref()
                 .map_or(true, |j| j.input != input)
@@ -194,7 +195,7 @@ impl CognitiveLoopService {
         } else {
             // The map_or guard above ensures last_moral_judgment is Some here,
             // but we use unwrap_or_else for panic-freedom in the 50Hz hot path.
-            match self.last_moral_judgment.clone() {
+            match self.ethics_values.last_moral_judgment.clone() {
                 Some(j) => j,
                 None => {
                     // Should be unreachable — but if it is, re-evaluate rather than panic.
@@ -233,7 +234,7 @@ impl CognitiveLoopService {
 
         // Contextual harmony weighting: domain-aware moral modulation
         // Science: Haidt (2001) — moral foundations vary across contexts
-        let contextual_weight_factor = if let Some(ref mut cw) = self.contextual_weights {
+        let contextual_weight_factor = if let Some(ref mut cw) = self.ethics_values.contextual_weights {
             use crate::consciousness::contextual_weights::{ActionType, DomainClassifier};
             let domain = DomainClassifier::new().classify(input);
             let action_type = if moral_concern_detected {
@@ -379,8 +380,8 @@ impl CognitiveLoopService {
     /// dyad + interoceptive body + embodied cognition. Clamps to [0.0, 1.0].
     /// Updates the unification engine with the result.
     pub(in crate::cognitive_loop) fn compute_unified_psi(&mut self) -> f64 {
-        let coherence_psi = self.voice_coherence.bridge.phi_contribution();
-        let voice_psi = self.voice_coherence.voice.summary().phi_adjustment;
+        let coherence_psi = self.language_comm.voice_coherence.bridge.phi_contribution();
+        let voice_psi = self.language_comm.voice_coherence.voice.summary().phi_adjustment;
         let flow_psi = if self.flow_state.in_flow {
             self.flow_state.intensity * FLOW_PSI_WEIGHT
         } else {
@@ -401,7 +402,7 @@ impl CognitiveLoopService {
         // activity — this is the raw coherence, not the doubly-weighted phi_contribution.
         // Science: Tononi (2004) — Φ reflects the degree of information integration
         // in a system. An active recurrent network has non-trivial Φ by design.
-        let baseline_integration = self.voice_coherence.bridge.smoothed_coherence() * 0.3;
+        let baseline_integration = self.language_comm.voice_coherence.bridge.smoothed_coherence() * 0.3;
 
         let unified_psi = (baseline_integration
             + coherence_psi

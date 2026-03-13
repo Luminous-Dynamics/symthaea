@@ -402,6 +402,73 @@ impl CompositionAlgebra {
         Ok((best_name, best_sim, residual))
     }
 
+    /// Simulate a chain of institutional state transitions.
+    ///
+    /// Each step either removes (`Remove`) or adds (`Add`) a component.
+    /// Returns the trajectory: at each step, the current encoding, its nearest
+    /// axiom, and the similarity to that axiom.
+    ///
+    /// # Example
+    /// ```ignore
+    /// let trajectory = algebra.query_chain(
+    ///     "NATION_STATE",
+    ///     &[
+    ///         TransitionStep::Remove("ENFORCEMENT"),
+    ///         TransitionStep::Add("LEGITIMACY"),
+    ///     ],
+    ///     &system,
+    /// ).unwrap();
+    /// // Step 0: NATION_STATE minus ENFORCEMENT → nearest FAILED_STATE
+    /// // Step 1: ... plus LEGITIMACY → nearest ???
+    /// ```
+    pub fn query_chain(
+        &self,
+        start: &str,
+        steps: &[TransitionStep<'_>],
+        system: &PrimitiveSystem,
+    ) -> Result<Vec<TransitionResult>, CompositionAlgebraError> {
+        let mut current = self
+            .get_encoding(start, system)
+            .ok_or_else(|| CompositionAlgebraError::NotFound(start.to_string()))?;
+
+        let mut trajectory = Vec::with_capacity(steps.len());
+
+        for step in steps {
+            let component_name = step.component();
+            let component_hv = self
+                .get_encoding(component_name, system)
+                .ok_or_else(|| CompositionAlgebraError::NotFound(component_name.to_string()))?;
+
+            // XOR for both add and remove (XOR is its own inverse in BinaryHV)
+            current = current.bind(&component_hv);
+
+            // Find nearest axiom
+            let mut best_name = String::new();
+            let mut best_sim: f32 = -1.0;
+
+            for (name, comp) in &self.compositions {
+                let sim = current.similarity(&comp.encoding);
+                if sim > best_sim {
+                    best_sim = sim;
+                    best_name = name.clone();
+                }
+            }
+
+            let action = match step {
+                TransitionStep::Remove(name) => format!("-{name}"),
+                TransitionStep::Add(name) => format!("+{name}"),
+            };
+            trajectory.push(TransitionResult {
+                action,
+                nearest_axiom: best_name,
+                similarity: best_sim,
+                encoding: current,
+            });
+        }
+
+        Ok(trajectory)
+    }
+
     /// Rank all compositions by similarity to a given encoding.
     ///
     /// Returns a sorted list of (name, similarity) pairs, most similar first.
@@ -477,6 +544,37 @@ impl CompositionAlgebra {
         }
         loaded
     }
+}
+
+/// A single step in a causal transition chain.
+#[derive(Debug, Clone, Copy)]
+pub enum TransitionStep<'a> {
+    /// Remove a component (unbind via XOR)
+    Remove(&'a str),
+    /// Add a component (bind via XOR)
+    Add(&'a str),
+}
+
+impl<'a> TransitionStep<'a> {
+    /// Get the component name referenced by this step.
+    pub fn component(&self) -> &'a str {
+        match self {
+            TransitionStep::Remove(name) | TransitionStep::Add(name) => name,
+        }
+    }
+}
+
+/// Result of one step in a causal transition chain.
+#[derive(Debug, Clone)]
+pub struct TransitionResult {
+    /// Whether this was an Add or Remove, and the component name.
+    pub action: String,
+    /// Nearest known axiom after this step
+    pub nearest_axiom: String,
+    /// Similarity to the nearest axiom
+    pub similarity: f32,
+    /// The encoding after this step
+    pub encoding: BinaryHV,
 }
 
 /// Exportable composition (without encoding)

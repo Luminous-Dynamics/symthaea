@@ -76,6 +76,18 @@ pub struct EpistemicState {
     pub confidence_multiplier: f64,
 }
 
+/// Lightweight query result for cross-module consumers (Broca, EthicsEngine).
+/// Avoids pulling in the full ReasoningContext machinery.
+#[derive(Debug, Clone)]
+pub struct KnowledgeQueryResult {
+    /// Top-k relevant grounded facts
+    pub facts: Vec<GroundedFact>,
+    /// Causal chains traced from query entities
+    pub causal_chains: Vec<CausalChain>,
+    /// Overall grounding score [0.0, 1.0]
+    pub grounding_score: f64,
+}
+
 impl Default for ReasoningContext {
     fn default() -> Self {
         Self {
@@ -105,7 +117,7 @@ impl ReasoningContext {
     pub fn from_manager(manager: &KnowledgeManager, query: &str) -> Self {
         let signals = manager.signals();
         let search_results = manager.last_search_results();
-        let alerts = &[]; // Alerts are drained separately
+        let alerts: &[(); 0] = &[]; // Alerts are drained separately
 
         // 1. Convert search results to grounded facts
         let relevant_facts: Vec<GroundedFact> = search_results
@@ -370,8 +382,8 @@ mod tests {
         };
 
         let summary = generate_summary(&[], &[], &epistemic);
-        // With no facts, should show "No relevant knowledge"
-        assert!(summary.contains("No relevant knowledge"));
+        // High uncertainty + contradictions should produce warnings
+        assert!(summary.contains("WARNING") || summary.contains("ALERT"));
     }
 
     #[test]

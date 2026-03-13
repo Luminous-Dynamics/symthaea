@@ -45,6 +45,7 @@ use super::thresholds::{
     BINDING_LOW_THRESHOLD, BINDING_STRONG_CONFIDENCE_SCALE, BINDING_STRONG_RELIEF_SCALE,
     BINDING_WEAK_CAUTION_SCALE, BINDING_WEAK_CONFIDENCE_SCALE, CAUSAL_ATTENTION_CONFIDENCE_SCALE,
     CAUSAL_ATTENTION_STRENGTH_THRESHOLD, CAUSAL_CONFIDENCE_DENSE_THRESHOLD,
+    CAUSAL_SPARSE_EDGE_THRESHOLD, CAUSAL_SPARSE_EXPLORATION_BOOST,
     CAUSAL_CONFIDENCE_MODERATE_THRESHOLD, CAUSAL_DENSE_CONFIDENCE_SCALE,
     CAUSAL_MODERATE_CONFIDENCE_SCALE, CODEBOOK_FAMILIAR_TAU_SCALE, CODEBOOK_FAMILIAR_THRESHOLD,
     CODEBOOK_NOVEL_TAU_SCALE, CODEBOOK_NOVEL_THRESHOLD, COHERENCE_CONFIDENCE_BOOST,
@@ -64,7 +65,11 @@ use super::thresholds::{
     EPISTEMIC_UNCERTAINTY_DEFAULT, FEP_ACCURACY_CONFIDENCE_THRESHOLD, FEP_COMPLEXITY_THRESHOLD,
     FEP_LEARNING_PLASTICITY_THRESHOLD, FEP_PRAGMATIC_EXPLOIT_SCALE,
     FEP_PRAGMATIC_EXPLOIT_THRESHOLD, FEP_PRAGMATIC_EXPLORE_SCALE, FEP_PRAGMATIC_EXPLORE_THRESHOLD,
-    FEP_SURPRISE_TAU_SCALE, FEP_TD_ERROR_DISCOVERY_THRESHOLD, GOAL_PRIORITY_EXPLORATION_THRESHOLD,
+    FEP_EFFICIENT_ACCURACY_THRESHOLD, FEP_EFFICIENT_COMPLEXITY_THRESHOLD,
+    FEP_EFFICIENT_CONFIDENCE_BOOST, FEP_EFFICIENT_EXPLORE_DAMPEN, FEP_EFFICIENT_LR_BOOST,
+    FEP_EFFICIENT_LR_MAX, FEP_SURPRISE_EXPLORE_BOOST, FEP_SURPRISE_TAU_SCALE,
+    FEP_TD_CONVERGE_CYCLES, FEP_TD_CONVERGE_EXPLORATION_SCALE, FEP_TD_ERROR_DISCOVERY_THRESHOLD,
+    FEP_TD_LOW_THRESHOLD, GOAL_PRIORITY_EXPLORATION_THRESHOLD,
     GOAL_PRIORITY_LR_THRESHOLD, HOMEOSTASIS_AROUSAL_TARGET, HOMEOSTASIS_EFFICIENCY_EMA,
     HOMEOSTASIS_EFFICIENCY_HIGH, HOMEOSTASIS_EFFICIENCY_LOW, HOMEOSTASIS_EMOTIONAL_INERTIA,
     HOMEOSTASIS_NEUROMOD_STEP, HOMEOSTASIS_PULL_CRITICAL, HOMEOSTASIS_PULL_CRUISE,
@@ -137,7 +142,7 @@ impl CognitiveLoopService {
             self.prediction_confidence,
             self.fep.lr_boost,
             prediction_error,
-            self.voice_coherence.bridge.smoothed_coherence(),
+            self.language_comm.voice_coherence.bridge.smoothed_coherence(),
             self.stats.unified_psi as f64,
             phi_attention_weight,
             self.emotion_contagion.arousal,
@@ -183,6 +188,13 @@ impl CognitiveLoopService {
                     let perception_output = self.perception_manager.process(snapshot);
                     self.subsystem_collector
                         .record("perception_manager", perception_output);
+                }
+
+                // ── Swarm Manager (interval 41, co-prime) ─────────────
+                if self.swarm_manager.should_run(cycle_num, urgency_u8) {
+                    let swarm_output = self.swarm_manager.process(snapshot);
+                    self.subsystem_collector
+                        .record("swarm_manager", swarm_output);
                 }
 
                 // ── Governance Manager (interval 37, co-prime) ──────────
@@ -467,7 +479,7 @@ impl CognitiveLoopService {
         };
 
         // ── Phase 17: Coherence memoization — cache pre-update value ─────
-        let pre_update_coherence = self.voice_coherence.bridge.smoothed_coherence();
+        let pre_update_coherence = self.language_comm.voice_coherence.bridge.smoothed_coherence();
 
         // ── Phase 20: Phenomenal binding → threshold gating ──────────────────
         let cached_binding = self.carryover.quality.last_phenomenal_binding as f32;
@@ -654,13 +666,17 @@ impl CognitiveLoopService {
             if goal_priority > GOAL_PRIORITY_LR_THRESHOLD
                 && !matches!(urgency, super::CycleUrgency::Critical)
             {
-                let goal_lr_boost = (goal_priority - GOAL_PRIORITY_LR_THRESHOLD) * 0.1;
+                let goal_lr_boost = (goal_priority - GOAL_PRIORITY_LR_THRESHOLD)
+                    * super::thresholds::GOAL_PRIORITY_LR_SCALE;
                 self.scale_lr("goal_priority", 1.0 + goal_lr_boost);
             }
             if prediction_error < self.config.learning_threshold
                 && goal_priority > GOAL_PRIORITY_EXPLORATION_THRESHOLD
             {
-                self.adjust_exploration("goal_pursuit", goal_priority * 0.03);
+                self.adjust_exploration(
+                    "goal_pursuit",
+                    goal_priority * super::thresholds::GOAL_PRIORITY_EXPLORATION_SCALE,
+                );
             }
         }
 
@@ -722,6 +738,65 @@ impl CognitiveLoopService {
         // Rising coherence → slow down (stabilize); falling → speed up (explore corrections).
         // Science: Buzsáki (2006) — coherent oscillations modulate integration timescale.
         // (Applied below in delta_t product chain as coherence_velocity_tau_factor.)
+
+        // Resonance flow state → exploit stability. Csikszentmihalyi (1990):
+        // sustained cross-module agreement signals optimal cognitive zone.
+        // Dampen exploration (exploit stability) and slightly boost LR (leverage flow).
+        if self.carryover.quality.in_flow_state {
+            self.scale_exploration(
+                "resonance_flow_exploit",
+                super::thresholds::RESONANCE_FLOW_EXPLORATION_DAMPEN,
+            );
+            self.scale_lr(
+                "resonance_flow_boost",
+                super::thresholds::RESONANCE_FLOW_LR_BOOST,
+            );
+        }
+
+        // MCE narrative coherence → exploration feedback. Bruner (1991):
+        // low narrative coherence signals fragmented world model → boost exploration
+        // to discover integrative frames. High coherence → confidence boost.
+        {
+            use super::thresholds::{
+                MCE_NARRATIVE_HIGH_CONFIDENCE_BOOST, MCE_NARRATIVE_HIGH_THRESHOLD,
+                MCE_NARRATIVE_LOW_EXPLORATION_BOOST, MCE_NARRATIVE_LOW_THRESHOLD,
+            };
+            let narrative = self.carryover.consciousness.mce_narrative;
+            if narrative > 0.0 && narrative < MCE_NARRATIVE_LOW_THRESHOLD as f64 {
+                self.adjust_exploration(
+                    "mce_narrative_low",
+                    MCE_NARRATIVE_LOW_EXPLORATION_BOOST,
+                );
+            } else if narrative > MCE_NARRATIVE_HIGH_THRESHOLD as f64 {
+                self.adjust_confidence(
+                    "mce_narrative_high",
+                    MCE_NARRATIVE_HIGH_CONFIDENCE_BOOST,
+                );
+            }
+
+        }
+
+        // MCE social embedding → social cognition feedback. Frith & Frith (2006):
+        // low social signal means ToM is underperforming → boost LR for social learning.
+        {
+            use super::thresholds::{MCE_SOCIAL_LOW_LR_BOOST, MCE_SOCIAL_LOW_THRESHOLD};
+            let social = self.carryover.consciousness.mce_social;
+            if social > 0.0 && social < MCE_SOCIAL_LOW_THRESHOLD as f64 {
+                self.scale_lr("mce_social_low", MCE_SOCIAL_LOW_LR_BOOST);
+            }
+        }
+
+        // MCE bottleneck factor → proportional exploration. Tononi (2004):
+        // consciousness is limited by its weakest dimension (softmin).
+        // Low bottleneck → boost exploration to discover configurations that expand it.
+        {
+            use super::thresholds::MCE_SOFTMIN_EXPLORATION_THRESHOLD;
+            let softmin = self.carryover.consciousness.mce_softmin;
+            if softmin > 0.0 && softmin < MCE_SOFTMIN_EXPLORATION_THRESHOLD as f64 {
+                let deficit = MCE_SOFTMIN_EXPLORATION_THRESHOLD as f64 - softmin;
+                self.adjust_exploration("mce_bottleneck_deficit", (deficit * 0.05) as f32);
+            }
+        }
 
         // ═══════════════════════════════════════════════════════════════════════
         // 1c. Update Unified Emotional Bridge (VAD-based)
@@ -1077,15 +1152,15 @@ impl CognitiveLoopService {
         // 10. Update coherence bridge
         let tau_owned: Vec<ndarray::Array1<f32>> = self.temporal_network.all_tau_owned();
         let tau_refs: Vec<&ndarray::Array1<f32>> = tau_owned.iter().collect();
-        self.voice_coherence.bridge.update(&tau_refs);
+        self.language_comm.voice_coherence.bridge.update(&tau_refs);
 
         // 10b. Update temporal signature encoder
         let flattened_tau: Vec<f32> = tau_owned.iter().flat_map(|a| a.iter().copied()).collect();
-        self.voice_coherence.temporal.record_batch(&flattened_tau);
+        self.language_comm.voice_coherence.temporal.record_batch(&flattened_tau);
 
         // 10c. Update adaptive behavior
-        let (pattern, pattern_confidence) = self.voice_coherence.temporal.classify_state();
-        let coherence = self.voice_coherence.bridge.smoothed_coherence();
+        let (pattern, pattern_confidence) = self.language_comm.voice_coherence.temporal.classify_state();
+        let coherence = self.language_comm.voice_coherence.bridge.smoothed_coherence();
         self.carryover.history.cached_coherence = Some(coherence);
 
         // Voice feedback heartbeat: synthesize metrics from cognitive state
@@ -1108,9 +1183,9 @@ impl CognitiveLoopService {
             duration_accuracy: 0.7,
             energy_consistency: 0.8,
         };
-        self.voice_coherence.voice.update(voice_heartbeat);
+        self.language_comm.voice_coherence.voice.update(voice_heartbeat);
 
-        let voice_confidence = self.voice_coherence.voice.summary().voice_confidence;
+        let voice_confidence = self.language_comm.voice_coherence.voice.summary().voice_confidence;
         self.adaptive_behavior = AdaptiveBehavior::from_consciousness_state(
             pattern,
             pattern_confidence,
@@ -1304,7 +1379,7 @@ impl CognitiveLoopService {
                 }
             }
             self.carryover.quality.consecutive_low_td_error = 0;
-        } else if fep_td_error.abs() < 0.01 {
+        } else if fep_td_error.abs() < FEP_TD_LOW_THRESHOLD {
             self.carryover.quality.consecutive_low_td_error = self
                 .carryover
                 .quality
@@ -1313,8 +1388,10 @@ impl CognitiveLoopService {
         }
         // Session 13 Item 3: Sustained low TD error → model converged → dampen exploration.
         // Science: Sutton & Barto (2018) — convergent TD signals indicate policy stability.
-        if self.carryover.quality.consecutive_low_td_error > 10 && self.stats.total_cycles > 30 {
-            self.scale_exploration("fep_td_converged", 0.97);
+        if self.carryover.quality.consecutive_low_td_error > FEP_TD_CONVERGE_CYCLES
+            && self.stats.total_cycles > 30
+        {
+            self.scale_exploration("fep_td_converged", FEP_TD_CONVERGE_EXPLORATION_SCALE);
         }
 
         // ── Track 5e: Causal graph → attention weighting ─────────────────
@@ -1345,8 +1422,13 @@ impl CognitiveLoopService {
                             * CAUSAL_MODERATE_CONFIDENCE_SCALE,
                     );
                 }
-                if edge_count < 2 && self.stats.total_cycles > 200 {
-                    self.adjust_exploration("sparse_causal_graph", 0.02);
+                if edge_count < CAUSAL_SPARSE_EDGE_THRESHOLD
+                    && self.stats.total_cycles > 200
+                {
+                    self.adjust_exploration(
+                        "sparse_causal_graph",
+                        CAUSAL_SPARSE_EXPLORATION_BOOST,
+                    );
                 }
                 self.stats.causal_attention_uses += 1;
             }
@@ -1356,19 +1438,22 @@ impl CognitiveLoopService {
         };
 
         // ── FEP decomposition → adaptive behavior modulation ─────────────
-        if fep_accuracy > 0.5 && fep_complexity < 0.5 {
+        if fep_accuracy > FEP_EFFICIENT_ACCURACY_THRESHOLD
+            && fep_complexity < FEP_EFFICIENT_COMPLEXITY_THRESHOLD
+        {
             self.adaptive_behavior.learning_rate_multiplier =
-                (self.adaptive_behavior.learning_rate_multiplier * 1.1).min(2.0);
-            self.adaptive_behavior.exploration_factor *= 0.8;
+                (self.adaptive_behavior.learning_rate_multiplier * FEP_EFFICIENT_LR_BOOST)
+                    .min(FEP_EFFICIENT_LR_MAX);
+            self.adaptive_behavior.exploration_factor *= FEP_EFFICIENT_EXPLORE_DAMPEN;
             // Session 13 Item 6: Wire FEP efficiency into proposal system.
             // High accuracy + low complexity = efficient model → boost confidence.
             // Science: Friston (2010) — low complexity = good model evidence.
-            self.adjust_confidence("fep_efficient", 0.01);
+            self.adjust_confidence("fep_efficient", FEP_EFFICIENT_CONFIDENCE_BOOST);
         }
         let surprise_thresh = reflection_thresholds.surprise as f64;
         if fep_surprise > surprise_thresh {
             self.adaptive_behavior.exploration_factor =
-                (self.adaptive_behavior.exploration_factor + 0.15).min(1.0);
+                (self.adaptive_behavior.exploration_factor + FEP_SURPRISE_EXPLORE_BOOST).min(1.0);
             self.adaptive_behavior.action_hint = ActionHint::Explore;
         }
         if fep_complexity > FEP_COMPLEXITY_THRESHOLD {
@@ -1387,7 +1472,8 @@ impl CognitiveLoopService {
 
         if fep_surprise > surprise_thresh {
             if let Some(ref mut replay) = self.phi_episodic_replay {
-                let surprise_boost = (fep_surprise - surprise_thresh).min(0.5) * 0.2;
+                let surprise_boost = (fep_surprise - surprise_thresh).min(0.5)
+                    * super::thresholds::FEP_SURPRISE_CONSOLIDATION_SCALE;
                 replay.boost_recent_consolidation(surprise_boost);
             }
         }
@@ -1424,9 +1510,17 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         let math_result = if perception.math.math_detected {
             let _t = Instant::now();
-            // Dispatch solver based on classified problem type.
-            // Currently: descriptive statistics on any extracted numbers from input.
-            // Future: parse parameters from NL input for typed dispatch.
+            // ── Phase 7c: Memory recall — check for analogous past problems ──
+            // Before solving, search mathematical memory for similar episodes.
+            // Science: Hofstadter (2001) — analogy is the core of cognition.
+            let _recalled = {
+                let query_hv = &perception.encoding.hv16_cached;
+                self.math_service.recall_similar(query_hv, 3)
+                    .first()
+                    .map(|ep| (ep.problem_type, ep.phi, ep.description.clone()))
+            };
+
+            // ── Extract numbers from NL input for solver dispatch ──
             let numbers: Vec<f64> = input
                 .split_whitespace()
                 .filter_map(|w| {
@@ -1436,10 +1530,159 @@ impl CognitiveLoopService {
                 })
                 .collect();
 
-            let response = if !numbers.is_empty() {
-                Some(self.math_service.compute_statistics(&numbers))
-            } else {
-                None
+            // ── Route to typed solver based on classified problem type ──
+            use super::math_service::MathProblemType;
+            let problem_type = perception.math.problem_type
+                .unwrap_or(MathProblemType::Unknown);
+
+            let response: Option<super::math_service::MathResponse> = match problem_type {
+                MathProblemType::Statistics => {
+                    if !numbers.is_empty() {
+                        Some(self.math_service.compute_statistics(&numbers))
+                    } else {
+                        None
+                    }
+                }
+                MathProblemType::LinearSystem => {
+                    // Need at least 5 numbers for a 2x2 system: [a11,a12,a21,a22,b1,b2]
+                    if numbers.len() >= 5 {
+                        let n = (numbers.len() as f64).sqrt() as usize;
+                        let n = n.max(2);
+                        let matrix_size = n * n;
+                        if numbers.len() >= matrix_size + n {
+                            let a_data = &numbers[..matrix_size];
+                            let b_data = &numbers[matrix_size..matrix_size + n];
+                            Some(self.math_service.solve_linear_system(a_data, n, n, b_data))
+                        } else {
+                            // Fallback: treat as statistics
+                            Some(self.math_service.compute_statistics(&numbers))
+                        }
+                    } else {
+                        None
+                    }
+                }
+                MathProblemType::RootFinding => {
+                    // Use numbers as bracket [a, b] if 2+ present
+                    if numbers.len() >= 2 {
+                        let a = numbers[0];
+                        let b = numbers[1];
+                        // Default: find root of polynomial from remaining coefficients
+                        // or simple x^2 - c if only bracket given
+                        if numbers.len() > 2 {
+                            let coeffs = numbers[2..].to_vec();
+                            Some(self.math_service.find_root_phi_guided(
+                                &|x| coeffs.iter().rev().enumerate()
+                                    .map(|(i, c)| c * x.powi(i as i32))
+                                    .sum::<f64>(),
+                                a, b,
+                            ))
+                        } else {
+                            // x^2 - 1 as default
+                            Some(self.math_service.find_root_phi_guided(
+                                &|x| x * x - 1.0, a, b,
+                            ))
+                        }
+                    } else {
+                        None
+                    }
+                }
+                MathProblemType::Integration => {
+                    // [a, b] bounds + optional polynomial coefficients
+                    if numbers.len() >= 2 {
+                        let a = numbers[0];
+                        let b = numbers[1];
+                        if numbers.len() > 2 {
+                            let coeffs = numbers[2..].to_vec();
+                            Some(self.math_service.integrate(
+                                &|x| coeffs.iter().rev().enumerate()
+                                    .map(|(i, c)| c * x.powi(i as i32))
+                                    .sum::<f64>(),
+                                a, b,
+                            ))
+                        } else {
+                            // Default: integrate x^2
+                            Some(self.math_service.integrate(&|x| x * x, a, b))
+                        }
+                    } else {
+                        None
+                    }
+                }
+                MathProblemType::MatrixAnalysis => {
+                    // Eigenvalues/SVD: need square matrix
+                    if numbers.len() >= 4 {
+                        let n = (numbers.len() as f64).sqrt() as usize;
+                        let n = n.max(2);
+                        if numbers.len() >= n * n {
+                            Some(self.math_service.matrix_determinant(&numbers[..n * n], n))
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                }
+                MathProblemType::Optimization => {
+                    // Use extracted numbers as initial point
+                    if !numbers.is_empty() {
+                        // Default: minimize sum of squares (Rosenbrock-like)
+                        Some(self.math_service.optimize(
+                            &|x: &[f64]| x.iter().map(|v| v * v).sum::<f64>(),
+                            &numbers,
+                        ))
+                    } else {
+                        None
+                    }
+                }
+                MathProblemType::SignalAnalysis => {
+                    if !numbers.is_empty() {
+                        Some(self.math_service.compute_fft(&numbers))
+                    } else {
+                        None
+                    }
+                }
+                MathProblemType::Geometry => {
+                    // Parse as (x,y) pairs
+                    if numbers.len() >= 4 && numbers.len() % 2 == 0 {
+                        let pairs: Vec<(f64, f64)> = numbers
+                            .chunks(2)
+                            .map(|c| (c[0], c[1]))
+                            .collect();
+                        Some(self.math_service.convex_hull(&pairs))
+                    } else {
+                        None
+                    }
+                }
+                MathProblemType::GraphTheory => {
+                    // Parse as (u, v, weight) triples
+                    if numbers.len() >= 3 && numbers.len() % 3 == 0 {
+                        let n = numbers.iter().cloned().fold(0.0f64, f64::max) as usize + 1;
+                        let edges: Vec<(usize, usize, f64)> = numbers
+                            .chunks(3)
+                            .map(|c| (c[0] as usize, c[1] as usize, c[2]))
+                            .collect();
+                        Some(self.math_service.shortest_path(n, &edges, 0))
+                    } else {
+                        None
+                    }
+                }
+                MathProblemType::Arithmetic | MathProblemType::Unknown => {
+                    // Fallback: descriptive statistics on any numbers found
+                    if !numbers.is_empty() {
+                        Some(self.math_service.compute_statistics(&numbers))
+                    } else {
+                        None
+                    }
+                }
+                // Logic, CSP, DifferentialEquation require structured input
+                // that can't be trivially extracted from NL numbers alone.
+                // These are accessible via MathService API for structured callers.
+                _ => {
+                    if !numbers.is_empty() {
+                        Some(self.math_service.compute_statistics(&numbers))
+                    } else {
+                        None
+                    }
+                }
             };
 
             let dm = if let Some(ref resp) = response {
@@ -1540,38 +1783,43 @@ impl CognitiveLoopService {
         if let Some(ref enhanced_result) = enhanced_result {
             match enhanced_result.motor_command.command_type {
                 MotorCommandType::AttentionShift => {
-                    let shift_amount = enhanced_result.motor_command.intensity as f32 * 0.1;
+                    let shift_amount = enhanced_result.motor_command.intensity as f32
+                        * super::thresholds::MOTOR_ATTENTION_SHIFT_SCALE;
                     self.adaptive_behavior.attention_sensitivity =
-                        (self.adaptive_behavior.attention_sensitivity * (1.0 + shift_amount * 0.1))
-                            .clamp(0.5, 2.0);
+                        (self.adaptive_behavior.attention_sensitivity
+                            * (1.0 + shift_amount * super::thresholds::MOTOR_ATTENTION_SHIFT_SCALE))
+                            .clamp(0.5, super::thresholds::LIMITING_COMPONENT_ATTENTION_MAX);
                     self.stats.attention_shift = shift_amount;
                 }
                 MotorCommandType::LearningRateAdjust => {
                     if enhanced_result.should_learn {
                         let lr_mod = enhanced_result.fep_result.learning_rate_modulation as f32;
+                        let decay = super::thresholds::MOTOR_ADAPTIVE_LR_EMA_DECAY;
                         self.stats.adaptive_learning_rate =
-                            (self.stats.adaptive_learning_rate * 0.9 + lr_mod * 0.1)
+                            (self.stats.adaptive_learning_rate * decay + lr_mod * (1.0 - decay))
                                 .clamp(0.01, 1.0);
                     }
                 }
                 MotorCommandType::ExplorationTrigger => {
                     let intensity = enhanced_result.motor_command.intensity as f32;
                     if enhanced_result.fep_result.epistemic_value > 0.5 {
-                        // Scale exploration boost by epistemic value
-                        let boost = (intensity * 0.15).min(0.2);
+                        let boost = (intensity * 0.15)
+                            .min(super::thresholds::MOTOR_EXPLORATION_BOOST_MAX);
                         self.adjust_exploration("motor_exploration_trigger", boost);
                     }
-                    // High-intensity exploration → boost learning to absorb novelty
-                    if intensity > 0.8 {
+                    if intensity > super::thresholds::MOTOR_EXPLORATION_INTENSITY_THRESHOLD {
                         self.scale_lr("motor_explore_intense", 1.1);
                     }
                 }
                 MotorCommandType::ReflectionInitiate => {
                     let intensity = enhanced_result.motor_command.intensity as f32;
-                    if intensity > 0.5 {
+                    if intensity > super::thresholds::MOTOR_REFLECTION_THRESHOLD {
                         self.self_model_tier.self_reflection.force_reflection();
-                        // Boost meta-awareness proportional to intensity
-                        self.adjust_confidence("motor_reflection", (intensity - 0.5) * 0.05);
+                        self.adjust_confidence(
+                            "motor_reflection",
+                            (intensity - super::thresholds::MOTOR_REFLECTION_THRESHOLD)
+                                * super::thresholds::MOTOR_REFLECTION_CONFIDENCE_SCALE,
+                        );
                     }
                 }
                 MotorCommandType::MemoryConsolidate => {
@@ -1673,8 +1921,11 @@ impl CognitiveLoopService {
         // Epistemic uncertainty → attention budget expansion.
         // Science: Gottlieb et al. (2013) — uncertain environments demand more attentional resources.
         // High epistemic (>0.4) scales budget up to 1.3×; low (<0.2) contracts to 0.9×.
-        let epistemic_budget_scale = if epistemic_uncertainty > 0.4 {
-            1.0 + (epistemic_uncertainty - 0.4).min(0.3)
+        let epistemic_budget_scale = if epistemic_uncertainty
+            > super::thresholds::EPISTEMIC_BUDGET_HIGH_THRESHOLD
+        {
+            1.0 + (epistemic_uncertainty - super::thresholds::EPISTEMIC_BUDGET_HIGH_THRESHOLD)
+                .min(super::thresholds::EPISTEMIC_BUDGET_HIGH_MAX)
         } else if epistemic_uncertainty < 0.2 {
             0.9 + epistemic_uncertainty * 0.5 // 0.9 at 0.0, 1.0 at 0.2
         } else {
@@ -1685,10 +1936,12 @@ impl CognitiveLoopService {
         // Science: Raichle (2010) — default mode network reduces task-positive
         // resource allocation during rest states.
         let stillness_budget_scale = {
-            let ss_coord = self.ethics_engine.last_harmony_coordinates()[7]; // SacredStillness
-            if ss_coord > 0.5 {
-                // High stillness activation → contract budget by up to 30%
-                1.0 - (ss_coord - 0.5).min(0.3)
+            let ss_coord = self.ethics_engine.last_harmony_coordinates()[7] as f32; // SacredStillness
+            if ss_coord > super::thresholds::STILLNESS_BUDGET_THRESHOLD {
+                // High stillness activation → contract budget
+                1.0_f32
+                    - (ss_coord - super::thresholds::STILLNESS_BUDGET_THRESHOLD)
+                        .min(super::thresholds::STILLNESS_BUDGET_MAX_CONTRACTION)
             } else {
                 1.0
             }
@@ -1711,7 +1964,7 @@ impl CognitiveLoopService {
             * neuromod_attention_alloc as f64
             * depth_budget_scale
             * epistemic_budget_scale as f64
-            * stillness_budget_scale
+            * stillness_budget_scale as f64
             * coherence_velocity_budget_scale) as u64;
 
         // Active Rest Mode: track Sacred Stillness dominance streak
@@ -1772,7 +2025,9 @@ impl CognitiveLoopService {
                 let rate = self.fep.closed_learning_loop.exploration_rate();
                 self.fep
                     .closed_learning_loop
-                    .set_exploration_rate(rate * 0.8);
+                    .set_exploration_rate(
+                        rate * super::thresholds::MORAL_ATTRACTOR_EXPLORATION_DAMPEN,
+                    );
             }
             self.stats.prev_moral_attractor = attractor_now;
         }
@@ -2048,10 +2303,15 @@ impl CognitiveLoopService {
                 policy_agreement = true;
             } else if fep_prob_for_mcts > POLICY_SOFT_THRESHOLD {
                 policy_agreement = true;
-                reasoning_plan_confidence =
-                    (reasoning_plan_confidence * (1.0 + fep_prob_for_mcts as f32 * 0.3)).min(1.0);
+                reasoning_plan_confidence = (reasoning_plan_confidence
+                    * (1.0
+                        + fep_prob_for_mcts as f32
+                            * super::thresholds::POLICY_SOFT_CONFIDENCE_SCALE))
+                    .min(1.0);
             } else {
-                let dampen = (0.3 + fep_prob_for_mcts * 0.7) as f32;
+                let dampen = (super::thresholds::POLICY_DISAGREE_BASE
+                    + fep_prob_for_mcts * super::thresholds::POLICY_DISAGREE_SCALE)
+                    as f32;
                 self.fep.learning_signal *= dampen;
                 reasoning_plan_confidence *= dampen;
             }
@@ -2102,13 +2362,16 @@ impl CognitiveLoopService {
                 // Session 15 Item 8: Accelerate recovery when Phi is improving.
                 // If unified Psi exceeds recent average, add bonus progress.
                 // Science: Tononi (2004) — rising Phi signals integration recovery.
-                let phi_bonus = if unified_psi > self.stats.avg_psi as f64 * 1.05 {
-                    0.25 // 25% bonus progress when Phi above average
+                let phi_bonus = if unified_psi
+                    > self.stats.avg_psi as f64 * super::thresholds::PHI_RECOVERY_BONUS_THRESHOLD
+                {
+                    super::thresholds::PHI_RECOVERY_BONUS_PROGRESS
                 } else {
                     0.0
                 };
                 let recovery = ((counter as f32 / 20.0) + phi_bonus).min(1.0);
-                reasoning_lr_factor *= 0.5 + recovery * 0.5;
+                let w = super::thresholds::RECOVERY_BLEND_WEIGHT;
+                reasoning_lr_factor *= w + recovery * w;
                 anomaly_recovery_progress = recovery;
                 self.stats.anomaly_recovery_active_count += 1;
             } else {
@@ -2300,7 +2563,7 @@ impl CognitiveLoopService {
 
         self.stats.temporal_coherence = coherence;
         self.stats.effective_learning_rate = effective_lr;
-        self.stats.coherence_phi_contribution = self.voice_coherence.bridge.phi_contribution();
+        self.stats.coherence_phi_contribution = self.language_comm.voice_coherence.bridge.phi_contribution();
 
         #[cfg(feature = "school_learning")]
         let school_predicted_phi_gain = if self.stats.total_cycles % 53 == 0 {
@@ -2464,9 +2727,37 @@ impl CognitiveLoopService {
                     (0.0f32, 0.0f32, 0.5f32);
 
                 // Generate in a scoped borrow, then apply feedback outside
-                let broca_feedback = if let Some(ref mut broca) = self.broca_manager {
+                let broca_feedback = if let Some(ref mut broca) = self.language_comm.broca_manager {
+                    // Query knowledge engine for grounding context (Item 7)
+                    // Injects top facts as epistemic priors for grounded generation.
+                    // Science: Barsalou (2008) — grounded cognition.
+                    let knowledge_context: Vec<String> = self
+                        .last_reasoning_context
+                        .as_ref()
+                        .map(|ctx| {
+                            ctx.relevant_facts
+                                .iter()
+                                .filter(|f| f.confidence > 0.3)
+                                .take(3)
+                                .map(|f| f.text.clone())
+                                .collect()
+                        })
+                        .unwrap_or_default();
+
+                    // Phase 7b: Math epistemic caveat → lower Broca's epistemic confidence.
+                    // When a solver reports uncertainty (error bounds, low R², non-convergence),
+                    // Broca's EpistemicGate will suppress factual assertions and boost hedging.
+                    // Science: Kahneman (2011) — System 2 must express calibrated uncertainty.
+                    let math_epistemic_penalty = if math_result.epistemic_caveat.is_some() {
+                        0.3 // Push toward Uncertain (ordinal ~2)
+                    } else if math_result.solved && math_result.multipath_verified {
+                        -0.1 // Boost toward Certain for verified math
+                    } else {
+                        0.0
+                    };
                     let signals = super::broca_bridge::BrocaConsciousnessSignals {
-                        epistemic_confidence: self.carryover.quality.last_epistemic_confidence,
+                        epistemic_confidence: (self.carryover.quality.last_epistemic_confidence
+                            - math_epistemic_penalty).clamp(0.0, 1.0),
                         emotional_valence: self.emotion_contagion.prosody_valence()
                             + mode_valence_nudge,
                         emotional_arousal: self.emotion_contagion.prosody_arousal()
@@ -2475,11 +2766,12 @@ impl CognitiveLoopService {
                         consciousness_level: broca_psi,
                         meta_awareness: self.carryover.learning.self_model_accuracy as f32,
                         coherence,
+                        knowledge_context,
                     };
                     if let Some(result) = broca.generate(signals) {
                         // Surface the generated text for consumers
                         if !result.text.is_empty() {
-                            self.last_broca_text = Some(result.text.clone());
+                            self.language_comm.last_broca_text = Some(result.text.clone());
                         }
 
                         // ── Composite quality metric ──

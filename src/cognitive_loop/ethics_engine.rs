@@ -392,6 +392,10 @@ pub(crate) struct EthicsEngineInput<'a> {
     /// When present, Stage 5 compliance checker uses this instead of its own n-gram encoder,
     /// giving genuine semantic grounding to institutional constraint matching.
     pub action_hv: Option<&'a BinaryHV>,
+    /// Knowledge-grounded moral precedents from the knowledge engine.
+    /// When non-empty, boosts confidence in moral verdicts that align with prior experience.
+    /// Science: Haidt (2001) — moral reasoning informed by past experience.
+    pub knowledge_moral_context: Vec<String>,
 }
 
 /// Result of Stage 1 moral evaluation only.
@@ -1285,6 +1289,7 @@ mod tests {
             stillness_boost: 0.0,
             semantic_embedding: None,
             action_hv: None,
+            knowledge_moral_context: Vec::new(),
         }
     }
 
@@ -1343,6 +1348,7 @@ mod tests {
             stillness_boost: 0.0,
             semantic_embedding: None,
             action_hv: None,
+            knowledge_moral_context: Vec::new(),
         };
         let output = engine.evaluate(&input);
 
@@ -1364,6 +1370,7 @@ mod tests {
             stillness_boost: 0.0,
             semantic_embedding: None,
             action_hv: None,
+            knowledge_moral_context: Vec::new(),
         };
         let output = engine.evaluate(&input);
 
@@ -1392,6 +1399,7 @@ mod tests {
             stillness_boost: 0.0,
             semantic_embedding: None,
             action_hv: None,
+            knowledge_moral_context: Vec::new(),
         };
         let output = engine.evaluate(&input);
 
@@ -1587,6 +1595,7 @@ mod tests {
             stillness_boost: 0.0,
             semantic_embedding: None,
             action_hv: None,
+            knowledge_moral_context: Vec::new(),
         };
         let output = engine.evaluate(&input);
         // With no value evaluator or harmonies, verdict depends on moral_score
@@ -1617,6 +1626,7 @@ mod tests {
             stillness_boost: 0.0,
             semantic_embedding: None,
             action_hv: None,
+            knowledge_moral_context: Vec::new(),
         };
         let output = engine.evaluate(&input);
         if output.consent_violation {
@@ -1720,6 +1730,7 @@ mod tests {
                 stillness_boost: 0.0,
                 semantic_embedding: None,
                 action_hv: None,
+                knowledge_moral_context: Vec::new(),
             };
             let output = engine.evaluate(&input);
             assert!(
@@ -1900,6 +1911,7 @@ mod tests {
             stillness_boost: 0.0,
             semantic_embedding: None,
             action_hv: Some(&constraint_hv),
+            knowledge_moral_context: Vec::new(),
         };
         let output = engine.evaluate(&input);
         assert!(output.compliance_fresh);
@@ -1930,6 +1942,7 @@ mod tests {
             stillness_boost: 0.0,
             semantic_embedding: None,
             action_hv: None,
+            knowledge_moral_context: Vec::new(),
         };
         let output = engine.evaluate(&input);
         assert!(output.compliance_fresh);

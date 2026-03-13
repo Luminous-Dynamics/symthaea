@@ -2560,3 +2560,107 @@ fn test_rank_by_similarity() {
         );
     }
 }
+
+// === Causal Chain Reasoning Tests ===
+
+#[test]
+fn test_query_chain_single_step() {
+    use crate::hdc::primitive_system::composition_algebra::TransitionStep;
+
+    let system = PrimitiveSystem::new();
+    let mut algebra = CompositionAlgebra::new();
+    algebra.load_institutional_axioms(&system);
+
+    // Remove ENFORCEMENT from NATION_STATE (single step = equivalent to query_transition)
+    let trajectory = algebra
+        .query_chain(
+            "NATION_STATE",
+            &[TransitionStep::Remove("ENFORCEMENT")],
+            &system,
+        )
+        .unwrap();
+
+    assert_eq!(trajectory.len(), 1);
+    assert_eq!(trajectory[0].action, "-ENFORCEMENT");
+    assert!(!trajectory[0].nearest_axiom.is_empty());
+    assert!(trajectory[0].similarity >= 0.0 && trajectory[0].similarity <= 1.0);
+}
+
+#[test]
+fn test_query_chain_multi_step() {
+    use crate::hdc::primitive_system::composition_algebra::TransitionStep;
+
+    let system = PrimitiveSystem::new();
+    let mut algebra = CompositionAlgebra::new();
+    algebra.load_institutional_axioms(&system);
+
+    // Simulate institutional collapse then reconstruction:
+    // NATION_STATE → remove ENFORCEMENT → add LEGITIMACY
+    let trajectory = algebra
+        .query_chain(
+            "NATION_STATE",
+            &[
+                TransitionStep::Remove("ENFORCEMENT"),
+                TransitionStep::Add("LEGITIMACY"),
+            ],
+            &system,
+        )
+        .unwrap();
+
+    assert_eq!(trajectory.len(), 2);
+    assert_eq!(trajectory[0].action, "-ENFORCEMENT");
+    assert_eq!(trajectory[1].action, "+LEGITIMACY");
+
+    // Each step should have a valid nearest axiom
+    for step in &trajectory {
+        assert!(!step.nearest_axiom.is_empty());
+        assert!(step.similarity >= 0.0 && step.similarity <= 1.0);
+    }
+}
+
+#[test]
+fn test_query_chain_roundtrip_recovers_original() {
+    use crate::hdc::primitive_system::composition_algebra::TransitionStep;
+
+    let system = PrimitiveSystem::new();
+    let mut algebra = CompositionAlgebra::new();
+    algebra.load_institutional_axioms(&system);
+
+    let original = algebra.get("TRADE_AGREEMENT").unwrap().encoding;
+
+    // Remove then re-add RECIPROCATE → should recover exactly
+    let trajectory = algebra
+        .query_chain(
+            "TRADE_AGREEMENT",
+            &[
+                TransitionStep::Remove("RECIPROCATE"),
+                TransitionStep::Add("RECIPROCATE"),
+            ],
+            &system,
+        )
+        .unwrap();
+
+    let recovered = trajectory[1].encoding;
+    let sim = recovered.similarity(&original);
+    assert!(
+        (sim - 1.0).abs() < 1e-6,
+        "Remove+Add of same component should recover original, got {}",
+        sim
+    );
+}
+
+#[test]
+fn test_query_chain_missing_component_errors() {
+    use crate::hdc::primitive_system::composition_algebra::TransitionStep;
+
+    let system = PrimitiveSystem::new();
+    let mut algebra = CompositionAlgebra::new();
+    algebra.load_institutional_axioms(&system);
+
+    let result = algebra.query_chain(
+        "NATION_STATE",
+        &[TransitionStep::Remove("NONEXISTENT_PRIMITIVE")],
+        &system,
+    );
+    assert!(result.is_err());
+}

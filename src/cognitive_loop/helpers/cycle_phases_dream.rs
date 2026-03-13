@@ -213,6 +213,29 @@ impl CognitiveLoopService {
             }
         }
 
+        // ── Knowledge consolidation during dream/rest ─────────────────────
+        // Prune low-confidence non-causal facts, strengthen causal schemas.
+        // Only during Cruise urgency (rest-like state) or Sacred Stillness.
+        // Science: Stickgold (2005) — sleep-dependent memory consolidation.
+        if matches!(urgency, super::super::CycleUrgency::Cruise)
+            || self.stats.circadian_stillness_boost > 0.1
+        {
+            if let Some(ref mut km) = self.knowledge_manager {
+                let cycle = self.stats.total_cycles as u64;
+                // Consolidate every 50 cycles during rest (not every cycle)
+                if cycle % 50 == 0 {
+                    let (pruned, consolidated) = km.consolidate_and_forget();
+                    if pruned > 0 || consolidated > 0 {
+                        tracing::debug!(
+                            target: "knowledge::consolidation",
+                            pruned, consolidated,
+                            "Dream-phase knowledge consolidation"
+                        );
+                    }
+                }
+            }
+        }
+
         module_timings.dream_replay = _t.elapsed().as_micros() as u64;
 
         DreamPhaseResult {

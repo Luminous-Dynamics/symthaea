@@ -325,6 +325,7 @@ impl RingBuffer {
 /// - Incremental state updates
 /// - Configurable batching
 /// - Backpressure handling
+#[derive(Debug)]
 pub struct StreamingInference {
     /// Configuration
     config: StreamingConfig,

@@ -248,6 +248,19 @@ impl DemoRunner {
             structural_emergence_ratio: m.structural_emergence_ratio,
             // Substrate
             substrate_feasibility: m.substrate_feasibility,
+            // Canvas living topology
+            #[cfg(feature = "canvas")]
+            canvas_svg: result.canvas_svg.clone(),
+            #[cfg(not(feature = "canvas"))]
+            canvas_svg: None,
+            #[cfg(feature = "canvas")]
+            canvas_aesthetic_score: m
+                .canvas
+                .as_ref()
+                .map(|c| c.aesthetic_score)
+                .unwrap_or(0.0),
+            #[cfg(not(feature = "canvas"))]
+            canvas_aesthetic_score: 0.0,
         };
 
         // Populate vision telemetry from CycleMetadata (internal VisionBridge path)

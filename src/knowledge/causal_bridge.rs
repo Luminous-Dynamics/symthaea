@@ -246,6 +246,45 @@ impl CausalKnowledgeBridge {
             .collect()
     }
 
+    /// Import a causal edge from persistence (no source text, no negation info).
+    pub fn import_edge(
+        &mut self,
+        cause: &str,
+        effect: &str,
+        strength: f32,
+        is_inhibitory: bool,
+    ) {
+        let edge = CausalEdge {
+            cause: cause.to_string(),
+            effect: effect.to_string(),
+            strength,
+            is_inhibitory,
+            is_negated: false,
+            source_text: String::new(),
+            discovered_at_cycle: 0,
+        };
+        self.add_edge(edge);
+    }
+
+    /// Export edges as persistence records.
+    pub fn export_edge_records(&self) -> Vec<super::persistence::CausalEdgeRecord> {
+        self.edges
+            .iter()
+            .filter(|e| !e.is_negated)
+            .map(|e| super::persistence::CausalEdgeRecord {
+                cause: e.cause.clone(),
+                effect: e.effect.clone(),
+                strength: if e.is_inhibitory {
+                    -e.strength
+                } else {
+                    e.strength
+                },
+                is_inhibitory: e.is_inhibitory,
+                cycle: e.discovered_at_cycle,
+            })
+            .collect()
+    }
+
     // ── Internal ────────────────────────────────────────────────────────
 
     fn prune(&mut self) {

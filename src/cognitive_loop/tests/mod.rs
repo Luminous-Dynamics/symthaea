@@ -8,6 +8,7 @@
 
 #[allow(clippy::field_reassign_with_default)]
 mod accessors_and_types;
+mod arousal_trap;
 mod behavioral_modulation;
 mod core;
 mod crucible_integration;
@@ -20,9 +21,11 @@ mod helpers;
 mod integration;
 mod managers;
 mod memory_pipeline;
+mod moral_and_drives;
 #[allow(clippy::field_reassign_with_default)]
 mod phase_coverage;
 mod phase_results;
 mod proptest_cross_coupling;
+mod proptest_feedback_loops;
 mod proptest_substrate;
 mod subsystems;

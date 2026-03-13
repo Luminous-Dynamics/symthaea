@@ -903,7 +903,7 @@ pub struct CycleMetadata {
     /// Canvas SVG generation telemetry (None when canvas feature disabled or not active).
     #[cfg(feature = "canvas")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub canvas: Option<super::canvas_bridge::CanvasTelemetry>,
+    pub canvas: Option<crate::cognitive_loop::canvas_bridge::CanvasTelemetry>,
 
     // ── Adaptive Dynamics Telemetry (Sessions 2-4) ───────────────────────
     /// Epistemic uncertainty: prediction disagreement across horizons (0.0–1.0).
@@ -1559,6 +1559,21 @@ pub struct BrocaGenerationTelemetry {
     /// Maximum consecutive repetitions of a single token (lower = better).
     #[serde(default)]
     pub max_repetition: usize,
+    /// Whether hallucination was detected (output drifted far from thought intent).
+    #[serde(default)]
+    pub hallucination_detected: bool,
+    /// Mean epistemic boost across generated tokens (0.0 = no hedging active).
+    #[serde(default)]
+    pub mean_epistemic_boost: f32,
+    /// Mean emotional modulation boost across generated tokens.
+    #[serde(default)]
+    pub mean_emotional_boost: f32,
+    /// Time pressure reduction applied (0.0–1.0, fraction of base tokens removed).
+    #[serde(default)]
+    pub time_pressure_reduction: f32,
+    /// Number of conversation context vectors active during generation.
+    #[serde(default)]
+    pub context_depth: usize,
 }
 
 /// Memory-resonator subsystem telemetry: dreams, codebook, replay.

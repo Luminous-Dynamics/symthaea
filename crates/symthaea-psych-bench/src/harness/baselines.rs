@@ -58,6 +58,10 @@ pub struct BaselineCollection {
     pub mathematics: BaselineMap,
     /// Institutional reasoning baselines (causal decomposition, axiom discrimination).
     pub institutional_reasoning: BaselineMap,
+    /// Causal reasoning baselines (intervention, confound detection, chain inference).
+    pub causal_reasoning: BaselineMap,
+    /// Spatial reasoning baselines (mental rotation, path updating, landmark binding, perspective taking).
+    pub spatial: BaselineMap,
     /// GPT-4 baselines from CogBench (Coda et al., 2023).
     pub llm_cogbench: BaselineMap,
     /// GPT-4 baselines from ToMBench (Kosinski, 2023).
@@ -94,6 +98,8 @@ impl BaselineCollection {
             substrate: substrate_baselines(),
             mathematics: mathematics_baselines(),
             institutional_reasoning: institutional_reasoning_baselines(),
+            causal_reasoning: causal_reasoning_baselines(),
+            spatial: spatial_baselines(),
             llm_cogbench: llm_cogbench_baselines(),
             llm_tombench: llm_tombench_baselines(),
             llm_arc: llm_arc_baselines(),
@@ -3675,6 +3681,237 @@ pub fn institutional_reasoning_baselines() -> BaselineMap {
             population: "theoretical",
         },
     );
+    m
+}
+
+/// Causal reasoning baselines.
+///
+/// Based on theoretical HDC properties (XOR binding invertibility) and
+/// human causal reasoning literature (Pearl 2009, Sloman 2005).
+pub fn causal_reasoning_baselines() -> BaselineMap {
+    let mut m = BTreeMap::new();
+    m.insert(
+        "intervention_discrimination",
+        Baseline {
+            value: 0.50,
+            sd: Some(0.15),
+            source: "HDC XOR binding: intervention residual distinct from conditioning",
+            population: "theoretical",
+        },
+    );
+    m.insert(
+        "backdoor_accuracy",
+        Baseline {
+            value: 0.80,
+            sd: Some(0.10),
+            source: "Pearl (2009) backdoor criterion; XOR unbinding is exact",
+            population: "theoretical",
+        },
+    );
+    m.insert(
+        "frontdoor_accuracy",
+        Baseline {
+            value: 0.40,
+            sd: Some(0.15),
+            source: "Pearl (2009) front-door criterion; approximate with confounders",
+            population: "theoretical",
+        },
+    );
+    m.insert(
+        "confound_detection_accuracy",
+        Baseline {
+            value: 0.50,
+            sd: Some(0.10),
+            source: "Simpson (1951); confounded composites differ from direct effects",
+            population: "theoretical",
+        },
+    );
+    m.insert(
+        "confounder_identification",
+        Baseline {
+            value: 0.90,
+            sd: Some(0.08),
+            source: "XOR unbinding: correct variable perfectly recovers direct effect",
+            population: "theoretical",
+        },
+    );
+    m.insert(
+        "chain_tracing_accuracy",
+        Baseline {
+            value: 0.95,
+            sd: Some(0.05),
+            source: "Sloman (2005); XOR chain tracing is exact for binary HVs",
+            population: "theoretical",
+        },
+    );
+    m.insert(
+        "depth_sensitivity",
+        Baseline {
+            value: 0.05,
+            sd: Some(0.05),
+            source: "XOR is lossless; minimal depth attenuation expected",
+            population: "theoretical",
+        },
+    );
+    m
+}
+
+/// Spatial reasoning baselines (mental rotation, path updating, landmark binding, perspective taking).
+pub fn spatial_baselines() -> BaselineMap {
+    let mut m = BTreeMap::new();
+
+    // Mental Rotation (Shepard & Metzler, 1971; Cooper & Shepard, 1973)
+    m.insert(
+        "mental_rotation_rt_slope",
+        Baseline {
+            value: 0.65,
+            sd: Some(0.10),
+            source: "Shepard & Metzler (1971), linear RT increase with angular disparity",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "mental_rotation_rt_linearity",
+        Baseline {
+            value: 0.90,
+            sd: Some(0.06),
+            source: "Shepard & Metzler (1971), R^2 of RT vs angle linear fit",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "mental_rotation_accuracy_mean",
+        Baseline {
+            value: 0.95,
+            sd: Some(0.03),
+            source: "Cooper & Shepard (1973), overall accuracy across angles",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "mental_rotation_accuracy_slope",
+        Baseline {
+            value: 0.05,
+            sd: Some(0.03),
+            source: "Cooper & Shepard (1973), accuracy decrease per unit angle",
+            population: "human adults",
+        },
+    );
+
+    // Spatial Path Updating (Morrow et al., 1989; Rieser, 1989)
+    m.insert(
+        "path_updating_accuracy",
+        Baseline {
+            value: 0.85,
+            sd: Some(0.08),
+            source: "Morrow et al. (1989), mean accuracy across path lengths",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "path_updating_complexity_slope",
+        Baseline {
+            value: 0.06,
+            sd: Some(0.03),
+            source: "Morrow et al. (1989), accuracy decrease per additional step",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "path_updating_simple_accuracy",
+        Baseline {
+            value: 0.95,
+            sd: Some(0.03),
+            source: "Rieser (1989), accuracy on 1-2 step paths",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "path_updating_complex_accuracy",
+        Baseline {
+            value: 0.70,
+            sd: Some(0.10),
+            source: "Rieser (1989), accuracy on 5+ step paths",
+            population: "human adults",
+        },
+    );
+
+    // Landmark Binding (Postma et al., 2004; Luck & Vogel, 1997)
+    m.insert(
+        "landmark_retrieval_accuracy",
+        Baseline {
+            value: 0.80,
+            sd: Some(0.10),
+            source: "Postma et al. (2004), mean retrieval accuracy across set sizes",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "landmark_capacity_k",
+        Baseline {
+            value: 4.0,
+            sd: Some(1.0),
+            source: "Luck & Vogel (1997), visuospatial binding capacity",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "landmark_setsize_slope",
+        Baseline {
+            value: 0.08,
+            sd: Some(0.04),
+            source: "Postma et al. (2004), accuracy decrease per additional bound pair",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "landmark_bidirectional_symmetry",
+        Baseline {
+            value: 0.90,
+            sd: Some(0.05),
+            source: "Treisman & Zhang (2006), loc->obj vs obj->loc consistency",
+            population: "human adults",
+        },
+    );
+
+    // Perspective Taking (Kozhevnikov & Hegarty, 2001; Hegarty & Waller, 2004)
+    m.insert(
+        "perspective_accuracy",
+        Baseline {
+            value: 0.75,
+            sd: Some(0.12),
+            source: "Kozhevnikov & Hegarty (2001), mean accuracy across perspective angles",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "perspective_angular_error_slope",
+        Baseline {
+            value: 0.60,
+            sd: Some(0.10),
+            source: "Kozhevnikov & Hegarty (2001), normalized error increase with angle",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "perspective_small_angle_accuracy",
+        Baseline {
+            value: 0.90,
+            sd: Some(0.05),
+            source: "Hegarty & Waller (2004), accuracy at <90 degree rotations",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "perspective_large_angle_accuracy",
+        Baseline {
+            value: 0.60,
+            sd: Some(0.15),
+            source: "Hegarty & Waller (2004), accuracy at >90 degree rotations",
+            population: "human adults",
+        },
+    );
+
     m
 }
 

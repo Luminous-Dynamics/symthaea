@@ -694,6 +694,29 @@ impl MathService {
         response
     }
 
+    /// Compute the determinant of a square matrix
+    pub fn matrix_determinant(&mut self, data: &[f64], n: usize) -> MathResponse {
+        let a = HdcMatrix::new(data.to_vec(), n, n);
+        let (det, result) = self.linalg.determinant(&a);
+
+        self.record_solve(MathProblemType::MatrixAnalysis, result.phi);
+
+        let response = MathResponse {
+            answer: format!("Determinant of {}x{} matrix: {:.6}", n, n, det),
+            numerical_result: Some(det),
+            vector_result: Some(data.to_vec()),
+            encoding: result.encoding,
+            phi: result.phi,
+            confidence: if result.verified { 0.95 } else { 0.7 },
+            multipath_verified: result.verified,
+            problem_type: MathProblemType::MatrixAnalysis,
+            epistemic_caveat: None,
+            error_bound: None,
+        };
+        self.store_episode(&response, "matrix_determinant");
+        response
+    }
+
     /// Find shortest path in a weighted graph using Dijkstra's algorithm
     pub fn shortest_path(
         &mut self,
@@ -783,6 +806,16 @@ impl MathService {
     /// Get service telemetry
     pub fn telemetry(&self) -> &MathServiceTelemetry {
         &self.telemetry
+    }
+
+    /// Access the underlying linear algebra engine for direct operations
+    pub fn linalg_engine(&mut self) -> &mut LinearAlgebraEngine {
+        &mut self.linalg
+    }
+
+    /// Record a solve from an external caller (e.g., dynamics phase direct dispatch)
+    pub fn record_external(&mut self, problem_type: MathProblemType, phi: f64) {
+        self.record_solve(problem_type, phi);
     }
 
     // ─── Phase 7: Consciousness-Coupled Methods ─────────────────────────
@@ -1361,5 +1394,48 @@ mod tests {
             root
         );
         assert!(response.answer.contains("methods converged"));
+    }
+
+    #[test]
+    fn test_matrix_determinant() {
+        let mut service = MathService::new();
+        // 2x2 identity matrix → det = 1
+        let response = service.matrix_determinant(&[1.0, 0.0, 0.0, 1.0], 2);
+        let det = response.numerical_result.unwrap();
+        assert!(
+            (det - 1.0).abs() < 1e-10,
+            "det(I₂) should be 1.0, got {}",
+            det
+        );
+        assert_eq!(response.problem_type, MathProblemType::MatrixAnalysis);
+        assert!(response.answer.contains("Determinant"));
+    }
+
+    #[test]
+    fn test_memory_recall_after_multiple_solves() {
+        let mut service = MathService::new();
+
+        // Solve several different problem types
+        service.compute_statistics(&[1.0, 2.0, 3.0, 4.0, 5.0]);
+        service.find_root(&|x: f64| x - 2.0, 0.0, 5.0);
+        service.matrix_determinant(&[2.0, 1.0, 0.0, 3.0], 2);
+
+        assert_eq!(service.memory().len(), 3);
+
+        // Recall: query with encoding similar to the root-finding episode
+        let query = BinaryHV::random(seed_from_name("PROB_root_finding_2"));
+        let recalled = service.recall_similar(&query, 2);
+        assert!(
+            !recalled.is_empty(),
+            "Should recall at least one similar episode"
+        );
+    }
+
+    #[test]
+    fn test_linalg_engine_access() {
+        let mut service = MathService::new();
+        let engine = service.linalg_engine();
+        // Just verify we can access it without panic
+        let _ = engine;
     }
 }

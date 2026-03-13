@@ -288,11 +288,12 @@ impl SubstrateManager {
         };
 
         // log_ratio > 0 when substrate is faster than biological
-        let log_ratio = (bio_speed / sub_speed).log10();
+        // Defensive: .max(f64::MIN_POSITIVE) guards against hypothetical zero-speed substrates.
+        let log_ratio = (bio_speed / sub_speed).max(f64::MIN_POSITIVE).log10();
         // Compress 12 orders of magnitude to [0.5, 2.0] tau factor
         self.tau_factor = (1.0 + 0.5 * log_ratio / 9.0).clamp(0.5, 2.0) as f32;
 
-        self.scale_pressure = (sub_scale / bio_scale).log10() as f32;
+        self.scale_pressure = (sub_scale / bio_scale).max(f64::MIN_POSITIVE).log10() as f32;
     }
 
     /// Track energy expenditure for this cycle.

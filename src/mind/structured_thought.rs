@@ -80,12 +80,15 @@ pub enum HTier {
 impl HTier {
     /// Derive HTier from phi (consciousness) and coherence scores
     pub fn from_phi_coherence(phi: f64, coherence: f64) -> Self {
+        use crate::cognitive_loop::thresholds::{
+            HTIER_BREAKPOINT_H1, HTIER_BREAKPOINT_H2, HTIER_BREAKPOINT_H3, HTIER_BREAKPOINT_H4,
+        };
         let combined = (phi + coherence) / 2.0;
         match combined {
-            v if v < 0.125 => HTier::H0,
-            v if v < 0.375 => HTier::H1,
-            v if v < 0.625 => HTier::H2,
-            v if v < 0.875 => HTier::H3,
+            v if v < HTIER_BREAKPOINT_H1 => HTier::H0,
+            v if v < HTIER_BREAKPOINT_H2 => HTier::H1,
+            v if v < HTIER_BREAKPOINT_H3 => HTier::H2,
+            v if v < HTIER_BREAKPOINT_H4 => HTier::H3,
             _ => HTier::H4,
         }
     }

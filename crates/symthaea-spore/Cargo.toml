@@ -14,6 +14,7 @@ symthaea-consciousness-equation = { path = "../symthaea-consciousness-equation" 
 symthaea-neuromodulators = { path = "../symthaea-neuromodulators" }
 symthaea-types = { path = "../symthaea-types" }
 symthaea-harmonies = { path = "../symthaea-harmonies" }
+symthaea-canvas = { path = "../symthaea-canvas", optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 
@@ -33,3 +34,4 @@ uuid = { version = "1.6", features = ["rng-getrandom"] }
 [features]
 default = []
 wasm = ["dep:wasm-bindgen", "dep:serde-wasm-bindgen", "dep:console_error_panic_hook"]
+canvas = ["dep:symthaea-canvas"]

@@ -185,12 +185,14 @@ impl CognitiveLoopService {
                 empathic_speech_rate_mod: feedback.ethics.empathic_speech_rate_mod,
                 kosmic_coherence: feedback.ethics.kosmic_coherence,
                 // Soul telemetry
-                soul_coherence: self.soul.as_ref().map_or(0.0, |s| s.stats().soul_coherence),
+                soul_coherence: self.ethics_values.soul.as_ref().map_or(0.0, |s| s.stats().soul_coherence),
                 soul_growth_potential: self
+                    .ethics_values
                     .soul
                     .as_ref()
                     .map_or(0.0, |s| s.self_model().current_assessment.growth_potential),
                 soul_avg_value_alignment: self
+                    .ethics_values
                     .soul
                     .as_ref()
                     .map_or(0.0, |s| s.stats().avg_value_alignment),
@@ -491,7 +493,7 @@ impl CognitiveLoopService {
             self.stats.tom_prediction_mismatch_ema > 0.4 && self.stats.total_cycles > 10;
 
         // ── User State Inference telemetry ──
-        if let Some(ref usi) = self.user_state {
+        if let Some(ref usi) = self.language_comm.user_state {
             let state = usi.state();
             metadata.user_cognitive_load = state.cognitive_load.level as f32;
             metadata.user_frustration = state.frustration as f32;
@@ -1088,12 +1090,12 @@ impl CognitiveLoopService {
 
         // ── Voice telemetry ──
         {
-            let voice_summary = self.voice_coherence.voice.summary();
+            let voice_summary = self.language_comm.voice_coherence.voice.summary();
             metadata.voice_articulation_quality =
-                self.voice_coherence.voice.smoothed_articulation();
-            metadata.voice_rate_stability = self.voice_coherence.voice.rate_stability();
+                self.language_comm.voice_coherence.voice.smoothed_articulation();
+            metadata.voice_rate_stability = self.language_comm.voice_coherence.voice.rate_stability();
             metadata.voice_confidence = voice_summary.voice_confidence;
-            metadata.voice_phi_adjustment = self.voice_coherence.voice.compute_phi_adjustment();
+            metadata.voice_phi_adjustment = self.language_comm.voice_coherence.voice.compute_phi_adjustment();
         }
 
         // ── Substrate & convergence telemetry ──
@@ -1236,7 +1238,7 @@ impl CognitiveLoopService {
         // Foveation bridge telemetry
         #[cfg(feature = "foveation")]
         {
-            if let Some(ref fov_mutex) = self.foveation_manager {
+            if let Some(ref fov_mutex) = self.vision_sensory.foveation_manager {
                 if let Ok(fov) = fov_mutex.lock() {
                     let ft = fov.telemetry();
                     metadata.foveation = Some(super::FoveationBridgeTelemetry {
@@ -1263,19 +1265,14 @@ impl CognitiveLoopService {
         #[cfg(feature = "ssm_language")]
         {
             metadata.broca = self
+                .language_comm
                 .broca_manager
                 .as_ref()
                 .map(|m| m.last_telemetry().clone());
         }
 
-        // Canvas living topology telemetry
-        #[cfg(feature = "canvas")]
-        {
-            metadata.canvas = self
-                .canvas_manager
-                .as_ref()
-                .map(|m| m.last_telemetry().clone());
-        }
+        // Canvas telemetry — tick() is called later (after thought_vector is computed).
+        // Telemetry is populated there, not here.
 
         metadata.weight_convergence_state = feedback.consciousness.convergence_state.clone();
         if feedback.consciousness.convergence_state == "Converged" && self.convergence_cycle == 0 {
@@ -1358,7 +1355,7 @@ impl CognitiveLoopService {
 
         // Cross-manifold predictor: observe actual cognitive state for Hebbian learning
         #[cfg(feature = "vision-manifold")]
-        if let Some(ref mut pred) = self.cross_manifold_predictor {
+        if let Some(ref mut pred) = self.vision_sensory.cross_manifold_predictor {
             pred.observe_cognitive(&perception.encoding.encoding_result.hdv);
         }
 
@@ -1387,6 +1384,59 @@ impl CognitiveLoopService {
             exploration = ?metadata.exploration_action,
             "Cycle metadata"
         );
+
+        // ── Canvas living topology: tick + telemetry ──────────────────────────
+        // Placed after thought_vector so all snapshot fields are available.
+        #[cfg(feature = "canvas")]
+        {
+            if let Some(ref mut mgr) = self.canvas_manager {
+                // Extract live Betti numbers from moral topology
+                let topo_summary = self.ethics_engine.moral_topology().last_summary();
+                let betti = (
+                    topo_summary.beta_0,
+                    topo_summary.beta_1,
+                    topo_summary.beta_2,
+                );
+                let snap = super::canvas_bridge::extract_snapshot(
+                    &metadata,
+                    &super::NeuromodTelemetry {
+                        dopamine_effective: self.neuromod.bath.dopamine.effective(),
+                        noradrenaline_effective: self.neuromod.bath.noradrenaline.effective(),
+                        serotonin_effective: self.neuromod.bath.serotonin.effective(),
+                        acetylcholine_effective: self.neuromod.bath.acetylcholine.effective(),
+                        neuromod_oxytocin_effective: self.neuromod.bath.oxytocin.effective(),
+                        neuromod_gaba_effective: self.neuromod.bath.gaba.effective(),
+                        neuromod_allostatic_load: self.neuromod.bath.allostatic_load,
+                        ..Default::default()
+                    },
+                    self.ethics_engine.last_harmony_coordinates(),
+                    &thought_vector,
+                    betti,
+                    &[], // persistence_components — future: wire from moral topology
+                    &[], // persistence_cycles — future: wire from moral topology
+                    metadata.cantor_metacognitive_depth,
+                    metadata.cantor_last_depth,
+                    self.stats.total_cycles as u64,
+                );
+                if let Some(svg) = mgr.tick(&snap) {
+                    self.last_canvas_svg = Some(svg.to_string());
+                }
+                // Aesthetic score → neuromod feedback: beauty as reward signal.
+                // Birkhoff (1933): mathematical beauty triggers pleasure centers.
+                let aesthetic = mgr.last_telemetry().aesthetic_score;
+                if mgr.last_telemetry().generated && aesthetic > 0.5 {
+                    let da_base = self.neuromod.bath.dopamine.baseline_val();
+                    self.neuromod.bath.dopamine.set_baseline(
+                        da_base + (aesthetic - 0.5) * 0.005,
+                    );
+                    let sht_base = self.neuromod.bath.serotonin.baseline_val();
+                    self.neuromod.bath.serotonin.set_baseline(
+                        sht_base + (aesthetic - 0.5) * 0.003,
+                    );
+                }
+                metadata.canvas = Some(mgr.last_telemetry().clone());
+            }
+        }
 
         // ═══════════════════════════════════════════════════════════════════════
         // METRICS COLLECTION
@@ -1635,7 +1685,7 @@ impl CognitiveLoopService {
             thought_vector,
             wisdom_hv: perception.encoding.hv16_cached,
             #[cfg(feature = "ssm_language")]
-            language_output: self.last_broca_text.take(),
+            language_output: self.language_comm.last_broca_text.take(),
             #[cfg(feature = "canvas")]
             canvas_svg: self.last_canvas_svg.take(),
             #[cfg(feature = "identity")]

@@ -12,6 +12,7 @@
 //! | [`LearningManager`] | FEP, dream, school, evolution | 13 | Friston (2010), Walker (2017) |
 //! | [`PerceptionManager`] | attention, multi-modal, social | 19 | Posner (1980), Baron-Cohen (1995) |
 //! | [`GovernanceManager`] | governance events, neuromod contagion | 37 | Schultz (1997), Zak (2012) | `mycelix` |
+//! | [`SwarmManager`] | peer consciousness, affective contagion | 41 | Hatfield (1993), Heinrichs (2003) |
 //!
 //! ## Architecture
 //!
@@ -34,10 +35,13 @@ pub mod perception_manager;
 #[cfg(feature = "mycelix")]
 pub mod governance_manager;
 
+pub mod swarm_manager;
+
 pub use drive_manager::DriveManager;
 pub use learning_manager::LearningManager;
 pub use memory_manager::MemoryManager;
 pub use perception_manager::PerceptionManager;
+pub use swarm_manager::SwarmManager;
 
 #[cfg(feature = "mycelix")]
 pub use governance_manager::GovernanceManager;

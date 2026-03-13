@@ -41,7 +41,7 @@ impl CognitiveLoopService {
         pub fn hdc_bridge_dim(&self) -> Option<usize> { self.temporal_network.hdc_dim() }
 
         /// Get coherence summary for external systems
-        pub fn coherence_summary(&self) -> crate::dynamics::cfc_coherence::CoherenceSummary { self.voice_coherence.bridge.summary() }
+        pub fn coherence_summary(&self) -> crate::dynamics::cfc_coherence::CoherenceSummary { self.language_comm.voice_coherence.bridge.summary() }
 
         // ═══════════════════════════════════════════════════════════════════
         // SEMANTIC MEMORY / STABILITY ACCESSORS
@@ -206,7 +206,7 @@ impl CognitiveLoopService {
     /// Evaluate temporal prediction horizon accuracy from the vision manifold.
     #[cfg(feature = "vision-manifold")]
     pub fn vision_evaluate_horizons(&self) -> Option<symthaea_vision_manifold::HorizonAccuracy> {
-        self.vision_bridge
+        self.vision_sensory.vision_bridge
             .as_ref()
             .map(|b| b.manifold().evaluate_horizons())
     }
@@ -240,7 +240,7 @@ impl CognitiveLoopService {
 
     /// Get the current inferred user state (if user state inference is enabled).
     pub fn user_state(&self) -> Option<&crate::user_state_inference::UserState> {
-        self.user_state.as_ref().map(|usi| usi.state())
+        self.language_comm.user_state.as_ref().map(|usi| usi.state())
     }
 
     /// Inject L-SSM semantic prediction error from LLMOrgan after translation.
@@ -407,7 +407,7 @@ impl CognitiveLoopService {
     /// The frame is consumed during the next `cycle()` call.
     #[cfg(feature = "vision-manifold")]
     pub fn inject_vision_frame(&mut self, frame: Vec<u8>) {
-        self.vision_frame_buffer = Some(frame);
+        self.vision_sensory.vision_frame_buffer = Some(frame);
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -515,6 +515,11 @@ impl CognitiveLoopService {
         }
     }
 
+    /// Get the last assembled reasoning context (if knowledge engine is enabled).
+    pub fn reasoning_context(&self) -> Option<&crate::knowledge::ReasoningContext> {
+        self.last_reasoning_context.as_ref()
+    }
+
     /// Trace causal chains from a starting concept through the knowledge causal bridge.
     pub fn knowledge_causal_chain(&self, start: &str, max_depth: usize) -> Vec<Vec<String>> {
         if let Some(ref km) = self.knowledge_manager {
@@ -523,10 +528,6 @@ impl CognitiveLoopService {
             Vec::new()
         }
     }
-
-    // ═══════════════════════════════════════════════════════════════════
-    // CANVAS (LIVING TOPOLOGY) ACCESSORS
-    // ═══════════════════════════════════════════════════════════════════
 
     /// Whether the canvas living topology pipeline is active.
     #[cfg(feature = "canvas")]
@@ -564,5 +565,70 @@ impl CognitiveLoopService {
         if let Some(ref mut mgr) = self.canvas_manager {
             mgr.set_generation_interval(interval);
         }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // INSTITUTIONAL REASONING ACCESSORS
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// Query what happens when a component is removed from an institutional composite.
+    ///
+    /// Uses the causal axioms loaded in the CompositionAlgebra to find the nearest
+    /// known institutional pattern after unbinding. Example: removing ENFORCEMENT
+    /// from NATION_STATE → nearest pattern is FAILED_STATE.
+    ///
+    /// Returns `(nearest_axiom_name, similarity, residual_encoding)`.
+    pub fn institutional_query_transition(
+        &self,
+        composite: &str,
+        removed: &str,
+    ) -> Result<
+        (String, f32, symthaea_core::hdc::binary_hv::BinaryHV),
+        symthaea_core::hdc::primitive_system::CompositionAlgebraError,
+    > {
+        use symthaea_core::hdc::primitive_system::{
+            CompositionAlgebra, PrimitiveSystem,
+        };
+
+        let system = PrimitiveSystem::global();
+        let mut algebra = CompositionAlgebra::new();
+        algebra.load_institutional_axioms(system);
+        algebra.query_transition(composite, removed, system)
+    }
+
+    /// Simulate a chain of institutional state transitions.
+    ///
+    /// Each step either removes or adds a component. Returns the full trajectory
+    /// showing which axiom is nearest at each step.
+    ///
+    /// Example: `[Remove("ENFORCEMENT"), Add("LEGITIMACY")]` starting from
+    /// NATION_STATE traces collapse → reconstruction.
+    pub fn institutional_query_chain(
+        &self,
+        start: &str,
+        steps: &[symthaea_core::hdc::primitive_system::TransitionStep<'_>],
+    ) -> Result<
+        Vec<symthaea_core::hdc::primitive_system::TransitionResult>,
+        symthaea_core::hdc::primitive_system::CompositionAlgebraError,
+    > {
+        use symthaea_core::hdc::primitive_system::{
+            CompositionAlgebra, PrimitiveSystem,
+        };
+
+        let system = PrimitiveSystem::global();
+        let mut algebra = CompositionAlgebra::new();
+        algebra.load_institutional_axioms(system);
+        algebra.query_chain(start, steps, system)
+    }
+
+    /// Load external regulatory constraints into the ethics engine's compliance checker.
+    ///
+    /// Use this to add jurisdiction-specific constraints at runtime, e.g., from
+    /// Mycelix JurisdictionConstraintEntry records. Returns the number loaded.
+    pub(crate) fn load_institutional_constraints(
+        &mut self,
+        specs: &[super::super::ethics_engine::ExternalConstraintSpec],
+    ) -> usize {
+        self.ethics_engine.load_external_constraints(specs)
     }
 }

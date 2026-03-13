@@ -337,7 +337,7 @@ impl CognitiveLoopService {
         }
 
         // Soul value alignment
-        let soul_alignment = if let Some(ref soul) = self.soul {
+        let soul_alignment = if let Some(ref soul) = self.ethics_values.soul {
             let alignment = soul.evaluate_alignment(&encoding_result.hdv);
             if alignment.overall_alignment < MORAL_CONCERN_THRESHOLD {
                 self.stats.moral_concerns_detected += 1;
@@ -434,7 +434,7 @@ impl CognitiveLoopService {
         // from observation to top-down control.
         let compressed_state = if let Some(ref schema) = self.self_model_tier.attention_schema {
             let ast_encoding = schema.encode_for_thought_vector();
-            let ast_weight = 0.05; // Small modulation — AST guides, doesn't overwhelm
+            let ast_weight = super::thresholds::AST_ENCODING_WEIGHT;
             let mut modulated = compressed_state;
             for (i, &ast_val) in ast_encoding.iter().enumerate() {
                 if i < modulated.len() {
@@ -530,6 +530,25 @@ impl CognitiveLoopService {
         #[cfg(not(feature = "semantic-encoder"))]
         let semantic_emb_ref: Option<&[f32]> = None;
 
+        // Query knowledge engine for moral precedent (Item 7)
+        // Extracts facts tagged with ethics/social domains for grounded moral reasoning.
+        let knowledge_moral_context: Vec<String> = self
+            .last_reasoning_context
+            .as_ref()
+            .map(|ctx| {
+                ctx.relevant_facts
+                    .iter()
+                    .filter(|f| {
+                        f.is_causal
+                            || f.domain.as_deref() == Some("social")
+                            || f.domain.as_deref() == Some("geopolitics")
+                    })
+                    .take(3)
+                    .map(|f| f.text.clone())
+                    .collect()
+            })
+            .unwrap_or_default();
+
         let ethics_output = self
             .ethics_engine
             .evaluate(&super::ethics_engine::EthicsEngineInput {
@@ -540,6 +559,7 @@ impl CognitiveLoopService {
                 stillness_boost,
                 semantic_embedding: semantic_emb_ref,
                 action_hv: Some(&hv16_cached),
+                knowledge_moral_context,
             });
         module_timings.ethics_engine = ethics_output.total_us;
         module_timings.ethics_engine_moral = ethics_output.moral_us;
@@ -652,8 +672,8 @@ impl CognitiveLoopService {
                         hazard = ?report.matched_hazard,
                         "Topological immune system: THROTTLE — reducing exploration"
                     );
-                    self.adjust_exploration("escalation_throttle", -0.15);
-                    self.adjust_confidence("escalation_throttle", -0.1);
+                    self.adjust_exploration("escalation_throttle", -super::thresholds::ESCALATION_THROTTLE_EXPLORATION);
+                    self.adjust_confidence("escalation_throttle", -super::thresholds::ESCALATION_THROTTLE_CONFIDENCE);
                     self.stats.escalation_warn_count += 1;
                     self.stats.escalation_throttle_count += 1;
                 }
@@ -665,9 +685,9 @@ impl CognitiveLoopService {
                         "Topological immune system: BLOCK — request rejected"
                     );
                     self.stats.escalation_blocked = true;
-                    self.adjust_exploration("escalation_block", -0.3);
-                    self.adjust_confidence("escalation_block", -0.2);
-                    self.scale_lr("escalation_block", 0.05);
+                    self.adjust_exploration("escalation_block", -super::thresholds::ESCALATION_BLOCK_EXPLORATION);
+                    self.adjust_confidence("escalation_block", -super::thresholds::ESCALATION_BLOCK_CONFIDENCE);
+                    self.scale_lr("escalation_block", super::thresholds::ESCALATION_BLOCK_LR_SCALE);
                     self.stats.escalation_warn_count += 1;
                     self.stats.escalation_throttle_count += 1;
                     self.stats.escalation_block_count += 1;

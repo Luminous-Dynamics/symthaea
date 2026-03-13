@@ -229,7 +229,7 @@ impl CognitiveLoopService {
         // NE → surprise threshold (attention aperture), DA → compute budget.
         // Science: Corbetta & Shulman (2002) — NE modulates attentional scope.
         #[cfg(feature = "foveation")]
-        if let Some(ref fov_mutex) = self.foveation_manager {
+        if let Some(ref fov_mutex) = self.vision_sensory.foveation_manager {
             let ne = self.neuromod.bath.noradrenaline.effective();
             let da = self.neuromod.bath.dopamine.effective();
             if let Ok(mut fov) = fov_mutex.lock() {

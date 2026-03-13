@@ -325,13 +325,21 @@ impl ConsciousnessEngine {
             0.0
         };
 
+        // Knowledge grounding → consciousness coupling
+        // Well-grounded reasoning enriches phenomenal experience ±2.5%.
+        // Neutral at 0.5 (no knowledge data) — below dampens, above amplifies.
+        // Science: Barsalou (2008) — grounded cognition; Clark (2013) — predictive processing.
+        let knowledge_grounding_factor = (input.knowledge_grounding - 0.5)
+            * super::super::thresholds::KNOWLEDGE_CONSCIOUSNESS_MODULATION;
+
         unified_consciousness = (unified_consciousness
             + sht_2a_boost as f64
             + gaba_a_dampen as f64
             + entropy_factor
             + moral_dampen
             + cantor_depth_factor
-            + governance_phi_factor)
+            + governance_phi_factor
+            + knowledge_grounding_factor)
             .clamp(0.0, 1.0);
 
         let total_us = total_start.elapsed().as_micros() as u64;

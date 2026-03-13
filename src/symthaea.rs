@@ -3942,6 +3942,11 @@ impl Symthaea {
             agent.set_code_context(context);
         }
 
+        // Inject error hints from prior failures
+        if !self.error_pattern_memory.is_empty() {
+            agent.set_error_hints(self.error_pattern_memory.clone());
+        }
+
         // Run the agent
         let result = agent.run(task);
 
@@ -4011,6 +4016,11 @@ impl Symthaea {
 
         if !context.is_empty() {
             agent.set_code_context(context);
+        }
+
+        // Inject error hints from prior failures
+        if !self.error_pattern_memory.is_empty() {
+            agent.set_error_hints(self.error_pattern_memory.clone());
         }
 
         let result = agent.run(task);

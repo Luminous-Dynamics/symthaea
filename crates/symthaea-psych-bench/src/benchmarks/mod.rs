@@ -3,6 +3,7 @@
 pub mod affect;
 pub mod attention;
 pub mod binding;
+pub mod causal_reasoning;
 pub mod butlin;
 pub mod cogbench;
 pub mod consciousness;
@@ -20,6 +21,7 @@ pub mod normative_integration;
 pub mod qualia_confidence;
 pub mod reasoning;
 pub mod social;
+pub mod spatial;
 pub mod speech;
 pub mod substrate;
 pub mod sustained_attention;

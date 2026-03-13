@@ -204,6 +204,7 @@ mod tests {
         use crate::benchmarks::motor::*;
         use crate::benchmarks::reasoning::*;
         use crate::benchmarks::social::*;
+        use crate::benchmarks::spatial::*;
         use crate::benchmarks::speech::*;
         use crate::benchmarks::substrate::*;
         use crate::benchmarks::sustained_attention::*;
@@ -303,6 +304,11 @@ mod tests {
             Box::new(MachiavelliBenchmark),
             // Binding
             Box::new(TemporalOrderBenchmark),
+            // Spatial
+            Box::new(MentalRotationBenchmark),
+            Box::new(SpatialPathUpdatingBenchmark),
+            Box::new(LandmarkBindingBenchmark),
+            Box::new(PerspectiveTakingBenchmark),
             // Speech
             Box::new(PhonemeDiscriminationBenchmark),
             // Consciousness

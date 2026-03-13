@@ -474,6 +474,8 @@ impl CognitiveLoopService {
         let knowledge_causal_capacity = config.knowledge_causal_capacity;
         let knowledge_search_top_k = config.knowledge_search_top_k;
         let knowledge_ontology_max = config.knowledge_ontology_max;
+        let knowledge_db_path = config.knowledge_db_path.clone();
+        let enable_streaming_inference = config.enable_streaming_inference;
 
         Ok(Self {
             config,
@@ -486,7 +488,32 @@ impl CognitiveLoopService {
             last_prediction: None,
             start_time: Instant::now(),
             is_consolidating: false,
-            voice_coherence,
+            language_comm: super::language_comm_manager::LanguageAndCommunicationManager {
+                voice_coherence,
+                #[cfg(feature = "ssm_language")]
+                broca_manager: if broca_enabled {
+                    let genesis = broca_genesis_phrase
+                        .as_deref()
+                        .map(symthaea_core::genesis::GenesisSeed::from_phrase)
+                        .unwrap_or_else(|| {
+                            symthaea_core::genesis::GenesisSeed::from_phrase("symthaea-broca-default")
+                        });
+                    Some(super::broca_bridge::BrocaManager::new(
+                        &genesis,
+                        symthaea_broca::BrocaConfig::default(),
+                        broca_checkpoint_path.as_deref(),
+                    ))
+                } else {
+                    None
+                },
+                #[cfg(feature = "ssm_language")]
+                last_broca_text: None,
+                user_state: if enable_user_state {
+                    Some(crate::user_state_inference::UserStateInference::new())
+                } else {
+                    None
+                },
+            },
             adaptive_behavior,
             prediction_confidence: 0.5_f64, // Start neutral
             flow_state: FlowState::default(),
@@ -670,7 +697,20 @@ impl CognitiveLoopService {
             // Safety gateway for pre-cognitive safety veto
             safety_gateway,
             // Moral parser + algebra now owned by EthicsEngine
-            last_moral_judgment: None,
+            ethics_values: super::ethics_values_manager::EthicsAndValuesManager {
+                last_moral_judgment: None,
+                contextual_weights,
+                phi_attention,
+                negation_detector,
+                soul: if enable_soul_alignment {
+                    Some(crate::soul::Soul::new(crate::soul::SoulConfig {
+                        dimension: symthaea_core::hdc::unified_hv::HDC_DIMENSION,
+                        ..Default::default()
+                    }))
+                } else {
+                    None
+                },
+            },
 
             // Primitive-Belief Bridge for tier-level prediction error learning
             primitive_belief_bridge: PrimitiveBeliefBridge::new(),
@@ -685,9 +725,6 @@ impl CognitiveLoopService {
                 phi_attention_gate: Some(crate::attention::PhiAttentionGate::default_gate()),
                 affective_bridge,
             },
-            contextual_weights,
-            phi_attention,
-            negation_detector,
             primitive_tier,
             #[cfg(feature = "support")]
             support_predictive_engine: Some(symthaea_support::predictive::PredictiveEngine::new()),
@@ -719,14 +756,6 @@ impl CognitiveLoopService {
                 hierarchical_free_energy,
             },
             narrative_gwt,
-            soul: if enable_soul_alignment {
-                Some(crate::soul::Soul::new(crate::soul::SoulConfig {
-                    dimension: symthaea_core::hdc::unified_hv::HDC_DIMENSION,
-                    ..Default::default()
-                }))
-            } else {
-                None
-            },
             attention_visualizer: if enable_visualization {
                 Some(crate::visualization::AttentionVisualizer::with_max_history(
                     500,
@@ -735,63 +764,44 @@ impl CognitiveLoopService {
                 None
             },
             social_mgr: super::SocialManager::new(enable_primitive_consciousness),
-            user_state: if enable_user_state {
-                Some(crate::user_state_inference::UserStateInference::new())
-            } else {
-                None
+            vision_sensory: super::vision_sensory_manager::VisionAndSensoryManager {
+                coherence_field: if enable_coherence_field {
+                    Some(crate::physiology::CoherenceField::new())
+                } else {
+                    None
+                },
+                virtual_body,
+                #[cfg(feature = "vision-manifold")]
+                vision_bridge: if vision_manifold_enabled {
+                    let vm_config = symthaea_vision_manifold::VisionConfig::default();
+                    Some(symthaea_vision_manifold::VisionBridge::new(
+                        vm_config,
+                        vision_frame_width,
+                        vision_frame_height,
+                    ))
+                } else {
+                    None
+                },
+                #[cfg(feature = "vision-manifold")]
+                vision_frame_buffer: None,
+                #[cfg(feature = "vision-manifold")]
+                cross_manifold_predictor: cross_manifold_predictor_init,
+                #[cfg(feature = "foveation")]
+                foveation_manager: {
+                    let fov_config = symthaea_foveation::FoveationConfig::default();
+                    Some(std::sync::Mutex::new(
+                        symthaea_foveation::FoveationManager::new(fov_config, 8),
+                    ))
+                },
             },
-            coherence_field: if enable_coherence_field {
-                Some(crate::physiology::CoherenceField::new())
-            } else {
-                None
-            },
-            virtual_body,
             #[cfg(feature = "nurture")]
             nurture_attachment: if enable_nurture_attachment {
                 Some(super::nurture_bridge::NurtureAttachmentBridge::new())
             } else {
                 None
             },
-            #[cfg(feature = "vision-manifold")]
-            vision_bridge: if vision_manifold_enabled {
-                let vm_config = symthaea_vision_manifold::VisionConfig::default();
-                Some(symthaea_vision_manifold::VisionBridge::new(
-                    vm_config,
-                    vision_frame_width,
-                    vision_frame_height,
-                ))
-            } else {
-                None
-            },
-            #[cfg(feature = "vision-manifold")]
-            vision_frame_buffer: None,
-            #[cfg(feature = "vision-manifold")]
-            cross_manifold_predictor: cross_manifold_predictor_init,
-            #[cfg(feature = "foveation")]
-            foveation_manager: {
-                let fov_config = symthaea_foveation::FoveationConfig::default();
-                Some(std::sync::Mutex::new(
-                    symthaea_foveation::FoveationManager::new(fov_config, 8),
-                ))
-            },
-            #[cfg(feature = "ssm_language")]
-            broca_manager: if broca_enabled {
-                let genesis = broca_genesis_phrase
-                    .as_deref()
-                    .map(symthaea_core::genesis::GenesisSeed::from_phrase)
-                    .unwrap_or_else(|| {
-                        symthaea_core::genesis::GenesisSeed::from_phrase("symthaea-broca-default")
-                    });
-                Some(super::broca_bridge::BrocaManager::new(
-                    &genesis,
-                    symthaea_broca::BrocaConfig::default(),
-                    broca_checkpoint_path.as_deref(),
-                ))
-            } else {
-                None
-            },
-            #[cfg(feature = "ssm_language")]
-            last_broca_text: None,
+            // vision_bridge, vision_frame_buffer, cross_manifold_predictor, foveation_manager moved to vision_sensory
+            // broca_manager, last_broca_text moved to language_comm
             #[cfg(feature = "canvas")]
             canvas_manager: Some(super::canvas_bridge::CanvasManager::new()),
             #[cfg(feature = "canvas")]
@@ -821,6 +831,7 @@ impl CognitiveLoopService {
                         max_primitives: knowledge_ontology_max,
                         ..Default::default()
                     },
+                    db_path: knowledge_db_path.clone(),
                     ..Default::default()
                 };
                 let mut km = crate::knowledge::KnowledgeManager::new(km_config);
@@ -829,6 +840,7 @@ impl CognitiveLoopService {
             } else {
                 None
             },
+            last_reasoning_context: None,
             experience_bus: Some(crate::experience::ExperienceBus::with_defaults()),
             #[cfg(feature = "school_learning")]
             school_bridge: None,
@@ -935,6 +947,7 @@ impl CognitiveLoopService {
             perception_manager: super::managers::PerceptionManager::default(),
             #[cfg(feature = "mycelix")]
             governance_mgr: super::managers::GovernanceManager::default(),
+            swarm_manager: super::managers::SwarmManager::default(),
             cantor_broadcast_buffer: Vec::with_capacity(32),
             cantor_cleanup_engine: {
                 use symthaea_core::hdc::cantor_resonator_cleanup::*;
@@ -1008,6 +1021,18 @@ impl CognitiveLoopService {
             last_motor_phi: 0.0,
             math_service: super::math_service::MathService::new(),
             resonant_speech: crate::resonant_speech::ResonantSpeech::new(),
+            streaming_inference: if enable_streaming_inference {
+                // Cycle-aligned config: batch=1, max_latency=32ms (~31Hz loop)
+                let si_config = crate::inference::StreamingConfig {
+                    batch_accumulation: 1,
+                    max_latency_ms: 32,
+                    warmup_samples: 10,
+                    ..crate::inference::StreamingConfig::low_latency()
+                };
+                Some(crate::inference::StreamingInference::with_default_network(si_config))
+            } else {
+                None
+            },
         })
     }
 

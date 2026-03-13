@@ -155,6 +155,13 @@ pub(crate) struct ConsciousnessEngineInput<'a> {
     /// Science: Haidt (2012) — shared moral reasoning amplifies collective intelligence;
     ///          Woolley et al. (2010) — collective intelligence emerges from social sensitivity.
     pub governance_collective_phi: f64,
+
+    /// Knowledge grounding score [0.0, 1.0].
+    /// Measures how well current input is supported by stored knowledge.
+    /// Modulates unified consciousness ±2.5%: grounded knowledge enriches experience.
+    /// Neutral at 0.5 (no knowledge engine). Only active when knowledge engine enabled.
+    /// Science: Barsalou (2008) — grounded cognition; Clark (2013) — predictive processing.
+    pub knowledge_grounding: f64,
 }
 
 /// Dynamic weights for the unified consciousness computation.

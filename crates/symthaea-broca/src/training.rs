@@ -308,6 +308,15 @@ impl GradientDiagnostics {
         self.grad_norms.iter().filter(|&&n| n > 10.0).count()
     }
 
+    /// Detect gradient anomalies from accumulated diagnostics.
+    ///
+    /// Returns `Some(GradientAnomaly)` if the mean gradient norm indicates
+    /// vanishing (< 1e-6) or exploding (> 100.0) gradients. Returns `None`
+    /// if gradients are healthy or no steps have been recorded.
+    pub fn detect_anomaly(&self) -> Option<GradientAnomaly> {
+        detect_gradient_anomaly(self)
+    }
+
     /// Format a human-readable summary.
     pub fn format_summary(&self) -> String {
         let mut s = String::new();
@@ -341,6 +350,46 @@ impl GradientDiagnostics {
             s.push_str(&format!("Mean emb norm:     {:.4}\n", mean_emb));
         }
         s
+    }
+}
+
+/// Classification of gradient health anomalies detected during training.
+///
+/// Gradient norms outside healthy ranges indicate pathological training dynamics:
+/// - **Vanishing**: gradients too small to drive meaningful weight updates (Hochreiter 1991)
+/// - **Exploding**: gradients too large, causing unstable weight oscillations (Pascanu et al. 2013)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GradientAnomaly {
+    /// Mean gradient norm < 1e-6 — gradients are too small to drive learning.
+    /// Common causes: deep networks without residual connections, saturated activations.
+    Vanishing,
+    /// Mean gradient norm > 100.0 — gradients are dangerously large.
+    /// Common causes: high learning rate, unstable loss landscape, lack of gradient clipping.
+    Exploding,
+}
+
+/// Detect gradient anomalies from accumulated diagnostics.
+///
+/// Checks the mean gradient norm against thresholds:
+/// - Vanishing: mean norm < 1e-6
+/// - Exploding: mean norm > 100.0
+///
+/// Returns `None` if gradients are healthy or no steps have been recorded.
+pub fn detect_gradient_anomaly(diagnostics: &GradientDiagnostics) -> Option<GradientAnomaly> {
+    if diagnostics.total_steps == 0 {
+        return None;
+    }
+    let mean = diagnostics.mean_grad_norm();
+    if !mean.is_finite() {
+        // NaN/Inf mean norm is treated as exploding
+        return Some(GradientAnomaly::Exploding);
+    }
+    if mean < 1e-6 {
+        Some(GradientAnomaly::Vanishing)
+    } else if mean > 100.0 {
+        Some(GradientAnomaly::Exploding)
+    } else {
+        None
     }
 }
 
@@ -1133,6 +1182,55 @@ mod tests {
         }
     }
 
+    // -----------------------------------------------------------------------
+    // Gradient anomaly detection
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_detect_gradient_anomaly_vanishing() {
+        let mut diag = GradientDiagnostics::new();
+        // Record 10 steps with tiny norms (< 1e-6)
+        for _ in 0..10 {
+            diag.record_step(1e-8, false);
+        }
+        let anomaly = detect_gradient_anomaly(&diag);
+        assert_eq!(anomaly, Some(GradientAnomaly::Vanishing));
+        // Also test the method on GradientDiagnostics
+        assert_eq!(diag.detect_anomaly(), Some(GradientAnomaly::Vanishing));
+    }
+
+    #[test]
+    fn test_detect_gradient_anomaly_exploding() {
+        let mut diag = GradientDiagnostics::new();
+        // Record 10 steps with huge norms (> 100)
+        for _ in 0..10 {
+            diag.record_step(500.0, true);
+        }
+        let anomaly = detect_gradient_anomaly(&diag);
+        assert_eq!(anomaly, Some(GradientAnomaly::Exploding));
+        assert_eq!(diag.detect_anomaly(), Some(GradientAnomaly::Exploding));
+    }
+
+    #[test]
+    fn test_detect_gradient_anomaly_healthy() {
+        let mut diag = GradientDiagnostics::new();
+        // Record steps with healthy norms
+        for norm in [0.01, 0.1, 1.0, 5.0, 0.5] {
+            diag.record_step(norm, false);
+        }
+        let anomaly = detect_gradient_anomaly(&diag);
+        assert_eq!(anomaly, None, "Healthy gradients should return None");
+        assert_eq!(diag.detect_anomaly(), None);
+
+        // Empty diagnostics should also return None
+        let empty = GradientDiagnostics::new();
+        assert_eq!(detect_gradient_anomaly(&empty), None);
+    }
+
+    // -----------------------------------------------------------------------
+    // Existing tests
+    // -----------------------------------------------------------------------
+
     #[test]
     fn test_training_pair_creation() {
         let tok = BpeTokenizer::default_minimal();
@@ -1785,6 +1883,145 @@ mod tests {
             metrics.len() < 100,
             "Early stopping should trigger with validation: got {} epochs",
             metrics.len()
+        );
+    }
+
+    #[test]
+    fn test_network_warmup_epochs_phases() {
+        // Verify that network_warmup_epochs creates a two-phase training:
+        // Phase 1 (warmup): embeddings only, Phase 2: CfC BPTT enabled
+        let genesis = test_genesis();
+        let config = test_config();
+        let mut gen = BrocaGenerator::new(&genesis, config);
+
+        let tok = gen.tokenizer().clone();
+        let mut dataset = TrainingDataset::default();
+        let channels = ThoughtChannels::default();
+        for word in &["hello", "world", "test", "data", "more"] {
+            dataset.push(TrainingPair::new(channels, word.to_string(), &tok));
+        }
+
+        let train_config = TrainingConfig {
+            epochs: 6,
+            learning_rate: 0.001,
+            bptt_window: 8,
+            use_adam: true,
+            train_network: true,
+            network_warmup_epochs: 3, // First 3 = embedding-only, last 3 = CfC BPTT
+            enable_diagnostics: true,
+            ..Default::default()
+        };
+
+        let metrics = train(&mut gen, &dataset, &train_config);
+        assert_eq!(metrics.len(), 6, "Should complete all 6 epochs");
+
+        // All epochs should have finite loss
+        for m in &metrics {
+            assert!(m.avg_loss.is_finite(), "Loss should be finite");
+        }
+    }
+
+    #[test]
+    fn test_legacy_20_channel_padding() {
+        // Verify that 20-channel legacy data is correctly padded to 24 channels
+        use crate::encoder::{LEGACY_NUM_CHANNELS, NUM_CHANNELS};
+
+        let legacy_channels: Vec<f32> = vec![0.5; LEGACY_NUM_CHANNELS];
+        let pair = TrainingPair {
+            channels: legacy_channels.clone(),
+            target_text: "test".to_string(),
+            target_ids: vec![1, 2],
+        };
+
+        let tc = pair.to_thought_channels();
+        assert_eq!(tc.channels.len(), NUM_CHANNELS);
+
+        // First 20 channels should match original
+        for i in 0..LEGACY_NUM_CHANNELS {
+            assert!(
+                (tc.channels[i] - 0.5).abs() < 1e-6,
+                "Channel {i} should be 0.5"
+            );
+        }
+
+        // Channels 20-23 should be padded with defaults (not 0.5)
+        if NUM_CHANNELS > LEGACY_NUM_CHANNELS {
+            // At least one padded channel should differ from 0.5 (default is 0.0 for most)
+            let any_default = (LEGACY_NUM_CHANNELS..NUM_CHANNELS)
+                .any(|i| (tc.channels[i] - 0.5).abs() > 1e-6);
+            assert!(any_default, "Padded channels should use defaults, not legacy values");
+        }
+    }
+
+    #[test]
+    fn test_24_channel_data_passes_through() {
+        // Verify that 24-channel data is NOT padded (passthrough)
+        use crate::encoder::NUM_CHANNELS;
+
+        let full_channels: Vec<f32> = (0..NUM_CHANNELS).map(|i| i as f32 * 0.1).collect();
+        let pair = TrainingPair {
+            channels: full_channels.clone(),
+            target_text: "test".to_string(),
+            target_ids: vec![1, 2],
+        };
+
+        let tc = pair.to_thought_channels();
+        assert_eq!(tc.channels.len(), NUM_CHANNELS);
+        for i in 0..NUM_CHANNELS {
+            assert!(
+                (tc.channels[i] - full_channels[i]).abs() < 1e-6,
+                "Channel {i} should pass through unchanged"
+            );
+        }
+    }
+
+    #[test]
+    fn test_checkpoint_resume_preserves_loss_trajectory() {
+        // Train, save checkpoint, reload, verify generation still works
+        let genesis = test_genesis();
+        let config = test_config();
+        let mut gen = BrocaGenerator::new(&genesis, config);
+
+        let tok = gen.tokenizer().clone();
+        let mut dataset = TrainingDataset::default();
+        let channels = ThoughtChannels::default();
+        for word in &["hello", "world", "test"] {
+            dataset.push(TrainingPair::new(channels, word.to_string(), &tok));
+        }
+
+        let train_config = TrainingConfig {
+            epochs: 3,
+            learning_rate: 0.001,
+            bptt_window: 8,
+            use_adam: true,
+            train_network: false,
+            ..Default::default()
+        };
+
+        let metrics = train(&mut gen, &dataset, &train_config);
+        let final_loss = metrics.last().unwrap().avg_loss;
+
+        // Save and reload via tempfile
+        let tmp = std::env::temp_dir().join("broca_test_ckpt_resume.bin");
+        gen.save_checkpoint(&tmp, 3, final_loss, None, None, None)
+            .unwrap();
+        let (mut gen2, _, _, _) = BrocaGenerator::from_checkpoint(&tmp, &genesis).unwrap();
+        let _ = std::fs::remove_file(&tmp);
+
+        // Generate from both — should produce same output
+        let r1 = gen.generate(&channels);
+        let r2 = gen2.generate(&channels);
+        assert_eq!(
+            r1.token_ids, r2.token_ids,
+            "Checkpoint should preserve generation"
+        );
+
+        // Continue training from checkpoint — loss should start near where we left off
+        let metrics2 = train(&mut gen2, &dataset, &train_config);
+        let resumed_loss = metrics2[0].avg_loss;
+        assert!(
+            (resumed_loss - final_loss).abs() < 1.0,
+            "Resumed loss {resumed_loss} should be near final loss {final_loss}"
         );
     }
 }

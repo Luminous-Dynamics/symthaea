@@ -14,7 +14,7 @@ use crate::dynamics::temporal_signatures::ConsciousnessPattern;
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Type of code task detected from natural language input
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum CodeTaskType {
     /// Write new code from scratch
     Create,
