@@ -108,7 +108,7 @@ impl CognitiveLoopService {
             #[cfg(feature = "vision-manifold")]
             scene_recognized: perception.scene_recognized,
             #[cfg(feature = "semantic-encoder")]
-            semantic_embedding: self.last_semantic_continuous.clone(),
+            semantic_embedding: self.feature_integ.last_semantic_continuous.clone(),
         };
 
         // ═══════════════════════════════════════════════════════════════════════

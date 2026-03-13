@@ -515,7 +515,7 @@ impl CognitiveLoopService {
         let resonator_coherence_gate = pre_update_coherence > reflection_thresholds.coherence_gate
             || self.stats.total_cycles < 10;
         if resonator_coherence_gate && urgency.should_run(self.stats.total_cycles, 1, 1, 4) {
-            if let Some(ref mut res_mem) = self.resonator_memory {
+            if let Some(ref mut res_mem) = self.memory_consol.resonator_memory {
                 let res_start = Instant::now();
 
                 let res_dim_ok =
@@ -667,7 +667,7 @@ impl CognitiveLoopService {
             if prediction_error < self.config.learning_threshold
                 && goal_priority > GOAL_PRIORITY_EXPLORATION_THRESHOLD
             {
-                self.adjust_exploration("goal_pursuit", goal_priority * 0.03);
+                self.adjust_exploration("goal_pursuit", goal_priority * super::thresholds::GOAL_PURSUIT_EXPLORATION_SCALE);
             }
         }
 
@@ -759,7 +759,7 @@ impl CognitiveLoopService {
             .map(Cow::Owned)
             .unwrap_or(Cow::Borrowed(&perception.encoding.compressed_state));
         let current_phi_for_lr = pre_update_coherence as f64;
-        let mut semantic_lr_factor = self.semantic_memory.compute_lr_factor_phi_weighted(
+        let mut semantic_lr_factor = self.memory_consol.semantic_memory.compute_lr_factor_phi_weighted(
             &semantic_hdc,
             3,
             current_phi_for_lr,
@@ -796,7 +796,7 @@ impl CognitiveLoopService {
         let compressed_for_cfc: &[f32] = {
             _compressed_owned = {
                 let mut buf = perception.encoding.compressed_state.clone();
-                if let Some(ref mut physics) = self.physics_integration {
+                if let Some(ref mut physics) = self.feature_integ.physics_integration {
                     physics.query_cycle(
                         self.stats.total_cycles,
                         self.config.physics_bridge_query_interval,
@@ -1271,7 +1271,7 @@ impl CognitiveLoopService {
         let (fep_accuracy, fep_complexity, fep_surprise, fep_td_error) =
             if let Some((acc, comp, surp, pe)) = fep_vals {
                 if acc > FEP_ACCURACY_CONFIDENCE_THRESHOLD {
-                    self.adjust_confidence("fep_accuracy_high", 0.01);
+                    self.adjust_confidence("fep_accuracy_high", super::thresholds::FEP_ACCURACY_HIGH_CONFIDENCE);
                 }
                 if comp > FEP_COMPLEXITY_THRESHOLD {
                     self.scale_lr(
@@ -1321,7 +1321,7 @@ impl CognitiveLoopService {
         // Session 13 Item 3: Sustained low TD error → model converged → dampen exploration.
         // Science: Sutton & Barto (2018) — convergent TD signals indicate policy stability.
         if self.carryover.quality.consecutive_low_td_error > 10 && self.stats.total_cycles > 30 {
-            self.scale_exploration("fep_td_converged", 0.97);
+            self.scale_exploration("fep_td_converged", super::thresholds::FEP_TD_CONVERGE_EXPLORE_SCALE);
         }
 
         // ── Track 5e: Causal graph → attention weighting ─────────────────
@@ -1353,7 +1353,7 @@ impl CognitiveLoopService {
                     );
                 }
                 if edge_count < 2 && self.stats.total_cycles > 200 {
-                    self.adjust_exploration("sparse_causal_graph", 0.02);
+                    self.adjust_exploration("sparse_causal_graph", super::thresholds::SPARSE_CAUSAL_EXPLORATION_BOOST);
                 }
                 self.stats.causal_attention_uses += 1;
             }
@@ -1370,7 +1370,7 @@ impl CognitiveLoopService {
             // Session 13 Item 6: Wire FEP efficiency into proposal system.
             // High accuracy + low complexity = efficient model → boost confidence.
             // Science: Friston (2010) — low complexity = good model evidence.
-            self.adjust_confidence("fep_efficient", 0.01);
+            self.adjust_confidence("fep_efficient", super::thresholds::FEP_EFFICIENT_CONFIDENCE);
         }
         let surprise_thresh = reflection_thresholds.surprise as f64;
         if fep_surprise > surprise_thresh {
@@ -1592,11 +1592,11 @@ impl CognitiveLoopService {
                 // Math Phi → consciousness coupling: boost prediction confidence
                 // when math produces high-Phi verified results.
                 if resp.multipath_verified && resp.phi > 0.3 {
-                    self.adjust_confidence("math_verified", 0.02);
+                    self.adjust_confidence("math_verified", super::thresholds::MATH_VERIFIED_CONFIDENCE);
                 }
                 // Epistemic caveat → dampen confidence (honest uncertainty).
                 if resp.epistemic_caveat.is_some() {
-                    self.scale_confidence("math_epistemic_caveat", 0.98);
+                    self.scale_confidence("math_epistemic_caveat", super::thresholds::MATH_CAVEAT_CONFIDENCE_SCALE);
                 }
                 // Math Phi → DA nudge (reward signal for successful problem solving).
                 // Science: Schultz (1997) — unexpected reward prediction error → DA burst.
@@ -1709,15 +1709,15 @@ impl CognitiveLoopService {
                     }
                     // High-intensity exploration → boost learning to absorb novelty
                     if intensity > 0.8 {
-                        self.scale_lr("motor_explore_intense", 1.1);
+                        self.scale_lr("motor_explore_intense", super::thresholds::MOTOR_EXPLORE_INTENSE_LR);
                     }
                 }
                 MotorCommandType::ReflectionInitiate => {
                     let intensity = enhanced_result.motor_command.intensity as f32;
-                    if intensity > 0.5 {
+                    if intensity > super::thresholds::MOTOR_REFLECTION_THRESHOLD {
                         self.self_model_tier.self_reflection.force_reflection();
                         // Boost meta-awareness proportional to intensity
-                        self.adjust_confidence("motor_reflection", (intensity - 0.5) * 0.05);
+                        self.adjust_confidence("motor_reflection", (intensity - super::thresholds::MOTOR_REFLECTION_THRESHOLD) * super::thresholds::MOTOR_REFLECTION_CONFIDENCE_SCALE);
                     }
                 }
                 MotorCommandType::MemoryConsolidate => {
@@ -1787,7 +1787,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         let degraded = self.coherence_tracker.record_turn(coherence);
         if degraded {
-            self.scale_lr("coherence_degraded", 1.3);
+            self.scale_lr("coherence_degraded", super::thresholds::COHERENCE_DEGRADED_LR_BOOST);
             let coh_urgency = self.coherence_tracker.correction_urgency();
             let urgent_obs = Observation::from_consciousness_state(
                 coh_urgency as f64,
@@ -2450,7 +2450,7 @@ impl CognitiveLoopService {
 
         #[cfg(feature = "school_learning")]
         let school_predicted_phi_gain = if self.stats.total_cycles % 53 == 0 {
-            if let Some(ref school) = self.school_bridge {
+            if let Some(ref school) = self.feature_integ.school_bridge {
                 school
                     .recommend_next()
                     .ok()
@@ -2467,7 +2467,7 @@ impl CognitiveLoopService {
         let school_predicted_phi_gain = 0.0f32;
 
         let causal_attention_boost = if self.stats.total_cycles % 41 == 0 {
-            if let Some(ref mut cc) = self.causal_consciousness {
+            if let Some(ref mut cc) = self.feature_integ.causal_consciousness {
                 let vars: Vec<Vec<f64>> = perception
                     .encoding
                     .compressed_state
@@ -2783,16 +2783,16 @@ impl CognitiveLoopService {
         };
 
         let (evicted_semantic, memory_confidence_boost) = {
-            let stability_regime = &mut self.stability_regime;
-            let discovery_service = &mut self.discovery_service;
-            let semantic_memory = &mut self.semantic_memory;
+            let stability_regime = &mut self.memory_consol.stability_regime;
+            let discovery_service = &mut self.memory_consol.discovery_service;
+            let semantic_memory = &mut self.memory_consol.semantic_memory;
             let causal_enhancer = &mut self.causal_enhancer;
             let episodic_memory = &mut self.fep.episodic_memory;
             let primitive_belief_bridge = &mut self.primitive_belief_bridge;
             let closed_learning_loop = &mut self.fep.closed_learning_loop;
             let fep_learning_signal = &mut self.fep.learning_signal;
             let prev_primitive_state = &mut self.prev_primitive_state;
-            let resonator_memory = &mut self.resonator_memory;
+            let resonator_memory = &mut self.memory_consol.resonator_memory;
 
             module_timings.stability_regime = helpers::run_stability_regime(
                 stability_regime,
@@ -2854,7 +2854,7 @@ impl CognitiveLoopService {
         // Route evicted semantic entry to graduation pipeline (Phase 2: semantic → episodic flow)
         if let Some(evicted) = evicted_semantic {
             let hv = symthaea_core::hdc::unified_hv::ContinuousHV::from_vec(evicted.hdc_vector);
-            self.memory_coordinator.queue_graduation(
+            self.memory_consol.memory_coordinator.queue_graduation(
                 crate::memory::memory_coordinator::GraduationEvent {
                     content: hv,
                     label: evicted.category.unwrap_or_default(),
@@ -2875,11 +2875,11 @@ impl CognitiveLoopService {
 
         module_timings.core_parallel_postprocess = _t_core.elapsed().as_micros() as u64;
 
-        self.stats.semantic_hits = self.semantic_memory.stats().semantic_hits;
-        self.stats.semantic_misses = self.semantic_memory.stats().semantic_misses;
+        self.stats.semantic_hits = self.memory_consol.semantic_memory.stats().semantic_hits;
+        self.stats.semantic_misses = self.memory_consol.semantic_memory.stats().semantic_misses;
         self.stats.semantic_lr_factor = semantic_lr_factor;
-        self.stats.semantic_avg_retrieved_error = self.semantic_memory.stats().avg_retrieved_error;
-        self.stats.semantic_entries_stored = self.semantic_memory.stats().total_stored;
+        self.stats.semantic_avg_retrieved_error = self.memory_consol.semantic_memory.stats().avg_retrieved_error;
+        self.stats.semantic_entries_stored = self.memory_consol.semantic_memory.stats().total_stored;
 
         DynamicsPhaseResult {
             core: DynCore {

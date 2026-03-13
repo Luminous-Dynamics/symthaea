@@ -57,7 +57,7 @@ impl CognitiveLoopService {
                 if !graduates.is_empty() {
                     for grad in &graduates {
                         // Route graduate through resonator for importance scoring
-                        let grad_importance = if let Some(ref mut res_mem) = self.resonator_memory {
+                        let grad_importance = if let Some(ref mut res_mem) = self.memory_consol.resonator_memory {
                             let res_dim = res_mem.resonator.config.dim;
                             let grad_vals = &grad.embedding.values;
                             if grad_vals.len() >= res_dim && !res_mem.episodes.is_empty() {
@@ -101,7 +101,7 @@ impl CognitiveLoopService {
                         };
                         // Route through MemoryCoordinator for quality filtering instead of
                         // bypassing directly to fep.episodic_memory.encode().
-                        self.memory_coordinator.queue_graduation(
+                        self.memory_consol.memory_coordinator.queue_graduation(
                             crate::memory::memory_coordinator::GraduationEvent {
                                 content: grad.embedding.clone(),
                                 label: grad.id.clone(),

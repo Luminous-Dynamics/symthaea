@@ -151,7 +151,7 @@ impl CognitiveLoopService {
         use symthaea_core::hdc::ContinuousHV;
 
         let bridge = self
-            .neural_bridge
+            .feature_integ.neural_bridge
             .as_ref()
             .ok_or_else(|| anyhow::anyhow!("Neural bridge not loaded (no probe weights found)"))?;
 
@@ -810,6 +810,9 @@ impl CognitiveLoopService {
         }
         self.ethics_values.reset();
         self.primitive_tier.reset();
+        self.memory_consol.reset();
+        self.feature_integ.reset();
+        self.vision_sensory.reset();
         // Note: predictive_phi_modulation and cross_modal_psi already reset
         // via self.carryover = CycleCarryover::default() above.
         self.subsystem_collector.clear();

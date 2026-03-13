@@ -160,6 +160,8 @@ pub(crate) mod social_manager;
 pub(crate) mod substrate_manager;
 pub(crate) mod language_comm_manager;
 pub(crate) mod vision_sensory_manager;
+pub(crate) mod memory_consolidation_manager;
+pub(crate) mod feature_integration_manager;
 pub use substrate_manager::SubstrateTransitionRecord;
 pub(crate) mod subsystem_trait;
 #[allow(dead_code)] // Registry of tuning constants — many reserved for future wiring
@@ -212,22 +214,19 @@ use crate::consciousness::narrative_gwt_integration::NarrativeGWTIntegration;
 // PredictiveMind now owned by ConsciousnessStateManager
 use crate::consciousness::primitive_belief_bridge::PrimitiveBeliefBridge;
 use crate::consciousness::primitive_consciousness::PrimitiveConsciousnessState;
-use crate::consciousness::primitive_discovery::PrimitiveDiscoveryService;
+// PrimitiveDiscoveryService + StabilityRegimeProcessor now owned by MemoryAndConsolidationManager
 #[cfg(any(feature = "full_consciousness", feature = "magi_loop"))]
 use crate::consciousness::recursive_improvement::DreamFeedbackBridge;
-use crate::consciousness::stability_regime::StabilityRegimeProcessor;
 #[cfg(feature = "full_consciousness")]
 use crate::consciousness::unified_living_mind::UnifiedLivingMind;
 // CfCCoherenceBridge + TemporalSignatureEncoder now owned by VoiceCoherenceBridge
 // SurpriseExplorationBridge moved to fep_module.rs
 // MoralAlgebra + MoralParser now solely owned by EthicsEngine
 use crate::memory::coherence_tracker::ConversationCoherenceTracker;
-use crate::memory::memory_coordinator::MemoryCoordinator;
-use crate::memory::semantic_memory::SemanticMemory;
+// MemoryCoordinator + SemanticMemory now owned by MemoryAndConsolidationManager
 use crate::mycelix::KosmicSong;
 // HumanPartnerModel + PhiDyadCalculator now owned by SocialManager
-#[cfg(feature = "neural-bridge")]
-use crate::perception::NeuralBridge;
+// NeuralBridge now owned by FeatureIntegrationManager
 use crate::safety::SafetyGateway;
 // VoiceFeedbackBridge now owned by VoiceCoherenceBridge
 // MetaCognitiveLayer now owned by SelfModelTierManager
@@ -356,60 +355,11 @@ pub struct CognitiveLoopService {
     /// Conversation coherence tracker for degradation detection
     coherence_tracker: ConversationCoherenceTracker,
 
-    /// Stability regime processor: CfC dynamics for primitives
-    /// Frequently-used primitives crystallize, rarely-used stay fluid
-    stability_regime: StabilityRegimeProcessor,
+    /// Memory & consolidation: semantic memory, coordinator, resonator, stability, discovery.
+    pub(crate) memory_consol: memory_consolidation_manager::MemoryAndConsolidationManager,
 
-    /// Discovery service for finding new primitives seeded by crystallization events
-    discovery_service: PrimitiveDiscoveryService,
-
-    /// Semantic Memory: HDC-based similarity lookup for CfC contextual learning
-    /// Stores (HDC vector, prediction error) pairs and retrieves similar past inputs
-    /// to modulate learning rate - high error on similar inputs -> boost learning
-    semantic_memory: SemanticMemory,
-
-    /// Memory Coordinator: cross-tier signal broadcaster
-    /// Bridges episodic and semantic memory with shared consciousness signals,
-    /// handles graduation from working memory to episodic storage.
-    memory_coordinator: MemoryCoordinator,
-
-    /// Resonator Memory for factorized episodic recall.
-    /// Stores episodes as bound (content ⊗ valence ⊗ phi_level) hypervectors
-    /// with growing semantic codebook. Factorization decomposes bundled recalls
-    /// into clean content/valence/phi components for richer context priming.
-    resonator_memory: Option<crate::dynamics::resonator::ResonatorMemory>,
-
-    /// Neural bridge for projecting pre-computed embeddings (e.g. BGE-M3)
-    /// directly into HDC space via a trained linear probe.
-    /// Only available when the `neural-bridge` feature is enabled and
-    /// probe weights exist on disk.
-    #[cfg(feature = "neural-bridge")]
-    neural_bridge: Option<NeuralBridge>,
-
-    /// Background embedding channel for Qwen3 semantic encoding.
-    /// Runs a dedicated thread that produces 1024D embeddings, projected
-    /// to BinaryHV via HdcBridge. Non-blocking: submits current input,
-    /// collects previous cycle's result.
-    #[cfg(feature = "semantic-encoder")]
-    semantic_embedding_channel: Option<symthaea_embeddings::channel::EmbeddingChannel>,
-
-    /// JL projection bridge for semantic embeddings → BinaryHV.
-    #[cfg(feature = "semantic-encoder")]
-    semantic_hdc_bridge: Option<symthaea_embeddings::HdcBridge>,
-
-    /// Pending response receiver from the semantic embedding channel.
-    /// Swapped each cycle: previous cycle's rx is consumed, new rx installed.
-    /// Wrapped in Mutex to satisfy Sync bound (MetricsProvider).
-    #[cfg(feature = "semantic-encoder")]
-    pending_semantic_rx: std::sync::Mutex<
-        Option<std::sync::mpsc::Receiver<symthaea_embeddings::channel::EmbedResponse>>,
-    >,
-
-    /// Last semantic embedding projected to continuous HDC space (16,384D).
-    /// Fed to the ethics engine for moral topology trajectory analysis,
-    /// giving genuine semantic resolution vs N-gram fallback.
-    #[cfg(feature = "semantic-encoder")]
-    last_semantic_continuous: Option<Vec<f32>>,
+    /// Feature integrations: neural bridge, semantic encoder, school, causal, physics.
+    pub(crate) feature_integ: feature_integration_manager::FeatureIntegrationManager,
 
     /// Background training thread handle (when `config.async_training` is true
     /// and the backend is CfC).  `None` for synchronous training or HdcLtc backend.
@@ -657,17 +607,7 @@ pub struct CognitiveLoopService {
     /// Bridges cognitive loop signals to Eight Harmonies wisdom system.
     experience_bus: Option<crate::experience::ExperienceBus>,
 
-    /// School bridge for curriculum-aware learning recommendations.
-    /// When present (and `school_learning` feature enabled), recommends objectives
-    /// with predicted Phi gain from CfC-powered O(1) lookahead.
-    /// Co-gated with `school_learning` feature.
-    #[cfg(feature = "school_learning")]
-    school_bridge: Option<crate::school::School>,
-
-    /// Causal consciousness: HSIC-based causal attention weighting.
-    /// Provides causal-strength attention maps for encoding interpretation.
-    /// Richer than CausalLoopEnhancer — uses HSIC independence testing.
-    causal_consciousness: Option<crate::intelligence::CausalConsciousness>,
+    // school_bridge + causal_consciousness moved to feature_integ manager
 
     /// Thermodynamic load (0.0 to 1.0, where 1.0 = 6W limit reached).
     pub(crate) thermodynamic_load: f32,
@@ -706,10 +646,7 @@ pub struct CognitiveLoopService {
     /// speed/scale modulation, and telemetry into a single cohesive struct.
     pub(super) substrate_manager: substrate_manager::SubstrateManager,
 
-    /// Physics bridge integration: HDC semantic search for physics analogies.
-    /// When enabled, blends physics-informed HDC vectors into CfC dynamics each cycle.
-    #[cfg(feature = "physics-bridge")]
-    physics_integration: Option<physics_integration::PhysicsIntegration>,
+    // physics_integration moved to feature_integ manager
 
     /// Cycle at which consciousness weights first converged (0 = not yet).
     convergence_cycle: usize,

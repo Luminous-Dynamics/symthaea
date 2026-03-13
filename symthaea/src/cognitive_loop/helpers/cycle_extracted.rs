@@ -903,7 +903,7 @@ impl CognitiveLoopService {
         // Physics-domain exploration modulation:
         // High physics similarity → exploit (known territory), low → explore (uncharted).
         #[cfg(feature = "physics-bridge")]
-        if let Some(ref physics) = self.physics_integration {
+        if let Some(ref physics) = self.feature_integ.physics_integration {
             let score = physics.last_top_score;
             if score > 0.5 {
                 // Known physics territory — dampen exploration (scale 0.85–0.95)

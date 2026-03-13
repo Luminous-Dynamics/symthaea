@@ -163,14 +163,17 @@ impl SemanticMemory {
         }
     }
 
-    /// Store a new entry in semantic memory
+    /// Store a new entry in semantic memory.
+    ///
+    /// Returns the evicted entry if the ring buffer was full and an entry was
+    /// overwritten. Callers can route evicted entries to the graduation pipeline.
     ///
     /// # Arguments
     ///
     /// * `hdc` - HDC vector representation of the input
     /// * `error` - Prediction error after CfC processed this input
     /// * `category` - Optional category label
-    pub fn store(&mut self, hdc: Vec<f32>, error: f32, category: Option<String>) {
+    pub fn store(&mut self, hdc: Vec<f32>, error: f32, category: Option<String>) -> Option<SemanticEntry> {
         let timestamp = self.stats.total_stored;
         let entry = SemanticEntry {
             hdc_vector: hdc,
@@ -180,28 +183,33 @@ impl SemanticMemory {
             encoding_confidence: 1.0,
         };
 
-        if self.entries.len() < self.max_entries {
+        let evicted = if self.entries.len() < self.max_entries {
             // Buffer not full yet: just push
             self.entries.push(entry);
+            None
         } else {
-            // Ring buffer full: overwrite oldest
-            self.entries[self.write_pos] = entry;
+            // Ring buffer full: capture evicted entry before overwriting
+            let old = std::mem::replace(&mut self.entries[self.write_pos], entry);
             self.stats.evictions += 1;
             self.wrapped = true;
-        }
+            Some(old)
+        };
 
         self.write_pos = (self.write_pos + 1) % self.max_entries;
         self.stats.total_stored += 1;
+        evicted
     }
 
-    /// Store with timestamp explicitly provided
+    /// Store with timestamp explicitly provided.
+    ///
+    /// Returns the evicted entry if the ring buffer was full.
     pub fn store_with_timestamp(
         &mut self,
         hdc: Vec<f32>,
         error: f32,
         category: Option<String>,
         timestamp: u64,
-    ) {
+    ) -> Option<SemanticEntry> {
         let entry = SemanticEntry {
             hdc_vector: hdc,
             timestamp,
@@ -210,16 +218,19 @@ impl SemanticMemory {
             encoding_confidence: 1.0,
         };
 
-        if self.entries.len() < self.max_entries {
+        let evicted = if self.entries.len() < self.max_entries {
             self.entries.push(entry);
+            None
         } else {
-            self.entries[self.write_pos] = entry;
+            let old = std::mem::replace(&mut self.entries[self.write_pos], entry);
             self.stats.evictions += 1;
             self.wrapped = true;
-        }
+            Some(old)
+        };
 
         self.write_pos = (self.write_pos + 1) % self.max_entries;
         self.stats.total_stored += 1;
+        evicted
     }
 
     /// Find semantically similar past entries

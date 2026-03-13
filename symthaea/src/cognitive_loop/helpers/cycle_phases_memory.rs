@@ -28,7 +28,7 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         // Gate codebook growth on epistemic approval — don't learn from rejected inputs
         if epistemic_gate_approved {
-            if let Some(ref mut res_mem) = self.resonator_memory {
+            if let Some(ref mut res_mem) = self.memory_consol.resonator_memory {
                 let res_dim_ok = compressed_state.len() == res_mem.resonator.config.dim;
                 if res_dim_ok
                     && self.stats.total_cycles % self.config.resonator_growth_interval == 0
@@ -81,7 +81,7 @@ impl CognitiveLoopService {
 
             // Track A-2: Causal chain content → resonator codebook symbols
             if !causal_codebook_entries.is_empty() {
-                if let Some(ref mut res_mem) = self.resonator_memory {
+                if let Some(ref mut res_mem) = self.memory_consol.resonator_memory {
                     for (label, hv) in causal_codebook_entries {
                         if let Some(ref mut semantic_cb) = res_mem.resonator.codebooks.get_mut(0) {
                             if semantic_cb.len() < self.config.resonator_max_symbols
@@ -111,7 +111,7 @@ impl CognitiveLoopService {
                 .unwrap_or_default();
 
             if !top_eps.is_empty() {
-                if let Some(ref mut res_mem) = self.resonator_memory {
+                if let Some(ref mut res_mem) = self.memory_consol.resonator_memory {
                     let dim = res_mem.resonator.config.dim;
                     if let Some(ref mut semantic_cb) = res_mem.resonator.codebooks.get_mut(0) {
                         for ep in &top_eps {
@@ -169,7 +169,7 @@ impl CognitiveLoopService {
         // Science: competitive learning — low diversity = redundant representations
         // Compute average pairwise cosine distance (every 50 cycles to amortize cost)
         let codebook_diversity: f32 = if self.stats.total_cycles % 50 == 0 {
-            if let Some(ref res_mem) = self.resonator_memory {
+            if let Some(ref res_mem) = self.memory_consol.resonator_memory {
                 if let Some(semantic_cb) = res_mem.resonator.codebooks.first() {
                     let n = semantic_cb.symbols.len();
                     if n >= 2 {
@@ -208,7 +208,7 @@ impl CognitiveLoopService {
         // Compute fraction of codebook symbols that match recent input (similarity > 0.2).
         // Low utilization → too many dead symbols → slow codebook growth.
         let codebook_utilization_rate: f32 = if self.stats.total_cycles % 50 == 0 {
-            if let Some(ref res_mem) = self.resonator_memory {
+            if let Some(ref res_mem) = self.memory_consol.resonator_memory {
                 if let Some(semantic_cb) = res_mem.resonator.codebooks.first() {
                     let n = semantic_cb.symbols.len();
                     if n > 0 && compressed_state.len() == res_mem.resonator.config.dim {
@@ -301,7 +301,7 @@ impl CognitiveLoopService {
         if let Some(ref mut replay) = self.phi_episodic_replay {
             let avg_err = self.stats.avg_prediction_error;
             let error_spike = avg_err > 0.01 && prediction_error > avg_err * 2.0;
-            let semantic_miss = self.semantic_memory.stats().semantic_misses > 0
+            let semantic_miss = self.memory_consol.semantic_memory.stats().semantic_misses > 0
                 && memory_context_boost == 0.0 // no episodic memories recalled this cycle
                 && self.stats.total_cycles > 10;
 
@@ -442,7 +442,7 @@ impl CognitiveLoopService {
                             for ep in &top_eps_for_tracking {
                                 let hash =
                                     crate::memory::memory_coordinator::content_hash(&ep.input);
-                                self.memory_coordinator.record_retrieval(hash);
+                                self.memory_consol.memory_coordinator.record_retrieval(hash);
                             }
                         }
 
@@ -450,7 +450,7 @@ impl CognitiveLoopService {
                         // Science: Stickgold (2005) — sleep replay extracts gist representations
                         // After episodic replay, factorize top episodes through the resonator to
                         // extract clean semantic components and strengthen codebook representations.
-                        if let Some(ref mut res_mem) = self.resonator_memory {
+                        if let Some(ref mut res_mem) = self.memory_consol.resonator_memory {
                             if !res_mem.resonator.codebooks.is_empty() {
                                 let res_dim = res_mem.resonator.config.dim;
                                 let top_eps = replay.get_top_episodes(3);
@@ -503,7 +503,7 @@ impl CognitiveLoopService {
         if !self.cantor_broadcast_buffer.is_empty() {
             // Refresh persistent engine's codebook from resonator memory (additive — new entries
             // supplement existing consolidated knowledge rather than replacing it)
-            if let Some(ref res_mem) = self.resonator_memory {
+            if let Some(ref res_mem) = self.memory_consol.resonator_memory {
                 for cb in &res_mem.resonator.codebooks {
                     for (label, continuous_vec) in &cb.symbols {
                         let mut bytes = [0u8; 2048];
@@ -619,14 +619,14 @@ impl CognitiveLoopService {
         {
             let coord_phi = self.language_comm.voice_coherence.bridge.smoothed_coherence() as f64;
             let coord_coherence = coherence as f64;
-            self.memory_coordinator.update_signals_with_sigma(
+            self.memory_consol.memory_coordinator.update_signals_with_sigma(
                 coord_phi,
                 coord_coherence,
                 self.carryover.consciousness.last_sigma,
             );
 
             if let Some(ref mut replay) = self.phi_episodic_replay {
-                let graduated = self.memory_coordinator.process_graduations(replay);
+                let graduated = self.memory_consol.memory_coordinator.process_graduations(replay);
                 if graduated > 0 {
                     tracing::debug!(
                         graduated,

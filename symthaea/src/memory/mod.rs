@@ -34,6 +34,7 @@ pub mod semantic_memory {
 pub use episodic_replay::{
     Episode, EpisodicMemory, EpisodicMemoryStats, EpisodicReplayConfig, ReplaySessionResult,
 };
+#[allow(deprecated)]
 pub use hippocampus::{
     EmotionalValence, HippocampusActor, HippocampusStats, MemoryTrace, RecallQuery, RecallResult,
 };

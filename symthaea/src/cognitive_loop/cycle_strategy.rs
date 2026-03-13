@@ -308,17 +308,17 @@ impl CognitiveLoopService {
         #[cfg(feature = "semantic-encoder")]
         {
             // Check previous cycle's result (non-blocking)
-            if let Ok(mut guard) = self.pending_semantic_rx.lock() {
+            if let Ok(mut guard) = self.feature_integ.pending_semantic_rx.lock() {
                 if let Some(rx) = guard.take() {
                     if let Ok(response) = rx.try_recv() {
                         if let Ok(emb_result) = response.result {
-                            if let Some(ref bridge) = self.semantic_hdc_bridge {
+                            if let Some(ref bridge) = self.feature_integ.semantic_hdc_bridge {
                                 let semantic_hv = bridge.project(&emb_result.embedding);
                                 let sim = hv16_cached.similarity(&semantic_hv);
                                 self.stats.semantic_encoder_similarity = sim;
                                 // Store continuous projection for ethics engine
                                 // moral topology (genuine semantic resolution).
-                                self.last_semantic_continuous =
+                                self.feature_integ.last_semantic_continuous =
                                     Some(bridge.project_continuous(&emb_result.embedding));
                             }
                         }
@@ -327,9 +327,9 @@ impl CognitiveLoopService {
             }
 
             // Submit current input for next cycle (non-blocking)
-            if let Some(ref channel) = self.semantic_embedding_channel {
+            if let Some(ref channel) = self.feature_integ.semantic_embedding_channel {
                 if let Ok(rx) = channel.request(input) {
-                    if let Ok(mut guard) = self.pending_semantic_rx.lock() {
+                    if let Ok(mut guard) = self.feature_integ.pending_semantic_rx.lock() {
                         *guard = Some(rx);
                     }
                 }
@@ -526,13 +526,13 @@ impl CognitiveLoopService {
         };
         // Collect semantic embedding for ethics engine (when semantic-encoder enabled).
         #[cfg(feature = "semantic-encoder")]
-        let semantic_emb_ref = self.last_semantic_continuous.as_deref();
+        let semantic_emb_ref = self.feature_integ.last_semantic_continuous.as_deref();
         #[cfg(not(feature = "semantic-encoder"))]
         let semantic_emb_ref: Option<&[f32]> = None;
 
         // Query knowledge engine for moral precedent (Item 7)
         // Extracts facts tagged with ethics/social domains for grounded moral reasoning.
-        let knowledge_moral_context: Vec<String> = self
+        let _knowledge_moral_context: Vec<String> = self
             .last_reasoning_context
             .as_ref()
             .map(|ctx| {

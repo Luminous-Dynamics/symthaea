@@ -48,10 +48,10 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════
 
         /// Get semantic memory statistics
-        pub fn semantic_memory_stats(&self) -> &crate::memory::semantic_memory::SemanticMemoryStats { self.semantic_memory.stats() }
+        pub fn semantic_memory_stats(&self) -> &crate::memory::semantic_memory::SemanticMemoryStats { self.memory_consol.semantic_memory.stats() }
 
         /// Get reference to the stability regime processor
-        pub fn stability_regime(&self) -> &crate::consciousness::stability_regime::StabilityRegimeProcessor { &self.stability_regime }
+        pub fn stability_regime(&self) -> &crate::consciousness::stability_regime::StabilityRegimeProcessor { &self.memory_consol.stability_regime }
 
         // ═══════════════════════════════════════════════════════════════════
         // PREDICTION CONFIDENCE
@@ -398,7 +398,7 @@ impl CognitiveLoopService {
         &mut self,
         ctx: super::super::physics_integration::ParetoContext,
     ) {
-        if let Some(ref mut physics) = self.physics_integration {
+        if let Some(ref mut physics) = self.feature_integ.physics_integration {
             physics.set_pareto_context(ctx);
         }
     }

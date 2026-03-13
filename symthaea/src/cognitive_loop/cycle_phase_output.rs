@@ -96,14 +96,14 @@ impl CognitiveLoopService {
                 dream_wisdom_count: feedback.memory.dream_wisdom_count,
                 continuity_replay_triggered: feedback.consciousness.continuity_replay_needed,
                 resonator_codebook_size: self
-                    .resonator_memory
+                    .memory_consol.resonator_memory
                     .as_ref()
                     .and_then(|m| m.resonator.codebooks.first())
                     .map(|cb| cb.len())
                     .unwrap_or(0),
-                resonator_episodes: self.resonator_memory.as_ref().map(|m| m.len()).unwrap_or(0),
+                resonator_episodes: self.memory_consol.resonator_memory.as_ref().map(|m| m.len()).unwrap_or(0),
                 resonator_factorization_iters: self
-                    .resonator_memory
+                    .memory_consol.resonator_memory
                     .as_ref()
                     .map(|m| m.resonator.iterations())
                     .unwrap_or(0),
@@ -1195,7 +1195,7 @@ impl CognitiveLoopService {
         // Physics bridge telemetry
         #[cfg(feature = "physics-bridge")]
         {
-            if let Some(ref mut physics) = self.physics_integration {
+            if let Some(ref mut physics) = self.feature_integ.physics_integration {
                 let pt = physics.telemetry();
                 let pareto = pt.pareto_context.as_ref();
                 metadata.physics_bridge = Some(super::PhysicsBridgeTelemetry {
