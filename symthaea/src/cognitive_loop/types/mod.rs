@@ -51,6 +51,22 @@ pub struct SubstrateTelemetry {
     /// Non-zero when substrate encoding noise is enabled and scale_pressure < 0.
     #[serde(default)]
     pub substrate_encoding_noise: f32,
+    /// Total energy spent so far (joules). Monotonically increasing.
+    #[serde(default)]
+    pub total_energy_spent: f64,
+    /// Energy spent this cycle (joules, speed-adjusted via tau_factor).
+    #[serde(default)]
+    pub energy_this_cycle: f64,
+    /// Energy throughput multiplier (ratio of bio energy to substrate energy).
+    #[serde(default = "default_one_f32_substrate")]
+    pub energy_throughput_multiplier: f32,
+    /// Effective HDC/CfC dimensionality fraction [0.1, 1.0].
+    /// 1.0 for substrates at or above biological scale.
+    #[serde(default = "default_one_f32_substrate")]
+    pub effective_dim_fraction: f32,
+    /// Number of substrate transitions recorded so far.
+    #[serde(default)]
+    pub transition_count: usize,
 }
 
 fn default_one_f32_substrate() -> f32 {

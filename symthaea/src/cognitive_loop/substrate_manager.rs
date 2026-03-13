@@ -4,17 +4,36 @@
 //! into a single cohesive manager. Handles feasibility computation,
 //! validation overlays, speed/scale modulation, and runtime reconfiguration.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 
 use symthaea_core::hdc::substrate_independence::{
     CorticalRegion, SubstrateRequirements, SubstrateType,
 };
 
 use super::config::CognitiveLoopConfig;
+use super::thresholds::{
+    SUBSTRATE_MIN_DIM_FRACTION, SUBSTRATE_OPS_PER_CYCLE, SUBSTRATE_SCALE_DIM_DIVISOR,
+    SUBSTRATE_TRANSITION_HISTORY_CAP,
+};
 
 /// Default honest confidence for substrates not in the validation framework.
 /// Matches EvidenceLevel::Theoretical.confidence() = 0.10.
 const THEORETICAL_CONFIDENCE: f64 = 0.10;
+
+/// Record of a substrate transition event.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct SubstrateTransitionRecord {
+    /// Cycle number when the transition occurred (0 = pre-run).
+    pub cycle: u64,
+    /// Previous substrate type.
+    pub from: SubstrateType,
+    /// New substrate type.
+    pub to: SubstrateType,
+    /// Feasibility before transition.
+    pub old_feasibility: f64,
+    /// Feasibility after transition.
+    pub new_feasibility: f64,
+}
 
 /// Manages substrate-dependent consciousness feasibility, validation overlays,
 /// and speed/scale modulation factors.
@@ -65,6 +84,22 @@ pub(crate) struct SubstrateManager {
 
     /// Per-region feasibility scores.
     per_region_feasibility: HashMap<CorticalRegion, f32>,
+
+    // ── Phase 3: Transition smoothing ────────────────────────────────────
+    /// Target effective feasibility after transition (for EMA blending).
+    target_effective_feasibility: f64,
+
+    /// Target tau_factor after transition (for EMA blending).
+    target_tau_factor: f32,
+
+    /// Transition history log (ring buffer).
+    transition_history: VecDeque<SubstrateTransitionRecord>,
+
+    /// Current substrate type (for transition logging).
+    current_substrate: SubstrateType,
+
+    /// Energy spent in the most recent tick (for telemetry).
+    last_energy_spent: f64,
 }
 
 impl SubstrateManager {
@@ -78,9 +113,7 @@ impl SubstrateManager {
 
         // Compute energy per cycle from substrate energy_per_op
         let energy_per_op = config.substrate_type.energy_per_operation();
-        // Approximate: 256 neurons × 256 ops each = 65536 ops per cycle
-        let ops_per_cycle = 65_536.0;
-        let energy_per_cycle = energy_per_op * ops_per_cycle;
+        let energy_per_cycle = energy_per_op * SUBSTRATE_OPS_PER_CYCLE;
 
         // Throughput multiplier: ratio of bio energy to this substrate's energy
         let bio_energy = SubstrateType::BiologicalNeurons.energy_per_operation();
@@ -99,6 +132,11 @@ impl SubstrateManager {
             energy_throughput_multiplier,
             per_region_substrates: config.per_region_substrates.clone(),
             per_region_feasibility: HashMap::new(),
+            target_effective_feasibility: feasibility,
+            target_tau_factor: 1.0,
+            transition_history: VecDeque::new(),
+            current_substrate: config.substrate_type,
+            last_energy_spent: 0.0,
         };
         mgr.recompute_effective_feasibility(config);
         mgr.recompute_substrate_dynamics(config);
@@ -127,7 +165,47 @@ impl SubstrateManager {
         ));
         self.recompute_effective_feasibility(config);
         self.recompute_substrate_dynamics(config);
+
+        // Phase 3: recalculate energy for new substrate
+        let energy_per_op = canonical.energy_per_operation();
+        self.energy_per_cycle = energy_per_op * SUBSTRATE_OPS_PER_CYCLE;
+        let bio_energy = SubstrateType::BiologicalNeurons.energy_per_operation();
+        self.energy_throughput_multiplier = (bio_energy / energy_per_op).clamp(0.1, 100.0) as f32;
+
+        // Phase 3: set transition targets (smoothing via tick_transition)
+        self.target_effective_feasibility = self.effective_feasibility;
+        self.target_tau_factor = self.tau_factor;
+
+        // Phase 3: record transition history
+        let record = SubstrateTransitionRecord {
+            cycle: 0, // caller should set via reconfigure_substrate_at_cycle
+            from: old_type,
+            to: canonical,
+            old_feasibility: old,
+            new_feasibility: self.feasibility,
+        };
+        self.transition_history.push_back(record);
+        if self.transition_history.len() > SUBSTRATE_TRANSITION_HISTORY_CAP {
+            self.transition_history.pop_front();
+        }
+        self.current_substrate = canonical;
+
         (old, self.feasibility)
+    }
+
+    /// Reconfigure substrate with cycle number for transition history.
+    pub fn reconfigure_substrate_at_cycle(
+        &mut self,
+        config: &mut CognitiveLoopConfig,
+        substrate: SubstrateType,
+        cycle: u64,
+    ) -> (f64, f64) {
+        let result = self.reconfigure_substrate(config, substrate);
+        // Patch the cycle number on the most recent transition record
+        if let Some(record) = self.transition_history.back_mut() {
+            record.cycle = cycle;
+        }
+        result
     }
 
     /// Switch to a substrate composition at runtime, recomputing feasibility.
@@ -224,15 +302,53 @@ impl SubstrateManager {
     /// second, so energy per wall-clock tick scales with tau_factor.
     pub fn tick_energy(&mut self, config: &CognitiveLoopConfig) {
         if !config.enable_energy_budget {
+            self.last_energy_spent = 0.0;
             return;
         }
         let speed_adjusted_energy = self.energy_per_cycle * self.tau_factor as f64;
         self.total_energy_spent += speed_adjusted_energy;
+        self.last_energy_spent = speed_adjusted_energy;
         if let Some(budget) = config.energy_budget_joules_per_sec {
             if self.total_energy_spent > budget {
                 self.consciousness_viable = false;
             }
         }
+    }
+
+    /// Smooth transition dynamics via EMA blending each cycle.
+    ///
+    /// When `substrate_transition_alpha` < 1.0, effective_feasibility and
+    /// tau_factor blend gradually toward their targets after a substrate switch.
+    /// This models the imperfect fidelity of substrate transfer (Bostrom 2003).
+    pub fn tick_transition(&mut self, config: &CognitiveLoopConfig) {
+        let alpha = config.substrate_transition_alpha;
+        if alpha >= 1.0 {
+            return; // Instant switching — no smoothing needed
+        }
+        // EMA blend: current += alpha × (target − current)
+        self.effective_feasibility +=
+            alpha as f64 * (self.target_effective_feasibility - self.effective_feasibility);
+        self.tau_factor += alpha * (self.target_tau_factor - self.tau_factor);
+    }
+
+    /// Compute effective HDC/CfC dimensionality fraction for this substrate.
+    ///
+    /// Returns 1.0 for substrates at or above biological scale (positive scale_pressure).
+    /// Returns < 1.0 for scale-constrained substrates (negative scale_pressure),
+    /// clamped to [SUBSTRATE_MIN_DIM_FRACTION, 1.0].
+    ///
+    /// Science: Berry & Srivastava (2018) — HDC capacity scales with D^(5/3).
+    pub fn effective_dim_fraction(&self) -> f32 {
+        if self.scale_pressure >= 0.0 {
+            return 1.0;
+        }
+        (1.0 + self.scale_pressure / SUBSTRATE_SCALE_DIM_DIVISOR)
+            .clamp(SUBSTRATE_MIN_DIM_FRACTION, 1.0)
+    }
+
+    /// Access the transition history log.
+    pub fn transition_history(&self) -> &VecDeque<SubstrateTransitionRecord> {
+        &self.transition_history
     }
 
     /// Returns true when substrate feasibility is too low for full consciousness.
@@ -354,6 +470,11 @@ impl SubstrateManager {
             substrate_scale_pressure: self.scale_pressure,
             per_region_feasibility: per_region,
             substrate_encoding_noise: encoding_noise,
+            total_energy_spent: self.total_energy_spent,
+            energy_this_cycle: self.last_energy_spent,
+            energy_throughput_multiplier: self.energy_throughput_multiplier,
+            effective_dim_fraction: self.effective_dim_fraction(),
+            transition_count: self.transition_history.len(),
         }
     }
 

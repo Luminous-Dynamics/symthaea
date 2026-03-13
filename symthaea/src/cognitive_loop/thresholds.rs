@@ -1247,6 +1247,85 @@ pub const FEP_TD_ERROR_DISCOVERY_THRESHOLD: f64 = 0.5;
 #[allow(dead_code)]
 pub const FEP_LEARNING_PLASTICITY_THRESHOLD: f32 = 0.5;
 
+/// FEP complexity LR dampen factor: multiplier applied to learning rate when
+/// FEP complexity exceeds FEP_COMPLEXITY_THRESHOLD.
+/// Friston (2010): high model complexity = overfitting risk → slow learning.
+pub const FEP_COMPLEXITY_LR_DAMPEN: f32 = 0.85;
+
+/// FEP complexity minimum learning rate multiplier floor.
+pub const FEP_COMPLEXITY_LR_FLOOR: f32 = 0.1;
+
+/// FEP complexity pause multiplier: scales pause duration when complexity is high.
+pub const FEP_COMPLEXITY_PAUSE_MULT: f32 = 1.2;
+
+/// FEP complexity maximum pause multiplier.
+pub const FEP_COMPLEXITY_PAUSE_MAX: f32 = 2.0;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// AROUSAL TRAP STATE MACHINE
+// Science: Yerkes-Dodson (1908) — inverted-U performance curve; sustained
+// high arousal degrades performance. Porges (2011) — polyvagal recovery.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Arousal threshold for LR suppression (moderate arousal dampens learning).
+pub const AROUSAL_TRAP_SUPPRESS_THRESHOLD: f32 = 0.7;
+
+/// Scale factor for arousal LR suppression. At arousal=1.0: (1.0-0.7)*0.25 = 0.075.
+pub const AROUSAL_TRAP_SUPPRESS_SCALE: f32 = 0.25;
+
+/// Maximum arousal LR suppression (cap).
+pub const AROUSAL_TRAP_SUPPRESS_MAX: f32 = 0.08;
+
+/// Arousal threshold for trap detection (high arousal increments counter).
+pub const AROUSAL_TRAP_DETECT_THRESHOLD: f32 = 0.8;
+
+/// Counter threshold for entering Phase 2 (active recovery).
+pub const AROUSAL_TRAP_RECOVERY_ENTER: u32 = 5;
+
+/// Counter threshold for entering Phase 3 (forced escape).
+pub const AROUSAL_TRAP_ESCAPE_ENTER: u32 = 10;
+
+/// LR dampening scale during recovery (Phase 2).
+pub const AROUSAL_TRAP_RECOVERY_LR_SCALE: f32 = 0.1;
+
+/// Exploration boost scale during recovery (Phase 2).
+pub const AROUSAL_TRAP_RECOVERY_EXPLORE_SCALE: f32 = 0.025;
+
+/// Confidence scale during forced escape (Phase 3).
+pub const AROUSAL_TRAP_ESCAPE_CONFIDENCE_SCALE: f32 = 0.9;
+
+/// Arousal threshold below which consolidation LR boost activates.
+/// Steriade (1996): low arousal enhances memory consolidation.
+pub const AROUSAL_LOW_CONSOLIDATION_THRESHOLD: f32 = 0.3;
+
+/// Scale factor for low-arousal consolidation boost.
+pub const AROUSAL_LOW_CONSOLIDATION_SCALE: f32 = 0.3;
+
+/// Maximum consolidation boost from low arousal.
+pub const AROUSAL_LOW_CONSOLIDATION_MAX: f32 = 0.05;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CROSS-MODAL BINDING ATTENTION
+// Science: Engel et al. (2001) — synchrony-based binding gates cross-modal attention.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Cross-modal binding strength above which attention confidence is boosted.
+/// High binding = multiple modalities coherently integrated.
+pub const CROSS_MODAL_BINDING_HIGH_THRESHOLD: f32 = 0.7;
+
+/// Scale factor for binding-driven confidence boost.
+pub const CROSS_MODAL_BINDING_HIGH_SCALE: f32 = 0.1;
+
+/// Cross-modal binding strength below which attention confidence is dampened.
+/// Low binding = weak integration → trust only primary modality.
+pub const CROSS_MODAL_BINDING_LOW_THRESHOLD: f32 = 0.3;
+
+/// Scale factor for binding-driven confidence dampening.
+pub const CROSS_MODAL_BINDING_LOW_SCALE: f32 = 0.1;
+
+/// Minimum confidence scale when binding is low (floor to prevent collapse).
+pub const CROSS_MODAL_BINDING_LOW_FLOOR: f32 = 0.95;
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // ACTIVE REST / SACRED STILLNESS
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -2728,6 +2807,37 @@ pub const CANTOR_CODEBOOK_DIVERSITY_THRESHOLD: f32 = 0.92;
 /// EMA decay for Cantor dream surprise tracking.
 /// Science: Friston (2010) — surprise drives plasticity updates.
 pub const CANTOR_SURPRISE_EMA_DECAY: f32 = 0.85;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SUBSTRATE SIMULATION (Phase 3)
+// Science: Bostrom (2003) substrate-independence, Putnam (1967) multiple
+// realizability. Gradual transitions model substrate transfer fidelity.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Default transition smoothing alpha (1.0 = instant, 0.1 = ~10 cycles to settle).
+/// 1.0 preserves backward compatibility; `enable_substrate_simulation()` sets 0.1.
+/// Science: Bostrom (2003) gradual uploading — smooth substrate transfer.
+pub const SUBSTRATE_TRANSITION_ALPHA_DEFAULT: f32 = 1.0;
+
+/// Simulation-mode transition alpha (slower, more realistic blending).
+/// Science: Bostrom (2003) — ~10 cycles for dynamics to settle after switch.
+pub const SUBSTRATE_TRANSITION_ALPHA_SIMULATION: f32 = 0.1;
+
+/// Minimum effective dimensionality fraction for scale-constrained substrates.
+/// Even the most limited substrate retains 10% of HDC/CfC capacity.
+/// Science: Berry & Srivastava (2018) — HDC capacity scales with D^(5/3).
+pub const SUBSTRATE_MIN_DIM_FRACTION: f32 = 0.1;
+
+/// Divisor for mapping scale_pressure to dim fraction.
+/// scale_pressure ∈ [-7, 0] → dim_fraction ∈ [0.3, 1.0] via (1 + sp/divisor).
+pub const SUBSTRATE_SCALE_DIM_DIVISOR: f32 = 10.0;
+
+/// Transition history ring buffer capacity.
+pub const SUBSTRATE_TRANSITION_HISTORY_CAP: usize = 32;
+
+/// Number of operations per cognitive cycle (256 neurons × 256 ops each).
+/// Used for energy-per-cycle computation.
+pub const SUBSTRATE_OPS_PER_CYCLE: f64 = 65_536.0;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TESTS

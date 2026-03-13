@@ -64,6 +64,7 @@ pub struct ConceptAffect {
 }
 
 /// Bridge between ConsciousnessWorldModel and AffectiveConsciousness
+#[derive(Debug)]
 pub struct AffectiveBridge {
     /// Configuration
     config: AffectiveBridgeConfig,

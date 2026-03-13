@@ -914,6 +914,24 @@ impl CognitiveLoopService {
         if let Err(e) = self.temporal_network.step(&input_array, delta_t) {
             tracing::warn!(error = %e, "CfC temporal step failed — continuing with stale state");
         }
+
+        // Phase 3: Scale-limited CfC hidden state masking.
+        // When substrate has fewer computational units than biological (negative
+        // scale_pressure), mask out a fraction of hidden state dimensions.
+        // Science: Berry & Srivastava (2018) — HDC capacity ~ D^(5/3).
+        if self.config.enable_substrate_encoding_noise {
+            let frac = self.substrate_manager.effective_dim_fraction();
+            if frac < 1.0 {
+                if let Ok(mut state) = self.temporal_network.read_state() {
+                    let mask_start = (frac * state.len() as f32) as usize;
+                    for h in state.as_slice_mut().unwrap_or(&mut [])[mask_start..].iter_mut() {
+                        *h = 0.0;
+                    }
+                    let _ = self.temporal_network.inject(&state);
+                }
+            }
+        }
+
         module_timings.core_cfc_step = _t_core.elapsed().as_micros() as u64;
 
         // 5. Get multi-scale predictions
@@ -1353,11 +1371,17 @@ impl CognitiveLoopService {
                 (self.adaptive_behavior.exploration_factor + 0.15).min(1.0);
             self.adaptive_behavior.action_hint = ActionHint::Explore;
         }
-        if fep_complexity > 1.0 {
+        if fep_complexity > FEP_COMPLEXITY_THRESHOLD {
+            use super::thresholds::{
+                FEP_COMPLEXITY_LR_DAMPEN, FEP_COMPLEXITY_LR_FLOOR, FEP_COMPLEXITY_PAUSE_MAX,
+                FEP_COMPLEXITY_PAUSE_MULT,
+            };
             self.adaptive_behavior.learning_rate_multiplier =
-                (self.adaptive_behavior.learning_rate_multiplier * 0.85).max(0.1);
-            self.adaptive_behavior.pause_multiplier =
-                (self.adaptive_behavior.pause_multiplier * 1.2).min(2.0);
+                (self.adaptive_behavior.learning_rate_multiplier * FEP_COMPLEXITY_LR_DAMPEN)
+                    .max(FEP_COMPLEXITY_LR_FLOOR);
+            self.adaptive_behavior.pause_multiplier = (self.adaptive_behavior.pause_multiplier
+                * FEP_COMPLEXITY_PAUSE_MULT)
+                .min(FEP_COMPLEXITY_PAUSE_MAX);
             self.adaptive_behavior.action_hint = ActionHint::SlowDown;
         }
 
