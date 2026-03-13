@@ -374,7 +374,7 @@ impl CSPSolver {
 
         while let Some((xi, xj)) = queue.pop_front() {
             if Self::revise(domains, &xi, &xj, constraints) {
-                if !domains.get(&xi).is_some_and(|d| !d.is_empty()) {
+                if domains.get(&xi).is_none_or(|d| d.is_empty()) {
                     return; // No solution exists
                 }
                 // Add all arcs (xk, xi) back to queue

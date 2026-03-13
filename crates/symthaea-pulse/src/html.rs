@@ -456,6 +456,9 @@ pub fn generate_pulse_html(
     write_governance_pane(&mut html, &current.governance);
     write_knowledge_pane(&mut html, &current.knowledge);
     write_cantor_pane(&mut html, &current.cantor);
+    if let Some(ref canvas_svg) = current.canvas_svg {
+        write_canvas_pane(&mut html, canvas_svg);
+    }
     write_narrative_pane(&mut html, narrative);
     if !timeline.is_empty() {
         write_timeline_pane(&mut html, timeline, current);
@@ -2303,6 +2306,24 @@ fn write_cantor_pane(html: &mut String, cantor: &CantorInfo) {
     }
 
     html.push_str("</div>\n");
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Canvas: Living Topology Visualization
+// ═══════════════════════════════════════════════════════════════════════════════
+
+fn write_canvas_pane(html: &mut String, svg: &str) {
+    let _ = write!(
+        html,
+        r##"<div class="pane">
+<h2>Living Topology — The Inner Geometry</h2>
+<div style="display:flex;justify-content:center;align-items:center;padding:0.5em;">
+{svg}
+</div>
+<div class="status-bar">Real-time cognitive topology projection</div>
+</div>
+"##
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

@@ -1022,4 +1022,147 @@ mod tests {
             "High collective phi should nudge ECB baseline"
         );
     }
+
+    #[test]
+    fn test_external_mesh_not_overwritten_by_local() {
+        use crate::mycelix::epistemic_mesh::{EpistemicMesh, EpistemicSummary};
+        use crate::mycelix::gis::IgnoranceType;
+
+        let mut mgr = GovernanceManager::default();
+
+        // Set external mesh with 2 agents
+        let external = EpistemicMesh::new(vec![
+            EpistemicSummary {
+                agent_id: "ext-a1".into(),
+                dominant_ignorance: IgnoranceType::KnownUnknown,
+                domain_expertise: vec![],
+                blind_spots: vec!["physics".into()],
+            },
+            EpistemicSummary {
+                agent_id: "ext-a2".into(),
+                dominant_ignorance: IgnoranceType::Known,
+                domain_expertise: vec![],
+                blind_spots: vec![],
+            },
+        ]);
+        mgr.set_epistemic_mesh(external);
+        assert!(mgr.has_external_mesh());
+        assert_eq!(mgr.epistemic_agent_count(), 2);
+
+        // Local fallback should NOT overwrite
+        let local = EpistemicMesh::new(vec![EpistemicSummary {
+            agent_id: "local".into(),
+            dominant_ignorance: IgnoranceType::Unknown,
+            domain_expertise: vec![],
+            blind_spots: vec!["everything".into()],
+        }]);
+        mgr.set_local_epistemic_mesh(local);
+
+        // External mesh should still be active
+        assert_eq!(
+            mgr.epistemic_agent_count(),
+            2,
+            "External mesh should not be overwritten by local fallback"
+        );
+    }
+
+    #[test]
+    fn test_positive_reputation_boosts_serotonin() {
+        let mut mgr = GovernanceManager::default();
+        mgr.inject_event(make_event(GovernanceEventKind::ReputationChanged {
+            delta: 0.5,
+        }));
+        mgr.process(&default_snapshot());
+
+        let baselines = mgr.drain_baselines();
+        assert!(
+            baselines
+                .iter()
+                .any(|b| b.target == "serotonin" && b.nudge > 0.0),
+            "Positive reputation should boost 5-HT"
+        );
+    }
+
+    #[test]
+    fn test_nan_outcome_clamped() {
+        let mut mgr = GovernanceManager::default();
+        mgr.inject_outcome(GovernanceOutcome {
+            proposal_id: "nan-test".into(),
+            passed: true,
+            my_vote_aligned: Some(true),
+            value_alignment_score: f64::NAN,
+            harmonic_resonance: f64::INFINITY,
+        });
+        // Should have clamped to safe defaults
+        let output = mgr.process(&default_snapshot());
+        let ema = mgr.reward_ema();
+        assert!(ema.is_finite(), "NaN outcome should produce finite EMA: {}", ema);
+        assert!(
+            output.confidence_delta.is_finite(),
+            "NaN outcome should produce finite confidence delta"
+        );
+        // Harmonic deltas should be finite
+        let deltas = mgr.take_harmonic_deltas();
+        for (i, d) in deltas.iter().enumerate() {
+            assert!(d.is_finite(), "Harmonic delta {} not finite: {}", i, d);
+        }
+    }
+
+    #[test]
+    fn test_lr_boost_tracked() {
+        let mut mgr = GovernanceManager::default();
+        // Predict outcome then give mismatched result → high PE → high LR boost
+        mgr.predict_outcome("lr-test".into(), 0.9);
+        mgr.inject_outcome(GovernanceOutcome {
+            proposal_id: "lr-test".into(),
+            passed: true,
+            my_vote_aligned: Some(true),
+            value_alignment_score: 0.1, // very different from 0.9
+            harmonic_resonance: 0.5,
+        });
+        mgr.process(&default_snapshot());
+
+        let lr = mgr.last_lr_boost();
+        assert!(
+            lr > 1.0,
+            "High PE should produce LR boost > 1.0: {}",
+            lr
+        );
+    }
+
+    #[test]
+    fn test_delayed_outcome_uses_default_pe() {
+        let mut mgr = GovernanceManager::default();
+        // Predict at cycle 0
+        mgr.predict_outcome("delayed".into(), 0.9);
+
+        // Advance cycle counter past TTL (5000 cycles)
+        let mut snap = default_snapshot();
+        snap.cycle_number = 6000;
+        mgr.inject_event(make_event(GovernanceEventKind::ProposalCreated));
+        mgr.process(&snap); // This triggers eviction of stale predictions
+
+        // Now inject the delayed outcome
+        mgr.inject_outcome(GovernanceOutcome {
+            proposal_id: "delayed".into(),
+            passed: true,
+            my_vote_aligned: Some(true),
+            value_alignment_score: 0.1,
+            harmonic_resonance: 0.5,
+        });
+        let mut snap2 = default_snapshot();
+        snap2.cycle_number = 6037;
+        mgr.inject_event(make_event(GovernanceEventKind::ProposalCreated));
+        mgr.process(&snap2);
+
+        let completed = mgr.drain_completed();
+        assert_eq!(completed.len(), 1);
+        let (_outcome, pe) = &completed[0];
+        // Default PE = |0.5 - 0.1| = 0.4 (not |0.9 - 0.1| = 0.8)
+        assert!(
+            (*pe - 0.4).abs() < 1e-6,
+            "Evicted prediction should use default 0.5: PE={} (expected ~0.4)",
+            pe
+        );
+    }
 }

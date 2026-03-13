@@ -157,7 +157,7 @@ pub fn extract_snapshot(
 ) -> CognitiveSnapshot {
     CognitiveSnapshot {
         consciousness_level: metadata.consciousness_level,
-        prediction_error: metadata.fep.fep_surprise,
+        prediction_error: metadata.fep.fep_surprise as f32,
         living_mind_vitality: metadata.living_mind_vitality,
         living_mind_coherence: metadata.living_mind_coherence,
         dopamine: neuromod.dopamine_effective,
