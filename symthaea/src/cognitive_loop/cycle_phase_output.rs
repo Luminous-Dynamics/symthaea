@@ -493,7 +493,7 @@ impl CognitiveLoopService {
             self.stats.tom_prediction_mismatch_ema > 0.4 && self.stats.total_cycles > 10;
 
         // ── User State Inference telemetry ──
-        if let Some(ref usi) = self.user_state {
+        if let Some(ref usi) = self.language_comm.user_state {
             let state = usi.state();
             metadata.user_cognitive_load = state.cognitive_load.level as f32;
             metadata.user_frustration = state.frustration as f32;
@@ -1090,12 +1090,12 @@ impl CognitiveLoopService {
 
         // ── Voice telemetry ──
         {
-            let voice_summary = self.voice_coherence.voice.summary();
+            let voice_summary = self.language_comm.voice_coherence.voice.summary();
             metadata.voice_articulation_quality =
-                self.voice_coherence.voice.smoothed_articulation();
-            metadata.voice_rate_stability = self.voice_coherence.voice.rate_stability();
+                self.language_comm.voice_coherence.voice.smoothed_articulation();
+            metadata.voice_rate_stability = self.language_comm.voice_coherence.voice.rate_stability();
             metadata.voice_confidence = voice_summary.voice_confidence;
-            metadata.voice_phi_adjustment = self.voice_coherence.voice.compute_phi_adjustment();
+            metadata.voice_phi_adjustment = self.language_comm.voice_coherence.voice.compute_phi_adjustment();
         }
 
         // ── Substrate & convergence telemetry ──
@@ -1238,7 +1238,7 @@ impl CognitiveLoopService {
         // Foveation bridge telemetry
         #[cfg(feature = "foveation")]
         {
-            if let Some(ref fov_mutex) = self.foveation_manager {
+            if let Some(ref fov_mutex) = self.vision_sensory.foveation_manager {
                 if let Ok(fov) = fov_mutex.lock() {
                     let ft = fov.telemetry();
                     metadata.foveation = Some(super::FoveationBridgeTelemetry {
@@ -1265,6 +1265,7 @@ impl CognitiveLoopService {
         #[cfg(feature = "ssm_language")]
         {
             metadata.broca = self
+                .language_comm
                 .broca_manager
                 .as_ref()
                 .map(|m| m.last_telemetry().clone());
@@ -1354,7 +1355,7 @@ impl CognitiveLoopService {
 
         // Cross-manifold predictor: observe actual cognitive state for Hebbian learning
         #[cfg(feature = "vision-manifold")]
-        if let Some(ref mut pred) = self.cross_manifold_predictor {
+        if let Some(ref mut pred) = self.vision_sensory.cross_manifold_predictor {
             pred.observe_cognitive(&perception.encoding.encoding_result.hdv);
         }
 
@@ -1684,7 +1685,7 @@ impl CognitiveLoopService {
             thought_vector,
             wisdom_hv: perception.encoding.hv16_cached,
             #[cfg(feature = "ssm_language")]
-            language_output: self.last_broca_text.take(),
+            language_output: self.language_comm.last_broca_text.take(),
             #[cfg(feature = "canvas")]
             canvas_svg: self.last_canvas_svg.take(),
             #[cfg(feature = "identity")]

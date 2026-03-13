@@ -623,6 +623,7 @@ impl CognitiveLoopService {
             if let Some(ref mut empathy) = self.primitive_tier.empathic_unification {
                 if self.stats.total_cycles % 11 == 0 {
                     let context = self
+                        .language_comm
                         .user_state
                         .as_ref()
                         .map(|usi| usi.state().context)

@@ -1089,7 +1089,7 @@ impl CognitiveLoopService {
         // USER STATE INFERENCE → BEHAVIORAL COUPLING
         // Swanson (2000) — frustration dampens exploration; engagement boosts learning.
         // ═══════════════════════════════════════════════════════════════════════
-        let usi_vals = self.user_state.as_ref().map(|usi| {
+        let usi_vals = self.language_comm.user_state.as_ref().map(|usi| {
             let state = usi.state();
             (
                 state.frustration,
@@ -1348,8 +1348,8 @@ impl CognitiveLoopService {
         // Session 13 Item 5: Flow state → subsystem LR modulation.
         // Flow = optimal learning zone → gently boost subsystem learning.
         // Science: Csikszentmihalyi (1990) — flow maximizes skill acquisition.
-        if self.flow_state.in_flow && self.flow_state.intensity > 0.5 {
-            self.carryover.learning.subsystem_lr_factor *= 1.05;
+        if self.flow_state.in_flow && self.flow_state.intensity > super::thresholds::FLOW_INTENSITY_LR_THRESHOLD {
+            self.carryover.learning.subsystem_lr_factor *= super::thresholds::FLOW_SUBSYSTEM_LR_BOOST;
             self.carryover.learning.subsystem_lr_factor = self
                 .carryover
                 .learning
@@ -1360,7 +1360,7 @@ impl CognitiveLoopService {
         // Session 13 Item 8: Sustained high quality → exploration floor.
         // Prevent total convergence when system is performing well.
         // Science: Dayan & Sejnowski (1996) — minimum exploration prevents local optima.
-        if unified_quality_score > 0.7 {
+        if unified_quality_score > super::thresholds::HIGH_QUALITY_SCORE_THRESHOLD {
             self.carryover.quality.consecutive_high_quality = self
                 .carryover
                 .quality
@@ -1369,8 +1369,8 @@ impl CognitiveLoopService {
         } else {
             self.carryover.quality.consecutive_high_quality = 0;
         }
-        if self.carryover.quality.consecutive_high_quality > 10 && self.stats.total_cycles > 30 {
-            self.adjust_exploration("quality_floor", 0.01);
+        if self.carryover.quality.consecutive_high_quality > super::thresholds::CONSECUTIVE_HIGH_QUALITY_CYCLES && self.stats.total_cycles > 30 {
+            self.adjust_exploration("quality_floor", super::thresholds::QUALITY_FLOOR_EXPLORATION_BOOST);
         }
 
         // Session 12 Item 4: Epistemic conflict → exploration boost.
@@ -1687,7 +1687,7 @@ impl CognitiveLoopService {
                 self.adjust_exploration("temporal_binding_low", boost);
                 self.scale_lr("temporal_binding_low", TEMPORAL_BINDING_LOW_LR_SCALE);
             } else if tb > TEMPORAL_BINDING_DAMPEN_THRESHOLD && self.stats.total_cycles > 15 {
-                self.scale_exploration("temporal_binding_high", 0.98);
+                self.scale_exploration("temporal_binding_high", super::thresholds::TEMPORAL_BINDING_HIGH_EXPLORE_SCALE);
             }
         }
 
@@ -1702,7 +1702,7 @@ impl CognitiveLoopService {
             {
                 self.scale_lr("gradient_caution", CONSCIOUSNESS_GRADIENT_LR_SCALE);
                 self.carryover.quality.consecutive_stable_gradient = 0;
-            } else if consciousness_gradient_magnitude < 0.01 {
+            } else if consciousness_gradient_magnitude < super::thresholds::GRADIENT_STABLE_DETECT_THRESHOLD {
                 self.carryover.quality.consecutive_stable_gradient = self
                     .carryover
                     .quality
@@ -1758,7 +1758,7 @@ impl CognitiveLoopService {
                 ALLOSTATIC_OVERLOAD_THRESHOLD,
             };
             self.carryover.quality.allostatic_load *= ALLOSTATIC_LOAD_DECAY;
-            if self.carryover.history.consciousness_ema < 0.2
+            if self.carryover.history.consciousness_ema < super::thresholds::CONSCIOUSNESS_EMA_LOW_THRESHOLD
                 && self.carryover.history.consciousness_ema > 0.0
             {
                 self.carryover.quality.allostatic_load += ALLOSTATIC_LOAD_INCREMENT;
@@ -1926,7 +1926,7 @@ impl CognitiveLoopService {
                 // S21: Passive micro-rest recovery. Lim & Dinges (2010) — brief rest
                 // periods partially dissipate sleep pressure even without full consolidation.
                 // When readiness is high (low overall stress), pressure decays slowly.
-                if self.carryover.quality.last_readiness_score > 0.9 {
+                if self.carryover.quality.last_readiness_score > super::thresholds::READINESS_REST_THRESHOLD {
                     self.carryover.quality.sleep_pressure *=
                         super::thresholds::SLEEP_PRESSURE_PASSIVE_DECAY;
                 } else {
@@ -1959,7 +1959,7 @@ impl CognitiveLoopService {
                 EXPLORE_EXPLOIT_CORRECTION, EXPLORE_EXPLOIT_HIGH_BOUND, EXPLORE_EXPLOIT_LOW_BOUND,
                 EXPLORE_EXPLOIT_WINDOW,
             };
-            let explore_biased = self.feedback_state.cycle_start_exploration() > 0.5;
+            let explore_biased = self.feedback_state.cycle_start_exploration() > super::thresholds::EXPLORE_BIAS_MIDPOINT as f64;
             let history = &mut self.carryover.quality.explore_exploit_history;
             history.push_back(explore_biased);
             while history.len() > EXPLORE_EXPLOIT_WINDOW {
@@ -2044,13 +2044,13 @@ impl CognitiveLoopService {
                 RECOVERY_FATIGUE_DECAY,
             };
             let total_props = self.feedback_state.total_proposals();
-            let stable = consciousness_gradient_magnitude.abs() < 0.05;
+            let stable = consciousness_gradient_magnitude.abs() < super::thresholds::RECOVERY_STABILITY_THRESHOLD;
             if total_props <= FATIGUE_EFFORT_THRESHOLD && stable {
                 self.carryover.quality.consecutive_recovery_cycles += 1;
                 if self.carryover.quality.consecutive_recovery_cycles >= RECOVERY_CYCLES_NEEDED {
                     self.carryover.quality.fatigue =
                         (self.carryover.quality.fatigue - RECOVERY_FATIGUE_DECAY).max(0.0);
-                    if self.carryover.quality.fatigue < 0.1 {
+                    if self.carryover.quality.fatigue < super::thresholds::FATIGUE_RECOVERED_THRESHOLD {
                         self.adjust_confidence("recovery_boost", RECOVERY_CONFIDENCE_BOOST);
                     }
                 }
@@ -2065,7 +2065,7 @@ impl CognitiveLoopService {
                 ENV_PREDICTABILITY_HIGH, ENV_PREDICTABILITY_LOW, ENV_PREDICTABILITY_WINDOW,
                 ENV_PREDICTABLE_THRESHOLD_SCALE, ENV_UNPREDICTABLE_THRESHOLD_SCALE,
             };
-            let pred_ok = consciousness_gradient_magnitude.abs() < 0.1;
+            let pred_ok = consciousness_gradient_magnitude.abs() < super::thresholds::GRADIENT_PREDICTION_OK_THRESHOLD;
             let history = &mut self.carryover.quality.prediction_success_history;
             history.push_back(pred_ok);
             while history.len() > ENV_PREDICTABILITY_WINDOW {
@@ -2145,7 +2145,7 @@ impl CognitiveLoopService {
             let readiness = (1.0 - total_cost).clamp(0.3, 1.0);
             // Store for telemetry.
             self.carryover.quality.last_readiness_score = readiness;
-            if readiness < 0.95 && self.stats.total_cycles > 20 {
+            if readiness < super::thresholds::READINESS_DEGRADED_THRESHOLD && self.stats.total_cycles > 20 {
                 self.scale_lr("unified_readiness", readiness);
             }
         }

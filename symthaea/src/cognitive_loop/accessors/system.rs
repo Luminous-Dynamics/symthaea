@@ -41,7 +41,7 @@ impl CognitiveLoopService {
         pub fn hdc_bridge_dim(&self) -> Option<usize> { self.temporal_network.hdc_dim() }
 
         /// Get coherence summary for external systems
-        pub fn coherence_summary(&self) -> crate::dynamics::cfc_coherence::CoherenceSummary { self.voice_coherence.bridge.summary() }
+        pub fn coherence_summary(&self) -> crate::dynamics::cfc_coherence::CoherenceSummary { self.language_comm.voice_coherence.bridge.summary() }
 
         // ═══════════════════════════════════════════════════════════════════
         // SEMANTIC MEMORY / STABILITY ACCESSORS
@@ -206,7 +206,7 @@ impl CognitiveLoopService {
     /// Evaluate temporal prediction horizon accuracy from the vision manifold.
     #[cfg(feature = "vision-manifold")]
     pub fn vision_evaluate_horizons(&self) -> Option<symthaea_vision_manifold::HorizonAccuracy> {
-        self.vision_bridge
+        self.vision_sensory.vision_bridge
             .as_ref()
             .map(|b| b.manifold().evaluate_horizons())
     }
@@ -240,7 +240,7 @@ impl CognitiveLoopService {
 
     /// Get the current inferred user state (if user state inference is enabled).
     pub fn user_state(&self) -> Option<&crate::user_state_inference::UserState> {
-        self.user_state.as_ref().map(|usi| usi.state())
+        self.language_comm.user_state.as_ref().map(|usi| usi.state())
     }
 
     /// Inject L-SSM semantic prediction error from LLMOrgan after translation.
@@ -407,7 +407,7 @@ impl CognitiveLoopService {
     /// The frame is consumed during the next `cycle()` call.
     #[cfg(feature = "vision-manifold")]
     pub fn inject_vision_frame(&mut self, frame: Vec<u8>) {
-        self.vision_frame_buffer = Some(frame);
+        self.vision_sensory.vision_frame_buffer = Some(frame);
     }
 
     // ═══════════════════════════════════════════════════════════════════

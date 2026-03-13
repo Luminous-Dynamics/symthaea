@@ -99,22 +99,24 @@ impl CognitiveLoopService {
                         } else {
                             ctx.pp_phi
                         };
-                        self.fep.episodic_memory.encode(
-                            &grad.id,
-                            grad.embedding
-                                .values
-                                .iter()
-                                .take(64)
-                                .copied()
-                                .collect::<Vec<_>>(),
-                            0.0,
-                            grad_importance,
-                            self.stats.total_cycles,
+                        // Route through MemoryCoordinator for quality filtering instead of
+                        // bypassing directly to fep.episodic_memory.encode().
+                        self.memory_coordinator.queue_graduation(
+                            crate::memory::memory_coordinator::GraduationEvent {
+                                content: grad.embedding.clone(),
+                                label: grad.id.clone(),
+                                steps_survived: self.stats.total_cycles as u64 - grad.added_at,
+                                final_activation: grad_importance as f64,
+                                psi_at_graduation: ctx.pp_phi as f64,
+                                coherence_at_graduation: 0.0,
+                                source: Default::default(),
+                                is_verified: false,
+                            },
                         );
                     }
                     tracing::debug!(
                         count = graduates.len(),
-                        "Prefrontal graduated items to episodic memory (resonator-routed)"
+                        "Prefrontal graduates queued for memory coordinator"
                     );
                 }
 
@@ -207,7 +209,7 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         let (body_psi_modulation, body_valence, body_arousal) =
             if ctx.urgency.should_run(self.stats.total_cycles, 1, 1, 2) {
-                if let Some(ref mut body) = self.virtual_body {
+                if let Some(ref mut body) = self.vision_sensory.virtual_body {
                     let signals = crate::cognitive_loop::virtual_body::CognitiveSignals {
                         prediction_error: ctx.prediction_error,
                         coherence: ctx.coherence,
@@ -292,7 +294,7 @@ impl CognitiveLoopService {
         // USER STATE INFERENCE: Infer cognitive load, frustration, engagement
         // Runs every cycle (lightweight: keyword detection + rolling averages)
         // ═══════════════════════════════════════════════════════════════════════
-        if let Some(ref mut usi) = self.user_state {
+        if let Some(ref mut usi) = self.language_comm.user_state {
             let had_error = ctx.prediction_error > 0.8;
             usi.process(ctx.input, had_error);
         }

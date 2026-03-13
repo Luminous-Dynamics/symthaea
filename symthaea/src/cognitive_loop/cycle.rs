@@ -96,7 +96,7 @@ impl CognitiveLoopService {
 
         // User state inference: process input to update context, frustration, cognitive load
         // Science: adaptive UI via inferred cognitive state (Ritter et al. 2019)
-        if let Some(ref mut usi) = self.user_state {
+        if let Some(ref mut usi) = self.language_comm.user_state {
             usi.process(input, false);
             let state = usi.state();
             // Frustration → dampen exploration (noisy signals, don't overfit to errors)
@@ -236,7 +236,7 @@ impl CognitiveLoopService {
 
         // Coherence field: apply hormone modulation from neuromod bath
         // Science: McEwen (2007) — allostatic load shapes integration capacity
-        if let Some(ref mut cf) = self.coherence_field {
+        if let Some(ref mut cf) = self.vision_sensory.coherence_field {
             use super::neuromodulators::NeuromodulatorBathExt;
             let hormones = self.neuromod.bath.to_hormone_state();
             cf.apply_hormone_modulation(&hormones);

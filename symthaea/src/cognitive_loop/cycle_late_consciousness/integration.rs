@@ -463,7 +463,7 @@ impl CognitiveLoopService {
         let (embodied_psi_modulation, embodied_agency) =
             if ctx.urgency.should_run(self.stats.total_cycles, 1, 1, 2) {
                 if let Some(ref mut embodied) = self.consciousness_monitors.embodied {
-                    if let Some(ref body) = self.virtual_body {
+                    if let Some(ref body) = self.vision_sensory.virtual_body {
                         embodied.update_interoception(body.interoceptive_state().clone());
                     }
                     let response = embodied.process();

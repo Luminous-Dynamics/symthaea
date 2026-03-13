@@ -559,7 +559,6 @@ impl CognitiveLoopService {
                 stillness_boost,
                 semantic_embedding: semantic_emb_ref,
                 action_hv: Some(&hv16_cached),
-                knowledge_moral_context,
             });
         module_timings.ethics_engine = ethics_output.total_us;
         module_timings.ethics_engine_moral = ethics_output.moral_us;

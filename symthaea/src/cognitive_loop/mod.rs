@@ -158,6 +158,8 @@ pub(crate) mod primitive_tier;
 pub(crate) mod self_model_tier;
 pub(crate) mod social_manager;
 pub(crate) mod substrate_manager;
+pub(crate) mod language_comm_manager;
+pub(crate) mod vision_sensory_manager;
 pub use substrate_manager::SubstrateTransitionRecord;
 pub(crate) mod subsystem_trait;
 #[allow(dead_code)] // Registry of tuning constants — many reserved for future wiring
@@ -304,8 +306,8 @@ pub struct CognitiveLoopService {
     /// Is currently consolidating (background learning)
     is_consolidating: bool,
 
-    /// Voice-coherence bridge: CfC coherence + voice feedback + temporal signatures.
-    voice_coherence: voice_coherence_bridge::VoiceCoherenceBridge,
+    /// Language & communication: voice coherence, Broca, user state.
+    pub(crate) language_comm: language_comm_manager::LanguageAndCommunicationManager,
 
     /// Current adaptive behavior based on consciousness state
     adaptive_behavior: AdaptiveBehavior,
@@ -422,9 +424,17 @@ pub struct CognitiveLoopService {
     causal_enhancer: Option<CausalLoopEnhancer>,
 
     /// Episodic memory replay for high-Phi moment consolidation.
-    /// When enabled via `config.episodic_replay`, stores high-consciousness episodes
+    /// When enabled via `config.memory_graduation`, stores high-consciousness episodes
     /// and periodically replays them to reinforce important patterns.
     phi_episodic_replay: Option<crate::memory::episodic_replay::EpisodicMemory>,
+
+    /// Persistent memory database for cross-session episode storage.
+    /// Created when `config.memory_db_path` is `Some`. Episodes are periodically
+    /// flushed (every 199 cycles) via a background thread.
+    memory_db: Option<std::sync::Arc<crate::databases::SqliteMemory>>,
+
+    /// Guard to prevent overlapping memory flushes. When true, a flush is in progress.
+    memory_flush_in_progress: std::sync::Arc<std::sync::atomic::AtomicBool>,
 
     /// Conscious Reasoning Engine: unified 7-step reasoning cycle
     /// Composes epistemic conflict, temporal planning, counterfactual reasoning,
@@ -557,9 +567,7 @@ pub struct CognitiveLoopService {
     /// Social manager: social signals + phi-dyad + partner model + ring buffers.
     pub(crate) social_mgr: SocialManager,
 
-    /// User state inference for adaptive response generation.
-    /// When enabled, infers user cognitive load, frustration, and engagement from input text.
-    user_state: Option<crate::user_state_inference::UserStateInference>,
+    // user_state moved to language_comm_manager
 
     /// Resonant speech generator: adapts response complexity to user cognitive load.
     /// Uses neuromod bath signals + USI to determine response profile each cycle.
@@ -571,14 +579,8 @@ pub struct CognitiveLoopService {
     /// Config: batch_accumulation=1, max_latency=32ms (cycle-aligned).
     streaming_inference: Option<crate::inference::StreamingInference>,
 
-    /// Physiology coherence field — consciousness integration via hormone modulation.
-    /// Tracks coherence state, applies hormone effects from neuromod bath each cycle.
-    coherence_field: Option<crate::physiology::CoherenceField>,
-
-    /// Virtual body adapter for embodied cognition.
-    /// When enabled, maps cognitive signals to interoceptive states and produces
-    /// a phi_modulation factor that scales consciousness from somatic feedback.
-    virtual_body: Option<virtual_body::VirtualBody>,
+    /// Vision & sensory: coherence field, virtual body, vision, foveation.
+    pub(crate) vision_sensory: vision_sensory_manager::VisionAndSensoryManager,
 
     /// Nurture/attachment bridge — Bowlby attachment -> neuromodulator modulation.
     /// When enabled, models caregiver presence/absence and modulates oxytocin, NE,
@@ -586,33 +588,9 @@ pub struct CognitiveLoopService {
     #[cfg(feature = "nurture")]
     pub(crate) nurture_attachment: Option<nurture_bridge::NurtureAttachmentBridge>,
 
-    /// Vision bridge: frame → attention-boosted HDC encoding.
-    #[cfg(feature = "vision-manifold")]
-    pub(super) vision_bridge: Option<symthaea_vision_manifold::VisionBridge>,
-    /// Latest frame buffer for vision processing (injected externally or from mock).
-    #[cfg(feature = "vision-manifold")]
-    pub(super) vision_frame_buffer: Option<Vec<u8>>,
+    // vision_bridge, vision_frame_buffer, cross_manifold_predictor, foveation_manager moved to vision_sensory_manager
 
-    /// Cross-manifold predictor: vision→cognitive Hebbian mapping.
-    #[cfg(feature = "vision-manifold")]
-    pub(super) cross_manifold_predictor: Option<symthaea_vision_manifold::CrossManifoldPredictor>,
-
-    /// Foveation bridge: dorsal surprise → ventral recognition dispatch.
-    /// When enabled, receives salient patches from vision manifold and dispatches
-    /// background ventral recognition, feeding results into GWT.
-    #[cfg(feature = "foveation")]
-    pub(super) foveation_manager: Option<std::sync::Mutex<symthaea_foveation::FoveationManager>>,
-
-    /// Broca SSM language center: consciousness-gated thought-to-text.
-    /// When enabled via `ssm_language` feature + `enable_broca_language` config,
-    /// generates text from HDC-encoded thoughts with epistemic/emotional gating.
-    #[cfg(feature = "ssm_language")]
-    pub(crate) broca_manager: Option<broca_bridge::BrocaManager>,
-
-    /// Most recent Broca-generated text, drained into `CycleResult.language_output`
-    /// each cycle. `None` when Broca is disabled or gated by low consciousness.
-    #[cfg(feature = "ssm_language")]
-    pub(crate) last_broca_text: Option<String>,
+    // broca_manager, last_broca_text moved to language_comm_manager
 
     /// Canvas living topology: consciousness-driven SVG generation.
     /// When enabled via `canvas` feature, generates real-time topology SVGs

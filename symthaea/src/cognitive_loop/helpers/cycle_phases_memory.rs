@@ -326,7 +326,7 @@ impl CognitiveLoopService {
         // - Memory coordinator needs &mut phi_episodic_replay after replay completes
         let _t = Instant::now();
         if let Some(ref mut replay) = self.phi_episodic_replay {
-            let coherence_summary = self.voice_coherence.bridge.summary();
+            let coherence_summary = self.language_comm.voice_coherence.bridge.summary();
             let current_phi = coherence_summary.smoothed_coherence as f64;
 
             let input_hv =
@@ -378,7 +378,7 @@ impl CognitiveLoopService {
                 }
             }
 
-            if replay.should_replay() {
+            if self.config.episodic_replay_training && replay.should_replay() {
                 // ── Track 5f: FEP surprise → replay batch size modulation ────────
                 // Science: Mnih et al. (2015) — prioritized experience replay:
                 // high surprise = high learning potential → replay more episodes
@@ -602,7 +602,10 @@ impl CognitiveLoopService {
 
         // Track 4d: Adaptive replay scheduling — modulate interval based on error volatility
         // Science: McClelland et al. (1995) — fast-changing environments need more replay
-        if self.stats.total_cycles % 50 == 0 && self.stats.total_cycles > 50 {
+        if self.config.episodic_replay_training
+            && self.stats.total_cycles % 50 == 0
+            && self.stats.total_cycles > 50
+        {
             if let Some(ref mut replay) = self.phi_episodic_replay {
                 // Variance = E[X²] - E[X]² (from EMA-tracked moments)
                 let error_variance = (self.stats.avg_prediction_error_sq
@@ -614,7 +617,7 @@ impl CognitiveLoopService {
 
         // Memory coordinator: broadcast signals and process graduations
         {
-            let coord_phi = self.voice_coherence.bridge.smoothed_coherence() as f64;
+            let coord_phi = self.language_comm.voice_coherence.bridge.smoothed_coherence() as f64;
             let coord_coherence = coherence as f64;
             self.memory_coordinator.update_signals_with_sigma(
                 coord_phi,
@@ -629,6 +632,73 @@ impl CognitiveLoopService {
                         graduated,
                         "Memory coordinator graduated items to episodic storage"
                     );
+                }
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // PERIODIC MEMORY FLUSH: Persist top episodes to SQLite
+        // Co-prime cadence (199 cycles ≈ 0.85s at 234Hz) avoids interference
+        // with other periodic tasks. Uses background thread to stay off rayon pool.
+        // ═══════════════════════════════════════════════════════════════════════
+        if self.stats.total_cycles % 199 == 0
+            && self.stats.total_cycles > 0
+            && self.memory_db.is_some()
+        {
+            use std::sync::atomic::Ordering;
+
+            if !self
+                .memory_flush_in_progress
+                .load(Ordering::Relaxed)
+            {
+                if let Some(ref replay) = self.phi_episodic_replay {
+                    let top_episodes = replay.get_top_episodes(16);
+                    if !top_episodes.is_empty() {
+                        let db = self.memory_db.as_ref().unwrap().clone();
+                        let flush_guard = self.memory_flush_in_progress.clone();
+                        flush_guard.store(true, Ordering::Relaxed);
+
+                        let records: Vec<crate::databases::MemoryRecord> = top_episodes
+                            .iter()
+                            .enumerate()
+                            .map(|(i, ep)| {
+                                // Threshold continuous HV to binary: positive → 1
+                                let mut bytes = [0u8; 2048];
+                                for (j, &val) in ep.input.values.iter().enumerate() {
+                                    if j / 8 < 2048 && val > 0.0 {
+                                        bytes[j / 8] |= 1 << (j % 8);
+                                    }
+                                }
+                                let encoding = symthaea_core::hdc::binary_hv::BinaryHV(bytes);
+                                crate::databases::MemoryRecord {
+                                    id: format!("ep_{}_{}", ep.timestamp, i),
+                                    memory_type: crate::databases::MemoryType::Episodic,
+                                    encoding,
+                                    content: String::new(),
+                                    timestamp_ms: ep.timestamp as u64 * 20, // ~20ms per cycle at 50Hz
+                                    valence: ep.valence.unwrap_or(0.0),
+                                    arousal: 0.5,
+                                    psi: ep.psi,
+                                    topics: Vec::new(),
+                                    metadata: "{}".to_string(),
+                                    consolidation_strength: ep.psi,
+                                    retrieval_count: 0,
+                                }
+                            })
+                            .collect();
+
+                        std::thread::spawn(move || {
+                            match db.store_batch_sync(&records) {
+                                Ok(n) => {
+                                    tracing::debug!(stored = n, "Memory flush: episodes persisted to SQLite");
+                                }
+                                Err(e) => {
+                                    tracing::warn!(error = %e, "Memory flush failed");
+                                }
+                            }
+                            flush_guard.store(false, Ordering::Relaxed);
+                        });
+                    }
                 }
             }
         }

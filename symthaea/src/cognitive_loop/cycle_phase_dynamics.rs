@@ -137,7 +137,7 @@ impl CognitiveLoopService {
             self.prediction_confidence,
             self.fep.lr_boost,
             prediction_error,
-            self.voice_coherence.bridge.smoothed_coherence(),
+            self.language_comm.voice_coherence.bridge.smoothed_coherence(),
             self.stats.unified_psi as f64,
             phi_attention_weight,
             self.emotion_contagion.arousal,
@@ -183,6 +183,13 @@ impl CognitiveLoopService {
                     let perception_output = self.perception_manager.process(snapshot);
                     self.subsystem_collector
                         .record("perception_manager", perception_output);
+                }
+
+                // ── Swarm Manager (interval 41, co-prime) ─────────────
+                if self.swarm_manager.should_run(cycle_num, urgency_u8) {
+                    let swarm_output = self.swarm_manager.process(snapshot);
+                    self.subsystem_collector
+                        .record("swarm_manager", swarm_output);
                 }
 
                 // ── Governance Manager (interval 37, co-prime) ──────────
@@ -459,7 +466,7 @@ impl CognitiveLoopService {
                 && self.stats.resonator_error_exploration_count
                     > (self.stats.total_cycles / 2) as u64
             {
-                self.adjust_confidence("resonator_sustained_low", 0.005);
+                self.adjust_confidence("resonator_sustained_low", super::thresholds::RESONATOR_SUSTAINED_LOW_CONFIDENCE);
             }
             -confidence_boost
         } else {
@@ -467,7 +474,7 @@ impl CognitiveLoopService {
         };
 
         // ── Phase 17: Coherence memoization — cache pre-update value ─────
-        let pre_update_coherence = self.voice_coherence.bridge.smoothed_coherence();
+        let pre_update_coherence = self.language_comm.voice_coherence.bridge.smoothed_coherence();
 
         // ── Phase 20: Phenomenal binding → threshold gating ──────────────────
         let cached_binding = self.carryover.quality.last_phenomenal_binding as f32;
@@ -596,7 +603,7 @@ impl CognitiveLoopService {
                                                     .clamp(-1.0, 1.0);
                                         }
                                         "high" => {
-                                            self.adjust_confidence("resonator_factor_high", 0.03);
+                                            self.adjust_confidence("resonator_factor_high", super::thresholds::RESONATOR_FACTOR_HIGH_CONFIDENCE);
                                         }
                                         _ => {}
                                     }
@@ -605,13 +612,13 @@ impl CognitiveLoopService {
                         }
 
                         if best_match_sim > RESONATOR_SIMILARITY_PRIME_THRESHOLD {
-                            self.adjust_confidence("resonator_recall_prime", best_match_sim * 0.02);
+                            self.adjust_confidence("resonator_recall_prime", best_match_sim * super::thresholds::RESONATOR_RECALL_PRIME_SCALE);
                             resonator_wm_primed = true;
                         }
 
                         if !match_timestamps.is_empty() {
                             if let Some(ref mut replay) = self.phi_episodic_replay {
-                                replay.boost_causal_consolidation(&match_timestamps, 0.05);
+                                replay.boost_causal_consolidation(&match_timestamps, super::thresholds::RESONATOR_CAUSAL_CONSOLIDATION_BOOST as f64);
                                 resonator_reconsolidated = match_timestamps.len();
                             }
                         }
@@ -1058,7 +1065,7 @@ impl CognitiveLoopService {
             let sensory_error = level_errors[0];
             let abstract_error = level_errors[level_errors.len() - 1];
             if abstract_error > sensory_error * 1.5 && abstract_error > 0.1 {
-                self.adjust_exploration("conceptual_confusion", 0.08);
+                self.adjust_exploration("conceptual_confusion", super::thresholds::CONCEPTUAL_CONFUSION_EXPLORATION);
             }
             wm_sensory_mismatch = sensory_error > abstract_error * 2.0 && sensory_error > 0.1;
         }
@@ -1077,15 +1084,15 @@ impl CognitiveLoopService {
         // 10. Update coherence bridge
         let tau_owned: Vec<ndarray::Array1<f32>> = self.temporal_network.all_tau_owned();
         let tau_refs: Vec<&ndarray::Array1<f32>> = tau_owned.iter().collect();
-        self.voice_coherence.bridge.update(&tau_refs);
+        self.language_comm.voice_coherence.bridge.update(&tau_refs);
 
         // 10b. Update temporal signature encoder
         let flattened_tau: Vec<f32> = tau_owned.iter().flat_map(|a| a.iter().copied()).collect();
-        self.voice_coherence.temporal.record_batch(&flattened_tau);
+        self.language_comm.voice_coherence.temporal.record_batch(&flattened_tau);
 
         // 10c. Update adaptive behavior
-        let (pattern, pattern_confidence) = self.voice_coherence.temporal.classify_state();
-        let coherence = self.voice_coherence.bridge.smoothed_coherence();
+        let (pattern, pattern_confidence) = self.language_comm.voice_coherence.temporal.classify_state();
+        let coherence = self.language_comm.voice_coherence.bridge.smoothed_coherence();
         self.carryover.history.cached_coherence = Some(coherence);
 
         // Voice feedback heartbeat: synthesize metrics from cognitive state
@@ -1108,9 +1115,9 @@ impl CognitiveLoopService {
             duration_accuracy: 0.7,
             energy_consistency: 0.8,
         };
-        self.voice_coherence.voice.update(voice_heartbeat);
+        self.language_comm.voice_coherence.voice.update(voice_heartbeat);
 
-        let voice_confidence = self.voice_coherence.voice.summary().voice_confidence;
+        let voice_confidence = self.language_comm.voice_coherence.voice.summary().voice_confidence;
         self.adaptive_behavior = AdaptiveBehavior::from_consciousness_state(
             pattern,
             pattern_confidence,
@@ -1424,9 +1431,17 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         let math_result = if perception.math.math_detected {
             let _t = Instant::now();
-            // Dispatch solver based on classified problem type.
-            // Currently: descriptive statistics on any extracted numbers from input.
-            // Future: parse parameters from NL input for typed dispatch.
+            // ── Phase 7c: Memory recall — check for analogous past problems ──
+            // Before solving, search mathematical memory for similar episodes.
+            // Science: Hofstadter (2001) — analogy is the core of cognition.
+            let _recalled = {
+                let query_hv = &perception.encoding.hv16_cached;
+                self.math_service.recall_similar(query_hv, 3)
+                    .first()
+                    .map(|ep| (ep.problem_type, ep.phi, ep.description.clone()))
+            };
+
+            // ── Extract numbers from NL input for solver dispatch ──
             let numbers: Vec<f64> = input
                 .split_whitespace()
                 .filter_map(|w| {
@@ -1436,10 +1451,141 @@ impl CognitiveLoopService {
                 })
                 .collect();
 
-            let response = if !numbers.is_empty() {
-                Some(self.math_service.compute_statistics(&numbers))
-            } else {
-                None
+            // ── Route to typed solver based on classified problem type ──
+            use super::math_service::MathProblemType;
+            let problem_type = perception.math.problem_type
+                .unwrap_or(MathProblemType::Unknown);
+
+            let response: Option<super::math_service::MathResponse> = match problem_type {
+                MathProblemType::Statistics => {
+                    if !numbers.is_empty() {
+                        Some(self.math_service.compute_statistics(&numbers))
+                    } else {
+                        None
+                    }
+                }
+                MathProblemType::LinearSystem => {
+                    if numbers.len() >= 5 {
+                        let n = (numbers.len() as f64).sqrt() as usize;
+                        let n = n.max(2);
+                        let matrix_size = n * n;
+                        if numbers.len() >= matrix_size + n {
+                            let a_data = &numbers[..matrix_size];
+                            let b_data = &numbers[matrix_size..matrix_size + n];
+                            Some(self.math_service.solve_linear_system(a_data, n, n, b_data))
+                        } else if !numbers.is_empty() {
+                            Some(self.math_service.compute_statistics(&numbers))
+                        } else {
+                            None
+                        }
+                    } else if !numbers.is_empty() {
+                        Some(self.math_service.compute_statistics(&numbers))
+                    } else {
+                        None
+                    }
+                }
+                MathProblemType::RootFinding => {
+                    if numbers.len() >= 2 {
+                        let a = numbers[0];
+                        let b = numbers[1];
+                        if numbers.len() > 2 {
+                            let coeffs = numbers[2..].to_vec();
+                            Some(self.math_service.find_root_phi_guided(
+                                &|x| coeffs.iter().rev().enumerate()
+                                    .map(|(i, c)| c * x.powi(i as i32))
+                                    .sum::<f64>(),
+                                a, b,
+                            ))
+                        } else {
+                            Some(self.math_service.find_root_phi_guided(
+                                &|x| x * x - 1.0, a, b,
+                            ))
+                        }
+                    } else {
+                        None
+                    }
+                }
+                MathProblemType::Integration => {
+                    if numbers.len() >= 2 {
+                        let a = numbers[0];
+                        let b = numbers[1];
+                        if numbers.len() > 2 {
+                            let coeffs = numbers[2..].to_vec();
+                            Some(self.math_service.integrate(
+                                &|x| coeffs.iter().rev().enumerate()
+                                    .map(|(i, c)| c * x.powi(i as i32))
+                                    .sum::<f64>(),
+                                a, b,
+                            ))
+                        } else {
+                            Some(self.math_service.integrate(&|x| x * x, a, b))
+                        }
+                    } else {
+                        None
+                    }
+                }
+                MathProblemType::MatrixAnalysis => {
+                    if numbers.len() >= 4 {
+                        let n = (numbers.len() as f64).sqrt() as usize;
+                        let n = n.max(2);
+                        if numbers.len() >= n * n {
+                            Some(self.math_service.matrix_determinant(&numbers[..n * n], n))
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                }
+                MathProblemType::Optimization => {
+                    if !numbers.is_empty() {
+                        Some(self.math_service.optimize(
+                            &|x: &[f64]| x.iter().map(|v| v * v).sum::<f64>(),
+                            &numbers,
+                        ))
+                    } else {
+                        None
+                    }
+                }
+                MathProblemType::SignalAnalysis => {
+                    if !numbers.is_empty() {
+                        Some(self.math_service.compute_fft(&numbers))
+                    } else {
+                        None
+                    }
+                }
+                MathProblemType::Geometry => {
+                    if numbers.len() >= 4 && numbers.len() % 2 == 0 {
+                        let pairs: Vec<(f64, f64)> = numbers
+                            .chunks(2)
+                            .map(|c| (c[0], c[1]))
+                            .collect();
+                        Some(self.math_service.convex_hull(&pairs))
+                    } else {
+                        None
+                    }
+                }
+                MathProblemType::GraphTheory => {
+                    if numbers.len() >= 3 && numbers.len() % 3 == 0 {
+                        let n = numbers.iter().cloned().fold(0.0f64, f64::max) as usize + 1;
+                        let edges: Vec<(usize, usize, f64)> = numbers
+                            .chunks(3)
+                            .map(|c| (c[0] as usize, c[1] as usize, c[2]))
+                            .collect();
+                        Some(self.math_service.shortest_path(n, &edges, 0))
+                    } else {
+                        None
+                    }
+                }
+                // Arithmetic, Unknown, and structured-input types (Logic, CSP, DE)
+                // fall back to statistics when numbers are available
+                _ => {
+                    if !numbers.is_empty() {
+                        Some(self.math_service.compute_statistics(&numbers))
+                    } else {
+                        None
+                    }
+                }
             };
 
             let dm = if let Some(ref resp) = response {
@@ -2300,7 +2446,7 @@ impl CognitiveLoopService {
 
         self.stats.temporal_coherence = coherence;
         self.stats.effective_learning_rate = effective_lr;
-        self.stats.coherence_phi_contribution = self.voice_coherence.bridge.phi_contribution();
+        self.stats.coherence_phi_contribution = self.language_comm.voice_coherence.bridge.phi_contribution();
 
         #[cfg(feature = "school_learning")]
         let school_predicted_phi_gain = if self.stats.total_cycles % 53 == 0 {
@@ -2464,9 +2610,21 @@ impl CognitiveLoopService {
                     (0.0f32, 0.0f32, 0.5f32);
 
                 // Generate in a scoped borrow, then apply feedback outside
-                let broca_feedback = if let Some(ref mut broca) = self.broca_manager {
+                let broca_feedback = if let Some(ref mut broca) = self.language_comm.broca_manager {
+                    // Phase 7b: Math epistemic caveat → lower Broca's epistemic confidence.
+                    // When a solver reports uncertainty (error bounds, low R², non-convergence),
+                    // Broca's EpistemicGate suppresses factual assertions and boosts hedging.
+                    // Science: Kahneman (2011) — System 2 must express calibrated uncertainty.
+                    let math_epistemic_penalty = if math_result.epistemic_caveat.is_some() {
+                        0.3 // Push toward Uncertain (ordinal ~2)
+                    } else if math_result.solved && math_result.multipath_verified {
+                        -0.1 // Boost toward Certain for verified math
+                    } else {
+                        0.0
+                    };
                     let signals = super::broca_bridge::BrocaConsciousnessSignals {
-                        epistemic_confidence: self.carryover.quality.last_epistemic_confidence,
+                        epistemic_confidence: (self.carryover.quality.last_epistemic_confidence
+                            - math_epistemic_penalty).clamp(0.0, 1.0),
                         emotional_valence: self.emotion_contagion.prosody_valence()
                             + mode_valence_nudge,
                         emotional_arousal: self.emotion_contagion.prosody_arousal()
@@ -2479,7 +2637,7 @@ impl CognitiveLoopService {
                     if let Some(result) = broca.generate(signals) {
                         // Surface the generated text for consumers
                         if !result.text.is_empty() {
-                            self.last_broca_text = Some(result.text.clone());
+                            self.language_comm.last_broca_text = Some(result.text.clone());
                         }
 
                         // ── Composite quality metric ──
@@ -2551,8 +2709,8 @@ impl CognitiveLoopService {
                     broca_feedback
                 {
                     // Coherence feedback: high Broca coherence → confidence boost
-                    if final_coherence > 0.7 {
-                        self.adjust_confidence("broca_coherent", (final_coherence - 0.7) * 0.03);
+                    if final_coherence > super::thresholds::BROCA_COHERENT_THRESHOLD {
+                        self.adjust_confidence("broca_coherent", (final_coherence - super::thresholds::BROCA_COHERENT_THRESHOLD) * super::thresholds::BROCA_COHERENT_CONFIDENCE_SCALE);
                     } else if final_coherence < 0.3 {
                         self.scale_confidence(
                             "broca_incoherent",
@@ -2569,7 +2727,7 @@ impl CognitiveLoopService {
 
                     // Veto feedback: triggered veto → dampen exploration
                     if veto_triggered {
-                        self.scale_exploration("broca_veto", 0.95);
+                        self.scale_exploration("broca_veto", super::thresholds::BROCA_VETO_EXPLORATION_SCALE);
                     }
 
                     // Semantic PE → FEP: language reconstruction error as
@@ -2624,7 +2782,7 @@ impl CognitiveLoopService {
             coherence,
         };
 
-        let (_, memory_confidence_boost) = {
+        let (evicted_semantic, memory_confidence_boost) = {
             let stability_regime = &mut self.stability_regime;
             let discovery_service = &mut self.discovery_service;
             let semantic_memory = &mut self.semantic_memory;
@@ -2693,6 +2851,23 @@ impl CognitiveLoopService {
                 }
             }
         };
+        // Route evicted semantic entry to graduation pipeline (Phase 2: semantic → episodic flow)
+        if let Some(evicted) = evicted_semantic {
+            let hv = symthaea_core::hdc::unified_hv::ContinuousHV::from_vec(evicted.hdc_vector);
+            self.memory_coordinator.queue_graduation(
+                crate::memory::memory_coordinator::GraduationEvent {
+                    content: hv,
+                    label: evicted.category.unwrap_or_default(),
+                    steps_survived: self.stats.total_cycles as u64 - evicted.timestamp,
+                    final_activation: 1.0 - evicted.prediction_error as f64,
+                    psi_at_graduation: self.language_comm.voice_coherence.bridge.smoothed_coherence() as f64,
+                    coherence_at_graduation: 0.0,
+                    source: Default::default(),
+                    is_verified: false,
+                },
+            );
+        }
+
         // Apply memory context boost to confidence after rayon::join (deferred from parallel branch)
         if memory_confidence_boost.abs() > f32::EPSILON {
             self.adjust_confidence("memory_context_boost", memory_confidence_boost);

@@ -114,10 +114,10 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════
 
         /// Get voice quality summary for external systems
-        pub fn voice_feedback_summary(&self) -> VoiceQualitySummary { self.voice_coherence.voice.summary() }
+        pub fn voice_feedback_summary(&self) -> VoiceQualitySummary { self.language_comm.voice_coherence.voice.summary() }
 
         /// Check if voice indicates uncertainty
-        pub fn voice_indicates_uncertainty(&self) -> bool { self.voice_coherence.voice.is_uncertain() }
+        pub fn voice_indicates_uncertainty(&self) -> bool { self.language_comm.voice_coherence.voice.is_uncertain() }
 
         // ═══════════════════════════════════════════════════════════════════
         // MEGA-UNIFIED ARCHITECTURE
@@ -207,12 +207,12 @@ impl CognitiveLoopService {
 
     /// Update voice feedback with synthesis output metrics
     pub fn update_voice_feedback(&mut self, metrics: VoiceOutputMetrics) {
-        self.voice_coherence.voice.update(metrics);
+        self.language_comm.voice_coherence.voice.update(metrics);
     }
 
     /// Update listener prediction feedback
     pub fn update_listener_prediction(&mut self, success: f32) {
-        self.voice_coherence
+        self.language_comm.voice_coherence
             .voice
             .update_listener_prediction(success);
     }
@@ -223,11 +223,11 @@ impl CognitiveLoopService {
     /// dissipative health, coherence velocity, and consciousness level —
     /// the signals needed by `CognitivePacing::from_cycle_metadata()`.
     pub fn voice_consciousness_signals(&self) -> VoiceConsciousnessSignals {
-        let (_, pattern_confidence) = self.voice_coherence.temporal.classify_state();
+        let (_, pattern_confidence) = self.language_comm.voice_coherence.temporal.classify_state();
         let consciousness_level =
             super::super::snapshot::ConsciousnessSnapshot::compute_consciousness_level(
                 self.prediction_confidence as f32,
-                self.voice_coherence.bridge.smoothed_coherence(),
+                self.language_comm.voice_coherence.bridge.smoothed_coherence(),
                 self.flow_state.intensity,
                 pattern_confidence,
             );
@@ -267,8 +267,8 @@ impl CognitiveLoopService {
             coherence_velocity: signals.coherence_velocity,
             cross_agreement: signals.cross_module_agreement,
             consciousness_level: signals.consciousness_level as f32,
-            articulation_quality: self.voice_coherence.voice.smoothed_articulation(),
-            rate_stability: self.voice_coherence.voice.rate_stability(),
+            articulation_quality: self.language_comm.voice_coherence.voice.smoothed_articulation(),
+            rate_stability: self.language_comm.voice_coherence.voice.rate_stability(),
             integrated_phi: self
                 .carryover
                 .consciousness
@@ -286,8 +286,8 @@ impl CognitiveLoopService {
 
     /// Get combined phi contribution from all feedback sources
     pub fn combined_phi_contribution(&self) -> f32 {
-        self.voice_coherence.bridge.phi_contribution()
-            + self.voice_coherence.voice.compute_phi_adjustment()
+        self.language_comm.voice_coherence.bridge.phi_contribution()
+            + self.language_comm.voice_coherence.voice.compute_phi_adjustment()
     }
 
     /// Get the prediction-outcome coupling Modulation Index
@@ -314,8 +314,8 @@ impl CognitiveLoopService {
 
     /// Get combined learning rate modifier
     pub fn combined_learning_rate(&self) -> f32 {
-        let coherence_lr = self.voice_coherence.bridge.effective_learning_rate();
-        let voice_modifier = self.voice_coherence.voice.learning_rate_modifier();
+        let coherence_lr = self.language_comm.voice_coherence.bridge.effective_learning_rate();
+        let voice_modifier = self.language_comm.voice_coherence.voice.learning_rate_modifier();
         coherence_lr * voice_modifier
     }
 
@@ -743,5 +743,19 @@ impl CognitiveLoopService {
     /// Access the streaming inference engine stats (if enabled).
     pub fn streaming_inference_stats(&self) -> Option<crate::inference::StreamingStats> {
         self.streaming_inference.as_ref().map(|si| si.stats())
+    }
+
+    /// Access the language and communication manager.
+    pub fn language_comm(
+        &self,
+    ) -> &super::super::language_comm_manager::LanguageAndCommunicationManager {
+        &self.language_comm
+    }
+
+    /// Access the vision and sensory manager.
+    pub fn vision_sensory(
+        &self,
+    ) -> &super::super::vision_sensory_manager::VisionAndSensoryManager {
+        &self.vision_sensory
     }
 }

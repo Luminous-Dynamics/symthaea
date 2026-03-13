@@ -390,8 +390,10 @@ impl CognitiveLoopService {
         let primitive_tier =
             super::primitive_tier::PrimitiveTierManager::new(&config, config.cfc_config.input_dim);
 
-        // Build optional episodic replay (needs config fields before move)
-        let phi_episodic_replay = if config.episodic_replay {
+        // Always create episodic replay — it backs both graduation (always-on when
+        // memory_graduation=true) and replay training (gated by episodic_replay_training).
+        // Previously gated on config.episodic_replay, which blocked ALL graduation.
+        let phi_episodic_replay = if config.memory_graduation || config.episodic_replay_training {
             Some(crate::memory::episodic_replay::EpisodicMemory::new(
                 config.episodic_replay_config.clone(),
             ))
@@ -477,7 +479,7 @@ impl CognitiveLoopService {
         let knowledge_db_path = config.knowledge_db_path.clone();
         let enable_streaming_inference = config.enable_streaming_inference;
 
-        Ok(Self {
+        let mut service = Self {
             config,
             encoder,
             temporal_network,
@@ -488,7 +490,32 @@ impl CognitiveLoopService {
             last_prediction: None,
             start_time: Instant::now(),
             is_consolidating: false,
-            voice_coherence,
+            language_comm: super::language_comm_manager::LanguageAndCommunicationManager {
+                voice_coherence,
+                #[cfg(feature = "ssm_language")]
+                broca_manager: if broca_enabled {
+                    let genesis = broca_genesis_phrase
+                        .as_deref()
+                        .map(symthaea_core::genesis::GenesisSeed::from_phrase)
+                        .unwrap_or_else(|| {
+                            symthaea_core::genesis::GenesisSeed::from_phrase("symthaea-broca-default")
+                        });
+                    Some(super::broca_bridge::BrocaManager::new(
+                        &genesis,
+                        symthaea_broca::BrocaConfig::default(),
+                        broca_checkpoint_path.as_deref(),
+                    ))
+                } else {
+                    None
+                },
+                #[cfg(feature = "ssm_language")]
+                last_broca_text: None,
+                user_state: if enable_user_state {
+                    Some(crate::user_state_inference::UserStateInference::new())
+                } else {
+                    None
+                },
+            },
             adaptive_behavior,
             prediction_confidence: 0.5_f64, // Start neutral
             flow_state: FlowState::default(),
@@ -657,6 +684,8 @@ impl CognitiveLoopService {
             async_trainer,
             causal_enhancer,
             phi_episodic_replay,
+            memory_db: None, // initialized below after struct creation
+            memory_flush_in_progress: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
             #[cfg(feature = "reasoning_engine")]
             reasoning_engine: Some(
                 crate::consciousness::reasoning_engine::ConsciousReasoningEngine::new(),
@@ -739,63 +768,43 @@ impl CognitiveLoopService {
                 None
             },
             social_mgr: super::SocialManager::new(enable_primitive_consciousness),
-            user_state: if enable_user_state {
-                Some(crate::user_state_inference::UserStateInference::new())
-            } else {
-                None
+            vision_sensory: super::vision_sensory_manager::VisionAndSensoryManager {
+                coherence_field: if enable_coherence_field {
+                    Some(crate::physiology::CoherenceField::new())
+                } else {
+                    None
+                },
+                virtual_body,
+                #[cfg(feature = "vision-manifold")]
+                vision_bridge: if vision_manifold_enabled {
+                    let vm_config = symthaea_vision_manifold::VisionConfig::default();
+                    Some(symthaea_vision_manifold::VisionBridge::new(
+                        vm_config,
+                        vision_frame_width,
+                        vision_frame_height,
+                    ))
+                } else {
+                    None
+                },
+                #[cfg(feature = "vision-manifold")]
+                vision_frame_buffer: None,
+                #[cfg(feature = "vision-manifold")]
+                cross_manifold_predictor: cross_manifold_predictor_init,
+                #[cfg(feature = "foveation")]
+                foveation_manager: {
+                    let fov_config = symthaea_foveation::FoveationConfig::default();
+                    Some(std::sync::Mutex::new(
+                        symthaea_foveation::FoveationManager::new(fov_config, 8),
+                    ))
+                },
             },
-            coherence_field: if enable_coherence_field {
-                Some(crate::physiology::CoherenceField::new())
-            } else {
-                None
-            },
-            virtual_body,
             #[cfg(feature = "nurture")]
             nurture_attachment: if enable_nurture_attachment {
                 Some(super::nurture_bridge::NurtureAttachmentBridge::new())
             } else {
                 None
             },
-            #[cfg(feature = "vision-manifold")]
-            vision_bridge: if vision_manifold_enabled {
-                let vm_config = symthaea_vision_manifold::VisionConfig::default();
-                Some(symthaea_vision_manifold::VisionBridge::new(
-                    vm_config,
-                    vision_frame_width,
-                    vision_frame_height,
-                ))
-            } else {
-                None
-            },
-            #[cfg(feature = "vision-manifold")]
-            vision_frame_buffer: None,
-            #[cfg(feature = "vision-manifold")]
-            cross_manifold_predictor: cross_manifold_predictor_init,
-            #[cfg(feature = "foveation")]
-            foveation_manager: {
-                let fov_config = symthaea_foveation::FoveationConfig::default();
-                Some(std::sync::Mutex::new(
-                    symthaea_foveation::FoveationManager::new(fov_config, 8),
-                ))
-            },
-            #[cfg(feature = "ssm_language")]
-            broca_manager: if broca_enabled {
-                let genesis = broca_genesis_phrase
-                    .as_deref()
-                    .map(symthaea_core::genesis::GenesisSeed::from_phrase)
-                    .unwrap_or_else(|| {
-                        symthaea_core::genesis::GenesisSeed::from_phrase("symthaea-broca-default")
-                    });
-                Some(super::broca_bridge::BrocaManager::new(
-                    &genesis,
-                    symthaea_broca::BrocaConfig::default(),
-                    broca_checkpoint_path.as_deref(),
-                ))
-            } else {
-                None
-            },
-            #[cfg(feature = "ssm_language")]
-            last_broca_text: None,
+            // vision/foveation/broca inits moved to vision_sensory and language_comm managers above
             #[cfg(feature = "canvas")]
             canvas_manager: Some(super::canvas_bridge::CanvasManager::new()),
             #[cfg(feature = "canvas")]
@@ -1027,7 +1036,22 @@ impl CognitiveLoopService {
             } else {
                 None
             },
-        })
+        };
+
+        // Initialize persistent memory database if configured
+        if let Some(ref db_path) = service.config.memory_db_path {
+            match crate::databases::SqliteMemory::new(db_path) {
+                Ok(db) => {
+                    tracing::info!(path = %db_path, "Memory persistence database initialized");
+                    service.memory_db = Some(std::sync::Arc::new(db));
+                }
+                Err(e) => {
+                    tracing::warn!(path = %db_path, error = %e, "Failed to open memory database — persistence disabled");
+                }
+            }
+        }
+
+        Ok(service)
     }
 
     /// Build a dense-encoded HarmonyBasis by encoding HARMONY_KEYWORDS through
@@ -1273,17 +1297,27 @@ mod tests {
     }
 
     #[test]
-    fn episodic_replay_disabled_by_default() {
+    fn episodic_memory_created_by_default_for_graduation() {
+        // memory_graduation defaults to true, so phi_episodic_replay is always created
         let config = CognitiveLoopConfig::default();
         let service = CognitiveLoopService::new(config).unwrap();
         assert_eq!(service.episodic_replay_count(), 0);
+        assert!(service.episodic_replay_stats().is_some());
+    }
+
+    #[test]
+    fn episodic_memory_absent_when_graduation_disabled() {
+        let mut config = CognitiveLoopConfig::default();
+        config.memory_graduation = false;
+        config.episodic_replay_training = false;
+        let service = CognitiveLoopService::new(config).unwrap();
         assert!(service.episodic_replay_stats().is_none());
     }
 
     #[test]
     fn episodic_replay_enabled_creates_memory() {
         let mut config = CognitiveLoopConfig::default();
-        config.episodic_replay = true;
+        config.episodic_replay_training = true;
         let service = CognitiveLoopService::new(config).unwrap();
         assert!(service.episodic_replay_stats().is_some());
         assert_eq!(service.episodic_replay_count(), 0);
