@@ -417,14 +417,14 @@ pub fn submit_dkg_deal(input: SubmitDkgDealInput) -> ExternResult<Record> {
     for link in member_links {
         let ah = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(ah.clone(), GetOptions::default())? {
+        if let Some(record) = get_latest_record(ah)? {
             if let Some(m) = record
                 .entry()
                 .to_app_option::<CommitteeMember>()
                 .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
             {
                 if m.agent == caller {
-                    member_action_hash = Some(ah);
+                    member_action_hash = Some(record.action_address().clone());
                     member = Some(m);
                     break;
                 }
@@ -887,9 +887,8 @@ pub fn finalize_dkg(input: FinalizeDkgInput) -> ExternResult<Record> {
         }
     };
 
-    let record = get(committee_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
-        WasmErrorInner::Guest("Committee not found".into())
-    ))?;
+    let record = get_latest_record(committee_hash.clone())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Committee not found".into())))?;
 
     let mut committee: SigningCommittee = record
         .entry()
@@ -951,7 +950,7 @@ pub fn finalize_dkg(input: FinalizeDkgInput) -> ExternResult<Record> {
         for link in &member_links {
             let ah = ActionHash::try_from(link.target.clone())
                 .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-            if let Some(record) = get(ah.clone(), GetOptions::default())? {
+            if let Some(record) = get_latest_record(ah)? {
                 if let Some(mut m) = record
                     .entry()
                     .to_app_option::<CommitteeMember>()
@@ -959,7 +958,7 @@ pub fn finalize_dkg(input: FinalizeDkgInput) -> ExternResult<Record> {
                 {
                     if m.participant_id == *member_id {
                         m.qualified = true;
-                        update_entry(ah, &EntryTypes::CommitteeMember(m))?;
+                        update_entry(record.action_address().clone(), &EntryTypes::CommitteeMember(m))?;
                         break;
                     }
                 }
@@ -1407,7 +1406,7 @@ pub fn get_committee_members(committee_id: String) -> ExternResult<Vec<Record>> 
     for link in links {
         let ah = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(ah, GetOptions::default())? {
+        if let Some(record) = get_latest_record(ah)? {
             members.push(record);
         }
     }
@@ -1567,7 +1566,7 @@ pub fn rotate_committee_keys(committee_id: String) -> ExternResult<Record> {
     for link in &member_links {
         let ah = ActionHash::try_from(link.target.clone())
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(ah, GetOptions::default())? {
+        if let Some(record) = get_latest_record(ah)? {
             if let Some(m) = record
                 .entry()
                 .to_app_option::<CommitteeMember>()
@@ -1621,7 +1620,7 @@ pub fn get_committee_history(committee_id: String) -> ExternResult<Vec<Record>> 
     for link in links {
         let ah = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(ah, GetOptions::default())? {
+        if let Some(record) = get_latest_record(ah)? {
             records.push(record);
         }
     }

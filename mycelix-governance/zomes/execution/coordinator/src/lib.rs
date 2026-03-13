@@ -48,6 +48,25 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     hash_entry(&EntryTypes::Anchor(anchor))
 }
 
+/// Follow update chains to get the latest version of a record.
+fn get_latest_record(action_hash: ActionHash) -> ExternResult<Option<Record>> {
+    let Some(details) = get_details(action_hash, GetOptions::default())? else {
+        return Ok(None);
+    };
+    match details {
+        Details::Record(record_details) => {
+            if record_details.updates.is_empty() {
+                Ok(Some(record_details.record))
+            } else {
+                let latest_update = &record_details.updates[record_details.updates.len() - 1];
+                let latest_hash = latest_update.action_address().clone();
+                get_latest_record(latest_hash)
+            }
+        }
+        Details::Entry(_) => Ok(None),
+    }
+}
+
 /// O(1) link-based lookup: find a timelock record by its string ID.
 /// Falls back to O(n) chain scan if the link is missing (backwards compat).
 fn find_timelock_by_id(timelock_id: &str) -> ExternResult<Record> {
@@ -60,7 +79,7 @@ fn find_timelock_by_id(timelock_id: &str) -> ExternResult<Record> {
         ) {
             if let Some(link) = links.into_iter().max_by_key(|l| l.timestamp) {
                 if let Ok(ah) = ActionHash::try_from(link.target) {
-                    if let Some(record) = get(ah, GetOptions::default())? {
+                    if let Some(record) = get_latest_record(ah)? {
                         return Ok(record);
                     }
                 }
@@ -208,7 +227,7 @@ pub fn get_proposal_timelock(proposal_id: String) -> ExternResult<Option<Record>
     if let Some(link) = latest_link {
         let action_hash = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        return get(action_hash, GetOptions::default());
+        return get_latest_record(action_hash);
     }
 
     Ok(None)
@@ -1112,7 +1131,7 @@ fn find_fund_allocation_for_proposal(
     if let Some(link) = latest_link {
         let action_hash = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(action_hash, GetOptions::default())? {
+        if let Some(record) = get_latest_record(action_hash)? {
             let alloc: FundAllocation = record
                 .entry()
                 .to_app_option()
@@ -1141,7 +1160,7 @@ pub fn get_pending_timelocks(_: ()) -> ExternResult<Vec<Record>> {
     for link in links {
         let action_hash = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(action_hash, GetOptions::default())? {
+        if let Some(record) = get_latest_record(action_hash)? {
             // Filter to only actually pending timelocks
             if let Some(tl) = record
                 .entry()
