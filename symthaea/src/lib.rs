@@ -387,6 +387,7 @@ pub mod integration;
 pub mod action;
 
 // Coding Agent: multi-step consciousness-gated coding loop
+#[cfg(feature = "code_generation")]
 pub mod coding_agent;
 
 // Partnership (enabled - 0 errors)

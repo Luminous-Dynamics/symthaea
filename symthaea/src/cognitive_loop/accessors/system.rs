@@ -515,6 +515,11 @@ impl CognitiveLoopService {
         }
     }
 
+    /// Get the last assembled reasoning context (if knowledge engine is enabled).
+    pub fn reasoning_context(&self) -> Option<&crate::knowledge::ReasoningContext> {
+        self.last_reasoning_context.as_ref()
+    }
+
     /// Trace causal chains from a starting concept through the knowledge causal bridge.
     pub fn knowledge_causal_chain(&self, start: &str, max_depth: usize) -> Vec<Vec<String>> {
         if let Some(ref km) = self.knowledge_manager {
@@ -522,5 +527,108 @@ impl CognitiveLoopService {
         } else {
             Vec::new()
         }
+    }
+
+    /// Whether the canvas living topology pipeline is active.
+    #[cfg(feature = "canvas")]
+    pub fn has_canvas(&self) -> bool {
+        self.canvas_manager.is_some()
+    }
+
+    /// Last Birkhoff aesthetic score (0.0-1.0) from the canvas pipeline.
+    #[cfg(feature = "canvas")]
+    pub fn canvas_aesthetic_score(&self) -> f32 {
+        self.canvas_manager
+            .as_ref()
+            .map(|m| m.last_telemetry().aesthetic_score)
+            .unwrap_or(0.0)
+    }
+
+    /// Take the last generated canvas SVG (drains it).
+    #[cfg(feature = "canvas")]
+    pub fn take_canvas_svg(&mut self) -> Option<String> {
+        self.canvas_manager.as_mut().and_then(|m| m.take_svg())
+    }
+
+    /// Last canvas generation time in microseconds.
+    #[cfg(feature = "canvas")]
+    pub fn canvas_generation_time_us(&self) -> u64 {
+        self.canvas_manager
+            .as_ref()
+            .map(|m| m.last_telemetry().generation_time_us)
+            .unwrap_or(0)
+    }
+
+    /// Set the canvas generation interval (SVG produced every N cycles).
+    #[cfg(feature = "canvas")]
+    pub fn set_canvas_generation_interval(&mut self, interval: u32) {
+        if let Some(ref mut mgr) = self.canvas_manager {
+            mgr.set_generation_interval(interval);
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // INSTITUTIONAL REASONING ACCESSORS
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// Query what happens when a component is removed from an institutional composite.
+    ///
+    /// Uses the causal axioms loaded in the CompositionAlgebra to find the nearest
+    /// known institutional pattern after unbinding. Example: removing ENFORCEMENT
+    /// from NATION_STATE → nearest pattern is FAILED_STATE.
+    ///
+    /// Returns `(nearest_axiom_name, similarity, residual_encoding)`.
+    pub fn institutional_query_transition(
+        &self,
+        composite: &str,
+        removed: &str,
+    ) -> Result<
+        (String, f32, symthaea_core::hdc::binary_hv::BinaryHV),
+        symthaea_core::hdc::primitive_system::CompositionAlgebraError,
+    > {
+        use symthaea_core::hdc::primitive_system::{
+            CompositionAlgebra, PrimitiveSystem,
+        };
+
+        let system = PrimitiveSystem::global();
+        let mut algebra = CompositionAlgebra::new();
+        algebra.load_institutional_axioms(system);
+        algebra.query_transition(composite, removed, system)
+    }
+
+    /// Simulate a chain of institutional state transitions.
+    ///
+    /// Each step either removes or adds a component. Returns the full trajectory
+    /// showing which axiom is nearest at each step.
+    ///
+    /// Example: `[Remove("ENFORCEMENT"), Add("LEGITIMACY")]` starting from
+    /// NATION_STATE traces collapse → reconstruction.
+    pub fn institutional_query_chain(
+        &self,
+        start: &str,
+        steps: &[symthaea_core::hdc::primitive_system::TransitionStep<'_>],
+    ) -> Result<
+        Vec<symthaea_core::hdc::primitive_system::TransitionResult>,
+        symthaea_core::hdc::primitive_system::CompositionAlgebraError,
+    > {
+        use symthaea_core::hdc::primitive_system::{
+            CompositionAlgebra, PrimitiveSystem,
+        };
+
+        let system = PrimitiveSystem::global();
+        let mut algebra = CompositionAlgebra::new();
+        algebra.load_institutional_axioms(system);
+        algebra.query_chain(start, steps, system)
+    }
+
+    /// Load external regulatory constraints into the ethics engine's compliance checker.
+    ///
+    /// Use this to add jurisdiction-specific constraints at runtime, e.g., from
+    /// Mycelix JurisdictionConstraintEntry records. Returns the number loaded.
+    pub(crate) fn load_institutional_constraints(
+        &mut self,
+        specs: &[super::super::ethics_engine::ExternalConstraintSpec],
+    ) -> usize {
+        self.ethics_engine.load_external_constraints(specs)
     }
 }

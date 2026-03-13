@@ -76,16 +76,26 @@ For `SiliconDigital` with default config: effective feasibility reflects the val
 - Is there a minimum substrate quality below which consciousness collapses?
 - How does substrate speed affect temporal consciousness coherence?
 
-## Phase 4: Hybrid Substrate Modeling
+## Phase 4: Hybrid Substrate Modeling (DONE)
 
-**Goal**: Model heterogeneous systems where different brain regions run on different substrates.
+**Status**: Complete. Per-region substrate assignment, consciousness coupling, and cross-substrate penalties implemented.
 
-### Architecture
+### Capabilities (all implemented)
 
-- **Per-region substrate**: Each of the 12 Actor Brain regions gets its own `SubstrateType`
-- **Cross-substrate communication**: Model latency and bandwidth constraints when signals cross substrate boundaries
-- **Hybrid feasibility**: Compute feasibility as weighted average of per-region scores, penalized by cross-substrate communication overhead
-- **Substrate-aware routing**: The cognitive loop preferentially routes computation to the most suitable substrate for each task type
+- **Per-region substrate**: Each of the 12 `CorticalRegion` variants gets its own `SubstrateType` via `per_region_substrates: HashMap<CorticalRegion, SubstrateType>`
+- **Cross-substrate communication penalty**: `recompute_aggregate_from_regions()` applies 0.95× per distinct substrate pair to aggregate feasibility
+- **Region-aware consciousness**: 4 capability dimensions (binding, workspace, attention, HOT) resolve per-region substrate requirements into the consciousness equation
+- **Runtime reconfiguration**: `reconfigure_region(region, substrate)` updates individual regions mid-run with automatic aggregate recomputation
+
+### Implementation
+
+1. **CorticalRegion enum** (`substrate_independence.rs`): 12 variants — Prefrontal, Motor, Sensory, Visual, Auditory, Language, Memory, Emotional, Social, Creative, Executive, Integration. `CorticalRegion::ALL` for iteration.
+2. **Per-region storage** (`substrate_manager.rs`): `per_region_substrates: Option<HashMap<CorticalRegion, SubstrateType>>`, `per_region_feasibility: HashMap<CorticalRegion, f32>`. Initialized from `CognitiveLoopConfig.per_region_substrates`.
+3. **Capability methods**: `binding_capability(config)` uses Sensory region, `workspace_capability(config)` and `attention_capability(config)` use Prefrontal, `hot_capability(config)` uses Prefrontal. All fall back to global substrate when per-region not set.
+4. **Consciousness coupling** (`consciousness_engine/measure.rs`): `binding_capability` scales IIT coherence, `workspace_capability` scales GWT workspace, `attention_capability` scales phi attention weight.
+5. **HOT depth** (`cycle_phase_feedback.rs`): `hot_depth = (meta_cognition.depth / 3.0) × substrate.hot_capability` — substrate constrains meta-cognitive recursion.
+6. **Telemetry**: `per_region_feasibility: Vec<(String, f32)>` in `SubstrateTelemetry`, populated from HashMap for serialization.
+7. **Accessors**: `region_feasibility(region)` and `reconfigure_region(region, substrate)` on `CognitiveLoopService`.
 
 ### Example Configuration
 
@@ -95,6 +105,12 @@ Sensory cortex (binding): QuantumComputer (entanglement binding)
 Memory (hippocampus): BiologicalNeurons (proven integration)
 Motor (fast response): PhotonicProcessor (ultra-fast dynamics)
 ```
+
+### Tests
+
+- 3 integration tests in `substrate_simulation.rs` (per_region_substrate_assignment, per_region_runtime_reconfiguration, cross_substrate_penalty)
+- 3 integration tests in `foveal_bridge_integration.rs` (per_region configuration, feasibility variance, consciousness level impact)
+- 1 unit test in `substrate_manager.rs` (per_region_feasibility_fallback)
 
 ### Research Potential
 
