@@ -679,9 +679,12 @@ impl CognitiveLoopService {
             #[cfg(any(feature = "full_consciousness", feature = "magi_loop"))]
             dream_feedback_bridge:
                 crate::consciousness::recursive_improvement::DreamFeedbackBridge::new(),
-            predictive_mind,
-            cross_modal_binder,
-            affective_bridge,
+            consciousness_state: super::consciousness_state_manager::ConsciousnessStateManager {
+                predictive_mind,
+                cross_modal_binder,
+                phi_attention_gate: Some(crate::attention::PhiAttentionGate::default_gate()),
+                affective_bridge,
+            },
             contextual_weights,
             phi_attention,
             negation_detector,
@@ -808,7 +811,6 @@ impl CognitiveLoopService {
             #[cfg(feature = "full_consciousness")]
             enactive: EnactiveCognition::new(),
             biorhythm_mgr: super::biorhythm_manager::BiorhythmManager::new(timezone_offset_hours),
-            phi_attention_gate: Some(crate::attention::PhiAttentionGate::default_gate()),
             metrics_collector: Some(crate::infrastructure::MetricsCollector::new()),
             knowledge_manager: if enable_knowledge_engine {
                 let km_config = crate::knowledge::manager::KnowledgeManagerConfig {
@@ -1005,6 +1007,7 @@ impl CognitiveLoopService {
             last_motor_result: None,
             last_motor_phi: 0.0,
             math_service: super::math_service::MathService::new(),
+            resonant_speech: crate::resonant_speech::ResonantSpeech::new(),
         })
     }
 
@@ -1038,7 +1041,7 @@ impl CognitiveLoopService {
             });
 
         // Encode all 8 harmony keyword strings in batch
-        let keyword_refs: Vec<&str> = HARMONY_KEYWORDS.iter().copied().collect();
+        let keyword_refs: Vec<&str> = HARMONY_KEYWORDS.to_vec();
         let batch_result = match embedder.embed_batch(&keyword_refs) {
             Ok(results) => results,
             Err(e) => {

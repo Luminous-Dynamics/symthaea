@@ -793,17 +793,7 @@ impl CognitiveLoopService {
         }
         self.policy_agreement_window.clear();
         self.carryover = CycleCarryover::default();
-        if let Some(ref mut mind) = self.predictive_mind {
-            *mind = crate::consciousness::predictive_processing::PredictiveMind::new(
-                crate::consciousness::predictive_processing::PredictiveConfig::default(),
-            );
-        }
-        if let Some(ref mut binder) = self.cross_modal_binder {
-            binder.clear();
-        }
-        if let Some(ref mut bridge) = self.affective_bridge {
-            *bridge = crate::brain::affective_bridge::AffectiveBridge::default();
-        }
+        self.consciousness_state.reset();
         if let Some(ref mut thermo) = self.consciousness_monitors.thermodynamics {
             *thermo = crate::consciousness::consciousness_thermodynamics::ConsciousnessThermodynamicsAnalyzer::new(
                 crate::consciousness::consciousness_thermodynamics::ThermodynamicsConfig::default(),

@@ -371,7 +371,7 @@ impl CognitiveLoopService {
         // 0.5 Phi-Guided Attention Gating
         // ═══════════════════════════════════════════════════════════════════════
         let phi_attention_weight = {
-            let raw = if let Some(ref mut gate) = self.phi_attention_gate {
+            let raw = if let Some(ref mut gate) = self.consciousness_state.phi_attention_gate {
                 let phi_vals = [self.stats.unified_psi as f64];
                 let result = gate.forward(std::slice::from_ref(&encoding_result.hdv), &phi_vals);
                 result.weights.first().copied().unwrap_or(1.0)

@@ -617,7 +617,7 @@ impl CognitiveLoopService {
         predictive_free_energy: f64,
     ) -> (f32, f64) {
         let (cross_modal_binding_strength, cross_modal_psi) =
-            if let Some(ref mut binder) = self.cross_modal_binder {
+            if let Some(ref mut binder) = self.consciousness_state.cross_modal_binder {
                 use symthaea_core::hdc::unified_hv::ContinuousHV;
                 binder.clear();
                 let linguistic_repr = ModalRepresentation::new(
@@ -627,7 +627,7 @@ impl CognitiveLoopService {
                     "encoder",
                 );
                 binder.add_representation(linguistic_repr);
-                if self.affective_bridge.is_some() {
+                if self.consciousness_state.affective_bridge.is_some() {
                     let affect_seed = (affective_valence * 1000.0) as u64;
                     let affective_hv = symthaea_core::hdc::binary_hv::BinaryHV::random(affect_seed);
                     binder.update_modality(Modality::Affective, affective_hv);
@@ -660,13 +660,13 @@ impl CognitiveLoopService {
         }
 
         // FEEDBACK: Predictive <-> Cross-Modal bidirectional coupling (Talsma 2015)
-        if let Some(ref mut mind) = self.predictive_mind {
+        if let Some(ref mut mind) = self.consciousness_state.predictive_mind {
             if cross_modal_binding_strength > 0.5 {
                 let precision_boost = (cross_modal_binding_strength - 0.5) as f64 * 0.1;
                 mind.precision.boost_precision(precision_boost);
             }
         }
-        if let Some(ref mut binder) = self.cross_modal_binder {
+        if let Some(ref mut binder) = self.consciousness_state.cross_modal_binder {
             if predictive_free_energy > 0.6 {
                 let dampen = (1.0 - (predictive_free_energy - 0.6) * 0.3).max(0.5) as f32;
                 binder.set_attention_weight(dampen);
