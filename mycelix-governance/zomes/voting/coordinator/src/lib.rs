@@ -15,6 +15,25 @@
 use hdk::prelude::*;
 use voting_integrity::*;
 
+/// Follow update chains to get the latest version of a record.
+fn get_latest_record(action_hash: ActionHash) -> ExternResult<Option<Record>> {
+    let Some(details) = get_details(action_hash, GetOptions::default())? else {
+        return Ok(None);
+    };
+    match details {
+        Details::Record(record_details) => {
+            if record_details.updates.is_empty() {
+                Ok(Some(record_details.record))
+            } else {
+                let latest_update = &record_details.updates[record_details.updates.len() - 1];
+                let latest_hash = latest_update.action_address().clone();
+                get_latest_record(latest_hash)
+            }
+        }
+        Details::Entry(_) => Ok(None),
+    }
+}
+
 /// Full proposal mirror for voting-period verification.
 /// Must match Proposal field order exactly (msgpack positional deserialization).
 /// Avoids linking proposals_integrity which causes duplicate HDI symbols in WASM.
@@ -317,11 +336,11 @@ pub fn cast_vote(input: CastVoteInput) -> ExternResult<Record> {
         serde_json::json!({"action_type": "Voting", "action_id": input.proposal_id.clone()}),
     )? {
         if let Ok(result) = extern_io.decode::<serde_json::Value>() {
-            let has_credential = result
-                .get("has_credential")
+            let passed = result
+                .get("passed")
                 .and_then(|v| v.as_bool())
                 .unwrap_or(false);
-            if !has_credential {
+            if !passed {
                 return Err(wasm_error!(WasmErrorInner::Guest(
                     "Voting requires a valid consciousness credential. Complete identity verification first.".into()
                 )));
@@ -1196,7 +1215,7 @@ fn get_voter_credits(voter_did: &str) -> ExternResult<VoiceCredits> {
             wasm_error!(WasmErrorInner::Guest("Invalid credits link target".into()))
         })?;
 
-        if let Some(record) = get(action_hash, GetOptions::default())? {
+        if let Some(record) = get_latest_record(action_hash)? {
             if let Some(credits) = record
                 .entry()
                 .to_app_option::<VoiceCredits>()

@@ -23,19 +23,15 @@ pub fn call_local(
     fn_name: &str,
     payload: impl serde::Serialize + std::fmt::Debug,
 ) -> ExternResult<ExternIO> {
-    let encoded = ExternIO::encode(payload).map_err(|e| {
-        wasm_error!(WasmErrorInner::Guest(format!(
-            "Failed to encode payload for {}::{}: {}",
-            zome, fn_name, e
-        )))
-    })?;
-
+    // Pass payload directly to call() — it handles serialization internally.
+    // Do NOT pre-encode with ExternIO::encode(), which causes double-encoding
+    // (call() would serialize the Vec<u8> as msgpack bin8, wrapping the already-encoded bytes).
     match call(
         CallTargetCell::Local,
         ZomeName::from(zome),
         FunctionName::from(fn_name),
         None,
-        encoded,
+        payload,
     )? {
         ZomeCallResponse::Ok(io) => Ok(io),
         ZomeCallResponse::NetworkError(e) => Err(wasm_error!(WasmErrorInner::Guest(format!(
@@ -58,19 +54,15 @@ pub fn call_role(
     fn_name: &str,
     payload: impl serde::Serialize + std::fmt::Debug,
 ) -> ExternResult<ExternIO> {
-    let encoded = ExternIO::encode(payload).map_err(|e| {
-        wasm_error!(WasmErrorInner::Guest(format!(
-            "Failed to encode payload for {}::{}::{}: {}",
-            role, zome, fn_name, e
-        )))
-    })?;
-
+    // Pass payload directly to call() — it handles serialization internally.
+    // Do NOT pre-encode with ExternIO::encode(), which causes double-encoding
+    // (call() would serialize the Vec<u8> as msgpack bin8, wrapping the already-encoded bytes).
     match call(
         CallTargetCell::OtherRole(role.into()),
         ZomeName::from(zome),
         FunctionName::from(fn_name),
         None,
-        encoded,
+        payload,
     )? {
         ZomeCallResponse::Ok(io) => Ok(io),
         ZomeCallResponse::NetworkError(e) => Err(wasm_error!(WasmErrorInner::Guest(format!(
