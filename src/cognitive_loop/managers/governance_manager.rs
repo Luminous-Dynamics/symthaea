@@ -359,11 +359,18 @@ impl GovernanceManager {
         outcome: &GovernanceOutcome,
         output: &mut SubsystemOutput,
     ) {
-        // 1. Compute prediction error
+        // 1. Compute prediction error (with TTL check)
         let predicted = self
             .predicted_outcomes
             .remove(&outcome.proposal_id)
-            .map(|(pred, _)| pred)
+            .and_then(|(pred, cycle)| {
+                // Evict stale predictions — treat as unknown
+                if self.current_cycle.saturating_sub(cycle) < Self::PREDICTION_TTL_CYCLES {
+                    Some(pred)
+                } else {
+                    None
+                }
+            })
             .unwrap_or(0.5); // default: uncertain
         let actual = outcome.value_alignment_score;
         let prediction_error = (predicted - actual).abs();

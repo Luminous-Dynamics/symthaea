@@ -1262,6 +1262,49 @@ pub const FEP_COMPLEXITY_PAUSE_MULT: f32 = 1.2;
 pub const FEP_COMPLEXITY_PAUSE_MAX: f32 = 2.0;
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// AROUSAL TRAP STATE MACHINE
+// Science: Yerkes-Dodson (1908) — inverted-U performance curve; sustained
+// high arousal degrades performance. Porges (2011) — polyvagal recovery.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Arousal threshold for LR suppression (moderate arousal dampens learning).
+pub const AROUSAL_TRAP_SUPPRESS_THRESHOLD: f32 = 0.7;
+
+/// Scale factor for arousal LR suppression. At arousal=1.0: (1.0-0.7)*0.25 = 0.075.
+pub const AROUSAL_TRAP_SUPPRESS_SCALE: f32 = 0.25;
+
+/// Maximum arousal LR suppression (cap).
+pub const AROUSAL_TRAP_SUPPRESS_MAX: f32 = 0.08;
+
+/// Arousal threshold for trap detection (high arousal increments counter).
+pub const AROUSAL_TRAP_DETECT_THRESHOLD: f32 = 0.8;
+
+/// Counter threshold for entering Phase 2 (active recovery).
+pub const AROUSAL_TRAP_RECOVERY_ENTER: u32 = 5;
+
+/// Counter threshold for entering Phase 3 (forced escape).
+pub const AROUSAL_TRAP_ESCAPE_ENTER: u32 = 10;
+
+/// LR dampening scale during recovery (Phase 2).
+pub const AROUSAL_TRAP_RECOVERY_LR_SCALE: f32 = 0.1;
+
+/// Exploration boost scale during recovery (Phase 2).
+pub const AROUSAL_TRAP_RECOVERY_EXPLORE_SCALE: f32 = 0.025;
+
+/// Confidence scale during forced escape (Phase 3).
+pub const AROUSAL_TRAP_ESCAPE_CONFIDENCE_SCALE: f32 = 0.9;
+
+/// Arousal threshold below which consolidation LR boost activates.
+/// Steriade (1996): low arousal enhances memory consolidation.
+pub const AROUSAL_LOW_CONSOLIDATION_THRESHOLD: f32 = 0.3;
+
+/// Scale factor for low-arousal consolidation boost.
+pub const AROUSAL_LOW_CONSOLIDATION_SCALE: f32 = 0.3;
+
+/// Maximum consolidation boost from low arousal.
+pub const AROUSAL_LOW_CONSOLIDATION_MAX: f32 = 0.05;
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // CROSS-MODAL BINDING ATTENTION
 // Science: Engel et al. (2001) — synchrony-based binding gates cross-modal attention.
 // ═══════════════════════════════════════════════════════════════════════════════

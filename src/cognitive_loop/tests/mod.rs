@@ -8,6 +8,7 @@
 
 #[allow(clippy::field_reassign_with_default)]
 mod accessors_and_types;
+mod arousal_trap;
 mod behavioral_modulation;
 mod core;
 mod crucible_integration;

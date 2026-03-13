@@ -849,6 +849,11 @@ impl ErrorPatternTracker {
         }
     }
 
+    /// Whether there are no tracked patterns.
+    pub fn is_empty(&self) -> bool {
+        self.patterns.is_empty()
+    }
+
     /// Total tracked patterns.
     pub fn len(&self) -> usize {
         self.patterns.len()
