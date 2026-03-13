@@ -104,6 +104,8 @@ pub fn get_schema(schema_id: String) -> ExternResult<Option<Record>> {
 
     let records = query(filter)?;
 
+    // Take the LAST match — update_entry appends newer versions later in the chain
+    let mut found: Option<Record> = None;
     for record in records {
         if let Some(schema) = record
             .entry()
@@ -111,29 +113,38 @@ pub fn get_schema(schema_id: String) -> ExternResult<Option<Record>> {
             .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
         {
             if schema.id == schema_id {
-                return Ok(Some(record));
+                found = Some(record);
             }
         }
     }
 
-    Ok(None)
+    Ok(found)
 }
 
 /// List all schemas by author
 #[hdk_extern]
 pub fn get_schemas_by_author(author_did: String) -> ExternResult<Vec<Record>> {
-    let author_hash = string_to_entry_hash(&author_did);
-    let links = get_links(
-        LinkQuery::try_new(author_hash, LinkTypes::AuthorToSchema)?,
-        GetStrategy::default(),
-    )?;
+    let filter = ChainQueryFilter::new()
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::CredentialSchema,
+        )?))
+        .include_entries(true);
 
+    let records = query(filter)?;
+
+    // Iterate in reverse (newest first) to collect latest version of each schema by ID
+    let mut seen_ids = std::collections::HashSet::new();
     let mut schemas = Vec::new();
-    for link in links {
-        let action_hash = ActionHash::try_from(link.target)
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(action_hash, GetOptions::default())? {
-            schemas.push(record);
+    for record in records.into_iter().rev() {
+        if let Some(schema) = record
+            .entry()
+            .to_app_option::<CredentialSchema>()
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        {
+            if schema.author == author_did && !seen_ids.contains(&schema.id) {
+                seen_ids.insert(schema.id.clone());
+                schemas.push(record);
+            }
         }
     }
 

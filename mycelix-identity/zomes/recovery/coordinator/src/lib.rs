@@ -656,9 +656,9 @@ fn check_and_update_request_status(request_id: String) -> ExternResult<()> {
             .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
         {
             if req.id == request_id {
+                // Keep iterating — update_entry appends newer versions later in the chain
                 request_data = Some(req);
                 request_record = Some(record);
-                break;
             }
         }
     }
@@ -842,8 +842,8 @@ pub fn execute_recovery(request_id: String) -> ExternResult<Record> {
             .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
         {
             if req.id == request_id {
+                // Keep iterating — update_entry appends newer versions later in the chain
                 request_record = Some(record);
-                break;
             }
         }
     }
@@ -954,8 +954,8 @@ pub fn cancel_recovery(request_id: String) -> ExternResult<Record> {
             .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
         {
             if req.id == request_id {
+                // Keep iterating — update_entry appends newer versions later in the chain
                 request_record = Some(record);
-                break;
             }
         }
     }
@@ -1036,6 +1036,7 @@ pub fn get_recovery_request(request_id: String) -> ExternResult<Option<Record>> 
         )?))
         .include_entries(true);
 
+    let mut found: Option<Record> = None;
     for record in query(filter)? {
         if let Some(req) = record
             .entry()
@@ -1043,12 +1044,13 @@ pub fn get_recovery_request(request_id: String) -> ExternResult<Option<Record>> 
             .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
         {
             if req.id == request_id {
-                return Ok(Some(record));
+                // Keep iterating — update_entry appends newer versions later in the chain
+                found = Some(record);
             }
         }
     }
 
-    Ok(None)
+    Ok(found)
 }
 
 /// Get pending recovery requests for a trustee

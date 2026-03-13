@@ -1517,6 +1517,9 @@ pub fn update_request_status(input: UpdateRequestStatusInput) -> ExternResult<Re
         )?))
         .include_entries(true);
 
+    // Find the latest version of this request (update_entry appends newer versions)
+    let mut found_record: Option<Record> = None;
+    let mut found_req: Option<CredentialRequest> = None;
     for record in query(filter)? {
         if let Some(req) = record
             .entry()
@@ -1525,32 +1528,41 @@ pub fn update_request_status(input: UpdateRequestStatusInput) -> ExternResult<Re
             .flatten()
         {
             if req.id == input.request_id {
-                if req.issuer_did != caller_did {
-                    return Err(wasm_error!(WasmErrorInner::Guest(
-                        "Only the target issuer can update request status".into()
-                    )));
-                }
-                let now = sys_time()?;
-                let updated_req = CredentialRequest {
-                    status: input.new_status,
-                    updated: now,
-                    ..req
-                };
-
-                let action_hash = update_entry(
-                    record.action_address().clone(),
-                    &EntryTypes::CredentialRequest(updated_req),
-                )?;
-
-                return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(
-                    WasmErrorInner::Guest("Could not find updated request".into())
-                ));
+                found_req = Some(req);
+                found_record = Some(record);
             }
         }
     }
-    Err(wasm_error!(WasmErrorInner::Guest(
-        "Request not found".into()
-    )))
+
+    let (record, req) = match (found_record, found_req) {
+        (Some(r), Some(q)) => (r, q),
+        _ => {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Request not found".into()
+            )))
+        }
+    };
+
+    if req.issuer_did != caller_did {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only the target issuer can update request status".into()
+        )));
+    }
+    let now = sys_time()?;
+    let updated_req = CredentialRequest {
+        status: input.new_status,
+        updated: now,
+        ..req
+    };
+
+    let action_hash = update_entry(
+        record.action_address().clone(),
+        &EntryTypes::CredentialRequest(updated_req),
+    )?;
+
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Could not find updated request".into())
+    ))
 }
 
 /// Input for updating request status
