@@ -1180,7 +1180,7 @@ mod proposal_tests {
 
         let author_did = format!("did:mycelix:{}", agent);
 
-        // Create multiple proposals
+        // Create multiple proposals as Draft, then activate them
         for i in 0..3 {
             let proposal = make_proposal(
                 &format!("MIP-{:03}", i + 10),
@@ -1191,6 +1191,18 @@ mod proposal_tests {
             let _: Record = conductor
                 .call(&cell.zome("proposals"), "create_proposal", proposal)
                 .await;
+
+            // Transition Draft → Active
+            let _: Record = conductor
+                .call(
+                    &cell.zome("proposals"),
+                    "update_proposal_status",
+                    UpdateStatusInput {
+                        proposal_id: format!("MIP-{:03}", i + 10),
+                        new_status: ProposalStatus::Active,
+                    },
+                )
+                .await;
         }
 
         // Get active proposals
@@ -1200,7 +1212,8 @@ mod proposal_tests {
 
         assert!(
             active_proposals.len() >= 3,
-            "Should have at least 3 active proposals"
+            "Should have at least 3 active proposals, got {}",
+            active_proposals.len()
         );
 
         println!("=== test_get_active_proposals PASSED ===\n");

@@ -310,6 +310,17 @@ pub fn update_proposal_status(input: UpdateStatusInput) -> ExternResult<Record> 
         &EntryTypes::Proposal(updated_proposal),
     )?;
 
+    // Create active_proposals link when transitioning TO Active
+    if !was_active && new_status == ProposalStatus::Active {
+        create_entry(&EntryTypes::Anchor(Anchor("active_proposals".to_string())))?;
+        create_link(
+            anchor_hash("active_proposals")?,
+            action_hash.clone(),
+            LinkTypes::ActiveProposals,
+            (),
+        )?;
+    }
+
     // Clean up active_proposals link when transitioning away from Active
     if was_active && new_status != ProposalStatus::Active {
         if let Ok(active_links) = get_links(
