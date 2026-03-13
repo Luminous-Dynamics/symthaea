@@ -1096,7 +1096,11 @@ mod tests {
         });
         let output = mgr.process(&default_snapshot());
         let ema = mgr.reward_ema();
-        assert!(ema.is_finite(), "NaN outcome should produce finite EMA: {}", ema);
+        assert!(
+            ema.is_finite(),
+            "NaN outcome should produce finite EMA: {}",
+            ema
+        );
         assert!(output.confidence_delta.is_finite());
         let deltas = mgr.take_harmonic_deltas();
         for (i, d) in deltas.iter().enumerate() {

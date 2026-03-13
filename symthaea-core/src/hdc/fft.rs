@@ -177,7 +177,7 @@ impl FftEngine {
             n,
             is_forward: true,
             phi: 0.2,
-            encoding: Self::encode_fft(&signal, true),
+            encoding: Self::encode_fft(signal, true),
         }
     }
 

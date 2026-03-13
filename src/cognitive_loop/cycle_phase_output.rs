@@ -413,13 +413,14 @@ impl CognitiveLoopService {
             relational_psi: self.social_mgr.social.relational_psi,
             // Resonant Speech: response profile from neuromod bath signals.
             response_profile: {
-                let user_state = crate::resonant_speech::UserState::from_neuromod(
+                let rs_user_state = crate::resonant_speech::UserState::from_neuromod(
                     self.neuromod.bath.allostatic_load,
                     feedback.consciousness.consciousness_level,
                     self.emotion_contagion.arousal,
                     self.neuromod.bath.oxytocin.effective(),
                 );
-                match user_state.cognitive_load {
+                self.resonant_speech.update_state(rs_user_state);
+                match self.resonant_speech.user_state().cognitive_load {
                     crate::resonant_speech::CognitiveLoad::Low => "technical",
                     crate::resonant_speech::CognitiveLoad::Medium => "balanced",
                     crate::resonant_speech::CognitiveLoad::High => "simplified",

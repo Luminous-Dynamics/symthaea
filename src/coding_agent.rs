@@ -616,9 +616,25 @@ impl CodingAgent {
     fn extract_entity_name(&self) -> String {
         let task_lower = self.task.to_lowercase();
         let name_hints = [
-            "fibonacci", "fib", "hello", "sort", "search", "parse", "validate",
-            "process", "compute", "calculate", "convert", "transform", "filter",
-            "merge", "split", "encode", "decode", "serialize", "deserialize",
+            "fibonacci",
+            "fib",
+            "hello",
+            "sort",
+            "search",
+            "parse",
+            "validate",
+            "process",
+            "compute",
+            "calculate",
+            "convert",
+            "transform",
+            "filter",
+            "merge",
+            "split",
+            "encode",
+            "decode",
+            "serialize",
+            "deserialize",
         ];
         for hint in &name_hints {
             if task_lower.contains(hint) {
@@ -1749,7 +1765,10 @@ mod tests {
 
         // Set hints
         agent.set_error_hints(vec![
-            ("E0412".to_string(), "use fully qualified type path".to_string()),
+            (
+                "E0412".to_string(),
+                "use fully qualified type path".to_string(),
+            ),
             ("borrow checker".to_string(), "clone the value".to_string()),
         ]);
 

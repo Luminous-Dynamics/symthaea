@@ -127,8 +127,7 @@ impl KnowledgePersistence {
             count += 1;
         }
 
-        conn.execute_batch("COMMIT")
-            .map_err(|e| e.to_string())?;
+        conn.execute_batch("COMMIT").map_err(|e| e.to_string())?;
 
         self.total_saved += count as u64;
         Ok(count)
@@ -198,8 +197,7 @@ impl KnowledgePersistence {
             count += 1;
         }
 
-        conn.execute_batch("COMMIT")
-            .map_err(|e| e.to_string())?;
+        conn.execute_batch("COMMIT").map_err(|e| e.to_string())?;
 
         self.total_saved += count as u64;
         Ok(count)
@@ -308,8 +306,8 @@ mod tests {
 
     #[test]
     fn test_save_and_load_facts() {
-        let dir = std::env::temp_dir()
-            .join(format!("symthaea_knowledge_test_{}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("symthaea_knowledge_test_{}", std::process::id()));
         let db_path = dir.join("knowledge.db");
         let _ = std::fs::create_dir_all(&dir);
 
@@ -350,8 +348,7 @@ mod tests {
 
     #[test]
     fn test_save_and_load_causal_edges() {
-        let dir = std::env::temp_dir()
-            .join(format!("symthaea_causal_test_{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("symthaea_causal_test_{}", std::process::id()));
         let db_path = dir.join("knowledge.db");
         let _ = std::fs::create_dir_all(&dir);
 
@@ -385,8 +382,7 @@ mod tests {
 
     #[test]
     fn test_upsert_causal_edges() {
-        let dir = std::env::temp_dir()
-            .join(format!("symthaea_upsert_test_{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("symthaea_upsert_test_{}", std::process::id()));
         let db_path = dir.join("knowledge.db");
         let _ = std::fs::create_dir_all(&dir);
 

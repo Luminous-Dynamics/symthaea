@@ -678,4 +678,21 @@ impl CognitiveLoopService {
             self.neuromod.bath.inject("oxytocin", oxy_dose, 50);
         }
     }
+
+    /// Access the resonant speech module (read-only).
+    pub fn resonant_speech(&self) -> &crate::resonant_speech::ResonantSpeech {
+        &self.resonant_speech
+    }
+
+    /// Access the resonant speech module (mutable).
+    pub fn resonant_speech_mut(&mut self) -> &mut crate::resonant_speech::ResonantSpeech {
+        &mut self.resonant_speech
+    }
+
+    /// Access the consciousness state manager.
+    pub fn consciousness_state(
+        &self,
+    ) -> &super::super::consciousness_state_manager::ConsciousnessStateManager {
+        &self.consciousness_state
+    }
 }

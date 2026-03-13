@@ -67,6 +67,12 @@ pub struct FactSearchResult {
     pub similarity: f32,
     /// Current confidence
     pub confidence: f32,
+    /// Source text of the fact (for human readability and reasoning context)
+    pub source_text: String,
+    /// Domain tag (if any)
+    pub domain: Option<String>,
+    /// Whether this fact contains causal relations
+    pub is_causal: bool,
 }
 
 // ── Enhanced Knowledge Graph ───────────────────────────────────────────────
@@ -196,6 +202,9 @@ impl EnhancedKnowledgeGraph {
                     fact_id: fact.id,
                     similarity,
                     confidence: fact.confidence,
+                    source_text: fact.encoding.source_text.clone(),
+                    domain: fact.domain.clone(),
+                    is_causal: fact.has_causal_relations,
                 }
             })
             .filter(|r| r.similarity > 0.0) // Only positive similarity
@@ -237,6 +246,9 @@ impl EnhancedKnowledgeGraph {
                     fact_id: fact.id,
                     similarity,
                     confidence: fact.confidence,
+                    source_text: fact.encoding.source_text.clone(),
+                    domain: fact.domain.clone(),
+                    is_causal: fact.has_causal_relations,
                 }
             })
             .filter(|r| r.similarity > 0.0)

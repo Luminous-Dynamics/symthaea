@@ -416,8 +416,7 @@ impl CognitiveLoopService {
         // FEEDBACK: Low epistemic confidence reduces prediction confidence
         {
             use super::thresholds::{EPISTEMIC_GATE_LOW_PENALTY, EPISTEMIC_GATE_LOW_THRESHOLD};
-            if epistemic_gate_confidence < EPISTEMIC_GATE_LOW_THRESHOLD
-                && !epistemic_gate_approved
+            if epistemic_gate_confidence < EPISTEMIC_GATE_LOW_THRESHOLD && !epistemic_gate_approved
             {
                 self.adjust_confidence("epistemic_gate_low", -EPISTEMIC_GATE_LOW_PENALTY);
             }

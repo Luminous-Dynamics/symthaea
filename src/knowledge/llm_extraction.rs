@@ -12,7 +12,9 @@
 //!
 //! Science: Etzioni et al. (2011) Open IE, Wei et al. (2022) chain-of-thought
 
-use super::extraction::{EntityType, ExtractedEntity, ExtractedFact, ExtractedRelation, SemanticRole};
+use super::extraction::{
+    EntityType, ExtractedEntity, ExtractedFact, ExtractedRelation, SemanticRole,
+};
 use std::collections::HashMap;
 
 /// Prompt template for structured extraction
