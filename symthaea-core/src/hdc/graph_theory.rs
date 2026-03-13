@@ -248,10 +248,8 @@ impl Graph {
         } else {
             let mut visited = vec![false; self.n];
             for start in 0..self.n {
-                if !visited[start] {
-                    if self.dfs_cycle_undirected(start, usize::MAX, &mut visited) {
-                        return true;
-                    }
+                if !visited[start] && self.dfs_cycle_undirected(start, usize::MAX, &mut visited) {
+                    return true;
                 }
             }
             false

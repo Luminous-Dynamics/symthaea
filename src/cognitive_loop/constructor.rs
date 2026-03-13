@@ -679,9 +679,12 @@ impl CognitiveLoopService {
             #[cfg(any(feature = "full_consciousness", feature = "magi_loop"))]
             dream_feedback_bridge:
                 crate::consciousness::recursive_improvement::DreamFeedbackBridge::new(),
-            predictive_mind,
-            cross_modal_binder,
-            affective_bridge,
+            consciousness_state: super::consciousness_state_manager::ConsciousnessStateManager {
+                predictive_mind,
+                cross_modal_binder,
+                phi_attention_gate: Some(crate::attention::PhiAttentionGate::default_gate()),
+                affective_bridge,
+            },
             contextual_weights,
             phi_attention,
             negation_detector,
@@ -737,6 +740,7 @@ impl CognitiveLoopService {
             } else {
                 None
             },
+            resonant_speech: crate::resonant_speech::ResonantSpeech::new(),
             coherence_field: if enable_coherence_field {
                 Some(crate::physiology::CoherenceField::new())
             } else {
@@ -808,7 +812,7 @@ impl CognitiveLoopService {
             #[cfg(feature = "full_consciousness")]
             enactive: EnactiveCognition::new(),
             biorhythm_mgr: super::biorhythm_manager::BiorhythmManager::new(timezone_offset_hours),
-            phi_attention_gate: Some(crate::attention::PhiAttentionGate::default_gate()),
+            // phi_attention_gate moved to consciousness_state
             metrics_collector: Some(crate::infrastructure::MetricsCollector::new()),
             knowledge_manager: if enable_knowledge_engine {
                 let km_config = crate::knowledge::manager::KnowledgeManagerConfig {

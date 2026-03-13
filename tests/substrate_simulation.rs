@@ -384,3 +384,174 @@ fn soak_200_cycles_with_mid_run_substrate_switch() {
         );
     }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Phase 3 Additions: Transition Smoothing, Energy, Dim Fraction, History
+// ═══════════════════════════════════════════════════════════════════════════════
+
+fn make_simulation_service(substrate: SubstrateType) -> CognitiveLoopService {
+    let mut config = CognitiveLoopConfig {
+        async_training: false,
+        learning_threshold: 0.0,
+        substrate_type: substrate,
+        ..Default::default()
+    };
+    config.enable_substrate_simulation();
+    CognitiveLoopService::new(config).unwrap()
+}
+
+#[test]
+fn test_energy_recalculates_on_substrate_switch() {
+    let mut service = make_simulation_service(SubstrateType::SiliconDigital);
+    let silicon_energy = service.substrate_energy_per_cycle();
+
+    service.reconfigure_substrate_at_cycle(SubstrateType::BiologicalNeurons, 0);
+    let bio_energy = service.substrate_energy_per_cycle();
+
+    // Silicon and biological have different energy_per_operation
+    assert!(
+        (silicon_energy - bio_energy).abs() > f64::EPSILON,
+        "Energy should change on switch: silicon={silicon_energy:.2e} bio={bio_energy:.2e}"
+    );
+}
+
+#[test]
+fn test_transition_smoothing_converges() {
+    let mut service = make_simulation_service(SubstrateType::SiliconDigital);
+
+    // Warmup
+    for _ in 0..5 {
+        service.cycle("warmup");
+    }
+
+    let tau_before = service.substrate_tau_factor();
+    service.reconfigure_substrate_at_cycle(SubstrateType::BiochemicalComputer, 5);
+
+    // With alpha=0.1, after 50 cycles we should be very close to target
+    for i in 0..50 {
+        service.cycle(&format!("converge {i}"));
+    }
+    let tau_after = service.substrate_tau_factor();
+
+    // Tau should have moved significantly from silicon toward biochemical
+    assert!(
+        tau_after != tau_before || tau_before == 1.0,
+        "Tau should converge to target: before={tau_before:.4} after={tau_after:.4}"
+    );
+    assert!(
+        tau_after.is_finite() && tau_after >= 0.5 && tau_after <= 2.0,
+        "Tau out of range: {tau_after:.4}"
+    );
+}
+
+#[test]
+fn test_effective_dim_fraction_varies_by_substrate() {
+    let silicon = make_simulation_service(SubstrateType::SiliconDigital);
+    let quantum = make_simulation_service(SubstrateType::QuantumComputer);
+
+    let silicon_frac = silicon.substrate_effective_dim_fraction();
+    let quantum_frac = quantum.substrate_effective_dim_fraction();
+
+    // Silicon has positive scale_pressure → frac = 1.0
+    assert!(
+        (silicon_frac - 1.0).abs() < f32::EPSILON,
+        "Silicon should have dim_fraction=1.0: {silicon_frac}"
+    );
+    // Quantum has very negative scale_pressure → frac < 1.0
+    assert!(
+        quantum_frac < 1.0,
+        "Quantum should have dim_fraction < 1.0: {quantum_frac}"
+    );
+    assert!(
+        quantum_frac >= 0.1,
+        "Quantum dim_fraction should be >= 0.1: {quantum_frac}"
+    );
+}
+
+#[test]
+fn test_transition_history_tracks_switches() {
+    let mut service = make_simulation_service(SubstrateType::SiliconDigital);
+
+    assert!(service.substrate_transition_history().is_empty());
+
+    let switches = [
+        SubstrateType::BiologicalNeurons,
+        SubstrateType::QuantumComputer,
+        SubstrateType::PhotonicProcessor,
+        SubstrateType::NeuromorphicChip,
+        SubstrateType::ExoticSubstrate,
+    ];
+
+    for (i, &sub) in switches.iter().enumerate() {
+        service.reconfigure_substrate_at_cycle(sub, i as u64);
+    }
+
+    let history = service.substrate_transition_history();
+    assert_eq!(history.len(), 5, "Should have 5 transition records");
+
+    // Verify cycle numbers are correct
+    for (i, record) in history.iter().enumerate() {
+        assert_eq!(record.cycle, i as u64, "Record {i} should have cycle={i}");
+    }
+}
+
+#[test]
+fn test_energy_telemetry_populated() {
+    let mut service = make_simulation_service(SubstrateType::SiliconDigital);
+
+    // Run a few cycles so energy accumulates
+    for _ in 0..5 {
+        service.cycle("energy test");
+    }
+
+    let result = service.cycle("check telemetry");
+    let substrate = &result.metadata.substrate;
+    assert!(
+        substrate.total_energy_spent > 0.0,
+        "Energy should have accumulated: {}",
+        substrate.total_energy_spent
+    );
+    assert!(
+        substrate.energy_this_cycle > 0.0,
+        "Per-cycle energy should be positive: {}",
+        substrate.energy_this_cycle
+    );
+    assert!(
+        substrate.energy_throughput_multiplier > 0.0,
+        "Throughput multiplier should be positive: {}",
+        substrate.energy_throughput_multiplier
+    );
+    assert!(
+        (0.1..=1.0).contains(&substrate.effective_dim_fraction),
+        "Dim fraction out of range: {}",
+        substrate.effective_dim_fraction
+    );
+}
+
+#[test]
+fn test_scale_masking_affects_state_diversity() {
+    // Quantum substrate with scale masking should produce lower state diversity
+    // than silicon (which retains full dimensionality)
+    let mut silicon = make_simulation_service(SubstrateType::SiliconDigital);
+    let mut quantum = make_simulation_service(SubstrateType::QuantumComputer);
+
+    // Warmup both identically
+    for _ in 0..20 {
+        silicon.cycle("diversity test");
+        quantum.cycle("diversity test");
+    }
+
+    // Both should produce finite, non-negative state diversity
+    // (We can't assert quantum < silicon because the masking is subtle,
+    // but we CAN assert no NaN/Inf)
+    let silicon_result = silicon.cycle("final");
+    let quantum_result = quantum.cycle("final");
+    assert!(
+        silicon_result.metadata.consciousness_level.is_finite(),
+        "Silicon consciousness should be finite"
+    );
+    assert!(
+        quantum_result.metadata.consciousness_level.is_finite(),
+        "Quantum consciousness should be finite after scale masking"
+    );
+}

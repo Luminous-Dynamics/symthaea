@@ -1247,6 +1247,42 @@ pub const FEP_TD_ERROR_DISCOVERY_THRESHOLD: f64 = 0.5;
 #[allow(dead_code)]
 pub const FEP_LEARNING_PLASTICITY_THRESHOLD: f32 = 0.5;
 
+/// FEP complexity LR dampen factor: multiplier applied to learning rate when
+/// FEP complexity exceeds FEP_COMPLEXITY_THRESHOLD.
+/// Friston (2010): high model complexity = overfitting risk → slow learning.
+pub const FEP_COMPLEXITY_LR_DAMPEN: f32 = 0.85;
+
+/// FEP complexity minimum learning rate multiplier floor.
+pub const FEP_COMPLEXITY_LR_FLOOR: f32 = 0.1;
+
+/// FEP complexity pause multiplier: scales pause duration when complexity is high.
+pub const FEP_COMPLEXITY_PAUSE_MULT: f32 = 1.2;
+
+/// FEP complexity maximum pause multiplier.
+pub const FEP_COMPLEXITY_PAUSE_MAX: f32 = 2.0;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CROSS-MODAL BINDING ATTENTION
+// Science: Engel et al. (2001) — synchrony-based binding gates cross-modal attention.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Cross-modal binding strength above which attention confidence is boosted.
+/// High binding = multiple modalities coherently integrated.
+pub const CROSS_MODAL_BINDING_HIGH_THRESHOLD: f32 = 0.7;
+
+/// Scale factor for binding-driven confidence boost.
+pub const CROSS_MODAL_BINDING_HIGH_SCALE: f32 = 0.1;
+
+/// Cross-modal binding strength below which attention confidence is dampened.
+/// Low binding = weak integration → trust only primary modality.
+pub const CROSS_MODAL_BINDING_LOW_THRESHOLD: f32 = 0.3;
+
+/// Scale factor for binding-driven confidence dampening.
+pub const CROSS_MODAL_BINDING_LOW_SCALE: f32 = 0.1;
+
+/// Minimum confidence scale when binding is low (floor to prevent collapse).
+pub const CROSS_MODAL_BINDING_LOW_FLOOR: f32 = 0.95;
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // ACTIVE REST / SACRED STILLNESS
 // ═══════════════════════════════════════════════════════════════════════════════

@@ -360,6 +360,37 @@ impl CognitiveLoopService {
         self.substrate_manager.reconfigure_region(region, substrate);
     }
 
+    /// Get the effective HDC/CfC dimensionality fraction [0.1, 1.0].
+    /// 1.0 for substrates at or above biological scale.
+    pub fn substrate_effective_dim_fraction(&self) -> f32 {
+        self.substrate_manager.effective_dim_fraction()
+    }
+
+    /// Get the substrate transition history log.
+    pub fn substrate_transition_history(
+        &self,
+    ) -> &std::collections::VecDeque<super::super::substrate_manager::SubstrateTransitionRecord>
+    {
+        self.substrate_manager.transition_history()
+    }
+
+    /// Reconfigure substrate with cycle tracking for transition history.
+    pub fn reconfigure_substrate_at_cycle(
+        &mut self,
+        substrate: symthaea_core::hdc::substrate_independence::SubstrateType,
+        cycle: u64,
+    ) -> (f64, f64) {
+        let result = self.substrate_manager.reconfigure_substrate_at_cycle(
+            &mut self.config,
+            substrate,
+            cycle,
+        );
+        #[cfg(feature = "integrity")]
+        self.integrity_manager
+            .set_substrate_tau_factor(self.substrate_manager.tau_factor);
+        result
+    }
+
     /// Inject Pareto context from a GuidedDesignExplorer into the physics bridge.
     /// The context is drained into telemetry on the next cycle.
     #[cfg(feature = "physics-bridge")]

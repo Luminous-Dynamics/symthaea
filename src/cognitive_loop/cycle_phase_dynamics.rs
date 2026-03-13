@@ -1371,11 +1371,17 @@ impl CognitiveLoopService {
                 (self.adaptive_behavior.exploration_factor + 0.15).min(1.0);
             self.adaptive_behavior.action_hint = ActionHint::Explore;
         }
-        if fep_complexity > 1.0 {
+        if fep_complexity > FEP_COMPLEXITY_THRESHOLD {
+            use super::thresholds::{
+                FEP_COMPLEXITY_LR_DAMPEN, FEP_COMPLEXITY_LR_FLOOR, FEP_COMPLEXITY_PAUSE_MAX,
+                FEP_COMPLEXITY_PAUSE_MULT,
+            };
             self.adaptive_behavior.learning_rate_multiplier =
-                (self.adaptive_behavior.learning_rate_multiplier * 0.85).max(0.1);
-            self.adaptive_behavior.pause_multiplier =
-                (self.adaptive_behavior.pause_multiplier * 1.2).min(2.0);
+                (self.adaptive_behavior.learning_rate_multiplier * FEP_COMPLEXITY_LR_DAMPEN)
+                    .max(FEP_COMPLEXITY_LR_FLOOR);
+            self.adaptive_behavior.pause_multiplier = (self.adaptive_behavior.pause_multiplier
+                * FEP_COMPLEXITY_PAUSE_MULT)
+                .min(FEP_COMPLEXITY_PAUSE_MAX);
             self.adaptive_behavior.action_hint = ActionHint::SlowDown;
         }
 

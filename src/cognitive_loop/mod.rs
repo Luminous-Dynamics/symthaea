@@ -128,6 +128,7 @@ mod accessors;
 pub(crate) mod biorhythm_manager;
 pub(crate) mod consciousness_engine;
 pub(crate) mod consciousness_monitor_tier;
+pub(crate) mod consciousness_state_manager;
 mod constructor;
 mod cycle;
 mod cycle_consciousness;
@@ -156,6 +157,7 @@ pub(crate) mod primitive_tier;
 pub(crate) mod self_model_tier;
 pub(crate) mod social_manager;
 pub(crate) mod substrate_manager;
+pub use substrate_manager::SubstrateTransitionRecord;
 pub(crate) mod subsystem_trait;
 #[allow(dead_code)] // Registry of tuning constants — many reserved for future wiring
 pub(crate) mod thresholds;
@@ -186,7 +188,7 @@ pub mod nurture_bridge;
 pub mod motor_bridge;
 
 // ── Imports (only what the struct definitions below require) ─────────────────
-use crate::brain::affective_bridge::AffectiveBridge;
+// AffectiveBridge now owned by ConsciousnessStateManager
 use crate::brain::prefrontal::PrefrontalCortex;
 use crate::causal::CausalLoopEnhancer;
 // AttentionSchema now owned by SelfModelTierManager
@@ -196,7 +198,7 @@ use crate::consciousness::autopoietic_consciousness::AutopoieticConsciousness;
 // EmbodiedConsciousnessAnalyzer, HierarchicalFreeEnergy, QuantumCoherenceAnalyzer,
 // TemporalConsciousnessAnalyzer, TemporalSynchronizationAnalyzer
 use crate::consciousness::consciousness_unification::ConsciousnessUnificationEngine;
-use crate::consciousness::cross_modal_binding::CrossModalBinder;
+// CrossModalBinder now owned by ConsciousnessStateManager
 use crate::consciousness::dream::DreamEngine;
 #[cfg(feature = "full_consciousness")]
 use crate::consciousness::enactive_cognition::EnactiveCognition;
@@ -204,7 +206,7 @@ use crate::consciousness::enactive_cognition::EnactiveCognition;
 // UnifiedGlobalWorkspace now owned by GwtManager
 use crate::consciousness::master_consciousness_equation::MasterConsciousnessEquation;
 use crate::consciousness::narrative_gwt_integration::NarrativeGWTIntegration;
-use crate::consciousness::predictive_processing::PredictiveMind;
+// PredictiveMind now owned by ConsciousnessStateManager
 use crate::consciousness::primitive_belief_bridge::PrimitiveBeliefBridge;
 use crate::consciousness::primitive_consciousness::PrimitiveConsciousnessState;
 use crate::consciousness::primitive_discovery::PrimitiveDiscoveryService;
@@ -495,17 +497,10 @@ pub struct CognitiveLoopService {
     #[cfg(any(feature = "full_consciousness", feature = "magi_loop"))]
     dream_feedback_bridge: DreamFeedbackBridge,
 
-    /// Predictive processing mind (hierarchical predictive coding + precision dynamics).
-    /// When enabled, provides phi_modulation from free energy minimization.
-    predictive_mind: Option<PredictiveMind>,
-
-    /// Cross-modal binder for multi-modal integration.
-    /// When enabled, binds HDC encodings across modalities and computes cross-modal Phi.
-    cross_modal_binder: Option<CrossModalBinder>,
-
-    /// Affective bridge for emotion-cognition coupling.
-    /// When enabled, evaluates somatic marker signals from cognitive loop state.
-    affective_bridge: Option<AffectiveBridge>,
+    /// Consciousness state manager: groups cross-modal binding, predictive processing,
+    /// phi-attention gating, and affective bridge into a single manager.
+    /// Science: Treisman (1996), Friston (2010), Tononi (2004), Russell (1980).
+    pub(crate) consciousness_state: consciousness_state_manager::ConsciousnessStateManager,
 
     /// Contextual harmony weighting for domain-aware ethical reasoning.
     contextual_weights: Option<crate::consciousness::contextual_weights::ContextualWeights>,
@@ -573,6 +568,11 @@ pub struct CognitiveLoopService {
     /// User state inference for adaptive response generation.
     /// When enabled, infers user cognitive load, frustration, and engagement from input text.
     user_state: Option<crate::user_state_inference::UserStateInference>,
+
+    /// Resonant speech generator: adapts response complexity to user cognitive load.
+    /// Uses neuromod bath signals + USI to determine response profile each cycle.
+    /// Science: Ritter et al. (2019) — adaptive complexity reduces cognitive overload.
+    resonant_speech: crate::resonant_speech::ResonantSpeech,
 
     /// Physiology coherence field — consciousness integration via hormone modulation.
     /// Tracks coherence state, applies hormone effects from neuromod bath each cycle.
@@ -661,11 +661,7 @@ pub struct CognitiveLoopService {
     /// Biorhythm manager: circadian/ultradian rhythm + refresh counter.
     biorhythm_mgr: biorhythm_manager::BiorhythmManager,
 
-    /// Phi-guided attention gate for consciousness-aware perception weighting.
-    /// When present, weights perception inputs by their integrated information
-    /// contribution, focusing processing on high-Phi signals.
-    phi_attention_gate: Option<crate::attention::PhiAttentionGate>,
-
+    // phi_attention_gate moved to consciousness_state_manager
     /// Metrics collector for Prometheus-compatible observability.
     /// When present, records per-cycle consciousness, performance, and safety metrics
     /// for external monitoring dashboards.
