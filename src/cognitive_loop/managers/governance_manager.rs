@@ -1096,7 +1096,11 @@ mod tests {
         // Should have clamped to safe defaults
         let output = mgr.process(&default_snapshot());
         let ema = mgr.reward_ema();
-        assert!(ema.is_finite(), "NaN outcome should produce finite EMA: {}", ema);
+        assert!(
+            ema.is_finite(),
+            "NaN outcome should produce finite EMA: {}",
+            ema
+        );
         assert!(
             output.confidence_delta.is_finite(),
             "NaN outcome should produce finite confidence delta"
@@ -1123,11 +1127,7 @@ mod tests {
         mgr.process(&default_snapshot());
 
         let lr = mgr.last_lr_boost();
-        assert!(
-            lr > 1.0,
-            "High PE should produce LR boost > 1.0: {}",
-            lr
-        );
+        assert!(lr > 1.0, "High PE should produce LR boost > 1.0: {}", lr);
     }
 
     #[test]
