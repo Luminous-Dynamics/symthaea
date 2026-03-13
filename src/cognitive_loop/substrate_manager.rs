@@ -4,17 +4,36 @@
 //! into a single cohesive manager. Handles feasibility computation,
 //! validation overlays, speed/scale modulation, and runtime reconfiguration.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 
 use symthaea_core::hdc::substrate_independence::{
     CorticalRegion, SubstrateRequirements, SubstrateType,
 };
 
 use super::config::CognitiveLoopConfig;
+use super::thresholds::{
+    SUBSTRATE_MIN_DIM_FRACTION, SUBSTRATE_OPS_PER_CYCLE, SUBSTRATE_SCALE_DIM_DIVISOR,
+    SUBSTRATE_TRANSITION_HISTORY_CAP,
+};
 
 /// Default honest confidence for substrates not in the validation framework.
 /// Matches EvidenceLevel::Theoretical.confidence() = 0.10.
 const THEORETICAL_CONFIDENCE: f64 = 0.10;
+
+/// Record of a substrate transition event.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct SubstrateTransitionRecord {
+    /// Cycle number when the transition occurred (0 = pre-run).
+    pub cycle: u64,
+    /// Previous substrate type.
+    pub from: SubstrateType,
+    /// New substrate type.
+    pub to: SubstrateType,
+    /// Feasibility before transition.
+    pub old_feasibility: f64,
+    /// Feasibility after transition.
+    pub new_feasibility: f64,
+}
 
 /// Manages substrate-dependent consciousness feasibility, validation overlays,
 /// and speed/scale modulation factors.
@@ -65,6 +84,23 @@ pub(crate) struct SubstrateManager {
 
     /// Per-region feasibility scores.
     per_region_feasibility: HashMap<CorticalRegion, f32>,
+
+    // ── Phase 3: Transition smoothing ────────────────────────────────────
+
+    /// Target effective feasibility after transition (for EMA blending).
+    target_effective_feasibility: f64,
+
+    /// Target tau_factor after transition (for EMA blending).
+    target_tau_factor: f32,
+
+    /// Transition history log (ring buffer).
+    transition_history: VecDeque<SubstrateTransitionRecord>,
+
+    /// Current substrate type (for transition logging).
+    current_substrate: SubstrateType,
+
+    /// Energy spent in the most recent tick (for telemetry).
+    last_energy_spent: f64,
 }
 
 impl SubstrateManager {
@@ -78,9 +114,7 @@ impl SubstrateManager {
 
         // Compute energy per cycle from substrate energy_per_op
         let energy_per_op = config.substrate_type.energy_per_operation();
-        // Approximate: 256 neurons × 256 ops each = 65536 ops per cycle
-        let ops_per_cycle = 65_536.0;
-        let energy_per_cycle = energy_per_op * ops_per_cycle;
+        let energy_per_cycle = energy_per_op * SUBSTRATE_OPS_PER_CYCLE;
 
         // Throughput multiplier: ratio of bio energy to this substrate's energy
         let bio_energy = SubstrateType::BiologicalNeurons.energy_per_operation();
@@ -99,6 +133,11 @@ impl SubstrateManager {
             energy_throughput_multiplier,
             per_region_substrates: config.per_region_substrates.clone(),
             per_region_feasibility: HashMap::new(),
+            target_effective_feasibility: feasibility,
+            target_tau_factor: 1.0,
+            transition_history: VecDeque::new(),
+            current_substrate: config.substrate_type,
+            last_energy_spent: 0.0,
         };
         mgr.recompute_effective_feasibility(config);
         mgr.recompute_substrate_dynamics(config);

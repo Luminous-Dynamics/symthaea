@@ -14,7 +14,7 @@
 
 use symthaea_broca::encoder::ThoughtChannels;
 use symthaea_broca::gating::GatingConfig;
-use symthaea_broca::generator::{BrocaConfig, BrocaGenerator, GatingTraceEntry, SamplingStrategy};
+use symthaea_broca::generator::{BrocaConfig, BrocaGenerator, SamplingStrategy};
 use symthaea_core::genesis::GenesisSeed;
 
 fn test_genesis() -> GenesisSeed {
@@ -364,7 +364,7 @@ fn test_eval_result_has_new_metrics() {
     channels.channels[0] = 1.0; // Acknowledgment intent
     channels.set_consciousness(0.8, 0.7, 0.8);
 
-    dataset.pairs.push(symthaea_broca::TrainingPair {
+    dataset.pairs.push(symthaea_broca::training::TrainingPair {
         channels: channels.channels.to_vec(),
         target_text: "I understand.".to_string(),
         target_ids: vec![],
@@ -416,7 +416,7 @@ fn test_checkpoint_roundtrip_preserves_generation() {
         .expect("save should succeed");
 
     // Reload
-    let (mut gen2, _, _, _) =
+    let (mut gen2, _adam, _proj, _lm_config) =
         BrocaGenerator::from_checkpoint(&path, &test_genesis()).expect("load should succeed");
     let result2 = gen2.generate(&channels);
 

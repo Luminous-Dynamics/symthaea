@@ -533,6 +533,12 @@ pub struct CognitiveLoopConfig {
     /// When set, limits cognitive throughput based on substrate energy characteristics.
     pub energy_budget_joules_per_sec: Option<f64>,
 
+    /// Transition smoothing alpha for substrate switches [0.0, 1.0].
+    /// 1.0 = instant switch (backward compatible default).
+    /// 0.1 = gradual EMA blend over ~10 cycles (set by `enable_substrate_simulation()`).
+    /// Science: Bostrom (2003) gradual substrate transfer.
+    pub substrate_transition_alpha: f32,
+
     // ── Vision Manifold Integration ─────────────────────────────────────
     /// Enable the internal VisionBridge in the cognitive loop (default false).
     /// When true, the cognitive loop creates a VisionBridge and processes
@@ -696,6 +702,7 @@ impl Default for CognitiveLoopConfig {
             broca_checkpoint_path: None,
             enable_energy_budget: false,
             energy_budget_joules_per_sec: None,
+            substrate_transition_alpha: super::thresholds::SUBSTRATE_TRANSITION_ALPHA_DEFAULT,
             #[cfg(feature = "vision-manifold")]
             enable_vision_manifold: false,
             #[cfg(feature = "vision-manifold")]
@@ -797,6 +804,8 @@ impl CognitiveLoopConfig {
         self.enable_substrate_encoding_noise = true;
         self.enable_validation_overlay = true;
         self.enable_energy_budget = true;
+        self.substrate_transition_alpha =
+            super::thresholds::SUBSTRATE_TRANSITION_ALPHA_SIMULATION;
         self
     }
 }
