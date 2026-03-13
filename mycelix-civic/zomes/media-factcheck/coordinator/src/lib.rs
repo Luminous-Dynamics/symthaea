@@ -162,14 +162,16 @@ pub fn get_fact_check(fact_check_id: String) -> ExternResult<Option<Record>> {
         )?))
         .include_entries(true);
 
+    // Take the LAST match — update_entry appends newer versions later in the chain
+    let mut found: Option<Record> = None;
     for record in query(filter)? {
         if let Some(check) = record.entry().to_app_option::<FactCheck>().ok().flatten() {
             if check.id == fact_check_id {
-                return Ok(Some(record));
+                found = Some(record);
             }
         }
     }
-    Ok(None)
+    Ok(found)
 }
 
 /// Get fact checks by checker
@@ -319,6 +321,8 @@ pub fn get_source_credibility(source_id: String) -> ExternResult<Option<Record>>
         )?))
         .include_entries(true);
 
+    // Take the LAST match — update_entry appends newer versions later in the chain
+    let mut found: Option<Record> = None;
     for record in query(filter)? {
         if let Some(source) = record
             .entry()
@@ -327,11 +331,11 @@ pub fn get_source_credibility(source_id: String) -> ExternResult<Option<Record>>
             .flatten()
         {
             if source.source_id == source_id {
-                return Ok(Some(record));
+                found = Some(record);
             }
         }
     }
-    Ok(None)
+    Ok(found)
 }
 
 /// Get checker stats

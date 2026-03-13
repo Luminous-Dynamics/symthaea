@@ -118,6 +118,7 @@ impl HarmonyWeightProfile {
 }
 
 /// Contextual weight manager
+#[derive(Debug)]
 pub struct ContextualWeights {
     /// Action type profiles
     action_type_profiles: HashMap<ActionType, HarmonyWeightProfile>,

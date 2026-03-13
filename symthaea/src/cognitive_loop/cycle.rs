@@ -208,6 +208,23 @@ impl CognitiveLoopService {
                 self.carryover.quality.last_exploration_bonus +=
                     0.05 * (signals.novelty - 0.6) as f32;
             }
+
+            // Item 4: Causal depth → exploitation bias (Pearl 2009)
+            // Deep causal chains = we understand the structure → exploit, don't explore
+            if signals.causal_depth
+                > super::thresholds::KNOWLEDGE_CAUSAL_DEPTH_EXPLOIT_THRESHOLD
+            {
+                let dampen = (signals.causal_depth
+                    - super::thresholds::KNOWLEDGE_CAUSAL_DEPTH_EXPLOIT_THRESHOLD)
+                    as f32
+                    * super::thresholds::KNOWLEDGE_CAUSAL_DEPTH_EXPLORE_DAMPEN;
+                self.carryover.quality.last_exploration_bonus =
+                    (self.carryover.quality.last_exploration_bonus - dampen).max(0.0);
+            }
+
+            // Item 2: Assemble reasoning context for downstream consumers
+            self.last_reasoning_context =
+                Some(crate::knowledge::ReasoningContext::from_manager(km, input));
         }
 
         // ═══════════════════════════════════════════════════════════════════
@@ -230,6 +247,16 @@ impl CognitiveLoopService {
         // Consciousness metrics, quality gating, homeostasis, dream engine
         // ═══════════════════════════════════════════════════════════════════
         let feedback = self.phase_feedback(input, &perception, &mut dynamics, &mut module_timings);
+
+        // ═══════════════════════════════════════════════════════════════════
+        // STREAMING INFERENCE: Push perception encoding, poll outputs
+        // ═══════════════════════════════════════════════════════════════════
+        if let Some(ref si) = self.streaming_inference {
+            let encoding = ndarray::Array1::from_vec(perception.encoding.compressed_state.clone());
+            si.push(encoding);
+            // Drain outputs — future: feed into learning or downstream
+            let _outputs = si.poll_all();
+        }
 
         // ═══════════════════════════════════════════════════════════════════
         // PHASE 4: OUTPUT
@@ -871,7 +898,7 @@ mod tests {
         let mut s = CognitiveLoopService::new(config).unwrap();
         let r = s.cycle("resonance and flourishing");
         assert!(r.metadata.ethics.soul_alignment.is_finite());
-        assert!(s.soul.is_some());
+        assert!(s.ethics_values.soul.is_some());
     }
 
     #[test]
@@ -879,7 +906,7 @@ mod tests {
         let mut s = make_service();
         let r = s.cycle("test without soul");
         assert_eq!(r.metadata.ethics.soul_alignment, 0.0);
-        assert!(s.soul.is_none());
+        assert!(s.ethics_values.soul.is_none());
     }
 
     #[test]

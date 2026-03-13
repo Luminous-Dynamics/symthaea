@@ -87,7 +87,7 @@ fn test_run_moral_phase_negation_dampening() {
     let (score_no_neg, _, _) = service.run_moral_phase("harmful action", 0.0);
     // Reset for second call
     service.stats.total_cycles = 1;
-    service.last_moral_judgment = None;
+    service.ethics_values.last_moral_judgment = None;
     // With high negation polarity ("not harmful"), score should be dampened
     let (score_with_neg, _, _) = service.run_moral_phase("harmful action", 0.8);
     // Negation dampening multiplies by 0.3, so |dampened| <= |original|

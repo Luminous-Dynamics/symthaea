@@ -444,13 +444,14 @@ impl CognitiveLoopService {
     pub fn governance_consciousness_vector(
         metadata: &crate::cognitive_loop::CycleMetadata,
     ) -> (f64, f64, f64, f64, f64, f64) {
+        let lr = metadata.actual_effective_lr as f64;
         (
             metadata.consciousness_level,
-            metadata.actual_effective_lr, // meta-awareness proxy (learning rate = adaptive awareness)
+            lr,                                // meta-awareness proxy
             metadata.consciousness_level * 0.8, // coherence proxy
             metadata.consciousness_level * 0.6, // care activation proxy
             metadata.consciousness_level * 0.9, // quality proxy
-            metadata.actual_effective_lr.min(1.0), // epistemic confidence proxy
+            lr.min(1.0),                       // epistemic confidence proxy
         )
     }
 
@@ -679,6 +680,42 @@ impl CognitiveLoopService {
         }
     }
 
+    // ========================================================================
+    // SWARM MANAGER ACCESSORS
+    // ========================================================================
+
+    /// Inject a swarm event into the SwarmManager for processing.
+    ///
+    /// Events are queued and drained during the next `process()` call (interval 41).
+    pub fn inject_swarm_event(
+        &mut self,
+        event: super::super::managers::swarm_manager::SwarmEvent,
+    ) {
+        self.swarm_manager.inject_event(event);
+    }
+
+    /// Get the current swarm telemetry snapshot.
+    pub fn swarm_telemetry(
+        &self,
+    ) -> &super::super::managers::swarm_manager::SwarmTelemetry {
+        self.swarm_manager.telemetry()
+    }
+
+    /// Set the expected peer count for connectivity ratio calculation.
+    pub fn set_swarm_expected_peers(&mut self, n: usize) {
+        self.swarm_manager.set_expected_peers(n);
+    }
+
+    /// Current number of connected swarm peers.
+    pub fn swarm_connected_peers(&self) -> usize {
+        self.swarm_manager.connected_peers()
+    }
+
+    /// Mean peer Φ across connected swarm peers.
+    pub fn swarm_mean_peer_phi(&self) -> f64 {
+        self.swarm_manager.mean_peer_phi()
+    }
+
     /// Access the resonant speech module (read-only).
     pub fn resonant_speech(&self) -> &crate::resonant_speech::ResonantSpeech {
         &self.resonant_speech
@@ -694,5 +731,17 @@ impl CognitiveLoopService {
         &self,
     ) -> &super::super::consciousness_state_manager::ConsciousnessStateManager {
         &self.consciousness_state
+    }
+
+    /// Access the ethics and values manager.
+    pub fn ethics_values(
+        &self,
+    ) -> &super::super::ethics_values_manager::EthicsAndValuesManager {
+        &self.ethics_values
+    }
+
+    /// Access the streaming inference engine stats (if enabled).
+    pub fn streaming_inference_stats(&self) -> Option<crate::inference::StreamingStats> {
+        self.streaming_inference.as_ref().map(|si| si.stats())
     }
 }

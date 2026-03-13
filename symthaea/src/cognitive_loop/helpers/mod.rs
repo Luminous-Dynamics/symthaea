@@ -810,15 +810,7 @@ impl CognitiveLoopService {
                 crate::consciousness::hierarchical_free_energy::HierarchicalFEConfig::default(),
             );
         }
-        if let Some(ref mut cw) = self.contextual_weights {
-            *cw = crate::consciousness::contextual_weights::ContextualWeights::new();
-        }
-        if let Some(ref mut pa) = self.phi_attention {
-            *pa = crate::consciousness::phi_attention::AdaptiveThresholds::new(100);
-        }
-        if let Some(ref mut nd) = self.negation_detector {
-            *nd = crate::consciousness::negation_detector::NegationDetector::new();
-        }
+        self.ethics_values.reset();
         self.primitive_tier.reset();
         // Note: predictive_phi_modulation and cross_modal_psi already reset
         // via self.carryover = CycleCarryover::default() above.
@@ -828,5 +820,6 @@ impl CognitiveLoopService {
         self.memory_manager = super::managers::MemoryManager::default();
         self.learning_manager = super::managers::LearningManager::default();
         self.perception_manager = super::managers::PerceptionManager::default();
+        self.swarm_manager = super::managers::SwarmManager::default();
     }
 }

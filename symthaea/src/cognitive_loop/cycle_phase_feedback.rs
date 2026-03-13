@@ -253,17 +253,25 @@ impl CognitiveLoopService {
             match consciousness_limiting_component.as_str() {
                 "Attention" => {
                     self.adaptive_behavior.attention_sensitivity =
-                        (self.adaptive_behavior.attention_sensitivity * 1.05).min(2.0);
+                        (self.adaptive_behavior.attention_sensitivity
+                            * super::thresholds::LIMITING_COMPONENT_ATTENTION_SCALE)
+                            .min(super::thresholds::LIMITING_COMPONENT_ATTENTION_MAX);
                     self.stats.limiting_component_boost_count += 1;
                     "Attention"
                 }
                 "Binding" => {
-                    self.adjust_confidence("limit_binding", 0.01);
+                    self.adjust_confidence(
+                        "limit_binding",
+                        super::thresholds::LIMITING_COMPONENT_BINDING_BOOST,
+                    );
                     self.stats.limiting_component_boost_count += 1;
                     "Binding"
                 }
                 "Efficacy" => {
-                    self.scale_lr("limit_efficacy", 1.05);
+                    self.scale_lr(
+                        "limit_efficacy",
+                        super::thresholds::LIMITING_COMPONENT_EFFICACY_SCALE,
+                    );
                     self.stats.limiting_component_boost_count += 1;
                     "Efficacy"
                 }
@@ -720,7 +728,8 @@ impl CognitiveLoopService {
                     .meta_cognition
                     .as_ref()
                     .map(|mc| {
-                        let normalized_depth = mc.depth() as f64 / 3.0;
+                        let normalized_depth =
+                            mc.depth() as f64 / super::thresholds::METACOGNITION_DEPTH_NORMALIZER;
                         normalized_depth * self.substrate_manager.hot_capability(&self.config)
                     })
                     .unwrap_or(0.5), // preserve backward compat when disabled
@@ -735,6 +744,16 @@ impl CognitiveLoopService {
                 governance_collective_phi: self.governance_mgr.last_collective_phi(),
                 #[cfg(not(feature = "mycelix"))]
                 governance_collective_phi: 0.0, // neutral when governance disabled
+                // Knowledge grounding: how well current input is supported by stored knowledge
+                knowledge_grounding: self
+                    .knowledge_manager
+                    .as_ref()
+                    .map(|km| {
+                        let s = km.signals();
+                        // Combine relevance and certainty as grounding measure
+                        (s.relevance * 0.6 + (1.0 - s.uncertainty) * 0.4).clamp(0.0, 1.0)
+                    })
+                    .unwrap_or(0.5), // neutral when knowledge engine disabled
             },
         );
         self.consciousness_engine
@@ -756,8 +775,11 @@ impl CognitiveLoopService {
         }
         if consciousness_output.subsystem_lr_factor != 1.0 {
             self.carryover.learning.subsystem_lr_factor *= consciousness_output.subsystem_lr_factor;
-            self.carryover.learning.subsystem_lr_factor =
-                self.carryover.learning.subsystem_lr_factor.clamp(0.8, 1.2);
+            self.carryover.learning.subsystem_lr_factor = self
+                .carryover
+                .learning
+                .subsystem_lr_factor
+                .clamp(super::thresholds::SUBSYSTEM_LR_FACTOR_MIN, super::thresholds::SUBSYSTEM_LR_FACTOR_MAX);
         }
         if let Some(consolidation_boost) = consciousness_output.episodic_consolidation_boost {
             if let Some(ref mut replay) = self.phi_episodic_replay {
@@ -797,6 +819,53 @@ impl CognitiveLoopService {
         module_timings.consciousness_engine_pipeline = consciousness_output.pipeline_us;
         module_timings.consciousness_engine_multimodal = consciousness_output.multimodal_us;
 
+        // ── Knowledge contradiction consumption ─────────────────────────
+        // Drain pending alerts and route to neuromod + episodic memory.
+        // Science: Berlyne (1960) — conceptual conflict drives arousal;
+        //          Festinger (1957) — dissonance triggers reappraisal.
+        if let Some(ref mut km) = self.knowledge_manager {
+            let alerts = km.drain_alerts();
+            if !alerts.is_empty() {
+                let alert_count = alerts.len();
+                // (a) NE + 5-HT boost: contradiction = conflict demanding attention
+                let ne_base = self.neuromod.bath.noradrenaline.baseline_val();
+                self.neuromod.bath.noradrenaline.set_baseline(
+                    ne_base
+                        + super::thresholds::KNOWLEDGE_CONTRADICTION_NE_BOOST
+                            * alert_count as f32,
+                );
+                let sht_base = self.neuromod.bath.serotonin.baseline_val();
+                self.neuromod.bath.serotonin.set_baseline(
+                    sht_base
+                        + super::thresholds::KNOWLEDGE_CONTRADICTION_SHT_BOOST
+                            * alert_count as f32,
+                );
+
+                // (b) Record as episodic surprise events
+                // Contradictions are high-salience events that should persist in memory
+                if let Some(ref mut bus) = self.experience_bus {
+                    for alert in &alerts {
+                        let mut memory = crate::experience::EpisodicMemory::new(
+                            &format!("knowledge_contradiction_{}", alert.detected_at_cycle),
+                            &format!(
+                                "Contradiction: fact {} vs fact {} (sim={:.2})",
+                                alert.new_fact_id, alert.existing_fact_id, alert.similarity
+                            ),
+                        );
+                        memory.salience = 0.8; // Contradictions are highly salient
+                        memory.prediction_error = alert.similarity; // High sim = big surprise
+                        bus.record_experience(memory);
+                    }
+                }
+
+                tracing::debug!(
+                    target: "knowledge::contradictions",
+                    count = alert_count,
+                    "Consumed knowledge contradiction alerts"
+                );
+            }
+        }
+
         // ── Structural Phi telemetry ────────────────────────────────────
         let (struct_micro, struct_meso, struct_macro, struct_bn, struct_er, struct_nc) =
             if let Some(ref sp) = consciousness_output.structural_phi {
@@ -822,7 +891,7 @@ impl CognitiveLoopService {
                     };
 
                 (
-                    sp.micro_phi * (1.0 + scale_boost * 0.5),
+                    sp.micro_phi * (1.0 + scale_boost * super::thresholds::MICRO_PHI_SCALE_BOOST),
                     sp.meso_phi * (1.0 + scale_boost),
                     sp.macro_phi * (1.0 + scale_boost),
                     sp.bottleneck_score,
@@ -911,8 +980,9 @@ impl CognitiveLoopService {
 
         // Soul experience integration
         let _t = Instant::now();
-        if let Some(ref mut soul) = self.soul {
+        if let Some(ref mut soul) = self.ethics_values.soul {
             let moral_score = self
+                .ethics_values
                 .last_moral_judgment
                 .as_ref()
                 .map(|j| j.moral_score)
@@ -932,7 +1002,7 @@ impl CognitiveLoopService {
         // SOUL SELF-ASSESSMENT → BEHAVIORAL COUPLING
         // Damasio (2010) — somatic markers from self-assessment guide decisions.
         // ═══════════════════════════════════════════════════════════════════════
-        let soul_snapshot = self.soul.as_ref().map(|s| {
+        let soul_snapshot = self.ethics_values.soul.as_ref().map(|s| {
             (
                 s.stats().soul_coherence,
                 s.self_model().current_assessment.growth_potential,
@@ -987,8 +1057,8 @@ impl CognitiveLoopService {
             if drift > 0.0 {
                 self.kosmic_song.moral_uncertainty = crate::mycelix::gis::MoralUncertainty::new(
                     drift as f32,
-                    drift as f32 * 0.8,
-                    drift as f32 * 0.6,
+                    drift as f32 * super::thresholds::MORAL_DRIFT_UNCERTAINTY_SCALE,
+                    drift as f32 * super::thresholds::MORAL_DRIFT_AXIOM_SCALE,
                 );
             }
 
@@ -1130,6 +1200,7 @@ impl CognitiveLoopService {
         let fep_confidence = (1.0 - dynamics.fep.fep_surprise.min(1.0)).max(0.0) as f32;
         let resonator_confidence = dynamics.resonator.resonator_best_sim;
         let moral_confidence = self
+            .ethics_values
             .last_moral_judgment
             .as_ref()
             .map(|j| (j.moral_score + 1.0) / 2.0)
@@ -1154,7 +1225,7 @@ impl CognitiveLoopService {
             .sum::<f32>()
             / signals.len() as f32;
         let cross_module_agreement =
-            (1.0 - (variance * CROSS_MODULE_VARIANCE_AMPLIFICATION).sqrt()).clamp(0.0, 1.0);
+            (1.0 - (variance * CROSS_MODULE_VARIANCE_AMPLIFICATION).max(0.0).sqrt()).clamp(0.0, 1.0);
         if cross_module_agreement > CROSS_MODULE_AGREEMENT_HIGH {
             self.adjust_confidence(
                 "cross_mod_agree",
@@ -1329,15 +1400,33 @@ impl CognitiveLoopService {
         }
 
         // Session 12 Item 7: Cross-modal binding → attention sensitivity.
-        // High binding (>0.7) → more modalities integrated → boost attention sensitivity.
-        // Low binding (<0.3) → weak integration → dampen (trust only primary modality).
+        // High binding → more modalities integrated → boost attention sensitivity.
+        // Low binding → weak integration → dampen (trust only primary modality).
         // Science: Engel et al. (2001) — synchrony-based binding gates cross-modal attention.
-        if cross_modal_binding_strength > 0.7 && self.stats.total_cycles > 10 {
-            let binding_boost = (cross_modal_binding_strength - 0.7) * 0.1;
-            self.adjust_confidence("binding_attention_hi", binding_boost);
-        } else if cross_modal_binding_strength < 0.3 && self.stats.total_cycles > 10 {
-            let binding_dampen = 1.0 - (0.3 - cross_modal_binding_strength) * 0.1;
-            self.scale_confidence("binding_attention_lo", binding_dampen.max(0.95));
+        {
+            use super::thresholds::{
+                CROSS_MODAL_BINDING_HIGH_SCALE, CROSS_MODAL_BINDING_HIGH_THRESHOLD,
+                CROSS_MODAL_BINDING_LOW_FLOOR, CROSS_MODAL_BINDING_LOW_SCALE,
+                CROSS_MODAL_BINDING_LOW_THRESHOLD,
+            };
+            if cross_modal_binding_strength > CROSS_MODAL_BINDING_HIGH_THRESHOLD
+                && self.stats.total_cycles > 10
+            {
+                let binding_boost = (cross_modal_binding_strength
+                    - CROSS_MODAL_BINDING_HIGH_THRESHOLD)
+                    * CROSS_MODAL_BINDING_HIGH_SCALE;
+                self.adjust_confidence("binding_attention_hi", binding_boost);
+            } else if cross_modal_binding_strength < CROSS_MODAL_BINDING_LOW_THRESHOLD
+                && self.stats.total_cycles > 10
+            {
+                let binding_dampen = 1.0
+                    - (CROSS_MODAL_BINDING_LOW_THRESHOLD - cross_modal_binding_strength)
+                        * CROSS_MODAL_BINDING_LOW_SCALE;
+                self.scale_confidence(
+                    "binding_attention_lo",
+                    binding_dampen.max(CROSS_MODAL_BINDING_LOW_FLOOR),
+                );
+            }
         }
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -1678,7 +1767,8 @@ impl CognitiveLoopService {
                 self.carryover.quality.allostatic_load += ALLOSTATIC_LOAD_INCREMENT;
             }
             if self.carryover.quality.consecutive_full_dampen > 0 {
-                self.carryover.quality.allostatic_load += ALLOSTATIC_LOAD_INCREMENT * 0.5;
+                self.carryover.quality.allostatic_load +=
+                    ALLOSTATIC_LOAD_INCREMENT * super::thresholds::ALLOSTATIC_LOAD_DAMPEN_INCREMENT_SCALE;
             }
             self.carryover.quality.allostatic_load =
                 self.carryover.quality.allostatic_load.clamp(0.0, 1.0);
@@ -1814,7 +1904,9 @@ impl CognitiveLoopService {
                 );
             }
             // Update prediction: simple EMA of consciousness level
-            self.carryover.quality.prev_metacognitive_prediction = 0.9 * predicted + 0.1 * actual;
+            let decay = super::thresholds::METACOGNITIVE_PREDICTION_EMA_DECAY;
+            self.carryover.quality.prev_metacognitive_prediction =
+                decay * predicted + (1.0 - decay) * actual;
         }
 
         // S18-5: Sleep pressure accumulation. Tononi & Cirelli (2006).

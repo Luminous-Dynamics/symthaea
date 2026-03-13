@@ -185,12 +185,14 @@ impl CognitiveLoopService {
                 empathic_speech_rate_mod: feedback.ethics.empathic_speech_rate_mod,
                 kosmic_coherence: feedback.ethics.kosmic_coherence,
                 // Soul telemetry
-                soul_coherence: self.soul.as_ref().map_or(0.0, |s| s.stats().soul_coherence),
+                soul_coherence: self.ethics_values.soul.as_ref().map_or(0.0, |s| s.stats().soul_coherence),
                 soul_growth_potential: self
+                    .ethics_values
                     .soul
                     .as_ref()
                     .map_or(0.0, |s| s.self_model().current_assessment.growth_potential),
                 soul_avg_value_alignment: self
+                    .ethics_values
                     .soul
                     .as_ref()
                     .map_or(0.0, |s| s.stats().avg_value_alignment),
@@ -1268,14 +1270,8 @@ impl CognitiveLoopService {
                 .map(|m| m.last_telemetry().clone());
         }
 
-        // Canvas living topology telemetry
-        #[cfg(feature = "canvas")]
-        {
-            metadata.canvas = self
-                .canvas_manager
-                .as_ref()
-                .map(|m| m.last_telemetry().clone());
-        }
+        // Canvas telemetry — tick() is called later (after thought_vector is computed).
+        // Telemetry is populated there, not here.
 
         metadata.weight_convergence_state = feedback.consciousness.convergence_state.clone();
         if feedback.consciousness.convergence_state == "Converged" && self.convergence_cycle == 0 {
@@ -1387,6 +1383,59 @@ impl CognitiveLoopService {
             exploration = ?metadata.exploration_action,
             "Cycle metadata"
         );
+
+        // ── Canvas living topology: tick + telemetry ──────────────────────────
+        // Placed after thought_vector so all snapshot fields are available.
+        #[cfg(feature = "canvas")]
+        {
+            if let Some(ref mut mgr) = self.canvas_manager {
+                // Extract live Betti numbers from moral topology
+                let topo_summary = self.ethics_engine.moral_topology().last_summary();
+                let betti = (
+                    topo_summary.beta_0,
+                    topo_summary.beta_1,
+                    topo_summary.beta_2,
+                );
+                let snap = super::canvas_bridge::extract_snapshot(
+                    &metadata,
+                    &super::NeuromodTelemetry {
+                        dopamine_effective: self.neuromod.bath.dopamine.effective(),
+                        noradrenaline_effective: self.neuromod.bath.noradrenaline.effective(),
+                        serotonin_effective: self.neuromod.bath.serotonin.effective(),
+                        acetylcholine_effective: self.neuromod.bath.acetylcholine.effective(),
+                        neuromod_oxytocin_effective: self.neuromod.bath.oxytocin.effective(),
+                        neuromod_gaba_effective: self.neuromod.bath.gaba.effective(),
+                        neuromod_allostatic_load: self.neuromod.bath.allostatic_load,
+                        ..Default::default()
+                    },
+                    self.ethics_engine.last_harmony_coordinates(),
+                    &thought_vector,
+                    betti,
+                    &[], // persistence_components — future: wire from moral topology
+                    &[], // persistence_cycles — future: wire from moral topology
+                    metadata.cantor_metacognitive_depth,
+                    metadata.cantor_last_depth,
+                    self.stats.total_cycles,
+                );
+                if let Some(svg) = mgr.tick(&snap) {
+                    self.last_canvas_svg = Some(svg.to_string());
+                }
+                // Aesthetic score → neuromod feedback: beauty as reward signal.
+                // Birkhoff (1933): mathematical beauty triggers pleasure centers.
+                let aesthetic = mgr.last_telemetry().aesthetic_score;
+                if mgr.last_telemetry().generated && aesthetic > 0.5 {
+                    let da_base = self.neuromod.bath.dopamine.baseline_val();
+                    self.neuromod.bath.dopamine.set_baseline(
+                        da_base + (aesthetic - 0.5) * 0.005,
+                    );
+                    let sht_base = self.neuromod.bath.serotonin.baseline_val();
+                    self.neuromod.bath.serotonin.set_baseline(
+                        sht_base + (aesthetic - 0.5) * 0.003,
+                    );
+                }
+                metadata.canvas = Some(mgr.last_telemetry().clone());
+            }
+        }
 
         // ═══════════════════════════════════════════════════════════════════════
         // METRICS COLLECTION

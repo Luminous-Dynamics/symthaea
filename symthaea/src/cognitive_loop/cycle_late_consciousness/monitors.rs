@@ -257,6 +257,7 @@ impl CognitiveLoopService {
         let (affective_valence, affective_arousal) =
             if let Some(ref mut bridge) = self.consciousness_state.affective_bridge {
                 let moral_score = self
+                    .ethics_values
                     .last_moral_judgment
                     .as_ref()
                     .map(|j| j.moral_score)
@@ -516,7 +517,7 @@ impl CognitiveLoopService {
         // Observes current Phi and gates expensive actions by consciousness level.
         // Science: Dehaene (2014) — conscious access enables flexible routing
         // ═══════════════════════════════════════════════════════════════════════
-        let (psi_attention_avg, phi_suppress) = if let Some(ref mut phi_attn) = self.phi_attention {
+        let (psi_attention_avg, phi_suppress) = if let Some(ref mut phi_attn) = self.ethics_values.phi_attention {
             phi_attn.observe(ctx.unified_psi as f32);
             let suppress = !phi_attn.allows_action(
                 crate::consciousness::phi_attention::ActionType::StateModifying,

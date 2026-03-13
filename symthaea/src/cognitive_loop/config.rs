@@ -611,6 +611,17 @@ pub struct CognitiveLoopConfig {
     /// Maximum learned primitives in the adaptive ontology (default: 500).
     #[serde(default = "default_knowledge_ontology_max")]
     pub knowledge_ontology_max: usize,
+
+    /// Path to SQLite database for persistent knowledge storage.
+    /// When set, facts and causal edges are saved periodically and loaded on startup.
+    #[serde(default)]
+    pub knowledge_db_path: Option<String>,
+
+    /// Enable streaming inference engine for real-time CfC network inference.
+    /// When enabled, perception encodings are pushed each cycle and outputs polled.
+    /// Default: false (inference engine not spawned).
+    #[serde(default)]
+    pub enable_streaming_inference: bool,
 }
 
 impl Default for CognitiveLoopConfig {
@@ -729,6 +740,8 @@ impl Default for CognitiveLoopConfig {
             knowledge_causal_capacity: 5_000,
             knowledge_search_top_k: 5,
             knowledge_ontology_max: 500,
+            knowledge_db_path: None,
+            enable_streaming_inference: false,
         }
     }
 }

@@ -203,14 +203,16 @@ pub fn get_attribution(attribution_id: String) -> ExternResult<Option<Record>> {
         )?))
         .include_entries(true);
 
+    // Take the LAST match — update_entry appends newer versions later in the chain
+    let mut found: Option<Record> = None;
     for record in query(filter)? {
         if let Some(attr) = record.entry().to_app_option::<Attribution>().ok().flatten() {
             if attr.id == attribution_id {
-                return Ok(Some(record));
+                found = Some(record);
             }
         }
     }
-    Ok(None)
+    Ok(found)
 }
 
 /// Verify an attribution

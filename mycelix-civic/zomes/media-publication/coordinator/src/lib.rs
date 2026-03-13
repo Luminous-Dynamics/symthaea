@@ -184,14 +184,16 @@ pub fn get_publication(publication_id: String) -> ExternResult<Option<Record>> {
             UnitEntryTypes::Publication,
         )?))
         .include_entries(true);
+    // Take the LAST match — update_entry appends newer versions later in the chain
+    let mut found: Option<Record> = None;
     for record in query(filter)? {
         if let Some(pub_entry) = record.entry().to_app_option::<Publication>().ok().flatten() {
             if pub_entry.id == publication_id {
-                return Ok(Some(record));
+                found = Some(record);
             }
         }
     }
-    Ok(None)
+    Ok(found)
 }
 
 #[hdk_extern]

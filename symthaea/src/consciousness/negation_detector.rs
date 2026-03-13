@@ -128,6 +128,7 @@ pub struct NegationPhrase {
 }
 
 /// Negation detector for semantic analysis
+#[derive(Debug)]
 pub struct NegationDetector {
     /// Additional custom negation words
     custom_negations: HashSet<String>,

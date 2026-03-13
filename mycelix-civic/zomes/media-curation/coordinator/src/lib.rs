@@ -282,14 +282,16 @@ pub fn get_collection(collection_id: String) -> ExternResult<Option<Record>> {
         )?))
         .include_entries(true);
 
+    // Take the LAST match — update_entry appends newer versions later in the chain
+    let mut found: Option<Record> = None;
     for record in query(filter)? {
         if let Some(collection) = record.entry().to_app_option::<Collection>().ok().flatten() {
             if collection.id == collection_id {
-                return Ok(Some(record));
+                found = Some(record);
             }
         }
     }
-    Ok(None)
+    Ok(found)
 }
 
 /// Add publication to collection
