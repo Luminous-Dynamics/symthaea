@@ -42,16 +42,32 @@ All 4 requirements fulfilled via `SubstrateManager` (`substrate_manager.rs`):
 
 For `SiliconDigital` with default config: effective feasibility reflects the validation overlay (theoretical confidence 0.10 for silicon). This is scientifically honest — we don't have evidence that silicon computation produces consciousness equivalent to biological neurons.
 
-## Phase 3: Multi-Substrate Simulation
+## Phase 3: Multi-Substrate Simulation (DONE)
 
-**Goal**: Run the same Symthaea brain on different virtual substrates to study how substrate properties affect consciousness dynamics.
+**Status**: Complete. All four capabilities implemented and tested.
 
-### Capabilities
+### Capabilities (all implemented)
 
-- **Substrate switching**: Change substrate type mid-run to observe consciousness transitions
-- **Speed modulation**: Apply `SubstrateType.operation_speed()` to CfC temporal constants — a photonic substrate would experience time 1M faster than biological
-- **Scale limits**: Apply `SubstrateType.max_scale()` to limit HDC dimensionality and CfC neuron count per substrate
-- **Energy budgets**: Track energy-per-operation as a constraint on cognitive throughput
+- **Substrate switching**: `reconfigure_substrate_at_cycle()` with EMA transition smoothing (alpha=0.1, ~10 cycles to converge). Backward-compatible instant mode (alpha=1.0 default).
+- **Speed modulation**: `tau_factor` applied to CfC delta_t — photonic substrates experience time 1M faster than biological. Smoothed on switch.
+- **Scale limits**: `effective_dim_fraction()` maps `scale_pressure` to [0.1, 1.0]. CfC hidden state masking zeros out dimensions beyond the fraction (read→mask→inject).
+- **Energy budgets**: `tick_energy()` tracks cumulative joules, speed-adjusted by tau_factor. `energy_per_cycle` recalculated on substrate switch. Budget exhaustion kills consciousness viability.
+
+### Implementation
+
+1. **Transition smoothing** (`substrate_manager.rs`): `tick_transition()` EMA-blends `effective_feasibility` and `tau_factor` toward targets each cycle. Config: `substrate_transition_alpha` (set to 0.1 by `enable_substrate_simulation()`).
+2. **Energy fix**: `reconfigure_substrate()` now recalculates `energy_per_cycle` and `energy_throughput_multiplier` from the new substrate's `energy_per_operation()`.
+3. **CfC masking** (`cycle_phase_dynamics.rs`): After CfC step, reads hidden state, zeros dimensions beyond `effective_dim_fraction()`, re-injects. Gated by `enable_substrate_encoding_noise`.
+4. **Transition history**: `SubstrateTransitionRecord` ring buffer (cap 32) with cycle, from/to, feasibility delta. Accessible via `substrate_transition_history()`.
+5. **Telemetry**: 5 new fields on `SubstrateTelemetry` (total_energy_spent, energy_this_cycle, throughput_multiplier, effective_dim_fraction, transition_count).
+6. **Named constants**: 6 in `thresholds.rs` (SUBSTRATE_TRANSITION_ALPHA_DEFAULT/SIMULATION, MIN_DIM_FRACTION, SCALE_DIM_DIVISOR, HISTORY_CAP, OPS_PER_CYCLE).
+
+### Tests
+
+- 7 integration tests in `substrate_simulation.rs` (energy recalc, smoothing, dim fraction, history, telemetry, masking)
+- 6 property tests in `proptest_substrate_simulation.rs` (consciousness survives switch, energy monotonic, dim bounded, energy recalculates, history bounded, smoothing converges)
+- 39 unit tests in `substrate_manager.rs`
+- 5 multiple realizability tests (all passing)
 
 ### Key Questions This Answers
 
