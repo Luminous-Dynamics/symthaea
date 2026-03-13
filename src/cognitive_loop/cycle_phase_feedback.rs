@@ -1329,33 +1329,15 @@ impl CognitiveLoopService {
         }
 
         // Session 12 Item 7: Cross-modal binding → attention sensitivity.
-        // High binding → more modalities integrated → boost attention sensitivity.
-        // Low binding → weak integration → dampen (trust only primary modality).
+        // High binding (>0.7) → more modalities integrated → boost attention sensitivity.
+        // Low binding (<0.3) → weak integration → dampen (trust only primary modality).
         // Science: Engel et al. (2001) — synchrony-based binding gates cross-modal attention.
-        {
-            use super::thresholds::{
-                CROSS_MODAL_BINDING_HIGH_SCALE, CROSS_MODAL_BINDING_HIGH_THRESHOLD,
-                CROSS_MODAL_BINDING_LOW_FLOOR, CROSS_MODAL_BINDING_LOW_SCALE,
-                CROSS_MODAL_BINDING_LOW_THRESHOLD,
-            };
-            if cross_modal_binding_strength > CROSS_MODAL_BINDING_HIGH_THRESHOLD
-                && self.stats.total_cycles > 10
-            {
-                let binding_boost = (cross_modal_binding_strength
-                    - CROSS_MODAL_BINDING_HIGH_THRESHOLD)
-                    * CROSS_MODAL_BINDING_HIGH_SCALE;
-                self.adjust_confidence("binding_attention_hi", binding_boost);
-            } else if cross_modal_binding_strength < CROSS_MODAL_BINDING_LOW_THRESHOLD
-                && self.stats.total_cycles > 10
-            {
-                let binding_dampen = 1.0
-                    - (CROSS_MODAL_BINDING_LOW_THRESHOLD - cross_modal_binding_strength)
-                        * CROSS_MODAL_BINDING_LOW_SCALE;
-                self.scale_confidence(
-                    "binding_attention_lo",
-                    binding_dampen.max(CROSS_MODAL_BINDING_LOW_FLOOR),
-                );
-            }
+        if cross_modal_binding_strength > 0.7 && self.stats.total_cycles > 10 {
+            let binding_boost = (cross_modal_binding_strength - 0.7) * 0.1;
+            self.adjust_confidence("binding_attention_hi", binding_boost);
+        } else if cross_modal_binding_strength < 0.3 && self.stats.total_cycles > 10 {
+            let binding_dampen = 1.0 - (0.3 - cross_modal_binding_strength) * 0.1;
+            self.scale_confidence("binding_attention_lo", binding_dampen.max(0.95));
         }
 
         // ═══════════════════════════════════════════════════════════════════════

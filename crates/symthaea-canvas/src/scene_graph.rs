@@ -114,6 +114,8 @@ impl Transform {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Style {
     pub fill: Option<Color>,
+    /// Fill referencing a gradient/pattern by id: `url(#id)`.
+    pub fill_url: Option<String>,
     pub stroke: Option<Color>,
     pub stroke_width: Option<f32>,
     pub opacity: Option<f32>,

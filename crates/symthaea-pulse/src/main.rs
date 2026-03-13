@@ -339,10 +339,6 @@ pub struct PulseSnapshot {
     pub governance: GovernanceInfo,
     #[serde(default)]
     pub knowledge: KnowledgeInfo,
-    /// Pre-rendered canvas SVG (living topology visualization).
-    /// Populated when symthaea-canvas generates a frame during pulse cycles.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub canvas_svg: Option<String>,
 }
 
 /// Computed delta between two pulse snapshots for the comparison view.
@@ -1185,41 +1181,7 @@ fn main() -> Result<()> {
             best_similarity: 0.0,
             uncertainty_history: Vec::new(),
         },
-        canvas_svg: None, // populated below if canvas feature enabled
     };
-
-    // Generate canvas SVG from the last cycle's cognitive state
-    #[cfg(feature = "canvas")]
-    {
-        use symthaea_canvas::{render_snapshot as canvas_render, CognitiveSnapshot};
-        let canvas_snap = CognitiveSnapshot {
-            consciousness_level: m.consciousness_level,
-            prediction_error: m.fep.fep_surprise,
-            living_mind_vitality: m.living_mind_vitality,
-            living_mind_coherence: m.living_mind_coherence,
-            dopamine: m.neuromod.dopamine_effective,
-            noradrenaline: m.neuromod.noradrenaline_effective,
-            serotonin: m.neuromod.serotonin_effective,
-            acetylcholine: m.neuromod.acetylcholine_effective,
-            oxytocin: m.neuromod.neuromod_oxytocin_effective,
-            gaba: m.neuromod.neuromod_gaba_effective,
-            allostatic_load: m.neuromod.neuromod_allostatic_load,
-            betti_0: m.ethics.moral_topo_beta_0 as usize,
-            betti_1: m.ethics.moral_topo_beta_1 as usize,
-            betti_2: m.ethics.moral_topo_beta_2 as usize,
-            persistence_components: Vec::new(),
-            persistence_cycles: Vec::new(),
-            cantor_metacognitive_depth: m.cantor_metacognitive_depth,
-            cantor_last_depth: m.cantor_last_depth as u8,
-            valence: m.affective_valence,
-            arousal: m.affective_arousal,
-            harmony_activations: m.harmonics.harmony_coordinates,
-            thought_vector: vec![0.0, 0.0],
-            cycle_count: m.total_cycles as u64,
-        };
-        let (svg, _state) = canvas_render(&canvas_snap);
-        snapshot.canvas_svg = Some(svg);
-    }
 
     if let Some(json_path) = &args.json {
         let json = serde_json::to_string_pretty(&snapshot)?;
@@ -1504,7 +1466,6 @@ fn main() -> Result<()> {
                     best_similarity: 0.0,
                     uncertainty_history: Vec::new(),
                 },
-                canvas_svg: None, // watch mode: no canvas yet
             };
 
             // Delta against previous snapshot
@@ -1674,7 +1635,6 @@ mod tests {
             cantor: CantorInfo::default(),
             governance: GovernanceInfo::default(),
             knowledge: KnowledgeInfo::default(),
-            canvas_svg: None,
         }
     }
 

@@ -122,7 +122,7 @@ fn build_background(state: &AestheticState) -> SceneNode {
     // Full-viewport rect with gradient fill
     group.children.push(
         SceneNode::rect(0.0, 0.0, VIEWPORT_W, VIEWPORT_H).with_style(Style {
-            fill: Some(bg_color), // fallback; gradient applied via CSS in browser
+            fill_url: Some("bg-grad".to_string()),
             ..Style::default()
         }),
     );

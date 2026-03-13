@@ -523,4 +523,46 @@ impl CognitiveLoopService {
             Vec::new()
         }
     }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // CANVAS (LIVING TOPOLOGY) ACCESSORS
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// Whether the canvas living topology pipeline is active.
+    #[cfg(feature = "canvas")]
+    pub fn has_canvas(&self) -> bool {
+        self.canvas_manager.is_some()
+    }
+
+    /// Last Birkhoff aesthetic score (0.0-1.0) from the canvas pipeline.
+    #[cfg(feature = "canvas")]
+    pub fn canvas_aesthetic_score(&self) -> f32 {
+        self.canvas_manager
+            .as_ref()
+            .map(|m| m.last_telemetry().aesthetic_score)
+            .unwrap_or(0.0)
+    }
+
+    /// Take the last generated canvas SVG (drains it).
+    #[cfg(feature = "canvas")]
+    pub fn take_canvas_svg(&mut self) -> Option<String> {
+        self.canvas_manager.as_mut().and_then(|m| m.take_svg())
+    }
+
+    /// Last canvas generation time in microseconds.
+    #[cfg(feature = "canvas")]
+    pub fn canvas_generation_time_us(&self) -> u64 {
+        self.canvas_manager
+            .as_ref()
+            .map(|m| m.last_telemetry().generation_time_us)
+            .unwrap_or(0)
+    }
+
+    /// Set the canvas generation interval (SVG produced every N cycles).
+    #[cfg(feature = "canvas")]
+    pub fn set_canvas_generation_interval(&mut self, interval: u32) {
+        if let Some(ref mut mgr) = self.canvas_manager {
+            mgr.set_generation_interval(interval);
+        }
+    }
 }

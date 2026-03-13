@@ -178,7 +178,9 @@ fn write_transform(buf: &mut String, node: &SceneNode) {
 }
 
 fn write_style_attrs(buf: &mut String, style: &Style) {
-    if let Some(fill) = &style.fill {
+    if let Some(url) = &style.fill_url {
+        let _ = write!(buf, r#" fill="url(#{url})""#);
+    } else if let Some(fill) = &style.fill {
         let _ = write!(buf, r#" fill="{}""#, fill.to_css());
     }
     if let Some(stroke) = &style.stroke {

@@ -11,7 +11,6 @@ path = "src/main.rs"
 
 [dependencies]
 symthaea = { path = "../.." }
-symthaea-canvas = { path = "../symthaea-canvas", optional = true }
 symthaea-psych-bench = { path = "../symthaea-psych-bench" }
 symthaea-types = { path = "../symthaea-types" }
 anyhow = { workspace = true }
@@ -19,7 +18,3 @@ chrono = { workspace = true }
 clap = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-
-[features]
-default = []
-canvas = ["dep:symthaea-canvas"]

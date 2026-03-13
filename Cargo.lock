@@ -14765,7 +14765,6 @@ dependencies = [
  "serde",
  "serde_json",
  "symthaea",
- "symthaea-canvas",
  "symthaea-psych-bench",
  "symthaea-types",
 ]

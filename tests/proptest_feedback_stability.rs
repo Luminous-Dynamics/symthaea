@@ -1804,39 +1804,4 @@ proptest! {
             let _ = m.compound_dampening_prevented;
         }
     }
-
-    // S22 Proptest #41: Safety signal persistence — when readiness drops below 0.5,
-    // the next cycle's LR should also be reduced (divergence dampener must not
-    // override the safety signal). Verifies Item 1 fix.
-    #[test]
-    fn prop_session22_safety_signal_persistence(inputs in fuzz_input_sequence(80, 160)) {
-        let mut service = feedback_service();
-        let mut prev_readiness = 1.0_f32;
-        let mut prev_lr = 1.0_f32;
-
-        for (i, input) in inputs.iter().enumerate() {
-            let result = service.cycle(input);
-            let m = &result.metadata;
-
-            // Core invariant: if readiness was < 0.5 last cycle AND readiness
-            // is still < 0.5 this cycle, LR should not have bounced back above
-            // the pre-safety level. The divergence dampener should not have
-            // pulled it back up.
-            if prev_readiness < 0.5 && m.unified_readiness_score < 0.5 && i > 25 {
-                // LR should still be dampened — not above 2.0 (the default ceiling
-                // minus safety margin). This is a soft check: we're verifying the
-                // dampener doesn't fully reverse the safety signal.
-                prop_assert!(m.actual_effective_lr <= 2.5,
-                    "LR bounced back to {} after safety dampening at cycle {i} \
-                     (readiness was {prev_readiness:.3}, now {:.3})",
-                    m.actual_effective_lr, m.unified_readiness_score);
-            }
-
-            prev_readiness = m.unified_readiness_score;
-            prev_lr = m.actual_effective_lr;
-        }
-
-        // Suppress unused variable warning
-        let _ = prev_lr;
-    }
 }

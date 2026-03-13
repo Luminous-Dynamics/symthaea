@@ -124,41 +124,12 @@ impl ProposalCollector {
         minority as f32 / adds.len() as f32
     }
 
-    /// S22 Item 3: Compute conflict ratio among Scale proposals.
-    /// Returns fraction of proposals where boost (>1.0) and dampen (<1.0) coexist.
-    /// 0.0 = all agree, >0.3 = significant disagreement.
-    pub fn scale_conflict_ratio(&self) -> f32 {
-        let scales: Vec<f64> = self
-            .proposals
-            .iter()
-            .filter_map(|ap| match ap.proposal {
-                FeedbackProposal::Scale(f) => Some(f),
-                _ => None,
-            })
-            .collect();
-        if scales.len() < 2 {
-            return 0.0;
-        }
-        let boosters = scales.iter().filter(|&&f| f > 1.0).count();
-        let dampeners = scales.iter().filter(|&&f| f < 1.0).count();
-        let minority = boosters.min(dampeners);
-        minority as f32 / scales.len() as f32
-    }
-
-    /// S22 Item 1: Check if this channel contains a safety dampener (Scale < 0.5).
-    /// Used by `end_cycle_ext` to exempt safety-dampened channels from divergence dampening.
-    pub fn has_safety_dampener(&self) -> bool {
-        self.proposals
-            .iter()
-            .any(|ap| matches!(ap.proposal, FeedbackProposal::Scale(f) if f < 0.5))
-    }
-
     /// Integrate all proposals using consensus mode.
     ///
     /// Consensus integration strategy:
     /// - `Set` proposals: last one wins (they're rare and intentional)
     /// - `Add` proposals: averaged (consensus), then applied
-    /// - `Scale` proposals: geometric mean, then applied (safety override if any < 0.5)
+    /// - `Scale` proposals: geometric mean, then applied
     pub fn integrate(&self, base_value: f64, clamp_min: f64, clamp_max: f64) -> IntegrationResult {
         let mut sets: Vec<(&'static str, f64)> = Vec::new();
         let mut adds: Vec<(&'static str, f64)> = Vec::new();
@@ -184,12 +155,9 @@ impl ProposalCollector {
             let avg_delta: f64 = adds.iter().map(|(_, d)| d).sum::<f64>() / adds.len() as f64;
             value += avg_delta;
         }
-        // Multiplicative proposal integration.
-        // S22 Item 2: Safety-priority scaling. If any Scale factor is a safety
-        // dampener (< 0.5), use the minimum scale factor instead of geometric mean.
-        // Rationale: safety dampeners (e.g., unified readiness gate at 0.3) should
-        // not be diluted by mild boost proposals (e.g., arousal_boost at 1.05).
-        // Science: Kahneman & Tversky (1979) — losses (safety) weighted more than gains.
+        // Geometric mean of multiplicative proposals.
+        // Guard: filter out non-positive scale factors (ln(0) = -inf, ln(<0) = NaN).
+        // Science: scale factors represent multiplicative modulation and must be > 0.
         if !scales.is_empty() {
             let valid_scales: Vec<f64> = scales
                 .iter()
@@ -197,21 +165,12 @@ impl ProposalCollector {
                 .filter(|f| *f > 0.0 && f.is_finite())
                 .collect();
             if !valid_scales.is_empty() {
-                let min_scale = valid_scales.iter().copied().fold(f64::MAX, f64::min);
-                let effective_scale = if min_scale < 0.5 {
-                    // Safety override: use minimum factor (strongest dampener wins).
-                    min_scale
-                } else {
-                    // Normal: geometric mean (noise-resistant consensus).
-                    let log_sum: f64 = valid_scales.iter().map(|f| f.ln()).sum::<f64>();
-                    let geo_mean = (log_sum / valid_scales.len() as f64).exp();
-                    if geo_mean.is_finite() {
-                        geo_mean
-                    } else {
-                        1.0
-                    }
-                };
-                value *= effective_scale;
+                let log_sum: f64 = valid_scales.iter().map(|f| f.ln()).sum::<f64>();
+                let geo_mean = (log_sum / valid_scales.len() as f64).exp();
+                if geo_mean.is_finite() {
+                    value *= geo_mean;
+                }
+                // else: overflow/underflow in exp() — skip scaling entirely
             }
         }
 
@@ -454,22 +413,13 @@ impl FeedbackState {
                 consensus_val
             }
         };
-        // S22 Item 1: Exempt LR from divergence dampening when a safety dampener
-        // fired. The readiness gate's signal should persist across cycles — pulling
-        // LR back toward the previous cycle's value would partially override the
-        // safety mechanism. Science: safety signals must propagate without attenuation.
-        let lr_has_safety = self.learning_rate.has_safety_dampener();
         let consensus = ConsensusResult {
             consensus_confidence: dampen(
                 consensus.consensus_confidence,
                 base_confidence,
                 &mut dampened_count,
             ),
-            consensus_lr: if lr_has_safety {
-                consensus.consensus_lr // Bypass dampening — safety signal preserved
-            } else {
-                dampen(consensus.consensus_lr, base_lr, &mut dampened_count)
-            },
+            consensus_lr: dampen(consensus.consensus_lr, base_lr, &mut dampened_count),
             consensus_exploration: dampen(
                 consensus.consensus_exploration,
                 base_exploration,
@@ -1253,99 +1203,5 @@ mod tests {
         assert!(lr.unwrap().is_finite());
         assert!(explore.unwrap().is_finite());
         assert!(thresh.unwrap().is_finite());
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // S22: Safety-priority integration tests
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    #[test]
-    fn test_safety_dampener_overrides_geometric_mean() {
-        // S22 Item 2: When readiness gate fires Scale(0.3) and arousal boost
-        // fires Scale(1.05), the safety factor should win — not be averaged.
-        let mut collector = ProposalCollector::new();
-        collector.propose("unified_readiness", FeedbackProposal::Scale(0.3));
-        collector.propose("arousal_boost", FeedbackProposal::Scale(1.05));
-        let result = collector.integrate(1.5, 1.0, 3.0);
-        // With safety override: effective = 1.5 * 0.3 = 0.45, clamped to [1.0, 3.0] = 1.0
-        // Without (geo mean): effective = 1.5 * sqrt(0.3 * 1.05) = 1.5 * 0.561 = 0.842 → 1.0
-        // Both clamp to 1.0 in this case. Test with wider clamp:
-        let result_wide = collector.integrate(1.5, 0.0, 10.0);
-        // Safety override: 1.5 * 0.3 = 0.45
-        // Geo mean: 1.5 * 0.561 = 0.842
-        assert!(
-            result_wide.effective < 0.5,
-            "Safety dampener should give ~0.45, got {}",
-            result_wide.effective
-        );
-    }
-
-    #[test]
-    fn test_normal_scales_still_use_geometric_mean() {
-        // When no safety dampener (all factors > 0.5), geometric mean applies.
-        let mut collector = ProposalCollector::new();
-        collector.propose("arousal_boost", FeedbackProposal::Scale(1.05));
-        collector.propose("phi_gated", FeedbackProposal::Scale(0.95));
-        let result = collector.integrate(1.5, 0.0, 10.0);
-        // Geo mean of [1.05, 0.95] = sqrt(1.05 * 0.95) = sqrt(0.9975) ≈ 0.99875
-        let expected = 1.5 * (1.05_f64 * 0.95).sqrt();
-        assert!(
-            (result.effective - expected).abs() < 1e-6,
-            "Expected geo mean {expected}, got {}",
-            result.effective
-        );
-    }
-
-    #[test]
-    fn test_has_safety_dampener() {
-        let mut collector = ProposalCollector::new();
-        assert!(!collector.has_safety_dampener());
-        collector.propose("mild", FeedbackProposal::Scale(0.95));
-        assert!(!collector.has_safety_dampener()); // 0.95 > 0.5
-        collector.propose("severe", FeedbackProposal::Scale(0.3));
-        assert!(collector.has_safety_dampener()); // 0.3 < 0.5
-    }
-
-    #[test]
-    fn test_scale_conflict_ratio() {
-        let mut collector = ProposalCollector::new();
-        // No scales → 0.0
-        assert!((collector.scale_conflict_ratio() - 0.0).abs() < 1e-6);
-        // All boost → 0.0
-        collector.propose("a", FeedbackProposal::Scale(1.05));
-        collector.propose("b", FeedbackProposal::Scale(1.10));
-        assert!((collector.scale_conflict_ratio() - 0.0).abs() < 1e-6);
-        // Mixed: 2 boost, 1 dampen → minority=1, total=3, ratio=0.333
-        collector.propose("c", FeedbackProposal::Scale(0.95));
-        assert!(
-            (collector.scale_conflict_ratio() - 1.0 / 3.0).abs() < 0.01,
-            "Expected ~0.333, got {}",
-            collector.scale_conflict_ratio()
-        );
-    }
-
-    #[test]
-    fn test_safety_exemption_from_divergence_dampening() {
-        // S22 Item 1: When LR has a safety dampener, divergence dampening
-        // should NOT pull LR back toward cycle-start.
-        let mut state = FeedbackState::new();
-        state.begin_cycle();
-        state.snapshot_cycle_start(0.5, 1.5, 0.3, 1.0);
-
-        // Simulate safety dampener on LR channel
-        state
-            .learning_rate
-            .propose("unified_readiness", FeedbackProposal::Scale(0.3));
-
-        let consensus = state.end_cycle(0.5, 1.5, 0.3, 1.0);
-        // LR base=1.5, Scale(0.3) → integrated=1.5*0.3=0.45, clamped to [1.0,3.0]=1.0
-        // Without safety exemption, divergence dampener would see 33% divergence
-        // from base 1.5 and blend back: 1.0*0.5 + 1.5*0.5 = 1.25
-        // WITH safety exemption, consensus_lr should stay at 1.0 (clamped integrated value)
-        assert!(
-            consensus.consensus_lr <= 1.01,
-            "Safety-dampened LR should not be pulled back by divergence dampener, got {}",
-            consensus.consensus_lr
-        );
     }
 }

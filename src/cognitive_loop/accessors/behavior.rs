@@ -446,11 +446,11 @@ impl CognitiveLoopService {
     ) -> (f64, f64, f64, f64, f64, f64) {
         (
             metadata.consciousness_level,
-            metadata.actual_effective_lr as f64, // meta-awareness proxy
-            metadata.consciousness_level * 0.8,  // coherence proxy
-            metadata.consciousness_level * 0.6,  // care activation proxy
-            metadata.consciousness_level * 0.9,  // quality proxy
-            (metadata.actual_effective_lr as f64).min(1.0), // epistemic confidence proxy
+            metadata.actual_effective_lr, // meta-awareness proxy (learning rate = adaptive awareness)
+            metadata.consciousness_level * 0.8, // coherence proxy
+            metadata.consciousness_level * 0.6, // care activation proxy
+            metadata.consciousness_level * 0.9, // quality proxy
+            metadata.actual_effective_lr.min(1.0), // epistemic confidence proxy
         )
     }
 
@@ -677,22 +677,5 @@ impl CognitiveLoopService {
         if oxy_dose > 0.01 {
             self.neuromod.bath.inject("oxytocin", oxy_dose, 50);
         }
-    }
-
-    /// Access the resonant speech generator for adaptive response generation.
-    pub fn resonant_speech(&self) -> &crate::resonant_speech::ResonantSpeech {
-        &self.resonant_speech
-    }
-
-    /// Get a mutable reference to the resonant speech generator.
-    pub fn resonant_speech_mut(&mut self) -> &mut crate::resonant_speech::ResonantSpeech {
-        &mut self.resonant_speech
-    }
-
-    /// Access the consciousness state manager.
-    pub fn consciousness_state(
-        &self,
-    ) -> &super::super::consciousness_state_manager::ConsciousnessStateManager {
-        &self.consciousness_state
     }
 }

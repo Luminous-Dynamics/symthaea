@@ -903,7 +903,7 @@ pub struct CycleMetadata {
     /// Canvas SVG generation telemetry (None when canvas feature disabled or not active).
     #[cfg(feature = "canvas")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub canvas: Option<crate::cognitive_loop::canvas_bridge::CanvasTelemetry>,
+    pub canvas: Option<super::canvas_bridge::CanvasTelemetry>,
 
     // ── Adaptive Dynamics Telemetry (Sessions 2-4) ───────────────────────
     /// Epistemic uncertainty: prediction disagreement across horizons (0.0–1.0).

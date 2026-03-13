@@ -279,15 +279,10 @@ if ! $DRY_RUN; then
     sed -i '/^# These lints apply on top/d' "${STANDALONE_REPO}/Cargo.toml"
     # Remove [lints] workspace = true from main crate
     sed -i '/^\[lints\]/{N;/workspace = true/d;}' "${STANDALONE_REPO}/Cargo.toml"
-    # Remove [lints] workspace = true from symthaea-core and all sub-crates
+    # Remove [lints] workspace = true from symthaea-core
     if [ -f "${STANDALONE_REPO}/symthaea-core/Cargo.toml" ]; then
         sed -i '/^\[lints\]/{N;/workspace = true/d;}' "${STANDALONE_REPO}/symthaea-core/Cargo.toml"
     fi
-    for subcrate_toml in "${STANDALONE_REPO}"/crates/*/Cargo.toml; do
-        if [ -f "$subcrate_toml" ] && grep -q 'workspace = true' "$subcrate_toml"; then
-            sed -i '/^\[lints\]/{N;/workspace = true/d;}' "$subcrate_toml"
-        fi
-    done
     ok "Stripped workspace lints (incompatible with CI clippy config)"
 
     # Remove workspace members that don't exist in the standalone repo

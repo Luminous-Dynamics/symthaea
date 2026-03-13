@@ -169,7 +169,6 @@ fn test_training_convergence_trajectory() {
         train_network: true,
         network_lr_scale: 0.3,
         embedding_target_norm: 128.0,
-        ..Default::default()
     };
 
     let (metrics, _, _) = train_with_adam(&mut gen, &dataset, &train_cfg, None);
@@ -278,7 +277,6 @@ fn test_checkpoint_training_resume() {
         train_network: true,
         network_lr_scale: 0.3,
         embedding_target_norm: 128.0,
-        ..Default::default()
     };
 
     // Phase 1: train 10 epochs
@@ -309,7 +307,6 @@ fn test_checkpoint_training_resume() {
         train_network: true,
         network_lr_scale: 0.3,
         embedding_target_norm: 128.0,
-        ..Default::default()
     };
 
     let (metrics_phase2, _, _) =
@@ -682,7 +679,6 @@ fn test_training_with_diverse_thoughts() {
         train_network: true,
         network_lr_scale: 0.3,
         embedding_target_norm: 128.0,
-        ..Default::default()
     };
 
     let (metrics, _, _) = train_with_adam(&mut gen, &dataset, &train_cfg, None);
@@ -1042,7 +1038,6 @@ fn test_generate_then_train_no_corruption() {
         train_network: true,
         network_lr_scale: 0.3,
         embedding_target_norm: 128.0,
-        ..Default::default()
     };
 
     let (metrics, _, _) = train_with_adam(&mut gen, &dataset, &train_cfg, None);
@@ -1140,7 +1135,6 @@ fn test_training_gradient_health_after_diverse_training() {
         train_network: true,
         network_lr_scale: 0.3,
         embedding_target_norm: 128.0,
-        ..Default::default()
     };
 
     let (metrics, adam_state, diag) = train_with_adam(&mut gen, &dataset, &train_cfg, None);

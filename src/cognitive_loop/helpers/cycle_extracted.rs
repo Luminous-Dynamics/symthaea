@@ -617,7 +617,7 @@ impl CognitiveLoopService {
         predictive_free_energy: f64,
     ) -> (f32, f64) {
         let (cross_modal_binding_strength, cross_modal_psi) =
-            if let Some(ref mut binder) = self.consciousness_state.cross_modal_binder {
+            if let Some(ref mut binder) = self.cross_modal_binder {
                 use symthaea_core::hdc::unified_hv::ContinuousHV;
                 binder.clear();
                 let linguistic_repr = ModalRepresentation::new(
@@ -627,7 +627,7 @@ impl CognitiveLoopService {
                     "encoder",
                 );
                 binder.add_representation(linguistic_repr);
-                if self.consciousness_state.affective_bridge.is_some() {
+                if self.affective_bridge.is_some() {
                     let affect_seed = (affective_valence * 1000.0) as u64;
                     let affective_hv = symthaea_core::hdc::binary_hv::BinaryHV::random(affect_seed);
                     binder.update_modality(Modality::Affective, affective_hv);
@@ -660,13 +660,13 @@ impl CognitiveLoopService {
         }
 
         // FEEDBACK: Predictive <-> Cross-Modal bidirectional coupling (Talsma 2015)
-        if let Some(ref mut mind) = self.consciousness_state.predictive_mind {
+        if let Some(ref mut mind) = self.predictive_mind {
             if cross_modal_binding_strength > 0.5 {
                 let precision_boost = (cross_modal_binding_strength - 0.5) as f64 * 0.1;
                 mind.precision.boost_precision(precision_boost);
             }
         }
-        if let Some(ref mut binder) = self.consciousness_state.cross_modal_binder {
+        if let Some(ref mut binder) = self.cross_modal_binder {
             if predictive_free_energy > 0.6 {
                 let dampen = (1.0 - (predictive_free_energy - 0.6) * 0.3).max(0.5) as f32;
                 binder.set_attention_weight(dampen);
@@ -726,23 +726,13 @@ impl CognitiveLoopService {
     /// - Phase 3 (escape, cycles >10): forced exploration=1.0, confidence×0.9, reset
     /// - Low arousal (<0.3): consolidation LR boost (Steriade 1996)
     pub(in crate::cognitive_loop) fn manage_arousal_trap(&mut self, affective_arousal: f32) {
-        use super::super::thresholds::{
-            AROUSAL_LOW_CONSOLIDATION_MAX, AROUSAL_LOW_CONSOLIDATION_SCALE,
-            AROUSAL_LOW_CONSOLIDATION_THRESHOLD, AROUSAL_TRAP_DETECT_THRESHOLD,
-            AROUSAL_TRAP_ESCAPE_CONFIDENCE_SCALE, AROUSAL_TRAP_ESCAPE_ENTER,
-            AROUSAL_TRAP_RECOVERY_ENTER, AROUSAL_TRAP_RECOVERY_EXPLORE_SCALE,
-            AROUSAL_TRAP_RECOVERY_LR_SCALE, AROUSAL_TRAP_SUPPRESS_MAX, AROUSAL_TRAP_SUPPRESS_SCALE,
-            AROUSAL_TRAP_SUPPRESS_THRESHOLD,
-        };
-        if affective_arousal > AROUSAL_TRAP_SUPPRESS_THRESHOLD {
+        if affective_arousal > 0.7 {
             // Attenuated 50%: DA learning_rate_factor() already scales LR via the bath
-            let arousal_suppress = ((affective_arousal - AROUSAL_TRAP_SUPPRESS_THRESHOLD)
-                * AROUSAL_TRAP_SUPPRESS_SCALE)
-                .min(AROUSAL_TRAP_SUPPRESS_MAX);
+            let arousal_suppress = ((affective_arousal - 0.7) * 0.25).min(0.08);
             self.scale_lr("affective_arousal_suppress", 1.0 - arousal_suppress);
 
             // Arousal trap detection (Yerkes-Dodson 1908 — inverted-U performance curve)
-            if affective_arousal > AROUSAL_TRAP_DETECT_THRESHOLD {
+            if affective_arousal > 0.8 {
                 self.carryover.urgency.arousal_trap_counter = self
                     .carryover
                     .urgency
@@ -750,22 +740,15 @@ impl CognitiveLoopService {
                     .saturating_add(1);
             }
             // Phase 2: Active arousal recovery mode (Porges 2011 polyvagal theory)
-            if self.carryover.urgency.arousal_trap_counter > AROUSAL_TRAP_RECOVERY_ENTER
-                && self.carryover.urgency.arousal_trap_counter <= AROUSAL_TRAP_ESCAPE_ENTER
+            if self.carryover.urgency.arousal_trap_counter > 5
+                && self.carryover.urgency.arousal_trap_counter <= 10
             {
-                let recovery_intensity = (self.carryover.urgency.arousal_trap_counter
-                    - AROUSAL_TRAP_RECOVERY_ENTER) as f32
-                    / (AROUSAL_TRAP_ESCAPE_ENTER - AROUSAL_TRAP_RECOVERY_ENTER) as f32;
+                let recovery_intensity =
+                    (self.carryover.urgency.arousal_trap_counter - 5) as f32 / 5.0;
                 // Gradual LR dampening: attenuated 50% (NE exploration_delta handles arousal)
-                self.scale_lr(
-                    "arousal_trap_recovery",
-                    1.0 - recovery_intensity * AROUSAL_TRAP_RECOVERY_LR_SCALE,
-                );
+                self.scale_lr("arousal_trap_recovery", 1.0 - recovery_intensity * 0.1);
                 // Slight exploration boost: attenuated 50% (NE exploration_delta covers this)
-                self.adjust_exploration(
-                    "arousal_trap_recovery",
-                    recovery_intensity * AROUSAL_TRAP_RECOVERY_EXPLORE_SCALE,
-                );
+                self.adjust_exploration("arousal_trap_recovery", recovery_intensity * 0.025);
                 self.stats.arousal_recovery_cycles += 1;
                 tracing::debug!(
                     cycle = self.stats.total_cycles,
@@ -775,26 +758,23 @@ impl CognitiveLoopService {
                 );
             }
             // Phase 3: Forced escape
-            if self.carryover.urgency.arousal_trap_counter > AROUSAL_TRAP_ESCAPE_ENTER {
+            if self.carryover.urgency.arousal_trap_counter > 10 {
                 self.set_exploration("arousal_trap_escape", 1.0); // forced escape attempt
-                self.scale_confidence("arousal_trap_escape", AROUSAL_TRAP_ESCAPE_CONFIDENCE_SCALE);
+                self.scale_confidence("arousal_trap_escape", 0.9);
                 self.carryover.urgency.arousal_trap_counter = 0;
                 tracing::debug!(
                     cycle = self.stats.total_cycles,
-                    "Arousal trap escape: forced exploration after sustained high-arousal cycles"
+                    "Arousal trap escape: forced exploration after 10 high-arousal cycles"
                 );
             }
         } else {
             // Reset trap counter when arousal drops below threshold
             self.carryover.urgency.arousal_trap_counter = 0;
 
-            if affective_arousal < AROUSAL_LOW_CONSOLIDATION_THRESHOLD {
+            if affective_arousal < 0.3 {
                 // Low arousal enhances consolidation (Steriade 1996)
                 // Attenuated 50%: DA handles low-error consolidation boost via the bath
-                let consolidation_boost = ((AROUSAL_LOW_CONSOLIDATION_THRESHOLD
-                    - affective_arousal)
-                    * AROUSAL_LOW_CONSOLIDATION_SCALE)
-                    .min(AROUSAL_LOW_CONSOLIDATION_MAX);
+                let consolidation_boost = ((0.3 - affective_arousal) * 0.3).min(0.05);
                 self.scale_lr("low_arousal_consolidate", 1.0 + consolidation_boost);
             }
         }
