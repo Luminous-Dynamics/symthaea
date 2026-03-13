@@ -259,8 +259,8 @@ pub fn ratify_amendment(amendment_id: String) -> ExternResult<Record> {
                     .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
                 {
                     if amend.id == amendment_id {
+                        // Keep iterating — update_entry appends newer versions later in the chain
                         found = Some(record);
-                        break;
                     }
                 }
             }

@@ -77,6 +77,8 @@ fn find_timelock_by_id(timelock_id: &str) -> ExternResult<Record> {
 
     let records = query(filter)?;
 
+    // Take the LAST match — update_entry appends newer versions later in the chain
+    let mut found: Option<Record> = None;
     for record in records {
         if let Some(tl) = record
             .entry()
@@ -84,12 +86,12 @@ fn find_timelock_by_id(timelock_id: &str) -> ExternResult<Record> {
             .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
         {
             if tl.id == timelock_id {
-                return Ok(record);
+                found = Some(record);
             }
         }
     }
 
-    Err(wasm_error!(WasmErrorInner::Guest(
+    found.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Timelock not found".into()
     )))
 }

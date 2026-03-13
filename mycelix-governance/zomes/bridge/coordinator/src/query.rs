@@ -403,6 +403,9 @@ pub fn acknowledge_execution(input: AcknowledgeExecutionInput) -> ExternResult<b
 
         let records = query(filter)?;
 
+        // Find the latest version (update_entry appends newer versions later in the chain)
+        let mut latest_record: Option<Record> = None;
+        let mut latest_exec: Option<ExecutionRequest> = None;
         for record in records {
             if let Some(exec) = record
                 .entry()
@@ -410,19 +413,22 @@ pub fn acknowledge_execution(input: AcknowledgeExecutionInput) -> ExternResult<b
                 .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
             {
                 if exec.id == input.execution_id {
-                    let updated_exec = ExecutionRequest {
-                        status: input.status.clone(),
-                        executed_at: Some(sys_time()?),
-                        ..exec
-                    };
-                    update_entry(
-                        record.action_address().clone(),
-                        &EntryTypes::ExecutionRequest(updated_exec),
-                    )?;
-                    found = true;
-                    break;
+                    latest_exec = Some(exec);
+                    latest_record = Some(record);
                 }
             }
+        }
+        if let (Some(record), Some(exec)) = (latest_record, latest_exec) {
+            let updated_exec = ExecutionRequest {
+                status: input.status.clone(),
+                executed_at: Some(sys_time()?),
+                ..exec
+            };
+            update_entry(
+                record.action_address().clone(),
+                &EntryTypes::ExecutionRequest(updated_exec),
+            )?;
+            found = true;
         }
     }
 

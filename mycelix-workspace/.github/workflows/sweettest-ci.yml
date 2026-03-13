@@ -78,10 +78,9 @@ jobs:
         run: hc dna pack dna/ -o dna/mycelix_identity_dna.dna
         working-directory: mycelix-identity
 
-      - name: Run Identity sweettests
+      - name: Run Identity sweettests (67 tests, strict)
         run: cargo test --release --test sweettest_integration -- --ignored --test-threads=1
         working-directory: mycelix-identity/tests
-        continue-on-error: true
         env:
           RUST_LOG: warn
 

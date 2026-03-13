@@ -23,9 +23,9 @@ struct ProposalMirror {
     id: String,
     title: String,
     description: String,
-    proposal_type: String,
+    proposal_type: ProposalTypeMirror,
     author: String,
-    status: String,
+    status: ProposalStatusMirror,
     actions: String,
     discussion_url: Option<String>,
     voting_starts: Timestamp,
@@ -33,6 +33,32 @@ struct ProposalMirror {
     created: Timestamp,
     updated: Timestamp,
     version: u32,
+}
+
+/// Mirror of ProposalType enum from proposals_integrity.
+/// Must match variant order exactly for msgpack deserialization.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+enum ProposalTypeMirror {
+    Standard,
+    Emergency,
+    Constitutional,
+    Parameter,
+    Funding,
+}
+
+/// Mirror of ProposalStatus enum from proposals_integrity.
+/// Must match variant order exactly for msgpack deserialization.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+enum ProposalStatusMirror {
+    Draft,
+    Active,
+    Ended,
+    Approved,
+    Signed,
+    Rejected,
+    Executed,
+    Cancelled,
+    Failed,
 }
 
 // ============================================================================
