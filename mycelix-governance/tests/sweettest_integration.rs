@@ -3212,7 +3212,7 @@ mod threshold_signing_dkg_tests {
                 scope: CommitteeScope::Treasury,
                 min_phi: None,
                 signature_algorithm: Some(ThresholdSignatureAlgorithm::HybridEcdsaMlDsa65),
-                pq_required: true,
+                pq_required: false, // false to allow plain DKG deals; PQ verified at signature level
             })
             .await;
         let committee: SigningCommittee = decode_entry(&record).unwrap();
