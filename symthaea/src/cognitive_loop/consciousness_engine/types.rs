@@ -155,6 +155,13 @@ pub(crate) struct ConsciousnessEngineInput<'a> {
     /// Science: Haidt (2012) — shared moral reasoning amplifies collective intelligence;
     ///          Woolley et al. (2010) — collective intelligence emerges from social sensitivity.
     pub governance_collective_phi: f64,
+
+    // ── Knowledge grounding → epistemic quality coupling ─────────────
+    /// Knowledge grounding score [0.0, 1.0] from the knowledge engine.
+    /// Combines fact relevance and certainty: high grounding → more confident reasoning.
+    /// Neutral at 0.5 when knowledge engine is disabled.
+    /// Science: Baddeley (2000) — working memory benefits from grounded semantic content.
+    pub knowledge_grounding: f64,
 }
 
 /// Dynamic weights for the unified consciousness computation.

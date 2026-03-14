@@ -2840,6 +2840,454 @@ pub const SUBSTRATE_TRANSITION_HISTORY_CAP: usize = 32;
 pub const SUBSTRATE_OPS_PER_CYCLE: f64 = 65_536.0;
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// SESSION 22+: MISSING CONSTANTS (added to fix compilation)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Multiplicative dampener for allostatic load increment when consecutive full-dampen
+/// cycles are detected. Values < 1.0 reduce the penalty (Science: adaptive resilience).
+pub const ALLOSTATIC_LOAD_DAMPEN_INCREMENT_SCALE: f32 = 0.5;
+
+/// Weight for attention schema (AST) encoding contribution to compressed state.
+/// Science: Graziano (2013) — top-down attention schema modulates perception.
+pub const AST_ENCODING_WEIGHT: f32 = 0.1;
+
+/// LR boost multiplier when coherence is degraded (coherence < stability floor).
+/// Science: Rescorla-Wagner (1972) — prediction error drives learning.
+pub const COHERENCE_DEGRADED_LR_BOOST: f32 = 1.05;
+
+/// Exploration adjustment when conceptual confusion is detected.
+/// Science: Berlyne (1960) — incongruity increases exploratory drive.
+pub const CONCEPTUAL_CONFUSION_EXPLORATION: f32 = 0.03;
+
+/// Number of consecutive high-quality cycles before floor exploration boost.
+/// Science: Csikszentmihalyi (1990) — sustained quality enables exploration.
+pub const CONSECUTIVE_HIGH_QUALITY_CYCLES: u32 = 10;
+
+/// Confidence penalty when escalation is throttled (mild constraint violation).
+pub const ESCALATION_THROTTLE_CONFIDENCE: f32 = 0.02;
+
+/// Exploration penalty when escalation is throttled.
+pub const ESCALATION_THROTTLE_EXPLORATION: f32 = 0.02;
+
+/// Confidence penalty when escalation is hard-blocked (severe constraint violation).
+pub const ESCALATION_BLOCK_CONFIDENCE: f32 = 0.05;
+
+/// Exploration penalty when escalation is hard-blocked.
+pub const ESCALATION_BLOCK_EXPLORATION: f32 = 0.05;
+
+/// LR scale when escalation is hard-blocked (slow down learning during conflict).
+pub const ESCALATION_BLOCK_LR_SCALE: f32 = 0.95;
+
+/// Midpoint for exploration bias detection (0.5 = neutral).
+/// Science: explore/exploit balance theory.
+pub const EXPLORE_BIAS_MIDPOINT: f32 = 0.5;
+
+/// Fatigue level below which the system is considered recovered.
+/// Science: recovery threshold after exertion (Hess 1944 sleep-wake theory).
+pub const FATIGUE_RECOVERED_THRESHOLD: f32 = 0.1;
+
+/// High FEP accuracy threshold for confidence boost.
+/// Science: Friston (2010) — accurate prediction reduces uncertainty.
+pub const FEP_ACCURACY_HIGH_CONFIDENCE: f32 = 0.03;
+
+/// Confidence boost when FEP is operating efficiently.
+pub const FEP_EFFICIENT_CONFIDENCE: f32 = 0.02;
+
+/// Exploration scale when FEP TD learning has converged.
+/// Science: Sutton & Barto (1998) — TD convergence signals exploitation.
+pub const FEP_TD_CONVERGE_EXPLORE_SCALE: f32 = 0.98;
+
+/// Flow intensity threshold above which LR is boosted.
+/// Science: Csikszentmihalyi (1990) — flow state enhances learning efficiency.
+pub const FLOW_INTENSITY_LR_THRESHOLD: f32 = 0.7;
+
+/// LR boost multiplier when in flow state.
+pub const FLOW_SUBSYSTEM_LR_BOOST: f32 = 1.05;
+
+/// Scale factor for goal priority → exploration adjustment.
+/// Science: Botvinick et al. (2009) — goal-directed attention modulates exploration.
+pub const GOAL_PURSUIT_EXPLORATION_SCALE: f32 = 0.05;
+
+/// Gradient magnitude below which prediction is considered OK (stable).
+pub const GRADIENT_PREDICTION_OK_THRESHOLD: f64 = 0.05;
+
+/// Gradient magnitude below which the system is considered in a stable attractor.
+pub const GRADIENT_STABLE_DETECT_THRESHOLD: f64 = 0.03;
+
+/// Quality score above which a cycle is considered high quality.
+pub const HIGH_QUALITY_SCORE_THRESHOLD: f32 = 0.75;
+
+/// Causal depth above which exploitation bias activates (depth > threshold → exploit).
+pub const KNOWLEDGE_CAUSAL_DEPTH_EXPLOIT_THRESHOLD: f64 = 3.0;
+
+/// Dampener for exploration urge when causal depth exceeds exploit threshold.
+pub const KNOWLEDGE_CAUSAL_DEPTH_EXPLORE_DAMPEN: f32 = 0.1;
+
+/// Exploration boost when knowledge contradiction detected with negation evidence.
+pub const KNOWLEDGE_CONTRADICTION_NE_BOOST: f32 = 0.02;
+
+/// Exploration boost when knowledge contradiction detected with serotonin-linked evidence.
+pub const KNOWLEDGE_CONTRADICTION_SHT_BOOST: f32 = 0.01;
+
+/// Basis: Ebbinghaus (1885) — periodic consolidation preserves long-term knowledge.
+/// How often (in cycles) the knowledge manager persists to SQLite.
+pub const KNOWLEDGE_SAVE_INTERVAL: u64 = 500;
+
+/// Basis: Barsalou (2008), Clark (2013) — grounded cognition modulates consciousness.
+/// Knowledge grounding ±modulation factor on unified consciousness score.
+pub const KNOWLEDGE_CONSCIOUSNESS_MODULATION: f64 = 0.05;
+
+/// Basis: Anderson & Schooler (1991) — power law of forgetting; low-confidence items pruned.
+/// Confidence threshold below which non-causal facts are pruned during dream consolidation.
+pub const KNOWLEDGE_FORGET_CONFIDENCE_THRESHOLD: f32 = 0.1;
+
+/// Basis: Stickgold & Walker (2013) — sleep strengthens causal memory traces.
+/// Confidence boost applied to causal facts during dream consolidation.
+pub const KNOWLEDGE_CONSOLIDATION_BOOST: f32 = 0.05;
+
+/// Maximum attention contribution from limiting component analysis (cap).
+pub const LIMITING_COMPONENT_ATTENTION_MAX: f32 = 0.1;
+
+/// Scale factor for attention adjustment from limiting component.
+pub const LIMITING_COMPONENT_ATTENTION_SCALE: f32 = 0.3;
+
+/// Binding capability boost when limiting component analysis recommends it.
+pub const LIMITING_COMPONENT_BINDING_BOOST: f32 = 0.02;
+
+/// Efficacy scale for limiting component remediation.
+pub const LIMITING_COMPONENT_EFFICACY_SCALE: f32 = 1.05;
+
+/// Confidence scale when math result has epistemic caveats.
+pub const MATH_CAVEAT_CONFIDENCE_SCALE: f32 = 0.97;
+
+/// Confidence boost when math result is formally verified.
+pub const MATH_VERIFIED_CONFIDENCE: f32 = 0.03;
+
+/// Normalizer for metacognition depth → HOT depth fraction.
+/// Science: Hofstadter (1979) — meta-levels scale logarithmically.
+pub const METACOGNITION_DEPTH_NORMALIZER: f64 = 3.0;
+
+/// EMA decay for metacognitive prediction accuracy tracking.
+/// Science: EMA smoothing for online prediction calibration.
+pub const METACOGNITIVE_PREDICTION_EMA_DECAY: f64 = 0.95;
+
+/// Scale boost for micro-Phi measurement in consciousness equation.
+pub const MICRO_PHI_SCALE_BOOST: f64 = 0.1;
+
+/// Scale for moral drift → uncertainty signal.
+pub const MORAL_DRIFT_UNCERTAINTY_SCALE: f32 = 0.3;
+
+/// Scale for moral drift → axiom pressure signal.
+pub const MORAL_DRIFT_AXIOM_SCALE: f32 = 0.2;
+
+/// LR scale when motor system is in intense exploration mode.
+pub const MOTOR_EXPLORE_INTENSE_LR: f32 = 1.05;
+
+/// Motor intensity threshold above which reflection is triggered.
+pub const MOTOR_REFLECTION_THRESHOLD: f32 = 0.8;
+
+/// Scale for motor intensity → confidence adjustment during reflection.
+pub const MOTOR_REFLECTION_CONFIDENCE_SCALE: f32 = 0.05;
+
+/// Exploration boost when quality floor is maintained across consecutive good cycles.
+pub const QUALITY_FLOOR_EXPLORATION_BOOST: f32 = 0.01;
+
+/// Readiness score below which degraded mode is activated.
+pub const READINESS_DEGRADED_THRESHOLD: f32 = 0.5;
+
+/// Readiness score above which rest/consolidation is allowed.
+pub const READINESS_REST_THRESHOLD: f32 = 0.85;
+
+/// Gradient magnitude below which the system is considered stable for recovery.
+pub const RECOVERY_STABILITY_THRESHOLD: f64 = 0.05;
+
+/// Causal consolidation boost from resonator recall matching.
+pub const RESONATOR_CAUSAL_CONSOLIDATION_BOOST: f32 = 0.1;
+
+/// Confidence boost when resonator factor is high (strong recall).
+pub const RESONATOR_FACTOR_HIGH_CONFIDENCE: f32 = 0.02;
+
+/// Scale for best-match similarity → resonator recall confidence boost.
+pub const RESONATOR_RECALL_PRIME_SCALE: f32 = 0.05;
+
+/// Confidence boost when resonator error is sustained low across many cycles.
+pub const RESONATOR_SUSTAINED_LOW_CONFIDENCE: f32 = 0.01;
+
+/// Broca coherence threshold for language generation quality gating.
+pub const BROCA_COHERENT_THRESHOLD: f32 = 0.7;
+
+/// Exploration boost when causal graph is sparse (few patterns learned).
+/// Science: Pearl (2009) — sparse causal knowledge → explore to discover structure.
+pub const SPARSE_CAUSAL_EXPLORATION_BOOST: f32 = 0.03;
+
+/// Exploration scale when temporal binding is in high mode.
+/// Science: Binding theory — strong temporal binding → explore new associations.
+pub const TEMPORAL_BINDING_HIGH_EXPLORE_SCALE: f32 = 1.02;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SUBSYSTEM PHASE CONSTANTS (cycle_subsystems.rs)
+// Consciousness subsystem feedback loops: hierarchical LTC Phi, holographic
+// encoding, evolution coordinator, affective consciousness, epistemic gating,
+// cross-module coupling, meta-cognition, empathic unification.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Minimum hierarchical LTC Phi before cross-validating against spectral MIP.
+/// Science: Tononi (2015) — Phi must be non-trivial to meaningfully compare.
+pub const HIER_LTC_PHI_MIN_THRESHOLD: f32 = 0.1;
+
+/// Phi divergence upper bound for convergence → confidence boost.
+/// Science: Tononi (2015, §3.1) — independent estimates within this range converge.
+pub const HIER_LTC_PHI_CONVERGE_THRESHOLD: f32 = 0.2;
+
+/// Confidence boost scale when Phi estimates converge.
+/// Science: Multiple consistent estimates increase epistemological confidence.
+pub const HIER_LTC_PHI_CONVERGE_BOOST: f32 = 0.05;
+
+/// Phi divergence lower bound for penalty → exploration boost.
+/// Science: Tononi (2015, §3.1) — divergence above this signals instability.
+pub const HIER_LTC_PHI_DIVERGE_THRESHOLD: f32 = 0.4;
+
+/// Maximum clamp for Phi divergence penalty contribution.
+/// Prevents runaway penalties from extreme divergence.
+pub const HIER_LTC_PHI_DIVERGE_MAX: f32 = 0.3;
+
+/// Confidence penalty scale for Phi divergence (attenuated 50%).
+/// Science: NE exploration_delta already covers surprise-driven exploration.
+pub const HIER_LTC_PHI_DIVERGE_PENALTY_SCALE: f32 = 0.015;
+
+/// Minimum positive evolution Phi delta to trigger exploit boost.
+/// Science: Holland (1975) — evolutionary fitness signals drive adaptive behavior.
+pub const EVOLUTION_POSITIVE_DELTA_THRESHOLD: f64 = 0.01;
+
+/// LR boost scale from positive evolution delta (up to EVOLUTION_POSITIVE_LR_CLAMP).
+pub const EVOLUTION_POSITIVE_LR_SCALE: f64 = 0.1;
+
+/// Maximum LR boost from positive evolution delta.
+pub const EVOLUTION_POSITIVE_LR_CLAMP: f64 = 0.05;
+
+/// Confidence boost scale from positive evolution delta.
+pub const EVOLUTION_POSITIVE_CONF_SCALE: f64 = 0.05;
+
+/// Maximum confidence boost from positive evolution delta.
+pub const EVOLUTION_POSITIVE_CONF_CLAMP: f64 = 0.03;
+
+/// Minimum negative evolution delta to trigger exploration boost.
+/// Science: Holland (1975) — regression signals need for broader search.
+pub const EVOLUTION_NEGATIVE_DELTA_THRESHOLD: f64 = -0.01;
+
+/// Exploration boost scale from negative evolution delta.
+pub const EVOLUTION_NEGATIVE_EXPLORE_SCALE: f64 = 0.08;
+
+/// Maximum exploration boost from negative evolution delta.
+pub const EVOLUTION_NEGATIVE_EXPLORE_CLAMP: f64 = 0.04;
+
+/// Holographic unity threshold for prediction confidence boost.
+/// Science: Pribram (1991) — holographic encoding enables stable predictions.
+pub const HOLOGRAPHIC_UNITY_CONFIDENCE_THRESHOLD: f64 = 0.7;
+
+/// Confidence boost scale for high holographic unity.
+pub const HOLOGRAPHIC_UNITY_CONFIDENCE_SCALE: f64 = 0.03;
+
+/// Holographic binding threshold for LR boost.
+/// Science: Pribram (1971), Bohm (1980) — strong binding = coherent representations.
+pub const HOLOGRAPHIC_BINDING_STRONG_THRESHOLD: f64 = 0.7;
+
+/// LR factor when binding is strong.
+pub const HOLOGRAPHIC_BINDING_STRONG_LR: f32 = 1.01;
+
+/// Holographic binding upper bound for weak fragmentation regime.
+pub const HOLOGRAPHIC_BINDING_WEAK_UPPER: f64 = 0.3;
+
+/// LR dampen factor when binding is weak (fragmented representations).
+pub const HOLOGRAPHIC_BINDING_WEAK_LR: f32 = 0.99;
+
+/// Workspace value scaling from coherence in differentiable consciousness.
+/// Science: Bengio (2017) — workspace value ≈ coherence.
+pub const DIFF_CONSCIOUSNESS_WORKSPACE_SCALE: f64 = 0.8;
+
+/// Default recursion core value when no recursion depth data available.
+pub const DIFF_CONSCIOUSNESS_RECURSION_DEFAULT: f64 = 0.5;
+
+/// Minimum consciousness gradient magnitude for exploration boost.
+/// Science: Bengio (2017) — gradient information guides search.
+pub const CONSCIOUSNESS_GRADIENT_EXPLORE_THRESHOLD: f64 = 0.5;
+
+/// Exploration boost scale from large consciousness gradients.
+pub const CONSCIOUSNESS_GRADIENT_EXPLORE_SCALE: f64 = 0.05;
+
+/// Affective decay rate per cycle.
+/// Science: Russell (2003) — affect decays towards neutral over time.
+pub const AFFECTIVE_DECAY_RATE: f32 = 0.05;
+
+/// Negative valence threshold for confidence dampening.
+/// Science: Colombetti (2014) — negative affect strengthens caution.
+pub const AFFECTIVE_NEGATIVE_VALENCE_THRESHOLD: f32 = -0.3;
+
+/// Confidence scale factor from negative valence.
+pub const AFFECTIVE_NEGATIVE_CONFIDENCE_SCALE: f32 = 0.02;
+
+/// NSM similarity threshold for synthetic grounding classification.
+/// Science: Wierzbicka (1996) — minimum similarity for state classification.
+pub const SYNTHETIC_GROUNDING_SIM_THRESHOLD: f64 = 0.1;
+
+/// Low epistemic confidence threshold for gating penalty.
+/// Science: Kruger & Dunning (1999) — epistemic humility below this threshold.
+pub const EPISTEMIC_GATE_LOW_THRESHOLD: f32 = 0.3;
+
+/// Confidence penalty when epistemic gate rejects.
+pub const EPISTEMIC_GATE_LOW_PENALTY: f32 = 0.03;
+
+/// p-value threshold for primitive validation significance.
+/// Science: Popper (1959) — standard statistical significance threshold.
+pub const PRIMITIVE_VALIDATION_P_THRESHOLD: f64 = 0.05;
+
+/// LR boost scale from validated primitives (positive Phi gain).
+pub const PRIMITIVE_VALIDATION_POSITIVE_LR_SCALE: f64 = 0.02;
+
+/// Maximum LR boost from validated primitives.
+pub const PRIMITIVE_VALIDATION_POSITIVE_LR_CLAMP: f64 = 0.03;
+
+/// LR dampen factor from falsified primitives (negative Phi gain).
+pub const PRIMITIVE_VALIDATION_NEGATIVE_LR: f32 = 0.98;
+
+/// Consciousness state low level threshold for urgency escalation.
+/// Science: Varela (1991) — low consciousness triggers autopoietic response.
+pub const CONSCIOUSNESS_STATE_LOW_URGENCY: f64 = 0.3;
+
+/// Strong gradient threshold for boredom reduction (clear optimization direction).
+pub const GRADIENT_STRONG_DIRECTION_THRESHOLD: f64 = 1.0;
+
+/// Boredom reduction when gradient has strong direction.
+pub const GRADIENT_STRONG_BOREDOM_REDUCE: f32 = 0.05;
+
+/// Near-zero gradient upper bound (plateau detection).
+pub const GRADIENT_PLATEAU_UPPER: f64 = 0.1;
+
+/// Boredom increment when gradient is near-zero (plateau → explore).
+pub const GRADIENT_PLATEAU_BOREDOM_INCREMENT: f32 = 0.03;
+
+/// Holographic unity threshold for cross-module LR boost.
+/// Science: Pribram (1991) — high unity = coherent, safe for aggressive learning.
+pub const HOLOGRAPHIC_UNITY_LR_BOOST_THRESHOLD: f64 = 0.8;
+
+/// LR factor for high holographic unity.
+pub const HOLOGRAPHIC_UNITY_LR_BOOST_FACTOR: f32 = 1.02;
+
+/// LR clamp bounds for holographic unity modulation.
+pub const HOLOGRAPHIC_UNITY_LR_CLAMP_LOW: f32 = 0.8;
+pub const HOLOGRAPHIC_UNITY_LR_CLAMP_HIGH: f32 = 1.2;
+
+/// Holographic unity threshold for LR dampening (fragmented representations).
+pub const HOLOGRAPHIC_UNITY_LR_DAMPEN_THRESHOLD: f64 = 0.2;
+
+/// LR dampen factor for low holographic unity.
+pub const HOLOGRAPHIC_UNITY_LR_DAMPEN_FACTOR: f32 = 0.98;
+
+/// Pipeline consciousness threshold for epistemic confidence nudge.
+/// Science: Dehaene (2011) — strong global workspace relaxes epistemic constraints.
+pub const PIPELINE_CONSCIOUSNESS_EPISTEMIC_THRESHOLD: f64 = 0.7;
+
+/// Epistemic confidence nudge when pipeline consciousness is high.
+pub const PIPELINE_CONSCIOUSNESS_EPISTEMIC_NUDGE: f32 = 0.02;
+
+/// Meta-reasoning confidence threshold for LR boost.
+/// Science: Nelson & Narens (1990) — monitoring-control loop.
+pub const META_REASONING_CONFIDENCE_THRESHOLD: f64 = 0.7;
+
+/// LR boost scale from high meta-reasoning confidence.
+pub const META_REASONING_LR_BOOST_SCALE: f64 = 0.1;
+
+/// Empathic compassion threshold for LR boost.
+/// Science: Decety & Jackson (2004) — shared representations enhance learning.
+pub const EMPATHIC_COMPASSION_LR_THRESHOLD: f64 = 0.7;
+
+/// Empathic compassion LR boost scale.
+pub const EMPATHIC_COMPASSION_LR_SCALE: f32 = 0.02;
+
+/// Empathic LR factor clamp bounds.
+pub const EMPATHIC_LR_CLAMP_LOW: f32 = 0.8;
+pub const EMPATHIC_LR_CLAMP_HIGH: f32 = 1.2;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// HOT-PATH REMAINING CONSTANTS (feedback, dynamics, strategy)
+// Knowledge grounding, Phi scale sigmoid, resonator consolidation,
+// confidence crash guards, world model confusion detection, social trust.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Weight of relevance in knowledge grounding score (sums to 1.0 with CERTAINTY).
+/// Science: Knowledge-grounded consciousness — relevance directly tracks usefulness.
+pub const KNOWLEDGE_GROUNDING_RELEVANCE_WEIGHT: f64 = 0.6;
+
+/// Weight of certainty (1-uncertainty) in knowledge grounding score.
+pub const KNOWLEDGE_GROUNDING_CERTAINTY_WEIGHT: f64 = 0.4;
+
+/// Maximum amplitude of Phi scale boost from coefficient of variation.
+/// Science: Scale-dependent Phi (Tononi 2004) — up to 15% boost for multi-scale coherence.
+pub const PHI_SCALE_BOOST_MAX_AMPLITUDE: f32 = 0.15;
+
+/// Sigmoid slope for Phi scale boost activation.
+pub const PHI_SCALE_BOOST_SIGMOID_SLOPE: f32 = -2.0;
+
+/// Center of sigmoid: CV = 1.0 is the half-activation point.
+pub const PHI_SCALE_BOOST_CV_CENTER: f32 = 1.0;
+
+/// Resonator consolidation precision boost scale per unit similarity above threshold.
+/// Science: McClelland et al. (1995) — complementary learning systems.
+pub const RESONATOR_CONSOLIDATION_PRECISION_SCALE: f64 = 0.1;
+
+/// Maximum prior precision from resonator consolidation.
+pub const RESONATOR_CONSOLIDATION_PRECISION_MAX: f64 = 2.0;
+
+/// Goal priority → LR boost scale factor.
+/// Science: Locke & Latham (2002) — goal commitment modulates learning intensity.
+pub const GOAL_PRIORITY_LR_SCALE: f32 = 0.1;
+
+/// Minimum prior confidence before confidence crash detection fires.
+/// Science: Below this, the system has no basis for detecting a "crash" (Weber-Fechner law).
+pub const CONFIDENCE_CRASH_MIN_PRIOR: f64 = 0.15;
+
+/// Mode stability counter threshold for light freeze vs full freeze.
+/// Science: Post-transition drops are expected; grace period avoids overreaction.
+pub const MODE_STABILITY_GRACE_THRESHOLD: u32 = 3;
+
+/// Light freeze duration when mode stability is below grace threshold.
+pub const CONFIDENCE_CRASH_LIGHT_FREEZE_CYCLES: u32 = 1;
+
+/// Social trust threshold for I-Thou relationship mode.
+/// Science: Buber (1923) — I-Thou requires minimum reciprocal trust.
+pub const SOCIAL_TRUST_ITHOU_THRESHOLD: f32 = 0.3;
+
+/// World model abstract/sensory error ratio for conceptual confusion.
+/// Science: Friston (2010) — hierarchical PE ratio signals level-specific failure.
+pub const WORLD_MODEL_CONFUSION_RATIO: f32 = 1.5;
+
+/// World model sensory/abstract error ratio for sensory mismatch.
+pub const WORLD_MODEL_MISMATCH_RATIO: f32 = 2.0;
+
+/// Minimum absolute error before confusion/mismatch detection fires.
+pub const WORLD_MODEL_ERROR_FLOOR: f32 = 0.1;
+
+/// MCTS effectiveness normalization: maps raw to [0.5, 1.0] range.
+/// Science: Thompson (1933) — normalized effectiveness for Thompson sampling.
+pub const MCTS_EFFECTIVENESS_NORM_SCALE: f32 = 0.5;
+
+/// MCTS effectiveness normalization offset.
+pub const MCTS_EFFECTIVENESS_NORM_OFFSET: f32 = 0.5;
+
+/// Voice heartbeat base speech rate multiplier.
+/// Science: Liberman & Mattingly (1985) — synthetic proxy for vocal tract feedback.
+pub const VOICE_HEARTBEAT_BASE_RATE: f32 = 4.0;
+
+/// Voice heartbeat coarticulation smoothness weight.
+pub const VOICE_HEARTBEAT_COARTICULATION_WEIGHT: f32 = 0.8;
+
+/// Voice heartbeat listener prediction: success value.
+pub const VOICE_HEARTBEAT_LISTENER_SUCCESS: f32 = 0.8;
+
+/// Voice heartbeat listener prediction: failure value.
+pub const VOICE_HEARTBEAT_LISTENER_FAIL: f32 = 0.3;
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // TESTS
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -3723,5 +4171,182 @@ mod tests {
             cycles_to_halve <= 15,
             "fatigue takes {cycles_to_halve} recovery cycles to halve (want <= 15)"
         );
+    }
+
+    #[test]
+    fn test_session23_extracted_constants() {
+        // Feedback phase
+        assert!(FLOW_INTENSITY_LR_THRESHOLD > 0.0 && FLOW_INTENSITY_LR_THRESHOLD < 1.0);
+        assert!(FLOW_SUBSYSTEM_LR_BOOST > 1.0 && FLOW_SUBSYSTEM_LR_BOOST < 1.2);
+        assert!(HIGH_QUALITY_SCORE_THRESHOLD > 0.5 && HIGH_QUALITY_SCORE_THRESHOLD < 1.0);
+        assert!(CONSECUTIVE_HIGH_QUALITY_CYCLES >= 5 && CONSECUTIVE_HIGH_QUALITY_CYCLES <= 50);
+        assert!(QUALITY_FLOOR_EXPLORATION_BOOST > 0.0 && QUALITY_FLOOR_EXPLORATION_BOOST < 0.1);
+        assert!(TEMPORAL_BINDING_HIGH_EXPLORE_SCALE > 0.9 && TEMPORAL_BINDING_HIGH_EXPLORE_SCALE < 1.1);
+        assert!(GRADIENT_STABLE_DETECT_THRESHOLD > 0.0 && GRADIENT_STABLE_DETECT_THRESHOLD < 0.1);
+        assert!(READINESS_REST_THRESHOLD > 0.8 && READINESS_REST_THRESHOLD < 1.0);
+        assert!(READINESS_DEGRADED_THRESHOLD > 0.3 && READINESS_DEGRADED_THRESHOLD < 1.0);
+        assert!(READINESS_REST_THRESHOLD > READINESS_DEGRADED_THRESHOLD); // rest threshold is higher (more ready)
+        assert!(RECOVERY_STABILITY_THRESHOLD > 0.0 && RECOVERY_STABILITY_THRESHOLD < 0.2);
+        assert!(FATIGUE_RECOVERED_THRESHOLD > 0.0 && FATIGUE_RECOVERED_THRESHOLD < 0.3);
+        assert!(GRADIENT_PREDICTION_OK_THRESHOLD > 0.0 && GRADIENT_PREDICTION_OK_THRESHOLD < 0.5);
+        // Dynamics phase
+        assert!(RESONATOR_SUSTAINED_LOW_CONFIDENCE > 0.0 && RESONATOR_SUSTAINED_LOW_CONFIDENCE < 0.05);
+        assert!(BROCA_COHERENT_THRESHOLD > 0.5 && BROCA_COHERENT_THRESHOLD < 1.0);
+        assert!(FEP_ACCURACY_HIGH_CONFIDENCE > 0.0 && FEP_ACCURACY_HIGH_CONFIDENCE < 0.05);
+        assert!(FEP_TD_CONVERGE_EXPLORE_SCALE > 0.9 && FEP_TD_CONVERGE_EXPLORE_SCALE < 1.0);
+        assert!(MATH_VERIFIED_CONFIDENCE > 0.0 && MATH_VERIFIED_CONFIDENCE < 0.1);
+        assert!(MATH_CAVEAT_CONFIDENCE_SCALE > 0.9 && MATH_CAVEAT_CONFIDENCE_SCALE < 1.0);
+        assert!(MOTOR_EXPLORE_INTENSE_LR > 1.0 && MOTOR_EXPLORE_INTENSE_LR < 1.5);
+        assert!(COHERENCE_DEGRADED_LR_BOOST > 1.0 && COHERENCE_DEGRADED_LR_BOOST < 2.0);
+        // Strategy phase
+        assert!(ESCALATION_BLOCK_LR_SCALE > 0.0 && ESCALATION_BLOCK_LR_SCALE < 1.0);
+        assert!(ESCALATION_THROTTLE_EXPLORATION > 0.0 && ESCALATION_THROTTLE_EXPLORATION < 0.5);
+        // Cross-session constants
+        assert!(ALLOSTATIC_LOAD_DAMPEN_INCREMENT_SCALE > 0.0 && ALLOSTATIC_LOAD_DAMPEN_INCREMENT_SCALE < 1.0);
+        assert!(METACOGNITIVE_PREDICTION_EMA_DECAY > 0.5 && METACOGNITIVE_PREDICTION_EMA_DECAY < 1.0);
+        assert!(LIMITING_COMPONENT_ATTENTION_SCALE > 0.0 && LIMITING_COMPONENT_ATTENTION_SCALE < 2.0);
+        assert!(METACOGNITION_DEPTH_NORMALIZER > 1.0 && METACOGNITION_DEPTH_NORMALIZER < 10.0);
+        assert!(KNOWLEDGE_CAUSAL_DEPTH_EXPLOIT_THRESHOLD > 0.0 && KNOWLEDGE_CAUSAL_DEPTH_EXPLOIT_THRESHOLD < 10.0);
+    }
+
+    #[test]
+    fn test_subsystem_phase_constants() {
+        // Hierarchical LTC Phi cross-validation
+        assert!(HIER_LTC_PHI_MIN_THRESHOLD > 0.0 && HIER_LTC_PHI_MIN_THRESHOLD < 0.5);
+        assert!(HIER_LTC_PHI_CONVERGE_THRESHOLD > 0.0 && HIER_LTC_PHI_CONVERGE_THRESHOLD < 0.5);
+        assert!(HIER_LTC_PHI_CONVERGE_BOOST > 0.0 && HIER_LTC_PHI_CONVERGE_BOOST < 0.2);
+        assert!(HIER_LTC_PHI_DIVERGE_THRESHOLD > HIER_LTC_PHI_CONVERGE_THRESHOLD); // diverge > converge
+        assert!(HIER_LTC_PHI_DIVERGE_MAX > 0.0 && HIER_LTC_PHI_DIVERGE_MAX < 1.0);
+        assert!(HIER_LTC_PHI_DIVERGE_PENALTY_SCALE > 0.0 && HIER_LTC_PHI_DIVERGE_PENALTY_SCALE < 0.1);
+
+        // Evolution coordinator
+        assert!(EVOLUTION_POSITIVE_DELTA_THRESHOLD > 0.0 && EVOLUTION_POSITIVE_DELTA_THRESHOLD < 0.1);
+        assert!(EVOLUTION_POSITIVE_LR_SCALE > 0.0 && EVOLUTION_POSITIVE_LR_SCALE < 1.0);
+        assert!(EVOLUTION_POSITIVE_LR_CLAMP > 0.0 && EVOLUTION_POSITIVE_LR_CLAMP <= EVOLUTION_POSITIVE_LR_SCALE);
+        assert!(EVOLUTION_POSITIVE_CONF_SCALE > 0.0 && EVOLUTION_POSITIVE_CONF_SCALE < 0.5);
+        assert!(EVOLUTION_POSITIVE_CONF_CLAMP > 0.0 && EVOLUTION_POSITIVE_CONF_CLAMP <= EVOLUTION_POSITIVE_CONF_SCALE);
+        assert!(EVOLUTION_NEGATIVE_DELTA_THRESHOLD < 0.0 && EVOLUTION_NEGATIVE_DELTA_THRESHOLD > -0.1);
+        assert!(EVOLUTION_NEGATIVE_EXPLORE_SCALE > 0.0 && EVOLUTION_NEGATIVE_EXPLORE_SCALE < 0.5);
+        assert!(EVOLUTION_NEGATIVE_EXPLORE_CLAMP > 0.0 && EVOLUTION_NEGATIVE_EXPLORE_CLAMP <= EVOLUTION_NEGATIVE_EXPLORE_SCALE);
+
+        // Holographic
+        assert!(HOLOGRAPHIC_UNITY_CONFIDENCE_THRESHOLD > 0.3 && HOLOGRAPHIC_UNITY_CONFIDENCE_THRESHOLD < 1.0);
+        assert!(HOLOGRAPHIC_UNITY_CONFIDENCE_SCALE > 0.0 && HOLOGRAPHIC_UNITY_CONFIDENCE_SCALE < 0.2);
+        assert!(HOLOGRAPHIC_BINDING_STRONG_THRESHOLD > 0.3 && HOLOGRAPHIC_BINDING_STRONG_THRESHOLD < 1.0);
+        assert!(HOLOGRAPHIC_BINDING_STRONG_LR > 1.0 && HOLOGRAPHIC_BINDING_STRONG_LR < 1.1);
+        assert!(HOLOGRAPHIC_BINDING_WEAK_UPPER > 0.0 && HOLOGRAPHIC_BINDING_WEAK_UPPER < HOLOGRAPHIC_BINDING_STRONG_THRESHOLD);
+        assert!(HOLOGRAPHIC_BINDING_WEAK_LR > 0.9 && HOLOGRAPHIC_BINDING_WEAK_LR < 1.0);
+
+        // Differentiable consciousness
+        assert!(DIFF_CONSCIOUSNESS_WORKSPACE_SCALE > 0.5 && DIFF_CONSCIOUSNESS_WORKSPACE_SCALE < 1.0);
+        assert!(DIFF_CONSCIOUSNESS_RECURSION_DEFAULT > 0.0 && DIFF_CONSCIOUSNESS_RECURSION_DEFAULT < 1.0);
+
+        // Consciousness gradient
+        assert!(CONSCIOUSNESS_GRADIENT_EXPLORE_THRESHOLD > 0.0 && CONSCIOUSNESS_GRADIENT_EXPLORE_THRESHOLD < 1.0);
+        assert!(CONSCIOUSNESS_GRADIENT_EXPLORE_SCALE > 0.0 && CONSCIOUSNESS_GRADIENT_EXPLORE_SCALE < 0.2);
+
+        // Affective consciousness
+        assert!(AFFECTIVE_DECAY_RATE > 0.0 && AFFECTIVE_DECAY_RATE < 0.2);
+        assert!(AFFECTIVE_NEGATIVE_VALENCE_THRESHOLD < 0.0 && AFFECTIVE_NEGATIVE_VALENCE_THRESHOLD > -1.0);
+        assert!(AFFECTIVE_NEGATIVE_CONFIDENCE_SCALE > 0.0 && AFFECTIVE_NEGATIVE_CONFIDENCE_SCALE < 0.1);
+
+        // Synthetic grounding + epistemic gate
+        assert!(SYNTHETIC_GROUNDING_SIM_THRESHOLD > 0.0 && SYNTHETIC_GROUNDING_SIM_THRESHOLD < 0.5);
+        assert!(EPISTEMIC_GATE_LOW_THRESHOLD > 0.0 && EPISTEMIC_GATE_LOW_THRESHOLD < 0.5);
+        assert!(EPISTEMIC_GATE_LOW_PENALTY > 0.0 && EPISTEMIC_GATE_LOW_PENALTY < 0.1);
+
+        // Primitive validation
+        assert!(PRIMITIVE_VALIDATION_P_THRESHOLD > 0.0 && PRIMITIVE_VALIDATION_P_THRESHOLD < 0.1);
+        assert!(PRIMITIVE_VALIDATION_POSITIVE_LR_SCALE > 0.0 && PRIMITIVE_VALIDATION_POSITIVE_LR_SCALE < 0.1);
+        assert!(PRIMITIVE_VALIDATION_POSITIVE_LR_CLAMP >= PRIMITIVE_VALIDATION_POSITIVE_LR_SCALE);
+        assert!(PRIMITIVE_VALIDATION_NEGATIVE_LR > 0.9 && PRIMITIVE_VALIDATION_NEGATIVE_LR < 1.0);
+
+        // Cross-module feedback
+        assert!(CONSCIOUSNESS_STATE_LOW_URGENCY > 0.0 && CONSCIOUSNESS_STATE_LOW_URGENCY < 0.5);
+        assert!(GRADIENT_STRONG_DIRECTION_THRESHOLD > 0.5 && GRADIENT_STRONG_DIRECTION_THRESHOLD < 2.0);
+        assert!(GRADIENT_STRONG_BOREDOM_REDUCE > 0.0 && GRADIENT_STRONG_BOREDOM_REDUCE < 0.2);
+        assert!(GRADIENT_PLATEAU_UPPER > 0.0 && GRADIENT_PLATEAU_UPPER < GRADIENT_STRONG_DIRECTION_THRESHOLD);
+        assert!(GRADIENT_PLATEAU_BOREDOM_INCREMENT > 0.0 && GRADIENT_PLATEAU_BOREDOM_INCREMENT < 0.1);
+
+        // Holographic unity LR modulation
+        assert!(HOLOGRAPHIC_UNITY_LR_BOOST_THRESHOLD > HOLOGRAPHIC_UNITY_CONFIDENCE_THRESHOLD);
+        assert!(HOLOGRAPHIC_UNITY_LR_BOOST_FACTOR > 1.0 && HOLOGRAPHIC_UNITY_LR_BOOST_FACTOR < 1.1);
+        assert!(HOLOGRAPHIC_UNITY_LR_CLAMP_LOW > 0.5 && HOLOGRAPHIC_UNITY_LR_CLAMP_LOW < 1.0);
+        assert!(HOLOGRAPHIC_UNITY_LR_CLAMP_HIGH > 1.0 && HOLOGRAPHIC_UNITY_LR_CLAMP_HIGH < 2.0);
+        assert!(HOLOGRAPHIC_UNITY_LR_DAMPEN_THRESHOLD > 0.0 && HOLOGRAPHIC_UNITY_LR_DAMPEN_THRESHOLD < 0.5);
+        assert!(HOLOGRAPHIC_UNITY_LR_DAMPEN_FACTOR > 0.9 && HOLOGRAPHIC_UNITY_LR_DAMPEN_FACTOR < 1.0);
+
+        // Pipeline consciousness
+        assert!(PIPELINE_CONSCIOUSNESS_EPISTEMIC_THRESHOLD > 0.5 && PIPELINE_CONSCIOUSNESS_EPISTEMIC_THRESHOLD < 1.0);
+        assert!(PIPELINE_CONSCIOUSNESS_EPISTEMIC_NUDGE > 0.0 && PIPELINE_CONSCIOUSNESS_EPISTEMIC_NUDGE < 0.1);
+
+        // Meta-reasoning
+        assert!(META_REASONING_CONFIDENCE_THRESHOLD > 0.5 && META_REASONING_CONFIDENCE_THRESHOLD < 1.0);
+        assert!(META_REASONING_LR_BOOST_SCALE > 0.0 && META_REASONING_LR_BOOST_SCALE < 0.5);
+
+        // Empathic compassion
+        assert!(EMPATHIC_COMPASSION_LR_THRESHOLD > 0.5 && EMPATHIC_COMPASSION_LR_THRESHOLD < 1.0);
+        assert!(EMPATHIC_COMPASSION_LR_SCALE > 0.0 && EMPATHIC_COMPASSION_LR_SCALE < 0.1);
+        assert!(EMPATHIC_LR_CLAMP_LOW > 0.5 && EMPATHIC_LR_CLAMP_LOW < 1.0);
+        assert!(EMPATHIC_LR_CLAMP_HIGH > 1.0 && EMPATHIC_LR_CLAMP_HIGH < 2.0);
+    }
+
+    #[test]
+    fn test_hotpath_remaining_constants() {
+        // Knowledge grounding weights sum to 1.0
+        let weight_sum = KNOWLEDGE_GROUNDING_RELEVANCE_WEIGHT + KNOWLEDGE_GROUNDING_CERTAINTY_WEIGHT;
+        assert!((weight_sum - 1.0).abs() < 1e-6, "Grounding weights must sum to 1.0");
+        assert!(KNOWLEDGE_GROUNDING_RELEVANCE_WEIGHT > 0.0 && KNOWLEDGE_GROUNDING_RELEVANCE_WEIGHT < 1.0);
+
+        // Phi scale boost sigmoid
+        assert!(PHI_SCALE_BOOST_MAX_AMPLITUDE > 0.0 && PHI_SCALE_BOOST_MAX_AMPLITUDE < 0.5);
+        assert!(PHI_SCALE_BOOST_SIGMOID_SLOPE < 0.0); // negative slope for standard sigmoid
+        assert!(PHI_SCALE_BOOST_CV_CENTER > 0.0);
+
+        // Resonator consolidation
+        assert!(RESONATOR_CONSOLIDATION_PRECISION_SCALE > 0.0 && RESONATOR_CONSOLIDATION_PRECISION_SCALE < 0.5);
+        assert!(RESONATOR_CONSOLIDATION_PRECISION_MAX > 1.0 && RESONATOR_CONSOLIDATION_PRECISION_MAX < 5.0);
+
+        // Goal LR
+        assert!(GOAL_PRIORITY_LR_SCALE > 0.0 && GOAL_PRIORITY_LR_SCALE < 0.5);
+
+        // Confidence crash
+        assert!(CONFIDENCE_CRASH_MIN_PRIOR > 0.0 && CONFIDENCE_CRASH_MIN_PRIOR < 0.5);
+        assert!(MODE_STABILITY_GRACE_THRESHOLD >= 1 && MODE_STABILITY_GRACE_THRESHOLD <= 10);
+        assert!(CONFIDENCE_CRASH_LIGHT_FREEZE_CYCLES >= 1 && CONFIDENCE_CRASH_LIGHT_FREEZE_CYCLES <= 5);
+
+        // Social trust
+        assert!(SOCIAL_TRUST_ITHOU_THRESHOLD > 0.0 && SOCIAL_TRUST_ITHOU_THRESHOLD < 1.0);
+
+        // World model
+        assert!(WORLD_MODEL_CONFUSION_RATIO > 1.0 && WORLD_MODEL_CONFUSION_RATIO < 3.0);
+        assert!(WORLD_MODEL_MISMATCH_RATIO > WORLD_MODEL_CONFUSION_RATIO); // mismatch requires higher ratio
+        assert!(WORLD_MODEL_ERROR_FLOOR > 0.0 && WORLD_MODEL_ERROR_FLOOR < 0.5);
+
+        // MCTS normalization
+        let norm_sum = MCTS_EFFECTIVENESS_NORM_SCALE + MCTS_EFFECTIVENESS_NORM_OFFSET;
+        assert!((norm_sum - 1.0).abs() < 1e-6, "MCTS norm scale+offset should map max to 1.0");
+
+        // Voice heartbeat
+        assert!(VOICE_HEARTBEAT_BASE_RATE > 1.0 && VOICE_HEARTBEAT_BASE_RATE < 10.0);
+        assert!(VOICE_HEARTBEAT_COARTICULATION_WEIGHT > 0.0 && VOICE_HEARTBEAT_COARTICULATION_WEIGHT < 1.0);
+        assert!(VOICE_HEARTBEAT_LISTENER_SUCCESS > VOICE_HEARTBEAT_LISTENER_FAIL);
+    }
+
+    #[test]
+    fn test_knowledge_engine_params() {
+        // Persistence
+        assert!(KNOWLEDGE_SAVE_INTERVAL >= 100 && KNOWLEDGE_SAVE_INTERVAL <= 5000);
+        // Consciousness coupling
+        assert!(KNOWLEDGE_CONSCIOUSNESS_MODULATION > 0.0 && KNOWLEDGE_CONSCIOUSNESS_MODULATION < 0.1);
+        // Dream consolidation
+        assert!(KNOWLEDGE_FORGET_CONFIDENCE_THRESHOLD > 0.0 && KNOWLEDGE_FORGET_CONFIDENCE_THRESHOLD < 0.5);
+        assert!(KNOWLEDGE_CONSOLIDATION_BOOST > 0.0 && KNOWLEDGE_CONSOLIDATION_BOOST < 0.2);
+        // Causal depth exploitation
+        assert!(KNOWLEDGE_CAUSAL_DEPTH_EXPLOIT_THRESHOLD > 0.0);
+        assert!(KNOWLEDGE_CAUSAL_DEPTH_EXPLORE_DAMPEN > 0.0 && KNOWLEDGE_CAUSAL_DEPTH_EXPLORE_DAMPEN < 0.5);
+        // Contradiction boosts
+        assert!(KNOWLEDGE_CONTRADICTION_NE_BOOST > 0.0 && KNOWLEDGE_CONTRADICTION_NE_BOOST < 0.1);
+        assert!(KNOWLEDGE_CONTRADICTION_SHT_BOOST > 0.0 && KNOWLEDGE_CONTRADICTION_SHT_BOOST < 0.1);
     }
 }

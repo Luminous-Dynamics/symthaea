@@ -548,10 +548,10 @@ fn phi_trust_decays_slowly() {
 #[test]
 fn coordinator_signals_updated_after_cycle() {
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
-    let initial_updates = service.memory_coordinator.stats.signal_updates;
+    let initial_updates = service.memory_consol.memory_coordinator.stats.signal_updates;
     let _ = service.cycle("test memory signals");
     assert!(
-        service.memory_coordinator.stats.signal_updates > initial_updates,
+        service.memory_consol.memory_coordinator.stats.signal_updates > initial_updates,
         "cycle should update coordinator signals"
     );
 }
@@ -564,15 +564,17 @@ fn coordinator_enriched_priority_modulates() {
 
     // Before any retrievals: enriched ≈ base + coherence_bonus
     let before = service
+        .memory_consol
         .memory_coordinator
         .enriched_priority(base_priority, hash);
 
     // After recording retrievals
-    service.memory_coordinator.record_retrieval(hash);
-    service.memory_coordinator.record_retrieval(hash);
-    service.memory_coordinator.record_retrieval(hash);
+    service.memory_consol.memory_coordinator.record_retrieval(hash);
+    service.memory_consol.memory_coordinator.record_retrieval(hash);
+    service.memory_consol.memory_coordinator.record_retrieval(hash);
 
     let after = service
+        .memory_consol
         .memory_coordinator
         .enriched_priority(base_priority, hash);
     assert!(

@@ -1509,6 +1509,104 @@ pub const TIER3_OBJECTIVES: &[&str] = &[
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// AUTO-CURRICULUM FROM FAILURES (Phase 5, Item 6)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Generate a targeted [`CodeLesson`] from a recurring compiler error pattern.
+pub fn lesson_from_failure(
+    error_pattern: &str,
+    task_description: &str,
+    _failure_count: usize,
+) -> Option<CodeLesson> {
+    use crate::mind::structured_thought::EpistemicStatus;
+
+    let error_lower = error_pattern.to_lowercase();
+    let (name, signature, purpose, test) = if error_lower.contains("e0308")
+        || error_lower.contains("mismatched types")
+    {
+        (
+            "type_conversion_drill",
+            "fn convert(input: &str) -> i64",
+            "Parse string to integer with proper error handling",
+            "assert_eq!(convert(\"42\"), 42);",
+        )
+    } else if error_lower.contains("e0382")
+        || error_lower.contains("moved value")
+        || error_lower.contains("borrow")
+    {
+        (
+            "ownership_transfer_drill",
+            "fn process(data: Vec<u8>) -> (Vec<u8>, usize)",
+            "Return owned data after processing to maintain ownership",
+            "let (d, n) = process(vec![1,2,3]); assert_eq!(n, 3);",
+        )
+    } else if error_lower.contains("e0106") || error_lower.contains("lifetime") {
+        (
+            "lifetime_annotation_drill",
+            "fn longest<'a>(a: &'a str, b: &'a str) -> &'a str",
+            "Return the longer of two string slices with correct lifetimes",
+            "assert_eq!(longest(\"ab\", \"abc\"), \"abc\");",
+        )
+    } else if error_lower.contains("e0412") || error_lower.contains("cannot find type") {
+        (
+            "import_resolution_drill",
+            "fn create_map() -> std::collections::HashMap<String, i32>",
+            "Use fully qualified paths or proper imports",
+            "let m = create_map(); assert!(m.is_empty());",
+        )
+    } else if error_lower.contains("e0277") || error_lower.contains("trait bound") {
+        (
+            "trait_bound_drill",
+            "fn print_all<T: std::fmt::Display>(items: &[T])",
+            "Apply correct trait bounds for generic functions",
+            "print_all(&[1, 2, 3]);",
+        )
+    } else if error_lower.contains("overflow") {
+        (
+            "safe_arithmetic_drill",
+            "fn safe_add(a: u32, b: u32) -> Option<u32>",
+            "Use checked arithmetic to prevent overflow",
+            "assert_eq!(safe_add(u32::MAX, 1), None);",
+        )
+    } else {
+        return None;
+    };
+
+    Some(CodeLesson {
+        objective_id: format!("auto_drill_{}", name),
+        spec: CodeSpec {
+            language: "rust".to_string(),
+            name: format!("auto_{}", name),
+            purpose: format!(
+                "{} (auto-generated from: {})",
+                purpose, task_description
+            ),
+            purpose_hv: None,
+            signature: Some(signature.to_string()),
+            constraints: Vec::new(),
+            examples: Vec::new(),
+            epistemic_status: EpistemicStatus::Probable,
+            metadata: HashMap::new(),
+        },
+        test_source: Some(test.to_string()),
+    })
+}
+
+/// Generate lessons from a batch of failure patterns, sorted by frequency.
+pub fn lessons_from_failures(
+    failures: &[(String, String, usize)],
+    max: usize,
+) -> Vec<CodeLesson> {
+    let mut sorted: Vec<_> = failures.to_vec();
+    sorted.sort_by(|a, b| b.2.cmp(&a.2));
+    sorted
+        .iter()
+        .filter_map(|(pattern, task, count)| lesson_from_failure(pattern, task, *count))
+        .take(max)
+        .collect()
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // TESTS
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -1968,5 +2066,68 @@ mod tests {
         );
         assert_eq!(objective_prefix("codegen_string_ops"), "codegen_string");
         assert_eq!(objective_prefix("solo"), "solo");
+    }
+
+    #[test]
+    fn test_lesson_from_borrow_error() {
+        let lesson = lesson_from_failure(
+            "error[E0382]: use of moved value: `data`",
+            "process data after sending", 2,
+        );
+        assert!(lesson.is_some());
+        assert!(lesson.unwrap().spec.name.contains("ownership"));
+    }
+
+    #[test]
+    fn test_lesson_from_type_mismatch() {
+        let lesson = lesson_from_failure(
+            "error[E0308]: mismatched types expected i32 found &str",
+            "parse user input", 3,
+        );
+        assert!(lesson.is_some());
+        let l = lesson.unwrap();
+        assert!(l.spec.name.contains("type_conversion"));
+    }
+
+    #[test]
+    fn test_lesson_from_lifetime_error() {
+        let lesson = lesson_from_failure(
+            "error[E0106]: missing lifetime specifier",
+            "return reference from function", 1,
+        );
+        assert!(lesson.is_some());
+        assert!(lesson.unwrap().spec.name.contains("lifetime"));
+    }
+
+    #[test]
+    fn test_lesson_from_unknown_error_returns_none() {
+        let lesson = lesson_from_failure(
+            "some completely unknown error pattern",
+            "do something", 5,
+        );
+        assert!(lesson.is_none());
+    }
+
+    #[test]
+    fn test_lessons_from_failures_sorted_by_frequency() {
+        let failures = vec![
+            ("E0382 moved".into(), "task a".into(), 1usize),
+            ("E0308 mismatch".into(), "task b".into(), 5),
+            ("E0106 lifetime".into(), "task c".into(), 3),
+        ];
+        let lessons = lessons_from_failures(&failures, 10);
+        assert_eq!(lessons.len(), 3);
+        assert!(lessons[0].spec.name.contains("type_conversion"));
+    }
+
+    #[test]
+    fn test_lessons_from_failures_max_cap() {
+        let failures = vec![
+            ("E0382 moved".into(), "a".into(), 2usize),
+            ("E0308 mismatch".into(), "b".into(), 4),
+            ("E0106 lifetime".into(), "c".into(), 3),
+        ];
+        let lessons = lessons_from_failures(&failures, 2);
+        assert_eq!(lessons.len(), 2);
     }
 }

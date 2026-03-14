@@ -146,6 +146,43 @@ pub struct MathService {
     memory_capacity: usize,
 }
 
+/// Compute determinant of an n×n row-major matrix using LU decomposition.
+fn lu_determinant(data: &[f64], n: usize) -> f64 {
+    let mut mat: Vec<f64> = data.to_vec();
+    let mut det = 1.0_f64;
+    for col in 0..n {
+        // Partial pivoting: find row with max abs value in this column
+        let mut max_row = col;
+        let mut max_val = mat[col * n + col].abs();
+        for row in (col + 1)..n {
+            let v = mat[row * n + col].abs();
+            if v > max_val {
+                max_val = v;
+                max_row = row;
+            }
+        }
+        if max_val < 1e-12 {
+            return 0.0; // Singular matrix
+        }
+        if max_row != col {
+            for k in 0..n {
+                mat.swap(col * n + k, max_row * n + k);
+            }
+            det *= -1.0;
+        }
+        det *= mat[col * n + col];
+        let pivot = mat[col * n + col];
+        for row in (col + 1)..n {
+            let factor = mat[row * n + col] / pivot;
+            for k in col..n {
+                let v = mat[col * n + k];
+                mat[row * n + k] -= factor * v;
+            }
+        }
+    }
+    det
+}
+
 impl MathService {
     /// Create a new math service
     pub fn new() -> Self {
@@ -926,6 +963,32 @@ impl MathService {
     /// Get memory utilization (0.0 to 1.0)
     pub fn memory_utilization(&self) -> f64 {
         self.memory.len() as f64 / self.memory_capacity as f64
+    }
+
+    /// Compute the determinant of an n×n matrix (row-major layout).
+    ///
+    /// Uses LU decomposition with partial pivoting. Returns a `MathResponse`
+    /// with `numerical_result` set to the determinant value.
+    ///
+    /// Science: Gaussian elimination with pivoting (Golub & Van Loan 1996).
+    pub fn matrix_determinant(&mut self, data: &[f64], n: usize) -> MathResponse {
+        assert_eq!(data.len(), n * n, "matrix_determinant: data.len() must equal n*n");
+        let det = lu_determinant(data, n);
+        let response = MathResponse {
+            answer: format!("det = {det:.6}"),
+            numerical_result: Some(det),
+            vector_result: None,
+            encoding: BinaryHV::random(42),
+            phi: 0.4,
+            confidence: 0.9,
+            multipath_verified: false,
+            problem_type: MathProblemType::MatrixAnalysis,
+            epistemic_caveat: None,
+            error_bound: None,
+        };
+        self.store_episode(&response, &format!("matrix_determinant(n={n})"));
+        self.telemetry.problems_solved += 1;
+        response
     }
 
     // ─── Internal ────────────────────────────────────────────────────────

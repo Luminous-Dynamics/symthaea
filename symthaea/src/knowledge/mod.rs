@@ -31,7 +31,10 @@ pub mod causal_reasoning_bridge;
 pub mod encoding;
 pub mod extraction;
 pub mod graph;
+pub mod llm_extraction;
 pub mod manager;
+pub mod persistence;
+pub mod reasoning_context;
 
 pub use adaptive_ontology::{AdaptiveOntology, PrimitiveUsage};
 pub use causal_bridge::CausalKnowledgeBridge;
@@ -42,3 +45,6 @@ pub use extraction::{
 };
 pub use graph::{ContradictionAlert, EnhancedKnowledgeGraph, FactId, TemporalFact};
 pub use manager::{KnowledgeManager, KnowledgeSignals, KnowledgeTelemetry};
+pub use reasoning_context::{
+    CausalChain, EpistemicState, GroundedFact, KnowledgeQueryResult, ReasoningContext,
+};

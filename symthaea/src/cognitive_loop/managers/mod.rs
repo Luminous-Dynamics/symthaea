@@ -30,6 +30,7 @@ pub mod drive_manager;
 pub mod learning_manager;
 pub mod memory_manager;
 pub mod perception_manager;
+pub mod swarm_manager;
 
 #[cfg(feature = "mycelix")]
 pub mod governance_manager;
@@ -38,6 +39,7 @@ pub use drive_manager::DriveManager;
 pub use learning_manager::LearningManager;
 pub use memory_manager::MemoryManager;
 pub use perception_manager::PerceptionManager;
+pub use swarm_manager::SwarmManager;
 
 #[cfg(feature = "mycelix")]
 pub use governance_manager::GovernanceManager;
