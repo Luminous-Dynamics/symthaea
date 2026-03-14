@@ -3660,9 +3660,9 @@ pub fn institutional_reasoning_baselines() -> BaselineMap {
     m.insert(
         "institutional_recovery_fidelity",
         Baseline {
-            value: 0.95,
-            sd: Some(0.05),
-            source: "XOR binding invertibility",
+            value: 0.65,
+            sd: Some(0.10),
+            source: "Bundled composite component similarity",
             population: "theoretical",
         },
     );
@@ -3672,6 +3672,42 @@ pub fn institutional_reasoning_baselines() -> BaselineMap {
             value: 0.55,
             sd: Some(0.10),
             source: "Conceptual overlap via shared components",
+            population: "theoretical",
+        },
+    );
+    m.insert(
+        "analogical_transfer_accuracy",
+        Baseline {
+            value: 0.65,
+            sd: Some(0.15),
+            source: "Structure-mapping via HDC set-difference",
+            population: "theoretical",
+        },
+    );
+    m.insert(
+        "analogical_transfer_strength",
+        Baseline {
+            value: 0.50,
+            sd: Some(0.10),
+            source: "HDC similarity of analogical targets",
+            population: "theoretical",
+        },
+    );
+    m.insert(
+        "analogical_shared_component_advantage",
+        Baseline {
+            value: 0.05,
+            sd: Some(0.03),
+            source: "Shared-component similarity advantage",
+            population: "theoretical",
+        },
+    );
+    m.insert(
+        "analogical_asymmetry_score",
+        Baseline {
+            value: 0.50,
+            sd: Some(0.15),
+            source: "Permutation-based directional asymmetry",
             population: "theoretical",
         },
     );

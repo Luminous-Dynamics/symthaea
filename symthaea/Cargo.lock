@@ -14740,6 +14740,7 @@ dependencies = [
 name = "symthaea-psych-bench"
 version = "0.1.0"
 dependencies = [
+ "blake3",
  "chrono",
  "criterion",
  "csv",
