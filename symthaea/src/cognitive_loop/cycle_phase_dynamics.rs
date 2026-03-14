@@ -1,31 +1,34 @@
 //! Core dynamics phase of the cognitive cycle.
 //!
-//! Single method `phase_dynamics()` (~1900 LOC) that runs Phases A–11.
-//! Ordering is load-bearing — do not reorder sections.
+//! `phase_dynamics()` orchestrates Phases A–11, delegating to three private helpers:
+//! - `phase_dynamics_memory_binding()` — episodic recall, resonator, binding, goals
+//! - `phase_dynamics_cfc_planning()` — semantic memory, CfC step, prediction, world model
+//! - `phase_dynamics_training()` — training dispatch, Broca, parallel post-processing
 //!
-//! ## Section index
+//! Ordering is load-bearing — do not reorder sections or helper calls.
 //!
-//! | Line  | Section | Description |
-//! |-------|---------|-------------|
-//! |  ~86  | Phase A: OBSERVE | Build immutable CycleSnapshot |
-//! | ~123  | Phase B: COMPUTE | Run subsystem managers via trait |
-//! | ~156  | Self-model | Accuracy tracking (EMA) |
-//! | ~200  | Foveation | Vision-manifold coupling (cfg) |
-//! | ~240  | 1a: Memory | Episodic recall + resonator + goals |
-//! | ~290  | Binding | Phenomenal binding → threshold/confidence |
-//! | ~468  | 1b+15+18: Emotion | Contagion + homeostasis (→ `apply_emotional_homeostasis`) |
-//! | ~479  | 1c: Emotion | Unified emotional bridge (VAD) |
-//! | ~498  | 2a: Semantic | Semantic memory lookup + LR modulation |
-//! | ~660  | CfC step | Temporal network forward + prediction |
-//! | ~780  | 6b: World model | World model stiffness → LR scaling |
-//! | ~853  | MCTS | Plan evaluation + application |
-//! | ~967  | FEP decomp | Free energy → accuracy/complexity/pragmatic |
-//! | ~1006 | 10d.7: Moral | Moral modulation of inference |
-//! | ~1030 | 10d.6b: FEP | Enhanced FEP bridge |
-//! | ~1143 | Attention | Budget check + substrate tau scaling |
-//! | ~1240 | Training | CfC weight update + async dispatch |
-//! | ~1830 | Parallel | rayon::join post-processing (stability, episodic) |
-//! | ~1869 | Result | Assemble DynamicsPhaseResult |
+//! ## Section index (phase_dynamics outline)
+//!
+//! | Section | Description |
+//! |---------|-------------|
+//! | Phase A: OBSERVE | Build immutable CycleSnapshot |
+//! | Phase B: COMPUTE | Run subsystem managers via CognitiveSubsystem trait |
+//! | Self-model | Accuracy tracking (EMA) |
+//! | Foveation | Vision-manifold coupling (cfg) |
+//! | **→ memory_binding()** | Episodic recall + resonator + binding + goals |
+//! | 1b+15+18: Emotion | Contagion + homeostasis |
+//! | 1c: Emotion | Unified emotional bridge (VAD) |
+//! | **→ cfc_planning()** | Semantic memory + CfC step + prediction + world model |
+//! | 8–10c: Experience | Create experience, coherence bridge, adaptive behavior |
+//! | 10d: Active inference | FEP, MCTS, moral modulation, math solver |
+//! | Neuromod + Psi | Neuromodulator bath, unified Psi synthesis |
+//! | 10d.6b: Enhanced FEP | Enhanced FEP bridge + motor commands |
+//! | Attention | Budget check + active rest + moral attractor |
+//! | Reasoning engine | Phi-gated multi-tier reasoning (cfg) |
+//! | Metacognition | Anomaly detection + recovery |
+//! | LR composition | Compose final effective learning rate |
+//! | **→ training()** | Training + Broca + parallel post-processing |
+//! | Result | Assemble DynamicsPhaseResult |
 
 use crate::consciousness::fep_active_inference::{MotorCommandType, Observation};
 use ndarray::Array1;
@@ -111,6 +114,62 @@ use super::training::TrainingSample;
 use super::{
     ActionHint, AdaptiveBehavior, CognitiveLoopService, CycleLearningResult, TrainingMethod,
 };
+
+/// Results from memory recall, resonator matching, phenomenal binding, and goal attention.
+struct MemoryBindingResult {
+    memory_context_boost: f32,
+    resonator_wm_primed: bool,
+    resonator_reconsolidated: usize,
+    resonator_best_sim: f32,
+    resonator_prediction_error: f32,
+    resonator_error_exploration_mod: f32,
+    binding_threshold_mod: f32,
+    binding_confidence_mod: f32,
+    pre_update_coherence: f32,
+    goal_attention_bias: f32,
+}
+
+/// Results from semantic memory, CfC temporal step, prediction, uncertainty, and world model.
+struct CfcPlanningResult {
+    /// Owned semantic HDC projection (consumed by parallel post-processing).
+    semantic_hdc: Vec<f32>,
+    /// Phi-weighted semantic memory LR factor.
+    semantic_lr_factor: f32,
+    /// Epistemic gate modulation of semantic LR.
+    epistemic_semantic_lr_mod: f32,
+    /// CfC temporal step size (tau-modulated).
+    delta_t: f32,
+    /// CfC hidden state output vector.
+    output: Vec<f32>,
+    /// Multi-scale prediction from CfC.
+    prediction: Vec<f32>,
+    /// Cross-horizon prediction coherence (EMA'd).
+    prediction_coherence: f32,
+    /// Model uncertainty (reducible by exploration).
+    epistemic_uncertainty: f32,
+    /// Data noise uncertainty (irreducible).
+    aleatoric_uncertainty: f32,
+    /// Sensory-abstract mismatch in world model hierarchy.
+    wm_sensory_mismatch: bool,
+    /// FEP surprise → CfC tau modulation factor.
+    fep_tau_factor: f32,
+    /// Prediction horizon → CfC integration depth factor.
+    prediction_horizon_tau: f32,
+    /// Whether arousal trap recovery is active.
+    arousal_recovery_active: bool,
+    /// Arousal recovery tau scaling factor.
+    arousal_recovery_tau_factor: f32,
+}
+
+/// Results from training, stats update, and parallel post-processing.
+struct TrainingPostResult {
+    learning_occurred: bool,
+    training_loss: Option<f32>,
+    effective_lr: f32,
+    cycle_reward: f32,
+    had_semantic_eviction: bool,
+    school_predicted_phi_gain: f32,
+}
 
 impl CognitiveLoopService {
     /// Core dynamics phase: CycleSnapshot, subsystem managers, self-model tracking,
@@ -223,7 +282,9 @@ impl CognitiveLoopService {
 
                 // ── Therapeutic Manager (interval 11, co-prime) ─────────
                 #[cfg(feature = "therapeutic")]
-                if self.therapeutic_manager.should_run(cycle_num, urgency_u8) {
+                if self.config.enable_therapeutic
+                    && self.therapeutic_manager.should_run(cycle_num, urgency_u8)
+                {
                     let therapeutic_output = self.therapeutic_manager.process(snapshot);
                     self.subsystem_collector
                         .record("therapeutic_manager", therapeutic_output);
@@ -485,277 +546,27 @@ impl CognitiveLoopService {
         }
 
         // ═══════════════════════════════════════════════════════════════════════
-        // 1a. Memory System Integration: Recall relevant episodic memories
+        // 1a–1a.2: Memory recall, resonator, binding, goals
         // ═══════════════════════════════════════════════════════════════════════
-        let memory_context_boost =
-            self.recall_episodic_context(&perception.encoding.compressed_state);
+        let mem_bind = self.phase_dynamics_memory_binding(
+            perception,
+            urgency,
+            prediction_error,
+            module_timings,
+        );
+        let memory_context_boost = mem_bind.memory_context_boost;
+        let resonator_wm_primed = mem_bind.resonator_wm_primed;
+        let resonator_reconsolidated = mem_bind.resonator_reconsolidated;
+        let resonator_best_sim = mem_bind.resonator_best_sim;
+        let resonator_prediction_error = mem_bind.resonator_prediction_error;
+        let resonator_error_exploration_mod = mem_bind.resonator_error_exploration_mod;
+        let binding_threshold_mod = mem_bind.binding_threshold_mod;
+        let binding_confidence_mod = mem_bind.binding_confidence_mod;
+        let pre_update_coherence = mem_bind.pre_update_coherence;
+        let goal_attention_bias = mem_bind.goal_attention_bias;
 
-        // ═══════════════════════════════════════════════════════════════════════
-        // 1a.1 Resonator-enhanced recall: factorize bundled memories
-        // ═══════════════════════════════════════════════════════════════════════
-        let mut resonator_wm_primed = false;
-        let mut resonator_reconsolidated: usize = 0;
-        let mut resonator_best_sim: f32 = 0.0;
-
-        let resonator_prediction_error: f32 =
-            if let Some(ref prev_pred) = self.stats.last_resonator_prediction {
-                let sim = helpers::cosine_f32(prev_pred, &perception.encoding.compressed_state);
-                (1.0 - sim).clamp(0.0, 1.0)
-            } else {
-                0.0
-            };
-
-        // ── Phase 20: Resonator prediction error → exploration/confidence ────
-        let resonator_error_exploration_mod = if resonator_prediction_error
-            > RESONATOR_ERROR_EXPLORATION_THRESHOLD
-            && self.stats.total_cycles > RESONATOR_STARTUP_CYCLES
-        {
-            let boost = (resonator_prediction_error - RESONATOR_ERROR_EXPLORATION_THRESHOLD)
-                * RESONATOR_ERROR_EXPLORATION_SCALE;
-            self.adjust_exploration("resonator_error_high", boost);
-            self.adjust_confidence(
-                "resonator_error_high",
-                -boost * RESONATOR_ERROR_CONFIDENCE_DAMPEN,
-            );
-            self.stats.resonator_error_exploration_count += 1;
-            boost
-        } else if resonator_prediction_error < RESONATOR_LOW_ERROR_THRESHOLD
-            && resonator_prediction_error > 0.0
-        {
-            let confidence_boost = (RESONATOR_LOW_ERROR_THRESHOLD - resonator_prediction_error)
-                * RESONATOR_LOW_ERROR_CONFIDENCE_SCALE;
-            self.adjust_confidence("resonator_error_low", confidence_boost);
-            self.stats.resonator_error_exploration_count += 1;
-            // Session 15 Item 7: Sustained low resonator error → confidence recovery.
-            // If >80% of recent cycles had low error, give an additional confidence nudge.
-            // Science: Bar (2009) — consistent prediction accuracy signals reliable model.
-            if self.stats.total_cycles > DYNAMICS_POST_BOOT_CYCLES
-                && self.stats.resonator_error_exploration_count
-                    > (self.stats.total_cycles / 2) as u64
-            {
-                self.adjust_confidence(
-                    "resonator_sustained_low",
-                    super::thresholds::RESONATOR_SUSTAINED_LOW_CONFIDENCE,
-                );
-            }
-            -confidence_boost
-        } else {
-            0.0
-        };
-
-        // ── Phase 17: Coherence memoization — cache pre-update value ─────
-        let pre_update_coherence = self
-            .language_comm
-            .voice_coherence
-            .bridge
-            .smoothed_coherence();
-
-        // ── Phase 20: Phenomenal binding → threshold gating ──────────────────
-        let cached_binding = self.carryover.quality.last_phenomenal_binding as f32;
-        let binding_threshold_mod = if cached_binding > BINDING_CONFIDENCE_THRESHOLD {
-            let relief =
-                (cached_binding - BINDING_CONFIDENCE_THRESHOLD) * BINDING_STRONG_RELIEF_SCALE;
-            self.scale_threshold("binding_strong_relief", 1.0 - relief);
-            self.stats.binding_threshold_mod_count += 1;
-            -relief
-        } else if cached_binding < BINDING_LOW_THRESHOLD && cached_binding > 0.0 {
-            let caution = (BINDING_LOW_THRESHOLD - cached_binding) * BINDING_WEAK_CAUTION_SCALE;
-            self.scale_threshold("binding_weak_caution", 1.0 + caution);
-            self.stats.binding_threshold_mod_count += 1;
-            caution
-        } else {
-            0.0
-        };
-
-        // ── Phase 21: Phenomenal binding → prediction confidence ─────────
-        let binding_confidence_mod = if cached_binding > BINDING_CONFIDENCE_THRESHOLD {
-            let conf_boost =
-                (cached_binding - BINDING_CONFIDENCE_THRESHOLD) * BINDING_STRONG_CONFIDENCE_SCALE;
-            self.adjust_confidence("binding_strong", conf_boost);
-            self.stats.binding_confidence_mod_count += 1;
-            conf_boost
-        } else if cached_binding < BINDING_LOW_THRESHOLD && cached_binding > 0.0 {
-            let conf_dampen =
-                (BINDING_LOW_THRESHOLD - cached_binding) * BINDING_WEAK_CONFIDENCE_SCALE;
-            self.adjust_confidence("binding_weak", -conf_dampen);
-            self.stats.binding_confidence_mod_count += 1;
-            -conf_dampen
-        } else {
-            0.0
-        };
-
-        // Coherence gate: skip resonator recall during unstable CfC dynamics
+        // Re-derive reflection thresholds (also used in FEP decomposition below)
         let reflection_thresholds = self.self_model_tier.self_reflection.get_thresholds();
-        let resonator_coherence_gate = pre_update_coherence > reflection_thresholds.coherence_gate
-            || self.stats.total_cycles < DYNAMICS_STARTUP_WARMUP_CYCLES;
-        if resonator_coherence_gate && urgency.should_run(self.stats.total_cycles, 1, 1, 4) {
-            if let Some(ref mut res_mem) = self.memory_consol.resonator_memory {
-                let res_start = Instant::now();
-
-                let res_dim_ok =
-                    perception.encoding.compressed_state.len() == res_mem.resonator.config.dim;
-                if res_dim_ok && !res_mem.is_empty() {
-                    if let Ok(matches) =
-                        res_mem.retrieve(&[("content", &perception.encoding.compressed_state)])
-                    {
-                        // Thalamic depth → recall depth gating
-                        // Science: Cowan (2001) — WM capacity scales with attentional focus
-                        let recall_k = match self.cognitive_depth {
-                            super::CognitiveDepth::DeepThought => MEMORY_RECALL_TOP_K * 2,
-                            super::CognitiveDepth::Cortical => MEMORY_RECALL_TOP_K,
-                            super::CognitiveDepth::Reflex => 1,
-                        };
-                        let top_matches: Vec<_> = matches.into_iter().take(recall_k).collect();
-
-                        let best_match_sim = top_matches
-                            .iter()
-                            .map(|m| {
-                                helpers::cosine_f32(&perception.encoding.compressed_state, &m.hv)
-                            })
-                            .fold(0.0f32, f32::max);
-                        let match_timestamps: Vec<u64> =
-                            top_matches.iter().map(|m| m.timestamp).collect();
-                        resonator_best_sim = best_match_sim;
-
-                        if best_match_sim > RESONATOR_SIMILARITY_PRIME_THRESHOLD {
-                            let best_ep = top_matches.iter().max_by(|a, b| {
-                                let sa: f32 = perception
-                                    .encoding
-                                    .compressed_state
-                                    .iter()
-                                    .zip(a.hv.iter())
-                                    .map(|(x, y)| x * y)
-                                    .sum();
-                                let sb: f32 = perception
-                                    .encoding
-                                    .compressed_state
-                                    .iter()
-                                    .zip(b.hv.iter())
-                                    .map(|(x, y)| x * y)
-                                    .sum();
-                                sa.partial_cmp(&sb).unwrap_or(std::cmp::Ordering::Equal)
-                            });
-                            if let Some(ep) = best_ep {
-                                self.stats.last_resonator_prediction = Some(ep.hv.clone());
-                            }
-                        }
-
-                        let bundled = if top_matches.len() >= 2 {
-                            let dim = perception.encoding.compressed_state.len();
-                            let mut b = vec![0.0f32; dim];
-                            let n = top_matches.len() as f32;
-                            for ep in &top_matches {
-                                for (j, &v) in ep.hv.iter().take(dim).enumerate() {
-                                    b[j] += v;
-                                }
-                            }
-                            for v in &mut b {
-                                *v /= n;
-                            }
-                            Some(b)
-                        } else {
-                            None
-                        };
-
-                        drop(top_matches);
-
-                        if let Some(bundled) = bundled {
-                            if let Ok(factors) = res_mem.query_factorize(
-                                &bundled,
-                                &[("content", &perception.encoding.compressed_state)],
-                            ) {
-                                for (label, _hv) in &factors {
-                                    match label.as_str() {
-                                        "positive" => {
-                                            self.emotion_contagion.valence =
-                                                (self.emotion_contagion.valence + 0.1)
-                                                    .clamp(-1.0, 1.0);
-                                        }
-                                        "negative" => {
-                                            self.emotion_contagion.valence =
-                                                (self.emotion_contagion.valence - 0.1)
-                                                    .clamp(-1.0, 1.0);
-                                        }
-                                        "high" => {
-                                            self.adjust_confidence(
-                                                "resonator_factor_high",
-                                                super::thresholds::RESONATOR_FACTOR_HIGH_CONFIDENCE,
-                                            );
-                                        }
-                                        _ => {}
-                                    }
-                                }
-                            }
-                        }
-
-                        if best_match_sim > RESONATOR_SIMILARITY_PRIME_THRESHOLD {
-                            self.adjust_confidence(
-                                "resonator_recall_prime",
-                                best_match_sim * super::thresholds::RESONATOR_RECALL_PRIME_SCALE,
-                            );
-                            resonator_wm_primed = true;
-                        }
-
-                        if !match_timestamps.is_empty() {
-                            if let Some(ref mut replay) = self.phi_episodic_replay {
-                                replay.boost_causal_consolidation(
-                                    &match_timestamps,
-                                    super::thresholds::RESONATOR_CAUSAL_CONSOLIDATION_BOOST as f64,
-                                );
-                                resonator_reconsolidated = match_timestamps.len();
-                            }
-                        }
-                    }
-                }
-
-                module_timings.resonator_recall = res_start.elapsed().as_micros() as u64;
-            }
-        }
-
-        // Resonator similarity → unified consolidation response.
-        // High similarity = familiar pattern → lock precision + slow LR (consolidate).
-        // Low similarity = novel pattern → fast LR (rapid encoding).
-        // Unified threshold prevents contradictory signals (precision lock without LR slow).
-        // Science: McClelland et al. (1995) — complementary learning systems.
-        if resonator_best_sim > RESONATOR_CONSOLIDATION_THRESHOLD {
-            self.fep.agent.precision.prior_precision = (self.fep.agent.precision.prior_precision
-                + (resonator_best_sim - RESONATOR_CONSOLIDATION_THRESHOLD) as f64 * super::thresholds::RESONATOR_CONSOLIDATION_PRECISION_SCALE)
-                .min(super::thresholds::RESONATOR_CONSOLIDATION_PRECISION_MAX);
-            if self.stats.total_cycles > DYNAMICS_STARTUP_WARMUP_CYCLES {
-                self.scale_lr("resonator_familiar", RESONATOR_FAMILIAR_LR_SCALE);
-            }
-        } else if resonator_best_sim < RESONATOR_NOVEL_THRESHOLD
-            && resonator_best_sim > 0.0
-            && self.stats.total_cycles > DYNAMICS_STARTUP_WARMUP_CYCLES
-        {
-            self.scale_lr("resonator_novel", RESONATOR_NOVEL_LR_SCALE);
-        }
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // 1a.2. Goal System: Apply attention bias from active goals
-        // ═══════════════════════════════════════════════════════════════════════
-        let goal_attention_bias = self.fep.goal_system.attention_bias();
-
-        if let Some(top) = self.fep.goal_system.top_goal() {
-            let goal_priority = top.priority;
-            // Session 12 Item 2: Skip goal LR boost during Critical urgency.
-            // Critical = recovery mode; goal-chasing works against stability.
-            // Science: Yerkes-Dodson (1908) — high arousal impairs goal-directed learning.
-            if goal_priority > GOAL_PRIORITY_LR_THRESHOLD
-                && !matches!(urgency, super::CycleUrgency::Critical)
-            {
-                let goal_lr_boost = (goal_priority - GOAL_PRIORITY_LR_THRESHOLD) * super::thresholds::GOAL_PRIORITY_LR_SCALE;
-                self.scale_lr("goal_priority", 1.0 + goal_lr_boost);
-            }
-            if prediction_error < self.config.learning_threshold
-                && goal_priority > GOAL_PRIORITY_EXPLORATION_THRESHOLD
-            {
-                self.adjust_exploration(
-                    "goal_pursuit",
-                    goal_priority * super::thresholds::GOAL_PURSUIT_EXPLORATION_SCALE,
-                );
-            }
-        }
 
         // 1b. Analyze emotional content for simple contagion (keyword-based)
         self.emotion_contagion.analyze(input);
@@ -836,335 +647,28 @@ impl CognitiveLoopService {
         );
 
         // ═══════════════════════════════════════════════════════════════════════
-        // 2a. SEMANTIC MEMORY
+        // 2a–6b: Semantic memory, CfC step, prediction, world model
         // ═══════════════════════════════════════════════════════════════════════
-        let _t_core = Instant::now();
-        let semantic_hdc: Cow<'_, [f32]> = self
-            .temporal_network
-            .project_to_hdc_vec(&perception.encoding.compressed_state)
-            .map(Cow::Owned)
-            .unwrap_or(Cow::Borrowed(&perception.encoding.compressed_state));
-        let current_phi_for_lr = pre_update_coherence as f64;
-        let mut semantic_lr_factor = self
-            .memory_consol
-            .semantic_memory
-            .compute_lr_factor_phi_weighted(
-                &semantic_hdc,
-                3,
-                current_phi_for_lr,
-                self.stats.total_cycles as u64,
-            );
-        module_timings.core_semantic_lookup = _t_core.elapsed().as_micros() as u64;
-
-        // ── Phase 20: Epistemic gate → semantic memory LR bidirectionality ───
-        let prev_epistemic = self.carryover.quality.last_epistemic_confidence;
-        let epistemic_semantic_lr_mod: f32 =
-            if prev_epistemic < EPISTEMIC_SEMANTIC_CAUTION_THRESHOLD && prev_epistemic > 0.0 {
-                let caution = EPISTEMIC_SEMANTIC_CAUTION_BASE
-                    + prev_epistemic * EPISTEMIC_SEMANTIC_CAUTION_SCALE;
-                semantic_lr_factor *= caution;
-                self.stats.epistemic_semantic_mod_count += 1;
-                caution - 1.0
-            } else if prev_epistemic > EPISTEMIC_SEMANTIC_BOOST_THRESHOLD {
-                let boost = 1.0_f32
-                    + (prev_epistemic - EPISTEMIC_SEMANTIC_BOOST_THRESHOLD)
-                        * EPISTEMIC_SEMANTIC_BOOST_SCALE;
-                semantic_lr_factor *= boost;
-                self.stats.epistemic_semantic_mod_count += 1;
-                boost - 1.0
-            } else {
-                0.0
-            };
-
-        // 2b. Physics bridge: blend physics-informed HDC into compressed state.
-        // Only clone when physics-bridge feature needs to mutate the buffer;
-        // otherwise borrow directly to skip a Vec allocation per cycle.
-        #[cfg(feature = "physics-bridge")]
-        let _compressed_owned;
-        #[cfg(feature = "physics-bridge")]
-        let compressed_for_cfc: &[f32] = {
-            _compressed_owned = {
-                let mut buf = perception.encoding.compressed_state.clone();
-                if let Some(ref mut physics) = self.feature_integ.physics_integration {
-                    physics.query_cycle(
-                        self.stats.total_cycles,
-                        self.config.physics_bridge_query_interval,
-                        self.config.physics_bridge_blend_weight,
-                        self.substrate_manager.tau_factor,
-                        self.substrate_manager.scale_pressure,
-                        &perception.encoding.hv16_cached,
-                        &mut buf,
-                    );
-                }
-                buf
-            };
-            &_compressed_owned
-        };
-        #[cfg(not(feature = "physics-bridge"))]
-        let compressed_for_cfc: &[f32] = &perception.encoding.compressed_state;
-
-        // 3. Convert to ndarray for CfC
-        let input_array: Array1<f32> = compressed_for_cfc.iter().copied().collect();
-
-        // 4. Step CfC forward with current input
-        let resonance_tau_factor = if self.carryover.history.resonance_frequency > 0.0 {
-            let deviation = (self.carryover.history.resonance_frequency as f32
-                - RESONANCE_TAU_CENTER as f32)
-                .clamp(-0.5, 0.5);
-            1.0 - (deviation * RESONANCE_TAU_SCALE)
-        } else {
-            1.0
-        };
-        let arousal_tau_factor =
-            if (self.carryover.history.body_arousal - 0.5).abs() > AROUSAL_TAU_DEADZONE {
-                1.0 + (self.carryover.history.body_arousal - 0.5) * AROUSAL_TAU_SENSITIVITY
-            } else {
-                1.0
-            };
-        let codebook_tau_factor = if resonator_best_sim > CODEBOOK_FAMILIAR_THRESHOLD {
-            1.0 - (resonator_best_sim - CODEBOOK_FAMILIAR_THRESHOLD) * CODEBOOK_FAMILIAR_TAU_SCALE
-        } else if resonator_best_sim > 0.0 && resonator_best_sim < CODEBOOK_NOVEL_THRESHOLD {
-            1.0 + (CODEBOOK_NOVEL_THRESHOLD - resonator_best_sim) * CODEBOOK_NOVEL_TAU_SCALE
-        } else {
-            1.0
-        };
-        let arousal_recovery_tau_factor;
-        let arousal_recovery_active;
-        if self.carryover.urgency.arousal_trap_counter > AROUSAL_TRAP_RECOVERY_MIN_CYCLES {
-            // Recovery intensity ramps from 0→1 over the ramp window, then stays at 1.0.
-            // BUG FIX: Previously capped at counter=10, leaving extended traps unassisted.
-            let recovery_intensity =
-                ((self.carryover.urgency.arousal_trap_counter - AROUSAL_TRAP_RECOVERY_MIN_CYCLES) as f32 / AROUSAL_TRAP_RECOVERY_RAMP_CYCLES).min(1.0);
-            arousal_recovery_tau_factor = 1.0 + recovery_intensity * AROUSAL_RECOVERY_TAU_SCALE;
-            arousal_recovery_active = true;
-        } else {
-            arousal_recovery_tau_factor = 1.0;
-            arousal_recovery_active = false;
-        }
-
-        // FEP surprise → CfC time constant modulation.
-        // Friston (2010): high surprise (free energy) accelerates inference dynamics;
-        // low surprise allows consolidation via slower dynamics.
-        // Factor: [0.8, 1.2] — moderate modulation to prevent instability.
-        let fep_tau_factor = if let Some(ref fe) = self.fep.agent.last_fe_components {
-            let surprise_norm = (fe.surprise as f32).clamp(0.0, 2.0) / 2.0; // [0, 1]
-            1.0 - surprise_norm * FEP_SURPRISE_TAU_SCALE // high surprise → 0.8 (faster), low → 1.0
-        } else {
-            1.0
-        };
-
-        // Session 10 Item 3: Coherence velocity tau factor.
-        // Session 11 Item 3: Gate behind cycle > 5 to avoid spurious velocity from default init.
-        let coherence_velocity_tau_factor = {
-            let cv = self.carryover.quality.coherence_velocity;
-            if self.stats.total_cycles > RESONATOR_STARTUP_CYCLES && cv > COHERENCE_VELOCITY_TAU_THRESHOLD {
-                COHERENCE_VELOCITY_TAU_BOOST
-            } else if self.stats.total_cycles > RESONATOR_STARTUP_CYCLES && cv < -COHERENCE_VELOCITY_TAU_THRESHOLD {
-                COHERENCE_VELOCITY_TAU_DAMPEN
-            } else {
-                1.0
-            }
-        };
-
-        // Prediction horizon → CfC temporal integration depth.
-        // Clark (2013): high PE → contract horizons (focus near-term);
-        // low PE → expand horizons (exploit stability for planning).
-        // This complements FEP surprise tau (Friston 2010) — they work in synergy:
-        // FEP surprise drives fast dynamics, horizon scale drives planning depth.
-        let prediction_horizon_tau = {
-            let pe = self.stats.avg_prediction_error.clamp(0.0, 1.0);
-            let pe_scale = if pe > HORIZON_PE_CONTRACT_THRESHOLD {
-                1.0 - (pe - HORIZON_PE_CONTRACT_THRESHOLD) * HORIZON_PE_CONTRACT_RATE
-            } else if pe < HORIZON_PE_EXPAND_THRESHOLD {
-                1.0 + (HORIZON_PE_EXPAND_THRESHOLD - pe) * HORIZON_PE_EXPAND_RATE
-            } else {
-                1.0
-            };
-            let slope = perception.urgency.error_slope;
-            let slope_scale = if slope > HORIZON_SLOPE_THRESHOLD {
-                1.0 - (slope - HORIZON_SLOPE_THRESHOLD).min(HORIZON_SLOPE_CONTRACT_CAP)
-                    * HORIZON_SLOPE_CONTRACT_RATE
-            } else if slope < -HORIZON_SLOPE_THRESHOLD {
-                1.0 + (-slope - HORIZON_SLOPE_THRESHOLD).min(HORIZON_SLOPE_EXPAND_CAP)
-                    * HORIZON_SLOPE_EXPAND_RATE
-            } else {
-                1.0
-            };
-            (pe_scale * slope_scale)
-                .clamp(PREDICTION_HORIZON_MIN_SCALE, PREDICTION_HORIZON_MAX_SCALE)
-        };
-
-        let delta_t = self.config.cfc_config.delta_t
-            * resonance_tau_factor
-            * arousal_tau_factor
-            * codebook_tau_factor
-            * arousal_recovery_tau_factor
-            * fep_tau_factor
-            * coherence_velocity_tau_factor
-            * prediction_horizon_tau
-            * self
-                .somatic_bridge
-                .to_interoceptive_signals()
-                .tau_slowdown_factor as f32
-            * self.substrate_manager.tau_factor;
-        let _t_core = Instant::now();
-        if let Err(e) = self.temporal_network.step(&input_array, delta_t) {
-            tracing::warn!(error = %e, "CfC temporal step failed — continuing with stale state");
-        }
-
-        // Phase 3: Scale-limited CfC hidden state masking.
-        // When substrate has fewer computational units than biological (negative
-        // scale_pressure), mask out a fraction of hidden state dimensions.
-        // Science: Berry & Srivastava (2018) — HDC capacity ~ D^(5/3).
-        if self.config.enable_substrate_encoding_noise {
-            let frac = self.substrate_manager.effective_dim_fraction();
-            if frac < 1.0 {
-                if let Ok(mut state) = self.temporal_network.read_state() {
-                    let mask_start = (frac * state.len() as f32) as usize;
-                    for h in state.as_slice_mut().unwrap_or(&mut [])[mask_start..].iter_mut() {
-                        *h = 0.0;
-                    }
-                    let _ = self.temporal_network.inject(&state);
-                }
-            }
-        }
-
-        module_timings.core_cfc_step = _t_core.elapsed().as_micros() as u64;
-
-        // 5. Get multi-scale predictions
-        let _t_core = Instant::now();
-        let (prediction, raw_predictions) = self.get_multi_scale_prediction(&input_array);
-
-        let prediction_coherence = if self.stats.total_cycles % 11 == 0 {
-            let coh = Self::compute_prediction_coherence_from_cache(&raw_predictions);
-            self.stats.avg_prediction_coherence = self.stats.avg_prediction_coherence
-                * COHERENCE_PREDICTION_EMA
-                + coh * (1.0 - COHERENCE_PREDICTION_EMA);
-            if coh < COHERENCE_LOW_THRESHOLD {
-                let coh_dampen = (COHERENCE_LOW_THRESHOLD - coh) * COHERENCE_LOW_DAMPEN_SCALE;
-                self.scale_confidence("pred_coherence_low", 1.0 - coh_dampen);
-            }
-            if coh > COHERENCE_HIGH_THRESHOLD {
-                let coh_boost = (coh - COHERENCE_HIGH_THRESHOLD) * COHERENCE_CONFIDENCE_BOOST;
-                self.adjust_confidence("pred_coherence_high", coh_boost);
-            }
-            coh
-        } else {
-            self.stats.avg_prediction_coherence
-        };
-
-        // 5b. Epistemic vs aleatoric uncertainty decomposition.
-        // Epistemic (model uncertainty): prediction disagreement across horizons — reducible
-        // by exploration. Aleatoric (data noise): mean per-horizon prediction variance — not
-        // reducible. Only epistemic uncertainty should drive exploration.
-        // Depeweg et al. (2018): decomposing uncertainty for active learning.
-        let (epistemic_uncertainty, aleatoric_uncertainty) = if raw_predictions.len() >= 2 {
-            // Epistemic ≈ 1 - cross-horizon coherence (disagreement = model uncertainty)
-            let epistemic = (1.0 - prediction_coherence).clamp(0.0, 1.0);
-
-            // Aleatoric ≈ mean within-dimension variance across predictions
-            // Use min length across all prediction vectors — HierarchicalCfC can produce
-            // jagged vectors, and indexing by [0].len() would panic on shorter ones.
-            let dim = raw_predictions.iter().map(|p| p.len()).min().unwrap_or(0).max(1);
-            let n = raw_predictions.len() as f32;
-            let mut mean_var = 0.0f32;
-            for d in 0..dim {
-                let mean: f32 = raw_predictions.iter().map(|p| p[d]).sum::<f32>() / n;
-                let var: f32 = raw_predictions
-                    .iter()
-                    .map(|p| (p[d] - mean).powi(2))
-                    .sum::<f32>()
-                    / n;
-                mean_var += var;
-            }
-            let aleatoric = (mean_var / dim as f32).sqrt().clamp(0.0, 1.0);
-            (epistemic, aleatoric)
-        } else {
-            (EPISTEMIC_UNCERTAINTY_DEFAULT, ALEATORIC_UNCERTAINTY_DEFAULT) // defaults when insufficient data
-        };
-
-        // Only epistemic uncertainty drives exploration (aleatoric is irreducible noise).
-        // Use smoothed epistemic for stability; raw for responsiveness on first cycle.
-        // Depeweg et al. (2018): decomposing uncertainty for active learning.
-        let smoothed_eu = self.carryover.quality.smoothed_epistemic_uncertainty;
-        let eu_for_exploration = if smoothed_eu > 0.0 {
-            smoothed_eu
-        } else {
-            epistemic_uncertainty
-        };
-        if eu_for_exploration > EPISTEMIC_EXPLORE_THRESHOLD && self.stats.total_cycles % 7 == 0 {
-            let mut epistemic_explore =
-                (eu_for_exploration - EPISTEMIC_EXPLORE_THRESHOLD) * EPISTEMIC_EXPLORE_SCALE;
-            // Oscillation + high uncertainty = confused AND unstable → stronger exploration.
-            // Doya (2002) + Schmidhuber (2010): compound uncertainty warrants aggressive search.
-            if perception.urgency.oscillation_ratio > EPISTEMIC_OSCILLATION_THRESHOLD {
-                epistemic_explore *= EPISTEMIC_OSCILLATION_MULTIPLIER;
-            }
-            self.adjust_exploration("epistemic_uncertainty", epistemic_explore);
-        } else if eu_for_exploration < EPISTEMIC_LOW_THRESHOLD && self.stats.total_cycles % 7 == 0 {
-            // Low epistemic uncertainty → dampen exploration (model is confident).
-            self.adjust_exploration("epistemic_low", -EPISTEMIC_LOW_DAMPEN);
-        }
-
-        // 6. Get current CfC state as output
-        let output = self
-            .temporal_network
-            .read_state()
-            .map(|arr| arr.to_vec())
-            .unwrap_or_else(|_| vec![0.0; self.config.cfc_config.num_neurons]);
-        module_timings.core_predict = _t_core.elapsed().as_micros() as u64;
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // 6b. World Model
-        // ═══════════════════════════════════════════════════════════════════════
-        let _t = Instant::now();
-        self.fep
-            .world_model
-            .update_sensory(&perception.encoding.compressed_state);
-
-        // Incorporate causal structure into world model (every 41 cycles, co-prime).
-        // Pearl (2009): causal knowledge provides structural priors beyond correlation.
-        if self.stats.total_cycles % 41 == 0 {
-            if let Some(ref enhancer) = self.causal_enhancer {
-                let graph = enhancer.current_graph();
-                if !graph.is_empty() {
-                    let edges: Vec<(usize, usize, f32)> = graph
-                        .edges
-                        .iter()
-                        .map(|e| (e.from, e.to, e.strength as f32))
-                        .collect();
-                    self.fep.world_model.incorporate_causal_structure(&edges);
-                }
-            }
-        }
-
-        let wm_stiffness = self.fep.world_model.avg_error.clamp(0.0, 1.0);
-        if self.stats.total_cycles > DYNAMICS_POST_BOOT_CYCLES {
-            if wm_stiffness > WORLD_MODEL_STIFFNESS_THRESHOLD {
-                let stiffness_nudge = (wm_stiffness - WORLD_MODEL_STIFFNESS_THRESHOLD)
-                    * WORLD_MODEL_STIFFNESS_LR_SCALE;
-                self.adjust_lr("wm_stiff", stiffness_nudge);
-            } else if wm_stiffness < WORLD_MODEL_SPONGINESS_THRESHOLD {
-                let spongy_dampen =
-                    (WORLD_MODEL_SPONGINESS_THRESHOLD - wm_stiffness) * WORLD_MODEL_SPONGY_LR_SCALE;
-                self.scale_lr("wm_spongy", 1.0 - spongy_dampen);
-            }
-        }
-
-        let level_errors = self.fep.world_model.level_errors();
-        let mut wm_sensory_mismatch = false;
-        if level_errors.len() >= 2 && self.stats.total_cycles > DYNAMICS_STARTUP_WARMUP_CYCLES {
-            let sensory_error = level_errors[0];
-            let abstract_error = level_errors[level_errors.len() - 1];
-            if abstract_error > sensory_error * super::thresholds::WORLD_MODEL_CONFUSION_RATIO && abstract_error > super::thresholds::WORLD_MODEL_ERROR_FLOOR {
-                self.adjust_exploration(
-                    "conceptual_confusion",
-                    super::thresholds::CONCEPTUAL_CONFUSION_EXPLORATION,
-                );
-            }
-            wm_sensory_mismatch = sensory_error > abstract_error * super::thresholds::WORLD_MODEL_MISMATCH_RATIO && sensory_error > super::thresholds::WORLD_MODEL_ERROR_FLOOR;
-        }
-        module_timings.world_model = _t.elapsed().as_micros() as u64;
+        let cfc_plan = self.phase_dynamics_cfc_planning(
+            perception,
+            pre_update_coherence,
+            resonator_best_sim,
+            module_timings,
+        );
+        let semantic_hdc = cfc_plan.semantic_hdc;
+        let semantic_lr_factor = cfc_plan.semantic_lr_factor;
+        let epistemic_semantic_lr_mod = cfc_plan.epistemic_semantic_lr_mod;
+        let delta_t = cfc_plan.delta_t;
+        let output = cfc_plan.output;
+        let prediction = cfc_plan.prediction;
+        let prediction_coherence = cfc_plan.prediction_coherence;
+        let epistemic_uncertainty = cfc_plan.epistemic_uncertainty;
+        let aleatoric_uncertainty = cfc_plan.aleatoric_uncertainty;
+        let wm_sensory_mismatch = cfc_plan.wm_sensory_mismatch;
+        let fep_tau_factor = cfc_plan.fep_tau_factor;
+        let prediction_horizon_tau = cfc_plan.prediction_horizon_tau;
+        let arousal_recovery_active = cfc_plan.arousal_recovery_active;
+        let arousal_recovery_tau_factor = cfc_plan.arousal_recovery_tau_factor;
 
         // 8. Capture previous state BEFORE create_experience updates it
         let previous_state = self.last_state.clone();
@@ -1517,7 +1021,7 @@ impl CognitiveLoopService {
         }
 
         if fep_surprise > surprise_thresh {
-            if let Some(ref mut replay) = self.phi_episodic_replay {
+            if let Some(ref mut replay) = self.episodic_persistence.replay {
                 let surprise_boost = (fep_surprise - surprise_thresh).min(0.5) * 0.2;
                 replay.boost_recent_consolidation(surprise_boost);
             }
@@ -1910,8 +1414,8 @@ impl CognitiveLoopService {
                     }
                 }
                 MotorCommandType::MotorOutput => {
-                    if let Some(ref mut bridge) = self.motor_output_bridge {
-                        let request = self.pending_motor_request.take().unwrap_or_default();
+                    if let Some(ref mut bridge) = self.motor_rendering.output_bridge {
+                        let request = self.motor_rendering.pending_request.take().unwrap_or_default();
                         // Use actual consciousness level for Phi gating,
                         // falling back to coherence if not yet computed.
                         // Coherence alone is a poor Phi proxy — it measures voice
@@ -1938,8 +1442,8 @@ impl CognitiveLoopService {
                         );
                         self.fep.agent.perceive(&motor_obs);
 
-                        self.last_motor_phi = motor_phi;
-                        self.last_motor_result = Some(result);
+                        self.motor_rendering.last_phi = motor_phi;
+                        self.motor_rendering.last_result = Some(result);
                     }
                 }
                 MotorCommandType::NoOp => {}
@@ -2074,7 +1578,7 @@ impl CognitiveLoopService {
                 // Active rest: boost episodic memory consolidation priority.
                 // Rest states are when the brain consolidates recent experiences
                 // (Diekelmann & Born 2010 — memory consolidation during rest).
-                if let Some(ref mut replay) = self.phi_episodic_replay {
+                if let Some(ref mut replay) = self.episodic_persistence.replay {
                     replay.boost_recent_consolidation(0.15);
                 }
             }
@@ -2464,6 +1968,834 @@ impl CognitiveLoopService {
                 super::CognitiveDepth::Reflex => THALAMIC_REFLEX_LR_FACTOR,
             };
 
+        // ═══════════════════════════════════════════════════════════════════════
+        // 11–12 + Broca + Parallel: Training, stats, Broca, post-processing
+        // ═══════════════════════════════════════════════════════════════════════
+        let train_result = self.phase_dynamics_training(
+            input,
+            perception,
+            prediction_error,
+            effective_lr,
+            delta_t,
+            previous_state,
+            &output,
+            coherence,
+            semantic_hdc,
+            urgency,
+            selected_strategy,
+            surprise_triggered,
+            memory_context_boost,
+            cycle_start,
+            &math_result,
+            semantic_lr_factor,
+            module_timings,
+        );
+        let learning_occurred = train_result.learning_occurred;
+        let training_loss = train_result.training_loss;
+        let effective_lr = train_result.effective_lr;
+        let cycle_reward = train_result.cycle_reward;
+        let had_semantic_eviction = train_result.had_semantic_eviction;
+        let school_predicted_phi_gain = train_result.school_predicted_phi_gain;
+
+        DynamicsPhaseResult {
+            core: DynCore {
+                output,
+                prediction,
+                prediction_error,
+                coherence,
+                unified_psi,
+                learning_occurred,
+                training_loss,
+                effective_lr,
+                cycle_reward,
+                prediction_coherence,
+                self_model_accuracy,
+            },
+            fep: DynFep {
+                fep_action_idx,
+                fep_pragmatic_value,
+                fep_accuracy,
+                fep_complexity,
+                fep_surprise,
+                fep_td_error,
+            },
+            reasoning: DynReasoning {
+                reasoning_confidence,
+                reasoning_gate_blocked,
+                reasoning_fallback,
+                reasoning_plan_action,
+                reasoning_plan_confidence,
+                reasoning_narrative,
+                metacognitive_anomaly,
+                mcts_plan_effectiveness,
+                causal_attention_edges,
+                school_predicted_phi_gain,
+                re_phi_eff_raw,
+                re_phi_eff,
+                re_epistemic_mod,
+                re_gamma,
+                re_reliability,
+                re_budget_consumed,
+                re_wall_time_us,
+                re_steps_taken,
+                re_tier_reached,
+                re_gate_checks,
+                re_budget_exceeded,
+                re_evs,
+                re_mcts_iterations,
+                re_did_simulate,
+            },
+            attention: DynAttention {
+                attention_budget_exceeded,
+                attention_budget_elapsed_us,
+                predictive_budget_gated,
+            },
+            resonator: DynResonator {
+                resonator_wm_primed,
+                resonator_reconsolidated,
+                resonator_best_sim,
+                resonator_prediction_error,
+                resonator_error_exploration_mod,
+            },
+            homeostasis: DynHomeostasis {
+                anomaly_recovery_progress,
+                anomaly_recovering,
+                valence_homeostasis_pull,
+                arousal_homeostasis_pull,
+                homeostasis_pull_strength,
+                arousal_recovery_active,
+                arousal_recovery_tau_factor,
+            },
+            guidance: DynGuidance {
+                moral_steering_category: moral_steering_category.into(),
+                guiding_priority_category,
+                guiding_question,
+                dominant_harmonic,
+            },
+            math: math_result,
+            neuromod: DynNeuromod {
+                neuromod_attention_alloc,
+                ne_reorienting_boost,
+                ne_arousal_feedback,
+                confidence_velocity,
+                sht_crash_dip,
+                exploration_sht_drain,
+                phasic_da_replay_boost: 0, // set during feedback phase
+            },
+            binding_threshold_mod,
+            binding_confidence_mod,
+            epistemic_semantic_lr_mod,
+            pfe_surprise_mod,
+            epistemic_uncertainty,
+            aleatoric_uncertainty,
+            fep_tau_factor,
+            prediction_horizon_tau,
+            causal_world_model_edges: if self
+                .causal_enhancer
+                .as_ref()
+                .map_or(false, |e| e.has_causal_structure())
+            {
+                self.causal_enhancer
+                    .as_ref()
+                    .map_or(0, |e| e.current_graph().edges.len())
+            } else {
+                0
+            },
+            epistemic_budget_scale,
+            confidence_crash_detected,
+            lr_frozen,
+            semantic_evictions: if had_semantic_eviction { 1 } else { 0 },
+        }
+    }
+
+    /// Memory recall, resonator matching, phenomenal binding, and goal attention.
+    ///
+    /// Performs episodic recall, resonator-enhanced factorization, binding→threshold/confidence
+    /// gating, resonator similarity→consolidation, and goal system attention bias.
+    fn phase_dynamics_memory_binding(
+        &mut self,
+        perception: &PerceptionPhaseResult,
+        urgency: super::CycleUrgency,
+        prediction_error: f32,
+        module_timings: &mut super::ModuleTimings,
+    ) -> MemoryBindingResult {
+        // ═══════════════════════════════════════════════════════════════════════
+        // 1a. Memory System Integration: Recall relevant episodic memories
+        // ═══════════════════════════════════════════════════════════════════════
+        let memory_context_boost =
+            self.recall_episodic_context(&perception.encoding.compressed_state);
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // 1a.1 Resonator-enhanced recall: factorize bundled memories
+        // ═══════════════════════════════════════════════════════════════════════
+        let mut resonator_wm_primed = false;
+        let mut resonator_reconsolidated: usize = 0;
+        let mut resonator_best_sim: f32 = 0.0;
+
+        let resonator_prediction_error: f32 =
+            if let Some(ref prev_pred) = self.stats.last_resonator_prediction {
+                let sim = helpers::cosine_f32(prev_pred, &perception.encoding.compressed_state);
+                (1.0 - sim).clamp(0.0, 1.0)
+            } else {
+                0.0
+            };
+
+        // ── Phase 20: Resonator prediction error → exploration/confidence ────
+        let resonator_error_exploration_mod = if resonator_prediction_error
+            > RESONATOR_ERROR_EXPLORATION_THRESHOLD
+            && self.stats.total_cycles > RESONATOR_STARTUP_CYCLES
+        {
+            let boost = (resonator_prediction_error - RESONATOR_ERROR_EXPLORATION_THRESHOLD)
+                * RESONATOR_ERROR_EXPLORATION_SCALE;
+            self.adjust_exploration("resonator_error_high", boost);
+            self.adjust_confidence(
+                "resonator_error_high",
+                -boost * RESONATOR_ERROR_CONFIDENCE_DAMPEN,
+            );
+            self.stats.resonator_error_exploration_count += 1;
+            boost
+        } else if resonator_prediction_error < RESONATOR_LOW_ERROR_THRESHOLD
+            && resonator_prediction_error > 0.0
+        {
+            let confidence_boost = (RESONATOR_LOW_ERROR_THRESHOLD - resonator_prediction_error)
+                * RESONATOR_LOW_ERROR_CONFIDENCE_SCALE;
+            self.adjust_confidence("resonator_error_low", confidence_boost);
+            self.stats.resonator_error_exploration_count += 1;
+            // Session 15 Item 7: Sustained low resonator error → confidence recovery.
+            // If >80% of recent cycles had low error, give an additional confidence nudge.
+            // Science: Bar (2009) — consistent prediction accuracy signals reliable model.
+            if self.stats.total_cycles > DYNAMICS_POST_BOOT_CYCLES
+                && self.stats.resonator_error_exploration_count
+                    > (self.stats.total_cycles / 2) as u64
+            {
+                self.adjust_confidence(
+                    "resonator_sustained_low",
+                    super::thresholds::RESONATOR_SUSTAINED_LOW_CONFIDENCE,
+                );
+            }
+            -confidence_boost
+        } else {
+            0.0
+        };
+
+        // ── Phase 17: Coherence memoization — cache pre-update value ─────
+        let pre_update_coherence = self
+            .language_comm
+            .voice_coherence
+            .bridge
+            .smoothed_coherence();
+
+        // ── Phase 20: Phenomenal binding → threshold gating ──────────────────
+        let cached_binding = self.carryover.quality.last_phenomenal_binding as f32;
+        let binding_threshold_mod = if cached_binding > BINDING_CONFIDENCE_THRESHOLD {
+            let relief =
+                (cached_binding - BINDING_CONFIDENCE_THRESHOLD) * BINDING_STRONG_RELIEF_SCALE;
+            self.scale_threshold("binding_strong_relief", 1.0 - relief);
+            self.stats.binding_threshold_mod_count += 1;
+            -relief
+        } else if cached_binding < BINDING_LOW_THRESHOLD && cached_binding > 0.0 {
+            let caution = (BINDING_LOW_THRESHOLD - cached_binding) * BINDING_WEAK_CAUTION_SCALE;
+            self.scale_threshold("binding_weak_caution", 1.0 + caution);
+            self.stats.binding_threshold_mod_count += 1;
+            caution
+        } else {
+            0.0
+        };
+
+        // ── Phase 21: Phenomenal binding → prediction confidence ─────────
+        let binding_confidence_mod = if cached_binding > BINDING_CONFIDENCE_THRESHOLD {
+            let conf_boost =
+                (cached_binding - BINDING_CONFIDENCE_THRESHOLD) * BINDING_STRONG_CONFIDENCE_SCALE;
+            self.adjust_confidence("binding_strong", conf_boost);
+            self.stats.binding_confidence_mod_count += 1;
+            conf_boost
+        } else if cached_binding < BINDING_LOW_THRESHOLD && cached_binding > 0.0 {
+            let conf_dampen =
+                (BINDING_LOW_THRESHOLD - cached_binding) * BINDING_WEAK_CONFIDENCE_SCALE;
+            self.adjust_confidence("binding_weak", -conf_dampen);
+            self.stats.binding_confidence_mod_count += 1;
+            -conf_dampen
+        } else {
+            0.0
+        };
+
+        // Coherence gate: skip resonator recall during unstable CfC dynamics
+        let reflection_thresholds = self.self_model_tier.self_reflection.get_thresholds();
+        let resonator_coherence_gate = pre_update_coherence > reflection_thresholds.coherence_gate
+            || self.stats.total_cycles < DYNAMICS_STARTUP_WARMUP_CYCLES;
+        if resonator_coherence_gate && urgency.should_run(self.stats.total_cycles, 1, 1, 4) {
+            if let Some(ref mut res_mem) = self.memory_consol.resonator_memory {
+                let res_start = Instant::now();
+
+                let res_dim_ok =
+                    perception.encoding.compressed_state.len() == res_mem.resonator.config.dim;
+                if res_dim_ok && !res_mem.is_empty() {
+                    if let Ok(matches) =
+                        res_mem.retrieve(&[("content", &perception.encoding.compressed_state)])
+                    {
+                        // Thalamic depth → recall depth gating
+                        // Science: Cowan (2001) — WM capacity scales with attentional focus
+                        let recall_k = match self.cognitive_depth {
+                            super::CognitiveDepth::DeepThought => MEMORY_RECALL_TOP_K * 2,
+                            super::CognitiveDepth::Cortical => MEMORY_RECALL_TOP_K,
+                            super::CognitiveDepth::Reflex => 1,
+                        };
+                        let top_matches: Vec<_> = matches.into_iter().take(recall_k).collect();
+
+                        let best_match_sim = top_matches
+                            .iter()
+                            .map(|m| {
+                                helpers::cosine_f32(&perception.encoding.compressed_state, &m.hv)
+                            })
+                            .fold(0.0f32, f32::max);
+                        let match_timestamps: Vec<u64> =
+                            top_matches.iter().map(|m| m.timestamp).collect();
+                        resonator_best_sim = best_match_sim;
+
+                        if best_match_sim > RESONATOR_SIMILARITY_PRIME_THRESHOLD {
+                            let best_ep = top_matches.iter().max_by(|a, b| {
+                                let sa: f32 = perception
+                                    .encoding
+                                    .compressed_state
+                                    .iter()
+                                    .zip(a.hv.iter())
+                                    .map(|(x, y)| x * y)
+                                    .sum();
+                                let sb: f32 = perception
+                                    .encoding
+                                    .compressed_state
+                                    .iter()
+                                    .zip(b.hv.iter())
+                                    .map(|(x, y)| x * y)
+                                    .sum();
+                                sa.partial_cmp(&sb).unwrap_or(std::cmp::Ordering::Equal)
+                            });
+                            if let Some(ep) = best_ep {
+                                self.stats.last_resonator_prediction = Some(ep.hv.clone());
+                            }
+                        }
+
+                        let bundled = if top_matches.len() >= 2 {
+                            let dim = perception.encoding.compressed_state.len();
+                            let mut b = vec![0.0f32; dim];
+                            let n = top_matches.len() as f32;
+                            for ep in &top_matches {
+                                for (j, &v) in ep.hv.iter().take(dim).enumerate() {
+                                    b[j] += v;
+                                }
+                            }
+                            for v in &mut b {
+                                *v /= n;
+                            }
+                            Some(b)
+                        } else {
+                            None
+                        };
+
+                        drop(top_matches);
+
+                        if let Some(bundled) = bundled {
+                            if let Ok(factors) = res_mem.query_factorize(
+                                &bundled,
+                                &[("content", &perception.encoding.compressed_state)],
+                            ) {
+                                for (label, _hv) in &factors {
+                                    match label.as_str() {
+                                        "positive" => {
+                                            self.emotion_contagion.valence =
+                                                (self.emotion_contagion.valence + 0.1)
+                                                    .clamp(-1.0, 1.0);
+                                        }
+                                        "negative" => {
+                                            self.emotion_contagion.valence =
+                                                (self.emotion_contagion.valence - 0.1)
+                                                    .clamp(-1.0, 1.0);
+                                        }
+                                        "high" => {
+                                            self.adjust_confidence(
+                                                "resonator_factor_high",
+                                                super::thresholds::RESONATOR_FACTOR_HIGH_CONFIDENCE,
+                                            );
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                            }
+                        }
+
+                        if best_match_sim > RESONATOR_SIMILARITY_PRIME_THRESHOLD {
+                            self.adjust_confidence(
+                                "resonator_recall_prime",
+                                best_match_sim * super::thresholds::RESONATOR_RECALL_PRIME_SCALE,
+                            );
+                            resonator_wm_primed = true;
+                        }
+
+                        if !match_timestamps.is_empty() {
+                            if let Some(ref mut replay) = self.episodic_persistence.replay {
+                                replay.boost_causal_consolidation(
+                                    &match_timestamps,
+                                    super::thresholds::RESONATOR_CAUSAL_CONSOLIDATION_BOOST as f64,
+                                );
+                                resonator_reconsolidated = match_timestamps.len();
+                            }
+                        }
+                    }
+                }
+
+                module_timings.resonator_recall = res_start.elapsed().as_micros() as u64;
+            }
+        }
+
+        // Resonator similarity → unified consolidation response.
+        // High similarity = familiar pattern → lock precision + slow LR (consolidate).
+        // Low similarity = novel pattern → fast LR (rapid encoding).
+        // Unified threshold prevents contradictory signals (precision lock without LR slow).
+        // Science: McClelland et al. (1995) — complementary learning systems.
+        if resonator_best_sim > RESONATOR_CONSOLIDATION_THRESHOLD {
+            self.fep.agent.precision.prior_precision = (self.fep.agent.precision.prior_precision
+                + (resonator_best_sim - RESONATOR_CONSOLIDATION_THRESHOLD) as f64 * super::thresholds::RESONATOR_CONSOLIDATION_PRECISION_SCALE)
+                .min(super::thresholds::RESONATOR_CONSOLIDATION_PRECISION_MAX);
+            if self.stats.total_cycles > DYNAMICS_STARTUP_WARMUP_CYCLES {
+                self.scale_lr("resonator_familiar", RESONATOR_FAMILIAR_LR_SCALE);
+            }
+        } else if resonator_best_sim < RESONATOR_NOVEL_THRESHOLD
+            && resonator_best_sim > 0.0
+            && self.stats.total_cycles > DYNAMICS_STARTUP_WARMUP_CYCLES
+        {
+            self.scale_lr("resonator_novel", RESONATOR_NOVEL_LR_SCALE);
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // 1a.2. Goal System: Apply attention bias from active goals
+        // ═══════════════════════════════════════════════════════════════════════
+        let goal_attention_bias = self.fep.goal_system.attention_bias();
+
+        if let Some(top) = self.fep.goal_system.top_goal() {
+            let goal_priority = top.priority;
+            // Session 12 Item 2: Skip goal LR boost during Critical urgency.
+            // Critical = recovery mode; goal-chasing works against stability.
+            // Science: Yerkes-Dodson (1908) — high arousal impairs goal-directed learning.
+            if goal_priority > GOAL_PRIORITY_LR_THRESHOLD
+                && !matches!(urgency, super::CycleUrgency::Critical)
+            {
+                let goal_lr_boost = (goal_priority - GOAL_PRIORITY_LR_THRESHOLD) * super::thresholds::GOAL_PRIORITY_LR_SCALE;
+                self.scale_lr("goal_priority", 1.0 + goal_lr_boost);
+            }
+            if prediction_error < self.config.learning_threshold
+                && goal_priority > GOAL_PRIORITY_EXPLORATION_THRESHOLD
+            {
+                self.adjust_exploration(
+                    "goal_pursuit",
+                    goal_priority * super::thresholds::GOAL_PURSUIT_EXPLORATION_SCALE,
+                );
+            }
+        }
+
+        MemoryBindingResult {
+            memory_context_boost,
+            resonator_wm_primed,
+            resonator_reconsolidated,
+            resonator_best_sim,
+            resonator_prediction_error,
+            resonator_error_exploration_mod,
+            binding_threshold_mod,
+            binding_confidence_mod,
+            pre_update_coherence,
+            goal_attention_bias,
+        }
+    }
+
+    /// Semantic memory lookup, CfC temporal step, multi-scale prediction,
+    /// uncertainty decomposition, and hierarchical world model update.
+    ///
+    /// Computes tau-modulated CfC step, extracts predictions, decomposes
+    /// epistemic/aleatoric uncertainty, and updates world model stiffness.
+    fn phase_dynamics_cfc_planning(
+        &mut self,
+        perception: &PerceptionPhaseResult,
+        pre_update_coherence: f32,
+        resonator_best_sim: f32,
+        module_timings: &mut super::ModuleTimings,
+    ) -> CfcPlanningResult {
+        // ═══════════════════════════════════════════════════════════════════════
+        // 2a. SEMANTIC MEMORY
+        // ═══════════════════════════════════════════════════════════════════════
+        let _t_core = Instant::now();
+        let semantic_hdc: Cow<'_, [f32]> = self
+            .temporal_network
+            .project_to_hdc_vec(&perception.encoding.compressed_state)
+            .map(Cow::Owned)
+            .unwrap_or(Cow::Borrowed(&perception.encoding.compressed_state));
+        let current_phi_for_lr = pre_update_coherence as f64;
+        let mut semantic_lr_factor = self
+            .memory_consol
+            .semantic_memory
+            .compute_lr_factor_phi_weighted(
+                &semantic_hdc,
+                3,
+                current_phi_for_lr,
+                self.stats.total_cycles as u64,
+            );
+        module_timings.core_semantic_lookup = _t_core.elapsed().as_micros() as u64;
+
+        // ── Phase 20: Epistemic gate → semantic memory LR bidirectionality ───
+        let prev_epistemic = self.carryover.quality.last_epistemic_confidence;
+        let epistemic_semantic_lr_mod: f32 =
+            if prev_epistemic < EPISTEMIC_SEMANTIC_CAUTION_THRESHOLD && prev_epistemic > 0.0 {
+                let caution = EPISTEMIC_SEMANTIC_CAUTION_BASE
+                    + prev_epistemic * EPISTEMIC_SEMANTIC_CAUTION_SCALE;
+                semantic_lr_factor *= caution;
+                self.stats.epistemic_semantic_mod_count += 1;
+                caution - 1.0
+            } else if prev_epistemic > EPISTEMIC_SEMANTIC_BOOST_THRESHOLD {
+                let boost = 1.0_f32
+                    + (prev_epistemic - EPISTEMIC_SEMANTIC_BOOST_THRESHOLD)
+                        * EPISTEMIC_SEMANTIC_BOOST_SCALE;
+                semantic_lr_factor *= boost;
+                self.stats.epistemic_semantic_mod_count += 1;
+                boost - 1.0
+            } else {
+                0.0
+            };
+
+        // 2b. Physics bridge: blend physics-informed HDC into compressed state.
+        // Only clone when physics-bridge feature needs to mutate the buffer;
+        // otherwise borrow directly to skip a Vec allocation per cycle.
+        #[cfg(feature = "physics-bridge")]
+        let _compressed_owned;
+        #[cfg(feature = "physics-bridge")]
+        let compressed_for_cfc: &[f32] = {
+            _compressed_owned = {
+                let mut buf = perception.encoding.compressed_state.clone();
+                if let Some(ref mut physics) = self.feature_integ.physics_integration {
+                    physics.query_cycle(
+                        self.stats.total_cycles,
+                        self.config.physics_bridge_query_interval,
+                        self.config.physics_bridge_blend_weight,
+                        self.substrate_manager.tau_factor,
+                        self.substrate_manager.scale_pressure,
+                        &perception.encoding.hv16_cached,
+                        &mut buf,
+                    );
+                }
+                buf
+            };
+            &_compressed_owned
+        };
+        #[cfg(not(feature = "physics-bridge"))]
+        let compressed_for_cfc: &[f32] = &perception.encoding.compressed_state;
+
+        // 3. Convert to ndarray for CfC
+        let input_array: Array1<f32> = compressed_for_cfc.iter().copied().collect();
+
+        // 4. Step CfC forward with current input
+        let resonance_tau_factor = if self.carryover.history.resonance_frequency > 0.0 {
+            let deviation = (self.carryover.history.resonance_frequency as f32
+                - RESONANCE_TAU_CENTER as f32)
+                .clamp(-0.5, 0.5);
+            1.0 - (deviation * RESONANCE_TAU_SCALE)
+        } else {
+            1.0
+        };
+        let arousal_tau_factor =
+            if (self.carryover.history.body_arousal - 0.5).abs() > AROUSAL_TAU_DEADZONE {
+                1.0 + (self.carryover.history.body_arousal - 0.5) * AROUSAL_TAU_SENSITIVITY
+            } else {
+                1.0
+            };
+        let codebook_tau_factor = if resonator_best_sim > CODEBOOK_FAMILIAR_THRESHOLD {
+            1.0 - (resonator_best_sim - CODEBOOK_FAMILIAR_THRESHOLD) * CODEBOOK_FAMILIAR_TAU_SCALE
+        } else if resonator_best_sim > 0.0 && resonator_best_sim < CODEBOOK_NOVEL_THRESHOLD {
+            1.0 + (CODEBOOK_NOVEL_THRESHOLD - resonator_best_sim) * CODEBOOK_NOVEL_TAU_SCALE
+        } else {
+            1.0
+        };
+        let arousal_recovery_tau_factor;
+        let arousal_recovery_active;
+        if self.carryover.urgency.arousal_trap_counter > AROUSAL_TRAP_RECOVERY_MIN_CYCLES {
+            // Recovery intensity ramps from 0→1 over the ramp window, then stays at 1.0.
+            // BUG FIX: Previously capped at counter=10, leaving extended traps unassisted.
+            let recovery_intensity =
+                ((self.carryover.urgency.arousal_trap_counter - AROUSAL_TRAP_RECOVERY_MIN_CYCLES) as f32 / AROUSAL_TRAP_RECOVERY_RAMP_CYCLES).min(1.0);
+            arousal_recovery_tau_factor = 1.0 + recovery_intensity * AROUSAL_RECOVERY_TAU_SCALE;
+            arousal_recovery_active = true;
+        } else {
+            arousal_recovery_tau_factor = 1.0;
+            arousal_recovery_active = false;
+        }
+
+        // FEP surprise → CfC time constant modulation.
+        // Friston (2010): high surprise (free energy) accelerates inference dynamics;
+        // low surprise allows consolidation via slower dynamics.
+        // Factor: [0.8, 1.2] — moderate modulation to prevent instability.
+        let fep_tau_factor = if let Some(ref fe) = self.fep.agent.last_fe_components {
+            let surprise_norm = (fe.surprise as f32).clamp(0.0, 2.0) / 2.0; // [0, 1]
+            1.0 - surprise_norm * FEP_SURPRISE_TAU_SCALE // high surprise → 0.8 (faster), low → 1.0
+        } else {
+            1.0
+        };
+
+        // Session 10 Item 3: Coherence velocity tau factor.
+        // Session 11 Item 3: Gate behind cycle > 5 to avoid spurious velocity from default init.
+        let coherence_velocity_tau_factor = {
+            let cv = self.carryover.quality.coherence_velocity;
+            if self.stats.total_cycles > RESONATOR_STARTUP_CYCLES && cv > COHERENCE_VELOCITY_TAU_THRESHOLD {
+                COHERENCE_VELOCITY_TAU_BOOST
+            } else if self.stats.total_cycles > RESONATOR_STARTUP_CYCLES && cv < -COHERENCE_VELOCITY_TAU_THRESHOLD {
+                COHERENCE_VELOCITY_TAU_DAMPEN
+            } else {
+                1.0
+            }
+        };
+
+        // Prediction horizon → CfC temporal integration depth.
+        // Clark (2013): high PE → contract horizons (focus near-term);
+        // low PE → expand horizons (exploit stability for planning).
+        // This complements FEP surprise tau (Friston 2010) — they work in synergy:
+        // FEP surprise drives fast dynamics, horizon scale drives planning depth.
+        let prediction_horizon_tau = {
+            let pe = self.stats.avg_prediction_error.clamp(0.0, 1.0);
+            let pe_scale = if pe > HORIZON_PE_CONTRACT_THRESHOLD {
+                1.0 - (pe - HORIZON_PE_CONTRACT_THRESHOLD) * HORIZON_PE_CONTRACT_RATE
+            } else if pe < HORIZON_PE_EXPAND_THRESHOLD {
+                1.0 + (HORIZON_PE_EXPAND_THRESHOLD - pe) * HORIZON_PE_EXPAND_RATE
+            } else {
+                1.0
+            };
+            let slope = perception.urgency.error_slope;
+            let slope_scale = if slope > HORIZON_SLOPE_THRESHOLD {
+                1.0 - (slope - HORIZON_SLOPE_THRESHOLD).min(HORIZON_SLOPE_CONTRACT_CAP)
+                    * HORIZON_SLOPE_CONTRACT_RATE
+            } else if slope < -HORIZON_SLOPE_THRESHOLD {
+                1.0 + (-slope - HORIZON_SLOPE_THRESHOLD).min(HORIZON_SLOPE_EXPAND_CAP)
+                    * HORIZON_SLOPE_EXPAND_RATE
+            } else {
+                1.0
+            };
+            (pe_scale * slope_scale)
+                .clamp(PREDICTION_HORIZON_MIN_SCALE, PREDICTION_HORIZON_MAX_SCALE)
+        };
+
+        let delta_t = self.config.cfc_config.delta_t
+            * resonance_tau_factor
+            * arousal_tau_factor
+            * codebook_tau_factor
+            * arousal_recovery_tau_factor
+            * fep_tau_factor
+            * coherence_velocity_tau_factor
+            * prediction_horizon_tau
+            * self
+                .somatic_bridge
+                .to_interoceptive_signals()
+                .tau_slowdown_factor as f32
+            * self.substrate_manager.tau_factor;
+        let _t_core = Instant::now();
+        if let Err(e) = self.temporal_network.step(&input_array, delta_t) {
+            tracing::warn!(error = %e, "CfC temporal step failed — continuing with stale state");
+        }
+
+        // Phase 3: Scale-limited CfC hidden state masking.
+        // When substrate has fewer computational units than biological (negative
+        // scale_pressure), mask out a fraction of hidden state dimensions.
+        // Science: Berry & Srivastava (2018) — HDC capacity ~ D^(5/3).
+        if self.config.enable_substrate_encoding_noise {
+            let frac = self.substrate_manager.effective_dim_fraction();
+            if frac < 1.0 {
+                if let Ok(mut state) = self.temporal_network.read_state() {
+                    let mask_start = (frac * state.len() as f32) as usize;
+                    for h in state.as_slice_mut().unwrap_or(&mut [])[mask_start..].iter_mut() {
+                        *h = 0.0;
+                    }
+                    let _ = self.temporal_network.inject(&state);
+                }
+            }
+        }
+
+        module_timings.core_cfc_step = _t_core.elapsed().as_micros() as u64;
+
+        // 5. Get multi-scale predictions
+        let _t_core = Instant::now();
+        let (prediction, raw_predictions) = self.get_multi_scale_prediction(&input_array);
+
+        let prediction_coherence = if self.stats.total_cycles % 11 == 0 {
+            let coh = Self::compute_prediction_coherence_from_cache(&raw_predictions);
+            self.stats.avg_prediction_coherence = self.stats.avg_prediction_coherence
+                * COHERENCE_PREDICTION_EMA
+                + coh * (1.0 - COHERENCE_PREDICTION_EMA);
+            if coh < COHERENCE_LOW_THRESHOLD {
+                let coh_dampen = (COHERENCE_LOW_THRESHOLD - coh) * COHERENCE_LOW_DAMPEN_SCALE;
+                self.scale_confidence("pred_coherence_low", 1.0 - coh_dampen);
+            }
+            if coh > COHERENCE_HIGH_THRESHOLD {
+                let coh_boost = (coh - COHERENCE_HIGH_THRESHOLD) * COHERENCE_CONFIDENCE_BOOST;
+                self.adjust_confidence("pred_coherence_high", coh_boost);
+            }
+            coh
+        } else {
+            self.stats.avg_prediction_coherence
+        };
+
+        // 5b. Epistemic vs aleatoric uncertainty decomposition.
+        // Epistemic (model uncertainty): prediction disagreement across horizons — reducible
+        // by exploration. Aleatoric (data noise): mean per-horizon prediction variance — not
+        // reducible. Only epistemic uncertainty should drive exploration.
+        // Depeweg et al. (2018): decomposing uncertainty for active learning.
+        let (epistemic_uncertainty, aleatoric_uncertainty) = if raw_predictions.len() >= 2 {
+            // Epistemic ≈ 1 - cross-horizon coherence (disagreement = model uncertainty)
+            let epistemic = (1.0 - prediction_coherence).clamp(0.0, 1.0);
+
+            // Aleatoric ≈ mean within-dimension variance across predictions
+            // Use min length across all prediction vectors — HierarchicalCfC can produce
+            // jagged vectors, and indexing by [0].len() would panic on shorter ones.
+            let dim = raw_predictions.iter().map(|p| p.len()).min().unwrap_or(0).max(1);
+            let n = raw_predictions.len() as f32;
+            let mut mean_var = 0.0f32;
+            for d in 0..dim {
+                let mean: f32 = raw_predictions.iter().map(|p| p[d]).sum::<f32>() / n;
+                let var: f32 = raw_predictions
+                    .iter()
+                    .map(|p| (p[d] - mean).powi(2))
+                    .sum::<f32>()
+                    / n;
+                mean_var += var;
+            }
+            let aleatoric = (mean_var / dim as f32).sqrt().clamp(0.0, 1.0);
+            (epistemic, aleatoric)
+        } else {
+            (EPISTEMIC_UNCERTAINTY_DEFAULT, ALEATORIC_UNCERTAINTY_DEFAULT) // defaults when insufficient data
+        };
+
+        // Only epistemic uncertainty drives exploration (aleatoric is irreducible noise).
+        // Use smoothed epistemic for stability; raw for responsiveness on first cycle.
+        // Depeweg et al. (2018): decomposing uncertainty for active learning.
+        let smoothed_eu = self.carryover.quality.smoothed_epistemic_uncertainty;
+        let eu_for_exploration = if smoothed_eu > 0.0 {
+            smoothed_eu
+        } else {
+            epistemic_uncertainty
+        };
+        if eu_for_exploration > EPISTEMIC_EXPLORE_THRESHOLD && self.stats.total_cycles % 7 == 0 {
+            let mut epistemic_explore =
+                (eu_for_exploration - EPISTEMIC_EXPLORE_THRESHOLD) * EPISTEMIC_EXPLORE_SCALE;
+            // Oscillation + high uncertainty = confused AND unstable → stronger exploration.
+            // Doya (2002) + Schmidhuber (2010): compound uncertainty warrants aggressive search.
+            if perception.urgency.oscillation_ratio > EPISTEMIC_OSCILLATION_THRESHOLD {
+                epistemic_explore *= EPISTEMIC_OSCILLATION_MULTIPLIER;
+            }
+            self.adjust_exploration("epistemic_uncertainty", epistemic_explore);
+        } else if eu_for_exploration < EPISTEMIC_LOW_THRESHOLD && self.stats.total_cycles % 7 == 0 {
+            // Low epistemic uncertainty → dampen exploration (model is confident).
+            self.adjust_exploration("epistemic_low", -EPISTEMIC_LOW_DAMPEN);
+        }
+
+        // 6. Get current CfC state as output
+        let output = self
+            .temporal_network
+            .read_state()
+            .map(|arr| arr.to_vec())
+            .unwrap_or_else(|_| vec![0.0; self.config.cfc_config.num_neurons]);
+        module_timings.core_predict = _t_core.elapsed().as_micros() as u64;
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // 6b. World Model
+        // ═══════════════════════════════════════════════════════════════════════
+        let _t = Instant::now();
+        self.fep
+            .world_model
+            .update_sensory(&perception.encoding.compressed_state);
+
+        // Incorporate causal structure into world model (every 41 cycles, co-prime).
+        // Pearl (2009): causal knowledge provides structural priors beyond correlation.
+        if self.stats.total_cycles % 41 == 0 {
+            if let Some(ref enhancer) = self.causal_enhancer {
+                let graph = enhancer.current_graph();
+                if !graph.is_empty() {
+                    let edges: Vec<(usize, usize, f32)> = graph
+                        .edges
+                        .iter()
+                        .map(|e| (e.from, e.to, e.strength as f32))
+                        .collect();
+                    self.fep.world_model.incorporate_causal_structure(&edges);
+                }
+            }
+        }
+
+        let wm_stiffness = self.fep.world_model.avg_error.clamp(0.0, 1.0);
+        if self.stats.total_cycles > DYNAMICS_POST_BOOT_CYCLES {
+            if wm_stiffness > WORLD_MODEL_STIFFNESS_THRESHOLD {
+                let stiffness_nudge = (wm_stiffness - WORLD_MODEL_STIFFNESS_THRESHOLD)
+                    * WORLD_MODEL_STIFFNESS_LR_SCALE;
+                self.adjust_lr("wm_stiff", stiffness_nudge);
+            } else if wm_stiffness < WORLD_MODEL_SPONGINESS_THRESHOLD {
+                let spongy_dampen =
+                    (WORLD_MODEL_SPONGINESS_THRESHOLD - wm_stiffness) * WORLD_MODEL_SPONGY_LR_SCALE;
+                self.scale_lr("wm_spongy", 1.0 - spongy_dampen);
+            }
+        }
+
+        let level_errors = self.fep.world_model.level_errors();
+        let mut wm_sensory_mismatch = false;
+        if level_errors.len() >= 2 && self.stats.total_cycles > DYNAMICS_STARTUP_WARMUP_CYCLES {
+            let sensory_error = level_errors[0];
+            let abstract_error = level_errors[level_errors.len() - 1];
+            if abstract_error > sensory_error * super::thresholds::WORLD_MODEL_CONFUSION_RATIO && abstract_error > super::thresholds::WORLD_MODEL_ERROR_FLOOR {
+                self.adjust_exploration(
+                    "conceptual_confusion",
+                    super::thresholds::CONCEPTUAL_CONFUSION_EXPLORATION,
+                );
+            }
+            wm_sensory_mismatch = sensory_error > abstract_error * super::thresholds::WORLD_MODEL_MISMATCH_RATIO && sensory_error > super::thresholds::WORLD_MODEL_ERROR_FLOOR;
+        }
+        module_timings.world_model = _t.elapsed().as_micros() as u64;
+
+        // Convert semantic_hdc to owned Vec for the caller
+        let semantic_hdc_owned = semantic_hdc.into_owned();
+
+        CfcPlanningResult {
+            semantic_hdc: semantic_hdc_owned,
+            semantic_lr_factor,
+            epistemic_semantic_lr_mod,
+            delta_t,
+            output,
+            prediction,
+            prediction_coherence,
+            epistemic_uncertainty,
+            aleatoric_uncertainty,
+            wm_sensory_mismatch,
+            fep_tau_factor,
+            prediction_horizon_tau,
+            arousal_recovery_active,
+            arousal_recovery_tau_factor,
+        }
+    }
+
+    /// Training dispatch, stats update, Broca generation, and parallel post-processing.
+    ///
+    /// Performs CfC weight update (sync or async), glutamate feedback, goal progress,
+    /// statistics update, school learning, causal attention, Broca SSM generation,
+    /// and rayon-parallel episodic/semantic post-processing.
+    #[allow(clippy::too_many_arguments)]
+    fn phase_dynamics_training(
+        &mut self,
+        input: &str,
+        perception: &PerceptionPhaseResult,
+        prediction_error: f32,
+        effective_lr: f32,
+        delta_t: f32,
+        previous_state: Option<Vec<f32>>,
+        output: &[f32],
+        coherence: f32,
+        semantic_hdc: Vec<f32>,
+        urgency: super::CycleUrgency,
+        selected_strategy: super::flow::ResponseStrategy,
+        surprise_triggered: bool,
+        memory_context_boost: f32,
+        cycle_start: Instant,
+        math_result: &DynMath,
+        semantic_lr_factor: f32,
+        module_timings: &mut super::ModuleTimings,
+    ) -> TrainingPostResult {
         let neuromod_threshold =
             perception.encoding.effective_threshold * self.neuromod.bath.threshold_gate();
 
@@ -2735,7 +3067,7 @@ impl CognitiveLoopService {
                     CANTOR_SURPRISE_BROCA_THRESHOLD,
                 };
                 let depth_boost = if self
-                    .cantor_broadcast_buffer
+                    .cantor_dream.broadcast_buffer
                     .last()
                     .map(|crhv| crhv.depth > 5)
                     .unwrap_or(false)
@@ -2744,7 +3076,7 @@ impl CognitiveLoopService {
                 } else {
                     0
                 };
-                let surprise_boost = if self.cantor_dream_surprise > CANTOR_SURPRISE_BROCA_THRESHOLD
+                let surprise_boost = if self.cantor_dream.dream_surprise > CANTOR_SURPRISE_BROCA_THRESHOLD
                 {
                     CANTOR_SURPRISE_BROCA_SPACING_BOOST
                 } else {
@@ -2801,20 +3133,8 @@ impl CognitiveLoopService {
                     } else {
                         0.0
                     };
-                    // Extract knowledge context for grounded generation
-                    let knowledge_context: Vec<String> = self
-                        .last_reasoning_context
-                        .as_ref()
-                        .map(|ctx| {
-                            ctx.relevant_facts
-                                .iter()
-                                .filter(|f| f.confidence > 0.3)
-                                .take(3)
-                                .map(|f| f.text.clone())
-                                .collect()
-                        })
-                        .unwrap_or_default();
-                    let _knowledge_context = knowledge_context; // reserved for future use
+                    // Knowledge context for grounded generation (reserved for future use)
+                    let _knowledge_context: Vec<String> = Vec::new();
                     let signals = super::broca_bridge::BrocaConsciousnessSignals {
                         epistemic_confidence: (self.carryover.quality.last_epistemic_confidence
                             - math_epistemic_penalty)
@@ -2857,7 +3177,19 @@ impl CognitiveLoopService {
                     if let Some(result) = broca.generate(signals) {
                         // Surface the generated text for consumers
                         if !result.text.is_empty() {
-                            self.language_comm.last_broca_text = Some(result.text.clone());
+                            // Scope guard: check generated text for scope violations
+                            // (diagnostic claims, prescriptive language, therapist impersonation).
+                            // Violations append disclaimers; the text is never silently suppressed.
+                            // Science: APA Ethics Code (2017) principle 2.01 — boundaries of competence
+                            #[cfg(feature = "therapeutic")]
+                            let text = if self.config.enable_therapeutic {
+                                self.therapeutic_manager.scope_guard.apply_disclaimers(&result.text)
+                            } else {
+                                result.text.clone()
+                            };
+                            #[cfg(not(feature = "therapeutic"))]
+                            let text = result.text.clone();
+                            self.language_comm.last_broca_text = Some(text);
                         }
 
                         // ── Composite quality metric ──
@@ -3049,9 +3381,9 @@ impl CognitiveLoopService {
                     helpers::parallel_semantic_causal(
                         semantic_memory,
                         causal_enhancer,
-                        semantic_hdc.into_owned(),
+                        semantic_hdc,
                         &perception.encoding.compressed_state,
-                        &output,
+                        output,
                         prediction_error,
                         pp_total_cycles,
                     )
@@ -3100,114 +3432,13 @@ impl CognitiveLoopService {
         self.stats.semantic_entries_stored =
             self.memory_consol.semantic_memory.stats().total_stored;
 
-        DynamicsPhaseResult {
-            core: DynCore {
-                output,
-                prediction,
-                prediction_error,
-                coherence,
-                unified_psi,
-                learning_occurred,
-                training_loss,
-                effective_lr,
-                cycle_reward,
-                prediction_coherence,
-                self_model_accuracy,
-            },
-            fep: DynFep {
-                fep_action_idx,
-                fep_pragmatic_value,
-                fep_accuracy,
-                fep_complexity,
-                fep_surprise,
-                fep_td_error,
-            },
-            reasoning: DynReasoning {
-                reasoning_confidence,
-                reasoning_gate_blocked,
-                reasoning_fallback,
-                reasoning_plan_action,
-                reasoning_plan_confidence,
-                reasoning_narrative,
-                metacognitive_anomaly,
-                mcts_plan_effectiveness,
-                causal_attention_edges,
-                school_predicted_phi_gain,
-                re_phi_eff_raw,
-                re_phi_eff,
-                re_epistemic_mod,
-                re_gamma,
-                re_reliability,
-                re_budget_consumed,
-                re_wall_time_us,
-                re_steps_taken,
-                re_tier_reached,
-                re_gate_checks,
-                re_budget_exceeded,
-                re_evs,
-                re_mcts_iterations,
-                re_did_simulate,
-            },
-            attention: DynAttention {
-                attention_budget_exceeded,
-                attention_budget_elapsed_us,
-                predictive_budget_gated,
-            },
-            resonator: DynResonator {
-                resonator_wm_primed,
-                resonator_reconsolidated,
-                resonator_best_sim,
-                resonator_prediction_error,
-                resonator_error_exploration_mod,
-            },
-            homeostasis: DynHomeostasis {
-                anomaly_recovery_progress,
-                anomaly_recovering,
-                valence_homeostasis_pull,
-                arousal_homeostasis_pull,
-                homeostasis_pull_strength,
-                arousal_recovery_active,
-                arousal_recovery_tau_factor,
-            },
-            guidance: DynGuidance {
-                moral_steering_category: moral_steering_category.into(),
-                guiding_priority_category,
-                guiding_question,
-                dominant_harmonic,
-            },
-            math: math_result,
-            neuromod: DynNeuromod {
-                neuromod_attention_alloc,
-                ne_reorienting_boost,
-                ne_arousal_feedback,
-                confidence_velocity,
-                sht_crash_dip,
-                exploration_sht_drain,
-                phasic_da_replay_boost: 0, // set during feedback phase
-            },
-            binding_threshold_mod,
-            binding_confidence_mod,
-            epistemic_semantic_lr_mod,
-            pfe_surprise_mod,
-            epistemic_uncertainty,
-            aleatoric_uncertainty,
-            fep_tau_factor,
-            prediction_horizon_tau,
-            causal_world_model_edges: if self
-                .causal_enhancer
-                .as_ref()
-                .map_or(false, |e| e.has_causal_structure())
-            {
-                self.causal_enhancer
-                    .as_ref()
-                    .map_or(0, |e| e.current_graph().edges.len())
-            } else {
-                0
-            },
-            epistemic_budget_scale,
-            confidence_crash_detected,
-            lr_frozen,
-            semantic_evictions: if had_semantic_eviction { 1 } else { 0 },
+        TrainingPostResult {
+            learning_occurred,
+            training_loss,
+            effective_lr,
+            cycle_reward,
+            had_semantic_eviction,
+            school_predicted_phi_gain,
         }
     }
 

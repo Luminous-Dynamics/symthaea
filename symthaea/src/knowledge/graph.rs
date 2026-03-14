@@ -343,6 +343,124 @@ impl EnhancedKnowledgeGraph {
         self.total_contradictions
     }
 
+    // ── Iteration ───────────────────────────────────────────────────────
+
+    /// Iterate over all stored facts.
+    pub fn all_facts(&self) -> impl Iterator<Item = &TemporalFact> {
+        self.facts.values()
+    }
+
+    // ── Contradiction Resolution ────────────────────────────────────────
+
+    /// Resolve contradictions by demoting the weaker fact's confidence.
+    /// Science: AGM theory (Alchourrón et al. 1985) — belief contraction.
+    pub fn resolve_contradictions(&mut self, alerts: &[ContradictionAlert]) -> usize {
+        let mut resolved = 0;
+        for alert in alerts {
+            let weaker_id = if alert.higher_confidence_id == alert.new_fact_id {
+                alert.existing_fact_id
+            } else {
+                alert.new_fact_id
+            };
+            let should_remove = if let Some(fact) = self.facts.get_mut(&weaker_id) {
+                fact.confidence *= 0.5;
+                fact.contradiction_count += 1;
+                resolved += 1;
+                fact.confidence < 0.05
+            } else {
+                false
+            };
+            if should_remove {
+                self.remove_fact(weaker_id);
+            }
+        }
+        resolved
+    }
+
+    // ── Persistence Support ─────────────────────────────────────────────
+
+    /// Import a fact from a persistence record.
+    pub fn import_fact_record(&mut self, record: &super::persistence::FactRecord) {
+        if record.vector_bytes.len() != 2048 {
+            return;
+        }
+        let mut arr = [0u8; 2048];
+        arr.copy_from_slice(&record.vector_bytes);
+        let encoding = super::encoding::FactEncoding {
+            vector: symthaea_core::hdc::binary_hv::BinaryHV(arr),
+            role_vectors: std::collections::HashMap::new(),
+            source_text: record.source_text.clone(),
+            confidence: record.confidence,
+        };
+        let id: FactId = self.next_id;
+        self.next_id += 1;
+        let fact = TemporalFact {
+            id,
+            encoding,
+            inserted_at_cycle: record.cycle,
+            last_accessed_cycle: record.cycle,
+            confidence: record.confidence,
+            initial_confidence: record.confidence,
+            corroboration_count: 0,
+            contradiction_count: 0,
+            domain: record.domain.clone(),
+            has_causal_relations: record.is_causal,
+        };
+        if let Some(ref domain) = fact.domain {
+            self.domain_index
+                .entry(domain.clone())
+                .or_default()
+                .push(id);
+        }
+        self.facts.insert(id, fact);
+    }
+
+    /// Export all facts as persistence records.
+    pub fn export_fact_records(&self) -> Vec<super::persistence::FactRecord> {
+        self.facts
+            .values()
+            .map(|f| super::persistence::FactRecord {
+                vector_bytes: f.encoding.vector.0.to_vec(),
+                source_text: f.encoding.source_text.clone(),
+                confidence: f.confidence,
+                domain: f.domain.clone(),
+                cycle: f.inserted_at_cycle,
+                is_causal: f.has_causal_relations,
+            })
+            .collect()
+    }
+
+    // ── Dream Consolidation ─────────────────────────────────────────────
+
+    /// Prune non-causal facts below confidence threshold.
+    /// Science: Anderson & Schooler (1991) — power law of forgetting.
+    pub fn prune_low_confidence(&mut self, threshold: f32) -> usize {
+        let ids: Vec<FactId> = self
+            .facts
+            .iter()
+            .filter(|(_, f)| f.confidence < threshold && !f.has_causal_relations)
+            .map(|(&id, _)| id)
+            .collect();
+        let count = ids.len();
+        for id in ids {
+            self.remove_fact(id);
+        }
+        count
+    }
+
+    /// Strengthen causal facts, capped at initial_confidence.
+    /// Science: Stickgold & Walker (2013) — sleep-dependent consolidation.
+    pub fn strengthen_causal_facts(&mut self, boost: f32) -> usize {
+        let mut count = 0;
+        for fact in self.facts.values_mut() {
+            if fact.has_causal_relations && fact.confidence < fact.initial_confidence {
+                fact.confidence = (fact.confidence + boost).min(fact.initial_confidence);
+                count += 1;
+            }
+        }
+        count
+    }
+
     // ── Internal ────────────────────────────────────────────────────────
 
     fn detect_contradictions(

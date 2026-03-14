@@ -342,6 +342,127 @@ impl GradientDiagnostics {
         }
         s
     }
+
+    /// Detect gradient anomalies from the recorded history.
+    ///
+    /// Classifies the gradient health based on norm statistics:
+    /// - Vanishing: >20% of steps have norm < 1e-6
+    /// - Exploding: >5% of steps have norm > 10
+    /// - Oscillating: coefficient of variation > 2.0 (norms vary wildly)
+    /// - Plateau: all norms within 1% of mean (no learning signal)
+    ///
+    /// Science: Pascanu et al. (2013) "On the difficulty of training RNNs"
+    pub fn detect_anomalies(&self) -> Vec<GradientAnomaly> {
+        if self.grad_norms.is_empty() {
+            return Vec::new();
+        }
+        let mut anomalies = Vec::new();
+        let n = self.grad_norms.len();
+        let mean = self.mean_grad_norm();
+
+        // Vanishing: >20% of steps below threshold
+        let vanishing_frac = self.vanishing_count() as f32 / n as f32;
+        if vanishing_frac > 0.2 {
+            anomalies.push(GradientAnomaly::Vanishing {
+                fraction: vanishing_frac,
+            });
+        }
+
+        // Exploding: >5% of steps above threshold
+        let exploding_frac = self.exploding_count() as f32 / n as f32;
+        if exploding_frac > 0.05 {
+            anomalies.push(GradientAnomaly::Exploding {
+                fraction: exploding_frac,
+                max_norm: self.max_grad,
+            });
+        }
+
+        // Oscillating: high coefficient of variation (std/mean > 2.0)
+        if mean > 1e-8 {
+            let variance =
+                self.grad_norms.iter().map(|&g| (g - mean).powi(2)).sum::<f32>() / n as f32;
+            let cv = variance.sqrt() / mean;
+            if cv > 2.0 {
+                anomalies.push(GradientAnomaly::Oscillating {
+                    coefficient_of_variation: cv,
+                });
+            }
+        }
+
+        // Plateau: all norms within 1% of mean (no learning signal diversity)
+        if n >= 10 && mean > 1e-8 {
+            let all_flat = self.grad_norms.iter().all(|&g| (g - mean).abs() < mean * 0.01);
+            if all_flat {
+                anomalies.push(GradientAnomaly::Plateau { mean_norm: mean });
+            }
+        }
+
+        anomalies
+    }
+
+    /// Check overall gradient health. Returns true if no anomalies detected.
+    pub fn is_healthy(&self) -> bool {
+        self.detect_anomalies().is_empty()
+    }
+}
+
+/// Classification of gradient flow anomalies during training.
+///
+/// Science: Pascanu et al. (2013), Bengio et al. (1994) — gradient flow in RNNs
+#[derive(Debug, Clone, PartialEq)]
+pub enum GradientAnomaly {
+    /// Too many steps with near-zero gradients — network stops learning.
+    Vanishing {
+        /// Fraction of steps with gradient norm < 1e-6.
+        fraction: f32,
+    },
+    /// Too many steps with very large gradients — training becomes unstable.
+    Exploding {
+        /// Fraction of steps with gradient norm > 10.
+        fraction: f32,
+        /// Maximum observed gradient norm.
+        max_norm: f32,
+    },
+    /// Gradient norms vary wildly — optimizer may be fighting itself.
+    Oscillating {
+        /// Coefficient of variation (std/mean) of gradient norms.
+        coefficient_of_variation: f32,
+    },
+    /// All gradient norms identical — possible dead network or saturated activations.
+    Plateau {
+        /// Mean gradient norm during the plateau.
+        mean_norm: f32,
+    },
+}
+
+impl std::fmt::Display for GradientAnomaly {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Vanishing { fraction } => {
+                write!(f, "Vanishing gradients: {:.1}% of steps", fraction * 100.0)
+            }
+            Self::Exploding { fraction, max_norm } => {
+                write!(
+                    f,
+                    "Exploding gradients: {:.1}% of steps (max={:.2})",
+                    fraction * 100.0,
+                    max_norm
+                )
+            }
+            Self::Oscillating {
+                coefficient_of_variation,
+            } => {
+                write!(
+                    f,
+                    "Oscillating gradients: CV={:.2}",
+                    coefficient_of_variation
+                )
+            }
+            Self::Plateau { mean_norm } => {
+                write!(f, "Gradient plateau: mean_norm={:.6}", mean_norm)
+            }
+        }
+    }
 }
 
 /// Compute the effective learning rate with warmup + cosine decay.
@@ -1468,6 +1589,120 @@ mod tests {
     }
 
     #[test]
+    fn test_gradient_anomaly_vanishing() {
+        let mut diag = GradientDiagnostics::new();
+        // 80% vanishing (< 1e-6)
+        for _ in 0..80 {
+            diag.record_step(1e-8, false);
+        }
+        for _ in 0..20 {
+            diag.record_step(0.5, false);
+        }
+        let anomalies = diag.detect_anomalies();
+        assert!(
+            anomalies
+                .iter()
+                .any(|a| matches!(a, GradientAnomaly::Vanishing { .. })),
+            "Should detect vanishing: {:?}",
+            anomalies
+        );
+        assert!(!diag.is_healthy());
+    }
+
+    #[test]
+    fn test_gradient_anomaly_exploding() {
+        let mut diag = GradientDiagnostics::new();
+        // 30% exploding (> 10)
+        for _ in 0..30 {
+            diag.record_step(50.0, true);
+        }
+        for _ in 0..70 {
+            diag.record_step(0.5, false);
+        }
+        let anomalies = diag.detect_anomalies();
+        assert!(
+            anomalies
+                .iter()
+                .any(|a| matches!(a, GradientAnomaly::Exploding { .. })),
+            "Should detect exploding: {:?}",
+            anomalies
+        );
+    }
+
+    #[test]
+    fn test_gradient_anomaly_oscillating() {
+        let mut diag = GradientDiagnostics::new();
+        // Mix of very small and very large norms → high CV (>2.0)
+        // mean ≈ 1.0, but std >> mean when most values are near 0 and a few are huge
+        for _ in 0..90 {
+            diag.record_step(0.01, false);
+        }
+        for _ in 0..10 {
+            diag.record_step(30.0, false);
+        }
+        let anomalies = diag.detect_anomalies();
+        assert!(
+            anomalies
+                .iter()
+                .any(|a| matches!(a, GradientAnomaly::Oscillating { .. })),
+            "Should detect oscillation: {:?}",
+            anomalies
+        );
+    }
+
+    #[test]
+    fn test_gradient_anomaly_plateau() {
+        let mut diag = GradientDiagnostics::new();
+        // All norms identical → plateau
+        for _ in 0..50 {
+            diag.record_step(1.0, false);
+        }
+        let anomalies = diag.detect_anomalies();
+        assert!(
+            anomalies
+                .iter()
+                .any(|a| matches!(a, GradientAnomaly::Plateau { .. })),
+            "Should detect plateau: {:?}",
+            anomalies
+        );
+    }
+
+    #[test]
+    fn test_gradient_anomaly_healthy() {
+        let mut diag = GradientDiagnostics::new();
+        // Normal-ish gradient norms with some variation
+        for i in 0..100 {
+            diag.record_step(0.3 + (i as f32 * 0.01), false);
+        }
+        assert!(
+            diag.is_healthy(),
+            "Should be healthy, got anomalies: {:?}",
+            diag.detect_anomalies()
+        );
+    }
+
+    #[test]
+    fn test_gradient_anomaly_empty() {
+        let diag = GradientDiagnostics::new();
+        assert!(diag.detect_anomalies().is_empty());
+        assert!(diag.is_healthy());
+    }
+
+    #[test]
+    fn test_gradient_anomaly_display() {
+        let a = GradientAnomaly::Vanishing { fraction: 0.5 };
+        let s = format!("{}", a);
+        assert!(s.contains("50.0%"), "Display should show percentage: {}", s);
+
+        let b = GradientAnomaly::Exploding {
+            fraction: 0.1,
+            max_norm: 42.0,
+        };
+        let s = format!("{}", b);
+        assert!(s.contains("42.00"), "Display should show max norm: {}", s);
+    }
+
+    #[test]
     fn test_generate_curriculum_produces_valid_pairs() {
         let tokenizer = BpeTokenizer::default_minimal();
         let dataset = generate_curriculum(&tokenizer);
@@ -1787,4 +2022,64 @@ mod tests {
             metrics.len()
         );
     }
+}
+
+// ── Therapeutic training data generation ──────────────────────────────────
+
+/// Generate therapeutic training pairs from template responses.
+///
+/// Creates training data with therapeutic channels set for different
+/// clinical scenarios (validation, crisis, reappraisal, etc.).
+/// This bootstraps the model's ability to generate clinically appropriate
+/// language without requiring a large external corpus.
+#[cfg(feature = "therapeutic")]
+pub fn generate_therapeutic_training_data(tokenizer: &BpeTokenizer) -> TrainingDataset {
+    let mut dataset = TrainingDataset::default();
+
+    // Template responses for each therapeutic intent
+    let templates: Vec<(f32, f32, f32, f32, &str)> = vec![
+        // (intent, alliance, distress, depth, response)
+        // Validation (intent=0): empathic, non-directive
+        (0.0, 0.3, 0.5, 0.1, "I hear you. That sounds really difficult."),
+        (0.0, 0.5, 0.6, 0.1, "It makes sense that you would feel that way."),
+        (0.0, 0.4, 0.4, 0.1, "What you're going through is completely understandable."),
+        (0.0, 0.6, 0.3, 0.1, "Thank you for sharing that with me. It takes courage."),
+        // Reflection (intent=1): mirroring, exploring
+        (1.0, 0.5, 0.4, 0.2, "It sounds like you're feeling overwhelmed right now."),
+        (1.0, 0.6, 0.3, 0.2, "I wonder what comes up for you when you think about that."),
+        (1.0, 0.5, 0.5, 0.3, "When you say that, what does it feel like in your body?"),
+        // Reappraisal (intent=2): cognitive restructuring
+        (2.0, 0.6, 0.5, 0.4, "What if we looked at this from a different angle?"),
+        (2.0, 0.7, 0.4, 0.4, "Are there other ways to understand what happened?"),
+        // Exploration (intent=3): deepening understanding
+        (3.0, 0.6, 0.3, 0.3, "Tell me more about what that experience was like for you."),
+        (3.0, 0.7, 0.4, 0.4, "How does this connect to other things in your life?"),
+        // Psychoeducation (intent=4): normalizing, teaching
+        (4.0, 0.5, 0.5, 0.3, "Many people experience similar feelings in situations like this."),
+        (4.0, 0.6, 0.4, 0.3, "Our bodies often respond to stress in ways that feel overwhelming but are actually protective."),
+        // Containment (intent=6): holding, stabilizing
+        (6.0, 0.5, 0.8, 0.5, "I'm here with you right now. You are safe in this moment."),
+        (6.0, 0.6, 0.7, 0.5, "Let's take a moment together. Can you feel your feet on the ground?"),
+        // Crisis (intent=7): grounding, referral
+        (7.0, 0.3, 0.9, 0.1, "I want you to know you're not alone. Can you take a slow breath with me?"),
+        (7.0, 0.3, 0.95, 0.1, "Your safety matters. If you're in immediate danger, please call 988 or emergency services."),
+        (7.0, 0.4, 0.85, 0.1, "Right now, can you notice five things you can see around you?"),
+    ];
+
+    for (intent, alliance, distress, depth, response) in templates {
+        let mut channels = ThoughtChannels::default();
+        // Set base consciousness channels to reasonable defaults
+        channels.set_consciousness(0.6, 0.5, 0.7);
+        channels.set_emotion(
+            if distress > 0.5 { -(distress - 0.5) } else { 0.3 },
+            distress.clamp(0.3, 0.8),
+            0.7, // warmth
+        );
+        channels.set_therapeutic(intent, alliance, distress, depth);
+
+        let pair = TrainingPair::new(channels, response.to_string(), tokenizer);
+        dataset.push(pair);
+    }
+
+    dataset
 }
