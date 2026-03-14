@@ -22,7 +22,8 @@
 use super::super::subsystem_trait::{CognitiveSubsystem, CycleSnapshot, SubsystemOutput};
 use symthaea_clinical::InterventionLibrary;
 use symthaea_therapeutic::{
-    ClientModel, CrisisDetector, RegulationEngine, ScopeGuard, TherapeuticAlliance,
+    CaseFormulation, ClientModel, CrisisDetector, NarrativeFragment, RegulationEngine, ScopeGuard,
+    TherapeuticAlliance, TherapeuticNarrative,
 };
 use symthaea_therapeutic::affect_regulation::NeuromodDelta;
 use symthaea_therapeutic::client_model::CoreAffectSnapshot;
@@ -43,6 +44,10 @@ pub struct TherapeuticManager {
     pub scope_guard: ScopeGuard,
     /// Evidence-based intervention library.
     pub intervention_library: InterventionLibrary,
+    /// CBT 4P case formulation (predisposing, precipitating, perpetuating, protective).
+    pub formulation: CaseFormulation,
+    /// Therapeutic narrative with coherence tracking.
+    pub narrative: TherapeuticNarrative,
     /// Whether a crisis was detected this cycle.
     pub crisis_active: bool,
     /// Last detected crisis type name (for telemetry).
@@ -60,6 +65,8 @@ impl Default for TherapeuticManager {
             regulation_engine: RegulationEngine::new(),
             scope_guard: ScopeGuard::new(),
             intervention_library: InterventionLibrary::bootstrap(),
+            formulation: CaseFormulation::new(),
+            narrative: TherapeuticNarrative::new(),
             crisis_active: false,
             last_crisis_type: None,
             last_neuromod_delta: None,
@@ -81,6 +88,16 @@ impl TherapeuticManager {
     /// Get current alliance composite (0-1).
     pub fn alliance_composite(&self) -> f32 {
         self.alliance.composite()
+    }
+
+    /// Get narrative coherence (0-1).
+    pub fn narrative_coherence(&self) -> f32 {
+        self.narrative.coherence
+    }
+
+    /// Get case formulation resilience ratio.
+    pub fn formulation_resilience_ratio(&self) -> f32 {
+        self.formulation.resilience_ratio()
     }
 
     /// Get the currently active regulation strategy.
@@ -242,6 +259,32 @@ impl CognitiveSubsystem for TherapeuticManager {
         // ── 5. Track regulation effectiveness ─────────────────────────────
         if self.client_model.affect_trend() > 0.0 {
             self.regulation_engine.record_success(strategy);
+        }
+
+        // ── 6. Narrative fragment recording ─────────────────────────────────
+        let is_traumatic = self.client_model.distress() > 0.7 && snapshot.valence < -0.3;
+        let fragment_text = format!(
+            "cycle_{}_v{:.2}_a{:.2}",
+            snapshot.cycle_number, snapshot.valence, snapshot.arousal
+        );
+        self.narrative.integrate_fragment(NarrativeFragment::new(
+            &fragment_text,
+            snapshot.cycle_number,
+            snapshot.valence,
+            is_traumatic,
+        ));
+
+        // ── 7. Formulation updates ──────────────────────────────────────────
+        if self.client_model.affect_trend() < -0.1 && self.formulation.perpetuating.is_empty() {
+            self.formulation
+                .add_perpetuating("sustained negative affect pattern", 0.6);
+        }
+        if self.alliance.composite() > 0.6
+            && self.client_model.affect_trend() > 0.1
+            && self.formulation.protective.is_empty()
+        {
+            self.formulation
+                .add_protective("therapeutic engagement", 0.7);
         }
 
         output

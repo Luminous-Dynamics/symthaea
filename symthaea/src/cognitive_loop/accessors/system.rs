@@ -747,4 +747,24 @@ impl CognitiveLoopService {
     pub fn therapeutic_manager_last_crisis_type(&self) -> Option<&str> {
         self.therapeutic_manager.last_crisis_type.as_deref()
     }
+
+    /// Narrative coherence score (0-1).
+    pub fn therapeutic_manager_narrative_coherence(&self) -> f32 {
+        self.therapeutic_manager.narrative_coherence()
+    }
+
+    /// Case formulation resilience ratio (protective / risk factors).
+    pub fn therapeutic_manager_resilience_ratio(&self) -> f32 {
+        self.therapeutic_manager.formulation_resilience_ratio()
+    }
+
+    /// Number of narrative fragments recorded.
+    pub fn therapeutic_manager_narrative_len(&self) -> usize {
+        self.therapeutic_manager.narrative.len()
+    }
+
+    /// Whether the case formulation is actionable.
+    pub fn therapeutic_manager_formulation_actionable(&self) -> bool {
+        self.therapeutic_manager.formulation.is_actionable()
+    }
 }

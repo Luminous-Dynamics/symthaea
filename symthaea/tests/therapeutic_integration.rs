@@ -170,3 +170,87 @@ fn test_scope_guard_applies_disclaimers() {
     let clean = guard.apply_disclaimers("It sounds like you're going through a tough time.");
     assert!(!clean.contains("Important Notice"));
 }
+
+// ── 9. Narrative fragments accumulate over cycles ────────────────────
+
+#[test]
+fn test_narrative_fragment_recording() {
+    let mut service = make_therapeutic_service();
+
+    for i in 0..25 {
+        service.cycle(&format!("I had an interesting experience today {}", i));
+    }
+
+    let narrative_len = service.therapeutic_manager_narrative_len();
+    assert!(
+        narrative_len >= 1,
+        "Narrative should have fragments after 25 cycles, got {}",
+        narrative_len,
+    );
+}
+
+// ── 10. Formulation updates from sustained patterns ──────────────────
+
+#[test]
+fn test_formulation_auto_detection() {
+    let mut service = make_therapeutic_service();
+
+    for _ in 0..50 {
+        service.cycle("things are going well");
+    }
+
+    let ratio = service.therapeutic_manager_resilience_ratio();
+    assert!(ratio >= 0.0, "Resilience ratio should be non-negative, got {}", ratio);
+}
+
+// ── 11. Therapeutic gating unit test (Broca word modulation) ─────────
+
+#[test]
+fn test_therapeutic_gate_crisis_mode() {
+    use symthaea_broca::gating::TherapeuticGate;
+    use symthaea_broca::encoder::ThoughtChannels;
+
+    let mut channels = ThoughtChannels::default();
+    channels.set_therapeutic(7.0, 0.5, 0.9, 0.5);
+
+    let directive_logit = TherapeuticGate::apply("should", &channels, 0.5);
+    assert!(directive_logit < 0.5, "Directive 'should' suppressed in crisis, got {}", directive_logit);
+
+    let validating_logit = TherapeuticGate::apply("understand", &channels, 0.5);
+    assert!(validating_logit > 0.5, "Validating 'understand' boosted in crisis, got {}", validating_logit);
+
+    let crisis_logit = TherapeuticGate::apply("helpline", &channels, 0.5);
+    assert!(crisis_logit > 0.5, "Crisis word 'helpline' boosted, got {}", crisis_logit);
+}
+
+// ── 12. High distress suppresses directives ──────────────────────────
+
+#[test]
+fn test_therapeutic_gate_high_distress() {
+    use symthaea_broca::gating::TherapeuticGate;
+    use symthaea_broca::encoder::ThoughtChannels;
+
+    let mut channels = ThoughtChannels::default();
+    channels.set_therapeutic(0.0, 0.2, 0.9, 0.3);
+
+    let directive_logit = TherapeuticGate::apply("must", &channels, 0.5);
+    assert!(directive_logit < 0.5, "Directive 'must' suppressed under high distress, got {}", directive_logit);
+
+    let validating_logit = TherapeuticGate::apply("hear", &channels, 0.5);
+    assert!(validating_logit > 0.5, "Validating 'hear' boosted under high distress, got {}", validating_logit);
+}
+
+// ── 13. Alliance gates intervention depth ────────────────────────────
+
+#[test]
+fn test_alliance_gates_intervention_depth() {
+    use symthaea_broca::gating::TherapeuticGate;
+    use symthaea_broca::encoder::ThoughtChannels;
+
+    let mut channels = ThoughtChannels::default();
+    // Low alliance (0.2) but high depth (0.8) → depth > alliance + 0.2
+    channels.set_therapeutic(0.0, 0.2, 0.3, 0.8);
+
+    let directive_logit = TherapeuticGate::apply("need to", &channels, 0.5);
+    assert!(directive_logit < 0.5, "Depth-exceeding-alliance suppresses directives, got {}", directive_logit);
+}

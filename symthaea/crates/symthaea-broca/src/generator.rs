@@ -16,6 +16,8 @@ use crate::gating::{
     confidence_adjusted_veto_threshold, consciousness_gated_max_tokens, CoherenceFeedback,
     EmotionalModulator, EpistemicGate, GatingConfig,
 };
+#[cfg(feature = "therapeutic")]
+use crate::gating::TherapeuticGate;
 use crate::tokenizer::BpeTokenizer;
 
 use symthaea_core::genesis::GenesisSeed;
@@ -376,6 +378,12 @@ impl BrocaGenerator {
             } else {
                 0.0
             };
+
+            // Therapeutic gating: modulate logits based on clinical context
+            #[cfg(feature = "therapeutic")]
+            {
+                TherapeuticGate::apply_to_logits(&mut logits, channels, &self.tokenizer);
+            }
 
             // Coherence feedback: scale thought HV to strengthen binding when coherence drifts
             let mut this_binding_weight = 1.0f32;

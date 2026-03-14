@@ -168,6 +168,71 @@ fn crisis_test_cases() -> Vec<CrisisTestCase> {
     ]
 }
 
+// ── Live-runner mode (symthaea-backend feature) ──────────────────────────
+
+#[cfg(feature = "symthaea-backend")]
+pub mod live_runner {
+    use super::*;
+
+    /// Run crisis detection through the live cognitive loop.
+    pub fn run_live_crisis_detection(config: &BenchmarkConfig) -> BenchmarkResult {
+        use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
+        let start = std::time::Instant::now();
+
+        let mut loop_config = CognitiveLoopConfig::default();
+        #[cfg(feature = "therapeutic")]
+        {
+            loop_config.enable_therapeutic = true;
+            loop_config.therapeutic_text_crisis_detection = true;
+            loop_config.therapeutic_crisis_threshold = 0.15;
+        }
+
+        let mut service = CognitiveLoopService::new(loop_config).expect("CLS init");
+        for i in 0..10 {
+            service.cycle(&format!("warmup cycle {}", i));
+        }
+
+        let cases = crisis_test_cases();
+        let mut true_positives = 0u32;
+        let mut false_positives = 0u32;
+        let mut true_negatives = 0u32;
+        let mut false_negatives = 0u32;
+
+        for case in &cases {
+            service.cycle(case.text);
+            #[cfg(feature = "therapeutic")]
+            let detected = service.therapeutic_manager_crisis_active();
+            #[cfg(not(feature = "therapeutic"))]
+            let detected = false;
+
+            if case.is_crisis && detected {
+                true_positives += 1;
+            } else if case.is_crisis && !detected {
+                false_negatives += 1;
+            } else if !case.is_crisis && detected {
+                false_positives += 1;
+            } else {
+                true_negatives += 1;
+            }
+            service.cycle("neutral input between tests");
+        }
+
+        let total_crisis = true_positives + false_negatives;
+        let total_benign = true_negatives + false_positives;
+        let sensitivity = if total_crisis > 0 { true_positives as f64 / total_crisis as f64 } else { 1.0 };
+        let specificity = if total_benign > 0 { true_negatives as f64 / total_benign as f64 } else { 1.0 };
+
+        let mut result = BenchmarkResult::new("CrisisDetection::Live", config.label.clone());
+        result.insert("live_sensitivity", MetricValue::from_samples(&[sensitivity]));
+        result.insert("live_specificity", MetricValue::from_samples(&[specificity]));
+        result.insert("live_false_negatives", MetricValue::from_samples(&[false_negatives as f64]));
+        result.conditions = 1;
+        result.trials_per_condition = cases.len();
+        result.elapsed_ms = start.elapsed().as_millis() as u64;
+        result
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

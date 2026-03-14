@@ -719,6 +719,20 @@ pub struct TherapeuticGate;
 
 #[cfg(feature = "therapeutic")]
 impl TherapeuticGate {
+    /// Apply therapeutic gating to all logits in-place using the tokenizer vocabulary.
+    pub fn apply_to_logits(
+        logits: &mut [f32],
+        channels: &super::encoder::ThoughtChannels,
+        tokenizer: &BpeTokenizer,
+    ) {
+        for id in 0..logits.len() {
+            let word = tokenizer.token_str(id as u32);
+            if !word.is_empty() {
+                logits[id] = Self::apply(word, channels, logits[id]);
+            }
+        }
+    }
+
     pub fn apply(word: &str, channels: &super::encoder::ThoughtChannels, base_logit: f32) -> f32 {
         let distress = channels.client_distress_level();
         let alliance = channels.alliance_quality();
