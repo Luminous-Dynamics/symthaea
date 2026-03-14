@@ -75,6 +75,49 @@ use super::thresholds::{
 };
 use super::{CognitiveLoopService, CycleState};
 
+
+// ─── Result structs for extracted feedback sub-phases ───────────────────────
+
+/// Results from soul/identity assessment, kosmic song synthesis,
+/// user state inference, phi-dyad computation, and trust evolution.
+struct SoulIdentityResult {
+    kosmic_coherence: f32,
+}
+
+/// Results from cross-module agreement computation, unified quality
+/// signal fusion, and consciousness-metric behavioral couplings.
+struct AgreementQualityResult {
+    cross_module_agreement: f32,
+    unified_quality_score: f32,
+    agreement_confidence_coupling: bool,
+}
+
+/// Input parameters for the late-stage signal wiring sub-phase (Sessions 16-20).
+struct LateSignalWiringInput {
+    epistemic_phi_eff: f64,
+    phenomenal_binding_strength: f64,
+    temporal_coherence_score: f64,
+    holographic_unity: f64,
+    affect_cons_arousal: f32,
+    affect_cons_valence: f32,
+    narrative_gwt_self_psi: f64,
+    harmonies_alignment: f32,
+    value_cache_hit_rate: f32,
+    consciousness_gradient_magnitude: f64,
+    multi_obj_frontier_size: usize,
+    consciousness_state_level: f64,
+    living_mind_vitality: f64,
+    living_mind_coherence: f64,
+    temporal_binding_strength: f32,
+    body_arousal: f32,
+    cross_module_agreement: f32,
+    epistemic_gate_approved: bool,
+    epistemic_conflict_count: usize,
+    phenomenal_fragmented: bool,
+    temporal_discontinuity: bool,
+    cross_modal_binding_strength: f32,
+}
+
 impl CognitiveLoopService {
     /// Feedback integration phase: consciousness metrics, advanced subsystems,
     /// late consciousness monitors, quality gating, homeostasis, consciousness
@@ -1061,6 +1104,251 @@ impl CognitiveLoopService {
         module_timings.soul_experience = _t.elapsed().as_micros() as u64;
 
         // ═══════════════════════════════════════════════════════════════════════
+        // SOUL/IDENTITY ASSESSMENT + KOSMIC SONG + USI + PHI-DYAD + TRUST
+        // ═══════════════════════════════════════════════════════════════════════
+        let soul_identity = self.run_soul_identity_coupling(
+            equation_v2_consciousness,
+            dynamics.core.coherence,
+        );
+        let kosmic_coherence = soul_identity.kosmic_coherence;
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // CROSS-MODULE AGREEMENT + QUALITY FUSION + CONSCIOUSNESS COUPLINGS
+        // ═══════════════════════════════════════════════════════════════════════
+        let aq = self.run_agreement_quality_coupling(
+            dynamics,
+            perception,
+            epistemic_conflict_count,
+            phenomenal_fragmented,
+            temporal_discontinuity,
+            cross_modal_binding_strength,
+        );
+        let cross_module_agreement = aq.cross_module_agreement;
+        let unified_quality_score = aq.unified_quality_score;
+        let agreement_confidence_coupling = aq.agreement_confidence_coupling;
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // LATE-STAGE SIGNAL WIRING (Sessions 16-20)
+        // ═══════════════════════════════════════════════════════════════════════
+        self.run_late_signal_wiring(
+            &LateSignalWiringInput {
+                epistemic_phi_eff,
+                phenomenal_binding_strength,
+                temporal_coherence_score,
+                holographic_unity,
+                affect_cons_arousal,
+                affect_cons_valence,
+                narrative_gwt_self_psi,
+                harmonies_alignment,
+                value_cache_hit_rate,
+                consciousness_gradient_magnitude,
+                multi_obj_frontier_size,
+                consciousness_state_level,
+                living_mind_vitality,
+                living_mind_coherence,
+                temporal_binding_strength: perception.encoding.temporal_binding_strength,
+                body_arousal,
+                cross_module_agreement,
+                epistemic_gate_approved,
+                epistemic_conflict_count,
+                phenomenal_fragmented,
+                temporal_discontinuity,
+                cross_modal_binding_strength,
+            },
+            perception,
+        );
+
+        // ── Governance → Neuromod + Learning (Phase C, every cycle) ──────
+        // Events are queued at interval 37 in Phase B; neuromod + learning applied every cycle.
+        #[cfg(feature = "mycelix")]
+        {
+            self.apply_governance_neuromod();
+            self.process_governance_learning();
+        }
+
+        // Swarm neuromodulatory coupling (not feature-gated — SwarmManager is always present).
+        self.apply_swarm_neuromod();
+
+        // Cross-couple swarm and governance signals (Woolley 2010).
+        #[cfg(feature = "mycelix")]
+        self.cross_couple_swarm_governance();
+
+        FeedbackPhaseResult {
+            quality: FbQuality {
+                cross_module_agreement,
+                unified_quality_score,
+                coherence_velocity_gated,
+                dissipative_health_gated,
+                dissipative_health,
+                dissipative_regime,
+                dissipative_entropy_rate,
+                dissipative_lr_factor,
+                coherence_velocity,
+                agreement_confidence_coupling,
+            },
+            consciousness: FbConsciousness {
+                primitive_psi,
+                temporal_causal_chains,
+                temporal_continuity,
+                temporal_max_chain_length,
+                causal_codebook_entries_len: causal_codebook_entries.len(),
+                continuity_replay_needed,
+                lattice_height,
+                lattice_width,
+                lattice_join_concept,
+                compositionality_total,
+                consciousness_profile_composite,
+                synergy_enhanced_composite,
+                emergent_properties_count,
+                equation_v2_consciousness,
+                eq_v2_limiting_component,
+                pipeline_consciousness,
+                multimodal_integrated_phi,
+                consciousness_state_label,
+                consciousness_state_level,
+                consciousness_gradient_magnitude,
+                consciousness_limiting_component,
+                holographic_unity,
+                holographic_binding,
+                affect_cons_valence,
+                affect_cons_arousal,
+                consciousness_level,
+                spectral_mip_phi,
+                sigma,
+                phi_spectral_weight,
+                structural_micro_phi: struct_micro,
+                structural_meso_phi: struct_meso,
+                structural_macro_phi: struct_macro,
+                structural_bottleneck: struct_bn,
+                structural_emergence_ratio: struct_er,
+                structural_num_clusters: struct_nc,
+                consciousness_weights,
+                consciousness_weight_variance,
+                convergence_state,
+            },
+            self_model: FbSelfModel {
+                prefrontal_veto,
+                meta_cognitive_accuracy,
+                meta_cognitive_depth,
+                body_psi_modulation,
+                body_valence,
+                body_arousal,
+                affective_valence,
+                affective_arousal,
+                narrative_self_psi,
+                predictive_free_energy,
+                predictive_psi_modulation,
+                hierarchical_total_free_energy,
+                predictive_self_safety,
+                attention_schema_focus,
+                attention_fatigue,
+                attention_prediction_accuracy,
+                psi_attention_avg,
+                gwt_broadcast,
+                gwt_coalition_size,
+                cross_modal_binding_strength,
+                cross_modal_psi,
+                resonance_frequency,
+                quantum_coherence_level,
+                phenomenal_binding_strength,
+                phenomenal_fragmented,
+                temporal_coherence_score,
+                temporal_discontinuity,
+                thermodynamic_entropy,
+                thermodynamic_free_energy,
+                embodied_psi_modulation,
+                embodied_agency,
+                narrative_gwt_veto,
+                narrative_gwt_self_psi,
+                living_mind_vitality,
+                living_mind_coherence,
+            },
+            reasoning: FbReasoning {
+                reasoning_context,
+                context_phi_weight,
+                context_phi_applied,
+                reasoning_chain_confidence,
+                reasoning_chain_depth,
+                causal_relations_count,
+                causal_avg_confidence,
+                adaptive_reasoning_phi,
+                epistemic_quality,
+                phi_validation_correlation,
+                epistemic_phi_eff,
+                epistemic_conflict_count,
+                epistemic_gate_confidence,
+                epistemic_gate_approved,
+                meta_reasoning_confidence,
+                meta_reasoning_insights,
+                code_primitives_selected,
+            },
+            ethics: FbEthics {
+                value_evaluator_score,
+                value_evaluator_decision,
+                value_gate_factor,
+                value_embeddings_created,
+                value_cache_hit_rate,
+                harmonies_alignment,
+                harmonies_approved,
+                composition_rule_applied,
+                harmonic_field_coherence,
+                harmonic_love_resonance,
+                harmonic_interferences,
+                empathic_compassion,
+                empathic_tone_adj,
+                empathic_speech_rate_mod,
+                kosmic_coherence,
+            },
+            evolution: FbEvolution {
+                hierarchical_ltc_phi,
+                evolution_generation,
+                evolution_phi_delta,
+                evolution_confidence_delta,
+                primitive_validation_phi_gain,
+                primitive_validation_p_value,
+            },
+            loops: FbLoops {
+                limiting_component_boosted: limiting_component_boosted.into(),
+                love_resonance_boost,
+                reasoning_chain_boosted,
+                harmonic_interference_lr_mod,
+                causal_urgency_gated,
+                epistemic_coherence_gated,
+                attention_budget_gated,
+            },
+            memory: FbMemory {
+                dream_insights,
+                dream_phi_improvement,
+                dream_wisdom_count,
+                resonator_promotions,
+                codebook_evictions,
+                codebook_diversity,
+                codebook_utilization_rate,
+                surprise_replay_batch_size,
+                memory_db_flushed,
+            },
+            support: FbSupport {
+                support_triage_count,
+                support_alert_fired,
+                support_federation_graduated,
+                support_efe,
+            },
+            multi_obj_frontier_size,
+            grid_encoding_norm,
+            grid_spatial_complexity,
+            social_learning_rate_factor,
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Extracted helper: Soul/identity assessment, Kosmic Song, USI, Phi-Dyad, Trust
+    // ═══════════════════════════════════════════════════════════════════════════
+    fn run_soul_identity_coupling(
+        &mut self,
+        equation_v2_consciousness: f64,
+        cycle_coherence: f32,
+    ) -> SoulIdentityResult {
+        // ═══════════════════════════════════════════════════════════════════════
         // SOUL SELF-ASSESSMENT → BEHAVIORAL COUPLING
         // Damasio (2010) — somatic markers from self-assessment guide decisions.
         // ═══════════════════════════════════════════════════════════════════════
@@ -1253,11 +1541,27 @@ impl CognitiveLoopService {
         // Coherence > 0.5 builds trust, < 0.5 erodes it; slow decay prevents runaway
         if let Some(ref mut model) = self.social_mgr.partner_model {
             let signal =
-                (dynamics.core.coherence as f64 - TRUST_SIGNAL_MIDPOINT) * TRUST_SIGNAL_RATE;
+                (cycle_coherence as f64 - TRUST_SIGNAL_MIDPOINT) * TRUST_SIGNAL_RATE;
             model.trust =
                 ((model.trust as f64 + signal).clamp(0.0, 1.0) * TRUST_DECAY_FACTOR) as f32;
         }
 
+
+        SoulIdentityResult { kosmic_coherence }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Extracted helper: Cross-module agreement, quality fusion, consciousness couplings
+    // ═══════════════════════════════════════════════════════════════════════════
+    fn run_agreement_quality_coupling(
+        &mut self,
+        dynamics: &mut DynamicsPhaseResult,
+        perception: &PerceptionPhaseResult,
+        epistemic_conflict_count: usize,
+        phenomenal_fragmented: bool,
+        temporal_discontinuity: bool,
+        cross_modal_binding_strength: f32,
+    ) -> AgreementQualityResult {
         // ── Track 4b: Cross-module agreement metric ─────────────────────────
         let fep_confidence = (1.0 - dynamics.fep.fep_surprise.min(1.0)).max(0.0) as f32;
         let resonator_confidence = dynamics.resonator.resonator_best_sim;
@@ -1491,6 +1795,22 @@ impl CognitiveLoopService {
             }
         }
 
+
+        AgreementQualityResult {
+            cross_module_agreement,
+            unified_quality_score,
+            agreement_confidence_coupling,
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Extracted helper: Late-stage signal wiring (Sessions 16-20)
+    // ═══════════════════════════════════════════════════════════════════════════
+    fn run_late_signal_wiring(
+        &mut self,
+        s: &LateSignalWiringInput,
+        perception: &PerceptionPhaseResult,
+    ) {
         // ═══════════════════════════════════════════════════════════════════════
         // SESSION 16: ORPHANED SIGNAL WIRING
         // Wire consciousness metrics that were computed but never drove behavior.
@@ -1499,12 +1819,12 @@ impl CognitiveLoopService {
         // Item 1: Epistemic Phi → confidence coupling.
         // Low epistemic integration quality degrades confidence; high quality reinforces it.
         // Science: Tononi (2004) — Phi measures integrated information; low Phi = unreliable inference.
-        if epistemic_phi_eff > EPISTEMIC_PHI_HIGH_THRESHOLD && self.stats.total_cycles > 20 {
-            let boost = ((epistemic_phi_eff - EPISTEMIC_PHI_HIGH_THRESHOLD)
+        if s.epistemic_phi_eff > EPISTEMIC_PHI_HIGH_THRESHOLD && self.stats.total_cycles > 20 {
+            let boost = ((s.epistemic_phi_eff - EPISTEMIC_PHI_HIGH_THRESHOLD)
                 * EPISTEMIC_PHI_HIGH_CONFIDENCE_SCALE as f64) as f32;
             self.adjust_confidence("epistemic_phi_high", boost);
-        } else if epistemic_phi_eff > 0.0
-            && epistemic_phi_eff < EPISTEMIC_PHI_LOW_THRESHOLD
+        } else if s.epistemic_phi_eff > 0.0
+            && s.epistemic_phi_eff < EPISTEMIC_PHI_LOW_THRESHOLD
             && self.stats.total_cycles > 20
         {
             self.scale_confidence("epistemic_phi_low", EPISTEMIC_PHI_LOW_CONFIDENCE_SCALE);
@@ -1514,15 +1834,15 @@ impl CognitiveLoopService {
         // Low binding = incoherent representation → explore for better conjunctions.
         // High binding = stable gestalt → consolidate, dampen LR.
         // Science: Treisman (1996) — feature integration requires binding; weak binding = search.
-        if phenomenal_binding_strength < PHENOMENAL_BINDING_LOW_THRESHOLD
-            && phenomenal_binding_strength > 0.0
+        if s.phenomenal_binding_strength < PHENOMENAL_BINDING_LOW_THRESHOLD
+            && s.phenomenal_binding_strength > 0.0
             && self.stats.total_cycles > 15
         {
             self.adjust_exploration(
                 "phenomenal_binding_low",
                 PHENOMENAL_BINDING_LOW_EXPLORE_BOOST,
             );
-        } else if phenomenal_binding_strength > PHENOMENAL_BINDING_HIGH_THRESHOLD
+        } else if s.phenomenal_binding_strength > PHENOMENAL_BINDING_HIGH_THRESHOLD
             && self.stats.total_cycles > 15
         {
             self.scale_lr(
@@ -1535,14 +1855,14 @@ impl CognitiveLoopService {
         // High temporal coherence = predictable flow → boost confidence.
         // Low temporal coherence = fragmented temporal context → explore for patterns.
         // Science: Howard & Kahana (2002) — temporal context model: stability supports encoding.
-        if temporal_coherence_score > TEMPORAL_COHERENCE_HIGH_THRESHOLD
+        if s.temporal_coherence_score > TEMPORAL_COHERENCE_HIGH_THRESHOLD
             && self.stats.total_cycles > 15
         {
-            let boost = ((temporal_coherence_score - TEMPORAL_COHERENCE_HIGH_THRESHOLD)
+            let boost = ((s.temporal_coherence_score - TEMPORAL_COHERENCE_HIGH_THRESHOLD)
                 * TEMPORAL_COHERENCE_CONFIDENCE_SCALE as f64) as f32;
             self.adjust_confidence("temporal_coherence_high", boost);
-        } else if temporal_coherence_score > 0.0
-            && temporal_coherence_score < TEMPORAL_COHERENCE_LOW_THRESHOLD
+        } else if s.temporal_coherence_score > 0.0
+            && s.temporal_coherence_score < TEMPORAL_COHERENCE_LOW_THRESHOLD
             && self.stats.total_cycles > 15
         {
             self.adjust_exploration(
@@ -1555,15 +1875,15 @@ impl CognitiveLoopService {
         // Low unity = global decomposition → learning during decomposition is noise.
         // High unity = integrated representation → confident decisions.
         // Science: Pribram (1991) — holographic storage coherence gates encoding fidelity.
-        if holographic_unity < HOLOGRAPHIC_UNITY_LOW_THRESHOLD
-            && holographic_unity > 0.0
+        if s.holographic_unity < HOLOGRAPHIC_UNITY_LOW_THRESHOLD
+            && s.holographic_unity > 0.0
             && self.stats.total_cycles > 20
         {
             self.scale_lr("holographic_unity_low", HOLOGRAPHIC_UNITY_LOW_LR_DAMPEN);
-        } else if holographic_unity > HOLOGRAPHIC_UNITY_HIGH_THRESHOLD
+        } else if s.holographic_unity > HOLOGRAPHIC_UNITY_HIGH_THRESHOLD
             && self.stats.total_cycles > 20
         {
-            let boost = ((holographic_unity - HOLOGRAPHIC_UNITY_HIGH_THRESHOLD)
+            let boost = ((s.holographic_unity - HOLOGRAPHIC_UNITY_HIGH_THRESHOLD)
                 * HOLOGRAPHIC_UNITY_HIGH_CONFIDENCE_SCALE as f64) as f32;
             self.adjust_confidence("holographic_unity_high", boost);
         }
@@ -1576,10 +1896,10 @@ impl CognitiveLoopService {
         // Item 1: Affective consciousness arousal → LR/exploration modulation.
         // High arousal accelerates learning; low arousal dampens exploration.
         // Science: Yerkes-Dodson (1908) — inverted-U arousal-performance relationship.
-        if affect_cons_arousal > AFFECT_AROUSAL_HIGH_THRESHOLD && self.stats.total_cycles > 10 {
+        if s.affect_cons_arousal > AFFECT_AROUSAL_HIGH_THRESHOLD && self.stats.total_cycles > 10 {
             self.scale_lr("affect_high_arousal", AFFECT_AROUSAL_HIGH_LR_SCALE);
-        } else if affect_cons_arousal < AFFECT_AROUSAL_LOW_THRESHOLD
-            && affect_cons_arousal > 0.0
+        } else if s.affect_cons_arousal < AFFECT_AROUSAL_LOW_THRESHOLD
+            && s.affect_cons_arousal > 0.0
             && self.stats.total_cycles > 10
         {
             self.scale_exploration("affect_low_arousal", AFFECT_AROUSAL_LOW_EXPLORE_DAMPEN);
@@ -1589,12 +1909,12 @@ impl CognitiveLoopService {
         // Negative valence boosts exploration (search for better states);
         // positive valence boosts confidence (current approach is working).
         // Science: Fredrickson (2001) — broaden-and-build; negative affect narrows → explore.
-        if affect_cons_valence < AFFECT_VALENCE_NEGATIVE_THRESHOLD && self.stats.total_cycles > 10 {
+        if s.affect_cons_valence < AFFECT_VALENCE_NEGATIVE_THRESHOLD && self.stats.total_cycles > 10 {
             self.adjust_exploration(
                 "affect_negative_valence",
                 AFFECT_VALENCE_NEGATIVE_EXPLORE_BOOST,
             );
-        } else if affect_cons_valence > AFFECT_VALENCE_POSITIVE_THRESHOLD
+        } else if s.affect_cons_valence > AFFECT_VALENCE_POSITIVE_THRESHOLD
             && self.stats.total_cycles > 10
         {
             self.adjust_confidence(
@@ -1607,14 +1927,14 @@ impl CognitiveLoopService {
         // High narrative coherence = stable identity → ground confidence.
         // Low narrative coherence = fragmented self → explore for integration.
         // Science: Gallagher (2000) — narrative self-model supports action coherence.
-        if narrative_gwt_self_psi > NARRATIVE_SELF_PHI_CONFIDENCE_THRESHOLD
+        if s.narrative_gwt_self_psi > NARRATIVE_SELF_PHI_CONFIDENCE_THRESHOLD
             && self.stats.total_cycles > 15
         {
-            let boost = ((narrative_gwt_self_psi - NARRATIVE_SELF_PHI_CONFIDENCE_THRESHOLD)
+            let boost = ((s.narrative_gwt_self_psi - NARRATIVE_SELF_PHI_CONFIDENCE_THRESHOLD)
                 * NARRATIVE_SELF_PHI_CONFIDENCE_SCALE as f64) as f32;
             self.adjust_confidence("narrative_self_coherent", boost);
-        } else if narrative_gwt_self_psi > 0.0
-            && narrative_gwt_self_psi < NARRATIVE_SELF_PHI_LOW_THRESHOLD
+        } else if s.narrative_gwt_self_psi > 0.0
+            && s.narrative_gwt_self_psi < NARRATIVE_SELF_PHI_LOW_THRESHOLD
             && self.stats.total_cycles > 15
         {
             self.adjust_exploration(
@@ -1627,12 +1947,12 @@ impl CognitiveLoopService {
         // Low alignment = value misalignment → explore to find aligned actions.
         // High alignment = value-congruent → boost confidence.
         // Science: Schwartz (2012) — value congruence strengthens self-efficacy.
-        if harmonies_alignment < HARMONIES_MISALIGNMENT_THRESHOLD
-            && harmonies_alignment > 0.0
+        if s.harmonies_alignment < HARMONIES_MISALIGNMENT_THRESHOLD
+            && s.harmonies_alignment > 0.0
             && self.stats.total_cycles > 15
         {
             self.adjust_exploration("harmony_misaligned", HARMONIES_MISALIGNMENT_EXPLORE_BOOST);
-        } else if harmonies_alignment > HARMONIES_ALIGNED_THRESHOLD && self.stats.total_cycles > 15
+        } else if s.harmonies_alignment > HARMONIES_ALIGNED_THRESHOLD && self.stats.total_cycles > 15
         {
             self.adjust_confidence("harmony_aligned", HARMONIES_ALIGNED_CONFIDENCE_BOOST);
         }
@@ -1640,12 +1960,12 @@ impl CognitiveLoopService {
         // Item 5: Value cache hit rate → confidence recovery.
         // High cache hit = pattern recognition working → confident in predictions.
         // Science: Logan (1988) — instance-based automaticity from repeated retrieval.
-        if value_cache_hit_rate > VALUE_CACHE_HIT_CONFIDENCE_THRESHOLD
+        if s.value_cache_hit_rate > VALUE_CACHE_HIT_CONFIDENCE_THRESHOLD
             && self.stats.total_cycles > 20
         {
             self.adjust_confidence(
                 "value_cache_high",
-                (value_cache_hit_rate - VALUE_CACHE_HIT_CONFIDENCE_THRESHOLD)
+                (s.value_cache_hit_rate - VALUE_CACHE_HIT_CONFIDENCE_THRESHOLD)
                     * VALUE_CACHE_HIT_CONFIDENCE_SCALE,
             );
         }
@@ -1653,7 +1973,7 @@ impl CognitiveLoopService {
         // Item 6: Consciousness gradient magnitude → stability-aware LR modulation.
         // Large gradient = consciousness shifting rapidly → dampen LR for stability.
         // Science: Baars (2005) — global workspace transitions require stabilization.
-        if consciousness_gradient_magnitude > CONSCIOUSNESS_GRADIENT_THRESHOLD
+        if s.consciousness_gradient_magnitude > CONSCIOUSNESS_GRADIENT_THRESHOLD
             && self.stats.total_cycles > 15
         {
             self.scale_lr(
@@ -1666,13 +1986,13 @@ impl CognitiveLoopService {
         // Deb (2002) — large Pareto frontier = competing objectives → explore tradeoffs.
         // Kelso (1995) — converged frontier = phase lock → dampen and observe.
         if self.stats.total_cycles > 15 {
-            if multi_obj_frontier_size >= MULTI_OBJ_FRONTIER_LARGE {
+            if s.multi_obj_frontier_size >= MULTI_OBJ_FRONTIER_LARGE {
                 self.adjust_exploration(
                     "multi_obj_frontier_large",
                     MULTI_OBJ_FRONTIER_EXPLORE_SCALE,
                 );
-            } else if multi_obj_frontier_size <= MULTI_OBJ_FRONTIER_SMALL
-                && multi_obj_frontier_size > 0
+            } else if s.multi_obj_frontier_size <= MULTI_OBJ_FRONTIER_SMALL
+                && s.multi_obj_frontier_size > 0
             {
                 self.scale_exploration("multi_obj_frontier_converged", MULTI_OBJ_FRONTIER_DAMPEN);
             }
@@ -1682,13 +2002,13 @@ impl CognitiveLoopService {
         // Dehaene & Changeux (2011) — high global ignition → enhanced plasticity.
         // Tononi (2004) — low Phi / fragmented processing → protective dampening.
         if self.stats.total_cycles > 15 {
-            if consciousness_state_level > CONSCIOUSNESS_STATE_HIGH_THRESHOLD {
+            if s.consciousness_state_level > CONSCIOUSNESS_STATE_HIGH_THRESHOLD {
                 self.scale_lr(
                     "consciousness_state_high",
                     CONSCIOUSNESS_STATE_HIGH_LR_SCALE,
                 );
-            } else if consciousness_state_level < CONSCIOUSNESS_STATE_LOW_THRESHOLD
-                && consciousness_state_level > 0.0
+            } else if s.consciousness_state_level < CONSCIOUSNESS_STATE_LOW_THRESHOLD
+                && s.consciousness_state_level > 0.0
             {
                 self.scale_lr("consciousness_state_low", CONSCIOUSNESS_STATE_LOW_LR_DAMPEN);
             }
@@ -1698,13 +2018,13 @@ impl CognitiveLoopService {
         // Di Paolo (2005) — high adaptivity → justified confidence.
         // Sterling (2012) — allostatic overload → protective downregulation.
         if self.stats.total_cycles > 15 {
-            if living_mind_vitality > LIVING_MIND_VITALITY_HIGH_THRESHOLD {
+            if s.living_mind_vitality > LIVING_MIND_VITALITY_HIGH_THRESHOLD {
                 self.adjust_confidence(
                     "living_mind_vitality_high",
                     LIVING_MIND_VITALITY_CONFIDENCE_BOOST,
                 );
-            } else if living_mind_vitality < LIVING_MIND_VITALITY_LOW_THRESHOLD
-                && living_mind_vitality > 0.0
+            } else if s.living_mind_vitality < LIVING_MIND_VITALITY_LOW_THRESHOLD
+                && s.living_mind_vitality > 0.0
             {
                 self.scale_lr(
                     "living_mind_vitality_low",
@@ -1717,13 +2037,13 @@ impl CognitiveLoopService {
         // Kelso (1995) — high phase coherence → stable attractor → reduce search.
         // Friston (2010) — low coherence = high surprise → explore.
         if self.stats.total_cycles > 15 {
-            if living_mind_coherence > LIVING_MIND_COHERENCE_HIGH_THRESHOLD {
+            if s.living_mind_coherence > LIVING_MIND_COHERENCE_HIGH_THRESHOLD {
                 self.scale_exploration(
                     "living_mind_coherence_high",
                     LIVING_MIND_COHERENCE_HIGH_EXPLORE_DAMPEN,
                 );
-            } else if living_mind_coherence < LIVING_MIND_COHERENCE_LOW_THRESHOLD
-                && living_mind_coherence > 0.0
+            } else if s.living_mind_coherence < LIVING_MIND_COHERENCE_LOW_THRESHOLD
+                && s.living_mind_coherence > 0.0
             {
                 self.adjust_exploration(
                     "living_mind_coherence_low",
@@ -1742,7 +2062,7 @@ impl CognitiveLoopService {
                 TEMPORAL_BINDING_DAMPEN_THRESHOLD, TEMPORAL_BINDING_EXPLORE_SCALE,
                 TEMPORAL_BINDING_EXPLORE_THRESHOLD, TEMPORAL_BINDING_LOW_LR_SCALE,
             };
-            let tb = perception.encoding.temporal_binding_strength;
+            let tb = s.temporal_binding_strength;
             if tb < TEMPORAL_BINDING_EXPLORE_THRESHOLD && self.stats.total_cycles > 15 {
                 let boost =
                     (TEMPORAL_BINDING_EXPLORE_THRESHOLD - tb) * TEMPORAL_BINDING_EXPLORE_SCALE;
@@ -1759,12 +2079,12 @@ impl CognitiveLoopService {
                 CONSCIOUSNESS_GRADIENT_CAUTION_THRESHOLD, CONSCIOUSNESS_GRADIENT_LR_SCALE,
                 CONSCIOUSNESS_GRADIENT_RECOVERY_BOOST, CONSCIOUSNESS_GRADIENT_STABLE_CYCLES,
             };
-            if consciousness_gradient_magnitude > CONSCIOUSNESS_GRADIENT_CAUTION_THRESHOLD
+            if s.consciousness_gradient_magnitude > CONSCIOUSNESS_GRADIENT_CAUTION_THRESHOLD
                 && self.stats.total_cycles > 15
             {
                 self.scale_lr("gradient_caution", CONSCIOUSNESS_GRADIENT_LR_SCALE);
                 self.carryover.quality.consecutive_stable_gradient = 0;
-            } else if consciousness_gradient_magnitude < super::thresholds::GRADIENT_STABLE_DETECT_THRESHOLD {
+            } else if s.consciousness_gradient_magnitude < super::thresholds::GRADIENT_STABLE_DETECT_THRESHOLD {
                 self.carryover.quality.consecutive_stable_gradient = self
                     .carryover
                     .quality
@@ -1785,7 +2105,7 @@ impl CognitiveLoopService {
         }
 
         // S16-4: Epistemic rejection streak → recalibration. Berlyne (1960).
-        if !epistemic_gate_approved {
+        if !s.epistemic_gate_approved {
             self.carryover.quality.consecutive_epistemic_rejections = self
                 .carryover
                 .quality
@@ -1860,8 +2180,8 @@ impl CognitiveLoopService {
                 CONSCIOUSNESS_ACCEL_THRESHOLD,
             };
             let prev_grad = self.carryover.quality.prev_gradient_magnitude;
-            let acceleration = (consciousness_gradient_magnitude - prev_grad).abs();
-            self.carryover.quality.prev_gradient_magnitude = consciousness_gradient_magnitude;
+            let acceleration = (s.consciousness_gradient_magnitude - prev_grad).abs();
+            self.carryover.quality.prev_gradient_magnitude = s.consciousness_gradient_magnitude;
             if acceleration > CONSCIOUSNESS_ACCEL_THRESHOLD && self.stats.total_cycles > 20 {
                 self.scale_lr("consciousness_accel", CONSCIOUSNESS_ACCEL_LR_SCALE);
                 self.scale_confidence("consciousness_accel", CONSCIOUSNESS_ACCEL_CONFIDENCE_SCALE);
@@ -1904,7 +2224,7 @@ impl CognitiveLoopService {
         // S18-1: PE variance tracking → LR dampening. Clark (2013).
         {
             use super::thresholds::PE_VARIANCE_EMA_DECAY;
-            let pe = consciousness_gradient_magnitude as f32;
+            let pe = s.consciousness_gradient_magnitude as f32;
             let pe_sq = pe * pe;
             self.carryover.quality.pe_variance_ema = PE_VARIANCE_EMA_DECAY
                 * self.carryover.quality.pe_variance_ema
@@ -1920,7 +2240,7 @@ impl CognitiveLoopService {
                 CONFIDENCE_CALIBRATION_WINDOW,
             };
             let predicted_conf = self.feedback_state.cycle_start_confidence() as f32;
-            let actual_quality = cross_module_agreement as f32;
+            let actual_quality = s.cross_module_agreement;
             let error = predicted_conf - actual_quality;
             self.carryover.quality.confidence_calibration_bias += error;
             self.carryover.quality.confidence_calibration_count += 1;
@@ -2005,7 +2325,7 @@ impl CognitiveLoopService {
         // S18-6: Gradient sign consistency → oscillation dampening. Schaul et al. (2013).
         {
             use super::thresholds::GRADIENT_SIGN_WINDOW;
-            let grad = consciousness_gradient_magnitude;
+            let grad = s.consciousness_gradient_magnitude;
             let sign = grad >= 0.0;
             let history = &mut self.carryover.quality.gradient_sign_history;
             history.push_back(sign);
@@ -2060,8 +2380,8 @@ impl CognitiveLoopService {
             // S21: Pruned empty over-arousal branch — readiness gate handles dampening.
             // Only the boost path remains.
             if self.stats.total_cycles > 15
-                && body_arousal > AROUSAL_LR_BOOST_THRESHOLD
-                && body_arousal <= AROUSAL_OVERAROUSAL_THRESHOLD
+                && s.body_arousal > AROUSAL_LR_BOOST_THRESHOLD
+                && s.body_arousal <= AROUSAL_OVERAROUSAL_THRESHOLD
             {
                 self.scale_lr("arousal_boost", AROUSAL_LR_BOOST_SCALE);
             }
@@ -2073,7 +2393,7 @@ impl CognitiveLoopService {
                 NOVELTY_EMA_DECAY, NOVELTY_LOW_EXPLORE_SCALE, NOVELTY_LOW_THRESHOLD,
             };
             // Use consciousness gradient as proxy for input novelty.
-            let novelty_signal = consciousness_gradient_magnitude.abs() as f32;
+            let novelty_signal = s.consciousness_gradient_magnitude.abs() as f32;
             self.carryover.quality.novelty_ema = NOVELTY_EMA_DECAY
                 * self.carryover.quality.novelty_ema
                 + (1.0 - NOVELTY_EMA_DECAY) * novelty_signal.min(1.0);
@@ -2106,7 +2426,7 @@ impl CognitiveLoopService {
                 RECOVERY_FATIGUE_DECAY,
             };
             let total_props = self.feedback_state.total_proposals();
-            let stable = consciousness_gradient_magnitude.abs() < super::thresholds::RECOVERY_STABILITY_THRESHOLD;
+            let stable = s.consciousness_gradient_magnitude.abs() < super::thresholds::RECOVERY_STABILITY_THRESHOLD;
             if total_props <= FATIGUE_EFFORT_THRESHOLD && stable {
                 self.carryover.quality.consecutive_recovery_cycles += 1;
                 if self.carryover.quality.consecutive_recovery_cycles >= RECOVERY_CYCLES_NEEDED {
@@ -2127,7 +2447,7 @@ impl CognitiveLoopService {
                 ENV_PREDICTABILITY_HIGH, ENV_PREDICTABILITY_LOW, ENV_PREDICTABILITY_WINDOW,
                 ENV_PREDICTABLE_THRESHOLD_SCALE, ENV_UNPREDICTABLE_THRESHOLD_SCALE,
             };
-            let pred_ok = consciousness_gradient_magnitude.abs() < super::thresholds::GRADIENT_PREDICTION_OK_THRESHOLD;
+            let pred_ok = s.consciousness_gradient_magnitude.abs() < super::thresholds::GRADIENT_PREDICTION_OK_THRESHOLD;
             let history = &mut self.carryover.quality.prediction_success_history;
             history.push_back(pred_ok);
             while history.len() > ENV_PREDICTABILITY_WINDOW {
@@ -2172,8 +2492,8 @@ impl CognitiveLoopService {
                 } else {
                     0.0
                 };
-            let arousal_cost = if body_arousal > AROUSAL_OVERAROUSAL_THRESHOLD {
-                ((body_arousal - AROUSAL_OVERAROUSAL_THRESHOLD)
+            let arousal_cost = if s.body_arousal > AROUSAL_OVERAROUSAL_THRESHOLD {
+                ((s.body_arousal - AROUSAL_OVERAROUSAL_THRESHOLD)
                     / (1.0 - AROUSAL_OVERAROUSAL_THRESHOLD).max(0.01))
                 .clamp(0.0, 1.0)
             } else {
@@ -2217,7 +2537,7 @@ impl CognitiveLoopService {
             use super::thresholds::{
                 RESONANCE_AGREEMENT_THRESHOLD, RESONANCE_CONFIDENCE_BOOST, RESONANCE_FLOW_CYCLES,
             };
-            if cross_module_agreement as f32 >= RESONANCE_AGREEMENT_THRESHOLD {
+            if s.cross_module_agreement >= RESONANCE_AGREEMENT_THRESHOLD {
                 self.carryover.quality.consecutive_high_agreement += 1;
             } else {
                 self.carryover.quality.consecutive_high_agreement = 0;
@@ -2229,186 +2549,6 @@ impl CognitiveLoopService {
             }
         }
 
-        // ── Governance → Neuromod + Learning (Phase C, every cycle) ──────
-        // Events are queued at interval 37 in Phase B; neuromod + learning applied every cycle.
-        #[cfg(feature = "mycelix")]
-        {
-            self.apply_governance_neuromod();
-            self.process_governance_learning();
-        }
-
-        // Swarm neuromodulatory coupling (not feature-gated — SwarmManager is always present).
-        self.apply_swarm_neuromod();
-
-        // Cross-couple swarm and governance signals (Woolley 2010).
-        #[cfg(feature = "mycelix")]
-        self.cross_couple_swarm_governance();
-
-        FeedbackPhaseResult {
-            quality: FbQuality {
-                cross_module_agreement,
-                unified_quality_score,
-                coherence_velocity_gated,
-                dissipative_health_gated,
-                dissipative_health,
-                dissipative_regime,
-                dissipative_entropy_rate,
-                dissipative_lr_factor,
-                coherence_velocity,
-                agreement_confidence_coupling,
-            },
-            consciousness: FbConsciousness {
-                primitive_psi,
-                temporal_causal_chains,
-                temporal_continuity,
-                temporal_max_chain_length,
-                causal_codebook_entries_len: causal_codebook_entries.len(),
-                continuity_replay_needed,
-                lattice_height,
-                lattice_width,
-                lattice_join_concept,
-                compositionality_total,
-                consciousness_profile_composite,
-                synergy_enhanced_composite,
-                emergent_properties_count,
-                equation_v2_consciousness,
-                eq_v2_limiting_component,
-                pipeline_consciousness,
-                multimodal_integrated_phi,
-                consciousness_state_label,
-                consciousness_state_level,
-                consciousness_gradient_magnitude,
-                consciousness_limiting_component,
-                holographic_unity,
-                holographic_binding,
-                affect_cons_valence,
-                affect_cons_arousal,
-                consciousness_level,
-                spectral_mip_phi,
-                sigma,
-                phi_spectral_weight,
-                structural_micro_phi: struct_micro,
-                structural_meso_phi: struct_meso,
-                structural_macro_phi: struct_macro,
-                structural_bottleneck: struct_bn,
-                structural_emergence_ratio: struct_er,
-                structural_num_clusters: struct_nc,
-                consciousness_weights,
-                consciousness_weight_variance,
-                convergence_state,
-            },
-            self_model: FbSelfModel {
-                prefrontal_veto,
-                meta_cognitive_accuracy,
-                meta_cognitive_depth,
-                body_psi_modulation,
-                body_valence,
-                body_arousal,
-                affective_valence,
-                affective_arousal,
-                narrative_self_psi,
-                predictive_free_energy,
-                predictive_psi_modulation,
-                hierarchical_total_free_energy,
-                predictive_self_safety,
-                attention_schema_focus,
-                attention_fatigue,
-                attention_prediction_accuracy,
-                psi_attention_avg,
-                gwt_broadcast,
-                gwt_coalition_size,
-                cross_modal_binding_strength,
-                cross_modal_psi,
-                resonance_frequency,
-                quantum_coherence_level,
-                phenomenal_binding_strength,
-                phenomenal_fragmented,
-                temporal_coherence_score,
-                temporal_discontinuity,
-                thermodynamic_entropy,
-                thermodynamic_free_energy,
-                embodied_psi_modulation,
-                embodied_agency,
-                narrative_gwt_veto,
-                narrative_gwt_self_psi,
-                living_mind_vitality,
-                living_mind_coherence,
-            },
-            reasoning: FbReasoning {
-                reasoning_context,
-                context_phi_weight,
-                context_phi_applied,
-                reasoning_chain_confidence,
-                reasoning_chain_depth,
-                causal_relations_count,
-                causal_avg_confidence,
-                adaptive_reasoning_phi,
-                epistemic_quality,
-                phi_validation_correlation,
-                epistemic_phi_eff,
-                epistemic_conflict_count,
-                epistemic_gate_confidence,
-                epistemic_gate_approved,
-                meta_reasoning_confidence,
-                meta_reasoning_insights,
-                code_primitives_selected,
-            },
-            ethics: FbEthics {
-                value_evaluator_score,
-                value_evaluator_decision,
-                value_gate_factor,
-                value_embeddings_created,
-                value_cache_hit_rate,
-                harmonies_alignment,
-                harmonies_approved,
-                composition_rule_applied,
-                harmonic_field_coherence,
-                harmonic_love_resonance,
-                harmonic_interferences,
-                empathic_compassion,
-                empathic_tone_adj,
-                empathic_speech_rate_mod,
-                kosmic_coherence,
-            },
-            evolution: FbEvolution {
-                hierarchical_ltc_phi,
-                evolution_generation,
-                evolution_phi_delta,
-                evolution_confidence_delta,
-                primitive_validation_phi_gain,
-                primitive_validation_p_value,
-            },
-            loops: FbLoops {
-                limiting_component_boosted: limiting_component_boosted.into(),
-                love_resonance_boost,
-                reasoning_chain_boosted,
-                harmonic_interference_lr_mod,
-                causal_urgency_gated,
-                epistemic_coherence_gated,
-                attention_budget_gated,
-            },
-            memory: FbMemory {
-                dream_insights,
-                dream_phi_improvement,
-                dream_wisdom_count,
-                resonator_promotions,
-                codebook_evictions,
-                codebook_diversity,
-                codebook_utilization_rate,
-                surprise_replay_batch_size,
-                memory_db_flushed,
-            },
-            support: FbSupport {
-                support_triage_count,
-                support_alert_fired,
-                support_federation_graduated,
-                support_efe,
-            },
-            multi_obj_frontier_size,
-            grid_encoding_norm,
-            grid_spatial_complexity,
-            social_learning_rate_factor,
-        }
     }
 }
 
