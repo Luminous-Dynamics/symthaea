@@ -331,38 +331,6 @@ pub fn difficulty_model_for(name: &str) -> DifficultyModel {
             interference_scale: 0.0,
         },
 
-        // Spatial — mental rotation is SNR-limited (similarity degrades with angle)
-        "Spatial::MentalRotation" => DifficultyModel {
-            model_type: DifficultyModelType::Snr,
-            temp_scale: 0.35,
-            snr_reduction: 0.35, // rotation signal degrades with angular disparity
-            interference_scale: 0.0,
-        },
-
-        // Spatial — path updating has interference from prior positions
-        "Spatial::PathUpdating" => DifficultyModel {
-            model_type: DifficultyModelType::Interference,
-            temp_scale: 0.3,
-            snr_reduction: 0.0,
-            interference_scale: 0.45, // cumulative binding noise from path composition
-        },
-
-        // Spatial — landmark binding has interference from competing bindings
-        "Spatial::LandmarkBinding" => DifficultyModel {
-            model_type: DifficultyModelType::Interference,
-            temp_scale: 0.25,
-            snr_reduction: 0.0,
-            interference_scale: 0.40, // cross-talk between bound location-object pairs
-        },
-
-        // Spatial — perspective taking is SNR-limited (permutation degrades signal)
-        "Spatial::PerspectiveTaking" => DifficultyModel {
-            model_type: DifficultyModelType::Snr,
-            temp_scale: 0.35,
-            snr_reduction: 0.40, // perspective rotation degrades spatial signal
-            interference_scale: 0.0,
-        },
-
         // Default model: temperature-only scaling for everything else
         _ => DifficultyModel {
             model_type: DifficultyModelType::Default,
@@ -508,11 +476,6 @@ mod tests {
             "Consciousness::Blindsight",
             "Attention::MismatchNegativity",
             "Metacognition::ChangeBlindness",
-            // Spatial models
-            "Spatial::MentalRotation",
-            "Spatial::PathUpdating",
-            "Spatial::LandmarkBinding",
-            "Spatial::PerspectiveTaking",
         ];
 
         for name in &registered {

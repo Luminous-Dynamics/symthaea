@@ -116,13 +116,19 @@ impl CognitiveLoopService {
         // PHASE 1.3: Vision Manifold (frame → attention-boosted HDC encoding)
         // ═══════════════════════════════════════════════════════════════════════
         #[cfg(feature = "vision-manifold")]
-        let (visual_hv, vision_telemetry) = if let Some(ref mut bridge) = self.vision_sensory.vision_bridge {
-            let frame = self.vision_sensory.vision_frame_buffer.take().unwrap_or_else(|| {
-                vec![
-                    128u8;
-                    (self.config.vision_frame_width * self.config.vision_frame_height) as usize
-                ]
-            });
+        let (visual_hv, vision_telemetry) = if let Some(ref mut bridge) =
+            self.vision_sensory.vision_bridge
+        {
+            let frame = self
+                .vision_sensory
+                .vision_frame_buffer
+                .take()
+                .unwrap_or_else(|| {
+                    vec![
+                        128u8;
+                        (self.config.vision_frame_width * self.config.vision_frame_height) as usize
+                    ]
+                });
             let w = self.config.vision_frame_width;
             let h = self.config.vision_frame_height;
             let dt = self.config.cfc_config.delta_t;

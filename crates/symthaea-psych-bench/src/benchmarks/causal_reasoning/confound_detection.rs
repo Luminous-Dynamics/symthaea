@@ -58,10 +58,10 @@ impl ConfoundDetectionBenchmark {
             let irrelevant = BinaryHV::random(s.wrapping_add(4));
 
             // Effect template: X ⊕ Y (direct association)
-            let direct_effect = x.xor(&y);
+            let direct_effect = x.bind(&y);
 
             // Confounded composite: X ⊕ Y ⊕ C (confounder mixed in)
-            let confounded = direct_effect.xor(&confounder);
+            let confounded = direct_effect.bind(&confounder);
 
             // ── Test 1: Detection ─────────────────────────────────────
             // The confounded composite should be LESS similar to the
@@ -73,7 +73,7 @@ impl ConfoundDetectionBenchmark {
 
             // ── Test 2: Reversal on stratification ────────────────────
             // Unbinding the confounder should recover the direct effect
-            let adjusted = confounded.xor(&confounder);
+            let adjusted = confounded.bind(&confounder);
             let adjusted_sim = adjusted.cosine_similarity(&direct_effect);
 
             // Reversal: how much does adjusting change the similarity?
@@ -83,8 +83,8 @@ impl ConfoundDetectionBenchmark {
             // ── Test 3: Confounder identification ─────────────────────
             // Given candidates [confounder, irrelevant], which one when
             // unbinding produces a result closer to the direct effect?
-            let unbind_confounder = confounded.xor(&confounder);
-            let unbind_irrelevant = confounded.xor(&irrelevant);
+            let unbind_confounder = confounded.bind(&confounder);
+            let unbind_irrelevant = confounded.bind(&irrelevant);
 
             let sim_correct = unbind_confounder.cosine_similarity(&direct_effect);
             let sim_wrong = unbind_irrelevant.cosine_similarity(&direct_effect);
@@ -118,49 +118,57 @@ impl PsychBenchmark for ConfoundDetectionBenchmark {
     }
 
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
-        let n_trials = config.trials_per_condition;
-        let mut trials = Vec::with_capacity(n_trials);
-        let mut detection_sum = 0.0;
-        let mut reversal_sum = 0.0;
-        let mut ident_sum = 0.0;
+        let start = std::time::Instant::now();
+        let mut result = BenchmarkResult::new(self.name(), config.label.clone());
 
-        for t in 0..n_trials {
-            let result = self.run_trial(config, t);
-            detection_sum += result.confound_detection_accuracy;
-            reversal_sum += result.reversal_magnitude;
-            ident_sum += result.confounder_identification;
+        let mut detection_vals = Vec::new();
+        let mut reversal_vals = Vec::new();
+        let mut ident_vals = Vec::new();
+        let mut trace = Vec::new();
 
-            trials.push(TrialOutcome {
-                correct: result.confounder_identification > 0.5,
-                rt_ticks: None,
-                confidence: Some(result.confound_detection_accuracy as f32),
-                condition: "confound".to_string(),
-            });
+        for t in 0..config.trials_per_condition {
+            let r = self.run_trial(config, t);
+            detection_vals.push(r.confound_detection_accuracy);
+            reversal_vals.push(r.reversal_magnitude);
+            ident_vals.push(r.confounder_identification);
+
+            if config.trial_trace {
+                let mut extra = BTreeMap::new();
+                extra.insert("reversal_magnitude".to_string(), r.reversal_magnitude);
+                extra.insert("confounder_identification".to_string(), r.confounder_identification);
+                trace.push(TrialOutcome {
+                    trial_idx: t,
+                    correct: r.confounder_identification > 0.5,
+                    rt_ticks: 1.0,
+                    confidence: r.confound_detection_accuracy,
+                    similarity: r.confound_detection_accuracy,
+                    response_idx: 0,
+                    condition: "confound".to_string(),
+                    extra,
+                });
+            }
         }
 
-        let n = n_trials as f64;
-        let mut metrics = BTreeMap::new();
-        metrics.insert(
-            "confound_detection_accuracy".to_string(),
-            MetricValue::new(detection_sum / n),
+        result.insert(
+            "confound_detection_accuracy",
+            MetricValue::from_samples(&detection_vals),
         );
-        metrics.insert(
-            "reversal_magnitude".to_string(),
-            MetricValue::new(reversal_sum / n),
+        result.insert(
+            "reversal_magnitude",
+            MetricValue::from_samples(&reversal_vals),
         );
-        metrics.insert(
-            "confounder_identification".to_string(),
-            MetricValue::new(ident_sum / n),
+        result.insert(
+            "confounder_identification",
+            MetricValue::from_samples(&ident_vals),
         );
 
-        BenchmarkResult {
-            benchmark_name: self.name().to_string(),
-            domain: "causal_reasoning".to_string(),
-            metrics,
-            trials,
-            config: config.clone(),
-            label: config.label.clone(),
+        result.conditions = 3;
+        result.trials_per_condition = config.trials_per_condition;
+        if config.trial_trace {
+            result.trial_trace = trace;
         }
+        result.elapsed_ms = start.elapsed().as_millis() as u64;
+        result
     }
 }
 
@@ -179,7 +187,7 @@ mod tests {
     fn test_confound_detection_runs() {
         let bench = ConfoundDetectionBenchmark;
         let result = bench.run(&default_config());
-        assert_eq!(result.domain, "causal_reasoning");
+        assert!(result.benchmark.contains("confound_detection"));
         assert!(result.metrics.contains_key("confound_detection_accuracy"));
     }
 
@@ -187,7 +195,7 @@ mod tests {
     fn test_confounder_identification_above_chance() {
         let bench = ConfoundDetectionBenchmark;
         let result = bench.run(&default_config());
-        let ident = result.metrics["confounder_identification"].value;
+        let ident = result.metrics["confounder_identification"].mean;
         // With XOR binding, unbinding the correct variable should perfectly
         // recover the direct effect. Identification should be well above chance (0.5).
         assert!(
@@ -200,7 +208,7 @@ mod tests {
     fn test_reversal_positive() {
         let bench = ConfoundDetectionBenchmark;
         let result = bench.run(&default_config());
-        let rev = result.metrics["reversal_magnitude"].value;
+        let rev = result.metrics["reversal_magnitude"].mean;
         assert!(
             rev > 0.0,
             "Adjusting for confounder should improve recovery, got {rev}"

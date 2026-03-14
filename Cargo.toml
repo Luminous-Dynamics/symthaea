@@ -524,6 +524,7 @@ all_benchmarks = ["benchmarks", "physics"]              # All benchmarking featu
 criterion = "0.5"
 proptest = "1.4"
 serial_test = "3.2"
+symthaea-broca = { path = "crates/symthaea-broca" }
 symthaea-crucible = { path = "crates/symthaea-crucible" }
 tempfile = "3.8"  # For perception tests
 
@@ -647,6 +648,10 @@ name = "humanoid_training_curves"
 
 [[example]]
 name = "demo_self_analysis"
+required-features = ["code_generation"]
+
+[[example]]
+name = "coding_agent_demo"
 required-features = ["code_generation"]
 
 [[example]]

@@ -8,7 +8,6 @@
 /// - `broca_manager` — SSM language generation (feature-gated)
 /// - `last_broca_text` — most recent Broca output
 /// - `user_state` — user state inference for adaptive responses
-#[derive(Debug)]
 pub struct LanguageAndCommunicationManager {
     /// Voice-coherence bridge: CfC coherence + voice feedback + temporal signatures.
     pub voice_coherence: super::voice_coherence_bridge::VoiceCoherenceBridge,
@@ -23,6 +22,14 @@ pub struct LanguageAndCommunicationManager {
 
     /// User state inference for adaptive response generation.
     pub user_state: Option<crate::user_state_inference::UserStateInference>,
+}
+
+impl std::fmt::Debug for LanguageAndCommunicationManager {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LanguageAndCommunicationManager")
+            .field("user_state", &self.user_state.is_some())
+            .finish_non_exhaustive()
+    }
 }
 
 impl LanguageAndCommunicationManager {

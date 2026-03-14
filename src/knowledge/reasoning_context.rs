@@ -88,6 +88,23 @@ pub struct KnowledgeQueryResult {
     pub grounding_score: f64,
 }
 
+impl Default for KnowledgeQueryResult {
+    fn default() -> Self {
+        Self {
+            facts: Vec::new(),
+            causal_chains: Vec::new(),
+            grounding_score: 0.0,
+        }
+    }
+}
+
+impl KnowledgeQueryResult {
+    /// Confidence multiplier for consumers — maps grounding score to [0.3, 1.3].
+    pub fn confidence_multiplier(&self) -> f64 {
+        0.3 + self.grounding_score
+    }
+}
+
 impl Default for ReasoningContext {
     fn default() -> Self {
         Self {
@@ -123,11 +140,11 @@ impl ReasoningContext {
         let relevant_facts: Vec<GroundedFact> = search_results
             .iter()
             .map(|r| GroundedFact {
-                text: r.source_text.clone(),
+                text: format!("fact:{}", r.fact_id),
                 confidence: r.confidence,
                 similarity: r.similarity,
-                domain: r.domain.clone(),
-                is_causal: r.is_causal,
+                domain: None,
+                is_causal: false,
             })
             .collect();
 

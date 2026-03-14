@@ -325,10 +325,9 @@ impl ConsciousnessEngine {
             0.0
         };
 
-        // Knowledge grounding → consciousness coupling
-        // Well-grounded reasoning enriches phenomenal experience ±2.5%.
-        // Neutral at 0.5 (no knowledge data) — below dampens, above amplifies.
-        // Science: Barsalou (2008) — grounded cognition; Clark (2013) — predictive processing.
+        // Knowledge grounding modulation: grounded cognition enhances consciousness,
+        // ungrounded reasoning dampens it. Neutral at 0.5.
+        // Science: Barsalou (2008) — grounded cognition; Clark (2013) — predictive processing
         let knowledge_grounding_factor = (input.knowledge_grounding - 0.5)
             * super::super::thresholds::KNOWLEDGE_CONSCIOUSNESS_MODULATION;
 

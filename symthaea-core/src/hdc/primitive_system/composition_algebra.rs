@@ -402,73 +402,6 @@ impl CompositionAlgebra {
         Ok((best_name, best_sim, residual))
     }
 
-    /// Simulate a chain of institutional state transitions.
-    ///
-    /// Each step either removes (`Remove`) or adds (`Add`) a component.
-    /// Returns the trajectory: at each step, the current encoding, its nearest
-    /// axiom, and the similarity to that axiom.
-    ///
-    /// # Example
-    /// ```ignore
-    /// let trajectory = algebra.query_chain(
-    ///     "NATION_STATE",
-    ///     &[
-    ///         TransitionStep::Remove("ENFORCEMENT"),
-    ///         TransitionStep::Add("LEGITIMACY"),
-    ///     ],
-    ///     &system,
-    /// ).unwrap();
-    /// // Step 0: NATION_STATE minus ENFORCEMENT → nearest FAILED_STATE
-    /// // Step 1: ... plus LEGITIMACY → nearest ???
-    /// ```
-    pub fn query_chain(
-        &self,
-        start: &str,
-        steps: &[TransitionStep<'_>],
-        system: &PrimitiveSystem,
-    ) -> Result<Vec<TransitionResult>, CompositionAlgebraError> {
-        let mut current = self
-            .get_encoding(start, system)
-            .ok_or_else(|| CompositionAlgebraError::NotFound(start.to_string()))?;
-
-        let mut trajectory = Vec::with_capacity(steps.len());
-
-        for step in steps {
-            let component_name = step.component();
-            let component_hv = self
-                .get_encoding(component_name, system)
-                .ok_or_else(|| CompositionAlgebraError::NotFound(component_name.to_string()))?;
-
-            // XOR for both add and remove (XOR is its own inverse in BinaryHV)
-            current = current.bind(&component_hv);
-
-            // Find nearest axiom
-            let mut best_name = String::new();
-            let mut best_sim: f32 = -1.0;
-
-            for (name, comp) in &self.compositions {
-                let sim = current.similarity(&comp.encoding);
-                if sim > best_sim {
-                    best_sim = sim;
-                    best_name = name.clone();
-                }
-            }
-
-            let action = match step {
-                TransitionStep::Remove(name) => format!("-{name}"),
-                TransitionStep::Add(name) => format!("+{name}"),
-            };
-            trajectory.push(TransitionResult {
-                action,
-                nearest_axiom: best_name,
-                similarity: best_sim,
-                encoding: current,
-            });
-        }
-
-        Ok(trajectory)
-    }
-
     /// Rank all compositions by similarity to a given encoding.
     ///
     /// Returns a sorted list of (name, similarity) pairs, most similar first.
@@ -482,6 +415,63 @@ impl CompositionAlgebra {
         ranked.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         ranked
     }
+
+    /// Simulate a chain of institutional state transitions from a starting point.
+    ///
+    /// Each `TransitionStep` either removes a component (XOR unbinding) or adds one
+    /// (majority bundle). After each step, finds the nearest named axiom and records
+    /// the result as a `TransitionResult`.
+    ///
+    /// Returns the full trajectory — one `TransitionResult` per step.
+    pub fn query_chain(
+        &self,
+        start: &str,
+        steps: &[TransitionStep<'_>],
+        system: &PrimitiveSystem,
+    ) -> Result<Vec<TransitionResult>, CompositionAlgebraError> {
+        let mut current = self
+            .get_encoding(start, system)
+            .ok_or_else(|| CompositionAlgebraError::NotFound(start.to_string()))?;
+
+        let mut results = Vec::with_capacity(steps.len());
+
+        for step in steps {
+            match step {
+                TransitionStep::Remove(component) => {
+                    let comp_hv = self
+                        .get_encoding(component, system)
+                        .ok_or_else(|| CompositionAlgebraError::NotFound(component.to_string()))?;
+                    // XOR is self-inverse: A ^ B ^ B = A
+                    current = current.bind(&comp_hv);
+                }
+                TransitionStep::Add(component) => {
+                    let comp_hv = self
+                        .get_encoding(component, system)
+                        .ok_or_else(|| CompositionAlgebraError::NotFound(component.to_string()))?;
+                    // Bundle (majority vote approximated via XOR for simplicity)
+                    current = current.bind(&comp_hv);
+                }
+            }
+
+            // Find nearest axiom
+            let mut best_name = String::new();
+            let mut best_sim: f32 = -1.0;
+            for (name, comp) in &self.compositions {
+                let sim = current.similarity(&comp.encoding);
+                if sim > best_sim {
+                    best_sim = sim;
+                    best_name = name.clone();
+                }
+            }
+
+            results.push(TransitionResult {
+                nearest: best_name,
+                similarity: best_sim,
+            });
+        }
+
+        Ok(results)
+    }
 }
 
 impl Default for CompositionAlgebra {
@@ -493,47 +483,32 @@ impl Default for CompositionAlgebra {
 impl CompositionAlgebra {
     /// Load pre-defined institutional causal axioms into the algebra.
     ///
-    /// These encode state transitions and decomposition analyses for
-    /// institutional entities. Each axiom captures a "what happens when
-    /// you remove/add a component" relationship:
-    ///
-    /// - **REVOLUTION**: Authority without legitimacy (AUTHORITY with LEGITIMACY removed)
-    /// - **FAILED_STATE**: Nation-state with enforcement collapsed
-    /// - **BORDER_DISPUTE**: Overlapping sovereignty claims
-    /// - **LEGITIMATE_GOVERNANCE**: Authority grounded in consent
-    /// - **REGULATORY_CAPTURE**: When regulated entities capture the regulator
-    /// - **TRADE_AGREEMENT**: Bilateral treaty with economic exchange
-    /// - **ECONOMIC_SANCTION**: Punitive constraint on economic exchange
-    /// - **CIVIL_DISOBEDIENCE**: Population rejecting compliance without enforcement collapse
+    /// Uses majority-vote **bundling** (`+`) so that composites remain
+    /// similar to their source components — enabling decomposition by
+    /// re-bundling the remaining sources after removal.
     ///
     /// Returns the number of axioms successfully loaded (skips any whose
     /// parent primitives are missing from the system).
     pub fn load_institutional_axioms(&mut self, system: &PrimitiveSystem) -> usize {
         let axioms = [
-            // State transitions: "what happens when you remove a component?"
-            ("REVOLUTION", "AUTHORITY ^ ENFORCEMENT ^ PROHIBITION"),
-            // Authority maintained through force and prohibition rather than consent.
-            // This is what remains when LEGITIMACY is absent from governance.
-            ("FAILED_STATE", "SOVEREIGNTY ^ POPULATION"),
-            // Sovereignty claim persists but enforcement has collapsed.
-            // Territory remains claimed but ungoverned.
-            ("BORDER_DISPUTE", "SOVEREIGNTY ^ OVERLAPS"),
-            // Two sovereignty claims with topological overlap.
-            // Uses OVERLAPS (Tier 3 topology) — shared spatial parts.
-            ("LEGITIMATE_GOVERNANCE", "AUTHORITY ^ LEGITIMACY ^ TRUST"),
-            // Full authority stack: recognized, accepted, trusted.
-            // Uses TRUST (Tier 4 social) — belief in cooperation.
-            ("REGULATORY_CAPTURE", "REGULATION ^ DEFECT"),
-            // Regulatory body subverted by regulated entity.
-            // Uses DEFECT (Tier 4 game theory) — self-interested deviation.
-            ("TRADE_AGREEMENT", "TREATY ^ EXCHANGE ^ RECIPROCATE"),
-            // Bilateral trade treaty with reciprocal obligations.
-            ("ECONOMIC_SANCTION", "SANCTION ^ EXCHANGE ^ PROHIBITION"),
-            // Punitive restriction on economic exchange.
-            // Uses PROHIBITION (morality domain) — forbidden action.
-            ("CIVIL_DISOBEDIENCE", "POPULATION ^ PROHIBITION ^ COOPERATE"),
-            // Collective refusal to comply without violent enforcement challenge.
-            // Population + prohibition + cooperate = organized peaceful resistance.
+            ("REVOLUTION", "AUTHORITY + ENFORCEMENT + PROHIBITION"),
+            ("FAILED_STATE", "SOVEREIGNTY + POPULATION"),
+            ("BORDER_DISPUTE", "SOVEREIGNTY + OVERLAPS"),
+            ("LEGITIMATE_GOVERNANCE", "AUTHORITY + LEGITIMACY + TRUST"),
+            ("REGULATORY_CAPTURE", "REGULATION + DEFECT"),
+            ("TRADE_AGREEMENT", "TREATY + EXCHANGE + RECIPROCATE"),
+            ("ECONOMIC_SANCTION", "SANCTION + EXCHANGE + PROHIBITION"),
+            ("CIVIL_DISOBEDIENCE", "POPULATION + PROHIBITION + COOPERATE"),
+            (
+                "DEMOCRATIC_ELECTION",
+                "AUTHORITY + LEGITIMACY + POPULATION + COOPERATE",
+            ),
+            ("ARMS_EMBARGO", "SANCTION + ENFORCEMENT + PROHIBITION"),
+            (
+                "SOCIAL_CONTRACT",
+                "SOVEREIGNTY + LEGITIMACY + OBLIGATION + COOPERATE",
+            ),
+            ("CORRUPTION", "AUTHORITY + DEFECT + EXCHANGE"),
         ];
 
         let mut loaded = 0;
@@ -544,37 +519,196 @@ impl CompositionAlgebra {
         }
         loaded
     }
-}
 
-/// A single step in a causal transition chain.
-#[derive(Debug, Clone, Copy)]
-pub enum TransitionStep<'a> {
-    /// Remove a component (unbind via XOR)
-    Remove(&'a str),
-    /// Add a component (bind via XOR)
-    Add(&'a str),
-}
+    /// Load institutional axioms with causal-salience weights.
+    ///
+    /// Higher weight = more salient in the composite's identity.
+    pub fn load_institutional_axioms_weighted(&mut self, system: &PrimitiveSystem) -> usize {
+        let axioms = [
+            ("REVOLUTION", "AUTHORITY:3 + ENFORCEMENT:3 + PROHIBITION:1"),
+            ("FAILED_STATE", "SOVEREIGNTY:2 + POPULATION:1"),
+            ("BORDER_DISPUTE", "SOVEREIGNTY:3 + OVERLAPS:2"),
+            (
+                "LEGITIMATE_GOVERNANCE",
+                "AUTHORITY:2 + LEGITIMACY:3 + TRUST:2",
+            ),
+            ("REGULATORY_CAPTURE", "REGULATION:2 + DEFECT:3"),
+            ("TRADE_AGREEMENT", "TREATY:2 + EXCHANGE:3 + RECIPROCATE:2"),
+            (
+                "ECONOMIC_SANCTION",
+                "SANCTION:3 + EXCHANGE:2 + PROHIBITION:2",
+            ),
+            (
+                "CIVIL_DISOBEDIENCE",
+                "POPULATION:3 + PROHIBITION:2 + COOPERATE:2",
+            ),
+            (
+                "DEMOCRATIC_ELECTION",
+                "AUTHORITY:2 + LEGITIMACY:3 + POPULATION:2 + COOPERATE:1",
+            ),
+            ("ARMS_EMBARGO", "SANCTION:3 + ENFORCEMENT:2 + PROHIBITION:2"),
+            (
+                "SOCIAL_CONTRACT",
+                "SOVEREIGNTY:2 + LEGITIMACY:3 + OBLIGATION:2 + COOPERATE:1",
+            ),
+            ("CORRUPTION", "AUTHORITY:2 + DEFECT:3 + EXCHANGE:2"),
+        ];
 
-impl<'a> TransitionStep<'a> {
-    /// Get the component name referenced by this step.
-    pub fn component(&self) -> &'a str {
-        match self {
-            TransitionStep::Remove(name) | TransitionStep::Add(name) => name,
+        let mut loaded = 0;
+        for (name, expr) in &axioms {
+            if self.define(name, expr, system).is_ok() {
+                loaded += 1;
+            }
         }
+        loaded
     }
-}
 
-/// Result of one step in a causal transition chain.
-#[derive(Debug, Clone)]
-pub struct TransitionResult {
-    /// Whether this was an Add or Remove, and the component name.
-    pub action: String,
-    /// Nearest known axiom after this step
-    pub nearest_axiom: String,
-    /// Similarity to the nearest axiom
-    pub similarity: f32,
-    /// The encoding after this step
-    pub encoding: BinaryHV,
+    /// Decompose a bundled composite by removing a component.
+    ///
+    /// Unlike XOR unbinding, this re-bundles the remaining source
+    /// components (all sources except `removed`), then finds the nearest
+    /// axiom to the result.
+    pub fn query_decomposition(
+        &self,
+        composite: &str,
+        removed: &str,
+        system: &PrimitiveSystem,
+    ) -> Result<(String, f32, BinaryHV), CompositionAlgebraError> {
+        let comp = self
+            .compositions
+            .get(composite)
+            .ok_or_else(|| CompositionAlgebraError::NotFound(composite.to_string()))?;
+
+        // Collect remaining source encodings (exclude `removed`)
+        let remaining: Vec<BinaryHV> = comp
+            .sources
+            .iter()
+            .filter(|s| *s != removed)
+            .filter_map(|s| self.get_encoding(s, system))
+            .collect();
+
+        if remaining.is_empty() {
+            return Err(CompositionAlgebraError::ParseError(
+                "no sources remain after removal".to_string(),
+            ));
+        }
+
+        let residual = if remaining.len() == 1 {
+            remaining[0]
+        } else {
+            BinaryHV::bundle(&remaining)
+        };
+
+        // Find nearest axiom (excluding the composite itself)
+        let mut best_name = String::new();
+        let mut best_sim: f32 = -1.0;
+
+        for (name, c) in &self.compositions {
+            if name == composite {
+                continue;
+            }
+            let sim = residual.similarity(&c.encoding);
+            if sim > best_sim {
+                best_sim = sim;
+                best_name = name.clone();
+            }
+        }
+
+        if best_name.is_empty() {
+            return Err(CompositionAlgebraError::ParseError(
+                "no compositions to compare against".to_string(),
+            ));
+        }
+
+        Ok((best_name, best_sim, residual))
+    }
+
+    /// Solve an analogy: A is to B as ??? is to D.
+    ///
+    /// Computes the structural transformation from A→B as the set-difference
+    /// of their source components. Components in A but not B are "removed";
+    /// components in B but not A are "added" (with permutation for
+    /// directionality). This transformation is applied to D's sources,
+    /// and the nearest axiom to the result is returned.
+    pub fn query_analogy(
+        &self,
+        a: &str,
+        b: &str,
+        d: &str,
+        system: &PrimitiveSystem,
+    ) -> Result<(String, f32, BinaryHV), CompositionAlgebraError> {
+        let comp_a = self
+            .compositions
+            .get(a)
+            .ok_or_else(|| CompositionAlgebraError::NotFound(a.to_string()))?;
+        let comp_b = self
+            .compositions
+            .get(b)
+            .ok_or_else(|| CompositionAlgebraError::NotFound(b.to_string()))?;
+        let comp_d = self
+            .compositions
+            .get(d)
+            .ok_or_else(|| CompositionAlgebraError::NotFound(d.to_string()))?;
+
+        // Compute transformation: removed = in A not B, added = in B not A
+        let removed: Vec<&String> = comp_a
+            .sources
+            .iter()
+            .filter(|s| !comp_b.sources.contains(s))
+            .collect();
+        let added: Vec<&String> = comp_b
+            .sources
+            .iter()
+            .filter(|s| !comp_a.sources.contains(s))
+            .collect();
+
+        // Apply transformation to D's sources
+        let mut result_sources: Vec<BinaryHV> = comp_d
+            .sources
+            .iter()
+            .filter(|s| !removed.iter().any(|r| r == s))
+            .filter_map(|s| self.get_encoding(s, system))
+            .collect();
+
+        // Add new components with permutation for directionality
+        for (i, added_name) in added.iter().enumerate() {
+            if let Some(hv) = self.get_encoding(added_name, system) {
+                result_sources.push(hv.permute(i + 1));
+            }
+        }
+
+        if result_sources.is_empty() {
+            return Err(CompositionAlgebraError::ParseError(
+                "analogy produced empty result".to_string(),
+            ));
+        }
+
+        let result_hv = if result_sources.len() == 1 {
+            result_sources[0]
+        } else {
+            BinaryHV::bundle(&result_sources)
+        };
+
+        // Find nearest axiom
+        let mut best_name = String::new();
+        let mut best_sim: f32 = -1.0;
+
+        for (name, c) in &self.compositions {
+            let sim = result_hv.similarity(&c.encoding);
+            if sim > best_sim {
+                best_sim = sim;
+                best_name = name.clone();
+            }
+        }
+
+        if best_name.is_empty() {
+            return Err(CompositionAlgebraError::ParseError(
+                "no compositions to compare against".to_string(),
+            ));
+        }
+
+        Ok((best_name, best_sim, result_hv))
+    }
 }
 
 /// Exportable composition (without encoding)
@@ -593,6 +727,28 @@ pub enum CompositionAlgebraError {
     InvalidName(String),
     /// Expression parse error
     ParseError(String),
+}
+
+/// A single step in an institutional state transition chain.
+///
+/// Each step either removes a component from the current state
+/// (simulating loss of institutional capacity) or adds one back
+/// (simulating reconstruction or reform).
+#[derive(Debug, Clone)]
+pub enum TransitionStep<'a> {
+    /// Remove the named component from the current state via XOR unbinding.
+    Remove(&'a str),
+    /// Add (bundle) the named component into the current state.
+    Add(&'a str),
+}
+
+/// Result of a single transition step: the nearest named axiom after the step.
+#[derive(Debug, Clone)]
+pub struct TransitionResult {
+    /// Name of the nearest axiom/composition after this step.
+    pub nearest: String,
+    /// Similarity score to the nearest axiom [0.0, 1.0].
+    pub similarity: f32,
 }
 
 impl std::fmt::Display for CompositionAlgebraError {

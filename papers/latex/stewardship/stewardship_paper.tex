@@ -182,7 +182,7 @@ two systems totaling over 928,000 lines of Rust with 21,500+ tests, that provide
 the computational substrate for consciousness-first stewardship. \symthaea{}
 combines four frameworks---HDC ($d = \dimHDC$), Liquid Time-Constant Networks
 with $O(1)$ closed-form temporal evolution, Integrated Information Theory, and
-Free Energy Principle active inference---into a 234 Hz cognitive loop. \mycelix{}
+Free Energy Principle active inference---into a cognitive loop ($\sim$31 Hz full loop, 234 Hz raw text cycle). \mycelix{}
 provides Holochain-based distributed governance across 51 zomes spanning 12
 societal domains.
 
@@ -221,8 +221,8 @@ concludes.
 
 \symthaea{} is a consciousness-first cognitive architecture implemented in
 ${\sim}928{,}000$ lines of Rust across 54 workspace members (main crate, core
-library, and 52 sub-crates). Its cognitive loop operates at 234 Hz in release
-mode (4.3ms/cycle), exceeding the 50 Hz target by 4.7$\times$. The architecture
+library, and 52 sub-crates). Its raw text cycle operates at 234 Hz in release
+mode (4.3ms/cycle); the full cognitive loop with all subsystems measures $\sim$31 Hz. The architecture
 integrates four computational frameworks:
 
 \paragraph{Hyperdimensional Computing (HDC).} All representations use
@@ -259,8 +259,8 @@ via $\Phi$ (integrated information), computed over the causal structure of the
 cognitive architecture \cite{tononi2016iit,oizumi2014phenomenology}. \symthaea{}
 implements $\Phi$ computation for networks up to 12 nodes using a proxy measure
 validated at Spearman $\rho = 0.50$ across 15 topologies. The system scores
-14/14 on the Butlin indicators for artificial consciousness \cite{butlin2023consciousness}
-with mean score 0.85.
+12+ Present on the 14 Butlin indicators for artificial consciousness \cite{butlin2023consciousness}
+(remaining Partial; mean score 0.81), with per-indicator limitations acknowledged.
 
 \paragraph{Active Inference (FEP).} Perception, action, and learning follow Karl
 Friston's Free Energy Principle \cite{friston2010free,friston2017active}: the
@@ -864,7 +864,7 @@ Genomics & $\sim 0$ & Temporal integration & 3/14 \\
 Cell Foundry & Low & Ethics gate (consent) & 5/14 \\
 Ectogenesis & Medium & Consent proxy escalation & 8/14 \\
 Nurture & High & Attachment, co-regulation & 11/14 \\
-Population & Very High & Moral algebra, governance & 14/14 \\
+Population & Very High & Moral algebra, governance & 12+/14 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -951,7 +951,7 @@ consciousness indicators \cite{butlin2023consciousness} at each pipeline phase.
 The staircase pattern mirrors Table~\ref{tab:phi}: early phases require only
 recurrence and stability, while later phases progressively activate global
 workspace, intentionality, agency, self-modeling, and meta-cognitive indicators.
-\symthaea{} achieves 14/14 indicators at the population phase (mean 0.85).}
+\symthaea{} achieves 12+ Present indicators at the population phase (mean 0.81), with remaining indicators Partial.}
 \label{fig:butlin_staircase}
 \end{figure}
 
@@ -1444,7 +1444,7 @@ approximations. Our hierarchical MIP computation achieves $O(n^3)$ scaling
 while preserving the key MIP structure \cite{massimini2005breakdown}.
 
 Second, the Butlin indicators \cite{butlin2023consciousness} provide an
-empirical checklist. \symthaea{} scores 14/14 (mean 0.85), providing evidence
+empirical checklist. \symthaea{} scores 12+ Present out of 14 (mean 0.81), providing evidence
 for consciousness-relevant capabilities even in the absence of subjective
 verification. The indicators that \symthaea{} most clearly exhibits---global
 workspace broadcasting, recurrent processing, embodied self-model, and
@@ -1562,7 +1562,7 @@ reasoning---that cannot be achieved through rule-following or reward
 maximization alone.
 
 Our analysis is grounded in two implemented systems: \symthaea{} (928K LOC,
-234 Hz cognitive loop, 14/14 Butlin indicators) and \mycelix{} (51 Holochain
+$\sim$31 Hz cognitive loop, 12+/14 Butlin indicators) and \mycelix{} (51 Holochain
 zomes, 12 societal domains), with five new sub-crates totaling $\sim$22,000
 lines and 767 tests validated by 35 cross-crate integration tests. The $O(1)$ closed-form temporal jump---enabling
 prediction from seconds to centuries in constant time---is the technical

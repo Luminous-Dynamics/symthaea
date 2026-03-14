@@ -377,7 +377,11 @@ impl CognitiveLoopService {
             // Powers & Cisek (2021): outcome monitoring for closed-loop neuromodulation.
             if let Some(improved) = self.neuromod.calibration_validator.check_validation(
                 self.stats.avg_prediction_error as f64,
-                self.language_comm.voice_coherence.bridge.smoothed_coherence().into(),
+                self.language_comm
+                    .voice_coherence
+                    .bridge
+                    .smoothed_coherence()
+                    .into(),
                 self.neuromod.self_assessment.confidence_error_ema(),
                 self.stats.total_cycles as u64,
             ) {

@@ -1,3 +1,8 @@
+// NOTE: This module is theoretical/aspirational. The "Mental Roles" mapping below describes
+// a future multi-database architecture. Currently, only SQLite (via sqlite_client.rs) and
+// LanceDB (behind `lancedb-backend` feature) are implemented. DuckDB is gated behind the
+// `duck` feature in symthaea-core and has no active callers.
+//
 // Revolutionary Improvement #30: Multi-Database Integration - Production Consciousness Architecture
 //
 // THE PARADIGM SHIFT: Consciousness requires SPECIALIZED SUBSYSTEMS working in concert!

@@ -132,6 +132,14 @@ pub struct GovernanceManager {
     external_mesh_set: bool,
     /// Latest governance LR boost from prediction error (for telemetry).
     last_lr_boost: f64,
+    /// External confidence nudge accumulator (drained into process() output).
+    /// Used by cross-coupling (e.g., SwarmManager peer phi → governance confidence).
+    confidence_nudge_acc: f64,
+    /// Preferred radio tier for governance traffic (set by SpectrumManager cross-coupling).
+    /// When `Some`, governance messages prefer this tier for transmission.
+    /// Feature-gated: only populated when both `mycelix` and `mesh` features are enabled.
+    #[cfg(feature = "mesh")]
+    preferred_tier: Option<super::radio_dispatcher::RadioTier>,
 }
 
 impl Default for GovernanceManager {
@@ -154,6 +162,9 @@ impl Default for GovernanceManager {
             community_mode: None,
             external_mesh_set: false,
             last_lr_boost: 1.0,
+            confidence_nudge_acc: 0.0,
+            #[cfg(feature = "mesh")]
+            preferred_tier: None,
         }
     }
 }
@@ -165,6 +176,21 @@ impl GovernanceManager {
     /// Inject a governance event for processing in the next `process()` call.
     pub fn inject_event(&mut self, event: GovernanceEvent) {
         self.pending_events.push(event);
+    }
+
+    /// Set the preferred radio tier for governance message transmission.
+    ///
+    /// Called by the SpectrumManager cross-coupling when both `mycelix` and `mesh`
+    /// features are enabled. Governance votes and proposals prefer this tier.
+    #[cfg(feature = "mesh")]
+    pub fn set_preferred_tier(&mut self, tier: super::radio_dispatcher::RadioTier) {
+        self.preferred_tier = Some(tier);
+    }
+
+    /// Get the currently preferred radio tier for governance traffic.
+    #[cfg(feature = "mesh")]
+    pub fn preferred_tier(&self) -> Option<super::radio_dispatcher::RadioTier> {
+        self.preferred_tier
     }
 
     /// Inject a governance outcome for learning feedback.
@@ -300,6 +326,15 @@ impl GovernanceManager {
     /// LR boost from governance prediction error (1.0 = no boost).
     pub fn last_lr_boost(&self) -> f64 {
         self.last_lr_boost
+    }
+
+    /// Nudge governance confidence from an external coupling.
+    ///
+    /// Accumulated nudges are drained and applied to the next `process()` output's
+    /// `confidence_delta`. Clamped to [-0.1, 0.1] to prevent runaway coupling.
+    pub fn nudge_confidence(&mut self, delta: f64) {
+        let delta = if delta.is_finite() { delta } else { 0.0 };
+        self.confidence_nudge_acc = (self.confidence_nudge_acc + delta).clamp(-0.1, 0.1);
     }
 
     // ── Phase 2: Learning Methods ──────────────────────────────────────
@@ -541,6 +576,12 @@ impl CognitiveSubsystem for GovernanceManager {
         let outcomes: Vec<GovernanceOutcome> = self.outcome_history.drain(..).collect();
 
         if events.is_empty() && outcomes.is_empty() {
+            // Still drain accumulated confidence nudge from cross-coupling
+            if self.confidence_nudge_acc.abs() > 1e-10 {
+                output.confidence_delta += self.confidence_nudge_acc;
+                self.confidence_nudge_acc = 0.0;
+                return output;
+            }
             return output;
         }
 
@@ -637,6 +678,12 @@ impl CognitiveSubsystem for GovernanceManager {
             .iter()
             .map(|d| d.abs())
             .fold(0.0f64, f64::max);
+
+        // Drain accumulated confidence nudge from cross-coupling
+        if self.confidence_nudge_acc.abs() > 1e-10 {
+            output.confidence_delta += self.confidence_nudge_acc;
+            self.confidence_nudge_acc = 0.0;
+        }
 
         output
     }

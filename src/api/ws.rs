@@ -242,14 +242,6 @@ pub struct DemoCycleData {
     // ── Substrate ──
     #[serde(default)]
     pub substrate_feasibility: f64,
-
-    // ── Canvas Living Topology ──
-    /// SVG string from the canvas living topology pipeline (None when not generated this cycle).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub canvas_svg: Option<String>,
-    /// Birkhoff aesthetic score of the last generated frame (0.0–1.0).
-    #[serde(default)]
-    pub canvas_aesthetic_score: f32,
 }
 
 impl DemoCycleData {

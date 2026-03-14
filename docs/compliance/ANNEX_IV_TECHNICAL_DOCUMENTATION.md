@@ -90,7 +90,7 @@ Symthaea is a research platform for consciousness-first artificial intelligence.
 | Component | Implementation | Key Parameters |
 |-----------|---------------|----------------|
 | HDC encoder | 16,384-bit BinaryHV | XOR/MAJ operations, LSH indexing |
-| LTC neurons | CfC (Closed-form Continuous-time) | O(1) temporal jumps, 234Hz throughput |
+| LTC neurons | CfC (Closed-form Continuous-time) | O(1) temporal jumps, 234Hz raw text cycle (~31Hz full loop) |
 | IIT/Phi | SpectralMIP (Gaussian MI) | r=0.99 vs exhaustive MIP, cadence 97 |
 | FEP | Active inference agent | Prediction error → learning rate modulation |
 | Ethics | 3-stage pipeline | MoralParser → ValueEvaluator → HarmoniesIntegrator |

@@ -10,13 +10,12 @@
 /// - `vision_frame_buffer` — latest frame buffer (vision-manifold)
 /// - `cross_manifold_predictor` — vision→cognitive Hebbian mapping (vision-manifold)
 /// - `foveation_manager` — dorsal surprise → ventral recognition (foveation)
-#[derive(Debug)]
 pub struct VisionAndSensoryManager {
     /// Physiology coherence field — consciousness integration via hormone modulation.
     pub coherence_field: Option<crate::physiology::CoherenceField>,
 
     /// Virtual body adapter for embodied cognition.
-    pub virtual_body: Option<super::virtual_body::VirtualBody>,
+    pub(crate) virtual_body: Option<super::virtual_body::VirtualBody>,
 
     /// Vision bridge: frame → attention-boosted HDC encoding.
     #[cfg(feature = "vision-manifold")]
@@ -33,6 +32,15 @@ pub struct VisionAndSensoryManager {
     /// Foveation bridge: dorsal surprise → ventral recognition dispatch.
     #[cfg(feature = "foveation")]
     pub foveation_manager: Option<std::sync::Mutex<symthaea_foveation::FoveationManager>>,
+}
+
+impl std::fmt::Debug for VisionAndSensoryManager {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("VisionAndSensoryManager")
+            .field("coherence_field", &self.coherence_field.is_some())
+            .field("virtual_body", &self.virtual_body.is_some())
+            .finish_non_exhaustive()
+    }
 }
 
 impl VisionAndSensoryManager {

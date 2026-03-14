@@ -128,7 +128,7 @@ If classified as High-Risk, Symthaea must satisfy Articles 8-15. Current complia
 
 | Requirement | Status | Implementation |
 |-------------|--------|----------------|
-| Appropriate accuracy levels | **Implemented** | Phi r=0.99, moral classification 91.1%, CfC 234Hz release mode |
+| Appropriate accuracy levels | **Implemented** | Phi r=0.99, moral classification 92.9% (Hendrycks ETHICS), CfC 234Hz raw text cycle (~31Hz full loop) |
 | Resilience to errors/inconsistencies | **Implemented** | NaN-safe clamping in SafetyMetrics, proptest stability validation, homeostasis regulation |
 | Resilience to adversarial attempts | **Partial** | SafetyGateway blocks dangerous inputs; no adversarial ML robustness testing |
 | Cybersecurity measures | **Implemented** | PQC readiness documented; Holochain cryptographic integrity; Ed25519 signatures |

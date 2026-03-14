@@ -3,8 +3,9 @@
 pub mod affect;
 pub mod attention;
 pub mod binding;
-pub mod causal_reasoning;
 pub mod butlin;
+pub mod causal_reasoning;
+pub mod clinical;
 pub mod cogbench;
 pub mod consciousness;
 pub mod creativity;

@@ -29,6 +29,18 @@ impl ButlinIndicatorSuite {
         2.0 / (1.0 + (-phi).exp()) - 1.0
     }
 
+    /// Derive indicator status from computed score.
+    /// ≥0.6 = Present, 0.3–0.6 = Partial, <0.3 = Absent.
+    fn status_from_score(score: f64) -> IndicatorStatus {
+        if score >= 0.6 {
+            IndicatorStatus::Present
+        } else if score >= 0.3 {
+            IndicatorStatus::Partial
+        } else {
+            IndicatorStatus::Absent
+        }
+    }
+
     /// Blend a static architectural score with an optional runtime measurement.
     /// Ratio: 0.6 × static + 0.4 × runtime (clamped to [0, 1]).
     /// Falls back to static-only when runtime is None.
@@ -53,174 +65,184 @@ impl ButlinIndicatorSuite {
         let rt = config.runtime_consciousness.as_ref();
 
         // RPT-1: Algorithmic recurrence (CfC feedback loop)
-        let rpt1_runtime = rt.map(|r| Self::normalize_phi(r.micro_phi));
+        let rpt1_score = Self::blend_score(1.0, rt.map(|r| Self::normalize_phi(r.micro_phi)));
         indicators.push(IndicatorEvidence {
             id: "RPT-1".into(),
             theory: "Recurrent Processing Theory".into(),
             description: "Algorithmic recurrence".into(),
-            status: IndicatorStatus::Present,
+            status: Self::status_from_score(rpt1_score),
             evidence: "CfC (Closed-form Continuous-time) temporal network provides \
                 recurrent feedback via O(1) closed-form temporal jumps in \
                 hdc_ltc_unified.rs; each cognitive cycle feeds predictions \
                 back as input to the next cycle"
                 .into(),
-            score: Some(Self::blend_score(1.0, rpt1_runtime)),
+            score: Some(rpt1_score),
         });
 
         // RPT-2: Integrated perceptual representations (Phi > 0 on WM contents)
-        let rpt2_runtime = rt.map(|r| Self::normalize_phi(r.micro_phi) * 0.8);
+        let rpt2_score = Self::blend_score(0.8, rt.map(|r| Self::normalize_phi(r.micro_phi) * 0.8));
         indicators.push(IndicatorEvidence {
             id: "RPT-2".into(),
             theory: "Recurrent Processing Theory".into(),
             description: "Integrated perceptual representations".into(),
-            status: IndicatorStatus::Present,
+            status: Self::status_from_score(rpt2_score),
             evidence: "IIT Phi engine (phi_engine/) computes integrated information \
                 over HDC state; ContinuousHV bundle operations create holographic \
                 superpositions that integrate features across perceptual modalities"
                 .into(),
-            score: Some(Self::blend_score(0.8, rpt2_runtime)),
+            score: Some(rpt2_score),
         });
 
         // GWT-1: Parallel specialized systems
-        let gwt1_runtime = rt.map(|r| (r.num_clusters as f64 / 3.0).min(1.0));
+        let gwt1_score = Self::blend_score(0.9, rt.map(|r| (r.num_clusters as f64 / 3.0).min(1.0)));
         indicators.push(IndicatorEvidence {
             id: "GWT-1".into(),
             theory: "Global Workspace Theory".into(),
             description: "Parallel specialized systems".into(),
-            status: IndicatorStatus::Present,
+            status: Self::status_from_score(gwt1_score),
             evidence: "12-region Actor Brain architecture with concurrent subsystems: \
                 HDC encoding, CfC temporal processing, FEP active inference, \
                 moral algebra, reasoning engine (7-step cycle), social coherence \
                 (ToM), all coordinated via rayon-parallel post-processing in \
                 cognitive_loop/cycle.rs"
                 .into(),
-            score: Some(Self::blend_score(0.9, gwt1_runtime)),
+            score: Some(gwt1_score),
         });
 
         // GWT-2: Limited capacity + selective attention (static only)
+        // Score 0.75: FIFO eviction + prefrontal gating, not full coalition competition
+        let gwt2_score = 0.75;
         indicators.push(IndicatorEvidence {
             id: "GWT-2".into(),
             theory: "Global Workspace Theory".into(),
             description: "Limited capacity with selective attention".into(),
-            status: IndicatorStatus::Present,
+            status: Self::status_from_score(gwt2_score),
             evidence: format!(
                 "Working memory capacity={} with FIFO eviction enforces information \
                 bottleneck; prefrontal gating selects which items enter the global \
-                workspace; activation decay (0.9/step) in working_memory.rs",
+                workspace; activation decay (0.9/step). Limitation: FIFO eviction \
+                is not coalition-competition per Baars/Dehaene",
                 config.working_memory_capacity
             ),
-            score: Some(1.0),
+            score: Some(gwt2_score),
         });
 
         // GWT-3: Global broadcast
-        let gwt3_runtime = rt.map(|r| Self::normalize_phi(r.meso_phi));
+        let gwt3_score = Self::blend_score(0.8, rt.map(|r| Self::normalize_phi(r.meso_phi)));
         indicators.push(IndicatorEvidence {
             id: "GWT-3".into(),
             theory: "Global Workspace Theory".into(),
             description: "Global broadcast mechanism".into(),
-            status: IndicatorStatus::Present,
+            status: Self::status_from_score(gwt3_score),
             evidence: "CycleMetadata.gwt_broadcast flag in cognitive_loop indicates \
                 when WM contents are broadcast to all subsystems; the 8-phase \
                 pipeline (perception -> cognition -> translation) in symthaea.rs \
                 distributes processed state to reasoning, moral, and social modules"
                 .into(),
-            score: Some(Self::blend_score(0.8, gwt3_runtime)),
+            score: Some(gwt3_score),
         });
 
         // GWT-4: State-dependent attention
-        let gwt4_runtime = rt.map(|r| (r.emergence_ratio - 0.5).tanh());
+        let gwt4_score = Self::blend_score(0.8, rt.map(|r| (r.emergence_ratio - 0.5).tanh()));
         indicators.push(IndicatorEvidence {
             id: "GWT-4".into(),
             theory: "Global Workspace Theory".into(),
             description: "State-dependent attention modulation".into(),
-            status: IndicatorStatus::Present,
+            status: Self::status_from_score(gwt4_score),
             evidence: "CycleUrgency adapts subsystem scheduling based on prediction \
                 error magnitude; surprise-driven exploration modulates attention \
                 allocation; consciousness_level field tracks dynamic state changes"
                 .into(),
-            score: Some(Self::blend_score(0.8, gwt4_runtime)),
+            score: Some(gwt4_score),
         });
 
         // HOT-1: Generative/top-down perception (static only)
+        let hot1_score = 0.9;
         indicators.push(IndicatorEvidence {
             id: "HOT-1".into(),
             theory: "Higher-Order Theories".into(),
             description: "Generative/top-down perceptual processing".into(),
-            status: IndicatorStatus::Present,
+            status: Self::status_from_score(hot1_score),
             evidence: "PredictiveHdcEncoder generates top-down predictions compared \
                 against sensory input; prediction errors drive CfC weight updates \
                 in the predictive coding loop (HDC encode -> CfC evolve -> predict \
                 -> learn at 50Hz)"
                 .into(),
-            score: Some(0.9),
+            score: Some(hot1_score),
         });
 
         // HOT-2: Metacognitive monitoring
-        let hot2_runtime = rt.map(|r| (r.bottleneck_score * 2.0).clamp(0.0, 1.0));
+        let hot2_score = Self::blend_score(0.7, rt.map(|r| (r.bottleneck_score * 2.0).clamp(0.0, 1.0)));
         indicators.push(IndicatorEvidence {
             id: "HOT-2".into(),
             theory: "Higher-Order Theories".into(),
             description: "Metacognitive monitoring of own states".into(),
-            status: IndicatorStatus::Present,
+            status: Self::status_from_score(hot2_score),
             evidence: "meta_cognitive_accuracy tracked in CycleMetadata; meta-cognition \
                 module monitors processing quality and confidence; reasoning engine \
                 7-step cycle includes self-evaluation phase"
                 .into(),
-            score: Some(Self::blend_score(0.7, hot2_runtime)),
+            score: Some(hot2_score),
         });
 
         // HOT-3: Agency with belief updating (static only)
+        // Score 0.65: FEP generates motor commands but outcomes are internally
+        // predicted, not sensorimotor (no physical embodiment).
+        let hot3_score = 0.65;
         indicators.push(IndicatorEvidence {
             id: "HOT-3".into(),
             theory: "Higher-Order Theories".into(),
             description: "Agency with belief updating from action outcomes".into(),
-            status: IndicatorStatus::Present,
+            status: Self::status_from_score(hot3_score),
             evidence: "FEP active inference (fep_active_inference.rs) generates motor \
                 commands with expected outcomes; CfC weight updates from prediction \
-                errors implement belief revision; planning_horizon controls \
-                forward-looking action selection"
+                errors implement belief revision. Limitation: action outcomes are \
+                internally predicted rather than sensorimotor (no physical embodiment)"
                 .into(),
-            score: Some(0.8),
+            score: Some(hot3_score),
         });
 
-        // HOT-4: Sparse and smooth coding (static only)
+        // HOT-4: Smooth coding (static only)
+        // Score 0.6: ContinuousHV provides smooth representations but 16,384D
+        // continuous vectors are dense, not sparse in the neuroscience sense.
+        let hot4_score = 0.6;
         indicators.push(IndicatorEvidence {
             id: "HOT-4".into(),
             theory: "Higher-Order Theories".into(),
-            description: "Sparse and smooth neural coding".into(),
-            status: IndicatorStatus::Present,
+            description: "Smooth coding".into(),
+            status: Self::status_from_score(hot4_score),
             evidence: format!(
                 "ContinuousHV provides smooth (differentiable) representations in \
-                {}-dimensional space; HDC holographic encoding naturally produces \
-                sparse activation patterns; similarity is a smooth function of \
-                representational distance",
+                {}-dimensional space; similarity is a smooth function of \
+                representational distance. Limitation: 16,384D continuous vectors \
+                are dense, not sparse in the neuroscience sense",
                 config.dimension
             ),
-            score: Some(0.7),
+            score: Some(hot4_score),
         });
 
         // PP-1: Prediction errors driving learning
-        let pp1_runtime = rt.map(|r| Self::normalize_phi(r.macro_phi));
+        let pp1_score = Self::blend_score(0.9, rt.map(|r| Self::normalize_phi(r.macro_phi)));
         indicators.push(IndicatorEvidence {
             id: "PP-1".into(),
             theory: "Predictive Processing".into(),
             description: "Prediction errors drive learning and adaptation".into(),
-            status: IndicatorStatus::Present,
+            status: Self::status_from_score(pp1_score),
             evidence: "Core cognitive pipeline: HDC encode -> CfC evolve -> predict -> \
                 learn; prediction error drives CfC weight updates, surprise \
                 exploration, and episodic memory priority (Phi-weighted); \
                 learning_occurred flag tracked per cycle"
                 .into(),
-            score: Some(Self::blend_score(0.9, pp1_runtime)),
+            score: Some(pp1_score),
         });
 
         // PP-2: Hierarchical prediction at multiple scales
-        let pp2_runtime = rt.map(|r| if r.num_clusters >= 3 { 0.8 } else { 0.4 });
+        let pp2_score = Self::blend_score(0.85, rt.map(|r| if r.num_clusters >= 3 { 0.8 } else { 0.4 }));
         indicators.push(IndicatorEvidence {
             id: "PP-2".into(),
             theory: "Predictive Processing".into(),
             description: "Hierarchical prediction at multiple scales".into(),
-            status: IndicatorStatus::Present,
+            status: Self::status_from_score(pp2_score),
             evidence: "HierarchicalCfC temporal backbone provides 4-level cortical \
                 hierarchy (tau 0.01/0.1/1.0/10.0) with bidirectional information flow: \
                 bottom-up prediction errors (fast→slow via up_projections) and \
@@ -232,16 +254,16 @@ impl ButlinIndicatorSuite {
                 horizons (contract under high PE, expand under low PE) with \
                 causal-informed per-dimension weighting."
                 .into(),
-            score: Some(Self::blend_score(0.85, pp2_runtime)),
+            score: Some(pp2_score),
         });
 
         // AST-1: Self-model of attention (Graziano 2013, 2019)
-        let ast1_runtime = rt.map(|r| (r.bottleneck_score * 1.5).clamp(0.0, 1.0));
+        let ast1_score = Self::blend_score(0.85, rt.map(|r| (r.bottleneck_score * 1.5).clamp(0.0, 1.0)));
         indicators.push(IndicatorEvidence {
             id: "AST-1".into(),
             theory: "Attention Schema Theory".into(),
             description: "Self-model of attention process".into(),
-            status: IndicatorStatus::Present,
+            status: Self::status_from_score(ast1_score),
             evidence: "AttentionSchema (attention_schema.rs) implements Graziano's AST \
                 with full self-model: AttentionModel tracks SubjectiveCharacter \
                 (presence/controllability/effort/clarity), AttentionCapabilities \
@@ -253,22 +275,22 @@ impl ButlinIndicatorSuite {
                 predictions). Control signal modulates GWT competition. Attention \
                 modes grounded in NSM primitives (SEE+THIS+VERY for Focused, etc.)."
                 .into(),
-            score: Some(Self::blend_score(0.85, ast1_runtime)),
+            score: Some(ast1_score),
         });
 
         // IIT-1: Integrated information > 0
-        let iit1_runtime = rt.map(|r| Self::normalize_phi(r.macro_phi));
+        let iit1_score = Self::blend_score(0.8, rt.map(|r| Self::normalize_phi(r.macro_phi)));
         indicators.push(IndicatorEvidence {
             id: "IIT-1".into(),
             theory: "Integrated Information Theory".into(),
             description: "Integrated information (Phi) > 0".into(),
-            status: IndicatorStatus::Present,
+            status: Self::status_from_score(iit1_score),
             evidence: "Phi engine (phi_engine/) computes IIT-4.0 integrated information; \
                 consciousness_level derived from Phi computation over HDC network \
                 state; consciousness_verifier.rs validates Phi > 0 for non-trivial \
                 network configurations"
                 .into(),
-            score: Some(Self::blend_score(0.8, iit1_runtime)),
+            score: Some(iit1_score),
         });
 
         ButlinIndicatorReport::from_indicators(indicators)

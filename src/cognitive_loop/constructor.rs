@@ -390,8 +390,10 @@ impl CognitiveLoopService {
         let primitive_tier =
             super::primitive_tier::PrimitiveTierManager::new(&config, config.cfc_config.input_dim);
 
-        // Build optional episodic replay (needs config fields before move)
-        let phi_episodic_replay = if config.episodic_replay {
+        // Always create episodic replay — it backs both graduation (always-on when
+        // memory_graduation=true) and replay training (gated by episodic_replay_training).
+        // Previously gated on config.episodic_replay, which blocked ALL graduation.
+        let phi_episodic_replay = if config.memory_graduation || config.episodic_replay_training {
             Some(crate::memory::episodic_replay::EpisodicMemory::new(
                 config.episodic_replay_config.clone(),
             ))
@@ -477,7 +479,7 @@ impl CognitiveLoopService {
         let knowledge_db_path = config.knowledge_db_path.clone();
         let enable_streaming_inference = config.enable_streaming_inference;
 
-        Ok(Self {
+        let mut service = Self {
             config,
             encoder,
             temporal_network,
@@ -496,7 +498,9 @@ impl CognitiveLoopService {
                         .as_deref()
                         .map(symthaea_core::genesis::GenesisSeed::from_phrase)
                         .unwrap_or_else(|| {
-                            symthaea_core::genesis::GenesisSeed::from_phrase("symthaea-broca-default")
+                            symthaea_core::genesis::GenesisSeed::from_phrase(
+                                "symthaea-broca-default",
+                            )
                         });
                     Some(super::broca_bridge::BrocaManager::new(
                         &genesis,
@@ -553,135 +557,133 @@ impl CognitiveLoopService {
             },
             feedback_state: super::feedback_state::FeedbackState::new(),
             coherence_tracker: ConversationCoherenceTracker::new(0.3),
-            stability_regime: StabilityRegimeProcessor::new(),
-            discovery_service: PrimitiveDiscoveryService::new(DiscoveryServiceConfig::default()),
-            // Semantic memory: HDC-based similarity lookup for CfC context
-            // 1000 entries, 0.3 similarity threshold
-            semantic_memory: SemanticMemory::with_threshold(1000, 0.3),
-            // Memory coordinator: cross-tier signal broadcaster
-            memory_coordinator: MemoryCoordinator::new(CoordinatorConfig::default()),
-            // Resonator Memory: factorized episodic recall with 3 codebooks
-            resonator_memory: if enable_resonator_recall {
-                let dim = resonator_cfc_input_dim; // matches compressed_state
-                let res_config = crate::dynamics::resonator::ResonatorConfig {
-                    dim,
-                    max_iters: 50, // Real-time budget (default 100 too slow)
-                    convergence_threshold: 0.995, // Slightly relaxed for speed
-                    temperature: 0.1,
-                    bipolar: true,
-                };
-                let mut mem = crate::dynamics::resonator::ResonatorMemory::new(res_config, 500);
-
-                // Helper: generate deterministic random bipolar HV from seed
-                let make_hv = |seed: u64, d: usize| -> Vec<f32> {
-                    let mut state = seed ^ 0x9E3779B97F4A7C15; // xorshift64 seed-0 fix
-                    (0..d)
-                        .map(|_| {
-                            state ^= state << 13;
-                            state ^= state >> 7;
-                            state ^= state << 17;
-                            if state % 2 == 0 {
-                                1.0
-                            } else {
-                                -1.0
-                            }
+            memory_consol: super::memory_consolidation_manager::MemoryAndConsolidationManager {
+                stability_regime: StabilityRegimeProcessor::new(),
+                discovery_service: PrimitiveDiscoveryService::new(DiscoveryServiceConfig::default()),
+                semantic_memory: SemanticMemory::with_threshold(1000, 0.3),
+                memory_coordinator: MemoryCoordinator::new(CoordinatorConfig::default()),
+                resonator_memory: if enable_resonator_recall {
+                    let dim = resonator_cfc_input_dim;
+                    let res_config = crate::dynamics::resonator::ResonatorConfig {
+                        dim,
+                        max_iters: 50,
+                        convergence_threshold: 0.995,
+                        temperature: 0.1,
+                        bipolar: true,
+                    };
+                    let mut mem = crate::dynamics::resonator::ResonatorMemory::new(res_config, 500);
+                    let make_hv = |seed: u64, d: usize| -> Vec<f32> {
+                        let mut state = seed ^ 0x9E3779B97F4A7C15;
+                        (0..d)
+                            .map(|_| {
+                                state ^= state << 13;
+                                state ^= state >> 7;
+                                state ^= state << 17;
+                                if state % 2 == 0 {
+                                    1.0
+                                } else {
+                                    -1.0
+                                }
+                            })
+                            .collect()
+                    };
+                    let seed_base: u64 = resonator_genesis_phrase
+                        .as_ref()
+                        .map(|p| {
+                            let genesis = symthaea_core::genesis::GenesisSeed::from_phrase(p);
+                            genesis.domain("resonator_memory").gen::<u64>()
                         })
-                        .collect()
-                };
-
-                let seed_base: u64 = resonator_genesis_phrase
-                    .as_ref()
-                    .map(|p| {
-                        let genesis = symthaea_core::genesis::GenesisSeed::from_phrase(p);
-                        genesis.domain("resonator_memory").gen::<u64>()
-                    })
-                    .unwrap_or(0xBE50_0A70_0000_5EED);
-
-                // Codebook 1: "semantic" — 8 proto-symbols, grows dynamically
-                let mut semantic_cb = crate::dynamics::Codebook::new("semantic");
-                for i in 0..8u64 {
-                    semantic_cb.add(
-                        &format!("proto_{i}"),
-                        make_hv(seed_base.wrapping_add(i), dim),
-                    );
-                }
-                mem.add_codebook(semantic_cb);
-
-                // Codebook 2: "valence" — 3 fixed emotional poles
-                let mut valence_cb = crate::dynamics::Codebook::new("valence");
-                valence_cb.add("positive", make_hv(seed_base.wrapping_add(100), dim));
-                valence_cb.add("neutral", make_hv(seed_base.wrapping_add(101), dim));
-                valence_cb.add("negative", make_hv(seed_base.wrapping_add(102), dim));
-                mem.add_codebook(valence_cb);
-
-                // Codebook 3: "phi_level" — 3 consciousness tiers
-                let mut phi_cb = crate::dynamics::Codebook::new("phi_level");
-                phi_cb.add("low", make_hv(seed_base.wrapping_add(200), dim));
-                phi_cb.add("medium", make_hv(seed_base.wrapping_add(201), dim));
-                phi_cb.add("high", make_hv(seed_base.wrapping_add(202), dim));
-                mem.add_codebook(phi_cb);
-
-                Some(mem)
-            } else {
-                None
-            },
-            #[cfg(feature = "neural-bridge")]
-            neural_bridge: {
-                let probe_path = std::path::Path::new("models/neural_bridge/probe_weights.npy");
-                if probe_path.exists() {
-                    match NeuralBridge::load(probe_path) {
-                        Ok(nb) => {
-                            tracing::info!(
-                                input_dim = nb.input_dim(),
-                                "Neural bridge loaded from {}",
-                                probe_path.display()
-                            );
-                            Some(nb)
-                        }
-                        Err(e) => {
-                            tracing::warn!("Failed to load neural bridge: {e}");
-                            None
-                        }
+                        .unwrap_or(0xBE50_0A70_0000_5EED);
+                    let mut semantic_cb = crate::dynamics::Codebook::new("semantic");
+                    for i in 0..8u64 {
+                        semantic_cb.add(
+                            &format!("proto_{i}"),
+                            make_hv(seed_base.wrapping_add(i), dim),
+                        );
                     }
+                    mem.add_codebook(semantic_cb);
+                    let mut valence_cb = crate::dynamics::Codebook::new("valence");
+                    valence_cb.add("positive", make_hv(seed_base.wrapping_add(100), dim));
+                    valence_cb.add("neutral", make_hv(seed_base.wrapping_add(101), dim));
+                    valence_cb.add("negative", make_hv(seed_base.wrapping_add(102), dim));
+                    mem.add_codebook(valence_cb);
+                    let mut phi_cb = crate::dynamics::Codebook::new("phi_level");
+                    phi_cb.add("low", make_hv(seed_base.wrapping_add(200), dim));
+                    phi_cb.add("medium", make_hv(seed_base.wrapping_add(201), dim));
+                    phi_cb.add("high", make_hv(seed_base.wrapping_add(202), dim));
+                    mem.add_codebook(phi_cb);
+                    Some(mem)
                 } else {
-                    tracing::debug!(
-                        "No probe weights at {}, neural bridge disabled",
-                        probe_path.display()
-                    );
                     None
-                }
+                },
             },
-            // Semantic encoder: background Qwen3 embedding channel + HdcBridge
-            #[cfg(feature = "semantic-encoder")]
-            semantic_embedding_channel: {
-                if enable_semantic_encoder {
-                    let qwen_config = symthaea_embeddings::Qwen3Config::simulated();
-                    match symthaea_embeddings::channel::EmbeddingChannel::spawn(qwen_config) {
-                        Ok(channel) => Some(channel),
-                        Err(e) => {
-                            tracing::warn!("Failed to spawn semantic encoder: {e}");
-                            None
+            feature_integ: super::feature_integration_manager::FeatureIntegrationManager {
+                #[cfg(feature = "neural-bridge")]
+                neural_bridge: {
+                    let probe_path = std::path::Path::new("models/neural_bridge/probe_weights.npy");
+                    if probe_path.exists() {
+                        match NeuralBridge::load(probe_path) {
+                            Ok(nb) => {
+                                tracing::info!(
+                                    input_dim = nb.input_dim(),
+                                    "Neural bridge loaded from {}",
+                                    probe_path.display()
+                                );
+                                Some(nb)
+                            }
+                            Err(e) => {
+                                tracing::warn!("Failed to load neural bridge: {e}");
+                                None
+                            }
                         }
+                    } else {
+                        tracing::debug!(
+                            "No probe weights at {}, neural bridge disabled",
+                            probe_path.display()
+                        );
+                        None
                     }
-                } else {
-                    None
-                }
+                },
+                #[cfg(feature = "semantic-encoder")]
+                semantic_embedding_channel: {
+                    if enable_semantic_encoder {
+                        let qwen_config = symthaea_embeddings::Qwen3Config::simulated();
+                        match symthaea_embeddings::channel::EmbeddingChannel::spawn(qwen_config) {
+                            Ok(channel) => Some(channel),
+                            Err(e) => {
+                                tracing::warn!("Failed to spawn semantic encoder: {e}");
+                                None
+                            }
+                        }
+                    } else {
+                        None
+                    }
+                },
+                #[cfg(feature = "semantic-encoder")]
+                semantic_hdc_bridge: {
+                    if enable_semantic_encoder {
+                        Some(symthaea_embeddings::HdcBridge::for_qwen3())
+                    } else {
+                        None
+                    }
+                },
+                #[cfg(feature = "semantic-encoder")]
+                pending_semantic_rx: std::sync::Mutex::new(None),
+                #[cfg(feature = "semantic-encoder")]
+                last_semantic_continuous: None,
+                #[cfg(feature = "school_learning")]
+                school_bridge: None,
+                causal_consciousness,
+                #[cfg(feature = "physics-bridge")]
+                physics_integration,
             },
-            #[cfg(feature = "semantic-encoder")]
-            semantic_hdc_bridge: {
-                if enable_semantic_encoder {
-                    Some(symthaea_embeddings::HdcBridge::for_qwen3())
-                } else {
-                    None
-                }
-            },
-            #[cfg(feature = "semantic-encoder")]
-            pending_semantic_rx: std::sync::Mutex::new(None),
-            #[cfg(feature = "semantic-encoder")]
-            last_semantic_continuous: None,
             async_trainer,
             causal_enhancer,
             phi_episodic_replay,
+            memory_db: None, // initialized below after struct creation
+            memory_flush_in_progress: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(
+                false,
+            )),
             #[cfg(feature = "reasoning_engine")]
             reasoning_engine: Some(
                 crate::consciousness::reasoning_engine::ConsciousReasoningEngine::new(),
@@ -727,17 +729,7 @@ impl CognitiveLoopService {
             },
             primitive_tier,
             #[cfg(feature = "support")]
-            support_predictive_engine: Some(symthaea_support::predictive::PredictiveEngine::new()),
-            #[cfg(feature = "support")]
-            support_knowledge_manager: Some(symthaea_support::knowledge::KnowledgeManager::new()),
-            #[cfg(feature = "support")]
-            support_triage_engine: Some(symthaea_support::triage::TriageEngine::new()),
-            #[cfg(feature = "support")]
-            support_privacy_manager: Some(symthaea_support::privacy::PrivacyManager::default()),
-            #[cfg(feature = "support")]
-            support_action_engine: Some(symthaea_support::actions::ActionEngine::new()),
-            #[cfg(feature = "support")]
-            support_cycle_counter: 0,
+            support: super::support_manager::SupportManager::new(),
             carryover: CycleCarryover::default(),
             prefrontal,
             self_model_tier,
@@ -800,8 +792,7 @@ impl CognitiveLoopService {
             } else {
                 None
             },
-            // vision_bridge, vision_frame_buffer, cross_manifold_predictor, foveation_manager moved to vision_sensory
-            // broca_manager, last_broca_text moved to language_comm
+            // vision/foveation/broca inits moved to vision_sensory and language_comm managers above
             #[cfg(feature = "canvas")]
             canvas_manager: Some(super::canvas_bridge::CanvasManager::new()),
             #[cfg(feature = "canvas")]
@@ -842,9 +833,7 @@ impl CognitiveLoopService {
             },
             last_reasoning_context: None,
             experience_bus: Some(crate::experience::ExperienceBus::with_defaults()),
-            #[cfg(feature = "school_learning")]
-            school_bridge: None,
-            causal_consciousness,
+            // school_bridge + causal_consciousness moved to feature_integ manager
             thermodynamic_load: 0.0,
             mood_temperature: 1.0,
             neuromod: super::neuromod_manager::NeuromodManager::default(),
@@ -887,8 +876,7 @@ impl CognitiveLoopService {
                 )
             },
             substrate_manager,
-            #[cfg(feature = "physics-bridge")]
-            physics_integration,
+            // physics_integration moved to feature_integ manager
             convergence_cycle: 0,
             ethics_engine: {
                 let engine_mp = MoralParser::new();
@@ -948,6 +936,8 @@ impl CognitiveLoopService {
             #[cfg(feature = "mycelix")]
             governance_mgr: super::managers::GovernanceManager::default(),
             swarm_manager: super::managers::SwarmManager::default(),
+            #[cfg(feature = "mesh")]
+            spectrum_manager: super::managers::SpectrumManager::default(),
             cantor_broadcast_buffer: Vec::with_capacity(32),
             cantor_cleanup_engine: {
                 use symthaea_core::hdc::cantor_resonator_cleanup::*;
@@ -1006,6 +996,8 @@ impl CognitiveLoopService {
                     0.125,
                     0.125,
                 ]);
+                // Register knowledge engine thresholds for integrity monitoring
+                im.register_knowledge_thresholds();
                 // Register governance thresholds for integrity monitoring
                 #[cfg(feature = "mycelix")]
                 im.register_governance_thresholds();
@@ -1020,6 +1012,8 @@ impl CognitiveLoopService {
             last_motor_result: None,
             last_motor_phi: 0.0,
             math_service: super::math_service::MathService::new(),
+            #[cfg(feature = "scientific_method")]
+            scientific_method: crate::scientific_method::ScientificMethodEngine::new(),
             resonant_speech: crate::resonant_speech::ResonantSpeech::new(),
             streaming_inference: if enable_streaming_inference {
                 // Cycle-aligned config: batch=1, max_latency=32ms (~31Hz loop)
@@ -1029,11 +1023,28 @@ impl CognitiveLoopService {
                     warmup_samples: 10,
                     ..crate::inference::StreamingConfig::low_latency()
                 };
-                Some(crate::inference::StreamingInference::with_default_network(si_config))
+                Some(crate::inference::StreamingInference::with_default_network(
+                    si_config,
+                ))
             } else {
                 None
             },
-        })
+        };
+
+        // Initialize persistent memory database if configured
+        if let Some(ref db_path) = service.config.memory_db_path {
+            match crate::databases::SqliteMemory::new(db_path) {
+                Ok(db) => {
+                    tracing::info!(path = %db_path, "Memory persistence database initialized");
+                    service.memory_db = Some(std::sync::Arc::new(db));
+                }
+                Err(e) => {
+                    tracing::warn!(path = %db_path, error = %e, "Failed to open memory database — persistence disabled");
+                }
+            }
+        }
+
+        Ok(service)
     }
 
     /// Build a dense-encoded HarmonyBasis by encoding HARMONY_KEYWORDS through
@@ -1279,17 +1290,27 @@ mod tests {
     }
 
     #[test]
-    fn episodic_replay_disabled_by_default() {
+    fn episodic_memory_created_by_default_for_graduation() {
+        // memory_graduation defaults to true, so phi_episodic_replay is always created
         let config = CognitiveLoopConfig::default();
         let service = CognitiveLoopService::new(config).unwrap();
         assert_eq!(service.episodic_replay_count(), 0);
+        assert!(service.episodic_replay_stats().is_some());
+    }
+
+    #[test]
+    fn episodic_memory_absent_when_graduation_disabled() {
+        let mut config = CognitiveLoopConfig::default();
+        config.memory_graduation = false;
+        config.episodic_replay_training = false;
+        let service = CognitiveLoopService::new(config).unwrap();
         assert!(service.episodic_replay_stats().is_none());
     }
 
     #[test]
     fn episodic_replay_enabled_creates_memory() {
         let mut config = CognitiveLoopConfig::default();
-        config.episodic_replay = true;
+        config.episodic_replay_training = true;
         let service = CognitiveLoopService::new(config).unwrap();
         assert!(service.episodic_replay_stats().is_some());
         assert_eq!(service.episodic_replay_count(), 0);

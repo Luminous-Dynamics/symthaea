@@ -153,11 +153,8 @@ impl PerspectiveTakingBenchmark {
 
         // Large angle accuracy (>= 120 degrees: indices 2, 3, 4, 5)
         let large_count = angle_data.len() - 2;
-        let large_angle_accuracy: f64 = angle_data[2..]
-            .iter()
-            .map(|d| d.1)
-            .sum::<f64>()
-            / large_count as f64;
+        let large_angle_accuracy: f64 =
+            angle_data[2..].iter().map(|d| d.1).sum::<f64>() / large_count as f64;
 
         // Angular error slope: how much does accuracy decrease with angle?
         let mean_angle: f64 = angle_data.iter().map(|d| d.0).sum::<f64>() / n;
@@ -243,18 +240,9 @@ impl PsychBenchmark for PerspectiveTakingBenchmark {
             "perspective_accuracy",
             MetricValue::from_samples(&accuracies),
         );
-        result.insert(
-            "angular_error_slope",
-            MetricValue::from_samples(&slopes),
-        );
-        result.insert(
-            "small_angle_accuracy",
-            MetricValue::from_samples(&smalls),
-        );
-        result.insert(
-            "large_angle_accuracy",
-            MetricValue::from_samples(&larges),
-        );
+        result.insert("angular_error_slope", MetricValue::from_samples(&slopes));
+        result.insert("small_angle_accuracy", MetricValue::from_samples(&smalls));
+        result.insert("large_angle_accuracy", MetricValue::from_samples(&larges));
         result.insert("rt_ticks", MetricValue::from_samples(&rts));
 
         result.conditions = 6; // number of angle levels

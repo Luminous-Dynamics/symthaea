@@ -115,10 +115,12 @@ impl CognitiveLoopService {
 
     /// Get temporal coherence value (uses cycle-cached value when available)
     pub fn temporal_coherence(&self) -> f32 {
-        self.carryover
-            .history
-            .cached_coherence
-            .unwrap_or_else(|| self.language_comm.voice_coherence.bridge.smoothed_coherence())
+        self.carryover.history.cached_coherence.unwrap_or_else(|| {
+            self.language_comm
+                .voice_coherence
+                .bridge
+                .smoothed_coherence()
+        })
     }
 
     /// Recall memories similar to input

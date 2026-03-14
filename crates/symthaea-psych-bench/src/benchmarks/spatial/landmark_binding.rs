@@ -144,11 +144,8 @@ impl LandmarkBindingBenchmark {
 
         // Overall retrieval accuracy (average of both directions)
         let n = setsize_data.len() as f64;
-        let retrieval_accuracy: f64 = setsize_data
-            .iter()
-            .map(|d| (d.1 + d.2) / 2.0)
-            .sum::<f64>()
-            / n;
+        let retrieval_accuracy: f64 =
+            setsize_data.iter().map(|d| (d.1 + d.2) / 2.0).sum::<f64>() / n;
 
         // Capacity K: largest set size where accuracy > 0.75
         let mut capacity_k = 1.0;
@@ -161,11 +158,7 @@ impl LandmarkBindingBenchmark {
 
         // Set-size slope: accuracy decrease per pair
         let mean_ss: f64 = setsize_data.iter().map(|d| d.0).sum::<f64>() / n;
-        let mean_acc: f64 = setsize_data
-            .iter()
-            .map(|d| (d.1 + d.2) / 2.0)
-            .sum::<f64>()
-            / n;
+        let mean_acc: f64 = setsize_data.iter().map(|d| (d.1 + d.2) / 2.0).sum::<f64>() / n;
         let cov: f64 = setsize_data
             .iter()
             .map(|d| (d.0 - mean_ss) * ((d.1 + d.2) / 2.0 - mean_acc))
@@ -174,11 +167,7 @@ impl LandmarkBindingBenchmark {
             .iter()
             .map(|d| (d.0 - mean_ss).powi(2))
             .sum::<f64>();
-        let raw_slope = if var_ss > 1e-10 {
-            -(cov / var_ss)
-        } else {
-            0.0
-        };
+        let raw_slope = if var_ss > 1e-10 { -(cov / var_ss) } else { 0.0 };
         let setsize_slope = raw_slope.clamp(0.0, 1.0);
 
         // Bidirectional symmetry: correlation between loc->obj and obj->loc accuracy
@@ -265,10 +254,7 @@ impl PsychBenchmark for LandmarkBindingBenchmark {
             }
         }
 
-        result.insert(
-            "retrieval_accuracy",
-            MetricValue::from_samples(&accuracies),
-        );
+        result.insert("retrieval_accuracy", MetricValue::from_samples(&accuracies));
         result.insert("capacity_k", MetricValue::from_samples(&capacities));
         result.insert("setsize_slope", MetricValue::from_samples(&slopes));
         result.insert(

@@ -72,9 +72,9 @@ pub(in crate::cognitive_loop) fn parallel_semantic_causal(
     output: &[f32],
     prediction_error: f32,
     total_cycles: usize,
-) {
+) -> Option<crate::memory::semantic_memory::SemanticEntry> {
     // Semantic memory: store HDC vector + prediction error for future similarity lookup
-    semantic_memory.store_with_timestamp(semantic_hdc, prediction_error, None, total_cycles as u64);
+    let evicted = semantic_memory.store_with_timestamp(semantic_hdc, prediction_error, None, total_cycles as u64);
 
     // Causal enhancement: track (input, output) pairs and discover structure
     if let Some(ref mut enhancer) = causal_enhancer {
@@ -93,6 +93,7 @@ pub(in crate::cognitive_loop) fn parallel_semantic_causal(
             }
         }
     }
+    evicted
 }
 
 /// Parallel Branch B: Episodic memory + resonator storage + primitive-belief bridge + closed learning.

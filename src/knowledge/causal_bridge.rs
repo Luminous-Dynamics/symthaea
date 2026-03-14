@@ -246,43 +246,114 @@ impl CausalKnowledgeBridge {
             .collect()
     }
 
-    /// Import a causal edge from persistence (no source text, no negation info).
-    pub fn import_edge(
-        &mut self,
-        cause: &str,
-        effect: &str,
-        strength: f32,
-        is_inhibitory: bool,
-    ) {
+    // ── Persistence Support ─────────────────────────────────────────────
+
+    /// Import an edge from a persistence record.
+    pub fn import_edge(&mut self, record: &super::persistence::CausalEdgeRecord) {
         let edge = CausalEdge {
-            cause: cause.to_string(),
-            effect: effect.to_string(),
-            strength,
-            is_inhibitory,
+            cause: record.cause.clone(),
+            effect: record.effect.clone(),
+            strength: record.strength,
+            is_inhibitory: record.is_inhibitory,
             is_negated: false,
             source_text: String::new(),
-            discovered_at_cycle: 0,
+            discovered_at_cycle: record.cycle,
         };
         self.add_edge(edge);
     }
 
-    /// Export edges as persistence records.
+    /// Export all edges as persistence records.
     pub fn export_edge_records(&self) -> Vec<super::persistence::CausalEdgeRecord> {
         self.edges
             .iter()
-            .filter(|e| !e.is_negated)
             .map(|e| super::persistence::CausalEdgeRecord {
                 cause: e.cause.clone(),
                 effect: e.effect.clone(),
-                strength: if e.is_inhibitory {
-                    -e.strength
-                } else {
-                    e.strength
-                },
+                strength: e.strength,
                 is_inhibitory: e.is_inhibitory,
                 cycle: e.discovered_at_cycle,
             })
             .collect()
+    }
+
+    // ── Visualization ─────────────────────────────────────────────────
+
+    /// Export the causal graph as a DOT (Graphviz) string.
+    ///
+    /// Edges are colored by strength (green=strong, red=weak).
+    /// Inhibitory edges are rendered with dashed lines.
+    pub fn export_dot(&self) -> String {
+        use std::fmt::Write;
+        let mut dot = String::with_capacity(512);
+        let _ = writeln!(dot, "digraph CausalKnowledge {{");
+        let _ = writeln!(dot, "  rankdir=LR;");
+        let _ = writeln!(
+            dot,
+            "  node [shape=box, style=rounded, fontsize=10];"
+        );
+
+        // Emit all nodes
+        for name in self.nodes.keys() {
+            let _ = writeln!(dot, "  \"{}\" ;", name);
+        }
+
+        // Emit edges with strength labels
+        for edge in &self.edges {
+            let style = if edge.is_inhibitory {
+                "dashed"
+            } else {
+                "solid"
+            };
+            let color = if edge.strength > 0.7 {
+                "#2d7d46" // strong green
+            } else if edge.strength > 0.3 {
+                "#b8860b" // moderate gold
+            } else {
+                "#c0392b" // weak red
+            };
+            let _ = writeln!(
+                dot,
+                "  \"{}\" -> \"{}\" [label=\"{:.2}\", style={}, color=\"{}\"];",
+                edge.cause, edge.effect, edge.strength, style, color
+            );
+        }
+
+        let _ = writeln!(dot, "}}");
+        dot
+    }
+
+    /// Export the causal graph as a Mermaid diagram string.
+    ///
+    /// Suitable for embedding in Markdown documentation.
+    pub fn export_mermaid(&self) -> String {
+        use std::fmt::Write;
+        let mut md = String::with_capacity(512);
+        let _ = writeln!(md, "graph LR");
+
+        for edge in &self.edges {
+            if edge.is_inhibitory {
+                let _ = writeln!(
+                    md,
+                    "  {}({}) -.->|inhibits| {}({})",
+                    sanitize_mermaid(&edge.cause),
+                    edge.cause,
+                    sanitize_mermaid(&edge.effect),
+                    edge.effect
+                );
+            } else {
+                let _ = writeln!(
+                    md,
+                    "  {}({}) -->|{:.2}| {}({})",
+                    sanitize_mermaid(&edge.cause),
+                    edge.cause,
+                    edge.strength,
+                    sanitize_mermaid(&edge.effect),
+                    edge.effect
+                );
+            }
+        }
+
+        md
     }
 
     // ── Internal ────────────────────────────────────────────────────────
@@ -306,6 +377,13 @@ impl CausalKnowledgeBridge {
             }
         }
     }
+}
+
+/// Sanitize a string for use as a Mermaid node ID (alphanumeric + underscore).
+fn sanitize_mermaid(s: &str) -> String {
+    s.chars()
+        .map(|c| if c.is_alphanumeric() { c } else { '_' })
+        .collect()
 }
 
 // ── Tests ──────────────────────────────────────────────────────────────────

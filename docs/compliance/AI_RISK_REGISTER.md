@@ -113,7 +113,7 @@ Risks are scored using: **Likelihood** (1-5) x **Impact** (1-5) = **Risk Score**
 
 | Field | Value |
 |-------|-------|
-| **Description** | The cognitive loop (running at 50Hz/234Hz) takes actions that were not anticipated by designers, arising from complex interactions between subsystems |
+| **Description** | The cognitive loop (running at ~31Hz full loop / 234Hz raw text cycle) takes actions that were not anticipated by designers, arising from complex interactions between subsystems |
 | **Likelihood** | 2 (Low — current system is primarily a measurement/analysis pipeline, not an actuator; SafetyGateway blocks dangerous system calls) |
 | **Impact** | 5 (Critical — unintended autonomous actions could affect downstream systems including Terra Atlas and Mycelix governance) |
 | **Risk Score** | **10 (High)** |

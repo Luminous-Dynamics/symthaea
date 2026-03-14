@@ -658,73 +658,26 @@ impl BenchmarkReport {
                 "institutional_cross_domain_coherence",
                 &bl.institutional_reasoning,
             ),
-            // Spatial: Mental Rotation
-            ("rt_slope", "mental_rotation_rt_slope", &bl.spatial),
-            ("rt_linearity", "mental_rotation_rt_linearity", &bl.spatial),
+            // Analogical Reasoning
             (
-                "accuracy_mean",
-                "mental_rotation_accuracy_mean",
-                &bl.spatial,
+                "analogical_transfer_accuracy",
+                "analogical_transfer_accuracy",
+                &bl.institutional_reasoning,
             ),
             (
-                "accuracy_slope",
-                "mental_rotation_accuracy_slope",
-                &bl.spatial,
-            ),
-            // Spatial: Path Updating
-            (
-                "updating_accuracy",
-                "path_updating_accuracy",
-                &bl.spatial,
+                "analogical_transfer_strength",
+                "analogical_transfer_strength",
+                &bl.institutional_reasoning,
             ),
             (
-                "complexity_slope",
-                "path_updating_complexity_slope",
-                &bl.spatial,
+                "analogical_shared_component_advantage",
+                "analogical_shared_component_advantage",
+                &bl.institutional_reasoning,
             ),
             (
-                "simple_accuracy",
-                "path_updating_simple_accuracy",
-                &bl.spatial,
-            ),
-            (
-                "complex_accuracy",
-                "path_updating_complex_accuracy",
-                &bl.spatial,
-            ),
-            // Spatial: Landmark Binding
-            (
-                "retrieval_accuracy",
-                "landmark_retrieval_accuracy",
-                &bl.spatial,
-            ),
-            ("capacity_k", "landmark_capacity_k", &bl.spatial),
-            ("setsize_slope", "landmark_setsize_slope", &bl.spatial),
-            (
-                "bidirectional_symmetry",
-                "landmark_bidirectional_symmetry",
-                &bl.spatial,
-            ),
-            // Spatial: Perspective Taking
-            (
-                "perspective_accuracy",
-                "perspective_accuracy",
-                &bl.spatial,
-            ),
-            (
-                "angular_error_slope",
-                "perspective_angular_error_slope",
-                &bl.spatial,
-            ),
-            (
-                "small_angle_accuracy",
-                "perspective_small_angle_accuracy",
-                &bl.spatial,
-            ),
-            (
-                "large_angle_accuracy",
-                "perspective_large_angle_accuracy",
-                &bl.spatial,
+                "analogical_asymmetry_score",
+                "analogical_asymmetry_score",
+                &bl.institutional_reasoning,
             ),
         ];
 
@@ -1677,13 +1630,10 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("LogicalDeduction") => "overall_accuracy",
         b if b.contains("ConstraintPuzzle") => "queens_4_accuracy",
         b if b.contains("ProofConstruction") => "tautology_accuracy",
+        // Analogical Reasoning
+        b if b.contains("AnalogicalReasoning") => "analogical_transfer_accuracy",
         // Institutional Reasoning domain
         b if b.contains("InstitutionalReasoning") => "institutional_decomposition_accuracy",
-        // Spatial domain
-        b if b.contains("MentalRotation") => "rt_slope",
-        b if b.contains("PathUpdating") => "updating_accuracy",
-        b if b.contains("LandmarkBinding") => "retrieval_accuracy",
-        b if b.contains("PerspectiveTaking") => "perspective_accuracy",
         _ => "overall_accuracy",
     }
 }
@@ -2003,7 +1953,6 @@ impl BenchmarkReport {
                             &bl.butlin,
                             &bl.inhibition,
                             &bl.attention,
-                            &bl.spatial,
                         ];
                         baseline_maps.iter().find_map(|bm| {
                             bm.values()

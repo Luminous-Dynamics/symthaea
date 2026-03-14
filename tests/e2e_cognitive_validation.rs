@@ -204,7 +204,6 @@ fn test_memory_formation_and_recall() {
         enable_primitive_consciousness: true,
         learning_threshold: 0.0,
         async_training: false,
-        episodic_replay: true,
         ..Default::default()
     })
     .unwrap();

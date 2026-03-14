@@ -129,7 +129,6 @@ pub(crate) mod biorhythm_manager;
 pub(crate) mod consciousness_engine;
 pub(crate) mod consciousness_monitor_tier;
 pub(crate) mod consciousness_state_manager;
-pub(crate) mod ethics_values_manager;
 mod constructor;
 mod cycle;
 mod cycle_consciousness;
@@ -143,13 +142,19 @@ mod cycle_quality;
 mod cycle_strategy;
 mod cycle_subsystems;
 pub(crate) mod ethics_engine;
+pub(crate) mod ethics_values_manager;
+pub(crate) mod feature_integration_manager;
 pub(crate) mod feedback_state;
 pub(crate) mod fep_module;
 pub(crate) mod gwt_manager;
 mod helpers;
+pub(crate) mod language_comm_manager;
 pub(crate) mod managers;
+pub(crate) mod memory_consolidation_manager;
 mod moral;
 pub mod motor_output_bridge;
+#[cfg(feature = "support")]
+pub(crate) mod support_manager;
 pub(crate) mod neuromod_manager;
 pub(crate) mod neuromodulators;
 mod phase_results;
@@ -158,7 +163,6 @@ pub(crate) mod primitive_tier;
 pub(crate) mod self_model_tier;
 pub(crate) mod social_manager;
 pub(crate) mod substrate_manager;
-pub(crate) mod language_comm_manager;
 pub(crate) mod vision_sensory_manager;
 pub use substrate_manager::SubstrateTransitionRecord;
 pub(crate) mod subsystem_trait;
@@ -180,6 +184,11 @@ pub use physics_integration::ParetoContext;
 
 #[cfg(feature = "mycelix")]
 pub use managers::governance_manager::{GovernanceEvent, GovernanceEventKind, GovernanceOutcome};
+
+#[cfg(feature = "mesh")]
+use managers::SpectrumManager;
+
+pub use managers::swarm_manager::{SwarmEvent, SwarmTelemetry};
 
 pub mod calibration;
 pub mod math_service;
@@ -212,22 +221,19 @@ use crate::consciousness::narrative_gwt_integration::NarrativeGWTIntegration;
 // PredictiveMind now owned by ConsciousnessStateManager
 use crate::consciousness::primitive_belief_bridge::PrimitiveBeliefBridge;
 use crate::consciousness::primitive_consciousness::PrimitiveConsciousnessState;
-use crate::consciousness::primitive_discovery::PrimitiveDiscoveryService;
+// PrimitiveDiscoveryService + StabilityRegimeProcessor now owned by MemoryAndConsolidationManager
 #[cfg(any(feature = "full_consciousness", feature = "magi_loop"))]
 use crate::consciousness::recursive_improvement::DreamFeedbackBridge;
-use crate::consciousness::stability_regime::StabilityRegimeProcessor;
 #[cfg(feature = "full_consciousness")]
 use crate::consciousness::unified_living_mind::UnifiedLivingMind;
 // CfCCoherenceBridge + TemporalSignatureEncoder now owned by VoiceCoherenceBridge
 // SurpriseExplorationBridge moved to fep_module.rs
 // MoralAlgebra + MoralParser now solely owned by EthicsEngine
 use crate::memory::coherence_tracker::ConversationCoherenceTracker;
-use crate::memory::memory_coordinator::MemoryCoordinator;
-use crate::memory::semantic_memory::SemanticMemory;
+// MemoryCoordinator + SemanticMemory now owned by MemoryAndConsolidationManager
 use crate::mycelix::KosmicSong;
 // HumanPartnerModel + PhiDyadCalculator now owned by SocialManager
-#[cfg(feature = "neural-bridge")]
-use crate::perception::NeuralBridge;
+// NeuralBridge now owned by FeatureIntegrationManager
 use crate::safety::SafetyGateway;
 // VoiceFeedbackBridge now owned by VoiceCoherenceBridge
 // MetaCognitiveLayer now owned by SelfModelTierManager
@@ -356,60 +362,11 @@ pub struct CognitiveLoopService {
     /// Conversation coherence tracker for degradation detection
     coherence_tracker: ConversationCoherenceTracker,
 
-    /// Stability regime processor: CfC dynamics for primitives
-    /// Frequently-used primitives crystallize, rarely-used stay fluid
-    stability_regime: StabilityRegimeProcessor,
+    /// Memory & consolidation: semantic memory, coordinator, resonator, stability, discovery.
+    pub(crate) memory_consol: memory_consolidation_manager::MemoryAndConsolidationManager,
 
-    /// Discovery service for finding new primitives seeded by crystallization events
-    discovery_service: PrimitiveDiscoveryService,
-
-    /// Semantic Memory: HDC-based similarity lookup for CfC contextual learning
-    /// Stores (HDC vector, prediction error) pairs and retrieves similar past inputs
-    /// to modulate learning rate - high error on similar inputs -> boost learning
-    semantic_memory: SemanticMemory,
-
-    /// Memory Coordinator: cross-tier signal broadcaster
-    /// Bridges episodic and semantic memory with shared consciousness signals,
-    /// handles graduation from working memory to episodic storage.
-    memory_coordinator: MemoryCoordinator,
-
-    /// Resonator Memory for factorized episodic recall.
-    /// Stores episodes as bound (content ⊗ valence ⊗ phi_level) hypervectors
-    /// with growing semantic codebook. Factorization decomposes bundled recalls
-    /// into clean content/valence/phi components for richer context priming.
-    resonator_memory: Option<crate::dynamics::resonator::ResonatorMemory>,
-
-    /// Neural bridge for projecting pre-computed embeddings (e.g. BGE-M3)
-    /// directly into HDC space via a trained linear probe.
-    /// Only available when the `neural-bridge` feature is enabled and
-    /// probe weights exist on disk.
-    #[cfg(feature = "neural-bridge")]
-    neural_bridge: Option<NeuralBridge>,
-
-    /// Background embedding channel for Qwen3 semantic encoding.
-    /// Runs a dedicated thread that produces 1024D embeddings, projected
-    /// to BinaryHV via HdcBridge. Non-blocking: submits current input,
-    /// collects previous cycle's result.
-    #[cfg(feature = "semantic-encoder")]
-    semantic_embedding_channel: Option<symthaea_embeddings::channel::EmbeddingChannel>,
-
-    /// JL projection bridge for semantic embeddings → BinaryHV.
-    #[cfg(feature = "semantic-encoder")]
-    semantic_hdc_bridge: Option<symthaea_embeddings::HdcBridge>,
-
-    /// Pending response receiver from the semantic embedding channel.
-    /// Swapped each cycle: previous cycle's rx is consumed, new rx installed.
-    /// Wrapped in Mutex to satisfy Sync bound (MetricsProvider).
-    #[cfg(feature = "semantic-encoder")]
-    pending_semantic_rx: std::sync::Mutex<
-        Option<std::sync::mpsc::Receiver<symthaea_embeddings::channel::EmbedResponse>>,
-    >,
-
-    /// Last semantic embedding projected to continuous HDC space (16,384D).
-    /// Fed to the ethics engine for moral topology trajectory analysis,
-    /// giving genuine semantic resolution vs N-gram fallback.
-    #[cfg(feature = "semantic-encoder")]
-    last_semantic_continuous: Option<Vec<f32>>,
+    /// Feature integrations: neural bridge, semantic encoder, school, causal, physics.
+    pub(crate) feature_integ: feature_integration_manager::FeatureIntegrationManager,
 
     /// Background training thread handle (when `config.async_training` is true
     /// and the backend is CfC).  `None` for synchronous training or HdcLtc backend.
@@ -424,9 +381,17 @@ pub struct CognitiveLoopService {
     causal_enhancer: Option<CausalLoopEnhancer>,
 
     /// Episodic memory replay for high-Phi moment consolidation.
-    /// When enabled via `config.episodic_replay`, stores high-consciousness episodes
+    /// When enabled via `config.memory_graduation`, stores high-consciousness episodes
     /// and periodically replays them to reinforce important patterns.
     phi_episodic_replay: Option<crate::memory::episodic_replay::EpisodicMemory>,
+
+    /// Persistent memory database for cross-session episode storage.
+    /// Created when `config.memory_db_path` is `Some`. Episodes are periodically
+    /// flushed (every 199 cycles) via a background thread.
+    memory_db: Option<std::sync::Arc<crate::databases::SqliteMemory>>,
+
+    /// Guard to prevent overlapping memory flushes. When true, a flush is in progress.
+    memory_flush_in_progress: std::sync::Arc<std::sync::atomic::AtomicBool>,
 
     /// Conscious Reasoning Engine: unified 7-step reasoning cycle
     /// Composes epistemic conflict, temporal planning, counterfactual reasoning,
@@ -507,7 +472,6 @@ pub struct CognitiveLoopService {
     pub(crate) consciousness_state: consciousness_state_manager::ConsciousnessStateManager,
 
     // contextual_weights, phi_attention, negation_detector moved to ethics_values_manager
-
     /// All primitive-consciousness-gated subsystems, grouped into a single manager.
     /// See `primitive_tier::PrimitiveTierManager` for field list.
     primitive_tier: primitive_tier::PrimitiveTierManager,
@@ -515,42 +479,15 @@ pub struct CognitiveLoopService {
     // ═══════════════════════════════════════════════════════════════════════
     // SUPPORT INTELLIGENCE: Predictive diagnostics + knowledge federation
     // ═══════════════════════════════════════════════════════════════════════
-    /// Predictive engine for zero-click proactive support (telemetry → free energy alerts).
+    /// Support intelligence: predictive engine, knowledge, triage, privacy, actions.
     #[cfg(feature = "support")]
-    support_predictive_engine: Option<symthaea_support::predictive::PredictiveEngine>,
-
-    /// Knowledge manager for article graduation and cognitive update absorption.
-    /// Drives federation graduation checks and knowledge search during triage.
-    #[cfg(feature = "support")]
-    support_knowledge_manager: Option<symthaea_support::knowledge::KnowledgeManager>,
-
-    /// Triage engine for ticket classification and prioritization.
-    /// Classifies current input every cycle (lightweight keyword match).
-    #[cfg(feature = "support")]
-    support_triage_engine: Option<symthaea_support::triage::TriageEngine>,
-
-    /// Privacy manager for federation sharing tier enforcement.
-    /// Gates outbound knowledge federation based on SharingTier.
-    #[cfg(feature = "support")]
-    support_privacy_manager: Option<symthaea_support::privacy::PrivacyManager>,
-
-    /// Action engine for autonomous remediation proposals.
-    /// Proposes and gates actions based on autonomy level.
-    /// Consumed by bridge dispatch when conductor events are wired.
-    #[cfg(feature = "support")]
-    #[allow(dead_code)] // RESERVED(feature-support): autonomy-aware action engine
-    support_action_engine: Option<symthaea_support::actions::ActionEngine>,
-
-    /// Cycle counter for amortizing support subsystem updates.
-    #[cfg(feature = "support")]
-    support_cycle_counter: u64,
+    pub(crate) support: support_manager::SupportManager,
 
     /// State carried over between consecutive cycles (phi modulations, veto flags,
     /// urgency hysteresis, MCE boost, etc.). Reset via `CycleCarryover::default()`.
     carryover: CycleCarryover,
 
     // soul moved to ethics_values_manager
-
     /// Attention visualizer for debugging attention flow.
     /// When present, captures attention snapshots each cycle for
     /// ASCII heatmaps, JSON export, and Graphviz flow graphs.
@@ -560,7 +497,6 @@ pub struct CognitiveLoopService {
     pub(crate) social_mgr: SocialManager,
 
     // user_state moved to language_comm_manager
-
     /// Resonant speech generator: adapts response complexity to user cognitive load.
     /// Uses neuromod bath signals + USI to determine response profile each cycle.
     /// Science: Ritter et al. (2019) — adaptive complexity reduces cognitive overload.
@@ -583,7 +519,6 @@ pub struct CognitiveLoopService {
     // vision_bridge, vision_frame_buffer, cross_manifold_predictor, foveation_manager moved to vision_sensory_manager
 
     // broca_manager, last_broca_text moved to language_comm_manager
-
     /// Canvas living topology: consciousness-driven SVG generation.
     /// When enabled via `canvas` feature, generates real-time topology SVGs
     /// from cognitive telemetry with EMA-smoothed aesthetic mapping.
@@ -649,18 +584,7 @@ pub struct CognitiveLoopService {
     /// Bridges cognitive loop signals to Eight Harmonies wisdom system.
     experience_bus: Option<crate::experience::ExperienceBus>,
 
-    /// School bridge for curriculum-aware learning recommendations.
-    /// When present (and `school_learning` feature enabled), recommends objectives
-    /// with predicted Phi gain from CfC-powered O(1) lookahead.
-    /// Co-gated with `school_learning` feature.
-    #[cfg(feature = "school_learning")]
-    school_bridge: Option<crate::school::School>,
-
-    /// Causal consciousness: HSIC-based causal attention weighting.
-    /// Provides causal-strength attention maps for encoding interpretation.
-    /// Richer than CausalLoopEnhancer — uses HSIC independence testing.
-    causal_consciousness: Option<crate::intelligence::CausalConsciousness>,
-
+    // school_bridge + causal_consciousness moved to feature_integ manager
     /// Thermodynamic load (0.0 to 1.0, where 1.0 = 6W limit reached).
     pub(crate) thermodynamic_load: f32,
 
@@ -698,11 +622,7 @@ pub struct CognitiveLoopService {
     /// speed/scale modulation, and telemetry into a single cohesive struct.
     pub(super) substrate_manager: substrate_manager::SubstrateManager,
 
-    /// Physics bridge integration: HDC semantic search for physics analogies.
-    /// When enabled, blends physics-informed HDC vectors into CfC dynamics each cycle.
-    #[cfg(feature = "physics-bridge")]
-    physics_integration: Option<physics_integration::PhysicsIntegration>,
-
+    // physics_integration moved to feature_integ manager
     /// Cycle at which consciousness weights first converged (0 = not yet).
     convergence_cycle: usize,
 
@@ -740,6 +660,11 @@ pub struct CognitiveLoopService {
     /// Swarm Manager: Peer consciousness signals → social buffering, affective contagion,
     /// collective Φ modulation. Implements CognitiveSubsystem at interval 41.
     swarm_manager: managers::SwarmManager,
+
+    /// Spectrum Manager: Multi-band radio dispatch — SDR as sensory modality.
+    /// Implements CognitiveSubsystem at interval 53. Feature-gated behind `mesh`.
+    #[cfg(feature = "mesh")]
+    pub(crate) spectrum_manager: SpectrumManager,
 
     /// Integrity Manager: BLAKE3 attestation, temporal consistency, behavioral canaries.
     /// Runs tamper detection at co-prime intervals. Feature-gated behind `integrity`.
@@ -802,6 +727,12 @@ pub struct CognitiveLoopService {
     /// logic engine, constraint solver, geometry, graphs, differential equations).
     /// Tracks telemetry and stores solved-problem episodes for analogical retrieval.
     math_service: math_service::MathService,
+
+    /// Scientific method engine — hypothesis-test-update cycle for scientific reasoning.
+    /// Bayesian belief updates + HDC contradiction detection + MathService bridge.
+    /// Science: Popper (1959) — falsification; Jaynes (2003) — probability as logic.
+    #[cfg(feature = "scientific_method")]
+    scientific_method: crate::scientific_method::ScientificMethodEngine,
 }
 
 // MetricsProvider impl is in metrics_provider.rs

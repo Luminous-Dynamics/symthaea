@@ -389,8 +389,6 @@ pub mod action;
 // Coding Agent: multi-step consciousness-gated coding loop
 #[cfg(feature = "code_generation")]
 pub mod coding_agent;
-
-// Coding Experience: persistent HDC-encoded coding experience store
 pub mod coding_experience;
 
 // Partnership (enabled - 0 errors)

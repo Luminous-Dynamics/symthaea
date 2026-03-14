@@ -11,10 +11,8 @@
 //! Tracks per-backend success rates and respects metabolic budget constraints.
 //! Native code generation costs 1.0 energy, local LLM costs 10.0, cloud costs 50.0.
 
-use crate::cognitive_loop::routing::CodeTaskType;
 use crate::language::llm_backend::{GenerationParams, LLMBackend, SimulatedBackend};
 use crate::mind::structured_thought::EpistemicStatus;
-use std::collections::HashMap;
 use std::sync::Arc;
 
 /// Metabolic energy cost per backend tier.
@@ -23,7 +21,7 @@ const COST_LOCAL_LLM: f64 = 10.0;
 const COST_CLOUD_LLM: f64 = 50.0;
 
 /// Which backend tier was selected for a generation request.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BackendTier {
     /// Native HDC+CfC code generation (zero external calls).
     Native,
@@ -87,31 +85,20 @@ impl BackendStats {
 ///
 /// Selects the optimal backend tier based on epistemic status, prediction error,
 /// and metabolic budget. Falls back gracefully: cloud → local → native → simulated.
-///
-/// ## Adaptive Routing
-///
-/// Tracks per-backend AND per-(task_type, backend) success rates. When a backend's
-/// success rate for a specific task type drops below `MIN_VIABLE_RATE`, the dispatcher
-/// downgrades to the next cheaper tier — preventing repeated expensive failures.
 pub struct IntelligentDispatcher {
     /// Local LLM backend (Ollama with qwen2.5-coder:7b).
     local_llm: Arc<dyn LLMBackend>,
     /// Cloud LLM backend (Anthropic Claude, if available).
     cloud_llm: Option<Arc<dyn LLMBackend>>,
-    /// Per-tier success tracking (global).
+    /// Per-tier success tracking.
     native_stats: BackendStats,
     local_stats: BackendStats,
     cloud_stats: BackendStats,
-    /// Per-(task_type, tier) success tracking for adaptive routing.
-    task_tier_stats: HashMap<(CodeTaskType, BackendTier), BackendStats>,
     /// Cumulative energy spent.
     total_energy: f64,
     /// Maximum energy budget (0.0 = unlimited).
     energy_budget: f64,
 }
-
-/// Minimum viable success rate before a tier is downgraded for a task type.
-const MIN_VIABLE_RATE: f64 = 0.25;
 
 impl IntelligentDispatcher {
     /// Create a dispatcher with the given LLM backends.
@@ -122,7 +109,6 @@ impl IntelligentDispatcher {
             native_stats: BackendStats::default(),
             local_stats: BackendStats::default(),
             cloud_stats: BackendStats::default(),
-            task_tier_stats: HashMap::new(),
             total_energy: 0.0,
             energy_budget: 0.0,
         }
@@ -145,28 +131,12 @@ impl IntelligentDispatcher {
     /// 1. **Certain** + low prediction error → Native (fast, free)
     /// 2. **Probable** + medium error → Local LLM (moderate cost)
     /// 3. **Uncertain/Unknown** → Cloud LLM (expensive but capable)
-    /// 4. Adaptive: downgrade if success rate for (task_type, tier) < 25%
-    /// 5. Budget exceeded → fall back to cheaper tier
+    /// 4. Budget exceeded → fall back to cheaper tier
     pub fn select_tier(
         &self,
         epistemic: EpistemicStatus,
         prediction_error: f64,
         consciousness_level: f64,
-    ) -> BackendTier {
-        self.select_tier_for_task(epistemic, prediction_error, consciousness_level, None)
-    }
-
-    /// Select the backend tier with task-type-aware adaptive routing.
-    ///
-    /// When `task_type` is provided, the dispatcher checks per-(task_type, tier)
-    /// success rates and downgrades tiers that have been failing. This prevents
-    /// expensive repeated failures on task types a backend can't handle.
-    pub fn select_tier_for_task(
-        &self,
-        epistemic: EpistemicStatus,
-        prediction_error: f64,
-        consciousness_level: f64,
-        task_type: Option<CodeTaskType>,
     ) -> BackendTier {
         // Budget check: if we'd exceed budget, force cheaper tier
         let remaining = if self.energy_budget > 0.0 {
@@ -196,16 +166,8 @@ impl IntelligentDispatcher {
             return BackendTier::Native;
         }
 
-        // Adaptive routing: downgrade if this (task_type, tier) has poor success rate
-        let tier_after_adaptive = if let Some(tt) = task_type {
-            self.adaptive_downgrade(base_tier, tt)
-        } else {
-            // No task type — use global success rates
-            self.global_adaptive_downgrade(base_tier)
-        };
-
         // Budget constraints: fall back to cheaper tiers
-        match tier_after_adaptive {
+        match base_tier {
             BackendTier::CloudLlm if remaining < COST_CLOUD_LLM => {
                 if remaining >= COST_LOCAL_LLM {
                     BackendTier::LocalLlm
@@ -215,56 +177,6 @@ impl IntelligentDispatcher {
             }
             BackendTier::LocalLlm if remaining < COST_LOCAL_LLM => BackendTier::Native,
             other => other,
-        }
-    }
-
-    /// Downgrade a tier if its task-type-specific success rate is below MIN_VIABLE_RATE.
-    ///
-    /// Only triggers after enough data: requires >= 3 attempts for a (task_type, tier) pair.
-    fn adaptive_downgrade(&self, tier: BackendTier, task_type: CodeTaskType) -> BackendTier {
-        let key = (task_type, tier);
-        if let Some(stats) = self.task_tier_stats.get(&key) {
-            if stats.attempts >= 3 && stats.success_rate() < MIN_VIABLE_RATE {
-                tracing::info!(
-                    target: "symthaea::dispatcher",
-                    tier = %tier,
-                    task_type = ?task_type,
-                    rate = stats.success_rate(),
-                    "Adaptive downgrade: {tier} failing on {task_type:?}"
-                );
-                return match tier {
-                    BackendTier::CloudLlm => BackendTier::LocalLlm,
-                    BackendTier::LocalLlm => BackendTier::Native,
-                    other => other,
-                };
-            }
-        }
-        tier
-    }
-
-    /// Downgrade based on global success rates (no task type context).
-    fn global_adaptive_downgrade(&self, tier: BackendTier) -> BackendTier {
-        let rate = match tier {
-            BackendTier::CloudLlm => self.cloud_stats.success_rate(),
-            BackendTier::LocalLlm => self.local_stats.success_rate(),
-            _ => return tier,
-        };
-
-        // Only downgrade if we have enough data AND rate is poor
-        let attempts = match tier {
-            BackendTier::CloudLlm => self.cloud_stats.attempts,
-            BackendTier::LocalLlm => self.local_stats.attempts,
-            _ => 0,
-        };
-
-        if attempts >= 3 && rate < MIN_VIABLE_RATE {
-            match tier {
-                BackendTier::CloudLlm => BackendTier::LocalLlm,
-                BackendTier::LocalLlm => BackendTier::Native,
-                other => other,
-            }
-        } else {
-            tier
         }
     }
 
@@ -280,21 +192,7 @@ impl IntelligentDispatcher {
         prediction_error: f64,
         consciousness_level: f64,
     ) -> DispatchResult {
-        self.generate_for_task(prompt, params, epistemic, prediction_error, consciousness_level, None)
-            .await
-    }
-
-    /// Generate code with task-type-aware adaptive routing.
-    pub async fn generate_for_task(
-        &mut self,
-        prompt: &str,
-        params: &GenerationParams,
-        epistemic: EpistemicStatus,
-        prediction_error: f64,
-        consciousness_level: f64,
-        task_type: Option<CodeTaskType>,
-    ) -> DispatchResult {
-        let tier = self.select_tier_for_task(epistemic, prediction_error, consciousness_level, task_type);
+        let tier = self.select_tier(epistemic, prediction_error, consciousness_level);
 
         let (output, success, cost) = match tier {
             BackendTier::Native => {
@@ -403,57 +301,19 @@ impl IntelligentDispatcher {
     /// it calls this with the tier that was used and whether the code passed checks.
     /// Over time, this shifts routing toward backends with higher success rates.
     pub fn record_outcome(&mut self, tier: BackendTier, success: bool) {
-        self.record_outcome_for_task(tier, success, None);
-    }
-
-    /// Record outcome with task-type context for adaptive routing.
-    ///
-    /// When `task_type` is provided, updates both global and per-(task_type, tier)
-    /// stats. This enables the dispatcher to learn that e.g. Native works well for
-    /// Create tasks but poorly for Debug tasks.
-    pub fn record_outcome_for_task(
-        &mut self,
-        tier: BackendTier,
-        success: bool,
-        task_type: Option<CodeTaskType>,
-    ) {
-        // Global stats
         match tier {
             BackendTier::Native => self.native_stats.record(success),
             BackendTier::LocalLlm => self.local_stats.record(success),
             BackendTier::CloudLlm => self.cloud_stats.record(success),
-            BackendTier::Simulated => {}
+            BackendTier::Simulated => {} // no tracking for simulated
         }
-
-        // Per-task-type stats
-        if let Some(tt) = task_type {
-            self.task_tier_stats
-                .entry((tt, tier))
-                .or_default()
-                .record(success);
-        }
-
         tracing::debug!(
             target: "symthaea::dispatcher",
             tier = %tier,
             success = success,
-            task_type = ?task_type,
             rate = self.success_rate(tier),
             "Recorded generation outcome"
         );
-    }
-
-    /// Get the success rate for a (task_type, tier) combination.
-    ///
-    /// Returns the task-specific rate if enough data exists (>= 3 attempts),
-    /// otherwise falls back to the global tier rate.
-    pub fn task_success_rate(&self, task_type: CodeTaskType, tier: BackendTier) -> f64 {
-        if let Some(stats) = self.task_tier_stats.get(&(task_type, tier)) {
-            if stats.attempts >= 3 {
-                return stats.success_rate();
-            }
-        }
-        self.success_rate(tier)
     }
 
     /// Get remaining energy budget (f64::MAX if unlimited).
@@ -622,156 +482,5 @@ mod tests {
         // Should not panic
         dispatcher.record_outcome(BackendTier::Simulated, true);
         dispatcher.record_outcome(BackendTier::Simulated, false);
-    }
-
-    // ── Adaptive Routing Tests ────────────────────────────────────────────
-
-    #[test]
-    fn test_task_tier_stats_tracking() {
-        let mut dispatcher = IntelligentDispatcher::simulated();
-
-        // Record outcomes for specific task types
-        dispatcher.record_outcome_for_task(
-            BackendTier::Native,
-            true,
-            Some(CodeTaskType::Create),
-        );
-        dispatcher.record_outcome_for_task(
-            BackendTier::Native,
-            true,
-            Some(CodeTaskType::Create),
-        );
-        dispatcher.record_outcome_for_task(
-            BackendTier::Native,
-            false,
-            Some(CodeTaskType::Create),
-        );
-
-        // Task-specific rate (3 attempts, 2 successes)
-        let rate = dispatcher.task_success_rate(CodeTaskType::Create, BackendTier::Native);
-        assert!((rate - 0.667).abs() < 0.01, "Rate should be ~66%: {rate}");
-
-        // Different task type should fall back to global
-        let debug_rate = dispatcher.task_success_rate(CodeTaskType::Debug, BackendTier::Native);
-        // Global native_stats has the same 3 recordings
-        assert!((debug_rate - 0.667).abs() < 0.01);
-    }
-
-    #[test]
-    fn test_adaptive_downgrade_on_poor_success() {
-        let mut dispatcher = IntelligentDispatcher::new(
-            Arc::new(SimulatedBackend),
-            Some(Arc::new(SimulatedBackend)),
-        );
-
-        // Record 3 failures for CloudLlm on Debug tasks
-        for _ in 0..3 {
-            dispatcher.record_outcome_for_task(
-                BackendTier::CloudLlm,
-                false,
-                Some(CodeTaskType::Debug),
-            );
-        }
-
-        // CloudLlm now has 0% success on Debug → should downgrade to LocalLlm
-        let tier = dispatcher.select_tier_for_task(
-            EpistemicStatus::Uncertain,
-            0.8,
-            0.8,
-            Some(CodeTaskType::Debug),
-        );
-        assert_eq!(
-            tier,
-            BackendTier::LocalLlm,
-            "Should downgrade CloudLlm after 3 failures"
-        );
-
-        // Create tasks should still get CloudLlm (no data)
-        let tier = dispatcher.select_tier_for_task(
-            EpistemicStatus::Uncertain,
-            0.8,
-            0.8,
-            Some(CodeTaskType::Create),
-        );
-        assert_eq!(
-            tier,
-            BackendTier::CloudLlm,
-            "Create should still use CloudLlm"
-        );
-    }
-
-    #[test]
-    fn test_adaptive_requires_minimum_attempts() {
-        let mut dispatcher = IntelligentDispatcher::new(
-            Arc::new(SimulatedBackend),
-            Some(Arc::new(SimulatedBackend)),
-        );
-
-        // Only 2 failures — not enough to trigger downgrade
-        dispatcher.record_outcome_for_task(
-            BackendTier::CloudLlm,
-            false,
-            Some(CodeTaskType::Debug),
-        );
-        dispatcher.record_outcome_for_task(
-            BackendTier::CloudLlm,
-            false,
-            Some(CodeTaskType::Debug),
-        );
-
-        let tier = dispatcher.select_tier_for_task(
-            EpistemicStatus::Uncertain,
-            0.8,
-            0.8,
-            Some(CodeTaskType::Debug),
-        );
-        assert_eq!(
-            tier,
-            BackendTier::CloudLlm,
-            "Should NOT downgrade with only 2 attempts"
-        );
-    }
-
-    #[test]
-    fn test_global_adaptive_downgrade() {
-        let mut dispatcher = IntelligentDispatcher::simulated();
-
-        // Record 4 global failures for LocalLlm
-        for _ in 0..4 {
-            dispatcher.record_outcome(BackendTier::LocalLlm, false);
-        }
-
-        // Without task type, global stats should trigger downgrade
-        let tier = dispatcher.select_tier(EpistemicStatus::Probable, 0.5, 0.8);
-        assert_eq!(
-            tier,
-            BackendTier::Native,
-            "Should downgrade LocalLlm after 4 global failures"
-        );
-    }
-
-    #[test]
-    fn test_select_tier_for_task_with_none_matches_select_tier() {
-        let dispatcher = IntelligentDispatcher::simulated();
-
-        let tier1 = dispatcher.select_tier(EpistemicStatus::Certain, 0.1, 0.8);
-        let tier2 =
-            dispatcher.select_tier_for_task(EpistemicStatus::Certain, 0.1, 0.8, None);
-
-        assert_eq!(tier1, tier2, "None task type should match base select_tier");
-    }
-
-    #[test]
-    fn test_task_success_rate_falls_back_to_global() {
-        let mut dispatcher = IntelligentDispatcher::simulated();
-
-        // Only global stats, no task-specific
-        dispatcher.record_outcome(BackendTier::Native, true);
-        dispatcher.record_outcome(BackendTier::Native, true);
-        dispatcher.record_outcome(BackendTier::Native, false);
-
-        // Task-specific with < 3 attempts → falls back to global
-        let rate = dispatcher.task_success_rate(CodeTaskType::Create, BackendTier::Native);
-        assert!((rate - 0.667).abs() < 0.01);
     }
 }

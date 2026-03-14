@@ -57,64 +57,67 @@ impl CognitiveLoopService {
                 if !graduates.is_empty() {
                     for grad in &graduates {
                         // Route graduate through resonator for importance scoring
-                        let grad_importance = if let Some(ref mut res_mem) = self.resonator_memory {
-                            let res_dim = res_mem.resonator.config.dim;
-                            let grad_vals = &grad.embedding.values;
-                            if grad_vals.len() >= res_dim && !res_mem.episodes.is_empty() {
-                                // Project to resonator dim and find best episode match
-                                let projected: Vec<f32> =
-                                    grad_vals.iter().take(res_dim).copied().collect();
-                                let best_sim = res_mem
-                                    .episodes
-                                    .iter()
-                                    .map(|ep| {
-                                        let dot: f32 = ep
-                                            .hv
-                                            .iter()
-                                            .zip(projected.iter())
-                                            .map(|(a, b)| a * b)
-                                            .sum();
-                                        let denom = (ep
-                                            .hv
-                                            .iter()
-                                            .map(|x| x * x)
-                                            .sum::<f32>()
-                                            .sqrt()
-                                            * projected.iter().map(|x| x * x).sum::<f32>().sqrt())
-                                        .max(1e-8);
-                                        let sim = dot / denom;
-                                        if sim.is_finite() {
-                                            sim.clamp(-1.0, 1.0)
-                                        } else {
-                                            0.0
-                                        }
-                                    })
-                                    .fold(0.0f32, f32::max);
-                                // High resonator match → boost importance (consolidation-worthy)
-                                // Low match → novel content, still store but with base importance
-                                ctx.pp_phi + best_sim * 0.2
+                        let grad_importance =
+                            if let Some(ref mut res_mem) = self.memory_consol.resonator_memory {
+                                let res_dim = res_mem.resonator.config.dim;
+                                let grad_vals = &grad.embedding.values;
+                                if grad_vals.len() >= res_dim && !res_mem.episodes.is_empty() {
+                                    // Project to resonator dim and find best episode match
+                                    let projected: Vec<f32> =
+                                        grad_vals.iter().take(res_dim).copied().collect();
+                                    let best_sim = res_mem
+                                        .episodes
+                                        .iter()
+                                        .map(|ep| {
+                                            let dot: f32 = ep
+                                                .hv
+                                                .iter()
+                                                .zip(projected.iter())
+                                                .map(|(a, b)| a * b)
+                                                .sum();
+                                            let denom =
+                                                (ep.hv.iter().map(|x| x * x).sum::<f32>().sqrt()
+                                                    * projected
+                                                        .iter()
+                                                        .map(|x| x * x)
+                                                        .sum::<f32>()
+                                                        .sqrt())
+                                                .max(1e-8);
+                                            let sim = dot / denom;
+                                            if sim.is_finite() {
+                                                sim.clamp(-1.0, 1.0)
+                                            } else {
+                                                0.0
+                                            }
+                                        })
+                                        .fold(0.0f32, f32::max);
+                                    // High resonator match → boost importance (consolidation-worthy)
+                                    // Low match → novel content, still store but with base importance
+                                    ctx.pp_phi + best_sim * 0.2
+                                } else {
+                                    ctx.pp_phi
+                                }
                             } else {
                                 ctx.pp_phi
-                            }
-                        } else {
-                            ctx.pp_phi
-                        };
-                        self.fep.episodic_memory.encode(
-                            &grad.id,
-                            grad.embedding
-                                .values
-                                .iter()
-                                .take(64)
-                                .copied()
-                                .collect::<Vec<_>>(),
-                            0.0,
-                            grad_importance,
-                            self.stats.total_cycles,
+                            };
+                        // Route through MemoryCoordinator for quality filtering instead of
+                        // bypassing directly to fep.episodic_memory.encode().
+                        self.memory_consol.memory_coordinator.queue_graduation(
+                            crate::memory::memory_coordinator::GraduationEvent {
+                                content: grad.embedding.clone(),
+                                label: grad.id.clone(),
+                                steps_survived: self.stats.total_cycles as u64 - grad.added_at,
+                                final_activation: grad_importance as f64,
+                                psi_at_graduation: ctx.pp_phi as f64,
+                                coherence_at_graduation: 0.0,
+                                source: Default::default(),
+                                is_verified: false,
+                            },
                         );
                     }
                     tracing::debug!(
                         count = graduates.len(),
-                        "Prefrontal graduated items to episodic memory (resonator-routed)"
+                        "Prefrontal graduates queued for memory coordinator"
                     );
                 }
 
@@ -517,16 +520,17 @@ impl CognitiveLoopService {
         // Observes current Phi and gates expensive actions by consciousness level.
         // Science: Dehaene (2014) — conscious access enables flexible routing
         // ═══════════════════════════════════════════════════════════════════════
-        let (psi_attention_avg, phi_suppress) = if let Some(ref mut phi_attn) = self.ethics_values.phi_attention {
-            phi_attn.observe(ctx.unified_psi as f32);
-            let suppress = !phi_attn.allows_action(
-                crate::consciousness::phi_attention::ActionType::StateModifying,
-                ctx.unified_psi as f32,
-            );
-            (phi_attn.phi_average().unwrap_or(0.0), suppress)
-        } else {
-            (0.0, false)
-        };
+        let (psi_attention_avg, phi_suppress) =
+            if let Some(ref mut phi_attn) = self.ethics_values.phi_attention {
+                phi_attn.observe(ctx.unified_psi as f32);
+                let suppress = !phi_attn.allows_action(
+                    crate::consciousness::phi_attention::ActionType::StateModifying,
+                    ctx.unified_psi as f32,
+                );
+                (phi_attn.phi_average().unwrap_or(0.0), suppress)
+            } else {
+                (0.0, false)
+            };
         if phi_suppress {
             // Attenuated: 5-HT confidence_delta implicitly reduces exploration
             self.scale_exploration("phi_gate_suppress", 0.85);

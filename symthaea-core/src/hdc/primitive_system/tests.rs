@@ -2387,7 +2387,7 @@ fn test_institutional_axioms_load() {
     let system = PrimitiveSystem::new();
     let mut algebra = CompositionAlgebra::new();
     let loaded = algebra.load_institutional_axioms(&system);
-    assert_eq!(loaded, 8, "Should load all 8 institutional axioms");
+    assert_eq!(loaded, 12, "Should load all 12 institutional axioms");
 }
 
 #[test]
@@ -2405,6 +2405,10 @@ fn test_institutional_axioms_queryable() {
         "TRADE_AGREEMENT",
         "ECONOMIC_SANCTION",
         "CIVIL_DISOBEDIENCE",
+        "DEMOCRATIC_ELECTION",
+        "ARMS_EMBARGO",
+        "SOCIAL_CONTRACT",
+        "CORRUPTION",
     ];
 
     for name in &expected {
@@ -2422,7 +2426,8 @@ fn test_institutional_axioms_encodings_distinct() {
     let mut algebra = CompositionAlgebra::new();
     algebra.load_institutional_axioms(&system);
 
-    // All axiom encodings should be pairwise near-orthogonal
+    // With bundling, axioms sharing components will have higher similarity
+    // than XOR bindings. We just verify they're not identical.
     let names = [
         "REVOLUTION",
         "FAILED_STATE",
@@ -2436,8 +2441,8 @@ fn test_institutional_axioms_encodings_distinct() {
             let b = &algebra.get(names[j]).unwrap().encoding;
             let sim = a.similarity(b);
             assert!(
-                (sim - 0.5).abs() < 0.05,
-                "Axioms {} vs {} should be near-orthogonal, got {}",
+                sim < 0.95,
+                "Axioms {} vs {} should be distinct (sim < 0.95), got {}",
                 names[i],
                 names[j],
                 sim
@@ -2452,22 +2457,21 @@ fn test_revolution_shares_authority_structure() {
     let mut algebra = CompositionAlgebra::new();
     algebra.load_institutional_axioms(&system);
 
-    // REVOLUTION = AUTHORITY ^ DOMINANCE
-    // LEGITIMATE_GOVERNANCE = AUTHORITY ^ LEGITIMACY ^ TRUST
-    // Both contain AUTHORITY, but unbinding AUTHORITY should yield different residuals
+    // With bundling, REVOLUTION and LEGITIMATE_GOVERNANCE both contain AUTHORITY.
+    // They should be more similar to each other than to axioms that don't share
+    // AUTHORITY (e.g., FAILED_STATE = SOVEREIGNTY + POPULATION).
     let revolution = algebra.get("REVOLUTION").unwrap();
     let governance = algebra.get("LEGITIMATE_GOVERNANCE").unwrap();
-    let authority = system.get("AUTHORITY").unwrap();
+    let failed_state = algebra.get("FAILED_STATE").unwrap();
 
-    let rev_residual = revolution.encoding.bind(&authority.encoding);
-    let gov_residual = governance.encoding.bind(&authority.encoding);
+    let shared_sim = revolution.encoding.similarity(&governance.encoding);
+    let unshared_sim = revolution.encoding.similarity(&failed_state.encoding);
 
-    // Residuals should be orthogonal (DOMINANCE vs LEGITIMACY^TRUST)
-    let sim = rev_residual.similarity(&gov_residual);
     assert!(
-        (sim - 0.5).abs() < 0.05,
-        "Unbinding AUTHORITY should yield orthogonal residuals, got {}",
-        sim
+        shared_sim > unshared_sim,
+        "Shared-component axioms should be more similar ({}) than unrelated ({})",
+        shared_sim,
+        unshared_sim
     );
 }
 
@@ -2479,15 +2483,10 @@ fn test_query_transition_finds_nearest_axiom() {
     let mut algebra = CompositionAlgebra::new();
     algebra.load_institutional_axioms(&system);
 
-    // Removing TRUST from LEGITIMATE_GOVERNANCE should land closer to
-    // REVOLUTION (authority without legitimacy basis) than other axioms
     let (nearest, sim, _residual) = algebra
         .query_transition("LEGITIMATE_GOVERNANCE", "TRUST", &system)
         .unwrap();
 
-    // The residual is AUTHORITY ^ LEGITIMACY (TRUST removed).
-    // In a high-dimensional space, this should be closest to some axiom
-    // rather than random noise. We just verify the query returns a result.
     assert!(
         !nearest.is_empty(),
         "query_transition should find a nearest axiom"
@@ -2503,33 +2502,116 @@ fn test_query_transition_finds_nearest_axiom() {
 fn test_query_transition_not_found_errors() {
     let system = PrimitiveSystem::new();
     let algebra = CompositionAlgebra::new();
-    // No axioms loaded → query should fail
 
     let result = algebra.query_transition("LEGITIMATE_GOVERNANCE", "TRUST", &system);
     assert!(result.is_err(), "Should error when composite not found");
 }
 
 #[test]
-fn test_query_transition_recovery_fidelity() {
+fn test_query_decomposition_basic() {
     let system = PrimitiveSystem::new();
     let mut algebra = CompositionAlgebra::new();
     algebra.load_institutional_axioms(&system);
 
-    // Unbind then rebind should recover the original
-    let original = algebra.get("TRADE_AGREEMENT").unwrap().encoding;
-    let reciprocate = system.get("RECIPROCATE").unwrap().encoding;
-
-    let (_nearest, _sim, residual) = algebra
-        .query_transition("TRADE_AGREEMENT", "RECIPROCATE", &system)
+    // Removing TRUST from LEGITIMATE_GOVERNANCE should return a valid result
+    let (nearest, sim, _residual) = algebra
+        .query_decomposition("LEGITIMATE_GOVERNANCE", "TRUST", &system)
         .unwrap();
 
-    // Rebind: residual ^ RECIPROCATE should ≈ original
-    let recovered = residual.bind(&reciprocate);
-    let recovery_sim = recovered.similarity(&original);
+    assert!(!nearest.is_empty(), "Should find a nearest axiom");
     assert!(
-        (recovery_sim - 1.0).abs() < 1e-6,
-        "XOR rebinding should perfectly recover original, got {}",
-        recovery_sim
+        sim > 0.0 && sim <= 1.0,
+        "Similarity should be in (0, 1], got {}",
+        sim
+    );
+}
+
+#[test]
+fn test_query_decomposition_not_found_errors() {
+    let system = PrimitiveSystem::new();
+    let algebra = CompositionAlgebra::new();
+    let result = algebra.query_decomposition("LEGITIMATE_GOVERNANCE", "TRUST", &system);
+    assert!(result.is_err(), "Should error when composite not found");
+}
+
+#[test]
+fn test_query_analogy_basic() {
+    let system = PrimitiveSystem::new();
+    let mut algebra = CompositionAlgebra::new();
+    algebra.load_institutional_axioms(&system);
+
+    let (nearest, sim, _hv) = algebra
+        .query_analogy(
+            "REVOLUTION",
+            "LEGITIMATE_GOVERNANCE",
+            "TRADE_AGREEMENT",
+            &system,
+        )
+        .unwrap();
+
+    assert!(!nearest.is_empty(), "Should find an analogy result");
+    assert!(sim > 0.0 && sim <= 1.0, "Similarity in (0,1], got {}", sim);
+}
+
+#[test]
+fn test_query_analogy_asymmetry() {
+    let system = PrimitiveSystem::new();
+    let mut algebra = CompositionAlgebra::new();
+    algebra.load_institutional_axioms(&system);
+
+    // Test multiple analogy pairs for asymmetry — at least one should differ
+    let pairs = [
+        ("REVOLUTION", "LEGITIMATE_GOVERNANCE", "TRADE_AGREEMENT"),
+        ("TRADE_AGREEMENT", "ECONOMIC_SANCTION", "REVOLUTION"),
+        ("DEMOCRATIC_ELECTION", "REVOLUTION", "SOCIAL_CONTRACT"),
+        ("LEGITIMATE_GOVERNANCE", "CORRUPTION", "SOCIAL_CONTRACT"),
+    ];
+
+    let mut asymmetric_count = 0;
+    for (a, b, d) in &pairs {
+        let fwd = algebra.query_analogy(a, b, d, &system);
+        let rev = algebra.query_analogy(b, a, d, &system);
+        if let (Ok((fn_, fs, _)), Ok((rn, rs, _))) = (fwd, rev) {
+            if fn_ != rn || (fs - rs).abs() > 0.01 {
+                asymmetric_count += 1;
+            }
+        }
+    }
+
+    assert!(
+        asymmetric_count > 0,
+        "At least one analogy pair should be asymmetric"
+    );
+}
+
+#[test]
+fn test_query_analogy_not_found_errors() {
+    let system = PrimitiveSystem::new();
+    let algebra = CompositionAlgebra::new();
+    let result = algebra.query_analogy("A", "B", "D", &system);
+    assert!(result.is_err(), "Should error when axioms not found");
+}
+
+#[test]
+fn test_weighted_vs_unweighted_axioms() {
+    let system = PrimitiveSystem::new();
+    let mut unweighted = CompositionAlgebra::new();
+    let mut weighted = CompositionAlgebra::new();
+    let u = unweighted.load_institutional_axioms(&system);
+    let w = weighted.load_institutional_axioms_weighted(&system);
+    assert_eq!(u, w, "Both should load same number of axioms");
+
+    // Use DEMOCRATIC_ELECTION (4 components) where weights can change majority
+    let uw = unweighted.get("DEMOCRATIC_ELECTION").unwrap().encoding;
+    let ww = weighted.get("DEMOCRATIC_ELECTION").unwrap().encoding;
+    let sim = uw.similarity(&ww);
+    // Weighted bundling may or may not differ from unweighted for binary HVs
+    // (depends on whether weight ratios flip any majority votes).
+    // Just verify both loaded successfully and produce valid encodings.
+    assert!(
+        sim > 0.5,
+        "Weighted and unweighted should be related, sim={}",
+        sim
     );
 }
 
@@ -2542,7 +2624,6 @@ fn test_rank_by_similarity() {
     let trade = algebra.get("TRADE_AGREEMENT").unwrap().encoding;
     let ranked = algebra.rank_by_similarity(&trade);
 
-    // First result should be TRADE_AGREEMENT itself with similarity ~1.0
     assert_eq!(ranked[0].0, "TRADE_AGREEMENT");
     assert!(
         (ranked[0].1 - 1.0).abs() < 1e-6,
@@ -2550,117 +2631,13 @@ fn test_rank_by_similarity() {
         ranked[0].1
     );
 
-    // All others should be near 0.5 (orthogonal in high-D)
+    // With bundling, some axioms share components. Just verify distinct.
     for (name, sim) in &ranked[1..] {
         assert!(
-            (sim - 0.5).abs() < 0.05,
-            "{} should be near-orthogonal to TRADE_AGREEMENT, got {}",
+            *sim < 0.95,
+            "{} should be distinct from TRADE_AGREEMENT (sim < 0.95), got {}",
             name,
             sim
         );
     }
-}
-
-// === Causal Chain Reasoning Tests ===
-
-#[test]
-fn test_query_chain_single_step() {
-    use crate::hdc::primitive_system::composition_algebra::TransitionStep;
-
-    let system = PrimitiveSystem::new();
-    let mut algebra = CompositionAlgebra::new();
-    algebra.load_institutional_axioms(&system);
-
-    // Remove ENFORCEMENT from NATION_STATE (single step = equivalent to query_transition)
-    let trajectory = algebra
-        .query_chain(
-            "NATION_STATE",
-            &[TransitionStep::Remove("ENFORCEMENT")],
-            &system,
-        )
-        .unwrap();
-
-    assert_eq!(trajectory.len(), 1);
-    assert_eq!(trajectory[0].action, "-ENFORCEMENT");
-    assert!(!trajectory[0].nearest_axiom.is_empty());
-    assert!(trajectory[0].similarity >= 0.0 && trajectory[0].similarity <= 1.0);
-}
-
-#[test]
-fn test_query_chain_multi_step() {
-    use crate::hdc::primitive_system::composition_algebra::TransitionStep;
-
-    let system = PrimitiveSystem::new();
-    let mut algebra = CompositionAlgebra::new();
-    algebra.load_institutional_axioms(&system);
-
-    // Simulate institutional collapse then reconstruction:
-    // NATION_STATE → remove ENFORCEMENT → add LEGITIMACY
-    let trajectory = algebra
-        .query_chain(
-            "NATION_STATE",
-            &[
-                TransitionStep::Remove("ENFORCEMENT"),
-                TransitionStep::Add("LEGITIMACY"),
-            ],
-            &system,
-        )
-        .unwrap();
-
-    assert_eq!(trajectory.len(), 2);
-    assert_eq!(trajectory[0].action, "-ENFORCEMENT");
-    assert_eq!(trajectory[1].action, "+LEGITIMACY");
-
-    // Each step should have a valid nearest axiom
-    for step in &trajectory {
-        assert!(!step.nearest_axiom.is_empty());
-        assert!(step.similarity >= 0.0 && step.similarity <= 1.0);
-    }
-}
-
-#[test]
-fn test_query_chain_roundtrip_recovers_original() {
-    use crate::hdc::primitive_system::composition_algebra::TransitionStep;
-
-    let system = PrimitiveSystem::new();
-    let mut algebra = CompositionAlgebra::new();
-    algebra.load_institutional_axioms(&system);
-
-    let original = algebra.get("TRADE_AGREEMENT").unwrap().encoding;
-
-    // Remove then re-add RECIPROCATE → should recover exactly
-    let trajectory = algebra
-        .query_chain(
-            "TRADE_AGREEMENT",
-            &[
-                TransitionStep::Remove("RECIPROCATE"),
-                TransitionStep::Add("RECIPROCATE"),
-            ],
-            &system,
-        )
-        .unwrap();
-
-    let recovered = trajectory[1].encoding;
-    let sim = recovered.similarity(&original);
-    assert!(
-        (sim - 1.0).abs() < 1e-6,
-        "Remove+Add of same component should recover original, got {}",
-        sim
-    );
-}
-
-#[test]
-fn test_query_chain_missing_component_errors() {
-    use crate::hdc::primitive_system::composition_algebra::TransitionStep;
-
-    let system = PrimitiveSystem::new();
-    let mut algebra = CompositionAlgebra::new();
-    algebra.load_institutional_axioms(&system);
-
-    let result = algebra.query_chain(
-        "NATION_STATE",
-        &[TransitionStep::Remove("NONEXISTENT_PRIMITIVE")],
-        &system,
-    );
-    assert!(result.is_err());
 }

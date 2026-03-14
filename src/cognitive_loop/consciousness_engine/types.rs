@@ -156,11 +156,11 @@ pub(crate) struct ConsciousnessEngineInput<'a> {
     ///          Woolley et al. (2010) — collective intelligence emerges from social sensitivity.
     pub governance_collective_phi: f64,
 
-    /// Knowledge grounding score [0.0, 1.0].
-    /// Measures how well current input is supported by stored knowledge.
-    /// Modulates unified consciousness ±2.5%: grounded knowledge enriches experience.
-    /// Neutral at 0.5 (no knowledge engine). Only active when knowledge engine enabled.
-    /// Science: Barsalou (2008) — grounded cognition; Clark (2013) — predictive processing.
+    // ── Knowledge grounding → epistemic quality coupling ─────────────
+    /// Knowledge grounding score [0.0, 1.0] from the knowledge engine.
+    /// Combines fact relevance and certainty: high grounding → more confident reasoning.
+    /// Neutral at 0.5 when knowledge engine is disabled.
+    /// Science: Baddeley (2000) — working memory benefits from grounded semantic content.
     pub knowledge_grounding: f64,
 }
 

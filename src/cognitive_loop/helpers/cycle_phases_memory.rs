@@ -28,7 +28,7 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         // Gate codebook growth on epistemic approval — don't learn from rejected inputs
         if epistemic_gate_approved {
-            if let Some(ref mut res_mem) = self.resonator_memory {
+            if let Some(ref mut res_mem) = self.memory_consol.resonator_memory {
                 let res_dim_ok = compressed_state.len() == res_mem.resonator.config.dim;
                 if res_dim_ok
                     && self.stats.total_cycles % self.config.resonator_growth_interval == 0
@@ -81,7 +81,7 @@ impl CognitiveLoopService {
 
             // Track A-2: Causal chain content → resonator codebook symbols
             if !causal_codebook_entries.is_empty() {
-                if let Some(ref mut res_mem) = self.resonator_memory {
+                if let Some(ref mut res_mem) = self.memory_consol.resonator_memory {
                     for (label, hv) in causal_codebook_entries {
                         if let Some(ref mut semantic_cb) = res_mem.resonator.codebooks.get_mut(0) {
                             if semantic_cb.len() < self.config.resonator_max_symbols
@@ -111,7 +111,7 @@ impl CognitiveLoopService {
                 .unwrap_or_default();
 
             if !top_eps.is_empty() {
-                if let Some(ref mut res_mem) = self.resonator_memory {
+                if let Some(ref mut res_mem) = self.memory_consol.resonator_memory {
                     let dim = res_mem.resonator.config.dim;
                     if let Some(ref mut semantic_cb) = res_mem.resonator.codebooks.get_mut(0) {
                         for ep in &top_eps {
@@ -169,7 +169,7 @@ impl CognitiveLoopService {
         // Science: competitive learning — low diversity = redundant representations
         // Compute average pairwise cosine distance (every 50 cycles to amortize cost)
         let codebook_diversity: f32 = if self.stats.total_cycles % 50 == 0 {
-            if let Some(ref res_mem) = self.resonator_memory {
+            if let Some(ref res_mem) = self.memory_consol.resonator_memory {
                 if let Some(semantic_cb) = res_mem.resonator.codebooks.first() {
                     let n = semantic_cb.symbols.len();
                     if n >= 2 {
@@ -208,7 +208,7 @@ impl CognitiveLoopService {
         // Compute fraction of codebook symbols that match recent input (similarity > 0.2).
         // Low utilization → too many dead symbols → slow codebook growth.
         let codebook_utilization_rate: f32 = if self.stats.total_cycles % 50 == 0 {
-            if let Some(ref res_mem) = self.resonator_memory {
+            if let Some(ref res_mem) = self.memory_consol.resonator_memory {
                 if let Some(semantic_cb) = res_mem.resonator.codebooks.first() {
                     let n = semantic_cb.symbols.len();
                     if n > 0 && compressed_state.len() == res_mem.resonator.config.dim {
@@ -301,7 +301,7 @@ impl CognitiveLoopService {
         if let Some(ref mut replay) = self.phi_episodic_replay {
             let avg_err = self.stats.avg_prediction_error;
             let error_spike = avg_err > 0.01 && prediction_error > avg_err * 2.0;
-            let semantic_miss = self.semantic_memory.stats().semantic_misses > 0
+            let semantic_miss = self.memory_consol.semantic_memory.stats().semantic_misses > 0
                 && memory_context_boost == 0.0 // no episodic memories recalled this cycle
                 && self.stats.total_cycles > 10;
 
@@ -378,7 +378,7 @@ impl CognitiveLoopService {
                 }
             }
 
-            if replay.should_replay() {
+            if self.config.episodic_replay_training && replay.should_replay() {
                 // ── Track 5f: FEP surprise → replay batch size modulation ────────
                 // Science: Mnih et al. (2015) — prioritized experience replay:
                 // high surprise = high learning potential → replay more episodes
@@ -442,7 +442,7 @@ impl CognitiveLoopService {
                             for ep in &top_eps_for_tracking {
                                 let hash =
                                     crate::memory::memory_coordinator::content_hash(&ep.input);
-                                self.memory_coordinator.record_retrieval(hash);
+                                self.memory_consol.memory_coordinator.record_retrieval(hash);
                             }
                         }
 
@@ -450,7 +450,7 @@ impl CognitiveLoopService {
                         // Science: Stickgold (2005) — sleep replay extracts gist representations
                         // After episodic replay, factorize top episodes through the resonator to
                         // extract clean semantic components and strengthen codebook representations.
-                        if let Some(ref mut res_mem) = self.resonator_memory {
+                        if let Some(ref mut res_mem) = self.memory_consol.resonator_memory {
                             if !res_mem.resonator.codebooks.is_empty() {
                                 let res_dim = res_mem.resonator.config.dim;
                                 let top_eps = replay.get_top_episodes(3);
@@ -503,7 +503,7 @@ impl CognitiveLoopService {
         if !self.cantor_broadcast_buffer.is_empty() {
             // Refresh persistent engine's codebook from resonator memory (additive — new entries
             // supplement existing consolidated knowledge rather than replacing it)
-            if let Some(ref res_mem) = self.resonator_memory {
+            if let Some(ref res_mem) = self.memory_consol.resonator_memory {
                 for cb in &res_mem.resonator.codebooks {
                     for (label, continuous_vec) in &cb.symbols {
                         let mut bytes = [0u8; 2048];
@@ -602,7 +602,10 @@ impl CognitiveLoopService {
 
         // Track 4d: Adaptive replay scheduling — modulate interval based on error volatility
         // Science: McClelland et al. (1995) — fast-changing environments need more replay
-        if self.stats.total_cycles % 50 == 0 && self.stats.total_cycles > 50 {
+        if self.config.episodic_replay_training
+            && self.stats.total_cycles % 50 == 0
+            && self.stats.total_cycles > 50
+        {
             if let Some(ref mut replay) = self.phi_episodic_replay {
                 // Variance = E[X²] - E[X]² (from EMA-tracked moments)
                 let error_variance = (self.stats.avg_prediction_error_sq
@@ -614,21 +617,97 @@ impl CognitiveLoopService {
 
         // Memory coordinator: broadcast signals and process graduations
         {
-            let coord_phi = self.language_comm.voice_coherence.bridge.smoothed_coherence() as f64;
+            let coord_phi = self
+                .language_comm
+                .voice_coherence
+                .bridge
+                .smoothed_coherence() as f64;
             let coord_coherence = coherence as f64;
-            self.memory_coordinator.update_signals_with_sigma(
-                coord_phi,
-                coord_coherence,
-                self.carryover.consciousness.last_sigma,
-            );
+            self.memory_consol
+                .memory_coordinator
+                .update_signals_with_sigma(
+                    coord_phi,
+                    coord_coherence,
+                    self.carryover.consciousness.last_sigma,
+                );
 
             if let Some(ref mut replay) = self.phi_episodic_replay {
-                let graduated = self.memory_coordinator.process_graduations(replay);
+                let graduated = self
+                    .memory_consol
+                    .memory_coordinator
+                    .process_graduations(replay);
                 if graduated > 0 {
                     tracing::debug!(
                         graduated,
                         "Memory coordinator graduated items to episodic storage"
                     );
+                }
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // PERIODIC MEMORY FLUSH: Persist top episodes to SQLite
+        // Co-prime cadence (199 cycles ≈ 0.85s at 234Hz) avoids interference
+        // with other periodic tasks. Uses background thread to stay off rayon pool.
+        // ═══════════════════════════════════════════════════════════════════════
+        if self.stats.total_cycles % 199 == 0
+            && self.stats.total_cycles > 0
+            && self.memory_db.is_some()
+        {
+            use std::sync::atomic::Ordering;
+
+            if !self.memory_flush_in_progress.load(Ordering::Relaxed) {
+                if let Some(ref replay) = self.phi_episodic_replay {
+                    let top_episodes = replay.get_top_episodes(16);
+                    if !top_episodes.is_empty() {
+                        let db = self.memory_db.as_ref().unwrap().clone();
+                        let flush_guard = self.memory_flush_in_progress.clone();
+                        flush_guard.store(true, Ordering::Relaxed);
+
+                        let records: Vec<crate::databases::MemoryRecord> = top_episodes
+                            .iter()
+                            .enumerate()
+                            .map(|(i, ep)| {
+                                // Threshold continuous HV to binary: positive → 1
+                                let mut bytes = [0u8; 2048];
+                                for (j, &val) in ep.input.values.iter().enumerate() {
+                                    if j / 8 < 2048 && val > 0.0 {
+                                        bytes[j / 8] |= 1 << (j % 8);
+                                    }
+                                }
+                                let encoding = symthaea_core::hdc::binary_hv::BinaryHV(bytes);
+                                crate::databases::MemoryRecord {
+                                    id: format!("ep_{}_{}", ep.timestamp, i),
+                                    memory_type: crate::databases::MemoryType::Episodic,
+                                    encoding,
+                                    content: String::new(),
+                                    timestamp_ms: ep.timestamp as u64 * 20, // ~20ms per cycle at 50Hz
+                                    valence: ep.valence.unwrap_or(0.0),
+                                    arousal: 0.5,
+                                    psi: ep.psi,
+                                    topics: Vec::new(),
+                                    metadata: "{}".to_string(),
+                                    consolidation_strength: ep.psi,
+                                    retrieval_count: 0,
+                                }
+                            })
+                            .collect();
+
+                        std::thread::spawn(move || {
+                            match db.store_batch_sync(&records) {
+                                Ok(n) => {
+                                    tracing::debug!(
+                                        stored = n,
+                                        "Memory flush: episodes persisted to SQLite"
+                                    );
+                                }
+                                Err(e) => {
+                                    tracing::warn!(error = %e, "Memory flush failed");
+                                }
+                            }
+                            flush_guard.store(false, Ordering::Relaxed);
+                        });
+                    }
                 }
             }
         }

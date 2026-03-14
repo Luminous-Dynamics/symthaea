@@ -52,7 +52,7 @@ This document maps Symthaea's technical architecture to AI-specific compliance f
 | **A.5.2** | Data management | Done | Holochain DHT (no central store); CfC temporal dynamics; identity vaults; `DATA_GOVERNANCE.md` (6 categories); GDPR 95% coverage |
 | **A.5.3** | Data quality | Done | `DATA_QUALITY_FRAMEWORK.md` — 6 data sources assessed across 6 quality dimensions, automated monitoring, non-conformance handling |
 | **A.6.2** | AI system operation and monitoring | Done | SafetyAgent (NRC-style Green/Yellow/Orange/Red); CycleMetadata 75+ fields/cycle; SelfAssessmentMonitor; CalibrationHistory |
-| **A.6.3** | Performance monitoring | Done | Phi validation (r=0.99); CfC 234Hz; moral classification 91.1%; weekly psych-bench regression |
+| **A.6.3** | Performance monitoring | Done | Phi validation (r=0.99); CfC ~31Hz full loop (234Hz raw text cycle); moral classification 92.9% (Hendrycks ETHICS); weekly psych-bench regression |
 | **A.6.4** | AI system logs | Done | Per-cycle telemetry; SafetyAuditReport; governance gate audit trail with correlation IDs |
 | **A.7.2** | Third-party AI considerations | Done | `ANNEX_IV_TECHNICAL_DOCUMENTATION.md` §7 — 5 approved models, supply chain risk analysis, integration safeguards, monitoring |
 | **A.7.3** | Outsourced activities | N/A | No outsourced AI processing |

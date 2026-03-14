@@ -96,13 +96,20 @@ impl CognitiveLoopService {
                 dream_wisdom_count: feedback.memory.dream_wisdom_count,
                 continuity_replay_triggered: feedback.consciousness.continuity_replay_needed,
                 resonator_codebook_size: self
+                    .memory_consol
                     .resonator_memory
                     .as_ref()
                     .and_then(|m| m.resonator.codebooks.first())
                     .map(|cb| cb.len())
                     .unwrap_or(0),
-                resonator_episodes: self.resonator_memory.as_ref().map(|m| m.len()).unwrap_or(0),
+                resonator_episodes: self
+                    .memory_consol
+                    .resonator_memory
+                    .as_ref()
+                    .map(|m| m.len())
+                    .unwrap_or(0),
                 resonator_factorization_iters: self
+                    .memory_consol
                     .resonator_memory
                     .as_ref()
                     .map(|m| m.resonator.iterations())
@@ -185,7 +192,11 @@ impl CognitiveLoopService {
                 empathic_speech_rate_mod: feedback.ethics.empathic_speech_rate_mod,
                 kosmic_coherence: feedback.ethics.kosmic_coherence,
                 // Soul telemetry
-                soul_coherence: self.ethics_values.soul.as_ref().map_or(0.0, |s| s.stats().soul_coherence),
+                soul_coherence: self
+                    .ethics_values
+                    .soul
+                    .as_ref()
+                    .map_or(0.0, |s| s.stats().soul_coherence),
                 soul_growth_potential: self
                     .ethics_values
                     .soul
@@ -354,6 +365,12 @@ impl CognitiveLoopService {
             consciousness_weakest_layer: String::new(), // computed below
             module_timings_us: {
                 module_timings.metadata_assembly = _t.elapsed().as_micros() as u64;
+                // phase_output = total time from phase_output entry to metadata assembly.
+                // Excludes only the clone() below.
+                module_timings.phase_output = (cycle_start.elapsed().as_micros() as u64)
+                    .saturating_sub(module_timings.phase_perception)
+                    .saturating_sub(module_timings.phase_dynamics)
+                    .saturating_sub(module_timings.phase_feedback);
                 module_timings.clone()
             },
             circadian_phase: circadian_phase_str.into(),
@@ -870,7 +887,7 @@ impl CognitiveLoopService {
             } else {
                 0.5
             };
-            metadata.attention_budget_exceeded =
+            metadata.proposal_budget_exceeded =
                 self.feedback_state.total_proposals() > ATTENTION_BUDGET_MAX;
             metadata.readiness_score = self.carryover.quality.last_readiness_score;
             metadata.flow_state_active = self.carryover.quality.in_flow_state;
@@ -1091,11 +1108,19 @@ impl CognitiveLoopService {
         // ── Voice telemetry ──
         {
             let voice_summary = self.language_comm.voice_coherence.voice.summary();
-            metadata.voice_articulation_quality =
-                self.language_comm.voice_coherence.voice.smoothed_articulation();
-            metadata.voice_rate_stability = self.language_comm.voice_coherence.voice.rate_stability();
+            metadata.voice_articulation_quality = self
+                .language_comm
+                .voice_coherence
+                .voice
+                .smoothed_articulation();
+            metadata.voice_rate_stability =
+                self.language_comm.voice_coherence.voice.rate_stability();
             metadata.voice_confidence = voice_summary.voice_confidence;
-            metadata.voice_phi_adjustment = self.language_comm.voice_coherence.voice.compute_phi_adjustment();
+            metadata.voice_phi_adjustment = self
+                .language_comm
+                .voice_coherence
+                .voice
+                .compute_phi_adjustment();
         }
 
         // ── Substrate & convergence telemetry ──
@@ -1179,6 +1204,29 @@ impl CognitiveLoopService {
             metadata.governance_lr_boost = self.governance_mgr.last_lr_boost();
         }
 
+        // Swarm telemetry
+        {
+            let st = self.swarm_manager.telemetry();
+            metadata.swarm_connected_peers = st.connected_peers;
+            metadata.swarm_connectivity_ema = st.connectivity_ema;
+            metadata.swarm_mean_peer_phi = st.mean_peer_phi;
+            metadata.swarm_affective_contagion = st.affective_contagion;
+            metadata.swarm_federated_confidence = st.federated_confidence;
+            metadata.swarm_anomaly_count = st.anomaly_count;
+        }
+
+        // Spectrum / Radio telemetry
+        #[cfg(feature = "mesh")]
+        {
+            let st = self.spectrum_manager.telemetry();
+            metadata.spectrum_network_health = st.network_health;
+            metadata.spectrum_tier_available = st.tier_available;
+            metadata.spectrum_jamming_streak = st.jamming_streak;
+            metadata.spectrum_prediction_error = st.spectrum_prediction_error;
+            metadata.spectrum_epistemic_discount = st.epistemic_discount;
+            metadata.spectrum_degradation_streak = st.degradation_streak;
+        }
+
         // Knowledge engine telemetry
         if let Some(ref km) = self.knowledge_manager {
             let telem = km.telemetry();
@@ -1195,7 +1243,7 @@ impl CognitiveLoopService {
         // Physics bridge telemetry
         #[cfg(feature = "physics-bridge")]
         {
-            if let Some(ref mut physics) = self.physics_integration {
+            if let Some(ref mut physics) = self.feature_integ.physics_integration {
                 let pt = physics.telemetry();
                 let pareto = pt.pareto_context.as_ref();
                 metadata.physics_bridge = Some(super::PhysicsBridgeTelemetry {
@@ -1321,6 +1369,13 @@ impl CognitiveLoopService {
                 metadata.math_epistemic_caveat = caveat.clone();
             }
             metadata.math_error_bound = dynamics.math.error_bound.unwrap_or(0.0);
+            // Phase 7c: memory recall + expression parser telemetry
+            metadata.math_memory_hit = dynamics.math.memory_hit;
+            metadata.math_recalled_phi = dynamics.math.recalled_phi;
+            metadata.math_expression_parsed = dynamics.math.expression_parsed;
+            if let Some(ref transfer) = dynamics.math.strategy_transfer {
+                metadata.math_strategy_transfer = transfer.clone();
+            }
         }
 
         // ── Nurture/attachment telemetry ──
@@ -1416,7 +1471,7 @@ impl CognitiveLoopService {
                     &[], // persistence_cycles — future: wire from moral topology
                     metadata.cantor_metacognitive_depth,
                     metadata.cantor_last_depth,
-                    self.stats.total_cycles as u64,
+                    self.stats.total_cycles,
                 );
                 if let Some(svg) = mgr.tick(&snap) {
                     self.last_canvas_svg = Some(svg.to_string());
@@ -1426,13 +1481,15 @@ impl CognitiveLoopService {
                 let aesthetic = mgr.last_telemetry().aesthetic_score;
                 if mgr.last_telemetry().generated && aesthetic > 0.5 {
                     let da_base = self.neuromod.bath.dopamine.baseline_val();
-                    self.neuromod.bath.dopamine.set_baseline(
-                        da_base + (aesthetic - 0.5) * 0.005,
-                    );
+                    self.neuromod
+                        .bath
+                        .dopamine
+                        .set_baseline(da_base + (aesthetic - 0.5) * 0.005);
                     let sht_base = self.neuromod.bath.serotonin.baseline_val();
-                    self.neuromod.bath.serotonin.set_baseline(
-                        sht_base + (aesthetic - 0.5) * 0.003,
-                    );
+                    self.neuromod
+                        .bath
+                        .serotonin
+                        .set_baseline(sht_base + (aesthetic - 0.5) * 0.003);
                 }
                 metadata.canvas = Some(mgr.last_telemetry().clone());
             }

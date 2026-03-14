@@ -14740,6 +14740,7 @@ dependencies = [
 name = "symthaea-psych-bench"
 version = "0.1.0"
 dependencies = [
+ "blake3",
  "chrono",
  "criterion",
  "csv",
@@ -14804,7 +14805,6 @@ dependencies = [
  "serde",
  "serde-wasm-bindgen",
  "serde_json",
- "symthaea-canvas",
  "symthaea-consciousness-equation",
  "symthaea-core",
  "symthaea-harmonies",

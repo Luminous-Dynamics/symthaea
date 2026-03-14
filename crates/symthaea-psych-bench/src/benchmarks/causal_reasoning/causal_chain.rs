@@ -71,7 +71,7 @@ impl CausalChainBenchmark {
                 // Encode each link as ρ(cause) ⊕ effect
                 // Permutation makes the binding directional (cause→effect ≠ effect→cause)
                 let links: Vec<BinaryHV> = (0..depth)
-                    .map(|i| variables[i].permute(1).xor(&variables[i + 1]))
+                    .map(|i| variables[i].permute(1).bind(&variables[i + 1]))
                     .collect();
 
                 // Trace the chain: starting from V0, follow each link
@@ -80,7 +80,7 @@ impl CausalChainBenchmark {
 
                 for (i, link) in links.iter().enumerate() {
                     // Unbind ρ(current) from the link to get next variable
-                    let predicted_next = link.xor(&current.permute(1));
+                    let predicted_next = link.bind(&current.permute(1));
 
                     // Check similarity to actual next variable
                     let sim = predicted_next.cosine_similarity(&variables[i + 1]);
@@ -133,18 +133,18 @@ impl CausalChainBenchmark {
                 .collect();
 
             // Direct link: V0 ⊕ V3
-            let direct = variables[0].xor(&variables[depth]);
+            let direct = variables[0].bind(&variables[depth]);
 
             // Chain composite: bundle of all links
             let links: Vec<BinaryHV> = (0..depth)
-                .map(|j| variables[j].permute(1).xor(&variables[j + 1]))
+                .map(|j| variables[j].permute(1).bind(&variables[j + 1]))
                 .collect();
 
             // Bundle all links into a single chain representation
             // Using majority vote bundling approximation via XOR
             let mut chain_composite = links[0].clone();
             for link in &links[1..] {
-                chain_composite = chain_composite.xor(link);
+                chain_composite = chain_composite.bind(link);
             }
 
             // How similar is the chain composite to the direct link?
@@ -178,49 +178,57 @@ impl PsychBenchmark for CausalChainBenchmark {
     }
 
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
-        let n_trials = config.trials_per_condition;
-        let mut trials = Vec::with_capacity(n_trials);
-        let mut tracing_sum = 0.0;
-        let mut sensitivity_sum = 0.0;
-        let mut ratio_sum = 0.0;
+        let start = std::time::Instant::now();
+        let mut result = BenchmarkResult::new(self.name(), config.label.clone());
 
-        for t in 0..n_trials {
-            let result = self.run_trial(config, t);
-            tracing_sum += result.chain_tracing_accuracy;
-            sensitivity_sum += result.depth_sensitivity;
-            ratio_sum += result.chain_vs_direct_ratio;
+        let mut tracing_vals = Vec::new();
+        let mut sensitivity_vals = Vec::new();
+        let mut ratio_vals = Vec::new();
+        let mut trace = Vec::new();
 
-            trials.push(TrialOutcome {
-                correct: result.chain_tracing_accuracy > 0.5,
-                rt_ticks: None,
-                confidence: Some(result.chain_tracing_accuracy as f32),
-                condition: "causal_chain".to_string(),
-            });
+        for t in 0..config.trials_per_condition {
+            let r = self.run_trial(config, t);
+            tracing_vals.push(r.chain_tracing_accuracy);
+            sensitivity_vals.push(r.depth_sensitivity);
+            ratio_vals.push(r.chain_vs_direct_ratio);
+
+            if config.trial_trace {
+                let mut extra = BTreeMap::new();
+                extra.insert("depth_sensitivity".to_string(), r.depth_sensitivity);
+                extra.insert("chain_vs_direct_ratio".to_string(), r.chain_vs_direct_ratio);
+                trace.push(TrialOutcome {
+                    trial_idx: t,
+                    correct: r.chain_tracing_accuracy > 0.5,
+                    rt_ticks: 1.0,
+                    confidence: r.chain_tracing_accuracy,
+                    similarity: r.chain_tracing_accuracy,
+                    response_idx: 0,
+                    condition: "causal_chain".to_string(),
+                    extra,
+                });
+            }
         }
 
-        let n = n_trials as f64;
-        let mut metrics = BTreeMap::new();
-        metrics.insert(
-            "chain_tracing_accuracy".to_string(),
-            MetricValue::new(tracing_sum / n),
+        result.insert(
+            "chain_tracing_accuracy",
+            MetricValue::from_samples(&tracing_vals),
         );
-        metrics.insert(
-            "depth_sensitivity".to_string(),
-            MetricValue::new(sensitivity_sum / n),
+        result.insert(
+            "depth_sensitivity",
+            MetricValue::from_samples(&sensitivity_vals),
         );
-        metrics.insert(
-            "chain_vs_direct_ratio".to_string(),
-            MetricValue::new(ratio_sum / n),
+        result.insert(
+            "chain_vs_direct_ratio",
+            MetricValue::from_samples(&ratio_vals),
         );
 
-        BenchmarkResult {
-            benchmark_name: self.name().to_string(),
-            domain: "causal_reasoning".to_string(),
-            metrics,
-            trials,
-            config: config.clone(),
-            label: config.label.clone(),
+        result.conditions = 3;
+        result.trials_per_condition = config.trials_per_condition;
+        if config.trial_trace {
+            result.trial_trace = trace;
         }
+        result.elapsed_ms = start.elapsed().as_millis() as u64;
+        result
     }
 }
 
@@ -239,7 +247,7 @@ mod tests {
     fn test_causal_chain_runs() {
         let bench = CausalChainBenchmark;
         let result = bench.run(&default_config());
-        assert_eq!(result.domain, "causal_reasoning");
+        assert!(result.benchmark.contains("causal_chain"));
         assert!(result.metrics.contains_key("chain_tracing_accuracy"));
     }
 
@@ -247,7 +255,7 @@ mod tests {
     fn test_chain_tracing_above_chance() {
         let bench = CausalChainBenchmark;
         let result = bench.run(&default_config());
-        let acc = result.metrics["chain_tracing_accuracy"].value;
+        let acc = result.metrics["chain_tracing_accuracy"].mean;
         // XOR chain tracing should be exact (or very close), well above 0.5
         assert!(
             acc > 0.5,
@@ -260,10 +268,11 @@ mod tests {
         let bench = CausalChainBenchmark;
         let result = bench.run(&default_config());
         for (name, metric) in &result.metrics {
+            // chain_vs_direct_ratio uses cosine similarity which can be negative
             assert!(
-                metric.value >= 0.0 && metric.value <= 1.0,
-                "{name} should be in [0,1], got {}",
-                metric.value
+                metric.mean >= -1.0 && metric.mean <= 1.0,
+                "{name} should be in [-1,1], got {}",
+                metric.mean
             );
         }
     }
@@ -280,7 +289,7 @@ mod tests {
     fn test_depth_sensitivity_finite() {
         let bench = CausalChainBenchmark;
         let result = bench.run(&default_config());
-        let sensitivity = result.metrics["depth_sensitivity"].value;
+        let sensitivity = result.metrics["depth_sensitivity"].mean;
         assert!(
             sensitivity.is_finite(),
             "Depth sensitivity should be finite, got {sensitivity}"

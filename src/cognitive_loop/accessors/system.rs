@@ -48,10 +48,10 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════
 
         /// Get semantic memory statistics
-        pub fn semantic_memory_stats(&self) -> &crate::memory::semantic_memory::SemanticMemoryStats { self.semantic_memory.stats() }
+        pub fn semantic_memory_stats(&self) -> &crate::memory::semantic_memory::SemanticMemoryStats { self.memory_consol.semantic_memory.stats() }
 
         /// Get reference to the stability regime processor
-        pub fn stability_regime(&self) -> &crate::consciousness::stability_regime::StabilityRegimeProcessor { &self.stability_regime }
+        pub fn stability_regime(&self) -> &crate::consciousness::stability_regime::StabilityRegimeProcessor { &self.memory_consol.stability_regime }
 
         // ═══════════════════════════════════════════════════════════════════
         // PREDICTION CONFIDENCE
@@ -206,7 +206,8 @@ impl CognitiveLoopService {
     /// Evaluate temporal prediction horizon accuracy from the vision manifold.
     #[cfg(feature = "vision-manifold")]
     pub fn vision_evaluate_horizons(&self) -> Option<symthaea_vision_manifold::HorizonAccuracy> {
-        self.vision_sensory.vision_bridge
+        self.vision_sensory
+            .vision_bridge
             .as_ref()
             .map(|b| b.manifold().evaluate_horizons())
     }
@@ -240,7 +241,10 @@ impl CognitiveLoopService {
 
     /// Get the current inferred user state (if user state inference is enabled).
     pub fn user_state(&self) -> Option<&crate::user_state_inference::UserState> {
-        self.language_comm.user_state.as_ref().map(|usi| usi.state())
+        self.language_comm
+            .user_state
+            .as_ref()
+            .map(|usi| usi.state())
     }
 
     /// Inject L-SSM semantic prediction error from LLMOrgan after translation.
@@ -398,7 +402,7 @@ impl CognitiveLoopService {
         &mut self,
         ctx: super::super::physics_integration::ParetoContext,
     ) {
-        if let Some(ref mut physics) = self.physics_integration {
+        if let Some(ref mut physics) = self.feature_integ.physics_integration {
             physics.set_pareto_context(ctx);
         }
     }
@@ -459,6 +463,18 @@ impl CognitiveLoopService {
     /// Get the math service telemetry.
     pub fn math_telemetry(&self) -> &super::super::math_service::MathServiceTelemetry {
         self.math_service.telemetry()
+    }
+
+    /// Get a reference to the scientific method engine.
+    #[cfg(feature = "scientific_method")]
+    pub fn scientific_method(&self) -> &crate::scientific_method::ScientificMethodEngine {
+        &self.scientific_method
+    }
+
+    /// Get a mutable reference to the scientific method engine.
+    #[cfg(feature = "scientific_method")]
+    pub fn scientific_method_mut(&mut self) -> &mut crate::scientific_method::ScientificMethodEngine {
+        &mut self.scientific_method
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -529,6 +545,32 @@ impl CognitiveLoopService {
         }
     }
 
+    /// Consolidate and forget weak knowledge facts, strengthen causal ones.
+    /// Returns (pruned_count, strengthened_count).
+    pub fn knowledge_consolidate_and_forget(&mut self) -> (usize, usize) {
+        if let Some(ref mut km) = self.knowledge_manager {
+            km.consolidate_and_forget()
+        } else {
+            (0, 0)
+        }
+    }
+
+    /// Persist the current knowledge snapshot to SQLite (if persistence is configured).
+    pub fn knowledge_persist_snapshot(&mut self) {
+        if let Some(ref mut km) = self.knowledge_manager {
+            km.persist_snapshot();
+        }
+    }
+
+    /// Query the knowledge engine for facts relevant to a text query.
+    pub fn knowledge_query(&mut self, query: &str) -> crate::knowledge::KnowledgeQueryResult {
+        if let Some(ref mut km) = self.knowledge_manager {
+            km.query(query)
+        } else {
+            crate::knowledge::KnowledgeQueryResult::default()
+        }
+    }
+
     /// Whether the canvas living topology pipeline is active.
     #[cfg(feature = "canvas")]
     pub fn has_canvas(&self) -> bool {
@@ -586,9 +628,7 @@ impl CognitiveLoopService {
         (String, f32, symthaea_core::hdc::binary_hv::BinaryHV),
         symthaea_core::hdc::primitive_system::CompositionAlgebraError,
     > {
-        use symthaea_core::hdc::primitive_system::{
-            CompositionAlgebra, PrimitiveSystem,
-        };
+        use symthaea_core::hdc::primitive_system::{CompositionAlgebra, PrimitiveSystem};
 
         let system = PrimitiveSystem::global();
         let mut algebra = CompositionAlgebra::new();
@@ -611,9 +651,7 @@ impl CognitiveLoopService {
         Vec<symthaea_core::hdc::primitive_system::TransitionResult>,
         symthaea_core::hdc::primitive_system::CompositionAlgebraError,
     > {
-        use symthaea_core::hdc::primitive_system::{
-            CompositionAlgebra, PrimitiveSystem,
-        };
+        use symthaea_core::hdc::primitive_system::{CompositionAlgebra, PrimitiveSystem};
 
         let system = PrimitiveSystem::global();
         let mut algebra = CompositionAlgebra::new();

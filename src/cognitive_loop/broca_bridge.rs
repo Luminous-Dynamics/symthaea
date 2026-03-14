@@ -26,10 +26,9 @@ pub struct BrocaConsciousnessSignals {
     pub meta_awareness: f32,
     /// Coherence (0..1).
     pub coherence: f32,
-    /// Knowledge grounding context: top facts from knowledge engine.
-    /// When non-empty, these are injected as epistemic priors — Broca will
-    /// generate text grounded in stored knowledge rather than hallucinating.
-    /// Science: Barsalou (2008) — grounded cognition requires perceptual memory support.
+    /// Knowledge-grounded context: relevant facts from the knowledge engine.
+    /// When non-empty, boosts epistemic confidence for grounded generation.
+    /// Science: Barsalou (2008) — grounded cognition reduces hallucination.
     pub knowledge_context: Vec<String>,
 }
 
@@ -128,16 +127,15 @@ impl BrocaManager {
 
         let start = std::time::Instant::now();
 
+        // Knowledge grounding → epistemic confidence boost.
+        // When knowledge context is available, the system has factual basis for claims.
+        // Science: Barsalou (2008) — grounded cognition reduces hallucination risk.
+        let grounding_boost =
+            (signals.knowledge_context.len() as f32 * 0.1).min(0.3);
+        let grounded_confidence = (signals.epistemic_confidence + grounding_boost).min(1.0);
+
         // Build thought channels from consciousness signals
         let mut channels = ThoughtChannels::default();
-        // Knowledge grounding boosts epistemic confidence toward Certain
-        let grounded_confidence = if signals.knowledge_context.is_empty() {
-            signals.epistemic_confidence
-        } else {
-            // Each grounding fact nudges confidence up (diminishing returns)
-            let boost = (signals.knowledge_context.len() as f32 * 0.1).min(0.3);
-            (signals.epistemic_confidence + boost).min(1.0)
-        };
         // Map epistemic confidence to epistemic ordinal (invert: 1.0=Certain→0, 0.0=OutOfDomain→4)
         channels.set_epistemic((1.0 - grounded_confidence) * 4.0);
         channels.set_emotion(
@@ -188,19 +186,6 @@ impl BrocaManager {
             (ttr, max_rep)
         };
 
-        // Compute mean gating trace metrics
-        let (mean_epistemic, mean_emotional, time_pressure_red) = if result.gating_trace.is_empty()
-        {
-            (0.0, 0.0, 0.0)
-        } else {
-            let n = result.gating_trace.len() as f32;
-            let ep: f32 = result.gating_trace.iter().map(|g| g.epistemic_boost).sum();
-            let em: f32 = result.gating_trace.iter().map(|g| g.emotional_boost).sum();
-            // time_pressure_reduction is constant per generation, take first
-            let tp = result.gating_trace[0].time_pressure_reduction;
-            (ep / n, em / n, tp)
-        };
-
         self.last_telemetry = BrocaGenerationTelemetry {
             generated: true,
             token_count: result.num_tokens,
@@ -210,11 +195,7 @@ impl BrocaManager {
             consciousness_gated: false,
             type_token_ratio,
             max_repetition,
-            hallucination_detected: result.hallucination_flag,
-            mean_epistemic_boost: mean_epistemic,
-            mean_emotional_boost: mean_emotional,
-            time_pressure_reduction: time_pressure_red,
-            context_depth: self.context_window.len(),
+            ..Default::default()
         };
 
         Some(result)

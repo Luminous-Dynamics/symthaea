@@ -17,7 +17,7 @@ use symthaea_types::N_HARMONIES;
 
 use crate::{
     Anomaly, CantorInfo, GovernanceInfo, IntegrityInfo, KnowledgeInfo, MoralCompass, Narrative,
-    NeuroBath, PulseDelta, PulseSnapshot, SparklinePoint, SubstrateInfo, Vitals,
+    NeuroBath, PulseDelta, PulseSnapshot, SparklinePoint, SubstrateInfo, SwarmInfo, Vitals,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -454,6 +454,7 @@ pub fn generate_pulse_html(
     write_substrate_pane(&mut html, substrate);
     write_integrity_pane(&mut html, &current.integrity);
     write_governance_pane(&mut html, &current.governance);
+    write_swarm_pane(&mut html, &current.swarm);
     write_knowledge_pane(&mut html, &current.knowledge);
     write_cantor_pane(&mut html, &current.cantor);
     write_narrative_pane(&mut html, narrative);
@@ -1967,6 +1968,54 @@ fn write_integrity_pane(html: &mut String, integrity: &IntegrityInfo) {
     }
 
     html.push_str("</div>\n");
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Pane 7d: Swarm Network
+// ═══════════════════════════════════════════════════════════════════════════════
+
+fn write_swarm_pane(html: &mut String, swarm: &SwarmInfo) {
+    let active = swarm.connected_peers > 0 || swarm.anomaly_count > 0;
+
+    let (status_label, status_color) = if !active {
+        ("ISOLATED", "#8a9a8a")
+    } else if swarm.anomaly_count > 0 {
+        ("ANOMALY", "#c76b5a")
+    } else if swarm.connected_peers >= 5 {
+        ("SWARMING", "#e8c547")
+    } else {
+        ("CONNECTED", "#7ec8a0")
+    };
+
+    let _ = write!(
+        html,
+        r##"<div class="pane">
+<h2>Swarm</h2>
+<div style="text-align:center;margin-bottom:12px">
+  <span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:{color};box-shadow:0 0 12px {color};margin-right:8px;vertical-align:middle"></span>
+  <span style="color:{color};font-weight:bold;font-size:1.1em;vertical-align:middle">{label}</span>
+</div>
+<table style="width:100%;font-size:0.88em">
+<tr><td>Connected Peers</td><td style="text-align:right">{peers}</td></tr>
+<tr><td>Connectivity</td><td style="text-align:right">{conn:.1}%</td></tr>
+<tr><td>Mean Peer &Phi;</td><td style="text-align:right;color:{phi_color}">{phi:.3}</td></tr>
+<tr><td>Affective Contagion</td><td style="text-align:right">{affect:.3}</td></tr>
+<tr><td>Federated Confidence</td><td style="text-align:right">{fed:.3}</td></tr>
+<tr><td>Anomalies</td><td style="text-align:right;color:{anom_color}">{anoms}</td></tr>
+</table>
+</div>
+"##,
+        color = status_color,
+        label = status_label,
+        peers = swarm.connected_peers,
+        conn = swarm.connectivity_ema * 100.0,
+        phi_color = if swarm.mean_peer_phi > 0.5 { "#e8c547" } else { "#8a9a8a" },
+        phi = swarm.mean_peer_phi,
+        affect = swarm.affective_contagion,
+        fed = swarm.federated_confidence,
+        anom_color = if swarm.anomaly_count > 0 { "#c76b5a" } else { "#8a9a8a" },
+        anoms = swarm.anomaly_count,
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

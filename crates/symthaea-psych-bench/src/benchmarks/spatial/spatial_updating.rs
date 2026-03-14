@@ -116,12 +116,11 @@ impl SpatialPathUpdatingBenchmark {
 
                 // Target location
                 let target_idx = pos_y as usize * grid_size + pos_x as usize;
-                let target_hv = &locations[target_idx];
+                let _target_hv = &locations[target_idx];
 
                 // The system tries to match the composed path to a location.
                 // We bind the start location with the path, then compare to all locations.
-                let start_idx =
-                    (grid_size / 2) * grid_size + (grid_size / 2);
+                let start_idx = (grid_size / 2) * grid_size + (grid_size / 2);
                 let start_hv = &locations[start_idx];
                 let computed = start_hv.bind(&path_hv);
 

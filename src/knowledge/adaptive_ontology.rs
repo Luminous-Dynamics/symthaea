@@ -284,6 +284,50 @@ impl AdaptiveOntology {
         let sum: f64 = self.primitives.values().map(|u| u.utility).sum();
         sum / self.primitives.len() as f64
     }
+
+    /// Export ontology primitives as persistence records.
+    pub fn export_records(&self) -> Vec<super::persistence::OntologyRecord> {
+        self.primitives
+            .values()
+            .map(|p| super::persistence::OntologyRecord {
+                name: p.name.clone(),
+                vector_bytes: p.vector.0.to_vec(),
+                usage_count: p.usage_count,
+                utility: p.utility,
+                created_at_cycle: p.created_at_cycle,
+                last_used_cycle: p.last_used_cycle,
+            })
+            .collect()
+    }
+
+    /// Import a primitive from a persistence record.
+    ///
+    /// Skips if already at capacity or primitive already exists.
+    pub fn import_record(&mut self, record: &super::persistence::OntologyRecord) {
+        if self.primitives.contains_key(&record.name) {
+            return;
+        }
+        if self.primitives.len() >= self.config.max_primitives {
+            return;
+        }
+        if record.vector_bytes.len() != 2048 {
+            return;
+        }
+        let mut arr = [0u8; 2048];
+        arr.copy_from_slice(&record.vector_bytes);
+        self.primitives.insert(
+            record.name.clone(),
+            PrimitiveUsage {
+                name: record.name.clone(),
+                vector: BinaryHV(arr),
+                usage_count: record.usage_count,
+                utility: record.utility,
+                created_at_cycle: record.created_at_cycle,
+                last_used_cycle: record.last_used_cycle,
+                parent_names: Vec::new(),
+            },
+        );
+    }
 }
 
 // ── Tests ──────────────────────────────────────────────────────────────────

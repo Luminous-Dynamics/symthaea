@@ -63,11 +63,11 @@ impl CausalDag {
 
         // Observational: full DAG as bound composite
         // Cause ⊕ Mediator ⊕ Effect (⊕ Confounder if present)
-        let mut observational = cause.xor(&mediator).xor(&effect);
+        let mut observational = cause.bind(&mediator).bind(&effect);
 
         let confounder = if with_confounder {
             let c = BinaryHV::random(seed.wrapping_add(4));
-            observational = observational.xor(&c);
+            observational = observational.bind(&c);
             Some(c)
         } else {
             None
@@ -75,7 +75,7 @@ impl CausalDag {
 
         // Interventional: do(Mediator) severs Cause → Mediator edge
         // Represented as Mediator ⊕ Effect (cause influence removed)
-        let interventional = mediator.xor(&effect);
+        let interventional = mediator.bind(&effect);
 
         Self {
             cause,
@@ -103,11 +103,11 @@ impl InterventionEffectBenchmark {
 
             // Conditioning: unbind Mediator from full observational composite
             // Residual = Cause ⊕ Effect (upstream edges still present)
-            let conditioned_residual = dag.observational.xor(&dag.mediator);
+            let conditioned_residual = dag.observational.bind(&dag.mediator);
 
             // Intervention: unbind Mediator from interventional composite
             // Residual = Effect only (upstream severed)
-            let intervened_residual = dag.interventional.xor(&dag.mediator);
+            let intervened_residual = dag.interventional.bind(&dag.mediator);
 
             // These residuals should be DIFFERENT (cause is in one but not the other)
             let sim = conditioned_residual.cosine_similarity(&intervened_residual);
@@ -127,10 +127,10 @@ impl InterventionEffectBenchmark {
             let confounder = dag.confounder.as_ref().unwrap();
 
             // Unadjusted: includes confounding
-            let unadjusted = dag.observational.xor(&dag.mediator);
+            let unadjusted = dag.observational.bind(&dag.mediator);
 
             // Adjusted: unbind confounder to remove confounding
-            let adjusted = unadjusted.xor(confounder);
+            let adjusted = unadjusted.bind(confounder);
 
             // The adjusted residual should be closer to the true causal
             // effect (Cause alone) than the unadjusted residual
@@ -154,10 +154,10 @@ impl InterventionEffectBenchmark {
 
             // Front-door: estimate effect via Cause → Mediator → Effect path
             // Unbind cause from observational to get mediator+effect+confounder
-            let via_mediator = dag.observational.xor(&dag.cause);
+            let via_mediator = dag.observational.bind(&dag.cause);
 
             // Then unbind mediator to isolate effect (+ confounder residual)
-            let effect_estimate = via_mediator.xor(&dag.mediator);
+            let effect_estimate = via_mediator.bind(&dag.mediator);
 
             // Compare to true effect
             let sim = effect_estimate.cosine_similarity(&dag.effect);
@@ -195,55 +195,64 @@ impl PsychBenchmark for InterventionEffectBenchmark {
     }
 
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
-        let n_trials = config.trials_per_condition;
-        let mut trials = Vec::with_capacity(n_trials);
-        let mut intervention_sum = 0.0;
-        let mut backdoor_sum = 0.0;
-        let mut frontdoor_sum = 0.0;
-        let mut causal_sum = 0.0;
+        let start = std::time::Instant::now();
+        let mut result = BenchmarkResult::new(self.name(), config.label.clone());
 
-        for t in 0..n_trials {
-            let result = self.run_trial(config, t);
-            intervention_sum += result.intervention_discrimination;
-            backdoor_sum += result.backdoor_accuracy;
-            frontdoor_sum += result.frontdoor_accuracy;
-            causal_sum += result.causal_score;
+        let mut intervention_vals = Vec::new();
+        let mut backdoor_vals = Vec::new();
+        let mut frontdoor_vals = Vec::new();
+        let mut causal_vals = Vec::new();
+        let mut trace = Vec::new();
 
-            trials.push(TrialOutcome {
-                correct: result.causal_score > 0.3,
-                rt_ticks: None,
-                confidence: Some(result.causal_score as f32),
-                condition: "intervention".to_string(),
-            });
+        for t in 0..config.trials_per_condition {
+            let r = self.run_trial(config, t);
+            intervention_vals.push(r.intervention_discrimination);
+            backdoor_vals.push(r.backdoor_accuracy);
+            frontdoor_vals.push(r.frontdoor_accuracy);
+            causal_vals.push(r.causal_score);
+
+            if config.trial_trace {
+                let mut extra = BTreeMap::new();
+                extra.insert("intervention_discrimination".to_string(), r.intervention_discrimination);
+                extra.insert("backdoor_accuracy".to_string(), r.backdoor_accuracy);
+                extra.insert("frontdoor_accuracy".to_string(), r.frontdoor_accuracy);
+                trace.push(TrialOutcome {
+                    trial_idx: t,
+                    correct: r.causal_score > 0.3,
+                    rt_ticks: 1.0,
+                    confidence: r.causal_score,
+                    similarity: r.causal_score,
+                    response_idx: 0,
+                    condition: "intervention".to_string(),
+                    extra,
+                });
+            }
         }
 
-        let n = n_trials as f64;
-        let mut metrics = BTreeMap::new();
-        metrics.insert(
-            "intervention_discrimination".to_string(),
-            MetricValue::new(intervention_sum / n),
+        result.insert(
+            "intervention_discrimination",
+            MetricValue::from_samples(&intervention_vals),
         );
-        metrics.insert(
-            "backdoor_accuracy".to_string(),
-            MetricValue::new(backdoor_sum / n),
+        result.insert(
+            "backdoor_accuracy",
+            MetricValue::from_samples(&backdoor_vals),
         );
-        metrics.insert(
-            "frontdoor_accuracy".to_string(),
-            MetricValue::new(frontdoor_sum / n),
+        result.insert(
+            "frontdoor_accuracy",
+            MetricValue::from_samples(&frontdoor_vals),
         );
-        metrics.insert(
-            "causal_score".to_string(),
-            MetricValue::new(causal_sum / n),
+        result.insert(
+            "causal_score",
+            MetricValue::from_samples(&causal_vals),
         );
 
-        BenchmarkResult {
-            benchmark_name: self.name().to_string(),
-            domain: "causal_reasoning".to_string(),
-            metrics,
-            trials,
-            config: config.clone(),
-            label: config.label.clone(),
+        result.conditions = 4;
+        result.trials_per_condition = config.trials_per_condition;
+        if config.trial_trace {
+            result.trial_trace = trace;
         }
+        result.elapsed_ms = start.elapsed().as_millis() as u64;
+        result
     }
 }
 
@@ -262,7 +271,7 @@ mod tests {
     fn test_intervention_effect_runs() {
         let bench = InterventionEffectBenchmark;
         let result = bench.run(&default_config());
-        assert_eq!(result.domain, "causal_reasoning");
+        assert!(result.benchmark.contains("intervention"));
         assert!(result.metrics.contains_key("causal_score"));
     }
 
@@ -270,7 +279,7 @@ mod tests {
     fn test_intervention_discrimination_positive() {
         let bench = InterventionEffectBenchmark;
         let result = bench.run(&default_config());
-        let discrim = result.metrics["intervention_discrimination"].value;
+        let discrim = result.metrics["intervention_discrimination"].mean;
         assert!(
             discrim > 0.0,
             "Intervention should produce discriminable residuals, got {discrim}"
@@ -281,7 +290,7 @@ mod tests {
     fn test_causal_score_bounded() {
         let bench = InterventionEffectBenchmark;
         let result = bench.run(&default_config());
-        let score = result.metrics["causal_score"].value;
+        let score = result.metrics["causal_score"].mean;
         assert!(score >= 0.0 && score <= 1.0, "Score should be in [0,1], got {score}");
     }
 

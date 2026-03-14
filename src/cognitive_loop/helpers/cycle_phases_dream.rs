@@ -213,24 +213,46 @@ impl CognitiveLoopService {
             }
         }
 
-        // ── Knowledge consolidation during dream/rest ─────────────────────
-        // Prune low-confidence non-causal facts, strengthen causal schemas.
-        // Only during Cruise urgency (rest-like state) or Sacred Stillness.
-        // Science: Stickgold (2005) — sleep-dependent memory consolidation.
+        // Knowledge consolidation during rest/stillness: prune weak facts,
+        // strengthen causal memory traces. Runs every 50 cycles during Cruise
+        // urgency or Sacred Stillness activation.
+        // Science: Stickgold & Walker (2013) — sleep-dependent memory consolidation
         if matches!(urgency, super::super::CycleUrgency::Cruise)
             || self.stats.circadian_stillness_boost > 0.1
         {
             if let Some(ref mut km) = self.knowledge_manager {
-                let cycle = self.stats.total_cycles as u64;
-                // Consolidate every 50 cycles during rest (not every cycle)
-                if cycle % 50 == 0 {
+                if self.stats.total_cycles % 50 == 0 {
                     let (pruned, consolidated) = km.consolidate_and_forget();
                     if pruned > 0 || consolidated > 0 {
                         tracing::debug!(
-                            target: "knowledge::consolidation",
-                            pruned, consolidated,
-                            "Dream-phase knowledge consolidation"
+                            pruned,
+                            consolidated,
+                            cycle = self.stats.total_cycles,
+                            "Knowledge dream consolidation"
                         );
+                    }
+
+                    // Convert high-confidence knowledge facts to episodic memories
+                    // for dream replay. Dudai (2012) — grounded memories consolidate.
+                    if let Some(ref mut bus) = self.experience_bus {
+                        let signals = km.signals();
+                        if signals.relevance > 0.3 {
+                            let top_facts = km.top_facts(
+                                super::super::thresholds::KNOWLEDGE_EPISODIC_MAX_PER_DREAM,
+                            );
+                            for fact_text in &top_facts {
+                                let mut memory = crate::experience::EpisodicMemory::new(
+                                    &format!(
+                                        "knowledge_consolidation_{}",
+                                        self.stats.total_cycles
+                                    ),
+                                    fact_text,
+                                );
+                                memory.salience = super::super::thresholds::KNOWLEDGE_EPISODIC_SALIENCE_BOOST;
+                                memory.prediction_error = 0.1; // Low PE — confirmed knowledge
+                                bus.record_experience(memory);
+                            }
+                        }
                     }
                 }
             }

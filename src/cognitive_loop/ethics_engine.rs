@@ -392,9 +392,9 @@ pub(crate) struct EthicsEngineInput<'a> {
     /// When present, Stage 5 compliance checker uses this instead of its own n-gram encoder,
     /// giving genuine semantic grounding to institutional constraint matching.
     pub action_hv: Option<&'a BinaryHV>,
-    /// Knowledge-grounded moral precedents from the knowledge engine.
-    /// When non-empty, boosts confidence in moral verdicts that align with prior experience.
-    /// Science: Haidt (2001) — moral reasoning informed by past experience.
+    /// Knowledge-grounded moral context: relevant social/causal facts for moral reasoning.
+    /// When non-empty, provides factual grounding for moral evaluation.
+    /// Science: Haidt (2001) — moral reasoning needs factual basis.
     pub knowledge_moral_context: Vec<String>,
 }
 

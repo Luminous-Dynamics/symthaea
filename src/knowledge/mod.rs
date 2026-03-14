@@ -44,7 +44,7 @@ pub use extraction::{
     EntityType, ExtractedEntity, ExtractedFact, ExtractedRelation, KnowledgeExtractor, SemanticRole,
 };
 pub use graph::{ContradictionAlert, EnhancedKnowledgeGraph, FactId, TemporalFact};
-pub use llm_extraction::{format_extraction_prompt, parse_llm_response, LlmExtractionResult};
 pub use manager::{KnowledgeManager, KnowledgeSignals, KnowledgeTelemetry};
-pub use persistence::KnowledgePersistence;
-pub use reasoning_context::{KnowledgeQueryResult, ReasoningContext};
+pub use reasoning_context::{
+    CausalChain, EpistemicState, GroundedFact, KnowledgeQueryResult, ReasoningContext,
+};

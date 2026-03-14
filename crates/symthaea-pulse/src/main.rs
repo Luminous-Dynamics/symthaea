@@ -290,6 +290,23 @@ pub struct GovernanceInfo {
     pub lr_boost: f64,
 }
 
+/// Swarm network telemetry for Pulse visualization.
+#[derive(Serialize, Deserialize, Default, Clone)]
+pub struct SwarmInfo {
+    /// Number of connected peers.
+    pub connected_peers: usize,
+    /// Connectivity EMA (0.0–1.0).
+    pub connectivity_ema: f64,
+    /// Mean peer Phi across the swarm.
+    pub mean_peer_phi: f64,
+    /// Affective contagion intensity.
+    pub affective_contagion: f64,
+    /// Federated learning confidence.
+    pub federated_confidence: f64,
+    /// Network anomaly count.
+    pub anomaly_count: u32,
+}
+
 /// Knowledge engine telemetry for Pulse visualization.
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct KnowledgeInfo {
@@ -337,6 +354,8 @@ pub struct PulseSnapshot {
     pub cantor: CantorInfo,
     #[serde(default)]
     pub governance: GovernanceInfo,
+    #[serde(default)]
+    pub swarm: SwarmInfo,
     #[serde(default)]
     pub knowledge: KnowledgeInfo,
 }

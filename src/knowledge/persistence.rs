@@ -236,6 +236,82 @@ impl KnowledgePersistence {
         Ok(edges)
     }
 
+    /// Save ontology primitives to the database.
+    ///
+    /// Uses INSERT OR REPLACE for upsert behavior.
+    /// Returns the number of primitives saved.
+    pub fn save_ontology(&mut self, records: &[OntologyRecord]) -> Result<usize, String> {
+        if !self.is_configured() {
+            return Err("No database path configured".into());
+        }
+        let conn = self.open_connection()?;
+        self.ensure_schema(&conn)?;
+
+        let tx = conn.unchecked_transaction().map_err(|e| format!("Tx: {e}"))?;
+        {
+            let mut stmt = tx
+                .prepare_cached(
+                    "INSERT OR REPLACE INTO knowledge_ontology
+                     (name, vector_blob, usage_count, utility, created_at_cycle, last_used_cycle)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                )
+                .map_err(|e| format!("Prepare: {e}"))?;
+
+            for r in records {
+                stmt.execute(rusqlite::params![
+                    r.name,
+                    r.vector_bytes,
+                    r.usage_count as i64,
+                    r.utility,
+                    r.created_at_cycle as i64,
+                    r.last_used_cycle as i64,
+                ])
+                .map_err(|e| format!("Insert ontology: {e}"))?;
+            }
+        }
+        tx.commit().map_err(|e| format!("Commit: {e}"))?;
+
+        let count = records.len();
+        self.total_saved += count as u64;
+        Ok(count)
+    }
+
+    /// Load ontology primitives from the database.
+    ///
+    /// Returns all stored primitives ordered by utility descending.
+    pub fn load_ontology(&mut self) -> Result<Vec<OntologyRecord>, String> {
+        if !self.is_configured() {
+            return Err("No database path configured".into());
+        }
+        let conn = self.open_connection()?;
+        self.ensure_schema(&conn)?;
+
+        let mut stmt = conn
+            .prepare(
+                "SELECT name, vector_blob, usage_count, utility, created_at_cycle, last_used_cycle
+                 FROM knowledge_ontology ORDER BY utility DESC",
+            )
+            .map_err(|e| format!("Prepare: {e}"))?;
+
+        let records: Vec<OntologyRecord> = stmt
+            .query_map([], |row| {
+                Ok(OntologyRecord {
+                    name: row.get(0)?,
+                    vector_bytes: row.get(1)?,
+                    usage_count: row.get::<_, i64>(2)? as u64,
+                    utility: row.get(3)?,
+                    created_at_cycle: row.get::<_, i64>(4)? as u64,
+                    last_used_cycle: row.get::<_, i64>(5)? as u64,
+                })
+            })
+            .map_err(|e| format!("Query: {e}"))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| format!("Collect: {e}"))?;
+
+        self.total_loaded += records.len() as u64;
+        Ok(records)
+    }
+
     /// Total records saved across all calls.
     pub fn total_saved(&self) -> u64 {
         self.total_saved

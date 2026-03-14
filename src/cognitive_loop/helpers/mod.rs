@@ -150,10 +150,10 @@ impl CognitiveLoopService {
     pub fn process_text_input(&mut self, embedding: &[f32]) -> Result<CycleResult> {
         use symthaea_core::hdc::ContinuousHV;
 
-        let bridge = self
-            .neural_bridge
-            .as_ref()
-            .ok_or_else(|| anyhow::anyhow!("Neural bridge not loaded (no probe weights found)"))?;
+        let bridge =
+            self.feature_integ.neural_bridge.as_ref().ok_or_else(|| {
+                anyhow::anyhow!("Neural bridge not loaded (no probe weights found)")
+            })?;
 
         let cycle_start = Instant::now();
         self.stats.total_cycles += 1;
@@ -349,7 +349,11 @@ impl CognitiveLoopService {
         let tau_owned: Vec<ndarray::Array1<f32>> = self.temporal_network.all_tau_owned();
         let tau_refs: Vec<&ndarray::Array1<f32>> = tau_owned.iter().collect();
         self.language_comm.voice_coherence.bridge.update(&tau_refs);
-        let coherence = self.language_comm.voice_coherence.bridge.smoothed_coherence();
+        let coherence = self
+            .language_comm
+            .voice_coherence
+            .bridge
+            .smoothed_coherence();
 
         // Effective threshold matches cycle() behavior (adaptive scaling)
         let effective_threshold = self.config.learning_threshold
@@ -788,7 +792,7 @@ impl CognitiveLoopService {
         self.fep.agent = ActiveInferenceAgent::new(self.fep.agent.config.clone());
         self.coherence_tracker.reset();
         self.social_mgr = super::SocialManager::default();
-        // user_state reset now handled by self.language_comm.reset() above
+        // user_state reset handled by self.language_comm.reset() above
         self.policy_agreement_window.clear();
         self.carryover = CycleCarryover::default();
         self.consciousness_state.reset();
@@ -810,6 +814,9 @@ impl CognitiveLoopService {
         }
         self.ethics_values.reset();
         self.primitive_tier.reset();
+        self.memory_consol.reset();
+        self.feature_integ.reset();
+        self.vision_sensory.reset();
         // Note: predictive_phi_modulation and cross_modal_psi already reset
         // via self.carryover = CycleCarryover::default() above.
         self.subsystem_collector.clear();
@@ -819,5 +826,13 @@ impl CognitiveLoopService {
         self.learning_manager = super::managers::LearningManager::default();
         self.perception_manager = super::managers::PerceptionManager::default();
         self.swarm_manager = super::managers::SwarmManager::default();
+        #[cfg(feature = "mesh")]
+        {
+            self.spectrum_manager = super::managers::SpectrumManager::default();
+        }
+        #[cfg(feature = "support")]
+        {
+            self.support.reset();
+        }
     }
 }

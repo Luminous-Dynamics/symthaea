@@ -581,6 +581,56 @@ impl SqliteMemory {
         }
         Ok(count)
     }
+
+    /// Synchronous batch store for use from non-async contexts (e.g., cognitive loop flush).
+    ///
+    /// Wraps all inserts in a single transaction for efficiency. Skips LSH indexing
+    /// (that can be backfilled lazily on next search).
+    pub fn store_batch_sync(&self, records: &[MemoryRecord]) -> DbResult<usize> {
+        if records.is_empty() {
+            return Ok(0);
+        }
+        let conn = self.conn.lock_resilient("sqlite_batch");
+        conn.execute_batch("BEGIN")
+            .map_err(|e| DatabaseError::InsertFailed(format!("BEGIN failed: {e}")))?;
+
+        let mut stored = 0usize;
+        for record in records {
+            let encoding_bytes = Self::hv_to_bytes(&record.encoding);
+            let memory_type_str = Self::memory_type_to_str(record.memory_type);
+            let topics_json = serde_json::to_string(&record.topics).unwrap_or_else(|_| "[]".into());
+
+            let result = conn.execute(
+                r#"INSERT OR REPLACE INTO memories
+                   (id, encoding, timestamp_ms, memory_type, content, valence, arousal, phi, topics, metadata, consolidation_strength, retrieval_count)
+                   VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)"#,
+                params![
+                    record.id,
+                    encoding_bytes,
+                    record.timestamp_ms as i64,
+                    memory_type_str,
+                    record.content,
+                    record.valence as f64,
+                    record.arousal as f64,
+                    { record.psi },
+                    topics_json,
+                    record.metadata,
+                    record.consolidation_strength,
+                    record.retrieval_count,
+                ],
+            );
+            match result {
+                Ok(_) => stored += 1,
+                Err(e) => {
+                    tracing::warn!(id = %record.id, error = %e, "Batch store: skipped record")
+                }
+            }
+        }
+
+        conn.execute_batch("COMMIT")
+            .map_err(|e| DatabaseError::InsertFailed(format!("COMMIT failed: {e}")))?;
+        Ok(stored)
+    }
 }
 
 #[async_trait]

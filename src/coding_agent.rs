@@ -29,16 +29,12 @@
 //! ```
 
 use crate::action::{ActionOutcome, PolicyBundle, SandboxRoot};
+use crate::coding_experience::{CodingExperience, CodingExperienceStore};
 use crate::cognitive_loop::motor_output_bridge::{
     ActionType, MotorActionRequest, MotorOutputBridge, MotorOutputResult,
 };
-use crate::cognitive_loop::routing::{CodeTaskDetector, CodeTaskType};
 use crate::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService, CycleResult};
 use crate::consciousness::fep_active_inference::MotorCommandType;
-#[cfg(feature = "code_generation")]
-use crate::language::code_generator::{CodeContext, CodeGenerator, GeneratedCode};
-#[cfg(feature = "code_generation")]
-use crate::language::code_intent::{CodeIntent, CodeSpec, CodeTarget};
 use crate::language::intelligent_dispatcher::{BackendTier, DispatchResult, IntelligentDispatcher};
 use crate::language::llm_backend::GenerationParams;
 use crate::mind::structured_thought::EpistemicStatus;
@@ -97,6 +93,48 @@ pub struct AgentResult {
     pub generation_tiers: Vec<BackendTier>,
     /// Total energy consumed across all generations.
     pub total_energy: f64,
+    /// Auto-generated curriculum lessons from failure patterns encountered.
+    #[cfg(feature = "school_learning")]
+    pub generated_lessons: Vec<crate::school::code_learning::CodeLesson>,
+}
+
+impl AgentResult {
+    /// Produce a JSON telemetry summary for dashboard consumption.
+    ///
+    /// Returns a `serde_json::Value` with all key metrics in a flat structure
+    /// suitable for WebSocket streaming or REST API responses.
+    pub fn to_telemetry_json(&self) -> serde_json::Value {
+        let avg_phi = if self.phi_trace.is_empty() {
+            0.0
+        } else {
+            self.phi_trace.iter().sum::<f32>() / self.phi_trace.len() as f32
+        };
+
+        serde_json::json!({
+            "phase": format!("{}", self.final_phase),
+            "iterations_used": self.iterations_used,
+            "consciousness": {
+                "avg_phi": avg_phi,
+                "min_phi": self.phi_trace.iter().cloned().fold(f32::MAX, f32::min),
+                "max_phi": self.phi_trace.iter().cloned().fold(f32::MIN, f32::max),
+                "phi_trace": self.phi_trace,
+                "samples": self.phi_trace.len(),
+            },
+            "epistemic_status": format!("{:?}", self.epistemic_status),
+            "generation": {
+                "tiers": self.generation_tiers.iter().map(|t| t.to_string()).collect::<Vec<_>>(),
+                "total_energy": self.total_energy,
+            },
+            "files_modified": self.files_modified.iter().map(|p| p.display().to_string()).collect::<Vec<_>>(),
+            "tests_passed": self.tests_passed,
+            "observations_count": self.observations.len(),
+            "errors_count": self.errors.len(),
+            "errors_preview": self.errors.iter().take(3).map(|e| {
+                let s: String = e.chars().take(100).collect();
+                s
+            }).collect::<Vec<_>>(),
+        })
+    }
 }
 
 /// Configuration for the coding agent.
@@ -170,15 +208,11 @@ pub struct CodingAgent {
     /// Set externally via `set_code_context()` — avoids coupling to the
     /// `code_generation` feature gate.
     code_context: Vec<String>,
-    /// Native code generator (HDC+CfC pipeline, no LLM).
-    #[cfg(feature = "code_generation")]
-    code_generator: CodeGenerator,
-    /// Error hints from prior failures: (error_pattern, fix_hint).
-    error_hints: Vec<(String, String)>,
-    /// Detected task type from CodeTaskDetector.
-    task_type: CodeTaskType,
-    /// Task type detector.
-    task_detector: CodeTaskDetector,
+    /// Persistent experience store for error patterns and successful generations.
+    /// Auto-initialized with in-memory SQLite in constructor.
+    experience_store: Option<CodingExperienceStore>,
+    /// Accumulated failure patterns during this run: (error_text, count).
+    failure_patterns: Vec<(String, usize)>,
 }
 
 impl CodingAgent {
@@ -217,31 +251,23 @@ impl CodingAgent {
             generation_tiers: Vec::new(),
             generated_code: None,
             code_context: Vec::new(),
-            #[cfg(feature = "code_generation")]
-            code_generator: CodeGenerator::with_default_dim(),
-            error_hints: Vec::new(),
-            task_type: CodeTaskType::None,
-            task_detector: CodeTaskDetector::new(),
+            experience_store: Self::try_init_experience_store(),
+            failure_patterns: Vec::new(),
         }
+    }
+
+    /// Attempt to create an in-memory experience store. Returns None on failure
+    /// (non-blocking — agent works fine without it).
+    fn try_init_experience_store() -> Option<CodingExperienceStore> {
+        // Use tokio if available, otherwise skip
+        let rt = tokio::runtime::Runtime::new().ok()?;
+        rt.block_on(async { CodingExperienceStore::new().await.ok() })
     }
 
     /// Run the agent on a coding task. Returns the result when done or max iterations reached.
     pub fn run(&mut self, task: &str) -> AgentResult {
         self.task = task.to_string();
-        self.task_type = self.task_detector.detect_task_type(task);
-        self.phase = match self.task_type {
-            CodeTaskType::Create => {
-                let target = self.resolve_target_file();
-                if target.exists() {
-                    TaskPhase::Understanding
-                } else {
-                    TaskPhase::Planning
-                }
-            }
-            CodeTaskType::Explain => TaskPhase::Understanding,
-            CodeTaskType::Debug | CodeTaskType::Refactor => TaskPhase::Understanding,
-            CodeTaskType::None => TaskPhase::Understanding,
-        };
+        self.phase = TaskPhase::Understanding;
         self.iteration = 0;
         self.phase_failures = 0;
         self.files_modified.clear();
@@ -251,12 +277,11 @@ impl CodingAgent {
         self.last_test_output = None;
         self.generated_code = None;
         self.generation_tiers.clear();
+        self.failure_patterns.clear();
 
         tracing::info!(
             target: "symthaea::coding_agent",
             task = task,
-            task_type = ?self.task_type,
-            initial_phase = %self.phase,
             max_iterations = self.config.max_iterations,
             "Starting coding agent"
         );
@@ -425,8 +450,7 @@ impl CodingAgent {
                 ),
             };
 
-            // Sync bridge for async dispatcher (passes task type for adaptive routing)
-            let task_type = self.task_type;
+            // Sync bridge for async dispatcher
             let result = Self::block_on_dispatch(
                 dispatcher,
                 &prompt,
@@ -434,7 +458,6 @@ impl CodingAgent {
                 epistemic,
                 prediction_error as f64,
                 phi,
-                Some(task_type),
             );
             Some(result)
         } else {
@@ -459,8 +482,9 @@ impl CodingAgent {
                     "Code generated and written"
                 );
             } else if result.tier == BackendTier::Native {
-                // Native tier — use real HDC+CfC code generator pipeline.
-                let code = self.native_generate_code();
+                // Native tier — generate a placeholder that the HDC+CfC pipeline
+                // would produce. For now, use a structural template.
+                let code = self.native_code_template();
                 let target = self.resolve_target_file();
                 self.write_code_to_disk(&target, &code);
                 self.generated_code = Some(code);
@@ -475,7 +499,7 @@ impl CodingAgent {
         }
     }
 
-    /// Synchronously call the async dispatcher with optional task-type routing.
+    /// Synchronously call the async dispatcher.
     fn block_on_dispatch(
         dispatcher: &mut IntelligentDispatcher,
         prompt: &str,
@@ -483,18 +507,16 @@ impl CodingAgent {
         epistemic: EpistemicStatus,
         prediction_error: f64,
         phi: f64,
-        task_type: Option<CodeTaskType>,
     ) -> DispatchResult {
         // Try existing tokio runtime first, fall back to a temporary one
         match tokio::runtime::Handle::try_current() {
             Ok(handle) => tokio::task::block_in_place(|| {
-                handle.block_on(dispatcher.generate_for_task(
+                handle.block_on(dispatcher.generate(
                     prompt,
                     params,
                     epistemic,
                     prediction_error,
                     phi,
-                    task_type,
                 ))
             }),
             Err(_) => {
@@ -503,9 +525,7 @@ impl CodingAgent {
                     .enable_all()
                     .build()
                     .expect("failed to create tokio runtime for code generation");
-                rt.block_on(dispatcher.generate_for_task(
-                    prompt, params, epistemic, prediction_error, phi, task_type,
-                ))
+                rt.block_on(dispatcher.generate(prompt, params, epistemic, prediction_error, phi))
             }
         }
     }
@@ -544,11 +564,12 @@ impl CodingAgent {
             }
         }
 
-        // Inject error hints from prior failures
-        if !self.error_hints.is_empty() {
-            prompt.push_str("Known error patterns to AVOID:\n");
-            for (pattern, hint) in self.error_hints.iter().take(10) {
-                prompt.push_str(&format!("- AVOID: {} — {}\n", pattern, hint));
+        // Inject experience hints from persistent store
+        let hints = self.retrieve_experience_hints();
+        if !hints.is_empty() {
+            prompt.push_str("Relevant patterns from past experience:\n");
+            for (pattern, hint) in hints.iter().take(3) {
+                prompt.push_str(&format!("- Error: {} → Fix: {}\n", pattern, hint));
             }
             prompt.push('\n');
         }
@@ -564,125 +585,34 @@ impl CodingAgent {
         prompt
     }
 
-    /// Generate code using the native pipeline. When the `code_generation` feature
-    /// is enabled, uses the full HDC+CfC CodeGenerator. Otherwise falls back to
-    /// structural templates.
-    fn native_generate_code(&self) -> String {
-        #[cfg(feature = "code_generation")]
-        {
-            let gen_result = self.native_generate();
-            if !gen_result.source.is_empty() {
-                self.log_native_generation(&gen_result);
-                return gen_result.source;
+    /// Retrieve relevant error hints from the persistent experience store.
+    fn retrieve_experience_hints(&self) -> Vec<(String, String)> {
+        if let Some(ref store) = self.experience_store {
+            if let Ok(rt) = tokio::runtime::Runtime::new() {
+                return rt.block_on(async {
+                    store.error_hints_for(&self.task, 3).await
+                });
             }
         }
-
-        // Fallback: structural template
-        self.native_code_fallback()
+        Vec::new()
     }
 
-    /// Full HDC+CfC native code generation pipeline.
-    #[cfg(feature = "code_generation")]
-    fn native_generate(&self) -> GeneratedCode {
-        use crate::language::code_parser::EntityKind;
-
-        let target = self.resolve_target_file();
-        let lang = target
-            .extension()
-            .and_then(|e| e.to_str())
-            .unwrap_or("rust")
-            .to_string();
-
-        let kind = match self.task_type {
-            CodeTaskType::Refactor => EntityKind::Module,
-            _ => EntityKind::Function,
-        };
-
-        let name = self.extract_entity_name();
-        let code_target = CodeTarget::new(&name, kind).with_language(&lang);
-        let spec = CodeSpec::new(&lang, &name, &self.task);
-
-        let intent = match self.task_type {
-            CodeTaskType::Debug => CodeIntent::Debug {
-                target: code_target,
-                symptoms: self.errors.clone(),
-            },
-            _ => CodeIntent::Create {
-                target: code_target,
-                spec,
-            },
-        };
-
-        let context = CodeContext {
-            past_examples: self
-                .code_context
-                .iter()
-                .map(|c| ("context".to_string(), c.clone()))
-                .collect(),
-            ..Default::default()
-        };
-
-        self.code_generator.generate(&intent, &context)
-    }
-
-    /// Log native generation telemetry.
-    #[cfg(feature = "code_generation")]
-    fn log_native_generation(&self, result: &GeneratedCode) {
-        tracing::info!(
-            target: "symthaea::coding_agent",
-            phi_score = result.phi_score,
-            intent_similarity = result.intent_similarity,
-            plan_steps = result.plan_steps.len(),
-            plan_coverage = result.plan_coverage,
-            "Native HDC+CfC generation completed"
-        );
-    }
-
-    /// Extract a plausible entity name from the task description.
-    fn extract_entity_name(&self) -> String {
+    /// Generate a structural template for native (non-LLM) code generation.
+    fn native_code_template(&self) -> String {
+        // Extract function/type names from the task
         let task_lower = self.task.to_lowercase();
-        let name_hints = [
-            "fibonacci", "fib", "hello", "sort", "search", "parse", "validate",
-            "process", "compute", "calculate", "convert", "transform", "filter",
-            "merge", "split", "encode", "decode", "serialize", "deserialize",
-        ];
-        for hint in &name_hints {
-            if task_lower.contains(hint) {
-                return hint.to_string();
-            }
-        }
-        let action_words = ["add", "create", "implement", "write", "build", "make"];
-        let words: Vec<&str> = self.task.split_whitespace().collect();
-        for (i, word) in words.iter().enumerate() {
-            if action_words.contains(&word.to_lowercase().as_str()) {
-                if let Some(next) = words.get(i + 1) {
-                    let clean: String = next
-                        .chars()
-                        .filter(|c| c.is_alphanumeric() || *c == '_')
-                        .collect();
-                    if !clean.is_empty() && clean.len() > 1 {
-                        return clean.to_lowercase();
-                    }
-                }
-            }
-        }
-        "generated".to_string()
-    }
 
-    /// Fallback template-based code generation (no CodeGenerator feature).
-    fn native_code_fallback(&self) -> String {
-        let task_lower = self.task.to_lowercase();
-        let name = self.extract_entity_name();
-
+        // Detect common patterns and generate appropriate templates
         if task_lower.contains("fibonacci") || task_lower.contains("fib") {
             "/// Compute the nth Fibonacci number.\npub fn fibonacci(n: u64) -> u64 {\n    match n {\n        0 => 0,\n        1 => 1,\n        _ => {\n            let (mut a, mut b) = (0u64, 1u64);\n            for _ in 2..=n {\n                let c = a.saturating_add(b);\n                a = b;\n                b = c;\n            }\n            b\n        }\n    }\n}\n".to_string()
         } else if task_lower.contains("hello") {
             "/// Return a greeting.\npub fn hello() -> &'static str {\n    \"Hello, world!\"\n}\n"
                 .to_string()
         } else {
+            // Generic function stub
             format!(
-                "/// Generated by Symthaea (native).\npub fn {}() {{\n    // TODO: implement — task: {}\n}}\n",
-                name, self.task
+                "/// Generated by Symthaea coding agent.\npub fn generated() -> () {{\n    // TODO: implement — task: {}\n}}\n",
+                self.task
             )
         }
     }
@@ -924,15 +854,9 @@ impl CodingAgent {
         match self.phase {
             TaskPhase::Understanding => {
                 if self.iteration >= 1 || !self.observations.is_empty() {
-                    // Explain tasks are read-only — go straight to Done after understanding
-                    if self.task_type == CodeTaskType::Explain {
-                        self.phase = TaskPhase::Done;
-                        tracing::info!(target: "symthaea::coding_agent", "→ Done (explain task, read-only)");
-                    } else {
-                        self.phase = TaskPhase::Planning;
-                        self.phase_failures = 0;
-                        tracing::info!(target: "symthaea::coding_agent", "→ Planning");
-                    }
+                    self.phase = TaskPhase::Planning;
+                    self.phase_failures = 0;
+                    tracing::info!(target: "symthaea::coding_agent", "→ Planning");
                 }
             }
             TaskPhase::Planning => {
@@ -1099,6 +1023,53 @@ impl CodingAgent {
                 || result.action_type == Some(ActionType::CargoCheck)
             {
                 self.last_test_output = Some(error.clone());
+
+                // Track failure pattern frequency
+                let pattern = Self::normalize_error_pattern(error);
+                if let Some(entry) = self.failure_patterns.iter_mut().find(|(p, _)| *p == pattern) {
+                    entry.1 += 1;
+                } else {
+                    self.failure_patterns.push((pattern.clone(), 1));
+                }
+
+                // Store failure in persistent experience store
+                self.store_experience(error, false);
+            }
+        }
+    }
+
+    /// Normalize an error message for pattern matching (strip paths, line numbers).
+    fn normalize_error_pattern(error: &str) -> String {
+        // Extract the error code and type, strip file-specific info
+        let mut normalized = String::new();
+        for line in error.lines().take(3) {
+            if line.contains("error[E") || line.contains("error:") {
+                normalized.push_str(line.trim());
+                normalized.push(' ');
+            }
+        }
+        if normalized.is_empty() {
+            error.lines().next().unwrap_or(error).to_string()
+        } else {
+            normalized.trim().to_string()
+        }
+    }
+
+    /// Store a coding experience (success or failure) in the persistent store.
+    fn store_experience(&mut self, detail: &str, success: bool) {
+        let experience = CodingExperience {
+            task: self.task.clone(),
+            detail: detail.chars().take(500).collect(),
+            success,
+            tier: self.generation_tiers.last().map(|t| t.to_string()).unwrap_or_default(),
+            fix_hint: None,
+        };
+
+        if let Some(ref mut store) = self.experience_store {
+            if let Ok(rt) = tokio::runtime::Runtime::new() {
+                rt.block_on(async {
+                    store.store(experience).await;
+                });
             }
         }
     }
@@ -1108,65 +1079,21 @@ impl CodingAgent {
     /// Record the outcome of code generation into the dispatcher's Bayesian stats.
     ///
     /// Called after Testing phase receives a motor result (cargo check/test pass/fail).
-    /// Feeds back into `IntelligentDispatcher::select_tier_for_task()` — over time,
-    /// backends with higher success rates get preferred for their task type + epistemic bracket.
-    ///
-    /// Also triggers distillation: successful Native-tier generations that pass testing
-    /// are flagged as distillation targets via `CodeGenerator::distillation_target()`.
+    /// Feeds back into `IntelligentDispatcher::select_tier()` — over time, backends
+    /// with higher success rates get preferred for their epistemic bracket.
     fn record_generation_outcome(&mut self, success: bool) {
         // Find the tier used for the most recent generation
         let tier = self.generation_tiers.last().copied();
         if let (Some(tier), Some(ref mut dispatcher)) = (tier, &mut self.dispatcher) {
-            // Record with task-type context for adaptive routing
-            dispatcher.record_outcome_for_task(tier, success, Some(self.task_type));
+            dispatcher.record_outcome(tier, success);
         }
 
-        // Distillation: successful native generations → mark for Broca SSM training
-        #[cfg(feature = "code_generation")]
+        // Store successful generation in persistent experience store
         if success {
-            if let Some(BackendTier::Native) = tier {
-                self.try_distillation();
+            if let Some(ref code) = self.generated_code {
+                let summary: String = code.chars().take(200).collect();
+                self.store_experience(&summary, true);
             }
-        }
-    }
-
-    /// Attempt to mark a successful native generation as a distillation target.
-    ///
-    /// Calls `CodeGenerator::distillation_target()` which checks quality gates:
-    /// - Must be Rust code
-    /// - No `todo!()` or `unimplemented!()` placeholders
-    /// - High intent similarity (>= 0.5)
-    /// - Clean dataflow (no use-before-def)
-    /// - No type warnings
-    #[cfg(feature = "code_generation")]
-    fn try_distillation(&self) {
-        use crate::language::code_intent::CodeSpec;
-
-        let target = self.resolve_target_file();
-        let lang = target
-            .extension()
-            .and_then(|e| e.to_str())
-            .unwrap_or("rust")
-            .to_string();
-
-        if lang != "rust" {
-            return; // distillation only for Rust
-        }
-
-        let name = self.extract_entity_name();
-        let spec = CodeSpec::new(&lang, &name, &self.task);
-
-        // Re-generate to get the GeneratedCode struct (the actual source is already on disk)
-        let gen_result = self.native_generate();
-
-        if let Some((_, src, quality)) = self.code_generator.distillation_target(&spec, &gen_result)
-        {
-            tracing::info!(
-                target: "symthaea::coding_agent",
-                quality = quality,
-                source_len = src.len(),
-                "Distillation target identified — eligible for Broca SSM training"
-            );
         }
     }
 
@@ -1205,7 +1132,20 @@ impl CodingAgent {
             errors: self.errors.clone(),
             generation_tiers: self.generation_tiers.clone(),
             total_energy: self.dispatcher.as_ref().map_or(0.0, |d| d.total_energy()),
+            #[cfg(feature = "school_learning")]
+            generated_lessons: self.generate_lessons_from_failures(),
         }
+    }
+
+    /// Generate auto-curriculum lessons from accumulated failure patterns.
+    #[cfg(feature = "school_learning")]
+    fn generate_lessons_from_failures(&self) -> Vec<crate::school::code_learning::CodeLesson> {
+        let failures: Vec<(String, String, usize)> = self
+            .failure_patterns
+            .iter()
+            .map(|(pattern, count)| (pattern.clone(), self.task.clone(), *count))
+            .collect();
+        crate::school::code_learning::lessons_from_failures(&failures, 5)
     }
 
     // ── Public API ──────────────────────────────────────────────────────
@@ -1255,24 +1195,14 @@ impl CodingAgent {
         self.dispatcher.as_ref().map_or(0.0, |d| d.total_energy())
     }
 
-    /// Set error hints from prior failures: `(error_pattern, fix_hint)` pairs.
-    ///
-    /// These are injected into the generation prompt as "AVOID" notes so the
-    /// agent doesn't repeat known mistakes. Called by the `Symthaea` facade
-    /// with its persistent `error_pattern_memory`.
-    pub fn set_error_hints(&mut self, hints: Vec<(String, String)>) {
-        self.error_hints = hints;
+    /// Get accumulated failure patterns from this run: (normalized_error, count).
+    pub fn failure_patterns(&self) -> &[(String, usize)] {
+        &self.failure_patterns
     }
 
-    /// Get the detected task type (Create/Debug/Refactor/Explain/None).
-    pub fn task_type(&self) -> &CodeTaskType {
-        &self.task_type
-    }
-
-    /// Access the native code generator (requires `code_generation` feature).
-    #[cfg(feature = "code_generation")]
-    pub fn code_generator(&self) -> &CodeGenerator {
-        &self.code_generator
+    /// Whether the agent has a persistent experience store.
+    pub fn has_experience_store(&self) -> bool {
+        self.experience_store.is_some()
     }
 }
 
@@ -1776,159 +1706,6 @@ mod tests {
             "Should read Cargo.toml: {:?}",
             agent.observations
         );
-    }
-
-    // ── Batch 4: CodeGenerator / Error Hints / CodeTaskDetector ─────────
-
-    #[test]
-    fn test_native_generate_code_produces_output() {
-        let config = CodingAgentConfig {
-            target_file: Some(PathBuf::from("fib.rs")),
-            ..Default::default()
-        };
-        let mut agent = CodingAgent::new(config).unwrap();
-        agent.task = "add fibonacci function".to_string();
-        agent.task_type = CodeTaskType::Create;
-
-        // native_generate_code works with or without code_generation feature
-        let code = agent.native_generate_code();
-        assert!(code.contains("fibonacci"), "Should generate fibonacci code");
-        assert!(code.contains("pub fn"), "Should be a public function");
-    }
-
-    #[test]
-    fn test_extract_entity_name_from_hints() {
-        let config = CodingAgentConfig::default();
-        let mut agent = CodingAgent::new(config).unwrap();
-
-        agent.task = "add fibonacci function to lib.rs".to_string();
-        assert_eq!(agent.extract_entity_name(), "fibonacci");
-
-        agent.task = "implement sort algorithm".to_string();
-        assert_eq!(agent.extract_entity_name(), "sort");
-
-        agent.task = "create validate input checker".to_string();
-        assert_eq!(agent.extract_entity_name(), "validate");
-    }
-
-    #[test]
-    fn test_extract_entity_name_from_action_words() {
-        let config = CodingAgentConfig::default();
-        let mut agent = CodingAgent::new(config).unwrap();
-
-        agent.task = "add greetings module".to_string();
-        assert_eq!(agent.extract_entity_name(), "greetings");
-
-        agent.task = "create analyzer utility".to_string();
-        assert_eq!(agent.extract_entity_name(), "analyzer");
-    }
-
-    #[test]
-    fn test_extract_entity_name_fallback() {
-        let config = CodingAgentConfig::default();
-        let mut agent = CodingAgent::new(config).unwrap();
-
-        // No matching hints or action words
-        agent.task = "do something vague".to_string();
-        assert_eq!(agent.extract_entity_name(), "generated");
-    }
-
-    #[test]
-    fn test_error_hints_in_prompt() {
-        let config = CodingAgentConfig::default();
-        let mut agent = CodingAgent::new(config).unwrap();
-        agent.task = "add function".to_string();
-
-        // No hints → no AVOID section
-        let prompt = agent.build_generation_prompt();
-        assert!(!prompt.contains("AVOID"));
-
-        // Set hints
-        agent.set_error_hints(vec![
-            ("E0412".to_string(), "use fully qualified type path".to_string()),
-            ("borrow checker".to_string(), "clone the value".to_string()),
-        ]);
-
-        let prompt = agent.build_generation_prompt();
-        assert!(prompt.contains("AVOID"));
-        assert!(prompt.contains("E0412"));
-        assert!(prompt.contains("fully qualified type path"));
-        assert!(prompt.contains("borrow checker"));
-    }
-
-    #[test]
-    fn test_task_type_detection() {
-        let config = CodingAgentConfig::default();
-        let mut agent = CodingAgent::new(config).unwrap();
-
-        // Create task
-        agent.run("add fibonacci function");
-        assert_eq!(*agent.task_type(), CodeTaskType::Create);
-    }
-
-    #[test]
-    fn test_explain_task_is_read_only() {
-        let dir = tempfile::tempdir().unwrap();
-        std::fs::create_dir_all(dir.path().join("src")).unwrap();
-        std::fs::write(dir.path().join("src/lib.rs"), "pub fn existing() {}").unwrap();
-
-        let config = CodingAgentConfig {
-            max_iterations: 5,
-            working_dir: dir.path().to_path_buf(),
-            target_file: Some(PathBuf::from("src/lib.rs")),
-            ..Default::default()
-        };
-        let mut agent = CodingAgent::new(config).unwrap();
-        let result = agent.run("explain the existing function");
-
-        // Explain should NOT write any files
-        assert!(
-            result.files_modified.is_empty(),
-            "Explain task should not modify files: {:?}",
-            result.files_modified
-        );
-        // Should complete quickly (Understanding → Done)
-        assert!(
-            result.iterations_used <= 3,
-            "Explain should finish quickly: {} iterations",
-            result.iterations_used
-        );
-    }
-
-    #[test]
-    fn test_create_task_skips_understanding_for_new_file() {
-        let dir = tempfile::tempdir().unwrap();
-        // Don't create the target — it shouldn't exist
-
-        let config = CodingAgentConfig {
-            max_iterations: 3,
-            working_dir: dir.path().to_path_buf(),
-            target_file: Some(PathBuf::from("new_file.rs")),
-            ..Default::default()
-        };
-        let mut agent = CodingAgent::new(config).unwrap();
-
-        // run() detects Create + non-existent target → starts at Planning
-        let result = agent.run("create a new module");
-        assert_eq!(*agent.task_type(), CodeTaskType::Create);
-        // Should have produced code (went through Planning → Generating)
-        assert!(!result.files_modified.is_empty() || result.iterations_used > 0);
-    }
-
-    #[test]
-    fn test_debug_task_native_fallback() {
-        let config = CodingAgentConfig {
-            target_file: Some(PathBuf::from("buggy.rs")),
-            ..Default::default()
-        };
-        let mut agent = CodingAgent::new(config).unwrap();
-        agent.task = "fix the broken parser".to_string();
-        agent.task_type = CodeTaskType::Debug;
-        agent.errors = vec!["panicked at index out of bounds".to_string()];
-
-        // native_generate_code produces output even in Debug mode
-        let code = agent.native_generate_code();
-        assert!(!code.is_empty(), "Should generate some code");
     }
 
     #[test]

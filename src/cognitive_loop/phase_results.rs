@@ -234,6 +234,14 @@ pub(super) struct DynMath {
     pub(super) epistemic_caveat: Option<String>,
     /// Error bound on numerical result (None if N/A)
     pub(super) error_bound: Option<f64>,
+    /// Whether memory recall found a similar past problem
+    pub(super) memory_hit: bool,
+    /// Phi from the best recalled episode (0.0 if no hit)
+    pub(super) recalled_phi: f64,
+    /// Whether the expression parser successfully parsed the input
+    pub(super) expression_parsed: bool,
+    /// Strategy transferred from memory (e.g. "use RootFinding" when recalled episode was root)
+    pub(super) strategy_transfer: Option<String>,
 }
 
 /// Result of the dynamics phase (Phases A–12).

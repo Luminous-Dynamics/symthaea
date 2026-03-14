@@ -24,6 +24,8 @@ use super::thresholds::{
     SURPRISE_PE_THRESHOLD, THETA_BINDING_BOOST_THRESHOLD, THETA_BINDING_CLAMP_MAX,
     THETA_BINDING_CLAMP_MIN, THETA_DEFAULT_SALIENCE, THETA_SALIENCE_CLAMP_MIN,
     TOM_MISMATCH_EMA_DECAY, TOM_MISMATCH_EXPLORE_SCALE, TOM_MISMATCH_THRESHOLD,
+    KNOWLEDGE_CAUSAL_DEPTH_EXPLOIT_THRESHOLD, KNOWLEDGE_CAUSAL_DEPTH_EXPLORE_DAMPEN,
+    KNOWLEDGE_NOVELTY_EXPLORE_SCALE,
 };
 use super::{CognitiveLoopService, ModuleTimings, ResponseStrategy};
 
@@ -183,6 +185,31 @@ impl CognitiveLoopService {
             }
         }
 
+        // ── Knowledge signals → exploration modulation ──────────────────
+        // Causal depth biases toward exploitation; novelty boosts exploration.
+        // Science: Berlyne (1960) — epistemic curiosity from information gap.
+        // Extract knowledge signals first, then mutably borrow self for exploration adjustments
+        let knowledge_signals = self
+            .knowledge_manager
+            .as_ref()
+            .map(|km| (km.signals().causal_depth, km.signals().novelty));
+
+        if let Some((causal_depth, novelty)) = knowledge_signals {
+            // Deep causal understanding → dampen exploration (exploit what we know)
+            if causal_depth > KNOWLEDGE_CAUSAL_DEPTH_EXPLOIT_THRESHOLD {
+                self.adjust_exploration(
+                    "knowledge_causal_deep",
+                    -KNOWLEDGE_CAUSAL_DEPTH_EXPLORE_DAMPEN,
+                );
+            }
+
+            // High novelty → boost exploration (seek information)
+            if novelty > 0.5 {
+                let boost = (novelty as f32 - 0.5) * KNOWLEDGE_NOVELTY_EXPLORE_SCALE;
+                self.adjust_exploration("knowledge_novelty", boost);
+            }
+        }
+
         self.apply_strategy_modulation(selected_strategy);
 
         // ── Phase 21: Embodied agency → strategy modulation ──────────────
@@ -308,17 +335,17 @@ impl CognitiveLoopService {
         #[cfg(feature = "semantic-encoder")]
         {
             // Check previous cycle's result (non-blocking)
-            if let Ok(mut guard) = self.pending_semantic_rx.lock() {
+            if let Ok(mut guard) = self.feature_integ.pending_semantic_rx.lock() {
                 if let Some(rx) = guard.take() {
                     if let Ok(response) = rx.try_recv() {
                         if let Ok(emb_result) = response.result {
-                            if let Some(ref bridge) = self.semantic_hdc_bridge {
+                            if let Some(ref bridge) = self.feature_integ.semantic_hdc_bridge {
                                 let semantic_hv = bridge.project(&emb_result.embedding);
                                 let sim = hv16_cached.similarity(&semantic_hv);
                                 self.stats.semantic_encoder_similarity = sim;
                                 // Store continuous projection for ethics engine
                                 // moral topology (genuine semantic resolution).
-                                self.last_semantic_continuous =
+                                self.feature_integ.last_semantic_continuous =
                                     Some(bridge.project_continuous(&emb_result.embedding));
                             }
                         }
@@ -327,9 +354,9 @@ impl CognitiveLoopService {
             }
 
             // Submit current input for next cycle (non-blocking)
-            if let Some(ref channel) = self.semantic_embedding_channel {
+            if let Some(ref channel) = self.feature_integ.semantic_embedding_channel {
                 if let Ok(rx) = channel.request(input) {
-                    if let Ok(mut guard) = self.pending_semantic_rx.lock() {
+                    if let Ok(mut guard) = self.feature_integ.pending_semantic_rx.lock() {
                         *guard = Some(rx);
                     }
                 }
@@ -526,7 +553,7 @@ impl CognitiveLoopService {
         };
         // Collect semantic embedding for ethics engine (when semantic-encoder enabled).
         #[cfg(feature = "semantic-encoder")]
-        let semantic_emb_ref = self.last_semantic_continuous.as_deref();
+        let semantic_emb_ref = self.feature_integ.last_semantic_continuous.as_deref();
         #[cfg(not(feature = "semantic-encoder"))]
         let semantic_emb_ref: Option<&[f32]> = None;
 
@@ -672,8 +699,14 @@ impl CognitiveLoopService {
                         hazard = ?report.matched_hazard,
                         "Topological immune system: THROTTLE — reducing exploration"
                     );
-                    self.adjust_exploration("escalation_throttle", -super::thresholds::ESCALATION_THROTTLE_EXPLORATION);
-                    self.adjust_confidence("escalation_throttle", -super::thresholds::ESCALATION_THROTTLE_CONFIDENCE);
+                    self.adjust_exploration(
+                        "escalation_throttle",
+                        -super::thresholds::ESCALATION_THROTTLE_EXPLORATION,
+                    );
+                    self.adjust_confidence(
+                        "escalation_throttle",
+                        -super::thresholds::ESCALATION_THROTTLE_CONFIDENCE,
+                    );
                     self.stats.escalation_warn_count += 1;
                     self.stats.escalation_throttle_count += 1;
                 }
@@ -685,9 +718,18 @@ impl CognitiveLoopService {
                         "Topological immune system: BLOCK — request rejected"
                     );
                     self.stats.escalation_blocked = true;
-                    self.adjust_exploration("escalation_block", -super::thresholds::ESCALATION_BLOCK_EXPLORATION);
-                    self.adjust_confidence("escalation_block", -super::thresholds::ESCALATION_BLOCK_CONFIDENCE);
-                    self.scale_lr("escalation_block", super::thresholds::ESCALATION_BLOCK_LR_SCALE);
+                    self.adjust_exploration(
+                        "escalation_block",
+                        -super::thresholds::ESCALATION_BLOCK_EXPLORATION,
+                    );
+                    self.adjust_confidence(
+                        "escalation_block",
+                        -super::thresholds::ESCALATION_BLOCK_CONFIDENCE,
+                    );
+                    self.scale_lr(
+                        "escalation_block",
+                        super::thresholds::ESCALATION_BLOCK_LR_SCALE,
+                    );
                     self.stats.escalation_warn_count += 1;
                     self.stats.escalation_throttle_count += 1;
                     self.stats.escalation_block_count += 1;

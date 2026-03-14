@@ -203,6 +203,7 @@ mod tests {
         use crate::benchmarks::metacognition::*;
         use crate::benchmarks::motor::*;
         use crate::benchmarks::reasoning::*;
+        use crate::benchmarks::causal_reasoning::*;
         use crate::benchmarks::social::*;
         use crate::benchmarks::spatial::*;
         use crate::benchmarks::speech::*;
@@ -309,6 +310,10 @@ mod tests {
             Box::new(SpatialPathUpdatingBenchmark),
             Box::new(LandmarkBindingBenchmark),
             Box::new(PerspectiveTakingBenchmark),
+            // Causal Reasoning
+            Box::new(CausalChainBenchmark),
+            Box::new(ConfoundDetectionBenchmark),
+            Box::new(InterventionEffectBenchmark),
             // Speech
             Box::new(PhonemeDiscriminationBenchmark),
             // Consciousness

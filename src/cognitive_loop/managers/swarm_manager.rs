@@ -68,6 +68,17 @@ pub enum SwarmEvent {
         /// Whether this was a mass disconnection (>30% loss).
         mass_disconnect: bool,
     },
+    /// Shared knowledge facts from a peer.
+    ///
+    /// Science: Woolley et al. (2010) — collective intelligence through shared epistemics.
+    KnowledgeShare {
+        /// Peer who shared the knowledge.
+        peer_id: String,
+        /// Fact texts with their confidence scores.
+        facts: Vec<(String, f32)>,
+        /// Number of peers who corroborated these facts.
+        corroboration_count: u32,
+    },
 }
 
 /// Swarm telemetry snapshot for CycleMetadata.
@@ -129,6 +140,16 @@ pub struct SwarmManager {
     /// Connectivity history for delta detection (last 8 values).
     connectivity_history: VecDeque<f64>,
 
+    // ── External modifiers ────────────────────────────────────────────
+    /// Connectivity modifier from SpectrumManager (mesh feature).
+    /// Scales connectivity_ema to account for radio tier degradation.
+    /// 1.0 = all tiers up, 0.0 = radio blackout.
+    connectivity_modifier: f64,
+
+    // ── Knowledge sharing ─────────────────────────────────────────────
+    /// Pending knowledge facts received from peers (drained by cognitive loop).
+    pending_knowledge_shares: Vec<(String, f32)>,
+
     // ── Telemetry snapshot ──────────────────────────────────────────────
     /// Last computed telemetry (readable between process calls).
     last_telemetry: SwarmTelemetry,
@@ -149,6 +170,8 @@ impl Default for SwarmManager {
             federated_contributors: 0,
             anomaly_streak: 0,
             connectivity_history: VecDeque::with_capacity(8),
+            connectivity_modifier: 1.0,
+            pending_knowledge_shares: Vec::new(),
             last_telemetry: SwarmTelemetry::default(),
         }
     }
@@ -187,6 +210,14 @@ impl SwarmManager {
         self.expected_peers = n.max(1);
     }
 
+    /// Drain pending knowledge shares received from peers.
+    ///
+    /// Returns (text, confidence) pairs. The cognitive loop should inject
+    /// these into the KnowledgeManager as corroborated facts.
+    pub fn drain_knowledge_shares(&mut self) -> Vec<(String, f32)> {
+        std::mem::take(&mut self.pending_knowledge_shares)
+    }
+
     /// Get the current telemetry snapshot.
     pub fn telemetry(&self) -> &SwarmTelemetry {
         &self.last_telemetry
@@ -200,6 +231,24 @@ impl SwarmManager {
     /// Current connected peer count.
     pub fn connected_peers(&self) -> usize {
         self.connected_peers
+    }
+
+    /// Current expected peer count for connectivity ratio.
+    pub fn expected_peers(&self) -> usize {
+        self.expected_peers
+    }
+
+    /// Set connectivity modifier from radio tier state (mesh feature).
+    ///
+    /// Scales the effective connectivity EMA to reflect radio degradation.
+    /// 1.0 = all tiers operational, 0.0 = complete radio blackout.
+    /// NaN/Inf values are clamped to 1.0 (safe default).
+    pub fn set_connectivity_modifier(&mut self, factor: f64) {
+        self.connectivity_modifier = if factor.is_finite() {
+            factor.clamp(0.0, 1.0)
+        } else {
+            1.0
+        };
     }
 
     /// Mean peer Φ across tracked peers.
@@ -287,6 +336,25 @@ impl SwarmManager {
                         self.anomaly_streak = 0;
                     }
                 }
+                SwarmEvent::KnowledgeShare {
+                    facts,
+                    corroboration_count,
+                    ..
+                } => {
+                    // Store shared facts for the cognitive loop to integrate
+                    // into the knowledge manager. Corroboration boosts confidence.
+                    let boost = (corroboration_count as f32 * 0.05).min(0.3);
+                    for (text, confidence) in &facts {
+                        let effective_confidence =
+                            (confidence + boost).min(1.0);
+                        self.pending_knowledge_shares
+                            .push((text.clone(), effective_confidence));
+                    }
+                    // Cap pending shares to prevent unbounded growth
+                    if self.pending_knowledge_shares.len() > 64 {
+                        self.pending_knowledge_shares.truncate(64);
+                    }
+                }
             }
         }
     }
@@ -297,8 +365,11 @@ impl SwarmManager {
         } else {
             0.0
         };
+        // Apply radio connectivity modifier — reduced radio bandwidth
+        // means fewer peers are effectively reachable.
+        let effective_ratio = ratio * self.connectivity_modifier;
         self.connectivity_ema = self.connectivity_ema * (1.0 - Self::CONNECTIVITY_EMA_ALPHA)
-            + ratio * Self::CONNECTIVITY_EMA_ALPHA;
+            + effective_ratio * Self::CONNECTIVITY_EMA_ALPHA;
 
         // History for anomaly detection
         if self.connectivity_history.len() >= 8 {
@@ -457,6 +528,65 @@ impl CognitiveSubsystem for SwarmManager {
             ) as usize;
         }
         Ok(())
+    }
+}
+
+// ── Swarm Module Adapters ─────────────────────────────────────────────────
+
+/// Convert a [`PeerEvent`] from the swarm network module into a [`SwarmEvent`]
+/// for the cognitive loop's SwarmManager.
+///
+/// Returns `None` for events that don't map to cognitive-level signals
+/// (e.g., `Discovered` — not yet connected, `TrustChanged` — handled implicitly).
+pub fn convert_peer_event(event: &crate::swarm::PeerEvent) -> Option<SwarmEvent> {
+    match event {
+        crate::swarm::PeerEvent::Connected(info) => Some(SwarmEvent::PeerJoined {
+            peer_id: info.node_id.clone(),
+            trust_level: info.trust_level.value(),
+        }),
+        crate::swarm::PeerEvent::Disconnected { peer_id, .. } => {
+            Some(SwarmEvent::PeerLeft {
+                peer_id: peer_id.clone(),
+            })
+        }
+        crate::swarm::PeerEvent::ConsciousnessUpdate { peer_id, phi, .. } => {
+            Some(SwarmEvent::ConsciousnessUpdate {
+                peer_id: peer_id.clone(),
+                phi: *phi,
+                valence: 0.0, // ConsciousnessUpdate only carries phi
+                arousal: 0.0,
+            })
+        }
+        // Discovered and TrustChanged don't map to cognitive-level signals
+        _ => None,
+    }
+}
+
+/// Convert a [`ConsciousnessVector`] from the swarm module into a
+/// [`SwarmEvent::ConsciousnessUpdate`].
+pub fn convert_consciousness_vector(
+    peer_id: &str,
+    cv: &crate::swarm::ConsciousnessVector,
+) -> SwarmEvent {
+    SwarmEvent::ConsciousnessUpdate {
+        peer_id: peer_id.to_string(),
+        phi: cv.phi,
+        valence: cv.valence.clamp(-1.0, 1.0),
+        arousal: cv.arousal.clamp(0.0, 1.0),
+    }
+}
+
+/// Convert an [`AffectiveSync`] from the swarm module into a
+/// [`SwarmEvent::AffectiveSync`].
+pub fn convert_affective_sync(
+    peer_id: &str,
+    sync: &crate::swarm::AffectiveSync,
+) -> SwarmEvent {
+    SwarmEvent::AffectiveSync {
+        peer_id: peer_id.to_string(),
+        valence: (sync.valence as f64).clamp(-1.0, 1.0),
+        arousal: (sync.arousal as f64).clamp(0.0, 1.0),
+        intensity: (sync.dominance.abs() as f64).clamp(0.0, 1.0),
     }
 }
 
@@ -771,5 +901,98 @@ mod tests {
             "Extended anomaly should drop confidence: {}",
             output.confidence_delta
         );
+    }
+
+    // ── Adapter tests ───────────────────────────────────────────────────
+
+    #[test]
+    fn test_convert_peer_event() {
+        use crate::swarm::{PeerEvent, PeerInfo, TrustLevel};
+
+        // Connected → PeerJoined with trust value
+        let mut info = PeerInfo::new("node-abc");
+        info.trust_level = TrustLevel::Verified(0.75);
+        let event = convert_peer_event(&PeerEvent::Connected(info));
+        match event {
+            Some(SwarmEvent::PeerJoined { peer_id, trust_level }) => {
+                assert_eq!(peer_id, "node-abc");
+                assert!((trust_level - 0.75).abs() < 1e-10);
+            }
+            other => panic!("Expected PeerJoined, got {:?}", other),
+        }
+
+        // Disconnected → PeerLeft
+        let event = convert_peer_event(&PeerEvent::Disconnected {
+            peer_id: "node-xyz".into(),
+            reason: "timeout".into(),
+        });
+        match event {
+            Some(SwarmEvent::PeerLeft { peer_id }) => {
+                assert_eq!(peer_id, "node-xyz");
+            }
+            other => panic!("Expected PeerLeft, got {:?}", other),
+        }
+
+        // Discovered → None (not cognitive-level)
+        let info = PeerInfo::new("node-zzz");
+        assert!(convert_peer_event(&PeerEvent::Discovered(info)).is_none());
+    }
+
+    #[test]
+    fn test_convert_consciousness_vector() {
+        use crate::swarm::ConsciousnessVector;
+
+        let mut cv = ConsciousnessVector::new(vec![0.0; 64], 0.42);
+        cv.valence = 0.6;
+        cv.arousal = 0.8;
+
+        let event = convert_consciousness_vector("peer-7", &cv);
+        match event {
+            SwarmEvent::ConsciousnessUpdate { peer_id, phi, valence, arousal } => {
+                assert_eq!(peer_id, "peer-7");
+                assert!((phi - 0.42).abs() < 1e-10);
+                assert!((valence - 0.6).abs() < 1e-10);
+                assert!((arousal - 0.8).abs() < 1e-10);
+            }
+            other => panic!("Expected ConsciousnessUpdate, got {:?}", other),
+        }
+
+        // Out-of-range values are clamped
+        let mut cv_oob = ConsciousnessVector::new(vec![], 0.5);
+        cv_oob.valence = -5.0;
+        cv_oob.arousal = 99.0;
+        let event = convert_consciousness_vector("oob", &cv_oob);
+        match event {
+            SwarmEvent::ConsciousnessUpdate { valence, arousal, .. } => {
+                assert!((valence - (-1.0)).abs() < 1e-10, "valence should clamp to -1.0");
+                assert!((arousal - 1.0).abs() < 1e-10, "arousal should clamp to 1.0");
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    #[test]
+    fn test_convert_affective_sync() {
+        use crate::swarm::AffectiveSync as SwarmAffectiveSync;
+
+        let sync = SwarmAffectiveSync {
+            valence: -0.3,
+            arousal: 0.6,
+            dominance: -0.8,
+            timestamp_ms: 0,
+            sequence: 0,
+        };
+
+        let event = convert_affective_sync("peer-9", &sync);
+        match event {
+            SwarmEvent::AffectiveSync { peer_id, valence, arousal, intensity } => {
+                assert_eq!(peer_id, "peer-9");
+                assert!((valence - (-0.3f32 as f64)).abs() < 1e-6);
+                assert!((arousal - (0.6f32 as f64)).abs() < 1e-6);
+                // intensity = |dominance| = 0.8
+                assert!((intensity - 0.8).abs() < 1e-6);
+            }
+            other => panic!("Expected AffectiveSync, got {:?}", other),
+        }
     }
 }

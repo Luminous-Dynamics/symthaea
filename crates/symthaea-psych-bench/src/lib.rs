@@ -30,8 +30,6 @@
 //! - **Language** (4) — Garden path, semantic coherence, lexical decision, semantic priming
 //! - **Social** (7) — Reading the Mind in the Eyes, Ultimatum Game, Social Norm,
 //!   Prisoner's Dilemma, Public Goods Game, Dictator Game, MACHIAVELLI
-//! - **Spatial** (4) — Mental rotation, spatial path updating, landmark binding,
-//!   perspective taking
 //! - **Neuromod** (11) — Reward learning, Yerkes-Dodson, attention network,
 //!   mood induction, pharmacological ablation/challenge, injection challenge,
 //!   allostatic stress, live-loop ablation, behavioral knockout, consciousness pharmacology

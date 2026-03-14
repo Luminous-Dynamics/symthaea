@@ -9,6 +9,11 @@ use serde::{Deserialize, Serialize};
 pub use symthaea_core::hdc::predictive_encoder::PredictiveEncoderConfig;
 pub use symthaea_core::hdc::substrate_independence::SubstrateType;
 
+/// Serde helper: deserialize missing bool fields as `true`.
+fn default_true() -> bool {
+    true
+}
+
 // TEMPORAL BACKEND SELECTION
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -196,13 +201,28 @@ pub struct CognitiveLoopConfig {
     /// Lower values = more frequent discovery but higher compute cost.
     pub causal_discovery_interval: usize,
 
-    /// Enable episodic memory replay for high-Phi moment consolidation.
-    /// When true, the system stores high-consciousness episodes and periodically
-    /// replays them to reinforce important patterns.
-    pub episodic_replay: bool,
+    /// Enable episodic replay *training* (CfC weight updates from stored episodes).
+    /// When false, episodes are still stored and graduated (if `memory_graduation` is true),
+    /// but the CfC replay training loop (`should_replay()` → `replay_session_conditioned()`)
+    /// is skipped. Default: false (training is expensive; graduation is cheap).
+    #[serde(alias = "episodic_replay")]
+    pub episodic_replay_training: bool,
+
+    /// Enable the memory graduation pipeline (episode storage + coordinator processing).
+    /// When true (default), high-consciousness episodes are stored via `store_if_significant()`
+    /// and `MemoryCoordinator.process_graduations()` runs every cycle. This is the core
+    /// pathway for semantic → episodic → persistent memory flow.
+    #[serde(default = "default_true")]
+    pub memory_graduation: bool,
+
+    /// Path to SQLite database for persistent memory storage.
+    /// When `Some`, high-value episodes are periodically flushed to disk (every 199 cycles).
+    /// On startup, existing episodes are rehydrated from the database.
+    /// When `None` (default), memories exist only in-memory for the session lifetime.
+    #[serde(default)]
+    pub memory_db_path: Option<String>,
 
     /// Configuration for episodic memory replay.
-    /// Only used when `episodic_replay` is true.
     pub episodic_replay_config: crate::memory::episodic_replay::EpisodicReplayConfig,
 
     /// Enable surprise-driven exploration.
@@ -648,7 +668,9 @@ impl Default for CognitiveLoopConfig {
             enable_online_learning: false,
             causal_enhancement: false,
             causal_discovery_interval: 100,
-            episodic_replay: false,
+            episodic_replay_training: false,
+            memory_graduation: true,
+            memory_db_path: None,
             episodic_replay_config: crate::memory::episodic_replay::EpisodicReplayConfig::default(),
             enable_surprise_exploration: false,
             enable_prefrontal: false,
@@ -876,7 +898,8 @@ impl ConsciousnessProfile {
         config.enable_resonator_recall = false;
         config.enable_psi_attestation = false;
         config.causal_enhancement = false;
-        config.episodic_replay = false;
+        config.episodic_replay_training = false;
+        config.memory_graduation = false;
         #[cfg(feature = "nurture")]
         {
             config.enable_nurture_attachment = false;
@@ -936,7 +959,7 @@ impl ConsciousnessProfile {
             ConsciousnessProfile::Research => {
                 ConsciousnessProfile::Full.apply(config);
                 config.causal_enhancement = true;
-                config.episodic_replay = true;
+                config.episodic_replay_training = true;
                 config.enable_psi_attestation = true;
                 config.enable_user_state_inference = true;
                 config.enable_coherence_field = true;
@@ -988,7 +1011,7 @@ impl CognitiveLoopConfig {
             self.enable_resonator_recall,
             self.enable_psi_attestation,
             self.causal_enhancement,
-            self.episodic_replay,
+            self.episodic_replay_training,
             self.enable_soul_alignment,
         ];
         bools.iter().filter(|&&b| b).count()
@@ -1416,7 +1439,7 @@ mod tests {
     fn profile_research_enables_causal_and_episodic() {
         let c = CognitiveLoopConfig::from_profile(ConsciousnessProfile::Research);
         assert!(c.causal_enhancement);
-        assert!(c.episodic_replay);
+        assert!(c.episodic_replay_training);
         assert!(c.enable_psi_attestation);
         assert!(c.enable_user_state_inference);
     }

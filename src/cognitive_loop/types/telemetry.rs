@@ -903,7 +903,7 @@ pub struct CycleMetadata {
     /// Canvas SVG generation telemetry (None when canvas feature disabled or not active).
     #[cfg(feature = "canvas")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub canvas: Option<crate::cognitive_loop::canvas_bridge::CanvasTelemetry>,
+    pub canvas: Option<super::canvas_bridge::CanvasTelemetry>,
 
     // ── Adaptive Dynamics Telemetry (Sessions 2-4) ───────────────────────
     /// Epistemic uncertainty: prediction disagreement across horizons (0.0–1.0).
@@ -1293,9 +1293,9 @@ pub struct CycleMetadata {
     /// Environmental predictability (0.0–1.0).
     #[serde(default)]
     pub env_predictability: f32,
-    /// Whether attention budget was exceeded.
+    /// Whether proposal budget was exceeded (feedback_state proposals > max).
     #[serde(default)]
-    pub attention_budget_exceeded: bool,
+    pub proposal_budget_exceeded: bool,
     /// Readiness score (0.0–1.0, composite of PE/sleep/fatigue).
     #[serde(default)]
     pub readiness_score: f32,
@@ -1361,6 +1361,26 @@ pub struct CycleMetadata {
     #[serde(default)]
     pub governance_lr_boost: f64,
 
+    // ── Swarm telemetry ────────────────────────────────────────────────────
+    /// Number of connected swarm peers.
+    #[serde(default)]
+    pub swarm_connected_peers: usize,
+    /// Connectivity EMA [0, 1] — ratio of connected/expected peers.
+    #[serde(default)]
+    pub swarm_connectivity_ema: f64,
+    /// Average peer Φ across connected peers.
+    #[serde(default)]
+    pub swarm_mean_peer_phi: f64,
+    /// Affective contagion strength this cycle.
+    #[serde(default)]
+    pub swarm_affective_contagion: f64,
+    /// Federated learning trust confidence.
+    #[serde(default)]
+    pub swarm_federated_confidence: f64,
+    /// Number of anomaly events (mass disconnects) since last reset.
+    #[serde(default)]
+    pub swarm_anomaly_count: u32,
+
     // ── Knowledge Engine Telemetry ──────────────────────────────────────
     /// Number of facts in the knowledge graph (0 if engine disabled).
     #[serde(default)]
@@ -1418,6 +1438,44 @@ pub struct CycleMetadata {
     /// Error bound on the numerical result (0.0 if N/A).
     #[serde(default)]
     pub math_error_bound: f64,
+    /// Whether memory recall found a similar past problem (Phase 7c).
+    #[serde(default)]
+    pub math_memory_hit: bool,
+    /// Phi from the best recalled episode (Phase 7c).
+    #[serde(default)]
+    pub math_recalled_phi: f64,
+    /// Whether the expression parser successfully parsed the input.
+    #[serde(default)]
+    pub math_expression_parsed: bool,
+    /// Strategy transferred from past episode memory (Phase 7c).
+    #[serde(default)]
+    pub math_strategy_transfer: String,
+
+    // ── Spectrum / Radio telemetry ──────────────────────────────────────
+    /// Network health level from SpectrumManager (0=AllUp, 1=LocalDown, 2=MetroOnly, 3=Blackout).
+    #[cfg(feature = "mesh")]
+    #[serde(default)]
+    pub spectrum_network_health: u8,
+    /// Per-tier availability [Local, Metro, Regional].
+    #[cfg(feature = "mesh")]
+    #[serde(default)]
+    pub spectrum_tier_available: [bool; 3],
+    /// Consecutive jamming cycles.
+    #[cfg(feature = "mesh")]
+    #[serde(default)]
+    pub spectrum_jamming_streak: u32,
+    /// Spectrum prediction error (0.0-1.0).
+    #[cfg(feature = "mesh")]
+    #[serde(default)]
+    pub spectrum_prediction_error: f64,
+    /// Epistemic discount from network degradation.
+    #[cfg(feature = "mesh")]
+    #[serde(default)]
+    pub spectrum_epistemic_discount: f64,
+    /// Degradation streak cycle count.
+    #[cfg(feature = "mesh")]
+    #[serde(default)]
+    pub spectrum_degradation_streak: u32,
 }
 
 fn default_response_profile() -> String {
@@ -1559,21 +1617,6 @@ pub struct BrocaGenerationTelemetry {
     /// Maximum consecutive repetitions of a single token (lower = better).
     #[serde(default)]
     pub max_repetition: usize,
-    /// Whether hallucination was detected (output drifted far from thought intent).
-    #[serde(default)]
-    pub hallucination_detected: bool,
-    /// Mean epistemic boost across generated tokens (0.0 = no hedging active).
-    #[serde(default)]
-    pub mean_epistemic_boost: f32,
-    /// Mean emotional modulation boost across generated tokens.
-    #[serde(default)]
-    pub mean_emotional_boost: f32,
-    /// Time pressure reduction applied (0.0–1.0, fraction of base tokens removed).
-    #[serde(default)]
-    pub time_pressure_reduction: f32,
-    /// Number of conversation context vectors active during generation.
-    #[serde(default)]
-    pub context_depth: usize,
 }
 
 /// Memory-resonator subsystem telemetry: dreams, codebook, replay.
@@ -2099,4 +2142,14 @@ pub struct ModuleTimings {
     pub dream_cycle: u64,
     /// Moral topology: persistent homology analysis on moral scenarios
     pub moral_topology: u64,
+
+    // ── Phase-level timings (top-level pipeline phases) ──
+    /// Phase 1: Perception (safety, encoding, moral eval, strategy, urgency).
+    pub phase_perception: u64,
+    /// Phase 2: Dynamics (CfC step, prediction, FEP, training, post-processing).
+    pub phase_dynamics: u64,
+    /// Phase 3: Feedback (consciousness, quality gating, homeostasis, dream).
+    pub phase_feedback: u64,
+    /// Phase 4: Output (metadata assembly, telemetry, CycleResult construction).
+    pub phase_output: u64,
 }

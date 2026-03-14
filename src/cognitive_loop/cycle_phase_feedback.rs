@@ -55,8 +55,7 @@ use super::thresholds::{
     NARRATIVE_SELF_PHI_CONFIDENCE_THRESHOLD, NARRATIVE_SELF_PHI_LOW_EXPLORE_BOOST,
     NARRATIVE_SELF_PHI_LOW_THRESHOLD, PHENOMENAL_BINDING_HIGH_LR_DAMPEN,
     PHENOMENAL_BINDING_HIGH_THRESHOLD, PHENOMENAL_BINDING_LOW_EXPLORE_BOOST,
-    PHENOMENAL_BINDING_LOW_THRESHOLD, PHENOMENAL_FRAGMENTED_CONFIDENCE_SCALE,
-    PHENOMENAL_FRAGMENTED_EXPLORATION_BOOST, PHI_DIVERGENCE_MAX, PHI_DIVERGENCE_SCALE,
+    PHENOMENAL_BINDING_LOW_THRESHOLD, PHI_DIVERGENCE_MAX, PHI_DIVERGENCE_SCALE,
     PHI_DIVERGENCE_THRESHOLD, PHI_RELATIONAL_OXY_SCALE, PHI_RELATIONAL_OXY_THRESHOLD,
     PIPELINE_CONSCIOUSNESS_CAUTION_SCALE, PIPELINE_CONSCIOUSNESS_HIGH_THRESHOLD,
     PIPELINE_CONSCIOUSNESS_LOW_THRESHOLD, PIPELINE_CONSCIOUSNESS_RELAX_SCALE, QUALITY_EMA_DECAY,
@@ -68,7 +67,6 @@ use super::thresholds::{
     STRUCTURAL_EMERGENCE_CONFIDENCE_THRESHOLD, SUBSYSTEM_LR_FACTOR_MAX, SUBSYSTEM_LR_FACTOR_MIN,
     TEMPORAL_CHAIN_DEEP_LR_SCALE, TEMPORAL_CHAIN_DEEP_THRESHOLD, TEMPORAL_CHAIN_SHALLOW_LR_SCALE,
     TEMPORAL_CHAIN_SHALLOW_THRESHOLD, TEMPORAL_COHERENCE_CONFIDENCE_SCALE,
-    TEMPORAL_DISCONTINUITY_EXPLORATION_BOOST, TEMPORAL_DISCONTINUITY_LR_SCALE,
     TEMPORAL_COHERENCE_HIGH_THRESHOLD, TEMPORAL_COHERENCE_LOW_EXPLORE_BOOST,
     TEMPORAL_COHERENCE_LOW_THRESHOLD, TOM_ACCURACY_HIGH, TOM_ACCURACY_LOW, TOM_ACCURACY_SCALE,
     TRUST_DECAY_FACTOR, TRUST_SIGNAL_MIDPOINT, TRUST_SIGNAL_RATE, UNIFIED_QUALITY_AGREEMENT_WEIGHT,
@@ -110,7 +108,7 @@ impl CognitiveLoopService {
             #[cfg(feature = "vision-manifold")]
             scene_recognized: perception.scene_recognized,
             #[cfg(feature = "semantic-encoder")]
-            semantic_embedding: self.last_semantic_continuous.clone(),
+            semantic_embedding: self.feature_integ.last_semantic_continuous.clone(),
         };
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -248,6 +246,24 @@ impl CognitiveLoopService {
             0.0
         };
 
+        // ── Phase 18b: Spectrum bandwidth → speech rate throttling ───────────
+        // When radio bandwidth is constrained, produce shorter outputs.
+        // Shannon (1948): channel capacity limits information throughput.
+        #[cfg(feature = "mesh")]
+        {
+            let total_budget: u64 = self.spectrum_manager.tier_budgets().iter().sum();
+            if total_budget < super::thresholds::RADIO_BANDWIDTH_THROTTLE_THRESHOLD {
+                let throttle = (total_budget as f64
+                    / super::thresholds::RADIO_BANDWIDTH_THROTTLE_THRESHOLD as f64)
+                    .max(0.3) as f32;
+                self.adaptive_behavior.speech_rate_multiplier *= throttle;
+                self.adaptive_behavior.speech_rate_multiplier = self
+                    .adaptive_behavior
+                    .speech_rate_multiplier
+                    .clamp(SPEECH_RATE_CLAMP_MIN, SPEECH_RATE_CLAMP_MAX);
+            }
+        }
+
         // ── Phase 19: Consciousness limiting component → targeted boost ─────
         let limiting_component_boosted = if !consciousness_limiting_component.is_empty()
             && consciousness_gradient_magnitude > 0.01
@@ -353,11 +369,18 @@ impl CognitiveLoopService {
             };
 
         // ── Social trust → learning rate modulation (Decety & Chaminade 2003) ──
-        let social_learning_rate_factor =
-            SOCIAL_LR_BASE + SOCIAL_LR_RANGE * self.social_mgr.social.social_trust; // [0.8, 1.2]
-        if (social_learning_rate_factor - 1.0).abs() > 0.01 {
-            self.scale_lr("social_trust", social_learning_rate_factor);
-        }
+        // Guard: only apply when social models exist. Without this, social_trust defaults
+        // to 0.0 → factor = 0.8 → permanent 20% LR dampening in single-agent sessions.
+        let social_learning_rate_factor = if self.social_mgr.social.social_models_count > 0 {
+            let factor =
+                SOCIAL_LR_BASE + SOCIAL_LR_RANGE * self.social_mgr.social.social_trust; // [0.8, 1.2]
+            if (factor - 1.0).abs() > 0.01 {
+                self.scale_lr("social_trust", factor);
+            }
+            factor
+        } else {
+            1.0 // neutral when no social models
+        };
 
         // ── ToM accuracy → prediction confidence modulation (Frith & Frith 2006) ──
         // High social prediction accuracy → boost prediction confidence (we understand the user).
@@ -507,13 +530,13 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         #[cfg(feature = "support")]
         let (support_triage_count, support_alert_fired, support_federation_graduated, support_efe) = {
-            self.support_cycle_counter += 1;
+            self.support.cycle_counter += 1;
 
             let mut triage_count: u32 = 0;
-            if let Some(ref engine) = self.support_triage_engine {
+            if let Some(ref engine) = self.support.triage_engine {
                 let result = engine.triage(input, "");
                 triage_count = 1;
-                if let Some(ref manager) = self.support_knowledge_manager {
+                if let Some(ref manager) = self.support.knowledge_manager {
                     let category_str = format!("{:?}", result.suggested_category);
                     let articles = manager.search(&category_str, 3);
                     if !articles.is_empty() {
@@ -528,8 +551,8 @@ impl CognitiveLoopService {
 
             let mut alert_fired = false;
             let mut efe = 0.0_f64;
-            if self.support_cycle_counter % 47 == 0 {
-                if let Some(ref engine) = self.support_predictive_engine {
+            if self.support.cycle_counter % 47 == 0 {
+                if let Some(ref engine) = self.support.predictive_engine {
                     let telemetry = symthaea_support::telemetry::collect_telemetry();
                     let prediction = engine.assess_system_state(&telemetry);
                     efe = prediction.expected_free_energy;
@@ -545,15 +568,16 @@ impl CognitiveLoopService {
             }
 
             let mut graduated: usize = 0;
-            if self.support_cycle_counter % 97 == 0 {
+            if self.support.cycle_counter % 97 == 0 {
                 let can_share = self
-                    .support_privacy_manager
+                    .support
+                    .privacy_manager
                     .as_ref()
                     .map(|pm| pm.can_share_cognitive())
                     .unwrap_or(true);
 
                 if can_share {
-                    if let Some(ref manager) = self.support_knowledge_manager {
+                    if let Some(ref manager) = self.support.knowledge_manager {
                         let pending = Vec::new();
                         let result =
                             symthaea_support::federation::check_graduations(manager, &pending);
@@ -753,7 +777,7 @@ impl CognitiveLoopService {
                     .map(|km| {
                         let s = km.signals();
                         // Combine relevance and certainty as grounding measure
-                        (s.relevance * 0.6 + (1.0 - s.uncertainty) * 0.4).clamp(0.0, 1.0)
+                        (s.relevance * super::thresholds::KNOWLEDGE_GROUNDING_RELEVANCE_WEIGHT + (1.0 - s.uncertainty) * super::thresholds::KNOWLEDGE_GROUNDING_CERTAINTY_WEIGHT).clamp(0.0, 1.0)
                     })
                     .unwrap_or(0.5), // neutral when knowledge engine disabled
             },
@@ -777,11 +801,11 @@ impl CognitiveLoopService {
         }
         if consciousness_output.subsystem_lr_factor != 1.0 {
             self.carryover.learning.subsystem_lr_factor *= consciousness_output.subsystem_lr_factor;
-            self.carryover.learning.subsystem_lr_factor = self
-                .carryover
-                .learning
-                .subsystem_lr_factor
-                .clamp(super::thresholds::SUBSYSTEM_LR_FACTOR_MIN, super::thresholds::SUBSYSTEM_LR_FACTOR_MAX);
+            self.carryover.learning.subsystem_lr_factor =
+                self.carryover.learning.subsystem_lr_factor.clamp(
+                    super::thresholds::SUBSYSTEM_LR_FACTOR_MIN,
+                    super::thresholds::SUBSYSTEM_LR_FACTOR_MAX,
+                );
         }
         if let Some(consolidation_boost) = consciousness_output.episodic_consolidation_boost {
             if let Some(ref mut replay) = self.phi_episodic_replay {
@@ -833,14 +857,12 @@ impl CognitiveLoopService {
                 let ne_base = self.neuromod.bath.noradrenaline.baseline_val();
                 self.neuromod.bath.noradrenaline.set_baseline(
                     ne_base
-                        + super::thresholds::KNOWLEDGE_CONTRADICTION_NE_BOOST
-                            * alert_count as f32,
+                        + super::thresholds::KNOWLEDGE_CONTRADICTION_NE_BOOST * alert_count as f32,
                 );
                 let sht_base = self.neuromod.bath.serotonin.baseline_val();
                 self.neuromod.bath.serotonin.set_baseline(
                     sht_base
-                        + super::thresholds::KNOWLEDGE_CONTRADICTION_SHT_BOOST
-                            * alert_count as f32,
+                        + super::thresholds::KNOWLEDGE_CONTRADICTION_SHT_BOOST * alert_count as f32,
                 );
 
                 // (b) Record as episodic surprise events
@@ -868,6 +890,42 @@ impl CognitiveLoopService {
             }
         }
 
+        // ── Knowledge signal → neuromodulator coupling ──────────────────
+        // Beyond contradiction alerts, the knowledge signals (uncertainty,
+        // causal depth, grounding) modulate the neuromod bath directly.
+        if let Some(ref km) = self.knowledge_manager {
+            let signals = km.signals();
+
+            // (a) High uncertainty → NE boost (Bouret & Sara 2005 — LC-NE alerting)
+            if signals.uncertainty > 0.5 {
+                let ne_base = self.neuromod.bath.noradrenaline.baseline_val();
+                let ne_nudge = (signals.uncertainty as f32 - 0.5)
+                    * super::thresholds::KNOWLEDGE_UNCERTAINTY_NE_SCALE;
+                self.neuromod
+                    .bath
+                    .noradrenaline
+                    .set_baseline((ne_base + ne_nudge).min(0.8));
+            }
+
+            // (b) Deep causal chains → DA reward (Schultz 1997 — reward prediction)
+            if signals.causal_depth
+                > super::thresholds::KNOWLEDGE_CAUSAL_DEPTH_EXPLOIT_THRESHOLD
+            {
+                let da_base = self.neuromod.bath.dopamine.baseline_val();
+                self.neuromod.bath.dopamine.set_baseline(
+                    (da_base + super::thresholds::KNOWLEDGE_CAUSAL_DEPTH_DA_NUDGE).min(0.8),
+                );
+            }
+
+            // (c) High grounding → 5-HT stability (Cools et al. 2008 — serotonin patience)
+            if signals.relevance > 0.6 && signals.uncertainty < 0.4 {
+                let sht_base = self.neuromod.bath.serotonin.baseline_val();
+                self.neuromod.bath.serotonin.set_baseline(
+                    (sht_base + super::thresholds::KNOWLEDGE_GROUNDING_SHT_NUDGE).min(0.8),
+                );
+            }
+        }
+
         // ── Structural Phi telemetry ────────────────────────────────────
         let (struct_micro, struct_meso, struct_macro, struct_bn, struct_er, struct_nc) =
             if let Some(ref sp) = consciousness_output.structural_phi {
@@ -884,7 +942,7 @@ impl CognitiveLoopService {
                             let cv = var.sqrt() / mean_tau;
                             // CV for default taus [0.01,0.1,1.0,10.0] ~ 1.7
                             // Map to 0-15% boost via sigmoid
-                            (0.15 * (1.0 / (1.0 + (-2.0 * (cv - 1.0)).exp()))) as f64
+                            (super::thresholds::PHI_SCALE_BOOST_MAX_AMPLITUDE * (1.0 / (1.0 + (super::thresholds::PHI_SCALE_BOOST_SIGMOID_SLOPE * (cv - super::thresholds::PHI_SCALE_BOOST_CV_CENTER)).exp()))) as f64
                         } else {
                             0.0
                         }
@@ -1151,7 +1209,7 @@ impl CognitiveLoopService {
                     synchrony: model.trust as f64,
                     turn_taking_quality: 0.7,
                     mutual_information: model.reciprocity as f64,
-                    mode: if model.trust > 0.3 {
+                    mode: if model.trust > super::thresholds::SOCIAL_TRUST_ITHOU_THRESHOLD {
                         RelationMode::IThou
                     } else {
                         RelationMode::IIt
@@ -1226,8 +1284,11 @@ impl CognitiveLoopService {
             .map(|s| (s - mean_signal).powi(2))
             .sum::<f32>()
             / signals.len() as f32;
-        let cross_module_agreement =
-            (1.0 - (variance * CROSS_MODULE_VARIANCE_AMPLIFICATION).max(0.0).sqrt()).clamp(0.0, 1.0);
+        let cross_module_agreement = (1.0
+            - (variance * CROSS_MODULE_VARIANCE_AMPLIFICATION)
+                .max(0.0)
+                .sqrt())
+        .clamp(0.0, 1.0);
         if cross_module_agreement > CROSS_MODULE_AGREEMENT_HIGH {
             self.adjust_confidence(
                 "cross_mod_agree",
@@ -1350,8 +1411,11 @@ impl CognitiveLoopService {
         // Session 13 Item 5: Flow state → subsystem LR modulation.
         // Flow = optimal learning zone → gently boost subsystem learning.
         // Science: Csikszentmihalyi (1990) — flow maximizes skill acquisition.
-        if self.flow_state.in_flow && self.flow_state.intensity > 0.5 {
-            self.carryover.learning.subsystem_lr_factor *= 1.05;
+        if self.flow_state.in_flow
+            && self.flow_state.intensity > super::thresholds::FLOW_INTENSITY_LR_THRESHOLD
+        {
+            self.carryover.learning.subsystem_lr_factor *=
+                super::thresholds::FLOW_SUBSYSTEM_LR_BOOST;
             self.carryover.learning.subsystem_lr_factor = self
                 .carryover
                 .learning
@@ -1362,7 +1426,7 @@ impl CognitiveLoopService {
         // Session 13 Item 8: Sustained high quality → exploration floor.
         // Prevent total convergence when system is performing well.
         // Science: Dayan & Sejnowski (1996) — minimum exploration prevents local optima.
-        if unified_quality_score > 0.7 {
+        if unified_quality_score > super::thresholds::HIGH_QUALITY_SCORE_THRESHOLD {
             self.carryover.quality.consecutive_high_quality = self
                 .carryover
                 .quality
@@ -1371,8 +1435,14 @@ impl CognitiveLoopService {
         } else {
             self.carryover.quality.consecutive_high_quality = 0;
         }
-        if self.carryover.quality.consecutive_high_quality > 10 && self.stats.total_cycles > 30 {
-            self.adjust_exploration("quality_floor", 0.01);
+        if self.carryover.quality.consecutive_high_quality
+            > super::thresholds::CONSECUTIVE_HIGH_QUALITY_CYCLES
+            && self.stats.total_cycles > 30
+        {
+            self.adjust_exploration(
+                "quality_floor",
+                super::thresholds::QUALITY_FLOOR_EXPLORATION_BOOST,
+            );
         }
 
         // Session 12 Item 4: Epistemic conflict → exploration boost.
@@ -1389,25 +1459,16 @@ impl CognitiveLoopService {
         // Fragmented binding = unreliable integration → dampen confidence, boost exploration.
         // Science: Tononi (2004) — low integration → low consciousness quality.
         if phenomenal_fragmented && self.stats.total_cycles > 15 {
-            self.scale_confidence(
-                "phenomenal_fragmented",
-                PHENOMENAL_FRAGMENTED_CONFIDENCE_SCALE,
-            );
-            self.adjust_exploration(
-                "phenomenal_fragmented",
-                PHENOMENAL_FRAGMENTED_EXPLORATION_BOOST,
-            );
+            self.scale_confidence("phenomenal_fragmented", 0.95);
+            self.adjust_exploration("phenomenal_fragmented", 0.02);
         }
 
         // Session 12 Item 6: Temporal discontinuity → LR dampen + exploration.
         // Temporal gaps make learning unreliable (missing causal chain).
         // Science: Howard & Kahana (2002) — temporal context model: gaps disrupt encoding.
         if temporal_discontinuity && self.stats.total_cycles > 15 {
-            self.scale_lr("temporal_discontinuity", TEMPORAL_DISCONTINUITY_LR_SCALE);
-            self.adjust_exploration(
-                "temporal_discontinuity",
-                TEMPORAL_DISCONTINUITY_EXPLORATION_BOOST,
-            );
+            self.scale_lr("temporal_discontinuity", 0.95);
+            self.adjust_exploration("temporal_discontinuity", 0.02);
         }
 
         // Session 12 Item 7: Cross-modal binding → attention sensitivity.
@@ -1698,7 +1759,10 @@ impl CognitiveLoopService {
                 self.adjust_exploration("temporal_binding_low", boost);
                 self.scale_lr("temporal_binding_low", TEMPORAL_BINDING_LOW_LR_SCALE);
             } else if tb > TEMPORAL_BINDING_DAMPEN_THRESHOLD && self.stats.total_cycles > 15 {
-                self.scale_exploration("temporal_binding_high", 0.98);
+                self.scale_exploration(
+                    "temporal_binding_high",
+                    super::thresholds::TEMPORAL_BINDING_HIGH_EXPLORE_SCALE,
+                );
             }
         }
 
@@ -1713,7 +1777,9 @@ impl CognitiveLoopService {
             {
                 self.scale_lr("gradient_caution", CONSCIOUSNESS_GRADIENT_LR_SCALE);
                 self.carryover.quality.consecutive_stable_gradient = 0;
-            } else if consciousness_gradient_magnitude < 0.01 {
+            } else if consciousness_gradient_magnitude
+                < super::thresholds::GRADIENT_STABLE_DETECT_THRESHOLD
+            {
                 self.carryover.quality.consecutive_stable_gradient = self
                     .carryover
                     .quality
@@ -1769,7 +1835,8 @@ impl CognitiveLoopService {
                 ALLOSTATIC_OVERLOAD_THRESHOLD,
             };
             self.carryover.quality.allostatic_load *= ALLOSTATIC_LOAD_DECAY;
-            if self.carryover.history.consciousness_ema < 0.2
+            if self.carryover.history.consciousness_ema
+                < super::thresholds::CONSCIOUSNESS_EMA_LOW_THRESHOLD
                 && self.carryover.history.consciousness_ema > 0.0
             {
                 self.carryover.quality.allostatic_load += ALLOSTATIC_LOAD_INCREMENT;
@@ -1778,8 +1845,8 @@ impl CognitiveLoopService {
                 self.carryover.quality.allostatic_load += ALLOSTATIC_LOAD_INCREMENT;
             }
             if self.carryover.quality.consecutive_full_dampen > 0 {
-                self.carryover.quality.allostatic_load +=
-                    ALLOSTATIC_LOAD_INCREMENT * super::thresholds::ALLOSTATIC_LOAD_DAMPEN_INCREMENT_SCALE;
+                self.carryover.quality.allostatic_load += ALLOSTATIC_LOAD_INCREMENT
+                    * super::thresholds::ALLOSTATIC_LOAD_DAMPEN_INCREMENT_SCALE;
             }
             self.carryover.quality.allostatic_load =
                 self.carryover.quality.allostatic_load.clamp(0.0, 1.0);
@@ -1809,8 +1876,20 @@ impl CognitiveLoopService {
                 CONSCIOUSNESS_ACCEL_THRESHOLD,
             };
             let prev_grad = self.carryover.quality.prev_gradient_magnitude;
-            let acceleration = (consciousness_gradient_magnitude - prev_grad).abs();
+            let grad_delta = consciousness_gradient_magnitude - prev_grad;
+            let acceleration = grad_delta.abs();
+            // Capture gradient direction BEFORE overwriting prev (for S18-6 oscillation).
+            let gradient_increasing = grad_delta >= 0.0;
             self.carryover.quality.prev_gradient_magnitude = consciousness_gradient_magnitude;
+            // Store sign for S18-6 oscillation detection (used in readiness gate).
+            {
+                use super::thresholds::GRADIENT_SIGN_WINDOW;
+                let history = &mut self.carryover.quality.gradient_sign_history;
+                history.push_back(gradient_increasing);
+                while history.len() > GRADIENT_SIGN_WINDOW {
+                    history.pop_front();
+                }
+            }
             if acceleration > CONSCIOUSNESS_ACCEL_THRESHOLD && self.stats.total_cycles > 20 {
                 self.scale_lr("consciousness_accel", CONSCIOUSNESS_ACCEL_LR_SCALE);
                 self.scale_confidence("consciousness_accel", CONSCIOUSNESS_ACCEL_CONFIDENCE_SCALE);
@@ -1937,7 +2016,9 @@ impl CognitiveLoopService {
                 // S21: Passive micro-rest recovery. Lim & Dinges (2010) — brief rest
                 // periods partially dissipate sleep pressure even without full consolidation.
                 // When readiness is high (low overall stress), pressure decays slowly.
-                if self.carryover.quality.last_readiness_score > 0.9 {
+                if self.carryover.quality.last_readiness_score
+                    > super::thresholds::READINESS_REST_THRESHOLD
+                {
                     self.carryover.quality.sleep_pressure *=
                         super::thresholds::SLEEP_PRESSURE_PASSIVE_DECAY;
                 } else {
@@ -1951,18 +2032,8 @@ impl CognitiveLoopService {
                 self.carryover.quality.sleep_pressure.clamp(0.0, 1.0);
         }
 
-        // S18-6: Gradient sign consistency → oscillation dampening. Schaul et al. (2013).
-        {
-            use super::thresholds::GRADIENT_SIGN_WINDOW;
-            let grad = consciousness_gradient_magnitude;
-            let sign = grad >= 0.0;
-            let history = &mut self.carryover.quality.gradient_sign_history;
-            history.push_back(sign);
-            while history.len() > GRADIENT_SIGN_WINDOW {
-                history.pop_front();
-            }
-            // S21: Pruned empty if-block — readiness gate computes flip_ratio directly.
-        }
+        // S18-6: Gradient sign tracking moved to S17-5 (above, near prev_gradient update)
+        // to capture delta BEFORE prev is overwritten. See acceleration block.
 
         // S18-7: Exploration-exploitation balance. Cohen et al. (2007).
         {
@@ -1970,7 +2041,8 @@ impl CognitiveLoopService {
                 EXPLORE_EXPLOIT_CORRECTION, EXPLORE_EXPLOIT_HIGH_BOUND, EXPLORE_EXPLOIT_LOW_BOUND,
                 EXPLORE_EXPLOIT_WINDOW,
             };
-            let explore_biased = self.feedback_state.cycle_start_exploration() > 0.5;
+            let explore_biased = self.feedback_state.cycle_start_exploration()
+                > super::thresholds::EXPLORE_BIAS_MIDPOINT as f64;
             let history = &mut self.carryover.quality.explore_exploit_history;
             history.push_back(explore_biased);
             while history.len() > EXPLORE_EXPLOIT_WINDOW {
@@ -1992,8 +2064,12 @@ impl CognitiveLoopService {
             use super::thresholds::PROPOSAL_CONFLICT_THRESHOLD;
             let lr_conflict = self.feedback_state.learning_rate.conflict_ratio();
             if lr_conflict > PROPOSAL_CONFLICT_THRESHOLD && self.stats.total_cycles > 15 {
-                // High conflict = subsystems disagree → cancel LR proposals, hold steady.
-                self.scale_lr("conflict_cancellation", 1.0);
+                // High conflict = subsystems disagree → pull LR toward neutral (1.0).
+                // Botvinick et al. (2001): conflict monitoring triggers control adjustment.
+                let current = self.carryover.learning.subsystem_lr_factor;
+                // Blend 50% toward 1.0: dampen without fully cancelling.
+                self.carryover.learning.subsystem_lr_factor =
+                    current * 0.5 + 0.5;
             }
         }
 
@@ -2055,13 +2131,16 @@ impl CognitiveLoopService {
                 RECOVERY_FATIGUE_DECAY,
             };
             let total_props = self.feedback_state.total_proposals();
-            let stable = consciousness_gradient_magnitude.abs() < 0.05;
+            let stable = consciousness_gradient_magnitude.abs()
+                < super::thresholds::RECOVERY_STABILITY_THRESHOLD;
             if total_props <= FATIGUE_EFFORT_THRESHOLD && stable {
                 self.carryover.quality.consecutive_recovery_cycles += 1;
                 if self.carryover.quality.consecutive_recovery_cycles >= RECOVERY_CYCLES_NEEDED {
                     self.carryover.quality.fatigue =
                         (self.carryover.quality.fatigue - RECOVERY_FATIGUE_DECAY).max(0.0);
-                    if self.carryover.quality.fatigue < 0.1 {
+                    if self.carryover.quality.fatigue
+                        < super::thresholds::FATIGUE_RECOVERED_THRESHOLD
+                    {
                         self.adjust_confidence("recovery_boost", RECOVERY_CONFIDENCE_BOOST);
                     }
                 }
@@ -2076,7 +2155,8 @@ impl CognitiveLoopService {
                 ENV_PREDICTABILITY_HIGH, ENV_PREDICTABILITY_LOW, ENV_PREDICTABILITY_WINDOW,
                 ENV_PREDICTABLE_THRESHOLD_SCALE, ENV_UNPREDICTABLE_THRESHOLD_SCALE,
             };
-            let pred_ok = consciousness_gradient_magnitude.abs() < 0.1;
+            let pred_ok = consciousness_gradient_magnitude.abs()
+                < super::thresholds::GRADIENT_PREDICTION_OK_THRESHOLD;
             let history = &mut self.carryover.quality.prediction_success_history;
             history.push_back(pred_ok);
             while history.len() > ENV_PREDICTABILITY_WINDOW {
@@ -2156,7 +2236,9 @@ impl CognitiveLoopService {
             let readiness = (1.0 - total_cost).clamp(0.3, 1.0);
             // Store for telemetry.
             self.carryover.quality.last_readiness_score = readiness;
-            if readiness < 0.95 && self.stats.total_cycles > 20 {
+            if readiness < super::thresholds::READINESS_DEGRADED_THRESHOLD
+                && self.stats.total_cycles > 20
+            {
                 self.scale_lr("unified_readiness", readiness);
             }
         }
@@ -2184,7 +2266,13 @@ impl CognitiveLoopService {
         {
             self.apply_governance_neuromod();
             self.process_governance_learning();
+            self.cross_couple_swarm_governance();
         }
+
+        // ── Swarm → Neuromod (Phase C, every cycle) ───────────────────────
+        // SwarmManager is not feature-gated; peer consciousness signals
+        // modulate neuromod bath each cycle (social buffering, contagion).
+        self.apply_swarm_neuromod();
 
         FeedbackPhaseResult {
             quality: FbQuality {

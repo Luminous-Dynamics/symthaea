@@ -261,7 +261,15 @@ pub struct RecallResult {
     pub total_searched: usize,
 }
 
-/// Hippocampus actor - manages episodic memory
+/// Hippocampus actor - manages episodic memory.
+///
+/// **Deprecated**: Use `MemoryCoordinator` + `EpisodicMemory` instead. This module
+/// duplicates their functionality, requires an async runtime (the cognitive loop is
+/// sync/rayon), and has zero call sites. Kept for type availability only.
+#[deprecated(
+    since = "1.10.0",
+    note = "Use MemoryCoordinator + EpisodicMemory instead"
+)]
 #[allow(dead_code)] // RESERVED(future): hippocampal memory consolidation actor
 pub struct HippocampusActor {
     /// Memory store

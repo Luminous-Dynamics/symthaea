@@ -321,7 +321,11 @@ impl CognitiveLoopService {
             // Powers & Cisek (2021): closed-loop neuromodulation requires outcome monitoring.
             self.neuromod.calibration_validator.record_pre_calibration(
                 self.stats.avg_prediction_error as f64,
-                self.language_comm.voice_coherence.bridge.smoothed_coherence().into(),
+                self.language_comm
+                    .voice_coherence
+                    .bridge
+                    .smoothed_coherence()
+                    .into(),
                 self.neuromod.self_assessment.confidence_error_ema(),
                 self.stats.total_cycles as u64,
             );

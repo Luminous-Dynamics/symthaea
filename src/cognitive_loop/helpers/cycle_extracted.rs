@@ -113,7 +113,12 @@ impl CognitiveLoopService {
     /// Uses temporal signature pattern, prosody valence, and average prediction
     /// error to select Reflex / Cortical / DeepThought processing depth.
     pub(in crate::cognitive_loop) fn update_cognitive_depth(&mut self) {
-        let prior_pattern = self.language_comm.voice_coherence.temporal.classify_state().0;
+        let prior_pattern = self
+            .language_comm
+            .voice_coherence
+            .temporal
+            .classify_state()
+            .0;
         let prior_valence = self.emotion_contagion.prosody_valence();
         let prior_error = self.stats.avg_prediction_error;
         self.cognitive_depth =
@@ -234,25 +239,26 @@ impl CognitiveLoopService {
 
         // Contextual harmony weighting: domain-aware moral modulation
         // Science: Haidt (2001) — moral foundations vary across contexts
-        let contextual_weight_factor = if let Some(ref mut cw) = self.ethics_values.contextual_weights {
-            use crate::consciousness::contextual_weights::{ActionType, DomainClassifier};
-            let domain = DomainClassifier::new().classify(input);
-            let action_type = if moral_concern_detected {
-                ActionType::Governance
+        let contextual_weight_factor =
+            if let Some(ref mut cw) = self.ethics_values.contextual_weights {
+                use crate::consciousness::contextual_weights::{ActionType, DomainClassifier};
+                let domain = DomainClassifier::new().classify(input);
+                let action_type = if moral_concern_detected {
+                    ActionType::Governance
+                } else {
+                    ActionType::Basic
+                };
+                let weights = cw.get_all_weights(action_type, domain);
+                let weight_avg =
+                    weights.iter().map(|(_, w)| w).sum::<f32>() / weights.len().max(1) as f32;
+                if weight_avg.abs() < f32::EPSILON {
+                    1.0
+                } else {
+                    weight_avg
+                }
             } else {
-                ActionType::Basic
-            };
-            let weights = cw.get_all_weights(action_type, domain);
-            let weight_avg =
-                weights.iter().map(|(_, w)| w).sum::<f32>() / weights.len().max(1) as f32;
-            if weight_avg.abs() < f32::EPSILON {
                 1.0
-            } else {
-                weight_avg
-            }
-        } else {
-            1.0
-        };
+            };
         let moral_score = moral_score * contextual_weight_factor;
 
         // Value feedback: self-correcting moral alignment via TD-learning trend
@@ -381,7 +387,12 @@ impl CognitiveLoopService {
     /// Updates the unification engine with the result.
     pub(in crate::cognitive_loop) fn compute_unified_psi(&mut self) -> f64 {
         let coherence_psi = self.language_comm.voice_coherence.bridge.phi_contribution();
-        let voice_psi = self.language_comm.voice_coherence.voice.summary().phi_adjustment;
+        let voice_psi = self
+            .language_comm
+            .voice_coherence
+            .voice
+            .summary()
+            .phi_adjustment;
         let flow_psi = if self.flow_state.in_flow {
             self.flow_state.intensity * FLOW_PSI_WEIGHT
         } else {
@@ -402,7 +413,12 @@ impl CognitiveLoopService {
         // activity — this is the raw coherence, not the doubly-weighted phi_contribution.
         // Science: Tononi (2004) — Φ reflects the degree of information integration
         // in a system. An active recurrent network has non-trivial Φ by design.
-        let baseline_integration = self.language_comm.voice_coherence.bridge.smoothed_coherence() * 0.3;
+        let baseline_integration = self
+            .language_comm
+            .voice_coherence
+            .bridge
+            .smoothed_coherence()
+            * 0.3;
 
         let unified_psi = (baseline_integration
             + coherence_psi
@@ -903,7 +919,7 @@ impl CognitiveLoopService {
         // Physics-domain exploration modulation:
         // High physics similarity → exploit (known territory), low → explore (uncharted).
         #[cfg(feature = "physics-bridge")]
-        if let Some(ref physics) = self.physics_integration {
+        if let Some(ref physics) = self.feature_integ.physics_integration {
             let score = physics.last_top_score;
             if score > 0.5 {
                 // Known physics territory — dampen exploration (scale 0.85–0.95)
