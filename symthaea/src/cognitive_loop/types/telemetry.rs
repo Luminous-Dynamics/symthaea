@@ -1352,6 +1352,26 @@ pub struct CycleMetadata {
     #[serde(default)]
     pub governance_lr_boost: f64,
 
+    // ── Swarm Telemetry ────────────────────────────────────────────────
+    /// Number of connected swarm peers.
+    #[serde(default)]
+    pub swarm_connected_peers: usize,
+    /// Connectivity EMA (0.0–1.0).
+    #[serde(default)]
+    pub swarm_connectivity_ema: f64,
+    /// Mean peer Phi across swarm.
+    #[serde(default)]
+    pub swarm_mean_peer_phi: f64,
+    /// Affective contagion intensity.
+    #[serde(default)]
+    pub swarm_affective_contagion: f64,
+    /// Federated learning confidence.
+    #[serde(default)]
+    pub swarm_federated_confidence: f64,
+    /// Network anomaly count.
+    #[serde(default)]
+    pub swarm_anomaly_count: u32,
+
     // ── Spectrum / Radio Telemetry (mesh feature) ───────────────────────
     /// Network health status string ("AllTiersUp", "LocalDown", "MetroOnly", "Blackout").
     #[cfg(feature = "mesh")]

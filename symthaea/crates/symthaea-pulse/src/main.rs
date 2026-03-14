@@ -290,6 +290,23 @@ pub struct GovernanceInfo {
     pub lr_boost: f64,
 }
 
+/// Swarm network telemetry for Pulse visualization.
+#[derive(Serialize, Deserialize, Default, Clone)]
+pub struct SwarmInfo {
+    /// Number of connected peers.
+    pub connected_peers: usize,
+    /// Connectivity EMA (0.0-1.0).
+    pub connectivity_ema: f64,
+    /// Mean peer Phi across the swarm.
+    pub mean_peer_phi: f64,
+    /// Affective contagion intensity.
+    pub affective_contagion: f64,
+    /// Federated learning confidence.
+    pub federated_confidence: f64,
+    /// Network anomaly count.
+    pub anomaly_count: u32,
+}
+
 /// Knowledge engine telemetry for Pulse visualization.
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct KnowledgeInfo {
@@ -339,6 +356,8 @@ pub struct PulseSnapshot {
     pub governance: GovernanceInfo,
     #[serde(default)]
     pub knowledge: KnowledgeInfo,
+    #[serde(default)]
+    pub swarm: SwarmInfo,
 }
 
 /// Computed delta between two pulse snapshots for the comparison view.
@@ -1181,6 +1200,7 @@ fn main() -> Result<()> {
             best_similarity: 0.0,
             uncertainty_history: Vec::new(),
         },
+        swarm: SwarmInfo::default(),
     };
 
     if let Some(json_path) = &args.json {
@@ -1466,6 +1486,7 @@ fn main() -> Result<()> {
                     best_similarity: 0.0,
                     uncertainty_history: Vec::new(),
                 },
+                swarm: SwarmInfo::default(),
             };
 
             // Delta against previous snapshot
@@ -1635,6 +1656,7 @@ mod tests {
             cantor: CantorInfo::default(),
             governance: GovernanceInfo::default(),
             knowledge: KnowledgeInfo::default(),
+            swarm: SwarmInfo::default(),
         }
     }
 

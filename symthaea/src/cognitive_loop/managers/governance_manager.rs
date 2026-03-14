@@ -130,8 +130,13 @@ pub struct GovernanceManager {
     last_harmonic_delta_max: f64,
     /// Whether an external (multi-agent) mesh was set — prevents local fallback overwrite.
     external_mesh_set: bool,
+    /// Accumulated confidence nudge from cross-coupling (drained in process()).
+    confidence_nudge_acc: f64,
     /// Latest governance LR boost from prediction error (for telemetry).
     last_lr_boost: f64,
+    /// Preferred radio tier for governance traffic (from SpectrumManager).
+    #[cfg(feature = "mesh")]
+    preferred_tier: Option<super::radio_dispatcher::RadioTier>,
 }
 
 impl Default for GovernanceManager {
@@ -153,7 +158,10 @@ impl Default for GovernanceManager {
             epistemic_mesh: None,
             community_mode: None,
             external_mesh_set: false,
+            confidence_nudge_acc: 0.0,
             last_lr_boost: 1.0,
+            #[cfg(feature = "mesh")]
+            preferred_tier: None,
         }
     }
 }
@@ -203,6 +211,15 @@ impl GovernanceManager {
     /// Current reward EMA (for external telemetry).
     pub fn reward_ema(&self) -> f64 {
         self.reward_ema
+    }
+
+    /// Accumulate a confidence nudge from cross-coupling (drained in process()).
+    /// Clamped to [-0.1, 0.1] per call, NaN-guarded.
+    pub fn nudge_confidence(&mut self, delta: f64) {
+        if delta.is_finite() {
+            self.confidence_nudge_acc =
+                (self.confidence_nudge_acc + delta.clamp(-0.1, 0.1)).clamp(-0.2, 0.2);
+        }
     }
 
     /// Number of pending events.
@@ -300,6 +317,18 @@ impl GovernanceManager {
     /// LR boost from governance prediction error (1.0 = no boost).
     pub fn last_lr_boost(&self) -> f64 {
         self.last_lr_boost
+    }
+
+    /// Set the preferred radio tier for governance traffic (from SpectrumManager).
+    #[cfg(feature = "mesh")]
+    pub fn set_preferred_tier(&mut self, tier: super::radio_dispatcher::RadioTier) {
+        self.preferred_tier = Some(tier);
+    }
+
+    /// Get the preferred radio tier for governance traffic.
+    #[cfg(feature = "mesh")]
+    pub fn preferred_tier(&self) -> Option<super::radio_dispatcher::RadioTier> {
+        self.preferred_tier
     }
 
     // ── Phase 2: Learning Methods ──────────────────────────────────────
@@ -541,6 +570,11 @@ impl CognitiveSubsystem for GovernanceManager {
         let outcomes: Vec<GovernanceOutcome> = self.outcome_history.drain(..).collect();
 
         if events.is_empty() && outcomes.is_empty() {
+            // Drain cross-coupling nudge even when idle
+            if self.confidence_nudge_acc.abs() > 1e-10 {
+                output.confidence_delta += self.confidence_nudge_acc;
+                self.confidence_nudge_acc = 0.0;
+            }
             return output;
         }
 
@@ -637,6 +671,12 @@ impl CognitiveSubsystem for GovernanceManager {
             .iter()
             .map(|d| d.abs())
             .fold(0.0f64, f64::max);
+
+        // Drain cross-coupling nudge
+        if self.confidence_nudge_acc.abs() > 1e-10 {
+            output.confidence_delta += self.confidence_nudge_acc;
+            self.confidence_nudge_acc = 0.0;
+        }
 
         output
     }
