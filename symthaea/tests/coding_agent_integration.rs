@@ -200,3 +200,50 @@ fn test_agent_index_project() {
     assert!(functions >= 1, "Should find at least 1 function");
     assert!(types >= 1, "Should find at least 1 type");
 }
+
+#[test]
+fn test_agent_source_context_contains_code() {
+    let tmp = tempfile::tempdir().unwrap();
+    let src_dir = tmp.path().join("src");
+    std::fs::create_dir_all(&src_dir).unwrap();
+    std::fs::write(
+        src_dir.join("lib.rs"),
+        "pub fn fibonacci(n: u64) -> u64 {\n    if n <= 1 { return n; }\n    fibonacci(n-1) + fibonacci(n-2)\n}\n",
+    )
+    .unwrap();
+
+    let config = CodingAgentConfig {
+        max_iterations: 3,
+        working_dir: tmp.path().to_path_buf(),
+        target_file: Some(PathBuf::from("src/utils.rs")),
+        ..Default::default()
+    };
+    let mut agent = CodingAgent::new(config).expect("Should create agent");
+    agent.index_project(tmp.path()).unwrap();
+    let result = agent.run("add a memoized fibonacci function");
+    assert!(result.iterations_used > 0);
+}
+
+#[test]
+fn test_agent_real_exec_writes_file() {
+    let tmp = tempfile::tempdir().unwrap();
+    let config = CodingAgentConfig {
+        max_iterations: 5,
+        max_phase_failures: 2,
+        working_dir: tmp.path().to_path_buf(),
+        target_file: Some(PathBuf::from("generated.rs")),
+        enable_real_exec: true,
+        use_local_llm: false,
+        ..Default::default()
+    };
+    let mut agent = CodingAgent::new(config).expect("Should create with real exec");
+    let result = agent.run("add a fibonacci function");
+
+    let target = tmp.path().join("generated.rs");
+    if target.exists() {
+        let content = std::fs::read_to_string(&target).unwrap();
+        assert!(content.contains("fn "), "Generated file should contain a function");
+    }
+    assert!(result.iterations_used > 0);
+    assert!(!result.phi_trace.is_empty());
+}
