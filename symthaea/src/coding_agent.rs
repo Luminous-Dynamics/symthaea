@@ -225,6 +225,9 @@ pub struct CodingAgent {
     /// Indexed codebase memory for semantic code search (populated by `index_project()`).
     #[cfg(feature = "code_generation")]
     code_memory: Option<crate::hdc::code_memory::CodebaseMemory>,
+    /// Cached file sources for source-level context extraction (path → source text).
+    #[cfg(feature = "code_generation")]
+    source_cache: std::collections::HashMap<PathBuf, String>,
 }
 
 impl CodingAgent {
@@ -286,6 +289,8 @@ impl CodingAgent {
             failure_patterns: Vec::new(),
             #[cfg(feature = "code_generation")]
             code_memory: None,
+            #[cfg(feature = "code_generation")]
+            source_cache: std::collections::HashMap::new(),
         }
     }
 
@@ -312,25 +317,10 @@ impl CodingAgent {
         self.generation_tiers.clear();
         self.failure_patterns.clear();
 
-        // If we have indexed codebase memory, query for relevant context
+        // If we have indexed codebase memory, query for source-level context
         #[cfg(feature = "code_generation")]
         if let Some(ref memory) = self.code_memory {
-            let encoder = memory.encoder();
-            let intent_hv = encoder.encode_name(task);
-            let matches = memory.query(&intent_hv, 5);
-            let context: Vec<String> = matches
-                .iter()
-                .filter(|m| m.similarity > 0.2)
-                .map(|m| {
-                    format!(
-                        "{:?} `{}` in {} (sim: {:.3})",
-                        m.kind,
-                        m.name,
-                        m.path.display(),
-                        m.similarity
-                    )
-                })
-                .collect();
+            let context = Self::build_source_context(memory, &self.source_cache, task);
             if !context.is_empty() {
                 self.code_context = context;
             }
@@ -723,6 +713,8 @@ impl CodingAgent {
                     code.len(),
                     target.display()
                 ));
+                #[cfg(feature = "code_generation")]
+                self.reindex_file(target, code);
             }
             Err(e) => {
                 self.errors
@@ -1294,6 +1286,7 @@ impl CodingAgent {
                 Ok(parsed) => {
                     memory.index_file(path, &parsed);
                     files_indexed += 1;
+                    self.source_cache.insert(path.to_path_buf(), source);
                 }
                 Err(_) => {
                     parse_errors += 1;
@@ -1311,30 +1304,91 @@ impl CodingAgent {
             "Indexed project into CodebaseMemory"
         );
 
-        // If we have a task, query for relevant context and inject it
+        // If we have a task, query for source-level context
         if !self.task.is_empty() {
-            let encoder = memory.encoder();
-            let intent_hv = encoder.encode_name(&self.task);
-            let matches = memory.query(&intent_hv, 5);
-            let context: Vec<String> = matches
-                .iter()
-                .filter(|m| m.similarity > 0.2)
-                .map(|m| {
-                    format!(
-                        "{:?} `{}` in {} (sim: {:.3})",
-                        m.kind, m.name, m.path.display(), m.similarity
-                    )
-                })
-                .collect();
-            if !context.is_empty() {
-                self.code_context = context;
-            }
+            self.code_context = Self::build_source_context(&memory, &self.source_cache, &self.task);
         }
 
         // Store memory for future queries
         self.code_memory = Some(memory);
 
         Ok((files_indexed, stats.functions, stats.types))
+    }
+
+    /// Re-index a single file after it has been written/modified.
+    #[cfg(feature = "code_generation")]
+    fn reindex_file(&mut self, path: &std::path::Path, source: &str) {
+        use crate::language::parser_registry::ParserRegistry;
+        let filename = path.file_name().and_then(|f| f.to_str());
+        let mut parser_registry = ParserRegistry::with_builtins();
+        if let Ok(parsed) = parser_registry.parse(source, None, filename) {
+            if let Some(ref mut memory) = self.code_memory {
+                memory.update_file(path, &parsed);
+            }
+        }
+        self.source_cache.insert(path.to_path_buf(), source.to_string());
+    }
+
+    /// Build source-level context from CodebaseMemory matches.
+    #[cfg(feature = "code_generation")]
+    fn build_source_context(
+        memory: &crate::hdc::code_memory::CodebaseMemory,
+        source_cache: &std::collections::HashMap<PathBuf, String>,
+        task: &str,
+    ) -> Vec<String> {
+        let encoder = memory.encoder();
+        let intent_hv = encoder.encode_name(task);
+        let matches = memory.query(&intent_hv, 5);
+        matches
+            .iter()
+            .filter(|m| m.similarity > 0.2)
+            .filter_map(|m| {
+                let source = source_cache.get(&m.path)?;
+                let snippet = Self::extract_entity_source(source, &m.name, m.kind);
+                Some(format!(
+                    "// {} — {:?} `{}` (similarity: {:.3})\n{}",
+                    m.path.display(), m.kind, m.name, m.similarity, snippet
+                ))
+            })
+            .collect()
+    }
+
+    /// Extract source code for a named entity using brace-matching (up to 20 lines).
+    #[cfg(feature = "code_generation")]
+    fn extract_entity_source(
+        source: &str,
+        name: &str,
+        kind: crate::language::code_parser::EntityKind,
+    ) -> String {
+        use crate::language::code_parser::EntityKind;
+        let keyword = match kind {
+            EntityKind::Function | EntityKind::Method => "fn ",
+            EntityKind::Struct => "struct ",
+            EntityKind::Enum => "enum ",
+            EntityKind::Trait | EntityKind::Interface => "trait ",
+            EntityKind::Class => "class ",
+            _ => "fn ",
+        };
+        let pattern = format!("{keyword}{name}");
+        let lines: Vec<&str> = source.lines().collect();
+        for (i, line) in lines.iter().enumerate() {
+            if line.contains(&pattern) {
+                let mut depth = 0i32;
+                let mut out = Vec::new();
+                let mut started = false;
+                for j in i..lines.len().min(i + 30) {
+                    out.push(lines[j]);
+                    for ch in lines[j].chars() {
+                        if ch == '{' { depth += 1; started = true; }
+                        if ch == '}' { depth -= 1; }
+                    }
+                    if started && depth <= 0 { break; }
+                    if out.len() >= 20 { out.push("    // ... (truncated)"); break; }
+                }
+                return out.join("\n");
+            }
+        }
+        format!("// {keyword}{name} (source not found)")
     }
 
     /// Get the last dispatch result (which backend tier was used, energy cost, etc.).
