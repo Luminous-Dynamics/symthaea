@@ -119,8 +119,8 @@ impl CognitiveLoopService {
                 graduations_processed: self.memory_consol.memory_coordinator.stats.graduations_processed,
                 graduations_rejected: self.memory_consol.memory_coordinator.stats.graduations_rejected,
                 semantic_evictions: dynamics.semantic_evictions,
-                episodic_memory_count: self.phi_episodic_replay.as_ref().map(|e| e.len()).unwrap_or(0),
-                episodic_avg_psi: self.phi_episodic_replay.as_ref().map(|e| e.stats().average_psi).unwrap_or(0.0),
+                episodic_memory_count: self.episodic_persistence.replay.as_ref().map(|e| e.len()).unwrap_or(0),
+                episodic_avg_psi: self.episodic_persistence.replay.as_ref().map(|e| e.stats().average_psi).unwrap_or(0.0),
                 memory_db_flushed: feedback.memory.memory_db_flushed,
             },
             fep: super::FepTelemetry {
@@ -1021,38 +1021,38 @@ impl CognitiveLoopService {
                 .swap(0, std::sync::atomic::Ordering::Relaxed) as u32;
 
         // ── Cantor fractal telemetry ──
-        metadata.cantor_buffer_occupancy = self.cantor_broadcast_buffer.len() as u32;
+        metadata.cantor_buffer_occupancy = self.cantor_dream.broadcast_buffer.len() as u32;
         metadata.cantor_metacognitive_depth = self
-            .cantor_broadcast_buffer
+            .cantor_dream.broadcast_buffer
             .last()
             .map(|crhv| crhv.self_similarity())
             .unwrap_or(0.0);
-        metadata.cantor_codebook_size = self.cantor_cleanup_engine.codebook.len() as u32;
+        metadata.cantor_codebook_size = self.cantor_dream.cleanup_engine.codebook.len() as u32;
         metadata.cantor_last_depth = self
-            .cantor_broadcast_buffer
+            .cantor_dream.broadcast_buffer
             .last()
             .map(|crhv| crhv.depth as u8)
             .unwrap_or(0);
-        metadata.cantor_dream_surprise = self.cantor_dream_surprise;
-        metadata.cantor_resonance_boost = self.cantor_resonance_boost;
+        metadata.cantor_dream_surprise = self.cantor_dream.dream_surprise;
+        metadata.cantor_resonance_boost = self.cantor_dream.resonance_boost;
 
         // Populate depth histogram from codebook labels ("d{N}_...")
         // Depth range 2-7 maps to histogram indices 0-5
         for d in 2..=7usize {
             metadata.cantor_depth_histogram[d - 2] =
-                self.cantor_cleanup_engine
+                self.cantor_dream.cleanup_engine
                     .codebook
                     .count_by_prefix(&format!("d{d}_")) as u32;
         }
 
         // ── Motor output bridge telemetry ──
-        metadata.motor_bridge_active = self.motor_output_bridge.is_some();
-        if let Some(ref result) = self.last_motor_result {
+        metadata.motor_bridge_active = self.motor_rendering.output_bridge.is_some();
+        if let Some(ref result) = self.motor_rendering.last_result {
             metadata.motor_action_executed = true;
             metadata.motor_action_success = result.success;
             metadata.motor_action_type = result.action_type.map(|at| at as u8).unwrap_or(255);
             metadata.motor_prediction_error = result.prediction_error;
-            metadata.motor_phi_used = self.last_motor_phi;
+            metadata.motor_phi_used = self.motor_rendering.last_phi;
         }
 
         // ── GWT-triggered memory consolidation (Dehaene & Changeux 2011) ──
@@ -1188,6 +1188,17 @@ impl CognitiveLoopService {
             metadata.governance_harmonic_delta_max = self.governance_mgr.last_harmonic_delta_max();
             metadata.governance_epistemic_agents = self.governance_mgr.epistemic_agent_count();
             metadata.governance_lr_boost = self.governance_mgr.last_lr_boost();
+        }
+
+        // Swarm telemetry
+        {
+            let st = self.swarm_manager.telemetry();
+            metadata.swarm_connected_peers = st.connected_peers;
+            metadata.swarm_connectivity_ema = st.connectivity_ema;
+            metadata.swarm_mean_peer_phi = st.mean_peer_phi;
+            metadata.swarm_affective_contagion = st.affective_contagion;
+            metadata.swarm_federated_confidence = st.federated_confidence;
+            metadata.swarm_anomaly_count = st.anomaly_count;
         }
 
         // Spectrum / radio telemetry
@@ -1418,7 +1429,7 @@ impl CognitiveLoopService {
         // Placed after thought_vector so all snapshot fields are available.
         #[cfg(feature = "canvas")]
         {
-            if let Some(ref mut mgr) = self.canvas_manager {
+            if let Some(ref mut mgr) = self.motor_rendering.canvas_manager {
                 // Extract live Betti numbers from moral topology
                 let topo_summary = self.ethics_engine.moral_topology().last_summary();
                 let betti = (
@@ -1448,7 +1459,7 @@ impl CognitiveLoopService {
                     self.stats.total_cycles,
                 );
                 if let Some(svg) = mgr.tick(&snap) {
-                    self.last_canvas_svg = Some(svg.to_string());
+                    self.motor_rendering.last_canvas_svg = Some(svg.to_string());
                 }
                 // Aesthetic score → neuromod feedback: beauty as reward signal.
                 // Birkhoff (1933): mathematical beauty triggers pleasure centers.
@@ -1716,7 +1727,7 @@ impl CognitiveLoopService {
             #[cfg(feature = "ssm_language")]
             language_output: self.language_comm.last_broca_text.take(),
             #[cfg(feature = "canvas")]
-            canvas_svg: self.last_canvas_svg.take(),
+            canvas_svg: self.motor_rendering.last_canvas_svg.take(),
             #[cfg(feature = "identity")]
             signed_output,
             #[cfg(feature = "identity")]

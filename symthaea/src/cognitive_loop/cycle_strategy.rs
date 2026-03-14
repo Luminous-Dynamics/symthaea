@@ -553,10 +553,10 @@ impl CognitiveLoopService {
         #[cfg(not(feature = "semantic-encoder"))]
         let semantic_emb_ref: Option<&[f32]> = None;
 
-        // Query knowledge engine for moral precedent (Item 7)
+        // Query knowledge engine for moral precedent
         // Extracts facts tagged with ethics/social domains for grounded moral reasoning.
-        let _knowledge_moral_context: Vec<String> = self
-            .last_reasoning_context
+        let knowledge_moral_context: Vec<String> = self
+            .episodic_persistence.last_reasoning_context
             .as_ref()
             .map(|ctx| {
                 ctx.relevant_facts
@@ -572,6 +572,22 @@ impl CognitiveLoopService {
             })
             .unwrap_or_default();
 
+        // Knowledge confidence multiplier: scales ethical confidence by knowledge grounding
+        // Science: Kahneman (2011) — epistemic uncertainty should constrain decision confidence
+        let knowledge_confidence_multiplier = self
+            .episodic_persistence
+            .last_reasoning_context
+            .as_ref()
+            .map(|ctx| {
+                let query_result = crate::knowledge::reasoning_context::KnowledgeQueryResult {
+                    facts: ctx.relevant_facts.clone(),
+                    causal_chains: Vec::new(),
+                    grounding_score: if ctx.epistemic_state.has_grounding { ctx.epistemic_state.confidence_multiplier.min(1.0) } else { 0.0 },
+                };
+                query_result.confidence_multiplier()
+            })
+            .unwrap_or(1.0);
+
         let ethics_output = self
             .ethics_engine
             .evaluate(&super::ethics_engine::EthicsEngineInput {
@@ -582,6 +598,8 @@ impl CognitiveLoopService {
                 stillness_boost,
                 semantic_embedding: semantic_emb_ref,
                 action_hv: Some(&hv16_cached),
+                knowledge_confidence_multiplier,
+                knowledge_moral_context,
             });
         module_timings.ethics_engine = ethics_output.total_us;
         module_timings.ethics_engine_moral = ethics_output.moral_us;
@@ -606,7 +624,7 @@ impl CognitiveLoopService {
                 CANTOR_HARMONY_INTERCONNECT_SCALE, CANTOR_HARMONY_STILLNESS_SCALE,
             };
             let meta_depth = self
-                .cantor_broadcast_buffer
+                .cantor_dream.broadcast_buffer
                 .last()
                 .map(|crhv| crhv.self_similarity() as f64)
                 .unwrap_or(0.0);
@@ -615,9 +633,9 @@ impl CognitiveLoopService {
                 self.ethics_engine
                     .nudge_harmony_coordinate(7, stillness_delta);
             }
-            if self.cantor_resonance_boost > 0.1 {
+            if self.cantor_dream.resonance_boost > 0.1 {
                 let interconnect_delta =
-                    self.cantor_resonance_boost as f64 * CANTOR_HARMONY_INTERCONNECT_SCALE;
+                    self.cantor_dream.resonance_boost as f64 * CANTOR_HARMONY_INTERCONNECT_SCALE;
                 self.ethics_engine
                     .nudge_harmony_coordinate(4, interconnect_delta);
             }

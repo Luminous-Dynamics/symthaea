@@ -758,7 +758,7 @@ impl CognitiveLoopService {
                     .unwrap_or(0.5), // preserve backward compat when disabled
                 // Cantor metacognitive depth: self-similarity of latest broadcast CRHV
                 cantor_metacognitive_depth: self
-                    .cantor_broadcast_buffer
+                    .cantor_dream.broadcast_buffer
                     .last()
                     .map(|crhv| crhv.self_similarity() as f64)
                     .unwrap_or(0.5), // neutral when no broadcasts yet
@@ -805,7 +805,7 @@ impl CognitiveLoopService {
                 .clamp(super::thresholds::SUBSYSTEM_LR_FACTOR_MIN, super::thresholds::SUBSYSTEM_LR_FACTOR_MAX);
         }
         if let Some(consolidation_boost) = consciousness_output.episodic_consolidation_boost {
-            if let Some(ref mut replay) = self.phi_episodic_replay {
+            if let Some(ref mut replay) = self.episodic_persistence.replay {
                 replay.boost_recent_consolidation(consolidation_boost);
             }
         }
@@ -919,6 +919,13 @@ impl CognitiveLoopService {
                     sht_base + super::thresholds::KNOWLEDGE_GROUNDING_SHT_NUDGE,
                 );
             }
+        }
+
+        // ── Knowledge confidence calibration from prediction outcomes ────
+        // Bayesian update: accurate predictions boost fact confidence, inaccurate reduce.
+        // Science: Jaynes (2003) — probability as extended logic.
+        if let Some(ref mut km) = self.knowledge_manager {
+            km.calibrate_from_prediction(prediction_error);
         }
 
         // ── Structural Phi telemetry ────────────────────────────────────
@@ -2229,6 +2236,13 @@ impl CognitiveLoopService {
             self.apply_governance_neuromod();
             self.process_governance_learning();
         }
+
+        // Swarm neuromodulatory coupling (not feature-gated — SwarmManager is always present).
+        self.apply_swarm_neuromod();
+
+        // Cross-couple swarm and governance signals (Woolley 2010).
+        #[cfg(feature = "mycelix")]
+        self.cross_couple_swarm_governance();
 
         FeedbackPhaseResult {
             quality: FbQuality {

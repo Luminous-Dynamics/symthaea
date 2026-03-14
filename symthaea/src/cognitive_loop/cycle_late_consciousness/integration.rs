@@ -53,7 +53,7 @@ impl CognitiveLoopService {
                     (false, 0, 0.0)
                 }
             } else {
-                (false, 0, self.cantor_last_activation)
+                (false, 0, self.cantor_dream.last_activation)
             };
 
         // Store GWT state in carryover for cross-domain coupling (next cycle)
@@ -83,7 +83,7 @@ impl CognitiveLoopService {
             //   - Strong broadcast (act~1.0): depth 7 (full recursive self-similarity)
             // Science: Dehaene et al. (2006) — ignition strength ∝ recruited cortical layers.
             use symthaea_core::hdc::cantor_recursive_hv::CantorRecursiveHV;
-            self.cantor_last_activation = gwt_activation;
+            self.cantor_dream.last_activation = gwt_activation;
             use crate::cognitive_loop::thresholds::{CANTOR_DEPTH_MAX, CANTOR_DEPTH_MIN};
             let depth_range = CANTOR_DEPTH_MAX - CANTOR_DEPTH_MIN;
             let adaptive_depth =
@@ -110,17 +110,17 @@ impl CognitiveLoopService {
                 CantorRecursiveHV::from_base_with_depth(ctx.hv16_cached, adaptive_depth)
             };
             // Cap at 32 to bound memory — oldest broadcasts evicted first (ring semantics)
-            if self.cantor_broadcast_buffer.len() >= 32 {
-                self.cantor_broadcast_buffer.remove(0);
+            if self.cantor_dream.broadcast_buffer.len() >= 32 {
+                self.cantor_dream.broadcast_buffer.remove(0);
             }
-            self.cantor_broadcast_buffer.push(crhv);
+            self.cantor_dream.broadcast_buffer.push(crhv);
 
             // RESONANCE COUPLING: Detect coherent CRHV pairs in the buffer.
             // When multiple fractal representations share high base-vector similarity,
             // they form a "resonant coalition" that amplifies workspace integration.
             // Science: Edelman & Tononi (2000) — reentrant signaling creates dynamic
             //          neural coalitions; Singer (1999) — binding by synchrony.
-            let buf = &self.cantor_broadcast_buffer;
+            let buf = &self.cantor_dream.broadcast_buffer;
             if buf.len() >= 2 {
                 let threshold =
                     crate::cognitive_loop::thresholds::CANTOR_RESONANCE_SIMILARITY_THRESHOLD;
@@ -140,36 +140,36 @@ impl CognitiveLoopService {
                     let w = (n - window_start) as u32;
                     w * (w - 1) / 2
                 };
-                self.cantor_resonance_boost = if max_pairs > 0 {
+                self.cantor_dream.resonance_boost = if max_pairs > 0 {
                     (resonant_pairs as f32 / max_pairs as f32).min(1.0)
                 } else {
                     0.0
                 };
-                if self.cantor_resonance_boost > 0.1 {
+                if self.cantor_dream.resonance_boost > 0.1 {
                     self.adjust_confidence(
                         "cantor_resonance",
                         crate::cognitive_loop::thresholds::CANTOR_RESONANCE_CONFIDENCE_BOOST
-                            * self.cantor_resonance_boost,
+                            * self.cantor_dream.resonance_boost,
                     );
                 }
                 // CANTOR → EXPLORATION: Surprise drives exploration, resonance drives exploitation.
                 // Science: Sutton & Barto (2018) — surprise-driven explore/exploit tradeoff.
-                if self.cantor_dream_surprise
+                if self.cantor_dream.dream_surprise
                     > crate::cognitive_loop::thresholds::CANTOR_SURPRISE_EXPLORATION_THRESHOLD
                 {
                     self.adjust_exploration(
                         "cantor_dream_surprise",
                         crate::cognitive_loop::thresholds::CANTOR_SURPRISE_EXPLORATION_BOOST
-                            * self.cantor_dream_surprise,
+                            * self.cantor_dream.dream_surprise,
                     );
                 }
-                if self.cantor_resonance_boost
+                if self.cantor_dream.resonance_boost
                     > crate::cognitive_loop::thresholds::CANTOR_RESONANCE_EXPLORATION_DAMPEN_THRESHOLD
                 {
                     self.adjust_exploration(
                         "cantor_resonance_exploit",
                         crate::cognitive_loop::thresholds::CANTOR_RESONANCE_EXPLORATION_DAMPEN
-                            * self.cantor_resonance_boost,
+                            * self.cantor_dream.resonance_boost,
                     );
                 }
             }

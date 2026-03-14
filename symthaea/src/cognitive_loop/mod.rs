@@ -164,6 +164,9 @@ pub(crate) mod memory_consolidation_manager;
 pub(crate) mod feature_integration_manager;
 #[cfg(feature = "support")]
 pub(crate) mod support_manager;
+pub(crate) mod cantor_dream_manager;
+pub(crate) mod motor_rendering_manager;
+pub(crate) mod episodic_persistence_manager;
 pub use substrate_manager::SubstrateTransitionRecord;
 pub(crate) mod subsystem_trait;
 #[allow(dead_code)] // Registry of tuning constants — many reserved for future wiring
@@ -186,9 +189,6 @@ pub use physics_integration::ParetoContext;
 pub use managers::governance_manager::{GovernanceEvent, GovernanceEventKind, GovernanceOutcome};
 
 pub use managers::swarm_manager::{SwarmEvent, SwarmTelemetry};
-
-#[cfg(feature = "mesh")]
-use managers::SpectrumManager;
 
 #[cfg(feature = "mesh")]
 pub use managers::{
@@ -386,18 +386,8 @@ pub struct CognitiveLoopService {
     /// - Suggests interventions for exploration
     causal_enhancer: Option<CausalLoopEnhancer>,
 
-    /// Episodic memory replay for high-Phi moment consolidation.
-    /// When enabled via `config.memory_graduation`, stores high-consciousness episodes
-    /// and periodically replays them to reinforce important patterns.
-    phi_episodic_replay: Option<crate::memory::episodic_replay::EpisodicMemory>,
-
-    /// Persistent memory database for cross-session episode storage.
-    /// Created when `config.memory_db_path` is `Some`. Episodes are periodically
-    /// flushed (every 199 cycles) via a background thread.
-    memory_db: Option<std::sync::Arc<crate::databases::SqliteMemory>>,
-
-    /// Guard to prevent overlapping memory flushes. When true, a flush is in progress.
-    memory_flush_in_progress: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    /// Episodic persistence: replay, database, flush guard, reasoning context.
+    pub(crate) episodic_persistence: episodic_persistence_manager::EpisodicPersistenceManager,
 
     /// Conscious Reasoning Engine: unified 7-step reasoning cycle
     /// Composes epistemic conflict, temporal planning, counterfactual reasoning,
@@ -529,15 +519,7 @@ pub struct CognitiveLoopService {
 
     // broca_manager, last_broca_text moved to language_comm_manager
 
-    /// Canvas living topology: consciousness-driven SVG generation.
-    /// When enabled via `canvas` feature, generates real-time topology SVGs
-    /// from cognitive telemetry with EMA-smoothed aesthetic mapping.
-    #[cfg(feature = "canvas")]
-    pub(crate) canvas_manager: Option<canvas_bridge::CanvasManager>,
-
-    /// Most recent canvas SVG, drained into `CycleResult.canvas_svg` each cycle.
-    #[cfg(feature = "canvas")]
-    pub(crate) last_canvas_svg: Option<String>,
+    // canvas_manager, last_canvas_svg moved to motor_rendering manager
 
     /// Buffer of PsiAttestationRecords ready for governance bridge consumption.
     /// Populated when `config.enable_psi_attestation` is true.
@@ -585,10 +567,7 @@ pub struct CognitiveLoopService {
     /// Science: Kanerva (2009) HDC, Pearl (2009) Causality, Carey (2009) conceptual change.
     knowledge_manager: Option<crate::knowledge::KnowledgeManager>,
 
-    /// Last assembled reasoning context from the knowledge engine.
-    /// Contains grounded facts, causal chains, and epistemic state.
-    /// Populated after knowledge engine processes each cycle's input.
-    last_reasoning_context: Option<crate::knowledge::ReasoningContext>,
+    // last_reasoning_context moved to episodic_persistence manager
 
     /// Experience integration bus for principled signal tracking and harmonic reasoning.
     /// Bridges cognitive loop signals to Eight Harmonies wisdom system.
@@ -688,56 +667,11 @@ pub struct CognitiveLoopService {
     #[cfg(feature = "integrity")]
     integrity_manager: crate::integrity::IntegrityManager,
 
-    /// Cantor broadcast buffer: CRHVs created from GWT broadcasts for dream consolidation.
-    /// When a thought becomes "conscious" (enters workspace and is broadcast), it gets
-    /// wrapped as a Cantor Recursive Hypervector preserving multi-scale structure.
-    /// During dream consolidation, the CantorCleanupEngine factorizes these through
-    /// the resonator codebook, preventing metacognitive amnesia (loss of faint peripheral
-    /// Cantor layers at shift/27, shift/81).
-    /// Science: Baars (1988) + Stickgold (2005) — conscious broadcast → fractal dreaming.
-    cantor_broadcast_buffer: Vec<symthaea_core::hdc::cantor_recursive_hv::CantorRecursiveHV>,
+    /// Cantor dream: broadcast buffer, cleanup engine, activation, surprise, resonance.
+    pub(crate) cantor_dream: cantor_dream_manager::CantorDreamManager,
 
-    /// Persistent Cantor cleanup engine: codebook accumulates across dream cycles.
-    /// Unlike the previous ephemeral approach (rebuild each dream), this engine retains
-    /// learned representations so dream consolidation genuinely strengthens memories
-    /// over the brain's lifetime.
-    /// Science: Born & Wilhelm (2012) — sleep spindle replay strengthens stable traces;
-    ///          Walker (2009) — offline consolidation requires persistent memory stores.
-    cantor_cleanup_engine: symthaea_core::hdc::cantor_resonator_cleanup::CantorCleanupEngine,
-
-    /// Last GWT activation strength, used for adaptive CRHV depth.
-    /// Stronger activations (higher workspace competition score) produce deeper fractals.
-    /// Science: Dehaene et al. (2006) — ignition strength varies with stimulus salience;
-    ///          stronger ignition recruits more recurrent cortical layers.
-    cantor_last_activation: f32,
-
-    /// EMA of dream consolidation surprise (|pre_ss − post_ss|).
-    /// High surprise signals the codebook is encountering novel fractal structure.
-    /// Science: Friston (2010) — free-energy surprise drives plasticity updates;
-    ///          unexpected outcomes signal model inadequacy requiring learning.
-    cantor_dream_surprise: f32,
-
-    /// Resonance boost from coherent CRHV pairs in the broadcast buffer.
-    /// When multiple CRHVs share high similarity (>0.8), the resulting coalition
-    /// amplifies workspace integration — a "fractal choir" effect.
-    /// Science: Edelman & Tononi (2000) — reentrant cortical signaling
-    ///          creates dynamic coalitions; Singer (1999) — binding by synchrony.
-    cantor_resonance_boost: f32,
-
-    /// Motor output bridge: translates FEP MotorOutput commands into real-world
-    /// actions (file I/O, shell commands, tests) via SimpleExecutor.
-    /// When `None`, MotorOutput commands are no-ops (default behavior).
-    motor_output_bridge: Option<motor_output_bridge::MotorOutputBridge>,
-
-    /// Pending motor action request (string data for the next MotorOutput dispatch).
-    /// Set externally before a cycle to provide path/content/args for motor commands.
-    pub(crate) pending_motor_request: Option<motor_output_bridge::MotorActionRequest>,
-
-    /// Last motor output result for FEP feedback.
-    pub(crate) last_motor_result: Option<motor_output_bridge::MotorOutputResult>,
-
-    /// Phi value used for motor gating in the most recent motor execution (telemetry).
-    pub(crate) last_motor_phi: f64,
+    /// Motor rendering: output bridge, pending request, last result, phi, canvas.
+    pub(crate) motor_rendering: motor_rendering_manager::MotorRenderingManager,
 
     /// Math Service: unified math dispatcher routing queries to Phase 1-3 solvers
     /// (linear algebra, root finding, quadrature, statistics, optimization, FFT,
