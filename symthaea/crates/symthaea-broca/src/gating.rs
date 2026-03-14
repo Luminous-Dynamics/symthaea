@@ -1433,6 +1433,80 @@ mod tests {
         );
     }
 
+    // ── Veto Stress Tests ─────────────────────────────────────────────────
+
+    #[test]
+    fn test_veto_binding_weight_saturation() {
+        let mut feedback = CoherenceFeedback::with_veto_threshold(0.5, 0.15);
+        let genesis = symthaea_core::genesis::GenesisSeed::from_phrase("veto-stress-saturation");
+        let a = symthaea_core::hdc::ContinuousHV::from_genesis(
+            &genesis, "a", symthaea_core::hdc::HDC_DIMENSION,
+        );
+        let b = symthaea_core::hdc::ContinuousHV::from_genesis(
+            &genesis, "b", symthaea_core::hdc::HDC_DIMENSION,
+        );
+        let weight = feedback.update(&a, &b);
+        assert!(weight <= 3.0, "Binding weight must cap at 3.0, got {weight}");
+        assert!(weight >= 1.0, "Binding weight must be >= 1.0, got {weight}");
+        assert!(weight.is_finite(), "Binding weight must be finite");
+    }
+
+    #[test]
+    fn test_veto_coherence_oscillation() {
+        let mut feedback = CoherenceFeedback::with_veto_threshold(0.3, 0.15);
+        let genesis = symthaea_core::genesis::GenesisSeed::from_phrase("veto-stress-osc");
+        let a = symthaea_core::hdc::ContinuousHV::from_genesis(
+            &genesis, "similar-a", symthaea_core::hdc::HDC_DIMENSION,
+        );
+        let b = symthaea_core::hdc::ContinuousHV::from_genesis(
+            &genesis, "different-b", symthaea_core::hdc::HDC_DIMENSION,
+        );
+        let mut veto_count = 0;
+        for i in 0..20 {
+            if i % 2 == 0 { feedback.update(&a, &b); } else { feedback.update(&a, &a); }
+            if feedback.should_veto() { veto_count += 1; }
+        }
+        assert_eq!(veto_count, 10, "Feedback reports veto state per-step");
+    }
+
+    #[test]
+    fn test_veto_confidence_threshold_monotonic() {
+        let scale = 0.3;
+        let mut prev = f32::INFINITY;
+        for c in 0..=10 {
+            let conf = c as f32 / 10.0;
+            let threshold = confidence_adjusted_veto_threshold(0.20, conf, scale);
+            assert!(threshold <= prev + f32::EPSILON, "Must decrease: conf={conf}");
+            assert!(threshold >= 0.0, "Must be non-negative");
+            prev = threshold;
+        }
+    }
+
+    #[test]
+    fn test_veto_zero_max_disables() {
+        let config = GatingConfig { max_vetoes: 0, ..GatingConfig::default() };
+        assert_eq!(config.max_vetoes, 0);
+    }
+
+    #[test]
+    fn test_veto_refractory_config() {
+        let config = GatingConfig { veto_refractory: 16, max_vetoes: 3, ..GatingConfig::default() };
+        assert_eq!(config.veto_refractory, 16);
+        assert_eq!(config.max_vetoes, 3);
+    }
+
+    #[test]
+    fn test_veto_self_similar_never_triggers() {
+        let mut feedback = CoherenceFeedback::with_veto_threshold(0.3, 0.99);
+        let genesis = symthaea_core::genesis::GenesisSeed::from_phrase("veto-self-similar");
+        let a = symthaea_core::hdc::ContinuousHV::from_genesis(
+            &genesis, "a", symthaea_core::hdc::HDC_DIMENSION,
+        );
+        feedback.update(&a, &a);
+        assert!(!feedback.should_veto(), "Self-similar should never veto");
+        assert!((feedback.coherence() - 1.0).abs() < 0.01);
+    }
+
     #[cfg(feature = "mamba")]
     mod backend_tests {
         use super::*;

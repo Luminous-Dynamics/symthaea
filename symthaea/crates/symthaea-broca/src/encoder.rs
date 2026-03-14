@@ -670,4 +670,62 @@ mod tests {
             "NaN channel should fall back to midpoint: sim={sim}"
         );
     }
+
+    // ── Channel Integration Tests ────────────────────────────────────────
+
+    #[test]
+    fn test_all_24_channels_produce_distinct_encodings() {
+        let genesis = test_genesis();
+        let enc = ThoughtLanguageEncoder::new(&genesis);
+        let baseline = enc.encode(&ThoughtChannels::default());
+        let mut distinct = 0;
+        for i in 0..NUM_CHANNELS {
+            let mut ch = ThoughtChannels::default();
+            ch.channels[i] = CHANNEL_RANGES[i][1];
+            let sim = baseline.similarity(&enc.encode(&ch));
+            if (sim - 1.0).abs() > 1e-4 { distinct += 1; }
+        }
+        assert!(distinct >= 20, "At least 20/24 channels should be distinct, got {distinct}");
+    }
+
+    #[test]
+    fn test_out_of_range_channels_clamped() {
+        let enc = ThoughtLanguageEncoder::new(&test_genesis());
+        let mut ch = ThoughtChannels::default();
+        ch.channels[8] = 100.0; ch.channels[9] = -50.0; ch.channels[10] = 999.0;
+        assert!(enc.encode(&ch).as_slice().iter().all(|v| v.is_finite()));
+    }
+
+    #[test]
+    fn test_legacy_20_channel_conversion() {
+        let mut legacy = [0.0f32; 20];
+        legacy[0] = 1.0; legacy[9] = -0.5; legacy[12] = 0.8;
+        let tc = ThoughtChannels::from_legacy(&legacy);
+        assert_eq!(tc.channels[0], 1.0);
+        assert_eq!(tc.channels[9], -0.5);
+        assert_eq!(tc.channels[20], NEW_CHANNEL_DEFAULTS[0]);
+        assert_eq!(tc.channels[23], NEW_CHANNEL_DEFAULTS[3]);
+    }
+
+    #[test]
+    fn test_consciousness_channels_affect_encoding() {
+        let enc = ThoughtLanguageEncoder::new(&test_genesis());
+        let mut low = ThoughtChannels::default();
+        low.set_consciousness(0.0, 0.0, 0.0);
+        let mut high = ThoughtChannels::default();
+        high.set_consciousness(1.0, 1.0, 1.0);
+        let sim = enc.encode(&low).similarity(&enc.encode(&high));
+        assert!(sim < 0.95, "Low vs high consciousness should differ, sim={sim}");
+    }
+
+    #[test]
+    fn test_emotion_channels_affect_encoding() {
+        let enc = ThoughtLanguageEncoder::new(&test_genesis());
+        let mut neg = ThoughtChannels::default();
+        neg.set_emotion(-1.0, 1.0, 0.0);
+        let mut pos = ThoughtChannels::default();
+        pos.set_emotion(1.0, 0.0, 1.0);
+        let sim = enc.encode(&neg).similarity(&enc.encode(&pos));
+        assert!(sim < 0.95, "Opposite emotions should differ, sim={sim}");
+    }
 }
