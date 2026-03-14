@@ -271,6 +271,10 @@ iroh = { version = "0.96", optional = true }
 # LanceDB: Columnar vector storage backend (optional)
 # Implementation: src/databases/lance_client.rs
 lancedb = { version = "0.23", optional = true }
+
+# DuckDB: Epistemic Auditor analytics backend (optional, bundled for reproducibility)
+# Note: does NOT conflict with rusqlite (libduckdb-sys has no links="sqlite3")
+duckdb = { version = "1.1", features = ["bundled"], optional = true }
 arrow-array = { workspace = true, optional = true }
 arrow-schema = { workspace = true, optional = true }
 futures = { version = "0.3", optional = true }
@@ -471,6 +475,8 @@ humanoid-viewer = ["humanoid-mujoco", "symthaea-humanoid/viewer"]  # Humanoid wi
 # DuckDB is an unconditional dep. Others deferred:
 # - cozo: graph_builder 0.4.1 rayon compat
 lancedb-backend = ["dep:lancedb", "dep:arrow-array", "dep:arrow-schema", "dep:futures"]
+# Note: duckdb optional dep declared in [dependencies] as duckdb = { optional = true }
+epistemic_auditor = ["symthaea-core/duck", "dep:duckdb"]  # DuckDB-backed consciousness telemetry audit trail
 
 # ── Consciousness & Reasoning (code-level cfg gates) ────────────────
 multi_agent = ["full_consciousness"]        # Multi-agent trust scoring (byzantine, causal consensus)

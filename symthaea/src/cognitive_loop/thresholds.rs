@@ -987,6 +987,16 @@ pub const EMPATHIC_COMPASSION_DA_THRESHOLD: f64 = 0.8;
 /// Dopamine production scale from empathic compassion.
 pub const EMPATHIC_COMPASSION_DA_SCALE: f32 = 0.08;
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// EPISTEMIC AUDITOR
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Epistemic Auditor DuckDB flush cadence (cycles between flushes).
+/// 1009 is prime and co-prime to all existing cadences (7, 11, 13, 41, 47, 53, 97, 199, 499, 997).
+/// At 31Hz, this is ~32.5 seconds between flushes.
+/// Science: intermittent self-reflection avoids metacognitive overhead (Flavell 1979).
+pub const EPISTEMIC_AUDITOR_FLUSH_CADENCE: u64 = 1009;
+
 /// 4. `ATTENTION_BUDGET_US > 0` (nonzero budget)
 /// 5. `POLICY_MIN_WINDOW < POLICY_WINDOW_SIZE`
 /// 6. `DOMINANCE_DEFAULT < DOMINANCE_CONFIDENT < DOMINANCE_FLOW_BASE`

@@ -994,6 +994,8 @@ impl CognitiveLoopService {
             },
             motor_rendering: super::motor_rendering_manager::MotorRenderingManager::new(),
             math_service: super::math_service::MathService::new(),
+            #[cfg(feature = "epistemic_auditor")]
+            epistemic_auditor: None, // initialized below after struct construction
             resonant_speech: crate::resonant_speech::ResonantSpeech::new(),
             streaming_inference: if enable_streaming_inference {
                 // Cycle-aligned config: batch=1, max_latency=32ms (~31Hz loop)
@@ -1008,6 +1010,23 @@ impl CognitiveLoopService {
                 None
             },
         };
+
+        // Initialize Epistemic Auditor if configured
+        #[cfg(feature = "epistemic_auditor")]
+        {
+            service.epistemic_auditor = service.config.epistemic_auditor_db_path.as_deref().map(|path| {
+                match super::epistemic_auditor::EpistemicAuditor::new(Some(path)) {
+                    Ok(auditor) => {
+                        tracing::info!(path, "Epistemic Auditor initialized (DuckDB)");
+                        Some(auditor)
+                    }
+                    Err(e) => {
+                        tracing::warn!(error = %e, "Epistemic Auditor init failed — auditing disabled");
+                        None
+                    }
+                }
+            }).flatten();
+        }
 
         // Initialize persistent memory database if configured
         if let Some(ref db_path) = service.config.memory_db_path {

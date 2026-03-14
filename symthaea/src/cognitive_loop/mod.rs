@@ -171,6 +171,9 @@ pub use substrate_manager::SubstrateTransitionRecord;
 pub(crate) mod subsystem_trait;
 #[allow(dead_code)] // Registry of tuning constants — many reserved for future wiring
 pub(crate) mod thresholds;
+
+#[cfg(feature = "epistemic_auditor")]
+pub(crate) mod epistemic_auditor;
 pub(crate) mod virtual_body;
 pub(crate) mod voice_coherence_bridge;
 
@@ -678,6 +681,10 @@ pub struct CognitiveLoopService {
     /// logic engine, constraint solver, geometry, graphs, differential equations).
     /// Tracks telemetry and stores solved-problem episodes for analogical retrieval.
     math_service: math_service::MathService,
+
+    /// Epistemic Auditor: DuckDB-backed consciousness telemetry audit trail.
+    #[cfg(feature = "epistemic_auditor")]
+    pub(crate) epistemic_auditor: Option<epistemic_auditor::EpistemicAuditor>,
 }
 
 // MetricsProvider impl is in metrics_provider.rs

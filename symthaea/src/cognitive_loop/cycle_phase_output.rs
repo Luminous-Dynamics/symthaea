@@ -1168,37 +1168,37 @@ impl CognitiveLoopService {
         // Governance telemetry
         #[cfg(feature = "mycelix")]
         {
-            metadata.governance_reward_ema = self.governance_mgr.reward_ema();
-            metadata.governance_pending_events = self.governance_mgr.pending_event_count();
-            metadata.governance_pending_outcomes = self.governance_mgr.pending_outcome_count();
-            metadata.governance_confidence_delta = self
+            metadata.governance.governance_reward_ema = self.governance_mgr.reward_ema();
+            metadata.governance.governance_pending_events = self.governance_mgr.pending_event_count();
+            metadata.governance.governance_pending_outcomes = self.governance_mgr.pending_outcome_count();
+            metadata.governance.governance_confidence_delta = self
                 .subsystem_collector
                 .get("governance_manager")
                 .map(|o| o.confidence_delta as f64)
                 .unwrap_or(0.0);
-            metadata.governance_collective_phi = self.governance_mgr.last_collective_phi();
-            metadata.governance_blind_spot_count = self.governance_mgr.blind_spot_count();
-            metadata.governance_max_blind_spot_severity =
+            metadata.governance.governance_collective_phi = self.governance_mgr.last_collective_phi();
+            metadata.governance.governance_blind_spot_count = self.governance_mgr.blind_spot_count();
+            metadata.governance.governance_max_blind_spot_severity =
                 self.governance_mgr.max_blind_spot_severity();
-            metadata.governance_community_mode = self
+            metadata.governance.governance_community_mode = self
                 .governance_mgr
                 .community_mode()
                 .map(|m| format!("{:?}", m))
                 .unwrap_or_default();
-            metadata.governance_harmonic_delta_max = self.governance_mgr.last_harmonic_delta_max();
-            metadata.governance_epistemic_agents = self.governance_mgr.epistemic_agent_count();
-            metadata.governance_lr_boost = self.governance_mgr.last_lr_boost();
+            metadata.governance.governance_harmonic_delta_max = self.governance_mgr.last_harmonic_delta_max();
+            metadata.governance.governance_epistemic_agents = self.governance_mgr.epistemic_agent_count();
+            metadata.governance.governance_lr_boost = self.governance_mgr.last_lr_boost();
         }
 
         // Swarm telemetry
         {
             let st = self.swarm_manager.telemetry();
-            metadata.swarm_connected_peers = st.connected_peers;
-            metadata.swarm_connectivity_ema = st.connectivity_ema;
-            metadata.swarm_mean_peer_phi = st.mean_peer_phi;
-            metadata.swarm_affective_contagion = st.affective_contagion;
-            metadata.swarm_federated_confidence = st.federated_confidence;
-            metadata.swarm_anomaly_count = st.anomaly_count;
+            metadata.swarm.swarm_connected_peers = st.connected_peers;
+            metadata.swarm.swarm_connectivity_ema = st.connectivity_ema;
+            metadata.swarm.swarm_mean_peer_phi = st.mean_peer_phi;
+            metadata.swarm.swarm_affective_contagion = st.affective_contagion;
+            metadata.swarm.swarm_federated_confidence = st.federated_confidence;
+            metadata.swarm.swarm_anomaly_count = st.anomaly_count;
         }
 
         // Spectrum / radio telemetry
@@ -1217,19 +1217,26 @@ impl CognitiveLoopService {
             metadata.spectrum_prediction_error = st.spectrum_prediction_error;
             metadata.spectrum_epistemic_discount = st.epistemic_discount;
             metadata.spectrum_degradation_streak = st.degradation_streak;
+            metadata.spectrum_tier_budgets = st.tier_budgets;
+            metadata.spectrum_waterfall_depth = st.waterfall_depth;
+            metadata.spectrum_periodic_interference = st.periodic_interference;
+            metadata.spectrum_known_peers = st.known_peers;
+            metadata.spectrum_encryption_sessions = st.encryption_sessions;
+            metadata.spectrum_energy_spent_nj = st.energy_spent_nj;
+            metadata.spectrum_waterfall_jamming_ratio = st.waterfall_jamming_ratio;
         }
 
         // Knowledge engine telemetry
         if let Some(ref km) = self.knowledge_manager {
             let telem = km.telemetry();
             let signals = km.signals();
-            metadata.knowledge_graph_size = telem.graph_size;
-            metadata.knowledge_avg_confidence = telem.avg_confidence;
-            metadata.knowledge_causal_edges = telem.causal_edge_count;
-            metadata.knowledge_uncertainty = signals.uncertainty;
-            metadata.knowledge_novelty = signals.novelty;
-            metadata.knowledge_contradictions = telem.contradictions_detected;
-            metadata.knowledge_ontology_size = telem.ontology_size;
+            metadata.knowledge.knowledge_graph_size = telem.graph_size;
+            metadata.knowledge.knowledge_avg_confidence = telem.avg_confidence;
+            metadata.knowledge.knowledge_causal_edges = telem.causal_edge_count;
+            metadata.knowledge.knowledge_uncertainty = signals.uncertainty;
+            metadata.knowledge.knowledge_novelty = signals.novelty;
+            metadata.knowledge.knowledge_contradictions = telem.contradictions_detected;
+            metadata.knowledge.knowledge_ontology_size = telem.ontology_size;
         }
 
         // Physics bridge telemetry
@@ -1338,29 +1345,29 @@ impl CognitiveLoopService {
 
         // ── Math Service telemetry ──
         {
-            metadata.math_detected = perception.math.math_detected;
+            metadata.math.math_detected = perception.math.math_detected;
             if let Some(pt) = perception.math.problem_type {
-                metadata.math_problem_type = format!("{:?}", pt);
+                metadata.math.math_problem_type = format!("{:?}", pt);
             }
             // Use dynamics-phase solver results (richer than perception-phase classification)
             if dynamics.math.solved {
-                metadata.math_phi = dynamics.math.phi;
-                metadata.math_confidence = dynamics.math.confidence;
+                metadata.math.math_phi = dynamics.math.phi;
+                metadata.math.math_confidence = dynamics.math.confidence;
             } else {
-                metadata.math_phi = perception.math.phi;
-                metadata.math_confidence = perception.math.confidence;
+                metadata.math.math_phi = perception.math.phi;
+                metadata.math.math_confidence = perception.math.confidence;
             }
             let mt = self.math_service.telemetry();
-            metadata.math_problems_solved = mt.problems_solved;
-            metadata.math_avg_phi = mt.average_phi;
+            metadata.math.math_problems_solved = mt.problems_solved;
+            metadata.math.math_avg_phi = mt.average_phi;
             // Solver dispatch telemetry
-            metadata.math_solved = dynamics.math.solved;
-            metadata.math_multipath_verified = dynamics.math.multipath_verified;
-            metadata.math_answer = dynamics.math.answer.clone();
+            metadata.math.math_solved = dynamics.math.solved;
+            metadata.math.math_multipath_verified = dynamics.math.multipath_verified;
+            metadata.math.math_answer = dynamics.math.answer.clone();
             if let Some(ref caveat) = dynamics.math.epistemic_caveat {
-                metadata.math_epistemic_caveat = caveat.clone();
+                metadata.math.math_epistemic_caveat = caveat.clone();
             }
-            metadata.math_error_bound = dynamics.math.error_bound.unwrap_or(0.0);
+            metadata.math.math_error_bound = dynamics.math.error_bound.unwrap_or(0.0);
         }
 
         // ── Nurture/attachment telemetry ──
@@ -1696,6 +1703,23 @@ impl CognitiveLoopService {
             .with_metadata("cycle", &self.stats.total_cycles.to_string())
             .with_metadata("depth", &format!("{:?}", self.cognitive_depth));
             viz.record(snapshot);
+        }
+
+        // ── Epistemic Auditor: buffer telemetry for DuckDB audit trail ──────
+        #[cfg(feature = "epistemic_auditor")]
+        if let Some(ref mut auditor) = self.epistemic_auditor {
+            auditor.record(
+                super::epistemic_auditor::AuditRecord::from_metadata(
+                    self.stats.total_cycles as u64,
+                    &metadata,
+                )
+            );
+            let total_cycles_u64 = self.stats.total_cycles as u64;
+            if total_cycles_u64 % super::thresholds::EPISTEMIC_AUDITOR_FLUSH_CADENCE == 0
+                && total_cycles_u64 > 0
+            {
+                auditor.flush_background();
+            }
         }
 
         // Final safety clamps — absolute last point in the cycle.

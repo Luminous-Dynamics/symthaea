@@ -222,6 +222,13 @@ pub struct CognitiveLoopConfig {
     #[serde(default)]
     pub memory_db_path: Option<String>,
 
+    /// Path to the DuckDB database for the epistemic auditor (audit trail).
+    /// When `Some`, consciousness telemetry is buffered and periodically flushed
+    /// to DuckDB for retrospective analysis. When `None`, no auditor overhead.
+    /// Requires the `epistemic_auditor` feature flag.
+    #[serde(default)]
+    pub epistemic_auditor_db_path: Option<String>,
+
     /// Configuration for episodic memory replay.
     pub episodic_replay_config: crate::memory::episodic_replay::EpisodicReplayConfig,
 
@@ -696,6 +703,7 @@ impl Default for CognitiveLoopConfig {
             episodic_replay_training: false,
             memory_graduation: true,
             memory_db_path: None,
+            epistemic_auditor_db_path: None,
             episodic_replay_config: crate::memory::episodic_replay::EpisodicReplayConfig::default(),
             enable_surprise_exploration: false,
             enable_prefrontal: false,
