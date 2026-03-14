@@ -183,6 +183,29 @@ impl CognitiveLoopService {
             }
         }
 
+        // ── Knowledge signals → exploration modulation ──────────────────
+        // Deep causal understanding → exploit (reduce exploration)
+        // High novelty → explore (boost exploration) — Berlyne (1960)
+        let knowledge_signals = self
+            .knowledge_manager
+            .as_ref()
+            .map(|km| (km.signals().causal_depth, km.signals().novelty));
+        if let Some((causal_depth, novelty)) = knowledge_signals {
+            if causal_depth
+                > super::thresholds::KNOWLEDGE_CAUSAL_DEPTH_EXPLOIT_THRESHOLD
+            {
+                self.adjust_exploration(
+                    "knowledge_causal_deep",
+                    -super::thresholds::KNOWLEDGE_CAUSAL_DEPTH_EXPLORE_DAMPEN,
+                );
+            }
+            if novelty > 0.5 {
+                let boost =
+                    (novelty as f32 - 0.5) * super::thresholds::KNOWLEDGE_NOVELTY_EXPLORE_SCALE;
+                self.adjust_exploration("knowledge_novelty", boost);
+            }
+        }
+
         self.apply_strategy_modulation(selected_strategy);
 
         // ── Phase 21: Embodied agency → strategy modulation ──────────────

@@ -490,6 +490,7 @@ impl CognitiveLoopService {
         let EpisodicReplayResult {
             surprise_replay_batch_size,
             phasic_da_replay_boost,
+            memory_db_flushed,
         } = self.run_episodic_replay_and_memory_phase(
             &cycle_state,
             dynamics.fep.fep_surprise as f32, // memory_context_boost already handled
@@ -505,13 +506,13 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         #[cfg(feature = "support")]
         let (support_triage_count, support_alert_fired, support_federation_graduated, support_efe) = {
-            self.support_cycle_counter += 1;
+            self.support.cycle_counter += 1;
 
             let mut triage_count: u32 = 0;
-            if let Some(ref engine) = self.support_triage_engine {
+            if let Some(ref engine) = self.support.triage_engine {
                 let result = engine.triage(input, "");
                 triage_count = 1;
-                if let Some(ref manager) = self.support_knowledge_manager {
+                if let Some(ref manager) = self.support.knowledge_manager {
                     let category_str = format!("{:?}", result.suggested_category);
                     let articles = manager.search(&category_str, 3);
                     if !articles.is_empty() {
@@ -526,8 +527,8 @@ impl CognitiveLoopService {
 
             let mut alert_fired = false;
             let mut efe = 0.0_f64;
-            if self.support_cycle_counter % 47 == 0 {
-                if let Some(ref engine) = self.support_predictive_engine {
+            if self.support.cycle_counter % 47 == 0 {
+                if let Some(ref engine) = self.support.predictive_engine {
                     let telemetry = symthaea_support::telemetry::collect_telemetry();
                     let prediction = engine.assess_system_state(&telemetry);
                     efe = prediction.expected_free_energy;
@@ -543,15 +544,16 @@ impl CognitiveLoopService {
             }
 
             let mut graduated: usize = 0;
-            if self.support_cycle_counter % 97 == 0 {
+            if self.support.cycle_counter % 97 == 0 {
                 let can_share = self
-                    .support_privacy_manager
+                    .support
+                    .privacy_manager
                     .as_ref()
                     .map(|pm| pm.can_share_cognitive())
                     .unwrap_or(true);
 
                 if can_share {
-                    if let Some(ref manager) = self.support_knowledge_manager {
+                    if let Some(ref manager) = self.support.knowledge_manager {
                         let pending = Vec::new();
                         let result =
                             symthaea_support::federation::check_graduations(manager, &pending);
@@ -862,6 +864,38 @@ impl CognitiveLoopService {
                     target: "knowledge::contradictions",
                     count = alert_count,
                     "Consumed knowledge contradiction alerts"
+                );
+            }
+        }
+
+        // ── Knowledge signal → neuromodulator coupling ──────────────────
+        if let Some(ref km) = self.knowledge_manager {
+            let signals = km.signals();
+            // (a) High uncertainty → NE boost (Bouret & Sara 2005)
+            // Uncertainty above 0.5 signals the LC to increase alertness
+            if signals.uncertainty > 0.5 {
+                let ne_base = self.neuromod.bath.noradrenaline.baseline_val();
+                let ne_delta = (signals.uncertainty as f32 - 0.5)
+                    * super::thresholds::KNOWLEDGE_UNCERTAINTY_NE_SCALE;
+                self.neuromod
+                    .bath
+                    .noradrenaline
+                    .set_baseline(ne_base + ne_delta);
+            }
+            // (b) Deep causal chains → DA reward (Schultz 1997)
+            // Understanding deep causal structure is intrinsically rewarding
+            if signals.causal_depth > super::thresholds::KNOWLEDGE_CAUSAL_DEPTH_EXPLOIT_THRESHOLD {
+                let da_base = self.neuromod.bath.dopamine.baseline_val();
+                self.neuromod.bath.dopamine.set_baseline(
+                    da_base + super::thresholds::KNOWLEDGE_CAUSAL_DEPTH_DA_NUDGE,
+                );
+            }
+            // (c) High grounding → 5-HT stability (Cools et al. 2008)
+            // Well-grounded, certain knowledge stabilizes the serotonin system
+            if signals.relevance > 0.6 && signals.uncertainty < 0.4 {
+                let sht_base = self.neuromod.bath.serotonin.baseline_val();
+                self.neuromod.bath.serotonin.set_baseline(
+                    sht_base + super::thresholds::KNOWLEDGE_GROUNDING_SHT_NUDGE,
                 );
             }
         }
@@ -2327,6 +2361,7 @@ impl CognitiveLoopService {
                 codebook_diversity,
                 codebook_utilization_rate,
                 surprise_replay_batch_size,
+                memory_db_flushed,
             },
             support: FbSupport {
                 support_triage_count,

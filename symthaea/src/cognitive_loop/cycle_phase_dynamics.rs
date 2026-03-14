@@ -195,6 +195,38 @@ impl CognitiveLoopService {
                         .record("swarm_manager", swarm_output);
                 }
 
+                // ── Therapeutic Manager (interval 11, co-prime) ─────────
+                #[cfg(feature = "therapeutic")]
+                if self.therapeutic_manager.should_run(cycle_num, urgency_u8) {
+                    let therapeutic_output = self.therapeutic_manager.process(snapshot);
+                    self.subsystem_collector
+                        .record("therapeutic_manager", therapeutic_output);
+
+                    // Inject neuromod deltas from regulation strategy into the bath.
+                    // This bridges RDoC domains → the 8-transmitter neuromod system.
+                    if let Some(delta) = self.therapeutic_manager.last_neuromod_delta {
+                        let half_life = 30_u32; // ~30 cycles for therapeutic effects
+                        if delta.serotonin.abs() > 0.001 {
+                            self.neuromod.bath.inject("serotonin", delta.serotonin, half_life);
+                        }
+                        if delta.dopamine.abs() > 0.001 {
+                            self.neuromod.bath.inject("dopamine", delta.dopamine, half_life);
+                        }
+                        if delta.noradrenaline.abs() > 0.001 {
+                            self.neuromod.bath.inject("noradrenaline", delta.noradrenaline, half_life);
+                        }
+                        if delta.oxytocin.abs() > 0.001 {
+                            self.neuromod.bath.inject("oxytocin", delta.oxytocin, half_life);
+                        }
+                        if delta.gaba.abs() > 0.001 {
+                            self.neuromod.bath.inject("gaba", delta.gaba, half_life);
+                        }
+                        if delta.acetylcholine.abs() > 0.001 {
+                            self.neuromod.bath.inject("acetylcholine", delta.acetylcholine, half_life);
+                        }
+                    }
+                }
+
                 // ── Governance Manager (interval 37, co-prime) ──────────
                 #[cfg(feature = "mycelix")]
                 if self.governance_mgr.should_run(cycle_num, urgency_u8) {
@@ -999,7 +1031,9 @@ impl CognitiveLoopService {
             let epistemic = (1.0 - prediction_coherence).clamp(0.0, 1.0);
 
             // Aleatoric ≈ mean within-dimension variance across predictions
-            let dim = raw_predictions[0].len().max(1);
+            // Use min length across all prediction vectors — HierarchicalCfC can produce
+            // jagged vectors, and indexing by [0].len() would panic on shorter ones.
+            let dim = raw_predictions.iter().map(|p| p.len()).min().unwrap_or(0).max(1);
             let n = raw_predictions.len() as f32;
             let mut mean_var = 0.0f32;
             for d in 0..dim {
@@ -1640,12 +1674,32 @@ impl CognitiveLoopService {
                     }
                     MathProblemType::GraphTheory => {
                         if numbers.len() >= 3 && numbers.len() % 3 == 0 {
-                            let n = numbers.iter().cloned().fold(0.0f64, f64::max) as usize + 1;
-                            let edges: Vec<(usize, usize, f64)> = numbers
-                                .chunks(3)
-                                .map(|c| (c[0] as usize, c[1] as usize, c[2]))
-                                .collect();
-                            Some(self.math_service.shortest_path(n, &edges, 0))
+                            // Guard against panic: negative values, NaN, Infinity, or
+                            // excessively large node indices would cause usize overflow
+                            // or unbounded allocation. Cap node count at 1024.
+                            const MAX_GRAPH_NODES: usize = 1024;
+                            let max_val = numbers.iter().cloned().fold(0.0f64, f64::max);
+                            if max_val.is_finite()
+                                && max_val >= 0.0
+                                && (max_val as usize) < MAX_GRAPH_NODES
+                                && numbers.iter().all(|v| v.is_finite())
+                            {
+                                let n = max_val as usize + 1;
+                                let edges: Vec<(usize, usize, f64)> = numbers
+                                    .chunks(3)
+                                    .filter_map(|c| {
+                                        let (a, b) = (c[0], c[1]);
+                                        if a >= 0.0 && b >= 0.0 {
+                                            Some((a as usize, b as usize, c[2]))
+                                        } else {
+                                            None // skip edges with negative node indices
+                                        }
+                                    })
+                                    .collect();
+                                Some(self.math_service.shortest_path(n, &edges, 0))
+                            } else {
+                                None // invalid graph input
+                            }
                         } else {
                             None
                         }
@@ -2963,26 +3017,9 @@ impl CognitiveLoopService {
                 }
             }
         };
-        // Route evicted semantic entry to graduation pipeline (Phase 2: semantic → episodic flow)
-        if let Some(evicted) = evicted_semantic {
-            let hv = symthaea_core::hdc::unified_hv::ContinuousHV::from_vec(evicted.hdc_vector);
-            self.memory_consol.memory_coordinator.queue_graduation(
-                crate::memory::memory_coordinator::GraduationEvent {
-                    content: hv,
-                    label: evicted.category.unwrap_or_default(),
-                    steps_survived: self.stats.total_cycles as u64 - evicted.timestamp,
-                    final_activation: 1.0 - evicted.prediction_error as f64,
-                    psi_at_graduation: self
-                        .language_comm
-                        .voice_coherence
-                        .bridge
-                        .smoothed_coherence() as f64,
-                    coherence_at_graduation: 0.0,
-                    source: Default::default(),
-                    is_verified: false,
-                },
-            );
-        }
+        // TODO: Route evicted semantic entries to graduation pipeline
+        // (Phase 2: semantic → episodic flow — requires GraduationEvent type)
+        let had_semantic_eviction = evicted_semantic.is_some();
 
         // Apply memory context boost to confidence after rayon::join (deferred from parallel branch)
         if memory_confidence_boost.abs() > f32::EPSILON {
@@ -3109,6 +3146,7 @@ impl CognitiveLoopService {
             epistemic_budget_scale,
             confidence_crash_detected,
             lr_frozen,
+            semantic_evictions: if had_semantic_eviction { 1 } else { 0 },
         }
     }
 

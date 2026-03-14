@@ -116,6 +116,12 @@ impl CognitiveLoopService {
                 resonator_prediction_error: dynamics.resonator.resonator_prediction_error,
                 codebook_utilization_rate: feedback.memory.codebook_utilization_rate,
                 surprise_replay_batch_size: feedback.memory.surprise_replay_batch_size,
+                graduations_processed: self.memory_consol.memory_coordinator.stats.graduations_processed,
+                graduations_rejected: self.memory_consol.memory_coordinator.stats.graduations_rejected,
+                semantic_evictions: dynamics.semantic_evictions,
+                episodic_memory_count: self.phi_episodic_replay.as_ref().map(|e| e.len()).unwrap_or(0),
+                episodic_avg_psi: self.phi_episodic_replay.as_ref().map(|e| e.stats().average_psi).unwrap_or(0.0),
+                memory_db_flushed: feedback.memory.memory_db_flushed,
             },
             fep: super::FepTelemetry {
                 fep_action: dynamics.fep.fep_action_idx,
@@ -354,6 +360,11 @@ impl CognitiveLoopService {
             consciousness_weakest_layer: String::new(), // computed below
             module_timings_us: {
                 module_timings.metadata_assembly = _t.elapsed().as_micros() as u64;
+                // phase_output = remainder of total cycle time after phases 1-3
+                module_timings.phase_output = (cycle_start.elapsed().as_micros() as u64)
+                    .saturating_sub(module_timings.phase_perception)
+                    .saturating_sub(module_timings.phase_dynamics)
+                    .saturating_sub(module_timings.phase_feedback);
                 module_timings.clone()
             },
             circadian_phase: circadian_phase_str.into(),
@@ -870,7 +881,7 @@ impl CognitiveLoopService {
             } else {
                 0.5
             };
-            metadata.attention_budget_exceeded =
+            metadata.proposal_budget_exceeded =
                 self.feedback_state.total_proposals() > ATTENTION_BUDGET_MAX;
             metadata.readiness_score = self.carryover.quality.last_readiness_score;
             metadata.flow_state_active = self.carryover.quality.in_flow_state;
