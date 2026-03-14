@@ -130,8 +130,7 @@ impl BrocaManager {
         // Knowledge grounding → epistemic confidence boost.
         // When knowledge context is available, the system has factual basis for claims.
         // Science: Barsalou (2008) — grounded cognition reduces hallucination risk.
-        let grounding_boost =
-            (signals.knowledge_context.len() as f32 * 0.1).min(0.3);
+        let grounding_boost = (signals.knowledge_context.len() as f32 * 0.1).min(0.3);
         let grounded_confidence = (signals.epistemic_confidence + grounding_boost).min(1.0);
 
         // Build thought channels from consciousness signals

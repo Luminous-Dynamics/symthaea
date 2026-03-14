@@ -2009,11 +2009,19 @@ fn write_swarm_pane(html: &mut String, swarm: &SwarmInfo) {
         label = status_label,
         peers = swarm.connected_peers,
         conn = swarm.connectivity_ema * 100.0,
-        phi_color = if swarm.mean_peer_phi > 0.5 { "#e8c547" } else { "#8a9a8a" },
+        phi_color = if swarm.mean_peer_phi > 0.5 {
+            "#e8c547"
+        } else {
+            "#8a9a8a"
+        },
         phi = swarm.mean_peer_phi,
         affect = swarm.affective_contagion,
         fed = swarm.federated_confidence,
-        anom_color = if swarm.anomaly_count > 0 { "#c76b5a" } else { "#8a9a8a" },
+        anom_color = if swarm.anomaly_count > 0 {
+            "#c76b5a"
+        } else {
+            "#8a9a8a"
+        },
         anoms = swarm.anomaly_count,
     );
 }

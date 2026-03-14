@@ -308,7 +308,10 @@ fn main() {
     // (runtime blending penalizes when structural Phi=0 on cold start)
     let all_pass = static_present == 14 && cfc_present >= 12 && hcfc_present >= 12;
     if all_pass {
-        println!("  RESULT: PASS (static=14/14, CfC>={}/14, HCfC>={}/14)", cfc_present, hcfc_present);
+        println!(
+            "  RESULT: PASS (static=14/14, CfC>={}/14, HCfC>={}/14)",
+            cfc_present, hcfc_present
+        );
     } else {
         println!(
             "  RESULT: FAIL (expected static=14 cfc>=12 hcfc>=12, got static={}/14 cfc={}/14 hcfc={}/14)",

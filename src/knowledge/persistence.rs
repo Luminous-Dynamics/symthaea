@@ -247,7 +247,9 @@ impl KnowledgePersistence {
         let conn = self.open_connection()?;
         self.ensure_schema(&conn)?;
 
-        let tx = conn.unchecked_transaction().map_err(|e| format!("Tx: {e}"))?;
+        let tx = conn
+            .unchecked_transaction()
+            .map_err(|e| format!("Tx: {e}"))?;
         {
             let mut stmt = tx
                 .prepare_cached(

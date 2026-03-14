@@ -372,8 +372,7 @@ impl CognitiveLoopService {
         // Guard: only apply when social models exist. Without this, social_trust defaults
         // to 0.0 → factor = 0.8 → permanent 20% LR dampening in single-agent sessions.
         let social_learning_rate_factor = if self.social_mgr.social.social_models_count > 0 {
-            let factor =
-                SOCIAL_LR_BASE + SOCIAL_LR_RANGE * self.social_mgr.social.social_trust; // [0.8, 1.2]
+            let factor = SOCIAL_LR_BASE + SOCIAL_LR_RANGE * self.social_mgr.social.social_trust; // [0.8, 1.2]
             if (factor - 1.0).abs() > 0.01 {
                 self.scale_lr("social_trust", factor);
             }
@@ -777,7 +776,10 @@ impl CognitiveLoopService {
                     .map(|km| {
                         let s = km.signals();
                         // Combine relevance and certainty as grounding measure
-                        (s.relevance * super::thresholds::KNOWLEDGE_GROUNDING_RELEVANCE_WEIGHT + (1.0 - s.uncertainty) * super::thresholds::KNOWLEDGE_GROUNDING_CERTAINTY_WEIGHT).clamp(0.0, 1.0)
+                        (s.relevance * super::thresholds::KNOWLEDGE_GROUNDING_RELEVANCE_WEIGHT
+                            + (1.0 - s.uncertainty)
+                                * super::thresholds::KNOWLEDGE_GROUNDING_CERTAINTY_WEIGHT)
+                            .clamp(0.0, 1.0)
                     })
                     .unwrap_or(0.5), // neutral when knowledge engine disabled
             },
@@ -908,9 +910,7 @@ impl CognitiveLoopService {
             }
 
             // (b) Deep causal chains → DA reward (Schultz 1997 — reward prediction)
-            if signals.causal_depth
-                > super::thresholds::KNOWLEDGE_CAUSAL_DEPTH_EXPLOIT_THRESHOLD
-            {
+            if signals.causal_depth > super::thresholds::KNOWLEDGE_CAUSAL_DEPTH_EXPLOIT_THRESHOLD {
                 let da_base = self.neuromod.bath.dopamine.baseline_val();
                 self.neuromod.bath.dopamine.set_baseline(
                     (da_base + super::thresholds::KNOWLEDGE_CAUSAL_DEPTH_DA_NUDGE).min(0.8),
@@ -933,22 +933,28 @@ impl CognitiveLoopService {
                 // operates at multiple scales (HierarchicalCfC), cross-scale
                 // integration contributes to emergence. Mediano et al. (2022):
                 // multi-scale integrated information exceeds single-scale Phi.
-                let scale_boost =
-                    if let Some(taus) = self.temporal_network.hierarchical_effective_taus() {
-                        let mean_tau = taus.iter().sum::<f32>() / taus.len().max(1) as f32;
-                        if mean_tau > 0.0 {
-                            let var = taus.iter().map(|t| (t - mean_tau).powi(2)).sum::<f32>()
-                                / taus.len().max(1) as f32;
-                            let cv = var.sqrt() / mean_tau;
-                            // CV for default taus [0.01,0.1,1.0,10.0] ~ 1.7
-                            // Map to 0-15% boost via sigmoid
-                            (super::thresholds::PHI_SCALE_BOOST_MAX_AMPLITUDE * (1.0 / (1.0 + (super::thresholds::PHI_SCALE_BOOST_SIGMOID_SLOPE * (cv - super::thresholds::PHI_SCALE_BOOST_CV_CENTER)).exp()))) as f64
-                        } else {
-                            0.0
-                        }
+                let scale_boost = if let Some(taus) =
+                    self.temporal_network.hierarchical_effective_taus()
+                {
+                    let mean_tau = taus.iter().sum::<f32>() / taus.len().max(1) as f32;
+                    if mean_tau > 0.0 {
+                        let var = taus.iter().map(|t| (t - mean_tau).powi(2)).sum::<f32>()
+                            / taus.len().max(1) as f32;
+                        let cv = var.sqrt() / mean_tau;
+                        // CV for default taus [0.01,0.1,1.0,10.0] ~ 1.7
+                        // Map to 0-15% boost via sigmoid
+                        (super::thresholds::PHI_SCALE_BOOST_MAX_AMPLITUDE
+                            * (1.0
+                                / (1.0
+                                    + (super::thresholds::PHI_SCALE_BOOST_SIGMOID_SLOPE
+                                        * (cv - super::thresholds::PHI_SCALE_BOOST_CV_CENTER))
+                                        .exp()))) as f64
                     } else {
                         0.0
-                    };
+                    }
+                } else {
+                    0.0
+                };
 
                 (
                     sp.micro_phi * (1.0 + scale_boost * super::thresholds::MICRO_PHI_SCALE_BOOST),
@@ -2068,8 +2074,7 @@ impl CognitiveLoopService {
                 // Botvinick et al. (2001): conflict monitoring triggers control adjustment.
                 let current = self.carryover.learning.subsystem_lr_factor;
                 // Blend 50% toward 1.0: dampen without fully cancelling.
-                self.carryover.learning.subsystem_lr_factor =
-                    current * 0.5 + 0.5;
+                self.carryover.learning.subsystem_lr_factor = current * 0.5 + 0.5;
             }
         }
 

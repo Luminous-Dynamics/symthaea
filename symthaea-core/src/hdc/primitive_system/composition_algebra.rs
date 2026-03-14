@@ -448,8 +448,8 @@ impl CompositionAlgebra {
                     let comp_hv = self
                         .get_encoding(component, system)
                         .ok_or_else(|| CompositionAlgebraError::NotFound(component.to_string()))?;
-                    // Bundle (majority vote approximated via XOR for simplicity)
-                    current = current.bind(&comp_hv);
+                    // bind_temporal makes Add distinguishable from Remove
+                    current = current.bind_temporal(&comp_hv);
                 }
             }
 
@@ -673,7 +673,7 @@ impl CompositionAlgebra {
         // Add new components with permutation for directionality
         for (i, added_name) in added.iter().enumerate() {
             if let Some(hv) = self.get_encoding(added_name, system) {
-                result_sources.push(hv.permute(i + 1));
+                result_sources.push(hv.bind_temporal(&comp_d.encoding));
             }
         }
 

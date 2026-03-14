@@ -118,12 +118,17 @@ impl CognitiveLoopService {
             let phi_divergence = (hierarchical_ltc_phi - spectral_phi).abs();
             if phi_divergence < super::thresholds::HIER_LTC_PHI_CONVERGE_THRESHOLD {
                 // Phi estimates converge → strong confidence in integration measure
-                let convergence_boost = (super::thresholds::HIER_LTC_PHI_CONVERGE_THRESHOLD - phi_divergence) * super::thresholds::HIER_LTC_PHI_CONVERGE_BOOST;
+                let convergence_boost = (super::thresholds::HIER_LTC_PHI_CONVERGE_THRESHOLD
+                    - phi_divergence)
+                    * super::thresholds::HIER_LTC_PHI_CONVERGE_BOOST;
                 self.adjust_confidence("hier_ltc_phi_converge", convergence_boost);
             } else if phi_divergence > super::thresholds::HIER_LTC_PHI_DIVERGE_THRESHOLD {
                 // Significant divergence → epistemic uncertainty about integration
                 // Attenuated 50%: NE exploration_delta covers surprise-driven exploration
-                let divergence_penalty = (phi_divergence - super::thresholds::HIER_LTC_PHI_DIVERGE_THRESHOLD).min(super::thresholds::HIER_LTC_PHI_DIVERGE_MAX) * super::thresholds::HIER_LTC_PHI_DIVERGE_PENALTY_SCALE;
+                let divergence_penalty = (phi_divergence
+                    - super::thresholds::HIER_LTC_PHI_DIVERGE_THRESHOLD)
+                    .min(super::thresholds::HIER_LTC_PHI_DIVERGE_MAX)
+                    * super::thresholds::HIER_LTC_PHI_DIVERGE_PENALTY_SCALE;
                 self.adjust_confidence("hier_ltc_phi_diverge", -divergence_penalty);
                 self.adjust_exploration("hierarchical_phi_div", divergence_penalty);
             }
@@ -157,15 +162,22 @@ impl CognitiveLoopService {
         // Positive delta: evolution improving → boost confidence + LR (exploit).
         // Negative delta: evolution regressing → boost exploration (search harder).
         if evolution_phi_delta > super::thresholds::EVOLUTION_POSITIVE_DELTA_THRESHOLD {
-            let evo_boost = 1.0 + (evolution_phi_delta * super::thresholds::EVOLUTION_POSITIVE_LR_SCALE).min(super::thresholds::EVOLUTION_POSITIVE_LR_CLAMP) as f32;
+            let evo_boost = 1.0
+                + (evolution_phi_delta * super::thresholds::EVOLUTION_POSITIVE_LR_SCALE)
+                    .min(super::thresholds::EVOLUTION_POSITIVE_LR_CLAMP) as f32;
             self.carryover.learning.subsystem_lr_factor *= evo_boost;
             // Phase 18: Positive delta → boost confidence (evolution is working)
-            let conf_boost = (evolution_phi_delta * super::thresholds::EVOLUTION_POSITIVE_CONF_SCALE).min(super::thresholds::EVOLUTION_POSITIVE_CONF_CLAMP) as f32;
+            let conf_boost =
+                (evolution_phi_delta * super::thresholds::EVOLUTION_POSITIVE_CONF_SCALE)
+                    .min(super::thresholds::EVOLUTION_POSITIVE_CONF_CLAMP) as f32;
             self.adjust_confidence("evolution_phi_delta", conf_boost);
             self.stats.evolution_feedback_count += 1;
         } else if evolution_phi_delta < super::thresholds::EVOLUTION_NEGATIVE_DELTA_THRESHOLD {
             // Phase 18: Negative delta → boost exploration urge (need to search harder)
-            let explore_boost = ((-evolution_phi_delta) * super::thresholds::EVOLUTION_NEGATIVE_EXPLORE_SCALE).min(super::thresholds::EVOLUTION_NEGATIVE_EXPLORE_CLAMP) as f32;
+            let explore_boost = ((-evolution_phi_delta)
+                * super::thresholds::EVOLUTION_NEGATIVE_EXPLORE_SCALE)
+                .min(super::thresholds::EVOLUTION_NEGATIVE_EXPLORE_CLAMP)
+                as f32;
             self.adjust_exploration("evolution_negative", explore_boost);
             self.stats.evolution_feedback_count += 1;
         }
@@ -204,16 +216,22 @@ impl CognitiveLoopService {
         // FEEDBACK: High holographic unity boosts prediction confidence
         // Science: Pribram (1991) — holographic encoding enables stable predictions
         if holographic_unity > super::thresholds::HOLOGRAPHIC_UNITY_CONFIDENCE_THRESHOLD {
-            let unity_boost = (holographic_unity - super::thresholds::HOLOGRAPHIC_UNITY_CONFIDENCE_THRESHOLD) * super::thresholds::HOLOGRAPHIC_UNITY_CONFIDENCE_SCALE;
+            let unity_boost = (holographic_unity
+                - super::thresholds::HOLOGRAPHIC_UNITY_CONFIDENCE_THRESHOLD)
+                * super::thresholds::HOLOGRAPHIC_UNITY_CONFIDENCE_SCALE;
             self.adjust_confidence("holographic_unity", unity_boost as f32);
         }
         // FEEDBACK: Binding strength modulates learning rate
         // Strong binding = coherent representations → safe to learn faster
         if holographic_binding > super::thresholds::HOLOGRAPHIC_BINDING_STRONG_THRESHOLD {
-            self.carryover.learning.subsystem_lr_factor *= super::thresholds::HOLOGRAPHIC_BINDING_STRONG_LR;
-        } else if holographic_binding > 0.0 && holographic_binding < super::thresholds::HOLOGRAPHIC_BINDING_WEAK_UPPER {
+            self.carryover.learning.subsystem_lr_factor *=
+                super::thresholds::HOLOGRAPHIC_BINDING_STRONG_LR;
+        } else if holographic_binding > 0.0
+            && holographic_binding < super::thresholds::HOLOGRAPHIC_BINDING_WEAK_UPPER
+        {
             // Weak binding = fragmented representations → dampen learning
-            self.carryover.learning.subsystem_lr_factor *= super::thresholds::HOLOGRAPHIC_BINDING_WEAK_LR;
+            self.carryover.learning.subsystem_lr_factor *=
+                super::thresholds::HOLOGRAPHIC_BINDING_WEAK_LR;
         }
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -234,9 +252,15 @@ impl CognitiveLoopService {
                     let mut core_values = HashMap::new();
                     core_values.insert(CoreComponent::Integration, unified_psi.clamp(0.0, 1.0));
                     core_values.insert(CoreComponent::Binding, coherence as f64);
-                    core_values.insert(CoreComponent::Workspace, coherence as f64 * super::thresholds::DIFF_CONSCIOUSNESS_WORKSPACE_SCALE);
+                    core_values.insert(
+                        CoreComponent::Workspace,
+                        coherence as f64 * super::thresholds::DIFF_CONSCIOUSNESS_WORKSPACE_SCALE,
+                    );
                     core_values.insert(CoreComponent::Attention, phi_attention_weight as f64);
-                    core_values.insert(CoreComponent::Recursion, super::thresholds::DIFF_CONSCIOUSNESS_RECURSION_DEFAULT);
+                    core_values.insert(
+                        CoreComponent::Recursion,
+                        super::thresholds::DIFF_CONSCIOUSNESS_RECURSION_DEFAULT,
+                    );
                     core_values.insert(CoreComponent::Efficacy, 1.0 - prediction_error as f64);
                     core_values.insert(
                         CoreComponent::Knowledge,
@@ -267,9 +291,14 @@ impl CognitiveLoopService {
 
         // FEEDBACK: Large consciousness gradients drive exploration
         // Science: Bengio (2017) — gradient information guides search
-        if consciousness_gradient_magnitude > super::thresholds::CONSCIOUSNESS_GRADIENT_EXPLORE_THRESHOLD {
+        if consciousness_gradient_magnitude
+            > super::thresholds::CONSCIOUSNESS_GRADIENT_EXPLORE_THRESHOLD
+        {
             // Attenuated 50%: NE exploration_delta handles consciousness gradient exploration
-            let gradient_explore = (consciousness_gradient_magnitude - super::thresholds::CONSCIOUSNESS_GRADIENT_EXPLORE_THRESHOLD).clamp(0.0, 0.5) * super::thresholds::CONSCIOUSNESS_GRADIENT_EXPLORE_SCALE;
+            let gradient_explore = (consciousness_gradient_magnitude
+                - super::thresholds::CONSCIOUSNESS_GRADIENT_EXPLORE_THRESHOLD)
+                .clamp(0.0, 0.5)
+                * super::thresholds::CONSCIOUSNESS_GRADIENT_EXPLORE_SCALE;
             self.adjust_exploration("consciousness_gradient", gradient_explore as f32);
         }
 
@@ -313,7 +342,10 @@ impl CognitiveLoopService {
         if let Some(ref ac) = self.primitive_tier.affective_consciousness {
             let affect = ac.current_affect();
             if affect.valence < super::thresholds::AFFECTIVE_NEGATIVE_VALENCE_THRESHOLD {
-                self.adjust_confidence("affective_neg_valence", affect.valence * super::thresholds::AFFECTIVE_NEGATIVE_CONFIDENCE_SCALE);
+                self.adjust_confidence(
+                    "affective_neg_valence",
+                    affect.valence * super::thresholds::AFFECTIVE_NEGATIVE_CONFIDENCE_SCALE,
+                );
             }
         }
 
@@ -335,7 +367,10 @@ impl CognitiveLoopService {
         let (consciousness_state_label, consciousness_state_level_val) =
             if let Some(ref sg) = self.primitive_tier.synthetic_grounding {
                 if self.stats.total_cycles % 97 == 0 {
-                    let similar = sg.find_similar(&hv16_cached, super::thresholds::SYNTHETIC_GROUNDING_SIM_THRESHOLD);
+                    let similar = sg.find_similar(
+                        &hv16_cached,
+                        super::thresholds::SYNTHETIC_GROUNDING_SIM_THRESHOLD,
+                    );
                     if let Some((state_type, _sim)) = similar.first() {
                         let label = format!("{:?}", state_type);
                         let level = state_type.consciousness_level();
@@ -382,8 +417,13 @@ impl CognitiveLoopService {
         module_timings.epistemic_gate = _t.elapsed().as_micros() as u64;
 
         // FEEDBACK: Low epistemic confidence reduces prediction confidence
-        if epistemic_gate_confidence < super::thresholds::EPISTEMIC_GATE_LOW_THRESHOLD && !epistemic_gate_approved {
-            self.adjust_confidence("epistemic_gate_low", -super::thresholds::EPISTEMIC_GATE_LOW_PENALTY);
+        if epistemic_gate_confidence < super::thresholds::EPISTEMIC_GATE_LOW_THRESHOLD
+            && !epistemic_gate_approved
+        {
+            self.adjust_confidence(
+                "epistemic_gate_low",
+                -super::thresholds::EPISTEMIC_GATE_LOW_PENALTY,
+            );
         }
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -469,11 +509,16 @@ impl CognitiveLoopService {
         if let Some((phi_gain, p_value)) = self.primitive_tier.primitive_validation_result {
             if p_value < super::thresholds::PRIMITIVE_VALIDATION_P_THRESHOLD && phi_gain > 0.0 {
                 // Significant positive effect → boost primitive subsystem LR
-                self.carryover.learning.subsystem_lr_factor *=
-                    1.0 + (phi_gain * super::thresholds::PRIMITIVE_VALIDATION_POSITIVE_LR_SCALE).min(super::thresholds::PRIMITIVE_VALIDATION_POSITIVE_LR_CLAMP) as f32;
-            } else if p_value < super::thresholds::PRIMITIVE_VALIDATION_P_THRESHOLD && phi_gain < 0.0 {
+                self.carryover.learning.subsystem_lr_factor *= 1.0
+                    + (phi_gain * super::thresholds::PRIMITIVE_VALIDATION_POSITIVE_LR_SCALE)
+                        .min(super::thresholds::PRIMITIVE_VALIDATION_POSITIVE_LR_CLAMP)
+                        as f32;
+            } else if p_value < super::thresholds::PRIMITIVE_VALIDATION_P_THRESHOLD
+                && phi_gain < 0.0
+            {
                 // Significant negative effect → dampen primitive processing
-                self.carryover.learning.subsystem_lr_factor *= super::thresholds::PRIMITIVE_VALIDATION_NEGATIVE_LR;
+                self.carryover.learning.subsystem_lr_factor *=
+                    super::thresholds::PRIMITIVE_VALIDATION_NEGATIVE_LR;
             }
         }
 
@@ -494,31 +539,50 @@ impl CognitiveLoopService {
 
         // 2. Gradient analysis → adaptive exploration: large gradients mean the system
         //    has clear direction for improvement → focus rather than explore
-        if consciousness_gradient_magnitude > super::thresholds::GRADIENT_STRONG_DIRECTION_THRESHOLD {
+        if consciousness_gradient_magnitude > super::thresholds::GRADIENT_STRONG_DIRECTION_THRESHOLD
+        {
             // Strong gradient = clear optimization direction → reduce random exploration
-            self.curiosity_drive.boredom = (self.curiosity_drive.boredom - super::thresholds::GRADIENT_STRONG_BOREDOM_REDUCE).max(0.0);
-        } else if consciousness_gradient_magnitude > 0.0 && consciousness_gradient_magnitude < super::thresholds::GRADIENT_PLATEAU_UPPER {
+            self.curiosity_drive.boredom = (self.curiosity_drive.boredom
+                - super::thresholds::GRADIENT_STRONG_BOREDOM_REDUCE)
+                .max(0.0);
+        } else if consciousness_gradient_magnitude > 0.0
+            && consciousness_gradient_magnitude < super::thresholds::GRADIENT_PLATEAU_UPPER
+        {
             // Near-zero gradient = plateau → boost exploration to escape
-            self.curiosity_drive.boredom = (self.curiosity_drive.boredom + super::thresholds::GRADIENT_PLATEAU_BOREDOM_INCREMENT).min(1.0);
+            self.curiosity_drive.boredom = (self.curiosity_drive.boredom
+                + super::thresholds::GRADIENT_PLATEAU_BOREDOM_INCREMENT)
+                .min(1.0);
         }
 
         // 3. Holographic unity gates learning: high unity = coherent representation →
         //    safe to learn aggressively. Low unity = fragmented → be conservative.
         if holographic_unity > super::thresholds::HOLOGRAPHIC_UNITY_LR_BOOST_THRESHOLD {
-            self.carryover.learning.subsystem_lr_factor *= super::thresholds::HOLOGRAPHIC_UNITY_LR_BOOST_FACTOR;
+            self.carryover.learning.subsystem_lr_factor *=
+                super::thresholds::HOLOGRAPHIC_UNITY_LR_BOOST_FACTOR;
             self.carryover.learning.subsystem_lr_factor =
-                self.carryover.learning.subsystem_lr_factor.clamp(super::thresholds::HOLOGRAPHIC_UNITY_LR_CLAMP_LOW, super::thresholds::HOLOGRAPHIC_UNITY_LR_CLAMP_HIGH);
-        } else if holographic_unity < super::thresholds::HOLOGRAPHIC_UNITY_LR_DAMPEN_THRESHOLD && holographic_unity > 0.0 {
-            self.carryover.learning.subsystem_lr_factor *= super::thresholds::HOLOGRAPHIC_UNITY_LR_DAMPEN_FACTOR;
+                self.carryover.learning.subsystem_lr_factor.clamp(
+                    super::thresholds::HOLOGRAPHIC_UNITY_LR_CLAMP_LOW,
+                    super::thresholds::HOLOGRAPHIC_UNITY_LR_CLAMP_HIGH,
+                );
+        } else if holographic_unity < super::thresholds::HOLOGRAPHIC_UNITY_LR_DAMPEN_THRESHOLD
+            && holographic_unity > 0.0
+        {
+            self.carryover.learning.subsystem_lr_factor *=
+                super::thresholds::HOLOGRAPHIC_UNITY_LR_DAMPEN_FACTOR;
             self.carryover.learning.subsystem_lr_factor =
-                self.carryover.learning.subsystem_lr_factor.clamp(super::thresholds::HOLOGRAPHIC_UNITY_LR_CLAMP_LOW, super::thresholds::HOLOGRAPHIC_UNITY_LR_CLAMP_HIGH);
+                self.carryover.learning.subsystem_lr_factor.clamp(
+                    super::thresholds::HOLOGRAPHIC_UNITY_LR_CLAMP_LOW,
+                    super::thresholds::HOLOGRAPHIC_UNITY_LR_CLAMP_HIGH,
+                );
         }
 
         // 4. Pipeline consciousness → epistemic gating: high pipeline consciousness
         //    means the system has strong global workspace → relax epistemic threshold
         if pipeline_consciousness > super::thresholds::PIPELINE_CONSCIOUSNESS_EPISTEMIC_THRESHOLD {
             self.carryover.quality.last_epistemic_confidence =
-                (self.carryover.quality.last_epistemic_confidence + super::thresholds::PIPELINE_CONSCIOUSNESS_EPISTEMIC_NUDGE).min(1.0);
+                (self.carryover.quality.last_epistemic_confidence
+                    + super::thresholds::PIPELINE_CONSCIOUSNESS_EPISTEMIC_NUDGE)
+                    .min(1.0);
         }
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -569,7 +633,9 @@ impl CognitiveLoopService {
         // uses weighted selection, not RNG). Safe for genesis determinism.
         // Science: Nelson & Narens (1990) — monitoring-control loop
         if meta_reasoning_confidence > super::thresholds::META_REASONING_CONFIDENCE_THRESHOLD {
-            let meta_boost = (meta_reasoning_confidence - super::thresholds::META_REASONING_CONFIDENCE_THRESHOLD) * super::thresholds::META_REASONING_LR_BOOST_SCALE;
+            let meta_boost = (meta_reasoning_confidence
+                - super::thresholds::META_REASONING_CONFIDENCE_THRESHOLD)
+                * super::thresholds::META_REASONING_LR_BOOST_SCALE;
             self.adjust_lr("meta_reasoning", meta_boost as f32);
         }
 
@@ -643,10 +709,15 @@ impl CognitiveLoopService {
         // ContextKind input). Instant::now() timestamps are internal only.
         // Science: Decety & Jackson (2004) — shared representations enhance learning
         if empathic_compassion > super::thresholds::EMPATHIC_COMPASSION_LR_THRESHOLD {
-            self.carryover.learning.subsystem_lr_factor *=
-                1.0 + (empathic_compassion as f32 - super::thresholds::EMPATHIC_COMPASSION_LR_THRESHOLD as f32) * super::thresholds::EMPATHIC_COMPASSION_LR_SCALE;
+            self.carryover.learning.subsystem_lr_factor *= 1.0
+                + (empathic_compassion as f32
+                    - super::thresholds::EMPATHIC_COMPASSION_LR_THRESHOLD as f32)
+                    * super::thresholds::EMPATHIC_COMPASSION_LR_SCALE;
             self.carryover.learning.subsystem_lr_factor =
-                self.carryover.learning.subsystem_lr_factor.clamp(super::thresholds::EMPATHIC_LR_CLAMP_LOW, super::thresholds::EMPATHIC_LR_CLAMP_HIGH);
+                self.carryover.learning.subsystem_lr_factor.clamp(
+                    super::thresholds::EMPATHIC_LR_CLAMP_LOW,
+                    super::thresholds::EMPATHIC_LR_CLAMP_HIGH,
+                );
         }
 
         // NEUROMOD COUPLING: Empathic compassion → oxytocin + dopamine production.

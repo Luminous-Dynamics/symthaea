@@ -153,6 +153,13 @@ pub struct CodingAgentConfig {
     /// Target file to write generated code into (relative to working_dir).
     /// If None, inferred from task description or defaults to `src/lib.rs`.
     pub target_file: Option<PathBuf>,
+    /// Enable real execution (file I/O, cargo check/test) instead of simulated mode.
+    /// When true, the motor bridge uses `SimpleExecutor::with_real_commands()` and
+    /// the sandbox is rooted at `working_dir` (not `/tmp/symthaea/`).
+    pub enable_real_exec: bool,
+    /// Use Ollama (qwen2.5-coder:7b) for code generation instead of simulated backend.
+    /// Requires Ollama running at localhost:11434.
+    pub use_local_llm: bool,
 }
 
 impl Default for CodingAgentConfig {
@@ -164,6 +171,8 @@ impl Default for CodingAgentConfig {
             working_dir: PathBuf::from("."),
             sandbox_session: "coding_agent".to_string(),
             target_file: None,
+            enable_real_exec: false,
+            use_local_llm: false,
         }
     }
 }
@@ -213,6 +222,9 @@ pub struct CodingAgent {
     experience_store: Option<CodingExperienceStore>,
     /// Accumulated failure patterns during this run: (error_text, count).
     failure_patterns: Vec<(String, usize)>,
+    /// Indexed codebase memory for semantic code search (populated by `index_project()`).
+    #[cfg(feature = "code_generation")]
+    code_memory: Option<crate::hdc::code_memory::CodebaseMemory>,
 }
 
 impl CodingAgent {
@@ -229,10 +241,29 @@ impl CodingAgent {
     ) -> Self {
         // Install motor output bridge if not already present
         if !cognitive_loop.has_motor_bridge() {
-            if let Ok(bridge) = MotorOutputBridge::with_defaults() {
+            let bridge = if config.enable_real_exec {
+                // Real execution: sandbox rooted at working_dir, real commands enabled
+                let sandbox = SandboxRoot::at(config.working_dir.clone()).unwrap_or_else(|_| {
+                    SandboxRoot::new(&config.sandbox_session).expect("sandbox")
+                });
+                let policy = PolicyBundle::restrictive();
+                let mut bridge = MotorOutputBridge::new(policy, sandbox);
+                bridge.enable_real_execution();
+                Ok(bridge)
+            } else {
+                MotorOutputBridge::with_defaults()
+            };
+            if let Ok(bridge) = bridge {
                 cognitive_loop.set_motor_output_bridge(bridge);
             }
         }
+
+        // Select dispatcher: real Ollama or simulated
+        let dispatcher = if config.use_local_llm {
+            IntelligentDispatcher::with_local_llm()
+        } else {
+            IntelligentDispatcher::simulated()
+        };
 
         Self {
             cognitive_loop,
@@ -246,13 +277,15 @@ impl CodingAgent {
             errors: Vec::new(),
             last_test_output: None,
             task: String::new(),
-            dispatcher: Some(IntelligentDispatcher::simulated()),
+            dispatcher: Some(dispatcher),
             last_dispatch: None,
             generation_tiers: Vec::new(),
             generated_code: None,
             code_context: Vec::new(),
             experience_store: Self::try_init_experience_store(),
             failure_patterns: Vec::new(),
+            #[cfg(feature = "code_generation")]
+            code_memory: None,
         }
     }
 
@@ -279,10 +312,35 @@ impl CodingAgent {
         self.generation_tiers.clear();
         self.failure_patterns.clear();
 
+        // If we have indexed codebase memory, query for relevant context
+        #[cfg(feature = "code_generation")]
+        if let Some(ref memory) = self.code_memory {
+            let encoder = memory.encoder();
+            let intent_hv = encoder.encode_name(task);
+            let matches = memory.query(&intent_hv, 5);
+            let context: Vec<String> = matches
+                .iter()
+                .filter(|m| m.similarity > 0.2)
+                .map(|m| {
+                    format!(
+                        "{:?} `{}` in {} (sim: {:.3})",
+                        m.kind,
+                        m.name,
+                        m.path.display(),
+                        m.similarity
+                    )
+                })
+                .collect();
+            if !context.is_empty() {
+                self.code_context = context;
+            }
+        }
+
         tracing::info!(
             target: "symthaea::coding_agent",
             task = task,
             max_iterations = self.config.max_iterations,
+            context_entries = self.code_context.len(),
             "Starting coding agent"
         );
 
@@ -589,9 +647,7 @@ impl CodingAgent {
     fn retrieve_experience_hints(&self) -> Vec<(String, String)> {
         if let Some(ref store) = self.experience_store {
             if let Ok(rt) = tokio::runtime::Runtime::new() {
-                return rt.block_on(async {
-                    store.error_hints_for(&self.task, 3).await
-                });
+                return rt.block_on(async { store.error_hints_for(&self.task, 3).await });
             }
         }
         Vec::new()
@@ -1026,7 +1082,11 @@ impl CodingAgent {
 
                 // Track failure pattern frequency
                 let pattern = Self::normalize_error_pattern(error);
-                if let Some(entry) = self.failure_patterns.iter_mut().find(|(p, _)| *p == pattern) {
+                if let Some(entry) = self
+                    .failure_patterns
+                    .iter_mut()
+                    .find(|(p, _)| *p == pattern)
+                {
                     entry.1 += 1;
                 } else {
                     self.failure_patterns.push((pattern.clone(), 1));
@@ -1061,7 +1121,11 @@ impl CodingAgent {
             task: self.task.clone(),
             detail: detail.chars().take(500).collect(),
             success,
-            tier: self.generation_tiers.last().map(|t| t.to_string()).unwrap_or_default(),
+            tier: self
+                .generation_tiers
+                .last()
+                .map(|t| t.to_string())
+                .unwrap_or_default(),
             fix_hint: None,
         };
 
@@ -1183,6 +1247,113 @@ impl CodingAgent {
     /// the agent from the `code_generation` feature gate.
     pub fn set_code_context(&mut self, context: Vec<String>) {
         self.code_context = context;
+    }
+
+    /// Index a project directory into a `CodebaseMemory` and inject relevant context.
+    ///
+    /// Walks the directory (respecting .gitignore), parses each source file using
+    /// `ParserRegistry`, and indexes into `CodebaseMemory`. Then queries the memory
+    /// for entities related to the current task and sets them as code context.
+    ///
+    /// Returns `(files_indexed, functions_found, types_found)` on success.
+    #[cfg(feature = "code_generation")]
+    pub fn index_project(
+        &mut self,
+        root: &std::path::Path,
+    ) -> anyhow::Result<(usize, usize, usize)> {
+        use crate::hdc::code_encoder::CodeHDEncoder;
+        use crate::hdc::code_memory::CodebaseMemory;
+        use crate::language::parser_registry::ParserRegistry;
+        use ignore::WalkBuilder;
+
+        let mut memory = CodebaseMemory::with_default_encoder();
+        let mut parser_registry = ParserRegistry::with_builtins();
+        let mut files_indexed = 0usize;
+        let mut parse_errors = 0usize;
+
+        // Walk directory respecting .gitignore
+        for entry in WalkBuilder::new(root)
+            .hidden(true)
+            .git_ignore(true)
+            .build()
+            .flatten()
+        {
+            let path = entry.path();
+            if !path.is_file() {
+                continue;
+            }
+
+            // Only process files the parser registry can handle
+            let filename = path.file_name().and_then(|f| f.to_str());
+            let ext = path.extension().and_then(|e| e.to_str());
+            let supported = matches!(ext, Some("rs") | Some("py") | Some("nix"));
+            if !supported {
+                continue;
+            }
+
+            // Read and parse the file
+            let source = match std::fs::read_to_string(path) {
+                Ok(s) => s,
+                Err(_) => continue,
+            };
+
+            match parser_registry.parse(&source, None, filename) {
+                Ok(parsed) => {
+                    memory.index_file(path, &parsed);
+                    files_indexed += 1;
+                }
+                Err(_) => {
+                    parse_errors += 1;
+                }
+            }
+        }
+
+        let stats = memory.stats();
+        tracing::info!(
+            target: "symthaea::coding_agent",
+            files = files_indexed,
+            functions = stats.functions,
+            types = stats.types,
+            parse_errors = parse_errors,
+            "Indexed project into CodebaseMemory"
+        );
+
+        // If we have a task, query for relevant context and inject it
+        if !self.task.is_empty() {
+            self.inject_context_from_memory(&memory);
+        }
+
+        // Store memory for future queries
+        self.code_memory = Some(memory);
+
+        Ok((files_indexed, stats.functions, stats.types))
+    }
+
+    /// Query the indexed CodebaseMemory for entities relevant to the current task
+    /// and inject them as code context for the generation prompt.
+    #[cfg(feature = "code_generation")]
+    fn inject_context_from_memory(&mut self, memory: &crate::hdc::code_memory::CodebaseMemory) {
+        let encoder = memory.encoder();
+        let intent_hv = encoder.encode_name(&self.task);
+        let matches = memory.query(&intent_hv, 5);
+
+        let context: Vec<String> = matches
+            .iter()
+            .filter(|m| m.similarity > 0.2)
+            .map(|m| {
+                format!(
+                    "{:?} `{}` in {} (similarity: {:.3})",
+                    m.kind,
+                    m.name,
+                    m.path.display(),
+                    m.similarity
+                )
+            })
+            .collect();
+
+        if !context.is_empty() {
+            self.code_context = context;
+        }
     }
 
     /// Get the last dispatch result (which backend tier was used, energy cost, etc.).

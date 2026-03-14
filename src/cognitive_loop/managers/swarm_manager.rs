@@ -30,14 +30,9 @@ use std::collections::VecDeque;
 #[derive(Debug, Clone)]
 pub enum SwarmEvent {
     /// A peer connected (trust-verified via Holochain cortex).
-    PeerJoined {
-        peer_id: String,
-        trust_level: f64,
-    },
+    PeerJoined { peer_id: String, trust_level: f64 },
     /// A peer disconnected or timed out.
-    PeerLeft {
-        peer_id: String,
-    },
+    PeerLeft { peer_id: String },
     /// Received a consciousness vector from a peer.
     ConsciousnessUpdate {
         peer_id: String,
@@ -266,7 +261,10 @@ impl SwarmManager {
         let events = std::mem::take(&mut self.pending_events);
         for event in events {
             match event {
-                SwarmEvent::PeerJoined { peer_id, trust_level } => {
+                SwarmEvent::PeerJoined {
+                    peer_id,
+                    trust_level,
+                } => {
                     self.connected_peers = self.connected_peers.saturating_add(1);
                     // Initialize peer Φ with trust-scaled default
                     if self.peer_phi.len() < Self::MAX_TRACKED_PEERS {
@@ -280,7 +278,11 @@ impl SwarmManager {
                     self.peer_phi.retain(|(id, _)| id != &peer_id);
                 }
                 SwarmEvent::ConsciousnessUpdate { peer_id, phi, .. } => {
-                    let phi = if phi.is_finite() { phi.clamp(0.0, 1.0) } else { 0.0 };
+                    let phi = if phi.is_finite() {
+                        phi.clamp(0.0, 1.0)
+                    } else {
+                        0.0
+                    };
                     if let Some(entry) = self.peer_phi.iter_mut().find(|(id, _)| id == &peer_id) {
                         entry.1 = phi;
                     } else if self.peer_phi.len() < Self::MAX_TRACKED_PEERS {
@@ -345,8 +347,7 @@ impl SwarmManager {
                     // into the knowledge manager. Corroboration boosts confidence.
                     let boost = (corroboration_count as f32 * 0.05).min(0.3);
                     for (text, confidence) in &facts {
-                        let effective_confidence =
-                            (confidence + boost).min(1.0);
+                        let effective_confidence = (confidence + boost).min(1.0);
                         self.pending_knowledge_shares
                             .push((text.clone(), effective_confidence));
                     }
@@ -429,8 +430,7 @@ impl CognitiveSubsystem for SwarmManager {
         // More peers = higher confidence (sqrt for diminishing returns).
         // Heinrichs et al. (2003): social support reduces HPA axis reactivity.
         if self.connected_peers > 0 {
-            let buffering =
-                (self.connected_peers as f64).sqrt() * Self::SOCIAL_BUFFERING_SCALE;
+            let buffering = (self.connected_peers as f64).sqrt() * Self::SOCIAL_BUFFERING_SCALE;
             output.confidence_delta += buffering.min(0.05);
         }
 
@@ -544,11 +544,9 @@ pub fn convert_peer_event(event: &crate::swarm::PeerEvent) -> Option<SwarmEvent>
             peer_id: info.node_id.clone(),
             trust_level: info.trust_level.value(),
         }),
-        crate::swarm::PeerEvent::Disconnected { peer_id, .. } => {
-            Some(SwarmEvent::PeerLeft {
-                peer_id: peer_id.clone(),
-            })
-        }
+        crate::swarm::PeerEvent::Disconnected { peer_id, .. } => Some(SwarmEvent::PeerLeft {
+            peer_id: peer_id.clone(),
+        }),
         crate::swarm::PeerEvent::ConsciousnessUpdate { peer_id, phi, .. } => {
             Some(SwarmEvent::ConsciousnessUpdate {
                 peer_id: peer_id.clone(),
@@ -578,10 +576,7 @@ pub fn convert_consciousness_vector(
 
 /// Convert an [`AffectiveSync`] from the swarm module into a
 /// [`SwarmEvent::AffectiveSync`].
-pub fn convert_affective_sync(
-    peer_id: &str,
-    sync: &crate::swarm::AffectiveSync,
-) -> SwarmEvent {
+pub fn convert_affective_sync(peer_id: &str, sync: &crate::swarm::AffectiveSync) -> SwarmEvent {
     SwarmEvent::AffectiveSync {
         peer_id: peer_id.to_string(),
         valence: (sync.valence as f64).clamp(-1.0, 1.0),
@@ -620,7 +615,11 @@ mod tests {
     }
 
     fn gcd(a: u32, b: u32) -> u32 {
-        if b == 0 { a } else { gcd(b, a % b) }
+        if b == 0 {
+            a
+        } else {
+            gcd(b, a % b)
+        }
     }
 
     #[test]
@@ -914,7 +913,10 @@ mod tests {
         info.trust_level = TrustLevel::Verified(0.75);
         let event = convert_peer_event(&PeerEvent::Connected(info));
         match event {
-            Some(SwarmEvent::PeerJoined { peer_id, trust_level }) => {
+            Some(SwarmEvent::PeerJoined {
+                peer_id,
+                trust_level,
+            }) => {
                 assert_eq!(peer_id, "node-abc");
                 assert!((trust_level - 0.75).abs() < 1e-10);
             }
@@ -948,7 +950,12 @@ mod tests {
 
         let event = convert_consciousness_vector("peer-7", &cv);
         match event {
-            SwarmEvent::ConsciousnessUpdate { peer_id, phi, valence, arousal } => {
+            SwarmEvent::ConsciousnessUpdate {
+                peer_id,
+                phi,
+                valence,
+                arousal,
+            } => {
                 assert_eq!(peer_id, "peer-7");
                 assert!((phi - 0.42).abs() < 1e-10);
                 assert!((valence - 0.6).abs() < 1e-10);
@@ -963,8 +970,13 @@ mod tests {
         cv_oob.arousal = 99.0;
         let event = convert_consciousness_vector("oob", &cv_oob);
         match event {
-            SwarmEvent::ConsciousnessUpdate { valence, arousal, .. } => {
-                assert!((valence - (-1.0)).abs() < 1e-10, "valence should clamp to -1.0");
+            SwarmEvent::ConsciousnessUpdate {
+                valence, arousal, ..
+            } => {
+                assert!(
+                    (valence - (-1.0)).abs() < 1e-10,
+                    "valence should clamp to -1.0"
+                );
                 assert!((arousal - 1.0).abs() < 1e-10, "arousal should clamp to 1.0");
             }
             _ => unreachable!(),
@@ -985,7 +997,12 @@ mod tests {
 
         let event = convert_affective_sync("peer-9", &sync);
         match event {
-            SwarmEvent::AffectiveSync { peer_id, valence, arousal, intensity } => {
+            SwarmEvent::AffectiveSync {
+                peer_id,
+                valence,
+                arousal,
+                intensity,
+            } => {
                 assert_eq!(peer_id, "peer-9");
                 assert!((valence - (-0.3f32 as f64)).abs() < 1e-6);
                 assert!((arousal - (0.6f32 as f64)).abs() < 1e-6);

@@ -189,7 +189,10 @@ impl KnowledgeManager {
                     causal_bridge.import_edge(record);
                 }
                 if edge_count > 0 {
-                    tracing::info!(count = edge_count, "Knowledge: loaded causal edges from SQLite");
+                    tracing::info!(
+                        count = edge_count,
+                        "Knowledge: loaded causal edges from SQLite"
+                    );
                 }
             }
             // Load existing ontology primitives
@@ -198,7 +201,10 @@ impl KnowledgeManager {
                     ontology.import_record(record);
                 }
                 if !records.is_empty() {
-                    tracing::info!(count = records.len(), "Knowledge: loaded ontology from SQLite");
+                    tracing::info!(
+                        count = records.len(),
+                        "Knowledge: loaded ontology from SQLite"
+                    );
                 }
             }
             p

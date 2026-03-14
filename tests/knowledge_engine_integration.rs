@@ -95,7 +95,10 @@ fn test_knowledge_grounding_modulates_consciousness() {
     let cl_no = no_knowledge.consciousness_level();
     let cl_with = with_knowledge.consciousness_level();
 
-    assert!(cl_no.is_finite(), "Consciousness without knowledge should be finite");
+    assert!(
+        cl_no.is_finite(),
+        "Consciousness without knowledge should be finite"
+    );
     assert!(
         cl_with.is_finite(),
         "Consciousness with knowledge should be finite"
@@ -110,7 +113,9 @@ fn test_knowledge_telemetry_populated() {
 
     run_cycles(&mut service, "test input for knowledge", 10);
 
-    let t = service.knowledge_telemetry().expect("telemetry should exist");
+    let t = service
+        .knowledge_telemetry()
+        .expect("telemetry should exist");
     // Basic sanity — fields should be valid numbers
     assert!(t.graph_size >= 0);
     assert!(t.causal_edges_added >= 0);

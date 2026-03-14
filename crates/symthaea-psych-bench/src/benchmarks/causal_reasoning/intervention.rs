@@ -141,8 +141,7 @@ impl InterventionEffectBenchmark {
             let improvement = (adjusted_to_cause - unadjusted_to_cause) as f64;
             backdoor_scores.push(improvement.max(0.0).min(1.0));
         }
-        let backdoor_accuracy =
-            backdoor_scores.iter().sum::<f64>() / backdoor_scores.len() as f64;
+        let backdoor_accuracy = backdoor_scores.iter().sum::<f64>() / backdoor_scores.len() as f64;
 
         // ── Test 3: Front-door criterion ──────────────────────────────
         // When confounder is latent, use the mediator path to estimate
@@ -213,7 +212,10 @@ impl PsychBenchmark for InterventionEffectBenchmark {
 
             if config.trial_trace {
                 let mut extra = BTreeMap::new();
-                extra.insert("intervention_discrimination".to_string(), r.intervention_discrimination);
+                extra.insert(
+                    "intervention_discrimination".to_string(),
+                    r.intervention_discrimination,
+                );
                 extra.insert("backdoor_accuracy".to_string(), r.backdoor_accuracy);
                 extra.insert("frontdoor_accuracy".to_string(), r.frontdoor_accuracy);
                 trace.push(TrialOutcome {
@@ -241,10 +243,7 @@ impl PsychBenchmark for InterventionEffectBenchmark {
             "frontdoor_accuracy",
             MetricValue::from_samples(&frontdoor_vals),
         );
-        result.insert(
-            "causal_score",
-            MetricValue::from_samples(&causal_vals),
-        );
+        result.insert("causal_score", MetricValue::from_samples(&causal_vals));
 
         result.conditions = 4;
         result.trials_per_condition = config.trials_per_condition;
@@ -291,7 +290,10 @@ mod tests {
         let bench = InterventionEffectBenchmark;
         let result = bench.run(&default_config());
         let score = result.metrics["causal_score"].mean;
-        assert!(score >= 0.0 && score <= 1.0, "Score should be in [0,1], got {score}");
+        assert!(
+            score >= 0.0 && score <= 1.0,
+            "Score should be in [0,1], got {score}"
+        );
     }
 
     #[test]

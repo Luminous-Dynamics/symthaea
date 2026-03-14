@@ -670,13 +670,61 @@ impl BenchmarkReport {
                 &bl.institutional_reasoning,
             ),
             (
-                "analogical_shared_component_advantage",
-                "analogical_shared_component_advantage",
+                "analogical_shared_component_auc",
+                "analogical_shared_component_auc",
                 &bl.institutional_reasoning,
             ),
             (
                 "analogical_asymmetry_score",
                 "analogical_asymmetry_score",
+                &bl.institutional_reasoning,
+            ),
+            // Causal Chain
+            (
+                "causal_chain_coherence",
+                "causal_chain_coherence",
+                &bl.institutional_reasoning,
+            ),
+            (
+                "causal_chain_terminal_accuracy",
+                "causal_chain_terminal_accuracy",
+                &bl.institutional_reasoning,
+            ),
+            (
+                "causal_chain_step_count",
+                "causal_chain_step_count",
+                &bl.institutional_reasoning,
+            ),
+            // Counterfactual
+            (
+                "counterfactual_accuracy",
+                "counterfactual_accuracy",
+                &bl.institutional_reasoning,
+            ),
+            (
+                "counterfactual_coherence",
+                "counterfactual_coherence",
+                &bl.institutional_reasoning,
+            ),
+            (
+                "counterfactual_reversibility",
+                "counterfactual_reversibility",
+                &bl.institutional_reasoning,
+            ),
+            // Weighted Decomposition
+            (
+                "weighted_decomposition_accuracy",
+                "weighted_decomposition_accuracy",
+                &bl.institutional_reasoning,
+            ),
+            (
+                "weight_sensitivity",
+                "weight_sensitivity",
+                &bl.institutional_reasoning,
+            ),
+            (
+                "weighted_vs_unweighted_delta",
+                "weighted_vs_unweighted_delta",
                 &bl.institutional_reasoning,
             ),
         ];
@@ -1630,9 +1678,11 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("LogicalDeduction") => "overall_accuracy",
         b if b.contains("ConstraintPuzzle") => "queens_4_accuracy",
         b if b.contains("ProofConstruction") => "tautology_accuracy",
-        // Analogical Reasoning
+        // Institutional Reasoning sub-benchmarks (specific before generic)
         b if b.contains("AnalogicalReasoning") => "analogical_transfer_accuracy",
-        // Institutional Reasoning domain
+        b if b.contains("CausalChain") => "causal_chain_coherence",
+        b if b.contains("Counterfactual") => "counterfactual_accuracy",
+        b if b.contains("WeightedDecomposition") => "weighted_decomposition_accuracy",
         b if b.contains("InstitutionalReasoning") => "institutional_decomposition_accuracy",
         _ => "overall_accuracy",
     }

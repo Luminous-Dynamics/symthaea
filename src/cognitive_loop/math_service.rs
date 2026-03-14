@@ -1025,7 +1025,11 @@ impl MathService {
     ///
     /// Science: Gaussian elimination with pivoting (Golub & Van Loan 1996).
     pub fn matrix_determinant(&mut self, data: &[f64], n: usize) -> MathResponse {
-        assert_eq!(data.len(), n * n, "matrix_determinant: data.len() must equal n*n");
+        assert_eq!(
+            data.len(),
+            n * n,
+            "matrix_determinant: data.len() must equal n*n"
+        );
         let det = lu_determinant(data, n);
         let response = MathResponse {
             answer: format!("det = {det:.6}"),
@@ -1107,8 +1111,7 @@ pub fn parse_expression(input: &str) -> Option<Box<dyn Fn(f64) -> f64>> {
 
     // x^N  (e.g. "x^2 - 4")
     if let Some(rest) = s.strip_prefix("x^") {
-        if let Some((exp_str, tail)) = rest.split_once(|c: char| c == ' ' || c == '-' || c == '+')
-        {
+        if let Some((exp_str, tail)) = rest.split_once(|c: char| c == ' ' || c == '-' || c == '+') {
             if let Ok(exp) = exp_str.trim().parse::<f64>() {
                 let tail = tail.trim();
                 let offset: f64 = tail.parse().unwrap_or(0.0);

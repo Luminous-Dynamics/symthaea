@@ -29,7 +29,10 @@ fn test_agent_completes_fibonacci_task() {
     let result = agent.run("add a fibonacci function");
 
     // Agent should complete (reach Done) or exhaust iterations
-    assert!(result.iterations_used > 0, "Should have run at least 1 iteration");
+    assert!(
+        result.iterations_used > 0,
+        "Should have run at least 1 iteration"
+    );
     assert!(!result.phi_trace.is_empty(), "Should have Phi measurements");
 
     // Should have generated a file

@@ -741,8 +741,7 @@ impl CognitiveLoopService {
         // Social bonding: connected peers → oxytocin (Zak 2012)
         // Sqrt for diminishing returns, capped at 0.08
         if telem.connected_peers > 0 {
-            let oxy_dose =
-                ((telem.connected_peers as f32).sqrt() * 0.02).min(0.08);
+            let oxy_dose = ((telem.connected_peers as f32).sqrt() * 0.02).min(0.08);
             if oxy_dose > 0.01 {
                 self.neuromod.bath.inject("oxytocin", oxy_dose, 60);
             }

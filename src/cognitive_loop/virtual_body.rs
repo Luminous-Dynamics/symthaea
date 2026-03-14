@@ -83,6 +83,7 @@ pub(crate) struct VirtualBodyState {
 ///
 /// Maintains a smoothed `InteroceptiveState` that updates each cycle,
 /// providing embodied grounding for the cognitive loop.
+#[derive(Debug)]
 pub(crate) struct VirtualBody {
     config: VirtualBodyConfig,
     /// Current smoothed interoceptive state

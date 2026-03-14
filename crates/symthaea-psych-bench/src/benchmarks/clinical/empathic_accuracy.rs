@@ -51,14 +51,20 @@ impl PsychBenchmark for EmpathicAccuracyBenchmark {
         }
 
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
-        result.insert("empathic_accuracy", MetricValue::from_samples(&correlations));
+        result.insert(
+            "empathic_accuracy",
+            MetricValue::from_samples(&correlations),
+        );
         result.insert("mean_similarity", MetricValue::from_samples(&accuracies));
 
         // Difficulty gradient: accuracy should decrease with noise
         let easy_acc: f64 = accuracies[..n_trials / 3].iter().sum::<f64>() / (n_trials / 3) as f64;
         let hard_acc: f64 = accuracies[2 * n_trials / 3..].iter().sum::<f64>()
             / (n_trials - 2 * n_trials / 3) as f64;
-        result.insert("difficulty_gradient", MetricValue::from_samples(&[easy_acc - hard_acc]));
+        result.insert(
+            "difficulty_gradient",
+            MetricValue::from_samples(&[easy_acc - hard_acc]),
+        );
 
         result.conditions = 1;
         result.trials_per_condition = n_trials;
@@ -95,7 +101,11 @@ mod tests {
         let result = bench.run(&config);
         let acc = result.metrics["empathic_accuracy"].mean;
         // Fisher z-transform can exceed [-1,1]; valid range is roughly [-3,3]
-        assert!(acc >= -3.0 && acc <= 3.0, "accuracy {:.3} out of range", acc);
+        assert!(
+            acc >= -3.0 && acc <= 3.0,
+            "accuracy {:.3} out of range",
+            acc
+        );
     }
 
     #[test]
@@ -124,7 +134,10 @@ mod tests {
         };
         let result = bench.run(&config);
         let gradient = result.metrics["difficulty_gradient"].mean;
-        assert!(gradient > 0.0, "easy trials should be more accurate than hard");
+        assert!(
+            gradient > 0.0,
+            "easy trials should be more accurate than hard"
+        );
     }
 
     #[test]

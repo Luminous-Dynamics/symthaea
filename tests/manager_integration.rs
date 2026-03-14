@@ -56,10 +56,7 @@ fn drive_manager_boredom_accumulates_on_repeated_input() {
     let boredom = svc.boredom();
     // After 100 cycles of identical input, boredom should be non-trivial
     // (exact value depends on prediction dynamics, but should be > 0)
-    assert!(
-        boredom >= 0.0,
-        "Boredom should be non-negative: {boredom}"
-    );
+    assert!(boredom >= 0.0, "Boredom should be non-negative: {boredom}");
 }
 
 #[test]
@@ -232,9 +229,18 @@ fn phase_timings_populated() {
     let t = &result.metadata.module_timings_us;
 
     // All 4 phase timings should be non-zero
-    assert!(t.phase_perception > 0, "Phase 1 (perception) timing should be > 0");
-    assert!(t.phase_dynamics > 0, "Phase 2 (dynamics) timing should be > 0");
-    assert!(t.phase_feedback > 0, "Phase 3 (feedback) timing should be > 0");
+    assert!(
+        t.phase_perception > 0,
+        "Phase 1 (perception) timing should be > 0"
+    );
+    assert!(
+        t.phase_dynamics > 0,
+        "Phase 2 (dynamics) timing should be > 0"
+    );
+    assert!(
+        t.phase_feedback > 0,
+        "Phase 3 (feedback) timing should be > 0"
+    );
     assert!(t.phase_output > 0, "Phase 4 (output) timing should be > 0");
 
     // Sum of phases should approximate total cycle time
@@ -283,7 +289,7 @@ fn no_phase_exceeds_budget_half() {
     let t = &result.metadata.module_timings_us;
 
     let budget_half_us = 25_000; // 25ms = half of 50ms cycle budget
-    // These are soft assertions — CI machines may be slow
+                                 // These are soft assertions — CI machines may be slow
     if t.phase_perception > budget_half_us {
         eprintln!(
             "WARNING: Phase 1 (perception) took {}us > {}us budget half",

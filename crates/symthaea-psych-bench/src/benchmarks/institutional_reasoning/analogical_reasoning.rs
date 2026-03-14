@@ -44,8 +44,8 @@ struct TrialResult {
     transfer_accuracy: f64,
     /// Mean similarity of analogical targets to their nearest axiom
     transfer_strength: f64,
-    /// Whether shared-component analogies score higher than unrelated
-    shared_component_advantage: f64,
+    /// AUC separating shared-component from unrelated analogy similarities
+    shared_component_auc: f64,
     /// Whether A:B::?:D ≠ B:A::?:D (asymmetry)
     asymmetry_score: f64,
 }
@@ -123,6 +123,29 @@ impl AnalogicalReasoningBenchmark {
         ]
     }
 
+    /// Compute AUC (Wilcoxon-Mann-Whitney) separating shared from unrelated sims.
+    fn compute_auc(shared_sims: &[f64], unrelated_sims: &[f64]) -> f64 {
+        if shared_sims.is_empty() || unrelated_sims.is_empty() {
+            return 0.5; // chance level
+        }
+        let mut concordant = 0usize;
+        let mut tied = 0usize;
+        let total = shared_sims.len() * unrelated_sims.len();
+        for &s in shared_sims {
+            for &u in unrelated_sims {
+                if s > u {
+                    concordant += 1;
+                } else if (s - u).abs() < 1e-10 {
+                    tied += 1;
+                }
+            }
+        }
+        if total == 0 {
+            return 0.5;
+        }
+        (concordant as f64 + 0.5 * tied as f64) / total as f64
+    }
+
     fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> TrialResult {
         let _seed = config.trial_seed("institutional", "analogical_reasoning", trial_idx);
         let system = PrimitiveSystem::new();
@@ -170,18 +193,8 @@ impl AnalogicalReasoningBenchmark {
             strengths.iter().sum::<f64>() / strengths.len() as f64
         };
 
-        // ── 2. Shared-component advantage ──
-        let mean_shared = if shared_sims.is_empty() {
-            0.5
-        } else {
-            shared_sims.iter().sum::<f64>() / shared_sims.len() as f64
-        };
-        let mean_unrelated = if unrelated_sims.is_empty() {
-            0.5
-        } else {
-            unrelated_sims.iter().sum::<f64>() / unrelated_sims.len() as f64
-        };
-        let shared_component_advantage = (mean_shared - mean_unrelated).max(0.0);
+        // ── 2. Shared-component AUC ──
+        let shared_component_auc = Self::compute_auc(&shared_sims, &unrelated_sims);
 
         // ── 3. Asymmetry: A:B::?:D should differ from B:A::?:D ──
         let mut asymmetry_count = 0usize;
@@ -205,7 +218,7 @@ impl AnalogicalReasoningBenchmark {
         TrialResult {
             transfer_accuracy,
             transfer_strength,
-            shared_component_advantage,
+            shared_component_auc,
             asymmetry_score,
         }
     }
@@ -231,7 +244,7 @@ impl PsychBenchmark for AnalogicalReasoningBenchmark {
 
         let mut transfer_accs = Vec::new();
         let mut transfer_strengths = Vec::new();
-        let mut advantages = Vec::new();
+        let mut aucs = Vec::new();
         let mut asymmetries = Vec::new();
         let mut trace = Vec::new();
 
@@ -239,16 +252,13 @@ impl PsychBenchmark for AnalogicalReasoningBenchmark {
             let r = self.run_trial(config, trial);
             transfer_accs.push(r.transfer_accuracy);
             transfer_strengths.push(r.transfer_strength);
-            advantages.push(r.shared_component_advantage);
+            aucs.push(r.shared_component_auc);
             asymmetries.push(r.asymmetry_score);
 
             if config.trial_trace {
                 let mut extra = BTreeMap::new();
                 extra.insert("transfer_strength".to_string(), r.transfer_strength);
-                extra.insert(
-                    "shared_component_advantage".to_string(),
-                    r.shared_component_advantage,
-                );
+                extra.insert("shared_component_auc".to_string(), r.shared_component_auc);
                 extra.insert("asymmetry_score".to_string(), r.asymmetry_score);
                 trace.push(TrialOutcome {
                     trial_idx: trial,
@@ -272,8 +282,8 @@ impl PsychBenchmark for AnalogicalReasoningBenchmark {
             MetricValue::from_samples(&transfer_strengths),
         );
         result.insert(
-            "analogical_shared_component_advantage",
-            MetricValue::from_samples(&advantages),
+            "analogical_shared_component_auc",
+            MetricValue::from_samples(&aucs),
         );
         result.insert(
             "analogical_asymmetry_score",
@@ -298,12 +308,11 @@ mod tests {
     fn test_analogical_reasoning_runs() {
         let config = BenchmarkConfig::default();
         let result = AnalogicalReasoningBenchmark.run(&config);
+        assert!(result.metrics.contains_key("analogical_transfer_accuracy"));
+        assert!(result.metrics.contains_key("analogical_transfer_strength"));
         assert!(result
             .metrics
-            .contains_key("analogical_transfer_accuracy"));
-        assert!(result
-            .metrics
-            .contains_key("analogical_transfer_strength"));
+            .contains_key("analogical_shared_component_auc"));
     }
 
     #[test]
@@ -319,16 +328,29 @@ mod tests {
     fn test_transfer_strength_above_chance() {
         let config = BenchmarkConfig::default();
         let result = AnalogicalReasoningBenchmark.run(&config);
-        let strength = result
-            .metrics
-            .get("analogical_transfer_strength")
-            .unwrap();
+        let strength = result.metrics.get("analogical_transfer_strength").unwrap();
         // With bundled compositions, analogical targets should have
         // above-chance similarity to some axiom
         assert!(
             strength.mean > 0.48,
             "Transfer strength should be near or above chance, got {}",
             strength.mean
+        );
+    }
+
+    #[test]
+    fn test_auc_above_chance() {
+        let config = BenchmarkConfig::default();
+        let result = AnalogicalReasoningBenchmark.run(&config);
+        let auc = result
+            .metrics
+            .get("analogical_shared_component_auc")
+            .unwrap();
+        // AUC >= 0.5 means shared-component analogies tend to score higher
+        assert!(
+            auc.mean >= 0.45,
+            "AUC should be near or above chance (0.5), got {}",
+            auc.mean
         );
     }
 

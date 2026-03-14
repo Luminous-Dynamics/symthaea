@@ -3694,11 +3694,11 @@ pub fn institutional_reasoning_baselines() -> BaselineMap {
         },
     );
     m.insert(
-        "analogical_shared_component_advantage",
+        "analogical_shared_component_auc",
         Baseline {
-            value: 0.05,
-            sd: Some(0.03),
-            source: "Shared-component similarity advantage",
+            value: 0.65,
+            sd: Some(0.10),
+            source: "Shared-component AUC (area under ROC)",
             population: "theoretical",
         },
     );
@@ -3708,6 +3708,90 @@ pub fn institutional_reasoning_baselines() -> BaselineMap {
             value: 0.50,
             sd: Some(0.15),
             source: "Permutation-based directional asymmetry",
+            population: "theoretical",
+        },
+    );
+    // Causal Chain baselines
+    m.insert(
+        "causal_chain_coherence",
+        Baseline {
+            value: 0.70,
+            sd: Some(0.15),
+            source: "Monotonic degradation under component removal",
+            population: "theoretical",
+        },
+    );
+    m.insert(
+        "causal_chain_terminal_accuracy",
+        Baseline {
+            value: 0.40,
+            sd: Some(0.15),
+            source: "Multi-step institutional collapse prediction",
+            population: "theoretical",
+        },
+    );
+    m.insert(
+        "causal_chain_step_count",
+        Baseline {
+            value: 2.0,
+            sd: Some(0.5),
+            source: "Mean steps before similarity collapse",
+            population: "theoretical",
+        },
+    );
+    // Counterfactual baselines
+    m.insert(
+        "counterfactual_accuracy",
+        Baseline {
+            value: 0.50,
+            sd: Some(0.15),
+            source: "Compound remove+add counterfactual accuracy",
+            population: "theoretical",
+        },
+    );
+    m.insert(
+        "counterfactual_coherence",
+        Baseline {
+            value: 0.60,
+            sd: Some(0.15),
+            source: "Counterfactual result above-chance similarity",
+            population: "theoretical",
+        },
+    );
+    m.insert(
+        "counterfactual_reversibility",
+        Baseline {
+            value: 0.50,
+            sd: Some(0.15),
+            source: "Inverse-transformation recovery (Pearl 2009)",
+            population: "theoretical",
+        },
+    );
+    // Weighted Decomposition baselines
+    m.insert(
+        "weighted_decomposition_accuracy",
+        Baseline {
+            value: 0.75,
+            sd: Some(0.15),
+            source: "Weighted bundling decomposition accuracy",
+            population: "theoretical",
+        },
+    );
+    m.insert(
+        "weight_sensitivity",
+        Baseline {
+            value: 0.05,
+            sd: Some(0.03),
+            source: "High-weight vs low-weight removal delta",
+            population: "theoretical",
+        },
+    );
+    m.insert(
+        "weighted_vs_unweighted_delta",
+        Baseline {
+            value: 0.0,
+            sd: Some(0.10),
+            source: "Weighted minus unweighted accuracy difference",
             population: "theoretical",
         },
     );

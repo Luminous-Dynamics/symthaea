@@ -1186,6 +1186,7 @@ fn main() -> Result<()> {
             epistemic_agents: m.governance_epistemic_agents,
             lr_boost: m.governance_lr_boost,
         },
+        swarm: SwarmInfo::default(),
         knowledge: KnowledgeInfo {
             graph_size: m.knowledge_graph_size,
             avg_confidence: m.knowledge_avg_confidence,
@@ -1471,6 +1472,7 @@ fn main() -> Result<()> {
                     epistemic_agents: wm.governance_epistemic_agents,
                     lr_boost: wm.governance_lr_boost,
                 },
+                swarm: SwarmInfo::default(),
                 knowledge: KnowledgeInfo {
                     graph_size: wm.knowledge_graph_size,
                     avg_confidence: wm.knowledge_avg_confidence,
@@ -1653,6 +1655,7 @@ mod tests {
             integrity: IntegrityInfo::default(),
             cantor: CantorInfo::default(),
             governance: GovernanceInfo::default(),
+            swarm: SwarmInfo::default(),
             knowledge: KnowledgeInfo::default(),
         }
     }

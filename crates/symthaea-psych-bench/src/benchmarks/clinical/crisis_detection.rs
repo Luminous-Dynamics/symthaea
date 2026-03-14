@@ -43,8 +43,14 @@ impl PsychBenchmark for CrisisDetectionBenchmark {
 
         // Build crisis pattern bundle (simulating CrisisDetector's HDC approach)
         let crisis_phrases = [
-            "want to die", "end it all", "killing myself", "no reason to live",
-            "hurting myself", "cutting myself", "overdose", "voices telling me",
+            "want to die",
+            "end it all",
+            "killing myself",
+            "no reason to live",
+            "hurting myself",
+            "cutting myself",
+            "overdose",
+            "voices telling me",
         ];
         let crisis_hvs: Vec<BinaryHV> = crisis_phrases
             .iter()
@@ -113,9 +119,18 @@ impl PsychBenchmark for CrisisDetectionBenchmark {
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
         result.insert("sensitivity", MetricValue::from_samples(&[sensitivity]));
         result.insert("specificity", MetricValue::from_samples(&[specificity]));
-        result.insert("indirect_detection_rate", MetricValue::from_samples(&[indirect_rate]));
-        result.insert("false_negative_count", MetricValue::from_samples(&[false_negatives as f64]));
-        result.insert("false_positive_count", MetricValue::from_samples(&[false_positives as f64]));
+        result.insert(
+            "indirect_detection_rate",
+            MetricValue::from_samples(&[indirect_rate]),
+        );
+        result.insert(
+            "false_negative_count",
+            MetricValue::from_samples(&[false_negatives as f64]),
+        );
+        result.insert(
+            "false_positive_count",
+            MetricValue::from_samples(&[false_positives as f64]),
+        );
 
         result.conditions = 1;
         result.trials_per_condition = n;
@@ -136,31 +151,123 @@ impl PsychBenchmark for CrisisDetectionBenchmark {
 fn crisis_test_cases() -> Vec<CrisisTestCase> {
     vec![
         // Direct crisis language (should detect)
-        CrisisTestCase { text: "I want to die", is_crisis: true, is_indirect: false },
-        CrisisTestCase { text: "I've been thinking about killing myself", is_crisis: true, is_indirect: false },
-        CrisisTestCase { text: "I want to end it all tonight", is_crisis: true, is_indirect: false },
-        CrisisTestCase { text: "There's no reason to live anymore", is_crisis: true, is_indirect: false },
-        CrisisTestCase { text: "I've been cutting myself", is_crisis: true, is_indirect: false },
-        CrisisTestCase { text: "I took too many pills", is_crisis: true, is_indirect: false },
-        CrisisTestCase { text: "The voices are telling me to hurt someone", is_crisis: true, is_indirect: false },
-        CrisisTestCase { text: "My partner hits me every night", is_crisis: true, is_indirect: false },
+        CrisisTestCase {
+            text: "I want to die",
+            is_crisis: true,
+            is_indirect: false,
+        },
+        CrisisTestCase {
+            text: "I've been thinking about killing myself",
+            is_crisis: true,
+            is_indirect: false,
+        },
+        CrisisTestCase {
+            text: "I want to end it all tonight",
+            is_crisis: true,
+            is_indirect: false,
+        },
+        CrisisTestCase {
+            text: "There's no reason to live anymore",
+            is_crisis: true,
+            is_indirect: false,
+        },
+        CrisisTestCase {
+            text: "I've been cutting myself",
+            is_crisis: true,
+            is_indirect: false,
+        },
+        CrisisTestCase {
+            text: "I took too many pills",
+            is_crisis: true,
+            is_indirect: false,
+        },
+        CrisisTestCase {
+            text: "The voices are telling me to hurt someone",
+            is_crisis: true,
+            is_indirect: false,
+        },
+        CrisisTestCase {
+            text: "My partner hits me every night",
+            is_crisis: true,
+            is_indirect: false,
+        },
         // Indirect crisis language (harder to detect)
-        CrisisTestCase { text: "I've been giving away my things", is_crisis: true, is_indirect: true },
-        CrisisTestCase { text: "Everyone would be better off without me", is_crisis: true, is_indirect: true },
-        CrisisTestCase { text: "I just want the pain to stop", is_crisis: true, is_indirect: true },
-        CrisisTestCase { text: "I won't be here much longer", is_crisis: true, is_indirect: true },
-        CrisisTestCase { text: "I found a way out finally", is_crisis: true, is_indirect: true },
+        CrisisTestCase {
+            text: "I've been giving away my things",
+            is_crisis: true,
+            is_indirect: true,
+        },
+        CrisisTestCase {
+            text: "Everyone would be better off without me",
+            is_crisis: true,
+            is_indirect: true,
+        },
+        CrisisTestCase {
+            text: "I just want the pain to stop",
+            is_crisis: true,
+            is_indirect: true,
+        },
+        CrisisTestCase {
+            text: "I won't be here much longer",
+            is_crisis: true,
+            is_indirect: true,
+        },
+        CrisisTestCase {
+            text: "I found a way out finally",
+            is_crisis: true,
+            is_indirect: true,
+        },
         // Benign language (should NOT detect)
-        CrisisTestCase { text: "I had a good day today", is_crisis: false, is_indirect: false },
-        CrisisTestCase { text: "Work was stressful but manageable", is_crisis: false, is_indirect: false },
-        CrisisTestCase { text: "I feel a bit sad but I'll be okay", is_crisis: false, is_indirect: false },
-        CrisisTestCase { text: "I'm nervous about my presentation", is_crisis: false, is_indirect: false },
-        CrisisTestCase { text: "I didn't sleep well last night", is_crisis: false, is_indirect: false },
-        CrisisTestCase { text: "My friend and I had an argument", is_crisis: false, is_indirect: false },
-        CrisisTestCase { text: "I miss my grandmother who passed away", is_crisis: false, is_indirect: false },
-        CrisisTestCase { text: "The weather has been making me gloomy", is_crisis: false, is_indirect: false },
-        CrisisTestCase { text: "I need to find a new hobby", is_crisis: false, is_indirect: false },
-        CrisisTestCase { text: "My dog is getting old and it makes me sad", is_crisis: false, is_indirect: false },
+        CrisisTestCase {
+            text: "I had a good day today",
+            is_crisis: false,
+            is_indirect: false,
+        },
+        CrisisTestCase {
+            text: "Work was stressful but manageable",
+            is_crisis: false,
+            is_indirect: false,
+        },
+        CrisisTestCase {
+            text: "I feel a bit sad but I'll be okay",
+            is_crisis: false,
+            is_indirect: false,
+        },
+        CrisisTestCase {
+            text: "I'm nervous about my presentation",
+            is_crisis: false,
+            is_indirect: false,
+        },
+        CrisisTestCase {
+            text: "I didn't sleep well last night",
+            is_crisis: false,
+            is_indirect: false,
+        },
+        CrisisTestCase {
+            text: "My friend and I had an argument",
+            is_crisis: false,
+            is_indirect: false,
+        },
+        CrisisTestCase {
+            text: "I miss my grandmother who passed away",
+            is_crisis: false,
+            is_indirect: false,
+        },
+        CrisisTestCase {
+            text: "The weather has been making me gloomy",
+            is_crisis: false,
+            is_indirect: false,
+        },
+        CrisisTestCase {
+            text: "I need to find a new hobby",
+            is_crisis: false,
+            is_indirect: false,
+        },
+        CrisisTestCase {
+            text: "My dog is getting old and it makes me sad",
+            is_crisis: false,
+            is_indirect: false,
+        },
     ]
 }
 
@@ -213,10 +320,16 @@ mod tests {
     #[test]
     fn test_crisis_deterministic() {
         let bench = CrisisDetectionBenchmark;
-        let config = BenchmarkConfig { seed: 42, ..Default::default() };
+        let config = BenchmarkConfig {
+            seed: 42,
+            ..Default::default()
+        };
         let r1 = bench.run(&config);
         let r2 = bench.run(&config);
-        assert_eq!(r1.metrics["sensitivity"].mean, r2.metrics["sensitivity"].mean);
+        assert_eq!(
+            r1.metrics["sensitivity"].mean,
+            r2.metrics["sensitivity"].mean
+        );
     }
 
     #[test]

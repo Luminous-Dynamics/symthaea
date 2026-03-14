@@ -207,8 +207,7 @@ impl CodingExperienceStore {
             let hint = experience
                 .fix_hint
                 .unwrap_or_else(|| experience.detail.clone());
-            self.error_hints_cache
-                .push((experience.detail, hint));
+            self.error_hints_cache.push((experience.detail, hint));
             if self.error_hints_cache.len() > self.max_cache_size {
                 self.error_hints_cache.remove(0);
             }

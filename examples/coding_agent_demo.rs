@@ -130,10 +130,7 @@ fn print_result(
     if !result.errors.is_empty() {
         println!("  Errors: {}", result.errors.len());
         for err in result.errors.iter().take(2) {
-            println!(
-                "    - {}",
-                &err[..err.len().min(80)]
-            );
+            println!("    - {}", &err[..err.len().min(80)]);
         }
     }
 

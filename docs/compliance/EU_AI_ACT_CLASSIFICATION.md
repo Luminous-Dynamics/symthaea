@@ -91,7 +91,7 @@ If classified as High-Risk, Symthaea must satisfy Articles 8-15. Current complia
 | Monitoring/functioning description | **Implemented** | CycleMetadata (75+ fields), SafetyAgent, SelfAssessmentMonitor |
 | Risk management system | **Implemented** | `AI_RISK_REGISTER.md` |
 | Changes made during lifecycle | **Partial** | Git history; ADR system started but sparse |
-| Performance metrics | **Implemented** | Phi validation (r=0.99), moral classification (91.1%), CfC cycle time (4.3ms), psych-bench baselines |
+| Performance metrics | **Implemented** | Phi validation (r=0.99), moral classification (92.9% Hendrycks ETHICS), CfC cycle time (4.3ms raw text cycle), psych-bench baselines |
 | Post-market monitoring plan | **Not yet** | System not yet deployed |
 
 ### Article 12: Record-Keeping (Logging)

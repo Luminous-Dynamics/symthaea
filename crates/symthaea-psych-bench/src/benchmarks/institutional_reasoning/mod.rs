@@ -1,4 +1,10 @@
 pub mod analogical_reasoning;
+pub mod causal_chain;
 pub mod causal_decomposition;
+pub mod counterfactual;
+pub mod weighted_decomposition;
 pub use analogical_reasoning::AnalogicalReasoningBenchmark;
+pub use causal_chain::CausalChainBenchmark;
 pub use causal_decomposition::InstitutionalReasoningBenchmark;
+pub use counterfactual::CounterfactualReasoningBenchmark;
+pub use weighted_decomposition::WeightedDecompositionBenchmark;

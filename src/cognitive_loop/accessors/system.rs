@@ -473,7 +473,9 @@ impl CognitiveLoopService {
 
     /// Get a mutable reference to the scientific method engine.
     #[cfg(feature = "scientific_method")]
-    pub fn scientific_method_mut(&mut self) -> &mut crate::scientific_method::ScientificMethodEngine {
+    pub fn scientific_method_mut(
+        &mut self,
+    ) -> &mut crate::scientific_method::ScientificMethodEngine {
         &mut self.scientific_method
     }
 

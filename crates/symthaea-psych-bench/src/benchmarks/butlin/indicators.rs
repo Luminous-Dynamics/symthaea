@@ -172,7 +172,8 @@ impl ButlinIndicatorSuite {
         });
 
         // HOT-2: Metacognitive monitoring
-        let hot2_score = Self::blend_score(0.7, rt.map(|r| (r.bottleneck_score * 2.0).clamp(0.0, 1.0)));
+        let hot2_score =
+            Self::blend_score(0.7, rt.map(|r| (r.bottleneck_score * 2.0).clamp(0.0, 1.0)));
         indicators.push(IndicatorEvidence {
             id: "HOT-2".into(),
             theory: "Higher-Order Theories".into(),
@@ -237,7 +238,10 @@ impl ButlinIndicatorSuite {
         });
 
         // PP-2: Hierarchical prediction at multiple scales
-        let pp2_score = Self::blend_score(0.85, rt.map(|r| if r.num_clusters >= 3 { 0.8 } else { 0.4 }));
+        let pp2_score = Self::blend_score(
+            0.85,
+            rt.map(|r| if r.num_clusters >= 3 { 0.8 } else { 0.4 }),
+        );
         indicators.push(IndicatorEvidence {
             id: "PP-2".into(),
             theory: "Predictive Processing".into(),
@@ -258,7 +262,8 @@ impl ButlinIndicatorSuite {
         });
 
         // AST-1: Self-model of attention (Graziano 2013, 2019)
-        let ast1_score = Self::blend_score(0.85, rt.map(|r| (r.bottleneck_score * 1.5).clamp(0.0, 1.0)));
+        let ast1_score =
+            Self::blend_score(0.85, rt.map(|r| (r.bottleneck_score * 1.5).clamp(0.0, 1.0)));
         indicators.push(IndicatorEvidence {
             id: "AST-1".into(),
             theory: "Attention Schema Theory".into(),

@@ -287,10 +287,7 @@ impl CausalKnowledgeBridge {
         let mut dot = String::with_capacity(512);
         let _ = writeln!(dot, "digraph CausalKnowledge {{");
         let _ = writeln!(dot, "  rankdir=LR;");
-        let _ = writeln!(
-            dot,
-            "  node [shape=box, style=rounded, fontsize=10];"
-        );
+        let _ = writeln!(dot, "  node [shape=box, style=rounded, fontsize=10];");
 
         // Emit all nodes
         for name in self.nodes.keys() {

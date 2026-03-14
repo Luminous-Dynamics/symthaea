@@ -41,14 +41,36 @@ impl DistortionType {
 
     fn examples(&self) -> &[&str] {
         match self {
-            Self::AllOrNothing => &["completely", "total failure", "perfect", "never right", "always wrong"],
-            Self::Catastrophizing => &["worst thing", "disaster", "catastrophe", "terrible", "end of the world"],
-            Self::MindReading => &["they think", "everyone knows", "they must feel", "obviously judging"],
+            Self::AllOrNothing => &[
+                "completely",
+                "total failure",
+                "perfect",
+                "never right",
+                "always wrong",
+            ],
+            Self::Catastrophizing => &[
+                "worst thing",
+                "disaster",
+                "catastrophe",
+                "terrible",
+                "end of the world",
+            ],
+            Self::MindReading => &[
+                "they think",
+                "everyone knows",
+                "they must feel",
+                "obviously judging",
+            ],
             Self::Personalization => &["my fault", "because of me", "I caused", "blame myself"],
             Self::Overgeneralization => &["always", "never", "every time", "nothing ever"],
             Self::ShouldStatements => &["should have", "must be", "ought to", "have to be"],
             Self::EmotionalReasoning => &["I feel therefore", "feels true", "feels like fact"],
-            Self::MentalFilter => &["only bad", "nothing good", "just negative", "only the worst"],
+            Self::MentalFilter => &[
+                "only bad",
+                "nothing good",
+                "just negative",
+                "only the worst",
+            ],
         }
     }
 }
@@ -131,9 +153,18 @@ impl PsychBenchmark for CognitiveDistortionBenchmark {
         let mean_type_accuracy = type_accuracies.iter().sum::<f64>() / type_accuracies.len() as f64;
 
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
-        result.insert("distortion_identification", MetricValue::from_samples(&[accuracy]));
-        result.insert("mean_type_accuracy", MetricValue::from_samples(&type_accuracies));
-        result.insert("types_evaluated", MetricValue::from_samples(&[DistortionType::ALL.len() as f64]));
+        result.insert(
+            "distortion_identification",
+            MetricValue::from_samples(&[accuracy]),
+        );
+        result.insert(
+            "mean_type_accuracy",
+            MetricValue::from_samples(&type_accuracies),
+        );
+        result.insert(
+            "types_evaluated",
+            MetricValue::from_samples(&[DistortionType::ALL.len() as f64]),
+        );
 
         result.conditions = 1;
         result.trials_per_condition = n;
@@ -153,22 +184,70 @@ impl PsychBenchmark for CognitiveDistortionBenchmark {
 
 fn distortion_test_cases() -> Vec<DistortionTestCase> {
     vec![
-        DistortionTestCase { text: "If I don't get this perfect, I'm a total failure", distortion: DistortionType::AllOrNothing },
-        DistortionTestCase { text: "Everything is ruined, nothing will ever work", distortion: DistortionType::AllOrNothing },
-        DistortionTestCase { text: "This is the worst thing that could ever happen", distortion: DistortionType::Catastrophizing },
-        DistortionTestCase { text: "If I fail this test, my life is over", distortion: DistortionType::Catastrophizing },
-        DistortionTestCase { text: "They think I'm stupid and incompetent", distortion: DistortionType::MindReading },
-        DistortionTestCase { text: "Everyone at the party was judging me", distortion: DistortionType::MindReading },
-        DistortionTestCase { text: "The project failed because of me", distortion: DistortionType::Personalization },
-        DistortionTestCase { text: "It's my fault that the team is struggling", distortion: DistortionType::Personalization },
-        DistortionTestCase { text: "Nothing ever goes right for me", distortion: DistortionType::Overgeneralization },
-        DistortionTestCase { text: "I always mess things up, every single time", distortion: DistortionType::Overgeneralization },
-        DistortionTestCase { text: "I should have known better than to try", distortion: DistortionType::ShouldStatements },
-        DistortionTestCase { text: "I must be perfect or I'm worthless", distortion: DistortionType::ShouldStatements },
-        DistortionTestCase { text: "I feel stupid therefore I must be stupid", distortion: DistortionType::EmotionalReasoning },
-        DistortionTestCase { text: "It feels hopeless so it must be hopeless", distortion: DistortionType::EmotionalReasoning },
-        DistortionTestCase { text: "The one criticism outweighs all the praise", distortion: DistortionType::MentalFilter },
-        DistortionTestCase { text: "All I can think about is what went wrong", distortion: DistortionType::MentalFilter },
+        DistortionTestCase {
+            text: "If I don't get this perfect, I'm a total failure",
+            distortion: DistortionType::AllOrNothing,
+        },
+        DistortionTestCase {
+            text: "Everything is ruined, nothing will ever work",
+            distortion: DistortionType::AllOrNothing,
+        },
+        DistortionTestCase {
+            text: "This is the worst thing that could ever happen",
+            distortion: DistortionType::Catastrophizing,
+        },
+        DistortionTestCase {
+            text: "If I fail this test, my life is over",
+            distortion: DistortionType::Catastrophizing,
+        },
+        DistortionTestCase {
+            text: "They think I'm stupid and incompetent",
+            distortion: DistortionType::MindReading,
+        },
+        DistortionTestCase {
+            text: "Everyone at the party was judging me",
+            distortion: DistortionType::MindReading,
+        },
+        DistortionTestCase {
+            text: "The project failed because of me",
+            distortion: DistortionType::Personalization,
+        },
+        DistortionTestCase {
+            text: "It's my fault that the team is struggling",
+            distortion: DistortionType::Personalization,
+        },
+        DistortionTestCase {
+            text: "Nothing ever goes right for me",
+            distortion: DistortionType::Overgeneralization,
+        },
+        DistortionTestCase {
+            text: "I always mess things up, every single time",
+            distortion: DistortionType::Overgeneralization,
+        },
+        DistortionTestCase {
+            text: "I should have known better than to try",
+            distortion: DistortionType::ShouldStatements,
+        },
+        DistortionTestCase {
+            text: "I must be perfect or I'm worthless",
+            distortion: DistortionType::ShouldStatements,
+        },
+        DistortionTestCase {
+            text: "I feel stupid therefore I must be stupid",
+            distortion: DistortionType::EmotionalReasoning,
+        },
+        DistortionTestCase {
+            text: "It feels hopeless so it must be hopeless",
+            distortion: DistortionType::EmotionalReasoning,
+        },
+        DistortionTestCase {
+            text: "The one criticism outweighs all the praise",
+            distortion: DistortionType::MentalFilter,
+        },
+        DistortionTestCase {
+            text: "All I can think about is what went wrong",
+            distortion: DistortionType::MentalFilter,
+        },
     ]
 }
 
@@ -203,7 +282,10 @@ mod tests {
     #[test]
     fn test_cognitive_distortion_deterministic() {
         let bench = CognitiveDistortionBenchmark;
-        let config = BenchmarkConfig { seed: 42, ..Default::default() };
+        let config = BenchmarkConfig {
+            seed: 42,
+            ..Default::default()
+        };
         let r1 = bench.run(&config);
         let r2 = bench.run(&config);
         assert_eq!(

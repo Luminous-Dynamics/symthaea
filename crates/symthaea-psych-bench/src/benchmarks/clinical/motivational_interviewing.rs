@@ -72,18 +72,37 @@ impl PsychBenchmark for MotivationalInterviewingBenchmark {
         // Combine all spirit dimensions into a single sample vector for spirit score
         let spirit_samples: Vec<f64> = (0..n_trials)
             .map(|i| {
-                (partnership_scores[i] + autonomy_scores[i] + evocation_scores[i] + compassion_scores[i]) / 4.0
+                (partnership_scores[i]
+                    + autonomy_scores[i]
+                    + evocation_scores[i]
+                    + compassion_scores[i])
+                    / 4.0
             })
             .collect();
 
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
-        result.insert("mi_spirit_score", MetricValue::from_samples(&spirit_samples));
-        result.insert("partnership", MetricValue::from_samples(&partnership_scores));
-        result.insert("autonomy_support", MetricValue::from_samples(&autonomy_scores));
+        result.insert(
+            "mi_spirit_score",
+            MetricValue::from_samples(&spirit_samples),
+        );
+        result.insert(
+            "partnership",
+            MetricValue::from_samples(&partnership_scores),
+        );
+        result.insert(
+            "autonomy_support",
+            MetricValue::from_samples(&autonomy_scores),
+        );
         result.insert("evocation", MetricValue::from_samples(&evocation_scores));
         result.insert("compassion", MetricValue::from_samples(&compassion_scores));
-        result.insert("reflection_to_question_ratio", MetricValue::from_samples(&reflection_to_question_ratios));
-        result.insert("change_talk_proportion", MetricValue::from_samples(&change_talk_proportions));
+        result.insert(
+            "reflection_to_question_ratio",
+            MetricValue::from_samples(&reflection_to_question_ratios),
+        );
+        result.insert(
+            "change_talk_proportion",
+            MetricValue::from_samples(&change_talk_proportions),
+        );
 
         result.conditions = 7;
         result.trials_per_condition = n_trials;
@@ -117,7 +136,11 @@ mod tests {
         let bench = MotivationalInterviewingBenchmark;
         let result = bench.run(&BenchmarkConfig::default());
         let spirit = result.metrics["mi_spirit_score"].mean;
-        assert!(spirit >= 1.0 && spirit <= 5.0, "MI spirit {:.2} out of range", spirit);
+        assert!(
+            spirit >= 1.0 && spirit <= 5.0,
+            "MI spirit {:.2} out of range",
+            spirit
+        );
     }
 
     #[test]
@@ -141,10 +164,17 @@ mod tests {
     #[test]
     fn test_mi_deterministic() {
         let bench = MotivationalInterviewingBenchmark;
-        let config = BenchmarkConfig { seed: 42, trials_per_condition: 20, ..Default::default() };
+        let config = BenchmarkConfig {
+            seed: 42,
+            trials_per_condition: 20,
+            ..Default::default()
+        };
         let r1 = bench.run(&config);
         let r2 = bench.run(&config);
-        assert_eq!(r1.metrics["mi_spirit_score"].mean, r2.metrics["mi_spirit_score"].mean);
+        assert_eq!(
+            r1.metrics["mi_spirit_score"].mean,
+            r2.metrics["mi_spirit_score"].mean
+        );
     }
 
     #[test]

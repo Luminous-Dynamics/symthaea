@@ -242,13 +242,11 @@ impl CognitiveLoopService {
                             );
                             for fact_text in &top_facts {
                                 let mut memory = crate::experience::EpisodicMemory::new(
-                                    &format!(
-                                        "knowledge_consolidation_{}",
-                                        self.stats.total_cycles
-                                    ),
+                                    &format!("knowledge_consolidation_{}", self.stats.total_cycles),
                                     fact_text,
                                 );
-                                memory.salience = super::super::thresholds::KNOWLEDGE_EPISODIC_SALIENCE_BOOST;
+                                memory.salience =
+                                    super::super::thresholds::KNOWLEDGE_EPISODIC_SALIENCE_BOOST;
                                 memory.prediction_error = 0.1; // Low PE — confirmed knowledge
                                 bus.record_experience(memory);
                             }

@@ -12,7 +12,9 @@ Science: Hatfield et al. (1993), Heinrichs et al. (2003)
 */
 
 use proptest::prelude::*;
-use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService, SwarmEvent, SwarmTelemetry};
+use symthaea::cognitive_loop::{
+    CognitiveLoopConfig, CognitiveLoopService, SwarmEvent, SwarmTelemetry,
+};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Strategies
@@ -29,14 +31,14 @@ fn arb_swarm_event() -> impl Strategy<Value = SwarmEvent> {
             trust_level: trust,
         }),
         arb_peer_id().prop_map(|id| SwarmEvent::PeerLeft { peer_id: id }),
-        (arb_peer_id(), 0.0..1.0f64, -1.0..1.0f64, 0.0..1.0f64).prop_map(
-            |(id, phi, val, ar)| SwarmEvent::ConsciousnessUpdate {
+        (arb_peer_id(), 0.0..1.0f64, -1.0..1.0f64, 0.0..1.0f64).prop_map(|(id, phi, val, ar)| {
+            SwarmEvent::ConsciousnessUpdate {
                 peer_id: id,
                 phi,
                 valence: val,
                 arousal: ar,
             }
-        ),
+        }),
         (arb_peer_id(), -1.0..1.0f64, 0.0..1.0f64, 0.0..1.0f64).prop_map(
             |(id, val, ar, intensity)| SwarmEvent::AffectiveSync {
                 peer_id: id,

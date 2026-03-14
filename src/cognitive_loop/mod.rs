@@ -153,8 +153,6 @@ pub(crate) mod managers;
 pub(crate) mod memory_consolidation_manager;
 mod moral;
 pub mod motor_output_bridge;
-#[cfg(feature = "support")]
-pub(crate) mod support_manager;
 pub(crate) mod neuromod_manager;
 pub(crate) mod neuromodulators;
 mod phase_results;
@@ -163,6 +161,8 @@ pub(crate) mod primitive_tier;
 pub(crate) mod self_model_tier;
 pub(crate) mod social_manager;
 pub(crate) mod substrate_manager;
+#[cfg(feature = "support")]
+pub(crate) mod support_manager;
 pub(crate) mod vision_sensory_manager;
 pub use substrate_manager::SubstrateTransitionRecord;
 pub(crate) mod subsystem_trait;

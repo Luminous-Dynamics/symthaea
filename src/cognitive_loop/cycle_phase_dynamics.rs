@@ -215,7 +215,8 @@ impl CognitiveLoopService {
                         }
                         managers::radio_dispatcher::NetworkHealth::Blackout => 0.0,
                     };
-                    self.swarm_manager.set_connectivity_modifier(connectivity_penalty);
+                    self.swarm_manager
+                        .set_connectivity_modifier(connectivity_penalty);
                 }
 
                 // ── Governance Manager (interval 37, co-prime) ──────────
@@ -360,7 +361,9 @@ impl CognitiveLoopService {
             if confidence_crash_detected {
                 // Session 11 Item 5: Grace period — lighter freeze after recent mode transition.
                 // Post-transition confidence drops are expected, not emergencies.
-                let freeze_duration = if self.carryover.urgency.mode_stability_counter < super::thresholds::MODE_STABILITY_GRACE_THRESHOLD {
+                let freeze_duration = if self.carryover.urgency.mode_stability_counter
+                    < super::thresholds::MODE_STABILITY_GRACE_THRESHOLD
+                {
                     super::thresholds::CONFIDENCE_CRASH_LIGHT_FREEZE_CYCLES // Light freeze: mode just changed, drop is expected
                 } else {
                     CONFIDENCE_CRASH_FREEZE_CYCLES // Full freeze
@@ -685,7 +688,8 @@ impl CognitiveLoopService {
         // Science: McClelland et al. (1995) — complementary learning systems.
         if resonator_best_sim > RESONATOR_CONSOLIDATION_THRESHOLD {
             self.fep.agent.precision.prior_precision = (self.fep.agent.precision.prior_precision
-                + (resonator_best_sim - RESONATOR_CONSOLIDATION_THRESHOLD) as f64 * super::thresholds::RESONATOR_CONSOLIDATION_PRECISION_SCALE)
+                + (resonator_best_sim - RESONATOR_CONSOLIDATION_THRESHOLD) as f64
+                    * super::thresholds::RESONATOR_CONSOLIDATION_PRECISION_SCALE)
                 .min(super::thresholds::RESONATOR_CONSOLIDATION_PRECISION_MAX);
             if self.stats.total_cycles > 10 {
                 self.scale_lr("resonator_familiar", RESONATOR_FAMILIAR_LR_SCALE);
@@ -710,7 +714,8 @@ impl CognitiveLoopService {
             if goal_priority > GOAL_PRIORITY_LR_THRESHOLD
                 && !matches!(urgency, super::CycleUrgency::Critical)
             {
-                let goal_lr_boost = (goal_priority - GOAL_PRIORITY_LR_THRESHOLD) * super::thresholds::GOAL_PRIORITY_LR_SCALE;
+                let goal_lr_boost = (goal_priority - GOAL_PRIORITY_LR_THRESHOLD)
+                    * super::thresholds::GOAL_PRIORITY_LR_SCALE;
                 self.scale_lr("goal_priority", 1.0 + goal_lr_boost);
             }
             if prediction_error < self.config.learning_threshold
@@ -1031,7 +1036,12 @@ impl CognitiveLoopService {
             // Aleatoric ≈ mean within-dimension variance across predictions
             // Use min length across all prediction vectors — HierarchicalCfC can produce
             // jagged vectors, and indexing by [0].len() would panic on shorter ones.
-            let dim = raw_predictions.iter().map(|p| p.len()).min().unwrap_or(0).max(1);
+            let dim = raw_predictions
+                .iter()
+                .map(|p| p.len())
+                .min()
+                .unwrap_or(0)
+                .max(1);
             let n = raw_predictions.len() as f32;
             let mut mean_var = 0.0f32;
             for d in 0..dim {
@@ -1122,13 +1132,17 @@ impl CognitiveLoopService {
         if level_errors.len() >= 2 && self.stats.total_cycles > 10 {
             let sensory_error = level_errors[0];
             let abstract_error = level_errors[level_errors.len() - 1];
-            if abstract_error > sensory_error * super::thresholds::WORLD_MODEL_CONFUSION_RATIO && abstract_error > super::thresholds::WORLD_MODEL_ERROR_FLOOR {
+            if abstract_error > sensory_error * super::thresholds::WORLD_MODEL_CONFUSION_RATIO
+                && abstract_error > super::thresholds::WORLD_MODEL_ERROR_FLOOR
+            {
                 self.adjust_exploration(
                     "conceptual_confusion",
                     super::thresholds::CONCEPTUAL_CONFUSION_EXPLORATION,
                 );
             }
-            wm_sensory_mismatch = sensory_error > abstract_error * super::thresholds::WORLD_MODEL_MISMATCH_RATIO && sensory_error > super::thresholds::WORLD_MODEL_ERROR_FLOOR;
+            wm_sensory_mismatch = sensory_error
+                > abstract_error * super::thresholds::WORLD_MODEL_MISMATCH_RATIO
+                && sensory_error > super::thresholds::WORLD_MODEL_ERROR_FLOOR;
         }
         module_timings.world_model = _t.elapsed().as_micros() as u64;
 
@@ -1173,9 +1187,11 @@ impl CognitiveLoopService {
         let voice_heartbeat = crate::voice::VoiceOutputMetrics {
             articulation_score: coherence.clamp(0.0, 1.0),
             formant_accuracy: (1.0 - prediction_error).clamp(0.0, 1.0),
-            speech_rate: super::thresholds::VOICE_HEARTBEAT_BASE_RATE * self.adaptive_behavior.speech_rate_multiplier,
+            speech_rate: super::thresholds::VOICE_HEARTBEAT_BASE_RATE
+                * self.adaptive_behavior.speech_rate_multiplier,
             pitch_stability: pattern_confidence,
-            coarticulation_smoothness: coherence.clamp(0.0, 1.0) * super::thresholds::VOICE_HEARTBEAT_COARTICULATION_WEIGHT,
+            coarticulation_smoothness: coherence.clamp(0.0, 1.0)
+                * super::thresholds::VOICE_HEARTBEAT_COARTICULATION_WEIGHT,
             listener_prediction: if prediction_error < self.config.learning_threshold {
                 super::thresholds::VOICE_HEARTBEAT_LISTENER_SUCCESS
             } else {
@@ -1294,7 +1310,10 @@ impl CognitiveLoopService {
                 } else {
                     0.0
                 };
-                let effectiveness = (raw_effectiveness * super::thresholds::MCTS_EFFECTIVENESS_NORM_SCALE + super::thresholds::MCTS_EFFECTIVENESS_NORM_OFFSET).clamp(0.0, 1.0);
+                let effectiveness = (raw_effectiveness
+                    * super::thresholds::MCTS_EFFECTIVENESS_NORM_SCALE
+                    + super::thresholds::MCTS_EFFECTIVENESS_NORM_OFFSET)
+                    .clamp(0.0, 1.0);
                 if effectiveness > MCTS_EFFECTIVENESS_HIGH {
                     self.adjust_confidence(
                         "mcts_effective",
@@ -1540,11 +1559,7 @@ impl CognitiveLoopService {
                     if sim > 0.8 {
                         self.adjust_confidence("math_memory_hit", 0.01);
                     }
-                    let transfer = if sim > 0.5 {
-                        Some(ep_type)
-                    } else {
-                        None
-                    };
+                    let transfer = if sim > 0.5 { Some(ep_type) } else { None };
                     (sim > 0.3, ep_phi, transfer)
                 } else {
                     (false, 0.0, None)
