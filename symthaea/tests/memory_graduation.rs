@@ -269,6 +269,52 @@ fn test_episodic_stores_only_high_phi_episodes() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// SEMANTIC EVICTION ROUTING TO GRADUATION PIPELINE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_semantic_evictions_route_to_graduation() {
+    // Use a tiny ring buffer (capacity 3) so evictions happen quickly
+    let mut semantic = SemanticMemory::with_threshold(3, 0.3);
+    let mut coordinator = MemoryCoordinator::new(CoordinatorConfig::default());
+    let mut episodic = EpisodicMemory::new(EpisodicReplayConfig {
+        psi_threshold: 0.1,
+        ..Default::default()
+    });
+
+    coordinator.update_signals(0.9, 0.9);
+
+    let dim = 128;
+    let mut eviction_count = 0usize;
+
+    for i in 0..10u64 {
+        let v: Vec<f32> = (0..dim).map(|j| ((i * 7 + j as u64) as f32 * 0.01).sin()).collect();
+        let evicted = semantic.store_with_timestamp(v, 0.1, None, i);
+
+        if let Some(entry) = evicted {
+            eviction_count += 1;
+            let hv = ContinuousHV::from_vec(entry.hdc_vector);
+            coordinator.queue_graduation(GraduationEvent {
+                content: hv,
+                label: format!("semantic_eviction_{i}"),
+                steps_survived: 10,
+                final_activation: 0.5,
+                psi_at_graduation: 0.9,
+                coherence_at_graduation: 0.9,
+                source: MemorySource::Internal,
+                is_verified: false,
+            });
+        }
+    }
+
+    assert_eq!(eviction_count, 7, "Should have 7 evictions from capacity-3 buffer with 10 stores");
+
+    let graduated = coordinator.process_graduations(&mut episodic);
+    assert!(graduated > 0, "Evicted semantic entries should graduate to episodic memory");
+    assert!(episodic.stats().total_stored > 0, "Episodic memory should contain graduated semantic entries");
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // SEMANTIC MEMORY: SEARCH AFTER TRAINING
 // ═══════════════════════════════════════════════════════════════════════════════
 
