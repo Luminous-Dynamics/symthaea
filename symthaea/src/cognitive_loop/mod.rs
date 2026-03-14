@@ -190,6 +190,12 @@ pub use managers::swarm_manager::{SwarmEvent, SwarmTelemetry};
 #[cfg(feature = "mesh")]
 use managers::SpectrumManager;
 
+#[cfg(feature = "mesh")]
+pub use managers::{
+    CompressedDelta, NetworkHealth, PayloadClass, PayloadClassifier, RadioTier, RoutingDecision,
+    SpectrumManager, SpectrumTelemetry,
+};
+
 pub mod calibration;
 pub mod math_service;
 

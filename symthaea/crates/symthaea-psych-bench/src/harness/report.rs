@@ -658,6 +658,83 @@ impl BenchmarkReport {
                 "institutional_cross_domain_coherence",
                 &bl.institutional_reasoning,
             ),
+            // Analogical Reasoning
+            (
+                "analogical_transfer_accuracy",
+                "analogical_transfer_accuracy",
+                &bl.institutional_reasoning,
+            ),
+            (
+                "analogical_transfer_strength",
+                "analogical_transfer_strength",
+                &bl.institutional_reasoning,
+            ),
+            (
+                "analogical_shared_component_auc",
+                "analogical_shared_component_auc",
+                &bl.institutional_reasoning,
+            ),
+            (
+                "analogical_asymmetry_score",
+                "analogical_asymmetry_score",
+                &bl.institutional_reasoning,
+            ),
+            // Causal Chain
+            (
+                "causal_chain_coherence",
+                "causal_chain_coherence",
+                &bl.institutional_reasoning,
+            ),
+            (
+                "causal_chain_terminal_accuracy",
+                "causal_chain_terminal_accuracy",
+                &bl.institutional_reasoning,
+            ),
+            (
+                "causal_chain_step_count",
+                "causal_chain_step_count",
+                &bl.institutional_reasoning,
+            ),
+            // Counterfactual
+            (
+                "counterfactual_accuracy",
+                "counterfactual_accuracy",
+                &bl.institutional_reasoning,
+            ),
+            (
+                "counterfactual_coherence",
+                "counterfactual_coherence",
+                &bl.institutional_reasoning,
+            ),
+            (
+                "counterfactual_reversibility",
+                "counterfactual_reversibility",
+                &bl.institutional_reasoning,
+            ),
+            // Weighted Decomposition
+            (
+                "weighted_decomposition_accuracy",
+                "weighted_decomposition_accuracy",
+                &bl.institutional_reasoning,
+            ),
+            (
+                "weight_sensitivity",
+                "weight_sensitivity",
+                &bl.institutional_reasoning,
+            ),
+            (
+                "weighted_vs_unweighted_delta",
+                "weighted_vs_unweighted_delta",
+                &bl.institutional_reasoning,
+            ),
+            // Clinical/Therapeutic
+            ("empathic_accuracy", "empathic_accuracy", &bl.clinical),
+            ("response_appropriateness", "response_appropriateness", &bl.clinical),
+            ("repair_success_rate", "repair_success_rate", &bl.clinical),
+            ("crisis_sensitivity", "crisis_sensitivity", &bl.clinical),
+            ("crisis_specificity", "crisis_specificity", &bl.clinical),
+            ("distortion_identification", "distortion_identification", &bl.clinical),
+            ("mi_spirit_score", "mi_spirit_score", &bl.clinical),
         ];
 
         for (metric_key, baseline_key, baselines) in &mappings {
@@ -1210,6 +1287,7 @@ impl BenchmarkReport {
             || benchmark.contains("Substrate")
             || benchmark.contains("Mathematics")
             || benchmark.contains("InstitutionalReasoning")
+            || benchmark.contains("Clinical")
         {
             comps
         } else {
@@ -1609,8 +1687,19 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("LogicalDeduction") => "overall_accuracy",
         b if b.contains("ConstraintPuzzle") => "queens_4_accuracy",
         b if b.contains("ProofConstruction") => "tautology_accuracy",
-        // Institutional Reasoning domain
+        // Institutional Reasoning sub-benchmarks (specific before generic)
+        b if b.contains("AnalogicalReasoning") => "analogical_transfer_accuracy",
+        b if b.contains("CausalChain") => "causal_chain_coherence",
+        b if b.contains("Counterfactual") => "counterfactual_accuracy",
+        b if b.contains("WeightedDecomposition") => "weighted_decomposition_accuracy",
         b if b.contains("InstitutionalReasoning") => "institutional_decomposition_accuracy",
+        // Clinical/Therapeutic domain
+        b if b.contains("EmpathicAccuracy") => "empathic_accuracy",
+        b if b.contains("TherapeuticResponse") => "response_appropriateness",
+        b if b.contains("AllianceMaintenance") => "repair_success_rate",
+        b if b.contains("CrisisDetection") => "crisis_sensitivity",
+        b if b.contains("CognitiveDistortion") => "distortion_identification",
+        b if b.contains("MotivationalInterviewing") => "mi_spirit_score",
         _ => "overall_accuracy",
     }
 }

@@ -55,6 +55,8 @@ members = [
     "crates/symthaea-spore",
     "crates/symthaea-crucible",
     "crates/symthaea-canvas",
+    "crates/symthaea-clinical",
+    "crates/symthaea-therapeutic",
 ]
 
 # Workspace-wide lint configuration. Members opt in via [lints] workspace = true.
@@ -104,6 +106,7 @@ rusqlite = { version = "0.37", features = ["bundled"] }
 dashmap = "5.5"
 lru = "0.16"
 rayon = "1.10"
+proptest = "1.4"
 
 [package]
 name = "symthaea"
@@ -207,6 +210,10 @@ symthaea-broca = { path = "crates/symthaea-broca", optional = true }
 
 # Symthaea Canvas - Living topology UI: cognitive geometry → SVG
 symthaea-canvas = { path = "crates/symthaea-canvas", optional = true }
+
+# Symthaea Clinical - Clinical assessment and therapeutic reasoning
+symthaea-clinical = { path = "crates/symthaea-clinical", optional = true }
+symthaea-therapeutic = { path = "crates/symthaea-therapeutic", optional = true }
 
 # Symthaea Nix - Conscious NixOS mind (HDC + active inference)
 symthaea-nix = { path = "crates/symthaea-nix", optional = true }
@@ -455,6 +462,7 @@ ssm-power = ["dep:symthaea-ssm", "mesh", "school_learning"]  # Diagonal SSM sens
 ssm-power-hal = ["ssm-power", "hal", "symthaea-hal/linux", "dep:linux-embedded-hal"]
 ssm_language = ["dep:symthaea-broca"]          # Native CfC-HDC language center (SSM Broca's area)
 canvas = ["dep:symthaea-canvas"]               # Living topology UI: cognitive geometry → animated SVG
+therapeutic = ["dep:symthaea-clinical", "dep:symthaea-therapeutic", "ssm_language", "symthaea-broca/therapeutic"]
 liquid-mamba = ["ssm_language", "symthaea-broca/mamba"]  # Liquid-Mamba fusion: pre-trained Mamba SSM + HDC consciousness gating
 humanoid-mujoco = ["humanoid", "symthaea-humanoid/mujoco"]  # Humanoid with MuJoCo physics
 humanoid-viewer = ["humanoid-mujoco", "symthaea-humanoid/viewer"]  # Humanoid with MuJoCo viewer

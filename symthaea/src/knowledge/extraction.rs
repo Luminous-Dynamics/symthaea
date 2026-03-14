@@ -36,6 +36,12 @@ pub enum SemanticRole {
     Cause,
     /// What results from the event
     Result,
+    #[cfg(feature = "therapeutic")]
+    TherapeuticTarget,
+    #[cfg(feature = "therapeutic")]
+    ProtectiveFactor,
+    #[cfg(feature = "therapeutic")]
+    RiskFactor,
 }
 
 /// Entity types for knowledge graph nodes
@@ -53,6 +59,12 @@ pub enum EntityType {
     Process,
     /// An abstract relation or property
     Property,
+    #[cfg(feature = "therapeutic")]
+    ClinicalConcept,
+    #[cfg(feature = "therapeutic")]
+    Symptom,
+    #[cfg(feature = "therapeutic")]
+    Intervention,
 }
 
 /// An extracted entity from text

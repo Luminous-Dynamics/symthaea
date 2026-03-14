@@ -168,7 +168,7 @@ impl KnowledgeManager {
     pub fn new(config: KnowledgeManagerConfig) -> Self {
         let mut graph = EnhancedKnowledgeGraph::new(config.graph_capacity);
         let mut causal_bridge = CausalKnowledgeBridge::new(config.causal_capacity);
-        let ontology = AdaptiveOntology::new(config.ontology_config.clone());
+        let mut ontology = AdaptiveOntology::new(config.ontology_config.clone());
 
         // Initialize persistence and load existing knowledge
         let persistence = config.db_path.as_ref().map(|path| {
@@ -190,6 +190,16 @@ impl KnowledgeManager {
                 }
                 if edge_count > 0 {
                     tracing::info!(count = edge_count, "Knowledge: loaded causal edges from SQLite");
+                }
+            }
+            // Load existing ontology primitives
+            if let Ok(records) = p.load_ontology() {
+                let onto_count = records.len();
+                for record in &records {
+                    ontology.import_record(record);
+                }
+                if onto_count > 0 {
+                    tracing::info!(count = onto_count, "Knowledge: loaded ontology primitives from SQLite");
                 }
             }
             p
@@ -466,6 +476,22 @@ impl KnowledgeManager {
         telem.causal_edges_added = causal_edges_added;
         telem.contradictions_detected = contradictions_detected;
 
+        // AGM-style contradiction resolution: demote weaker fact confidence
+        // (Alchourrón, Gärdenfors & Makinson 1985)
+        if !self.pending_alerts.is_empty() {
+            let threshold =
+                crate::cognitive_loop::thresholds::KNOWLEDGE_CONTRADICTION_RESOLUTION_THRESHOLD;
+            let resolvable: Vec<_> = self
+                .pending_alerts
+                .iter()
+                .filter(|a| a.similarity > threshold)
+                .cloned()
+                .collect();
+            if !resolvable.is_empty() {
+                self.graph.resolve_contradictions(&resolvable);
+            }
+        }
+
         // 5. Search knowledge graph for context
         self.do_search(input);
         telem.search_results = self.last_search_results.len() as u32;
@@ -565,11 +591,15 @@ impl KnowledgeManager {
         if let Some(ref mut p) = self.persistence {
             let facts = self.graph.export_fact_records();
             let edges = self.causal_bridge.export_edge_records();
+            let ontology_records = self.ontology.export_records();
             if let Err(e) = p.save_facts(&facts) {
                 tracing::warn!(error = %e, "Knowledge persistence: failed to save facts");
             }
             if let Err(e) = p.save_causal_edges(&edges) {
                 tracing::warn!(error = %e, "Knowledge persistence: failed to save edges");
+            }
+            if let Err(e) = p.save_ontology(&ontology_records) {
+                tracing::warn!(error = %e, "Knowledge persistence: failed to save ontology");
             }
         }
     }
@@ -640,6 +670,25 @@ impl KnowledgeManager {
     /// Get mutable access to the knowledge graph (for persistence import).
     pub fn graph_mut(&mut self) -> &mut EnhancedKnowledgeGraph {
         &mut self.graph
+    }
+
+    /// Get the source texts of the top-k highest-confidence facts.
+    ///
+    /// Used by episodic memory bridge during dream consolidation to promote
+    /// high-confidence knowledge into episodic memory for long-term retention.
+    pub fn top_facts(&self, k: usize) -> Vec<String> {
+        let mut facts: Vec<_> = self.graph.all_facts().collect();
+        facts.sort_by(|a, b| {
+            b.encoding
+                .confidence
+                .partial_cmp(&a.encoding.confidence)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        facts
+            .iter()
+            .take(k)
+            .map(|f| f.encoding.source_text.clone())
+            .collect()
     }
 
     // ── Internal ────────────────────────────────────────────────────────
@@ -744,6 +793,10 @@ fn infer_domain(fact: &super::extraction::ExtractedFact) -> Option<String> {
             EntityType::Event => return Some("events".to_string()),
             EntityType::Quantity => return Some("economics".to_string()),
             EntityType::Process => return Some("science".to_string()),
+            #[cfg(feature = "therapeutic")]
+            EntityType::ClinicalConcept | EntityType::Symptom | EntityType::Intervention => {
+                return Some("clinical".to_string());
+            }
             _ => {}
         }
     }

@@ -675,6 +675,85 @@ pub fn confidence_adjusted_veto_threshold(
     base_threshold * (1.0 - rc * scale)
 }
 
+#[cfg(feature = "therapeutic")]
+pub const CANONICAL_VALIDATING_WORDS: &[&str] = &[
+    "understand", "hear", "sense", "notice", "appreciate", "acknowledge",
+    "valid", "natural", "makes sense",
+];
+
+#[cfg(feature = "therapeutic")]
+pub const CANONICAL_DIRECTIVE_WORDS: &[&str] = &[
+    "should", "must", "need to", "have to", "wrong", "correct",
+];
+
+#[cfg(feature = "therapeutic")]
+pub const CANONICAL_REFLECTIVE_WORDS: &[&str] = &[
+    "sounds like", "it seems", "I wonder", "what if", "tell me more", "what comes up",
+];
+
+#[cfg(feature = "therapeutic")]
+pub struct TherapeuticGate;
+
+#[cfg(feature = "therapeutic")]
+impl TherapeuticGate {
+    pub fn apply(word: &str, channels: &super::encoder::ThoughtChannels, base_logit: f32) -> f32 {
+        let distress = channels.client_distress_level();
+        let alliance = channels.alliance_quality();
+        let intent = channels.therapeutic_intent();
+        let depth = channels.intervention_depth();
+        let word_lower = word.to_lowercase();
+
+        let mut logit = base_logit;
+
+        // Crisis mode (intent == 7.0): suppress all technique words, boost crisis protocol
+        if intent >= 6.5 {
+            if CANONICAL_DIRECTIVE_WORDS.iter().any(|w| word_lower.contains(w)) {
+                logit -= 5.0;
+            }
+            if CANONICAL_VALIDATING_WORDS.iter().any(|w| word_lower.contains(w)) {
+                logit += 2.0;
+            }
+            return logit;
+        }
+
+        // High distress (>0.7): suppress directives, boost validating
+        if distress > 0.7 {
+            if CANONICAL_DIRECTIVE_WORDS.iter().any(|w| word_lower.contains(w)) {
+                logit -= 3.0;
+            }
+            if CANONICAL_VALIDATING_WORDS.iter().any(|w| word_lower.contains(w)) {
+                logit += 1.5;
+            }
+        }
+
+        // Low alliance (<0.3): suppress challenges, boost empathy
+        if alliance < 0.3 {
+            if CANONICAL_DIRECTIVE_WORDS.iter().any(|w| word_lower.contains(w)) {
+                logit -= 2.0;
+            }
+            if CANONICAL_VALIDATING_WORDS.iter().any(|w| word_lower.contains(w)) {
+                logit += 1.0;
+            }
+        }
+
+        // Depth > alliance: suppress (can't challenge before trust)
+        if depth > alliance + 0.2 {
+            if CANONICAL_DIRECTIVE_WORDS.iter().any(|w| word_lower.contains(w)) {
+                logit -= 2.0;
+            }
+        }
+
+        // Reflective intent (intent == 2.0): boost reflective words
+        if (intent - 2.0).abs() < 0.5 {
+            if CANONICAL_REFLECTIVE_WORDS.iter().any(|w| word_lower.contains(w)) {
+                logit += 1.5;
+            }
+        }
+
+        logit
+    }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // TESTS
 // ═══════════════════════════════════════════════════════════════════════════════

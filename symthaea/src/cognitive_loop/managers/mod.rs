@@ -35,6 +35,9 @@ pub mod swarm_manager;
 #[cfg(feature = "mycelix")]
 pub mod governance_manager;
 
+#[cfg(feature = "mesh")]
+pub mod radio_dispatcher;
+
 pub use drive_manager::DriveManager;
 pub use learning_manager::LearningManager;
 pub use memory_manager::MemoryManager;
@@ -43,3 +46,18 @@ pub use swarm_manager::SwarmManager;
 
 #[cfg(feature = "mycelix")]
 pub use governance_manager::GovernanceManager;
+
+#[cfg(feature = "mesh")]
+pub use radio_dispatcher::{
+    CompressedDelta, NetworkHealth, PayloadClass, PayloadClassifier, RadioTier, RoutingDecision,
+    SpectrumManager, SpectrumTelemetry,
+};
+
+#[cfg(feature = "therapeutic")]
+pub mod therapeutic_manager;
+#[cfg(feature = "therapeutic")]
+pub mod therapeutic_dream_bridge;
+#[cfg(feature = "therapeutic")]
+pub use therapeutic_manager::TherapeuticManager;
+#[cfg(feature = "therapeutic")]
+pub use therapeutic_dream_bridge::DreamableTherapeuticAction;

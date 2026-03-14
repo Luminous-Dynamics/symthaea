@@ -68,6 +68,25 @@ impl CognitiveLoopService {
                 phi_weighted_surprise,
             );
 
+            // Therapeutic dream recording: encode current therapeutic state as a
+            // dream action so the dream engine can generate counterfactual therapeutic
+            // scenarios. Only records when therapeutic manager has an active strategy
+            // and surprise is meaningful.
+            // Science: Barrett (2001) — dreams process emotional concerns;
+            // Cartwright (2010) — dream content reflects waking emotional regulation.
+            #[cfg(feature = "therapeutic")]
+            if self.therapeutic_manager.active_strategy().is_some() && phi_weighted_surprise > 0.3 {
+                let therapeutic_action = self.therapeutic_manager.dream_action_vector();
+                // Use client RDoC profile as dream state, current compressed state as outcome
+                let therapeutic_dream_state: Vec<f32> = therapeutic_action[0..6].to_vec();
+                dream.record(
+                    &therapeutic_dream_state,
+                    therapeutic_action,
+                    &dream_outcome,
+                    phi_weighted_surprise * 0.8, // Slightly lower priority than primary events
+                );
+            }
+
             // Dream during Cruise urgency (low-error steady state) or periodically.
             // Consolidation pressure modulates frequency: when GWT broadcasts pile up
             // faster than they're processed, dream more often to integrate them.
@@ -210,6 +229,30 @@ impl CognitiveLoopService {
             // Decay priors every 199 cycles to forget stale wisdom (co-prime)
             if self.stats.total_cycles % 199 == 0 {
                 self.dream_feedback_bridge.decay_priors(0.95);
+            }
+        }
+
+        // ── Knowledge → Episodic memory bridge ───────────────────────────
+        // Promote high-confidence facts to episodic memory during dreams.
+        // Science: Tse et al. (2007) — schema-consistent facts consolidate rapidly
+        if let Some(ref km) = self.knowledge_manager {
+            if let Some(ref mut bus) = self.experience_bus {
+                let signals = km.signals();
+                if signals.relevance > 0.3 {
+                    let top_facts = km.top_facts(
+                        super::super::thresholds::KNOWLEDGE_EPISODIC_MAX_PER_DREAM,
+                    );
+                    for fact_text in &top_facts {
+                        let mut memory = crate::experience::EpisodicMemory::new(
+                            &format!("knowledge_fact_{}", self.stats.total_cycles),
+                            fact_text,
+                        );
+                        memory.salience =
+                            super::super::thresholds::KNOWLEDGE_EPISODIC_SALIENCE_BOOST;
+                        memory.prediction_error = 0.1;
+                        bus.record_experience(memory);
+                    }
+                }
             }
         }
 

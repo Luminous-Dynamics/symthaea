@@ -26,6 +26,18 @@ pub struct BrocaConsciousnessSignals {
     pub meta_awareness: f32,
     /// Coherence (0..1).
     pub coherence: f32,
+    /// Therapeutic intent (0=validate .. 7=crisis). Only used with `therapeutic` feature.
+    #[cfg(feature = "therapeutic")]
+    pub therapeutic_intent: f32,
+    /// Therapeutic alliance quality (0..1).
+    #[cfg(feature = "therapeutic")]
+    pub alliance_quality: f32,
+    /// Client distress level (0..1).
+    #[cfg(feature = "therapeutic")]
+    pub client_distress_level: f32,
+    /// Intervention depth (0..1).
+    #[cfg(feature = "therapeutic")]
+    pub intervention_depth: f32,
 }
 
 // Re-export telemetry type from the types module.
@@ -136,6 +148,15 @@ impl BrocaManager {
             signals.consciousness_level,
             signals.meta_awareness,
             signals.coherence,
+        );
+
+        // Set therapeutic channels from manager state
+        #[cfg(feature = "therapeutic")]
+        channels.set_therapeutic(
+            signals.therapeutic_intent,
+            signals.alliance_quality,
+            signals.client_distress_level,
+            signals.intervention_depth,
         );
 
         // Multi-turn context: use generate_continuing() after the first turn

@@ -14194,6 +14194,7 @@ dependencies = [
  "symthaea-canvas",
  "symthaea-causal-reasoning",
  "symthaea-cell-foundry",
+ "symthaea-clinical",
  "symthaea-consciousness-equation",
  "symthaea-consciousness-resonance",
  "symthaea-consciousness-topology",
@@ -14232,6 +14233,7 @@ dependencies = [
  "symthaea-ssm",
  "symthaea-stt",
  "symthaea-support",
+ "symthaea-therapeutic",
  "symthaea-types",
  "symthaea-vision-manifold",
  "symthaea-vocal-tract",
@@ -14306,6 +14308,16 @@ dependencies = [
  "serde_json",
  "symthaea-core",
  "symthaea-fep",
+]
+
+[[package]]
+name = "symthaea-clinical"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "serde",
+ "serde_json",
+ "symthaea-core",
 ]
 
 [[package]]
@@ -14855,6 +14867,18 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "symthaea-therapeutic"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "proptest",
+ "serde",
+ "serde_json",
+ "symthaea-clinical",
+ "symthaea-core",
 ]
 
 [[package]]

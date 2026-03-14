@@ -58,6 +58,8 @@ pub struct BaselineCollection {
     pub mathematics: BaselineMap,
     /// Institutional reasoning baselines (causal decomposition, axiom discrimination).
     pub institutional_reasoning: BaselineMap,
+    /// Clinical/therapeutic baselines (empathic accuracy, alliance, crisis detection).
+    pub clinical: BaselineMap,
     /// GPT-4 baselines from CogBench (Coda et al., 2023).
     pub llm_cogbench: BaselineMap,
     /// GPT-4 baselines from ToMBench (Kosinski, 2023).
@@ -94,6 +96,7 @@ impl BaselineCollection {
             substrate: substrate_baselines(),
             mathematics: mathematics_baselines(),
             institutional_reasoning: institutional_reasoning_baselines(),
+            clinical: clinical_baselines(),
             llm_cogbench: llm_cogbench_baselines(),
             llm_tombench: llm_tombench_baselines(),
             llm_arc: llm_arc_baselines(),
@@ -3566,6 +3569,24 @@ pub fn mathematics_baselines() -> BaselineMap {
             population: "human adults",
         },
     );
+    m.insert(
+        "variance_estimation_accuracy",
+        Baseline {
+            value: 0.75,
+            sd: Some(0.12),
+            source: "Kahneman & Tversky (1972), variance estimation in statistical reasoning",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "integration_accuracy",
+        Baseline {
+            value: 0.80,
+            sd: Some(0.10),
+            source: "Davis & Rabinowitz (2007), numerical integration",
+            population: "human undergraduates",
+        },
+    );
     // Bayesian reasoning
     m.insert(
         "bayesian_posterior_accuracy",
@@ -3694,11 +3715,11 @@ pub fn institutional_reasoning_baselines() -> BaselineMap {
         },
     );
     m.insert(
-        "analogical_shared_component_advantage",
+        "analogical_shared_component_auc",
         Baseline {
-            value: 0.05,
-            sd: Some(0.03),
-            source: "Shared-component similarity advantage",
+            value: 0.65,
+            sd: Some(0.10),
+            source: "Shared-component AUC (area under ROC)",
             population: "theoretical",
         },
     );
@@ -3709,6 +3730,159 @@ pub fn institutional_reasoning_baselines() -> BaselineMap {
             sd: Some(0.15),
             source: "Permutation-based directional asymmetry",
             population: "theoretical",
+        },
+    );
+    // Causal Chain baselines
+    m.insert(
+        "causal_chain_coherence",
+        Baseline {
+            value: 0.70,
+            sd: Some(0.15),
+            source: "Monotonic degradation under component removal",
+            population: "theoretical",
+        },
+    );
+    m.insert(
+        "causal_chain_terminal_accuracy",
+        Baseline {
+            value: 0.40,
+            sd: Some(0.15),
+            source: "Multi-step institutional collapse prediction",
+            population: "theoretical",
+        },
+    );
+    m.insert(
+        "causal_chain_step_count",
+        Baseline {
+            value: 2.0,
+            sd: Some(0.5),
+            source: "Mean steps before similarity collapse",
+            population: "theoretical",
+        },
+    );
+    // Counterfactual baselines
+    m.insert(
+        "counterfactual_accuracy",
+        Baseline {
+            value: 0.50,
+            sd: Some(0.15),
+            source: "Compound remove+add counterfactual accuracy",
+            population: "theoretical",
+        },
+    );
+    m.insert(
+        "counterfactual_coherence",
+        Baseline {
+            value: 0.60,
+            sd: Some(0.15),
+            source: "Counterfactual result above-chance similarity",
+            population: "theoretical",
+        },
+    );
+    m.insert(
+        "counterfactual_reversibility",
+        Baseline {
+            value: 0.50,
+            sd: Some(0.15),
+            source: "Inverse-transformation recovery (Pearl 2009)",
+            population: "theoretical",
+        },
+    );
+    // Weighted Decomposition baselines
+    m.insert(
+        "weighted_decomposition_accuracy",
+        Baseline {
+            value: 0.75,
+            sd: Some(0.15),
+            source: "Weighted bundling decomposition accuracy",
+            population: "theoretical",
+        },
+    );
+    m.insert(
+        "weight_sensitivity",
+        Baseline {
+            value: 0.05,
+            sd: Some(0.03),
+            source: "High-weight vs low-weight removal delta",
+            population: "theoretical",
+        },
+    );
+    m.insert(
+        "weighted_vs_unweighted_delta",
+        Baseline {
+            value: 0.0,
+            sd: Some(0.10),
+            source: "Weighted minus unweighted accuracy difference",
+            population: "theoretical",
+        },
+    );
+    m
+}
+
+/// Clinical/therapeutic baselines -- empathic accuracy, alliance, crisis detection.
+pub fn clinical_baselines() -> BaselineMap {
+    let mut m = BTreeMap::new();
+    m.insert(
+        "empathic_accuracy",
+        Baseline {
+            value: 0.60,
+            sd: Some(0.12),
+            source: "Ickes (1993) empathic accuracy paradigm",
+            population: "trained therapists",
+        },
+    );
+    m.insert(
+        "response_appropriateness",
+        Baseline {
+            value: 0.75,
+            sd: Some(0.10),
+            source: "Hill (2009) Helping Skills rating",
+            population: "clinical psychology trainees",
+        },
+    );
+    m.insert(
+        "repair_success_rate",
+        Baseline {
+            value: 0.65,
+            sd: Some(0.15),
+            source: "Safran & Muran (2000) alliance rupture-repair",
+            population: "experienced therapists",
+        },
+    );
+    m.insert(
+        "crisis_sensitivity",
+        Baseline {
+            value: 0.95,
+            sd: Some(0.03),
+            source: "C-SSRS screening validation",
+            population: "crisis clinicians",
+        },
+    );
+    m.insert(
+        "crisis_specificity",
+        Baseline {
+            value: 0.80,
+            sd: Some(0.08),
+            source: "C-SSRS screening validation",
+            population: "crisis clinicians",
+        },
+    );
+    m.insert(
+        "distortion_identification",
+        Baseline {
+            value: 0.75,
+            sd: Some(0.10),
+            source: "Burns (1980) cognitive distortion checklist",
+            population: "CBT therapists",
+        },
+    );
+    m.insert(
+        "mi_spirit_score",
+        Baseline {
+            value: 3.5,
+            sd: Some(0.5),
+            source: "MITI 4.2 coding manual",
+            population: "MI-trained clinicians",
         },
     );
     m

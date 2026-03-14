@@ -3359,6 +3359,49 @@ pub const RADIO_CONNECTIVITY_PENALTY_LOCAL_DOWN: f64 = 0.7;
 pub const RADIO_CONNECTIVITY_PENALTY_METRO_ONLY: f64 = 0.4;
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// DYNAMICS PHASE — STARTUP GUARDS & MISCELLANEOUS
+// Science: Cognitive systems require warmup before reliable inference.
+// Smaller thresholds gate cheap operations; larger thresholds gate expensive ones.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Flow-state multiplier for confidence crash threshold (×1.5 = more tolerant).
+/// Science: Csikszentmihalyi (1990) — flow tolerates transient perturbation.
+pub const CONFIDENCE_CRASH_FLOW_MULTIPLIER: f64 = 1.5;
+
+/// Minimum cycles before confidence crash detection activates.
+/// Science: Burns & Burns (2008) — early estimates are unreliable (small-sample bias).
+pub const DYNAMICS_STARTUP_WARMUP_CYCLES: usize = 10;
+
+/// Minimum cycles before PE variance, homeostasis recalibration, and
+/// error-level analysis fire. Higher bar for second-order statistics.
+/// Science: Yu & Dayan (2005) — variance estimates need ≥20 samples.
+pub const DYNAMICS_POST_BOOT_CYCLES: usize = 20;
+
+/// Minimum cycles before resonator prediction error influences exploration.
+/// Science: McClelland et al. (1995) — resonator needs initial encoding phase.
+pub const RESONATOR_STARTUP_CYCLES: usize = 5;
+
+/// Minimum absolute neuromod delta to inject (below = noise, skip injection).
+/// Science: Faisal et al. (2008) — neural noise floor; sub-threshold signals waste energy.
+pub const NEUROMOD_DELTA_THRESHOLD: f32 = 0.001;
+
+/// Arousal trap counter threshold before recovery ramp begins.
+/// Science: Yerkes-Dodson (1908) — recovery begins only after sustained hyper-arousal.
+pub const AROUSAL_TRAP_RECOVERY_MIN_CYCLES: u32 = 5;
+
+/// Arousal trap ramp duration (recovery intensity 0→1 over this many cycles after min).
+/// Science: Yerkes-Dodson (1908) — gradual recovery prevents oscillatory relapse.
+pub const AROUSAL_TRAP_RECOVERY_RAMP_CYCLES: f32 = 5.0;
+
+/// Attention sensitivity boost when world-model sensory mismatch detected.
+/// Science: Friston (2010) — hierarchical PE mismatch sharpens attention.
+pub const ATTENTION_SENSITIVITY_BOOST_FACTOR: f32 = 1.08;
+
+/// Exploration dampening when FEP indicates efficient model (accuracy>0.5, complexity<0.5).
+/// Science: Friston (2010) — low complexity = good model evidence → exploit.
+pub const FEP_EFFICIENT_EXPLORATION_DAMPEN: f32 = 0.8;
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // TESTS
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -4453,5 +4496,18 @@ mod tests {
         // Connectivity penalties
         assert!(RADIO_CONNECTIVITY_PENALTY_LOCAL_DOWN > 0.0 && RADIO_CONNECTIVITY_PENALTY_LOCAL_DOWN < 1.0);
         assert!(RADIO_CONNECTIVITY_PENALTY_METRO_ONLY > 0.0 && RADIO_CONNECTIVITY_PENALTY_METRO_ONLY < RADIO_CONNECTIVITY_PENALTY_LOCAL_DOWN);
+    }
+
+    #[test]
+    fn test_dynamics_startup_constants() {
+        assert!(CONFIDENCE_CRASH_FLOW_MULTIPLIER > 1.0_f64 && CONFIDENCE_CRASH_FLOW_MULTIPLIER < 3.0_f64);
+        assert!(DYNAMICS_STARTUP_WARMUP_CYCLES > 0 && DYNAMICS_STARTUP_WARMUP_CYCLES <= 50);
+        assert!(DYNAMICS_POST_BOOT_CYCLES > DYNAMICS_STARTUP_WARMUP_CYCLES);
+        assert!(RESONATOR_STARTUP_CYCLES > 0 && RESONATOR_STARTUP_CYCLES <= DYNAMICS_STARTUP_WARMUP_CYCLES);
+        assert!(NEUROMOD_DELTA_THRESHOLD > 0.0 && NEUROMOD_DELTA_THRESHOLD < 0.01);
+        assert!(AROUSAL_TRAP_RECOVERY_MIN_CYCLES > 0);
+        assert!(AROUSAL_TRAP_RECOVERY_RAMP_CYCLES > 0.0);
+        assert!(ATTENTION_SENSITIVITY_BOOST_FACTOR > 1.0 && ATTENTION_SENSITIVITY_BOOST_FACTOR < 1.5);
+        assert!(FEP_EFFICIENT_EXPLORATION_DAMPEN > 0.0 && FEP_EFFICIENT_EXPLORATION_DAMPEN < 1.0);
     }
 }

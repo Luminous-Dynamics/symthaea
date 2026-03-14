@@ -96,6 +96,11 @@ use super::thresholds::{
     TRANSITION_COST_THRESHOLD, WM_MISMATCH_CONFIDENCE_SCALE, WM_MISMATCH_LR_SCALE,
     WORLD_MODEL_SPONGINESS_THRESHOLD, WORLD_MODEL_SPONGY_LR_SCALE, WORLD_MODEL_STIFFNESS_LR_SCALE,
     WORLD_MODEL_STIFFNESS_THRESHOLD,
+    // Phase 1a: dynamics startup & miscellaneous
+    AROUSAL_TRAP_RECOVERY_MIN_CYCLES, AROUSAL_TRAP_RECOVERY_RAMP_CYCLES,
+    ATTENTION_SENSITIVITY_BOOST_FACTOR, CONFIDENCE_CRASH_FLOW_MULTIPLIER,
+    DYNAMICS_POST_BOOT_CYCLES, DYNAMICS_STARTUP_WARMUP_CYCLES,
+    FEP_EFFICIENT_EXPLORATION_DAMPEN, NEUROMOD_DELTA_THRESHOLD, RESONATOR_STARTUP_CYCLES,
 };
 #[cfg(feature = "vision-manifold")]
 use super::thresholds::{
@@ -195,6 +200,27 @@ impl CognitiveLoopService {
                         .record("swarm_manager", swarm_output);
                 }
 
+                // ── Spectrum Manager (interval 53, co-prime) ────────────
+                #[cfg(feature = "mesh")]
+                if self.spectrum_manager.should_run(cycle_num, urgency_u8) {
+                    let spectrum_output = self.spectrum_manager.process(snapshot);
+                    self.subsystem_collector
+                        .record("spectrum_manager", spectrum_output);
+
+                    // Cross-coupling: Spectrum → Swarm connectivity modifier
+                    let connectivity_penalty = match self.spectrum_manager.network_health() {
+                        super::managers::radio_dispatcher::NetworkHealth::AllTiersUp => 1.0,
+                        super::managers::radio_dispatcher::NetworkHealth::LocalDown => {
+                            super::thresholds::RADIO_CONNECTIVITY_PENALTY_LOCAL_DOWN
+                        }
+                        super::managers::radio_dispatcher::NetworkHealth::MetroOnly => {
+                            super::thresholds::RADIO_CONNECTIVITY_PENALTY_METRO_ONLY
+                        }
+                        super::managers::radio_dispatcher::NetworkHealth::Blackout => 0.0,
+                    };
+                    self.swarm_manager.set_connectivity_modifier(connectivity_penalty);
+                }
+
                 // ── Therapeutic Manager (interval 11, co-prime) ─────────
                 #[cfg(feature = "therapeutic")]
                 if self.therapeutic_manager.should_run(cycle_num, urgency_u8) {
@@ -206,22 +232,22 @@ impl CognitiveLoopService {
                     // This bridges RDoC domains → the 8-transmitter neuromod system.
                     if let Some(delta) = self.therapeutic_manager.last_neuromod_delta {
                         let half_life = 30_u32; // ~30 cycles for therapeutic effects
-                        if delta.serotonin.abs() > 0.001 {
+                        if delta.serotonin.abs() > NEUROMOD_DELTA_THRESHOLD {
                             self.neuromod.bath.inject("serotonin", delta.serotonin, half_life);
                         }
-                        if delta.dopamine.abs() > 0.001 {
+                        if delta.dopamine.abs() > NEUROMOD_DELTA_THRESHOLD {
                             self.neuromod.bath.inject("dopamine", delta.dopamine, half_life);
                         }
-                        if delta.noradrenaline.abs() > 0.001 {
+                        if delta.noradrenaline.abs() > NEUROMOD_DELTA_THRESHOLD {
                             self.neuromod.bath.inject("noradrenaline", delta.noradrenaline, half_life);
                         }
-                        if delta.oxytocin.abs() > 0.001 {
+                        if delta.oxytocin.abs() > NEUROMOD_DELTA_THRESHOLD {
                             self.neuromod.bath.inject("oxytocin", delta.oxytocin, half_life);
                         }
-                        if delta.gaba.abs() > 0.001 {
+                        if delta.gaba.abs() > NEUROMOD_DELTA_THRESHOLD {
                             self.neuromod.bath.inject("gaba", delta.gaba, half_life);
                         }
-                        if delta.acetylcholine.abs() > 0.001 {
+                        if delta.acetylcholine.abs() > NEUROMOD_DELTA_THRESHOLD {
                             self.neuromod.bath.inject("acetylcholine", delta.acetylcholine, half_life);
                         }
                     }
@@ -282,6 +308,12 @@ impl CognitiveLoopService {
                     let governance_output = self.governance_mgr.process(snapshot);
                     self.subsystem_collector
                         .record("governance_manager", governance_output);
+
+                    // Cross-coupling: Governance → Spectrum preferred tier
+                    #[cfg(feature = "mesh")]
+                    if let Some(best_tier) = self.spectrum_manager.best_tier_for_governance() {
+                        self.governance_mgr.set_preferred_tier(best_tier);
+                    }
                 }
             }
         }
@@ -352,13 +384,13 @@ impl CognitiveLoopService {
             // Flow = committed mode, transient dips are normal.
             // Science: Csikszentmihalyi (1990) — flow tolerates transient perturbation.
             let effective_crash_threshold = if self.flow_state.in_flow {
-                CONFIDENCE_CRASH_THRESHOLD * 1.5
+                CONFIDENCE_CRASH_THRESHOLD * CONFIDENCE_CRASH_FLOW_MULTIPLIER
             } else {
                 CONFIDENCE_CRASH_THRESHOLD
             };
             confidence_crash_detected = drop > prev_conf * effective_crash_threshold
                 && prev_conf > super::thresholds::CONFIDENCE_CRASH_MIN_PRIOR
-                && self.stats.total_cycles > 10;
+                && self.stats.total_cycles > DYNAMICS_STARTUP_WARMUP_CYCLES;
             if confidence_crash_detected {
                 // Session 11 Item 5: Grace period — lighter freeze after recent mode transition.
                 // Post-transition confidence drops are expected, not emergencies.
@@ -396,7 +428,7 @@ impl CognitiveLoopService {
         let pe_variance = self.stats.avg_prediction_error_sq
             - self.stats.avg_prediction_error * self.stats.avg_prediction_error;
         let pe_variance = pe_variance.max(0.0); // Clamp numerical noise
-        if pe_variance > PE_VARIANCE_THRESHOLD && self.stats.total_cycles > 20 {
+        if pe_variance > PE_VARIANCE_THRESHOLD && self.stats.total_cycles > DYNAMICS_POST_BOOT_CYCLES {
             // High variance = unstable errors → dampen confidence proportionally
             let variance_dampen = 1.0
                 - (pe_variance - PE_VARIANCE_THRESHOLD).min(PE_VARIANCE_MAX_EFFECT)
@@ -476,7 +508,7 @@ impl CognitiveLoopService {
         // ── Phase 20: Resonator prediction error → exploration/confidence ────
         let resonator_error_exploration_mod = if resonator_prediction_error
             > RESONATOR_ERROR_EXPLORATION_THRESHOLD
-            && self.stats.total_cycles > 5
+            && self.stats.total_cycles > RESONATOR_STARTUP_CYCLES
         {
             let boost = (resonator_prediction_error - RESONATOR_ERROR_EXPLORATION_THRESHOLD)
                 * RESONATOR_ERROR_EXPLORATION_SCALE;
@@ -497,7 +529,7 @@ impl CognitiveLoopService {
             // Session 15 Item 7: Sustained low resonator error → confidence recovery.
             // If >80% of recent cycles had low error, give an additional confidence nudge.
             // Science: Bar (2009) — consistent prediction accuracy signals reliable model.
-            if self.stats.total_cycles > 20
+            if self.stats.total_cycles > DYNAMICS_POST_BOOT_CYCLES
                 && self.stats.resonator_error_exploration_count
                     > (self.stats.total_cycles / 2) as u64
             {
@@ -555,7 +587,7 @@ impl CognitiveLoopService {
         // Coherence gate: skip resonator recall during unstable CfC dynamics
         let reflection_thresholds = self.self_model_tier.self_reflection.get_thresholds();
         let resonator_coherence_gate = pre_update_coherence > reflection_thresholds.coherence_gate
-            || self.stats.total_cycles < 10;
+            || self.stats.total_cycles < DYNAMICS_STARTUP_WARMUP_CYCLES;
         if resonator_coherence_gate && urgency.should_run(self.stats.total_cycles, 1, 1, 4) {
             if let Some(ref mut res_mem) = self.memory_consol.resonator_memory {
                 let res_start = Instant::now();
@@ -689,12 +721,12 @@ impl CognitiveLoopService {
             self.fep.agent.precision.prior_precision = (self.fep.agent.precision.prior_precision
                 + (resonator_best_sim - RESONATOR_CONSOLIDATION_THRESHOLD) as f64 * super::thresholds::RESONATOR_CONSOLIDATION_PRECISION_SCALE)
                 .min(super::thresholds::RESONATOR_CONSOLIDATION_PRECISION_MAX);
-            if self.stats.total_cycles > 10 {
+            if self.stats.total_cycles > DYNAMICS_STARTUP_WARMUP_CYCLES {
                 self.scale_lr("resonator_familiar", RESONATOR_FAMILIAR_LR_SCALE);
             }
         } else if resonator_best_sim < RESONATOR_NOVEL_THRESHOLD
             && resonator_best_sim > 0.0
-            && self.stats.total_cycles > 10
+            && self.stats.total_cycles > DYNAMICS_STARTUP_WARMUP_CYCLES
         {
             self.scale_lr("resonator_novel", RESONATOR_NOVEL_LR_SCALE);
         }
@@ -772,10 +804,10 @@ impl CognitiveLoopService {
         // Sustained overshoot (>1.15) → system is overcorrecting → dampen LR.
         // Sustained undershoot (<0.85) → system is sluggish → boost LR.
         // Science: Turrigiano (2008) — homeostatic failure triggers synaptic recalibration.
-        if eff > HOMEOSTASIS_RECALIBRATE_HIGH && self.stats.total_cycles > 20 {
+        if eff > HOMEOSTASIS_RECALIBRATE_HIGH && self.stats.total_cycles > DYNAMICS_POST_BOOT_CYCLES {
             self.scale_lr("homeostasis_overcorrect", 1.0 - HOMEOSTASIS_NEUROMOD_STEP);
             self.scale_exploration("homeostasis_overcorrect", 1.0 + HOMEOSTASIS_NEUROMOD_STEP);
-        } else if eff < HOMEOSTASIS_RECALIBRATE_LOW && eff > 0.0 && self.stats.total_cycles > 20 {
+        } else if eff < HOMEOSTASIS_RECALIBRATE_LOW && eff > 0.0 && self.stats.total_cycles > DYNAMICS_POST_BOOT_CYCLES {
             self.scale_lr("homeostasis_sluggish", 1.0 + HOMEOSTASIS_NEUROMOD_STEP);
         }
 
@@ -898,11 +930,11 @@ impl CognitiveLoopService {
         };
         let arousal_recovery_tau_factor;
         let arousal_recovery_active;
-        if self.carryover.urgency.arousal_trap_counter > 5 {
-            // Recovery intensity ramps from 0→1 over cycles 5-10, then stays at 1.0.
+        if self.carryover.urgency.arousal_trap_counter > AROUSAL_TRAP_RECOVERY_MIN_CYCLES {
+            // Recovery intensity ramps from 0→1 over the ramp window, then stays at 1.0.
             // BUG FIX: Previously capped at counter=10, leaving extended traps unassisted.
             let recovery_intensity =
-                ((self.carryover.urgency.arousal_trap_counter - 5) as f32 / 5.0).min(1.0);
+                ((self.carryover.urgency.arousal_trap_counter - AROUSAL_TRAP_RECOVERY_MIN_CYCLES) as f32 / AROUSAL_TRAP_RECOVERY_RAMP_CYCLES).min(1.0);
             arousal_recovery_tau_factor = 1.0 + recovery_intensity * AROUSAL_RECOVERY_TAU_SCALE;
             arousal_recovery_active = true;
         } else {
@@ -925,9 +957,9 @@ impl CognitiveLoopService {
         // Session 11 Item 3: Gate behind cycle > 5 to avoid spurious velocity from default init.
         let coherence_velocity_tau_factor = {
             let cv = self.carryover.quality.coherence_velocity;
-            if self.stats.total_cycles > 5 && cv > COHERENCE_VELOCITY_TAU_THRESHOLD {
+            if self.stats.total_cycles > RESONATOR_STARTUP_CYCLES && cv > COHERENCE_VELOCITY_TAU_THRESHOLD {
                 COHERENCE_VELOCITY_TAU_BOOST
-            } else if self.stats.total_cycles > 5 && cv < -COHERENCE_VELOCITY_TAU_THRESHOLD {
+            } else if self.stats.total_cycles > RESONATOR_STARTUP_CYCLES && cv < -COHERENCE_VELOCITY_TAU_THRESHOLD {
                 COHERENCE_VELOCITY_TAU_DAMPEN
             } else {
                 1.0
@@ -1107,7 +1139,7 @@ impl CognitiveLoopService {
         }
 
         let wm_stiffness = self.fep.world_model.avg_error.clamp(0.0, 1.0);
-        if self.stats.total_cycles > 20 {
+        if self.stats.total_cycles > DYNAMICS_POST_BOOT_CYCLES {
             if wm_stiffness > WORLD_MODEL_STIFFNESS_THRESHOLD {
                 let stiffness_nudge = (wm_stiffness - WORLD_MODEL_STIFFNESS_THRESHOLD)
                     * WORLD_MODEL_STIFFNESS_LR_SCALE;
@@ -1121,7 +1153,7 @@ impl CognitiveLoopService {
 
         let level_errors = self.fep.world_model.level_errors();
         let mut wm_sensory_mismatch = false;
-        if level_errors.len() >= 2 && self.stats.total_cycles > 10 {
+        if level_errors.len() >= 2 && self.stats.total_cycles > DYNAMICS_STARTUP_WARMUP_CYCLES {
             let sensory_error = level_errors[0];
             let abstract_error = level_errors[level_errors.len() - 1];
             if abstract_error > sensory_error * super::thresholds::WORLD_MODEL_CONFUSION_RATIO && abstract_error > super::thresholds::WORLD_MODEL_ERROR_FLOOR {
@@ -1208,7 +1240,7 @@ impl CognitiveLoopService {
 
         self.adaptive_behavior.attention_sensitivity *= goal_attention_bias;
         if wm_sensory_mismatch {
-            self.adaptive_behavior.attention_sensitivity *= 1.08;
+            self.adaptive_behavior.attention_sensitivity *= ATTENTION_SENSITIVITY_BOOST_FACTOR;
             // Sensory-abstract mismatch → slow consolidation + dampen confidence.
             // Hierarchical decomposition is breaking → protect abstract representations.
             // Science: Friston (2010) — hierarchical level misalignment = high free energy.
@@ -1458,7 +1490,7 @@ impl CognitiveLoopService {
         if fep_accuracy > 0.5 && fep_complexity < 0.5 {
             self.adaptive_behavior.learning_rate_multiplier =
                 (self.adaptive_behavior.learning_rate_multiplier * 1.1).min(2.0);
-            self.adaptive_behavior.exploration_factor *= 0.8;
+            self.adaptive_behavior.exploration_factor *= FEP_EFFICIENT_EXPLORATION_DAMPEN;
             // Session 13 Item 6: Wire FEP efficiency into proposal system.
             // High accuracy + low complexity = efficient model → boost confidence.
             // Science: Friston (2010) — low complexity = good model evidence.
@@ -2547,7 +2579,10 @@ impl CognitiveLoopService {
                         self.update_loss_stats(loss);
                         (true, Some(loss))
                     }
-                    Err(_) => (false, None),
+                    Err(e) => {
+                        tracing::warn!(error = %e, "CfC core training step failed");
+                        (false, None)
+                    }
                 }
             }
         } else {
@@ -2779,6 +2814,7 @@ impl CognitiveLoopService {
                                 .collect()
                         })
                         .unwrap_or_default();
+                    let _knowledge_context = knowledge_context; // reserved for future use
                     let signals = super::broca_bridge::BrocaConsciousnessSignals {
                         epistemic_confidence: (self.carryover.quality.last_epistemic_confidence
                             - math_epistemic_penalty)
@@ -2791,7 +2827,32 @@ impl CognitiveLoopService {
                         consciousness_level: broca_psi,
                         meta_awareness: self.carryover.learning.self_model_accuracy as f32,
                         coherence,
-                        knowledge_context,
+                        #[cfg(feature = "therapeutic")]
+                        therapeutic_intent: if self.therapeutic_manager.crisis_active {
+                            7.0 // Crisis mode
+                        } else {
+                            // Map regulation strategy to intent code:
+                            // 0=validate, 1=reflect, 2=reframe, 3=explore, 4=psychoeducate,
+                            // 5=challenge, 6=contain, 7=crisis
+                            match self.therapeutic_manager.active_strategy() {
+                                Some(symthaea_therapeutic::RegulationStrategy::Validation) => 0.0,
+                                Some(symthaea_therapeutic::RegulationStrategy::Defusion) => 1.0,
+                                Some(symthaea_therapeutic::RegulationStrategy::CognitiveReappraisal) => 2.0,
+                                Some(symthaea_therapeutic::RegulationStrategy::ExposurePrep) => 3.0,
+                                Some(symthaea_therapeutic::RegulationStrategy::DistressTolerance) => 4.0,
+                                Some(symthaea_therapeutic::RegulationStrategy::Containment) => 6.0,
+                                Some(symthaea_therapeutic::RegulationStrategy::Grounding) => 4.0,
+                                None => 0.0,
+                            }
+                        },
+                        #[cfg(feature = "therapeutic")]
+                        alliance_quality: self.therapeutic_manager.alliance_composite(),
+                        #[cfg(feature = "therapeutic")]
+                        client_distress_level: self.therapeutic_manager.client_distress(),
+                        #[cfg(feature = "therapeutic")]
+                        intervention_depth: self.therapeutic_manager.active_strategy()
+                            .map(|s| s.min_alliance()) // depth ≈ min_alliance required
+                            .unwrap_or(0.0),
                     };
                     if let Some(result) = broca.generate(signals) {
                         // Surface the generated text for consumers

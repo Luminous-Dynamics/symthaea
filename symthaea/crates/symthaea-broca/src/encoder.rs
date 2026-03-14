@@ -27,7 +27,10 @@ use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
 
 /// Number of thought channels.
+#[cfg(not(feature = "therapeutic"))]
 pub const NUM_CHANNELS: usize = 24;
+#[cfg(feature = "therapeutic")]
+pub const NUM_CHANNELS: usize = 28;
 
 /// Number of channels in legacy (v2) training data format.
 pub const LEGACY_NUM_CHANNELS: usize = 20;
@@ -36,6 +39,7 @@ pub const LEGACY_NUM_CHANNELS: usize = 20;
 const DEFAULT_NUM_LEVELS: usize = 32;
 
 /// Channel names for genesis seeding.
+#[cfg(not(feature = "therapeutic"))]
 const CHANNEL_NAMES: [&str; NUM_CHANNELS] = [
     "intent_acknowledge",  // 0
     "intent_answer",       // 1
@@ -64,7 +68,43 @@ const CHANNEL_NAMES: [&str; NUM_CHANNELS] = [
     "response_confidence", // 23: confidence in the generated response (0=unsure, 1=confident)
 ];
 
+/// Channel names for genesis seeding (therapeutic variant with 4 extra channels).
+#[cfg(feature = "therapeutic")]
+const CHANNEL_NAMES: [&str; NUM_CHANNELS] = [
+    "intent_acknowledge",  // 0
+    "intent_answer",       // 1
+    "intent_clarify",      // 2
+    "intent_propose",      // 3
+    "intent_uncertainty",  // 4
+    "intent_reflect",      // 5
+    "intent_continue",     // 6
+    "intent_unknown",      // 7
+    "epistemic_status",    // 8
+    "valence",             // 9
+    "arousal",             // 10
+    "warmth",              // 11
+    "psi",                 // 12
+    "meta_awareness",      // 13
+    "coherence",           // 14
+    "relationship_stage",  // 15
+    "trust",               // 16
+    "mood_temperature",    // 17
+    "has_computed_answer", // 18
+    "concept_count",       // 19
+    // New channels (v3)
+    "time_pressure",       // 20
+    "domain_familiarity",  // 21
+    "social_context",      // 22
+    "response_confidence", // 23
+    // Therapeutic channels (v4)
+    "therapeutic_intent",      // 24
+    "alliance_quality",        // 25
+    "client_distress_level",   // 26
+    "intervention_depth",      // 27
+];
+
 /// Channel ranges [min, max] for normalization to [0, 1].
+#[cfg(not(feature = "therapeutic"))]
 const CHANNEL_RANGES: [[f32; 2]; NUM_CHANNELS] = [
     [0.0, 1.0],  // intent_acknowledge
     [0.0, 1.0],  // intent_answer
@@ -93,6 +133,41 @@ const CHANNEL_RANGES: [[f32; 2]; NUM_CHANNELS] = [
     [0.0, 1.0], // response_confidence
 ];
 
+/// Channel ranges [min, max] for normalization to [0, 1] (therapeutic variant).
+#[cfg(feature = "therapeutic")]
+const CHANNEL_RANGES: [[f32; 2]; NUM_CHANNELS] = [
+    [0.0, 1.0],  // intent_acknowledge
+    [0.0, 1.0],  // intent_answer
+    [0.0, 1.0],  // intent_clarify
+    [0.0, 1.0],  // intent_propose
+    [0.0, 1.0],  // intent_uncertainty
+    [0.0, 1.0],  // intent_reflect
+    [0.0, 1.0],  // intent_continue
+    [0.0, 1.0],  // intent_unknown
+    [0.0, 4.0],  // epistemic_status
+    [-1.0, 1.0], // valence
+    [0.0, 1.0],  // arousal
+    [0.0, 1.0],  // warmth
+    [0.0, 1.0],  // psi
+    [0.0, 1.0],  // meta_awareness
+    [0.0, 1.0],  // coherence
+    [0.0, 6.0],  // relationship_stage
+    [0.0, 1.0],  // trust
+    [0.5, 2.0],  // mood_temperature
+    [0.0, 1.0],  // has_computed_answer
+    [0.0, 10.0], // concept_count
+    // New channels (v3)
+    [0.0, 1.0], // time_pressure
+    [0.0, 1.0], // domain_familiarity
+    [0.0, 1.0], // social_context
+    [0.0, 1.0], // response_confidence
+    // Therapeutic channels (v4)
+    [0.0, 7.0], // therapeutic_intent
+    [0.0, 1.0], // alliance_quality
+    [0.0, 1.0], // client_distress_level
+    [0.0, 1.0], // intervention_depth
+];
+
 /// Default values for the 4 new channels (used when loading legacy 20-channel data).
 pub const NEW_CHANNEL_DEFAULTS: [f32; 4] = [
     0.0, // time_pressure: relaxed
@@ -110,6 +185,7 @@ pub struct ThoughtChannels {
     pub channels: [f32; NUM_CHANNELS],
 }
 
+#[cfg(not(feature = "therapeutic"))]
 impl Default for ThoughtChannels {
     fn default() -> Self {
         Self {
@@ -132,6 +208,39 @@ impl Default for ThoughtChannels {
                 0.5, // domain_familiarity: mid
                 0.5, // social_context: mid
                 0.5, // response_confidence: mid
+            ],
+        }
+    }
+}
+
+#[cfg(feature = "therapeutic")]
+impl Default for ThoughtChannels {
+    fn default() -> Self {
+        Self {
+            channels: [
+                0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, // intent: Unknown
+                1.0, // epistemic: Probable
+                0.0, // valence: neutral
+                0.5, // arousal: mid
+                0.5, // warmth: mid
+                0.5, // psi: mid
+                0.5, // meta_awareness: mid
+                0.5, // coherence: mid
+                0.0, // relationship_stage: 0
+                0.5, // trust: mid
+                1.0, // mood_temperature: neutral
+                0.0, // has_computed_answer: false
+                0.0, // concept_count: none
+                // New channels (v3)
+                0.0, // time_pressure: relaxed
+                0.5, // domain_familiarity: mid
+                0.5, // social_context: mid
+                0.5, // response_confidence: mid
+                // Therapeutic channels (v4)
+                0.0, // therapeutic_intent
+                0.5, // alliance_quality
+                0.0, // client_distress_level
+                0.0, // intervention_depth
             ],
         }
     }
@@ -237,15 +346,61 @@ impl ThoughtChannels {
 
     /// Construct from a legacy 20-channel array, padding new channels with defaults.
     pub fn from_legacy(legacy: &[f32; LEGACY_NUM_CHANNELS]) -> Self {
-        let mut channels = [0.0f32; NUM_CHANNELS];
-        channels[..LEGACY_NUM_CHANNELS].copy_from_slice(legacy);
-        channels[20] = NEW_CHANNEL_DEFAULTS[0];
-        channels[21] = NEW_CHANNEL_DEFAULTS[1];
-        channels[22] = NEW_CHANNEL_DEFAULTS[2];
-        channels[23] = NEW_CHANNEL_DEFAULTS[3];
-        Self { channels }
+        let mut tc = Self::default();
+        tc.channels[..LEGACY_NUM_CHANNELS].copy_from_slice(legacy);
+        tc.channels[20] = NEW_CHANNEL_DEFAULTS[0];
+        tc.channels[21] = NEW_CHANNEL_DEFAULTS[1];
+        tc.channels[22] = NEW_CHANNEL_DEFAULTS[2];
+        tc.channels[23] = NEW_CHANNEL_DEFAULTS[3];
+        #[cfg(feature = "therapeutic")]
+        {
+            tc.channels[24] = THERAPEUTIC_CHANNEL_DEFAULTS[0];
+            tc.channels[25] = THERAPEUTIC_CHANNEL_DEFAULTS[1];
+            tc.channels[26] = THERAPEUTIC_CHANNEL_DEFAULTS[2];
+            tc.channels[27] = THERAPEUTIC_CHANNEL_DEFAULTS[3];
+        }
+        tc
     }
+
+    #[cfg(feature = "therapeutic")]
+    pub fn set_therapeutic(&mut self, intent: f32, alliance: f32, distress: f32, depth: f32) {
+        self.channels[24] = intent;
+        self.channels[25] = alliance;
+        self.channels[26] = distress;
+        self.channels[27] = depth;
+    }
+
+    #[cfg(feature = "therapeutic")]
+    pub fn therapeutic_intent(&self) -> f32 { self.channels[24] }
+
+    #[cfg(feature = "therapeutic")]
+    pub fn alliance_quality(&self) -> f32 { self.channels[25] }
+
+    #[cfg(feature = "therapeutic")]
+    pub fn client_distress_level(&self) -> f32 { self.channels[26] }
+
+    #[cfg(feature = "therapeutic")]
+    pub fn intervention_depth(&self) -> f32 { self.channels[27] }
 }
+
+#[cfg(feature = "therapeutic")]
+pub const THERAPEUTIC_CHANNEL_NAMES: &[&str] = &[
+    "therapeutic_intent",
+    "alliance_quality",
+    "client_distress_level",
+    "intervention_depth",
+];
+
+#[cfg(feature = "therapeutic")]
+pub const THERAPEUTIC_CHANNEL_RANGES: &[[f32; 2]] = &[
+    [0.0, 7.0],
+    [0.0, 1.0],
+    [0.0, 1.0],
+    [0.0, 1.0],
+];
+
+#[cfg(feature = "therapeutic")]
+pub const THERAPEUTIC_CHANNEL_DEFAULTS: &[f32] = &[0.0, 0.5, 0.0, 0.0];
 
 /// HDC encoder for thought channels.
 ///

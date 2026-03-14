@@ -247,7 +247,10 @@ impl CognitiveLoopService {
 
         // Pre-compute identity fields before moving output
         #[cfg(feature = "identity")]
-        let signed_output = self.mfdi_bridge.sign_output(&output).ok();
+        let signed_output = self.mfdi_bridge.sign_output(&output).map_err(|e| {
+            tracing::debug!(error = %e, "MFDI output signing failed");
+            e
+        }).ok();
         #[cfg(feature = "identity")]
         let assurance_level = self.mfdi_bridge.assurance_level();
 
@@ -373,7 +376,10 @@ impl CognitiveLoopService {
                         self.update_loss_stats(loss);
                         (true, Some(loss))
                     }
-                    Err(_) => (false, None),
+                    Err(e) => {
+                        tracing::warn!(error = %e, "CfC embedding training step failed");
+                        (false, None)
+                    }
                 }
             } else {
                 (false, None)
