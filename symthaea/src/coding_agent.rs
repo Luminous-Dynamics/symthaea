@@ -29,6 +29,7 @@
 //! ```
 
 use crate::action::{ActionOutcome, PolicyBundle, SandboxRoot};
+use crate::coding_experience::{CodingExperience, CodingExperienceStore};
 use crate::cognitive_loop::motor_output_bridge::{
     ActionType, MotorActionRequest, MotorOutputBridge, MotorOutputResult,
 };
@@ -92,6 +93,48 @@ pub struct AgentResult {
     pub generation_tiers: Vec<BackendTier>,
     /// Total energy consumed across all generations.
     pub total_energy: f64,
+    /// Auto-generated curriculum lessons from failure patterns encountered.
+    #[cfg(feature = "school_learning")]
+    pub generated_lessons: Vec<crate::school::code_learning::CodeLesson>,
+}
+
+impl AgentResult {
+    /// Produce a JSON telemetry summary for dashboard consumption.
+    ///
+    /// Returns a `serde_json::Value` with all key metrics in a flat structure
+    /// suitable for WebSocket streaming or REST API responses.
+    pub fn to_telemetry_json(&self) -> serde_json::Value {
+        let avg_phi = if self.phi_trace.is_empty() {
+            0.0
+        } else {
+            self.phi_trace.iter().sum::<f32>() / self.phi_trace.len() as f32
+        };
+
+        serde_json::json!({
+            "phase": format!("{}", self.final_phase),
+            "iterations_used": self.iterations_used,
+            "consciousness": {
+                "avg_phi": avg_phi,
+                "min_phi": self.phi_trace.iter().cloned().fold(f32::MAX, f32::min),
+                "max_phi": self.phi_trace.iter().cloned().fold(f32::MIN, f32::max),
+                "phi_trace": self.phi_trace,
+                "samples": self.phi_trace.len(),
+            },
+            "epistemic_status": format!("{:?}", self.epistemic_status),
+            "generation": {
+                "tiers": self.generation_tiers.iter().map(|t| t.to_string()).collect::<Vec<_>>(),
+                "total_energy": self.total_energy,
+            },
+            "files_modified": self.files_modified.iter().map(|p| p.display().to_string()).collect::<Vec<_>>(),
+            "tests_passed": self.tests_passed,
+            "observations_count": self.observations.len(),
+            "errors_count": self.errors.len(),
+            "errors_preview": self.errors.iter().take(3).map(|e| {
+                let s: String = e.chars().take(100).collect();
+                s
+            }).collect::<Vec<_>>(),
+        })
+    }
 }
 
 /// Configuration for the coding agent.
@@ -165,6 +208,11 @@ pub struct CodingAgent {
     /// Set externally via `set_code_context()` — avoids coupling to the
     /// `code_generation` feature gate.
     code_context: Vec<String>,
+    /// Persistent experience store for error patterns and successful generations.
+    /// Auto-initialized with in-memory SQLite in constructor.
+    experience_store: Option<CodingExperienceStore>,
+    /// Accumulated failure patterns during this run: (error_text, count).
+    failure_patterns: Vec<(String, usize)>,
 }
 
 impl CodingAgent {
@@ -203,7 +251,17 @@ impl CodingAgent {
             generation_tiers: Vec::new(),
             generated_code: None,
             code_context: Vec::new(),
+            experience_store: Self::try_init_experience_store(),
+            failure_patterns: Vec::new(),
         }
+    }
+
+    /// Attempt to create an in-memory experience store. Returns None on failure
+    /// (non-blocking — agent works fine without it).
+    fn try_init_experience_store() -> Option<CodingExperienceStore> {
+        // Use tokio if available, otherwise skip
+        let rt = tokio::runtime::Runtime::new().ok()?;
+        rt.block_on(async { CodingExperienceStore::new().await.ok() })
     }
 
     /// Run the agent on a coding task. Returns the result when done or max iterations reached.
@@ -219,6 +277,7 @@ impl CodingAgent {
         self.last_test_output = None;
         self.generated_code = None;
         self.generation_tiers.clear();
+        self.failure_patterns.clear();
 
         tracing::info!(
             target: "symthaea::coding_agent",
@@ -505,6 +564,16 @@ impl CodingAgent {
             }
         }
 
+        // Inject experience hints from persistent store
+        let hints = self.retrieve_experience_hints();
+        if !hints.is_empty() {
+            prompt.push_str("Relevant patterns from past experience:\n");
+            for (pattern, hint) in hints.iter().take(3) {
+                prompt.push_str(&format!("- Error: {} → Fix: {}\n", pattern, hint));
+            }
+            prompt.push('\n');
+        }
+
         // Infer language from target file extension
         let target = self.resolve_target_file();
         let lang = target
@@ -514,6 +583,18 @@ impl CodingAgent {
         prompt.push_str(&format!("Generate valid {} code.\n", lang));
 
         prompt
+    }
+
+    /// Retrieve relevant error hints from the persistent experience store.
+    fn retrieve_experience_hints(&self) -> Vec<(String, String)> {
+        if let Some(ref store) = self.experience_store {
+            if let Ok(rt) = tokio::runtime::Runtime::new() {
+                return rt.block_on(async {
+                    store.error_hints_for(&self.task, 3).await
+                });
+            }
+        }
+        Vec::new()
     }
 
     /// Generate a structural template for native (non-LLM) code generation.
@@ -942,6 +1023,53 @@ impl CodingAgent {
                 || result.action_type == Some(ActionType::CargoCheck)
             {
                 self.last_test_output = Some(error.clone());
+
+                // Track failure pattern frequency
+                let pattern = Self::normalize_error_pattern(error);
+                if let Some(entry) = self.failure_patterns.iter_mut().find(|(p, _)| *p == pattern) {
+                    entry.1 += 1;
+                } else {
+                    self.failure_patterns.push((pattern.clone(), 1));
+                }
+
+                // Store failure in persistent experience store
+                self.store_experience(error, false);
+            }
+        }
+    }
+
+    /// Normalize an error message for pattern matching (strip paths, line numbers).
+    fn normalize_error_pattern(error: &str) -> String {
+        // Extract the error code and type, strip file-specific info
+        let mut normalized = String::new();
+        for line in error.lines().take(3) {
+            if line.contains("error[E") || line.contains("error:") {
+                normalized.push_str(line.trim());
+                normalized.push(' ');
+            }
+        }
+        if normalized.is_empty() {
+            error.lines().next().unwrap_or(error).to_string()
+        } else {
+            normalized.trim().to_string()
+        }
+    }
+
+    /// Store a coding experience (success or failure) in the persistent store.
+    fn store_experience(&mut self, detail: &str, success: bool) {
+        let experience = CodingExperience {
+            task: self.task.clone(),
+            detail: detail.chars().take(500).collect(),
+            success,
+            tier: self.generation_tiers.last().map(|t| t.to_string()).unwrap_or_default(),
+            fix_hint: None,
+        };
+
+        if let Some(ref mut store) = self.experience_store {
+            if let Ok(rt) = tokio::runtime::Runtime::new() {
+                rt.block_on(async {
+                    store.store(experience).await;
+                });
             }
         }
     }
@@ -958,6 +1086,14 @@ impl CodingAgent {
         let tier = self.generation_tiers.last().copied();
         if let (Some(tier), Some(ref mut dispatcher)) = (tier, &mut self.dispatcher) {
             dispatcher.record_outcome(tier, success);
+        }
+
+        // Store successful generation in persistent experience store
+        if success {
+            if let Some(ref code) = self.generated_code {
+                let summary: String = code.chars().take(200).collect();
+                self.store_experience(&summary, true);
+            }
         }
     }
 
@@ -996,7 +1132,20 @@ impl CodingAgent {
             errors: self.errors.clone(),
             generation_tiers: self.generation_tiers.clone(),
             total_energy: self.dispatcher.as_ref().map_or(0.0, |d| d.total_energy()),
+            #[cfg(feature = "school_learning")]
+            generated_lessons: self.generate_lessons_from_failures(),
         }
+    }
+
+    /// Generate auto-curriculum lessons from accumulated failure patterns.
+    #[cfg(feature = "school_learning")]
+    fn generate_lessons_from_failures(&self) -> Vec<crate::school::code_learning::CodeLesson> {
+        let failures: Vec<(String, String, usize)> = self
+            .failure_patterns
+            .iter()
+            .map(|(pattern, count)| (pattern.clone(), self.task.clone(), *count))
+            .collect();
+        crate::school::code_learning::lessons_from_failures(&failures, 5)
     }
 
     // ── Public API ──────────────────────────────────────────────────────
@@ -1044,6 +1193,16 @@ impl CodingAgent {
     /// Get the dispatcher's total energy consumption.
     pub fn total_energy(&self) -> f64 {
         self.dispatcher.as_ref().map_or(0.0, |d| d.total_energy())
+    }
+
+    /// Get accumulated failure patterns from this run: (normalized_error, count).
+    pub fn failure_patterns(&self) -> &[(String, usize)] {
+        &self.failure_patterns
+    }
+
+    /// Whether the agent has a persistent experience store.
+    pub fn has_experience_store(&self) -> bool {
+        self.experience_store.is_some()
     }
 }
 
