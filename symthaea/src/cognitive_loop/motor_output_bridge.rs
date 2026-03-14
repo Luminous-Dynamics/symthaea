@@ -182,6 +182,14 @@ impl MotorOutputBridge {
         self
     }
 
+    /// Switch the executor to real command execution mode.
+    ///
+    /// This enables actual file I/O and shell commands (cargo check, cargo test).
+    /// Use with care — only when the sandbox is properly configured.
+    pub fn enable_real_execution(&mut self) {
+        self.executor = SimpleExecutor::with_real_commands();
+    }
+
     /// Access execution telemetry from the persistent executor.
     pub fn telemetry(&self) -> &[crate::action::ExecutionRecord] {
         self.executor.telemetry()

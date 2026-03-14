@@ -119,6 +119,16 @@ impl IntelligentDispatcher {
         Self::new(Arc::new(SimulatedBackend), None)
     }
 
+    /// Create a dispatcher with Ollama (qwen2.5-coder:7b) as the local LLM backend.
+    ///
+    /// Attempts to connect to Ollama at `localhost:11434`. If Ollama is not available,
+    /// the dispatcher still works — generation will fail gracefully and fall back to
+    /// Native tier on subsequent requests via the Bayesian stats tracker.
+    pub fn with_local_llm() -> Self {
+        use crate::language::llm_backend::OllamaBackend;
+        Self::new(Arc::new(OllamaBackend::new()), None)
+    }
+
     /// Set the energy budget. 0.0 means unlimited.
     pub fn with_energy_budget(mut self, budget: f64) -> Self {
         self.energy_budget = budget;

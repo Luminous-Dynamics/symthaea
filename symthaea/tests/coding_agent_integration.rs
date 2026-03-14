@@ -154,3 +154,49 @@ fn test_agent_generates_lessons_from_failures() {
     // generated_lessons should exist (may be empty if no failures matched patterns)
     let _lessons = &result.generated_lessons;
 }
+
+#[test]
+fn test_agent_real_exec_config() {
+    let tmp = tempfile::tempdir().unwrap();
+    let config = CodingAgentConfig {
+        max_iterations: 3,
+        working_dir: tmp.path().to_path_buf(),
+        target_file: Some(PathBuf::from("test.rs")),
+        enable_real_exec: true,
+        use_local_llm: false, // don't require Ollama for test
+        ..Default::default()
+    };
+    let agent = CodingAgent::new(config).expect("Should create with real exec enabled");
+
+    // Agent should work with real exec config
+    assert!(agent.has_experience_store());
+}
+
+#[test]
+fn test_agent_index_project() {
+    let tmp = tempfile::tempdir().unwrap();
+
+    // Create a small Rust file to index
+    let src_dir = tmp.path().join("src");
+    std::fs::create_dir_all(&src_dir).unwrap();
+    std::fs::write(
+        src_dir.join("lib.rs"),
+        "pub fn hello() -> &'static str { \"hello\" }\npub struct Config { pub name: String }\n",
+    )
+    .unwrap();
+
+    let config = CodingAgentConfig {
+        max_iterations: 3,
+        working_dir: tmp.path().to_path_buf(),
+        ..Default::default()
+    };
+    let mut agent = CodingAgent::new(config).expect("Should create agent");
+
+    let result = agent.index_project(tmp.path());
+    assert!(result.is_ok(), "index_project should succeed: {:?}", result);
+
+    let (files, functions, types) = result.unwrap();
+    assert_eq!(files, 1, "Should index 1 file");
+    assert!(functions >= 1, "Should find at least 1 function");
+    assert!(types >= 1, "Should find at least 1 type");
+}
