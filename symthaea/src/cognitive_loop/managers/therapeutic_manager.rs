@@ -171,8 +171,15 @@ impl CognitiveSubsystem for TherapeuticManager {
         self.client_model.update_affect(affect);
 
         // ── 2. Crisis detection (ALWAYS runs — safety critical) ────────────
-        self.crisis_active = false;
-        self.last_crisis_type = None;
+        // NOTE: Do not reset crisis_active here — text-based crisis detection
+        // runs in cycle() before process() and sets crisis_active. We only
+        // clear it if no affect-based crisis is detected AND no text-based
+        // crisis was already flagged this cycle.
+        let text_crisis_active = self.crisis_active;
+        if !text_crisis_active {
+            self.crisis_active = false;
+            self.last_crisis_type = None;
+        }
         if let Some(crisis_alert) = self.crisis_detector.detect_from_affect(
             snapshot.valence,
             snapshot.arousal,

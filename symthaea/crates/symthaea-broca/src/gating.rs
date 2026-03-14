@@ -678,19 +678,42 @@ pub fn confidence_adjusted_veto_threshold(
 #[cfg(feature = "therapeutic")]
 pub const CANONICAL_VALIDATING_WORDS: &[&str] = &[
     "understand", "hear", "sense", "notice", "appreciate", "acknowledge",
-    "valid", "natural", "makes sense",
+    "valid", "natural", "makes sense", "that's understandable", "of course",
+    "completely", "reasonable", "normal", "brave", "courageous", "strength",
 ];
 
 #[cfg(feature = "therapeutic")]
 pub const CANONICAL_DIRECTIVE_WORDS: &[&str] = &[
     "should", "must", "need to", "have to", "wrong", "correct",
+    "obviously", "clearly you", "just stop", "just do", "simply",
 ];
 
 #[cfg(feature = "therapeutic")]
 pub const CANONICAL_REFLECTIVE_WORDS: &[&str] = &[
-    "sounds like", "it seems", "I wonder", "what if", "tell me more", "what comes up",
+    "sounds like", "it seems", "I wonder", "what if", "tell me more",
+    "what comes up", "I'm curious", "how does that feel", "what would",
+    "when you say", "help me understand", "say more about",
 ];
 
+/// Grounding/safety words — boosted during crisis protocol.
+#[cfg(feature = "therapeutic")]
+pub const CANONICAL_GROUNDING_WORDS: &[&str] = &[
+    "breathe", "ground", "safe", "here", "present", "feet", "hands",
+    "notice", "five things", "slow down", "right now", "moment",
+];
+
+/// Crisis referral words — boosted during crisis (intent >= 6.5).
+#[cfg(feature = "therapeutic")]
+pub const CANONICAL_CRISIS_WORDS: &[&str] = &[
+    "988", "crisis line", "emergency", "call", "help", "support",
+    "not alone", "reach out", "someone who can help",
+];
+
+/// Therapeutic gating: modulates language generation based on clinical context.
+///
+/// Adjusts token logits using client distress, therapeutic alliance quality,
+/// intervention depth, and therapeutic intent channels. Suppresses harmful
+/// or premature clinical language under high distress / low alliance.
 #[cfg(feature = "therapeutic")]
 pub struct TherapeuticGate;
 
@@ -712,6 +735,13 @@ impl TherapeuticGate {
             }
             if CANONICAL_VALIDATING_WORDS.iter().any(|w| word_lower.contains(w)) {
                 logit += 2.0;
+            }
+            // Boost grounding and crisis referral language during crisis
+            if CANONICAL_GROUNDING_WORDS.iter().any(|w| word_lower.contains(w)) {
+                logit += 2.5;
+            }
+            if CANONICAL_CRISIS_WORDS.iter().any(|w| word_lower.contains(w)) {
+                logit += 3.0;
             }
             return logit;
         }

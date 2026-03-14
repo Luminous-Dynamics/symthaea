@@ -3147,6 +3147,20 @@ impl CognitiveLoopService {
                         consciousness_level: broca_psi,
                         meta_awareness: self.carryover.learning.self_model_accuracy as f32,
                         coherence,
+                        knowledge_grounding: self
+                            .knowledge_manager
+                            .as_ref()
+                            .map(|km| {
+                                let s = km.signals();
+                                ((s.relevance * 0.6 + (1.0 - s.uncertainty) * 0.4) as f32)
+                                    .clamp(0.0, 1.0)
+                            })
+                            .unwrap_or(0.5),
+                        knowledge_context: self
+                            .knowledge_manager
+                            .as_ref()
+                            .map(|km| km.top_facts(3))
+                            .unwrap_or_default(),
                         #[cfg(feature = "therapeutic")]
                         therapeutic_intent: if self.therapeutic_manager.crisis_active {
                             7.0 // Crisis mode

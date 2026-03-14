@@ -421,7 +421,7 @@ impl CognitiveLoopService {
         &mut self,
         bridge: super::super::motor_output_bridge::MotorOutputBridge,
     ) {
-        self.motor_output_bridge = Some(bridge);
+        self.motor_rendering.output_bridge = Some(bridge);
     }
 
     /// Set the pending motor action request (path, content, args).
@@ -430,7 +430,7 @@ impl CognitiveLoopService {
         &mut self,
         request: super::super::motor_output_bridge::MotorActionRequest,
     ) {
-        self.pending_motor_request = Some(request);
+        self.motor_rendering.pending_request = Some(request);
     }
 
     /// Take the last motor output result (if any).
@@ -438,12 +438,12 @@ impl CognitiveLoopService {
     pub fn take_motor_result(
         &mut self,
     ) -> Option<super::super::motor_output_bridge::MotorOutputResult> {
-        self.last_motor_result.take()
+        self.motor_rendering.last_result.take()
     }
 
     /// Whether a motor output bridge is installed.
     pub fn has_motor_bridge(&self) -> bool {
-        self.motor_output_bridge.is_some()
+        self.motor_rendering.output_bridge.is_some()
     }
 
     /// Get the math service for dispatching mathematical queries.
@@ -517,7 +517,7 @@ impl CognitiveLoopService {
 
     /// Get the last assembled reasoning context (if knowledge engine is enabled).
     pub fn reasoning_context(&self) -> Option<&crate::knowledge::ReasoningContext> {
-        self.last_reasoning_context.as_ref()
+        self.episodic_persistence.last_reasoning_context.as_ref()
     }
 
     /// Trace causal chains from a starting concept through the knowledge causal bridge.
@@ -529,16 +529,100 @@ impl CognitiveLoopService {
         }
     }
 
+    /// Consolidate knowledge: prune weak facts and strengthen causal ones.
+    /// Returns (pruned_count, strengthened_count).
+    pub fn knowledge_consolidate_and_forget(&mut self) -> (usize, usize) {
+        if let Some(ref mut km) = self.knowledge_manager {
+            km.consolidate_and_forget()
+        } else {
+            (0, 0)
+        }
+    }
+
+    /// Force a knowledge persistence snapshot to SQLite.
+    pub fn knowledge_persist_snapshot(&mut self) {
+        if let Some(ref mut km) = self.knowledge_manager {
+            km.persist_snapshot();
+        }
+    }
+
+    /// Query the knowledge graph for relevant facts and causal chains.
+    pub fn knowledge_query(
+        &mut self,
+        query: &str,
+    ) -> crate::knowledge::reasoning_context::KnowledgeQueryResult {
+        if let Some(ref km) = self.knowledge_manager {
+            km.query(query)
+        } else {
+            Default::default()
+        }
+    }
+
+    /// Export the causal bridge as a Graphviz DOT string.
+    pub fn knowledge_export_dot(&self) -> String {
+        if let Some(ref km) = self.knowledge_manager {
+            km.causal_bridge().export_dot()
+        } else {
+            String::from("digraph causal {}")
+        }
+    }
+
+    /// Export the causal bridge as a Mermaid diagram string.
+    pub fn knowledge_export_mermaid(&self) -> String {
+        if let Some(ref km) = self.knowledge_manager {
+            km.causal_bridge().export_mermaid()
+        } else {
+            String::from("graph TD")
+        }
+    }
+
+    /// Counterfactual query: "If X hadn't happened, would Y still hold?"
+    /// Returns (cause, necessity_score) pairs.
+    pub fn knowledge_counterfactual(
+        &self,
+        effect: &str,
+        max_depth: usize,
+    ) -> Vec<(String, f32)> {
+        if let Some(ref km) = self.knowledge_manager {
+            km.counterfactual(effect, max_depth)
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// Find analogous facts in a target domain using HDC similarity.
+    pub fn knowledge_find_analogous(
+        &self,
+        source_id: u64,
+        target_domain: &str,
+        top_k: usize,
+    ) -> Vec<(String, f32)> {
+        if let Some(ref km) = self.knowledge_manager {
+            km.find_analogous(source_id, target_domain, top_k)
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// Get per-domain uncertainty for knowledge-aware attention allocation.
+    pub fn knowledge_domain_uncertainty(&self) -> Vec<(String, f32, usize)> {
+        if let Some(ref km) = self.knowledge_manager {
+            km.domain_uncertainty()
+        } else {
+            Vec::new()
+        }
+    }
+
     /// Whether the canvas living topology pipeline is active.
     #[cfg(feature = "canvas")]
     pub fn has_canvas(&self) -> bool {
-        self.canvas_manager.is_some()
+        self.motor_rendering.canvas_manager.is_some()
     }
 
     /// Last Birkhoff aesthetic score (0.0-1.0) from the canvas pipeline.
     #[cfg(feature = "canvas")]
     pub fn canvas_aesthetic_score(&self) -> f32 {
-        self.canvas_manager
+        self.motor_rendering.canvas_manager
             .as_ref()
             .map(|m| m.last_telemetry().aesthetic_score)
             .unwrap_or(0.0)
@@ -547,13 +631,13 @@ impl CognitiveLoopService {
     /// Take the last generated canvas SVG (drains it).
     #[cfg(feature = "canvas")]
     pub fn take_canvas_svg(&mut self) -> Option<String> {
-        self.canvas_manager.as_mut().and_then(|m| m.take_svg())
+        self.motor_rendering.canvas_manager.as_mut().and_then(|m| m.take_svg())
     }
 
     /// Last canvas generation time in microseconds.
     #[cfg(feature = "canvas")]
     pub fn canvas_generation_time_us(&self) -> u64 {
-        self.canvas_manager
+        self.motor_rendering.canvas_manager
             .as_ref()
             .map(|m| m.last_telemetry().generation_time_us)
             .unwrap_or(0)
@@ -562,7 +646,7 @@ impl CognitiveLoopService {
     /// Set the canvas generation interval (SVG produced every N cycles).
     #[cfg(feature = "canvas")]
     pub fn set_canvas_generation_interval(&mut self, interval: u32) {
-        if let Some(ref mut mgr) = self.canvas_manager {
+        if let Some(ref mut mgr) = self.motor_rendering.canvas_manager {
             mgr.set_generation_interval(interval);
         }
     }
@@ -630,5 +714,37 @@ impl CognitiveLoopService {
         specs: &[super::super::ethics_engine::ExternalConstraintSpec],
     ) -> usize {
         self.ethics_engine.load_external_constraints(specs)
+    }
+}
+
+// ── Therapeutic accessors (feature-gated) ────────────────────────────────
+
+#[cfg(feature = "therapeutic")]
+impl CognitiveLoopService {
+    /// Whether a crisis was detected this cycle.
+    pub fn therapeutic_manager_crisis_active(&self) -> bool {
+        self.therapeutic_manager.crisis_active
+    }
+
+    /// Current client distress level (0-1).
+    pub fn therapeutic_manager_client_distress(&self) -> f32 {
+        self.therapeutic_manager.client_distress()
+    }
+
+    /// Current therapeutic alliance composite score (0-1).
+    pub fn therapeutic_manager_alliance_composite(&self) -> f32 {
+        self.therapeutic_manager.alliance_composite()
+    }
+
+    /// Currently active regulation strategy, if any.
+    pub fn therapeutic_manager_active_strategy(
+        &self,
+    ) -> Option<symthaea_therapeutic::RegulationStrategy> {
+        self.therapeutic_manager.active_strategy()
+    }
+
+    /// Last detected crisis type name, if any.
+    pub fn therapeutic_manager_last_crisis_type(&self) -> Option<&str> {
+        self.therapeutic_manager.last_crisis_type.as_deref()
     }
 }

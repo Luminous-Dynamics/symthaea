@@ -10,7 +10,7 @@ use symthaea_broca::{BrocaConfig, BrocaGenerator, GenerationResult, ThoughtChann
 use symthaea_core::genesis::GenesisSeed;
 
 /// Compact consciousness signals for language generation gating.
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct BrocaConsciousnessSignals {
     /// Epistemic confidence (0=out-of-domain .. 1=certain).
     pub epistemic_confidence: f32,
@@ -26,6 +26,12 @@ pub struct BrocaConsciousnessSignals {
     pub meta_awareness: f32,
     /// Coherence (0..1).
     pub coherence: f32,
+    /// Knowledge grounding (0..1). How well current reasoning is supported by stored knowledge.
+    /// High grounding enables more confident, factual generation.
+    /// Science: Baddeley (2000) — semantic grounding improves production coherence.
+    pub knowledge_grounding: f32,
+    /// Top-k relevant knowledge facts for context-grounded generation.
+    pub knowledge_context: Vec<String>,
     /// Therapeutic intent (0=validate .. 7=crisis). Only used with `therapeutic` feature.
     #[cfg(feature = "therapeutic")]
     pub therapeutic_intent: f32,

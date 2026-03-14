@@ -139,7 +139,7 @@ impl CognitiveLoopService {
         //   - Boosts ACh (sustained attention, cortical recurrence)
         //   - Dampens NE (reduces alerting/scanning, shifts to focused mode)
         // Only fires when we have recent broadcast data.
-        if let Some(last_crhv) = self.cantor_broadcast_buffer.last() {
+        if let Some(last_crhv) = self.cantor_dream.broadcast_buffer.last() {
             let depth_norm =
                 last_crhv.depth as f32 / crate::cognitive_loop::thresholds::CANTOR_DEPTH_MAX as f32;
             if depth_norm > 0.3 {
@@ -158,6 +158,28 @@ impl CognitiveLoopService {
                     .bath
                     .noradrenaline
                     .set_baseline(ne_base + ne_nudge);
+            }
+        }
+
+        // ── Therapeutic text-based crisis detection (pre-perception) ──────
+        // Runs CrisisDetector::detect(input) on every cycle when enabled.
+        // Must run before encoding to ensure crisis state is available
+        // for downstream therapeutic gating and safety protocols.
+        // Science: Stanley & Brown (2012) — early crisis identification
+        #[cfg(feature = "therapeutic")]
+        if self.config.enable_therapeutic && self.config.therapeutic_text_crisis_detection && !input.is_empty() {
+            if let Some(crisis_alert) = self.therapeutic_manager.crisis_detector.detect(input) {
+                self.therapeutic_manager.crisis_active = true;
+                self.therapeutic_manager.last_crisis_type =
+                    Some(crisis_alert.crisis_type_name().to_string());
+                tracing::warn!(
+                    target: "cognitive_loop::therapeutic",
+                    crisis_type = crisis_alert.crisis_type_name(),
+                    confidence = crisis_alert.confidence,
+                    action = ?crisis_alert.recommended_action,
+                    cycle = self.stats.total_cycles,
+                    "Crisis detected from input text"
+                );
             }
         }
 
@@ -223,8 +245,25 @@ impl CognitiveLoopService {
                     (self.carryover.quality.last_exploration_bonus - dampen).max(0.0);
             }
 
-            // Item 2: Assemble reasoning context for downstream consumers
-            self.last_reasoning_context =
+            // Knowledge-aware attention: uncertain domains get more exploration
+            // Science: Schmidhuber (2010) — curiosity as compression progress
+            let domains = km.domain_uncertainty();
+            if let Some((most_uncertain_domain, avg_conf, _count)) = domains.first() {
+                if *avg_conf < 0.3 {
+                    // Very uncertain domain — boost exploration to seek more information
+                    let boost = (0.3 - avg_conf) * 0.1;
+                    self.carryover.quality.last_exploration_bonus += boost;
+                    tracing::trace!(
+                        domain = %most_uncertain_domain,
+                        confidence = avg_conf,
+                        boost = boost,
+                        "Knowledge-aware attention: boosting exploration for uncertain domain"
+                    );
+                }
+            }
+
+            // Assemble reasoning context for downstream consumers
+            self.episodic_persistence.last_reasoning_context =
                 Some(crate::knowledge::ReasoningContext::from_manager(km, input));
         }
 

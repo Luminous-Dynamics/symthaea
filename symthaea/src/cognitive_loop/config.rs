@@ -514,6 +514,31 @@ pub struct CognitiveLoopConfig {
     pub physics_bridge_blend_weight: f32,
 
     // ── Broca SSM Language Center ──────────────────────────────────────
+    // ── Therapeutic Psychology ────────────────────────────────────────
+    /// Enable therapeutic psychology subsystem.
+    /// When true and `therapeutic` feature is enabled, activates the
+    /// TherapeuticManager (client model, alliance, crisis detection,
+    /// regulation strategies, scope guard). Safety-critical crisis
+    /// detection runs every invocation.
+    /// Science: Bordin (1979), Safran & Muran (2000), Lambert (2013).
+    #[cfg(feature = "therapeutic")]
+    pub enable_therapeutic: bool,
+
+    /// Crisis detection sensitivity threshold (lower = more sensitive).
+    /// Range: 0.01 to 0.5. Default: 0.15.
+    /// Lower values catch more crisis indicators but may produce
+    /// false positives. Safety-critical: err toward sensitivity.
+    #[cfg(feature = "therapeutic")]
+    pub therapeutic_crisis_threshold: f32,
+
+    /// Whether to run text-based crisis detection on every input.
+    /// When true, CrisisDetector::detect(input_text) runs alongside
+    /// affect-based detection. Slightly more expensive but catches
+    /// explicit crisis language that affect alone may miss.
+    /// Default: true (safety-critical).
+    #[cfg(feature = "therapeutic")]
+    pub therapeutic_text_crisis_detection: bool,
+
     /// Enable Broca SSM language generation in the cognitive loop.
     /// When true and `ssm_language` feature is enabled, generates text
     /// from HDC-encoded thoughts with consciousness-gated quality control.
@@ -729,6 +754,12 @@ impl Default for CognitiveLoopConfig {
             physics_bridge_query_interval: 10,
             #[cfg(feature = "physics-bridge")]
             physics_bridge_blend_weight: 0.1,
+            #[cfg(feature = "therapeutic")]
+            enable_therapeutic: true, // On by default when feature is compiled in
+            #[cfg(feature = "therapeutic")]
+            therapeutic_crisis_threshold: 0.15,
+            #[cfg(feature = "therapeutic")]
+            therapeutic_text_crisis_detection: true, // Safety-critical: on by default
             #[cfg(feature = "ssm_language")]
             enable_broca_language: false,
             #[cfg(feature = "ssm_language")]
