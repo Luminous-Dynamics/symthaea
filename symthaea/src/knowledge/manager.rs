@@ -22,7 +22,7 @@ use super::causal_bridge::CausalKnowledgeBridge;
 use super::encoding::KnowledgeEncoder;
 use super::extraction::{EntityType, KnowledgeExtractor};
 use super::graph::{ContradictionAlert, EnhancedKnowledgeGraph, FactSearchResult};
-use super::persistence::KnowledgePersistence;
+use super::persistence::{CausalEdgeRecord, KnowledgePersistence, OntologyRecord};
 use super::reasoning_context::{KnowledgeQueryResult, ReasoningContext};
 use std::collections::VecDeque;
 use symthaea_core::hdc::unified_hv::BinaryHV;
@@ -80,6 +80,9 @@ pub struct KnowledgeSignals {
     /// Causal depth: how many causal chain steps were traced
     /// Feeds → reasoning confidence
     pub causal_depth: f64,
+    /// Epistemic surprise: high when contradictions + novelty are both present.
+    /// Feeds → FEP learning signal boost (Friston 2010).
+    pub epistemic_surprise: f64,
 }
 
 // ── Configuration ──────────────────────────────────────────────────────────
@@ -156,6 +159,9 @@ pub struct KnowledgeManager {
     persistence: Option<KnowledgePersistence>,
     /// Save interval from config (cycles between persistence snapshots)
     save_interval: u64,
+    /// Ontology learning rate multiplier, modulated by prediction error
+    /// Science: Rescorla-Wagner (1972) — PE modulates learning rate
+    ontology_lr_multiplier: f32,
 }
 
 impl Default for KnowledgeManager {
@@ -186,7 +192,7 @@ impl KnowledgeManager {
             if let Ok(edges) = p.load_causal_edges() {
                 let edge_count = edges.len();
                 for record in &edges {
-                    causal_bridge.import_edge(record);
+                    causal_bridge.import_edge(record.cause.clone(), record.effect.clone(), record.strength);
                 }
                 if edge_count > 0 {
                     tracing::info!(count = edge_count, "Knowledge: loaded causal edges from SQLite");
@@ -196,7 +202,7 @@ impl KnowledgeManager {
             if let Ok(records) = p.load_ontology() {
                 let onto_count = records.len();
                 for record in &records {
-                    ontology.import_record(record);
+                    ontology.import_ontology_record(record);
                 }
                 if onto_count > 0 {
                     tracing::info!(count = onto_count, "Knowledge: loaded ontology primitives from SQLite");
@@ -223,6 +229,7 @@ impl KnowledgeManager {
             last_causal_depth: 0,
             persistence,
             save_interval,
+            ontology_lr_multiplier: 1.0,
         }
     }
 
@@ -590,8 +597,18 @@ impl KnowledgeManager {
     pub fn persist_snapshot(&mut self) {
         if let Some(ref mut p) = self.persistence {
             let facts = self.graph.export_fact_records();
-            let edges = self.causal_bridge.export_edge_records();
-            let ontology_records = self.ontology.export_records();
+            let edge_tuples = self.causal_bridge.export_edge_records();
+            let edges: Vec<CausalEdgeRecord> = edge_tuples
+                .into_iter()
+                .map(|(cause, effect, strength)| CausalEdgeRecord {
+                    cause,
+                    effect,
+                    strength,
+                    is_inhibitory: false,
+                    cycle: 0,
+                })
+                .collect();
+            let ontology_records = self.ontology.export_ontology_records();
             if let Err(e) = p.save_facts(&facts) {
                 tracing::warn!(error = %e, "Knowledge persistence: failed to save facts");
             }
@@ -691,6 +708,69 @@ impl KnowledgeManager {
             .collect()
     }
 
+    /// Calibrate fact confidence based on prediction outcomes.
+    /// Accurate predictions boost confidence, inaccurate reduce.
+    /// Science: Jaynes (2003) — probability as extended logic.
+    pub fn calibrate_from_prediction(&mut self, prediction_error: f32) {
+        let boost = if prediction_error < 0.3 {
+            0.01 // Good prediction → slightly boost confidence
+        } else if prediction_error > 0.7 {
+            -0.02 // Bad prediction → reduce confidence
+        } else {
+            0.0
+        };
+
+        if boost != 0.0 {
+            for result in &self.last_search_results {
+                self.graph.adjust_confidence(result.fact_id, boost);
+            }
+        }
+    }
+
+    /// Set ontology learning rate from prediction error.
+    /// High PE → faster learning; low PE → slower (already learned).
+    /// Science: Rescorla-Wagner (1972).
+    pub fn set_ontology_lr_from_pe(&mut self, prediction_error: f32) {
+        self.ontology_lr_multiplier = (0.5 + prediction_error * 1.5).clamp(0.3, 2.0);
+    }
+
+    /// Get per-domain uncertainty: (domain_name, avg_confidence, fact_count).
+    /// Sorted by confidence ascending (most uncertain first).
+    pub fn domain_uncertainty(&self) -> Vec<(String, f32, usize)> {
+        self.graph.domain_distribution()
+    }
+
+    /// Counterfactual query: find causes for an effect with necessity scores.
+    /// Science: Pearl (2000) — do-calculus.
+    pub fn counterfactual(&self, effect: &str, max_results: usize) -> Vec<(String, f32)> {
+        self.causal_bridge.counterfactual_necessity(effect, max_results)
+    }
+
+    /// Find analogous facts in a target domain using HDC similarity.
+    /// Science: Gentner (1983) — structure mapping theory.
+    pub fn find_analogous(&self, source_id: u64, target_domain: &str, top_k: usize) -> Vec<(String, f32)> {
+        // Find the source fact's vector (clone to release borrow)
+        let source_vector = match self.graph.all_facts().find(|f| f.id == source_id) {
+            Some(f) => f.encoding.vector.clone(),
+            None => return Vec::new(),
+        };
+
+        // Search for similar facts in the target domain
+        let results = self.graph.search_domain(target_domain, &source_vector, top_k * 3);
+        results.iter()
+            .take(top_k)
+            .map(|r| (format!("fact:{}", r.fact_id), r.similarity))
+            .collect()
+    }
+
+    /// Get per-domain distribution: (domain_name, fact_count, avg_confidence).
+    pub fn domain_distribution(&self) -> Vec<(String, usize, f32)> {
+        self.graph.domain_distribution()
+            .into_iter()
+            .map(|(name, avg_conf, count)| (name, count, avg_conf))
+            .collect()
+    }
+
     // ── Internal ────────────────────────────────────────────────────────
 
     fn do_search(&mut self, input: &str) {
@@ -774,6 +854,9 @@ impl KnowledgeManager {
             novelty: (1.0 - avg_sim).clamp(0.0, 1.0),
             // Causal depth: normalized by max reasonable chain length (5 = deep chain)
             causal_depth: (self.last_causal_depth as f64 / 5.0).clamp(0.0, 1.0),
+            // Epistemic surprise: contradictions + novelty
+            epistemic_surprise: ((self.last_telemetry.contradictions_detected as f64 * 0.3).min(0.6)
+                + (1.0 - avg_sim) * 0.4).clamp(0.0, 1.0),
         };
     }
 }

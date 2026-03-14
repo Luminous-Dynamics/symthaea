@@ -307,6 +307,7 @@ pub struct HippocampusStats {
     pub avg_recall_time_ms: f32,
 }
 
+#[allow(deprecated)]
 impl HippocampusActor {
     /// Create a new hippocampus actor
     pub fn new(max_memories: usize) -> Self {
@@ -531,6 +532,7 @@ impl HippocampusActor {
     }
 }
 
+#[allow(deprecated)]
 impl Default for HippocampusActor {
     fn default() -> Self {
         Self::default_settings()

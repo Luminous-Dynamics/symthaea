@@ -262,6 +262,7 @@ pub(super) struct DynamicsPhaseResult {
     // Session 11: crash detector telemetry
     pub(super) confidence_crash_detected: bool,
     pub(super) lr_frozen: bool,
+    pub(super) semantic_evictions: u64,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -442,6 +443,7 @@ pub(super) struct FbMemory {
     pub(super) codebook_diversity: f32,
     pub(super) codebook_utilization_rate: f32,
     pub(super) surprise_replay_batch_size: usize,
+    pub(super) memory_db_flushed: bool,
 }
 
 /// Support intelligence metrics.

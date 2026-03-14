@@ -629,6 +629,26 @@ impl SqliteMemory {
             .map_err(|e| DatabaseError::InsertFailed(format!("COMMIT failed: {e}")))?;
         Ok(stored)
     }
+
+    /// Synchronously load the top `limit` episodic memories sorted by Phi (descending).
+    ///
+    /// Used by the cognitive loop's memory rehydration path, which runs outside
+    /// an async context. Returns an empty Vec on any error rather than propagating.
+    pub fn load_top_by_psi_sync(&self, limit: usize) -> Vec<MemoryRecord> {
+        let conn = self.conn.lock_resilient("sqlite_rehydrate");
+        let mut stmt = match conn.prepare(
+            "SELECT id, encoding, timestamp_ms, memory_type, content, valence, arousal, phi, topics, metadata, consolidation_strength, retrieval_count
+             FROM memories WHERE memory_type = 'episodic' ORDER BY phi DESC LIMIT ?1"
+        ) {
+            Ok(s) => s,
+            Err(_) => return Vec::new(),
+        };
+        let rows = match stmt.query_map([limit as i64], Self::row_to_record) {
+            Ok(r) => r,
+            Err(_) => return Vec::new(),
+        };
+        rows.filter_map(|r| r.ok()).collect()
+    }
 }
 
 #[async_trait]

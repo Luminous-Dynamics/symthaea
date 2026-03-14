@@ -12,6 +12,8 @@
 use std::collections::HashMap;
 use symthaea_core::hdc::unified_hv::{BinaryHV, HDC_DIMENSION};
 
+use crate::knowledge::persistence::OntologyRecord;
+
 // ── Types ──────────────────────────────────────────────────────────────────
 
 /// Usage statistics for a learned primitive
@@ -283,6 +285,42 @@ impl AdaptiveOntology {
         }
         let sum: f64 = self.primitives.values().map(|u| u.utility).sum();
         sum / self.primitives.len() as f64
+    }
+
+    /// Export all primitives as persistence records for SQLite storage.
+    pub fn export_ontology_records(&self) -> Vec<OntologyRecord> {
+        self.primitives
+            .values()
+            .map(|u| OntologyRecord {
+                name: u.name.clone(),
+                vector_bytes: u.vector.0.to_vec(),
+                usage_count: u.usage_count,
+                utility: u.utility,
+                created_at_cycle: u.created_at_cycle,
+                last_used_cycle: u.last_used_cycle,
+            })
+            .collect()
+    }
+
+    /// Import a primitive from a persistence record loaded from SQLite.
+    ///
+    /// Silently skips records whose vector bytes are the wrong length.
+    pub fn import_ontology_record(&mut self, record: &OntologyRecord) {
+        if record.vector_bytes.len() < BinaryHV::BYTES {
+            return;
+        }
+        let mut arr = [0u8; BinaryHV::BYTES];
+        arr.copy_from_slice(&record.vector_bytes[..BinaryHV::BYTES]);
+        let vector = BinaryHV(arr);
+        // Use `learn` to insert without overwriting existing primitives
+        // (it merges via Hebbian update if a similar primitive already exists).
+        self.learn(&record.name, vector, Vec::new(), record.created_at_cycle);
+        // Restore persisted statistics if the primitive was inserted (not merged).
+        if let Some(u) = self.primitives.get_mut(&record.name) {
+            u.usage_count = u.usage_count.max(record.usage_count);
+            u.utility = record.utility;
+            u.last_used_cycle = record.last_used_cycle;
+        }
     }
 }
 
