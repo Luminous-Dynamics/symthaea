@@ -822,5 +822,17 @@ impl CognitiveLoopService {
         self.learning_manager = super::managers::LearningManager::default();
         self.perception_manager = super::managers::PerceptionManager::default();
         self.swarm_manager = super::managers::SwarmManager::default();
+        #[cfg(feature = "mesh")]
+        {
+            self.spectrum_manager = super::managers::SpectrumManager::default();
+        }
+        #[cfg(feature = "therapeutic")]
+        {
+            self.therapeutic_manager = super::managers::TherapeuticManager::default();
+        }
+        #[cfg(feature = "support")]
+        {
+            self.support.reset();
+        }
     }
 }

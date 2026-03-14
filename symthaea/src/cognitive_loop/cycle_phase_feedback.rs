@@ -246,6 +246,27 @@ impl CognitiveLoopService {
             0.0
         };
 
+        // ── Phase 18b: Spectrum bandwidth → Broca speech rate throttle ────────
+        // When radio bandwidth drops, throttle speech generation to fit channel capacity.
+        // Science: Shannon (1948) — information rate limited by channel capacity.
+        #[cfg(feature = "mesh")]
+        {
+            let total_budget: u64 = self.spectrum_manager.tier_budgets().iter().sum();
+            if total_budget < super::thresholds::RADIO_BANDWIDTH_THROTTLE_THRESHOLD {
+                let throttle = (total_budget as f64
+                    / super::thresholds::RADIO_BANDWIDTH_THROTTLE_THRESHOLD as f64)
+                    .max(0.3) as f32;
+                self.adaptive_behavior.speech_rate_multiplier *= throttle;
+                self.adaptive_behavior.speech_rate_multiplier = self
+                    .adaptive_behavior
+                    .speech_rate_multiplier
+                    .clamp(
+                        super::thresholds::SPEECH_RATE_CLAMP_MIN,
+                        super::thresholds::SPEECH_RATE_CLAMP_MAX,
+                    );
+            }
+        }
+
         // ── Phase 19: Consciousness limiting component → targeted boost ─────
         let limiting_component_boosted = if !consciousness_limiting_component.is_empty()
             && consciousness_gradient_magnitude > 0.01

@@ -1190,6 +1190,24 @@ impl CognitiveLoopService {
             metadata.governance_lr_boost = self.governance_mgr.last_lr_boost();
         }
 
+        // Spectrum / radio telemetry
+        #[cfg(feature = "mesh")]
+        {
+            let st = self.spectrum_manager.telemetry();
+            metadata.spectrum_network_health = match st.network_health {
+                0 => "AllTiersUp".to_string(),
+                1 => "LocalDown".to_string(),
+                2 => "MetroOnly".to_string(),
+                3 => "Blackout".to_string(),
+                n => format!("Unknown({n})"),
+            };
+            metadata.spectrum_tier_available = st.tier_available.iter().filter(|&&a| a).count() as u8;
+            metadata.spectrum_jamming_streak = st.jamming_streak;
+            metadata.spectrum_prediction_error = st.spectrum_prediction_error;
+            metadata.spectrum_epistemic_discount = st.epistemic_discount;
+            metadata.spectrum_degradation_streak = st.degradation_streak;
+        }
+
         // Knowledge engine telemetry
         if let Some(ref km) = self.knowledge_manager {
             let telem = km.telemetry();

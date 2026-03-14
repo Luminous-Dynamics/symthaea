@@ -162,6 +162,8 @@ pub(crate) mod language_comm_manager;
 pub(crate) mod vision_sensory_manager;
 pub(crate) mod memory_consolidation_manager;
 pub(crate) mod feature_integration_manager;
+#[cfg(feature = "support")]
+pub(crate) mod support_manager;
 pub use substrate_manager::SubstrateTransitionRecord;
 pub(crate) mod subsystem_trait;
 #[allow(dead_code)] // Registry of tuning constants — many reserved for future wiring
@@ -182,6 +184,11 @@ pub use physics_integration::ParetoContext;
 
 #[cfg(feature = "mycelix")]
 pub use managers::governance_manager::{GovernanceEvent, GovernanceEventKind, GovernanceOutcome};
+
+pub use managers::swarm_manager::{SwarmEvent, SwarmTelemetry};
+
+#[cfg(feature = "mesh")]
+use managers::SpectrumManager;
 
 pub mod calibration;
 pub mod math_service;
@@ -473,35 +480,9 @@ pub struct CognitiveLoopService {
     // ═══════════════════════════════════════════════════════════════════════
     // SUPPORT INTELLIGENCE: Predictive diagnostics + knowledge federation
     // ═══════════════════════════════════════════════════════════════════════
-    /// Predictive engine for zero-click proactive support (telemetry → free energy alerts).
+    /// Support intelligence: predictive engine, knowledge, triage, privacy, actions.
     #[cfg(feature = "support")]
-    support_predictive_engine: Option<symthaea_support::predictive::PredictiveEngine>,
-
-    /// Knowledge manager for article graduation and cognitive update absorption.
-    /// Drives federation graduation checks and knowledge search during triage.
-    #[cfg(feature = "support")]
-    support_knowledge_manager: Option<symthaea_support::knowledge::KnowledgeManager>,
-
-    /// Triage engine for ticket classification and prioritization.
-    /// Classifies current input every cycle (lightweight keyword match).
-    #[cfg(feature = "support")]
-    support_triage_engine: Option<symthaea_support::triage::TriageEngine>,
-
-    /// Privacy manager for federation sharing tier enforcement.
-    /// Gates outbound knowledge federation based on SharingTier.
-    #[cfg(feature = "support")]
-    support_privacy_manager: Option<symthaea_support::privacy::PrivacyManager>,
-
-    /// Action engine for autonomous remediation proposals.
-    /// Proposes and gates actions based on autonomy level.
-    /// Consumed by bridge dispatch when conductor events are wired.
-    #[cfg(feature = "support")]
-    #[allow(dead_code)] // RESERVED(feature-support): autonomy-aware action engine
-    support_action_engine: Option<symthaea_support::actions::ActionEngine>,
-
-    /// Cycle counter for amortizing support subsystem updates.
-    #[cfg(feature = "support")]
-    support_cycle_counter: u64,
+    pub(crate) support: support_manager::SupportManager,
 
     /// State carried over between consecutive cycles (phi modulations, veto flags,
     /// urgency hysteresis, MCE boost, etc.). Reset via `CycleCarryover::default()`.
@@ -685,6 +666,16 @@ pub struct CognitiveLoopService {
     /// Swarm Manager: Peer consciousness signals → social buffering, affective contagion,
     /// collective Φ modulation. Implements CognitiveSubsystem at interval 41.
     swarm_manager: managers::SwarmManager,
+
+    /// Spectrum Manager: Multi-band radio dispatch, AIMD congestion, delta compression.
+    /// Implements CognitiveSubsystem at interval 53. Feature-gated behind `mesh`.
+    #[cfg(feature = "mesh")]
+    pub(crate) spectrum_manager: SpectrumManager,
+
+    /// Therapeutic Manager: client model, alliance, crisis detection, regulation.
+    /// Implements CognitiveSubsystem at interval 11. Feature-gated behind `therapeutic`.
+    #[cfg(feature = "therapeutic")]
+    therapeutic_manager: managers::TherapeuticManager,
 
     /// Integrity Manager: BLAKE3 attestation, temporal consistency, behavioral canaries.
     /// Runs tamper detection at co-prime intervals. Feature-gated behind `integrity`.

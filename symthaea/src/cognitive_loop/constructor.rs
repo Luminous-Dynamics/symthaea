@@ -721,17 +721,7 @@ impl CognitiveLoopService {
             },
             primitive_tier,
             #[cfg(feature = "support")]
-            support_predictive_engine: Some(symthaea_support::predictive::PredictiveEngine::new()),
-            #[cfg(feature = "support")]
-            support_knowledge_manager: Some(symthaea_support::knowledge::KnowledgeManager::new()),
-            #[cfg(feature = "support")]
-            support_triage_engine: Some(symthaea_support::triage::TriageEngine::new()),
-            #[cfg(feature = "support")]
-            support_privacy_manager: Some(symthaea_support::privacy::PrivacyManager::default()),
-            #[cfg(feature = "support")]
-            support_action_engine: Some(symthaea_support::actions::ActionEngine::new()),
-            #[cfg(feature = "support")]
-            support_cycle_counter: 0,
+            support: super::support_manager::SupportManager::new(),
             carryover: CycleCarryover::default(),
             prefrontal,
             self_model_tier,
@@ -938,6 +928,10 @@ impl CognitiveLoopService {
             #[cfg(feature = "mycelix")]
             governance_mgr: super::managers::GovernanceManager::default(),
             swarm_manager: super::managers::SwarmManager::default(),
+            #[cfg(feature = "mesh")]
+            spectrum_manager: super::managers::SpectrumManager::default(),
+            #[cfg(feature = "therapeutic")]
+            therapeutic_manager: super::managers::TherapeuticManager::default(),
             cantor_broadcast_buffer: Vec::with_capacity(32),
             cantor_cleanup_engine: {
                 use symthaea_core::hdc::cantor_resonator_cleanup::*;
@@ -999,6 +993,7 @@ impl CognitiveLoopService {
                 // Register governance thresholds for integrity monitoring
                 #[cfg(feature = "mycelix")]
                 im.register_governance_thresholds();
+                im.register_knowledge_thresholds();
                 // Apply substrate tau factor for temporal consistency scaling (#3)
                 im.set_substrate_tau_factor(substrate_tau_for_integrity);
                 // Install panic hook for crash forensics — dumps integrity snapshot to disk
@@ -1034,6 +1029,42 @@ impl CognitiveLoopService {
                 }
                 Err(e) => {
                     tracing::warn!(path = %db_path, error = %e, "Failed to open memory database — persistence disabled");
+                }
+            }
+        }
+
+        // Startup rehydration: load top-64 episodes from SQLite into phi_episodic_replay
+        if let Some(ref db) = service.memory_db {
+            if let Some(ref mut replay) = service.phi_episodic_replay {
+                let records = db.load_top_by_psi_sync(64);
+                let mut rehydrated = 0usize;
+                for record in records {
+                    // Convert BinaryHV to ContinuousHV via bipolar encoding (bit=1 → +1.0, bit=0 → -1.0)
+                    let dim = record.encoding.0.len() * 8;
+                    let mut values = Vec::with_capacity(dim);
+                    for byte in &record.encoding.0 {
+                        for bit in (0..8).rev() {
+                            if (byte >> bit) & 1 == 1 {
+                                values.push(1.0f32);
+                            } else {
+                                values.push(-1.0f32);
+                            }
+                        }
+                    }
+                    let input_hv = symthaea_core::hdc::unified_hv::ContinuousHV::from_vec(values);
+                    let output_hv = symthaea_core::hdc::unified_hv::ContinuousHV::zero(dim);
+                    let episode = crate::memory::episodic_replay::Episode::new(
+                        input_hv,
+                        output_hv,
+                        record.psi,
+                        record.timestamp_ms / 20, // convert ms back to approximate cycle number
+                    );
+                    if replay.store_if_significant(episode) {
+                        rehydrated += 1;
+                    }
+                }
+                if rehydrated > 0 {
+                    tracing::info!(episodes = rehydrated, "Startup rehydration: loaded episodes from SQLite");
                 }
             }
         }

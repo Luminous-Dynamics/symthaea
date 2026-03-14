@@ -2945,6 +2945,21 @@ pub const KNOWLEDGE_FORGET_CONFIDENCE_THRESHOLD: f32 = 0.1;
 /// Confidence boost applied to causal facts during dream consolidation.
 pub const KNOWLEDGE_CONSOLIDATION_BOOST: f32 = 0.05;
 
+/// NE baseline boost per unit of knowledge uncertainty above 0.5 (Bouret & Sara 2005).
+pub const KNOWLEDGE_UNCERTAINTY_NE_SCALE: f32 = 0.015;
+/// DA baseline nudge when causal chain depth exceeds threshold (Schultz 1997).
+pub const KNOWLEDGE_CAUSAL_DEPTH_DA_NUDGE: f32 = 0.01;
+/// 5-HT baseline nudge for grounded, low-uncertainty knowledge (Cools et al. 2008).
+pub const KNOWLEDGE_GROUNDING_SHT_NUDGE: f32 = 0.005;
+/// Exploration boost scale for novel knowledge signals (novelty > 0.5).
+pub const KNOWLEDGE_NOVELTY_EXPLORE_SCALE: f32 = 0.08;
+/// Salience boost for knowledge facts promoted to episodic memory during dreams.
+pub const KNOWLEDGE_EPISODIC_SALIENCE_BOOST: f32 = 0.15;
+/// Max facts to promote per dream consolidation cycle.
+pub const KNOWLEDGE_EPISODIC_MAX_PER_DREAM: usize = 5;
+/// Minimum similarity for AGM-style contradiction resolution (demote weaker fact).
+pub const KNOWLEDGE_CONTRADICTION_RESOLUTION_THRESHOLD: f32 = 0.8;
+
 /// Maximum attention contribution from limiting component analysis (cap).
 pub const LIMITING_COMPONENT_ATTENTION_MAX: f32 = 0.1;
 
@@ -3015,6 +3030,16 @@ pub const RESONATOR_SUSTAINED_LOW_CONFIDENCE: f32 = 0.01;
 
 /// Broca coherence threshold for language generation quality gating.
 pub const BROCA_COHERENT_THRESHOLD: f32 = 0.7;
+
+/// Confidence boost scale when Broca coherence exceeds threshold.
+/// Applied as: (coherence - BROCA_COHERENT_THRESHOLD) * SCALE → adjust_confidence.
+/// Science: Pickering & Garrod (2013) — coherent language production reinforces cognitive confidence.
+pub const BROCA_COHERENT_CONFIDENCE_SCALE: f32 = 0.1;
+
+/// Exploration damping when Broca semantic veto fires.
+/// A veto means the model rejected incoherent output → exploitation is safer than exploration.
+/// Science: Pickering & Garrod (2013) — veto = self-correction → reduce drift.
+pub const BROCA_VETO_EXPLORATION_SCALE: f32 = -0.02;
 
 /// Exploration boost when causal graph is sparse (few patterns learned).
 /// Science: Pearl (2009) — sparse causal knowledge → explore to discover structure.
@@ -3286,6 +3311,52 @@ pub const VOICE_HEARTBEAT_LISTENER_SUCCESS: f32 = 0.8;
 
 /// Voice heartbeat listener prediction: failure value.
 pub const VOICE_HEARTBEAT_LISTENER_FAIL: f32 = 0.3;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Radio / Spectrum Manager (mesh feature)
+// Science: Haykin (2005) — cognitive radio, spectrum sensing and dynamic access.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// SNR threshold below which a channel is considered jammed (dB).
+/// Science: Haykin (2005) — cognitive radio spectrum sensing threshold.
+pub const RADIO_JAMMING_SNR_THRESHOLD: f32 = 5.0;
+
+/// Arousal spike when jamming is detected (threat response).
+/// Science: LeDoux (2003) — amygdala rapid threat detection.
+pub const RADIO_JAMMING_AROUSAL_SPIKE: f64 = 0.04;
+
+/// Exploration boost per jamming streak cycle (frequency-hopping search).
+/// Science: Berlyne (1960) — curiosity under uncertainty.
+pub const RADIO_JAMMING_EXPLORATION_BOOST: f64 = 0.02;
+
+/// Confidence drop per network degradation level.
+/// Science: Slovic (1993) — trust asymmetry (harder to build than destroy).
+pub const RADIO_DEGRADATION_CONFIDENCE_DROP: f64 = 0.03;
+
+/// EMA alpha for tier packet-loss tracking (higher = faster response).
+/// Science: Roberts (1959) — exponential smoothing for signal tracking.
+pub const RADIO_TIER_LOSS_EMA_ALPHA: f64 = 0.15;
+
+/// Tier loss EMA threshold above which a tier is considered degraded.
+pub const RADIO_TIER_DEGRADED_LOSS: f64 = 0.5;
+
+/// EMA alpha for predicted noise floor tracking.
+pub const RADIO_NOISE_FLOOR_EMA_ALPHA: f64 = 0.1;
+
+/// Maximum number of peers tracked for delta compression.
+/// Prevents unbounded memory growth in dense networks.
+pub const RADIO_MAX_DELTA_PEERS: usize = 64;
+
+/// Total bandwidth (bytes/s) below which Broca speech rate is throttled.
+/// Science: Shannon (1948) — channel capacity constrains information throughput.
+pub const RADIO_BANDWIDTH_THROTTLE_THRESHOLD: u64 = 500;
+
+/// Connectivity penalty when local tier is down (0.0-1.0 multiplier on swarm EMA).
+/// Science: Dunbar (1998) — local network loss degrades social cognition.
+pub const RADIO_CONNECTIVITY_PENALTY_LOCAL_DOWN: f64 = 0.7;
+
+/// Connectivity penalty when only metro tier remains (greater degradation).
+pub const RADIO_CONNECTIVITY_PENALTY_METRO_ONLY: f64 = 0.4;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TESTS
@@ -4192,6 +4263,7 @@ mod tests {
         // Dynamics phase
         assert!(RESONATOR_SUSTAINED_LOW_CONFIDENCE > 0.0 && RESONATOR_SUSTAINED_LOW_CONFIDENCE < 0.05);
         assert!(BROCA_COHERENT_THRESHOLD > 0.5 && BROCA_COHERENT_THRESHOLD < 1.0);
+        assert!(BROCA_COHERENT_CONFIDENCE_SCALE > 0.0 && BROCA_COHERENT_CONFIDENCE_SCALE < 0.5);
         assert!(FEP_ACCURACY_HIGH_CONFIDENCE > 0.0 && FEP_ACCURACY_HIGH_CONFIDENCE < 0.05);
         assert!(FEP_TD_CONVERGE_EXPLORE_SCALE > 0.9 && FEP_TD_CONVERGE_EXPLORE_SCALE < 1.0);
         assert!(MATH_VERIFIED_CONFIDENCE > 0.0 && MATH_VERIFIED_CONFIDENCE < 0.1);
@@ -4348,5 +4420,38 @@ mod tests {
         // Contradiction boosts
         assert!(KNOWLEDGE_CONTRADICTION_NE_BOOST > 0.0 && KNOWLEDGE_CONTRADICTION_NE_BOOST < 0.1);
         assert!(KNOWLEDGE_CONTRADICTION_SHT_BOOST > 0.0 && KNOWLEDGE_CONTRADICTION_SHT_BOOST < 0.1);
+        // Neuromod coupling
+        assert!(KNOWLEDGE_UNCERTAINTY_NE_SCALE > 0.0 && KNOWLEDGE_UNCERTAINTY_NE_SCALE < 0.1);
+        assert!(KNOWLEDGE_CAUSAL_DEPTH_DA_NUDGE > 0.0 && KNOWLEDGE_CAUSAL_DEPTH_DA_NUDGE < 0.1);
+        assert!(KNOWLEDGE_GROUNDING_SHT_NUDGE > 0.0 && KNOWLEDGE_GROUNDING_SHT_NUDGE < 0.1);
+        // Exploration modulation
+        assert!(KNOWLEDGE_NOVELTY_EXPLORE_SCALE > 0.0 && KNOWLEDGE_NOVELTY_EXPLORE_SCALE < 0.5);
+        // Episodic bridge
+        assert!(KNOWLEDGE_EPISODIC_SALIENCE_BOOST > 0.0 && KNOWLEDGE_EPISODIC_SALIENCE_BOOST < 1.0);
+        assert!(KNOWLEDGE_EPISODIC_MAX_PER_DREAM > 0 && KNOWLEDGE_EPISODIC_MAX_PER_DREAM <= 20);
+        // AGM contradiction resolution
+        assert!(KNOWLEDGE_CONTRADICTION_RESOLUTION_THRESHOLD > 0.5 && KNOWLEDGE_CONTRADICTION_RESOLUTION_THRESHOLD <= 1.0);
+    }
+
+    #[test]
+    fn test_radio_spectrum_params() {
+        // Jamming
+        assert!(RADIO_JAMMING_SNR_THRESHOLD > 0.0 && RADIO_JAMMING_SNR_THRESHOLD < 20.0);
+        assert!(RADIO_JAMMING_AROUSAL_SPIKE > 0.0 && RADIO_JAMMING_AROUSAL_SPIKE < 0.2);
+        assert!(RADIO_JAMMING_EXPLORATION_BOOST > 0.0 && RADIO_JAMMING_EXPLORATION_BOOST < 0.1);
+        // Degradation
+        assert!(RADIO_DEGRADATION_CONFIDENCE_DROP > 0.0 && RADIO_DEGRADATION_CONFIDENCE_DROP < 0.1);
+        // EMA alphas
+        assert!(RADIO_TIER_LOSS_EMA_ALPHA > 0.0 && RADIO_TIER_LOSS_EMA_ALPHA < 1.0);
+        assert!(RADIO_NOISE_FLOOR_EMA_ALPHA > 0.0 && RADIO_NOISE_FLOOR_EMA_ALPHA < 1.0);
+        // Tier degraded threshold
+        assert!(RADIO_TIER_DEGRADED_LOSS > 0.0 && RADIO_TIER_DEGRADED_LOSS < 1.0);
+        // Peer cap
+        assert!(RADIO_MAX_DELTA_PEERS > 0 && RADIO_MAX_DELTA_PEERS <= 256);
+        // Bandwidth throttle
+        assert!(RADIO_BANDWIDTH_THROTTLE_THRESHOLD > 0);
+        // Connectivity penalties
+        assert!(RADIO_CONNECTIVITY_PENALTY_LOCAL_DOWN > 0.0 && RADIO_CONNECTIVITY_PENALTY_LOCAL_DOWN < 1.0);
+        assert!(RADIO_CONNECTIVITY_PENALTY_METRO_ONLY > 0.0 && RADIO_CONNECTIVITY_PENALTY_METRO_ONLY < RADIO_CONNECTIVITY_PENALTY_LOCAL_DOWN);
     }
 }

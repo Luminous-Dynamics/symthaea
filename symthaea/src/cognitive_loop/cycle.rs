@@ -165,6 +165,7 @@ impl CognitiveLoopService {
         // PHASE 1: PERCEPTION
         // Safety checks, encoding, moral evaluation, strategy, urgency
         // ═══════════════════════════════════════════════════════════════════
+        let _phase1_t = Instant::now();
         let perception = match self.phase_perception(input, cycle_start, &mut module_timings) {
             Ok(p) => p,
             Err(blocked) => return *blocked,
@@ -231,6 +232,8 @@ impl CognitiveLoopService {
         // PHASE 2: DYNAMICS
         // CfC step, prediction, FEP, training, parallel post-processing
         // ═══════════════════════════════════════════════════════════════════
+        module_timings.phase_perception = _phase1_t.elapsed().as_micros() as u64;
+        let _phase2_t = Instant::now();
         let mut dynamics =
             self.phase_dynamics(input, &perception, cycle_start, &mut module_timings);
 
@@ -246,6 +249,8 @@ impl CognitiveLoopService {
         // PHASE 3: FEEDBACK
         // Consciousness metrics, quality gating, homeostasis, dream engine
         // ═══════════════════════════════════════════════════════════════════
+        module_timings.phase_dynamics = _phase2_t.elapsed().as_micros() as u64;
+        let _phase3_t = Instant::now();
         let feedback = self.phase_feedback(input, &perception, &mut dynamics, &mut module_timings);
 
         // ═══════════════════════════════════════════════════════════════════
@@ -262,6 +267,7 @@ impl CognitiveLoopService {
         // PHASE 4: OUTPUT
         // Metadata assembly, telemetry, CycleResult construction
         // ═══════════════════════════════════════════════════════════════════
+        module_timings.phase_feedback = _phase3_t.elapsed().as_micros() as u64;
         self.phase_output(
             input,
             cycle_start,

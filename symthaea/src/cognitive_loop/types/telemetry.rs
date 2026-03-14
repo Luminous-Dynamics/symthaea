@@ -205,7 +205,6 @@ pub struct CycleMetadata {
     pub reasoning_narrative: Option<String>,
 
     /// Quality diagnostics telemetry (meta-cognitive, dissipative, coherence, anomaly).
-    #[serde(flatten)]
     pub quality: QualityDiagnostics,
 
     /// Narrative self-model's integrated information (0.0 = off/no self, >0 = active self-Φ)
@@ -231,7 +230,6 @@ pub struct CycleMetadata {
     pub predictive_self_safety: f32,
 
     /// Attention subsystem telemetry (schema, GWT, budget, memoization).
-    #[serde(flatten)]
     pub attention: AttentionMetrics,
 
     /// Consciousness resonance dominant frequency (Hz).
@@ -288,11 +286,9 @@ pub struct CycleMetadata {
     pub urgency: CycleUrgency,
 
     /// Memory-resonator subsystem telemetry (dreams, codebook, replay).
-    #[serde(flatten)]
     pub memory: MemoryResonatorMetrics,
 
     /// Free energy principle (FEP) and predictive processing telemetry.
-    #[serde(flatten)]
     pub fep: FepTelemetry,
 
     /// Cross-modal binding strength (0.0 when off).
@@ -348,11 +344,9 @@ pub struct CycleMetadata {
     pub composition_rule_applied: String,
 
     /// Harmonic and moral geometry telemetry (harmonies, guiding question, moral FEP).
-    #[serde(flatten)]
     pub harmonics: HarmonicMetrics,
 
     /// Ethical and moral topology telemetry (moral score, value evaluator, topology).
-    #[serde(flatten)]
     pub ethics: EthicalTelemetry,
     /// Multi-objective evolution: Pareto frontier size (0 when not run this cycle).
     pub multi_obj_frontier_size: usize,
@@ -663,7 +657,6 @@ pub struct CycleMetadata {
     // ── Neuromodulator Bath ────────────────────────────────────────────
     /// Complete neuromodulator telemetry snapshot.
     /// Populated via `collect_neuromod_telemetry()` and assigned to `metadata.neuromod`.
-    #[serde(flatten)]
     pub neuromod: NeuromodTelemetry,
 
     // ── Phase 4: Neuroendocrine Control (CycleMetadata-specific) ─────
@@ -698,12 +691,10 @@ pub struct CycleMetadata {
     pub liquid_mamba_generation_count: u32,
 
     /// Mesh network telemetry (health, peers, bandwidth, encryption).
-    #[serde(flatten)]
     pub mesh: MeshTelemetry,
 
     // ── Feedback State Telemetry (Phase 2.2) ────────────────────────────
     /// Feedback proposal system telemetry: counts, consensus outcomes, traces.
-    #[serde(flatten)]
     pub feedback: FeedbackTelemetry,
 
     // ── Staged Computation Model Telemetry (Phase 2.3) ────────────────
@@ -1293,9 +1284,9 @@ pub struct CycleMetadata {
     /// Environmental predictability (0.0–1.0).
     #[serde(default)]
     pub env_predictability: f32,
-    /// Whether attention budget was exceeded.
+    /// Whether proposal budget was exceeded (feedback_state proposals > max).
     #[serde(default)]
-    pub attention_budget_exceeded: bool,
+    pub proposal_budget_exceeded: bool,
     /// Readiness score (0.0–1.0, composite of PE/sleep/fatigue).
     #[serde(default)]
     pub readiness_score: f32,
@@ -1360,6 +1351,32 @@ pub struct CycleMetadata {
     /// LR boost from governance prediction error (1.0 = no boost, >1.0 = high PE boosted learning).
     #[serde(default)]
     pub governance_lr_boost: f64,
+
+    // ── Spectrum / Radio Telemetry (mesh feature) ───────────────────────
+    /// Network health status string ("AllTiersUp", "LocalDown", "MetroOnly", "Blackout").
+    #[cfg(feature = "mesh")]
+    #[serde(default)]
+    pub spectrum_network_health: String,
+    /// Number of radio tiers currently available (0-3).
+    #[cfg(feature = "mesh")]
+    #[serde(default)]
+    pub spectrum_tier_available: u8,
+    /// Consecutive cycles in which jamming was detected.
+    #[cfg(feature = "mesh")]
+    #[serde(default)]
+    pub spectrum_jamming_streak: u32,
+    /// Spectrum prediction error (noise floor deviation, 0.0-1.0).
+    #[cfg(feature = "mesh")]
+    #[serde(default)]
+    pub spectrum_prediction_error: f64,
+    /// Epistemic discount from network degradation (1.0 = full trust, <1.0 = degraded).
+    #[cfg(feature = "mesh")]
+    #[serde(default)]
+    pub spectrum_epistemic_discount: f64,
+    /// Degradation streak (consecutive cycles with any tier down).
+    #[cfg(feature = "mesh")]
+    #[serde(default)]
+    pub spectrum_degradation_streak: u32,
 
     // ── Knowledge Engine Telemetry ──────────────────────────────────────
     /// Number of facts in the knowledge graph (0 if engine disabled).
@@ -1563,8 +1580,7 @@ pub struct BrocaGenerationTelemetry {
 
 /// Memory-resonator subsystem telemetry: dreams, codebook, replay.
 ///
-/// Grouped from CycleMetadata flat fields. `#[serde(flatten)]` preserves
-/// the original JSON format for backwards compatibility.
+/// Grouped from CycleMetadata as a named sub-struct.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct MemoryResonatorMetrics {
     /// Number of insights gained from dream replay this cycle (0 = no dreaming).
@@ -1600,12 +1616,25 @@ pub struct MemoryResonatorMetrics {
     pub codebook_utilization_rate: f32,
     /// FEP surprise-modulated replay batch size (0 when replay not triggered).
     pub surprise_replay_batch_size: usize,
+
+    // ── Graduation Pipeline Telemetry ────────────────────────────────────
+    /// Cumulative graduations processed by MemoryCoordinator (WM → episodic).
+    pub graduations_processed: u64,
+    /// Cumulative graduations rejected (too few survival steps).
+    pub graduations_rejected: u64,
+    /// Semantic entries evicted from ring buffer this cycle (0 or 1).
+    pub semantic_evictions: u64,
+    /// Current episodic memory count (episodes in priority heap).
+    pub episodic_memory_count: usize,
+    /// Average Psi across stored episodes (0.0 when empty).
+    pub episodic_avg_psi: f64,
+    /// Whether a SQLite flush occurred this cycle.
+    pub memory_db_flushed: bool,
 }
 
 /// Quality diagnostics telemetry: meta-cognitive, dissipative, coherence, anomaly recovery.
 ///
-/// Grouped from CycleMetadata flat fields. `#[serde(flatten)]` preserves
-/// the original JSON format for backwards compatibility.
+/// Grouped from CycleMetadata as a named sub-struct.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct QualityDiagnostics {
     /// Meta-cognitive self-model accuracy (0.0 = uncertain, 1.0 = perfect self-knowledge).
@@ -1642,8 +1671,7 @@ pub struct QualityDiagnostics {
 
 /// Attention subsystem telemetry: schema focus, GWT, budget, memoization.
 ///
-/// Grouped from CycleMetadata flat fields. `#[serde(flatten)]` preserves
-/// the original JSON format for backwards compatibility.
+/// Grouped from CycleMetadata as a named sub-struct.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct AttentionMetrics {
     /// Attention schema focus intensity (0.0 to 1.0, 0.0 when not enabled).
@@ -1678,8 +1706,7 @@ pub struct AttentionMetrics {
 
 /// Harmonic and moral geometry telemetry.
 ///
-/// Grouped from CycleMetadata flat fields. `#[serde(flatten)]` preserves
-/// the original JSON format for backwards compatibility.
+/// Grouped from CycleMetadata as a named sub-struct.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct HarmonicMetrics {
     /// Harmonies integrator: overall value alignment score (0.0–1.0, 0.0 when off).
@@ -1714,8 +1741,7 @@ pub struct HarmonicMetrics {
 
 /// Ethical and moral topology telemetry.
 ///
-/// Grouped from CycleMetadata flat fields. `#[serde(flatten)]` preserves
-/// the original JSON format for backwards compatibility.
+/// Grouped from CycleMetadata as a named sub-struct.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct EthicalTelemetry {
     /// Moral judgment score for this cycle (-1.0 to 1.0). 0.0 when skipped.
@@ -1820,8 +1846,7 @@ pub struct EthicalTelemetry {
 
 /// Free energy principle (FEP) and predictive processing telemetry.
 ///
-/// Grouped from CycleMetadata flat fields. `#[serde(flatten)]` preserves
-/// the original JSON format for backwards compatibility.
+/// Grouped from CycleMetadata as a named sub-struct.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct FepTelemetry {
     /// FEP action index selected this cycle (0=exploit, 1=consolidate, 2=explore, 3=tighten).
@@ -1844,8 +1869,7 @@ pub struct FepTelemetry {
 
 /// Mesh network telemetry.
 ///
-/// Grouped from CycleMetadata flat fields. `#[serde(flatten)]` preserves
-/// the original JSON format for backwards compatibility.
+/// Grouped from CycleMetadata as a named sub-struct.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct MeshTelemetry {
     /// Mesh network composite health score (0.0–1.0, 0.0 when mesh disabled).
@@ -2084,4 +2108,14 @@ pub struct ModuleTimings {
     pub dream_cycle: u64,
     /// Moral topology: persistent homology analysis on moral scenarios
     pub moral_topology: u64,
+
+    // ── Phase-level timings (top-level pipeline phases) ──
+    /// Phase 1: Perception (safety, encoding, moral eval, strategy, urgency).
+    pub phase_perception: u64,
+    /// Phase 2: Dynamics (CfC step, prediction, FEP, training, post-processing).
+    pub phase_dynamics: u64,
+    /// Phase 3: Feedback (consciousness, quality gating, homeostasis, dream).
+    pub phase_feedback: u64,
+    /// Phase 4: Output (metadata assembly, telemetry, CycleResult construction).
+    pub phase_output: u64,
 }
