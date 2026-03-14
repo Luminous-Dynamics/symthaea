@@ -1,0 +1,24 @@
+{
+  "community_name": "Maharashtra Farmer Producer Organisation",
+  "basket_name": "Maharashtra FPO Basket",
+  "dao_did": "maharashtra-fpo",
+  "currency_code": "INR",
+  "currency_symbol": "\u20b9",
+  "labor_hour_value": 26.00,
+  "labor_hour_source": "Maharashtra Minimum Wage 2026 (unskilled agricultural)",
+  "tax_year_start_month": 4,
+  "tax_form_name": "ITR-4 (Sugam)",
+  "tax_authority": "Income Tax Department",
+  "basket_items": [
+    { "key": "rice_1kg", "name": "Rice (1kg)", "unit": "kg", "default_price": 0.10, "weight": 0.15 },
+    { "key": "wheat_flour_1kg", "name": "Wheat flour (1kg)", "unit": "kg", "default_price": 0.08, "weight": 0.12 },
+    { "key": "lpg_1kg", "name": "LPG gas (1kg)", "unit": "kg", "default_price": 0.30, "weight": 0.12 },
+    { "key": "milk_1l", "name": "Milk (1L)", "unit": "litre", "default_price": 0.08, "weight": 0.10 },
+    { "key": "dal_1kg", "name": "Toor dal (1kg)", "unit": "kg", "default_price": 0.15, "weight": 0.10 },
+    { "key": "onion_1kg", "name": "Onions (1kg)", "unit": "kg", "default_price": 0.05, "weight": 0.08 },
+    { "key": "diesel_1l", "name": "Diesel (1L)", "unit": "litre", "default_price": 0.35, "weight": 0.10 },
+    { "key": "fertilizer_1kg", "name": "DAP fertilizer (1kg)", "unit": "kg", "default_price": 0.20, "weight": 0.08 },
+    { "key": "cooking_oil_1l", "name": "Cooking oil (1L)", "unit": "litre", "default_price": 0.15, "weight": 0.08 },
+    { "key": "sugar_1kg", "name": "Sugar (1kg)", "unit": "kg", "default_price": 0.08, "weight": 0.07 }
+  ]
+}

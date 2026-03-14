@@ -1,0 +1,15 @@
+[package]
+name = "price_oracle_integrity"
+version = "0.1.0"
+edition = "2021"
+description = "Price Oracle integrity zome — on-chain price discovery with consciousness-gated reporting"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "price_oracle_integrity"
+
+[dependencies]
+holochain_serialized_bytes = { workspace = true }
+hdi = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

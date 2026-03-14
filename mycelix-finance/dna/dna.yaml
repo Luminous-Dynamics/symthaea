@@ -43,6 +43,8 @@ integrity:
       path: ../target/wasm32-unknown-unknown/release/recognition_integrity.wasm
     - name: currency_mint_integrity
       path: ../target/wasm32-unknown-unknown/release/currency_mint_integrity.wasm
+    - name: price_oracle_integrity
+      path: ../target/wasm32-unknown-unknown/release/price_oracle_integrity.wasm
 
 coordinator:
   zomes:
@@ -79,3 +81,8 @@ coordinator:
         - name: currency_mint_integrity
         - name: tend_integrity
         - name: finance_bridge_integrity
+    - name: price_oracle
+      path: ../target/wasm32-unknown-unknown/release/price_oracle.wasm
+      dependencies:
+        - name: price_oracle_integrity
+        - name: tend_integrity

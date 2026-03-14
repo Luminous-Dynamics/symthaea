@@ -1,0 +1,24 @@
+{
+  "community_name": "Kibera Community Sacco",
+  "basket_name": "Kibera Resilience Basket",
+  "dao_did": "kibera-resilience",
+  "currency_code": "KES",
+  "currency_symbol": "KSh",
+  "labor_hour_value": 100.00,
+  "labor_hour_source": "Kenya Minimum Wage Order 2026 (unskilled, Nairobi)",
+  "tax_year_start_month": 1,
+  "tax_form_name": "iTax Return",
+  "tax_authority": "KRA",
+  "basket_items": [
+    { "key": "ugali_flour_2kg", "name": "Maize flour (2kg)", "unit": "bag", "default_price": 0.20, "weight": 0.18 },
+    { "key": "eggs_tray_30", "name": "Eggs (tray of 30)", "unit": "tray", "default_price": 1.50, "weight": 0.08 },
+    { "key": "kerosene_1l", "name": "Kerosene (1L)", "unit": "litre", "default_price": 0.30, "weight": 0.12 },
+    { "key": "milk_500ml", "name": "Milk (500ml)", "unit": "packet", "default_price": 0.08, "weight": 0.07 },
+    { "key": "sukuma_wiki", "name": "Sukuma wiki (bunch)", "unit": "bunch", "default_price": 0.05, "weight": 0.10 },
+    { "key": "charcoal_2kg", "name": "Charcoal (2kg)", "unit": "bag", "default_price": 0.20, "weight": 0.10 },
+    { "key": "matatu_trip", "name": "Matatu trip (local)", "unit": "trip", "default_price": 0.15, "weight": 0.10 },
+    { "key": "rice_1kg", "name": "Rice (1kg)", "unit": "bag", "default_price": 0.15, "weight": 0.08 },
+    { "key": "cooking_oil_500ml", "name": "Cooking oil (500ml)", "unit": "bottle", "default_price": 0.15, "weight": 0.10 },
+    { "key": "sugar_1kg", "name": "Sugar (1kg)", "unit": "bag", "default_price": 0.12, "weight": 0.07 }
+  ]
+}

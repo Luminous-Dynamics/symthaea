@@ -1,0 +1,17 @@
+[package]
+name = "price_oracle"
+version = "0.1.0"
+edition = "2021"
+description = "Price Oracle coordinator zome — consensus pricing with consciousness-gated reporting"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "price_oracle"
+
+[dependencies]
+holochain_serialized_bytes = { workspace = true }
+hdk = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+price_oracle_integrity = { path = "../integrity" }
+mycelix_finance_shared = { path = "../../shared" }

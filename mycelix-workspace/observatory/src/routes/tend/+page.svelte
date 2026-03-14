@@ -1,0 +1,286 @@
+<script lang="ts">
+  import { onMount } from 'svelte';
+  import { writable } from 'svelte/store';
+  import {
+    getBalance,
+    getOracleState,
+    getDaoListings,
+    getDaoRequests,
+    recordExchange,
+    type BalanceInfo,
+    type OracleState,
+    type ServiceListing,
+    type ServiceRequest,
+    type ExchangeRecord,
+  } from '$lib/resilience-client';
+
+  // ============================================================================
+  // Stores
+  // ============================================================================
+
+  const balance = writable<BalanceInfo | null>(null);
+  const oracle = writable<OracleState>({ vitality: 72, tier: 'Normal', updated_at: Date.now() });
+  const listings = writable<ServiceListing[]>([]);
+  const requests = writable<ServiceRequest[]>([]);
+  const lastExchange = writable<ExchangeRecord | null>(null);
+
+  // Form state
+  let receiverDid = '';
+  let hours = 1;
+  let serviceDesc = '';
+  let serviceCategory = 'General';
+  let submitting = false;
+  let tab: 'listings' | 'requests' = 'listings';
+
+  const categories = ['General', 'Maintenance', 'Education', 'Childcare', 'Transport', 'Food', 'Care', 'Construction', 'Tech'];
+
+  // ============================================================================
+  // Lifecycle
+  // ============================================================================
+
+  onMount(async () => {
+    const [bal, ora, lst, req] = await Promise.all([
+      getBalance('self.did'),
+      getOracleState(),
+      getDaoListings(),
+      getDaoRequests(),
+    ]);
+    balance.set(bal);
+    oracle.set(ora);
+    listings.set(lst);
+    requests.set(req);
+  });
+
+  async function handleExchange() {
+    if (!receiverDid || hours <= 0 || !serviceDesc) return;
+    submitting = true;
+    try {
+      const ex = await recordExchange(receiverDid, hours, serviceDesc, serviceCategory);
+      lastExchange.set(ex);
+      // Refresh balance
+      const bal = await getBalance('self.did');
+      balance.set(bal);
+      receiverDid = '';
+      hours = 1;
+      serviceDesc = '';
+    } finally {
+      submitting = false;
+    }
+  }
+
+  function tierColor(tier: string): string {
+    switch (tier) {
+      case 'Normal': return 'text-green-400';
+      case 'Elevated': return 'text-yellow-400';
+      case 'High': return 'text-orange-400';
+      case 'Emergency': return 'text-red-400';
+      default: return 'text-gray-400';
+    }
+  }
+
+  function tierBg(tier: string): string {
+    switch (tier) {
+      case 'Normal': return 'bg-green-900/30 border-green-700';
+      case 'Elevated': return 'bg-yellow-900/30 border-yellow-700';
+      case 'High': return 'bg-orange-900/30 border-orange-700';
+      case 'Emergency': return 'bg-red-900/30 border-red-700';
+      default: return 'bg-gray-900/30 border-gray-700';
+    }
+  }
+</script>
+
+<svelte:head>
+  <title>TEND | Mycelix Observatory</title>
+</svelte:head>
+
+<div class="text-white">
+  <!-- Header -->
+  <header class="bg-gray-800/50 border-b border-gray-700 px-4 py-2">
+    <div class="container mx-auto flex justify-between items-center">
+      <div class="flex items-center gap-2">
+        <span class="text-xl">&#x1F91D;</span>
+        <div>
+          <h1 class="text-lg font-bold">TEND — Time Exchange</h1>
+          <p class="text-xs text-gray-400">All hours are equal. 1 TEND = 1 hour of labor.</p>
+        </div>
+      </div>
+      {#if $oracle}
+        <div class="flex items-center gap-3">
+          <div class={`px-3 py-1 rounded border text-sm font-medium ${tierBg($oracle.tier)}`}>
+            <span class={tierColor($oracle.tier)}>Oracle: {$oracle.tier}</span>
+          </div>
+          <div class="text-right">
+            <p class="text-xs text-gray-400">Limit</p>
+            <p class="text-sm font-bold">
+              {#if $oracle.tier === 'Normal'}&plusmn;40
+              {:else if $oracle.tier === 'Elevated'}&plusmn;60
+              {:else if $oracle.tier === 'High'}&plusmn;80
+              {:else}&plusmn;120
+              {/if} TEND
+            </p>
+          </div>
+        </div>
+      {/if}
+    </div>
+  </header>
+
+  <main class="container mx-auto p-6">
+    <!-- Balance + Record Exchange -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+      <!-- Balance Card -->
+      <div class="bg-gray-800 rounded-lg border border-gray-700 p-6">
+        <h2 class="text-gray-400 text-xs uppercase mb-4">Your Balance</h2>
+        {#if $balance}
+          <p class="text-4xl font-bold" class:text-green-400={$balance.balance > 0} class:text-red-400={$balance.balance < 0}>
+            {$balance.balance > 0 ? '+' : ''}{$balance.balance} TEND
+          </p>
+          <div class="mt-4 grid grid-cols-3 gap-2 text-center">
+            <div>
+              <p class="text-lg font-semibold text-green-400">{$balance.total_earned}</p>
+              <p class="text-xs text-gray-400">Earned</p>
+            </div>
+            <div>
+              <p class="text-lg font-semibold text-orange-400">{$balance.total_spent}</p>
+              <p class="text-xs text-gray-400">Spent</p>
+            </div>
+            <div>
+              <p class="text-lg font-semibold">{$balance.exchange_count}</p>
+              <p class="text-xs text-gray-400">Exchanges</p>
+            </div>
+          </div>
+        {:else}
+          <p class="text-gray-500">Loading...</p>
+        {/if}
+      </div>
+
+      <!-- Record Exchange Form -->
+      <div class="bg-gray-800 rounded-lg border border-gray-700 p-6 lg:col-span-2">
+        <h2 class="text-gray-400 text-xs uppercase mb-4">Record Exchange</h2>
+        {#if $lastExchange}
+          <div class="mb-4 p-3 bg-green-900/30 border border-green-700 rounded-lg text-sm">
+            Exchange recorded: {$lastExchange.hours}h to {$lastExchange.receiver_did} — {$lastExchange.service_description}
+          </div>
+        {/if}
+        <form on:submit|preventDefault={handleExchange} class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label for="receiver" class="text-xs text-gray-400">Receiver DID</label>
+            <input id="receiver" bind:value={receiverDid} placeholder="member.did"
+              class="w-full mt-1 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500" />
+          </div>
+          <div>
+            <label for="hours" class="text-xs text-gray-400">Hours</label>
+            <input id="hours" type="number" bind:value={hours} min="0.25" step="0.25" max="12"
+              class="w-full mt-1 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500" />
+          </div>
+          <div>
+            <label for="desc" class="text-xs text-gray-400">Service Description</label>
+            <input id="desc" bind:value={serviceDesc} placeholder="What was done?"
+              class="w-full mt-1 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500" />
+          </div>
+          <div>
+            <label for="cat" class="text-xs text-gray-400">Category</label>
+            <select id="cat" bind:value={serviceCategory}
+              class="w-full mt-1 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
+              {#each categories as cat}
+                <option value={cat}>{cat}</option>
+              {/each}
+            </select>
+          </div>
+          <div class="md:col-span-2">
+            <button type="submit" disabled={submitting || !receiverDid || !serviceDesc}
+              class="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded px-4 py-2 text-sm font-medium transition-colors">
+              {submitting ? 'Recording...' : 'Record Exchange'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Marketplace Tabs -->
+    <div class="bg-gray-800 rounded-lg border border-gray-700">
+      <div class="p-4 border-b border-gray-700 flex items-center gap-4">
+        <h2 class="text-lg font-semibold">Service Marketplace</h2>
+        <div class="flex gap-1 ml-auto">
+          <button on:click={() => tab = 'listings'}
+            class="px-3 py-1 rounded text-sm {tab === 'listings' ? 'bg-blue-600' : 'bg-gray-700 hover:bg-gray-600'} transition-colors">
+            Listings ({$listings.length})
+          </button>
+          <button on:click={() => tab = 'requests'}
+            class="px-3 py-1 rounded text-sm {tab === 'requests' ? 'bg-blue-600' : 'bg-gray-700 hover:bg-gray-600'} transition-colors">
+            Requests ({$requests.length})
+          </button>
+        </div>
+      </div>
+      <div class="p-4 space-y-3">
+        {#if tab === 'listings'}
+          {#each $listings as listing}
+            <div class="p-4 bg-gray-700/50 rounded-lg hover:bg-gray-700/70 transition-colors">
+              <div class="flex justify-between items-start">
+                <div>
+                  <p class="font-medium">{listing.title}</p>
+                  <p class="text-xs text-gray-400 mt-1">{listing.description}</p>
+                </div>
+                <div class="text-right">
+                  <span class="text-sm font-bold text-green-400">{listing.hours_estimate}h</span>
+                  <p class="text-xs text-gray-400 mt-1">{listing.category}</p>
+                </div>
+              </div>
+              <div class="flex justify-between text-xs text-gray-500 mt-2">
+                <span>by {listing.provider_did}</span>
+                <span>{new Date(listing.created_at).toLocaleDateString()}</span>
+              </div>
+            </div>
+          {:else}
+            <p class="text-gray-500 text-center py-8">No listings yet</p>
+          {/each}
+        {:else}
+          {#each $requests as request}
+            <div class="p-4 bg-gray-700/50 rounded-lg hover:bg-gray-700/70 transition-colors">
+              <div class="flex justify-between items-start">
+                <div>
+                  <div class="flex items-center gap-2">
+                    <p class="font-medium">{request.title}</p>
+                    <span class="text-xs px-2 py-0.5 rounded {request.urgency === 'High' ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400'}">
+                      {request.urgency}
+                    </span>
+                  </div>
+                  <p class="text-xs text-gray-400 mt-1">{request.description}</p>
+                </div>
+                <div class="text-right">
+                  <span class="text-sm font-bold text-orange-400">{request.hours_budget}h budget</span>
+                  <p class="text-xs text-gray-400 mt-1">{request.category}</p>
+                </div>
+              </div>
+              <div class="flex justify-between text-xs text-gray-500 mt-2">
+                <span>by {request.requester_did}</span>
+                <span>{new Date(request.created_at).toLocaleDateString()}</span>
+              </div>
+            </div>
+          {:else}
+            <p class="text-gray-500 text-center py-8">No requests yet</p>
+          {/each}
+        {/if}
+      </div>
+    </div>
+
+    <!-- TEND Mechanics -->
+    <div class="mt-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div class="bg-gray-800 rounded-lg border border-gray-700 p-4">
+        <h3 class="text-sm font-semibold mb-3 text-gray-300">Mutual Credit</h3>
+        <p class="text-xs text-gray-400">Zero-sum: every credit = equal debit elsewhere. No money creation, no inflation. Community credit always sums to zero.</p>
+      </div>
+      <div class="bg-gray-800 rounded-lg border border-gray-700 p-4">
+        <h3 class="text-sm font-semibold mb-3 text-gray-300">Radical Equality</h3>
+        <p class="text-xs text-gray-400">1 TEND = 1 hour, regardless of service. A doctor's hour equals a gardener's hour. Dignity in all labor.</p>
+      </div>
+      <div class="bg-gray-800 rounded-lg border border-gray-700 p-4">
+        <h3 class="text-sm font-semibold mb-3 text-gray-300">Oracle Tiers</h3>
+        <p class="text-xs text-gray-400">Credit limits adjust with community stress. Normal &plusmn;40, Elevated &plusmn;60, High &plusmn;80, Emergency &plusmn;120 TEND.</p>
+      </div>
+    </div>
+
+    <footer class="mt-8 text-center text-gray-500 text-sm">
+      <p>TEND v1.0 &middot; Commons Charter Article II, Section 2 &middot; All Hours Are Equal</p>
+    </footer>
+  </main>
+</div>

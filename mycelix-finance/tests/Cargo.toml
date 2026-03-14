@@ -121,6 +121,11 @@ path = "sweettest_consciousness_gating.rs"
 name = "sweettest_race_conditions"
 path = "sweettest_race_conditions.rs"
 
+# Price Oracle Accuracy-Weighted Consensus Sweettest
+[[test]]
+name = "sweettest_price_oracle_accuracy"
+path = "sweettest_price_oracle_accuracy.rs"
+
 # NOTE: economics_stress_test has been moved to types/tests/ where it compiles
 # without the heavy Holochain dependency. Run with:
 #   cargo test -p mycelix_finance_types --test economics_stress_test

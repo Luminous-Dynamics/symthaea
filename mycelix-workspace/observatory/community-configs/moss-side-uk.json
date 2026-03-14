@@ -1,0 +1,24 @@
+{
+  "community_name": "Moss Side Mutual Aid Cooperative",
+  "basket_name": "Moss Side Resilience Basket",
+  "dao_did": "moss-side-resilience",
+  "currency_code": "GBP",
+  "currency_symbol": "\u00a3",
+  "labor_hour_value": 11.44,
+  "labor_hour_source": "UK National Living Wage 2026 (21+)",
+  "tax_year_start_month": 4,
+  "tax_form_name": "SA103 (Self Assessment)",
+  "tax_authority": "HMRC",
+  "basket_items": [
+    { "key": "bread_800g", "name": "Bread (800g)", "unit": "loaf", "default_price": 0.12, "weight": 0.10 },
+    { "key": "eggs_6", "name": "Eggs (6-pack)", "unit": "pack", "default_price": 0.20, "weight": 0.08 },
+    { "key": "heating_oil_1l", "name": "Heating oil (1L)", "unit": "litre", "default_price": 0.45, "weight": 0.15 },
+    { "key": "milk_2pt", "name": "Milk (2 pints)", "unit": "bottle", "default_price": 0.10, "weight": 0.08 },
+    { "key": "potato_2kg", "name": "Potatoes (2kg)", "unit": "bag", "default_price": 0.15, "weight": 0.12 },
+    { "key": "electricity_kwh", "name": "Electricity (1 kWh)", "unit": "kWh", "default_price": 0.25, "weight": 0.12 },
+    { "key": "bus_ticket", "name": "Bus ticket (single)", "unit": "ticket", "default_price": 0.20, "weight": 0.10 },
+    { "key": "chicken_whole", "name": "Whole chicken", "unit": "chicken", "default_price": 0.50, "weight": 0.10 },
+    { "key": "cooking_oil_1l", "name": "Cooking oil (1L)", "unit": "bottle", "default_price": 0.15, "weight": 0.08 },
+    { "key": "rice_1kg", "name": "Rice (1kg)", "unit": "bag", "default_price": 0.10, "weight": 0.07 }
+  ]
+}
