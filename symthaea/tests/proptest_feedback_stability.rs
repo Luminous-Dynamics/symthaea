@@ -1756,7 +1756,7 @@ proptest! {
             let _ = m.fatigue_level;
             let _ = m.recovery_detected;
             let _ = m.env_predictability;
-            let _ = m.attention_budget_exceeded;
+            let _ = m.attention.attention_budget_exceeded;
             let _ = m.readiness_score;
             let _ = m.flow_state_active;
         }

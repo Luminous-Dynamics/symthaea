@@ -119,10 +119,8 @@ fn memory_manager_metadata_populated() {
         last_result = svc.cycle(INPUTS[i % INPUTS.len()]);
     }
 
-    // Verify memory-related telemetry is populated
-    let m = &last_result.metadata;
-    // semantic_memory_size should be accessible (may be 0 if no storage)
-    assert!(m.prediction_error.is_finite());
+    // Verify prediction error is finite
+    assert!(last_result.prediction_error.is_finite());
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

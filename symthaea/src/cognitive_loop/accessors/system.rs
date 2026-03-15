@@ -768,3 +768,113 @@ impl CognitiveLoopService {
         self.therapeutic_manager.formulation.is_actionable()
     }
 }
+
+// ── Epistemic auditor accessors (feature-gated) ───────────────────────
+
+#[cfg(feature = "epistemic_auditor")]
+impl CognitiveLoopService {
+    /// Whether the epistemic auditor is active.
+    pub fn has_epistemic_auditor(&self) -> bool {
+        self.epistemic_auditor.is_some()
+    }
+
+    /// Total cycles recorded by the auditor (buffered + flushed).
+    pub fn audit_total_records(&self) -> u64 {
+        self.epistemic_auditor
+            .as_ref()
+            .map(|a| a.total_records())
+            .unwrap_or(0)
+    }
+
+    /// Total cycles flushed to DuckDB.
+    pub fn audit_total_flushed(&self) -> u64 {
+        self.epistemic_auditor
+            .as_ref()
+            .map(|a| a.total_flushed)
+            .unwrap_or(0)
+    }
+
+    /// Phi statistics over a cycle range.
+    pub fn phi_statistics(
+        &self,
+        from: u64,
+        to: u64,
+    ) -> Result<super::super::epistemic_auditor::PhiStatistics, String> {
+        self.epistemic_auditor
+            .as_ref()
+            .ok_or_else(|| "epistemic auditor not enabled".to_string())
+            .and_then(|a| a.phi_statistics(from, to))
+    }
+
+    /// Count of moral anomalies in a cycle range.
+    pub fn moral_anomaly_count(&self, from: u64, to: u64) -> Result<u64, String> {
+        self.epistemic_auditor
+            .as_ref()
+            .ok_or_else(|| "epistemic auditor not enabled".to_string())
+            .and_then(|a| a.moral_anomaly_count(from, to))
+    }
+
+    /// Full audit summary over a cycle range.
+    pub fn audit_summary(
+        &self,
+        from: u64,
+        to: u64,
+    ) -> Result<super::super::epistemic_auditor::AuditSummary, String> {
+        self.epistemic_auditor
+            .as_ref()
+            .ok_or_else(|| "epistemic auditor not enabled".to_string())
+            .and_then(|a| a.audit_summary(from, to))
+    }
+
+    /// Total cycles audited (flushed to DuckDB).
+    pub fn audit_total_cycles(&self) -> u64 {
+        self.epistemic_auditor
+            .as_ref()
+            .map(|a| a.total_cycles_audited())
+            .unwrap_or(0)
+    }
+
+    /// Export all audit tables to files in the given directory.
+    ///
+    /// `format` must be `"parquet"`, `"csv"`, or `"json"`.
+    /// Returns the number of files written (6).
+    pub fn export_audit(&self, dir: &str, format: &str) -> Result<usize, String> {
+        self.epistemic_auditor
+            .as_ref()
+            .ok_or_else(|| "epistemic auditor not enabled".to_string())
+            .and_then(|a| a.export(dir, format))
+    }
+
+    /// Generate a formatted audit report over a cycle range.
+    pub fn generate_audit_report(&self, from: u64, to: u64) -> Result<String, String> {
+        self.epistemic_auditor
+            .as_ref()
+            .ok_or_else(|| "epistemic auditor not enabled".to_string())
+            .and_then(|a| a.generate_report(from, to))
+    }
+
+    /// Full audit summary over all recorded cycles.
+    pub fn audit_summary_all(
+        &self,
+    ) -> Result<super::super::epistemic_auditor::AuditSummary, String> {
+        self.epistemic_auditor
+            .as_ref()
+            .ok_or_else(|| "epistemic auditor not enabled".to_string())
+            .and_then(|a| a.audit_summary_all())
+    }
+
+    /// Generate a formatted audit report over all recorded cycles.
+    pub fn generate_audit_report_all(&self) -> Result<String, String> {
+        self.epistemic_auditor
+            .as_ref()
+            .ok_or_else(|| "epistemic auditor not enabled".to_string())
+            .and_then(|a| a.generate_report_all())
+    }
+
+    /// Force a synchronous flush of all buffered audit records to DuckDB.
+    pub fn flush_audit(&mut self) {
+        if let Some(ref mut a) = self.epistemic_auditor {
+            a.flush_sync();
+        }
+    }
+}

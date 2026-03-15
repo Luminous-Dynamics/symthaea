@@ -669,6 +669,216 @@ impl EpistemicAuditor {
             .map(|n| n as u64)
             .unwrap_or(0)
     }
+
+    /// Full audit summary over all recorded cycles.
+    pub fn audit_summary_all(&self) -> Result<AuditSummary, String> {
+        let total = self.total_cycles_audited();
+        if total == 0 {
+            return Err("no cycles audited".to_string());
+        }
+        self.audit_summary(0, total + 1)
+    }
+
+    /// Generate a formatted audit report over all recorded cycles.
+    pub fn generate_report_all(&self) -> Result<String, String> {
+        let total = self.total_cycles_audited();
+        if total == 0 {
+            return Err("no cycles audited".to_string());
+        }
+        self.generate_report(0, total + 1)
+    }
+
+    // ── Export ────────────────────────────────────────────────────────────────
+
+    /// Export all audit tables to files in the given directory.
+    ///
+    /// `format` can be `"parquet"`, `"csv"`, or `"json"`.
+    /// Creates one file per table (e.g., `phi_trajectory.parquet`).
+    /// Returns the number of files written.
+    pub fn export(&self, dir: &str, format: &str) -> Result<usize, String> {
+        let fmt = match format.to_lowercase().as_str() {
+            "parquet" => "PARQUET",
+            "csv" => "CSV",
+            "json" => "JSON",
+            other => return Err(format!("Unsupported export format: {other}. Use parquet, csv, or json.")),
+        };
+
+        let conn = self.conn.lock().map_err(|e| format!("export: lock: {e}"))?;
+
+        let tables = [
+            "phi_trajectory",
+            "graduation_log",
+            "moral_audit",
+            "neuromod_history",
+            "energy_audit",
+            "substrate_audit",
+        ];
+
+        let mut written = 0;
+        for table in &tables {
+            let ext = format.to_lowercase();
+            let path = format!("{dir}/{table}.{ext}");
+            let sql = format!("COPY {table} TO '{path}' (FORMAT {fmt})");
+            conn.execute_batch(&sql)
+                .map_err(|e| format!("export {table}: {e}"))?;
+            written += 1;
+        }
+
+        Ok(written)
+    }
+
+    // ── Formatted Report ─────────────────────────────────────────────────────
+
+    /// Generate a human-readable audit report for cycles in `[from, to)`.
+    ///
+    /// Returns a multi-line string suitable for logging, CLI output, or
+    /// inclusion in documents. Covers Phi trajectory, memory graduation,
+    /// moral integrity, neuromodulator balance, and energy consumption.
+    pub fn generate_report(&self, from: u64, to: u64) -> Result<String, String> {
+        let summary = self.audit_summary(from, to)?;
+        let conn = self.conn.lock().map_err(|e| format!("report: lock: {e}"))?;
+
+        // Neuromodulator averages
+        let neuromod = {
+            let mut stmt = conn.prepare(
+                "SELECT AVG(dopamine), AVG(serotonin), AVG(noradrenaline), \
+                        AVG(acetylcholine), AVG(gaba), AVG(ei_ratio), \
+                        AVG(allostatic_load), AVG(sleep_pressure) \
+                 FROM neuromod_history WHERE cycle_id >= ? AND cycle_id < ?"
+            ).map_err(|e| format!("report neuromod: {e}"))?;
+            stmt.query_row(
+                duckdb::params![from as i64, to as i64],
+                |r: &duckdb::Row<'_>| {
+                    Ok((
+                        r.get::<_, f64>(0).unwrap_or(0.0),
+                        r.get::<_, f64>(1).unwrap_or(0.0),
+                        r.get::<_, f64>(2).unwrap_or(0.0),
+                        r.get::<_, f64>(3).unwrap_or(0.0),
+                        r.get::<_, f64>(4).unwrap_or(0.0),
+                        r.get::<_, f64>(5).unwrap_or(0.0),
+                        r.get::<_, f64>(6).unwrap_or(0.0),
+                        r.get::<_, f64>(7).unwrap_or(0.0),
+                    ))
+                },
+            ).map_err(|e| format!("report neuromod query: {e}"))?
+        };
+
+        // Moral drift alerts
+        let moral_drift_count: i64 = {
+            let mut stmt = conn.prepare(
+                "SELECT COUNT(*) FROM moral_audit \
+                 WHERE cycle_id >= ? AND cycle_id < ? AND moral_drift_alert = true"
+            ).map_err(|e| format!("report moral_drift: {e}"))?;
+            stmt.query_row(
+                duckdb::params![from as i64, to as i64],
+                |r: &duckdb::Row<'_>| r.get(0),
+            ).map_err(|e| format!("report moral_drift query: {e}"))?
+        };
+
+        // Substrate transitions
+        let substrate_transitions: i64 = {
+            let mut stmt = conn.prepare(
+                "SELECT COUNT(*) FROM substrate_audit \
+                 WHERE cycle_id >= ? AND cycle_id < ? \
+                   AND substrate_transition IS NOT NULL"
+            ).map_err(|e| format!("report substrate: {e}"))?;
+            stmt.query_row(
+                duckdb::params![from as i64, to as i64],
+                |r: &duckdb::Row<'_>| r.get(0),
+            ).map_err(|e| format!("report substrate query: {e}"))?
+        };
+
+        // Energy stats
+        let energy = {
+            let mut stmt = conn.prepare(
+                "SELECT AVG(energy_this_cycle), AVG(cycle_duration_us), \
+                        AVG(thermodynamic_load) \
+                 FROM energy_audit WHERE cycle_id >= ? AND cycle_id < ?"
+            ).map_err(|e| format!("report energy: {e}"))?;
+            stmt.query_row(
+                duckdb::params![from as i64, to as i64],
+                |r: &duckdb::Row<'_>| {
+                    Ok((
+                        r.get::<_, f64>(0).unwrap_or(0.0),
+                        r.get::<_, f64>(1).unwrap_or(0.0),
+                        r.get::<_, f64>(2).unwrap_or(0.0),
+                    ))
+                },
+            ).map_err(|e| format!("report energy query: {e}"))?
+        };
+
+        let grad_rate = if summary.total_graduations + summary.total_rejections > 0 {
+            summary.total_graduations as f64
+                / (summary.total_graduations + summary.total_rejections) as f64
+                * 100.0
+        } else {
+            0.0
+        };
+
+        Ok(format!(
+            "\
+================================================================
+  EPISTEMIC AUDIT REPORT  (cycles {from}..{to})
+================================================================
+
+  CONSCIOUSNESS
+    Cycles audited:     {total_cycles}
+    Phi mean:           {phi_mean:.6}  (stddev {phi_std:.6})
+    Phi range:          [{phi_min:.6}, {phi_max:.6}]
+    Consciousness mean: {cons:.6}
+
+  MEMORY GRADUATION
+    Graduated:          {grad}
+    Rejected:           {rej}
+    Acceptance rate:    {grad_rate:.1}%
+
+  MORAL INTEGRITY
+    Anomaly events:     {anomalies}
+    Drift alerts:       {drifts}
+
+  NEUROMODULATOR BALANCE
+    Dopamine:           {da:.4}
+    Serotonin:          {ser:.4}
+    Noradrenaline:      {ne:.4}
+    Acetylcholine:      {ach:.4}
+    GABA:               {gaba:.4}
+    E/I ratio:          {ei:.4}
+    Allostatic load:    {allo:.4}
+    Sleep pressure:     {sleep:.4}
+
+  ENERGY & PERFORMANCE
+    Total energy:       {energy_total:.6} J
+    Energy/cycle:       {energy_cycle:.6} J
+    Cycle duration:     {dur:.0} us
+    Thermodynamic load: {thermo:.4}
+    Substrate switches: {switches}
+
+================================================================",
+            total_cycles = summary.total_cycles,
+            phi_mean = summary.phi.mean,
+            phi_std = summary.phi.stddev,
+            phi_min = summary.phi.min,
+            phi_max = summary.phi.max,
+            cons = summary.phi.mean_consciousness,
+            grad = summary.total_graduations,
+            rej = summary.total_rejections,
+            anomalies = summary.moral_anomaly_count,
+            drifts = moral_drift_count,
+            da = neuromod.0,
+            ser = neuromod.1,
+            ne = neuromod.2,
+            ach = neuromod.3,
+            gaba = neuromod.4,
+            ei = neuromod.5,
+            allo = neuromod.6,
+            sleep = neuromod.7,
+            energy_total = summary.total_energy,
+            energy_cycle = energy.0,
+            dur = energy.1,
+            thermo = energy.2,
+            switches = substrate_transitions,
+        ))
+    }
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
