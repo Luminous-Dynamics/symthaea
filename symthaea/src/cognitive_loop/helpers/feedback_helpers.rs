@@ -1,8 +1,13 @@
 //! Helper methods for attributed feedback variable mutations.
 //!
-//! These methods both record proposals (for attribution tracking)
-//! AND apply the direct mutation. The proposal system provides
-//! consensus-smoothed alternatives at cycle end.
+//! Each helper records a proposal AND syncs the field to the running consensus
+//! (all proposals integrated via averaged adds + geometric mean scales).
+//! This makes field reads order-independent: the value always reflects the
+//! consensus of ALL proposals so far, not the most recent mutation.
+//!
+//! The old double-write bug had each helper both immediately mutate (order-
+//! dependent) AND record a proposal (order-independent consensus at cycle end).
+//! Now both paths converge: the field IS the running consensus.
 
 use super::super::feedback_state::FeedbackProposal;
 
@@ -11,179 +16,272 @@ impl super::super::CognitiveLoopService {
     // CONFIDENCE HELPERS (f64)
     // ═══════════════════════════════════════════════════════════════════════
 
-    /// Record and apply an additive delta to prediction_confidence.
-    ///
-    /// Usage: `self.adjust_confidence("subsystem_name", delta);`
+    /// Record an additive delta proposal for prediction_confidence and sync field.
     #[inline]
     pub(in crate::cognitive_loop) fn adjust_confidence(
         &mut self,
         source: &'static str,
         delta: f32,
     ) {
-        let delta64 = delta as f64;
         self.feedback_state
             .confidence
-            .propose(source, FeedbackProposal::Add(delta64));
-        self.prediction_confidence = (self.prediction_confidence + delta64).clamp(0.01, 0.99);
+            .propose(source, FeedbackProposal::Add(delta as f64));
+        self.prediction_confidence = self.feedback_state.effective_confidence();
     }
 
-    /// Record and apply a multiplicative scale factor to prediction_confidence.
-    ///
-    /// Usage: `self.scale_confidence("subsystem_name", 0.98);`
+    /// Record a multiplicative scale proposal for prediction_confidence and sync field.
     #[inline]
     pub(in crate::cognitive_loop) fn scale_confidence(
         &mut self,
         source: &'static str,
         factor: f32,
     ) {
-        let factor64 = factor as f64;
         self.feedback_state
             .confidence
-            .propose(source, FeedbackProposal::Scale(factor64));
-        self.prediction_confidence = (self.prediction_confidence * factor64).clamp(0.01, 0.99);
+            .propose(source, FeedbackProposal::Scale(factor as f64));
+        self.prediction_confidence = self.feedback_state.effective_confidence();
     }
 
-    /// Record and apply a hard set of prediction_confidence.
-    ///
-    /// Used sparingly (inference mode init, confidence reset).
+    /// Record a hard set proposal for prediction_confidence and sync field.
     #[inline]
     pub(in crate::cognitive_loop) fn set_confidence(&mut self, source: &'static str, value: f32) {
-        let value64 = value as f64;
         self.feedback_state
             .confidence
-            .propose(source, FeedbackProposal::Set(value64));
-        self.prediction_confidence = value64.clamp(0.01, 0.99);
+            .propose(source, FeedbackProposal::Set(value as f64));
+        self.prediction_confidence = self.feedback_state.effective_confidence();
     }
 
     // ═══════════════════════════════════════════════════════════════════════
     // LEARNING RATE HELPERS (f64)
     // ═══════════════════════════════════════════════════════════════════════
 
-    /// Record and apply an additive delta to fep_lr_boost.
-    ///
-    /// Usage: `self.adjust_lr("subsystem_name", delta);`
+    /// Record an additive delta proposal for fep_lr_boost and sync field.
     #[inline]
     pub(in crate::cognitive_loop) fn adjust_lr(&mut self, source: &'static str, delta: f32) {
-        let delta64 = delta as f64;
         self.feedback_state
             .learning_rate
-            .propose(source, FeedbackProposal::Add(delta64));
-        self.fep.lr_boost = (self.fep.lr_boost + delta64).clamp(1.0, 3.0);
+            .propose(source, FeedbackProposal::Add(delta as f64));
+        self.fep.lr_boost = self.feedback_state.effective_lr_boost();
     }
 
-    /// Record and apply a multiplicative scale factor to fep_lr_boost.
-    ///
-    /// Usage: `self.scale_lr("subsystem_name", 1.05);`
+    /// Record a multiplicative scale proposal for fep_lr_boost and sync field.
     #[inline]
     pub(in crate::cognitive_loop) fn scale_lr(&mut self, source: &'static str, factor: f32) {
-        let factor64 = factor as f64;
         self.feedback_state
             .learning_rate
-            .propose(source, FeedbackProposal::Scale(factor64));
-        self.fep.lr_boost = (self.fep.lr_boost * factor64).clamp(1.0, 3.0);
+            .propose(source, FeedbackProposal::Scale(factor as f64));
+        self.fep.lr_boost = self.feedback_state.effective_lr_boost();
     }
 
-    /// Record and apply a hard set of fep_lr_boost.
-    ///
-    /// Used sparingly (discontinuity reset, etc).
+    /// Record a hard set proposal for fep_lr_boost and sync field.
     #[inline]
     pub(in crate::cognitive_loop) fn set_lr(&mut self, source: &'static str, value: f32) {
-        let value64 = value as f64;
         self.feedback_state
             .learning_rate
-            .propose(source, FeedbackProposal::Set(value64));
-        self.fep.lr_boost = value64.clamp(1.0, 3.0);
+            .propose(source, FeedbackProposal::Set(value as f64));
+        self.fep.lr_boost = self.feedback_state.effective_lr_boost();
     }
 
     // ═══════════════════════════════════════════════════════════════════════
     // EXPLORATION HELPERS (f64)
     // ═══════════════════════════════════════════════════════════════════════
 
-    /// Record and apply an additive delta to exploration_urge.
-    ///
-    /// Usage: `self.adjust_exploration("subsystem_name", delta);`
+    /// Record an additive delta proposal for exploration_urge and sync field.
     #[inline]
     pub(in crate::cognitive_loop) fn adjust_exploration(
         &mut self,
         source: &'static str,
         delta: f32,
     ) {
-        let delta64 = delta as f64;
         self.feedback_state
             .exploration
-            .propose(source, FeedbackProposal::Add(delta64));
-        self.curiosity_drive.exploration_urge =
-            (self.curiosity_drive.exploration_urge + delta64).clamp(0.0, 1.0);
+            .propose(source, FeedbackProposal::Add(delta as f64));
+        self.curiosity_drive.exploration_urge = self.feedback_state.effective_exploration();
     }
 
-    /// Record and apply a multiplicative scale factor to exploration_urge.
-    ///
-    /// Usage: `self.scale_exploration("subsystem_name", 0.9);`
+    /// Record a multiplicative scale proposal for exploration_urge and sync field.
     #[inline]
     pub(in crate::cognitive_loop) fn scale_exploration(
         &mut self,
         source: &'static str,
         factor: f32,
     ) {
-        let factor64 = factor as f64;
         self.feedback_state
             .exploration
-            .propose(source, FeedbackProposal::Scale(factor64));
-        self.curiosity_drive.exploration_urge =
-            (self.curiosity_drive.exploration_urge * factor64).clamp(0.0, 1.0);
+            .propose(source, FeedbackProposal::Scale(factor as f64));
+        self.curiosity_drive.exploration_urge = self.feedback_state.effective_exploration();
     }
 
-    /// Record and apply a hard set of exploration_urge.
-    ///
-    /// Used sparingly (seizure protection freeze, etc).
+    /// Record a hard set proposal for exploration_urge and sync field.
     #[inline]
     pub(in crate::cognitive_loop) fn set_exploration(&mut self, source: &'static str, value: f32) {
-        let value64 = value as f64;
         self.feedback_state
             .exploration
-            .propose(source, FeedbackProposal::Set(value64));
-        self.curiosity_drive.exploration_urge = value64.clamp(0.0, 1.0);
+            .propose(source, FeedbackProposal::Set(value as f64));
+        self.curiosity_drive.exploration_urge = self.feedback_state.effective_exploration();
     }
 
     // ═══════════════════════════════════════════════════════════════════════
     // THRESHOLD HELPERS (f64)
     // ═══════════════════════════════════════════════════════════════════════
 
-    /// Record and apply a multiplicative scale factor to adaptive_threshold_scale.
-    ///
-    /// Usage: `self.scale_threshold("subsystem_name", 0.95);`
+    /// Record a multiplicative scale proposal for adaptive_threshold_scale and sync field.
     #[inline]
     pub(in crate::cognitive_loop) fn scale_threshold(&mut self, source: &'static str, factor: f32) {
-        let factor64 = factor as f64;
         self.feedback_state
             .threshold
-            .propose(source, FeedbackProposal::Scale(factor64));
+            .propose(source, FeedbackProposal::Scale(factor as f64));
         self.carryover.learning.adaptive_threshold_scale =
-            (self.carryover.learning.adaptive_threshold_scale * factor64).clamp(0.5, 2.0);
+            self.feedback_state.effective_threshold();
     }
 
-    /// Record and apply an additive delta to adaptive_threshold_scale.
-    ///
-    /// Usage: `self.adjust_threshold("homeostasis_drift", 0.02);`
+    /// Record an additive delta proposal for adaptive_threshold_scale and sync field.
     #[inline]
     pub(in crate::cognitive_loop) fn adjust_threshold(&mut self, source: &'static str, delta: f32) {
-        let delta64 = delta as f64;
         self.feedback_state
             .threshold
-            .propose(source, FeedbackProposal::Add(delta64));
+            .propose(source, FeedbackProposal::Add(delta as f64));
         self.carryover.learning.adaptive_threshold_scale =
-            (self.carryover.learning.adaptive_threshold_scale + delta64).clamp(0.5, 2.0);
+            self.feedback_state.effective_threshold();
     }
 
-    /// Record and apply a hard set of adaptive_threshold_scale.
-    ///
-    /// Used for consensus writeback at cycle start.
+    /// Record a hard set proposal for adaptive_threshold_scale and sync field.
     #[inline]
     pub(in crate::cognitive_loop) fn set_threshold(&mut self, source: &'static str, value: f32) {
-        let value64 = value as f64;
         self.feedback_state
             .threshold
-            .propose(source, FeedbackProposal::Set(value64));
-        self.carryover.learning.adaptive_threshold_scale = value64.clamp(0.5, 2.0);
+            .propose(source, FeedbackProposal::Set(value as f64));
+        self.carryover.learning.adaptive_threshold_scale =
+            self.feedback_state.effective_threshold();
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // MID-CYCLE EFFECTIVE VALUE ACCESSORS
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /// Current effective prediction_confidence: cycle-start snapshot + accumulated proposals.
+    #[inline]
+    pub(in crate::cognitive_loop) fn current_confidence(&self) -> f64 {
+        self.feedback_state.effective_confidence()
+    }
+
+    /// Current effective fep_lr_boost: cycle-start snapshot + accumulated proposals.
+    #[inline]
+    pub(in crate::cognitive_loop) fn current_lr_boost(&self) -> f64 {
+        self.feedback_state.effective_lr_boost()
+    }
+
+    /// Current effective exploration_urge: cycle-start snapshot + accumulated proposals.
+    #[inline]
+    pub(in crate::cognitive_loop) fn current_exploration(&self) -> f64 {
+        self.feedback_state.effective_exploration()
+    }
+
+    /// Current effective adaptive_threshold_scale: cycle-start snapshot + accumulated proposals.
+    #[inline]
+    pub(in crate::cognitive_loop) fn current_threshold(&self) -> f64 {
+        self.feedback_state.effective_threshold()
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // PRIORITY-AWARE VARIANTS
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /// Adjust confidence with an explicit priority tier.
+    #[inline]
+    pub(in crate::cognitive_loop) fn adjust_confidence_pri(
+        &mut self,
+        source: &'static str,
+        delta: f32,
+        priority: super::super::feedback_state::Priority,
+    ) {
+        self.feedback_state
+            .confidence
+            .propose_with_priority(source, FeedbackProposal::Add(delta as f64), priority);
+        self.prediction_confidence = self.feedback_state.effective_confidence();
+    }
+
+    /// Scale confidence with an explicit priority tier.
+    #[inline]
+    pub(in crate::cognitive_loop) fn scale_confidence_pri(
+        &mut self,
+        source: &'static str,
+        factor: f32,
+        priority: super::super::feedback_state::Priority,
+    ) {
+        self.feedback_state
+            .confidence
+            .propose_with_priority(source, FeedbackProposal::Scale(factor as f64), priority);
+        self.prediction_confidence = self.feedback_state.effective_confidence();
+    }
+
+    /// Adjust LR with an explicit priority tier.
+    #[inline]
+    pub(in crate::cognitive_loop) fn adjust_lr_pri(
+        &mut self,
+        source: &'static str,
+        delta: f32,
+        priority: super::super::feedback_state::Priority,
+    ) {
+        self.feedback_state
+            .learning_rate
+            .propose_with_priority(source, FeedbackProposal::Add(delta as f64), priority);
+        self.fep.lr_boost = self.feedback_state.effective_lr_boost();
+    }
+
+    /// Scale LR with an explicit priority tier.
+    #[inline]
+    pub(in crate::cognitive_loop) fn scale_lr_pri(
+        &mut self,
+        source: &'static str,
+        factor: f32,
+        priority: super::super::feedback_state::Priority,
+    ) {
+        self.feedback_state
+            .learning_rate
+            .propose_with_priority(source, FeedbackProposal::Scale(factor as f64), priority);
+        self.fep.lr_boost = self.feedback_state.effective_lr_boost();
+    }
+
+    /// Adjust exploration with an explicit priority tier.
+    #[inline]
+    pub(in crate::cognitive_loop) fn adjust_exploration_pri(
+        &mut self,
+        source: &'static str,
+        delta: f32,
+        priority: super::super::feedback_state::Priority,
+    ) {
+        self.feedback_state
+            .exploration
+            .propose_with_priority(source, FeedbackProposal::Add(delta as f64), priority);
+        self.curiosity_drive.exploration_urge = self.feedback_state.effective_exploration();
+    }
+
+    /// Scale exploration with an explicit priority tier.
+    #[inline]
+    pub(in crate::cognitive_loop) fn scale_exploration_pri(
+        &mut self,
+        source: &'static str,
+        factor: f32,
+        priority: super::super::feedback_state::Priority,
+    ) {
+        self.feedback_state
+            .exploration
+            .propose_with_priority(source, FeedbackProposal::Scale(factor as f64), priority);
+        self.curiosity_drive.exploration_urge = self.feedback_state.effective_exploration();
+    }
+
+    /// Set exploration with an explicit priority tier.
+    #[inline]
+    pub(in crate::cognitive_loop) fn set_exploration_pri(
+        &mut self,
+        source: &'static str,
+        value: f32,
+        priority: super::super::feedback_state::Priority,
+    ) {
+        self.feedback_state
+            .exploration
+            .propose_with_priority(source, FeedbackProposal::Set(value as f64), priority);
+        self.curiosity_drive.exploration_urge = self.feedback_state.effective_exploration();
     }
 }

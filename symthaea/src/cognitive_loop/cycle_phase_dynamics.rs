@@ -256,11 +256,13 @@ impl CognitiveLoopService {
                 // Any async P2P component (NetworkService, Hyperfeel,
                 // FederatedAggregator) sends SwarmEvents through mpsc::Sender;
                 // we drain them here before processing.
-                if let Ok(rx) = self.swarm_event_rx.lock() {
-                    super::managers::network_service_bridge::drain_swarm_channel(
-                        &rx,
-                        &mut self.swarm_manager,
-                    );
+                if let Ok(rx_guard) = self.swarm_event_rx.lock() {
+                    if let Some(ref rx) = *rx_guard {
+                        super::managers::network_service_bridge::drain_swarm_channel(
+                            rx,
+                            &mut self.swarm_manager,
+                        );
+                    }
                 }
 
                 // ── Swarm Manager (interval 41, co-prime) ─────────────
@@ -413,6 +415,17 @@ impl CognitiveLoopService {
                     if let Some(best_tier) = self.spectrum_manager.best_tier_for_governance() {
                         self.governance_mgr.set_preferred_tier(best_tier);
                     }
+                }
+
+                // ── Glyph Manager: symbolic consciousness field tracking ──
+                // Interval 43 (co-prime). Projects cognitive state onto 11 Field Modality
+                // basis vectors, tracks nearest resonant glyph, developmental spiral position.
+                // Science: Jung (1959) — archetypal symbolic fields; Graves (1970) — spiral dynamics.
+                #[cfg(feature = "glyph_codex")]
+                if self.glyph_manager.should_run(cycle_num, urgency_u8) {
+                    let glyph_output = self.glyph_manager.process(snapshot);
+                    self.subsystem_collector
+                        .record("glyph_manager", glyph_output);
                 }
             }
         }
@@ -2615,6 +2628,10 @@ impl CognitiveLoopService {
                 .clamp(PREDICTION_HORIZON_MIN_SCALE, PREDICTION_HORIZON_MAX_SCALE)
         };
 
+        // 10th factor: Thermal bridge — platform heat → CfC slowdown.
+        // Science: Angilletta (2009) thermal performance curves.
+        let thermal_tau_factor = self.thermal_bridge.signals().tau_factor as f32;
+
         let delta_t = self.config.cfc_config.delta_t
             * resonance_tau_factor
             * arousal_tau_factor
@@ -2627,7 +2644,8 @@ impl CognitiveLoopService {
                 .somatic_bridge
                 .to_interoceptive_signals()
                 .tau_slowdown_factor as f32
-            * self.substrate_manager.tau_factor;
+            * self.substrate_manager.tau_factor
+            * thermal_tau_factor;
         let _t_core = Instant::now();
         if let Err(e) = self.temporal_network.step(&input_array, delta_t) {
             tracing::warn!(error = %e, "CfC temporal step failed — continuing with stale state");
@@ -3753,7 +3771,7 @@ mod tests {
         let mut svc = make_service();
         let results = run_cycles(&mut svc, 33, "coherence check");
         for (i, r) in results.iter().enumerate() {
-            let coh = r.metadata.adaptive.prediction_coherence;
+            let coh = r.metadata.prediction_coherence;
             assert!(
                 coh.is_finite(),
                 "prediction_coherence NaN at cycle {i}: {coh}"
@@ -3787,7 +3805,7 @@ mod tests {
         let mut svc = make_service();
         let results = run_cycles(&mut svc, 50, "consciousness bounded");
         for (i, r) in results.iter().enumerate() {
-            let cl = r.metadata.consciousness_level;
+            let cl = r.metadata.consciousness.consciousness_level;
             assert!(
                 cl.is_finite() && cl >= 0.0 && cl <= 1.0,
                 "consciousness_level out of [0,1] at cycle {i}: {cl}"
@@ -3829,19 +3847,19 @@ mod tests {
             let m = &result.metadata;
             assert!(m.actual_effective_lr.is_finite(), "NaN LR at cycle {i}");
             assert!(
-                m.consciousness_level.is_finite(),
+                m.consciousness.consciousness_level.is_finite(),
                 "NaN consciousness at cycle {i}"
             );
             assert!(
-                m.adaptive.prediction_coherence.is_finite(),
+                m.prediction_coherence.is_finite(),
                 "NaN pred_coherence at cycle {i}"
             );
             assert!(
-                m.holographic_unity.is_finite(),
+                m.temporal.holographic_unity.is_finite(),
                 "NaN holographic_unity at cycle {i}"
             );
             assert!(
-                m.holographic_binding.is_finite(),
+                m.temporal.holographic_binding.is_finite(),
                 "NaN holographic_binding at cycle {i}"
             );
             assert!(

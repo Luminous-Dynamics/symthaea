@@ -11,6 +11,16 @@ use crate::consciousness::cross_modal_binding::{ModalRepresentation, Modality};
 use crate::consciousness::fep_active_inference::Observation;
 
 use super::super::{CognitiveLoopService, CycleResult, MoralJudgmentSummary, ResponseStrategy};
+use crate::cognitive_loop::feedback_state::Priority;
+
+/// Geometric mean of positive f32 values. Returns 1.0 for empty/invalid input.
+fn geometric_mean(factors: &[f32]) -> f32 {
+    let valid: Vec<f32> = factors.iter().copied().filter(|f| *f > 0.0 && f.is_finite()).collect();
+    if valid.is_empty() { return 1.0; }
+    let log_sum: f32 = valid.iter().map(|f| f.ln()).sum();
+    let mean = (log_sum / valid.len() as f32).exp();
+    if mean.is_finite() { mean } else { 1.0 }
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Tuning constants — see `thresholds.rs` for the centralized registry.
@@ -137,34 +147,43 @@ impl CognitiveLoopService {
         }
     }
 
-    /// Compose the effective learning rate from all modulation sources.
+    /// Compose the effective learning rate using 3-group geometric mean structure.
     ///
-    /// Combines: base coherence LR -> adaptive behavior -> flow state -> semantic
-    /// context -> reasoning reliability -> curiosity novelty -> FEP boost ->
-    /// MCE consciousness boost -> subsystem LR factor (from previous cycle).
-    ///
-    /// Resets `carryover.learning.subsystem_lr_factor` for the next cycle's
-    /// accumulation. Hard-capped to [0.0, 0.01].
+    /// **Base LR**: combined_learning_rate() -> adaptive behavior.
+    /// **Cognitive mod** (geomean): flow, semantic, reasoning, curiosity.
+    /// **Meta-learning mod** (geomean): FEP boost, MCE boost, subsystem LR factor.
+    /// Final: `base x cognitive_mod x meta_mod`, clamped [0, 0.01].
     pub(in crate::cognitive_loop) fn compose_effective_lr(
         &mut self,
         semantic_lr_factor: f32,
         reasoning_lr_factor: f32,
     ) -> f32 {
         let base_lr = self.combined_learning_rate();
-        let adaptive_lr = self.adaptive_behavior.effective_learning_rate(base_lr);
-        let flow_lr = self.flow_state.effective_learning_multiplier(adaptive_lr);
-        let semantic_modulated_lr = flow_lr * semantic_lr_factor * reasoning_lr_factor;
-        // Apply subsystem LR factor from PREVIOUS cycle (meta-cognition, predictive processing,
-        // predictive self, phenomenal binding, consciousness thermodynamics). Reset for next cycle.
-        let subsystem_lr = self.carryover.learning.subsystem_lr_factor.clamp(0.5, 2.0);
+        let base = self.adaptive_behavior.effective_learning_rate(base_lr);
+
+        let flow_factor = self.flow_state.learning_boost;
+        let curiosity_factor = self.curiosity_drive.novelty_bonus;
+        let cognitive_mod = geometric_mean(&[
+            flow_factor.max(0.01),
+            semantic_lr_factor.max(0.01),
+            reasoning_lr_factor.max(0.01),
+            curiosity_factor.max(0.01),
+        ]);
+
+        let fep_factor = self.fep.lr_boost as f32;
+        let mce_factor = 1.0 + self.carryover.learning.mce_lr_boost;
+        let subsystem_factor = self.carryover.learning.subsystem_lr_factor.clamp(0.5, 2.0);
         self.carryover.learning.subsystem_lr_factor = 1.0;
-        (self
-            .curiosity_drive
-            .effective_learning_rate(semantic_modulated_lr)
-            * self.fep.lr_boost as f32
-            * (1.0 + self.carryover.learning.mce_lr_boost)
-            * subsystem_lr)
-            .clamp(0.0, 0.01)
+        let meta_mod = geometric_mean(&[
+            fep_factor.max(0.01),
+            mce_factor.max(0.01),
+            subsystem_factor.max(0.01),
+        ]);
+
+        self.carryover.learning.lr_cognitive_mod = cognitive_mod;
+        self.carryover.learning.lr_meta_mod = meta_mod;
+
+        (base * cognitive_mod * meta_mod).clamp(0.0, 0.01)
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -569,7 +588,7 @@ impl CognitiveLoopService {
                 // Boost learning rate when free energy is high
                 if let Some(ref fe) = self.fep.agent.last_fe_components {
                     let fe_boost = (fe.total.abs() as f32 / 2.0).clamp(0.0, 1.5);
-                    self.scale_lr("fep_free_energy", 1.0 + fe_boost * 0.5);
+                    self.scale_lr_pri("fep_free_energy", 1.0 + fe_boost * 0.5, Priority::Homeostatic);
                 }
             }
             1 => {
@@ -580,7 +599,7 @@ impl CognitiveLoopService {
             2 => {
                 // Boost exploration -- stronger nudge when surprised
                 let nudge = if is_surprised { 0.15 } else { 0.05 };
-                self.adjust_exploration("perturbation", nudge);
+                self.adjust_exploration_pri("perturbation", nudge, Priority::Homeostatic);
             }
             3 => {
                 // Tighten trust via precision
@@ -730,7 +749,7 @@ impl CognitiveLoopService {
         if affective_arousal > 0.7 {
             // Attenuated 50%: DA learning_rate_factor() already scales LR via the bath
             let arousal_suppress = ((affective_arousal - 0.7) * 0.25).min(0.08);
-            self.scale_lr("affective_arousal_suppress", 1.0 - arousal_suppress);
+            self.scale_lr_pri("affective_arousal_suppress", 1.0 - arousal_suppress, Priority::Homeostatic);
 
             // Arousal trap detection (Yerkes-Dodson 1908 — inverted-U performance curve)
             if affective_arousal > 0.8 {
@@ -747,9 +766,9 @@ impl CognitiveLoopService {
                 let recovery_intensity =
                     (self.carryover.urgency.arousal_trap_counter - 5) as f32 / 5.0;
                 // Gradual LR dampening: attenuated 50% (NE exploration_delta handles arousal)
-                self.scale_lr("arousal_trap_recovery", 1.0 - recovery_intensity * 0.1);
+                self.scale_lr_pri("arousal_trap_recovery", 1.0 - recovery_intensity * 0.1, Priority::Homeostatic);
                 // Slight exploration boost: attenuated 50% (NE exploration_delta covers this)
-                self.adjust_exploration("arousal_trap_recovery", recovery_intensity * 0.025);
+                self.adjust_exploration_pri("arousal_trap_recovery", recovery_intensity * 0.025, Priority::Homeostatic);
                 self.stats.arousal_recovery_cycles += 1;
                 tracing::debug!(
                     cycle = self.stats.total_cycles,
@@ -760,8 +779,8 @@ impl CognitiveLoopService {
             }
             // Phase 3: Forced escape
             if self.carryover.urgency.arousal_trap_counter > 10 {
-                self.set_exploration("arousal_trap_escape", 1.0); // forced escape attempt
-                self.scale_confidence("arousal_trap_escape", 0.9);
+                self.set_exploration_pri("arousal_trap_escape", 1.0, Priority::Safety); // forced escape attempt
+                self.scale_confidence_pri("arousal_trap_escape", 0.9, Priority::Safety);
                 self.carryover.urgency.arousal_trap_counter = 0;
                 tracing::debug!(
                     cycle = self.stats.total_cycles,
@@ -776,7 +795,7 @@ impl CognitiveLoopService {
                 // Low arousal enhances consolidation (Steriade 1996)
                 // Attenuated 50%: DA handles low-error consolidation boost via the bath
                 let consolidation_boost = ((0.3 - affective_arousal) * 0.3).min(0.05);
-                self.scale_lr("low_arousal_consolidate", 1.0 + consolidation_boost);
+                self.scale_lr_pri("low_arousal_consolidate", 1.0 + consolidation_boost, Priority::Homeostatic);
             }
         }
     }
@@ -800,7 +819,7 @@ impl CognitiveLoopService {
     ) -> (&'static str, f32) {
         let mut moral_steering_category: &str = "";
         if moral_concern_detected {
-            self.scale_exploration("moral_concern", MORAL_CONCERN_EXPLORATION_DAMPEN);
+            self.scale_exploration_pri("moral_concern", MORAL_CONCERN_EXPLORATION_DAMPEN, Priority::Safety);
 
             self.self_model_tier.self_reflection.trust_threshold =
                 (self.self_model_tier.self_reflection.trust_threshold * 1.2).clamp(0.1, 0.95);
@@ -817,12 +836,12 @@ impl CognitiveLoopService {
             }
 
             if moral_judgment.consent_violation {
-                self.scale_confidence("moral_consent_viol", 0.7);
+                self.scale_confidence_pri("moral_consent_viol", 0.7, Priority::Safety);
                 self.carryover.learning.subsystem_lr_factor *= 0.5;
                 moral_steering_category = "consent";
             } else if moral_judgment.violations.iter().any(|v| v.contains("harm")) {
-                self.scale_exploration("harm_detected", 0.4);
-                self.scale_confidence("moral_harm_detect", 0.85);
+                self.scale_exploration_pri("harm_detected", 0.4, Priority::Safety);
+                self.scale_confidence_pri("moral_harm_detect", 0.85, Priority::Safety);
                 moral_steering_category = "harm";
             } else if moral_judgment
                 .violations
@@ -837,16 +856,16 @@ impl CognitiveLoopService {
                 moral_steering_category = "other";
             }
         } else if moral_score > MORAL_BENEFIT_THRESHOLD {
-            self.scale_confidence("moral_benefit", MORAL_BENEFIT_CONFIDENCE_BOOST);
+            self.scale_confidence_pri("moral_benefit", MORAL_BENEFIT_CONFIDENCE_BOOST, Priority::Aesthetic);
         }
 
         // Surprise-gated learning rate boost
         if is_surprised {
             let surprise_boost =
                 (self.fep.agent.current_free_energy() as f32 / FEP_SURPRISE_SCALE).clamp(0.1, 0.5);
-            self.adjust_lr("fep_surprise", surprise_boost);
+            self.adjust_lr_pri("fep_surprise", surprise_boost, Priority::Homeostatic);
         } else {
-            self.scale_lr("fep_decay", FEP_LR_DECAY);
+            self.scale_lr_pri("fep_decay", FEP_LR_DECAY, Priority::Homeostatic);
         }
 
         // Phase 21: Predictive free energy → surprise amplitude scaling

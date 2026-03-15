@@ -566,6 +566,12 @@ pub struct CycleMetadata {
     /// 0.0 when no learning occurred.
     pub actual_effective_lr: f32,
 
+    /// Cognitive group geometric mean (flow x semantic x reasoning x curiosity). 1.0 = neutral.
+    pub lr_cognitive_mod: f32,
+
+    /// Meta-learning group geometric mean (FEP x MCE x subsystem). 1.0 = neutral.
+    pub lr_meta_mod: f32,
+
     /// Cycle reward signal (internal + external blend, -1.0 to 1.0).
     pub cycle_reward: f32,
 
@@ -591,6 +597,12 @@ pub struct CycleMetadata {
     /// Groups all substrate-related fields for batch assignment.
     #[serde(default)]
     pub substrate: super::SubstrateTelemetry,
+
+    /// Thermal telemetry snapshot (from ThermalBridge).
+    /// Reports platform thermal state and CfC tau modulation.
+    /// Science: Angilletta (2009) thermal performance curves.
+    #[serde(default)]
+    pub thermal: super::ThermalTelemetry,
 
     /// Integrity telemetry snapshot (from IntegrityManager).
     /// Reports tamper detection: attestation, temporal, canaries.
@@ -1106,6 +1118,39 @@ pub struct CycleMetadata {
     /// Whether narrative self-phi modulated confidence or exploration.
     #[serde(default)]
     pub narrative_self_phi_modulated: bool,
+    /// Whether epistemic Phi (phi_eff) modulated LR or exploration.
+    #[serde(default)]
+    pub epistemic_phi_modulated: bool,
+    /// Whether phenomenal binding strength modulated confidence or threshold.
+    #[serde(default)]
+    pub phenomenal_binding_modulated: bool,
+    /// Whether temporal coherence modulated LR or confidence.
+    #[serde(default)]
+    pub temporal_coherence_modulated: bool,
+    /// Whether holographic unity modulated exploration or LR.
+    #[serde(default)]
+    pub holographic_unity_modulated: bool,
+    /// Whether harmonies alignment modulated confidence or exploration.
+    #[serde(default)]
+    pub harmonies_alignment_modulated: bool,
+    /// Whether consciousness gradient magnitude modulated LR.
+    #[serde(default)]
+    pub consciousness_gradient_lr_modulated: bool,
+    /// Whether value cache confidence modulated exploration or LR.
+    #[serde(default)]
+    pub value_cache_confidence_modulated: bool,
+    /// Whether consciousness state level (high/low extremes) triggered modulation.
+    #[serde(default)]
+    pub consciousness_state_modulated: bool,
+    /// Whether living mind vitality modulated confidence or LR.
+    #[serde(default)]
+    pub living_mind_vitality_modulated: bool,
+    /// Whether living mind coherence modulated confidence or LR.
+    #[serde(default)]
+    pub living_mind_coherence_modulated: bool,
+    /// Whether MCTS plan effectiveness triggered modulation (high or low extremes).
+    #[serde(default)]
+    pub mcts_effectiveness_modulated: bool,
 
     // ── Session 14: Late Consciousness Feedback ──────────────────────────
     /// Whether living mind vitality modulated confidence.
@@ -1175,6 +1220,24 @@ pub struct CycleMetadata {
     #[cfg(feature = "therapeutic")]
     #[serde(flatten, default)]
     pub therapeutic: TherapeuticTelemetry,
+
+    // ── Glyph Codex Telemetry ─────────────────────────────────────────────
+    /// Dominant glyph field modality name (e.g., "Resonant", "Threshold").
+    /// Empty when glyph_codex feature is disabled.
+    #[serde(default)]
+    pub glyph_dominant_modality: String,
+    /// Glyph coherence score (0.0–0.95). Measures symbolic integration
+    /// across all 11 Field Modalities. 0.0 when glyph_codex is disabled.
+    #[serde(default)]
+    pub glyph_coherence: f32,
+    /// Name of the nearest resonant glyph (e.g., "Ethical Emergence").
+    /// Empty when below quiet threshold or glyph_codex is disabled.
+    #[serde(default)]
+    pub glyph_resonant_name: String,
+    /// Spiral position (0.0–56.0) tracking developmental progression.
+    /// 0.0 when glyph_codex is disabled.
+    #[serde(default)]
+    pub glyph_spiral_position: f32,
 }
 
 /// Therapeutic subsystem telemetry for CycleMetadata.
@@ -1230,6 +1293,9 @@ pub struct TherapeuticTelemetry {
     /// Dream prediction accuracy (lower = better, 1.0 = no data).
     #[serde(default)]
     pub therapeutic_dream_accuracy: f32,
+    /// Scope violation detected in Broca output this cycle (empty = none).
+    #[serde(default)]
+    pub therapeutic_scope_violation: String,
 }
 
 fn default_response_profile() -> String {
@@ -1803,4 +1869,6 @@ pub struct ModuleTimings {
     pub dream_cycle: u64,
     /// Moral topology: persistent homology analysis on moral scenarios
     pub moral_topology: u64,
+    /// Math service: dynamic math problem solving (statistics, linear algebra, FFT, etc.)
+    pub math_service: u64,
 }

@@ -144,6 +144,10 @@ pub(crate) struct LearningState {
     // ── Phase 17: Predictive Self-Tuning ──────────────────────────────
     /// Self-model accuracy EMA (how well past predictions matched outcomes)
     pub(crate) self_model_accuracy: f32,
+    /// Cognitive group geometric mean (flow x semantic x reasoning x curiosity)
+    pub(crate) lr_cognitive_mod: f32,
+    /// Meta-learning group geometric mean (FEP x MCE x subsystem)
+    pub(crate) lr_meta_mod: f32,
 }
 
 impl Default for LearningState {
@@ -154,6 +158,8 @@ impl Default for LearningState {
             adaptive_threshold_scale: 1.0,
             subsystem_lr_factor: 1.0,
             self_model_accuracy: 0.5,
+            lr_cognitive_mod: 1.0,
+            lr_meta_mod: 1.0,
         }
     }
 }

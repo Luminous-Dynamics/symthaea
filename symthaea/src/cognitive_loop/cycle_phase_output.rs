@@ -139,14 +139,14 @@ impl CognitiveLoopService {
                 dream_wisdom_count: feedback.memory.dream_wisdom_count,
                 continuity_replay_triggered: feedback.consciousness.continuity_replay_needed,
                 resonator_codebook_size: self
-                    .resonator_memory
+                    .memory_consol.resonator_memory
                     .as_ref()
                     .and_then(|m| m.resonator.codebooks.first())
                     .map(|cb| cb.len())
                     .unwrap_or(0),
-                resonator_episodes: self.resonator_memory.as_ref().map(|m| m.len()).unwrap_or(0),
+                resonator_episodes: self.memory_consol.resonator_memory.as_ref().map(|m| m.len()).unwrap_or(0),
                 resonator_factorization_iters: self
-                    .resonator_memory
+                    .memory_consol.resonator_memory
                     .as_ref()
                     .map(|m| m.resonator.iterations())
                     .unwrap_or(0),
@@ -314,6 +314,8 @@ impl CognitiveLoopService {
             } else {
                 0.0
             },
+            lr_cognitive_mod: self.carryover.learning.lr_cognitive_mod,
+            lr_meta_mod: self.carryover.learning.lr_meta_mod,
             cycle_reward: dynamics.core.cycle_reward,
             support_triage_count: feedback.support.support_triage_count,
             support_alert_fired: feedback.support.support_alert_fired,
@@ -675,6 +677,42 @@ impl CognitiveLoopService {
                     || (nsp > 0.0 && nsp < NARRATIVE_SELF_PHI_LOW_THRESHOLD));
         }
 
+        // ── Session 15+ modulation observability booleans ──────────────────
+        if self.stats.total_cycles > 15 {
+            let phi_eff = metadata.quality.epistemic_phi_eff as f32;
+            metadata.epistemic_phi_modulated = phi_eff > 0.6 || (phi_eff > 0.0 && phi_eff < 0.2);
+
+            let pb = metadata.temporal.phenomenal_binding_strength as f32;
+            metadata.phenomenal_binding_modulated = pb > 0.7 || (pb > 0.0 && pb < 0.15);
+
+            let tc = metadata.temporal.temporal_coherence_score as f32;
+            metadata.temporal_coherence_modulated = tc > 0.75 || (tc > 0.0 && tc < 0.15);
+
+            let hu = metadata.temporal.holographic_unity as f32;
+            metadata.holographic_unity_modulated = hu > 0.7 || (hu > 0.0 && hu < 0.15);
+
+            let ha = metadata.harmonics.harmonies_alignment;
+            metadata.harmonies_alignment_modulated = ha > 0.8 || ha < 0.2;
+
+            let cg = feedback.consciousness.consciousness_gradient_magnitude;
+            metadata.consciousness_gradient_lr_modulated = cg.abs() as f32 > 0.05;
+
+            let vch = metadata.value_cache_hit_rate;
+            metadata.value_cache_confidence_modulated = vch < 0.3 || vch > 0.9;
+
+            let csl = feedback.consciousness.consciousness_state_level as f32;
+            metadata.consciousness_state_modulated = csl > 0.7 || (csl > 0.0 && csl < 0.2);
+
+            metadata.living_mind_vitality_modulated = metadata.living_mind_vitality > 0.0
+                && (metadata.living_mind_vitality > 0.7 || metadata.living_mind_vitality < 0.3);
+
+            metadata.living_mind_coherence_modulated = metadata.living_mind_coherence > 0.0
+                && (metadata.living_mind_coherence > 0.7 || metadata.living_mind_coherence < 0.3);
+
+            let mpe = metadata.mcts_plan_effectiveness;
+            metadata.mcts_effectiveness_modulated = mpe > 0.6 || (mpe > 0.0 && mpe < 0.2);
+        }
+
         // ── GWT handler telemetry ──
         metadata.gwt_memory_consolidation_requested = self
             .gwt_mgr
@@ -731,12 +769,12 @@ impl CognitiveLoopService {
 
         // ── Voice telemetry ──
         {
-            let voice_summary = self.voice_coherence.voice.summary();
+            let voice_summary = self.language_comm.voice_coherence.voice.summary();
             metadata.voice_articulation_quality =
-                self.voice_coherence.voice.smoothed_articulation();
-            metadata.voice_rate_stability = self.voice_coherence.voice.rate_stability();
+                self.language_comm.voice_coherence.voice.smoothed_articulation();
+            metadata.voice_rate_stability = self.language_comm.voice_coherence.voice.rate_stability();
             metadata.voice_confidence = voice_summary.voice_confidence;
-            metadata.voice_phi_adjustment = self.voice_coherence.voice.compute_phi_adjustment();
+            metadata.voice_phi_adjustment = self.language_comm.voice_coherence.voice.compute_phi_adjustment();
         }
 
         // ── Substrate & convergence telemetry ──
@@ -750,6 +788,17 @@ impl CognitiveLoopService {
         metadata.substrate_tau_factor = metadata.substrate.substrate_tau_factor;
         metadata.substrate_scale_pressure = metadata.substrate.substrate_scale_pressure;
         metadata.substrate_feasibility = metadata.substrate.substrate_effective_feasibility;
+
+        // ── Thermal telemetry ──
+        {
+            let thermal_signals = self.thermal_bridge.signals();
+            metadata.thermal = super::ThermalTelemetry {
+                thermal_level: thermal_signals.level as u8,
+                thermal_tau_factor: thermal_signals.tau_factor,
+                should_reduce_profile: thermal_signals.should_reduce_profile,
+                target_frequency_override: thermal_signals.target_frequency_override,
+            };
+        }
 
         // Integrity telemetry
         #[cfg(feature = "integrity")]
@@ -793,7 +842,7 @@ impl CognitiveLoopService {
         // Physics bridge telemetry
         #[cfg(feature = "physics-bridge")]
         {
-            if let Some(ref mut physics) = self.physics_integration {
+            if let Some(ref mut physics) = self.feature_integ.physics_integration {
                 let pt = physics.telemetry();
                 let pareto = pt.pareto_context.as_ref();
                 metadata.physics_bridge = Some(super::PhysicsBridgeTelemetry {
@@ -863,6 +912,7 @@ impl CognitiveLoopService {
         #[cfg(feature = "ssm_language")]
         {
             metadata.broca = self
+                .language_comm
                 .broca_manager
                 .as_ref()
                 .map(|m| m.last_telemetry().clone());
@@ -917,6 +967,23 @@ impl CognitiveLoopService {
             metadata.therapeutic.therapeutic_serotonin_debt = self.therapeutic_manager.regulation_engine.serotonin_debt();
             metadata.therapeutic.therapeutic_dopamine_debt = self.therapeutic_manager.regulation_engine.dopamine_debt();
             metadata.therapeutic.therapeutic_dream_accuracy = self.therapeutic_manager.dream_prediction_accuracy();
+
+            // ── Scope Guard: check Broca output for scope violations ──
+            // Runs BEFORE language_output is returned to caller.
+            // If a violation is detected, inject disclaimers into the text
+            // and log the violation type in telemetry.
+            if let Some(ref mut text) = self.language_comm.last_broca_text {
+                if let Some(violation) = self.therapeutic_manager.scope_guard.check_response(text) {
+                    tracing::warn!(
+                        target: "therapeutic_manager::scope_guard",
+                        violation = ?violation,
+                        cycle = self.stats.total_cycles,
+                        "Scope violation detected in Broca output — injecting disclaimer"
+                    );
+                    *text = self.therapeutic_manager.scope_guard.apply_disclaimers(text);
+                    metadata.therapeutic.therapeutic_scope_violation = format!("{:?}", violation);
+                }
+            }
         }
 
         // ── Nurture/attachment telemetry ──
@@ -926,6 +993,20 @@ impl CognitiveLoopService {
                 metadata.attachment_style = Some(format!("{:?}", nurture.style()));
                 metadata.attachment_security = Some(nurture.security_score());
             }
+        }
+
+        // ── Glyph Codex telemetry ──
+        #[cfg(feature = "glyph_codex")]
+        {
+            metadata.glyph_dominant_modality =
+                self.glyph_manager.dominant_modality().name().to_string();
+            metadata.glyph_coherence = self.glyph_manager.last_coherence().value as f32;
+            metadata.glyph_resonant_name = self
+                .glyph_manager
+                .resonant_glyph_name()
+                .unwrap_or("")
+                .to_string();
+            metadata.glyph_spiral_position = self.glyph_manager.spiral_position();
         }
 
         // ── End-of-cycle stats ──
@@ -1203,7 +1284,7 @@ impl CognitiveLoopService {
             thought_vector,
             wisdom_hv: perception.encoding.hv16_cached,
             #[cfg(feature = "ssm_language")]
-            language_output: self.last_broca_text.take(),
+            language_output: self.language_comm.last_broca_text.take(),
             #[cfg(feature = "identity")]
             signed_output,
             #[cfg(feature = "identity")]

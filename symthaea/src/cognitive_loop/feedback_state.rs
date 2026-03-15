@@ -23,13 +23,48 @@ pub(crate) enum FeedbackProposal {
     Set(f64),
 }
 
-/// An attributed proposal — who proposed what.
+/// Priority tier for feedback proposals.
+///
+/// Higher-priority proposals have more weight in consensus integration.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub(crate) enum Priority {
+    /// Aesthetic/flow/harmony signals (weight 0.5x)
+    Aesthetic = 0,
+    /// Default: cognitive signals — binding, reasoning, surprise (weight 1.0x)
+    Cognitive = 1,
+    /// Homeostatic regulation — neuromod bath, FEP, sleep/wake (weight 2.0x)
+    Homeostatic = 2,
+    /// Safety-critical — agent vetoes, moral concerns, seizure protection (weight 3.0x)
+    Safety = 3,
+}
+
+impl Priority {
+    /// Weight multiplier for this priority tier.
+    pub fn weight(self) -> f64 {
+        match self {
+            Priority::Aesthetic => 0.5,
+            Priority::Cognitive => 1.0,
+            Priority::Homeostatic => 2.0,
+            Priority::Safety => 3.0,
+        }
+    }
+}
+
+impl Default for Priority {
+    fn default() -> Self {
+        Priority::Cognitive
+    }
+}
+
+/// An attributed proposal — who proposed what, at what priority.
 #[derive(Debug, Clone)]
 pub(crate) struct AttributedProposal {
     /// Subsystem that made this proposal (static str for zero-alloc attribution)
     pub source: &'static str,
     /// The proposal itself
     pub proposal: FeedbackProposal,
+    /// Priority tier (higher = more weight in consensus)
+    pub priority: Priority,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -51,9 +86,19 @@ impl ProposalCollector {
         }
     }
 
-    /// Record a proposal from a named subsystem.
+    /// Record a proposal from a named subsystem (default priority: Cognitive).
     pub fn propose(&mut self, source: &'static str, proposal: FeedbackProposal) {
-        self.proposals.push(AttributedProposal { source, proposal });
+        self.proposals.push(AttributedProposal { source, proposal, priority: Priority::default() });
+    }
+
+    /// Record a proposal with an explicit priority tier.
+    pub fn propose_with_priority(
+        &mut self,
+        source: &'static str,
+        proposal: FeedbackProposal,
+        priority: Priority,
+    ) {
+        self.proposals.push(AttributedProposal { source, proposal, priority });
     }
 
     /// Number of proposals collected this cycle.
@@ -124,53 +169,55 @@ impl ProposalCollector {
         minority as f32 / adds.len() as f32
     }
 
-    /// Integrate all proposals using consensus mode.
+    /// Integrate all proposals using priority-weighted consensus mode.
     ///
-    /// Consensus integration strategy:
-    /// - `Set` proposals: last one wins (they're rare and intentional)
-    /// - `Add` proposals: averaged (consensus), then applied
-    /// - `Scale` proposals: geometric mean, then applied
+    /// - `Set` proposals: highest-priority Set wins (ties: last one)
+    /// - `Add` proposals: priority-weighted average, then applied
+    /// - `Scale` proposals: priority-weighted geometric mean, then applied
+    ///
+    /// When all proposals share the same priority, reduces to unweighted consensus.
     pub fn integrate(&self, base_value: f64, clamp_min: f64, clamp_max: f64) -> IntegrationResult {
-        let mut sets: Vec<(&'static str, f64)> = Vec::new();
-        let mut adds: Vec<(&'static str, f64)> = Vec::new();
-        let mut scales: Vec<(&'static str, f64)> = Vec::new();
+        let mut sets: Vec<(&'static str, f64, Priority)> = Vec::new();
+        let mut adds: Vec<(f64, f64)> = Vec::new(); // (delta, weight)
+        let mut scales: Vec<(f64, f64)> = Vec::new(); // (factor, weight)
 
         for ap in &self.proposals {
+            let w = ap.priority.weight();
             match ap.proposal {
-                FeedbackProposal::Set(v) => sets.push((ap.source, v)),
-                FeedbackProposal::Add(d) => adds.push((ap.source, d)),
-                FeedbackProposal::Scale(f) => scales.push((ap.source, f)),
+                FeedbackProposal::Set(v) => sets.push((ap.source, v, ap.priority)),
+                FeedbackProposal::Add(d) => adds.push((d, w)),
+                FeedbackProposal::Scale(f) => scales.push((f, w)),
             }
         }
 
-        // Start from base or last Set
-        let mut value = if let Some((_, v)) = sets.last() {
-            *v
+        // Start from base or highest-priority Set (ties: last one wins)
+        let mut value = if !sets.is_empty() {
+            let max_pri = sets.iter().map(|(_, _, p)| *p).max().unwrap();
+            sets.iter().rev().find(|(_, _, p)| *p == max_pri).map(|(_, v, _)| *v).unwrap_or(base_value)
         } else {
             base_value
         };
 
-        // Average additive proposals (noise-resistant consensus)
+        // Priority-weighted average of additive proposals
         if !adds.is_empty() {
-            let avg_delta: f64 = adds.iter().map(|(_, d)| d).sum::<f64>() / adds.len() as f64;
-            value += avg_delta;
+            let total_w: f64 = adds.iter().map(|(_, w)| w).sum();
+            if total_w > 0.0 {
+                let weighted_sum: f64 = adds.iter().map(|(d, w)| d * w).sum();
+                value += weighted_sum / total_w;
+            }
         }
-        // Geometric mean of multiplicative proposals.
-        // Guard: filter out non-positive scale factors (ln(0) = -inf, ln(<0) = NaN).
-        // Science: scale factors represent multiplicative modulation and must be > 0.
+        // Priority-weighted geometric mean of multiplicative proposals
         if !scales.is_empty() {
-            let valid_scales: Vec<f64> = scales
-                .iter()
-                .map(|(_, f)| *f)
-                .filter(|f| *f > 0.0 && f.is_finite())
-                .collect();
-            if !valid_scales.is_empty() {
-                let log_sum: f64 = valid_scales.iter().map(|f| f.ln()).sum::<f64>();
-                let geo_mean = (log_sum / valid_scales.len() as f64).exp();
-                if geo_mean.is_finite() {
-                    value *= geo_mean;
+            let valid: Vec<(f64, f64)> = scales.iter().filter(|(f, _)| *f > 0.0 && f.is_finite()).copied().collect();
+            if !valid.is_empty() {
+                let total_w: f64 = valid.iter().map(|(_, w)| w).sum();
+                if total_w > 0.0 {
+                    let wlog: f64 = valid.iter().map(|(f, w)| f.ln() * w).sum::<f64>();
+                    let geo_mean = (wlog / total_w).exp();
+                    if geo_mean.is_finite() {
+                        value *= geo_mean;
+                    }
                 }
-                // else: overflow/underflow in exp() — skip scaling entirely
             }
         }
 
@@ -619,6 +666,46 @@ impl FeedbackState {
     /// Feedback signal diversity: unique sources / total proposals.
     /// High diversity (>0.7) = many subsystems contributing = healthy.
     /// Low diversity (<0.3) = few subsystems dominating = potential bias.
+    // ── Mid-cycle effective value accessors ─────────────────────────────
+
+    /// Effective prediction_confidence from cycle-start + proposals so far.
+    pub fn effective_confidence(&self) -> f64 {
+        self.confidence.integrate(self.cycle_start_confidence, 0.01, 0.99).effective
+    }
+
+    /// Effective fep_lr_boost from cycle-start + proposals so far.
+    pub fn effective_lr_boost(&self) -> f64 {
+        self.learning_rate.integrate(self.cycle_start_lr, 1.0, 3.0).effective
+    }
+
+    /// Effective exploration_urge from cycle-start + proposals so far.
+    pub fn effective_exploration(&self) -> f64 {
+        self.exploration.integrate(self.cycle_start_exploration, 0.0, 1.0).effective
+    }
+
+    /// Effective adaptive_threshold_scale from cycle-start + proposals so far.
+    pub fn effective_threshold(&self) -> f64 {
+        self.threshold.integrate(self.cycle_start_threshold, 0.5, 2.0).effective
+    }
+
+    /// Compute a per-cycle feedback summary for diagnostics.
+    pub fn feedback_summary(&self) -> FeedbackSummary {
+        let total = self.total_proposals();
+        let mut priority_counts = [0u32; 4];
+        for collector in [&self.confidence, &self.learning_rate, &self.exploration, &self.threshold] {
+            for ap in collector.proposals() {
+                let idx = ap.priority as usize;
+                if idx < 4 { priority_counts[idx] += 1; }
+            }
+        }
+        FeedbackSummary {
+            total_proposals: total as u32,
+            conflict_ratio: self.avg_conflict_ratio(),
+            priority_counts,
+            diversity: self.signal_diversity(),
+        }
+    }
+
     pub fn signal_diversity(&self) -> f32 {
         let total = self.total_proposals();
         if total == 0 {
@@ -639,6 +726,19 @@ impl FeedbackState {
         }
         (seen.len() as f32 / total as f32).min(1.0)
     }
+}
+
+/// Per-cycle feedback diagnostics.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct FeedbackSummary {
+    /// Total proposals across all 4 channels
+    pub total_proposals: u32,
+    /// Average conflict ratio across channels
+    pub conflict_ratio: f32,
+    /// Proposal counts per priority tier: [Aesthetic, Cognitive, Homeostatic, Safety]
+    pub priority_counts: [u32; 4],
+    /// Signal diversity (unique sources / total proposals)
+    pub diversity: f32,
 }
 
 impl Default for FeedbackState {
@@ -1203,5 +1303,65 @@ mod tests {
         assert!(lr.unwrap().is_finite());
         assert!(explore.unwrap().is_finite());
         assert!(thresh.unwrap().is_finite());
+    }
+
+    // ── Priority-aware integration tests ─────────────────────────────
+
+    #[test]
+    fn test_all_cognitive_same_as_default() {
+        let mut d = ProposalCollector::new();
+        d.propose("a", FeedbackProposal::Add(0.1));
+        d.propose("b", FeedbackProposal::Scale(0.9));
+        let mut e = ProposalCollector::new();
+        e.propose_with_priority("a", FeedbackProposal::Add(0.1), Priority::Cognitive);
+        e.propose_with_priority("b", FeedbackProposal::Scale(0.9), Priority::Cognitive);
+        assert!((d.integrate(0.5, 0.0, 1.0).effective - e.integrate(0.5, 0.0, 1.0).effective).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_safety_outweighs_aesthetic_add() {
+        let mut c = ProposalCollector::new();
+        c.propose_with_priority("safety", FeedbackProposal::Add(0.2), Priority::Safety);
+        c.propose_with_priority("aesthetic", FeedbackProposal::Add(-0.2), Priority::Aesthetic);
+        assert!(c.integrate(0.5, 0.0, 1.0).effective > 0.5, "Safety should dominate");
+    }
+
+    #[test]
+    fn test_highest_priority_set_wins() {
+        let mut c = ProposalCollector::new();
+        c.propose_with_priority("aesthetic", FeedbackProposal::Set(0.2), Priority::Aesthetic);
+        c.propose_with_priority("safety", FeedbackProposal::Set(0.8), Priority::Safety);
+        assert!((c.integrate(0.5, 0.0, 1.0).effective - 0.8).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_order_independence_with_mixed_priorities() {
+        let mut fwd = ProposalCollector::new();
+        fwd.propose_with_priority("a", FeedbackProposal::Add(0.1), Priority::Safety);
+        fwd.propose_with_priority("b", FeedbackProposal::Add(-0.05), Priority::Aesthetic);
+        fwd.propose_with_priority("c", FeedbackProposal::Scale(1.1), Priority::Homeostatic);
+        fwd.propose_with_priority("d", FeedbackProposal::Scale(0.95), Priority::Cognitive);
+        let mut rev = ProposalCollector::new();
+        rev.propose_with_priority("d", FeedbackProposal::Scale(0.95), Priority::Cognitive);
+        rev.propose_with_priority("c", FeedbackProposal::Scale(1.1), Priority::Homeostatic);
+        rev.propose_with_priority("b", FeedbackProposal::Add(-0.05), Priority::Aesthetic);
+        rev.propose_with_priority("a", FeedbackProposal::Add(0.1), Priority::Safety);
+        let diff = (fwd.integrate(0.5, 0.0, 1.0).effective - rev.integrate(0.5, 0.0, 1.0).effective).abs();
+        assert!(diff < 1e-10, "Order matters: diff={diff}");
+    }
+
+    #[test]
+    fn test_feedback_summary_counts_priorities() {
+        let mut state = FeedbackState::new();
+        state.begin_cycle();
+        state.confidence.propose_with_priority("s1", FeedbackProposal::Add(0.1), Priority::Safety);
+        state.confidence.propose_with_priority("s2", FeedbackProposal::Add(0.05), Priority::Safety);
+        state.learning_rate.propose("fep", FeedbackProposal::Add(0.1));
+        state.exploration.propose_with_priority("flow", FeedbackProposal::Scale(1.1), Priority::Aesthetic);
+        let summary = state.feedback_summary();
+        assert_eq!(summary.total_proposals, 4);
+        assert_eq!(summary.priority_counts[Priority::Safety as usize], 2);
+        assert_eq!(summary.priority_counts[Priority::Cognitive as usize], 1);
+        assert_eq!(summary.priority_counts[Priority::Aesthetic as usize], 1);
     }
 }
