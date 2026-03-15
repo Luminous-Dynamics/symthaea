@@ -256,13 +256,11 @@ impl CognitiveLoopService {
                 // Any async P2P component (NetworkService, Hyperfeel,
                 // FederatedAggregator) sends SwarmEvents through mpsc::Sender;
                 // we drain them here before processing.
-                if let Ok(guard) = self.swarm_event_rx.lock() {
-                    if let Some(ref rx) = *guard {
-                        super::managers::network_service_bridge::drain_swarm_channel(
-                            rx,
-                            &mut self.swarm_manager,
-                        );
-                    }
+                if let Ok(rx) = self.swarm_event_rx.lock() {
+                    super::managers::network_service_bridge::drain_swarm_channel(
+                        &rx,
+                        &mut self.swarm_manager,
+                    );
                 }
 
                 // ── Swarm Manager (interval 41, co-prime) ─────────────
@@ -274,23 +272,34 @@ impl CognitiveLoopService {
 
                 // ── Spectrum Manager (interval 53, co-prime) ────────────
                 #[cfg(feature = "mesh")]
-                if self.spectrum_manager.should_run(cycle_num, urgency_u8) {
-                    let spectrum_output = self.spectrum_manager.process(snapshot);
-                    self.subsystem_collector
-                        .record("spectrum_manager", spectrum_output);
+                {
+                    // Swarm→Spectrum: inject synthetic observations from peer state.
+                    // This feeds the waterfall model even without SDR hardware.
+                    let swarm_telem = self.swarm_manager.telemetry();
+                    self.spectrum_manager.ingest_swarm_state(
+                        swarm_telem.connected_peers,
+                        swarm_telem.mean_peer_phi,
+                        swarm_telem.connectivity_ema,
+                    );
 
-                    // Cross-coupling: Spectrum → Swarm connectivity modifier
-                    let connectivity_penalty = match self.spectrum_manager.network_health() {
-                        super::managers::radio_dispatcher::NetworkHealth::AllTiersUp => 1.0,
-                        super::managers::radio_dispatcher::NetworkHealth::LocalDown => {
-                            super::thresholds::RADIO_CONNECTIVITY_PENALTY_LOCAL_DOWN
-                        }
-                        super::managers::radio_dispatcher::NetworkHealth::MetroOnly => {
-                            super::thresholds::RADIO_CONNECTIVITY_PENALTY_METRO_ONLY
-                        }
-                        super::managers::radio_dispatcher::NetworkHealth::Blackout => 0.0,
-                    };
-                    self.swarm_manager.set_connectivity_modifier(connectivity_penalty);
+                    if self.spectrum_manager.should_run(cycle_num, urgency_u8) {
+                        let spectrum_output = self.spectrum_manager.process(snapshot);
+                        self.subsystem_collector
+                            .record("spectrum_manager", spectrum_output);
+
+                        // Cross-coupling: Spectrum → Swarm connectivity modifier
+                        let connectivity_penalty = match self.spectrum_manager.network_health() {
+                            super::managers::radio_dispatcher::NetworkHealth::AllTiersUp => 1.0,
+                            super::managers::radio_dispatcher::NetworkHealth::LocalDown => {
+                                super::thresholds::RADIO_CONNECTIVITY_PENALTY_LOCAL_DOWN
+                            }
+                            super::managers::radio_dispatcher::NetworkHealth::MetroOnly => {
+                                super::thresholds::RADIO_CONNECTIVITY_PENALTY_METRO_ONLY
+                            }
+                            super::managers::radio_dispatcher::NetworkHealth::Blackout => 0.0,
+                        };
+                        self.swarm_manager.set_connectivity_modifier(connectivity_penalty);
+                    }
                 }
 
                 // ── Therapeutic Manager (interval 11, co-prime) ─────────
@@ -301,6 +310,22 @@ impl CognitiveLoopService {
                     let therapeutic_output = self.therapeutic_manager.process(snapshot);
                     self.subsystem_collector
                         .record("therapeutic_manager", therapeutic_output);
+
+                    // ── Bidirectional bridge: neuromod bath → RDoC profile ──
+                    // Reads actual transmitter levels and adjusts RDoC domains via EMA.
+                    {
+                        let bath = [
+                            self.neuromod.bath.dopamine.effective(),
+                            self.neuromod.bath.noradrenaline.effective(),
+                            self.neuromod.bath.serotonin.effective(),
+                            self.neuromod.bath.acetylcholine.effective(),
+                            self.neuromod.bath.gaba.effective(),
+                            self.neuromod.bath.oxytocin.effective(),
+                            self.neuromod.bath.glutamate.effective(),
+                            self.neuromod.bath.adenosine.effective(),
+                        ];
+                        self.therapeutic_manager.update_rdoc_from_bath(&bath);
+                    }
 
                     // Inject neuromod deltas from regulation strategy into the bath.
                     // This bridges RDoC domains → the 8-transmitter neuromod system.
@@ -474,7 +499,7 @@ impl CognitiveLoopService {
                     CONFIDENCE_CRASH_FREEZE_CYCLES // Full freeze
                 };
                 self.carryover.quality.crash_freeze_remaining = freeze_duration;
-                self.adjust_exploration("confidence_crash", CONFIDENCE_CRASH_EXPLORATION_BOOST);
+                self.adjust_exploration_pri("confidence_crash", CONFIDENCE_CRASH_EXPLORATION_BOOST, crate::cognitive_loop::feedback_state::Priority::Safety);
                 tracing::debug!(
                     "Confidence crash detected: {prev_conf:.3} → {current_conf:.3} (drop={drop:.3}), \
                      freezing LR for {freeze_duration} cycles"
@@ -629,10 +654,10 @@ impl CognitiveLoopService {
         // Sustained undershoot (<0.85) → system is sluggish → boost LR.
         // Science: Turrigiano (2008) — homeostatic failure triggers synaptic recalibration.
         if eff > HOMEOSTASIS_RECALIBRATE_HIGH && self.stats.total_cycles > DYNAMICS_POST_BOOT_CYCLES {
-            self.scale_lr("homeostasis_overcorrect", 1.0 - HOMEOSTASIS_NEUROMOD_STEP);
-            self.scale_exploration("homeostasis_overcorrect", 1.0 + HOMEOSTASIS_NEUROMOD_STEP);
+            self.scale_lr_pri("homeostasis_overcorrect", 1.0 - HOMEOSTASIS_NEUROMOD_STEP, crate::cognitive_loop::feedback_state::Priority::Homeostatic);
+            self.scale_exploration_pri("homeostasis_overcorrect", 1.0 + HOMEOSTASIS_NEUROMOD_STEP, crate::cognitive_loop::feedback_state::Priority::Homeostatic);
         } else if eff < HOMEOSTASIS_RECALIBRATE_LOW && eff > 0.0 && self.stats.total_cycles > DYNAMICS_POST_BOOT_CYCLES {
-            self.scale_lr("homeostasis_sluggish", 1.0 + HOMEOSTASIS_NEUROMOD_STEP);
+            self.scale_lr_pri("homeostasis_sluggish", 1.0 + HOMEOSTASIS_NEUROMOD_STEP, crate::cognitive_loop::feedback_state::Priority::Homeostatic);
         }
 
         // Session 10 Item 3: Coherence velocity → CfC tau modulation.
@@ -2944,7 +2969,7 @@ impl CognitiveLoopService {
                 .report_learning(effective_lr, prediction_error, is_night);
             let fatigue = self.neuromod.bath.learning_fatigue_factor();
             if fatigue < 1.0 {
-                self.scale_lr("glutamate_fatigue", fatigue);
+                self.scale_lr_pri("glutamate_fatigue", fatigue, crate::cognitive_loop::feedback_state::Priority::Homeostatic);
             }
         }
 
@@ -3437,9 +3462,26 @@ impl CognitiveLoopService {
                 }
             }
         };
-        // TODO: Route evicted semantic entries to graduation pipeline
-        // (Phase 2: semantic → episodic flow — requires GraduationEvent type)
+        // Phase 2: Route evicted semantic entries to graduation pipeline.
+        // Evicted entries survived a full ring buffer rotation, so they're worth
+        // considering for long-term storage. The MemoryCoordinator applies quality
+        // filtering (min WM steps, psi threshold) before actual graduation.
         let had_semantic_eviction = evicted_semantic.is_some();
+        if let Some(evicted) = evicted_semantic {
+            let steps_survived = pp_total_cycles.saturating_sub(evicted.timestamp as usize) as u64;
+            self.memory_consol.memory_coordinator.queue_graduation(
+                crate::memory::memory_coordinator::GraduationEvent {
+                    content: symthaea_core::hdc::ContinuousHV::from_vec(evicted.hdc_vector),
+                    label: evicted.category.unwrap_or_default(),
+                    steps_survived,
+                    final_activation: (1.0 - evicted.prediction_error).max(0.0) as f64,
+                    psi_at_graduation: pp_phi as f64,
+                    coherence_at_graduation: coherence as f64,
+                    source: crate::memory::memory_coordinator::MemorySource::SemanticEviction,
+                    is_verified: false,
+                },
+            );
+        }
 
         // Apply memory context boost to confidence after rayon::join (deferred from parallel branch)
         if memory_confidence_boost.abs() > f32::EPSILON {
