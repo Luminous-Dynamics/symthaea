@@ -741,8 +741,9 @@ impl EpistemicAuditor {
         // Neuromodulator averages
         let neuromod = {
             let mut stmt = conn.prepare(
-                "SELECT AVG(dopamine), AVG(serotonin), AVG(noradrenaline), \
-                        AVG(acetylcholine), AVG(gaba), AVG(ei_ratio), \
+                "SELECT AVG(dopamine_effective), AVG(serotonin_effective), \
+                        AVG(noradrenaline_effective), AVG(acetylcholine_effective), \
+                        AVG(gaba_effective), AVG(ei_balance_ratio), \
                         AVG(allostatic_load), AVG(sleep_pressure) \
                  FROM neuromod_history WHERE cycle_id >= ? AND cycle_id < ?"
             ).map_err(|e| format!("report neuromod: {e}"))?;
@@ -767,7 +768,7 @@ impl EpistemicAuditor {
         let moral_drift_count: i64 = {
             let mut stmt = conn.prepare(
                 "SELECT COUNT(*) FROM moral_audit \
-                 WHERE cycle_id >= ? AND cycle_id < ? AND moral_drift_alert = true"
+                 WHERE cycle_id >= ? AND cycle_id < ? AND drift_alert = true"
             ).map_err(|e| format!("report moral_drift: {e}"))?;
             stmt.query_row(
                 duckdb::params![from as i64, to as i64],
@@ -780,7 +781,7 @@ impl EpistemicAuditor {
             let mut stmt = conn.prepare(
                 "SELECT COUNT(*) FROM substrate_audit \
                  WHERE cycle_id >= ? AND cycle_id < ? \
-                   AND substrate_transition IS NOT NULL"
+                   AND transition_count > 0"
             ).map_err(|e| format!("report substrate: {e}"))?;
             stmt.query_row(
                 duckdb::params![from as i64, to as i64],
