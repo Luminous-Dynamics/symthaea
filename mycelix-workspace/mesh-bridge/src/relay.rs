@@ -6,10 +6,13 @@
 
 use crate::serializer::{self, EmergencyRelay, FoodRelay, RelayPayload, RelayType, TendRelay};
 use crate::transport::MeshTransport;
+use crate::BridgeMetrics;
 use anyhow::Result;
 use holochain_client::{AgentSigner, AppWebsocket, ClientAgentSigner, ExternIO, ZomeCallTarget};
 use std::collections::{HashMap, HashSet};
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
+use tokio_util::sync::CancellationToken;
 
 /// Timeout for fragment reassembly (seconds).
 const REASSEMBLY_TIMEOUT_SECS: u64 = 30;
@@ -18,17 +21,32 @@ const REASSEMBLY_TIMEOUT_SECS: u64 = 30;
 const MAX_REASSEMBLY_BUFFERS: usize = 64;
 
 /// Run the relay loop: mesh transport → deserializer → conductor.
-pub async fn run(conductor_url: &str, transport: Box<dyn MeshTransport>) -> Result<()> {
+///
+/// Respects the `cancel` token for graceful shutdown — finishes processing
+/// any in-flight payload before exiting.
+pub async fn run(
+    conductor_url: &str,
+    transport: Box<dyn MeshTransport>,
+    cancel: CancellationToken,
+    metrics: BridgeMetrics,
+) -> Result<()> {
     tracing::info!("Relay starting, conductor={conductor_url}");
 
     let mut dedup: HashSet<[u8; 32]> = HashSet::new();
     let mut reassembly: HashMap<[u8; 4], ReassemblyBuffer> = HashMap::new();
     let mut ws_cached: Option<AppWebsocket> = None;
+    let mut known_peers: HashSet<[u8; 8]> = HashSet::new();
 
     loop {
+        if cancel.is_cancelled() {
+            tracing::info!("Relay shutting down (cancel requested)");
+            break;
+        }
+
         match transport.recv(5000).await {
             Ok(Some(frame)) => {
                 if frame.len() < 8 {
+                    metrics.fragments_dropped.fetch_add(1, Ordering::Relaxed);
                     continue;
                 }
 
@@ -47,6 +65,11 @@ pub async fn run(conductor_url: &str, transport: Box<dyn MeshTransport>) -> Resu
 
                     match RelayPayload::from_bytes(&payload_bytes) {
                         Ok(payload) => {
+                            // Track peer
+                            if known_peers.insert(payload.origin) {
+                                metrics.peers_seen.fetch_add(1, Ordering::Relaxed);
+                            }
+
                             // Dedup by content hash
                             if dedup.contains(&payload.content_hash) {
                                 tracing::debug!("Duplicate payload, skipping");
@@ -56,22 +79,47 @@ pub async fn run(conductor_url: &str, transport: Box<dyn MeshTransport>) -> Resu
 
                             // Replay as zome call with cached connection
                             match replay_payload(conductor_url, &payload, &mut ws_cached).await {
-                                Ok(()) => {}
+                                Ok(()) => {
+                                    if payload.relay_type != RelayType::Heartbeat {
+                                        metrics
+                                            .messages_received
+                                            .fetch_add(1, Ordering::Relaxed);
+                                        metrics.last_recv_at.store(
+                                            std::time::SystemTime::now()
+                                                .duration_since(std::time::UNIX_EPOCH)
+                                                .unwrap_or_default()
+                                                .as_millis()
+                                                as u64,
+                                            Ordering::Relaxed,
+                                        );
+                                    }
+                                }
                                 Err(e) => {
                                     // Drop cached connection on failure
                                     ws_cached = None;
+                                    metrics
+                                        .connection_failures
+                                        .fetch_add(1, Ordering::Relaxed);
                                     tracing::warn!("Replay failed: {e}");
                                 }
                             }
                         }
                         Err(e) => {
+                            metrics.fragments_dropped.fetch_add(1, Ordering::Relaxed);
                             tracing::warn!("Failed to deserialize relay payload: {e}");
                         }
                     }
                 }
 
-                // Clean up stale reassembly buffers
+                // Clean up stale reassembly buffers — count dropped
+                let before = reassembly.len();
                 cleanup_stale(&mut reassembly);
+                let dropped = before.saturating_sub(reassembly.len());
+                if dropped > 0 {
+                    metrics
+                        .fragments_dropped
+                        .fetch_add(dropped as u64, Ordering::Relaxed);
+                }
             }
             Ok(None) => {
                 // Timeout, clean stale buffers
@@ -88,6 +136,11 @@ pub async fn run(conductor_url: &str, transport: Box<dyn MeshTransport>) -> Resu
             dedup.clear();
         }
     }
+
+    // Drop cached connection cleanly
+    drop(ws_cached);
+    tracing::info!("Relay stopped.");
+    Ok(())
 }
 
 struct ReassemblyBuffer {

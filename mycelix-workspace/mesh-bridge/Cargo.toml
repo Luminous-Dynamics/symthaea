@@ -41,6 +41,9 @@ chrono = "0.4"
 # Async trait for transport abstraction
 async-trait = "0.1"
 
+# Graceful shutdown
+tokio-util = "0.7"
+
 # Hostname for node ID
 hostname = "0.4"
 
@@ -50,6 +53,7 @@ spidev = { version = "0.6", optional = true }
 
 [dev-dependencies]
 proptest = "1"
+serde_yaml = "0.9"
 
 [features]
 default = []

@@ -11,9 +11,10 @@
 //! Conductor ←→ Relay  ← Serializer ← Transport (LoRa / B.A.T.M.A.N.)
 //! ```
 
-use mycelix_mesh_bridge::{poller, relay, transport};
+use mycelix_mesh_bridge::{poller, relay, transport, BridgeMetrics};
 
 use anyhow::Result;
+use tokio_util::sync::CancellationToken;
 use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
@@ -52,6 +53,10 @@ async fn main() -> Result<()> {
         );
     }
 
+    // Shared metrics + cancellation token
+    let metrics = BridgeMetrics::new();
+    let cancel = CancellationToken::new();
+
     // Select transport
     let transport = transport::create_transport()?;
     tracing::info!("Transport: {}", transport.name());
@@ -59,8 +64,18 @@ async fn main() -> Result<()> {
     // Start poller (conductor → mesh)
     let poller_transport = transport.clone_box();
     let poller_url = conductor_url.clone();
+    let poller_cancel = cancel.clone();
+    let poller_metrics = metrics.clone();
     let poller_handle = tokio::spawn(async move {
-        if let Err(e) = poller::run(&poller_url, poll_interval_secs, poller_transport).await {
+        if let Err(e) = poller::run(
+            &poller_url,
+            poll_interval_secs,
+            poller_transport,
+            poller_cancel,
+            poller_metrics,
+        )
+        .await
+        {
             tracing::error!("Poller error: {e}");
         }
     });
@@ -68,8 +83,12 @@ async fn main() -> Result<()> {
     // Start relay (mesh → conductor)
     let relay_transport = transport;
     let relay_url = conductor_url;
+    let relay_cancel = cancel.clone();
+    let relay_metrics = metrics.clone();
     let relay_handle = tokio::spawn(async move {
-        if let Err(e) = relay::run(&relay_url, relay_transport).await {
+        if let Err(e) =
+            relay::run(&relay_url, relay_transport, relay_cancel, relay_metrics).await
+        {
             tracing::error!("Relay error: {e}");
         }
     });
@@ -79,24 +98,32 @@ async fn main() -> Result<()> {
         .unwrap_or_else(|_| "9100".into())
         .parse()
         .unwrap_or(9100);
+    let health_metrics = metrics;
     let health_handle = tokio::spawn(async move {
-        if let Err(e) = serve_health(health_port).await {
+        if let Err(e) = serve_health(health_port, health_metrics).await {
             tracing::warn!("Health endpoint failed to start: {e}");
         }
     });
 
+    // Wait for shutdown signal
     tokio::select! {
         _ = poller_handle => tracing::warn!("Poller exited"),
         _ = relay_handle => tracing::warn!("Relay exited"),
         _ = health_handle => tracing::warn!("Health server exited"),
-        _ = tokio::signal::ctrl_c() => tracing::info!("Shutting down..."),
+        _ = tokio::signal::ctrl_c() => {
+            tracing::info!("Shutting down gracefully...");
+            cancel.cancel();
+            // Give in-flight operations up to 5 seconds to drain
+            tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+            tracing::info!("Shutdown complete.");
+        },
     }
 
     Ok(())
 }
 
-/// Minimal HTTP health endpoint — responds to GET /health with JSON status.
-async fn serve_health(port: u16) -> Result<()> {
+/// Minimal HTTP health endpoint — responds to GET /health with JSON status + metrics.
+async fn serve_health(port: u16, metrics: BridgeMetrics) -> Result<()> {
     use tokio::io::AsyncWriteExt;
     use tokio::net::TcpListener;
 
@@ -109,6 +136,7 @@ async fn serve_health(port: u16) -> Result<()> {
             "status": "running",
             "service": "mycelix-mesh-bridge",
             "version": env!("CARGO_PKG_VERSION"),
+            "metrics": metrics.to_json(),
         });
         let body_str = body.to_string();
         let response = format!(

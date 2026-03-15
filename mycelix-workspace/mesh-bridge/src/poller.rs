@@ -5,10 +5,13 @@
 
 use crate::serializer::{self, EmergencyRelay, RelayPayload, RelayType, TendRelay};
 use crate::transport::MeshTransport;
+use crate::BridgeMetrics;
 use anyhow::Result;
 use holochain_client::{AgentSigner, AppWebsocket, ClientAgentSigner, ExternIO, ZomeCallTarget};
 use std::collections::HashSet;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
+use tokio_util::sync::CancellationToken;
 
 /// Maximum dedup cache size (action hashes we've already relayed).
 const MAX_DEDUP_CACHE: usize = 10_000;
@@ -27,10 +30,15 @@ const BACKOFF_BASE_SECS: u64 = 5;
 const BACKOFF_MAX_SECS: u64 = 300;
 
 /// Run the poller loop: conductor → serializer → mesh transport.
+///
+/// Respects the `cancel` token for graceful shutdown — drains the current
+/// poll cycle before exiting.
 pub async fn run(
     conductor_url: &str,
     poll_interval_secs: u64,
     transport: Box<dyn MeshTransport>,
+    cancel: CancellationToken,
+    metrics: BridgeMetrics,
 ) -> Result<()> {
     tracing::info!("Poller starting, conductor={conductor_url}, interval={poll_interval_secs}s");
 
@@ -41,7 +49,13 @@ pub async fn run(
     let mut ws_cached: Option<AppWebsocket> = None;
 
     loop {
+        if cancel.is_cancelled() {
+            tracing::info!("Poller shutting down (cancel requested)");
+            break;
+        }
+
         poll_count += 1;
+        metrics.poll_cycles.fetch_add(1, Ordering::Relaxed);
 
         // Broadcast heartbeat periodically
         if poll_count % HEARTBEAT_EVERY_N_POLLS == 0 {
@@ -59,11 +73,22 @@ pub async fn run(
             Ok(relayed) => {
                 consecutive_failures = 0;
                 if relayed > 0 {
+                    metrics
+                        .messages_sent
+                        .fetch_add(relayed as u64, Ordering::Relaxed);
+                    metrics.last_send_at.store(
+                        std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_millis() as u64,
+                        Ordering::Relaxed,
+                    );
                     tracing::info!("Relayed {relayed} entries to mesh");
                 }
             }
             Err(e) => {
                 consecutive_failures += 1;
+                metrics.connection_failures.fetch_add(1, Ordering::Relaxed);
                 // Drop cached connection on failure so next cycle reconnects
                 ws_cached = None;
                 tracing::warn!(
@@ -96,8 +121,20 @@ pub async fn run(
             poll_interval_secs
         };
 
-        tokio::time::sleep(tokio::time::Duration::from_secs(sleep_secs)).await;
+        // Interruptible sleep — wake early on cancellation
+        tokio::select! {
+            _ = tokio::time::sleep(tokio::time::Duration::from_secs(sleep_secs)) => {}
+            _ = cancel.cancelled() => {
+                tracing::info!("Poller interrupted during sleep");
+                break;
+            }
+        }
     }
+
+    // Drop cached connection cleanly
+    drop(ws_cached);
+    tracing::info!("Poller stopped.");
+    Ok(())
 }
 
 /// Single poll cycle. Returns number of entries relayed.

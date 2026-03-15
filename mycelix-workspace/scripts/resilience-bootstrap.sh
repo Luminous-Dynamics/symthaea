@@ -9,10 +9,9 @@
 #
 # Usage:
 #   chmod +x scripts/resilience-bootstrap.sh
-#   ./scripts/resilience-bootstrap.sh
-#
-# For Docker deployment:
-#   ./scripts/resilience-bootstrap.sh --docker
+#   ./scripts/resilience-bootstrap.sh            # local deployment
+#   ./scripts/resilience-bootstrap.sh --docker   # Docker deployment
+#   ./scripts/resilience-bootstrap.sh --dry-run  # validate prerequisites only
 
 set -euo pipefail
 
@@ -56,6 +55,89 @@ check_prerequisites() {
 
     echo ""
     info "All prerequisites met."
+}
+
+# --------------------------------------------------------------------------
+# Dry-run: validate prerequisites + environment without starting anything
+# --------------------------------------------------------------------------
+
+deploy_dry_run() {
+    info "DRY RUN — validating deployment readiness..."
+    echo ""
+    local errors=0
+
+    # Check all prerequisites (both local and Docker)
+    info "--- Local prerequisites ---"
+    for cmd in just holochain hc lair-keystore pnpm; do
+        if command -v "$cmd" &>/dev/null; then
+            info "  Found $cmd: $(command -v "$cmd")"
+        else
+            warn "  Missing: $cmd"
+            errors=$((errors + 1))
+        fi
+    done
+
+    echo ""
+    info "--- Docker prerequisites ---"
+    for cmd in docker docker-compose; do
+        if command -v "$cmd" &>/dev/null; then
+            info "  Found $cmd: $(command -v "$cmd")"
+        else
+            warn "  Missing: $cmd (Docker deployment unavailable)"
+        fi
+    done
+
+    echo ""
+    info "--- Port availability ---"
+    for port in 5173 8888 4444 9100; do
+        if ss -tlnp 2>/dev/null | grep -q ":${port} " || \
+           lsof -i ":${port}" &>/dev/null; then
+            warn "  Port $port: IN USE (may conflict)"
+            errors=$((errors + 1))
+        else
+            info "  Port $port: available"
+        fi
+    done
+
+    echo ""
+    info "--- Disk space ---"
+    local avail_mb
+    avail_mb=$(df -m "$WORKSPACE_DIR" 2>/dev/null | awk 'NR==2 {print $4}')
+    if [ -n "$avail_mb" ]; then
+        if [ "$avail_mb" -lt 2048 ]; then
+            warn "  Available: ${avail_mb}MB — recommend at least 2GB"
+            errors=$((errors + 1))
+        else
+            info "  Available: ${avail_mb}MB"
+        fi
+    fi
+
+    echo ""
+    info "--- Key files ---"
+    local key_files=(
+        "happs/mycelix-resilience-happ.yaml"
+        "observatory/package.json"
+        "mesh-bridge/Cargo.toml"
+        "scripts/resilience-bootstrap.sh"
+    )
+    cd "$WORKSPACE_DIR"
+    for f in "${key_files[@]}"; do
+        if [ -f "$f" ]; then
+            info "  $f: present"
+        else
+            warn "  $f: MISSING"
+            errors=$((errors + 1))
+        fi
+    done
+
+    echo ""
+    if [ "$errors" -eq 0 ]; then
+        info "Dry run PASSED — system is ready for deployment."
+    else
+        warn "Dry run found $errors issue(s). Fix before deploying."
+    fi
+    echo ""
+    exit "$errors"
 }
 
 # --------------------------------------------------------------------------
@@ -160,13 +242,16 @@ echo ""
 
 MODE="${1:-local}"
 
-check_prerequisites "$MODE"
-
 case "$MODE" in
+    --dry-run)
+        deploy_dry_run
+        ;;
     --docker)
+        check_prerequisites "$MODE"
         deploy_docker
         ;;
     *)
+        check_prerequisites "$MODE"
         deploy_local
         ;;
 esac
