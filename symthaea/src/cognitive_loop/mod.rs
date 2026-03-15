@@ -661,9 +661,12 @@ pub struct CognitiveLoopService {
 
     /// Receiver for swarm events from external async P2P layer.
     /// Drained non-blocking in Phase B before `swarm_manager.process()`.
-    /// Any async component (NetworkService, Hyperfeel, FederatedAggregator) can
-    /// clone the corresponding `mpsc::Sender<SwarmEvent>` to inject events.
+    /// Created eagerly at construction; clone `swarm_event_tx` to inject events.
     swarm_event_rx: std::sync::Mutex<Option<std::sync::mpsc::Receiver<managers::swarm_manager::SwarmEvent>>>,
+
+    /// Sender half of the swarm event channel. Clone via `swarm_event_sender()` to
+    /// inject events from async components (NetworkService, Hyperfeel, mesh layer).
+    swarm_event_tx: std::sync::mpsc::Sender<managers::swarm_manager::SwarmEvent>,
 
     /// Spectrum Manager: Multi-band radio dispatch, AIMD congestion, delta compression.
     /// Implements CognitiveSubsystem at interval 53. Feature-gated behind `mesh`.

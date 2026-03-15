@@ -481,6 +481,9 @@ impl CognitiveLoopService {
         #[cfg(feature = "therapeutic")]
         let therapeutic_crisis_threshold = config.therapeutic_crisis_threshold;
 
+        // Create swarm event channel eagerly so the sender is always available.
+        let (swarm_event_tx, swarm_event_rx) = std::sync::mpsc::channel();
+
         let mut service = Self {
             config,
             encoder,
@@ -925,7 +928,8 @@ impl CognitiveLoopService {
             #[cfg(feature = "mycelix")]
             governance_mgr: super::managers::GovernanceManager::default(),
             swarm_manager: super::managers::SwarmManager::default(),
-            swarm_event_rx: std::sync::Mutex::new(None),
+            swarm_event_rx: std::sync::Mutex::new(Some(swarm_event_rx)),
+            swarm_event_tx,
             #[cfg(feature = "mesh")]
             spectrum_manager: super::managers::SpectrumManager::default(),
             #[cfg(feature = "therapeutic")]

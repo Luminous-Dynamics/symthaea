@@ -611,6 +611,16 @@ impl ContinuousMind {
                     }
                 }
 
+                // Forward PeerLeft events to CLS SwarmManager for each expired peer.
+                if let Some(ref tx) = self.swarm_event_tx {
+                    for id in &expired_ids {
+                        let peer_id = crate::swarm::mesh::hex_short(id);
+                        let _ = tx.send(crate::cognitive_loop::SwarmEvent::PeerLeft {
+                            peer_id,
+                        });
+                    }
+                }
+
                 tracing::debug!(
                     target: "symthaea::mind::mesh",
                     expired = expired_ids.len(),
@@ -637,6 +647,15 @@ impl ContinuousMind {
                 replay_count = self.mesh_replay_buffer.len(),
                 "Mesh partition detected — flushing replay buffer"
             );
+
+            // Forward mass-disconnect topology change to CLS SwarmManager.
+            if let Some(ref tx) = self.swarm_event_tx {
+                let _ = tx.send(crate::cognitive_loop::SwarmEvent::TopologyChange {
+                    connected_peers: self.mesh_peers.peer_count(),
+                    mass_disconnect: true,
+                });
+            }
+
             let replays: Vec<_> = self.mesh_replay_buffer.drain(..).collect();
             for packet in replays {
                 self.mesh_outbox
@@ -738,6 +757,15 @@ impl ContinuousMind {
             self.mesh_peers.update(packet);
 
             if is_new_peer {
+                // Forward PeerJoined to CLS SwarmManager via mpsc channel.
+                if let Some(ref tx) = self.swarm_event_tx {
+                    let peer_id = crate::swarm::mesh::hex_short(&packet.source_id);
+                    let _ = tx.send(crate::cognitive_loop::SwarmEvent::PeerJoined {
+                        peer_id,
+                        trust_level: 0.5, // initial neutral trust
+                    });
+                }
+
                 for replay_pkt in self.mesh_replay_buffer.iter() {
                     self.mesh_outbox.push(crate::swarm::mesh::MeshOutbound {
                         packet: replay_pkt.clone(),

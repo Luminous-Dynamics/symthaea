@@ -684,19 +684,23 @@ impl CognitiveLoopService {
     // SWARM MANAGER ACCESSORS
     // ========================================================================
 
-    /// Install a swarm event channel receiver.
+    /// Get a clone of the swarm event sender.
     ///
-    /// Returns the `Sender` half that external async components (NetworkService,
-    /// Hyperfeel, FederatedAggregator) should clone to inject events into the
+    /// The channel is created eagerly at CLS construction. Clone the returned
+    /// sender and pass it to async components (NetworkServiceBridge, Hyperfeel,
+    /// FederatedAggregator, ContinuousMind) so they can inject events into the
     /// cognitive loop. The receiver is drained non-blocking in Phase B.
+    pub fn swarm_event_sender(
+        &self,
+    ) -> std::sync::mpsc::Sender<super::super::managers::swarm_manager::SwarmEvent> {
+        self.swarm_event_tx.clone()
+    }
+
+    /// Backwards-compatible alias for `swarm_event_sender()`.
     pub fn create_swarm_event_channel(
         &self,
     ) -> std::sync::mpsc::Sender<super::super::managers::swarm_manager::SwarmEvent> {
-        let (tx, rx) = std::sync::mpsc::channel();
-        if let Ok(mut guard) = self.swarm_event_rx.lock() {
-            *guard = Some(rx);
-        }
-        tx
+        self.swarm_event_sender()
     }
 
     /// Inject a swarm event into the SwarmManager for processing.
