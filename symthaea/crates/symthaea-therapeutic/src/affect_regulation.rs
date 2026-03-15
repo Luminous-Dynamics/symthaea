@@ -10,6 +10,7 @@
 use crate::alliance::TherapeuticAlliance;
 use crate::client_model::ClientModel;
 use serde::{Deserialize, Serialize};
+use symthaea_clinical::rdoc::{RDocDomain, RDocProfile};
 
 // ── Regulation Strategies ──────────────────────────────────────────────────
 
@@ -130,6 +131,8 @@ pub struct RegulationEngine {
     pub active_strategy: Option<RegulationStrategy>,
     /// Strategy effectiveness history (strategy → success count).
     strategy_successes: Vec<(RegulationStrategy, u32)>,
+    /// Dream-discovered strategy preferences (strategy → cumulative Phi improvement).
+    dream_strategy_bias: Vec<(RegulationStrategy, f32)>,
 }
 
 impl RegulationEngine {
@@ -138,6 +141,7 @@ impl RegulationEngine {
         Self {
             active_strategy: None,
             strategy_successes: Vec::new(),
+            dream_strategy_bias: Vec::new(),
         }
     }
 
@@ -153,12 +157,24 @@ impl RegulationEngine {
         let alliance_level = alliance.composite();
         let distress = client.distress();
 
-        // Crisis: only crisis-safe strategies
+        // Crisis: only crisis-safe strategies (dream wisdom does NOT override safety)
         if is_crisis {
             if distress > 0.8 {
                 return RegulationStrategy::Grounding;
             }
             return RegulationStrategy::Validation;
+        }
+
+        // Dream wisdom tie-breaker: if the dream engine discovered a strategy
+        // that produces better consciousness quality (Phi), prefer it when
+        // alliance permits and the strategy is appropriate for distress level.
+        // Science: Walker (2009) — offline consolidation improves waking decisions.
+        if let Some(dream_pref) = self.dream_preferred_strategy() {
+            let pref_safe = !is_crisis || dream_pref.crisis_safe();
+            let pref_alliance_ok = alliance_level >= dream_pref.min_alliance();
+            if pref_safe && pref_alliance_ok {
+                return dream_pref;
+            }
         }
 
         // High distress: prioritize immediate relief
@@ -243,6 +259,96 @@ impl RegulationEngine {
         };
 
         base.scale(intensity)
+    }
+
+    /// Apply a regulation strategy with RDoC-aware neuromodulator modulation.
+    ///
+    /// Uses the client's RDoC profile to amplify transmitters along the
+    /// domain→neuromodulator mapping (Insel et al. 2010):
+    /// - High NegativeValence → stronger serotonin/GABA boost
+    /// - Low PositiveValence → stronger dopamine boost
+    /// - High ArousalRegulatory → stronger noradrenaline reduction + adenosine
+    /// - Low CognitiveSystems → stronger acetylcholine boost
+    /// - Low SocialProcesses → stronger oxytocin boost
+    pub fn apply_strategy_rdoc(
+        &mut self,
+        strategy: RegulationStrategy,
+        distress: f32,
+        rdoc: &RDocProfile,
+    ) -> NeuromodDelta {
+        let base_delta = self.apply_strategy(strategy, distress);
+
+        // RDoC domain scores modulate the primary neuromodulator for that domain.
+        // High NegativeValence (bad) → needs more serotonin/GABA.
+        // Low PositiveValence (bad) → needs more dopamine.
+        // For "deficit" domains, we use (1 - score) as the amplification factor.
+        let neg_val = rdoc.score(RDocDomain::NegativeValence);
+        let pos_val_deficit = 1.0 - rdoc.score(RDocDomain::PositiveValence);
+        let cog_deficit = 1.0 - rdoc.score(RDocDomain::CognitiveSystems);
+        let social_deficit = 1.0 - rdoc.score(RDocDomain::SocialProcesses);
+        let arousal_dysreg = (rdoc.score(RDocDomain::ArousalRegulatory) - 0.5).abs() * 2.0;
+
+        // Amplification factor: 1.0 (neutral) to 1.5 (maximum domain-driven boost)
+        let serotonin_amp = 1.0 + neg_val * 0.5;
+        let gaba_amp = 1.0 + neg_val * 0.3;
+        let dopamine_amp = 1.0 + pos_val_deficit * 0.5;
+        let acetylcholine_amp = 1.0 + cog_deficit * 0.4;
+        let oxytocin_amp = 1.0 + social_deficit * 0.4;
+        let noradrenaline_amp = 1.0 + arousal_dysreg * 0.3;
+        let adenosine_amp = 1.0 + arousal_dysreg * 0.2;
+
+        NeuromodDelta {
+            dopamine: base_delta.dopamine * dopamine_amp,
+            noradrenaline: base_delta.noradrenaline * noradrenaline_amp,
+            serotonin: base_delta.serotonin * serotonin_amp,
+            acetylcholine: base_delta.acetylcholine * acetylcholine_amp,
+            gaba: base_delta.gaba * gaba_amp,
+            oxytocin: base_delta.oxytocin * oxytocin_amp,
+            glutamate: base_delta.glutamate,
+            adenosine: base_delta.adenosine * adenosine_amp,
+        }
+    }
+
+    /// Incorporate dream-discovered strategy preference.
+    ///
+    /// Called when the dream engine discovers that a particular strategy
+    /// ordinal would have produced better Phi (consciousness quality).
+    /// Strategy ordinal maps: 0=CognitiveReappraisal, 1=DistressTolerance,
+    /// 2=Grounding, 3=Defusion, 4=Validation, 5=Containment, 6=ExposurePrep.
+    pub fn incorporate_dream_wisdom(&mut self, strategy_ordinal: u8, phi_improvement: f32) {
+        let strategy = match strategy_ordinal {
+            0 => RegulationStrategy::CognitiveReappraisal,
+            1 => RegulationStrategy::DistressTolerance,
+            2 => RegulationStrategy::Grounding,
+            3 => RegulationStrategy::Defusion,
+            4 => RegulationStrategy::Validation,
+            5 => RegulationStrategy::Containment,
+            6 => RegulationStrategy::ExposurePrep,
+            _ => return,
+        };
+
+        if let Some((_, score)) = self
+            .dream_strategy_bias
+            .iter_mut()
+            .find(|(s, _)| *s == strategy)
+        {
+            // EMA: blend new insight with historical preference
+            *score = *score * 0.9 + phi_improvement * 0.1;
+        } else {
+            self.dream_strategy_bias.push((strategy, phi_improvement));
+        }
+    }
+
+    /// Get the dream-biased best strategy, if dream wisdom suggests one.
+    ///
+    /// Returns the strategy with the highest cumulative Phi improvement
+    /// if it exceeds a minimum threshold (0.01).
+    pub fn dream_preferred_strategy(&self) -> Option<RegulationStrategy> {
+        self.dream_strategy_bias
+            .iter()
+            .filter(|(_, score)| *score > 0.01)
+            .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
+            .map(|(s, _)| *s)
     }
 
     /// Record that a strategy was effective (client distress decreased).
@@ -365,5 +471,137 @@ mod tests {
             assert!(strategy.min_alliance() >= 0.0);
             assert!(strategy.min_alliance() <= 1.0);
         }
+    }
+
+    #[test]
+    fn test_apply_strategy_rdoc_amplifies_serotonin_for_high_neg_valence() {
+        let mut engine = RegulationEngine::new();
+        let mut rdoc_high_neg = RDocProfile::default();
+        rdoc_high_neg.set_score(RDocDomain::NegativeValence, 0.9);
+        let rdoc_default = RDocProfile::default();
+
+        let delta_high = engine.apply_strategy_rdoc(
+            RegulationStrategy::Validation, 0.5, &rdoc_high_neg,
+        );
+        let delta_default = engine.apply_strategy_rdoc(
+            RegulationStrategy::Validation, 0.5, &rdoc_default,
+        );
+        // High NegativeValence should produce stronger serotonin delta
+        assert!(
+            delta_high.serotonin.abs() > delta_default.serotonin.abs(),
+            "serotonin should be amplified: {} vs {}",
+            delta_high.serotonin, delta_default.serotonin,
+        );
+    }
+
+    #[test]
+    fn test_apply_strategy_rdoc_amplifies_dopamine_for_low_pos_valence() {
+        let mut engine = RegulationEngine::new();
+        let mut rdoc_low_pos = RDocProfile::default();
+        rdoc_low_pos.set_score(RDocDomain::PositiveValence, 0.1); // low = deficit
+        let rdoc_default = RDocProfile::default();
+
+        let delta_low = engine.apply_strategy_rdoc(
+            RegulationStrategy::CognitiveReappraisal, 0.5, &rdoc_low_pos,
+        );
+        let delta_default = engine.apply_strategy_rdoc(
+            RegulationStrategy::CognitiveReappraisal, 0.5, &rdoc_default,
+        );
+        assert!(
+            delta_low.dopamine.abs() > delta_default.dopamine.abs(),
+            "dopamine should be amplified for PositiveValence deficit",
+        );
+    }
+
+    #[test]
+    fn test_apply_strategy_rdoc_backward_compat() {
+        // Default RDoC profile should produce approximately same results
+        // as non-RDoC apply_strategy (within amplification factor).
+        let mut engine = RegulationEngine::new();
+        let rdoc = RDocProfile::default();
+        let delta_rdoc = engine.apply_strategy_rdoc(
+            RegulationStrategy::Grounding, 0.5, &rdoc,
+        );
+        let delta_plain = engine.apply_strategy(
+            RegulationStrategy::Grounding, 0.5,
+        );
+        // With default RDoC (moderate scores), amplification should be modest
+        // GABA should still be positive and in the same ballpark
+        assert!(delta_rdoc.gaba > 0.0);
+        assert!(delta_plain.gaba > 0.0);
+        assert!((delta_rdoc.gaba / delta_plain.gaba - 1.0).abs() < 0.5);
+    }
+
+    #[test]
+    fn test_incorporate_dream_wisdom() {
+        let mut engine = RegulationEngine::new();
+        engine.incorporate_dream_wisdom(2, 0.15); // Grounding
+        engine.incorporate_dream_wisdom(2, 0.25); // Grounding again
+        let pref = engine.dream_preferred_strategy();
+        assert_eq!(pref, Some(RegulationStrategy::Grounding));
+    }
+
+    #[test]
+    fn test_dream_wisdom_ema_decay() {
+        let mut engine = RegulationEngine::new();
+        engine.incorporate_dream_wisdom(4, 0.5); // Validation
+        engine.incorporate_dream_wisdom(4, 0.0); // Low improvement
+        // EMA should decay: 0.5*0.9 + 0.0*0.1 = 0.45
+        let pref = engine.dream_preferred_strategy();
+        assert_eq!(pref, Some(RegulationStrategy::Validation));
+    }
+
+    #[test]
+    fn test_dream_wisdom_no_preference_below_threshold() {
+        let mut engine = RegulationEngine::new();
+        engine.incorporate_dream_wisdom(0, 0.005); // Below 0.01 threshold
+        assert_eq!(engine.dream_preferred_strategy(), None);
+    }
+
+    #[test]
+    fn test_dream_wisdom_invalid_ordinal_ignored() {
+        let mut engine = RegulationEngine::new();
+        engine.incorporate_dream_wisdom(99, 0.5); // Invalid
+        assert_eq!(engine.dream_preferred_strategy(), None);
+    }
+
+    #[test]
+    fn test_dream_preference_overrides_default_selection() {
+        let mut engine = RegulationEngine::new();
+        // Dream discovers Defusion (ordinal 3) works well
+        engine.incorporate_dream_wisdom(3, 0.3);
+
+        let client = make_calm_client();
+        let mut alliance = TherapeuticAlliance::new();
+        alliance.bond = 0.5;
+        alliance.goal_agreement = 0.5;
+        alliance.task_agreement = 0.5;
+
+        // Without dream: low distress + moderate alliance → ExposurePrep or Validation
+        // With dream: should prefer Defusion (if alliance permits)
+        let strategy = engine.select_strategy(&client, &alliance, false);
+        assert_eq!(
+            strategy,
+            RegulationStrategy::Defusion,
+            "Dream preference should override default when alliance permits",
+        );
+    }
+
+    #[test]
+    fn test_dream_preference_respects_crisis_safety() {
+        let mut engine = RegulationEngine::new();
+        // Dream discovers ExposurePrep (ordinal 6) is great — but not crisis-safe
+        engine.incorporate_dream_wisdom(6, 0.5);
+
+        let client = make_distressed_client();
+        let alliance = TherapeuticAlliance::new();
+
+        // During crisis, dream preference should NOT override safety
+        let strategy = engine.select_strategy(&client, &alliance, true);
+        assert!(
+            strategy.crisis_safe(),
+            "Crisis should always select crisis-safe strategy, got {:?}",
+            strategy,
+        );
     }
 }

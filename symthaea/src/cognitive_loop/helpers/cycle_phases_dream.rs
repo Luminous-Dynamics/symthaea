@@ -182,6 +182,27 @@ impl CognitiveLoopService {
                 self.dream_feedback_bridge.process_insight(insight);
             }
 
+            // Feed therapeutic dream wisdom back into regulation engine.
+            // When the dream engine discovers a counterfactual therapeutic action
+            // that would have improved Phi, bias future strategy selection accordingly.
+            // Science: Barrett (2001) — dreams process emotional concerns, informing
+            // waking regulation; Cartwright (2010) — dream rehearsal improves coping.
+            #[cfg(feature = "therapeutic")]
+            for wisdom in dream.wisdom().iter() {
+                // Therapeutic actions encode strategy ordinal at index 9
+                if wisdom.better_action.len() > 9 && wisdom.phi_improvement > 0.01 {
+                    let strategy_ordinal = wisdom.better_action[9];
+                    if strategy_ordinal >= 0.0 && strategy_ordinal <= 6.0 {
+                        self.therapeutic_manager
+                            .regulation_engine
+                            .incorporate_dream_wisdom(
+                                strategy_ordinal as u8,
+                                wisdom.phi_improvement,
+                            );
+                    }
+                }
+            }
+
             // Apply wisdom: if we have accumulated wisdom, modulate exploration
             // toward states where dream counterfactuals found Phi improvements
             if !dream.wisdom().is_empty() {
@@ -252,6 +273,32 @@ impl CognitiveLoopService {
                         memory.prediction_error = 0.1;
                         bus.record_experience(memory);
                     }
+                }
+            }
+        }
+
+        // ── Item 7: Episodic → semantic promotion ────────────────────────────
+        // When episodic memories survive 3+ dream replays (tracked via coordinator
+        // retrieval counts), distill them into semantic knowledge graph facts.
+        // Science: Stickgold & Walker (2013) — sleep-dependent memory consolidation;
+        //          McClelland et al. (1995) — complementary learning systems theory.
+        if let Some(ref mut km) = self.knowledge_manager {
+            let top = self
+                .memory_consol
+                .memory_coordinator
+                .most_replayed(5);
+            for (content_hash, replay_count) in &top {
+                if *replay_count >= 3 {
+                    let label = format!("episode_0x{:016x}", content_hash);
+                    km.process(
+                        &format!("Consolidated: {}", label),
+                        self.stats.total_cycles as u64,
+                    );
+                    tracing::trace!(
+                        label = %label,
+                        replays = replay_count,
+                        "Episodic→semantic promotion: consolidated episode into knowledge graph"
+                    );
                 }
             }
         }

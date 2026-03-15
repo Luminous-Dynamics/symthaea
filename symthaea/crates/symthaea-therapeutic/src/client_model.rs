@@ -210,6 +210,61 @@ impl ClientModel {
     pub fn clinical_severity(&self) -> f32 {
         self.rdoc_profile.clinical_severity()
     }
+
+    /// Update RDoC profile from sustained affect patterns.
+    ///
+    /// Called periodically to make the RDoC profile responsive to ongoing
+    /// emotional patterns rather than staying at defaults.
+    ///
+    /// Mapping (EMA blend, alpha=0.02 for slow adaptation):
+    /// - Sustained negative valence → NegativeValence ↑
+    /// - Sustained positive valence → PositiveValence ↑
+    /// - Arousal dysregulation (far from 0.5) → ArousalRegulatory ↑
+    /// - Low arousal variance → CognitiveSystems stable (no change)
+    ///
+    /// Science: Insel et al. (2010) — RDoC dimensions track continuous state.
+    pub fn update_rdoc_from_affect(&mut self) {
+        let window = 30;
+        if self.affect_trajectory.len() < window {
+            return;
+        }
+
+        let alpha = 0.02_f32; // Slow EMA for stability
+        let recent: Vec<&CoreAffectSnapshot> =
+            self.affect_trajectory.iter().rev().take(window).collect();
+
+        // Mean negative valence in window (higher = more negative affect)
+        let mean_neg = recent
+            .iter()
+            .map(|a| (-a.valence).max(0.0))
+            .sum::<f32>()
+            / window as f32;
+        let current_neg = self.rdoc_profile.score(RDocDomain::NegativeValence);
+        self.rdoc_profile
+            .set_score(RDocDomain::NegativeValence, current_neg * (1.0 - alpha) + mean_neg * alpha);
+
+        // Mean positive valence (higher = more positive affect)
+        let mean_pos = recent
+            .iter()
+            .map(|a| a.valence.max(0.0))
+            .sum::<f32>()
+            / window as f32;
+        let current_pos = self.rdoc_profile.score(RDocDomain::PositiveValence);
+        self.rdoc_profile
+            .set_score(RDocDomain::PositiveValence, current_pos * (1.0 - alpha) + mean_pos * alpha);
+
+        // Arousal dysregulation: deviation from 0.5 baseline
+        let mean_arousal_dev = recent
+            .iter()
+            .map(|a| (a.arousal - 0.5).abs() * 2.0)
+            .sum::<f32>()
+            / window as f32;
+        let current_arousal = self.rdoc_profile.score(RDocDomain::ArousalRegulatory);
+        self.rdoc_profile.set_score(
+            RDocDomain::ArousalRegulatory,
+            current_arousal * (1.0 - alpha) + mean_arousal_dev * alpha,
+        );
+    }
 }
 
 impl Default for ClientModel {
@@ -314,5 +369,69 @@ mod tests {
         client.update_affect(CoreAffectSnapshot::new(0.0, 0.2, 0));
         client.update_affect(CoreAffectSnapshot::new(0.0, 0.8, 1));
         assert!((client.mean_arousal() - 0.5).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_update_rdoc_from_affect_needs_window() {
+        let mut client = ClientModel::new();
+        let pre = client.rdoc_profile.score(RDocDomain::NegativeValence);
+        // Not enough data (< 30 snapshots)
+        for i in 0..10 {
+            client.update_affect(CoreAffectSnapshot::new(-0.9, 0.9, i));
+        }
+        client.update_rdoc_from_affect();
+        // Should not change — insufficient window
+        assert_eq!(client.rdoc_profile.score(RDocDomain::NegativeValence), pre);
+    }
+
+    #[test]
+    fn test_update_rdoc_from_affect_negative_valence() {
+        let mut client = ClientModel::new();
+        let pre_neg = client.rdoc_profile.score(RDocDomain::NegativeValence);
+        // 40 cycles of strong negative affect
+        for i in 0..40 {
+            client.update_affect(CoreAffectSnapshot::new(-0.8, 0.5, i));
+        }
+        client.update_rdoc_from_affect();
+        let post_neg = client.rdoc_profile.score(RDocDomain::NegativeValence);
+        assert!(
+            post_neg > pre_neg,
+            "NegativeValence should increase with sustained negative affect: {} → {}",
+            pre_neg, post_neg,
+        );
+    }
+
+    #[test]
+    fn test_update_rdoc_from_affect_positive_valence() {
+        let mut client = ClientModel::new();
+        let pre_pos = client.rdoc_profile.score(RDocDomain::PositiveValence);
+        // 40 cycles of strong positive affect
+        for i in 0..40 {
+            client.update_affect(CoreAffectSnapshot::new(0.8, 0.5, i));
+        }
+        client.update_rdoc_from_affect();
+        let post_pos = client.rdoc_profile.score(RDocDomain::PositiveValence);
+        assert!(
+            post_pos > pre_pos,
+            "PositiveValence should increase with sustained positive affect: {} → {}",
+            pre_pos, post_pos,
+        );
+    }
+
+    #[test]
+    fn test_update_rdoc_from_affect_arousal_dysregulation() {
+        let mut client = ClientModel::new();
+        let pre_arousal = client.rdoc_profile.score(RDocDomain::ArousalRegulatory);
+        // 40 cycles of extreme arousal (far from 0.5 baseline)
+        for i in 0..40 {
+            client.update_affect(CoreAffectSnapshot::new(0.0, 0.95, i));
+        }
+        client.update_rdoc_from_affect();
+        let post_arousal = client.rdoc_profile.score(RDocDomain::ArousalRegulatory);
+        assert!(
+            post_arousal > pre_arousal,
+            "ArousalRegulatory should increase with dysregulated arousal: {} → {}",
+            pre_arousal, post_arousal,
+        );
     }
 }

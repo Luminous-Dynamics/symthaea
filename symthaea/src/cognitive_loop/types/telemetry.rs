@@ -152,6 +152,339 @@ pub struct NeuromodTelemetry {
     pub inhibition_errors_this_cycle: u8,
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// GOVERNANCE METRICS — mycelix governance telemetry sub-struct
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Governance subsystem telemetry for CycleMetadata.
+///
+/// Populated from `GovernanceManager` in `cycle_phase_output.rs`.
+/// All fields default to zero/empty when governance (mycelix feature) is inactive.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct GovernanceMetrics {
+    /// Governance reward EMA — running average of governance outcome rewards.
+    /// Positive = aligned outcomes, negative = misaligned. 0.0 when no outcomes.
+    pub governance_reward_ema: f64,
+    /// Number of governance events pending in the GovernanceManager queue.
+    pub governance_pending_events: usize,
+    /// Number of governance outcomes pending processing.
+    pub governance_pending_outcomes: usize,
+    /// Cumulative governance confidence delta this cycle (from SubsystemOutput).
+    pub governance_confidence_delta: f64,
+    /// Last collective Phi observed from a governance tally (0.0 if none).
+    pub governance_collective_phi: f64,
+    /// Number of collective blind spots detected by the epistemic mesh.
+    pub governance_blind_spot_count: usize,
+    /// Maximum blind spot severity (0.0–1.0). Higher = more agents uncertain.
+    pub governance_max_blind_spot_severity: f64,
+    /// Community mode label (e.g. "Exploratory", "Protective", "Creative", "Reflective").
+    pub governance_community_mode: String,
+    /// Maximum absolute harmonic delta this cycle (governance influence on harmonies).
+    pub governance_harmonic_delta_max: f64,
+    /// Number of agents in the epistemic mesh (0 = no mesh data).
+    pub governance_epistemic_agents: usize,
+    /// LR boost from governance prediction error (1.0 = no boost, >1.0 = high PE boosted learning).
+    pub governance_lr_boost: f64,
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SWARM METRICS — peer consciousness telemetry sub-struct
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Swarm peer consciousness telemetry for CycleMetadata.
+///
+/// Populated from `SwarmManager::telemetry()` in `cycle_phase_output.rs`.
+/// All fields default to zero when no peers are connected.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct SwarmMetrics {
+    /// Number of connected swarm peers.
+    pub swarm_connected_peers: usize,
+    /// Connectivity EMA (0.0–1.0).
+    pub swarm_connectivity_ema: f64,
+    /// Mean peer Phi across swarm.
+    pub swarm_mean_peer_phi: f64,
+    /// Affective contagion intensity.
+    pub swarm_affective_contagion: f64,
+    /// Federated learning confidence.
+    pub swarm_federated_confidence: f64,
+    /// Network anomaly count.
+    pub swarm_anomaly_count: u32,
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// KNOWLEDGE METRICS — knowledge engine telemetry sub-struct
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Knowledge engine telemetry for CycleMetadata.
+///
+/// Populated from `KnowledgeManager::telemetry()` in `cycle_phase_output.rs`.
+/// All fields default to zero when the knowledge engine is disabled.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct KnowledgeMetrics {
+    /// Number of facts in the knowledge graph (0 if engine disabled).
+    pub knowledge_graph_size: u32,
+    /// Average confidence across stored knowledge facts.
+    pub knowledge_avg_confidence: f32,
+    /// Number of causal edges discovered.
+    pub knowledge_causal_edges: u32,
+    /// Knowledge uncertainty signal (0.0 = fully known, 1.0 = unknown territory).
+    pub knowledge_uncertainty: f64,
+    /// Knowledge novelty signal (0.0 = familiar, 1.0 = completely novel).
+    pub knowledge_novelty: f64,
+    /// Number of contradictions detected this cycle.
+    pub knowledge_contradictions: u32,
+    /// Number of learned primitives in the adaptive ontology.
+    pub knowledge_ontology_size: u32,
+    /// Grounding quality from top-k ReasoningContext facts injected into WM (0.0–1.0).
+    /// Non-zero only when the knowledge engine is active and has grounded facts.
+    /// Science: Baddeley (2000) — central executive integrates semantic retrieval.
+    pub knowledge_wm_grounding: f64,
+    /// Number of ReasoningContext facts that competed for WM slots this cycle (0–2).
+    pub knowledge_wm_injection_count: u8,
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MATH METRICS — math service telemetry sub-struct
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Math service telemetry for CycleMetadata.
+///
+/// Populated from `MathService` results in `cycle_phase_output.rs`.
+/// All fields default to zero/empty when no math intent is detected.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct MathMetrics {
+    /// Whether math intent was detected in this cycle's input.
+    pub math_detected: bool,
+    /// Classified math problem type (empty if no math detected).
+    pub math_problem_type: String,
+    /// Phi from the math computation (0.0 if no math).
+    pub math_phi: f64,
+    /// Epistemic confidence in the math result (0.0 if no math).
+    pub math_confidence: f64,
+    /// Total math problems solved since startup.
+    pub math_problems_solved: usize,
+    /// Average Phi across all math solutions.
+    pub math_avg_phi: f64,
+    /// Whether the math solver was dispatched this cycle.
+    pub math_solved: bool,
+    /// Whether multi-path verification succeeded for this cycle's math problem.
+    pub math_multipath_verified: bool,
+    /// Human-readable answer from the math solver (empty if not solved).
+    pub math_answer: String,
+    /// Epistemic caveat from the math solver (e.g., "small sample", "did not converge").
+    pub math_epistemic_caveat: String,
+    /// Error bound on the numerical result (0.0 if N/A).
+    pub math_error_bound: f64,
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// VOICE METRICS — voice feedback telemetry sub-struct
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Voice feedback telemetry for CycleMetadata.
+///
+/// Populated from the voice feedback bridge in `cycle_phase_output.rs`.
+/// All fields default to zero when voice processing is inactive.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct VoiceMetrics {
+    /// Smoothed articulation quality from voice feedback bridge (0.0–1.0).
+    pub voice_articulation_quality: f32,
+    /// Speech rate stability from voice feedback bridge (0.0–1.0).
+    pub voice_rate_stability: f32,
+    /// Overall voice confidence: articulation × 0.6 + stability × 0.4.
+    pub voice_confidence: f32,
+    /// Phi adjustment from voice quality (positive = understanding boost).
+    pub voice_phi_adjustment: f32,
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CANTOR METRICS — fractal consciousness telemetry sub-struct
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Cantor fractal consciousness telemetry for CycleMetadata.
+///
+/// Populated from the Cantor cleanup engine in `cycle_phase_output.rs`.
+/// All fields default to zero when fractal processing is inactive.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct CantorMetrics {
+    /// Metacognitive depth: self-similarity of most recent GWT-promoted CRHV.
+    /// Science: Hofstadter (1979) — strange loops; Metzinger (2003) — self-model depth.
+    pub cantor_metacognitive_depth: f32,
+    /// Number of CRHVs pending dream consolidation in the broadcast buffer.
+    pub cantor_buffer_occupancy: u32,
+    /// Number of entries in the persistent Cantor cleanup codebook.
+    /// Grows over the brain's lifetime as dream consolidation strengthens traces.
+    pub cantor_codebook_size: u32,
+    /// Depth of the most recent CRHV (adaptive: 2–7 based on GWT activation).
+    pub cantor_last_depth: u8,
+    /// EMA of dream consolidation surprise (self-similarity delta).
+    /// Non-zero values indicate the codebook is actively learning from novel fractal structure.
+    pub cantor_dream_surprise: f32,
+    /// Resonance boost from coherent CRHV pairs in the broadcast buffer.
+    /// Non-zero when multiple GWT-promoted fractals form a "resonant coalition".
+    pub cantor_resonance_boost: f32,
+    /// Depth histogram: entries per CRHV depth stratum (depths 2-7, indices 0-5).
+    /// Reflects diversity of fractal abstraction levels in the codebook.
+    pub cantor_depth_histogram: [u32; 6],
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MOTOR METRICS — motor output bridge telemetry sub-struct
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Motor output bridge telemetry for CycleMetadata.
+///
+/// Populated from the motor bridge in `cycle_phase_output.rs`.
+/// All fields default to zero/false when the motor bridge is inactive.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MotorMetrics {
+    /// Whether the motor output bridge executed an action this cycle.
+    pub motor_action_executed: bool,
+    /// Whether the motor action succeeded (false if skipped or failed).
+    pub motor_action_success: bool,
+    /// Action type index that was executed (0–7, 255 = none).
+    pub motor_action_type: u8,
+    /// Phi value used for motor gating this cycle (0.0 when bridge inactive).
+    pub motor_phi_used: f64,
+    /// Motor prediction error (0.0 = matched expectation, 1.0 = total surprise).
+    pub motor_prediction_error: f64,
+    /// Whether the motor bridge is installed and available.
+    pub motor_bridge_active: bool,
+}
+
+impl Default for MotorMetrics {
+    fn default() -> Self {
+        Self {
+            motor_action_executed: false,
+            motor_action_success: false,
+            motor_action_type: 255,
+            motor_phi_used: 0.0,
+            motor_prediction_error: 0.0,
+            motor_bridge_active: false,
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SOCIAL METRICS — social coherence + ToM telemetry sub-struct
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Social coherence and Theory of Mind telemetry for CycleMetadata.
+///
+/// Populated from `SocialManager` and perception/feedback phases in `cycle_phase_output.rs`.
+/// Default values reflect neutral/inactive state.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SocialMetrics {
+    /// Current social trust level (0.0–1.0) from Mind module's SocialCoherence.
+    pub social_trust_current: f32,
+    /// Current social cooperation rate (0.0–1.0).
+    pub social_cooperation_current: f32,
+    /// Whether social trust biased strategy selection this cycle.
+    pub social_strategy_bias_applied: bool,
+    /// Social learning rate factor applied this cycle (0.8–1.2).
+    pub social_learning_rate_factor: f32,
+    /// Social prediction accuracy (ToM) — rolling mean of prediction vs outcome (0.0–1.0).
+    pub social_prediction_accuracy: f32,
+    /// Number of active mental models being tracked.
+    pub social_models_count: usize,
+    /// Mean trust across all tracked relationships (0.0–1.0).
+    pub social_mean_trust: f32,
+    /// ToM prediction mismatch EMA (1 - accuracy, smoothed).
+    pub tom_prediction_mismatch: f32,
+    /// Whether ToM mismatch triggered exploration this cycle.
+    pub tom_exploration_triggered: bool,
+}
+
+impl Default for SocialMetrics {
+    fn default() -> Self {
+        Self {
+            social_trust_current: 0.0,
+            social_cooperation_current: 0.0,
+            social_strategy_bias_applied: false,
+            social_learning_rate_factor: 1.0,
+            social_prediction_accuracy: 0.5,
+            social_models_count: 0,
+            social_mean_trust: 0.5,
+            tom_prediction_mismatch: 0.0,
+            tom_exploration_triggered: false,
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// USER STATE METRICS — user state inference telemetry sub-struct
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// User state inference telemetry for CycleMetadata.
+///
+/// Populated from the user state inference module in `cycle_phase_output.rs`.
+/// Default values reflect neutral/disabled state.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UserStateMetrics {
+    /// User cognitive load (0.0 = low, 1.0 = high). 0.0 when USI disabled.
+    pub user_cognitive_load: f32,
+    /// User frustration level (0.0 = calm, 1.0 = very frustrated). 0.0 when USI disabled.
+    pub user_frustration: f32,
+    /// User engagement level (0.0 = disengaged, 1.0 = highly engaged). 0.5 when USI disabled.
+    pub user_engagement: f32,
+}
+
+impl Default for UserStateMetrics {
+    fn default() -> Self {
+        Self {
+            user_cognitive_load: 0.0,
+            user_frustration: 0.0,
+            user_engagement: 0.5,
+        }
+    }
+}
+
+/// Therapeutic subsystem telemetry for CycleMetadata.
+///
+/// Tracks client state, alliance, crisis detection, regulation strategy,
+/// narrative coherence, and case formulation — all zero/false when the
+/// `therapeutic` feature is disabled.
+#[cfg(feature = "therapeutic")]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct TherapeuticTelemetry {
+    /// Client distress level (0.0–1.0, RDoC-derived).
+    #[serde(default)]
+    pub therapeutic_client_distress: f32,
+    /// Therapeutic alliance composite (0.0–1.0, Bordin bond/goals/tasks).
+    #[serde(default)]
+    pub therapeutic_alliance: f32,
+    /// Whether a crisis was detected this cycle.
+    #[serde(default)]
+    pub therapeutic_crisis_active: bool,
+    /// Crisis type name (empty if no crisis).
+    #[serde(default)]
+    pub therapeutic_crisis_type: String,
+    /// Active regulation strategy name (empty if none).
+    #[serde(default)]
+    pub therapeutic_strategy: String,
+    /// Narrative coherence (0.0–1.0, fragment integration quality).
+    #[serde(default)]
+    pub therapeutic_narrative_coherence: f32,
+    /// Case formulation factor count (predisposing + precipitating + perpetuating + protective).
+    #[serde(default)]
+    pub therapeutic_formulation_factors: usize,
+    /// Case formulation resilience ratio (protective / total, 0.0–1.0).
+    #[serde(default)]
+    pub therapeutic_resilience_ratio: f32,
+    /// Alliance rupture count (cumulative).
+    #[serde(default)]
+    pub therapeutic_rupture_count: u32,
+    /// Alliance repair count (cumulative).
+    #[serde(default)]
+    pub therapeutic_repair_count: u32,
+    /// RDoC clinical severity composite (0.0–1.0).
+    #[serde(default)]
+    pub therapeutic_clinical_severity: f32,
+    /// Number of narrative fragments recorded.
+    #[serde(default)]
+    pub therapeutic_narrative_fragments: usize,
+}
+
 /// Metadata about internal decision-making during a cycle.
 ///
 /// Provides observability into which subsystems influenced the cycle's output,
@@ -761,18 +1094,9 @@ pub struct CycleMetadata {
     pub is_consolidating: bool,
 
     // ── Voice Telemetry ─────────────────────────────────────────────────
-    /// Smoothed articulation quality from voice feedback bridge (0.0–1.0).
-    #[serde(default)]
-    pub voice_articulation_quality: f32,
-    /// Speech rate stability from voice feedback bridge (0.0–1.0).
-    #[serde(default)]
-    pub voice_rate_stability: f32,
-    /// Overall voice confidence: articulation × 0.6 + stability × 0.4.
-    #[serde(default)]
-    pub voice_confidence: f32,
-    /// Phi adjustment from voice quality (positive = understanding boost).
-    #[serde(default)]
-    pub voice_phi_adjustment: f32,
+    /// Voice feedback telemetry (articulation, rate stability, confidence, phi adjustment).
+    #[serde(flatten, default)]
+    pub voice: VoiceMetrics,
 
     // ── GWT Handler Telemetry ───────────────────────────────────────────
     /// Whether a GWT memory consolidation handler fired this cycle.
@@ -783,92 +1107,24 @@ pub struct CycleMetadata {
     pub gwt_perception_broadcasts: u32,
 
     // ── Cantor Fractal Telemetry ─────────────────────────────────────────
-    /// Metacognitive depth: self-similarity of most recent GWT-promoted CRHV.
-    /// Science: Hofstadter (1979) — strange loops; Metzinger (2003) — self-model depth.
-    #[serde(default)]
-    pub cantor_metacognitive_depth: f32,
-    /// Number of CRHVs pending dream consolidation in the broadcast buffer.
-    #[serde(default)]
-    pub cantor_buffer_occupancy: u32,
-    /// Number of entries in the persistent Cantor cleanup codebook.
-    /// Grows over the brain's lifetime as dream consolidation strengthens traces.
-    #[serde(default)]
-    pub cantor_codebook_size: u32,
-    /// Depth of the most recent CRHV (adaptive: 2–7 based on GWT activation).
-    #[serde(default)]
-    pub cantor_last_depth: u8,
-    /// EMA of dream consolidation surprise (self-similarity delta).
-    /// Non-zero values indicate the codebook is actively learning from novel fractal structure.
-    #[serde(default)]
-    pub cantor_dream_surprise: f32,
-    /// Resonance boost from coherent CRHV pairs in the broadcast buffer.
-    /// Non-zero when multiple GWT-promoted fractals form a "resonant coalition".
-    #[serde(default)]
-    pub cantor_resonance_boost: f32,
-    /// Depth histogram: entries per CRHV depth stratum (depths 2-7, indices 0-5).
-    /// Reflects diversity of fractal abstraction levels in the codebook.
-    #[serde(default)]
-    pub cantor_depth_histogram: [u32; 6],
+    /// Cantor fractal consciousness telemetry (depth, codebook, dream surprise, resonance).
+    #[serde(flatten, default)]
+    pub cantor: CantorMetrics,
 
     // ── Motor Output Bridge Telemetry ───────────────────────────────────
-    /// Whether the motor output bridge executed an action this cycle.
-    #[serde(default)]
-    pub motor_action_executed: bool,
-    /// Whether the motor action succeeded (false if skipped or failed).
-    #[serde(default)]
-    pub motor_action_success: bool,
-    /// Action type index that was executed (0–7, 255 = none).
-    #[serde(default = "default_motor_action_type")]
-    pub motor_action_type: u8,
-    /// Phi value used for motor gating this cycle (0.0 when bridge inactive).
-    #[serde(default)]
-    pub motor_phi_used: f64,
-    /// Motor prediction error (0.0 = matched expectation, 1.0 = total surprise).
-    #[serde(default)]
-    pub motor_prediction_error: f64,
-    /// Whether the motor bridge is installed and available.
-    #[serde(default)]
-    pub motor_bridge_active: bool,
+    /// Motor output bridge telemetry (action execution, phi gating, prediction error).
+    #[serde(flatten, default)]
+    pub motor: MotorMetrics,
 
     // ── Social Coherence Telemetry ──────────────────────────────────────
-    /// Current social trust level (0.0–1.0) from Mind module's SocialCoherence.
-    #[serde(default)]
-    pub social_trust_current: f32,
-    /// Current social cooperation rate (0.0–1.0).
-    #[serde(default)]
-    pub social_cooperation_current: f32,
-    /// Whether social trust biased strategy selection this cycle.
-    #[serde(default)]
-    pub social_strategy_bias_applied: bool,
-    /// Social learning rate factor applied this cycle (0.8–1.2).
-    #[serde(default = "default_one_f32")]
-    pub social_learning_rate_factor: f32,
-    /// Social prediction accuracy (ToM) — rolling mean of prediction vs outcome (0.0–1.0).
-    #[serde(default = "default_half_f32")]
-    pub social_prediction_accuracy: f32,
-    /// Number of active mental models being tracked.
-    #[serde(default)]
-    pub social_models_count: usize,
-    /// Mean trust across all tracked relationships (0.0–1.0).
-    #[serde(default = "default_half_f32")]
-    pub social_mean_trust: f32,
-    /// ToM prediction mismatch EMA (1 - accuracy, smoothed).
-    #[serde(default)]
-    pub tom_prediction_mismatch: f32,
-    /// Whether ToM mismatch triggered exploration this cycle.
-    #[serde(default)]
-    pub tom_exploration_triggered: bool,
+    /// Social coherence + Theory of Mind telemetry (trust, cooperation, ToM, models).
+    #[serde(flatten, default)]
+    pub social: SocialMetrics,
 
     // ── User State Inference Telemetry ───────────────────────────────────
-    /// User cognitive load (0.0 = low, 1.0 = high). 0.0 when USI disabled.
-    #[serde(default)]
-    pub user_cognitive_load: f32,
-    /// User frustration level (0.0 = calm, 1.0 = very frustrated). 0.0 when USI disabled.
-    #[serde(default)]
-    pub user_frustration: f32,
-    /// User engagement level (0.0 = disengaged, 1.0 = highly engaged). 0.5 when USI disabled.
-    #[serde(default = "default_half_f32")]
-    pub user_engagement: f32,
+    /// User state inference telemetry (cognitive load, frustration, engagement).
+    #[serde(flatten, default)]
+    pub user_state: UserStateMetrics,
 
     // ── Vision Manifold Telemetry ───────────────────────────────────────
     /// Vision manifold telemetry (None when vision-manifold feature disabled or not active).
@@ -1317,60 +1573,14 @@ pub struct CycleMetadata {
     pub sleep_pressure_recovering: bool,
 
     // ── Governance telemetry (feature: mycelix) ─────────────────────────────
-    /// Governance reward EMA — running average of governance outcome rewards.
-    /// Positive = aligned outcomes, negative = misaligned. 0.0 when no outcomes.
-    #[serde(default)]
-    pub governance_reward_ema: f64,
-    /// Number of governance events pending in the GovernanceManager queue.
-    #[serde(default)]
-    pub governance_pending_events: usize,
-    /// Number of governance outcomes pending processing.
-    #[serde(default)]
-    pub governance_pending_outcomes: usize,
-    /// Cumulative governance confidence delta this cycle (from SubsystemOutput).
-    #[serde(default)]
-    pub governance_confidence_delta: f64,
-    /// Last collective Phi observed from a governance tally (0.0 if none).
-    #[serde(default)]
-    pub governance_collective_phi: f64,
-    /// Number of collective blind spots detected by the epistemic mesh.
-    #[serde(default)]
-    pub governance_blind_spot_count: usize,
-    /// Maximum blind spot severity (0.0–1.0). Higher = more agents uncertain.
-    #[serde(default)]
-    pub governance_max_blind_spot_severity: f64,
-    /// Community mode label (e.g. "Exploratory", "Protective", "Creative", "Reflective").
-    #[serde(default)]
-    pub governance_community_mode: String,
-    /// Maximum absolute harmonic delta this cycle (governance influence on harmonies).
-    #[serde(default)]
-    pub governance_harmonic_delta_max: f64,
-    /// Number of agents in the epistemic mesh (0 = no mesh data).
-    #[serde(default)]
-    pub governance_epistemic_agents: usize,
-    /// LR boost from governance prediction error (1.0 = no boost, >1.0 = high PE boosted learning).
-    #[serde(default)]
-    pub governance_lr_boost: f64,
+    /// Governance subsystem telemetry (reward EMA, blind spots, community mode, LR boost).
+    #[serde(flatten, default)]
+    pub governance: GovernanceMetrics,
 
     // ── Swarm Telemetry ────────────────────────────────────────────────
-    /// Number of connected swarm peers.
-    #[serde(default)]
-    pub swarm_connected_peers: usize,
-    /// Connectivity EMA (0.0–1.0).
-    #[serde(default)]
-    pub swarm_connectivity_ema: f64,
-    /// Mean peer Phi across swarm.
-    #[serde(default)]
-    pub swarm_mean_peer_phi: f64,
-    /// Affective contagion intensity.
-    #[serde(default)]
-    pub swarm_affective_contagion: f64,
-    /// Federated learning confidence.
-    #[serde(default)]
-    pub swarm_federated_confidence: f64,
-    /// Network anomaly count.
-    #[serde(default)]
-    pub swarm_anomaly_count: u32,
+    /// Swarm peer consciousness telemetry (peers, phi, contagion, anomalies).
+    #[serde(flatten, default)]
+    pub swarm: SwarmMetrics,
 
     // ── Spectrum / Radio Telemetry (mesh feature) ───────────────────────
     /// Network health status string ("AllTiersUp", "LocalDown", "MetroOnly", "Blackout").
@@ -1397,64 +1607,51 @@ pub struct CycleMetadata {
     #[cfg(feature = "mesh")]
     #[serde(default)]
     pub spectrum_degradation_streak: u32,
+    /// Per-tier AIMD bandwidth budgets [Local, Metro, Regional] (bytes).
+    #[cfg(feature = "mesh")]
+    #[serde(default)]
+    pub spectrum_tier_budgets: [u64; 3],
+    /// Waterfall observation buffer depth (0–64).
+    #[cfg(feature = "mesh")]
+    #[serde(default)]
+    pub spectrum_waterfall_depth: usize,
+    /// Periodic interference period (cycles), if detected.
+    #[cfg(feature = "mesh")]
+    #[serde(default)]
+    pub spectrum_periodic_interference: Option<u32>,
+    /// Known mesh peers in route table.
+    #[cfg(feature = "mesh")]
+    #[serde(default)]
+    pub spectrum_known_peers: usize,
+    /// Active encryption sessions.
+    #[cfg(feature = "mesh")]
+    #[serde(default)]
+    pub spectrum_encryption_sessions: usize,
+    /// Energy spent this cycle (nJ).
+    #[cfg(feature = "mesh")]
+    #[serde(default)]
+    pub spectrum_energy_spent_nj: f64,
+    /// Waterfall jamming ratio (0.0–1.0).
+    #[cfg(feature = "mesh")]
+    #[serde(default)]
+    pub spectrum_waterfall_jamming_ratio: f64,
 
     // ── Knowledge Engine Telemetry ──────────────────────────────────────
-    /// Number of facts in the knowledge graph (0 if engine disabled).
-    #[serde(default)]
-    pub knowledge_graph_size: u32,
-    /// Average confidence across stored knowledge facts.
-    #[serde(default)]
-    pub knowledge_avg_confidence: f32,
-    /// Number of causal edges discovered.
-    #[serde(default)]
-    pub knowledge_causal_edges: u32,
-    /// Knowledge uncertainty signal (0.0 = fully known, 1.0 = unknown territory).
-    #[serde(default)]
-    pub knowledge_uncertainty: f64,
-    /// Knowledge novelty signal (0.0 = familiar, 1.0 = completely novel).
-    #[serde(default)]
-    pub knowledge_novelty: f64,
-    /// Number of contradictions detected this cycle.
-    #[serde(default)]
-    pub knowledge_contradictions: u32,
-    /// Number of learned primitives in the adaptive ontology.
-    #[serde(default)]
-    pub knowledge_ontology_size: u32,
+    /// Knowledge engine telemetry (graph size, confidence, causal edges, novelty).
+    #[serde(flatten, default)]
+    pub knowledge: KnowledgeMetrics,
 
     // ── Math Service Telemetry ──────────────────────────────────────────
-    /// Whether math intent was detected in this cycle's input.
-    #[serde(default)]
-    pub math_detected: bool,
-    /// Classified math problem type (empty if no math detected).
-    #[serde(default)]
-    pub math_problem_type: String,
-    /// Phi from the math computation (0.0 if no math).
-    #[serde(default)]
-    pub math_phi: f64,
-    /// Epistemic confidence in the math result (0.0 if no math).
-    #[serde(default)]
-    pub math_confidence: f64,
-    /// Total math problems solved since startup.
-    #[serde(default)]
-    pub math_problems_solved: usize,
-    /// Average Phi across all math solutions.
-    #[serde(default)]
-    pub math_avg_phi: f64,
-    /// Whether the math solver was dispatched this cycle.
-    #[serde(default)]
-    pub math_solved: bool,
-    /// Whether multi-path verification succeeded for this cycle's math problem.
-    #[serde(default)]
-    pub math_multipath_verified: bool,
-    /// Human-readable answer from the math solver (empty if not solved).
-    #[serde(default)]
-    pub math_answer: String,
-    /// Epistemic caveat from the math solver (e.g., "small sample", "did not converge").
-    #[serde(default)]
-    pub math_epistemic_caveat: String,
-    /// Error bound on the numerical result (0.0 if N/A).
-    #[serde(default)]
-    pub math_error_bound: f64,
+    /// Math service telemetry (detection, phi, confidence, answer, verification).
+    #[serde(flatten, default)]
+    pub math: MathMetrics,
+
+    // ── Therapeutic Telemetry ─────────────────────────────────────────
+    /// Therapeutic subsystem telemetry (client state, alliance, crisis, regulation).
+    /// Default (zeros/false) when `therapeutic` feature is disabled.
+    #[cfg(feature = "therapeutic")]
+    #[serde(flatten, default)]
+    pub therapeutic: TherapeuticTelemetry,
 }
 
 fn default_response_profile() -> String {

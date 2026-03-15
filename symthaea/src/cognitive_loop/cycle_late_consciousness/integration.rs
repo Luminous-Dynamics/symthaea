@@ -283,6 +283,19 @@ impl CognitiveLoopService {
                 (0.0, false)
             };
 
+        // Therapeutic narrative coherence modulates phenomenal binding.
+        // Fragmented narratives (traumatic memory, incoherent self-model)
+        // weaken binding; coherent narratives strengthen it.
+        // Science: Gallagher (2000) — narrative self-model supports unified experience;
+        // Damasio (1999) — autobiographical self grounds phenomenal consciousness.
+        #[cfg(feature = "therapeutic")]
+        let phenomenal_binding_strength = {
+            let narrative_coh = self.therapeutic_manager.narrative_coherence() as f64;
+            // Modulate binding: 0.85 (low coherence) to 1.05 (high coherence)
+            let narrative_factor = 0.85 + 0.20 * narrative_coh;
+            (phenomenal_binding_strength * narrative_factor).clamp(0.0, 1.0)
+        };
+
         // FEEDBACK: Fragmentation suppresses exploration (Singer 1989)
         // When consciousness is fragmented, focus on integration not exploration
         if phenomenal_fragmented {
@@ -836,7 +849,19 @@ impl CognitiveLoopService {
             let attn_wm = ctx.peak_attention as f64 * 0.1;
             // Prediction confidence reflects world-model quality accessible in WM.
             // Capped at 0.05 to keep it a seasoning, not a main course.
-            let knowledge_wm = self.prediction_confidence * 0.05;
+            // WM knowledge injection: grounded ReasoningContext facts compete for WM slots.
+            // Top-k facts (≤2) modulate WM richness when grounding quality is high.
+            // Science: Baddeley (2000) — central executive integrates semantic retrieval;
+            //          Cowan (2001) — 4-chunk limit means knowledge must compete with percepts.
+            // Contribution capped at 0.04 per slot (max 2 slots = max +0.08 additive to WM).
+            let knowledge_wm = {
+                let base_conf = self.prediction_confidence * 0.05;
+                let grounding = self.carryover.quality.wm_knowledge_grounding;
+                let slot_boost = self.carryover.quality.wm_knowledge_injection_count as f64
+                    * 0.04
+                    * grounding;
+                base_conf + slot_boost
+            };
             let working_memory = (wm_base + gwt_wm + attn_wm + knowledge_wm).clamp(0.0, 1.0);
 
             let inputs = crate::consciousness::master_consciousness_equation::ConsciousnessInputs {

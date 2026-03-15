@@ -492,23 +492,23 @@ impl CognitiveLoopService {
             metadata.smoothed_epistemic_uncertainty;
 
         // ── Social coherence telemetry ──
-        metadata.social_trust_current = self.social_mgr.social.social_trust;
-        metadata.social_cooperation_current = self.social_mgr.social.social_cooperation_rate;
-        metadata.social_strategy_bias_applied = perception.strategy.social_strategy_bias;
-        metadata.social_learning_rate_factor = feedback.social_learning_rate_factor;
-        metadata.social_prediction_accuracy = self.social_mgr.social.social_prediction_accuracy;
-        metadata.social_models_count = self.social_mgr.social.social_models_count;
-        metadata.social_mean_trust = self.social_mgr.social.social_mean_trust;
-        metadata.tom_prediction_mismatch = self.stats.tom_prediction_mismatch_ema;
-        metadata.tom_exploration_triggered =
+        metadata.social.social_trust_current = self.social_mgr.social.social_trust;
+        metadata.social.social_cooperation_current = self.social_mgr.social.social_cooperation_rate;
+        metadata.social.social_strategy_bias_applied = perception.strategy.social_strategy_bias;
+        metadata.social.social_learning_rate_factor = feedback.social_learning_rate_factor;
+        metadata.social.social_prediction_accuracy = self.social_mgr.social.social_prediction_accuracy;
+        metadata.social.social_models_count = self.social_mgr.social.social_models_count;
+        metadata.social.social_mean_trust = self.social_mgr.social.social_mean_trust;
+        metadata.social.tom_prediction_mismatch = self.stats.tom_prediction_mismatch_ema;
+        metadata.social.tom_exploration_triggered =
             self.stats.tom_prediction_mismatch_ema > 0.4 && self.stats.total_cycles > 10;
 
         // ── User State Inference telemetry ──
         if let Some(ref usi) = self.language_comm.user_state {
             let state = usi.state();
-            metadata.user_cognitive_load = state.cognitive_load.level as f32;
-            metadata.user_frustration = state.frustration as f32;
-            metadata.user_engagement = state.engagement as f32;
+            metadata.user_state.user_cognitive_load = state.cognitive_load.level as f32;
+            metadata.user_state.user_frustration = state.frustration as f32;
+            metadata.user_state.user_engagement = state.engagement as f32;
         }
 
         // ── Reasoning engine internal diagnostics ──
@@ -1021,38 +1021,38 @@ impl CognitiveLoopService {
                 .swap(0, std::sync::atomic::Ordering::Relaxed) as u32;
 
         // ── Cantor fractal telemetry ──
-        metadata.cantor_buffer_occupancy = self.cantor_dream.broadcast_buffer.len() as u32;
-        metadata.cantor_metacognitive_depth = self
+        metadata.cantor.cantor_buffer_occupancy = self.cantor_dream.broadcast_buffer.len() as u32;
+        metadata.cantor.cantor_metacognitive_depth = self
             .cantor_dream.broadcast_buffer
             .last()
             .map(|crhv| crhv.self_similarity())
             .unwrap_or(0.0);
-        metadata.cantor_codebook_size = self.cantor_dream.cleanup_engine.codebook.len() as u32;
-        metadata.cantor_last_depth = self
+        metadata.cantor.cantor_codebook_size = self.cantor_dream.cleanup_engine.codebook.len() as u32;
+        metadata.cantor.cantor_last_depth = self
             .cantor_dream.broadcast_buffer
             .last()
             .map(|crhv| crhv.depth as u8)
             .unwrap_or(0);
-        metadata.cantor_dream_surprise = self.cantor_dream.dream_surprise;
-        metadata.cantor_resonance_boost = self.cantor_dream.resonance_boost;
+        metadata.cantor.cantor_dream_surprise = self.cantor_dream.dream_surprise;
+        metadata.cantor.cantor_resonance_boost = self.cantor_dream.resonance_boost;
 
         // Populate depth histogram from codebook labels ("d{N}_...")
         // Depth range 2-7 maps to histogram indices 0-5
         for d in 2..=7usize {
-            metadata.cantor_depth_histogram[d - 2] =
+            metadata.cantor.cantor_depth_histogram[d - 2] =
                 self.cantor_dream.cleanup_engine
                     .codebook
                     .count_by_prefix(&format!("d{d}_")) as u32;
         }
 
         // ── Motor output bridge telemetry ──
-        metadata.motor_bridge_active = self.motor_rendering.output_bridge.is_some();
+        metadata.motor.motor_bridge_active = self.motor_rendering.output_bridge.is_some();
         if let Some(ref result) = self.motor_rendering.last_result {
-            metadata.motor_action_executed = true;
-            metadata.motor_action_success = result.success;
-            metadata.motor_action_type = result.action_type.map(|at| at as u8).unwrap_or(255);
-            metadata.motor_prediction_error = result.prediction_error;
-            metadata.motor_phi_used = self.motor_rendering.last_phi;
+            metadata.motor.motor_action_executed = true;
+            metadata.motor.motor_action_success = result.success;
+            metadata.motor.motor_action_type = result.action_type.map(|at| at as u8).unwrap_or(255);
+            metadata.motor.motor_prediction_error = result.prediction_error;
+            metadata.motor.motor_phi_used = self.motor_rendering.last_phi;
         }
 
         // ── GWT-triggered memory consolidation (Dehaene & Changeux 2011) ──
@@ -1102,11 +1102,11 @@ impl CognitiveLoopService {
         // ── Voice telemetry ──
         {
             let voice_summary = self.language_comm.voice_coherence.voice.summary();
-            metadata.voice_articulation_quality =
+            metadata.voice.voice_articulation_quality =
                 self.language_comm.voice_coherence.voice.smoothed_articulation();
-            metadata.voice_rate_stability = self.language_comm.voice_coherence.voice.rate_stability();
-            metadata.voice_confidence = voice_summary.voice_confidence;
-            metadata.voice_phi_adjustment = self.language_comm.voice_coherence.voice.compute_phi_adjustment();
+            metadata.voice.voice_rate_stability = self.language_comm.voice_coherence.voice.rate_stability();
+            metadata.voice.voice_confidence = voice_summary.voice_confidence;
+            metadata.voice.voice_phi_adjustment = self.language_comm.voice_coherence.voice.compute_phi_adjustment();
         }
 
         // ── Substrate & convergence telemetry ──
@@ -1237,6 +1237,11 @@ impl CognitiveLoopService {
             metadata.knowledge.knowledge_novelty = signals.novelty;
             metadata.knowledge.knowledge_contradictions = telem.contradictions_detected;
             metadata.knowledge.knowledge_ontology_size = telem.ontology_size;
+            // Working memory knowledge injection telemetry — carried from perception phase
+            metadata.knowledge.knowledge_wm_grounding =
+                self.carryover.quality.wm_knowledge_grounding;
+            metadata.knowledge.knowledge_wm_injection_count =
+                self.carryover.quality.wm_knowledge_injection_count;
         }
 
         // Physics bridge telemetry
@@ -1370,6 +1375,31 @@ impl CognitiveLoopService {
             metadata.math.math_error_bound = dynamics.math.error_bound.unwrap_or(0.0);
         }
 
+        // ── Therapeutic telemetry ──
+        #[cfg(feature = "therapeutic")]
+        {
+            metadata.therapeutic.therapeutic_client_distress = self.therapeutic_manager.client_distress();
+            metadata.therapeutic.therapeutic_alliance = self.therapeutic_manager.alliance_composite();
+            metadata.therapeutic.therapeutic_crisis_active = self.therapeutic_manager.crisis_active;
+            metadata.therapeutic.therapeutic_crisis_type = self
+                .therapeutic_manager
+                .last_crisis_type
+                .clone()
+                .unwrap_or_default();
+            metadata.therapeutic.therapeutic_strategy = self
+                .therapeutic_manager
+                .active_strategy()
+                .map(|s| format!("{:?}", s))
+                .unwrap_or_default();
+            metadata.therapeutic.therapeutic_narrative_coherence = self.therapeutic_manager.narrative_coherence();
+            metadata.therapeutic.therapeutic_formulation_factors = self.therapeutic_manager.formulation.total_factors();
+            metadata.therapeutic.therapeutic_resilience_ratio = self.therapeutic_manager.formulation_resilience_ratio();
+            metadata.therapeutic.therapeutic_rupture_count = self.therapeutic_manager.alliance.rupture_count;
+            metadata.therapeutic.therapeutic_repair_count = self.therapeutic_manager.alliance.repair_count;
+            metadata.therapeutic.therapeutic_clinical_severity = self.therapeutic_manager.client_model.clinical_severity();
+            metadata.therapeutic.therapeutic_narrative_fragments = self.therapeutic_manager.narrative.fragments.len();
+        }
+
         // ── Nurture/attachment telemetry ──
         #[cfg(feature = "nurture")]
         {
@@ -1461,8 +1491,8 @@ impl CognitiveLoopService {
                     betti,
                     &[], // persistence_components — future: wire from moral topology
                     &[], // persistence_cycles — future: wire from moral topology
-                    metadata.cantor_metacognitive_depth,
-                    metadata.cantor_last_depth,
+                    metadata.cantor.cantor_metacognitive_depth,
+                    metadata.cantor.cantor_last_depth,
                     self.stats.total_cycles,
                 );
                 if let Some(svg) = mgr.tick(&snap) {
@@ -1902,15 +1932,15 @@ mod tests {
         for (i, r) in results.iter().enumerate() {
             let m = &r.metadata;
             assert!(
-                m.social_trust_current.is_finite(),
+                m.social.social_trust_current.is_finite(),
                 "NaN social_trust at cycle {i}"
             );
             assert!(
-                m.social_cooperation_current.is_finite(),
+                m.social.social_cooperation_current.is_finite(),
                 "NaN social_cooperation at cycle {i}"
             );
             assert!(
-                m.social_prediction_accuracy.is_finite(),
+                m.social.social_prediction_accuracy.is_finite(),
                 "NaN social_pred_acc at cycle {i}"
             );
         }
@@ -1922,7 +1952,7 @@ mod tests {
         let results = run_cycles(&mut svc, 10, "warmup gate");
         for (i, r) in results.iter().enumerate() {
             let m = &r.metadata;
-            assert!(!m.tom_exploration_triggered, "tom_exploration at cycle {i}");
+            assert!(!m.social.tom_exploration_triggered, "tom_exploration at cycle {i}");
             assert!(!m.compound_instability, "compound_instability at cycle {i}");
             assert!(
                 !m.confidence_rising_dampen,

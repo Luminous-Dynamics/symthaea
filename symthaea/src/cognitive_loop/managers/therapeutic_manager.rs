@@ -187,6 +187,10 @@ impl CognitiveSubsystem for TherapeuticManager {
         );
         self.client_model.update_affect(affect);
 
+        // ── 1b. Update RDoC profile from sustained affect patterns ────────
+        // Slow EMA adaptation makes neuromod deltas responsive to ongoing state.
+        self.client_model.update_rdoc_from_affect();
+
         // ── 2. Crisis detection (ALWAYS runs — safety critical) ────────────
         // NOTE: Do not reset crisis_active here — text-based crisis detection
         // runs in cycle() before process() and sets crisis_active. We only
@@ -233,9 +237,13 @@ impl CognitiveSubsystem for TherapeuticManager {
             &self.alliance,
             self.crisis_active,
         );
-        let delta = self
-            .regulation_engine
-            .apply_strategy(strategy, self.client_model.distress());
+        // RDoC-aware neuromod deltas: domain scores amplify relevant transmitters.
+        // High NegativeValence → stronger serotonin; low PositiveValence → stronger dopamine.
+        let delta = self.regulation_engine.apply_strategy_rdoc(
+            strategy,
+            self.client_model.distress(),
+            &self.client_model.rdoc_profile,
+        );
 
         // Store last delta for neuromod injection by the cycle runner
         self.last_neuromod_delta = Some(delta);

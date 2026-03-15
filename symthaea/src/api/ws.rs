@@ -242,6 +242,26 @@ pub struct DemoCycleData {
     // ── Substrate ──
     #[serde(default)]
     pub substrate_feasibility: f64,
+
+    // ── Therapeutic (feature-gated) ──
+    /// Client distress level (0.0–1.0).
+    #[serde(default)]
+    pub therapeutic_distress: f32,
+    /// Therapeutic alliance composite (0.0–1.0, Bordin bond/goals/tasks).
+    #[serde(default)]
+    pub therapeutic_alliance: f32,
+    /// Whether a crisis was detected this cycle.
+    #[serde(default)]
+    pub therapeutic_crisis_active: bool,
+    /// Active regulation strategy name (empty if none / feature disabled).
+    #[serde(default)]
+    pub therapeutic_strategy: String,
+    /// Narrative coherence (0.0–1.0).
+    #[serde(default)]
+    pub therapeutic_narrative_coherence: f32,
+    /// RDoC clinical severity composite (0.0–1.0).
+    #[serde(default)]
+    pub therapeutic_clinical_severity: f32,
 }
 
 impl DemoCycleData {
@@ -301,6 +321,10 @@ impl DemoCycleData {
         sf64(&mut self.structural_macro_phi);
         sf64(&mut self.structural_emergence_ratio);
         sf64(&mut self.substrate_feasibility);
+        sf32(&mut self.therapeutic_distress);
+        sf32(&mut self.therapeutic_alliance);
+        sf32(&mut self.therapeutic_narrative_coherence);
+        sf32(&mut self.therapeutic_clinical_severity);
 
         // Array f64 fields
         for v in &mut self.harmony_coordinates {

@@ -254,3 +254,78 @@ fn test_alliance_gates_intervention_depth() {
     let directive_logit = TherapeuticGate::apply("need to", &channels, 0.5);
     assert!(directive_logit < 0.5, "Depth-exceeding-alliance suppresses directives, got {}", directive_logit);
 }
+
+// ── 14. RDoC-aware neuromod deltas amplify domain-relevant transmitters ──
+
+#[test]
+fn test_rdoc_neuromod_bridge() {
+    use symthaea_therapeutic::affect_regulation::RegulationEngine;
+    use symthaea_therapeutic::RegulationStrategy;
+    use symthaea_clinical::rdoc::{RDocDomain, RDocProfile};
+
+    let mut engine = RegulationEngine::new();
+
+    // High negative valence client → serotonin should be amplified
+    let mut rdoc = RDocProfile::default();
+    rdoc.set_score(RDocDomain::NegativeValence, 0.9);
+
+    let delta = engine.apply_strategy_rdoc(RegulationStrategy::Validation, 0.6, &rdoc);
+    assert!(delta.serotonin > 0.0, "serotonin should be positive for Validation");
+    assert!(delta.oxytocin > 0.0, "oxytocin should be positive for Validation");
+}
+
+// ── 15. Therapeutic telemetry appears in CycleMetadata ──────────────
+
+#[test]
+fn test_therapeutic_telemetry_populated() {
+    let mut service = make_therapeutic_service();
+
+    // Run enough cycles for therapeutic manager to fire (interval 11)
+    for i in 0..25 {
+        service.cycle(&format!("feeling stressed cycle {}", i));
+    }
+
+    let result = service.cycle("checking telemetry");
+
+    // Therapeutic telemetry should be populated
+    let m = &result.metadata;
+    assert!(m.therapeutic.therapeutic_alliance >= 0.0);
+    assert!(m.therapeutic.therapeutic_alliance <= 1.0);
+    assert!(m.therapeutic.therapeutic_client_distress >= 0.0);
+    assert!(m.therapeutic.therapeutic_clinical_severity >= 0.0);
+}
+
+// ── 16. Dream wisdom feeds back into regulation engine ──────────────
+
+#[test]
+fn test_dream_wisdom_integration() {
+    use symthaea_therapeutic::affect_regulation::RegulationEngine;
+    use symthaea_therapeutic::RegulationStrategy;
+
+    let mut engine = RegulationEngine::new();
+
+    // Simulate dream discovering that Grounding (ordinal 2) would have
+    // improved Phi by 0.2
+    engine.incorporate_dream_wisdom(2, 0.2);
+
+    let pref = engine.dream_preferred_strategy();
+    assert_eq!(pref, Some(RegulationStrategy::Grounding));
+}
+
+// ── 17. Narrative coherence is tracked over cycles ──────────────────
+
+#[test]
+fn test_narrative_coherence_range() {
+    let mut service = make_therapeutic_service();
+
+    for i in 0..30 {
+        service.cycle(&format!("consistent narrative cycle {}", i));
+    }
+
+    let coherence = service.therapeutic_manager_narrative_coherence();
+    assert!(
+        coherence >= 0.0 && coherence <= 1.0,
+        "Narrative coherence should be in [0,1], got {}",
+        coherence,
+    );
+}
