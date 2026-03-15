@@ -5,8 +5,16 @@
     getAllPlots,
     registerPlot,
     recordHarvest,
+    logResourceInput,
+    getCommunityInputs,
+    getNutrientSummary,
+    RESOURCE_TYPES,
+    RESOURCE_TYPE_LABELS,
     type FoodPlot,
     type HarvestRecord,
+    type ResourceInput,
+    type ResourceType,
+    type NutrientSummary,
   } from '$lib/resilience-client';
 
   // ============================================================================
@@ -15,6 +23,8 @@
 
   const plots = writable<FoodPlot[]>([]);
   const harvests = writable<HarvestRecord[]>([]);
+  const resourceInputs = writable<ResourceInput[]>([]);
+  const nutrientSummary = writable<NutrientSummary | null>(null);
 
   // Plot form
   let plotName = '';
@@ -30,6 +40,13 @@
   let harvestNotes = '';
   let showHarvestForm = false;
 
+  // Resource input form
+  let riType: ResourceType = 'KitchenWaste';
+  let riKg = 5;
+  let riPlotId = '';
+  let riNotes = '';
+  let showResourceForm = false;
+
   let submitting = false;
 
   const plotTypes = ['Raised beds', 'Open field', 'Greenhouse tunnel', 'Container garden', 'Vertical garden', 'Rooftop'];
@@ -40,10 +57,16 @@
 
   onMount(async () => {
     try {
-      const p = await getAllPlots();
+      const [p, ri, ns] = await Promise.all([
+        getAllPlots(),
+        getCommunityInputs(),
+        getNutrientSummary(),
+      ]);
       plots.set(p);
+      resourceInputs.set(ri);
+      nutrientSummary.set(ns);
     } catch (e) {
-      console.warn('[Food] Failed to load plots, using defaults:', e);
+      console.warn('[Food] Failed to load data, using defaults:', e);
     }
   });
 
@@ -77,12 +100,44 @@
     }
   }
 
+  async function handleLogResource() {
+    if (riKg <= 0) return;
+    submitting = true;
+    try {
+      const ri = await logResourceInput(riType, riKg, riPlotId || null, riNotes);
+      resourceInputs.update(list => [ri, ...list]);
+      // Refresh summary
+      const ns = await getNutrientSummary();
+      nutrientSummary.set(ns);
+      riType = 'KitchenWaste';
+      riKg = 5;
+      riPlotId = '';
+      riNotes = '';
+      showResourceForm = false;
+    } finally {
+      submitting = false;
+    }
+  }
+
   function totalArea(plots: FoodPlot[]): number {
     return plots.reduce((sum, p) => sum + p.area_sqm, 0);
   }
 
   function totalHarvest(harvests: HarvestRecord[]): number {
     return harvests.reduce((sum, h) => sum + h.quantity_kg, 0);
+  }
+
+  function totalResourceKg(inputs: ResourceInput[]): number {
+    return inputs.reduce((sum, ri) => sum + ri.quantity_kg, 0);
+  }
+
+  function timeAgo(ts: number): string {
+    const diff = Date.now() - ts;
+    const days = Math.floor(diff / 86400000);
+    if (days > 0) return `${days}d ago`;
+    const hours = Math.floor(diff / 3600000);
+    if (hours > 0) return `${hours}h ago`;
+    return 'just now';
   }
 </script>
 
@@ -132,14 +187,18 @@
 
     <!-- Action Buttons -->
     <div class="flex gap-3 mb-6">
-      <button on:click={() => { showPlotForm = !showPlotForm; showHarvestForm = false; }}
+      <button on:click={() => { showPlotForm = !showPlotForm; showHarvestForm = false; showResourceForm = false; }}
         class="px-4 py-2 bg-green-600 hover:bg-green-700 rounded text-sm font-medium transition-colors">
         + Register Plot
       </button>
-      <button on:click={() => { showHarvestForm = !showHarvestForm; showPlotForm = false; }}
+      <button on:click={() => { showHarvestForm = !showHarvestForm; showPlotForm = false; showResourceForm = false; }}
         class="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 rounded text-sm font-medium transition-colors"
         disabled={$plots.length === 0}>
         + Record Harvest
+      </button>
+      <button on:click={() => { showResourceForm = !showResourceForm; showPlotForm = false; showHarvestForm = false; }}
+        class="px-4 py-2 bg-amber-600 hover:bg-amber-700 rounded text-sm font-medium transition-colors">
+        + Log Contribution
       </button>
     </div>
 
@@ -219,6 +278,119 @@
             </button>
           </div>
         </form>
+      </div>
+    {/if}
+
+    <!-- Log Resource Contribution Form -->
+    {#if showResourceForm}
+      <div class="bg-gray-800 rounded-lg border border-gray-700 p-6 mb-6">
+        <h2 class="text-sm font-semibold text-gray-300 mb-4">Log a Contribution</h2>
+        <form on:submit|preventDefault={handleLogResource} class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label for="ritype" class="text-xs text-gray-400">Resource Type</label>
+            <select id="ritype" bind:value={riType}
+              class="w-full mt-1 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-amber-500">
+              {#each RESOURCE_TYPES as t}
+                <option value={t}>{RESOURCE_TYPE_LABELS[t]}</option>
+              {/each}
+            </select>
+          </div>
+          <div>
+            <label for="rikg" class="text-xs text-gray-400">Quantity (kg)</label>
+            <input id="rikg" type="number" bind:value={riKg} min="0.1" step="0.1" max="100000"
+              class="w-full mt-1 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-amber-500" />
+          </div>
+          <div>
+            <label for="riplot" class="text-xs text-gray-400">Plot (optional)</label>
+            <select id="riplot" bind:value={riPlotId}
+              class="w-full mt-1 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-amber-500">
+              <option value="">No specific plot</option>
+              {#each $plots as plot}
+                <option value={plot.id}>{plot.name}</option>
+              {/each}
+            </select>
+          </div>
+          <div>
+            <label for="rinotes" class="text-xs text-gray-400">Notes</label>
+            <input id="rinotes" bind:value={riNotes} placeholder="Source, quality, etc."
+              class="w-full mt-1 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-amber-500" />
+          </div>
+          <div class="md:col-span-2">
+            <button type="submit" disabled={submitting || riKg <= 0}
+              class="w-full bg-amber-600 hover:bg-amber-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded px-4 py-2 text-sm font-medium transition-colors">
+              {submitting ? 'Logging...' : 'Log Contribution'}
+            </button>
+          </div>
+        </form>
+      </div>
+    {/if}
+
+    <!-- Nutrient Summary Card -->
+    {#if $nutrientSummary}
+      <div class="bg-gray-800 rounded-lg border border-gray-700 p-6 mb-6">
+        <h2 class="text-sm font-semibold text-gray-300 mb-4 flex items-center gap-2">
+          <span>&#x1F33E;</span> Community Nutrient Summary
+        </h2>
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">
+          <div class="bg-gray-700/50 rounded p-3">
+            <p class="text-xs text-gray-400">Contributions</p>
+            <p class="text-xl font-bold text-amber-400">{$nutrientSummary.total_contributions}</p>
+          </div>
+          <div class="bg-gray-700/50 rounded p-3">
+            <p class="text-xs text-gray-400">Total Input</p>
+            <p class="text-xl font-bold">{totalResourceKg($resourceInputs).toFixed(1)} kg</p>
+          </div>
+          <div class="bg-gray-700/50 rounded p-3">
+            <p class="text-xs text-gray-400">Est. Nitrogen</p>
+            <p class="text-xl font-bold text-green-400">{$nutrientSummary.total_nitrogen_kg.toFixed(2)} kg</p>
+          </div>
+          <div class="bg-gray-700/50 rounded p-3">
+            <p class="text-xs text-gray-400">Est. Phosphorus</p>
+            <p class="text-xl font-bold text-blue-400">{$nutrientSummary.total_phosphorus_kg.toFixed(2)} kg</p>
+          </div>
+          <div class="bg-gray-700/50 rounded p-3">
+            <p class="text-xs text-gray-400">Est. Potassium</p>
+            <p class="text-xl font-bold text-purple-400">{$nutrientSummary.total_potassium_kg.toFixed(2)} kg</p>
+          </div>
+        </div>
+        {#if $nutrientSummary.total_kg_by_type.length > 0}
+          <div class="space-y-2">
+            <p class="text-xs text-gray-400">By Resource Type</p>
+            {#each $nutrientSummary.total_kg_by_type as [type, kg]}
+              <div class="flex justify-between items-center text-sm">
+                <span class="text-gray-300">{RESOURCE_TYPE_LABELS[type] ?? type}</span>
+                <span class="text-gray-400">{kg.toFixed(1)} kg</span>
+              </div>
+            {/each}
+          </div>
+        {/if}
+      </div>
+    {/if}
+
+    <!-- Recent Contributions -->
+    {#if $resourceInputs.length > 0}
+      <div class="bg-gray-800 rounded-lg border border-gray-700 mb-6">
+        <div class="p-4 border-b border-gray-700">
+          <h2 class="text-lg font-semibold flex items-center gap-2">
+            <span>&#x267B;</span> Recent Contributions
+          </h2>
+        </div>
+        <div class="p-4 space-y-2">
+          {#each $resourceInputs.slice(0, 10) as ri}
+            <div class="flex justify-between items-center p-3 bg-gray-700/50 rounded text-sm">
+              <div>
+                <span class="font-medium text-amber-300">{RESOURCE_TYPE_LABELS[ri.input_type]}</span>
+                <span class="text-gray-400 ml-2">{ri.quantity_kg} kg</span>
+                {#if ri.notes}
+                  <span class="text-gray-500 ml-2">&mdash; {ri.notes}</span>
+                {/if}
+              </div>
+              <div class="text-xs text-gray-500">
+                {ri.contributor_did} &middot; {timeAgo(ri.contributed_at)}
+              </div>
+            </div>
+          {/each}
+        </div>
       </div>
     {/if}
 

@@ -150,6 +150,66 @@ export interface PlantingRecord {
   area_sqm: number;
 }
 
+export type ResourceType =
+  | 'KitchenWaste'
+  | 'GreenWaste'
+  | 'Biochar'
+  | 'Vermicompost'
+  | 'Digestate'
+  | 'Manure'
+  | 'Mulch'
+  | 'CoverCrop'
+  | 'Inoculant';
+
+export interface NutrientProfile {
+  nitrogen_pct: number;
+  phosphorus_pct: number;
+  potassium_pct: number;
+}
+
+export interface ResourceInput {
+  id: string;
+  plot_id: string | null;
+  input_type: ResourceType;
+  quantity_kg: number;
+  nutrient_estimate: NutrientProfile;
+  contributor_did: string;
+  contributed_at: number;
+  notes: string;
+}
+
+export interface NutrientSummary {
+  total_kg_by_type: [string, number][];
+  total_nitrogen_kg: number;
+  total_phosphorus_kg: number;
+  total_potassium_kg: number;
+  total_contributions: number;
+}
+
+export const RESOURCE_TYPES: ResourceType[] = [
+  'KitchenWaste',
+  'GreenWaste',
+  'Biochar',
+  'Vermicompost',
+  'Digestate',
+  'Manure',
+  'Mulch',
+  'CoverCrop',
+  'Inoculant',
+];
+
+export const RESOURCE_TYPE_LABELS: Record<ResourceType, string> = {
+  KitchenWaste: 'Kitchen Waste',
+  GreenWaste: 'Green Waste',
+  Biochar: 'Biochar',
+  Vermicompost: 'Vermicompost',
+  Digestate: 'Digestate',
+  Manure: 'Manure',
+  Mulch: 'Mulch',
+  CoverCrop: 'Cover Crop',
+  Inoculant: 'Inoculant',
+};
+
 // ============================================================================
 // Types — Mutual Aid / Timebank
 // ============================================================================
@@ -313,6 +373,45 @@ export async function recordHarvest(
     zome_name: 'food_production',
     fn_name: 'record_harvest',
     payload: { crop_hash: plotId, quantity_kg: quantityKg, quality: 'good', notes },
+  });
+}
+
+// ============================================================================
+// Resource Input Client
+// ============================================================================
+
+export async function logResourceInput(
+  inputType: ResourceType,
+  quantityKg: number,
+  plotId: string | null,
+  notes: string,
+): Promise<ResourceInput> {
+  if (!isConnected()) return mockResourceInput(inputType, quantityKg, plotId, notes);
+  return callZome<ResourceInput>({
+    role_name: 'commons_care',
+    zome_name: 'food_production',
+    fn_name: 'log_resource_input',
+    payload: { plot_hash: plotId, input_type: inputType, quantity_kg: quantityKg, notes },
+  });
+}
+
+export async function getCommunityInputs(limit = 50): Promise<ResourceInput[]> {
+  if (!isConnected()) return mockResourceInputs();
+  return callZome<ResourceInput[]>({
+    role_name: 'commons_care',
+    zome_name: 'food_production',
+    fn_name: 'get_community_inputs',
+    payload: { limit },
+  });
+}
+
+export async function getNutrientSummary(): Promise<NutrientSummary> {
+  if (!isConnected()) return mockNutrientSummary();
+  return callZome<NutrientSummary>({
+    role_name: 'commons_care',
+    zome_name: 'food_production',
+    fn_name: 'get_nutrient_summary',
+    payload: null,
   });
 }
 
@@ -584,6 +683,59 @@ function mockPlot(name: string, location: string, areaSqm: number, plotType: str
 
 function mockHarvest(plotId: string, cropName: string, quantityKg: number, notes: string): HarvestRecord {
   return { id: `har-${Date.now()}`, plot_id: plotId, crop_name: cropName, quantity_kg: quantityKg, harvested_at: Date.now(), notes };
+}
+
+const NUTRIENT_LOOKUP: Record<ResourceType, NutrientProfile> = {
+  KitchenWaste: { nitrogen_pct: 1.5, phosphorus_pct: 0.5, potassium_pct: 1.0 },
+  GreenWaste: { nitrogen_pct: 2.0, phosphorus_pct: 0.3, potassium_pct: 1.5 },
+  Biochar: { nitrogen_pct: 0.5, phosphorus_pct: 0.2, potassium_pct: 1.0 },
+  Vermicompost: { nitrogen_pct: 2.5, phosphorus_pct: 1.5, potassium_pct: 1.5 },
+  Digestate: { nitrogen_pct: 3.0, phosphorus_pct: 0.8, potassium_pct: 2.0 },
+  Manure: { nitrogen_pct: 2.0, phosphorus_pct: 1.0, potassium_pct: 2.0 },
+  Mulch: { nitrogen_pct: 0.5, phosphorus_pct: 0.1, potassium_pct: 0.3 },
+  CoverCrop: { nitrogen_pct: 3.0, phosphorus_pct: 0.4, potassium_pct: 1.0 },
+  Inoculant: { nitrogen_pct: 0.1, phosphorus_pct: 0.1, potassium_pct: 0.1 },
+};
+
+function mockResourceInputs(): ResourceInput[] {
+  return [
+    { id: 'ri-001', plot_id: 'plot-001', input_type: 'KitchenWaste', quantity_kg: 12.5, nutrient_estimate: NUTRIENT_LOOKUP.KitchenWaste, contributor_did: 'sipho.did', contributed_at: Date.now() - 604800000, notes: 'Weekly collection' },
+    { id: 'ri-002', plot_id: 'plot-002', input_type: 'Vermicompost', quantity_kg: 30.0, nutrient_estimate: NUTRIENT_LOOKUP.Vermicompost, contributor_did: 'fatima.did', contributed_at: Date.now() - 432000000, notes: 'Worm farm harvest' },
+    { id: 'ri-003', plot_id: null, input_type: 'Biochar', quantity_kg: 8.0, nutrient_estimate: NUTRIENT_LOOKUP.Biochar, contributor_did: 'community.did', contributed_at: Date.now() - 172800000, notes: 'Pyrolysis kiln run' },
+    { id: 'ri-004', plot_id: 'plot-001', input_type: 'GreenWaste', quantity_kg: 20.0, nutrient_estimate: NUTRIENT_LOOKUP.GreenWaste, contributor_did: 'sipho.did', contributed_at: Date.now() - 86400000, notes: 'Garden clippings' },
+  ];
+}
+
+function mockResourceInput(inputType: ResourceType, quantityKg: number, plotId: string | null, notes: string): ResourceInput {
+  return {
+    id: `ri-${Date.now()}`,
+    plot_id: plotId,
+    input_type: inputType,
+    quantity_kg: quantityKg,
+    nutrient_estimate: NUTRIENT_LOOKUP[inputType],
+    contributor_did: 'self.did',
+    contributed_at: Date.now(),
+    notes,
+  };
+}
+
+function mockNutrientSummary(): NutrientSummary {
+  const inputs = mockResourceInputs();
+  const byType = new Map<string, number>();
+  let n = 0, p = 0, k = 0;
+  for (const ri of inputs) {
+    byType.set(ri.input_type, (byType.get(ri.input_type) ?? 0) + ri.quantity_kg);
+    n += ri.quantity_kg * ri.nutrient_estimate.nitrogen_pct / 100;
+    p += ri.quantity_kg * ri.nutrient_estimate.phosphorus_pct / 100;
+    k += ri.quantity_kg * ri.nutrient_estimate.potassium_pct / 100;
+  }
+  return {
+    total_kg_by_type: [...byType.entries()].sort((a, b) => b[1] - a[1]),
+    total_nitrogen_kg: n,
+    total_phosphorus_kg: p,
+    total_potassium_kg: k,
+    total_contributions: inputs.length,
+  };
 }
 
 function mockOffers(): AidOffer[] {
