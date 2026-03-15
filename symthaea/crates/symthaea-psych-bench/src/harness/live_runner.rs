@@ -253,7 +253,7 @@ impl CognitiveLoopBenchmarkRunner {
                 ne: result.metadata.neuromod.noradrenaline_effective,
                 sht: result.metadata.neuromod.serotonin_effective,
                 ach: result.metadata.neuromod.acetylcholine_effective,
-                psi: result.metadata.consciousness_level as f32,
+                psi: result.metadata.consciousness.consciousness_level as f32,
                 cycle_time_us: result.cycle_time_us,
                 learning_occurred: result.learning_occurred,
                 reward: trial_reward,
@@ -263,8 +263,8 @@ impl CognitiveLoopBenchmarkRunner {
                 allostatic_load: result.metadata.neuromod.neuromod_allostatic_load,
                 consciousness_mod: result.metadata.neuromod.neuromod_consciousness_mod,
                 social_coherence: result.metadata.neuromod.neuromod_social_coherence,
-                structural_micro_phi: result.metadata.structural_micro_phi,
-                structural_emergence_ratio: result.metadata.structural_emergence_ratio,
+                structural_micro_phi: result.metadata.structural.structural_micro_phi,
+                structural_emergence_ratio: result.metadata.structural.structural_emergence_ratio,
             });
         }
 

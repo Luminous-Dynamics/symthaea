@@ -88,7 +88,7 @@ fn run_phase(service: &mut CognitiveLoopService, n: usize, offset: usize) -> Pha
         let result = service.cycle(input);
         metrics
             .consciousness_levels
-            .push(result.metadata.consciousness_level);
+            .push(result.metadata.consciousness.consciousness_level);
         metrics.prediction_errors.push(result.prediction_error);
         metrics
             .quality_scores
@@ -271,7 +271,7 @@ fn test_mid_run_substrate_switch_continuity() {
 
         let input = INPUTS[i % INPUTS.len()];
         let result = service.cycle(input);
-        let consciousness = result.metadata.consciousness_level;
+        let consciousness = result.metadata.consciousness.consciousness_level;
         let pe = result.prediction_error;
         let quality = result.metadata.quality.unified_quality_score;
 
@@ -384,11 +384,11 @@ fn test_substrate_behavioral_differences() {
     for i in 0..80 {
         let input = INPUTS[(130 + i) % INPUTS.len()];
         let result = service.cycle(input);
-        silicon_consciousness.push(result.metadata.consciousness_level);
+        silicon_consciousness.push(result.metadata.consciousness.consciousness_level);
         silicon_prediction_errors.push(result.prediction_error);
         // Check switch cycle (i==0) doesn't spike or crash vs prior cycle
         if i == 0 {
-            let switch_c = result.metadata.consciousness_level;
+            let switch_c = result.metadata.consciousness.consciousness_level;
             assert!(
                 switch_c.is_finite(),
                 "Switch cycle consciousness must be finite: {switch_c}"
@@ -420,11 +420,11 @@ fn test_substrate_behavioral_differences() {
     for i in 0..80 {
         let input = INPUTS[(210 + i) % INPUTS.len()];
         let result = service.cycle(input);
-        quantum_consciousness.push(result.metadata.consciousness_level);
+        quantum_consciousness.push(result.metadata.consciousness.consciousness_level);
         quantum_prediction_errors.push(result.prediction_error);
         // Check switch cycle doesn't spike or crash
         if i == 0 {
-            let switch_c = result.metadata.consciousness_level;
+            let switch_c = result.metadata.consciousness.consciousness_level;
             assert!(
                 switch_c.is_finite(),
                 "Quantum switch cycle consciousness must be finite: {switch_c}"
@@ -576,7 +576,7 @@ fn test_energy_budget_consciousness_collapse() {
     for i in 0..max_cycles {
         let input = INPUTS[i % INPUTS.len()];
         let result = service.cycle(input);
-        all_consciousness.push(result.metadata.consciousness_level);
+        all_consciousness.push(result.metadata.consciousness.consciousness_level);
 
         if !service.substrate_consciousness_viable() && collapse_cycle.is_none() {
             collapse_cycle = Some(i);

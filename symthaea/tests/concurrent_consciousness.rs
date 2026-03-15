@@ -117,9 +117,9 @@ fn test_three_agent_consciousness_convergence() {
 
         // Assert: consciousness levels stay bounded [0, 1]
         for (label, cl) in [
-            ("A", result_a.metadata.consciousness_level),
-            ("B", result_b.metadata.consciousness_level),
-            ("C", result_c.metadata.consciousness_level),
+            ("A", result_a.metadata.consciousness.consciousness_level),
+            ("B", result_b.metadata.consciousness.consciousness_level),
+            ("C", result_c.metadata.consciousness.consciousness_level),
         ] {
             assert!(
                 (0.0..=1.0).contains(&cl),

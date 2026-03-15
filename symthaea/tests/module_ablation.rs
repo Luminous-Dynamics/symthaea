@@ -394,8 +394,8 @@ fn test_all_modules_synergy() {
         let result = service.cycle(PATTERN[i % PATTERN.len()]);
         errors.push(result.prediction_error);
 
-        if result.metadata.consciousness_level > 0.0 {
-            consciousness_levels.push(result.metadata.consciousness_level);
+        if result.metadata.consciousness.consciousness_level > 0.0 {
+            consciousness_levels.push(result.metadata.consciousness.consciousness_level);
         }
 
         // Count non-default metadata fields
@@ -411,10 +411,10 @@ fn test_all_modules_synergy() {
         if result.metadata.narrative_self_psi > 0.0 {
             metadata_populated |= 8;
         }
-        if (result.metadata.body_phi_modulation - 1.0).abs() > 0.001 {
+        if (result.metadata.embodied.body_phi_modulation - 1.0).abs() > 0.001 {
             metadata_populated |= 16;
         }
-        if result.metadata.temporal_coherence_score > 0.0 {
+        if result.metadata.temporal.temporal_coherence_score > 0.0 {
             metadata_populated |= 32;
         }
         if result.metadata.attention.attention_schema_focus > 0.0 {

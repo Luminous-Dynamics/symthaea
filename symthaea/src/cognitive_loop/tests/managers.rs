@@ -15,16 +15,15 @@ fn voice_coherence_bridge_default_state() {
     let service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
     // Bridge should start with zero smoothed coherence
     assert!(service
-        .language_comm
         .voice_coherence
         .bridge
         .smoothed_coherence()
         .is_finite());
     // Voice feedback should start with default quality
-    let summary = service.language_comm.voice_coherence.voice.summary();
+    let summary = service.voice_coherence.voice.summary();
     assert!(summary.articulation_quality.is_finite());
     // Temporal signature should start with some default pattern
-    let temporal = service.language_comm.voice_coherence.temporal.summary();
+    let temporal = service.voice_coherence.temporal.summary();
     assert!(temporal.confidence.is_finite());
 }
 
@@ -39,7 +38,6 @@ fn voice_coherence_bridge_reset_restores_clean_state() {
     service.reset();
     // State should be clean
     assert!(service
-        .language_comm
         .voice_coherence
         .bridge
         .smoothed_coherence()
@@ -157,7 +155,6 @@ fn full_service_reset_restores_all_managers() {
     assert!((service.social_mgr.social.social_trust - 0.5).abs() < f32::EPSILON);
     assert!((service.social_mgr.social.relational_psi - 0.0).abs() < f64::EPSILON);
     assert!(service
-        .language_comm
         .voice_coherence
         .bridge
         .smoothed_coherence()
@@ -236,22 +233,22 @@ fn soak_500_cycles_all_metadata_finite() {
 
         // Core metrics must be finite every cycle
         assert!(
-            m.adaptive.valence_homeostasis_pull.is_finite(),
+            m.valence_homeostasis_pull.is_finite(),
             "valence_homeostasis_pull NaN at cycle {i}"
         );
         assert!(
-            m.voice.voice_articulation_quality.is_finite(),
+            m.voice_articulation_quality.is_finite(),
             "voice_articulation_quality NaN at cycle {i}"
         );
         assert!(
-            m.social.social_trust_current >= 0.0 && m.social.social_trust_current <= 1.0,
+            m.social_trust_current >= 0.0 && m.social_trust_current <= 1.0,
             "social_trust_current out of range at cycle {i}: {}",
-            m.social.social_trust_current
+            m.social_trust_current
         );
         assert!(
-            m.social.social_cooperation_current >= 0.0 && m.social.social_cooperation_current <= 1.0,
+            m.social_cooperation_current >= 0.0 && m.social_cooperation_current <= 1.0,
             "social_cooperation_current out of range at cycle {i}: {}",
-            m.social.social_cooperation_current
+            m.social_cooperation_current
         );
 
         // Biorhythm modulation must be positive (not in CycleMetadata, check manager directly)
@@ -276,7 +273,7 @@ fn soak_social_signals_survive_500_cycles() {
 
         // Social trust should persist (set once, not reset per cycle)
         assert!(
-            m.social.social_trust_current >= 0.0 && m.social.social_trust_current <= 1.0,
+            m.social_trust_current >= 0.0 && m.social_trust_current <= 1.0,
             "social_trust out of range at cycle {i}"
         );
 
@@ -312,13 +309,13 @@ fn consciousness_behavior_coupling_validation() {
     for i in 0..600 {
         let result = service.cycle(inputs[i % inputs.len()]);
         let m = &result.metadata;
-        let pe = m.adaptive.valence_homeostasis_pull.abs() as f64; // proxy for prediction error
+        let pe = m.valence_homeostasis_pull.abs() as f64; // proxy for prediction error
 
         if i > 100 {
             // Skip warmup; collect (prev_consciousness, current_pe)
             pairs.push((prev_consciousness, pe));
         }
-        prev_consciousness = m.consciousness_level;
+        prev_consciousness = m.consciousness.consciousness_level;
     }
 
     // Split into above-median and below-median consciousness groups
@@ -374,7 +371,7 @@ fn diagnostic_round5_trajectory() {
             let m = &result.metadata;
             eprintln!(
                 "Cycle {i}: C={:.4} softmin={:.4} weighted={:.4} btl={} N={:.4} Soc={:.4}",
-                m.consciousness_level,
+                m.consciousness.consciousness_level,
                 m.mce_softmin,
                 m.mce_weighted_sum,
                 m.mce_bottleneck,

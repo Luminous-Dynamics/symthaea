@@ -475,7 +475,7 @@ fn test_body_phi_modulation_feedback() {
     let mut body_mods = Vec::new();
     for _ in 0..20 {
         let result = service.cycle("body feedback test");
-        body_mods.push(result.metadata.body_phi_modulation);
+        body_mods.push(result.metadata.embodied.body_phi_modulation);
     }
 
     // At least some body phi modulation should differ from 1.0 after warmup
@@ -516,12 +516,12 @@ fn test_all_consciousness_modules_enabled() {
 
     let result = service.cycle("final check with all modules");
     assert!(result.prediction_error.is_finite());
-    assert!(result.metadata.consciousness_level.is_finite());
+    assert!(result.metadata.consciousness.consciousness_level.is_finite());
     // Temporal consciousness should have valid coherence
-    assert!(result.metadata.temporal_coherence_score >= 0.0);
-    assert!(result.metadata.temporal_coherence_score <= 1.0);
+    assert!(result.metadata.temporal.temporal_coherence_score >= 0.0);
+    assert!(result.metadata.temporal.temporal_coherence_score <= 1.0);
     // Embodied cognition should have valid phi modulation
-    assert!(result.metadata.embodied_phi_modulation.is_finite());
+    assert!(result.metadata.embodied.embodied_phi_modulation.is_finite());
     // Narrative-GWT self phi should be finite
     assert!(result.metadata.narrative_gwt_self_psi.is_finite());
 }
@@ -542,11 +542,11 @@ fn test_cycle_with_temporal_consciousness() {
 
     let result = service.cycle("temporal check");
     // Temporal coherence should be between 0 and 1
-    assert!(result.metadata.temporal_coherence_score >= 0.0);
-    assert!(result.metadata.temporal_coherence_score <= 1.0);
+    assert!(result.metadata.temporal.temporal_coherence_score >= 0.0);
+    assert!(result.metadata.temporal.temporal_coherence_score <= 1.0);
     // After 15 cycles, should have enough data for analysis
     // Verify temporal_discontinuity is accessible without panicking
-    let _discontinuity = result.metadata.temporal_discontinuity;
+    let _discontinuity = result.metadata.temporal.temporal_discontinuity;
 }
 
 #[test]
@@ -564,10 +564,10 @@ fn test_cycle_with_embodied_cognition() {
 
     let result = service.cycle("embodied check");
     // Embodied phi modulation should be finite and reasonable
-    assert!(result.metadata.embodied_phi_modulation.is_finite());
+    assert!(result.metadata.embodied.embodied_phi_modulation.is_finite());
     // Agency should be between 0 and 1
-    assert!(result.metadata.embodied_agency >= 0.0);
-    assert!(result.metadata.embodied_agency <= 1.0);
+    assert!(result.metadata.embodied.embodied_agency >= 0.0);
+    assert!(result.metadata.embodied.embodied_agency <= 1.0);
 }
 
 #[test]
@@ -948,14 +948,14 @@ fn test_ni1_moral_shift_drops_consciousness() {
     let mut late_a = Vec::with_capacity(40);
     for c in 0..40 {
         let r = service.cycle(prosocial[c % prosocial.len()]);
-        late_a.push(r.metadata.consciousness_level);
+        late_a.push(r.metadata.consciousness.consciousness_level);
     }
 
     // Record first 40 cycles of transition (conflicting input)
     let mut early_t = Vec::with_capacity(40);
     for c in 0..40 {
         let r = service.cycle(conflicting[c % conflicting.len()]);
-        early_t.push(r.metadata.consciousness_level);
+        early_t.push(r.metadata.consciousness.consciousness_level);
     }
 
     // Peak-to-trough: most robust metric across debug/release builds.

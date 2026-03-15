@@ -160,17 +160,17 @@ fn test_cycle_metadata_floats_finite() {
         let m = &r.metadata;
 
         assert_finite_f32(m.reasoning_confidence, "reasoning_confidence");
-        assert_finite(m.body_phi_modulation, "body_phi_modulation");
-        assert_finite_f32(m.body_valence, "body_valence");
-        assert_finite_f32(m.body_arousal, "body_arousal");
-        assert_finite(m.consciousness_level, "consciousness_level");
+        assert_finite(m.embodied.body_phi_modulation, "body_phi_modulation");
+        assert_finite_f32(m.embodied.body_valence, "body_valence");
+        assert_finite_f32(m.embodied.body_arousal, "body_arousal");
+        assert_finite(m.consciousness.consciousness_level, "consciousness_level");
         assert_finite_f32(m.predictive_self_safety, "predictive_self_safety");
         assert_finite_f32(m.attention.attention_schema_focus, "attention_schema_focus");
         assert_finite(m.resonance_frequency, "resonance_frequency");
         assert_finite(m.quantum_coherence_level, "quantum_coherence_level");
-        assert_finite(m.temporal_coherence_score, "temporal_coherence_score");
-        assert_finite(m.embodied_phi_modulation, "embodied_phi_modulation");
-        assert_finite(m.embodied_agency, "embodied_agency");
+        assert_finite(m.temporal.temporal_coherence_score, "temporal_coherence_score");
+        assert_finite(m.embodied.embodied_phi_modulation, "embodied_phi_modulation");
+        assert_finite(m.embodied.embodied_agency, "embodied_agency");
         assert_finite(m.narrative_gwt_self_psi, "narrative_gwt_self_psi");
         assert_finite(m.narrative_self_psi, "narrative_self_psi");
         assert_finite(m.living_mind_vitality, "living_mind_vitality");
@@ -178,15 +178,15 @@ fn test_cycle_metadata_floats_finite() {
         assert_finite(m.fep.predictive_free_energy, "predictive_free_energy");
         assert_finite(m.fep.predictive_phi_modulation, "predictive_phi_modulation");
         assert_finite_f32(
-            m.cross_modal_binding_strength,
+            m.temporal.cross_modal_binding_strength,
             "cross_modal_binding_strength",
         );
-        assert_finite(m.cross_modal_psi, "cross_modal_psi");
-        assert_finite_f32(m.affective_valence, "affective_valence");
-        assert_finite_f32(m.affective_arousal, "affective_arousal");
-        assert_finite(m.thermodynamic_entropy, "thermodynamic_entropy");
-        assert_finite(m.thermodynamic_free_energy, "thermodynamic_free_energy");
-        assert_finite(m.phenomenal_binding_strength, "phenomenal_binding_strength");
+        assert_finite(m.temporal.cross_modal_psi, "cross_modal_psi");
+        assert_finite_f32(m.embodied.affective_valence, "affective_valence");
+        assert_finite_f32(m.embodied.affective_arousal, "affective_arousal");
+        assert_finite(m.temporal.thermodynamic_entropy, "thermodynamic_entropy");
+        assert_finite(m.temporal.thermodynamic_free_energy, "thermodynamic_free_energy");
+        assert_finite(m.temporal.phenomenal_binding_strength, "phenomenal_binding_strength");
         assert_finite(
             m.hierarchical_total_free_energy,
             "hierarchical_total_free_energy",
@@ -196,10 +196,10 @@ fn test_cycle_metadata_floats_finite() {
         assert_finite(m.ethics.value_evaluator_score, "value_evaluator_score");
         assert_finite_f32(m.harmonics.harmonies_alignment, "harmonies_alignment");
         assert_finite(
-            m.consciousness_profile_composite,
+            m.consciousness.consciousness_profile_composite,
             "consciousness_profile_composite",
         );
-        assert_finite(m.synergy_enhanced_composite, "synergy_enhanced_composite");
+        assert_finite(m.consciousness.synergy_enhanced_composite, "synergy_enhanced_composite");
         assert_finite(
             m.harmonics.harmonic_field_coherence,
             "harmonic_field_coherence",
@@ -226,23 +226,23 @@ fn test_cycle_metadata_floats_finite() {
             "equation_v2_consciousness",
         );
         assert_finite_f32(m.quality.hierarchical_ltc_phi, "hierarchical_ltc_phi");
-        assert_finite(m.holographic_unity, "holographic_unity");
-        assert_finite(m.holographic_binding, "holographic_binding");
+        assert_finite(m.temporal.holographic_unity, "holographic_unity");
+        assert_finite(m.temporal.holographic_binding, "holographic_binding");
         assert_finite(
-            m.consciousness_gradient_magnitude,
+            m.consciousness.consciousness_gradient_magnitude,
             "consciousness_gradient_magnitude",
         );
         assert_finite_f32(
-            m.affect_consciousness_valence,
+            m.embodied.affect_consciousness_valence,
             "affect_consciousness_valence",
         );
         assert_finite_f32(
-            m.affect_consciousness_arousal,
+            m.embodied.affect_consciousness_arousal,
             "affect_consciousness_arousal",
         );
         assert_finite(m.pipeline_consciousness, "pipeline_consciousness");
         assert_finite(m.multimodal_integrated_phi, "multimodal_integrated_phi");
-        assert_finite(m.consciousness_state_level, "consciousness_state_level");
+        assert_finite(m.consciousness.consciousness_state_level, "consciousness_state_level");
         assert_finite_f32(m.epistemic_gate_confidence, "epistemic_gate_confidence");
         assert_finite(
             m.primitive_validation_phi_gain,
@@ -966,10 +966,10 @@ fn test_consciousness_level_bounded() {
     for i in 0..20 {
         let result = service.cycle(&format!("consciousness level {i}"));
         assert!(
-            result.metadata.consciousness_level >= 0.0
-                && result.metadata.consciousness_level <= 1.0,
+            result.metadata.consciousness.consciousness_level >= 0.0
+                && result.metadata.consciousness.consciousness_level <= 1.0,
             "Consciousness level out of [0.0, 1.0] at cycle {i}: {}",
-            result.metadata.consciousness_level
+            result.metadata.consciousness.consciousness_level
         );
     }
 }

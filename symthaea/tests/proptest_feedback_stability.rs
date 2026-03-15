@@ -387,7 +387,7 @@ proptest! {
         let mut service = feedback_service();
         for (i, input) in inputs.iter().enumerate() {
             let result = service.cycle(input);
-            let load = result.metadata.thermodynamic_load;
+            let load = result.metadata.temporal.thermodynamic_load;
             assert_finite_f32(load, &format!("thermodynamic_load@cycle{i}"))?;
             // Thermodynamic load: [0.0, 1.0]
             assert_bounded_f32(load, 0.0, 1.0,
@@ -428,7 +428,7 @@ proptest! {
         let mut service = feedback_service();
         for (i, input) in inputs.iter().enumerate() {
             let result = service.cycle(input);
-            let level = result.metadata.consciousness_level;
+            let level = result.metadata.consciousness.consciousness_level;
             assert_finite_f64(level, &format!("consciousness_level@cycle{i}"))?;
             prop_assert!(level >= 0.0 && level <= 1.0,
                 "consciousness_level out of [0.0, 1.0] at cycle {i}: {level}");
@@ -448,7 +448,7 @@ proptest! {
         let mut service = feedback_service();
         for (i, input) in inputs.iter().enumerate() {
             let result = service.cycle(input);
-            let stress = result.metadata.somatic_stress;
+            let stress = result.metadata.embodied.somatic_stress;
             assert_finite_f64(stress, &format!("somatic_stress@cycle{i}"))?;
             prop_assert!(stress >= 0.0,
                 "somatic_stress negative at cycle {i}: {stress}");
@@ -577,7 +577,7 @@ proptest! {
             prop_assert!(curiosity.is_finite() && curiosity >= 0.0 && curiosity <= 1.0,
                 "curiosity diverged at cycle {i}: {curiosity}");
 
-            let load = result.metadata.thermodynamic_load;
+            let load = result.metadata.temporal.thermodynamic_load;
             prop_assert!(load.is_finite(),
                 "thermodynamic_load diverged at cycle {i}: {load}");
 
@@ -986,9 +986,9 @@ proptest! {
             let result = service.cycle(input);
             let m = &result.metadata;
 
-            assert_finite_f32(m.adaptive.arousal_homeostasis_pull,
+            assert_finite_f32(m.arousal_homeostasis_pull,
                 &format!("arousal_homeostasis_pull@cycle{i}"))?;
-            assert_finite_f32(m.adaptive.arousal_recovery_tau_factor,
+            assert_finite_f32(m.arousal_recovery_tau_factor,
                 &format!("arousal_recovery_tau_factor@cycle{i}"))?;
         }
     }
@@ -1600,208 +1600,6 @@ proptest! {
             let _ = m.consciousness_ema_lr_bias;
             let _ = m.multi_obj_frontier_gated;
             let _ = m.error_bifurcation_response;
-        }
-    }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// 37. Session 17: Adaptive homeostasis & emergent dynamics regression guards
-// ═══════════════════════════════════════════════════════════════════════════════
-
-proptest! {
-    #![proptest_config(ProptestConfig::with_cases(5))]
-
-    /// Verify Session 17 regression guards:
-    /// - Allostatic load stays bounded [0, 1]
-    /// - Exploration decay doesn't kill exploration
-    /// - Consciousness acceleration doesn't kill confidence
-    /// - Proposal saturation doesn't collapse LR
-    /// - Phi-gated LR floor stays bounded
-    /// - Rhythmic oscillation doesn't break exploration bounds
-    /// - All 8 new telemetry fields populated
-    #[test]
-    fn prop_session17_regression_guards(inputs in fuzz_input_sequence(60, 120)) {
-        let mut service = feedback_service();
-
-        for (i, input) in inputs.iter().enumerate() {
-            let result = service.cycle(input);
-            let m = &result.metadata;
-
-            // Allostatic load must stay bounded
-            prop_assert!(m.allostatic_load >= 0.0 && m.allostatic_load <= 1.0,
-                "allostatic load OOB: {} at cycle {i}", m.allostatic_load);
-
-            // Exploration must survive decay + oscillation + phi gating
-            let exploration = service.exploration_factor();
-            assert_finite_f32(exploration, &format!("exploration@cycle{i}"))?;
-            prop_assert!(exploration >= 0.05,
-                "exploration killed by S17 mods: {} at cycle {i}", exploration);
-
-            // Confidence bounded after acceleration dampening
-            let conf = service.prediction_confidence();
-            prop_assert!(conf >= 0.0 && conf <= 1.0,
-                "confidence OOB after S17: {conf} at cycle {i}");
-
-            // LR bounded after saturation + phi gating
-            let lr = m.actual_effective_lr;
-            assert_finite_f32(lr, &format!("lr@cycle{i}"))?;
-            prop_assert!(lr >= 0.0 && lr <= 2.0,
-                "LR OOB after S17: {lr} at cycle {i}");
-
-            // All 8 new telemetry fields exist and are accessible
-            let _ = m.allostatic_overload_active;
-            let _ = m.allostatic_load;
-            let _ = m.exploration_decay_applied;
-            let _ = m.consciousness_accel_active;
-            let _ = m.adaptive_warmup_early_exit;
-            let _ = m.proposal_saturation_active;
-            let _ = m.phi_gated_lr_floor_active;
-            let _ = m.rhythmic_exploration_active;
-        }
-    }
-
-    /// Proptest #38: Session 18 — Predictive Coding & Metacognitive Refinement.
-    /// Guards:
-    /// - Sleep pressure stays bounded [0.0, 1.0]
-    /// - PE variance EMA stays bounded and finite
-    /// - Confidence calibration drift is finite
-    /// - Explore/exploit balance is in [0.0, 1.0]
-    /// - All 8 new telemetry fields populated
-    #[test]
-    fn prop_session18_regression_guards(inputs in fuzz_input_sequence(80, 160)) {
-        let mut service = feedback_service();
-
-        for (i, input) in inputs.iter().enumerate() {
-            let result = service.cycle(input);
-            let m = &result.metadata;
-
-            // Sleep pressure must stay bounded
-            prop_assert!(m.sleep_pressure >= 0.0 && m.sleep_pressure <= 1.0,
-                "sleep pressure OOB: {} at cycle {i}", m.sleep_pressure);
-
-            // Confidence calibration drift is finite and non-negative
-            prop_assert!(m.confidence_calibration_drift.is_finite()
-                && m.confidence_calibration_drift >= 0.0,
-                "calibration drift bad: {} at cycle {i}", m.confidence_calibration_drift);
-
-            // Explore/exploit balance in valid range
-            prop_assert!(m.explore_exploit_balance >= 0.0 && m.explore_exploit_balance <= 1.0,
-                "explore/exploit balance OOB: {} at cycle {i}", m.explore_exploit_balance);
-
-            // LR still bounded after momentum + sleep + gradient sign dampening
-            let lr = m.actual_effective_lr;
-            assert_finite_f32(lr, &format!("lr@cycle{i}"))?;
-            prop_assert!(lr >= 0.0 && lr <= 2.0,
-                "LR OOB after S18: {lr} at cycle {i}");
-
-            // Exploration still alive after all modulations
-            let exploration = service.exploration_factor();
-            assert_finite_f32(exploration, &format!("exploration@cycle{i}"))?;
-            prop_assert!(exploration >= 0.01,
-                "exploration killed by S18 mods: {} at cycle {i}", exploration);
-
-            // All 8 new telemetry fields accessible
-            let _ = m.pe_variance_damping_active;
-            let _ = m.confidence_calibration_drift;
-            let _ = m.lr_momentum_active;
-            let _ = m.metacognitive_surprise_active;
-            let _ = m.sleep_pressure;
-            let _ = m.gradient_sign_flip_active;
-            let _ = m.explore_exploit_balance;
-            let _ = m.proposal_conflict_detected;
-        }
-    }
-
-    /// Proptest #39: Session 19 — Embodied Cognition & Environmental Coupling.
-    /// Guards:
-    /// - Fatigue stays bounded [0.0, 1.0]
-    /// - Readiness score bounded [0.3, 1.0]
-    /// - Environmental predictability in [0.0, 1.0]
-    /// - Flow state doesn't break confidence bounds
-    /// - All 8 new telemetry fields populated
-    #[test]
-    fn prop_session19_regression_guards(inputs in fuzz_input_sequence(80, 160)) {
-        let mut service = feedback_service();
-
-        for (i, input) in inputs.iter().enumerate() {
-            let result = service.cycle(input);
-            let m = &result.metadata;
-
-            // Fatigue must stay bounded
-            prop_assert!(m.fatigue_level >= 0.0 && m.fatigue_level <= 1.0,
-                "fatigue OOB: {} at cycle {i}", m.fatigue_level);
-
-            // Readiness score bounded
-            prop_assert!(m.readiness_score >= 0.3 && m.readiness_score <= 1.0,
-                "readiness OOB: {} at cycle {i}", m.readiness_score);
-
-            // Env predictability bounded
-            prop_assert!(m.env_predictability >= 0.0 && m.env_predictability <= 1.0,
-                "env_predictability OOB: {} at cycle {i}", m.env_predictability);
-
-            // LR still bounded after all S19 modulations
-            let lr = m.actual_effective_lr;
-            assert_finite_f32(lr, &format!("lr@cycle{i}"))?;
-            prop_assert!(lr >= 0.0 && lr <= 2.0,
-                "LR OOB after S19: {lr} at cycle {i}");
-
-            // Confidence bounded after flow/recovery boosts
-            let conf = service.prediction_confidence();
-            prop_assert!(conf >= 0.0 && conf <= 1.0,
-                "confidence OOB after S19: {conf} at cycle {i}");
-
-            // All 8 new telemetry fields accessible
-            let _ = m.arousal_lr_modulated;
-            let _ = m.novelty_habituation_active;
-            let _ = m.fatigue_level;
-            let _ = m.recovery_detected;
-            let _ = m.env_predictability;
-            let _ = m.attention.attention_budget_exceeded;
-            let _ = m.readiness_score;
-            let _ = m.flow_state_active;
-        }
-    }
-
-    /// Proptest #40: Session 20 — Measurement & Consolidation.
-    /// Critical invariant: unified readiness gate prevents compound LR lobotomy.
-    /// Under ANY combination of stress signals, LR must never drop below 0.3
-    /// due to resource-depletion dampening alone.
-    #[test]
-    fn prop_session20_compound_dampening_floor(inputs in fuzz_input_sequence(100, 200)) {
-        let mut service = feedback_service();
-
-        for (i, input) in inputs.iter().enumerate() {
-            let result = service.cycle(input);
-            let m = &result.metadata;
-
-            // THE critical invariant: unified readiness never below 0.3
-            prop_assert!(m.unified_readiness_score >= 0.3
-                && m.unified_readiness_score <= 1.0,
-                "unified readiness OOB: {} at cycle {i}", m.unified_readiness_score);
-
-            // LR must survive even under maximum stress
-            let lr = m.actual_effective_lr;
-            assert_finite_f32(lr, &format!("lr@cycle{i}"))?;
-            // With readiness floor 0.3, LR should never be crushed to near-zero
-            // by resource-depletion dampeners alone.
-            // (Other signal-specific dampeners can still reduce it further.)
-            prop_assert!(lr >= 0.0,
-                "LR negative after S20: {lr} at cycle {i}");
-
-            // Mechanism activation count is non-negative
-            prop_assert!(m.mechanism_activation_count <= 100,
-                "implausible activation count: {} at cycle {i}", m.mechanism_activation_count);
-
-            // Readiness score matches the S19 telemetry field
-            let diff = (m.readiness_score - m.unified_readiness_score).abs();
-            prop_assert!(diff < 0.001,
-                "readiness mismatch: {} vs {} at cycle {i}",
-                m.readiness_score, m.unified_readiness_score);
-
-            // S20 telemetry fields accessible
-            let _ = m.unified_readiness_score;
-            let _ = m.mechanism_activation_count;
-            let _ = m.compound_dampening_prevented;
         }
     }
 }

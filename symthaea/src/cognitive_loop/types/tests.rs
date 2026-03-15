@@ -137,15 +137,47 @@ fn quality_metrics_default() {
 fn cycle_metadata_default_sensible() {
     let md = CycleMetadata::default();
     assert!(!md.surprise_triggered);
-    assert!(md.consciousness_level.is_finite());
+    assert!(md.consciousness.consciousness_level.is_finite());
 }
 
 #[test]
 fn cycle_metadata_serde_roundtrip() {
-    let md = CycleMetadata::default();
+    let mut md = CycleMetadata::default();
+    md.consciousness.consciousness_level = 0.75;
+    md.embodied.body_phi_modulation = 1.1;
+    md.temporal.temporal_coherence_score = 0.8;
+    md.structural.structural_micro_phi = 0.3;
     let json = serde_json::to_string(&md).expect("serialize CycleMetadata");
     let restored: CycleMetadata = serde_json::from_str(&json).expect("deserialize");
     assert_eq!(restored.surprise_triggered, md.surprise_triggered);
+    // Verify sub-struct fields survived the roundtrip
+    assert!((restored.consciousness.consciousness_level - 0.75).abs() < 1e-10);
+    assert!((restored.embodied.body_phi_modulation - 1.1).abs() < 1e-10);
+    assert!((restored.temporal.temporal_coherence_score - 0.8).abs() < 1e-10);
+    assert!((restored.structural.structural_micro_phi - 0.3).abs() < 1e-10);
+}
+
+#[test]
+fn cycle_metadata_flatten_produces_flat_json() {
+    let mut md = CycleMetadata::default();
+    md.consciousness.consciousness_level = 0.42;
+    md.embodied.body_phi_modulation = 1.05;
+    md.temporal.temporal_coherence_score = 0.6;
+    md.structural.structural_micro_phi = 0.2;
+    let json = serde_json::to_string(&md).expect("serialize");
+    let value: serde_json::Value = serde_json::from_str(&json).expect("parse");
+    let obj = value.as_object().expect("should be object");
+    // Flattened fields appear as top-level keys (not nested)
+    assert!(obj.contains_key("consciousness_level"), "consciousness_level should be flat key");
+    assert!(obj.contains_key("body_phi_modulation"), "body_phi_modulation should be flat key");
+    assert!(obj.contains_key("temporal_coherence_score"), "temporal_coherence_score should be flat key");
+    assert!(obj.contains_key("structural_micro_phi"), "structural_micro_phi should be flat key");
+    // No nested "consciousness", "embodied", "temporal", or "structural" sub-objects
+    // (they're flattened, not nested)
+    // Note: "consciousness" key should NOT exist as a nested object
+    if let Some(v) = obj.get("consciousness") {
+        assert!(!v.is_object(), "consciousness should not be a nested object");
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -363,12 +395,12 @@ fn module_timings_serde_roundtrip() {
 #[test]
 fn test_structural_phi_in_cycle_metadata_defaults_zero() {
     let md = CycleMetadata::default();
-    assert_eq!(md.structural_micro_phi, 0.0);
-    assert_eq!(md.structural_meso_phi, 0.0);
-    assert_eq!(md.structural_macro_phi, 0.0);
-    assert_eq!(md.structural_bottleneck, 0.0);
-    assert_eq!(md.structural_emergence_ratio, 0.0);
-    assert_eq!(md.structural_num_clusters, 0);
-    assert_eq!(md.consciousness_weights, [0.0; 4]);
-    assert_eq!(md.consciousness_weight_variance, 0.0);
+    assert_eq!(md.structural.structural_micro_phi, 0.0);
+    assert_eq!(md.structural.structural_meso_phi, 0.0);
+    assert_eq!(md.structural.structural_macro_phi, 0.0);
+    assert_eq!(md.structural.structural_bottleneck, 0.0);
+    assert_eq!(md.structural.structural_emergence_ratio, 0.0);
+    assert_eq!(md.structural.structural_num_clusters, 0);
+    assert_eq!(md.consciousness.consciousness_weights, [0.0; 4]);
+    assert_eq!(md.consciousness.consciousness_weight_variance, 0.0);
 }

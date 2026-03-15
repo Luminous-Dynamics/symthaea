@@ -99,12 +99,12 @@ impl DemoRunner {
         let mut data = DemoCycleData {
             cycle: self.cycle_count,
             prediction_error: result.prediction_error,
-            consciousness_level: m.consciousness_level,
+            consciousness_level: m.consciousness.consciousness_level,
             narrative_self_psi: m.narrative_self_psi,
-            valence: m.affective_valence,
-            arousal: m.affective_arousal,
-            mood_temperature: m.mood_temperature,
-            thermodynamic_load: m.thermodynamic_load,
+            valence: m.embodied.affective_valence,
+            arousal: m.embodied.affective_arousal,
+            mood_temperature: m.embodied.mood_temperature,
+            thermodynamic_load: m.temporal.thermodynamic_load,
             moral_score: m.ethics.value_evaluator_score,
             coherence: m.harmonics.harmonic_field_coherence,
             flow_state: m.attention.gwt_broadcast,
@@ -238,35 +238,17 @@ impl DemoRunner {
             vision_evolve_us: 0,
             vision_training_triggered: false,
             // Consciousness engine telemetry
-            consciousness_weights: m.consciousness_weights,
-            consciousness_weight_variance: m.consciousness_weight_variance,
-            weight_convergence_state: m.weight_convergence_state.clone(),
+            consciousness_weights: m.consciousness.consciousness_weights,
+            consciousness_weight_variance: m.consciousness.consciousness_weight_variance,
+            weight_convergence_state: m.consciousness.weight_convergence_state.clone(),
             // Structural Phi decomposition
-            structural_micro_phi: m.structural_micro_phi,
-            structural_meso_phi: m.structural_meso_phi,
-            structural_macro_phi: m.structural_macro_phi,
-            structural_emergence_ratio: m.structural_emergence_ratio,
+            structural_micro_phi: m.structural.structural_micro_phi,
+            structural_meso_phi: m.structural.structural_meso_phi,
+            structural_macro_phi: m.structural.structural_macro_phi,
+            structural_emergence_ratio: m.structural.structural_emergence_ratio,
             // Substrate
             substrate_feasibility: m.substrate_feasibility,
-            // Therapeutic — defaults, populated below if feature enabled
-            therapeutic_distress: 0.0,
-            therapeutic_alliance: 0.0,
-            therapeutic_crisis_active: false,
-            therapeutic_strategy: String::new(),
-            therapeutic_narrative_coherence: 0.0,
-            therapeutic_clinical_severity: 0.0,
         };
-
-        // Populate therapeutic telemetry from CycleMetadata
-        #[cfg(feature = "therapeutic")]
-        {
-            data.therapeutic_distress = m.therapeutic.therapeutic_client_distress;
-            data.therapeutic_alliance = m.therapeutic.therapeutic_alliance;
-            data.therapeutic_crisis_active = m.therapeutic.therapeutic_crisis_active;
-            data.therapeutic_strategy = m.therapeutic.therapeutic_strategy.clone();
-            data.therapeutic_narrative_coherence = m.therapeutic.therapeutic_narrative_coherence;
-            data.therapeutic_clinical_severity = m.therapeutic.therapeutic_clinical_severity;
-        }
 
         // Populate vision telemetry from CycleMetadata (internal VisionBridge path)
         #[cfg(feature = "vision-manifold")]

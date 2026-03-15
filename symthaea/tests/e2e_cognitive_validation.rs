@@ -86,7 +86,7 @@ fn test_multi_turn_dialogue_coherence() {
     for input in &topic_inputs {
         let result = service.cycle(input);
         errors.push(result.prediction_error);
-        consciousness_levels.push(result.metadata.consciousness_level);
+        consciousness_levels.push(result.metadata.consciousness.consciousness_level);
         thought_vectors.push(result.thought_vector.clone());
     }
 
@@ -204,6 +204,7 @@ fn test_memory_formation_and_recall() {
         enable_primitive_consciousness: true,
         learning_threshold: 0.0,
         async_training: false,
+        episodic_replay: true,
         ..Default::default()
     })
     .unwrap();
@@ -346,11 +347,11 @@ fn test_emotional_trajectory_across_conversation() {
 
         // Metadata emotional values should be finite
         assert!(
-            result.metadata.affective_valence.is_finite(),
+            result.metadata.embodied.affective_valence.is_finite(),
             "Affective valence must be finite"
         );
         assert!(
-            result.metadata.affective_arousal.is_finite(),
+            result.metadata.embodied.affective_arousal.is_finite(),
             "Affective arousal must be finite"
         );
     }
@@ -399,9 +400,9 @@ fn test_consciousness_trajectory_over_session() {
 
     for i in 0..100 {
         let result = service.cycle(inputs[i % inputs.len()]);
-        consciousness_levels.push(result.metadata.consciousness_level);
-        startup_suppressed_flags.push(result.metadata.predictive.startup_suppressed);
-        warmup_progress_values.push(result.metadata.predictive.startup_warmup_progress);
+        consciousness_levels.push(result.metadata.consciousness.consciousness_level);
+        startup_suppressed_flags.push(result.metadata.startup_suppressed);
+        warmup_progress_values.push(result.metadata.startup_warmup_progress);
     }
 
     // Consciousness level should not be flat 0.0 for the entire session
@@ -541,7 +542,7 @@ fn test_cross_system_consensus() {
     for i in 0..30 {
         let result = service.cycle(inputs[i % inputs.len()]);
         pred_confidences.push(service.prediction_confidence());
-        consciousness_levels.push(result.metadata.consciousness_level);
+        consciousness_levels.push(result.metadata.consciousness.consciousness_level);
         quality_scores.push(result.metadata.quality.unified_quality_score);
     }
 
@@ -737,7 +738,7 @@ fn test_error_recovery_after_disruption() {
     let disruption_result = service
         .cycle("ALERT: completely unexpected bizarre anomaly detected in sector seven gamma");
     let disruption_error = disruption_result.prediction_error;
-    let disruption_thermo = disruption_result.metadata.thermodynamic_load;
+    let disruption_thermo = disruption_result.metadata.temporal.thermodynamic_load;
     eprintln!("Disruption: error={disruption_error:.4}, thermo_load={disruption_thermo:.4}");
 
     // Phase 3: recovery — return to stable input

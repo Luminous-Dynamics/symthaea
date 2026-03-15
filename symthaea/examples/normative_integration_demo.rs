@@ -130,7 +130,7 @@ fn main() {
         };
 
         let result = service.cycle(input);
-        let consciousness = result.metadata.consciousness_level;
+        let consciousness = result.metadata.consciousness.consciousness_level;
         let anomaly = result.metadata.ethics.moral_anomaly_score;
         let pe = result.prediction_error as f64;
 

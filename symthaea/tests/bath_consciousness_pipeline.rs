@@ -31,7 +31,7 @@ fn test_bath_consciousness_pipeline() {
     let mut baseline_consciousness = Vec::new();
     for _ in 0..100 {
         let result = service.cycle("consciousness integration test");
-        baseline_consciousness.push(result.metadata.consciousness_level);
+        baseline_consciousness.push(result.metadata.consciousness.consciousness_level);
     }
     let baseline_avg_consciousness =
         baseline_consciousness.iter().sum::<f64>() / baseline_consciousness.len() as f64;
@@ -252,7 +252,7 @@ fn test_consciousness_varies_across_cycles() {
             "calm baseline neutral standard"
         };
         let result = service.cycle(input);
-        consciousness_values.push(result.metadata.consciousness_level);
+        consciousness_values.push(result.metadata.consciousness.consciousness_level);
     }
     let min = consciousness_values
         .iter()

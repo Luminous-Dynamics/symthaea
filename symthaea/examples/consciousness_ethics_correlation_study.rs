@@ -131,7 +131,7 @@ fn main() {
             // Prosocial phase
             for c in 0..PROSOCIAL_CYCLES {
                 let result = service.cycle(PROSOCIAL[c % PROSOCIAL.len()]);
-                consciousness_levels.push(result.metadata.consciousness_level);
+                consciousness_levels.push(result.metadata.consciousness.consciousness_level);
                 moral_scores.push(result.metadata.ethics.moral_score as f64);
                 harmony_scores.push(result.metadata.harmonics.harmonies_alignment as f64);
                 pro_scores.push(result.metadata.ethics.moral_score as f64);
@@ -140,7 +140,7 @@ fn main() {
             // Antisocial phase
             for c in 0..ANTISOCIAL_CYCLES {
                 let result = service.cycle(ANTISOCIAL[c % ANTISOCIAL.len()]);
-                consciousness_levels.push(result.metadata.consciousness_level);
+                consciousness_levels.push(result.metadata.consciousness.consciousness_level);
                 moral_scores.push(result.metadata.ethics.moral_score as f64);
                 harmony_scores.push(result.metadata.harmonics.harmonies_alignment as f64);
                 anti_scores.push(result.metadata.ethics.moral_score as f64);
@@ -149,7 +149,7 @@ fn main() {
             // Ambiguous phase
             for c in 0..AMBIGUOUS_CYCLES {
                 let result = service.cycle(AMBIGUOUS[c % AMBIGUOUS.len()]);
-                consciousness_levels.push(result.metadata.consciousness_level);
+                consciousness_levels.push(result.metadata.consciousness.consciousness_level);
                 moral_scores.push(result.metadata.ethics.moral_score as f64);
                 harmony_scores.push(result.metadata.harmonics.harmonies_alignment as f64);
                 amb_scores.push(result.metadata.ethics.moral_score as f64);

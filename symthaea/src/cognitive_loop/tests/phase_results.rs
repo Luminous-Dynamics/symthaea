@@ -50,21 +50,6 @@ fn dyn_reasoning_default_zeroed() {
     assert_eq!(d.mcts_plan_effectiveness, 0.0);
     assert_eq!(d.causal_attention_edges, 0);
     assert_eq!(d.school_predicted_phi_gain, 0.0);
-    // Internal reasoning engine diagnostics
-    assert_eq!(d.re_phi_eff_raw, 0.0);
-    assert_eq!(d.re_phi_eff, 0.0);
-    assert_eq!(d.re_epistemic_mod, 0.0);
-    assert_eq!(d.re_gamma, 0.0);
-    assert_eq!(d.re_reliability, 0.0);
-    assert_eq!(d.re_budget_consumed, 0.0);
-    assert_eq!(d.re_wall_time_us, 0);
-    assert_eq!(d.re_steps_taken, 0);
-    assert_eq!(d.re_tier_reached, 0);
-    assert_eq!(d.re_gate_checks, 0);
-    assert!(!d.re_budget_exceeded);
-    assert_eq!(d.re_evs, 0.0);
-    assert_eq!(d.re_mcts_iterations, 0);
-    assert!(!d.re_did_simulate);
 }
 
 #[test]
@@ -327,7 +312,6 @@ fn dyn_reasoning_field_count_10() {
         mcts_plan_effectiveness: _,
         causal_attention_edges: _,
         school_predicted_phi_gain: _,
-        ..
     } = d;
 }
 
@@ -402,7 +386,7 @@ fn cycle_propagates_reasoning_fields() {
     // Reasoning fields from DynReasoning should appear in metadata
     assert!(m.reasoning_confidence.is_finite());
     assert!(m.reasoning_plan_confidence.is_finite());
-    assert!(m.adaptive.mcts_plan_effectiveness.is_finite());
+    assert!(m.mcts_plan_effectiveness.is_finite());
 }
 
 #[test]
@@ -412,10 +396,10 @@ fn cycle_propagates_homeostasis_fields() {
     let m = &result.metadata;
 
     // Homeostasis fields from DynHomeostasis should appear in metadata
-    assert!(m.adaptive.valence_homeostasis_pull.is_finite());
-    assert!(m.adaptive.arousal_homeostasis_pull.is_finite());
-    assert!(m.control.homeostasis_pull_strength.is_finite());
-    assert!(m.adaptive.arousal_recovery_tau_factor.is_finite());
+    assert!(m.valence_homeostasis_pull.is_finite());
+    assert!(m.arousal_homeostasis_pull.is_finite());
+    assert!(m.homeostasis_pull_strength.is_finite());
+    assert!(m.arousal_recovery_tau_factor.is_finite());
 }
 
 #[test]
@@ -437,10 +421,10 @@ fn cycle_propagates_consciousness_fields() {
     let m = &result.metadata;
 
     // Consciousness fields from FbConsciousness
-    assert!(m.consciousness_level.is_finite());
+    assert!(m.consciousness.consciousness_level.is_finite());
     assert!(m.primitive_psi.is_finite());
-    assert!(m.temporal_continuity.is_finite());
-    assert!(m.consciousness_profile_composite.is_finite());
+    assert!(m.temporal.temporal_continuity.is_finite());
+    assert!(m.consciousness.consciousness_profile_composite.is_finite());
 }
 
 #[test]
@@ -476,7 +460,7 @@ fn cycle_propagates_attention_fields() {
 
     // Attention fields from DynAttention — verify they exist and are accessible
     let _ = m.attention.attention_budget_gated;
-    let _ = m.control.predictive_budget_gated;
+    let _ = m.predictive_budget_gated;
 }
 
 #[test]
