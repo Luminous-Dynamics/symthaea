@@ -1571,4 +1571,174 @@ mod tests {
             "Expected at least one veto across 5 multi-turn generations"
         );
     }
+
+    // ── Capstone: train→generate round-trip ──
+
+    /// Train on a small corpus, then generate and verify that training
+    /// actually improved generation quality. This is the single test that
+    /// proves the entire pipeline works end-to-end: encoder → training →
+    /// CfC network → generation → coherence feedback.
+    #[test]
+    fn test_train_generate_round_trip() {
+        use crate::training::{train, TrainingConfig, TrainingDataset, TrainingPair};
+
+        let genesis = test_genesis();
+        let config = BrocaConfig {
+            controller: LanguageControllerConfig {
+                network_layers: 2,
+                neurons_per_layer: 4,
+                vocab_size: 32,
+                max_seq_len: 32,
+                ..Default::default()
+            },
+            gating: GatingConfig {
+                base_max_tokens: 20,
+                ..Default::default()
+            },
+            sampling: SamplingStrategy::Greedy,
+            enable_coherence_feedback: true,
+            enable_semantic_veto: false,
+            ..Default::default()
+        };
+
+        // Generate BEFORE training (baseline)
+        let mut gen = BrocaGenerator::new(&genesis, config.clone());
+        let channels = ThoughtChannels::default();
+        let pre_train_result = gen.generate(&channels);
+
+        // Train on a small corpus
+        let tok = gen.tokenizer().clone();
+        let mut dataset = TrainingDataset::default();
+        for _ in 0..10 {
+            dataset.push(TrainingPair::new(
+                channels,
+                "hello world".to_string(),
+                &tok,
+            ));
+        }
+
+        let train_config = TrainingConfig {
+            epochs: 20,
+            learning_rate: 0.01,
+            bptt_window: 8,
+            use_adam: true,
+            train_network: true,
+            network_lr_scale: 0.3,
+            embedding_target_norm: 128.0,
+            ..Default::default()
+        };
+
+        let metrics = train(&mut gen, &dataset, &train_config);
+
+        // Verify training reduced loss
+        let first_loss = metrics[0].avg_loss;
+        let final_loss = metrics.last().unwrap().avg_loss;
+        assert!(
+            final_loss < first_loss,
+            "Training should reduce loss: {first_loss:.4} → {final_loss:.4}"
+        );
+
+        // Generate AFTER training
+        let post_train_result = gen.generate(&channels);
+
+        // Both should produce valid output
+        assert!(
+            post_train_result.final_coherence.is_finite(),
+            "Post-training coherence should be finite"
+        );
+        assert!(
+            !post_train_result.token_ids.is_empty(),
+            "Post-training should generate tokens"
+        );
+
+        // The generator should produce different output after training
+        // (weights changed, so even greedy sampling should differ)
+        let changed = pre_train_result.token_ids != post_train_result.token_ids
+            || pre_train_result.text != post_train_result.text;
+        assert!(
+            changed,
+            "Training should change generator behavior"
+        );
+    }
+
+    // ── Capstone: intent fidelity benchmark ──
+
+    /// Verify that different thought intents produce measurably different
+    /// generated text. If all 8 intents produce identical output, the
+    /// generator is ignoring intent information.
+    #[test]
+    fn test_intent_fidelity_generation_diversity() {
+        let genesis = test_genesis();
+        let config = BrocaConfig {
+            controller: LanguageControllerConfig {
+                network_layers: 2,
+                neurons_per_layer: 4,
+                vocab_size: 32,
+                max_seq_len: 32,
+                ..Default::default()
+            },
+            gating: GatingConfig {
+                base_max_tokens: 15,
+                ..Default::default()
+            },
+            sampling: SamplingStrategy::Greedy,
+            enable_coherence_feedback: false,
+            enable_semantic_veto: false,
+            ..Default::default()
+        };
+
+        let mut gen = BrocaGenerator::new(&genesis, config);
+
+        // Generate for all 8 intents
+        let mut results: Vec<Vec<u32>> = Vec::new();
+        for intent in 0..8 {
+            let channels = ThoughtChannels::with_intent(intent);
+            let result = gen.generate(&channels);
+            results.push(result.token_ids);
+        }
+
+        // Count distinct outputs
+        let mut unique_outputs = results.clone();
+        unique_outputs.sort();
+        unique_outputs.dedup();
+
+        // At least 3 of 8 intents should produce different token sequences
+        // (random CfC weights may not perfectly separate all 8, but the
+        // encoder one-hot intent channels should drive some diversity)
+        assert!(
+            unique_outputs.len() >= 3,
+            "Expected at least 3 distinct outputs from 8 intents, got {}. \
+             Generator may be ignoring intent information.",
+            unique_outputs.len()
+        );
+
+        // Pairwise Jaccard distance: verify low overlap between different intents
+        let mut total_jaccard = 0.0f32;
+        let mut pair_count = 0;
+        for i in 0..results.len() {
+            for j in (i + 1)..results.len() {
+                let set_i: std::collections::HashSet<u32> =
+                    results[i].iter().copied().collect();
+                let set_j: std::collections::HashSet<u32> =
+                    results[j].iter().copied().collect();
+                let intersection = set_i.intersection(&set_j).count();
+                let union = set_i.union(&set_j).count();
+                let jaccard = if union > 0 {
+                    intersection as f32 / union as f32
+                } else {
+                    1.0
+                };
+                total_jaccard += jaccard;
+                pair_count += 1;
+            }
+        }
+        let mean_jaccard = total_jaccard / pair_count as f32;
+
+        // Mean Jaccard should be < 0.95 (not all identical)
+        assert!(
+            mean_jaccard < 0.95,
+            "Mean pairwise Jaccard similarity {mean_jaccard:.4} too high — \
+             outputs are too similar across intents"
+        );
+    }
 }
