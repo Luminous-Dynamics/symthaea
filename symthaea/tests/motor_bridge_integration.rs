@@ -26,11 +26,11 @@ fn test_motor_bridge_telemetry_defaults() {
     // Without a motor bridge installed, telemetry should report inactive
     let mut service = make_service();
     let result = service.cycle("hello");
-    assert!(!result.metadata.motor_bridge_active);
-    assert!(!result.metadata.motor_action_executed);
+    assert!(!result.metadata.motor.motor_bridge_active);
+    assert!(!result.metadata.motor.motor_action_executed);
     // Default::default() produces 0 for u8 (serde default only applies during deserialization)
-    assert_eq!(result.metadata.motor_action_type, 0);
-    assert_eq!(result.metadata.motor_phi_used, 0.0);
+    assert_eq!(result.metadata.motor.motor_action_type, 0);
+    assert_eq!(result.metadata.motor.motor_phi_used, 0.0);
 }
 
 #[test]
@@ -44,7 +44,7 @@ fn test_motor_bridge_installation() {
 
     // After installation, telemetry reports bridge as active
     let result = service.cycle("test with bridge");
-    assert!(result.metadata.motor_bridge_active);
+    assert!(result.metadata.motor.motor_bridge_active);
 }
 
 #[test]
@@ -57,7 +57,7 @@ fn test_motor_bridge_telemetry_after_installation() {
     for i in 0..10 {
         let result = service.cycle(&format!("motor telemetry test {i}"));
         assert!(
-            result.metadata.motor_bridge_active,
+            result.metadata.motor.motor_bridge_active,
             "Bridge should remain active at cycle {i}"
         );
     }

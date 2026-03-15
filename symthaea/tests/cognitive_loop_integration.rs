@@ -3024,7 +3024,7 @@ fn test_pipeline_stability_with_primitives() {
             "pull_strength NaN at cycle {i}"
         );
         assert!(
-            m.social_trust_current >= 0.0 && m.social_trust_current <= 1.0,
+            m.social.social_trust_current >= 0.0 && m.social.social_trust_current <= 1.0,
             "social_trust out of range at cycle {i}"
         );
     }
@@ -7039,7 +7039,7 @@ fn test_active_rest_dream_fields_finite() {
             "homeostasis NaN at cycle {i}"
         );
         assert!(
-            m.voice_articulation_quality.is_finite(),
+            m.voice.voice_articulation_quality.is_finite(),
             "voice quality NaN at cycle {i}"
         );
     }
@@ -7083,13 +7083,13 @@ fn test_tom_telemetry_in_metadata() {
         let result = service.cycle("test social prediction");
         let m = &result.metadata;
         assert!(
-            m.tom_prediction_mismatch.is_finite(),
+            m.social.tom_prediction_mismatch.is_finite(),
             "tom_prediction_mismatch not finite"
         );
         assert!(
-            m.tom_prediction_mismatch >= 0.0 && m.tom_prediction_mismatch <= 1.0,
+            m.social.tom_prediction_mismatch >= 0.0 && m.social.tom_prediction_mismatch <= 1.0,
             "tom_prediction_mismatch out of [0,1]: {}",
-            m.tom_prediction_mismatch
+            m.social.tom_prediction_mismatch
         );
     }
 }
@@ -7183,17 +7183,17 @@ fn test_tom_stats_zero_without_social_models() {
         let result = service.cycle("testing social prediction without models");
         let m = &result.metadata;
         assert!(
-            m.tom_prediction_mismatch.is_finite(),
+            m.social.tom_prediction_mismatch.is_finite(),
             "tom_prediction_mismatch not finite at cycle {i}"
         );
         // Without social models, mismatch should stay at 0.0
         assert!(
-            m.tom_prediction_mismatch == 0.0,
+            m.social.tom_prediction_mismatch == 0.0,
             "tom_prediction_mismatch should be 0.0 without social models at cycle {i}, got {}",
-            m.tom_prediction_mismatch
+            m.social.tom_prediction_mismatch
         );
         assert!(
-            !m.tom_exploration_triggered,
+            !m.social.tom_exploration_triggered,
             "tom_exploration_triggered should be false without social models at cycle {i}"
         );
     }
@@ -7348,14 +7348,14 @@ fn test_cross_coupling_no_nan_500_cycles() {
 
         // ToM prediction mismatch: finite, bounded [0, 1]
         assert!(
-            m.tom_prediction_mismatch.is_finite(),
+            m.social.tom_prediction_mismatch.is_finite(),
             "tom_prediction_mismatch not finite at cycle {i}: {}",
-            m.tom_prediction_mismatch
+            m.social.tom_prediction_mismatch
         );
         assert!(
-            m.tom_prediction_mismatch >= 0.0 && m.tom_prediction_mismatch <= 1.0,
+            m.social.tom_prediction_mismatch >= 0.0 && m.social.tom_prediction_mismatch <= 1.0,
             "tom_prediction_mismatch out of [0,1] at cycle {i}: {}",
-            m.tom_prediction_mismatch
+            m.social.tom_prediction_mismatch
         );
 
         // Substrate fields: finite

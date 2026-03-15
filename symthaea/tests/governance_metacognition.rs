@@ -443,22 +443,22 @@ fn test_governance_telemetry_fields_populated() {
 
     // Community mode should be populated (from local KosmicSong fallback)
     assert!(
-        !m.governance_community_mode.is_empty(),
+        !m.governance.governance_community_mode.is_empty(),
         "Community mode should be populated in telemetry"
     );
 
     // Collective phi should reflect the injected event
     assert!(
-        m.governance_collective_phi > 0.0,
+        m.governance.governance_collective_phi > 0.0,
         "Collective phi should be populated: {}",
-        m.governance_collective_phi
+        m.governance.governance_collective_phi
     );
 
     // Epistemic agents should be at least 1 (local fallback)
     assert!(
-        m.governance_epistemic_agents >= 1,
+        m.governance.governance_epistemic_agents >= 1,
         "Epistemic agents should be >= 1: {}",
-        m.governance_epistemic_agents
+        m.governance.governance_epistemic_agents
     );
 }
 
@@ -522,7 +522,7 @@ fn test_epistemic_mesh_external_override() {
     let m = &result.metadata;
     // Note: blind spot count depends on whether the local fallback overwrites the
     // external mesh at the next governance interval. We verify the external set works.
-    assert!(m.governance_epistemic_agents >= 1);
+    assert!(m.governance.governance_epistemic_agents >= 1);
 }
 
 // ── Test 14: Full governance loop with telemetry verification ──────
@@ -551,9 +551,9 @@ fn test_governance_full_loop_with_telemetry() {
     for i in 0..60 {
         let result = service.cycle(&format!("full loop {}", i));
         let m = &result.metadata;
-        max_delta = max_delta.max(m.governance_harmonic_delta_max);
-        if !m.governance_community_mode.is_empty() {
-            community_modes.insert(m.governance_community_mode.clone());
+        max_delta = max_delta.max(m.governance.governance_harmonic_delta_max);
+        if !m.governance.governance_community_mode.is_empty() {
+            community_modes.insert(m.governance.governance_community_mode.clone());
         }
     }
 

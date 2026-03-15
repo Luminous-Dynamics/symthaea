@@ -240,18 +240,18 @@ fn soak_500_cycles_all_metadata_finite() {
             "valence_homeostasis_pull NaN at cycle {i}"
         );
         assert!(
-            m.voice_articulation_quality.is_finite(),
+            m.voice.voice_articulation_quality.is_finite(),
             "voice_articulation_quality NaN at cycle {i}"
         );
         assert!(
-            m.social_trust_current >= 0.0 && m.social_trust_current <= 1.0,
+            m.social.social_trust_current >= 0.0 && m.social.social_trust_current <= 1.0,
             "social_trust_current out of range at cycle {i}: {}",
-            m.social_trust_current
+            m.social.social_trust_current
         );
         assert!(
-            m.social_cooperation_current >= 0.0 && m.social_cooperation_current <= 1.0,
+            m.social.social_cooperation_current >= 0.0 && m.social.social_cooperation_current <= 1.0,
             "social_cooperation_current out of range at cycle {i}: {}",
-            m.social_cooperation_current
+            m.social.social_cooperation_current
         );
 
         // Biorhythm modulation must be positive (not in CycleMetadata, check manager directly)
@@ -276,7 +276,7 @@ fn soak_social_signals_survive_500_cycles() {
 
         // Social trust should persist (set once, not reset per cycle)
         assert!(
-            m.social_trust_current >= 0.0 && m.social_trust_current <= 1.0,
+            m.social.social_trust_current >= 0.0 && m.social.social_trust_current <= 1.0,
             "social_trust out of range at cycle {i}"
         );
 

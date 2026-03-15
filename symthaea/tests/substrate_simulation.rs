@@ -43,7 +43,7 @@ fn substrate_transfer_preserves_finite_dynamics() {
             "homeostasis NaN after bio→silicon at cycle {i}"
         );
         assert!(
-            m.social_trust_current >= 0.0 && m.social_trust_current <= 1.0,
+            m.social.social_trust_current >= 0.0 && m.social.social_trust_current <= 1.0,
             "social_trust out of range after switch at cycle {i}"
         );
     }
@@ -344,9 +344,9 @@ fn hybrid_substrate_soak_100_cycles() {
             "Hybrid substrate NaN at cycle {i}"
         );
         assert!(
-            m.social_trust_current >= 0.0 && m.social_trust_current <= 1.0,
+            m.social.social_trust_current >= 0.0 && m.social.social_trust_current <= 1.0,
             "social_trust out of range at cycle {i}: {}",
-            m.social_trust_current
+            m.social.social_trust_current
         );
     }
 }
@@ -379,7 +379,7 @@ fn soak_200_cycles_with_mid_run_substrate_switch() {
             "Quantum phase NaN at cycle {i}"
         );
         assert!(
-            result.metadata.social_trust_current >= 0.0,
+            result.metadata.social.social_trust_current >= 0.0,
             "Social trust negative in quantum phase at cycle {i}"
         );
     }

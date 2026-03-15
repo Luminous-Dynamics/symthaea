@@ -337,6 +337,53 @@ pub struct KnowledgeInfo {
     pub uncertainty_history: Vec<f64>,
 }
 
+/// Spectrum / radio mesh telemetry for Pulse visualization (feature: mesh).
+#[derive(Serialize, Deserialize, Default, Clone)]
+pub struct SpectrumInfo {
+    /// Network health status label ("AllTiersUp", "LocalDown", "MetroOnly", "Blackout").
+    #[serde(default)]
+    pub network_health: String,
+    /// Number of radio tiers currently available (0–3).
+    #[serde(default)]
+    pub tier_available: u8,
+    /// Consecutive jamming cycles.
+    #[serde(default)]
+    pub jamming_streak: u32,
+    /// Spectrum prediction error (0.0–1.0).
+    #[serde(default)]
+    pub prediction_error: f64,
+    /// Epistemic discount from degradation (1.0 = full trust).
+    #[serde(default)]
+    pub epistemic_discount: f64,
+    /// Degradation streak (consecutive cycles with any tier down).
+    #[serde(default)]
+    pub degradation_streak: u32,
+    /// Per-tier AIMD bandwidth budgets [Local, Metro, Regional] (bytes).
+    #[serde(default)]
+    pub tier_budgets: [u64; 3],
+    /// Waterfall observation buffer depth (0–64).
+    #[serde(default)]
+    pub waterfall_depth: usize,
+    /// Periodic interference period (cycles), if detected.
+    #[serde(default)]
+    pub periodic_interference: Option<u32>,
+    /// Known mesh peers in route table.
+    #[serde(default)]
+    pub known_peers: usize,
+    /// Active encryption sessions.
+    #[serde(default)]
+    pub encryption_sessions: usize,
+    /// Energy spent this cycle (nJ).
+    #[serde(default)]
+    pub energy_spent_nj: f64,
+    /// Waterfall jamming ratio (0.0–1.0).
+    #[serde(default)]
+    pub jamming_ratio: f64,
+    /// Rolling 30-cycle health history for sparkline (0=AllUp..3=Blackout).
+    #[serde(default)]
+    pub health_history: Vec<u8>,
+}
+
 /// Full JSON-serializable pulse snapshot for comparison mode.
 #[derive(Serialize, Deserialize)]
 pub struct PulseSnapshot {
@@ -358,6 +405,8 @@ pub struct PulseSnapshot {
     pub knowledge: KnowledgeInfo,
     #[serde(default)]
     pub swarm: SwarmInfo,
+    #[serde(default)]
+    pub spectrum: SpectrumInfo,
 }
 
 /// Computed delta between two pulse snapshots for the comparison view.
@@ -999,7 +1048,7 @@ fn main() -> Result<()> {
             in_active_rest: m.ethics.in_active_rest,
             stillness_dominance_streak: m.ethics.stillness_dominance_streak,
             broca_quality: 0.0, // TODO: wire broca telemetry when available on CycleMetadata
-            tom_mismatch: m.tom_prediction_mismatch,
+            tom_mismatch: m.social.tom_prediction_mismatch,
         });
         last_result = Some(result);
     }
@@ -1163,44 +1212,45 @@ fn main() -> Result<()> {
             confidence_history: m.integrity.confidence_history.clone(),
         },
         cantor: CantorInfo {
-            buffer_occupancy: m.cantor_buffer_occupancy,
-            codebook_size: m.cantor_codebook_size,
+            buffer_occupancy: m.cantor.cantor_buffer_occupancy,
+            codebook_size: m.cantor.cantor_codebook_size,
             codebook_capacity: 256,
-            last_depth: m.cantor_last_depth,
-            metacognitive_depth: m.cantor_metacognitive_depth,
-            dream_surprise: m.cantor_dream_surprise,
-            resonance_boost: m.cantor_resonance_boost,
+            last_depth: m.cantor.cantor_last_depth,
+            metacognitive_depth: m.cantor.cantor_metacognitive_depth,
+            dream_surprise: m.cantor.cantor_dream_surprise,
+            resonance_boost: m.cantor.cantor_resonance_boost,
             depth_histogram: [0; 6], // populated from codebook labels in watch mode
         },
         governance: GovernanceInfo {
-            reward_ema: m.governance_reward_ema,
-            pending_events: m.governance_pending_events,
-            pending_outcomes: m.governance_pending_outcomes,
-            confidence_delta: m.governance_confidence_delta,
-            collective_phi: m.governance_collective_phi,
+            reward_ema: m.governance.governance_reward_ema,
+            pending_events: m.governance.governance_pending_events,
+            pending_outcomes: m.governance.governance_pending_outcomes,
+            confidence_delta: m.governance.governance_confidence_delta,
+            collective_phi: m.governance.governance_collective_phi,
             reward_history: Vec::new(),
-            blind_spot_count: m.governance_blind_spot_count,
-            max_blind_spot_severity: m.governance_max_blind_spot_severity,
-            community_mode: m.governance_community_mode.clone(),
-            harmonic_delta_max: m.governance_harmonic_delta_max,
-            epistemic_agents: m.governance_epistemic_agents,
-            lr_boost: m.governance_lr_boost,
+            blind_spot_count: m.governance.governance_blind_spot_count,
+            max_blind_spot_severity: m.governance.governance_max_blind_spot_severity,
+            community_mode: m.governance.governance_community_mode.clone(),
+            harmonic_delta_max: m.governance.governance_harmonic_delta_max,
+            epistemic_agents: m.governance.governance_epistemic_agents,
+            lr_boost: m.governance.governance_lr_boost,
         },
         knowledge: KnowledgeInfo {
-            graph_size: m.knowledge_graph_size,
-            avg_confidence: m.knowledge_avg_confidence,
-            causal_edges: m.knowledge_causal_edges,
+            graph_size: m.knowledge.knowledge_graph_size,
+            avg_confidence: m.knowledge.knowledge_avg_confidence,
+            causal_edges: m.knowledge.knowledge_causal_edges,
             causal_nodes: 0,
-            ontology_size: m.knowledge_ontology_size,
+            ontology_size: m.knowledge.knowledge_ontology_size,
             avg_ontology_utility: 0.0,
             domain_count: 0,
-            uncertainty: m.knowledge_uncertainty,
-            novelty: m.knowledge_novelty,
-            contradictions: m.knowledge_contradictions,
+            uncertainty: m.knowledge.knowledge_uncertainty,
+            novelty: m.knowledge.knowledge_novelty,
+            contradictions: m.knowledge.knowledge_contradictions,
             best_similarity: 0.0,
             uncertainty_history: Vec::new(),
         },
         swarm: SwarmInfo::default(),
+        spectrum: SpectrumInfo::default(),
     };
 
     if let Some(json_path) = &args.json {
@@ -1344,7 +1394,7 @@ fn main() -> Result<()> {
                 let input = inputs[(cycle_count + i) % inputs.len()];
                 let result = service.cycle(input);
                 let wm = &result.metadata;
-                watch_reward_history.push(wm.governance_reward_ema);
+                watch_reward_history.push(wm.governance.governance_reward_ema);
                 watch_sparkline.push(SparklinePoint {
                     consciousness: wm.consciousness_level,
                     prediction_error: result.prediction_error,
@@ -1358,7 +1408,7 @@ fn main() -> Result<()> {
                     in_active_rest: wm.ethics.in_active_rest,
                     stillness_dominance_streak: wm.ethics.stillness_dominance_streak,
                     broca_quality: 0.0, // TODO: wire broca telemetry when available on CycleMetadata
-                    tom_mismatch: wm.tom_prediction_mismatch,
+                    tom_mismatch: wm.social.tom_prediction_mismatch,
                 });
                 watch_result = Some(result);
             }
@@ -1449,40 +1499,40 @@ fn main() -> Result<()> {
                     confidence_history: wm.integrity.confidence_history.clone(),
                 },
                 cantor: CantorInfo {
-                    buffer_occupancy: wm.cantor_buffer_occupancy,
-                    codebook_size: wm.cantor_codebook_size,
+                    buffer_occupancy: wm.cantor.cantor_buffer_occupancy,
+                    codebook_size: wm.cantor.cantor_codebook_size,
                     codebook_capacity: 256,
-                    last_depth: wm.cantor_last_depth,
-                    metacognitive_depth: wm.cantor_metacognitive_depth,
-                    dream_surprise: wm.cantor_dream_surprise,
-                    resonance_boost: wm.cantor_resonance_boost,
+                    last_depth: wm.cantor.cantor_last_depth,
+                    metacognitive_depth: wm.cantor.cantor_metacognitive_depth,
+                    dream_surprise: wm.cantor.cantor_dream_surprise,
+                    resonance_boost: wm.cantor.cantor_resonance_boost,
                     depth_histogram: [0; 6],
                 },
                 governance: GovernanceInfo {
-                    reward_ema: wm.governance_reward_ema,
-                    pending_events: wm.governance_pending_events,
-                    pending_outcomes: wm.governance_pending_outcomes,
-                    confidence_delta: wm.governance_confidence_delta,
-                    collective_phi: wm.governance_collective_phi,
+                    reward_ema: wm.governance.governance_reward_ema,
+                    pending_events: wm.governance.governance_pending_events,
+                    pending_outcomes: wm.governance.governance_pending_outcomes,
+                    confidence_delta: wm.governance.governance_confidence_delta,
+                    collective_phi: wm.governance.governance_collective_phi,
                     reward_history: watch_reward_history,
-                    blind_spot_count: wm.governance_blind_spot_count,
-                    max_blind_spot_severity: wm.governance_max_blind_spot_severity,
-                    community_mode: wm.governance_community_mode.clone(),
-                    harmonic_delta_max: wm.governance_harmonic_delta_max,
-                    epistemic_agents: wm.governance_epistemic_agents,
-                    lr_boost: wm.governance_lr_boost,
+                    blind_spot_count: wm.governance.governance_blind_spot_count,
+                    max_blind_spot_severity: wm.governance.governance_max_blind_spot_severity,
+                    community_mode: wm.governance.governance_community_mode.clone(),
+                    harmonic_delta_max: wm.governance.governance_harmonic_delta_max,
+                    epistemic_agents: wm.governance.governance_epistemic_agents,
+                    lr_boost: wm.governance.governance_lr_boost,
                 },
                 knowledge: KnowledgeInfo {
-                    graph_size: wm.knowledge_graph_size,
-                    avg_confidence: wm.knowledge_avg_confidence,
-                    causal_edges: wm.knowledge_causal_edges,
+                    graph_size: wm.knowledge.knowledge_graph_size,
+                    avg_confidence: wm.knowledge.knowledge_avg_confidence,
+                    causal_edges: wm.knowledge.knowledge_causal_edges,
                     causal_nodes: 0,
-                    ontology_size: wm.knowledge_ontology_size,
+                    ontology_size: wm.knowledge.knowledge_ontology_size,
                     avg_ontology_utility: 0.0,
                     domain_count: 0,
-                    uncertainty: wm.knowledge_uncertainty,
-                    novelty: wm.knowledge_novelty,
-                    contradictions: wm.knowledge_contradictions,
+                    uncertainty: wm.knowledge.knowledge_uncertainty,
+                    novelty: wm.knowledge.knowledge_novelty,
+                    contradictions: wm.knowledge.knowledge_contradictions,
                     best_similarity: 0.0,
                     uncertainty_history: Vec::new(),
                 },
