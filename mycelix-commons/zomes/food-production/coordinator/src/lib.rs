@@ -78,6 +78,32 @@ pub struct RemoveMemberInput {
 }
 
 // ============================================================================
+// RESOURCE INPUT TYPES
+// ============================================================================
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct LogResourceInputData {
+    pub plot_hash: Option<ActionHash>,
+    pub input_type: ResourceType,
+    pub quantity_kg: f64,
+    pub notes: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CommunityInputsQuery {
+    pub limit: usize,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct NutrientSummary {
+    pub total_kg_by_type: Vec<(String, f64)>,
+    pub total_nitrogen_kg: f64,
+    pub total_phosphorus_kg: f64,
+    pub total_potassium_kg: f64,
+    pub total_contributions: usize,
+}
+
+// ============================================================================
 // PLOT MANAGEMENT
 // ============================================================================
 
@@ -316,6 +342,140 @@ pub fn remove_garden_member(input: RemoveMemberInput) -> ExternResult<ActionHash
 
     delete_entry(input.membership_hash.clone())?;
     Ok(input.membership_hash)
+}
+
+// ============================================================================
+// RESOURCE INPUT TRACKING
+// ============================================================================
+
+#[hdk_extern]
+pub fn log_resource_input(input: LogResourceInputData) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "log_resource_input")?;
+    let agent = agent_info()?.agent_initial_pubkey;
+
+    // Verify plot exists if provided
+    if let Some(ref plot_hash) = input.plot_hash {
+        let _plot = get(plot_hash.clone(), GetOptions::default())?
+            .ok_or(wasm_error!(WasmErrorInner::Guest("Plot not found".into())))?;
+    }
+
+    let now = sys_time()?;
+    let nutrient_estimate = NutrientProfile::estimate(&input.input_type);
+    let resource_input = ResourceInput {
+        plot_hash: input.plot_hash.clone(),
+        input_type: input.input_type.clone(),
+        quantity_kg: input.quantity_kg,
+        nutrient_estimate,
+        contributor_did: agent.to_string(),
+        contributed_at: now.as_micros() as u64,
+        notes: input.notes,
+    };
+
+    let action_hash = create_entry(&EntryTypes::ResourceInput(resource_input))?;
+
+    // Link from plot (if specified)
+    if let Some(plot_hash) = input.plot_hash {
+        create_link(
+            plot_hash,
+            action_hash.clone(),
+            LinkTypes::PlotToResourceInput,
+            (),
+        )?;
+    }
+
+    // Link from contributing agent
+    create_link(
+        agent,
+        action_hash.clone(),
+        LinkTypes::AgentToResourceInput,
+        (),
+    )?;
+
+    // Global anchor for community queries
+    create_entry(&EntryTypes::Anchor(Anchor("all_resource_inputs".to_string())))?;
+    create_link(
+        anchor_hash("all_resource_inputs")?,
+        action_hash.clone(),
+        LinkTypes::AllResourceInputs,
+        (),
+    )?;
+
+    // Emit signal for UI
+    let _ = emit_signal(&BridgeEventSignal {
+        event_type: "resource_input_logged".to_string(),
+        source_zome: "food_production".to_string(),
+        payload: format!(
+            r#"{{"input_hash":"{}","type":"{:?}","quantity_kg":{}}}"#,
+            action_hash, input.input_type, input.quantity_kg,
+        ),
+    });
+
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created resource input".into()
+    )))
+}
+
+#[hdk_extern]
+pub fn get_plot_inputs(plot_hash: ActionHash) -> ExternResult<Vec<Record>> {
+    let links = get_links(
+        LinkQuery::try_new(plot_hash, LinkTypes::PlotToResourceInput)?,
+        GetStrategy::default(),
+    )?;
+    records_from_links(links)
+}
+
+#[hdk_extern]
+pub fn get_community_inputs(query: CommunityInputsQuery) -> ExternResult<Vec<Record>> {
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash("all_resource_inputs")?, LinkTypes::AllResourceInputs)?,
+        GetStrategy::default(),
+    )?;
+    // Take the most recent `limit` entries (links are appended chronologically)
+    let recent: Vec<Link> = if links.len() > query.limit {
+        links[links.len() - query.limit..].to_vec()
+    } else {
+        links
+    };
+    records_from_links(recent)
+}
+
+#[hdk_extern]
+pub fn get_nutrient_summary(_: ()) -> ExternResult<NutrientSummary> {
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash("all_resource_inputs")?, LinkTypes::AllResourceInputs)?,
+        GetStrategy::default(),
+    )?;
+    let records = records_from_links(links)?;
+
+    let mut type_totals: std::collections::HashMap<String, f64> = std::collections::HashMap::new();
+    let mut total_n = 0.0_f64;
+    let mut total_p = 0.0_f64;
+    let mut total_k = 0.0_f64;
+
+    for record in &records {
+        if let Some(ri) = record
+            .entry()
+            .to_app_option::<ResourceInput>()
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        {
+            let type_name = format!("{:?}", ri.input_type);
+            *type_totals.entry(type_name).or_default() += ri.quantity_kg;
+            total_n += ri.quantity_kg * ri.nutrient_estimate.nitrogen_pct / 100.0;
+            total_p += ri.quantity_kg * ri.nutrient_estimate.phosphorus_pct / 100.0;
+            total_k += ri.quantity_kg * ri.nutrient_estimate.potassium_pct / 100.0;
+        }
+    }
+
+    let mut total_kg_by_type: Vec<(String, f64)> = type_totals.into_iter().collect();
+    total_kg_by_type.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+
+    Ok(NutrientSummary {
+        total_kg_by_type,
+        total_nitrogen_kg: total_n,
+        total_phosphorus_kg: total_p,
+        total_potassium_kg: total_k,
+        total_contributions: records.len(),
+    })
 }
 
 #[cfg(test)]
@@ -832,5 +992,65 @@ mod tests {
         let decoded: GardenMembership = serde_json::from_str(&json).unwrap();
         assert_eq!(decoded.role, GardenRole::Steward);
         assert_eq!(decoded.joined_at, 1700000000);
+    }
+
+    // ========================================================================
+    // ResourceInput serde roundtrip (coordinator types)
+    // ========================================================================
+
+    #[test]
+    fn log_resource_input_data_serde_roundtrip() {
+        let input = LogResourceInputData {
+            plot_hash: Some(ActionHash::from_raw_36(vec![0xdb; 36])),
+            input_type: ResourceType::Biochar,
+            quantity_kg: 50.0,
+            notes: "From pyrolysis kiln".to_string(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: LogResourceInputData = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.quantity_kg, 50.0);
+        assert_eq!(decoded.input_type, ResourceType::Biochar);
+        assert!(decoded.plot_hash.is_some());
+    }
+
+    #[test]
+    fn log_resource_input_data_no_plot_serde_roundtrip() {
+        let input = LogResourceInputData {
+            plot_hash: None,
+            input_type: ResourceType::KitchenWaste,
+            quantity_kg: 3.5,
+            notes: "Community compost bin".to_string(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: LogResourceInputData = serde_json::from_str(&json).unwrap();
+        assert!(decoded.plot_hash.is_none());
+        assert_eq!(decoded.input_type, ResourceType::KitchenWaste);
+    }
+
+    #[test]
+    fn community_inputs_query_serde_roundtrip() {
+        let query = CommunityInputsQuery { limit: 25 };
+        let json = serde_json::to_string(&query).unwrap();
+        let decoded: CommunityInputsQuery = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.limit, 25);
+    }
+
+    #[test]
+    fn nutrient_summary_serde_roundtrip() {
+        let summary = NutrientSummary {
+            total_kg_by_type: vec![
+                ("Vermicompost".to_string(), 100.0),
+                ("Biochar".to_string(), 50.0),
+            ],
+            total_nitrogen_kg: 3.75,
+            total_phosphorus_kg: 1.6,
+            total_potassium_kg: 2.0,
+            total_contributions: 5,
+        };
+        let json = serde_json::to_string(&summary).unwrap();
+        let decoded: NutrientSummary = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.total_contributions, 5);
+        assert_eq!(decoded.total_kg_by_type.len(), 2);
+        assert!((decoded.total_nitrogen_kg - 3.75).abs() < 1e-9);
     }
 }

@@ -153,6 +153,99 @@ pub struct GardenMembership {
 }
 
 // ============================================================================
+// RESOURCE INPUT
+// ============================================================================
+
+/// Type of resource contributed to the soil/plot
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub enum ResourceType {
+    KitchenWaste,
+    GreenWaste,
+    Biochar,
+    Vermicompost,
+    Digestate,
+    Manure,
+    Mulch,
+    CoverCrop,
+    Inoculant,
+}
+
+/// Estimated macronutrient profile (percentage by weight)
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct NutrientProfile {
+    pub nitrogen_pct: f64,
+    pub phosphorus_pct: f64,
+    pub potassium_pct: f64,
+}
+
+impl NutrientProfile {
+    /// Lookup-table estimate from resource type.
+    /// Values are approximate central tendencies from composting literature.
+    pub fn estimate(resource_type: &ResourceType) -> Self {
+        match resource_type {
+            ResourceType::KitchenWaste => NutrientProfile {
+                nitrogen_pct: 1.5,
+                phosphorus_pct: 0.5,
+                potassium_pct: 1.0,
+            },
+            ResourceType::GreenWaste => NutrientProfile {
+                nitrogen_pct: 2.0,
+                phosphorus_pct: 0.3,
+                potassium_pct: 1.5,
+            },
+            ResourceType::Biochar => NutrientProfile {
+                nitrogen_pct: 0.5,
+                phosphorus_pct: 0.2,
+                potassium_pct: 1.0,
+            },
+            ResourceType::Vermicompost => NutrientProfile {
+                nitrogen_pct: 2.5,
+                phosphorus_pct: 1.5,
+                potassium_pct: 1.5,
+            },
+            ResourceType::Digestate => NutrientProfile {
+                nitrogen_pct: 3.0,
+                phosphorus_pct: 0.8,
+                potassium_pct: 2.0,
+            },
+            ResourceType::Manure => NutrientProfile {
+                nitrogen_pct: 2.0,
+                phosphorus_pct: 1.0,
+                potassium_pct: 2.0,
+            },
+            ResourceType::Mulch => NutrientProfile {
+                nitrogen_pct: 0.5,
+                phosphorus_pct: 0.1,
+                potassium_pct: 0.3,
+            },
+            ResourceType::CoverCrop => NutrientProfile {
+                nitrogen_pct: 3.0,
+                phosphorus_pct: 0.4,
+                potassium_pct: 1.0,
+            },
+            ResourceType::Inoculant => NutrientProfile {
+                nitrogen_pct: 0.1,
+                phosphorus_pct: 0.1,
+                potassium_pct: 0.1,
+            },
+        }
+    }
+}
+
+/// A resource contribution (waste, compost, biochar, etc.) applied to a plot
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct ResourceInput {
+    pub plot_hash: Option<ActionHash>,
+    pub input_type: ResourceType,
+    pub quantity_kg: f64,
+    pub nutrient_estimate: NutrientProfile,
+    pub contributor_did: String,
+    pub contributed_at: u64,
+    pub notes: String,
+}
+
+// ============================================================================
 // ENTRY & LINK TYPE REGISTRATION
 // ============================================================================
 
@@ -165,6 +258,7 @@ pub enum EntryTypes {
     YieldRecord(YieldRecord),
     SeasonPlan(SeasonPlan),
     GardenMembership(GardenMembership),
+    ResourceInput(ResourceInput),
 }
 
 #[hdk_link_types]
@@ -176,6 +270,9 @@ pub enum LinkTypes {
     PlotToSeasonPlan,
     AgentToYield,
     PlotToMembers,
+    PlotToResourceInput,
+    AgentToResourceInput,
+    AllResourceInputs,
 }
 
 // ============================================================================
@@ -193,10 +290,12 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::YieldRecord(yr) => validate_yield(yr),
                 EntryTypes::SeasonPlan(sp) => validate_season_plan(sp),
                 EntryTypes::GardenMembership(m) => validate_garden_membership(m),
+                EntryTypes::ResourceInput(ri) => validate_resource_input(ri),
             },
             OpEntry::UpdateEntry { app_entry, .. } => match app_entry {
                 EntryTypes::Plot(plot) => validate_plot(plot),
                 EntryTypes::GardenMembership(m) => validate_garden_membership(m),
+                EntryTypes::ResourceInput(ri) => validate_resource_input(ri),
                 _ => Ok(ValidateCallbackResult::Valid),
             },
             _ => Ok(ValidateCallbackResult::Valid),
@@ -254,6 +353,30 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 if tag.0.len() > 256 {
                     return Ok(ValidateCallbackResult::Invalid(
                         "PlotToMembers link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::PlotToResourceInput => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "PlotToResourceInput link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AgentToResourceInput => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AgentToResourceInput link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AllResourceInputs => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AllResourceInputs link tag too long (max 256 bytes)".into(),
                     ));
                 }
                 Ok(ValidateCallbackResult::Valid)
@@ -425,6 +548,69 @@ fn validate_garden_membership(m: GardenMembership) -> ExternResult<ValidateCallb
     if m.joined_at == 0 {
         return Ok(ValidateCallbackResult::Invalid(
             "GardenMembership joined_at cannot be zero".into(),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_resource_input(ri: ResourceInput) -> ExternResult<ValidateCallbackResult> {
+    if !ri.quantity_kg.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Quantity must be a finite number".into(),
+        ));
+    }
+    if ri.quantity_kg <= 0.0 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Quantity must be positive".into(),
+        ));
+    }
+    if ri.quantity_kg > 100_000.0 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Quantity exceeds maximum (100,000 kg)".into(),
+        ));
+    }
+    if !ri.nutrient_estimate.nitrogen_pct.is_finite()
+        || !ri.nutrient_estimate.phosphorus_pct.is_finite()
+        || !ri.nutrient_estimate.potassium_pct.is_finite()
+    {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Nutrient percentages must be finite numbers".into(),
+        ));
+    }
+    if ri.nutrient_estimate.nitrogen_pct < 0.0
+        || ri.nutrient_estimate.phosphorus_pct < 0.0
+        || ri.nutrient_estimate.potassium_pct < 0.0
+    {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Nutrient percentages cannot be negative".into(),
+        ));
+    }
+    if ri.nutrient_estimate.nitrogen_pct > 100.0
+        || ri.nutrient_estimate.phosphorus_pct > 100.0
+        || ri.nutrient_estimate.potassium_pct > 100.0
+    {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Nutrient percentages cannot exceed 100%".into(),
+        ));
+    }
+    if ri.contributor_did.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Contributor DID cannot be empty".into(),
+        ));
+    }
+    if ri.contributor_did.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Contributor DID must be 256 characters or fewer".into(),
+        ));
+    }
+    if ri.contributed_at == 0 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Contributed timestamp cannot be zero".into(),
+        ));
+    }
+    if ri.notes.len() > 2048 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Notes must be 2048 characters or fewer".into(),
         ));
     }
     Ok(ValidateCallbackResult::Valid)
@@ -1300,7 +1486,10 @@ mod tests {
             | LinkTypes::CropToYield
             | LinkTypes::PlotToSeasonPlan
             | LinkTypes::AgentToYield
-            | LinkTypes::PlotToMembers => 256,
+            | LinkTypes::PlotToMembers
+            | LinkTypes::PlotToResourceInput
+            | LinkTypes::AgentToResourceInput
+            | LinkTypes::AllResourceInputs => 256,
         };
         let name = match link_type {
             LinkTypes::AllPlots => "AllPlots",
@@ -1310,6 +1499,9 @@ mod tests {
             LinkTypes::PlotToSeasonPlan => "PlotToSeasonPlan",
             LinkTypes::AgentToYield => "AgentToYield",
             LinkTypes::PlotToMembers => "PlotToMembers",
+            LinkTypes::PlotToResourceInput => "PlotToResourceInput",
+            LinkTypes::AgentToResourceInput => "AgentToResourceInput",
+            LinkTypes::AllResourceInputs => "AllResourceInputs",
         };
         if tag.0.len() > max {
             ValidateCallbackResult::Invalid(format!(
@@ -1589,5 +1781,178 @@ mod tests {
             m.role = role;
             assert_valid(validate_garden_membership(m));
         }
+    }
+
+    // ── ResourceInput tests ────────────────────────────────────────────
+
+    fn valid_resource_input() -> ResourceInput {
+        ResourceInput {
+            plot_hash: Some(fake_action_hash()),
+            input_type: ResourceType::Vermicompost,
+            quantity_kg: 25.0,
+            nutrient_estimate: NutrientProfile::estimate(&ResourceType::Vermicompost),
+            contributor_did: "did:key:z6Mk...".to_string(),
+            contributed_at: 1700000000,
+            notes: "Weekly compost delivery".to_string(),
+        }
+    }
+
+    #[test]
+    fn resource_input_valid() {
+        assert_valid(validate_resource_input(valid_resource_input()));
+    }
+
+    #[test]
+    fn resource_input_no_plot_valid() {
+        let mut ri = valid_resource_input();
+        ri.plot_hash = None;
+        assert_valid(validate_resource_input(ri));
+    }
+
+    #[test]
+    fn resource_input_zero_quantity_rejected() {
+        let mut ri = valid_resource_input();
+        ri.quantity_kg = 0.0;
+        assert_invalid(validate_resource_input(ri), "Quantity must be positive");
+    }
+
+    #[test]
+    fn resource_input_negative_quantity_rejected() {
+        let mut ri = valid_resource_input();
+        ri.quantity_kg = -1.0;
+        assert_invalid(validate_resource_input(ri), "Quantity must be positive");
+    }
+
+    #[test]
+    fn resource_input_infinity_quantity_rejected() {
+        let mut ri = valid_resource_input();
+        ri.quantity_kg = f64::INFINITY;
+        assert_invalid(validate_resource_input(ri), "Quantity must be a finite number");
+    }
+
+    #[test]
+    fn resource_input_nan_quantity_rejected() {
+        let mut ri = valid_resource_input();
+        ri.quantity_kg = f64::NAN;
+        assert_invalid(validate_resource_input(ri), "Quantity must be a finite number");
+    }
+
+    #[test]
+    fn resource_input_exceeds_max_quantity_rejected() {
+        let mut ri = valid_resource_input();
+        ri.quantity_kg = 100_001.0;
+        assert_invalid(validate_resource_input(ri), "exceeds maximum");
+    }
+
+    #[test]
+    fn resource_input_negative_nitrogen_rejected() {
+        let mut ri = valid_resource_input();
+        ri.nutrient_estimate.nitrogen_pct = -0.1;
+        assert_invalid(validate_resource_input(ri), "cannot be negative");
+    }
+
+    #[test]
+    fn resource_input_nutrient_over_100_rejected() {
+        let mut ri = valid_resource_input();
+        ri.nutrient_estimate.phosphorus_pct = 101.0;
+        assert_invalid(validate_resource_input(ri), "cannot exceed 100%");
+    }
+
+    #[test]
+    fn resource_input_nan_nutrient_rejected() {
+        let mut ri = valid_resource_input();
+        ri.nutrient_estimate.potassium_pct = f64::NAN;
+        assert_invalid(validate_resource_input(ri), "must be finite");
+    }
+
+    #[test]
+    fn resource_input_empty_did_rejected() {
+        let mut ri = valid_resource_input();
+        ri.contributor_did = "   ".to_string();
+        assert_invalid(validate_resource_input(ri), "cannot be empty");
+    }
+
+    #[test]
+    fn resource_input_long_did_rejected() {
+        let mut ri = valid_resource_input();
+        ri.contributor_did = "x".repeat(257);
+        assert_invalid(validate_resource_input(ri), "256 characters");
+    }
+
+    #[test]
+    fn resource_input_zero_timestamp_rejected() {
+        let mut ri = valid_resource_input();
+        ri.contributed_at = 0;
+        assert_invalid(validate_resource_input(ri), "cannot be zero");
+    }
+
+    #[test]
+    fn resource_input_long_notes_rejected() {
+        let mut ri = valid_resource_input();
+        ri.notes = "x".repeat(2049);
+        assert_invalid(validate_resource_input(ri), "2048 characters");
+    }
+
+    #[test]
+    fn resource_input_serde_roundtrip() {
+        let ri = valid_resource_input();
+        let json = serde_json::to_string(&ri).unwrap();
+        let decoded: ResourceInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.quantity_kg, 25.0);
+        assert_eq!(decoded.input_type, ResourceType::Vermicompost);
+        assert_eq!(decoded.contributor_did, "did:key:z6Mk...");
+    }
+
+    #[test]
+    fn resource_type_all_variants_serde_roundtrip() {
+        let variants = vec![
+            ResourceType::KitchenWaste,
+            ResourceType::GreenWaste,
+            ResourceType::Biochar,
+            ResourceType::Vermicompost,
+            ResourceType::Digestate,
+            ResourceType::Manure,
+            ResourceType::Mulch,
+            ResourceType::CoverCrop,
+            ResourceType::Inoculant,
+        ];
+        for v in variants {
+            let json = serde_json::to_string(&v).unwrap();
+            let decoded: ResourceType = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, v);
+        }
+    }
+
+    #[test]
+    fn nutrient_profile_estimate_all_types() {
+        let types = vec![
+            ResourceType::KitchenWaste,
+            ResourceType::GreenWaste,
+            ResourceType::Biochar,
+            ResourceType::Vermicompost,
+            ResourceType::Digestate,
+            ResourceType::Manure,
+            ResourceType::Mulch,
+            ResourceType::CoverCrop,
+            ResourceType::Inoculant,
+        ];
+        for t in types {
+            let np = NutrientProfile::estimate(&t);
+            assert!(np.nitrogen_pct >= 0.0 && np.nitrogen_pct <= 100.0);
+            assert!(np.phosphorus_pct >= 0.0 && np.phosphorus_pct <= 100.0);
+            assert!(np.potassium_pct >= 0.0 && np.potassium_pct <= 100.0);
+        }
+    }
+
+    #[test]
+    fn nutrient_profile_serde_roundtrip() {
+        let np = NutrientProfile {
+            nitrogen_pct: 2.5,
+            phosphorus_pct: 1.5,
+            potassium_pct: 1.5,
+        };
+        let json = serde_json::to_string(&np).unwrap();
+        let decoded: NutrientProfile = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, np);
     }
 }
