@@ -684,6 +684,21 @@ impl CognitiveLoopService {
     // SWARM MANAGER ACCESSORS
     // ========================================================================
 
+    /// Install a swarm event channel receiver.
+    ///
+    /// Returns the `Sender` half that external async components (NetworkService,
+    /// Hyperfeel, FederatedAggregator) should clone to inject events into the
+    /// cognitive loop. The receiver is drained non-blocking in Phase B.
+    pub fn create_swarm_event_channel(
+        &self,
+    ) -> std::sync::mpsc::Sender<super::super::managers::swarm_manager::SwarmEvent> {
+        let (tx, rx) = std::sync::mpsc::channel();
+        if let Ok(mut guard) = self.swarm_event_rx.lock() {
+            *guard = Some(rx);
+        }
+        tx
+    }
+
     /// Inject a swarm event into the SwarmManager for processing.
     ///
     /// Events are queued and drained during the next `process()` call (interval 41).
@@ -714,6 +729,98 @@ impl CognitiveLoopService {
     /// Mean peer Φ across connected swarm peers.
     pub fn swarm_mean_peer_phi(&self) -> f64 {
         self.swarm_manager.mean_peer_phi()
+    }
+
+    // ========================================================================
+    // SWARM NEUROMODULATORY COUPLING
+    // ========================================================================
+
+    /// Apply swarm-derived neuromodulatory effects to the bath.
+    ///
+    /// Mapping (all doses use named constants from `thresholds.rs`):
+    /// - Peer connectivity → oxytocin injection (social buffering, Zak 2012)
+    /// - Network anomalies → NE baseline nudge (arousal/vigilance, Arnsten 2009)
+    /// - High mean peer Φ → 5-HT baseline nudge (social confidence, Crockett 2009)
+    /// - Strong affective contagion → DA baseline nudge (reward salience, Schultz 1997)
+    pub(crate) fn apply_swarm_neuromod(&mut self) {
+        use super::super::thresholds::{
+            SWARM_ANOMALY_NE_CAP, SWARM_ANOMALY_NE_MULT, SWARM_CONTAGION_DA_CAP,
+            SWARM_CONTAGION_DA_GAIN, SWARM_CONTAGION_DA_THRESHOLD, SWARM_OXY_CAP,
+            SWARM_OXY_HALFLIFE, SWARM_OXY_PER_SQRT_PEER, SWARM_PHI_SHT_CAP,
+            SWARM_PHI_SHT_GAIN,
+        };
+        let telem = self.swarm_manager.telemetry().clone();
+
+        // Social buffering: peer count → oxytocin (Zak 2012)
+        if telem.connected_peers > 0 {
+            let oxy_dose = ((telem.connected_peers as f32).sqrt() * SWARM_OXY_PER_SQRT_PEER)
+                .min(SWARM_OXY_CAP);
+            if oxy_dose > super::super::thresholds::GOV_NEUROMOD_FLOOR {
+                self.neuromod.bath.inject("oxytocin", oxy_dose, SWARM_OXY_HALFLIFE);
+            }
+        }
+
+        // Anomaly vigilance: sudden peer loss → NE (Arnsten 2009)
+        if telem.anomaly_count > 0 {
+            let ne_nudge =
+                (SWARM_ANOMALY_NE_MULT * telem.anomaly_count.min(3) as f32).min(SWARM_ANOMALY_NE_CAP);
+            self.neuromod
+                .bath
+                .noradrenaline
+                .adjust_baseline(ne_nudge, 0.2, 0.8);
+        }
+
+        // Collective coherence: high peer Φ → 5-HT (Crockett 2009)
+        if telem.mean_peer_phi > 0.5 {
+            let sht_nudge = ((telem.mean_peer_phi - 0.5) * SWARM_PHI_SHT_GAIN as f64)
+                .min(SWARM_PHI_SHT_CAP as f64) as f32;
+            if sht_nudge > super::super::thresholds::GOV_NEUROMOD_FLOOR {
+                self.neuromod
+                    .bath
+                    .serotonin
+                    .adjust_baseline(sht_nudge, 0.2, 0.8);
+            }
+        }
+
+        // Affective contagion: strong emotional sync → DA (Schultz 1997)
+        if telem.affective_contagion > SWARM_CONTAGION_DA_THRESHOLD {
+            let da_nudge = (telem.affective_contagion * SWARM_CONTAGION_DA_GAIN as f64)
+                .min(SWARM_CONTAGION_DA_CAP as f64) as f32;
+            self.neuromod
+                .bath
+                .dopamine
+                .adjust_baseline(da_nudge, 0.2, 0.8);
+        }
+    }
+
+    /// Bidirectional coupling between SwarmManager and GovernanceManager.
+    ///
+    /// - High peer Φ → governance confidence boost (Woolley 2010: collective intelligence)
+    /// - Network anomalies → governance confidence decrease (uncertainty signal)
+    /// - Positive governance reward EMA → expected peer growth (success attracts)
+    #[cfg(feature = "mycelix")]
+    pub(crate) fn cross_couple_swarm_governance(&mut self) {
+        let swarm_telem = self.swarm_manager.telemetry().clone();
+
+        // Collective intelligence: high peer Φ → governance confidence (Woolley 2010)
+        if swarm_telem.mean_peer_phi > 0.3 && swarm_telem.connected_peers > 1 {
+            let phi_boost = ((swarm_telem.mean_peer_phi - 0.3) * 0.05).min(0.03);
+            self.governance_mgr.nudge_confidence(phi_boost);
+        }
+
+        // Network instability: anomalies → lower governance confidence
+        if swarm_telem.anomaly_count > 2 {
+            self.governance_mgr.nudge_confidence(-0.02);
+        }
+
+        // Success attracts: positive governance rewards → grow expected peers
+        let reward = self.governance_mgr.reward_ema();
+        if reward > 0.05 {
+            let current = self.swarm_manager.expected_peers();
+            let growth = ((reward * 5.0) as usize).min(10);
+            self.swarm_manager
+                .set_expected_peers((current + growth).min(256));
+        }
     }
 
     /// Access the resonant speech module (read-only).

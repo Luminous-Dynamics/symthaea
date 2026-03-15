@@ -192,11 +192,15 @@ pub use physics_integration::ParetoContext;
 pub use managers::governance_manager::{GovernanceEvent, GovernanceEventKind, GovernanceOutcome};
 
 pub use managers::swarm_manager::{SwarmEvent, SwarmTelemetry};
+pub use managers::network_service_bridge::{
+    forward_affective_state, forward_federated_round, NetworkServiceBridge,
+    NetworkServiceBridgeHandle,
+};
 
 #[cfg(feature = "mesh")]
 pub use managers::{
     CompressedDelta, NetworkHealth, PayloadClass, PayloadClassifier, RadioTier, RoutingDecision,
-    SpectrumManager, SpectrumTelemetry,
+    SpectrumManager, SpectrumObservation, SpectrumTelemetry,
 };
 
 pub mod calibration;
@@ -654,6 +658,12 @@ pub struct CognitiveLoopService {
     /// Swarm Manager: Peer consciousness signals → social buffering, affective contagion,
     /// collective Φ modulation. Implements CognitiveSubsystem at interval 41.
     swarm_manager: managers::SwarmManager,
+
+    /// Receiver for swarm events from external async P2P layer.
+    /// Drained non-blocking in Phase B before `swarm_manager.process()`.
+    /// Any async component (NetworkService, Hyperfeel, FederatedAggregator) can
+    /// clone the corresponding `mpsc::Sender<SwarmEvent>` to inject events.
+    swarm_event_rx: std::sync::Mutex<Option<std::sync::mpsc::Receiver<managers::swarm_manager::SwarmEvent>>>,
 
     /// Spectrum Manager: Multi-band radio dispatch, AIMD congestion, delta compression.
     /// Implements CognitiveSubsystem at interval 53. Feature-gated behind `mesh`.

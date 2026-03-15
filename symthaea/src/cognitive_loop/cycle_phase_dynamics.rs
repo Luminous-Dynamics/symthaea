@@ -252,6 +252,19 @@ impl CognitiveLoopService {
                         .record("perception_manager", perception_output);
                 }
 
+                // ── Drain swarm event channel (non-blocking) ──────────
+                // Any async P2P component (NetworkService, Hyperfeel,
+                // FederatedAggregator) sends SwarmEvents through mpsc::Sender;
+                // we drain them here before processing.
+                if let Ok(guard) = self.swarm_event_rx.lock() {
+                    if let Some(ref rx) = *guard {
+                        super::managers::network_service_bridge::drain_swarm_channel(
+                            rx,
+                            &mut self.swarm_manager,
+                        );
+                    }
+                }
+
                 // ── Swarm Manager (interval 41, co-prime) ─────────────
                 if self.swarm_manager.should_run(cycle_num, urgency_u8) {
                     let swarm_output = self.swarm_manager.process(snapshot);
@@ -3159,7 +3172,7 @@ impl CognitiveLoopService {
                         knowledge_context: self
                             .knowledge_manager
                             .as_ref()
-                            .map(|km| km.top_facts(3))
+                            .map(|km| km.top_grounded_facts(5))
                             .unwrap_or_default(),
                         #[cfg(feature = "therapeutic")]
                         therapeutic_intent: if self.therapeutic_manager.crisis_active {

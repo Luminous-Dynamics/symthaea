@@ -925,6 +925,7 @@ impl CognitiveLoopService {
             #[cfg(feature = "mycelix")]
             governance_mgr: super::managers::GovernanceManager::default(),
             swarm_manager: super::managers::SwarmManager::default(),
+            swarm_event_rx: std::sync::Mutex::new(None),
             #[cfg(feature = "mesh")]
             spectrum_manager: super::managers::SpectrumManager::default(),
             #[cfg(feature = "therapeutic")]

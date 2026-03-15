@@ -31,6 +31,7 @@ pub mod learning_manager;
 pub mod memory_manager;
 pub mod perception_manager;
 pub mod swarm_manager;
+pub mod network_service_bridge;
 
 #[cfg(feature = "mycelix")]
 pub mod governance_manager;
@@ -43,6 +44,10 @@ pub use learning_manager::LearningManager;
 pub use memory_manager::MemoryManager;
 pub use perception_manager::PerceptionManager;
 pub use swarm_manager::SwarmManager;
+pub use network_service_bridge::{
+    forward_affective_state, forward_federated_round, NetworkServiceBridge,
+    NetworkServiceBridgeHandle,
+};
 
 #[cfg(feature = "mycelix")]
 pub use governance_manager::GovernanceManager;
@@ -50,7 +55,7 @@ pub use governance_manager::GovernanceManager;
 #[cfg(feature = "mesh")]
 pub use radio_dispatcher::{
     CompressedDelta, NetworkHealth, PayloadClass, PayloadClassifier, RadioTier, RoutingDecision,
-    SpectrumManager, SpectrumTelemetry,
+    SpectrumManager, SpectrumObservation, SpectrumTelemetry,
 };
 
 #[cfg(feature = "therapeutic")]
