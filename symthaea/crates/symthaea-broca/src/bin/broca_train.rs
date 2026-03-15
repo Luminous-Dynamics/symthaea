@@ -153,7 +153,7 @@ fn main() {
         "Starting training"
     );
 
-    let (metrics, final_adam, diagnostics, anomaly_report) =
+    let (metrics, final_adam, diagnostics, anomaly_report, validation) =
         train_with_adam(&mut generator, &dataset, &train_config, adam_state);
 
     // Report results
@@ -194,6 +194,22 @@ fn main() {
             for a in anomalies {
                 println!("  epoch {epoch}: {a}");
             }
+        }
+    }
+
+    // Print smoke test results if enabled
+    if let Some(ref val) = validation {
+        println!("\n--- Smoke Test ---");
+        println!(
+            "  Result: {}",
+            if val.passed { "PASSED" } else { "FAILED" }
+        );
+        println!("  Mean coherence: {:.4}", val.mean_coherence);
+        for (intent, coh) in &val.intent_coherences {
+            println!("  intent {intent}: coh={coh:.4}");
+        }
+        if !val.failed_intents.is_empty() {
+            println!("  Failed intents: {:?}", val.failed_intents);
         }
     }
 

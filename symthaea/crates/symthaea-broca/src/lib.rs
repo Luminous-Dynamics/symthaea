@@ -75,6 +75,7 @@ pub use generator::{BrocaConfig, BrocaGenerator, GenerationResult, SamplingStrat
 pub use tokenizer::BpeTokenizer;
 pub use training::{
     AnomalyReport, GradientAnomaly, GradientDiagnostics, TrainingDataset, TrainingPair,
+    TrainingValidation,
 };
 
 #[cfg(feature = "mamba")]
