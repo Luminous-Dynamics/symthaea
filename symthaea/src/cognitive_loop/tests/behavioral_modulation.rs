@@ -166,12 +166,12 @@ fn mcts_effectiveness_telemetry_consistent() {
     for (i, r) in results.iter().enumerate() {
         let m = &r.metadata;
         assert!(
-            m.mcts_plan_effectiveness.is_finite(),
+            m.adaptive.mcts_plan_effectiveness.is_finite(),
             "NaN mcts_plan_effectiveness at cycle {i}"
         );
 
         if i > 15 {
-            let mpe = m.mcts_plan_effectiveness;
+            let mpe = m.adaptive.mcts_plan_effectiveness;
             let expected = mpe > 0.6 || (mpe > 0.0 && mpe < 0.2);
             assert_eq!(
                 m.mcts_effectiveness_modulated, expected,

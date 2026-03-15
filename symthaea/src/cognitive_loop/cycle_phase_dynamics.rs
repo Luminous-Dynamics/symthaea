@@ -3711,7 +3711,7 @@ mod tests {
         let mut svc = make_service();
         let results = run_cycles(&mut svc, 33, "coherence check");
         for (i, r) in results.iter().enumerate() {
-            let coh = r.metadata.prediction_coherence;
+            let coh = r.metadata.adaptive.prediction_coherence;
             assert!(
                 coh.is_finite(),
                 "prediction_coherence NaN at cycle {i}: {coh}"
@@ -3791,7 +3791,7 @@ mod tests {
                 "NaN consciousness at cycle {i}"
             );
             assert!(
-                m.prediction_coherence.is_finite(),
+                m.adaptive.prediction_coherence.is_finite(),
                 "NaN pred_coherence at cycle {i}"
             );
             assert!(

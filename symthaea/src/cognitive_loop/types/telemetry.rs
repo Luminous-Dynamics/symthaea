@@ -439,6 +439,120 @@ impl Default for UserStateMetrics {
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// ADAPTIVE FEEDBACK METRICS — Sessions 14-16 feedback telemetry sub-struct
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Adaptive feedback loop telemetry for CycleMetadata (Sessions 14-16).
+///
+/// Covers epistemic gating, causal attention, MCTS effectiveness, homeostasis,
+/// and quality-aware adaptive processing. Populated in `cycle_phase_output.rs`.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct AdaptiveFeedbackMetrics {
+    /// Whether epistemic gate gated codebook growth this cycle.
+    pub epistemic_gate_gated: bool,
+    /// Number of causal edges used for attention weighting this cycle.
+    pub causal_attention_edges: usize,
+    /// MCTS plan effectiveness score from post-hoc evaluation (0.0 when not evaluated).
+    pub mcts_plan_effectiveness: f32,
+    /// Multi-horizon prediction coherence (0.0 = divergent, 1.0 = identical).
+    pub prediction_coherence: f32,
+    /// Emotional valence homeostasis pull (amount returned toward baseline).
+    pub valence_homeostasis_pull: f32,
+    /// Emotional arousal homeostasis pull (amount returned toward baseline).
+    pub arousal_homeostasis_pull: f32,
+    /// Whether arousal recovery mode is active (tau slowdown engaged).
+    pub arousal_recovery_active: bool,
+    /// CfC tau factor from arousal recovery (1.0 = no change, <1.0 = slowdown).
+    pub arousal_recovery_tau_factor: f32,
+    /// Total cycle wall-clock time in microseconds.
+    pub cycle_duration_us: u64,
+    /// Predicted Phi gain from school curriculum recommendation (0.0 when school disabled).
+    pub school_predicted_phi_gain: f32,
+    /// Whether epistemic gate confidence gated expensive modules this cycle.
+    pub epistemic_coherence_gated: bool,
+    /// Phi validation correlation from most recent validation run (0.0 when not yet run).
+    pub phi_validation_cached: f64,
+    /// Adjusted spectral weight used in unified Psi computation.
+    pub phi_spectral_weight: f32,
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PREDICTIVE TUNING METRICS — Session 17 predictive self-tuning sub-struct
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Predictive self-tuning telemetry for CycleMetadata (Session 17).
+///
+/// Tracks error pattern detection, startup transient suppression, self-model
+/// accuracy, and urgency mode prediction. Populated in `cycle_phase_output.rs`.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PredictiveTuningMetrics {
+    /// Detected error pattern (Rising/Falling/Oscillating/Spike/Stable).
+    pub error_pattern: String,
+    /// Whether startup transient suppression is active (cycles 0-50).
+    pub startup_suppressed: bool,
+    /// Startup warmup progress (0.0–1.0, 1.0 = fully warmed up).
+    pub startup_warmup_progress: f32,
+    /// Self-model prediction accuracy EMA (0.0–1.0).
+    pub self_model_accuracy: f32,
+    /// Mode transition confidence (0.0 = just switched, 1.0 = fully settled).
+    pub mode_confidence: f32,
+    /// Cycles since last urgency mode change.
+    pub mode_stability_counter: u32,
+    /// Predicted urgency for next 5 cycles (from error pattern analysis).
+    pub predicted_urgency: String,
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CONTROL SYNTHESIS METRICS — Sessions 18-21 control synthesis sub-struct
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Control synthesis telemetry for CycleMetadata (Sessions 18-21).
+///
+/// Covers closing feedback loops, dormant pathway activation, signal-to-control
+/// synthesis, and consciousness-grounded control. Populated in `cycle_phase_output.rs`.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ControlSynthesisMetrics {
+    /// Whether context_phi_weight was applied to modulate unified Psi this cycle.
+    pub context_phi_applied: bool,
+    /// Evolution phi delta feedback: confidence change applied this cycle.
+    pub evolution_confidence_delta: f32,
+    /// Homeostasis pull strength multiplier (urgency-adaptive, 1.0 = baseline).
+    pub homeostasis_pull_strength: f32,
+    /// Prediction coherence bias applied to urgency threshold (-1.0 to 1.0).
+    pub prediction_coherence_urgency_bias: f32,
+    /// Consciousness limiting component that was boosted (empty when none).
+    pub limiting_component_boosted: String,
+    /// Love resonance confidence boost applied this cycle.
+    pub love_resonance_boost: f32,
+    /// Whether reasoning chain boosted prediction confidence this cycle.
+    pub reasoning_chain_boosted: bool,
+    /// LR modulation from harmonic interferences (>0.5 dampens, <0.2 boosts).
+    pub harmonic_interference_lr_mod: f32,
+    /// Exploration modulation from resonator prediction error (cosine distance).
+    pub resonator_error_exploration_mod: f32,
+    /// Threshold modulation from phenomenal binding strength (±scale).
+    pub binding_threshold_mod: f32,
+    /// Whether causal density gated urgency this cycle.
+    pub causal_urgency_gated: bool,
+    /// Semantic LR modulation from epistemic gate confidence (previous cycle).
+    pub epistemic_semantic_lr_mod: f32,
+    /// Whether predictive budget gating was active (>80% budget at midpoint).
+    pub predictive_budget_gated: bool,
+    /// Prediction confidence modulation from phenomenal binding strength.
+    pub binding_confidence_mod: f32,
+    /// Consecutive temporal discontinuity cycles (recovery cascade tracker).
+    pub discontinuity_streak: u32,
+    /// Whether epistemic conflicts accelerated adaptive reasoning this cycle.
+    pub epistemic_reasoning_accelerated: bool,
+    /// Whether low agency overrode exploratory strategy to supportive.
+    pub agency_strategy_override: bool,
+    /// Surprise amplitude modulation from predictive free energy.
+    pub pfe_surprise_mod: f32,
+    /// Adaptive memoization threshold from codebook diversity.
+    pub adaptive_memo_threshold: f32,
+}
+
 /// Therapeutic subsystem telemetry for CycleMetadata.
 ///
 /// Tracks client state, alliance, crisis detection, regulation strategy,
@@ -886,100 +1000,20 @@ pub struct CycleMetadata {
     /// Thalamic depth score used for storage salience modulation.
     pub thalamic_depth_score: f32,
 
-    // ── Phase 14: Subsystem Feedback Closure ──────────────────────────
-    /// Whether epistemic gate gated codebook growth this cycle.
-    pub epistemic_gate_gated: bool,
-    /// Number of causal edges used for attention weighting this cycle.
-    pub causal_attention_edges: usize,
-    /// MCTS plan effectiveness score from post-hoc evaluation (0.0 when not evaluated).
-    pub mcts_plan_effectiveness: f32,
+    // ── Phases 14-16: Adaptive Feedback ────────────────────────────────
+    /// Adaptive feedback telemetry (epistemic gating, MCTS, homeostasis, quality).
+    #[serde(flatten, default)]
+    pub adaptive: AdaptiveFeedbackMetrics,
 
-    // ── Phase 15: Adaptive Architecture + Emotional Homeostasis ──────
-    /// Multi-horizon prediction coherence (0.0 = divergent, 1.0 = identical).
-    pub prediction_coherence: f32,
-    /// Emotional valence homeostasis pull (amount returned toward baseline).
-    pub valence_homeostasis_pull: f32,
-    /// Emotional arousal homeostasis pull (amount returned toward baseline).
-    pub arousal_homeostasis_pull: f32,
-    /// Whether arousal recovery mode is active (tau slowdown engaged).
-    pub arousal_recovery_active: bool,
-    /// CfC tau factor from arousal recovery (1.0 = no change, <1.0 = slowdown).
-    pub arousal_recovery_tau_factor: f32,
-    /// Total cycle wall-clock time in microseconds (same as CycleResult.cycle_time_us
-    /// but included in metadata for unified telemetry access).
-    pub cycle_duration_us: u64,
-    /// Predicted Phi gain from school curriculum recommendation (0.0 when school disabled).
-    pub school_predicted_phi_gain: f32,
+    // ── Phase 17: Predictive Self-Tuning ─────────────────────────────
+    /// Predictive self-tuning telemetry (error patterns, startup, mode prediction).
+    #[serde(flatten, default)]
+    pub predictive: PredictiveTuningMetrics,
 
-    // ── Phase 16: Quality-Aware Adaptive Processing ─────────────────
-    /// Whether epistemic gate confidence gated expensive modules this cycle.
-    pub epistemic_coherence_gated: bool,
-    /// Phi validation correlation from most recent validation run (0.0 when not yet run).
-    pub phi_validation_cached: f64,
-    /// Adjusted spectral weight used in unified Psi computation.
-    pub phi_spectral_weight: f32,
-
-    // ── Phase 17: Predictive Self-Tuning ──────────────────────────────
-    /// Detected error pattern (Rising/Falling/Oscillating/Spike/Stable).
-    pub error_pattern: String,
-    /// Whether startup transient suppression is active (cycles 0-50).
-    pub startup_suppressed: bool,
-    /// Startup warmup progress (0.0–1.0, 1.0 = fully warmed up).
-    pub startup_warmup_progress: f32,
-    /// Self-model prediction accuracy EMA (0.0–1.0).
-    pub self_model_accuracy: f32,
-    /// Mode transition confidence (0.0 = just switched, 1.0 = fully settled).
-    pub mode_confidence: f32,
-    /// Cycles since last urgency mode change.
-    pub mode_stability_counter: u32,
-    /// Predicted urgency for next 5 cycles (from error pattern analysis).
-    pub predicted_urgency: String,
-
-    // ── Phase 18: Closing Feedback Loops ─────────────────────────────
-    /// Whether context_phi_weight was applied to modulate unified Psi this cycle.
-    pub context_phi_applied: bool,
-    /// Evolution phi delta feedback: confidence change applied this cycle.
-    pub evolution_confidence_delta: f32,
-    /// Homeostasis pull strength multiplier (urgency-adaptive, 1.0 = baseline).
-    pub homeostasis_pull_strength: f32,
-    /// Prediction coherence bias applied to urgency threshold (-1.0 to 1.0).
-    pub prediction_coherence_urgency_bias: f32,
-
-    // ── Phase 19: Activating Dormant Pathways ────────────────────────
-    /// Consciousness limiting component that was boosted (empty when none).
-    pub limiting_component_boosted: String,
-    /// Love resonance confidence boost applied this cycle.
-    pub love_resonance_boost: f32,
-    /// Whether reasoning chain boosted prediction confidence this cycle.
-    pub reasoning_chain_boosted: bool,
-
-    // ── Phase 20: Signal-to-Control Synthesis ────────────────────────
-    /// LR modulation from harmonic interferences (>0.5 dampens, <0.2 boosts).
-    pub harmonic_interference_lr_mod: f32,
-    /// Exploration modulation from resonator prediction error (cosine distance).
-    pub resonator_error_exploration_mod: f32,
-    /// Threshold modulation from phenomenal binding strength (±scale).
-    pub binding_threshold_mod: f32,
-    /// Whether causal density gated urgency this cycle.
-    pub causal_urgency_gated: bool,
-    /// Semantic LR modulation from epistemic gate confidence (previous cycle).
-    pub epistemic_semantic_lr_mod: f32,
-    /// Whether predictive budget gating was active (>80% budget at midpoint).
-    pub predictive_budget_gated: bool,
-
-    // ── Phase 21: Consciousness-Grounded Control ────────────────────
-    /// Prediction confidence modulation from phenomenal binding strength.
-    pub binding_confidence_mod: f32,
-    /// Consecutive temporal discontinuity cycles (recovery cascade tracker).
-    pub discontinuity_streak: u32,
-    /// Whether epistemic conflicts accelerated adaptive reasoning this cycle.
-    pub epistemic_reasoning_accelerated: bool,
-    /// Whether low agency overrode exploratory strategy to supportive.
-    pub agency_strategy_override: bool,
-    /// Surprise amplitude modulation from predictive free energy.
-    pub pfe_surprise_mod: f32,
-    /// Adaptive memoization threshold from codebook diversity.
-    pub adaptive_memo_threshold: f32,
+    // ── Phases 18-21: Control Synthesis ──────────────────────────────
+    /// Control synthesis telemetry (feedback loops, dormant paths, signal-to-control).
+    #[serde(flatten, default)]
+    pub control: ControlSynthesisMetrics,
 
     // ── Spatial Reasoning (GridEncoder) ─────────────────────────────────
     /// L2 norm of the grid-encoded current input (0.0 when encoder disabled).
@@ -2390,6 +2424,21 @@ mod tests {
         m.user_state.user_engagement = 0.8;
         m.user_state.user_frustration = 0.3;
 
+        // Adaptive feedback (Sessions 14-16)
+        m.adaptive.prediction_coherence = 0.77;
+        m.adaptive.epistemic_gate_gated = true;
+        m.adaptive.cycle_duration_us = 12345;
+
+        // Predictive tuning (Session 17)
+        m.predictive.error_pattern = "Rising".into();
+        m.predictive.startup_suppressed = true;
+        m.predictive.self_model_accuracy = 0.85;
+
+        // Control synthesis (Sessions 18-21)
+        m.control.context_phi_applied = true;
+        m.control.love_resonance_boost = 0.05;
+        m.control.discontinuity_streak = 3;
+
         // Serialize → JSON → Deserialize
         let json = serde_json::to_string(&m).expect("serialize");
         let m2: CycleMetadata = serde_json::from_str(&json).expect("deserialize");
@@ -2413,6 +2462,21 @@ mod tests {
         assert!(m2.social.tom_exploration_triggered);
         assert!((m2.user_state.user_engagement - 0.8).abs() < 1e-6);
         assert!((m2.user_state.user_frustration - 0.3).abs() < 1e-6);
+
+        // Adaptive feedback (Sessions 14-16)
+        assert!((m2.adaptive.prediction_coherence - 0.77).abs() < 1e-6);
+        assert!(m2.adaptive.epistemic_gate_gated);
+        assert_eq!(m2.adaptive.cycle_duration_us, 12345);
+
+        // Predictive tuning (Session 17)
+        assert_eq!(m2.predictive.error_pattern, "Rising");
+        assert!(m2.predictive.startup_suppressed);
+        assert!((m2.predictive.self_model_accuracy - 0.85).abs() < 1e-6);
+
+        // Control synthesis (Sessions 18-21)
+        assert!(m2.control.context_phi_applied);
+        assert!((m2.control.love_resonance_boost - 0.05).abs() < 1e-6);
+        assert_eq!(m2.control.discontinuity_streak, 3);
     }
 
     /// Verify that `#[serde(flatten)]` produces flat JSON keys, not nested objects.
@@ -2431,10 +2495,18 @@ mod tests {
         assert!(json.contains("\"motor_action_type\":3"), "motor_action_type must be flat");
         assert!(json.contains("\"governance_reward_ema\":0.5"), "governance_reward_ema must be flat");
 
+        // New sub-structs also flatten correctly
+        assert!(json.contains("\"prediction_coherence\":"), "prediction_coherence must be flat");
+        assert!(json.contains("\"error_pattern\":"), "error_pattern must be flat");
+        assert!(json.contains("\"love_resonance_boost\":"), "love_resonance_boost must be flat");
+
         // Sub-struct names must NOT appear as JSON keys
         assert!(!json.contains("\"social\":{"), "social must not be a nested object");
         assert!(!json.contains("\"motor\":{"), "motor must not be a nested object");
         assert!(!json.contains("\"governance\":{"), "governance must not be a nested object");
+        assert!(!json.contains("\"adaptive\":{"), "adaptive must not be a nested object");
+        assert!(!json.contains("\"predictive\":{"), "predictive must not be a nested object");
+        assert!(!json.contains("\"control\":{"), "control must not be a nested object");
     }
 
     /// Verify that sub-struct custom defaults are preserved through Default::default().

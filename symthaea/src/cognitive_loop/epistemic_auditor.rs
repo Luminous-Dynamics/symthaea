@@ -286,7 +286,7 @@ impl AuditRecord {
             energy_this_cycle: m.substrate.energy_this_cycle,
             throughput_multiplier: m.substrate.energy_throughput_multiplier,
             thermodynamic_load: m.thermodynamic_load,
-            cycle_duration_us: m.cycle_duration_us,
+            cycle_duration_us: m.adaptive.cycle_duration_us,
 
             // Substrate
             feasibility_raw: m.substrate.substrate_feasibility_raw,

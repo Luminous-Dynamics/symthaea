@@ -420,9 +420,9 @@ fn dynamics_self_model_accuracy_bounded() {
     let result = service.cycle("test self model");
 
     assert!(
-        (0.0..=1.0).contains(&result.metadata.self_model_accuracy),
+        (0.0..=1.0).contains(&result.metadata.predictive.self_model_accuracy),
         "self_model_accuracy should be [0,1]: {}",
-        result.metadata.self_model_accuracy
+        result.metadata.predictive.self_model_accuracy
     );
 }
 

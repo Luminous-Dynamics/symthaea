@@ -236,7 +236,7 @@ fn soak_500_cycles_all_metadata_finite() {
 
         // Core metrics must be finite every cycle
         assert!(
-            m.valence_homeostasis_pull.is_finite(),
+            m.adaptive.valence_homeostasis_pull.is_finite(),
             "valence_homeostasis_pull NaN at cycle {i}"
         );
         assert!(
@@ -312,7 +312,7 @@ fn consciousness_behavior_coupling_validation() {
     for i in 0..600 {
         let result = service.cycle(inputs[i % inputs.len()]);
         let m = &result.metadata;
-        let pe = m.valence_homeostasis_pull.abs() as f64; // proxy for prediction error
+        let pe = m.adaptive.valence_homeostasis_pull.abs() as f64; // proxy for prediction error
 
         if i > 100 {
             // Skip warmup; collect (prev_consciousness, current_pe)

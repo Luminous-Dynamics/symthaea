@@ -180,8 +180,8 @@ fn homeostasis_fields_plausible() {
     let results = run_cycles(&mut svc, N_CYCLES);
 
     for (i, r) in results.iter().enumerate() {
-        let v = r.metadata.valence_homeostasis_pull;
-        let a = r.metadata.arousal_homeostasis_pull;
+        let v = r.metadata.adaptive.valence_homeostasis_pull;
+        let a = r.metadata.adaptive.arousal_homeostasis_pull;
 
         assert!(
             (-1.0..=1.0).contains(&v),
@@ -251,7 +251,7 @@ fn cycle_duration_reasonable() {
     // 10 test threads each run 50 Full-profile cycles simultaneously.
     for (i, r) in results.iter().enumerate() {
         assert!(
-            r.metadata.cycle_duration_us > 0,
+            r.metadata.adaptive.cycle_duration_us > 0,
             "Cycle {i}: cycle_duration_us should be > 0"
         );
     }
@@ -259,7 +259,7 @@ fn cycle_duration_reasonable() {
     // Median of warm cycles (skip first 5) should be under 2 seconds
     let mut warm: Vec<u64> = results[5..]
         .iter()
-        .map(|r| r.metadata.cycle_duration_us)
+        .map(|r| r.metadata.adaptive.cycle_duration_us)
         .collect();
     warm.sort_unstable();
     let median = warm[warm.len() / 2];
@@ -283,7 +283,7 @@ fn module_timings_sum_reasonable() {
         let t = &r.metadata.module_timings_us;
         let sum = t.core_hdc_encode + t.core_cfc_step + t.core_predict + t.core_training;
 
-        let total = r.metadata.cycle_duration_us;
+        let total = r.metadata.adaptive.cycle_duration_us;
 
         // Core timings should not exceed 110% of total (some non-core
         // work happens outside these modules)

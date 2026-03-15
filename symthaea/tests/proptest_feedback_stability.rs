@@ -986,9 +986,9 @@ proptest! {
             let result = service.cycle(input);
             let m = &result.metadata;
 
-            assert_finite_f32(m.arousal_homeostasis_pull,
+            assert_finite_f32(m.adaptive.arousal_homeostasis_pull,
                 &format!("arousal_homeostasis_pull@cycle{i}"))?;
-            assert_finite_f32(m.arousal_recovery_tau_factor,
+            assert_finite_f32(m.adaptive.arousal_recovery_tau_factor,
                 &format!("arousal_recovery_tau_factor@cycle{i}"))?;
         }
     }

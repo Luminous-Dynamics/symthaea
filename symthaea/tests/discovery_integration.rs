@@ -466,7 +466,7 @@ fn test_gwt_consolidation_triggers_dream_recording() {
     // The dream phase should have run at least once in 51 cycles
     // (base interval is 20 cycles, or 5 cycles under high pressure)
     assert!(
-        final_result.metadata.cycle_duration_us > 0,
+        final_result.metadata.adaptive.cycle_duration_us > 0,
         "Cycle should complete successfully"
     );
 }

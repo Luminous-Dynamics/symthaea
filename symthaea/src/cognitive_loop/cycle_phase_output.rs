@@ -6,6 +6,7 @@
 use std::time::Instant;
 
 use super::phase_results::{DynamicsPhaseResult, FeedbackPhaseResult, PerceptionPhaseResult};
+use super::types::telemetry::{AdaptiveFeedbackMetrics, ControlSynthesisMetrics, PredictiveTuningMetrics};
 use super::{CognitiveLoopService, CycleResult};
 
 impl CognitiveLoopService {
@@ -371,46 +372,52 @@ impl CognitiveLoopService {
             circadian_plasticity: self.biorhythm_mgr.rhythm.plasticity_mod as f32,
             cross_module_agreement: feedback.quality.cross_module_agreement,
             thalamic_depth_score,
-            epistemic_gate_gated: !feedback.reasoning.epistemic_gate_approved,
-            causal_attention_edges: dynamics.reasoning.causal_attention_edges,
-            mcts_plan_effectiveness: dynamics.reasoning.mcts_plan_effectiveness,
-            prediction_coherence: dynamics.core.prediction_coherence,
-            valence_homeostasis_pull: dynamics.homeostasis.valence_homeostasis_pull,
-            arousal_homeostasis_pull: dynamics.homeostasis.arousal_homeostasis_pull,
-            arousal_recovery_active: dynamics.homeostasis.arousal_recovery_active,
-            arousal_recovery_tau_factor: dynamics.homeostasis.arousal_recovery_tau_factor,
-            cycle_duration_us: cycle_start.elapsed().as_micros() as u64,
-            school_predicted_phi_gain: dynamics.reasoning.school_predicted_phi_gain,
-            epistemic_coherence_gated: feedback.loops.epistemic_coherence_gated,
-            phi_validation_cached: self.carryover.quality.phi_validation_correlation,
-            phi_spectral_weight: feedback.consciousness.phi_spectral_weight,
-            error_pattern: perception.urgency.error_pattern.into(),
-            startup_suppressed: perception.startup_suppressed,
-            startup_warmup_progress: perception.startup_warmup_progress,
-            self_model_accuracy: dynamics.core.self_model_accuracy,
-            mode_confidence: self.carryover.urgency.mode_confidence,
-            mode_stability_counter: self.carryover.urgency.mode_stability_counter,
-            predicted_urgency: perception.urgency.predicted_urgency.into(),
-            context_phi_applied: feedback.reasoning.context_phi_applied,
-            evolution_confidence_delta: feedback.evolution.evolution_confidence_delta,
-            homeostasis_pull_strength: dynamics.homeostasis.homeostasis_pull_strength,
-            prediction_coherence_urgency_bias: perception.urgency.prediction_coherence_urgency_bias,
-            limiting_component_boosted: feedback.loops.limiting_component_boosted.clone(),
-            love_resonance_boost: feedback.loops.love_resonance_boost,
-            reasoning_chain_boosted: feedback.loops.reasoning_chain_boosted,
-            harmonic_interference_lr_mod: feedback.loops.harmonic_interference_lr_mod,
-            resonator_error_exploration_mod: dynamics.resonator.resonator_error_exploration_mod,
-            binding_threshold_mod: dynamics.binding_threshold_mod,
-            causal_urgency_gated: feedback.loops.causal_urgency_gated,
-            epistemic_semantic_lr_mod: dynamics.epistemic_semantic_lr_mod,
-            predictive_budget_gated: dynamics.attention.predictive_budget_gated,
-            binding_confidence_mod: dynamics.binding_confidence_mod,
-            discontinuity_streak: self.carryover.urgency.discontinuity_streak,
-            epistemic_reasoning_accelerated: self.carryover.quality.last_epistemic_conflict_count
-                > 5,
-            agency_strategy_override: perception.strategy.agency_strategy_override,
-            pfe_surprise_mod: dynamics.pfe_surprise_mod,
-            adaptive_memo_threshold: perception.encoding.memo_threshold,
+            adaptive: AdaptiveFeedbackMetrics {
+                epistemic_gate_gated: !feedback.reasoning.epistemic_gate_approved,
+                causal_attention_edges: dynamics.reasoning.causal_attention_edges,
+                mcts_plan_effectiveness: dynamics.reasoning.mcts_plan_effectiveness,
+                prediction_coherence: dynamics.core.prediction_coherence,
+                valence_homeostasis_pull: dynamics.homeostasis.valence_homeostasis_pull,
+                arousal_homeostasis_pull: dynamics.homeostasis.arousal_homeostasis_pull,
+                arousal_recovery_active: dynamics.homeostasis.arousal_recovery_active,
+                arousal_recovery_tau_factor: dynamics.homeostasis.arousal_recovery_tau_factor,
+                cycle_duration_us: cycle_start.elapsed().as_micros() as u64,
+                school_predicted_phi_gain: dynamics.reasoning.school_predicted_phi_gain,
+                epistemic_coherence_gated: feedback.loops.epistemic_coherence_gated,
+                phi_validation_cached: self.carryover.quality.phi_validation_correlation,
+                phi_spectral_weight: feedback.consciousness.phi_spectral_weight,
+            },
+            predictive: PredictiveTuningMetrics {
+                error_pattern: perception.urgency.error_pattern.into(),
+                startup_suppressed: perception.startup_suppressed,
+                startup_warmup_progress: perception.startup_warmup_progress,
+                self_model_accuracy: dynamics.core.self_model_accuracy,
+                mode_confidence: self.carryover.urgency.mode_confidence,
+                mode_stability_counter: self.carryover.urgency.mode_stability_counter,
+                predicted_urgency: perception.urgency.predicted_urgency.into(),
+            },
+            control: ControlSynthesisMetrics {
+                context_phi_applied: feedback.reasoning.context_phi_applied,
+                evolution_confidence_delta: feedback.evolution.evolution_confidence_delta,
+                homeostasis_pull_strength: dynamics.homeostasis.homeostasis_pull_strength,
+                prediction_coherence_urgency_bias: perception.urgency.prediction_coherence_urgency_bias,
+                limiting_component_boosted: feedback.loops.limiting_component_boosted.clone(),
+                love_resonance_boost: feedback.loops.love_resonance_boost,
+                reasoning_chain_boosted: feedback.loops.reasoning_chain_boosted,
+                harmonic_interference_lr_mod: feedback.loops.harmonic_interference_lr_mod,
+                resonator_error_exploration_mod: dynamics.resonator.resonator_error_exploration_mod,
+                binding_threshold_mod: dynamics.binding_threshold_mod,
+                causal_urgency_gated: feedback.loops.causal_urgency_gated,
+                epistemic_semantic_lr_mod: dynamics.epistemic_semantic_lr_mod,
+                predictive_budget_gated: dynamics.attention.predictive_budget_gated,
+                binding_confidence_mod: dynamics.binding_confidence_mod,
+                discontinuity_streak: self.carryover.urgency.discontinuity_streak,
+                epistemic_reasoning_accelerated: self.carryover.quality.last_epistemic_conflict_count
+                    > 5,
+                agency_strategy_override: perception.strategy.agency_strategy_override,
+                pfe_surprise_mod: dynamics.pfe_surprise_mod,
+                adaptive_memo_threshold: perception.encoding.memo_threshold,
+            },
             grid_encoding_norm: feedback.grid_encoding_norm,
             grid_spatial_complexity: feedback.grid_spatial_complexity,
             mood_temperature: 1.0,
@@ -1529,7 +1536,7 @@ impl CognitiveLoopService {
             crate::api::metrics::update_timing_metrics(
                 crate::api::metrics::global(),
                 &metadata.module_timings_us,
-                metadata.cycle_duration_us,
+                metadata.adaptive.cycle_duration_us,
             );
         }
 
@@ -1802,7 +1809,7 @@ mod tests {
     fn output_metadata_non_default() {
         let mut svc = make_service();
         let result = svc.cycle("metadata check");
-        assert!(result.metadata.cycle_duration_us > 0);
+        assert!(result.metadata.adaptive.cycle_duration_us > 0);
         assert!(!result.metadata.selected_strategy.is_empty());
     }
 
@@ -2018,7 +2025,7 @@ mod tests {
         for i in 0..100 {
             let r = svc.cycle(inputs[i % inputs.len()]);
             let m = &r.metadata;
-            assert!(m.cycle_duration_us > 0, "zero duration at cycle {i}");
+            assert!(m.adaptive.cycle_duration_us > 0, "zero duration at cycle {i}");
             assert!(
                 !m.selected_strategy.is_empty(),
                 "empty strategy at cycle {i}"

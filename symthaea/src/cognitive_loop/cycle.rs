@@ -265,6 +265,43 @@ impl CognitiveLoopService {
             // Assemble reasoning context for downstream consumers
             self.episodic_persistence.last_reasoning_context =
                 Some(crate::knowledge::ReasoningContext::from_manager(km, input));
+
+            // Item 8: Working memory knowledge injection
+            // Top grounded facts compete for WM slots alongside perceptual items.
+            // Max 2 slots reserved for knowledge to leave room for perceptual items
+            // (Miller's Law: 7±2 total capacity — knowledge must not crowd perception).
+            // Science: Baddeley (2000) — central executive integrates semantic retrieval;
+            //          Cowan (2001) — embedded-processes model caps WM at ~4 chunks.
+            if let Some(ref ctx) = self.episodic_persistence.last_reasoning_context {
+                if ctx.is_grounded() && !ctx.relevant_facts.is_empty() {
+                    // Select top facts by confidence × similarity product (highest value first)
+                    let injection_count = ctx.relevant_facts.len().min(2) as u8;
+                    // Grounding quality: weighted average of confidence × similarity for top-2 facts
+                    let grounding: f64 = ctx
+                        .relevant_facts
+                        .iter()
+                        .take(injection_count as usize)
+                        .map(|f| (f.confidence * f.similarity) as f64)
+                        .sum::<f64>()
+                        / injection_count as f64;
+                    // Scale by epistemic confidence multiplier — uncertain knowledge gets lower weight
+                    let weighted_grounding = (grounding
+                        * ctx.epistemic_state.confidence_multiplier)
+                        .clamp(0.0, 1.0);
+                    self.carryover.quality.wm_knowledge_grounding = weighted_grounding;
+                    self.carryover.quality.wm_knowledge_injection_count = injection_count;
+                    tracing::trace!(
+                        facts = injection_count,
+                        grounding = weighted_grounding,
+                        confidence_multiplier = ctx.epistemic_state.confidence_multiplier,
+                        "Working memory: injecting grounded knowledge facts"
+                    );
+                } else {
+                    // No grounding this cycle — decay toward zero (EMA with fast decay)
+                    self.carryover.quality.wm_knowledge_grounding *= 0.5;
+                    self.carryover.quality.wm_knowledge_injection_count = 0;
+                }
+            }
         }
 
         // ═══════════════════════════════════════════════════════════════════
@@ -721,7 +758,7 @@ mod tests {
     fn dynamics_coherence_finite() {
         let mut s = make_service();
         let r = s.cycle("coherence check");
-        assert!(r.metadata.prediction_coherence.is_finite());
+        assert!(r.metadata.adaptive.prediction_coherence.is_finite());
         assert!(r.metadata.cross_module_agreement.is_finite());
     }
 
@@ -729,9 +766,9 @@ mod tests {
     fn dynamics_homeostasis_pulls_finite() {
         let mut s = make_service();
         let r = s.cycle("homeostasis check");
-        assert!(r.metadata.valence_homeostasis_pull.is_finite());
-        assert!(r.metadata.arousal_homeostasis_pull.is_finite());
-        assert!(r.metadata.homeostasis_pull_strength.is_finite());
+        assert!(r.metadata.adaptive.valence_homeostasis_pull.is_finite());
+        assert!(r.metadata.adaptive.arousal_homeostasis_pull.is_finite());
+        assert!(r.metadata.control.homeostasis_pull_strength.is_finite());
     }
 
     #[test]

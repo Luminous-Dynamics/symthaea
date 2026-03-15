@@ -402,7 +402,7 @@ fn cycle_propagates_reasoning_fields() {
     // Reasoning fields from DynReasoning should appear in metadata
     assert!(m.reasoning_confidence.is_finite());
     assert!(m.reasoning_plan_confidence.is_finite());
-    assert!(m.mcts_plan_effectiveness.is_finite());
+    assert!(m.adaptive.mcts_plan_effectiveness.is_finite());
 }
 
 #[test]
@@ -412,10 +412,10 @@ fn cycle_propagates_homeostasis_fields() {
     let m = &result.metadata;
 
     // Homeostasis fields from DynHomeostasis should appear in metadata
-    assert!(m.valence_homeostasis_pull.is_finite());
-    assert!(m.arousal_homeostasis_pull.is_finite());
-    assert!(m.homeostasis_pull_strength.is_finite());
-    assert!(m.arousal_recovery_tau_factor.is_finite());
+    assert!(m.adaptive.valence_homeostasis_pull.is_finite());
+    assert!(m.adaptive.arousal_homeostasis_pull.is_finite());
+    assert!(m.control.homeostasis_pull_strength.is_finite());
+    assert!(m.adaptive.arousal_recovery_tau_factor.is_finite());
 }
 
 #[test]
@@ -476,7 +476,7 @@ fn cycle_propagates_attention_fields() {
 
     // Attention fields from DynAttention — verify they exist and are accessible
     let _ = m.attention.attention_budget_gated;
-    let _ = m.predictive_budget_gated;
+    let _ = m.control.predictive_budget_gated;
 }
 
 #[test]

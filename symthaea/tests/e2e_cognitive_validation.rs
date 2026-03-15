@@ -400,8 +400,8 @@ fn test_consciousness_trajectory_over_session() {
     for i in 0..100 {
         let result = service.cycle(inputs[i % inputs.len()]);
         consciousness_levels.push(result.metadata.consciousness_level);
-        startup_suppressed_flags.push(result.metadata.startup_suppressed);
-        warmup_progress_values.push(result.metadata.startup_warmup_progress);
+        startup_suppressed_flags.push(result.metadata.predictive.startup_suppressed);
+        warmup_progress_values.push(result.metadata.predictive.startup_warmup_progress);
     }
 
     // Consciousness level should not be flat 0.0 for the entire session
