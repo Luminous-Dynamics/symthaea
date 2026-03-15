@@ -79,6 +79,8 @@ fn run_scenario_through_pipeline(
             stillness_boost: 0.0,
             semantic_embedding: None,
             action_hv: None,
+            knowledge_confidence_multiplier: 1.0,
+            knowledge_moral_context: Vec::new(),
         };
 
         let output = engine.evaluate(&input);
@@ -111,6 +113,8 @@ fn run_scenario_with_warmup(
             stillness_boost: 0.0,
             semantic_embedding: None,
             action_hv: None,
+            knowledge_confidence_multiplier: 1.0,
+            knowledge_moral_context: Vec::new(),
         };
         let _ = engine.evaluate(&input);
     }
@@ -129,6 +133,8 @@ fn run_scenario_with_warmup(
             stillness_boost: 0.0,
             semantic_embedding: None,
             action_hv: None,
+            knowledge_confidence_multiplier: 1.0,
+            knowledge_moral_context: Vec::new(),
         };
         let output = engine.evaluate(&input);
         outputs.push(output);
@@ -154,6 +160,8 @@ fn run_consciousness_coupled(
             stillness_boost: 0.0,
             semantic_embedding: None,
             action_hv: None,
+            knowledge_confidence_multiplier: 1.0,
+            knowledge_moral_context: Vec::new(),
         };
 
         let output = engine.evaluate(&input);
@@ -953,6 +961,8 @@ fn test_p4_stillness_boost_modulates_coordinate_7() {
         stillness_boost: 0.0,
         semantic_embedding: None,
         action_hv: None,
+        knowledge_confidence_multiplier: 1.0,
+        knowledge_moral_context: Vec::new(),
     };
     let out_no = engine1.evaluate(&input_no_boost);
 
@@ -965,6 +975,8 @@ fn test_p4_stillness_boost_modulates_coordinate_7() {
         stillness_boost: 0.5,
         semantic_embedding: None,
         action_hv: None,
+        knowledge_confidence_multiplier: 1.0,
+        knowledge_moral_context: Vec::new(),
     };
     let out_yes = engine2.evaluate(&input_with_boost);
 
@@ -1034,6 +1046,8 @@ fn test_p4_consciousness_level_affects_confidence() {
         stillness_boost: 0.0,
         semantic_embedding: None,
         action_hv: None,
+        knowledge_confidence_multiplier: 1.0,
+        knowledge_moral_context: Vec::new(),
     };
     let out_high = engine1.evaluate(&input_high);
 
@@ -1046,6 +1060,8 @@ fn test_p4_consciousness_level_affects_confidence() {
         stillness_boost: 0.0,
         semantic_embedding: None,
         action_hv: None,
+        knowledge_confidence_multiplier: 1.0,
+        knowledge_moral_context: Vec::new(),
     };
     let out_low = engine2.evaluate(&input_low);
 

@@ -289,6 +289,11 @@ pub(crate) struct QualityMetrics {
     // ── Session 20: Measurement & Consolidation ─────────────────────────
     /// Cumulative activation counts for each named mechanism (lifetime, not per-cycle).
     pub(crate) mechanism_activations: std::collections::HashMap<&'static str, u32>,
+    // ── Knowledge Engine: Working Memory Injection ─────────────────────
+    /// Grounding quality of knowledge facts injected into working memory (Baddeley 2000).
+    pub(crate) wm_knowledge_grounding: f64,
+    /// Number of knowledge facts injected into working memory this cycle.
+    pub(crate) wm_knowledge_injection_count: u8,
 }
 
 impl Default for QualityMetrics {
@@ -351,6 +356,8 @@ impl Default for QualityMetrics {
             consecutive_high_agreement: 0,
             in_flow_state: false,
             mechanism_activations: std::collections::HashMap::new(),
+            wm_knowledge_grounding: 0.0,
+            wm_knowledge_injection_count: 0,
         }
     }
 }
