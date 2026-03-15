@@ -690,8 +690,8 @@ pub const CANONICAL_DIRECTIVE_WORDS: &[&str] = &[
 
 #[cfg(feature = "therapeutic")]
 pub const CANONICAL_REFLECTIVE_WORDS: &[&str] = &[
-    "sounds like", "it seems", "I wonder", "what if", "tell me more",
-    "what comes up", "I'm curious", "how does that feel", "what would",
+    "sounds like", "it seems", "i wonder", "what if", "tell me more",
+    "what comes up", "i'm curious", "how does that feel", "what would",
     "when you say", "help me understand", "say more about",
 ];
 
@@ -1577,6 +1577,145 @@ mod tests {
             assert!(
                 modified_count > 0,
                 "Gate should modify logits at backend token positions"
+            );
+        }
+    }
+
+    // ── Therapeutic gating tests ─────────────────────────────────────────────
+
+    #[cfg(feature = "therapeutic")]
+    mod therapeutic_gate_tests {
+        use super::super::*;
+        use crate::encoder::ThoughtChannels;
+
+        /// High distress should suppress directive words and boost validating words.
+        #[test]
+        fn test_high_distress_suppresses_directives() {
+            let mut channels = ThoughtChannels::default();
+            channels.channels[26] = 0.9; // client_distress_level = high
+
+            let should_logit = TherapeuticGate::apply("should", &channels, 0.0);
+            assert!(
+                should_logit < 0.0,
+                "Directive 'should' should be suppressed under high distress: {}",
+                should_logit,
+            );
+        }
+
+        #[test]
+        fn test_high_distress_boosts_validating() {
+            let mut channels = ThoughtChannels::default();
+            channels.channels[26] = 0.9; // client_distress_level = high
+
+            let understand_logit = TherapeuticGate::apply("understand", &channels, 0.0);
+            assert!(
+                understand_logit > 0.0,
+                "Validating 'understand' should be boosted under high distress: {}",
+                understand_logit,
+            );
+        }
+
+        #[test]
+        fn test_low_alliance_suppresses_directives() {
+            let mut channels = ThoughtChannels::default();
+            channels.channels[25] = 0.1; // alliance_quality = low
+
+            let must_logit = TherapeuticGate::apply("must", &channels, 0.0);
+            assert!(
+                must_logit < 0.0,
+                "Directive 'must' should be suppressed under low alliance: {}",
+                must_logit,
+            );
+        }
+
+        #[test]
+        fn test_crisis_mode_suppresses_directives_boosts_crisis() {
+            let mut channels = ThoughtChannels::default();
+            channels.channels[24] = 7.0; // therapeutic_intent = crisis
+
+            let should_logit = TherapeuticGate::apply("should", &channels, 0.0);
+            let call_logit = TherapeuticGate::apply("call", &channels, 0.0);
+            let breathe_logit = TherapeuticGate::apply("breathe", &channels, 0.0);
+
+            assert!(
+                should_logit < 0.0,
+                "Crisis mode should suppress directives: {}",
+                should_logit,
+            );
+            assert!(
+                call_logit > 0.0,
+                "Crisis mode should boost crisis referral words: {}",
+                call_logit,
+            );
+            assert!(
+                breathe_logit > 0.0,
+                "Crisis mode should boost grounding words: {}",
+                breathe_logit,
+            );
+        }
+
+        #[test]
+        fn test_depth_exceeds_alliance_suppresses() {
+            let mut channels = ThoughtChannels::default();
+            channels.channels[25] = 0.3; // alliance
+            channels.channels[27] = 0.8; // depth > alliance + 0.2
+
+            let correct_logit = TherapeuticGate::apply("correct", &channels, 0.0);
+            assert!(
+                correct_logit < 0.0,
+                "High depth with low alliance should suppress directives: {}",
+                correct_logit,
+            );
+        }
+
+        #[test]
+        fn test_reflective_intent_boosts_reflective() {
+            let mut channels = ThoughtChannels::default();
+            channels.channels[24] = 2.0; // therapeutic_intent = reflect
+
+            let wonder_logit = TherapeuticGate::apply("I wonder", &channels, 0.0);
+            assert!(
+                wonder_logit > 0.0,
+                "Reflective intent should boost reflective words: {}",
+                wonder_logit,
+            );
+        }
+
+        #[test]
+        fn test_neutral_state_no_modification() {
+            let channels = ThoughtChannels::default();
+            // Default: distress=0, alliance=0.5, intent=0, depth=0
+            let hello_logit = TherapeuticGate::apply("hello", &channels, 1.0);
+            assert!(
+                (hello_logit - 1.0).abs() < 1e-6,
+                "Neutral state should not modify non-therapeutic word: {}",
+                hello_logit,
+            );
+        }
+
+        #[test]
+        fn test_e2e_high_distress_directive_vs_validating_spread() {
+            let mut channels = ThoughtChannels::default();
+            channels.channels[26] = 0.9; // High distress
+
+            let directive_words = ["should", "must", "wrong"];
+            let validating_words = ["understand", "hear", "notice"];
+
+            let dir_sum: f32 = directive_words
+                .iter()
+                .map(|w| TherapeuticGate::apply(w, &channels, 0.0))
+                .sum();
+            let val_sum: f32 = validating_words
+                .iter()
+                .map(|w| TherapeuticGate::apply(w, &channels, 0.0))
+                .sum();
+
+            assert!(
+                val_sum > dir_sum,
+                "Under high distress, validating words should have higher total logit \
+                 than directive words: val={} vs dir={}",
+                val_sum,
+                dir_sum,
             );
         }
     }

@@ -133,6 +133,12 @@ pub struct RegulationEngine {
     strategy_successes: Vec<(RegulationStrategy, u32)>,
     /// Dream-discovered strategy preferences (strategy → cumulative Phi improvement).
     dream_strategy_bias: Vec<(RegulationStrategy, f32)>,
+    /// Accumulated serotonin debt from sustained negative valence.
+    /// Grows when NegativeValence is high; decays toward zero otherwise.
+    /// Science: sustained negative affect depletes 5-HT reserves (Jans et al., 2007).
+    serotonin_debt: f32,
+    /// Accumulated dopamine debt from sustained low positive valence.
+    dopamine_debt: f32,
 }
 
 impl RegulationEngine {
@@ -142,7 +148,103 @@ impl RegulationEngine {
             active_strategy: None,
             strategy_successes: Vec::new(),
             dream_strategy_bias: Vec::new(),
+            serotonin_debt: 0.0,
+            dopamine_debt: 0.0,
         }
+    }
+
+    /// Update temporal neuromodulator debt from current RDoC profile.
+    ///
+    /// Called each cycle to accumulate or decay transmitter debt.
+    /// Sustained negative valence grows serotonin debt (need for more 5-HT);
+    /// sustained low positive valence grows dopamine debt.
+    /// Debt decays exponentially when the triggering condition resolves.
+    ///
+    /// Science: Jans et al. (2007) — chronic stress depletes central 5-HT.
+    pub fn tick_debt(&mut self, rdoc: &RDocProfile) {
+        let neg_val = rdoc.score(RDocDomain::NegativeValence);
+        let pos_val = rdoc.score(RDocDomain::PositiveValence);
+
+        // Accumulate: high negative → serotonin debt grows
+        if neg_val > 0.3 {
+            self.serotonin_debt = (self.serotonin_debt + (neg_val - 0.3) * 0.01).min(1.0);
+        } else {
+            // Decay toward zero
+            self.serotonin_debt *= 0.98;
+        }
+
+        // Accumulate: low positive → dopamine debt grows
+        if pos_val < 0.4 {
+            self.dopamine_debt = (self.dopamine_debt + (0.4 - pos_val) * 0.01).min(1.0);
+        } else {
+            self.dopamine_debt *= 0.98;
+        }
+    }
+
+    /// Get current serotonin debt (0-1). Higher = more 5-HT needed.
+    pub fn serotonin_debt(&self) -> f32 {
+        self.serotonin_debt
+    }
+
+    /// Get current dopamine debt (0-1). Higher = more DA needed.
+    pub fn dopamine_debt(&self) -> f32 {
+        self.dopamine_debt
+    }
+
+    /// Update RDoC profile from neuromodulator bath state (bidirectional bridge).
+    ///
+    /// The neuromod bath has rich temporal dynamics (PKs, circadian gating, etc.)
+    /// that should be reflected back into the clinical RDoC profile.
+    ///
+    /// Mapping (inverse of domain→neuromod):
+    /// - Low serotonin → NegativeValence ↑
+    /// - Low dopamine → PositiveValence ↓
+    /// - High noradrenaline → ArousalRegulatory deviation ↑
+    /// - Low acetylcholine → CognitiveSystems ↓
+    /// - Low oxytocin → SocialProcesses ↓
+    pub fn update_rdoc_from_neuromod(rdoc: &mut RDocProfile, bath: &[f32; 8]) {
+        let alpha = 0.03_f32; // Moderate EMA blending
+        let [da, ne, sht, ach, gaba, oxy, _glu, _aden] = *bath;
+
+        // Low serotonin → increase NegativeValence
+        let neg_val_signal = (1.0 - sht).max(0.0) * 0.5 + (1.0 - gaba).max(0.0) * 0.3;
+        let cur_neg = rdoc.score(RDocDomain::NegativeValence);
+        rdoc.set_score(
+            RDocDomain::NegativeValence,
+            cur_neg * (1.0 - alpha) + neg_val_signal * alpha,
+        );
+
+        // Low dopamine → decrease PositiveValence
+        let pos_val_signal = da.clamp(0.0, 1.0);
+        let cur_pos = rdoc.score(RDocDomain::PositiveValence);
+        rdoc.set_score(
+            RDocDomain::PositiveValence,
+            cur_pos * (1.0 - alpha) + pos_val_signal * alpha,
+        );
+
+        // High noradrenaline deviation → increase ArousalRegulatory
+        let arousal_signal = (ne - 0.5).abs() * 2.0;
+        let cur_arousal = rdoc.score(RDocDomain::ArousalRegulatory);
+        rdoc.set_score(
+            RDocDomain::ArousalRegulatory,
+            cur_arousal * (1.0 - alpha) + arousal_signal * alpha,
+        );
+
+        // Acetylcholine → CognitiveSystems
+        let cog_signal = ach.clamp(0.0, 1.0);
+        let cur_cog = rdoc.score(RDocDomain::CognitiveSystems);
+        rdoc.set_score(
+            RDocDomain::CognitiveSystems,
+            cur_cog * (1.0 - alpha) + cog_signal * alpha,
+        );
+
+        // Oxytocin → SocialProcesses
+        let social_signal = oxy.clamp(0.0, 1.0);
+        let cur_social = rdoc.score(RDocDomain::SocialProcesses);
+        rdoc.set_score(
+            RDocDomain::SocialProcesses,
+            cur_social * (1.0 - alpha) + social_signal * alpha,
+        );
     }
 
     /// Select the most appropriate regulation strategy given context.
@@ -297,10 +399,15 @@ impl RegulationEngine {
         let noradrenaline_amp = 1.0 + arousal_dysreg * 0.3;
         let adenosine_amp = 1.0 + arousal_dysreg * 0.2;
 
+        // Temporal debt amplification: accumulated need for serotonin/dopamine
+        // adds an extra boost proportional to the debt level.
+        let sht_debt_amp = 1.0 + self.serotonin_debt * 0.3;
+        let da_debt_amp = 1.0 + self.dopamine_debt * 0.3;
+
         NeuromodDelta {
-            dopamine: base_delta.dopamine * dopamine_amp,
+            dopamine: base_delta.dopamine * dopamine_amp * da_debt_amp,
             noradrenaline: base_delta.noradrenaline * noradrenaline_amp,
-            serotonin: base_delta.serotonin * serotonin_amp,
+            serotonin: base_delta.serotonin * serotonin_amp * sht_debt_amp,
             acetylcholine: base_delta.acetylcholine * acetylcholine_amp,
             gaba: base_delta.gaba * gaba_amp,
             oxytocin: base_delta.oxytocin * oxytocin_amp,
@@ -584,6 +691,126 @@ mod tests {
             strategy,
             RegulationStrategy::Defusion,
             "Dream preference should override default when alliance permits",
+        );
+    }
+
+    #[test]
+    fn test_serotonin_debt_accumulates() {
+        let mut engine = RegulationEngine::new();
+        let mut rdoc = RDocProfile::default();
+        rdoc.set_score(RDocDomain::NegativeValence, 0.8);
+        assert_eq!(engine.serotonin_debt(), 0.0);
+        for _ in 0..50 {
+            engine.tick_debt(&rdoc);
+        }
+        assert!(
+            engine.serotonin_debt() > 0.1,
+            "Serotonin debt should accumulate with high NegativeValence: {}",
+            engine.serotonin_debt(),
+        );
+    }
+
+    #[test]
+    fn test_serotonin_debt_decays() {
+        let mut engine = RegulationEngine::new();
+        let mut rdoc = RDocProfile::default();
+        rdoc.set_score(RDocDomain::NegativeValence, 0.8);
+        for _ in 0..50 {
+            engine.tick_debt(&rdoc);
+        }
+        let peak = engine.serotonin_debt();
+        // Now resolve the trigger
+        rdoc.set_score(RDocDomain::NegativeValence, 0.1);
+        for _ in 0..100 {
+            engine.tick_debt(&rdoc);
+        }
+        assert!(
+            engine.serotonin_debt() < peak * 0.5,
+            "Serotonin debt should decay when NegativeValence resolves",
+        );
+    }
+
+    #[test]
+    fn test_dopamine_debt_accumulates_with_low_positive() {
+        let mut engine = RegulationEngine::new();
+        let mut rdoc = RDocProfile::default();
+        rdoc.set_score(RDocDomain::PositiveValence, 0.1);
+        for _ in 0..50 {
+            engine.tick_debt(&rdoc);
+        }
+        assert!(
+            engine.dopamine_debt() > 0.05,
+            "Dopamine debt should accumulate with low PositiveValence",
+        );
+    }
+
+    #[test]
+    fn test_debt_amplifies_rdoc_deltas() {
+        let mut engine = RegulationEngine::new();
+        let rdoc = RDocProfile::default();
+
+        // Without debt
+        let delta_no_debt = engine.apply_strategy_rdoc(
+            RegulationStrategy::Validation, 0.5, &rdoc,
+        );
+
+        // Accumulate serotonin debt
+        let mut neg_rdoc = RDocProfile::default();
+        neg_rdoc.set_score(RDocDomain::NegativeValence, 0.9);
+        for _ in 0..100 {
+            engine.tick_debt(&neg_rdoc);
+        }
+
+        let delta_with_debt = engine.apply_strategy_rdoc(
+            RegulationStrategy::Validation, 0.5, &rdoc,
+        );
+        assert!(
+            delta_with_debt.serotonin > delta_no_debt.serotonin,
+            "Accumulated serotonin debt should amplify serotonin delta: {} vs {}",
+            delta_with_debt.serotonin, delta_no_debt.serotonin,
+        );
+    }
+
+    #[test]
+    fn test_update_rdoc_from_neuromod_low_serotonin() {
+        let mut rdoc = RDocProfile::default();
+        let pre_neg = rdoc.score(RDocDomain::NegativeValence);
+        // Low serotonin (index 2), low GABA (index 4)
+        let bath = [0.5, 0.5, 0.1, 0.5, 0.1, 0.5, 0.5, 0.5];
+        for _ in 0..50 {
+            RegulationEngine::update_rdoc_from_neuromod(&mut rdoc, &bath);
+        }
+        assert!(
+            rdoc.score(RDocDomain::NegativeValence) > pre_neg,
+            "Low serotonin should increase NegativeValence",
+        );
+    }
+
+    #[test]
+    fn test_update_rdoc_from_neuromod_high_dopamine() {
+        let mut rdoc = RDocProfile::default();
+        // High dopamine (index 0)
+        let bath = [0.9, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5];
+        for _ in 0..50 {
+            RegulationEngine::update_rdoc_from_neuromod(&mut rdoc, &bath);
+        }
+        assert!(
+            rdoc.score(RDocDomain::PositiveValence) > 0.5,
+            "High dopamine should increase PositiveValence",
+        );
+    }
+
+    #[test]
+    fn test_update_rdoc_from_neuromod_low_oxytocin() {
+        let mut rdoc = RDocProfile::default();
+        let pre_social = rdoc.score(RDocDomain::SocialProcesses);
+        let bath = [0.5, 0.5, 0.5, 0.5, 0.5, 0.1, 0.5, 0.5];
+        for _ in 0..50 {
+            RegulationEngine::update_rdoc_from_neuromod(&mut rdoc, &bath);
+        }
+        assert!(
+            rdoc.score(RDocDomain::SocialProcesses) < pre_social,
+            "Low oxytocin should decrease SocialProcesses",
         );
     }
 

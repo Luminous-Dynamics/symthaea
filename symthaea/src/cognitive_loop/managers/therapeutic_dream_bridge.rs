@@ -80,6 +80,149 @@ impl DreamableTherapeuticAction {
     }
 }
 
+/// Record of a predicted outcome and optional actual outcome for closed-loop validation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PredictionRecord {
+    /// Predicted RDoC outcome state.
+    pub predicted_outcome: Vec<f32>,
+    /// Actual RDoC outcome (filled in after the fact).
+    pub actual_outcome: Option<Vec<f32>>,
+    /// L2 prediction error (computed when actual is recorded).
+    pub prediction_error: Option<f32>,
+    /// Cycle when prediction was made.
+    pub cycle: u64,
+}
+
+/// Tracker for dream counterfactual prediction accuracy.
+///
+/// Maintains a rolling history of predicted vs actual RDoC outcomes,
+/// enabling closed-loop validation of therapeutic counterfactual reasoning.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct TherapeuticDreamTracker {
+    /// Prediction history (ring buffer, max 64).
+    pub predictions: Vec<PredictionRecord>,
+}
+
+impl TherapeuticDreamTracker {
+    /// Maximum prediction history size.
+    const MAX_HISTORY: usize = 64;
+
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Record a predicted outcome.
+    pub fn record_prediction(&mut self, predicted: Vec<f32>, cycle: u64) {
+        if self.predictions.len() >= Self::MAX_HISTORY {
+            self.predictions.remove(0);
+        }
+        self.predictions.push(PredictionRecord {
+            predicted_outcome: predicted,
+            actual_outcome: None,
+            prediction_error: None,
+            cycle,
+        });
+    }
+
+    /// Record the actual outcome for the most recent unresolved prediction.
+    ///
+    /// Computes L2 prediction error between predicted and actual RDoC states.
+    pub fn record_actual_outcome(&mut self, actual: &[f32]) {
+        if let Some(record) = self
+            .predictions
+            .iter_mut()
+            .rev()
+            .find(|r| r.actual_outcome.is_none())
+        {
+            let error: f32 = record
+                .predicted_outcome
+                .iter()
+                .zip(actual.iter())
+                .map(|(p, a)| (p - a).powi(2))
+                .sum::<f32>()
+                .sqrt();
+            record.actual_outcome = Some(actual.to_vec());
+            record.prediction_error = Some(error);
+        }
+    }
+
+    /// Mean prediction error across resolved predictions (lower = better).
+    ///
+    /// Returns 1.0 if no resolved predictions exist.
+    pub fn prediction_accuracy(&self) -> f32 {
+        let errors: Vec<f32> = self
+            .predictions
+            .iter()
+            .filter_map(|r| r.prediction_error)
+            .collect();
+        if errors.is_empty() {
+            return 1.0;
+        }
+        errors.iter().sum::<f32>() / errors.len() as f32
+    }
+
+    /// Fraction of predictions that have been resolved with actual outcomes.
+    pub fn resolution_rate(&self) -> f32 {
+        if self.predictions.is_empty() {
+            return 0.0;
+        }
+        let resolved = self
+            .predictions
+            .iter()
+            .filter(|r| r.actual_outcome.is_some())
+            .count();
+        resolved as f32 / self.predictions.len() as f32
+    }
+}
+
+impl DreamableTherapeuticAction {
+    /// Generate a set of counterfactual therapeutic actions with unique modalities.
+    ///
+    /// Each seed produces a perturbation with a different modality, enabling
+    /// the dream engine to compare multiple alternative strategies.
+    pub fn generate_counterfactual_set(&self, seeds: &[u64]) -> Vec<DreamableTherapeuticAction> {
+        let mut seen_modalities = std::collections::HashSet::new();
+        seen_modalities.insert(self.modality);
+        let mut set = Vec::new();
+
+        for &seed in seeds {
+            let perturbed = self.perturb(seed);
+            if !seen_modalities.contains(&perturbed.modality) {
+                seen_modalities.insert(perturbed.modality);
+                set.push(perturbed);
+            }
+        }
+        set
+    }
+
+    /// Rank counterfactual actions by predicted RDoC improvement.
+    ///
+    /// Returns indices sorted by total improvement magnitude (best first).
+    pub fn rank_counterfactuals(
+        actions: &[DreamableTherapeuticAction],
+        state: &[f32],
+    ) -> Vec<(usize, f32)> {
+        let mut ranked: Vec<(usize, f32)> = actions
+            .iter()
+            .enumerate()
+            .map(|(i, action)| {
+                let outcome = action.predict_outcome(state);
+                let improvement: f32 = outcome
+                    .iter()
+                    .zip(state.iter())
+                    .map(|(o, s)| {
+                        // Positive for neg_valence reduction, positive for other improvements
+                        o - s
+                    })
+                    .sum();
+                (i, improvement)
+            })
+            .collect();
+        ranked.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        ranked
+    }
+}
+
 impl DreamableAction for DreamableTherapeuticAction {
     fn perturb(&self, seed: u64) -> Self {
         let alt_modality = self.alternative_modality(seed);
@@ -226,5 +369,118 @@ mod tests {
         let state = vec![0.5, 0.5]; // Only 2 elements
         let outcome = action.predict_outcome(&state);
         assert_eq!(outcome.len(), 6); // Padded to 6
+    }
+
+    // ── Multi-strategy counterfactual tests ──
+
+    #[test]
+    fn test_counterfactual_set_unique_modalities() {
+        let action = sample_action();
+        let seeds: Vec<u64> = (0..20).collect();
+        let set = action.generate_counterfactual_set(&seeds);
+        // Should have unique modalities (up to 8 alternatives since 9 total minus original)
+        let modalities: std::collections::HashSet<_> = set.iter().map(|a| a.modality).collect();
+        assert_eq!(
+            set.len(),
+            modalities.len(),
+            "All counterfactuals should have unique modalities",
+        );
+        assert!(
+            set.len() >= 3,
+            "Should generate at least 3 unique alternatives, got {}",
+            set.len(),
+        );
+    }
+
+    #[test]
+    fn test_rank_counterfactuals_best_first() {
+        let action = sample_action();
+        let seeds: Vec<u64> = (0..10).collect();
+        let set = action.generate_counterfactual_set(&seeds);
+        let state = vec![0.8, 0.3, 0.4, 0.4, 0.7, 0.4];
+        let ranked = DreamableTherapeuticAction::rank_counterfactuals(&set, &state);
+        assert!(!ranked.is_empty());
+        // Verify sorted descending by improvement
+        for w in ranked.windows(2) {
+            assert!(
+                w[0].1 >= w[1].1,
+                "Rankings should be sorted: {} >= {}",
+                w[0].1,
+                w[1].1,
+            );
+        }
+    }
+
+    // ── Prediction tracking tests ──
+
+    #[test]
+    fn test_prediction_tracker_record_and_resolve() {
+        let mut tracker = TherapeuticDreamTracker::new();
+        tracker.record_prediction(vec![0.5, 0.5, 0.5, 0.5, 0.5, 0.5], 1);
+        assert_eq!(tracker.predictions.len(), 1);
+        assert_eq!(tracker.resolution_rate(), 0.0);
+
+        tracker.record_actual_outcome(&[0.4, 0.6, 0.5, 0.5, 0.4, 0.5]);
+        assert_eq!(tracker.resolution_rate(), 1.0);
+        assert!(tracker.prediction_accuracy() < 1.0);
+        assert!(tracker.prediction_accuracy() > 0.0);
+    }
+
+    #[test]
+    fn test_prediction_tracker_accuracy_decreases_with_better_predictions() {
+        let mut tracker = TherapeuticDreamTracker::new();
+        // Good prediction
+        tracker.record_prediction(vec![0.5, 0.5, 0.5, 0.5, 0.5, 0.5], 1);
+        tracker.record_actual_outcome(&[0.5, 0.5, 0.5, 0.5, 0.5, 0.5]); // perfect
+        let good_accuracy = tracker.prediction_accuracy();
+
+        // Bad prediction
+        let mut tracker2 = TherapeuticDreamTracker::new();
+        tracker2.record_prediction(vec![0.5, 0.5, 0.5, 0.5, 0.5, 0.5], 1);
+        tracker2.record_actual_outcome(&[0.0, 1.0, 0.0, 1.0, 0.0, 1.0]); // way off
+        let bad_accuracy = tracker2.prediction_accuracy();
+
+        assert!(
+            good_accuracy < bad_accuracy,
+            "Better predictions should have lower error: {} vs {}",
+            good_accuracy,
+            bad_accuracy,
+        );
+    }
+
+    #[test]
+    fn test_prediction_tracker_history_bounded() {
+        let mut tracker = TherapeuticDreamTracker::new();
+        for i in 0..100 {
+            tracker.record_prediction(vec![0.5; 6], i);
+        }
+        assert!(
+            tracker.predictions.len() <= TherapeuticDreamTracker::MAX_HISTORY,
+            "History should be bounded at {}",
+            TherapeuticDreamTracker::MAX_HISTORY,
+        );
+    }
+
+    #[test]
+    fn test_closed_loop_10_rounds() {
+        let mut tracker = TherapeuticDreamTracker::new();
+        let action = sample_action();
+        let initial_state = vec![0.7, 0.3, 0.5, 0.5, 0.6, 0.5];
+
+        for i in 0..10 {
+            let predicted = action.predict_outcome(&initial_state);
+            tracker.record_prediction(predicted, i);
+            // Simulate actual outcome close to predicted (with noise)
+            let mut actual = action.predict_outcome(&initial_state);
+            actual[0] += 0.05; // small deviation
+            tracker.record_actual_outcome(&actual);
+        }
+
+        assert_eq!(tracker.predictions.len(), 10);
+        assert_eq!(tracker.resolution_rate(), 1.0);
+        assert!(
+            tracker.prediction_accuracy().is_finite(),
+            "Prediction accuracy should be finite",
+        );
     }
 }

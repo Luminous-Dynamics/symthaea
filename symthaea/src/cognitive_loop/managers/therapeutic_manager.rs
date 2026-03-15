@@ -28,6 +28,38 @@ use symthaea_therapeutic::{
 use symthaea_therapeutic::affect_regulation::NeuromodDelta;
 use symthaea_therapeutic::client_model::CoreAffectSnapshot;
 
+/// Serializable snapshot of therapeutic session state for persistence.
+#[derive(serde::Serialize)]
+struct TherapeuticSessionSnapshot<'a> {
+    client_model: &'a symthaea_therapeutic::ClientModel,
+    alliance_bond: f32,
+    alliance_goal: f32,
+    alliance_task: f32,
+    alliance_ruptures: u32,
+    alliance_repairs: u32,
+    narrative_coherence: f32,
+    narrative_fragment_count: usize,
+    formulation_predisposing: usize,
+    formulation_perpetuating: usize,
+    formulation_protective: usize,
+    crisis_active: bool,
+    serotonin_debt: f32,
+    dopamine_debt: f32,
+}
+
+/// Deserializable restore struct for session persistence.
+#[derive(serde::Deserialize)]
+struct TherapeuticSessionRestore {
+    client_model: symthaea_therapeutic::ClientModel,
+    alliance_bond: f32,
+    alliance_goal: f32,
+    alliance_task: f32,
+    alliance_ruptures: u32,
+    alliance_repairs: u32,
+    narrative_coherence: f32,
+    crisis_active: bool,
+}
+
 /// Therapeutic Manager — integrates therapeutic psychology into the cognitive loop.
 ///
 /// Implements `CognitiveSubsystem` at interval 11 (co-prime).
@@ -78,6 +110,48 @@ impl TherapeuticManager {
     /// Create a new therapeutic manager with default configuration.
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Serialize the therapeutic session state to JSON for persistence.
+    ///
+    /// Captures the core session data (affect trajectory, alliance, formulation,
+    /// narrative coherence, risk level, session count) that can survive a restart.
+    /// HDC vectors are excluded (marked `#[serde(skip)]` on ClientModel).
+    pub fn serialize_session(&self) -> Result<String, serde_json::Error> {
+        let session = TherapeuticSessionSnapshot {
+            client_model: &self.client_model,
+            alliance_bond: self.alliance.bond,
+            alliance_goal: self.alliance.goal_agreement,
+            alliance_task: self.alliance.task_agreement,
+            alliance_ruptures: self.alliance.rupture_count,
+            alliance_repairs: self.alliance.repair_count,
+            narrative_coherence: self.narrative.coherence,
+            narrative_fragment_count: self.narrative.fragments.len(),
+            formulation_predisposing: self.formulation.predisposing.len(),
+            formulation_perpetuating: self.formulation.perpetuating.len(),
+            formulation_protective: self.formulation.protective.len(),
+            crisis_active: self.crisis_active,
+            serotonin_debt: self.regulation_engine.serotonin_debt(),
+            dopamine_debt: self.regulation_engine.dopamine_debt(),
+        };
+        serde_json::to_string(&session)
+    }
+
+    /// Restore therapeutic session state from a JSON snapshot.
+    ///
+    /// Restores affect trajectory, alliance, and risk level.
+    /// HDC vectors are not restored (require re-encoding from text).
+    pub fn restore_session(&mut self, json: &str) -> Result<(), serde_json::Error> {
+        let snapshot: TherapeuticSessionRestore = serde_json::from_str(json)?;
+        self.client_model = snapshot.client_model;
+        self.alliance.bond = snapshot.alliance_bond;
+        self.alliance.goal_agreement = snapshot.alliance_goal;
+        self.alliance.task_agreement = snapshot.alliance_task;
+        self.alliance.rupture_count = snapshot.alliance_ruptures;
+        self.alliance.repair_count = snapshot.alliance_repairs;
+        self.narrative.coherence = snapshot.narrative_coherence;
+        self.crisis_active = snapshot.crisis_active;
+        Ok(())
     }
 
     /// Get current client distress level (0-1).
@@ -190,6 +264,10 @@ impl CognitiveSubsystem for TherapeuticManager {
         // ── 1b. Update RDoC profile from sustained affect patterns ────────
         // Slow EMA adaptation makes neuromod deltas responsive to ongoing state.
         self.client_model.update_rdoc_from_affect();
+
+        // ── 1c. Tick transmitter debt from sustained RDoC imbalance ────────
+        // Accumulates serotonin/dopamine debt over time — amplifies future deltas.
+        self.regulation_engine.tick_debt(&self.client_model.rdoc_profile);
 
         // ── 2. Crisis detection (ALWAYS runs — safety critical) ────────────
         // NOTE: Do not reset crisis_active here — text-based crisis detection
@@ -388,6 +466,47 @@ mod tests {
         // Should produce some valence/arousal change from regulation
         // (validation strategy should boost serotonin/oxytocin → positive valence_delta)
         let _ = output; // non-neutral output is strategy-dependent
+    }
+
+    #[test]
+    fn test_serialize_restore_roundtrip() {
+        let mut manager = TherapeuticManager::new();
+        // Run a few cycles to build state
+        for i in 0..5 {
+            let snapshot = make_snapshot(-0.3, 0.6, i);
+            manager.process(&snapshot);
+        }
+        manager.alliance.bond = 0.7;
+        manager.alliance.goal_agreement = 0.6;
+
+        // Serialize
+        let json = manager.serialize_session().expect("serialize should succeed");
+        assert!(!json.is_empty());
+
+        // Restore into fresh manager
+        let mut restored = TherapeuticManager::new();
+        restored.restore_session(&json).expect("restore should succeed");
+        assert_eq!(restored.alliance.bond, 0.7);
+        assert_eq!(restored.alliance.goal_agreement, 0.6);
+        assert_eq!(restored.client_model.cycle_count, manager.client_model.cycle_count);
+    }
+
+    #[test]
+    fn test_tick_debt_wired_in_process() {
+        let mut manager = TherapeuticManager::new();
+        // Set high negative valence RDoC to trigger debt accumulation
+        manager.client_model.rdoc_profile.set_score(
+            symthaea_clinical::RDocDomain::NegativeValence,
+            0.9,
+        );
+        for i in 0..100 {
+            let snapshot = make_snapshot(-0.5, 0.7, i);
+            manager.process(&snapshot);
+        }
+        assert!(
+            manager.regulation_engine.serotonin_debt() > 0.0,
+            "Serotonin debt should accumulate through process() cycles",
+        );
     }
 
     #[test]

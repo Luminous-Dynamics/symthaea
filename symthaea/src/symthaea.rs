@@ -3327,6 +3327,27 @@ impl Symthaea {
     }
 
     // ========================================================================
+    // Swarm / P2P State
+    // ========================================================================
+
+    /// Install a swarm event channel on the ContinuousMind.
+    ///
+    /// The Mind will automatically forward Hyperfeel affective state and
+    /// FederatedAggregator round results through this sender.
+    ///
+    /// Typical usage:
+    /// ```ignore
+    /// let tx = cls.create_swarm_event_channel();  // CLS side
+    /// symthaea.set_swarm_channel(tx.clone());      // Mind side
+    /// ```
+    pub fn set_swarm_channel(
+        &mut self,
+        tx: std::sync::mpsc::Sender<crate::cognitive_loop::SwarmEvent>,
+    ) {
+        self.mind.set_swarm_channel(tx);
+    }
+
+    // ========================================================================
     // Calibration (Brier Score Integration)
     // ========================================================================
 

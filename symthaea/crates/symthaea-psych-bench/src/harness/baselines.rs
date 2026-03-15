@@ -3672,9 +3672,9 @@ pub fn institutional_reasoning_baselines() -> BaselineMap {
     m.insert(
         "institutional_axiom_discrimination",
         Baseline {
-            value: 0.40,
-            sd: Some(0.10),
-            source: "Kanerva (2009) HDC orthogonality",
+            value: 0.50,
+            sd: Some(0.15),
+            source: "Noise-ceiling classification (Kanerva 2009, normalized noise/0.50)",
             population: "theoretical",
         },
     );
@@ -3715,20 +3715,20 @@ pub fn institutional_reasoning_baselines() -> BaselineMap {
         },
     );
     m.insert(
-        "analogical_shared_component_auc",
+        "analogical_selectivity",
         Baseline {
-            value: 0.65,
-            sd: Some(0.10),
-            source: "Shared-component AUC (area under ROC)",
+            value: 0.05,
+            sd: Some(0.05),
+            source: "Random-chance analogical selectivity (best-2nd)/best",
             population: "theoretical",
         },
     );
     m.insert(
         "analogical_asymmetry_score",
         Baseline {
-            value: 0.50,
-            sd: Some(0.15),
-            source: "Permutation-based directional asymmetry",
+            value: 0.10,
+            sd: Some(0.10),
+            source: "Random-direction similarity-profile divergence (cosine distance ×100)",
             population: "theoretical",
         },
     );
@@ -3813,6 +3813,34 @@ pub fn institutional_reasoning_baselines() -> BaselineMap {
             value: 0.0,
             sd: Some(0.10),
             source: "Weighted minus unweighted accuracy difference",
+            population: "theoretical",
+        },
+    );
+    // Stability baselines
+    m.insert(
+        "institutional_stability",
+        Baseline {
+            value: 0.50,
+            sd: Some(0.15),
+            source: "Mean noise ceiling / 0.50 (Kanerva 2009 dimensionality theory)",
+            population: "theoretical",
+        },
+    );
+    m.insert(
+        "institutional_min_stability",
+        Baseline {
+            value: 0.40,
+            sd: Some(0.15),
+            source: "Worst-case axiom noise ceiling",
+            population: "theoretical",
+        },
+    );
+    m.insert(
+        "institutional_stability_variance",
+        Baseline {
+            value: 0.01,
+            sd: Some(0.01),
+            source: "Variance of per-axiom noise ceilings (lower is better)",
             population: "theoretical",
         },
     );
@@ -3915,6 +3943,7 @@ mod tests {
         assert!(!binding_baselines().is_empty());
         assert!(!speech_baselines().is_empty());
         assert!(!substrate_baselines().is_empty());
+        assert!(!clinical_baselines().is_empty());
     }
 
     #[test]

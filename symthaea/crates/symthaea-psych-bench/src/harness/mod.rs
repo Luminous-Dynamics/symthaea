@@ -209,6 +209,7 @@ mod tests {
         use crate::benchmarks::speech::*;
         use crate::benchmarks::substrate::*;
         use crate::benchmarks::sustained_attention::*;
+        use crate::benchmarks::clinical::*;
         use crate::benchmarks::tombench::*;
         use crate::benchmarks::worm::*;
 
@@ -320,6 +321,13 @@ mod tests {
             Box::new(BlindSightBenchmark),
             // Substrate
             Box::new(SubstrateTransferBenchmark),
+            // Clinical/Therapeutic
+            Box::new(EmpathicAccuracyBenchmark),
+            Box::new(TherapeuticResponseBenchmark),
+            Box::new(AllianceMaintenanceBenchmark),
+            Box::new(CrisisDetectionBenchmark),
+            Box::new(CognitiveDistortionBenchmark),
+            Box::new(MotivationalInterviewingBenchmark),
         ];
 
         let mut missing = Vec::new();
