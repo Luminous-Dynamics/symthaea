@@ -123,6 +123,7 @@ async fn main() -> Result<()> {
 }
 
 /// Minimal HTTP health endpoint — responds to GET /health with JSON status + metrics.
+/// Also sends systemd watchdog pings every 30 seconds if running under systemd.
 async fn serve_health(port: u16, metrics: BridgeMetrics) -> Result<()> {
     use tokio::io::AsyncWriteExt;
     use tokio::net::TcpListener;
@@ -130,12 +131,28 @@ async fn serve_health(port: u16, metrics: BridgeMetrics) -> Result<()> {
     let listener = TcpListener::bind(format!("0.0.0.0:{port}")).await?;
     tracing::info!("Health endpoint listening on :{port}/health");
 
+    // Notify systemd we're ready (Type=notify)
+    sd_notify("READY=1");
+
+    // Spawn watchdog ticker if running under systemd
+    tokio::spawn(async {
+        loop {
+            tokio::time::sleep(tokio::time::Duration::from_secs(30)).await;
+            sd_notify("WATCHDOG=1");
+        }
+    });
+
     loop {
         let (mut socket, _) = listener.accept().await?;
+        let uptime_secs = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
         let body = serde_json::json!({
             "status": "running",
             "service": "mycelix-mesh-bridge",
             "version": env!("CARGO_PKG_VERSION"),
+            "uptime_check": uptime_secs,
             "metrics": metrics.to_json(),
         });
         let body_str = body.to_string();
@@ -145,5 +162,16 @@ async fn serve_health(port: u16, metrics: BridgeMetrics) -> Result<()> {
             body_str
         );
         let _ = socket.write_all(response.as_bytes()).await;
+    }
+}
+
+/// Send a notification to systemd via $NOTIFY_SOCKET (if available).
+/// No-op if not running under systemd.
+fn sd_notify(msg: &str) {
+    if let Ok(socket_path) = std::env::var("NOTIFY_SOCKET") {
+        use std::os::unix::net::UnixDatagram;
+        if let Ok(sock) = UnixDatagram::unbound() {
+            let _ = sock.send_to(msg.as_bytes(), &socket_path);
+        }
     }
 }

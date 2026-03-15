@@ -42,7 +42,7 @@ pub async fn run(
 ) -> Result<()> {
     tracing::info!("Poller starting, conductor={conductor_url}, interval={poll_interval_secs}s");
 
-    let mut dedup: HashSet<String> = HashSet::new();
+    let mut dedup: HashSet<String> = crate::dedup_cache::load_string_cache("poller-dedup.cache");
     let origin = get_origin_id();
     let mut poll_count: u64 = 0;
     let mut consecutive_failures: u32 = 0;
@@ -129,6 +129,11 @@ pub async fn run(
                 break;
             }
         }
+    }
+
+    // Persist dedup cache for restart resilience
+    if let Err(e) = crate::dedup_cache::save_string_cache(&dedup, "poller-dedup.cache") {
+        tracing::warn!("Failed to save poller dedup cache: {e}");
     }
 
     // Drop cached connection cleanly

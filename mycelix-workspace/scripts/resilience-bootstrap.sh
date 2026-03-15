@@ -225,6 +225,88 @@ EOF
 }
 
 # --------------------------------------------------------------------------
+# Status check: are services running?
+# --------------------------------------------------------------------------
+
+check_status() {
+    info "Checking Resilience Kit status..."
+    echo ""
+
+    # Holochain conductor
+    info "--- Holochain Conductor ---"
+    if ss -tlnp 2>/dev/null | grep -q ":8888 "; then
+        info "  Port 8888: LISTENING"
+    elif lsof -i :8888 &>/dev/null; then
+        info "  Port 8888: LISTENING"
+    else
+        warn "  Port 8888: NOT listening (conductor may be down)"
+    fi
+
+    # Observatory
+    echo ""
+    info "--- Observatory ---"
+    if curl -sf -o /dev/null --connect-timeout 2 http://localhost:5173/ 2>/dev/null; then
+        info "  http://localhost:5173/: REACHABLE"
+    elif curl -sf -o /dev/null --connect-timeout 2 http://localhost/ 2>/dev/null; then
+        info "  http://localhost/: REACHABLE (Docker/nginx)"
+    else
+        warn "  Observatory: NOT reachable"
+    fi
+
+    # Mesh bridge health
+    echo ""
+    info "--- Mesh Bridge ---"
+    local health
+    health=$(curl -sf --connect-timeout 2 http://localhost:9100/health 2>/dev/null)
+    if [ -n "$health" ]; then
+        info "  Health endpoint: REACHABLE"
+        # Parse key metrics with basic tools
+        local sent recv peers cycles
+        sent=$(echo "$health" | grep -o '"messages_sent":[0-9]*' | cut -d: -f2)
+        recv=$(echo "$health" | grep -o '"messages_received":[0-9]*' | cut -d: -f2)
+        peers=$(echo "$health" | grep -o '"peers_seen":[0-9]*' | cut -d: -f2)
+        cycles=$(echo "$health" | grep -o '"poll_cycles":[0-9]*' | cut -d: -f2)
+        info "  Messages sent:     ${sent:-0}"
+        info "  Messages received: ${recv:-0}"
+        info "  Peers seen:        ${peers:-0}"
+        info "  Poll cycles:       ${cycles:-0}"
+    else
+        warn "  Mesh bridge: NOT reachable (port 9100)"
+    fi
+
+    # Docker containers (if Docker is available)
+    if command -v docker &>/dev/null; then
+        echo ""
+        info "--- Docker Containers ---"
+        local containers
+        containers=$(docker ps --filter "name=mycelix" --format "  {{.Names}}: {{.Status}}" 2>/dev/null)
+        if [ -n "$containers" ]; then
+            echo "$containers"
+        else
+            info "  No mycelix containers running"
+        fi
+    fi
+
+    # Dedup cache
+    echo ""
+    info "--- Dedup Cache ---"
+    local cache_dir="${MESH_CACHE_DIR:-/tmp/mycelix-mesh-bridge}"
+    if [ -d "$cache_dir" ]; then
+        for f in "$cache_dir"/*.cache; do
+            if [ -f "$f" ]; then
+                local size
+                size=$(wc -c < "$f" 2>/dev/null)
+                info "  $(basename "$f"): ${size} bytes"
+            fi
+        done
+    else
+        info "  No dedup cache found (fresh start)"
+    fi
+
+    echo ""
+}
+
+# --------------------------------------------------------------------------
 # Main
 # --------------------------------------------------------------------------
 
@@ -245,6 +327,9 @@ MODE="${1:-local}"
 case "$MODE" in
     --dry-run)
         deploy_dry_run
+        ;;
+    --status)
+        check_status
         ;;
     --docker)
         check_prerequisites "$MODE"

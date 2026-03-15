@@ -32,7 +32,9 @@
   let reportItem = CANONICAL_ITEMS[0].key;
   let reportPrice = CANONICAL_ITEMS[0].default_price;
   let reportEvidence = '';
-  let reportStatus: 'idle' | 'submitting' | 'success' | 'error' = 'idle';
+  let reportStatus: 'idle' | 'submitting' | 'success' | 'error' | 'cooldown' = 'idle';
+  let reportCooldownSecs = 0;
+  let cooldownInterval: ReturnType<typeof setInterval> | null = null;
 
   // Import/export
   let showImportExport = false;
@@ -62,11 +64,25 @@
 
   async function handleReport() {
     if (reportPrice <= 0 || !reportItem) return;
+    if (reportStatus === 'cooldown') return;
     reportStatus = 'submitting';
     const ok = await submitPriceReport(reportItem, reportPrice, reportEvidence);
-    reportStatus = ok ? 'success' : 'error';
-    reportEvidence = '';
-    setTimeout(() => { reportStatus = 'idle'; }, 2000);
+    if (ok) {
+      reportStatus = 'cooldown';
+      reportEvidence = '';
+      reportCooldownSecs = 30;
+      cooldownInterval = setInterval(() => {
+        reportCooldownSecs -= 1;
+        if (reportCooldownSecs <= 0) {
+          reportStatus = 'idle';
+          if (cooldownInterval) clearInterval(cooldownInterval);
+          cooldownInterval = null;
+        }
+      }, 1000);
+    } else {
+      reportStatus = 'error';
+      setTimeout(() => { reportStatus = 'idle'; }, 2000);
+    }
   }
 
   function handleSelectItem(key: string) {

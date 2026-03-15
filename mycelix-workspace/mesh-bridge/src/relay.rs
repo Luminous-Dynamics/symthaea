@@ -32,7 +32,7 @@ pub async fn run(
 ) -> Result<()> {
     tracing::info!("Relay starting, conductor={conductor_url}");
 
-    let mut dedup: HashSet<[u8; 32]> = HashSet::new();
+    let mut dedup: HashSet<[u8; 32]> = crate::dedup_cache::load_binary_cache("relay-dedup.cache");
     let mut reassembly: HashMap<[u8; 4], ReassemblyBuffer> = HashMap::new();
     let mut ws_cached: Option<AppWebsocket> = None;
     let mut known_peers: HashSet<[u8; 8]> = HashSet::new();
@@ -135,6 +135,11 @@ pub async fn run(
         if dedup.len() > 10_000 {
             dedup.clear();
         }
+    }
+
+    // Persist dedup cache for restart resilience
+    if let Err(e) = crate::dedup_cache::save_binary_cache(&dedup, "relay-dedup.cache") {
+        tracing::warn!("Failed to save relay dedup cache: {e}");
     }
 
     // Drop cached connection cleanly

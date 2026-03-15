@@ -95,7 +95,7 @@ Range: 10-15km line of sight. Auto-switches to mesh on internet loss, resyncs wh
 just resilience-test
 ```
 
-Runs: mesh-bridge (49 tests), price oracle (21 tests), Observatory type-check.
+Runs: mesh-bridge (54 tests), price oracle (21 tests), Observatory type-check.
 
 ## Pre-deployment Check
 
@@ -106,6 +106,16 @@ Before deploying to a new machine, run the dry-run validator:
 ```
 
 Checks: prerequisites, port availability, disk space, key files.
+
+## Service Status
+
+Check if everything is running:
+
+```bash
+./scripts/resilience-bootstrap.sh --status
+```
+
+Shows: conductor, Observatory, mesh bridge health + metrics, Docker containers, dedup cache.
 
 ## Tax Compliance (South Africa)
 

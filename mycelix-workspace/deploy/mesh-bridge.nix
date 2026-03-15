@@ -110,7 +110,9 @@ in {
         ExecStart = "${cfg.package}/bin/mesh-bridge";
         Restart = "always";
         RestartSec = 10;
-        Type = "simple";
+        Type = "notify";
+        WatchdogSec = 90;
+        StateDirectory = "mycelix-mesh-bridge";
 
         User = cfg.user;
         Group = cfg.group;
