@@ -2336,3 +2336,129 @@ pub struct ModuleTimings {
     /// Phase 4: Output (metadata assembly, telemetry, CycleResult construction).
     pub phase_output: u64,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Serde roundtrip regression test for CycleMetadata.
+    ///
+    /// Verifies that `#[serde(flatten)]` sub-structs serialize to flat JSON
+    /// fields and deserialize back identically. Catches any future breakage
+    /// from sub-struct additions, renames, or flatten conflicts.
+    #[test]
+    fn cycle_metadata_serde_roundtrip() {
+        // Build a metadata with non-default values in every sub-struct
+        let mut m = CycleMetadata::default();
+
+        // Governance
+        m.governance.governance_reward_ema = 0.42;
+        m.governance.governance_pending_events = 3;
+        m.governance.governance_confidence_delta = -0.05;
+
+        // Swarm
+        m.swarm.swarm_connected_peers = 7;
+        m.swarm.swarm_connectivity_ema = 0.88;
+
+        // Knowledge
+        m.knowledge.knowledge_graph_size = 150;
+        m.knowledge.knowledge_avg_confidence = 0.73;
+
+        // Math
+        m.math.math_detected = true;
+        m.math.math_phi = 0.61;
+
+        // Voice
+        m.voice.voice_articulation_quality = 0.95;
+        m.voice.voice_confidence = 0.82;
+
+        // Cantor
+        m.cantor.cantor_metacognitive_depth = 3.5;
+        m.cantor.cantor_codebook_size = 64;
+
+        // Motor (custom default: action_type=255)
+        m.motor.motor_action_executed = true;
+        m.motor.motor_action_type = 2;
+        m.motor.motor_phi_used = 0.77;
+
+        // Social (custom defaults: learning_rate_factor=1.0, prediction_accuracy=0.5, mean_trust=0.5)
+        m.social.social_trust_current = 0.9;
+        m.social.social_learning_rate_factor = 1.15;
+        m.social.tom_exploration_triggered = true;
+
+        // User state (custom default: engagement=0.5)
+        m.user_state.user_engagement = 0.8;
+        m.user_state.user_frustration = 0.3;
+
+        // Serialize → JSON → Deserialize
+        let json = serde_json::to_string(&m).expect("serialize");
+        let m2: CycleMetadata = serde_json::from_str(&json).expect("deserialize");
+
+        // Verify sub-struct fields survive the roundtrip
+        assert_eq!(m2.governance.governance_reward_ema, 0.42);
+        assert_eq!(m2.governance.governance_pending_events, 3);
+        assert!((m2.governance.governance_confidence_delta - (-0.05)).abs() < 1e-6);
+        assert_eq!(m2.swarm.swarm_connected_peers, 7);
+        assert!((m2.swarm.swarm_connectivity_ema - 0.88).abs() < 1e-6);
+        assert_eq!(m2.knowledge.knowledge_graph_size, 150);
+        assert!(m2.math.math_detected);
+        assert!((m2.math.math_phi - 0.61).abs() < 1e-6);
+        assert!((m2.voice.voice_articulation_quality - 0.95).abs() < 1e-6);
+        assert!((m2.cantor.cantor_metacognitive_depth - 3.5).abs() < 1e-6);
+        assert_eq!(m2.cantor.cantor_codebook_size, 64);
+        assert!(m2.motor.motor_action_executed);
+        assert_eq!(m2.motor.motor_action_type, 2);
+        assert!((m2.social.social_trust_current - 0.9).abs() < 1e-6);
+        assert!((m2.social.social_learning_rate_factor - 1.15).abs() < 1e-6);
+        assert!(m2.social.tom_exploration_triggered);
+        assert!((m2.user_state.user_engagement - 0.8).abs() < 1e-6);
+        assert!((m2.user_state.user_frustration - 0.3).abs() < 1e-6);
+    }
+
+    /// Verify that `#[serde(flatten)]` produces flat JSON keys, not nested objects.
+    /// This ensures backward compatibility with existing API consumers.
+    #[test]
+    fn cycle_metadata_flatten_produces_flat_json() {
+        let mut m = CycleMetadata::default();
+        m.social.social_trust_current = 0.75;
+        m.motor.motor_action_type = 3;
+        m.governance.governance_reward_ema = 0.5;
+
+        let json = serde_json::to_string(&m).expect("serialize");
+
+        // Fields must appear at top level, NOT nested under sub-struct names
+        assert!(json.contains("\"social_trust_current\":0.75"), "social_trust_current must be flat");
+        assert!(json.contains("\"motor_action_type\":3"), "motor_action_type must be flat");
+        assert!(json.contains("\"governance_reward_ema\":0.5"), "governance_reward_ema must be flat");
+
+        // Sub-struct names must NOT appear as JSON keys
+        assert!(!json.contains("\"social\":{"), "social must not be a nested object");
+        assert!(!json.contains("\"motor\":{"), "motor must not be a nested object");
+        assert!(!json.contains("\"governance\":{"), "governance must not be a nested object");
+    }
+
+    /// Verify that sub-struct custom defaults are preserved through Default::default().
+    #[test]
+    fn cycle_metadata_custom_defaults_preserved() {
+        let m = CycleMetadata::default();
+
+        // Custom defaults from sub-structs
+        assert_eq!(m.motor.motor_action_type, 255, "motor_action_type default");
+        assert!((m.social.social_learning_rate_factor - 1.0).abs() < 1e-6, "learning_rate_factor default");
+        assert!((m.social.social_prediction_accuracy - 0.5).abs() < 1e-6, "prediction_accuracy default");
+        assert!((m.social.social_mean_trust - 0.5).abs() < 1e-6, "mean_trust default");
+        assert!((m.user_state.user_engagement - 0.5).abs() < 1e-6, "engagement default");
+
+        // Zero defaults
+        assert_eq!(m.governance.governance_pending_events, 0);
+        assert_eq!(m.swarm.swarm_connected_peers, 0);
+        assert!(!m.math.math_detected);
+
+        // Roundtrip the default to verify sub-struct defaults survive serialization
+        let json = serde_json::to_string(&m).expect("serialize default");
+        let m2: CycleMetadata = serde_json::from_str(&json).expect("deserialize default");
+        assert_eq!(m2.motor.motor_action_type, 255, "motor default survives roundtrip");
+        assert!((m2.social.social_learning_rate_factor - 1.0).abs() < 1e-6, "social default survives roundtrip");
+        assert!((m2.user_state.user_engagement - 0.5).abs() < 1e-6, "user_state default survives roundtrip");
+    }
+}
