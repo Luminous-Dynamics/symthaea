@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 //! # Quantum Circuit Simulation Engine for Hyperdimensional Computing
 //!
 //! This module provides a statevector quantum circuit simulator integrated with

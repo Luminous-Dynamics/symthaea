@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 //! # Optimization Engine
 //!
 //! Numerical optimization methods with consciousness-coupled HDC encoding.

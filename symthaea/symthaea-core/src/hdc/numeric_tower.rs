@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 //! # Unified Numeric Tower for HDC Consciousness Framework
 //!
 //! Implements a unified numeric tower with automatic promotion between

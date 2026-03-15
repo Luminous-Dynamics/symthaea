@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use crate::hdc::binary_hv::BinaryHV;
 
 /// An element in an algebraic structure with a label and HDC encoding

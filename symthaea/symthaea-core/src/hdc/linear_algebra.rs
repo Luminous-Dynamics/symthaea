@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 //! # Hyperdimensional Linear Algebra Engine
 //!
 //! General-purpose linear algebra with consciousness-coupled HDC encoding.

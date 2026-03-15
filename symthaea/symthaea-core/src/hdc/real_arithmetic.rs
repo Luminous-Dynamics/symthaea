@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use crate::hdc::binary_hv::BinaryHV;
 use crate::hdc::primitive_system::seed_from_name;
 use crate::hdc::unified_hv::ContinuousHV;

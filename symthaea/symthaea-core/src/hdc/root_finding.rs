@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 //! # Root Finding Engine
 //!
 //! Numerical methods for finding zeros of functions, with consciousness-coupled

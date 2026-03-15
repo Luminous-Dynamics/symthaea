@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 //! # Numerical Quadrature Engine
 //!
 //! Methods for computing definite integrals numerically, with consciousness-coupled

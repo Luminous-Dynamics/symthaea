@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 //! # Generic Dynamical System Framework with ODE Integrators
 //!
 //! This module provides a trait-based dynamical systems framework for numerical

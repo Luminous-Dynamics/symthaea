@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 //! Symbolic calculus: differentiation, integration, and fundamental theorem verification.
 //!
 //! ## Capabilities

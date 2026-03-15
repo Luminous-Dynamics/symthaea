@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 //! Consciousness-Aware Physics Simulation Observer
 //!
 //! Bridges physics simulation with consciousness measurement (Φ), detecting
