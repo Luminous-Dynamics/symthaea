@@ -203,6 +203,10 @@ pub struct ContinuousMind {
     /// independently from the cognitive loop's bath (which doesn't run during dreams).
     /// Science: Xie et al. (2013), Piomelli (2003), Blier & de Montigny (1994).
     pub(crate) dream_bath: symthaea_neuromodulators::NeuromodulatorBath,
+    /// Optional sender for forwarding swarm events (affective sync, federated rounds)
+    /// to the CognitiveLoopService's SwarmManager via mpsc channel.
+    /// Set via `set_swarm_channel()` after CLS creates the channel.
+    pub(crate) swarm_event_tx: Option<std::sync::mpsc::Sender<crate::cognitive_loop::SwarmEvent>>,
     /// Holochain Cortex for trust and validation.
     pub(crate) cortex: crate::swarm::HolochainCortex,
     /// Optional LLM backend for swarm projection gradient exchange.
@@ -319,6 +323,7 @@ impl ContinuousMind {
             cached_moral_topology: None,
             memory_coordinator: crate::memory::memory_coordinator::MemoryCoordinator::default(),
             episodic_memory: None,
+            swarm_event_tx: None,
             dream_bath: symthaea_neuromodulators::NeuromodulatorBath::default(),
             cortex: crate::swarm::HolochainCortex::default(),
             #[cfg(feature = "liquid-mamba")]
@@ -394,6 +399,17 @@ impl ContinuousMind {
     /// Call this before `tick()` to enable HDC-based intent inference.
     pub fn set_input_text(&mut self, text: impl Into<String>) {
         self.last_input_text = Some(text.into());
+    }
+
+    /// Install a swarm event sender for forwarding affective sync and
+    /// federated round results to the CognitiveLoopService's SwarmManager.
+    ///
+    /// Call this after `CognitiveLoopService::create_swarm_event_channel()`.
+    pub fn set_swarm_channel(
+        &mut self,
+        tx: std::sync::mpsc::Sender<crate::cognitive_loop::SwarmEvent>,
+    ) {
+        self.swarm_event_tx = Some(tx);
     }
 
     /// Set relational Ψ (Phi-dyad from partnership module).
