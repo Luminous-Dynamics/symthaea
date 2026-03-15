@@ -11,10 +11,7 @@
 //! Conductor ←→ Relay  ← Serializer ← Transport (LoRa / B.A.T.M.A.N.)
 //! ```
 
-mod poller;
-mod relay;
-mod serializer;
-mod transport;
+use mycelix_mesh_bridge::{poller, relay, transport};
 
 use anyhow::Result;
 use tracing_subscriber::EnvFilter;
@@ -35,6 +32,25 @@ async fn main() -> Result<()> {
         .unwrap_or_else(|_| "30".into())
         .parse()
         .unwrap_or(30);
+
+    // Validate configuration
+    if !conductor_url.starts_with("ws://") && !conductor_url.starts_with("wss://") {
+        anyhow::bail!(
+            "CONDUCTOR_URL must start with ws:// or wss://, got: {conductor_url}\n\
+             Example: CONDUCTOR_URL=ws://localhost:8888"
+        );
+    }
+    if poll_interval_secs == 0 {
+        anyhow::bail!("POLL_INTERVAL_SECS must be > 0");
+    }
+
+    tracing::info!("Config: conductor={conductor_url}, poll_interval={poll_interval_secs}s");
+    if std::env::var("MESH_APP_TOKEN").unwrap_or_default().is_empty() {
+        tracing::warn!(
+            "MESH_APP_TOKEN not set — conductor auth may fail. \
+             Set it to the app token from hApp installation."
+        );
+    }
 
     // Select transport
     let transport = transport::create_transport()?;
@@ -58,11 +74,48 @@ async fn main() -> Result<()> {
         }
     });
 
+    // Health check HTTP endpoint (optional, for monitoring)
+    let health_port: u16 = std::env::var("HEALTH_PORT")
+        .unwrap_or_else(|_| "9100".into())
+        .parse()
+        .unwrap_or(9100);
+    let health_handle = tokio::spawn(async move {
+        if let Err(e) = serve_health(health_port).await {
+            tracing::warn!("Health endpoint failed to start: {e}");
+        }
+    });
+
     tokio::select! {
         _ = poller_handle => tracing::warn!("Poller exited"),
         _ = relay_handle => tracing::warn!("Relay exited"),
+        _ = health_handle => tracing::warn!("Health server exited"),
         _ = tokio::signal::ctrl_c() => tracing::info!("Shutting down..."),
     }
 
     Ok(())
+}
+
+/// Minimal HTTP health endpoint — responds to GET /health with JSON status.
+async fn serve_health(port: u16) -> Result<()> {
+    use tokio::io::AsyncWriteExt;
+    use tokio::net::TcpListener;
+
+    let listener = TcpListener::bind(format!("0.0.0.0:{port}")).await?;
+    tracing::info!("Health endpoint listening on :{port}/health");
+
+    loop {
+        let (mut socket, _) = listener.accept().await?;
+        let body = serde_json::json!({
+            "status": "running",
+            "service": "mycelix-mesh-bridge",
+            "version": env!("CARGO_PKG_VERSION"),
+        });
+        let body_str = body.to_string();
+        let response = format!(
+            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+            body_str.len(),
+            body_str
+        );
+        let _ = socket.write_all(response.as_bytes()).await;
+    }
 }

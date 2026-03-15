@@ -16,6 +16,16 @@ const MAX_DEDUP_CACHE: usize = 10_000;
 /// LoRa frame size limit (SX1276 max payload).
 const LORA_MAX_FRAME: usize = 255;
 
+/// Heartbeat interval: broadcast presence every N poll cycles.
+const HEARTBEAT_EVERY_N_POLLS: u64 = 4;
+
+/// Max consecutive conductor connection failures before backoff.
+const MAX_CONSECUTIVE_FAILURES: u32 = 5;
+
+/// Backoff multiplier per failure (capped at 5 minutes).
+const BACKOFF_BASE_SECS: u64 = 5;
+const BACKOFF_MAX_SECS: u64 = 300;
+
 /// Run the poller loop: conductor → serializer → mesh transport.
 pub async fn run(
     conductor_url: &str,
@@ -26,17 +36,41 @@ pub async fn run(
 
     let mut dedup: HashSet<String> = HashSet::new();
     let origin = get_origin_id();
+    let mut poll_count: u64 = 0;
+    let mut consecutive_failures: u32 = 0;
+    let mut ws_cached: Option<AppWebsocket> = None;
 
     loop {
+        poll_count += 1;
+
+        // Broadcast heartbeat periodically
+        if poll_count % HEARTBEAT_EVERY_N_POLLS == 0 {
+            let heartbeat = RelayPayload::new(RelayType::Heartbeat, origin, Vec::new());
+            let bytes = heartbeat.to_bytes();
+            let frames = serializer::fragment(&bytes, LORA_MAX_FRAME);
+            for frame in &frames {
+                let _ = transport.send(frame).await;
+            }
+            tracing::debug!("Heartbeat broadcast (cycle {})", poll_count);
+        }
+
         // Try to connect and poll
-        match poll_once(conductor_url, &mut dedup, &origin, &*transport).await {
+        match poll_once(conductor_url, &mut dedup, &origin, &*transport, &mut ws_cached).await {
             Ok(relayed) => {
+                consecutive_failures = 0;
                 if relayed > 0 {
                     tracing::info!("Relayed {relayed} entries to mesh");
                 }
             }
             Err(e) => {
-                tracing::warn!("Poll failed (conductor may be offline): {e}");
+                consecutive_failures += 1;
+                // Drop cached connection on failure so next cycle reconnects
+                ws_cached = None;
+                tracing::warn!(
+                    "Poll failed (attempt {}/{}): {e}",
+                    consecutive_failures,
+                    MAX_CONSECUTIVE_FAILURES
+                );
             }
         }
 
@@ -46,15 +80,30 @@ pub async fn run(
             tracing::debug!("Dedup cache cleared (exceeded {MAX_DEDUP_CACHE})");
         }
 
-        tokio::time::sleep(tokio::time::Duration::from_secs(poll_interval_secs)).await;
+        // Exponential backoff when conductor is consistently unreachable
+        let sleep_secs = if consecutive_failures > 0 {
+            let backoff = BACKOFF_BASE_SECS * (1u64 << consecutive_failures.min(6));
+            let capped = backoff.min(BACKOFF_MAX_SECS);
+            if consecutive_failures >= MAX_CONSECUTIVE_FAILURES {
+                tracing::warn!(
+                    "Conductor unreachable for {} cycles, backing off {}s",
+                    consecutive_failures,
+                    capped
+                );
+            }
+            capped
+        } else {
+            poll_interval_secs
+        };
+
+        tokio::time::sleep(tokio::time::Duration::from_secs(sleep_secs)).await;
     }
 }
 
 /// Single poll cycle. Returns number of entries relayed.
 ///
-/// Connects to the Holochain conductor via AppWebsocket, polls for new
-/// TEND exchanges and emergency messages, serializes them into compact
-/// relay payloads, and sends them over the mesh transport.
+/// Reuses a cached AppWebsocket connection when available. Reconnects
+/// on first call or after a failure clears the cache.
 ///
 /// Requires MESH_APP_TOKEN env var for authentication.
 async fn poll_once(
@@ -62,18 +111,22 @@ async fn poll_once(
     dedup: &mut HashSet<String>,
     origin: &[u8; 8],
     transport: &dyn MeshTransport,
+    ws_cached: &mut Option<AppWebsocket>,
 ) -> Result<usize> {
-    // Auth token from environment (set by resilience-bootstrap.sh)
-    let token: Vec<u8> = std::env::var("MESH_APP_TOKEN")
-        .unwrap_or_default()
-        .into_bytes();
+    // Reuse cached connection or establish a new one
+    let ws = match ws_cached.take() {
+        Some(ws) => ws,
+        None => {
+            let token: Vec<u8> = std::env::var("MESH_APP_TOKEN")
+                .unwrap_or_default()
+                .into_bytes();
+            let signer: Arc<dyn AgentSigner + Send + Sync> =
+                Arc::new(ClientAgentSigner::default());
+            tracing::debug!("Connecting to conductor at {conductor_url}");
+            AppWebsocket::connect(conductor_url, token, signer).await?
+        }
+    };
 
-    // For mesh bridge, we use a noop signer — the conductor handles signing
-    // for calls from authenticated local connections.
-    let signer: Arc<dyn AgentSigner + Send + Sync> =
-        Arc::new(ClientAgentSigner::default());
-
-    let ws = AppWebsocket::connect(conductor_url, token, signer).await?;
     let mut relayed = 0;
 
     // --- Poll TEND exchanges ---
@@ -174,6 +227,9 @@ async fn poll_once(
         }
     }
 
+    // Cache connection for reuse on next poll cycle
+    *ws_cached = Some(ws);
+
     Ok(relayed)
 }
 
@@ -192,6 +248,80 @@ fn get_origin_id() -> [u8; 8] {
 mod tests {
     use super::*;
     use crate::transport::LoopbackTransport;
+
+    #[test]
+    fn test_heartbeat_frame_creation() {
+        let origin = [1, 2, 3, 4, 5, 6, 7, 8];
+        let heartbeat = RelayPayload::new(RelayType::Heartbeat, origin, Vec::new());
+        assert_eq!(heartbeat.relay_type, RelayType::Heartbeat);
+        assert_eq!(heartbeat.origin, origin);
+        assert!(heartbeat.data.is_empty());
+
+        // Heartbeat should fit in a single LoRa frame
+        let bytes = heartbeat.to_bytes();
+        let frames = serializer::fragment(&bytes, LORA_MAX_FRAME);
+        assert_eq!(frames.len(), 1);
+    }
+
+    #[test]
+    fn test_heartbeat_interval() {
+        // Heartbeat fires on cycles divisible by HEARTBEAT_EVERY_N_POLLS
+        for cycle in 1..=20u64 {
+            let should_fire = cycle % HEARTBEAT_EVERY_N_POLLS == 0;
+            if cycle == 4 || cycle == 8 || cycle == 12 || cycle == 16 || cycle == 20 {
+                assert!(should_fire, "cycle {cycle} should fire heartbeat");
+            } else {
+                assert!(!should_fire, "cycle {cycle} should NOT fire heartbeat");
+            }
+        }
+    }
+
+    #[test]
+    fn test_backoff_calculation() {
+        // 0 failures → normal interval
+        let failures: u32 = 0;
+        assert_eq!(failures, 0);
+
+        // 1 failure → 5 * 2^1 = 10s
+        let backoff = BACKOFF_BASE_SECS * (1u64 << 1u32.min(6));
+        assert_eq!(backoff.min(BACKOFF_MAX_SECS), 10);
+
+        // 3 failures → 5 * 2^3 = 40s
+        let backoff = BACKOFF_BASE_SECS * (1u64 << 3u32.min(6));
+        assert_eq!(backoff.min(BACKOFF_MAX_SECS), 40);
+
+        // 6 failures → 5 * 2^6 = 320 → capped at 300s
+        let backoff = BACKOFF_BASE_SECS * (1u64 << 6u32.min(6));
+        assert_eq!(backoff.min(BACKOFF_MAX_SECS), BACKOFF_MAX_SECS);
+
+        // 10 failures → still capped at 6 bits → 320 → 300s
+        let backoff = BACKOFF_BASE_SECS * (1u64 << 10u32.min(6));
+        assert_eq!(backoff.min(BACKOFF_MAX_SECS), BACKOFF_MAX_SECS);
+    }
+
+    #[test]
+    fn test_dedup_cache_overflow() {
+        let mut dedup: HashSet<String> = HashSet::new();
+        // Fill past MAX_DEDUP_CACHE
+        for i in 0..=MAX_DEDUP_CACHE {
+            dedup.insert(format!("hash-{i}"));
+        }
+        assert!(dedup.len() > MAX_DEDUP_CACHE);
+
+        // Simulates the cache clear logic from run()
+        if dedup.len() > MAX_DEDUP_CACHE {
+            dedup.clear();
+        }
+        assert_eq!(dedup.len(), 0);
+    }
+
+    #[test]
+    fn test_origin_id_deterministic() {
+        let id1 = get_origin_id();
+        let id2 = get_origin_id();
+        assert_eq!(id1, id2, "origin ID should be deterministic for same hostname");
+        assert_ne!(id1, [0u8; 8], "origin ID should not be all zeros");
+    }
 
     #[tokio::test]
     async fn test_relay_pipeline() {

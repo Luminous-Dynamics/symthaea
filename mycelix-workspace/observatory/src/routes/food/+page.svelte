@@ -39,8 +39,12 @@
   // ============================================================================
 
   onMount(async () => {
-    const p = await getAllPlots();
-    plots.set(p);
+    try {
+      const p = await getAllPlots();
+      plots.set(p);
+    } catch (e) {
+      console.warn('[Food] Failed to load plots, using defaults:', e);
+    }
   });
 
   async function handleRegisterPlot() {

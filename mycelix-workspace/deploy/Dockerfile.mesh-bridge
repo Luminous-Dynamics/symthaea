@@ -1,0 +1,60 @@
+# Mycelix Mesh Bridge — Multi-stage Docker build
+#
+# Builds the mesh-bridge binary for LoRa/BATMAN mesh relay.
+#
+# Usage:
+#   docker build -f deploy/Dockerfile.mesh-bridge -t mycelix-mesh-bridge ..
+#
+# Build context should be mycelix-workspace/ (one level up from deploy/).
+
+# =============================================================================
+# Stage 1: Build
+# =============================================================================
+FROM rust:1.82-slim AS builder
+
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl-dev \
+    perl \
+    make \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+
+# Copy mesh-bridge source
+COPY mesh-bridge/ mesh-bridge/
+
+# Build release binary (no LoRa hardware in Docker by default)
+RUN cd mesh-bridge && cargo build --release
+
+# =============================================================================
+# Stage 2: Runtime
+# =============================================================================
+FROM debian:bookworm-slim
+
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    libssl3 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN groupadd -r meshbridge && useradd -r -g meshbridge -m meshbridge
+
+COPY --from=builder /build/mesh-bridge/target/release/mesh-bridge /usr/local/bin/mesh-bridge
+
+USER meshbridge
+
+# Configuration via environment variables:
+#   CONDUCTOR_URL       — ws://conductor:8888
+#   MESH_TRANSPORT      — loopback | lora | batman
+#   POLL_INTERVAL_SECS  — 30
+#   MESH_APP_TOKEN      — conductor auth token
+#   LORA_SPI_PATH       — /dev/spidev0.0 (if lora)
+#   LORA_FREQ_MHZ       — 868.0 (if lora)
+#   RUST_LOG            — info
+
+# Health check via HTTP endpoint
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+  CMD curl -sf http://localhost:9100/health || exit 1
+
+ENTRYPOINT ["mesh-bridge"]

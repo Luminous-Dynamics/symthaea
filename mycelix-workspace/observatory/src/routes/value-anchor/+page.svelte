@@ -51,9 +51,13 @@
   // ============================================================================
 
   onMount(async () => {
-    balance = await getBalance('self.did');
-    // Fetch DHT consensus on load
-    await refreshConsensus();
+    try {
+      balance = await getBalance('self.did');
+      // Fetch DHT consensus on load
+      await refreshConsensus();
+    } catch (e) {
+      console.warn('[ValueAnchor] Failed to load data:', e);
+    }
   });
 
   async function handleReport() {

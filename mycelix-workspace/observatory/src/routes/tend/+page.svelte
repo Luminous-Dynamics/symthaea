@@ -13,6 +13,8 @@
     type ServiceRequest,
     type ExchangeRecord,
   } from '$lib/resilience-client';
+  import { hasBasket, purchasingPowerIndex, enrichedItems } from '$lib/value-basket';
+  import { purchasingPower } from '$lib/value-basket';
 
   // ============================================================================
   // Stores
@@ -39,16 +41,20 @@
   // ============================================================================
 
   onMount(async () => {
-    const [bal, ora, lst, req] = await Promise.all([
-      getBalance('self.did'),
-      getOracleState(),
-      getDaoListings(),
-      getDaoRequests(),
-    ]);
-    balance.set(bal);
-    oracle.set(ora);
-    listings.set(lst);
-    requests.set(req);
+    try {
+      const [bal, ora, lst, req] = await Promise.all([
+        getBalance('self.did'),
+        getOracleState(),
+        getDaoListings(),
+        getDaoRequests(),
+      ]);
+      balance.set(bal);
+      oracle.set(ora);
+      listings.set(lst);
+      requests.set(req);
+    } catch (e) {
+      console.warn('[TEND] Failed to load data, using defaults:', e);
+    }
   });
 
   async function handleExchange() {
@@ -148,6 +154,20 @@
               <p class="text-xs text-gray-400">Exchanges</p>
             </div>
           </div>
+          {#if $hasBasket && $balance}
+            <div class="mt-4 pt-3 border-t border-gray-700">
+              <p class="text-xs text-gray-400 mb-2">Purchasing Power</p>
+              <div class="space-y-1">
+                {#each purchasingPower($balance.balance).slice(0, 4) as item}
+                  <div class="flex justify-between text-xs">
+                    <span class="text-gray-300">{item.name}</span>
+                    <span class="text-green-400 font-medium">{item.quantity} {item.unit}</span>
+                  </div>
+                {/each}
+              </div>
+              <a href="/value-anchor" class="block mt-2 text-xs text-blue-400 hover:text-blue-300">Edit basket</a>
+            </div>
+          {/if}
         {:else}
           <p class="text-gray-500">Loading...</p>
         {/if}

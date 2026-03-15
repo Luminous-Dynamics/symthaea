@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "2021"
 description = "Offline mesh bridge for Mycelix — relays TEND, food, and emergency entries over LoRa/WiFi-direct when internet is down"
 
+[lib]
+name = "mycelix_mesh_bridge"
+path = "src/lib.rs"
+
 [[bin]]
 name = "mesh-bridge"
 path = "src/main.rs"
@@ -43,6 +47,9 @@ hostname = "0.4"
 # Linux SPI for LoRa (optional, only on RPi)
 [target.'cfg(target_os = "linux")'.dependencies]
 spidev = { version = "0.6", optional = true }
+
+[dev-dependencies]
+proptest = "1"
 
 [features]
 default = []

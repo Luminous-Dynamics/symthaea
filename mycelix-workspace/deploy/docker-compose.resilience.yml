@@ -1,0 +1,63 @@
+# Mycelix Resilience Kit — Docker Compose Override
+#
+# Runs the 5-DNA resilience hApp (identity + finance + commons-care + civic + governance)
+# instead of the full 10-DNA unified bundle.
+#
+# Usage:
+#   cd deploy/
+#   docker-compose -f docker-compose.prod.yml -f docker-compose.resilience.yml up -d
+#
+# Prerequisites:
+#   just resilience-build   (builds the 5 DNAs and packs the hApp)
+
+services:
+  conductor:
+    environment:
+      - LAIR_PASSPHRASE=${LAIR_PASSPHRASE}
+      - HAPP_PATH=/data/happs/mycelix-resilience.happ
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
+    volumes:
+      - holochain-data:/data/holochain
+      - ../happs/mycelix-resilience.happ:/data/happs/mycelix-resilience.happ:ro
+
+  observatory:
+    build:
+      args:
+        VITE_CONDUCTOR_URL: ${VITE_CONDUCTOR_URL:-ws://conductor:8888}
+        VITE_FALLBACK_TO_SIMULATION: "true"
+
+  # Mesh bridge — offline relay over LoRa/WiFi-direct (optional)
+  # Only enable when hardware is connected.
+  mesh-bridge:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.mesh-bridge
+    container_name: mycelix-mesh-bridge
+    restart: unless-stopped
+    environment:
+      - CONDUCTOR_URL=ws://conductor:8888
+      - MESH_TRANSPORT=${MESH_TRANSPORT:-loopback}
+      - LORA_SPI_PATH=${LORA_SPI_PATH:-/dev/spidev0.0}
+      - LORA_FREQ_MHZ=${LORA_FREQ_MHZ:-868.0}
+      - POLL_INTERVAL_SECS=${POLL_INTERVAL_SECS:-30}
+      - RUST_LOG=info
+    depends_on:
+      conductor:
+        condition: service_started
+    networks:
+      - mycelix-net
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:9100/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    # Uncomment for LoRa hardware passthrough:
+    # devices:
+    #   - /dev/spidev0.0:/dev/spidev0.0
+    profiles:
+      - mesh

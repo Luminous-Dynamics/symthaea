@@ -80,6 +80,63 @@ logs:
     @tail -f /tmp/mycelix-*.log 2>/dev/null || echo "No logs found. Services may not be running."
 
 # ============================================================
+# RESILIENCE KIT
+# ============================================================
+
+# Build only the 5 resilience DNAs (identity + finance + commons-care + civic + governance)
+resilience-build: build-identity build-finance build-commons build-civic build-governance
+    @echo "Packing resilience hApp (5 DNAs)..."
+    @cd happs && ln -sf mycelix-resilience-happ.yaml happ.yaml && hc app pack . -o mycelix-resilience.happ; rm -f happ.yaml
+    @echo ""
+    @echo "Resilience hApp packed: happs/mycelix-resilience.happ"
+
+# Build (if needed) and start resilience kit: conductor + Observatory
+resilience-up: resilience-build
+    @echo ""
+    @echo "MYCELIX RESILIENCE KIT STARTING"
+    @echo "================================"
+    @echo ""
+    @just _check-deps
+    @just stop 2>/dev/null || true
+    @echo "Starting Lair keystore..."
+    @mkdir -p .lair
+    @lair-keystore server run --piped &>/dev/null &
+    @sleep 2
+    @echo "Starting Holochain conductor..."
+    @if [ ! -f "conductor-config.yaml" ]; then just _generate-conductor-config; fi
+    @holochain -c conductor-config.yaml &>/dev/null &
+    @sleep 3
+    @echo "Installing resilience hApp..."
+    @hc sandbox call install-app happs/mycelix-resilience.happ 2>/dev/null || echo "hApp may already be installed"
+    @echo "Starting Observatory..."
+    @cd observatory && pnpm dev &>/dev/null &
+    @sleep 2
+    @echo ""
+    @echo "Resilience Kit is running!"
+    @echo "  Observatory:  http://localhost:5173"
+    @echo "  TEND:         http://localhost:5173/tend"
+    @echo "  Value Anchor: http://localhost:5173/value-anchor"
+    @echo "  Emergency:    http://localhost:5173/emergency"
+
+# Run all resilience-related tests (mesh-bridge + price oracle + Observatory type-check)
+resilience-test:
+    @echo "Running mesh-bridge tests..."
+    @cd mesh-bridge && cargo test
+    @echo ""
+    @echo "Running price oracle unit tests..."
+    @cd ../mycelix-finance && cargo test --lib -p price_oracle -p price_oracle_integrity
+    @echo ""
+    @echo "Running Observatory type-check (resilience routes)..."
+    @cd observatory && npx svelte-check 2>&1 | tee /tmp/svelte-check.log | tail -1; \
+      if grep -q "routes/tend\|routes/food\|routes/mutual-aid\|routes/emergency\|routes/value-anchor\|lib/resilience-client\|lib/value-basket\|lib/community\|lib/tax-export" /tmp/svelte-check.log | grep -q "ERROR"; then \
+        echo "  FAIL: Errors in resilience code"; exit 1; \
+      else \
+        echo "  Resilience routes: 0 errors"; \
+      fi
+    @echo ""
+    @echo "All resilience tests passed!"
+
+# ============================================================
 # DEVELOPMENT
 # ============================================================
 

@@ -47,4 +47,22 @@
   </div>
 {/if}
 
+<!-- Navigation — all existing Observatory routes -->
+<nav class="bg-gray-900 border-b border-gray-800 px-4 py-2">
+  <div class="container mx-auto flex items-center gap-1 overflow-x-auto text-sm">
+    <a href="/" class="px-3 py-1.5 rounded text-gray-300 hover:bg-gray-800 hover:text-white transition-colors whitespace-nowrap">Dashboard</a>
+    <span class="text-gray-700">|</span>
+    <a href="/tend" class="px-3 py-1.5 rounded text-gray-300 hover:bg-gray-800 hover:text-white transition-colors whitespace-nowrap">TEND</a>
+    <a href="/food" class="px-3 py-1.5 rounded text-gray-300 hover:bg-gray-800 hover:text-white transition-colors whitespace-nowrap">Food</a>
+    <a href="/mutual-aid" class="px-3 py-1.5 rounded text-gray-300 hover:bg-gray-800 hover:text-white transition-colors whitespace-nowrap">Mutual Aid</a>
+    <a href="/emergency" class="px-3 py-1.5 rounded text-gray-300 hover:bg-gray-800 hover:text-white transition-colors whitespace-nowrap">Emergency</a>
+    <a href="/value-anchor" class="px-3 py-1.5 rounded text-gray-300 hover:bg-gray-800 hover:text-white transition-colors whitespace-nowrap">Value Anchor</a>
+    <span class="text-gray-700">|</span>
+    <a href="/governance" class="px-3 py-1.5 rounded text-gray-300 hover:bg-gray-800 hover:text-white transition-colors whitespace-nowrap">Governance</a>
+    <a href="/network" class="px-3 py-1.5 rounded text-gray-300 hover:bg-gray-800 hover:text-white transition-colors whitespace-nowrap">Network</a>
+    <a href="/analytics" class="px-3 py-1.5 rounded text-gray-300 hover:bg-gray-800 hover:text-white transition-colors whitespace-nowrap">Analytics</a>
+    <a href="/attribution" class="px-3 py-1.5 rounded text-gray-300 hover:bg-gray-800 hover:text-white transition-colors whitespace-nowrap">Attribution</a>
+  </div>
+</nav>
+
 <slot />

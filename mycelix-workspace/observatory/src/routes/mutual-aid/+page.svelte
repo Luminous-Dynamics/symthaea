@@ -44,12 +44,16 @@
   // ============================================================================
 
   onMount(async () => {
-    const [o, r] = await Promise.all([
-      getServiceOffers(),
-      getServiceRequests(),
-    ]);
-    offers.set(o);
-    requests.set(r);
+    try {
+      const [o, r] = await Promise.all([
+        getServiceOffers(),
+        getServiceRequests(),
+      ]);
+      offers.set(o);
+      requests.set(r);
+    } catch (e) {
+      console.warn('[MutualAid] Failed to load data, using defaults:', e);
+    }
   });
 
   async function handleCreateOffer() {

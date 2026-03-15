@@ -36,10 +36,14 @@
   // ============================================================================
 
   onMount(async () => {
-    const ch = await getChannels();
-    channels.set(ch);
-    if (ch.length > 0) {
-      selectChannel(ch[0]);
+    try {
+      const ch = await getChannels();
+      channels.set(ch);
+      if (ch.length > 0) {
+        selectChannel(ch[0]);
+      }
+    } catch (e) {
+      console.warn('[Emergency] Failed to load channels, using defaults:', e);
     }
   });
 

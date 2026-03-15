@@ -258,4 +258,65 @@ mod tests {
         assert_eq!(transport.recv(100).await.unwrap(), Some(b"first".to_vec()));
         assert_eq!(transport.recv(100).await.unwrap(), Some(b"second".to_vec()));
     }
+
+    #[tokio::test]
+    async fn test_clone_box_shares_buffer() {
+        let transport = LoopbackTransport::new();
+        let cloned = transport.clone_box();
+
+        // Send on original, receive on clone — shared Arc<Mutex<Vec>>
+        transport.send(b"shared").await.unwrap();
+        let received = cloned.recv(100).await.unwrap();
+        assert_eq!(received, Some(b"shared".to_vec()));
+    }
+
+    #[tokio::test]
+    async fn test_clone_box_bidirectional() {
+        let transport = LoopbackTransport::new();
+        let cloned = transport.clone_box();
+
+        // Send on clone, receive on original
+        cloned.send(b"from-clone").await.unwrap();
+        let received = transport.recv(100).await.unwrap();
+        assert_eq!(received, Some(b"from-clone".to_vec()));
+    }
+
+    #[test]
+    fn test_create_transport_default() {
+        // Without MESH_TRANSPORT env var, defaults to loopback
+        std::env::remove_var("MESH_TRANSPORT");
+        let t = create_transport().unwrap();
+        assert_eq!(t.name(), "loopback");
+    }
+
+    #[test]
+    fn test_create_transport_explicit_loopback() {
+        std::env::set_var("MESH_TRANSPORT", "loopback");
+        let t = create_transport().unwrap();
+        assert_eq!(t.name(), "loopback");
+        std::env::remove_var("MESH_TRANSPORT");
+    }
+
+    #[test]
+    fn test_loopback_name() {
+        let transport = LoopbackTransport::new();
+        assert_eq!(transport.name(), "loopback");
+    }
+
+    #[tokio::test]
+    async fn test_loopback_empty_frame() {
+        let transport = LoopbackTransport::new();
+        transport.send(b"").await.unwrap();
+        let received = transport.recv(100).await.unwrap();
+        assert_eq!(received, Some(vec![]));
+    }
+
+    #[tokio::test]
+    async fn test_loopback_large_frame() {
+        let transport = LoopbackTransport::new();
+        let large = vec![0xABu8; 4096];
+        transport.send(&large).await.unwrap();
+        let received = transport.recv(100).await.unwrap();
+        assert_eq!(received.unwrap().len(), 4096);
+    }
 }

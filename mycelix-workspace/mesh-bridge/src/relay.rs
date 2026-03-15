@@ -23,6 +23,7 @@ pub async fn run(conductor_url: &str, transport: Box<dyn MeshTransport>) -> Resu
 
     let mut dedup: HashSet<[u8; 32]> = HashSet::new();
     let mut reassembly: HashMap<[u8; 4], ReassemblyBuffer> = HashMap::new();
+    let mut ws_cached: Option<AppWebsocket> = None;
 
     loop {
         match transport.recv(5000).await {
@@ -53,9 +54,14 @@ pub async fn run(conductor_url: &str, transport: Box<dyn MeshTransport>) -> Resu
                             }
                             dedup.insert(payload.content_hash);
 
-                            // Replay as zome call
-                            if let Err(e) = replay_payload(conductor_url, &payload).await {
-                                tracing::warn!("Replay failed: {e}");
+                            // Replay as zome call with cached connection
+                            match replay_payload(conductor_url, &payload, &mut ws_cached).await {
+                                Ok(()) => {}
+                                Err(e) => {
+                                    // Drop cached connection on failure
+                                    ws_cached = None;
+                                    tracing::warn!("Replay failed: {e}");
+                                }
                             }
                         }
                         Err(e) => {
@@ -138,7 +144,27 @@ async fn connect_conductor(conductor_url: &str) -> Result<AppWebsocket> {
 }
 
 /// Replay a relay payload as a zome call on the local conductor.
-async fn replay_payload(conductor_url: &str, payload: &RelayPayload) -> Result<()> {
+/// Reuses a cached AppWebsocket connection when available.
+async fn replay_payload(
+    conductor_url: &str,
+    payload: &RelayPayload,
+    ws_cached: &mut Option<AppWebsocket>,
+) -> Result<()> {
+    // Heartbeats don't need a conductor connection
+    if payload.relay_type == RelayType::Heartbeat {
+        tracing::debug!("Mesh heartbeat from peer {:?}", &payload.origin);
+        return Ok(());
+    }
+
+    // Reuse cached connection or establish a new one
+    let ws = match ws_cached.take() {
+        Some(ws) => ws,
+        None => {
+            tracing::debug!("Connecting to conductor at {conductor_url}");
+            connect_conductor(conductor_url).await?
+        }
+    };
+
     match payload.relay_type {
         RelayType::TendExchange => {
             let tend: TendRelay = bincode::deserialize(&payload.data)?;
@@ -148,7 +174,6 @@ async fn replay_payload(conductor_url: &str, payload: &RelayPayload) -> Result<(
                 tend.hours
             );
 
-            let ws = connect_conductor(conductor_url).await?;
             let input = ExternIO::encode(serde_json::json!({
                 "receiver_did": tend.receiver_did,
                 "hours": tend.hours,
@@ -172,7 +197,6 @@ async fn replay_payload(conductor_url: &str, payload: &RelayPayload) -> Result<(
                 food.quality
             );
 
-            let ws = connect_conductor(conductor_url).await?;
             let input = ExternIO::encode(serde_json::json!({
                 "quantity_kg": food.quantity_kg,
                 "quality": food.quality,
@@ -194,7 +218,6 @@ async fn replay_payload(conductor_url: &str, payload: &RelayPayload) -> Result<(
                 &emergency.content[..emergency.content.len().min(50)]
             );
 
-            let ws = connect_conductor(conductor_url).await?;
             let input = ExternIO::encode(serde_json::json!({
                 "channel_id": emergency.channel_id,
                 "content": emergency.content,
@@ -208,10 +231,11 @@ async fn replay_payload(conductor_url: &str, payload: &RelayPayload) -> Result<(
             )
             .await?;
         }
-        RelayType::Heartbeat => {
-            tracing::debug!("Mesh heartbeat from peer {:?}", &payload.origin);
-        }
+        RelayType::Heartbeat => unreachable!(), // handled above
     }
+
+    // Cache connection for reuse
+    *ws_cached = Some(ws);
     Ok(())
 }
 
@@ -230,5 +254,84 @@ mod tests {
         let mut map: HashMap<[u8; 4], ReassemblyBuffer> = HashMap::new();
         cleanup_stale(&mut map);
         assert!(map.is_empty());
+    }
+
+    #[test]
+    fn test_reassembly_buffer_add_and_try() {
+        let mut buf = ReassemblyBuffer::new();
+        assert!(buf.frames.is_empty());
+
+        // Single frame that doesn't form a valid payload → reassemble returns None
+        buf.add_frame(vec![0; 4]);
+        assert_eq!(buf.frames.len(), 1);
+        assert!(buf.try_reassemble().is_none());
+    }
+
+    #[test]
+    fn test_reassembly_buffer_valid_reassembly() {
+        use crate::serializer;
+
+        let data = b"test relay payload for reassembly";
+        let frames = serializer::fragment(data, 20);
+        assert!(frames.len() > 1);
+
+        let mut buf = ReassemblyBuffer::new();
+        for frame in &frames {
+            buf.add_frame(frame.clone());
+        }
+
+        let result = buf.try_reassemble();
+        assert!(result.is_some());
+        assert_eq!(result.unwrap(), data);
+    }
+
+    #[test]
+    fn test_cleanup_stale_caps_at_max() {
+        let mut map: HashMap<[u8; 4], ReassemblyBuffer> = HashMap::new();
+
+        // Insert more than MAX_REASSEMBLY_BUFFERS entries
+        for i in 0..=(MAX_REASSEMBLY_BUFFERS + 10) {
+            let key = (i as u32).to_le_bytes();
+            map.insert(key, ReassemblyBuffer::new());
+        }
+        assert!(map.len() > MAX_REASSEMBLY_BUFFERS);
+
+        cleanup_stale(&mut map);
+        assert!(map.len() <= MAX_REASSEMBLY_BUFFERS);
+    }
+
+    #[test]
+    fn test_content_hash_dedup() {
+        let mut dedup: HashSet<[u8; 32]> = HashSet::new();
+
+        let hash1 = blake3::hash(b"payload-1").into();
+        let hash2 = blake3::hash(b"payload-2").into();
+
+        assert!(!dedup.contains(&hash1));
+        dedup.insert(hash1);
+        assert!(dedup.contains(&hash1));
+        assert!(!dedup.contains(&hash2));
+
+        // Duplicate insert doesn't grow set
+        dedup.insert(hash1);
+        assert_eq!(dedup.len(), 1);
+
+        dedup.insert(hash2);
+        assert_eq!(dedup.len(), 2);
+    }
+
+    #[test]
+    fn test_dedup_overflow_clear() {
+        let mut dedup: HashSet<[u8; 32]> = HashSet::new();
+        for i in 0..10_001u32 {
+            dedup.insert(blake3::hash(&i.to_le_bytes()).into());
+        }
+        assert!(dedup.len() > 10_000);
+
+        // Simulates the relay loop overflow logic
+        if dedup.len() > 10_000 {
+            dedup.clear();
+        }
+        assert_eq!(dedup.len(), 0);
     }
 }

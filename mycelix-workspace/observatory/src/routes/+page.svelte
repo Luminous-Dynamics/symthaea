@@ -1,6 +1,12 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { initializeStores, ecosystemStatus, byzantineAlerts, isLiveMode, conductorStatus } from '$lib/stores';
+  import { getBalance, getOracleState, type BalanceInfo, type OracleState } from '$lib/resilience-client';
+  import { hasBasket, purchasingPowerIndex } from '$lib/value-basket';
+  import { writable } from 'svelte/store';
+
+  const tendBalance = writable<BalanceInfo | null>(null);
+  const oracleState = writable<OracleState>({ vitality: 72, tier: 'Normal', updated_at: Date.now() });
 
   // Derived stats from stores
   $: stats = {
@@ -30,6 +36,14 @@
   onMount(async () => {
     console.log('Observatory mounted - initializing stores');
     cleanup = await initializeStores();
+    // Load resilience data
+    try {
+      const [bal, ora] = await Promise.all([getBalance('self.did'), getOracleState()]);
+      tendBalance.set(bal);
+      oracleState.set(ora);
+    } catch (e) {
+      console.warn('[Dashboard] Failed to load resilience data:', e);
+    }
   });
 
   onDestroy(() => {
@@ -70,39 +84,6 @@
           <span class="text-gray-400">v0.1.0</span>
         </div>
       </div>
-      <!-- Navigation -->
-      <nav class="flex gap-1 px-4 pb-2 overflow-x-auto">
-        <a href="/" class="px-4 py-2 rounded-lg bg-gray-700 text-white text-sm font-medium">
-          🏠 Dashboard
-        </a>
-        <a href="/mygov" class="px-4 py-2 rounded-lg hover:bg-gray-700 text-gray-300 text-sm font-medium transition-colors">
-          🏛️ MY GOV
-        </a>
-        <a href="/food" class="px-4 py-2 rounded-lg hover:bg-gray-700 text-gray-300 text-sm font-medium transition-colors">
-          🌱 Food
-        </a>
-        <a href="/water" class="px-4 py-2 rounded-lg hover:bg-gray-700 text-gray-300 text-sm font-medium transition-colors">
-          💧 Water
-        </a>
-        <a href="/governance" class="px-4 py-2 rounded-lg hover:bg-gray-700 text-gray-300 text-sm font-medium transition-colors">
-          🗳️ Governance
-        </a>
-        <a href="/identity" class="px-4 py-2 rounded-lg hover:bg-gray-700 text-gray-300 text-sm font-medium transition-colors">
-          🪪 Identity
-        </a>
-        <a href="/marketplace" class="px-4 py-2 rounded-lg hover:bg-gray-700 text-gray-300 text-sm font-medium transition-colors">
-          🛒 Marketplace
-        </a>
-        <a href="/network" class="px-4 py-2 rounded-lg hover:bg-gray-700 text-gray-300 text-sm font-medium transition-colors">
-          🌐 Network
-        </a>
-        <a href="/analytics" class="px-4 py-2 rounded-lg hover:bg-gray-700 text-gray-300 text-sm font-medium transition-colors">
-          📊 Analytics
-        </a>
-        <a href="/attribution" class="px-4 py-2 rounded-lg hover:bg-gray-700 text-gray-300 text-sm font-medium transition-colors">
-          🔗 Attribution
-        </a>
-      </nav>
     </div>
   </header>
 
@@ -140,6 +121,38 @@
         <h3 class="text-gray-400 text-sm uppercase">Cross-hApp Queries</h3>
         <p class="text-3xl font-bold mt-2">{stats.crossHappQueries.toLocaleString()}</p>
       </div>
+    </div>
+
+    <!-- Resilience Quick Stats -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+      <a href="/tend" class="block bg-gray-800 rounded-lg p-6 border border-gray-700 hover:border-blue-600 transition-colors">
+        <h3 class="text-gray-400 text-sm uppercase">TEND Balance</h3>
+        {#if $tendBalance}
+          <p class="text-3xl font-bold mt-2" class:text-green-400={$tendBalance.balance > 0} class:text-red-400={$tendBalance.balance < 0}>
+            {$tendBalance.balance > 0 ? '+' : ''}{$tendBalance.balance}
+          </p>
+          <p class="text-xs text-gray-500 mt-1">{$tendBalance.exchange_count} exchanges</p>
+        {:else}
+          <p class="text-gray-500 mt-2">Loading...</p>
+        {/if}
+      </a>
+
+      <a href="/tend" class="block bg-gray-800 rounded-lg p-6 border border-gray-700 hover:border-blue-600 transition-colors">
+        <h3 class="text-gray-400 text-sm uppercase">Oracle Tier</h3>
+        <p class="text-3xl font-bold mt-2">{$oracleState.tier}</p>
+        <p class="text-xs text-gray-500 mt-1">Vitality {$oracleState.vitality} · Limit &plusmn;{$oracleState.tier === 'Normal' ? 40 : $oracleState.tier === 'Elevated' ? 60 : $oracleState.tier === 'High' ? 80 : 120} TEND</p>
+      </a>
+
+      <a href="/value-anchor" class="block bg-gray-800 rounded-lg p-6 border border-gray-700 hover:border-blue-600 transition-colors">
+        <h3 class="text-gray-400 text-sm uppercase">Value Anchor</h3>
+        {#if $hasBasket}
+          <p class="text-3xl font-bold mt-2">{$purchasingPowerIndex.toFixed(2)}</p>
+          <p class="text-xs text-gray-500 mt-1">Basket index (TEND/unit)</p>
+        {:else}
+          <p class="text-sm text-gray-500 mt-2">No basket configured</p>
+          <p class="text-xs text-gray-500 mt-1">Set up local prices</p>
+        {/if}
+      </a>
     </div>
 
     <!-- Two Column Layout -->

@@ -44,7 +44,6 @@ pub const ACCURACY_MIN_WEIGHT: f64 = 0.05;
 
 /// String length limits
 const MAX_ITEM_NAME_LEN: usize = 128;
-const MAX_UNIT_LEN: usize = 32;
 const MAX_EVIDENCE_LEN: usize = 512;
 const MAX_DID_LEN: usize = 256;
 const MAX_BASKET_NAME_LEN: usize = 128;

@@ -168,6 +168,7 @@ pub fn reassemble(frames: &[Vec<u8>]) -> Option<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
 
     #[test]
     fn test_roundtrip_serialization() {
@@ -234,5 +235,126 @@ mod tests {
         let decoded: TendRelay = bincode::deserialize(&bytes).unwrap();
         assert_eq!(decoded.receiver_did, "alice.did");
         assert!((decoded.hours - 2.5).abs() < f32::EPSILON);
+    }
+
+    // =========================================================================
+    // Proptests — arbitrary payload roundtrip (item 4)
+    // =========================================================================
+
+    proptest! {
+        #[test]
+        fn prop_payload_roundtrip(
+            relay_type in prop_oneof![
+                Just(RelayType::TendExchange),
+                Just(RelayType::FoodHarvest),
+                Just(RelayType::EmergencyMessage),
+                Just(RelayType::Heartbeat),
+            ],
+            origin in proptest::array::uniform8(0u8..),
+            data in proptest::collection::vec(any::<u8>(), 0..512),
+            frame_size in 16usize..300,
+        ) {
+            let payload = RelayPayload::new(relay_type, origin, data.clone());
+
+            // Serialize → fragment → reassemble → deserialize
+            let bytes = payload.to_bytes();
+            let frames = fragment(&bytes, frame_size);
+            prop_assert!(!frames.is_empty());
+
+            let reassembled = reassemble(&frames);
+            prop_assert!(reassembled.is_some(), "reassembly failed for {} frames", frames.len());
+
+            let decoded = RelayPayload::from_bytes(&reassembled.unwrap());
+            prop_assert!(decoded.is_ok(), "deserialization failed");
+
+            let decoded = decoded.unwrap();
+            prop_assert_eq!(decoded.relay_type, relay_type);
+            prop_assert_eq!(decoded.origin, origin);
+            prop_assert_eq!(decoded.data, data);
+            prop_assert_eq!(decoded.content_hash, payload.content_hash);
+        }
+
+        #[test]
+        fn prop_fragment_count_bounded(
+            data in proptest::collection::vec(any::<u8>(), 1..1024),
+            frame_size in 16usize..300,
+        ) {
+            let frames = fragment(&data, frame_size);
+            let chunk_size = frame_size - 8; // header
+            let expected = (data.len() + chunk_size - 1) / chunk_size;
+            prop_assert_eq!(frames.len(), expected);
+        }
+    }
+
+    // =========================================================================
+    // E2E loopback test — all 3 payload types (item 6)
+    // =========================================================================
+
+    #[test]
+    fn test_e2e_tend_food_emergency_roundtrip() {
+        let origin = [10, 20, 30, 40, 50, 60, 70, 80];
+
+        // TEND
+        let tend = TendRelay {
+            receiver_did: "sipho.did".into(),
+            hours: 3.5,
+            service_description: "Repaired solar panel".into(),
+            service_category: "Maintenance".into(),
+            dao_did: "roodepoort-resilience".into(),
+        };
+        let tend_data = bincode::serialize(&tend).unwrap();
+        let tend_payload = RelayPayload::new(RelayType::TendExchange, origin, tend_data);
+        let tend_frames = fragment(&tend_payload.to_bytes(), 255);
+        let tend_reassembled = reassemble(&tend_frames).unwrap();
+        let tend_decoded = RelayPayload::from_bytes(&tend_reassembled).unwrap();
+        assert_eq!(tend_decoded.relay_type, RelayType::TendExchange);
+        let tend_inner: TendRelay = bincode::deserialize(&tend_decoded.data).unwrap();
+        assert_eq!(tend_inner.receiver_did, "sipho.did");
+        assert!((tend_inner.hours - 3.5).abs() < f32::EPSILON);
+
+        // Food
+        let food = FoodRelay {
+            crop_hash: "crop-001".into(),
+            quantity_kg: 12.5,
+            quality: "Good".into(),
+            notes: "Tomatoes from plot A3".into(),
+        };
+        let food_data = bincode::serialize(&food).unwrap();
+        let food_payload = RelayPayload::new(RelayType::FoodHarvest, origin, food_data);
+        let food_frames = fragment(&food_payload.to_bytes(), 255);
+        let food_reassembled = reassemble(&food_frames).unwrap();
+        let food_decoded = RelayPayload::from_bytes(&food_reassembled).unwrap();
+        assert_eq!(food_decoded.relay_type, RelayType::FoodHarvest);
+        let food_inner: FoodRelay = bincode::deserialize(&food_decoded.data).unwrap();
+        assert_eq!(food_inner.crop_hash, "crop-001");
+        assert!((food_inner.quantity_kg - 12.5).abs() < f32::EPSILON);
+
+        // Emergency
+        let emergency = EmergencyRelay {
+            channel_id: "ward-7-alert".into(),
+            content: "Water main burst on Ontdekkers Road — avoid area".into(),
+            priority: "Immediate".into(),
+        };
+        let emerg_data = bincode::serialize(&emergency).unwrap();
+        let emerg_payload = RelayPayload::new(RelayType::EmergencyMessage, origin, emerg_data);
+        let emerg_frames = fragment(&emerg_payload.to_bytes(), 255);
+        let emerg_reassembled = reassemble(&emerg_frames).unwrap();
+        let emerg_decoded = RelayPayload::from_bytes(&emerg_reassembled).unwrap();
+        assert_eq!(emerg_decoded.relay_type, RelayType::EmergencyMessage);
+        let emerg_inner: EmergencyRelay = bincode::deserialize(&emerg_decoded.data).unwrap();
+        assert_eq!(emerg_inner.channel_id, "ward-7-alert");
+        assert_eq!(emerg_inner.priority, "Immediate");
+    }
+
+    #[test]
+    fn test_out_of_order_reassembly() {
+        let data = b"This payload should survive out-of-order fragment delivery over mesh";
+        let mut frames = fragment(data, 20);
+        assert!(frames.len() > 3, "need multiple fragments");
+
+        // Reverse the frame order
+        frames.reverse();
+        let reassembled = reassemble(&frames).unwrap();
+        assert_eq!(reassembled, data);
     }
 }
