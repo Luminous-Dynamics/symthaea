@@ -11,7 +11,7 @@
 use std::process;
 
 use symthaea_broca::evaluation;
-use symthaea_broca::generator::{BrocaConfig, BrocaGenerator};
+use symthaea_broca::generator::{BrocaConfig, BrocaGenerator, SamplingStrategy};
 use symthaea_broca::training::{
     train_with_adam, CurriculumSchedule, TrainingConfig, TrainingDataset,
 };
@@ -73,7 +73,7 @@ fn main() {
     let genesis = GenesisSeed::from_phrase(&opts.genesis_phrase);
 
     // Create or resume generator
-    let (mut generator, adam_state) = if let Some(ref resume_path) = opts.resume_path {
+    let (mut generator, mut adam_state) = if let Some(ref resume_path) = opts.resume_path {
         tracing::info!(path = %resume_path, "Resuming from checkpoint");
         match BrocaGenerator::from_checkpoint(resume_path, &genesis) {
             Ok((gen, adam, _proj, _lm_config)) => (gen, adam),
@@ -108,6 +108,12 @@ fn main() {
         }
     });
 
+    // Discard checkpoint Adam state if --fresh-adam
+    if opts.fresh_adam {
+        tracing::info!("Discarding checkpoint Adam state (--fresh-adam)");
+        adam_state = None;
+    }
+
     let train_config = TrainingConfig {
         epochs: opts.epochs,
         learning_rate: opts.learning_rate,
@@ -126,6 +132,8 @@ fn main() {
         network_warmup_epochs: opts.network_warmup_epochs,
         validation_dataset,
         curriculum: CurriculumSchedule::LengthAscending,
+        freeze_embeddings: opts.freeze_embeddings,
+        ..Default::default()
     };
 
     tracing::info!(
@@ -140,11 +148,12 @@ fn main() {
         negative_samples = opts.negative_samples,
         carry_state = opts.carry_state,
         network_warmup_epochs = opts.network_warmup_epochs,
+        freeze_embeddings = opts.freeze_embeddings,
         diagnostics = opts.diagnostics,
         "Starting training"
     );
 
-    let (metrics, final_adam, diagnostics) =
+    let (metrics, final_adam, diagnostics, anomaly_report) =
         train_with_adam(&mut generator, &dataset, &train_config, adam_state);
 
     // Report results
@@ -168,6 +177,24 @@ fn main() {
     if let Some(diag) = diagnostics {
         println!();
         println!("{}", diag.format_summary());
+    }
+
+    // Print anomaly report if anomaly response was active
+    if let Some(ref report) = anomaly_report {
+        println!("\n--- Anomaly Report ---");
+        println!("  Final LR multiplier: {:.4}", report.final_lr_multiplier);
+        println!("  Final grad clip:     {:.4}", report.final_grad_clip);
+        println!("  Anomalous epochs:    {}", report.anomalous_epoch_count);
+        println!("  Early stopped:       {}", report.anomaly_early_stopped);
+        println!(
+            "  Forced CfC training: {}",
+            report.plateau_forced_network_training
+        );
+        for (epoch, anomalies) in &report.epoch_anomalies {
+            for a in anomalies {
+                println!("  epoch {epoch}: {a}");
+            }
+        }
     }
 
     // Save checkpoint
@@ -213,6 +240,14 @@ fn main() {
         let result = evaluation::evaluate(&mut generator, &eval_config);
         println!();
         println!("{}", evaluation::format_eval_report(&result));
+    }
+
+    // Override sampling strategy for sample generation if --temperature/--top-k
+    if opts.sample_top_k > 0 && opts.sample_temperature > 0.0 {
+        generator.set_sampling(SamplingStrategy::TopK {
+            k: opts.sample_top_k,
+            temperature: opts.sample_temperature,
+        });
     }
 
     // Generate sample outputs if --samples N
@@ -267,6 +302,14 @@ struct TrainOpts {
     carry_state: f32,
     /// Embedding-only epochs before enabling CfC BPTT (default: 0).
     network_warmup_epochs: usize,
+    /// Discard checkpoint Adam optimizer state on resume (default: false).
+    fresh_adam: bool,
+    /// Freeze embedding weights, only train CfC network via BPTT (default: false).
+    freeze_embeddings: bool,
+    /// Temperature for sample generation (default: 1.0).
+    sample_temperature: f32,
+    /// Top-k for sample generation, 0 = use config default (default: 0).
+    sample_top_k: usize,
 }
 
 fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
@@ -290,6 +333,10 @@ fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
         negative_samples: 0,
         carry_state: 0.0,
         network_warmup_epochs: 0,
+        fresh_adam: false,
+        freeze_embeddings: false,
+        sample_temperature: 1.0,
+        sample_top_k: 0,
     };
 
     let mut i = 1;
@@ -414,6 +461,28 @@ fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
                     .parse()
                     .map_err(|_| "--network-warmup must be a non-negative integer")?;
             }
+            "--fresh-adam" => {
+                opts.fresh_adam = true;
+            }
+            "--freeze-embeddings" => {
+                opts.freeze_embeddings = true;
+            }
+            "--temperature" => {
+                i += 1;
+                opts.sample_temperature = args
+                    .get(i)
+                    .ok_or("--temperature requires a number")?
+                    .parse()
+                    .map_err(|_| "--temperature must be a float")?;
+            }
+            "--top-k" => {
+                i += 1;
+                opts.sample_top_k = args
+                    .get(i)
+                    .ok_or("--top-k requires a number")?
+                    .parse()
+                    .map_err(|_| "--top-k must be a positive integer")?;
+            }
             "--help" | "-h" => {
                 print_usage();
                 process::exit(0);
@@ -455,5 +524,9 @@ fn print_usage() {
     eprintln!("  --negative-samples N Sampled softmax negatives, 0=full (default: 0)");
     eprintln!("  --carry-state F      CfC state carry probability 0-1 (default: 0.0)");
     eprintln!("  --network-warmup N   Embedding-only epochs before CfC BPTT (default: 0)");
+    eprintln!("  --fresh-adam          Discard checkpoint Adam state on resume");
+    eprintln!("  --freeze-embeddings   Only train CfC network, keep embeddings frozen");
+    eprintln!("  --temperature F       Sampling temperature for --samples (default: 1.0)");
+    eprintln!("  --top-k N             Top-k sampling for --samples (default: 0 = off)");
     eprintln!("  --help, -h           Show this help message");
 }

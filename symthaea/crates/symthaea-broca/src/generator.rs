@@ -516,6 +516,11 @@ impl BrocaGenerator {
         &self.tokenizer
     }
 
+    /// Override the sampling strategy (e.g., for sample generation with custom temperature/top-k).
+    pub fn set_sampling(&mut self, strategy: SamplingStrategy) {
+        self.config.sampling = strategy;
+    }
+
     /// Get mutable reference to the controller (for training).
     pub fn controller_mut(&mut self) -> &mut LanguageController {
         &mut self.controller
@@ -1359,5 +1364,211 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// Full generate() veto integration test.
+    ///
+    /// Exercises the actual veto path inside `generate_internal()`:
+    /// controller reset, hesitation text insertion, thought_hv re-injection.
+    /// Uses a very high veto threshold (0.99) so that almost any output
+    /// triggers a veto after `min_veto_position`.
+    #[test]
+    fn test_generate_veto_full_path() {
+        let genesis = test_genesis();
+        let config = BrocaConfig {
+            controller: LanguageControllerConfig {
+                network_layers: 2,
+                neurons_per_layer: 4,
+                vocab_size: 32,
+                max_seq_len: 32,
+                ..Default::default()
+            },
+            gating: GatingConfig {
+                base_max_tokens: 30,
+                // Very high threshold: almost any output will have coherence < 0.99
+                veto_threshold: 0.99,
+                min_veto_position: 1, // Allow veto after just 1 token
+                max_vetoes: 2,
+                veto_refractory: 1, // Minimal refractory so second veto can fire quickly
+                ..Default::default()
+            },
+            sampling: SamplingStrategy::Greedy,
+            enable_coherence_feedback: true,
+            enable_semantic_veto: true,
+            veto_hesitation: "-- wait, ".to_string(),
+            ..Default::default()
+        };
+
+        let mut gen = BrocaGenerator::new(&genesis, config);
+        let channels = ThoughtChannels::default();
+        let result = gen.generate(&channels);
+
+        // Veto should have triggered (coherence < 0.99 is almost guaranteed
+        // for random network weights)
+        assert!(
+            result.veto_triggered,
+            "Veto should trigger with threshold=0.99; coherence_dynamics={:?}",
+            &result.coherence_dynamics[..result.coherence_dynamics.len().min(10)]
+        );
+
+        // Hesitation text should appear in output
+        assert!(
+            result.text.contains("-- wait, "),
+            "Output should contain hesitation text, got: {:?}",
+            &result.text[..result.text.len().min(100)]
+        );
+
+        // Gating trace should record at least one veto entry
+        let veto_entries: Vec<_> = result
+            .gating_trace
+            .iter()
+            .filter(|e| e.veto_triggered)
+            .collect();
+        assert!(
+            !veto_entries.is_empty(),
+            "Gating trace should record veto events"
+        );
+        // Veto positions should be > min_veto_position (1)
+        for entry in &veto_entries {
+            assert!(
+                entry.position > 0,
+                "Veto at position {} should be > min_veto_position",
+                entry.position
+            );
+        }
+
+        // At most max_vetoes (2) should have fired
+        assert!(
+            veto_entries.len() <= 2,
+            "At most 2 vetoes should fire, got {}",
+            veto_entries.len()
+        );
+
+        // All coherence values should be finite (no NaN from reset/re-inject)
+        for &c in &result.coherence_dynamics {
+            assert!(c.is_finite(), "Coherence should be finite after veto reset");
+        }
+
+        // Final coherence should be valid
+        assert!(
+            result.final_coherence.is_finite(),
+            "Final coherence should be finite"
+        );
+    }
+
+    /// Verify that with veto disabled (default), no veto occurs even
+    /// when coherence would be low enough to trigger one.
+    #[test]
+    fn test_generate_veto_disabled_no_trigger() {
+        let genesis = test_genesis();
+        let config = BrocaConfig {
+            controller: LanguageControllerConfig {
+                network_layers: 2,
+                neurons_per_layer: 4,
+                vocab_size: 32,
+                max_seq_len: 16,
+                ..Default::default()
+            },
+            gating: GatingConfig {
+                base_max_tokens: 20,
+                veto_threshold: 0.99, // Would trigger if enabled
+                min_veto_position: 1,
+                max_vetoes: 2,
+                ..Default::default()
+            },
+            sampling: SamplingStrategy::Greedy,
+            enable_coherence_feedback: true,
+            enable_semantic_veto: false, // Disabled
+            ..Default::default()
+        };
+
+        let mut gen = BrocaGenerator::new(&genesis, config);
+        let channels = ThoughtChannels::default();
+        let result = gen.generate(&channels);
+
+        assert!(
+            !result.veto_triggered,
+            "Veto should NOT trigger when enable_semantic_veto=false"
+        );
+        assert!(
+            !result.text.contains("-- wait, "),
+            "No hesitation text when veto is disabled"
+        );
+    }
+
+    /// Multi-turn veto stability test (Item #3).
+    ///
+    /// `generate_continuing()` preserves CfC state across calls. If a veto
+    /// fires during multi-turn generation, it resets the controller — which
+    /// discards the cross-turn temporal context. This test verifies that
+    /// generation remains stable (no NaN, no panic) across multiple turns
+    /// with veto enabled, even when veto triggers mid-turn.
+    #[test]
+    fn test_multi_turn_veto_stability() {
+        let genesis = test_genesis();
+        let config = BrocaConfig {
+            controller: LanguageControllerConfig {
+                network_layers: 2,
+                neurons_per_layer: 4,
+                vocab_size: 32,
+                max_seq_len: 32,
+                ..Default::default()
+            },
+            gating: GatingConfig {
+                base_max_tokens: 15,
+                veto_threshold: 0.99, // High threshold to provoke vetoes
+                min_veto_position: 1,
+                max_vetoes: 1,
+                veto_refractory: 2,
+                ..Default::default()
+            },
+            sampling: SamplingStrategy::Greedy,
+            enable_coherence_feedback: true,
+            enable_semantic_veto: true,
+            veto_hesitation: "-- wait, ".to_string(),
+            ..Default::default()
+        };
+
+        let mut gen = BrocaGenerator::new(&genesis, config);
+
+        // Simulate a 5-turn conversation using generate_continuing()
+        let mut veto_count = 0;
+        for turn in 0..5 {
+            let channels = ThoughtChannels::with_intent(turn % 4);
+            let result = gen.generate_continuing(&channels);
+
+            // No NaN in coherence dynamics
+            for &c in &result.coherence_dynamics {
+                assert!(
+                    c.is_finite(),
+                    "Coherence NaN at turn {turn}: {:?}",
+                    &result.coherence_dynamics
+                );
+            }
+            assert!(
+                result.final_coherence.is_finite(),
+                "Final coherence NaN at turn {turn}"
+            );
+
+            // Track vetoes across turns
+            if result.veto_triggered {
+                veto_count += 1;
+            }
+
+            // All token IDs in range
+            for &id in &result.token_ids {
+                assert!(
+                    (id as usize) < gen.tokenizer().vocab_size(),
+                    "Token ID {id} out of range at turn {turn}"
+                );
+            }
+        }
+
+        // With threshold=0.99, at least some turns should veto
+        // (random CfC weights almost never produce 0.99 coherence)
+        assert!(
+            veto_count > 0,
+            "Expected at least one veto across 5 multi-turn generations"
+        );
     }
 }
