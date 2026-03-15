@@ -21,6 +21,7 @@
 
 use super::super::subsystem_trait::{CognitiveSubsystem, CycleSnapshot, SubsystemOutput};
 use symthaea_clinical::InterventionLibrary;
+use super::therapeutic_dream_bridge::TherapeuticDreamTracker;
 use symthaea_therapeutic::{
     CaseFormulation, ClientModel, CrisisDetector, NarrativeFragment, RegulationEngine, ScopeGuard,
     TherapeuticAlliance, TherapeuticNarrative,
@@ -86,6 +87,12 @@ pub struct TherapeuticManager {
     pub last_crisis_type: Option<String>,
     /// Last neuromod delta from regulation strategy (for bath injection).
     pub last_neuromod_delta: Option<NeuromodDelta>,
+    /// Dream counterfactual prediction tracker (closed-loop validation).
+    pub dream_tracker: TherapeuticDreamTracker,
+    /// Auto-checkpoint cycle counter (serialize every N cycles).
+    checkpoint_counter: u32,
+    /// Last serialized session snapshot (for periodic persistence).
+    pub last_checkpoint: Option<String>,
 }
 
 impl Default for TherapeuticManager {
@@ -102,6 +109,9 @@ impl Default for TherapeuticManager {
             crisis_active: false,
             last_crisis_type: None,
             last_neuromod_delta: None,
+            dream_tracker: TherapeuticDreamTracker::new(),
+            checkpoint_counter: 0,
+            last_checkpoint: None,
         }
     }
 }
@@ -179,6 +189,37 @@ impl TherapeuticManager {
         &self,
     ) -> Option<symthaea_therapeutic::RegulationStrategy> {
         self.regulation_engine.active_strategy
+    }
+
+    /// Update RDoC profile from live neuromodulator bath state (bidirectional bridge).
+    ///
+    /// Called from `cycle_phase_dynamics.rs` where both `self.neuromod.bath` and
+    /// `self.therapeutic_manager` are accessible.
+    pub fn update_rdoc_from_bath(&mut self, bath: &[f32; 8]) {
+        RegulationEngine::update_rdoc_from_neuromod(
+            &mut self.client_model.rdoc_profile,
+            bath,
+        );
+    }
+
+    /// Auto-checkpoint: serialize session every `interval` cycles.
+    ///
+    /// Returns `true` if a checkpoint was taken this call.
+    pub fn maybe_checkpoint(&mut self, interval: u32) -> bool {
+        self.checkpoint_counter += 1;
+        if self.checkpoint_counter >= interval {
+            self.checkpoint_counter = 0;
+            if let Ok(json) = self.serialize_session() {
+                self.last_checkpoint = Some(json);
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Get dream prediction accuracy (lower = better, 1.0 = no data).
+    pub fn dream_prediction_accuracy(&self) -> f32 {
+        self.dream_tracker.prediction_accuracy()
     }
 
     /// Encode the current therapeutic state as a dream-compatible action vector.
@@ -360,7 +401,26 @@ impl CognitiveSubsystem for TherapeuticManager {
             is_traumatic,
         ));
 
-        // ── 7. Formulation updates ──────────────────────────────────────────
+        // ── 7. Dream tracker: record current RDoC as prediction target ────
+        {
+            let rdoc = &self.client_model.rdoc_profile;
+            let rdoc_vec = vec![
+                rdoc.score(symthaea_clinical::RDocDomain::NegativeValence),
+                rdoc.score(symthaea_clinical::RDocDomain::PositiveValence),
+                rdoc.score(symthaea_clinical::RDocDomain::CognitiveSystems),
+                rdoc.score(symthaea_clinical::RDocDomain::SocialProcesses),
+                rdoc.score(symthaea_clinical::RDocDomain::ArousalRegulatory),
+                rdoc.score(symthaea_clinical::RDocDomain::Sensorimotor),
+            ];
+            // Record actual outcome for prior prediction, then predict next
+            self.dream_tracker.record_actual_outcome(&rdoc_vec);
+            self.dream_tracker.record_prediction(rdoc_vec, snapshot.cycle_number);
+        }
+
+        // ── 8. Auto-checkpoint (every 100 cycles) ──────────────────────────
+        self.maybe_checkpoint(100);
+
+        // ── 9. Formulation updates ──────────────────────────────────────────
         if self.client_model.affect_trend() < -0.1 && self.formulation.perpetuating.is_empty() {
             self.formulation
                 .add_perpetuating("sustained negative affect pattern", 0.6);
@@ -516,5 +576,422 @@ mod tests {
             .client_model
             .update_affect(CoreAffectSnapshot::new(-0.8, 0.9, 0));
         assert!(manager.client_distress() > 0.5);
+    }
+
+    // ── Proptests & hardening ───────────────────────────────────────────────
+
+    use proptest::prelude::*;
+
+    proptest! {
+        /// Property: process() output valence_delta and arousal_delta are finite
+        /// and lr_modulation is positive-finite regardless of input affect.
+        #[test]
+        fn prop_neuromod_modulation_bounds(
+            valence in -1.0f32..=1.0,
+            arousal in 0.0f32..=1.0,
+            cycle in 0u64..10_000,
+        ) {
+            let mut manager = TherapeuticManager::new();
+            let snapshot = make_snapshot(valence, arousal, cycle);
+            let output = manager.process(&snapshot);
+
+            prop_assert!(output.valence_delta.is_finite(),
+                "valence_delta not finite: {} for v={}, a={}", output.valence_delta, valence, arousal);
+            prop_assert!(output.arousal_delta.is_finite(),
+                "arousal_delta not finite: {} for v={}, a={}", output.arousal_delta, valence, arousal);
+            prop_assert!(output.lr_modulation.is_finite() && output.lr_modulation > 0.0,
+                "lr_modulation not positive-finite: {} for v={}, a={}", output.lr_modulation, valence, arousal);
+        }
+
+        /// Property: crisis detection never panics for arbitrary affect values
+        /// and crisis_active is always a valid boolean (trivially true in Rust,
+        /// but we verify the detector handles the full affect range).
+        #[test]
+        fn prop_crisis_detection_no_panic(
+            valence in -1.0f32..=1.0,
+            arousal in 0.0f32..=1.0,
+        ) {
+            let mut manager = TherapeuticManager::new();
+            let snapshot = make_snapshot(valence, arousal, 1);
+            let _output = manager.process(&snapshot);
+            // crisis_active must be set to some value without panic
+            let _ = manager.crisis_active;
+            // last_crisis_type must be None or Some(non-empty string)
+            if let Some(ref t) = manager.last_crisis_type {
+                prop_assert!(!t.is_empty(), "crisis type name should not be empty");
+            }
+        }
+
+        /// Property: dream_action_vector always returns exactly 32 finite elements
+        /// regardless of manager state after arbitrary processing.
+        #[test]
+        fn prop_dream_action_vector_shape_and_finiteness(
+            valence in -1.0f32..=1.0,
+            arousal in 0.0f32..=1.0,
+            cycles in 0u32..20,
+        ) {
+            let mut manager = TherapeuticManager::new();
+            for i in 0..cycles {
+                let snapshot = make_snapshot(valence, arousal, i as u64);
+                manager.process(&snapshot);
+            }
+            let vec = manager.dream_action_vector();
+            prop_assert_eq!(vec.len(), 32, "dream_action_vector length must be 32");
+            for (i, &val) in vec.iter().enumerate() {
+                prop_assert!(val.is_finite(),
+                    "dream_action_vector[{}] not finite: {}", i, val);
+            }
+        }
+
+        /// Property: narrative coherence stays in [0, 1] after arbitrary fragment integration.
+        #[test]
+        fn prop_narrative_coherence_bounded(
+            valence in -1.0f32..=1.0,
+            arousal in 0.0f32..=1.0,
+            n_cycles in 1u32..50,
+        ) {
+            let mut manager = TherapeuticManager::new();
+            for i in 0..n_cycles {
+                let snapshot = make_snapshot(valence, arousal, i as u64);
+                manager.process(&snapshot);
+            }
+            let coh = manager.narrative_coherence();
+            prop_assert!(coh >= 0.0 && coh <= 1.0,
+                "narrative coherence out of [0,1]: {} after {} cycles", coh, n_cycles);
+        }
+
+        /// Property: formulation resilience_ratio is always non-negative and finite.
+        #[test]
+        fn prop_formulation_resilience_ratio_valid(
+            valence in -1.0f32..=1.0,
+            arousal in 0.0f32..=1.0,
+            n_cycles in 1u32..50,
+        ) {
+            let mut manager = TherapeuticManager::new();
+            for i in 0..n_cycles {
+                let snapshot = make_snapshot(valence, arousal, i as u64);
+                manager.process(&snapshot);
+            }
+            let ratio = manager.formulation_resilience_ratio();
+            prop_assert!(ratio.is_finite() && ratio >= 0.0,
+                "resilience_ratio invalid: {} after {} cycles", ratio, n_cycles);
+        }
+    }
+
+    proptest! {
+        /// Property: serotonin debt stays in [0, 1] and amplification factor in [1, 1.3]
+        /// regardless of RDoC input sequences.
+        #[test]
+        fn prop_debt_accumulation_bounded(
+            neg_val in 0.0f32..=1.0,
+            pos_val in 0.0f32..=1.0,
+            n_ticks in 1u32..500,
+        ) {
+            let mut manager = TherapeuticManager::new();
+            manager.client_model.rdoc_profile.set_score(
+                symthaea_clinical::RDocDomain::NegativeValence, neg_val,
+            );
+            manager.client_model.rdoc_profile.set_score(
+                symthaea_clinical::RDocDomain::PositiveValence, pos_val,
+            );
+            for i in 0..n_ticks {
+                let snapshot = make_snapshot(-0.3, 0.6, i as u64);
+                manager.process(&snapshot);
+            }
+            let s_debt = manager.regulation_engine.serotonin_debt();
+            let d_debt = manager.regulation_engine.dopamine_debt();
+            prop_assert!(s_debt >= 0.0 && s_debt <= 1.0,
+                "serotonin_debt out of [0,1]: {}", s_debt);
+            prop_assert!(d_debt >= 0.0 && d_debt <= 1.0,
+                "dopamine_debt out of [0,1]: {}", d_debt);
+        }
+
+        /// Property: dream tracker predictions stay bounded after many cycles.
+        #[test]
+        fn prop_dream_tracker_bounded(
+            n_cycles in 1u32..200,
+            valence in -1.0f32..=1.0,
+            arousal in 0.0f32..=1.0,
+        ) {
+            let mut manager = TherapeuticManager::new();
+            for i in 0..n_cycles {
+                let snapshot = make_snapshot(valence, arousal, i as u64);
+                manager.process(&snapshot);
+            }
+            let acc = manager.dream_prediction_accuracy();
+            prop_assert!(acc.is_finite(), "dream accuracy not finite: {}", acc);
+            prop_assert!(acc >= 0.0, "dream accuracy negative: {}", acc);
+            prop_assert!(
+                manager.dream_tracker.predictions.len() <= 64,
+                "dream tracker exceeded MAX_HISTORY",
+            );
+        }
+
+        /// Property: auto-checkpoint produces valid JSON when triggered.
+        #[test]
+        fn prop_checkpoint_valid_json(
+            n_cycles in 100u32..300,
+        ) {
+            let mut manager = TherapeuticManager::new();
+            for i in 0..n_cycles {
+                let snapshot = make_snapshot(0.0, 0.5, i as u64);
+                manager.process(&snapshot);
+            }
+            // After 100+ cycles, at least one checkpoint should have fired
+            if let Some(ref json) = manager.last_checkpoint {
+                // Verify it's valid JSON
+                let parsed: Result<serde_json::Value, _> = serde_json::from_str(json);
+                prop_assert!(parsed.is_ok(), "checkpoint JSON invalid: {:?}", parsed.err());
+            }
+        }
+    }
+
+    // ── Deterministic hardening tests ───────────────────────────────────────
+
+    #[test]
+    fn test_narrative_fragment_recording_and_coherence() {
+        let mut manager = TherapeuticManager::new();
+        assert_eq!(manager.narrative.fragments.len(), 0);
+        assert_eq!(manager.narrative_coherence(), 0.0);
+
+        // Process several cycles to accumulate narrative fragments
+        for i in 0..10 {
+            let snapshot = make_snapshot(0.2, 0.4, i);
+            manager.process(&snapshot);
+        }
+        assert_eq!(manager.narrative.fragments.len(), 10);
+        // Coherence should have been updated (non-zero after fragments)
+        let coh = manager.narrative_coherence();
+        assert!(coh.is_finite(), "coherence must be finite after fragments");
+        assert!(coh >= 0.0 && coh <= 1.0, "coherence must be in [0,1], got {}", coh);
+    }
+
+    #[test]
+    fn test_formulation_perpetuating_and_protective_persist() {
+        let mut manager = TherapeuticManager::new();
+
+        // Manually add formulation factors
+        manager.formulation.add_perpetuating("rumination", 0.8);
+        manager.formulation.add_protective("social support", 0.7);
+
+        assert_eq!(manager.formulation.perpetuating.len(), 1);
+        assert_eq!(manager.formulation.protective.len(), 1);
+
+        // Process should not clear manually added factors
+        let snapshot = make_snapshot(0.0, 0.5, 1);
+        manager.process(&snapshot);
+
+        assert!(
+            manager.formulation.perpetuating.len() >= 1,
+            "perpetuating factors must persist after process()"
+        );
+        assert!(
+            manager.formulation.protective.len() >= 1,
+            "protective factors must persist after process()"
+        );
+
+        // Resilience ratio should reflect both risk and protective factors
+        let ratio = manager.formulation_resilience_ratio();
+        assert!(ratio.is_finite() && ratio >= 0.0);
+    }
+
+    #[test]
+    fn test_dream_action_vector_structure() {
+        let mut manager = TherapeuticManager::new();
+
+        // Process one cycle to populate neuromod delta
+        let snapshot = make_snapshot(-0.5, 0.8, 1);
+        manager.process(&snapshot);
+
+        let vec = manager.dream_action_vector();
+        assert_eq!(vec.len(), 32, "must be exactly 32 elements");
+
+        // Elements [18..32] are reserved zeros
+        for i in 18..32 {
+            assert_eq!(vec[i], 0.0, "reserved element [{}] must be 0.0", i);
+        }
+
+        // Crisis flag must be 0.0 or 1.0
+        assert!(vec[8] == 0.0 || vec[8] == 1.0, "crisis flag must be 0 or 1, got {}", vec[8]);
+
+        // Strategy ordinal must be in [-1, 6]
+        assert!(
+            vec[9] >= -1.0 && vec[9] <= 6.0,
+            "strategy ordinal out of [-1,6]: {}",
+            vec[9]
+        );
+
+        // All elements must be finite
+        for (i, &val) in vec.iter().enumerate() {
+            assert!(val.is_finite(), "element [{}] not finite: {}", i, val);
+        }
+    }
+
+    #[test]
+    fn test_extreme_affect_resilience() {
+        let mut manager = TherapeuticManager::new();
+
+        // Extreme negative valence + high arousal
+        let snapshot = make_snapshot(-1.0, 1.0, 1);
+        let output = manager.process(&snapshot);
+        assert!(output.valence_delta.is_finite());
+        assert!(output.arousal_delta.is_finite());
+        assert!(output.lr_modulation.is_finite());
+
+        // Extreme positive valence + zero arousal
+        let snapshot = make_snapshot(1.0, 0.0, 2);
+        let output = manager.process(&snapshot);
+        assert!(output.valence_delta.is_finite());
+        assert!(output.arousal_delta.is_finite());
+        assert!(output.lr_modulation.is_finite());
+
+        // Zero valence + zero arousal
+        let snapshot = make_snapshot(0.0, 0.0, 3);
+        let output = manager.process(&snapshot);
+        assert!(output.valence_delta.is_finite());
+        assert!(output.arousal_delta.is_finite());
+        assert!(output.lr_modulation.is_finite());
+
+        // Rapid oscillation (stress test for EMA trackers)
+        for i in 0..100 {
+            let v = if i % 2 == 0 { -1.0 } else { 1.0 };
+            let a = if i % 3 == 0 { 0.0 } else { 1.0 };
+            let snapshot = make_snapshot(v, a, 100 + i);
+            let output = manager.process(&snapshot);
+            assert!(
+                output.valence_delta.is_finite(),
+                "valence_delta not finite at oscillation cycle {}",
+                i
+            );
+            assert!(
+                output.arousal_delta.is_finite(),
+                "arousal_delta not finite at oscillation cycle {}",
+                i
+            );
+            assert!(
+                output.lr_modulation.is_finite() && output.lr_modulation > 0.0,
+                "lr_modulation invalid at oscillation cycle {}: {}",
+                i,
+                output.lr_modulation
+            );
+        }
+
+        // Verify manager is still coherent after extreme stress
+        let coh = manager.narrative_coherence();
+        assert!(coh.is_finite() && coh >= 0.0 && coh <= 1.0);
+        let vec = manager.dream_action_vector();
+        assert_eq!(vec.len(), 32);
+        for (i, &val) in vec.iter().enumerate() {
+            assert!(val.is_finite(), "dream vec [{}] not finite after stress: {}", i, val);
+        }
+    }
+
+    #[test]
+    fn test_update_rdoc_from_bath_wired() {
+        let mut manager = TherapeuticManager::new();
+        let initial_neg = manager.client_model.rdoc_profile.score(
+            symthaea_clinical::RDocDomain::NegativeValence,
+        );
+        // Low serotonin + low GABA → should increase NegativeValence
+        let bath = [0.5, 0.5, 0.1, 0.5, 0.1, 0.5, 0.5, 0.5];
+        manager.update_rdoc_from_bath(&bath);
+        let new_neg = manager.client_model.rdoc_profile.score(
+            symthaea_clinical::RDocDomain::NegativeValence,
+        );
+        assert!(
+            new_neg > initial_neg,
+            "NegativeValence should increase with low 5-HT: {} -> {}",
+            initial_neg, new_neg,
+        );
+    }
+
+    #[test]
+    fn test_dream_tracker_integrated_in_process() {
+        let mut manager = TherapeuticManager::new();
+        assert!(manager.dream_tracker.predictions.is_empty());
+
+        let snapshot = make_snapshot(0.0, 0.5, 1);
+        manager.process(&snapshot);
+
+        assert_eq!(
+            manager.dream_tracker.predictions.len(), 1,
+            "dream tracker should record one prediction per process() call",
+        );
+    }
+
+    #[test]
+    fn test_auto_checkpoint_fires() {
+        let mut manager = TherapeuticManager::new();
+        assert!(manager.last_checkpoint.is_none());
+
+        // Run 101 cycles — checkpoint fires at 100
+        for i in 0..101 {
+            let snapshot = make_snapshot(0.0, 0.5, i);
+            manager.process(&snapshot);
+        }
+
+        assert!(
+            manager.last_checkpoint.is_some(),
+            "checkpoint should fire after 100 cycles",
+        );
+        // Verify it's valid JSON
+        let json = manager.last_checkpoint.as_ref().unwrap();
+        let parsed: Result<serde_json::Value, _> = serde_json::from_str(json);
+        assert!(parsed.is_ok(), "checkpoint must be valid JSON");
+    }
+
+    #[test]
+    fn test_dream_prediction_accuracy_improves_with_stable_state() {
+        let mut manager = TherapeuticManager::new();
+        // Run many cycles with stable state — predictions should converge
+        for i in 0..50 {
+            let snapshot = make_snapshot(0.0, 0.5, i);
+            manager.process(&snapshot);
+        }
+        let accuracy = manager.dream_prediction_accuracy();
+        assert!(accuracy.is_finite());
+        // With stable state, predictions should be reasonably accurate (low error)
+        assert!(
+            accuracy < 0.5,
+            "stable-state dream accuracy should be < 0.5, got {}",
+            accuracy,
+        );
+    }
+
+    #[test]
+    fn test_extreme_out_of_range_affect_no_panic() {
+        let mut manager = TherapeuticManager::new();
+
+        // Values well outside normal [-1,1] / [0,1] range
+        // The snapshot struct uses f32, so we can pass extreme values.
+        // The system should handle them gracefully (clamp or process without panic).
+        let extreme_vals: &[(f32, f32)] = &[
+            (-100.0, 100.0),
+            (100.0, -100.0),
+            (f32::MIN, f32::MAX),
+            (f32::EPSILON, f32::EPSILON),
+            (-f32::EPSILON, f32::EPSILON),
+        ];
+
+        for (i, &(v, a)) in extreme_vals.iter().enumerate() {
+            let snapshot = make_snapshot(v, a, i as u64);
+            let output = manager.process(&snapshot);
+            // Must not panic — outputs should be finite (or at least not NaN)
+            assert!(
+                !output.valence_delta.is_nan(),
+                "valence_delta is NaN for extreme input ({}, {})",
+                v, a
+            );
+            assert!(
+                !output.arousal_delta.is_nan(),
+                "arousal_delta is NaN for extreme input ({}, {})",
+                v, a
+            );
+            assert!(
+                !output.lr_modulation.is_nan(),
+                "lr_modulation is NaN for extreme input ({}, {})",
+                v, a
+            );
+        }
     }
 }
