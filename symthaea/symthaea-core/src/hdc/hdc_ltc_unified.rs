@@ -411,6 +411,126 @@ unsafe fn fused_identity_avx2(
     }
 }
 
+/// Fused tanh evolution kernel using NEON intrinsics (AArch64).
+/// Same algorithm as `fused_tanh_avx2` but with 4-wide f32 lanes.
+#[cfg(all(target_arch = "aarch64", feature = "simd"))]
+unsafe fn fused_tanh_neon(
+    state: &mut [f32],
+    weight: &[f32],
+    input_mask: &[f32],
+    input: &[f32],
+    sigma: f32,
+    one_minus_sigma: f32,
+    pre_scale: f32,
+) {
+    use std::arch::aarch64::*;
+
+    let dim = state.len();
+    let chunks = dim / 4;
+
+    let sigma_v = vdupq_n_f32(sigma);
+    let oms_v = vdupq_n_f32(one_minus_sigma);
+    let scale_v = vdupq_n_f32(pre_scale);
+    let c27 = vdupq_n_f32(27.0);
+    let c9 = vdupq_n_f32(9.0);
+    let thresh = vdupq_n_f32(4.97);
+    let neg_thresh = vdupq_n_f32(-4.97);
+    let one = vdupq_n_f32(1.0);
+    let neg_one = vdupq_n_f32(-1.0);
+
+    let s_ptr = state.as_mut_ptr();
+    let w_ptr = weight.as_ptr();
+    let m_ptr = input_mask.as_ptr();
+    let i_ptr = input.as_ptr();
+
+    for c in 0..chunks {
+        let off = c * 4;
+
+        let s = vld1q_f32(s_ptr.add(off));
+        let w = vld1q_f32(w_ptr.add(off));
+        let m = vld1q_f32(m_ptr.add(off));
+        let inp = vld1q_f32(i_ptr.add(off));
+
+        // pre_act = (w*s + m*inp) * pre_scale
+        let ws = vmulq_f32(w, s);
+        let pre_act = vmulq_f32(vfmaq_f32(ws, m, inp), scale_v);
+
+        // fast_tanh: x*(27+x^2) / (27+9*x^2)
+        let x2 = vmulq_f32(pre_act, pre_act);
+        let num = vmulq_f32(pre_act, vaddq_f32(c27, x2));
+        let denom = vfmaq_f32(c27, c9, x2);
+        let tanh_v = vdivq_f32(num, denom);
+
+        // Clip: |x| > 4.97 -> signum(x)
+        let clip_hi = vcgtq_f32(pre_act, thresh);
+        let clip_lo = vcltq_f32(pre_act, neg_thresh);
+        let x_inf = vbslq_f32(clip_hi, one, tanh_v);
+        let x_inf = vbslq_f32(clip_lo, neg_one, x_inf);
+
+        // Lerp: new_state = oms*s + sigma*x_inf
+        let new_s = vfmaq_f32(vmulq_f32(oms_v, s), sigma_v, x_inf);
+
+        vst1q_f32(s_ptr.add(off), new_s);
+    }
+
+    // Scalar remainder
+    for i in (chunks * 4)..dim {
+        let si = *state.get_unchecked(i);
+        let x = (*weight.get_unchecked(i) * si
+            + *input_mask.get_unchecked(i) * *input.get_unchecked(i))
+            * pre_scale;
+        let x_inf = fast_tanh(x);
+        *state.get_unchecked_mut(i) = one_minus_sigma * si + sigma * x_inf;
+    }
+}
+
+/// Fused identity (linear) evolution kernel using NEON intrinsics (AArch64).
+#[cfg(all(target_arch = "aarch64", feature = "simd"))]
+unsafe fn fused_identity_neon(
+    state: &mut [f32],
+    weight: &[f32],
+    input_mask: &[f32],
+    input: &[f32],
+    sigma: f32,
+    one_minus_sigma: f32,
+) {
+    use std::arch::aarch64::*;
+
+    let dim = state.len();
+    let chunks = dim / 4;
+
+    let sigma_v = vdupq_n_f32(sigma);
+    let oms_v = vdupq_n_f32(one_minus_sigma);
+    let half = vdupq_n_f32(0.5);
+
+    let s_ptr = state.as_mut_ptr();
+    let w_ptr = weight.as_ptr();
+    let m_ptr = input_mask.as_ptr();
+    let i_ptr = input.as_ptr();
+
+    for c in 0..chunks {
+        let off = c * 4;
+
+        let s = vld1q_f32(s_ptr.add(off));
+        let w = vld1q_f32(w_ptr.add(off));
+        let m = vld1q_f32(m_ptr.add(off));
+        let inp = vld1q_f32(i_ptr.add(off));
+
+        let x_inf = vmulq_f32(vfmaq_f32(vmulq_f32(w, s), m, inp), half);
+        let new_s = vfmaq_f32(vmulq_f32(oms_v, s), sigma_v, x_inf);
+
+        vst1q_f32(s_ptr.add(off), new_s);
+    }
+
+    for i in (chunks * 4)..dim {
+        let si = *state.get_unchecked(i);
+        let x_inf = (*weight.get_unchecked(i) * si
+            + *input_mask.get_unchecked(i) * *input.get_unchecked(i))
+            * 0.5;
+        *state.get_unchecked_mut(i) = one_minus_sigma * si + sigma * x_inf;
+    }
+}
+
 impl HdcLtcUnifiedNeuron {
     /// Create a new unified neuron with given configuration and seed.
     ///
@@ -709,7 +829,9 @@ impl HdcLtcUnifiedNeuron {
                 // AVX2+FMA fast path: hand-written SIMD intrinsics
                 #[cfg(all(target_arch = "x86_64", feature = "simd"))]
                 {
-                    if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("fma") {
+                    if crate::hdc::simd_detect::has_avx2()
+                        && crate::hdc::simd_detect::has_fma()
+                    {
                         unsafe {
                             fused_tanh_avx2(
                                 &mut self.state.values,
@@ -725,6 +847,24 @@ impl HdcLtcUnifiedNeuron {
                         self.update_stats(dt);
                         return;
                     }
+                }
+                // NEON fast path (AArch64)
+                #[cfg(all(target_arch = "aarch64", feature = "simd"))]
+                {
+                    unsafe {
+                        fused_tanh_neon(
+                            &mut self.state.values,
+                            &self.weight_hv.values,
+                            &self.input_mask.values,
+                            &input.values,
+                            sigma,
+                            one_minus_sigma,
+                            0.5,
+                        );
+                    }
+                    self.apply_state_bounds();
+                    self.update_stats(dt);
+                    return;
                 }
                 // Scalar fallback (auto-vectorized by LLVM where possible)
                 for i in 0..dim {
@@ -761,7 +901,9 @@ impl HdcLtcUnifiedNeuron {
                 // AVX2+FMA fast path
                 #[cfg(all(target_arch = "x86_64", feature = "simd"))]
                 {
-                    if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("fma") {
+                    if crate::hdc::simd_detect::has_avx2()
+                        && crate::hdc::simd_detect::has_fma()
+                    {
                         unsafe {
                             fused_identity_avx2(
                                 &mut self.state.values,
@@ -777,6 +919,23 @@ impl HdcLtcUnifiedNeuron {
                         return;
                     }
                 }
+                // NEON fast path (AArch64)
+                #[cfg(all(target_arch = "aarch64", feature = "simd"))]
+                {
+                    unsafe {
+                        fused_identity_neon(
+                            &mut self.state.values,
+                            &self.weight_hv.values,
+                            &self.input_mask.values,
+                            &input.values,
+                            sigma,
+                            one_minus_sigma,
+                        );
+                    }
+                    self.apply_state_bounds();
+                    self.update_stats(dt);
+                    return;
+                }
                 // Scalar fallback
                 for i in 0..dim {
                     let state_i = self.state.values[i];
@@ -790,7 +949,9 @@ impl HdcLtcUnifiedNeuron {
                 // AVX2+FMA fast path (reuses tanh kernel with custom pre_scale)
                 #[cfg(all(target_arch = "x86_64", feature = "simd"))]
                 {
-                    if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("fma") {
+                    if crate::hdc::simd_detect::has_avx2()
+                        && crate::hdc::simd_detect::has_fma()
+                    {
                         unsafe {
                             fused_tanh_avx2(
                                 &mut self.state.values,
@@ -806,6 +967,24 @@ impl HdcLtcUnifiedNeuron {
                         self.update_stats(dt);
                         return;
                     }
+                }
+                // NEON fast path (AArch64)
+                #[cfg(all(target_arch = "aarch64", feature = "simd"))]
+                {
+                    unsafe {
+                        fused_tanh_neon(
+                            &mut self.state.values,
+                            &self.weight_hv.values,
+                            &self.input_mask.values,
+                            &input.values,
+                            sigma,
+                            one_minus_sigma,
+                            0.5 * scale,
+                        );
+                    }
+                    self.apply_state_bounds();
+                    self.update_stats(dt);
+                    return;
                 }
                 // Scalar fallback
                 for i in 0..dim {

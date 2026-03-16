@@ -42,98 +42,19 @@ use super::{ActionHint, AdaptiveBehavior, CognitiveLoopService, Experience, Loop
 
 /// Cosine similarity between two f32 slices.
 ///
-/// Returns 0.0 for mismatched lengths or zero-norm vectors.
-/// Uses `.max(1e-10)` denominator for NaN safety.
-/// Uses AVX2+FMA SIMD when available (8-wide f32 lanes).
+/// Returns 0.0 for mismatched lengths or empty/zero-norm vectors.
+/// Delegates to `symthaea_core::hdc::simd_continuous::similarity_simd` which
+/// uses AVX2+FMA SIMD when available. This eliminates a local duplicate
+/// implementation.
 #[inline]
 pub(super) fn cosine_f32(a: &[f32], b: &[f32]) -> f32 {
     if a.len() != b.len() {
         return 0.0;
     }
-    #[cfg(all(target_arch = "x86_64", feature = "simd"))]
-    {
-        if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("fma") && a.len() >= 8 {
-            // SAFETY: feature detection confirmed above
-            return unsafe { cosine_f32_avx2(a, b) };
-        }
+    if a.is_empty() {
+        return 0.0;
     }
-    cosine_f32_scalar(a, b)
-}
-
-#[inline]
-fn cosine_f32_scalar(a: &[f32], b: &[f32]) -> f32 {
-    let mut dot = 0.0f32;
-    let mut norm_a = 0.0f32;
-    let mut norm_b = 0.0f32;
-    for (x, y) in a.iter().zip(b.iter()) {
-        dot += x * y;
-        norm_a += x * x;
-        norm_b += y * y;
-    }
-    let denom = (norm_a.sqrt() * norm_b.sqrt()).max(1e-10);
-    let result = dot / denom;
-    if result.is_finite() {
-        result.clamp(-1.0, 1.0)
-    } else {
-        0.0
-    }
-}
-
-#[cfg(all(target_arch = "x86_64", feature = "simd"))]
-#[target_feature(enable = "avx2", enable = "fma")]
-unsafe fn cosine_f32_avx2(a: &[f32], b: &[f32]) -> f32 {
-    use std::arch::x86_64::*;
-    let n = a.len();
-    let chunks = n / 8;
-    let remainder = n % 8;
-    let mut dot_acc = _mm256_setzero_ps();
-    let mut na_acc = _mm256_setzero_ps();
-    let mut nb_acc = _mm256_setzero_ps();
-    let a_ptr = a.as_ptr();
-    let b_ptr = b.as_ptr();
-    for i in 0..chunks {
-        let offset = i * 8;
-        let va = _mm256_loadu_ps(a_ptr.add(offset));
-        let vb = _mm256_loadu_ps(b_ptr.add(offset));
-        dot_acc = _mm256_fmadd_ps(va, vb, dot_acc);
-        na_acc = _mm256_fmadd_ps(va, va, na_acc);
-        nb_acc = _mm256_fmadd_ps(vb, vb, nb_acc);
-    }
-    // Horizontal sum: 8 lanes → scalar
-    let mut dot_total = hsum_avx(dot_acc);
-    let mut norm_a = hsum_avx(na_acc);
-    let mut norm_b = hsum_avx(nb_acc);
-    // Remainder
-    let tail_start = chunks * 8;
-    for i in 0..remainder {
-        let av = *a_ptr.add(tail_start + i);
-        let bv = *b_ptr.add(tail_start + i);
-        dot_total += av * bv;
-        norm_a += av * av;
-        norm_b += bv * bv;
-    }
-    let denom = (norm_a.sqrt() * norm_b.sqrt()).max(1e-10);
-    let result = dot_total / denom;
-    if result.is_finite() {
-        result.clamp(-1.0, 1.0)
-    } else {
-        0.0
-    }
-}
-
-#[cfg(all(target_arch = "x86_64", feature = "simd"))]
-#[target_feature(enable = "avx2")]
-#[inline]
-unsafe fn hsum_avx(v: std::arch::x86_64::__m256) -> f32 {
-    use std::arch::x86_64::*;
-    let hi = _mm256_extractf128_ps(v, 1);
-    let lo = _mm256_castps256_ps128(v);
-    let sum128 = _mm_add_ps(lo, hi);
-    let shuf = _mm_movehdup_ps(sum128);
-    let sums = _mm_add_ps(sum128, shuf);
-    let shuf2 = _mm_movehl_ps(sums, sums);
-    let result = _mm_add_ss(sums, shuf2);
-    _mm_cvtss_f32(result)
+    symthaea_core::hdc::simd_continuous::similarity_simd(a, b)
 }
 
 impl CognitiveLoopService {

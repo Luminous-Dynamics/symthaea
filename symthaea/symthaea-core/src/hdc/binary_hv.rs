@@ -42,9 +42,10 @@ thread_local! {
 /// // Similarity (Hamming): ~160ns
 /// let sim = a.similarity(&b);  // ~0.485 for random vectors
 /// ```
-/// Ensure 8-byte alignment for SIMD operations
+/// 32-byte alignment for AVX2 aligned loads (16-byte is sufficient for NEON).
+/// This enables `_mm256_load_si256` on x86_64 for the source BinaryHV.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[repr(align(8))]
+#[repr(align(32))]
 pub struct BinaryHV(#[serde(with = "serde_arrays")] pub [u8; 2048]);
 
 impl BinaryHV {

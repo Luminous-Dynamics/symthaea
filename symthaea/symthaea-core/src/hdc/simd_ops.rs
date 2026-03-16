@@ -12,85 +12,21 @@
 //! - AVX-512 (x86_64): 512-bit operations (when available)
 //! - AVX2 (x86_64): 256-bit operations
 //! - SSE4.1 (x86_64): 128-bit operations (fallback)
+//! - NEON (AArch64): 128-bit operations
 //! - Portable: Safe fallback using auto-vectorization hints
 //!
-//! # Performance Optimization: Cached Feature Detection
-//! CPU feature detection is cached at first use via `OnceLock` to avoid
-//! repeated `is_x86_feature_detected!` calls (2-3x improvement for hot paths).
+//! Feature detection is centralized in [`super::simd_detect`].
 
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
-use std::sync::OnceLock;
 
-// =============================================================================
-// CACHED SIMD FEATURE DETECTION
-// =============================================================================
+#[cfg(target_arch = "aarch64")]
+use std::arch::aarch64::*;
 
-/// Cached result of AVX-512 feature detection
-#[cfg(target_arch = "x86_64")]
-static HAS_AVX512F: OnceLock<bool> = OnceLock::new();
-
-/// Cached result of AVX-512 BW (byte/word) feature detection
-#[cfg(target_arch = "x86_64")]
-static HAS_AVX512BW: OnceLock<bool> = OnceLock::new();
-
-/// Cached result of AVX-512 VPOPCNTDQ feature detection
-#[cfg(target_arch = "x86_64")]
-static HAS_AVX512VPOPCNTDQ: OnceLock<bool> = OnceLock::new();
-
-/// Cached result of AVX2 feature detection (initialized once, read many times)
-#[cfg(target_arch = "x86_64")]
-static HAS_AVX2: OnceLock<bool> = OnceLock::new();
-
-/// Cached result of SSE4.1 feature detection
-#[cfg(target_arch = "x86_64")]
-static HAS_SSE41: OnceLock<bool> = OnceLock::new();
-
-/// Cached result of POPCNT feature detection
-#[cfg(target_arch = "x86_64")]
-static HAS_POPCNT: OnceLock<bool> = OnceLock::new();
-
-/// Get cached AVX-512F availability
-#[cfg(target_arch = "x86_64")]
-#[inline(always)]
-pub fn has_avx512f() -> bool {
-    *HAS_AVX512F.get_or_init(|| is_x86_feature_detected!("avx512f"))
-}
-
-/// Get cached AVX-512BW availability
-#[cfg(target_arch = "x86_64")]
-#[inline(always)]
-pub fn has_avx512bw() -> bool {
-    *HAS_AVX512BW.get_or_init(|| is_x86_feature_detected!("avx512bw"))
-}
-
-/// Get cached AVX-512 VPOPCNTDQ availability
-#[cfg(target_arch = "x86_64")]
-#[inline(always)]
-pub fn has_avx512_vpopcntdq() -> bool {
-    *HAS_AVX512VPOPCNTDQ.get_or_init(|| is_x86_feature_detected!("avx512vpopcntdq"))
-}
-
-/// Get cached AVX2 availability (2-3x faster than repeated macro calls)
-#[cfg(target_arch = "x86_64")]
-#[inline(always)]
-pub fn has_avx2() -> bool {
-    *HAS_AVX2.get_or_init(|| is_x86_feature_detected!("avx2"))
-}
-
-/// Get cached SSE4.1 availability
-#[cfg(target_arch = "x86_64")]
-#[inline(always)]
-pub fn has_sse41() -> bool {
-    *HAS_SSE41.get_or_init(|| is_x86_feature_detected!("sse4.1"))
-}
-
-/// Get cached POPCNT availability
-#[cfg(target_arch = "x86_64")]
-#[inline(always)]
-pub fn has_popcnt() -> bool {
-    *HAS_POPCNT.get_or_init(|| is_x86_feature_detected!("popcnt"))
-}
+#[allow(unused_imports)]
+use super::simd_detect::{
+    has_avx2, has_avx512_vpopcntdq, has_avx512bw, has_avx512f, has_popcnt, has_sse41,
+};
 
 /// SIMD-optimized XOR (bind) operation for 2048 bytes
 ///
@@ -166,15 +102,16 @@ unsafe fn bind_avx2(a: &[u8; 2048], b: &[u8; 2048], result: &mut [u8; 2048]) {
 
     // 2048 bytes / 32 bytes = 64 iterations
     // Unroll by 4 for better instruction-level parallelism
+    // Source arrays are align(32) from BinaryHV, so use aligned loads
     for i in (0..64).step_by(4) {
-        let a0 = _mm256_loadu_si256(a_ptr.add(i));
-        let b0 = _mm256_loadu_si256(b_ptr.add(i));
-        let a1 = _mm256_loadu_si256(a_ptr.add(i + 1));
-        let b1 = _mm256_loadu_si256(b_ptr.add(i + 1));
-        let a2 = _mm256_loadu_si256(a_ptr.add(i + 2));
-        let b2 = _mm256_loadu_si256(b_ptr.add(i + 2));
-        let a3 = _mm256_loadu_si256(a_ptr.add(i + 3));
-        let b3 = _mm256_loadu_si256(b_ptr.add(i + 3));
+        let a0 = _mm256_load_si256(a_ptr.add(i));
+        let b0 = _mm256_load_si256(b_ptr.add(i));
+        let a1 = _mm256_load_si256(a_ptr.add(i + 1));
+        let b1 = _mm256_load_si256(b_ptr.add(i + 1));
+        let a2 = _mm256_load_si256(a_ptr.add(i + 2));
+        let b2 = _mm256_load_si256(b_ptr.add(i + 2));
+        let a3 = _mm256_load_si256(a_ptr.add(i + 3));
+        let b3 = _mm256_load_si256(b_ptr.add(i + 3));
 
         let r0 = _mm256_xor_si256(a0, b0);
         let r1 = _mm256_xor_si256(a1, b1);
@@ -285,33 +222,34 @@ unsafe fn intersection_avx2(a: &[u8; 2048], b: &[u8; 2048], result: &mut [u8; 20
     let a_ptr = a.as_ptr() as *const __m256i;
     let b_ptr = b.as_ptr() as *const __m256i;
     let r_ptr = result.as_mut_ptr() as *mut __m256i;
+    // Source arrays are align(32) from BinaryHV, so use aligned loads
     for i in (0..64).step_by(4) {
         _mm256_storeu_si256(
             r_ptr.add(i),
             _mm256_and_si256(
-                _mm256_loadu_si256(a_ptr.add(i)),
-                _mm256_loadu_si256(b_ptr.add(i)),
+                _mm256_load_si256(a_ptr.add(i)),
+                _mm256_load_si256(b_ptr.add(i)),
             ),
         );
         _mm256_storeu_si256(
             r_ptr.add(i + 1),
             _mm256_and_si256(
-                _mm256_loadu_si256(a_ptr.add(i + 1)),
-                _mm256_loadu_si256(b_ptr.add(i + 1)),
+                _mm256_load_si256(a_ptr.add(i + 1)),
+                _mm256_load_si256(b_ptr.add(i + 1)),
             ),
         );
         _mm256_storeu_si256(
             r_ptr.add(i + 2),
             _mm256_and_si256(
-                _mm256_loadu_si256(a_ptr.add(i + 2)),
-                _mm256_loadu_si256(b_ptr.add(i + 2)),
+                _mm256_load_si256(a_ptr.add(i + 2)),
+                _mm256_load_si256(b_ptr.add(i + 2)),
             ),
         );
         _mm256_storeu_si256(
             r_ptr.add(i + 3),
             _mm256_and_si256(
-                _mm256_loadu_si256(a_ptr.add(i + 3)),
-                _mm256_loadu_si256(b_ptr.add(i + 3)),
+                _mm256_load_si256(a_ptr.add(i + 3)),
+                _mm256_load_si256(b_ptr.add(i + 3)),
             ),
         );
     }
@@ -416,33 +354,34 @@ unsafe fn union_avx2(a: &[u8; 2048], b: &[u8; 2048], result: &mut [u8; 2048]) {
     let a_ptr = a.as_ptr() as *const __m256i;
     let b_ptr = b.as_ptr() as *const __m256i;
     let r_ptr = result.as_mut_ptr() as *mut __m256i;
+    // Source arrays are align(32) from BinaryHV, so use aligned loads
     for i in (0..64).step_by(4) {
         _mm256_storeu_si256(
             r_ptr.add(i),
             _mm256_or_si256(
-                _mm256_loadu_si256(a_ptr.add(i)),
-                _mm256_loadu_si256(b_ptr.add(i)),
+                _mm256_load_si256(a_ptr.add(i)),
+                _mm256_load_si256(b_ptr.add(i)),
             ),
         );
         _mm256_storeu_si256(
             r_ptr.add(i + 1),
             _mm256_or_si256(
-                _mm256_loadu_si256(a_ptr.add(i + 1)),
-                _mm256_loadu_si256(b_ptr.add(i + 1)),
+                _mm256_load_si256(a_ptr.add(i + 1)),
+                _mm256_load_si256(b_ptr.add(i + 1)),
             ),
         );
         _mm256_storeu_si256(
             r_ptr.add(i + 2),
             _mm256_or_si256(
-                _mm256_loadu_si256(a_ptr.add(i + 2)),
-                _mm256_loadu_si256(b_ptr.add(i + 2)),
+                _mm256_load_si256(a_ptr.add(i + 2)),
+                _mm256_load_si256(b_ptr.add(i + 2)),
             ),
         );
         _mm256_storeu_si256(
             r_ptr.add(i + 3),
             _mm256_or_si256(
-                _mm256_loadu_si256(a_ptr.add(i + 3)),
-                _mm256_loadu_si256(b_ptr.add(i + 3)),
+                _mm256_load_si256(a_ptr.add(i + 3)),
+                _mm256_load_si256(b_ptr.add(i + 3)),
             ),
         );
     }
@@ -562,12 +501,11 @@ unsafe fn matching_bits_avx512_vpopcntdq(a: &[u8; 2048], b: &[u8; 2048]) -> u32 
 }
 
 /// AVX-512 with scalar POPCNT fallback
+/// SAFETY: BinaryHV is #[repr(align(32))] so u64 reads are naturally aligned.
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx512f", enable = "popcnt")]
 #[inline]
 unsafe fn matching_bits_avx512_popcnt(a: &[u8; 2048], b: &[u8; 2048]) -> u32 {
-    use std::ptr::read_unaligned;
-
     let a_ptr = a.as_ptr() as *const u64;
     let b_ptr = b.as_ptr() as *const u64;
 
@@ -576,14 +514,14 @@ unsafe fn matching_bits_avx512_popcnt(a: &[u8; 2048], b: &[u8; 2048]) -> u32 {
     // 2048 bytes / 8 bytes = 256 u64s
     // Process 8 at a time for better ILP
     for i in (0..256).step_by(8) {
-        let xor0 = read_unaligned(a_ptr.add(i)) ^ read_unaligned(b_ptr.add(i));
-        let xor1 = read_unaligned(a_ptr.add(i + 1)) ^ read_unaligned(b_ptr.add(i + 1));
-        let xor2 = read_unaligned(a_ptr.add(i + 2)) ^ read_unaligned(b_ptr.add(i + 2));
-        let xor3 = read_unaligned(a_ptr.add(i + 3)) ^ read_unaligned(b_ptr.add(i + 3));
-        let xor4 = read_unaligned(a_ptr.add(i + 4)) ^ read_unaligned(b_ptr.add(i + 4));
-        let xor5 = read_unaligned(a_ptr.add(i + 5)) ^ read_unaligned(b_ptr.add(i + 5));
-        let xor6 = read_unaligned(a_ptr.add(i + 6)) ^ read_unaligned(b_ptr.add(i + 6));
-        let xor7 = read_unaligned(a_ptr.add(i + 7)) ^ read_unaligned(b_ptr.add(i + 7));
+        let xor0 = *a_ptr.add(i) ^ *b_ptr.add(i);
+        let xor1 = *a_ptr.add(i + 1) ^ *b_ptr.add(i + 1);
+        let xor2 = *a_ptr.add(i + 2) ^ *b_ptr.add(i + 2);
+        let xor3 = *a_ptr.add(i + 3) ^ *b_ptr.add(i + 3);
+        let xor4 = *a_ptr.add(i + 4) ^ *b_ptr.add(i + 4);
+        let xor5 = *a_ptr.add(i + 5) ^ *b_ptr.add(i + 5);
+        let xor6 = *a_ptr.add(i + 6) ^ *b_ptr.add(i + 6);
+        let xor7 = *a_ptr.add(i + 7) ^ *b_ptr.add(i + 7);
 
         total += _popcnt64(xor0 as i64) as u64;
         total += _popcnt64(xor1 as i64) as u64;
@@ -599,27 +537,23 @@ unsafe fn matching_bits_avx512_popcnt(a: &[u8; 2048], b: &[u8; 2048]) -> u32 {
 }
 
 /// AVX2 + POPCNT implementation
-/// XOR bytes together, then count zero bits (matching = ~xor)
-/// Uses read_unaligned for safety with potentially unaligned data
+/// XOR bytes together, then popcount to find differing bits.
+/// SAFETY: BinaryHV is #[repr(align(32))] so u64 reads are naturally aligned.
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx2", enable = "popcnt")]
 #[inline]
 unsafe fn matching_bits_avx2_popcnt(a: &[u8; 2048], b: &[u8; 2048]) -> u32 {
-    use std::ptr::read_unaligned;
-
     let a_ptr = a.as_ptr() as *const u64;
     let b_ptr = b.as_ptr() as *const u64;
 
     let mut total: u64 = 0;
 
-    // 2048 bytes / 8 bytes = 256 u64s
-    // Process 4 at a time for ILP
-    // Use read_unaligned for safety (BinaryHV should be aligned, but be defensive)
+    // 2048 bytes / 8 bytes = 256 u64s, process 4 at a time for ILP
     for i in (0..256).step_by(4) {
-        let xor0 = read_unaligned(a_ptr.add(i)) ^ read_unaligned(b_ptr.add(i));
-        let xor1 = read_unaligned(a_ptr.add(i + 1)) ^ read_unaligned(b_ptr.add(i + 1));
-        let xor2 = read_unaligned(a_ptr.add(i + 2)) ^ read_unaligned(b_ptr.add(i + 2));
-        let xor3 = read_unaligned(a_ptr.add(i + 3)) ^ read_unaligned(b_ptr.add(i + 3));
+        let xor0 = *a_ptr.add(i) ^ *b_ptr.add(i);
+        let xor1 = *a_ptr.add(i + 1) ^ *b_ptr.add(i + 1);
+        let xor2 = *a_ptr.add(i + 2) ^ *b_ptr.add(i + 2);
+        let xor3 = *a_ptr.add(i + 3) ^ *b_ptr.add(i + 3);
 
         // Count DIFFERING bits (popcount of XOR)
         // Matching = total bits - differing
@@ -690,11 +624,12 @@ unsafe fn invert_avx2(a: &[u8; 2048], result: &mut [u8; 2048]) {
     let r_ptr = result.as_mut_ptr() as *mut __m256i;
     let ones = _mm256_set1_epi8(-1i8); // All 1s
 
+    // Source array is align(32) from BinaryHV, so use aligned loads
     for i in (0..64).step_by(4) {
-        let a0 = _mm256_loadu_si256(a_ptr.add(i));
-        let a1 = _mm256_loadu_si256(a_ptr.add(i + 1));
-        let a2 = _mm256_loadu_si256(a_ptr.add(i + 2));
-        let a3 = _mm256_loadu_si256(a_ptr.add(i + 3));
+        let a0 = _mm256_load_si256(a_ptr.add(i));
+        let a1 = _mm256_load_si256(a_ptr.add(i + 1));
+        let a2 = _mm256_load_si256(a_ptr.add(i + 2));
+        let a3 = _mm256_load_si256(a_ptr.add(i + 3));
 
         // XOR with all 1s = NOT
         let r0 = _mm256_xor_si256(a0, ones);
@@ -771,8 +706,11 @@ pub fn hamming_distance_simd(a: &[u8; 2048], b: &[u8; 2048]) -> u32 {
 /// For each bit position, count how many vectors have 1.
 /// If count > N/2, result bit = 1, else 0.
 ///
-/// # Performance
-/// Expected 5-10x speedup over scalar implementation.
+/// # Note on SIMD
+/// Majority-vote bundle on packed binary HVs is inherently hard to beat with
+/// hand-written SIMD intrinsics because the per-bit extraction (shift+mask)
+/// is the bottleneck, and LLVM auto-vectorizes it well. The scalar implementation
+/// below is the fastest path on all tested hardware.
 #[inline]
 #[cfg(target_arch = "x86_64")]
 pub fn bundle_simd(vectors: &[&[u8; 2048]]) -> [u8; 2048] {
@@ -783,108 +721,26 @@ pub fn bundle_simd(vectors: &[&[u8; 2048]]) -> [u8; 2048] {
         return *vectors[0];
     }
 
-    // Use AVX2 path when available
-    if has_avx2() {
-        unsafe { bundle_avx2(vectors) }
-    } else {
-        bundle_scalar_optimized(vectors)
-    }
+    bundle_scalar_optimized(vectors)
 }
 
-/// AVX2-optimized bundle using parallel bit counting
+/// Bundle using scalar bit counting with LLVM auto-vectorization.
 ///
-/// Strategy:
-/// 1. Process 32 bytes at a time (256 bits)
-/// 2. For each bit position, accumulate counts across all vectors
-/// 3. Threshold to determine output bits
-#[cfg(target_arch = "x86_64")]
-#[target_feature(enable = "avx2")]
-#[inline]
-unsafe fn bundle_avx2(vectors: &[&[u8; 2048]]) -> [u8; 2048] {
-    let n = vectors.len();
-    let threshold = n / 2;
-    let mut result = [0u8; 2048];
-
-    // Process 32 bytes at a time using AVX2
-    // For each chunk, we count bits across all vectors
-    for chunk in 0..64 {
-        let offset = chunk * 32;
-
-        // We need to count bits at each position across all vectors
-        // Use 256-bit registers to process 32 bytes at once
-
-        // Accumulate bit counts for this chunk
-        // Strategy: Process byte-by-byte within the SIMD chunk,
-        // using vertical addition
-
-        // For short vector counts (< 256), we can accumulate directly in bytes
-        if n < 256 {
-            // Initialize accumulators for each bit position (8 bits per byte, 32 bytes)
-            // We use i16 accumulators for headroom
-            let mut bit_counts = [[0i16; 8]; 32];
-
-            // Count bits from each vector
-            for vec in vectors {
-                for byte_idx in 0..32 {
-                    let byte = vec[offset + byte_idx];
-                    for bit in 0..8 {
-                        if (byte >> bit) & 1 == 1 {
-                            bit_counts[byte_idx][bit] += 1;
-                        }
-                    }
-                }
-            }
-
-            // Threshold and write result
-            for byte_idx in 0..32 {
-                let mut result_byte = 0u8;
-                for bit in 0..8 {
-                    if bit_counts[byte_idx][bit] as usize > threshold {
-                        result_byte |= 1 << bit;
-                    }
-                }
-                result[offset + byte_idx] = result_byte;
-            }
-        } else {
-            // For large vector counts, use chunked processing
-            bundle_chunk_large(vectors, &mut result, offset, threshold);
-        }
-    }
-
-    result
-}
-
-/// Handle large vector counts (>= 256) with chunked processing
+/// Note: Hand-written AVX2 intrinsics for majority-vote bundle on packed
+/// binary HVs do NOT outperform well-optimized scalar code. The per-bit
+/// counting pattern (extract 8 bits per byte, count across N vectors) is
+/// inherently hard to beat with SIMD when the data is bit-packed. LLVM
+/// auto-vectorizes the shift+mask+add inner loop effectively.
+///
+/// A future optimization would be to transpose the bit layout at the HV
+/// storage level (all bit-0s contiguous, then all bit-1s, etc.), enabling
+/// true SIMD accumulation. That's a data structure change, not an
+/// algorithm change.
 #[cfg(target_arch = "x86_64")]
 #[inline]
-fn bundle_chunk_large(
-    vectors: &[&[u8; 2048]],
-    result: &mut [u8; 2048],
-    offset: usize,
-    threshold: usize,
-) {
-    let mut bit_counts = [[0i32; 8]; 32];
-
-    for vec in vectors {
-        for byte_idx in 0..32 {
-            let byte = vec[offset + byte_idx];
-            for bit in 0..8 {
-                if (byte >> bit) & 1 == 1 {
-                    bit_counts[byte_idx][bit] += 1;
-                }
-            }
-        }
-    }
-
-    for byte_idx in 0..32 {
-        let mut result_byte = 0u8;
-        for bit in 0..8 {
-            if bit_counts[byte_idx][bit] as usize > threshold {
-                result_byte |= 1 << bit;
-            }
-        }
-        result[offset + byte_idx] = result_byte;
-    }
+fn bundle_avx2_friendly(vectors: &[&[u8; 2048]]) -> [u8; 2048] {
+    // Reuse the scalar implementation which LLVM auto-vectorizes well
+    bundle_scalar_optimized(vectors)
 }
 
 /// Optimized scalar bundle with better cache locality
@@ -933,63 +789,213 @@ pub fn bundle_simd_slice(vectors: &[[u8; 2048]]) -> [u8; 2048] {
     bundle_simd(&refs)
 }
 
-// Non-x86_64 fallback implementations
+// =============================================================================
+// NEON (AArch64) IMPLEMENTATIONS
+// =============================================================================
+
+/// NEON XOR bind: 128-bit veorq_u8, unrolled 4x (32 iterations for 2048 bytes)
+#[cfg(target_arch = "aarch64")]
+#[inline]
+unsafe fn bind_neon(a: &[u8; 2048], b: &[u8; 2048], result: &mut [u8; 2048]) {
+    let a_ptr = a.as_ptr();
+    let b_ptr = b.as_ptr();
+    let r_ptr = result.as_mut_ptr();
+    for i in (0..128).step_by(4) {
+        let off0 = i * 16;
+        let off1 = (i + 1) * 16;
+        let off2 = (i + 2) * 16;
+        let off3 = (i + 3) * 16;
+        let r0 = veorq_u8(vld1q_u8(a_ptr.add(off0)), vld1q_u8(b_ptr.add(off0)));
+        let r1 = veorq_u8(vld1q_u8(a_ptr.add(off1)), vld1q_u8(b_ptr.add(off1)));
+        let r2 = veorq_u8(vld1q_u8(a_ptr.add(off2)), vld1q_u8(b_ptr.add(off2)));
+        let r3 = veorq_u8(vld1q_u8(a_ptr.add(off3)), vld1q_u8(b_ptr.add(off3)));
+        vst1q_u8(r_ptr.add(off0), r0);
+        vst1q_u8(r_ptr.add(off1), r1);
+        vst1q_u8(r_ptr.add(off2), r2);
+        vst1q_u8(r_ptr.add(off3), r3);
+    }
+}
+
+/// NEON AND intersection: vandq_u8
+#[cfg(target_arch = "aarch64")]
+#[inline]
+unsafe fn intersection_neon(a: &[u8; 2048], b: &[u8; 2048], result: &mut [u8; 2048]) {
+    let a_ptr = a.as_ptr();
+    let b_ptr = b.as_ptr();
+    let r_ptr = result.as_mut_ptr();
+    for i in (0..128).step_by(4) {
+        let off0 = i * 16;
+        let off1 = (i + 1) * 16;
+        let off2 = (i + 2) * 16;
+        let off3 = (i + 3) * 16;
+        vst1q_u8(r_ptr.add(off0), vandq_u8(vld1q_u8(a_ptr.add(off0)), vld1q_u8(b_ptr.add(off0))));
+        vst1q_u8(r_ptr.add(off1), vandq_u8(vld1q_u8(a_ptr.add(off1)), vld1q_u8(b_ptr.add(off1))));
+        vst1q_u8(r_ptr.add(off2), vandq_u8(vld1q_u8(a_ptr.add(off2)), vld1q_u8(b_ptr.add(off2))));
+        vst1q_u8(r_ptr.add(off3), vandq_u8(vld1q_u8(a_ptr.add(off3)), vld1q_u8(b_ptr.add(off3))));
+    }
+}
+
+/// NEON OR union: vorrq_u8
+#[cfg(target_arch = "aarch64")]
+#[inline]
+unsafe fn union_neon(a: &[u8; 2048], b: &[u8; 2048], result: &mut [u8; 2048]) {
+    let a_ptr = a.as_ptr();
+    let b_ptr = b.as_ptr();
+    let r_ptr = result.as_mut_ptr();
+    for i in (0..128).step_by(4) {
+        let off0 = i * 16;
+        let off1 = (i + 1) * 16;
+        let off2 = (i + 2) * 16;
+        let off3 = (i + 3) * 16;
+        vst1q_u8(r_ptr.add(off0), vorrq_u8(vld1q_u8(a_ptr.add(off0)), vld1q_u8(b_ptr.add(off0))));
+        vst1q_u8(r_ptr.add(off1), vorrq_u8(vld1q_u8(a_ptr.add(off1)), vld1q_u8(b_ptr.add(off1))));
+        vst1q_u8(r_ptr.add(off2), vorrq_u8(vld1q_u8(a_ptr.add(off2)), vld1q_u8(b_ptr.add(off2))));
+        vst1q_u8(r_ptr.add(off3), vorrq_u8(vld1q_u8(a_ptr.add(off3)), vld1q_u8(b_ptr.add(off3))));
+    }
+}
+
+/// NEON NOT invert: vmvnq_u8
+#[cfg(target_arch = "aarch64")]
+#[inline]
+unsafe fn invert_neon(a: &[u8; 2048], result: &mut [u8; 2048]) {
+    let a_ptr = a.as_ptr();
+    let r_ptr = result.as_mut_ptr();
+    for i in (0..128).step_by(4) {
+        let off0 = i * 16;
+        let off1 = (i + 1) * 16;
+        let off2 = (i + 2) * 16;
+        let off3 = (i + 3) * 16;
+        vst1q_u8(r_ptr.add(off0), vmvnq_u8(vld1q_u8(a_ptr.add(off0))));
+        vst1q_u8(r_ptr.add(off1), vmvnq_u8(vld1q_u8(a_ptr.add(off1))));
+        vst1q_u8(r_ptr.add(off2), vmvnq_u8(vld1q_u8(a_ptr.add(off2))));
+        vst1q_u8(r_ptr.add(off3), vmvnq_u8(vld1q_u8(a_ptr.add(off3))));
+    }
+}
+
+/// NEON popcount via vcntq_u8 + widening horizontal adds.
+#[cfg(target_arch = "aarch64")]
+#[inline]
+unsafe fn matching_bits_neon(a: &[u8; 2048], b: &[u8; 2048]) -> u32 {
+    let a_ptr = a.as_ptr();
+    let b_ptr = b.as_ptr();
+    let mut differing: u64 = 0;
+
+    for i in 0..128 {
+        let off = i * 16;
+        let xor = veorq_u8(vld1q_u8(a_ptr.add(off)), vld1q_u8(b_ptr.add(off)));
+        let cnt8 = vcntq_u8(xor);
+        let cnt16 = vpaddlq_u8(cnt8);
+        let cnt32 = vpaddlq_u16(cnt16);
+        let cnt64 = vpaddlq_u32(cnt32);
+        differing += vgetq_lane_u64(cnt64, 0) + vgetq_lane_u64(cnt64, 1);
+    }
+
+    (16_384 - differing) as u32
+}
+
+// =============================================================================
+// NON-x86_64 DISPATCH FUNCTIONS (NEON on aarch64, scalar elsewhere)
+// =============================================================================
+
 #[cfg(not(target_arch = "x86_64"))]
+#[inline]
 pub fn bind_simd(a: &[u8; 2048], b: &[u8; 2048]) -> [u8; 2048] {
     let mut result = [0u8; 2048];
-    for i in 0..2048 {
-        result[i] = a[i] ^ b[i];
+    #[cfg(target_arch = "aarch64")]
+    unsafe {
+        bind_neon(a, b, &mut result);
+    }
+    #[cfg(not(target_arch = "aarch64"))]
+    {
+        bind_scalar_unrolled(a, b, &mut result);
     }
     result
 }
 
 #[cfg(not(target_arch = "x86_64"))]
+#[inline]
 pub fn intersection_simd(a: &[u8; 2048], b: &[u8; 2048]) -> [u8; 2048] {
     let mut result = [0u8; 2048];
-    for i in 0..2048 {
-        result[i] = a[i] & b[i];
+    #[cfg(target_arch = "aarch64")]
+    unsafe {
+        intersection_neon(a, b, &mut result);
+    }
+    #[cfg(not(target_arch = "aarch64"))]
+    {
+        intersection_scalar_unrolled(a, b, &mut result);
     }
     result
 }
 
 #[cfg(not(target_arch = "x86_64"))]
+#[inline]
 pub fn union_simd(a: &[u8; 2048], b: &[u8; 2048]) -> [u8; 2048] {
     let mut result = [0u8; 2048];
-    for i in 0..2048 {
-        result[i] = a[i] | b[i];
+    #[cfg(target_arch = "aarch64")]
+    unsafe {
+        union_neon(a, b, &mut result);
+    }
+    #[cfg(not(target_arch = "aarch64"))]
+    {
+        union_scalar_unrolled(a, b, &mut result);
     }
     result
 }
 
 #[cfg(not(target_arch = "x86_64"))]
+#[inline]
 pub fn matching_bits_simd(a: &[u8; 2048], b: &[u8; 2048]) -> u32 {
-    matching_bits_scalar(a, b)
+    #[cfg(target_arch = "aarch64")]
+    unsafe {
+        return matching_bits_neon(a, b);
+    }
+    #[cfg(not(target_arch = "aarch64"))]
+    {
+        matching_bits_scalar(a, b)
+    }
 }
 
 #[cfg(not(target_arch = "x86_64"))]
+#[inline]
 pub fn invert_simd(a: &[u8; 2048]) -> [u8; 2048] {
     let mut result = [0u8; 2048];
-    for i in 0..2048 {
-        result[i] = !a[i];
+    #[cfg(target_arch = "aarch64")]
+    unsafe {
+        invert_neon(a, &mut result);
+    }
+    #[cfg(not(target_arch = "aarch64"))]
+    {
+        invert_scalar(a, &mut result);
     }
     result
 }
 
 #[cfg(not(target_arch = "x86_64"))]
+#[inline(always)]
 pub fn hamming_distance_simd(a: &[u8; 2048], b: &[u8; 2048]) -> u32 {
-    a.iter()
-        .zip(b.iter())
-        .map(|(x, y)| (x ^ y).count_ones())
-        .sum()
+    16_384 - matching_bits_simd(a, b)
 }
 
 #[cfg(not(target_arch = "x86_64"))]
+#[inline]
 pub fn bundle_simd(vectors: &[&[u8; 2048]]) -> [u8; 2048] {
-    bundle_scalar_optimized(vectors)
+    if vectors.is_empty() {
+        return [0u8; 2048];
+    }
+    if vectors.len() == 1 {
+        return *vectors[0];
+    }
+    bundle_scalar_portable(vectors)
 }
 
 #[cfg(not(target_arch = "x86_64"))]
-fn bundle_scalar_optimized(vectors: &[&[u8; 2048]]) -> [u8; 2048] {
+pub fn bundle_simd_slice(vectors: &[[u8; 2048]]) -> [u8; 2048] {
+    let refs: Vec<&[u8; 2048]> = vectors.iter().collect();
+    bundle_simd(&refs)
+}
+
+/// Scalar bundle with good cache locality (used on all non-x86 platforms).
+fn bundle_scalar_portable(vectors: &[&[u8; 2048]]) -> [u8; 2048] {
     if vectors.is_empty() {
         return [0u8; 2048];
     }
@@ -1026,12 +1032,6 @@ fn bundle_scalar_optimized(vectors: &[&[u8; 2048]]) -> [u8; 2048] {
     }
 
     result
-}
-
-#[cfg(not(target_arch = "x86_64"))]
-pub fn bundle_simd_slice(vectors: &[[u8; 2048]]) -> [u8; 2048] {
-    let refs: Vec<&[u8; 2048]> = vectors.iter().collect();
-    bundle_simd(&refs)
 }
 
 #[cfg(test)]

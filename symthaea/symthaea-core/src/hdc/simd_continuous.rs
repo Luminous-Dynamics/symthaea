@@ -20,52 +20,11 @@
 #[cfg(all(target_arch = "x86_64", feature = "simd"))]
 use std::arch::x86_64::*;
 
-#[cfg(feature = "simd")]
-use std::sync::OnceLock;
+#[cfg(all(target_arch = "aarch64", feature = "simd"))]
+use std::arch::aarch64::*;
 
-// =============================================================================
-// CACHED SIMD FEATURE DETECTION
-// =============================================================================
-
-#[cfg(all(target_arch = "x86_64", feature = "simd"))]
-static HAS_AVX2: OnceLock<bool> = OnceLock::new();
-
-#[cfg(all(target_arch = "x86_64", feature = "simd"))]
-static HAS_AVX: OnceLock<bool> = OnceLock::new();
-
-#[cfg(all(target_arch = "x86_64", feature = "simd"))]
-static HAS_SSE41: OnceLock<bool> = OnceLock::new();
-
-#[cfg(all(target_arch = "x86_64", feature = "simd"))]
-static HAS_FMA: OnceLock<bool> = OnceLock::new();
-
-/// Get cached AVX2 availability
-#[cfg(all(target_arch = "x86_64", feature = "simd"))]
-#[inline(always)]
-fn has_avx2() -> bool {
-    *HAS_AVX2.get_or_init(|| is_x86_feature_detected!("avx2"))
-}
-
-/// Get cached AVX availability
-#[cfg(all(target_arch = "x86_64", feature = "simd"))]
-#[inline(always)]
-fn has_avx() -> bool {
-    *HAS_AVX.get_or_init(|| is_x86_feature_detected!("avx"))
-}
-
-/// Get cached SSE4.1 availability
-#[cfg(all(target_arch = "x86_64", feature = "simd"))]
-#[inline(always)]
-fn has_sse41() -> bool {
-    *HAS_SSE41.get_or_init(|| is_x86_feature_detected!("sse4.1"))
-}
-
-/// Get cached FMA availability (for fused multiply-add)
-#[cfg(all(target_arch = "x86_64", feature = "simd"))]
-#[inline(always)]
-fn has_fma() -> bool {
-    *HAS_FMA.get_or_init(|| is_x86_feature_detected!("fma"))
-}
+#[allow(unused_imports)]
+use super::simd_detect::{has_avx, has_avx2, has_fma, has_neon, has_sse41};
 
 // =============================================================================
 // DOT PRODUCT - Core operation for similarity computation
@@ -107,6 +66,10 @@ pub fn dot_product_simd(a: &[f32], b: &[f32]) -> f32 {
 
     #[cfg(not(target_arch = "x86_64"))]
     {
+        #[cfg(target_arch = "aarch64")]
+        if has_neon() {
+            return unsafe { dot_product_neon(a, b) };
+        }
         dot_product_scalar(a, b)
     }
 }
@@ -372,6 +335,11 @@ pub fn bind_simd(a: &[f32], b: &[f32]) -> Vec<f32> {
 
     #[cfg(not(target_arch = "x86_64"))]
     {
+        #[cfg(target_arch = "aarch64")]
+        if has_neon() {
+            unsafe { bind_neon(a, b, &mut result) };
+            return result;
+        }
         bind_scalar(a, b, &mut result);
     }
 
@@ -532,6 +500,11 @@ pub fn bundle_simd(hvs: &[&[f32]], weights: &[f32]) -> Vec<f32> {
 
     #[cfg(not(target_arch = "x86_64"))]
     {
+        #[cfg(target_arch = "aarch64")]
+        if has_neon() {
+            unsafe { bundle_neon(hvs, weights, &mut result, inv_weight_sum) };
+            return result;
+        }
         bundle_scalar(hvs, weights, &mut result, inv_weight_sum);
     }
 
@@ -716,6 +689,10 @@ pub fn similarity_simd(a: &[f32], b: &[f32]) -> f32 {
 
     #[cfg(not(target_arch = "x86_64"))]
     {
+        #[cfg(target_arch = "aarch64")]
+        if has_neon() {
+            return unsafe { similarity_neon(a, b) };
+        }
         similarity_scalar_optimized(a, b)
     }
 }
@@ -800,6 +777,132 @@ fn similarity_scalar_optimized(a: &[f32], b: &[f32]) -> f32 {
         0.0
     } else {
         (dot_ab / denom).clamp(-1.0, 1.0)
+    }
+}
+
+// =============================================================================
+// NEON (AArch64) IMPLEMENTATIONS FOR CONTINUOUS f32 HVs
+// =============================================================================
+
+/// NEON dot product: 4 f32s per vfmaq_f32, unrolled 4x.
+#[cfg(all(target_arch = "aarch64", feature = "simd"))]
+#[inline]
+unsafe fn dot_product_neon(a: &[f32], b: &[f32]) -> f32 {
+    let len = a.len();
+    let chunks = len / 16;
+    let a_ptr = a.as_ptr();
+    let b_ptr = b.as_ptr();
+
+    let mut sum0 = vdupq_n_f32(0.0);
+    let mut sum1 = vdupq_n_f32(0.0);
+    let mut sum2 = vdupq_n_f32(0.0);
+    let mut sum3 = vdupq_n_f32(0.0);
+
+    for i in 0..chunks {
+        let off = i * 16;
+        sum0 = vfmaq_f32(sum0, vld1q_f32(a_ptr.add(off)), vld1q_f32(b_ptr.add(off)));
+        sum1 = vfmaq_f32(sum1, vld1q_f32(a_ptr.add(off + 4)), vld1q_f32(b_ptr.add(off + 4)));
+        sum2 = vfmaq_f32(sum2, vld1q_f32(a_ptr.add(off + 8)), vld1q_f32(b_ptr.add(off + 8)));
+        sum3 = vfmaq_f32(sum3, vld1q_f32(a_ptr.add(off + 12)), vld1q_f32(b_ptr.add(off + 12)));
+    }
+
+    sum0 = vaddq_f32(vaddq_f32(sum0, sum1), vaddq_f32(sum2, sum3));
+    let mut total = vaddvq_f32(sum0);
+
+    for i in (chunks * 16)..len {
+        total += *a_ptr.add(i) * *b_ptr.add(i);
+    }
+    total
+}
+
+/// NEON element-wise multiply (bind) for f32 slices.
+#[cfg(all(target_arch = "aarch64", feature = "simd"))]
+#[inline]
+unsafe fn bind_neon(a: &[f32], b: &[f32], result: &mut [f32]) {
+    let len = a.len();
+    let chunks = len / 16;
+    let a_ptr = a.as_ptr();
+    let b_ptr = b.as_ptr();
+    let r_ptr = result.as_mut_ptr();
+
+    for i in 0..chunks {
+        let off = i * 16;
+        vst1q_f32(r_ptr.add(off), vmulq_f32(vld1q_f32(a_ptr.add(off)), vld1q_f32(b_ptr.add(off))));
+        vst1q_f32(r_ptr.add(off + 4), vmulq_f32(vld1q_f32(a_ptr.add(off + 4)), vld1q_f32(b_ptr.add(off + 4))));
+        vst1q_f32(r_ptr.add(off + 8), vmulq_f32(vld1q_f32(a_ptr.add(off + 8)), vld1q_f32(b_ptr.add(off + 8))));
+        vst1q_f32(r_ptr.add(off + 12), vmulq_f32(vld1q_f32(a_ptr.add(off + 12)), vld1q_f32(b_ptr.add(off + 12))));
+    }
+    for i in (chunks * 16)..len {
+        *r_ptr.add(i) = *a_ptr.add(i) * *b_ptr.add(i);
+    }
+}
+
+/// NEON weighted bundle (superposition) for f32 slices.
+#[cfg(all(target_arch = "aarch64", feature = "simd"))]
+#[inline]
+unsafe fn bundle_neon(hvs: &[&[f32]], weights: &[f32], result: &mut [f32], inv_weight_sum: f32) {
+    let dim = result.len();
+    let chunks = dim / 4;
+    let r_ptr = result.as_mut_ptr();
+    let inv_w = vdupq_n_f32(inv_weight_sum);
+
+    for chunk in 0..chunks {
+        let off = chunk * 4;
+        let mut acc = vdupq_n_f32(0.0);
+        for (hv, &weight) in hvs.iter().zip(weights.iter()) {
+            let w = vdupq_n_f32(weight);
+            acc = vfmaq_f32(acc, vld1q_f32(hv.as_ptr().add(off)), w);
+        }
+        vst1q_f32(r_ptr.add(off), vmulq_f32(acc, inv_w));
+    }
+    for i in (chunks * 4)..dim {
+        let mut sum = 0.0f32;
+        for (hv, &weight) in hvs.iter().zip(weights.iter()) {
+            sum += hv[i] * weight;
+        }
+        result[i] = sum * inv_weight_sum;
+    }
+}
+
+/// NEON cosine similarity: single-pass dot(a,b), dot(a,a), dot(b,b).
+#[cfg(all(target_arch = "aarch64", feature = "simd"))]
+#[inline]
+unsafe fn similarity_neon(a: &[f32], b: &[f32]) -> f32 {
+    let len = a.len();
+    let chunks = len / 4;
+    let a_ptr = a.as_ptr();
+    let b_ptr = b.as_ptr();
+
+    let mut dot_ab = vdupq_n_f32(0.0);
+    let mut dot_aa = vdupq_n_f32(0.0);
+    let mut dot_bb = vdupq_n_f32(0.0);
+
+    for i in 0..chunks {
+        let off = i * 4;
+        let av = vld1q_f32(a_ptr.add(off));
+        let bv = vld1q_f32(b_ptr.add(off));
+        dot_ab = vfmaq_f32(dot_ab, av, bv);
+        dot_aa = vfmaq_f32(dot_aa, av, av);
+        dot_bb = vfmaq_f32(dot_bb, bv, bv);
+    }
+
+    let mut ab = vaddvq_f32(dot_ab);
+    let mut aa = vaddvq_f32(dot_aa);
+    let mut bb = vaddvq_f32(dot_bb);
+
+    for i in (chunks * 4)..len {
+        let av = *a_ptr.add(i);
+        let bv = *b_ptr.add(i);
+        ab += av * bv;
+        aa += av * av;
+        bb += bv * bv;
+    }
+
+    let denom = (aa * bb).sqrt();
+    if denom < 1e-10 {
+        0.0
+    } else {
+        (ab / denom).clamp(-1.0, 1.0)
     }
 }
 
@@ -901,7 +1004,12 @@ pub fn simd_capabilities_report() -> String {
 
     #[cfg(not(target_arch = "x86_64"))]
     {
-        "SIMD Capabilities: Non-x86_64 platform (using scalar fallback)".to_string()
+        format!(
+            "SIMD Capabilities (Continuous HV):\n\
+             - NEON:   {}\n\
+             - (non-x86_64 platform)",
+            has_neon()
+        )
     }
 }
 
