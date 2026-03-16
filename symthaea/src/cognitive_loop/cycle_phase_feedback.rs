@@ -46,6 +46,7 @@ use super::thresholds::{
     UNIFIED_QUALITY_AGREEMENT_WEIGHT, UNIFIED_QUALITY_ANOMALY_WEIGHT,
     UNIFIED_QUALITY_PREDICTION_WEIGHT,
 };
+use super::feedback_state::Priority;
 use super::{CognitiveLoopService, CycleState};
 
 impl CognitiveLoopService {
@@ -311,7 +312,7 @@ impl CognitiveLoopService {
         let love_resonance_boost = if harmonic_love_resonance > LOVE_RESONANCE_THRESHOLD as f64 {
             let boost = ((harmonic_love_resonance - LOVE_RESONANCE_THRESHOLD as f64)
                 * LOVE_RESONANCE_CONFIDENCE_SCALE as f64) as f32;
-            self.adjust_confidence("love_resonance", boost);
+            self.adjust_confidence_pri("love_resonance", boost, Priority::Aesthetic);
             self.carryover.learning.subsystem_lr_factor *= 1.0 + boost * LOVE_RESONANCE_LR_FRACTION;
             self.carryover.learning.subsystem_lr_factor = self
                 .carryover
@@ -801,8 +802,16 @@ impl CognitiveLoopService {
                     #[cfg(not(feature = "mycelix"))]
                     { 0.0 }
                 },
-                // Knowledge grounding: neutral when no reasoning context available
-                knowledge_grounding: 0.5,
+                // Knowledge grounding: dynamic from KnowledgeManager signals
+                // Science: Barsalou (2008), Clark (2013) — grounded cognition modulates consciousness
+                knowledge_grounding: if let Some(ref km) = self.knowledge_manager {
+                    let s = km.signals();
+                    (s.relevance * super::thresholds::KNOWLEDGE_GROUNDING_RELEVANCE_WEIGHT
+                        + (1.0 - s.uncertainty) * super::thresholds::KNOWLEDGE_GROUNDING_CERTAINTY_WEIGHT)
+                        .clamp(0.0, 1.0)
+                } else {
+                    0.5
+                },
                 // Glyph coherence: symbolic consciousness field integration
                 glyph_coherence: {
                     #[cfg(feature = "glyph_codex")]
@@ -839,6 +848,12 @@ impl CognitiveLoopService {
                 replay.boost_recent_consolidation(consolidation_boost);
             }
         }
+        // ── Knowledge Engine: PE → ontology learning rate ────────────────
+        // High prediction error → faster ontology adaptation (Rescorla-Wagner 1972).
+        if let Some(ref mut km) = self.knowledge_manager {
+            km.set_ontology_lr_from_pe(prediction_error as f32);
+        }
+
         // Theta phase → Phi modulation (Buzsáki 2006).
         // 6Hz theta oscillation at 50Hz loop rate. Peaks enhance integration; troughs suppress.
         // EMA-smoothed to prevent 6Hz artifacts in downstream consciousness metrics.
@@ -1113,7 +1128,7 @@ impl CognitiveLoopService {
                 if phi_divergence > PHI_DIVERGENCE_THRESHOLD {
                     let boost = (phi_divergence - PHI_DIVERGENCE_THRESHOLD).min(PHI_DIVERGENCE_MAX)
                         * PHI_DIVERGENCE_SCALE;
-                    self.adjust_exploration("phi_divergence", boost as f32);
+                    self.adjust_exploration_pri("phi_divergence", boost as f32, Priority::Aesthetic);
                 }
 
                 // Phi relational → oxytocin (prosocial bonding)
