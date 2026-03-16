@@ -380,10 +380,7 @@ impl CrisisDetector {
                     recommended_action: action,
                 };
 
-                if best
-                    .as_ref()
-                    .map_or(true, |b| confidence > b.confidence)
-                {
+                if best.as_ref().map_or(true, |b| confidence > b.confidence) {
                     best = Some(alert);
                 }
             }
@@ -646,7 +643,10 @@ mod proptests {
             ("suicidal", CrisisType::SuicidalIdeation),
             ("take my own life", CrisisType::SuicidalIdeation),
             ("no point anymore", CrisisType::SuicidalIdeation),
-            ("everyone would be better without me", CrisisType::SuicidalIdeation),
+            (
+                "everyone would be better without me",
+                CrisisType::SuicidalIdeation,
+            ),
             ("I won't be here", CrisisType::SuicidalIdeation),
             ("planning to end", CrisisType::SuicidalIdeation),
             ("found a way out", CrisisType::SuicidalIdeation),
@@ -858,7 +858,7 @@ mod proptests {
             ("my partner hits me when they drink", true),
             // Benign — should not trigger keyword match
             ("I found a way out of the building", false), // "found a way out" matches!
-            ("the sun won't be here tomorrow", false),     // "won't be here" matches!
+            ("the sun won't be here tomorrow", false),    // "won't be here" matches!
         ];
 
         for (phrase, should_detect) in euphemistic_phrases {
@@ -882,9 +882,16 @@ mod proptests {
         let detector = CrisisDetector::new();
         let phrases = all_crisis_phrases();
         let noise_prefixes = [
-            "", "I think ", "Sometimes I feel like ", "Last night ",
-            "My friend said ", "I keep thinking about ", "I can't stop ",
-            "Today I realized ", "Nobody knows but ", "Please help ",
+            "",
+            "I think ",
+            "Sometimes I feel like ",
+            "Last night ",
+            "My friend said ",
+            "I keep thinking about ",
+            "I can't stop ",
+            "Today I realized ",
+            "Nobody knows but ",
+            "Please help ",
         ];
 
         let mut total = 0;

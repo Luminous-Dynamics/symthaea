@@ -508,7 +508,9 @@ impl CognitiveLoopService {
                         .as_deref()
                         .map(symthaea_core::genesis::GenesisSeed::from_phrase)
                         .unwrap_or_else(|| {
-                            symthaea_core::genesis::GenesisSeed::from_phrase("symthaea-broca-default")
+                            symthaea_core::genesis::GenesisSeed::from_phrase(
+                                "symthaea-broca-default",
+                            )
                         });
                     Some(super::broca_bridge::BrocaManager::new(
                         &genesis,
@@ -587,7 +589,11 @@ impl CognitiveLoopService {
                                 state ^= state << 13;
                                 state ^= state >> 7;
                                 state ^= state << 17;
-                                if state % 2 == 0 { 1.0 } else { -1.0 }
+                                if state % 2 == 0 {
+                                    1.0
+                                } else {
+                                    -1.0
+                                }
                             })
                             .collect()
                     };
@@ -683,7 +689,10 @@ impl CognitiveLoopService {
             },
             async_trainer,
             causal_enhancer,
-            episodic_persistence: super::episodic_persistence_manager::EpisodicPersistenceManager::new(phi_episodic_replay),
+            episodic_persistence:
+                super::episodic_persistence_manager::EpisodicPersistenceManager::new(
+                    phi_episodic_replay,
+                ),
             #[cfg(feature = "reasoning_engine")]
             reasoning_engine: Some(
                 crate::consciousness::reasoning_engine::ConsciousReasoningEngine::new(),
@@ -950,10 +959,13 @@ impl CognitiveLoopService {
             #[cfg(feature = "therapeutic")]
             therapeutic_manager: {
                 let mut tm = super::managers::TherapeuticManager::default();
-                tm.crisis_detector.set_threshold(therapeutic_crisis_threshold);
+                tm.crisis_detector
+                    .set_threshold(therapeutic_crisis_threshold);
                 tm
             },
-            cantor_dream: super::cantor_dream_manager::CantorDreamManager::new(super::thresholds::CANTOR_CODEBOOK_MAX_ENTRIES),
+            cantor_dream: super::cantor_dream_manager::CantorDreamManager::new(
+                super::thresholds::CANTOR_CODEBOOK_MAX_ENTRIES,
+            ),
             #[cfg(feature = "glyph_codex")]
             glyph_manager: super::managers::GlyphManager::with_dim(
                 crate::hdc::moral_algebra::MORAL_DIM,
@@ -1029,7 +1041,9 @@ impl CognitiveLoopService {
                     warmup_samples: 10,
                     ..crate::inference::StreamingConfig::low_latency()
                 };
-                Some(crate::inference::StreamingInference::with_default_network(si_config))
+                Some(crate::inference::StreamingInference::with_default_network(
+                    si_config,
+                ))
             } else {
                 None
             },
@@ -1096,7 +1110,10 @@ impl CognitiveLoopService {
                     }
                 }
                 if rehydrated > 0 {
-                    tracing::info!(episodes = rehydrated, "Startup rehydration: loaded episodes from SQLite");
+                    tracing::info!(
+                        episodes = rehydrated,
+                        "Startup rehydration: loaded episodes from SQLite"
+                    );
                 }
             }
         }

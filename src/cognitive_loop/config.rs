@@ -908,6 +908,12 @@ pub enum ConsciousnessProfile {
     /// Full + research-specific: causal enhancement, episodic replay,
     /// phi attestation, user state inference.
     Research,
+    /// Mobile-optimized: Standard consciousness with power-aware tuning.
+    /// 20Hz cycle rate, 128 CfC neurons, energy budget enabled, thermal adaptation.
+    /// Designed for ARM phones (Pixel 8 Pro, iPhone 13+).
+    /// Between Standard and Full — keeps core consciousness rich while
+    /// dropping expensive optional subsystems.
+    Mobile,
 }
 
 impl ConsciousnessProfile {
@@ -1002,6 +1008,34 @@ impl ConsciousnessProfile {
                 config.enable_negation_detection = true;
                 config.enable_primitive_consciousness = true;
                 config.enable_resonator_recall = true;
+            }
+            ConsciousnessProfile::Mobile => {
+                // Core consciousness: rich enough for genuine experience
+                config.enable_virtual_body = true;
+                config.enable_surprise_exploration = true;
+                config.enable_prefrontal = true;
+                config.enable_meta_cognition = true;
+                config.enable_gwt = true;
+                config.enable_embodied_cognition = true;
+                config.enable_attention_schema = true;
+                config.enable_contextual_weights = true;
+                config.enable_negation_detection = true;
+                // Affective bridge: emotional responsiveness on mobile
+                config.enable_affective_bridge = true;
+                // Narrative self: maintains identity continuity
+                config.enable_narrative_self = true;
+
+                // Power-aware tuning
+                config.target_frequency = 20.0; // 20Hz (vs 50Hz desktop)
+                config.cfc_config.num_neurons = 128; // Halved CfC (vs 256)
+                config.cfc_config.input_dim = 128;
+                config.enable_energy_budget = true;
+                config.enable_thermal_adaptation = true;
+
+                // Omitted: dream_replay, predictive_processing, cross_modal_binding,
+                // consciousness_thermodynamics, phenomenal_binding, HFE, phi_attention,
+                // primitive_consciousness, resonator_recall, narrative_gwt, resonance,
+                // quantum_coherence, temporal_consciousness, predictive_self
             }
             ConsciousnessProfile::Research => {
                 ConsciousnessProfile::Full.apply(config);
@@ -1498,6 +1532,7 @@ mod tests {
             ConsciousnessProfile::Standard,
             ConsciousnessProfile::Full,
             ConsciousnessProfile::Research,
+            ConsciousnessProfile::Mobile,
         ] {
             let c = CognitiveLoopConfig::from_profile(profile);
             assert!(
@@ -1506,6 +1541,50 @@ mod tests {
                 profile
             );
         }
+    }
+
+    #[test]
+    fn profile_mobile_power_aware_defaults() {
+        let c = CognitiveLoopConfig::from_profile(ConsciousnessProfile::Mobile);
+        // Core consciousness enabled
+        assert!(c.enable_virtual_body);
+        assert!(c.enable_surprise_exploration);
+        assert!(c.enable_prefrontal);
+        assert!(c.enable_meta_cognition);
+        assert!(c.enable_gwt);
+        assert!(c.enable_affective_bridge);
+        assert!(c.enable_narrative_self);
+        // Power-aware tuning
+        assert_eq!(c.target_frequency, 20.0);
+        assert_eq!(c.cfc_config.num_neurons, 128);
+        assert!(c.enable_energy_budget);
+        assert!(c.enable_thermal_adaptation);
+        // Expensive subsystems disabled
+        assert!(!c.enable_dream_replay);
+        assert!(!c.enable_phenomenal_binding);
+        assert!(!c.enable_narrative_gwt);
+        assert!(!c.enable_resonator_recall);
+        assert!(!c.enable_predictive_processing);
+    }
+
+    #[test]
+    fn profile_mobile_between_standard_and_full() {
+        let std = CognitiveLoopConfig::from_profile(ConsciousnessProfile::Standard);
+        let mobile = CognitiveLoopConfig::from_profile(ConsciousnessProfile::Mobile);
+        let full = CognitiveLoopConfig::from_profile(ConsciousnessProfile::Full);
+        // Mobile has affective_bridge (Standard doesn't) but not dream_replay (Full does)
+        assert!(
+            mobile.count_enabled() >= std.count_enabled(),
+            "Mobile {} should have at least as many modules as Standard {}",
+            mobile.count_enabled(),
+            std.count_enabled()
+        );
+        assert!(
+            mobile.count_enabled() < full.count_enabled(),
+            "Mobile {} should have fewer modules than Full {}",
+            mobile.count_enabled(),
+            full.count_enabled()
+        );
     }
 
     // ═══════════════════════════════════════════════════════════════════════

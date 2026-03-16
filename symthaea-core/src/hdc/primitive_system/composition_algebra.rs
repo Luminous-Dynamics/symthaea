@@ -562,10 +562,7 @@ impl CompositionAlgebra {
             // Extended axioms (match load_institutional_axioms_role_bound)
             ("PEACE_TREATY", "TREATY + COOPERATE + SOVEREIGNTY"),
             ("FEDERATION", "SOVEREIGNTY + AUTHORITY + COOPERATE + TRUST"),
-            (
-                "CONSTITUTIONAL_CRISIS",
-                "LEGITIMACY + AUTHORITY + DEFECT",
-            ),
+            ("CONSTITUTIONAL_CRISIS", "LEGITIMACY + AUTHORITY + DEFECT"),
             (
                 "IMPEACHMENT",
                 "AUTHORITY + LEGITIMACY + ENFORCEMENT + POPULATION",
@@ -876,24 +873,116 @@ impl CompositionAlgebra {
         }
 
         let axioms: Vec<(&str, Vec<&str>, Vec<&str>)> = vec![
-            ("REVOLUTION", vec!["RA_AUTHORITY", "RM_ENFORCEMENT", "RC_PROHIBITION"], vec!["AUTHORITY", "ENFORCEMENT", "PROHIBITION"]),
-            ("FAILED_STATE", vec!["RA_SOVEREIGNTY", "RA_POPULATION"], vec!["SOVEREIGNTY", "POPULATION"]),
-            ("BORDER_DISPUTE", vec!["RA_SOVEREIGNTY", "RC_OVERLAPS"], vec!["SOVEREIGNTY", "OVERLAPS"]),
-            ("LEGITIMATE_GOVERNANCE", vec!["RA_AUTHORITY", "RM_LEGITIMACY", "RC_TRUST"], vec!["AUTHORITY", "LEGITIMACY", "TRUST"]),
-            ("REGULATORY_CAPTURE", vec!["RA_AUTHORITY", "RM_EXCHANGE", "RM_DEFECT"], vec!["AUTHORITY", "EXCHANGE", "DEFECT"]),
-            ("TRADE_AGREEMENT", vec!["RT_TREATY", "RM_EXCHANGE", "RC_RECIPROCATE"], vec!["TREATY", "EXCHANGE", "RECIPROCATE"]),
-            ("ECONOMIC_SANCTION", vec!["RA_SANCTION", "RM_EXCHANGE", "RC_PROHIBITION"], vec!["SANCTION", "EXCHANGE", "PROHIBITION"]),
-            ("CIVIL_DISOBEDIENCE", vec!["RA_POPULATION", "RM_LEGITIMACY", "RC_OBLIGATION"], vec!["POPULATION", "LEGITIMACY", "OBLIGATION"]),
-            ("DEMOCRATIC_ELECTION", vec!["RA_AUTHORITY", "RM_LEGITIMACY", "RA_POPULATION", "RC_COOPERATE"], vec!["AUTHORITY", "LEGITIMACY", "POPULATION", "COOPERATE"]),
-            ("ARMS_EMBARGO", vec!["RA_SANCTION", "RM_ENFORCEMENT", "RC_PROHIBITION"], vec!["SANCTION", "ENFORCEMENT", "PROHIBITION"]),
-            ("SOCIAL_CONTRACT", vec!["RA_SOVEREIGNTY", "RM_LEGITIMACY", "RC_OBLIGATION", "RT_COOPERATE"], vec!["SOVEREIGNTY", "LEGITIMACY", "OBLIGATION", "COOPERATE"]),
-            ("CORRUPTION", vec!["RA_AUTHORITY", "RM_DEFECT", "RM_EXCHANGE"], vec!["AUTHORITY", "DEFECT", "EXCHANGE"]),
-            ("PEACE_TREATY", vec!["RT_TREATY", "RM_COOPERATE", "RA_SOVEREIGNTY"], vec!["TREATY", "COOPERATE", "SOVEREIGNTY"]),
-            ("FEDERATION", vec!["RA_SOVEREIGNTY", "RA_AUTHORITY", "RM_COOPERATE", "RC_TRUST"], vec!["SOVEREIGNTY", "AUTHORITY", "COOPERATE", "TRUST"]),
-            ("CONSTITUTIONAL_CRISIS", vec!["RM_LEGITIMACY", "RA_AUTHORITY", "RM_DEFECT"], vec!["LEGITIMACY", "AUTHORITY", "DEFECT"]),
-            ("IMPEACHMENT", vec!["RA_AUTHORITY", "RM_LEGITIMACY", "RM_ENFORCEMENT", "RA_POPULATION"], vec!["AUTHORITY", "LEGITIMACY", "ENFORCEMENT", "POPULATION"]),
-            ("DIPLOMACY", vec!["RT_TREATY", "RC_TRUST", "RM_COOPERATE", "RM_EXCHANGE"], vec!["TREATY", "TRUST", "COOPERATE", "EXCHANGE"]),
-            ("COLONIALISM", vec!["RA_SOVEREIGNTY", "RM_ENFORCEMENT", "RA_POPULATION", "RM_DEFECT"], vec!["SOVEREIGNTY", "ENFORCEMENT", "POPULATION", "DEFECT"]),
+            (
+                "REVOLUTION",
+                vec!["RA_AUTHORITY", "RM_ENFORCEMENT", "RC_PROHIBITION"],
+                vec!["AUTHORITY", "ENFORCEMENT", "PROHIBITION"],
+            ),
+            (
+                "FAILED_STATE",
+                vec!["RA_SOVEREIGNTY", "RA_POPULATION"],
+                vec!["SOVEREIGNTY", "POPULATION"],
+            ),
+            (
+                "BORDER_DISPUTE",
+                vec!["RA_SOVEREIGNTY", "RC_OVERLAPS"],
+                vec!["SOVEREIGNTY", "OVERLAPS"],
+            ),
+            (
+                "LEGITIMATE_GOVERNANCE",
+                vec!["RA_AUTHORITY", "RM_LEGITIMACY", "RC_TRUST"],
+                vec!["AUTHORITY", "LEGITIMACY", "TRUST"],
+            ),
+            (
+                "REGULATORY_CAPTURE",
+                vec!["RA_AUTHORITY", "RM_EXCHANGE", "RM_DEFECT"],
+                vec!["AUTHORITY", "EXCHANGE", "DEFECT"],
+            ),
+            (
+                "TRADE_AGREEMENT",
+                vec!["RT_TREATY", "RM_EXCHANGE", "RC_RECIPROCATE"],
+                vec!["TREATY", "EXCHANGE", "RECIPROCATE"],
+            ),
+            (
+                "ECONOMIC_SANCTION",
+                vec!["RA_SANCTION", "RM_EXCHANGE", "RC_PROHIBITION"],
+                vec!["SANCTION", "EXCHANGE", "PROHIBITION"],
+            ),
+            (
+                "CIVIL_DISOBEDIENCE",
+                vec!["RA_POPULATION", "RM_LEGITIMACY", "RC_OBLIGATION"],
+                vec!["POPULATION", "LEGITIMACY", "OBLIGATION"],
+            ),
+            (
+                "DEMOCRATIC_ELECTION",
+                vec![
+                    "RA_AUTHORITY",
+                    "RM_LEGITIMACY",
+                    "RA_POPULATION",
+                    "RC_COOPERATE",
+                ],
+                vec!["AUTHORITY", "LEGITIMACY", "POPULATION", "COOPERATE"],
+            ),
+            (
+                "ARMS_EMBARGO",
+                vec!["RA_SANCTION", "RM_ENFORCEMENT", "RC_PROHIBITION"],
+                vec!["SANCTION", "ENFORCEMENT", "PROHIBITION"],
+            ),
+            (
+                "SOCIAL_CONTRACT",
+                vec![
+                    "RA_SOVEREIGNTY",
+                    "RM_LEGITIMACY",
+                    "RC_OBLIGATION",
+                    "RT_COOPERATE",
+                ],
+                vec!["SOVEREIGNTY", "LEGITIMACY", "OBLIGATION", "COOPERATE"],
+            ),
+            (
+                "CORRUPTION",
+                vec!["RA_AUTHORITY", "RM_DEFECT", "RM_EXCHANGE"],
+                vec!["AUTHORITY", "DEFECT", "EXCHANGE"],
+            ),
+            (
+                "PEACE_TREATY",
+                vec!["RT_TREATY", "RM_COOPERATE", "RA_SOVEREIGNTY"],
+                vec!["TREATY", "COOPERATE", "SOVEREIGNTY"],
+            ),
+            (
+                "FEDERATION",
+                vec!["RA_SOVEREIGNTY", "RA_AUTHORITY", "RM_COOPERATE", "RC_TRUST"],
+                vec!["SOVEREIGNTY", "AUTHORITY", "COOPERATE", "TRUST"],
+            ),
+            (
+                "CONSTITUTIONAL_CRISIS",
+                vec!["RM_LEGITIMACY", "RA_AUTHORITY", "RM_DEFECT"],
+                vec!["LEGITIMACY", "AUTHORITY", "DEFECT"],
+            ),
+            (
+                "IMPEACHMENT",
+                vec![
+                    "RA_AUTHORITY",
+                    "RM_LEGITIMACY",
+                    "RM_ENFORCEMENT",
+                    "RA_POPULATION",
+                ],
+                vec!["AUTHORITY", "LEGITIMACY", "ENFORCEMENT", "POPULATION"],
+            ),
+            (
+                "DIPLOMACY",
+                vec!["RT_TREATY", "RC_TRUST", "RM_COOPERATE", "RM_EXCHANGE"],
+                vec!["TREATY", "TRUST", "COOPERATE", "EXCHANGE"],
+            ),
+            (
+                "COLONIALISM",
+                vec![
+                    "RA_SOVEREIGNTY",
+                    "RM_ENFORCEMENT",
+                    "RA_POPULATION",
+                    "RM_DEFECT",
+                ],
+                vec!["SOVEREIGNTY", "ENFORCEMENT", "POPULATION", "DEFECT"],
+            ),
         ];
 
         let mut loaded = 0;

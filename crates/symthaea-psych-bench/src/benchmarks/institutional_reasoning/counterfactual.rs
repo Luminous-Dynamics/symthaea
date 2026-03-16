@@ -342,7 +342,12 @@ mod tests {
                         };
                         eprintln!(
                             "  [{pass}] {} -[{:?}] +[{:?}] => nearest={}, sim={:.4} (expected={})",
-                            case.start, case.removals, case.additions, last.nearest, last.similarity, case.expected_nearest
+                            case.start,
+                            case.removals,
+                            case.additions,
+                            last.nearest,
+                            last.similarity,
+                            case.expected_nearest
                         );
                     }
                     // Show HV-based reversibility

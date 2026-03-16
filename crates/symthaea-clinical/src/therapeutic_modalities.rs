@@ -261,15 +261,13 @@ impl InterventionLibrary {
             0.8,
             0.5,
         ));
-        lib.add(
-            TherapeuticIntervention::new(
-                TherapeuticModality::Dbt,
-                "mindfulness",
-                vec![RDocDomain::ArousalRegulatory, RDocDomain::CognitiveSystems],
-                0.85,
-                0.2,
-            ),
-        );
+        lib.add(TherapeuticIntervention::new(
+            TherapeuticModality::Dbt,
+            "mindfulness",
+            vec![RDocDomain::ArousalRegulatory, RDocDomain::CognitiveSystems],
+            0.85,
+            0.2,
+        ));
 
         // ── Narrative ──
         lib.add(TherapeuticIntervention::new(
@@ -454,18 +452,18 @@ mod tests {
         // Should have interventions for all 9 modalities
         for modality in TherapeuticModality::ALL {
             let count = lib.by_modality(modality).len();
-            assert!(
-                count > 0,
-                "modality {:?} has no interventions",
-                modality
-            );
+            assert!(count > 0, "modality {:?} has no interventions", modality);
         }
     }
 
     #[test]
     fn test_bootstrap_has_reasonable_count() {
         let lib = InterventionLibrary::bootstrap();
-        assert!(lib.len() >= 20, "expected >= 20 interventions, got {}", lib.len());
+        assert!(
+            lib.len() >= 20,
+            "expected >= 20 interventions, got {}",
+            lib.len()
+        );
     }
 
     #[test]
@@ -551,7 +549,10 @@ mod tests {
     fn test_safe_at_alliance_low() {
         let lib = InterventionLibrary::bootstrap();
         let safe = lib.safe_at_alliance(0.2);
-        assert!(!safe.is_empty(), "should have some low-alliance-safe interventions");
+        assert!(
+            !safe.is_empty(),
+            "should have some low-alliance-safe interventions"
+        );
         for intervention in &safe {
             assert!(intervention.min_alliance <= 0.2);
         }

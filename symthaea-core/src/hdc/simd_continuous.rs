@@ -801,9 +801,21 @@ unsafe fn dot_product_neon(a: &[f32], b: &[f32]) -> f32 {
     for i in 0..chunks {
         let off = i * 16;
         sum0 = vfmaq_f32(sum0, vld1q_f32(a_ptr.add(off)), vld1q_f32(b_ptr.add(off)));
-        sum1 = vfmaq_f32(sum1, vld1q_f32(a_ptr.add(off + 4)), vld1q_f32(b_ptr.add(off + 4)));
-        sum2 = vfmaq_f32(sum2, vld1q_f32(a_ptr.add(off + 8)), vld1q_f32(b_ptr.add(off + 8)));
-        sum3 = vfmaq_f32(sum3, vld1q_f32(a_ptr.add(off + 12)), vld1q_f32(b_ptr.add(off + 12)));
+        sum1 = vfmaq_f32(
+            sum1,
+            vld1q_f32(a_ptr.add(off + 4)),
+            vld1q_f32(b_ptr.add(off + 4)),
+        );
+        sum2 = vfmaq_f32(
+            sum2,
+            vld1q_f32(a_ptr.add(off + 8)),
+            vld1q_f32(b_ptr.add(off + 8)),
+        );
+        sum3 = vfmaq_f32(
+            sum3,
+            vld1q_f32(a_ptr.add(off + 12)),
+            vld1q_f32(b_ptr.add(off + 12)),
+        );
     }
 
     sum0 = vaddq_f32(vaddq_f32(sum0, sum1), vaddq_f32(sum2, sum3));
@@ -827,10 +839,25 @@ unsafe fn bind_neon(a: &[f32], b: &[f32], result: &mut [f32]) {
 
     for i in 0..chunks {
         let off = i * 16;
-        vst1q_f32(r_ptr.add(off), vmulq_f32(vld1q_f32(a_ptr.add(off)), vld1q_f32(b_ptr.add(off))));
-        vst1q_f32(r_ptr.add(off + 4), vmulq_f32(vld1q_f32(a_ptr.add(off + 4)), vld1q_f32(b_ptr.add(off + 4))));
-        vst1q_f32(r_ptr.add(off + 8), vmulq_f32(vld1q_f32(a_ptr.add(off + 8)), vld1q_f32(b_ptr.add(off + 8))));
-        vst1q_f32(r_ptr.add(off + 12), vmulq_f32(vld1q_f32(a_ptr.add(off + 12)), vld1q_f32(b_ptr.add(off + 12))));
+        vst1q_f32(
+            r_ptr.add(off),
+            vmulq_f32(vld1q_f32(a_ptr.add(off)), vld1q_f32(b_ptr.add(off))),
+        );
+        vst1q_f32(
+            r_ptr.add(off + 4),
+            vmulq_f32(vld1q_f32(a_ptr.add(off + 4)), vld1q_f32(b_ptr.add(off + 4))),
+        );
+        vst1q_f32(
+            r_ptr.add(off + 8),
+            vmulq_f32(vld1q_f32(a_ptr.add(off + 8)), vld1q_f32(b_ptr.add(off + 8))),
+        );
+        vst1q_f32(
+            r_ptr.add(off + 12),
+            vmulq_f32(
+                vld1q_f32(a_ptr.add(off + 12)),
+                vld1q_f32(b_ptr.add(off + 12)),
+            ),
+        );
     }
     for i in (chunks * 16)..len {
         *r_ptr.add(i) = *a_ptr.add(i) * *b_ptr.add(i);

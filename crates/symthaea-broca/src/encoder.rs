@@ -97,10 +97,10 @@ const CHANNEL_NAMES: [&str; NUM_CHANNELS] = [
     "social_context",      // 22
     "response_confidence", // 23
     // Therapeutic channels (v4)
-    "therapeutic_intent",      // 24
-    "alliance_quality",        // 25
-    "client_distress_level",   // 26
-    "intervention_depth",      // 27
+    "therapeutic_intent",    // 24
+    "alliance_quality",      // 25
+    "client_distress_level", // 26
+    "intervention_depth",    // 27
 ];
 
 /// Channel ranges [min, max] for normalization to [0, 1].
@@ -371,16 +371,24 @@ impl ThoughtChannels {
     }
 
     #[cfg(feature = "therapeutic")]
-    pub fn therapeutic_intent(&self) -> f32 { self.channels[24] }
+    pub fn therapeutic_intent(&self) -> f32 {
+        self.channels[24]
+    }
 
     #[cfg(feature = "therapeutic")]
-    pub fn alliance_quality(&self) -> f32 { self.channels[25] }
+    pub fn alliance_quality(&self) -> f32 {
+        self.channels[25]
+    }
 
     #[cfg(feature = "therapeutic")]
-    pub fn client_distress_level(&self) -> f32 { self.channels[26] }
+    pub fn client_distress_level(&self) -> f32 {
+        self.channels[26]
+    }
 
     #[cfg(feature = "therapeutic")]
-    pub fn intervention_depth(&self) -> f32 { self.channels[27] }
+    pub fn intervention_depth(&self) -> f32 {
+        self.channels[27]
+    }
 }
 
 #[cfg(feature = "therapeutic")]
@@ -392,12 +400,8 @@ pub const THERAPEUTIC_CHANNEL_NAMES: &[&str] = &[
 ];
 
 #[cfg(feature = "therapeutic")]
-pub const THERAPEUTIC_CHANNEL_RANGES: &[[f32; 2]] = &[
-    [0.0, 7.0],
-    [0.0, 1.0],
-    [0.0, 1.0],
-    [0.0, 1.0],
-];
+pub const THERAPEUTIC_CHANNEL_RANGES: &[[f32; 2]] =
+    &[[0.0, 7.0], [0.0, 1.0], [0.0, 1.0], [0.0, 1.0]];
 
 #[cfg(feature = "therapeutic")]
 pub const THERAPEUTIC_CHANNEL_DEFAULTS: &[f32] = &[0.0, 0.5, 0.0, 0.0];
@@ -683,23 +687,32 @@ mod tests {
             let mut ch = ThoughtChannels::default();
             ch.channels[i] = CHANNEL_RANGES[i][1];
             let sim = baseline.similarity(&enc.encode(&ch));
-            if (sim - 1.0).abs() > 1e-4 { distinct += 1; }
+            if (sim - 1.0).abs() > 1e-4 {
+                distinct += 1;
+            }
         }
-        assert!(distinct >= 20, "At least 20/24 channels should be distinct, got {distinct}");
+        assert!(
+            distinct >= 20,
+            "At least 20/24 channels should be distinct, got {distinct}"
+        );
     }
 
     #[test]
     fn test_out_of_range_channels_clamped() {
         let enc = ThoughtLanguageEncoder::new(&test_genesis());
         let mut ch = ThoughtChannels::default();
-        ch.channels[8] = 100.0; ch.channels[9] = -50.0; ch.channels[10] = 999.0;
+        ch.channels[8] = 100.0;
+        ch.channels[9] = -50.0;
+        ch.channels[10] = 999.0;
         assert!(enc.encode(&ch).as_slice().iter().all(|v| v.is_finite()));
     }
 
     #[test]
     fn test_legacy_20_channel_conversion() {
         let mut legacy = [0.0f32; 20];
-        legacy[0] = 1.0; legacy[9] = -0.5; legacy[12] = 0.8;
+        legacy[0] = 1.0;
+        legacy[9] = -0.5;
+        legacy[12] = 0.8;
         let tc = ThoughtChannels::from_legacy(&legacy);
         assert_eq!(tc.channels[0], 1.0);
         assert_eq!(tc.channels[9], -0.5);
@@ -715,7 +728,10 @@ mod tests {
         let mut high = ThoughtChannels::default();
         high.set_consciousness(1.0, 1.0, 1.0);
         let sim = enc.encode(&low).similarity(&enc.encode(&high));
-        assert!(sim < 0.95, "Low vs high consciousness should differ, sim={sim}");
+        assert!(
+            sim < 0.95,
+            "Low vs high consciousness should differ, sim={sim}"
+        );
     }
 
     #[test]

@@ -257,10 +257,7 @@ mod tests {
         let result = bench.run(&default_config());
         let acc = result.metrics["chain_tracing_accuracy"].mean;
         // XOR chain tracing should be exact (or very close), well above 0.5
-        assert!(
-            acc > 0.5,
-            "Chain tracing should be above chance, got {acc}"
-        );
+        assert!(acc > 0.5, "Chain tracing should be above chance, got {acc}");
     }
 
     #[test]

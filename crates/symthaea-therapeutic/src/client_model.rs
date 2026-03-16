@@ -9,9 +9,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
-use symthaea_clinical::{
-    DiagnosticProfile, RDocDomain, RDocProfile, SymptomProfile,
-};
+use symthaea_clinical::{DiagnosticProfile, RDocDomain, RDocProfile, SymptomProfile};
 use symthaea_core::hdc::BinaryHV;
 
 /// Maximum number of affect snapshots retained in trajectory.
@@ -174,8 +172,23 @@ impl ClientModel {
         if len < 20 {
             return 0.0;
         }
-        let recent: f32 = self.affect_trajectory.iter().rev().take(10).map(|a| a.valence).sum::<f32>() / 10.0;
-        let earlier: f32 = self.affect_trajectory.iter().rev().skip(10).take(10).map(|a| a.valence).sum::<f32>() / 10.0;
+        let recent: f32 = self
+            .affect_trajectory
+            .iter()
+            .rev()
+            .take(10)
+            .map(|a| a.valence)
+            .sum::<f32>()
+            / 10.0;
+        let earlier: f32 = self
+            .affect_trajectory
+            .iter()
+            .rev()
+            .skip(10)
+            .take(10)
+            .map(|a| a.valence)
+            .sum::<f32>()
+            / 10.0;
         recent - earlier
     }
 
@@ -197,8 +210,11 @@ impl ClientModel {
     pub fn add_hypothesis(&mut self, profile: DiagnosticProfile) {
         self.diagnostic_hypotheses.push(profile);
         // Keep sorted by confidence (descending)
-        self.diagnostic_hypotheses
-            .sort_by(|a, b| b.confidence.partial_cmp(&a.confidence).unwrap_or(std::cmp::Ordering::Equal));
+        self.diagnostic_hypotheses.sort_by(|a, b| {
+            b.confidence
+                .partial_cmp(&a.confidence)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
     }
 
     /// Start a new session.
@@ -234,24 +250,20 @@ impl ClientModel {
             self.affect_trajectory.iter().rev().take(window).collect();
 
         // Mean negative valence in window (higher = more negative affect)
-        let mean_neg = recent
-            .iter()
-            .map(|a| (-a.valence).max(0.0))
-            .sum::<f32>()
-            / window as f32;
+        let mean_neg = recent.iter().map(|a| (-a.valence).max(0.0)).sum::<f32>() / window as f32;
         let current_neg = self.rdoc_profile.score(RDocDomain::NegativeValence);
-        self.rdoc_profile
-            .set_score(RDocDomain::NegativeValence, current_neg * (1.0 - alpha) + mean_neg * alpha);
+        self.rdoc_profile.set_score(
+            RDocDomain::NegativeValence,
+            current_neg * (1.0 - alpha) + mean_neg * alpha,
+        );
 
         // Mean positive valence (higher = more positive affect)
-        let mean_pos = recent
-            .iter()
-            .map(|a| a.valence.max(0.0))
-            .sum::<f32>()
-            / window as f32;
+        let mean_pos = recent.iter().map(|a| a.valence.max(0.0)).sum::<f32>() / window as f32;
         let current_pos = self.rdoc_profile.score(RDocDomain::PositiveValence);
-        self.rdoc_profile
-            .set_score(RDocDomain::PositiveValence, current_pos * (1.0 - alpha) + mean_pos * alpha);
+        self.rdoc_profile.set_score(
+            RDocDomain::PositiveValence,
+            current_pos * (1.0 - alpha) + mean_pos * alpha,
+        );
 
         // Arousal dysregulation: deviation from 0.5 baseline
         let mean_arousal_dev = recent
@@ -397,7 +409,8 @@ mod tests {
         assert!(
             post_neg > pre_neg,
             "NegativeValence should increase with sustained negative affect: {} → {}",
-            pre_neg, post_neg,
+            pre_neg,
+            post_neg,
         );
     }
 
@@ -414,7 +427,8 @@ mod tests {
         assert!(
             post_pos > pre_pos,
             "PositiveValence should increase with sustained positive affect: {} → {}",
-            pre_pos, post_pos,
+            pre_pos,
+            post_pos,
         );
     }
 
@@ -431,7 +445,8 @@ mod tests {
         assert!(
             post_arousal > pre_arousal,
             "ArousalRegulatory should increase with dysregulated arousal: {} → {}",
-            pre_arousal, post_arousal,
+            pre_arousal,
+            post_arousal,
         );
     }
 }

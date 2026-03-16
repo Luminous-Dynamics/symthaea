@@ -1089,6 +1089,7 @@ fn main() -> Result<()> {
     // Measurement — capture per-cycle sparkline data + last result
     let mut sparkline: Vec<SparklinePoint> = Vec::with_capacity(measurement);
     let mut last_result = None;
+    let mut glyph_coherence_init: Vec<f32> = Vec::with_capacity(measurement);
     for i in 0..measurement {
         let input = inputs[(warmup + i) % inputs.len()];
         let result = service.cycle(input);
@@ -1108,6 +1109,7 @@ fn main() -> Result<()> {
             broca_quality: 0.0, // TODO: wire broca telemetry when available on CycleMetadata
             tom_mismatch: m.tom_prediction_mismatch,
         });
+        glyph_coherence_init.push(m.glyph_coherence);
         last_result = Some(result);
     }
 
@@ -1273,7 +1275,13 @@ fn main() -> Result<()> {
         governance: GovernanceInfo::default(),
         knowledge: KnowledgeInfo::default(),
         cantor: CantorInfo::default(),
-        glyph: GlyphInfo::default(),
+        glyph: GlyphInfo {
+            dominant_modality: m.glyph_dominant_modality.clone(),
+            coherence: m.glyph_coherence,
+            resonant_glyph: m.glyph_resonant_name.clone(),
+            spiral_position: m.glyph_spiral_position,
+            coherence_history: glyph_coherence_init,
+        },
         spectrum: SpectrumInfo::default(),
         perception: PerceptionInfo {
             attention_focus: m.attention.attention_schema_focus,
@@ -1457,6 +1465,7 @@ fn main() -> Result<()> {
             // Run more measurement cycles
             let mut watch_sparkline: Vec<SparklinePoint> = Vec::with_capacity(measurement);
             let mut watch_result = None;
+            let mut glyph_coherence_history: Vec<f32> = Vec::with_capacity(measurement);
             for i in 0..measurement {
                 let input = inputs[(cycle_count + i) % inputs.len()];
                 let result = service.cycle(input);
@@ -1476,6 +1485,7 @@ fn main() -> Result<()> {
                     broca_quality: 0.0, // TODO: wire broca telemetry when available on CycleMetadata
                     tom_mismatch: wm.tom_prediction_mismatch,
                 });
+                glyph_coherence_history.push(wm.glyph_coherence);
                 watch_result = Some(result);
             }
             cycle_count += measurement;
@@ -1573,7 +1583,7 @@ fn main() -> Result<()> {
                     coherence: wm.glyph_coherence,
                     resonant_glyph: wm.glyph_resonant_name.clone(),
                     spiral_position: wm.glyph_spiral_position,
-                    coherence_history: Vec::new(), // TODO: accumulate across cycles
+                    coherence_history: glyph_coherence_history.clone(),
                 },
                 spectrum: SpectrumInfo::default(),
                 perception: PerceptionInfo {
@@ -1920,7 +1930,11 @@ mod tests {
             .map(|_| make_sparkline_point(0.5, 0.3, 1.0))
             .collect();
         let result = detect_anomalies(&points);
-        assert!(result.is_empty(), "constant data should have no anomalies, got {}", result.len());
+        assert!(
+            result.is_empty(),
+            "constant data should have no anomalies, got {}",
+            result.len()
+        );
     }
 
     #[test]
@@ -1972,7 +1986,11 @@ mod tests {
             points.push(make_sparkline_point(c, 0.9, 0.0));
         }
         let result = detect_anomalies(&points);
-        assert!(result.len() <= 8, "anomalies should be truncated to 8, got {}", result.len());
+        assert!(
+            result.len() <= 8,
+            "anomalies should be truncated to 8, got {}",
+            result.len()
+        );
     }
 
     // ── PulseDelta tests ─────────────────────────────────────────────────
@@ -2063,6 +2081,9 @@ mod tests {
             color: "#e8c547",
         }];
         let report = generate_session_report(&v, &b, &c, &sparkline, &anomalies, None, &[]);
-        assert!(report.contains("C(t) Surge"), "report should list anomaly kinds");
+        assert!(
+            report.contains("C(t) Surge"),
+            "report should list anomaly kinds"
+        );
     }
 }

@@ -342,7 +342,10 @@ impl MoralAnomalyConfig {
             ("response_confidence_frag", self.response_confidence_frag),
             ("response_lr_drift", self.response_lr_drift),
             ("response_lr_convergence", self.response_lr_convergence),
-            ("response_confidence_hubris", self.response_confidence_hubris),
+            (
+                "response_confidence_hubris",
+                self.response_confidence_hubris,
+            ),
         ] {
             if !val.is_finite() {
                 return Err(format!(
@@ -2282,11 +2285,12 @@ impl MoralTopology {
         // Moral hubris: sustained high-coherence low-variance state
         let moral_hubris = if ac.hubris_enabled {
             let max_entropy = (N_HARMONIES as f64).ln();
-            let normalized_entropy = if max_entropy > 0.0 && current_summary.harmony_entropy.is_finite() {
-                current_summary.harmony_entropy / max_entropy
-            } else {
-                1.0
-            };
+            let normalized_entropy =
+                if max_entropy > 0.0 && current_summary.harmony_entropy.is_finite() {
+                    current_summary.harmony_entropy / max_entropy
+                } else {
+                    1.0
+                };
             let coherence_proxy = if current_summary.moral_free_energy.is_finite() {
                 (1.0 - current_summary.moral_free_energy.min(2.0) / 2.0).clamp(0.0, 1.0)
             } else {
@@ -5378,7 +5382,10 @@ mod tests {
     #[test]
     fn test_hubris_detection_sustained() {
         use super::*;
-        let config = MoralTopologyConfig { dim: 256, ..Default::default() };
+        let config = MoralTopologyConfig {
+            dim: 256,
+            ..Default::default()
+        };
         let mut anomaly_config = MoralAnomalyConfig::default();
         anomaly_config.hubris_min_streak = 3;
         anomaly_config.hubris_coherence_threshold = 0.7;
@@ -5392,7 +5399,11 @@ mod tests {
         for i in 0..5 {
             let report = topo.detect_anomalies(&summary);
             if i >= 2 {
-                assert!(report.moral_hubris, "Hubris should trigger after {} cycles", i + 1);
+                assert!(
+                    report.moral_hubris,
+                    "Hubris should trigger after {} cycles",
+                    i + 1
+                );
             }
         }
     }
@@ -5400,7 +5411,10 @@ mod tests {
     #[test]
     fn test_hubris_resets_on_variance() {
         use super::*;
-        let config = MoralTopologyConfig { dim: 256, ..Default::default() };
+        let config = MoralTopologyConfig {
+            dim: 256,
+            ..Default::default()
+        };
         let mut anomaly_config = MoralAnomalyConfig::default();
         anomaly_config.hubris_min_streak = 3;
         anomaly_config.hubris_coherence_threshold = 0.7;
@@ -5415,16 +5429,25 @@ mod tests {
         topo.detect_anomalies(&summary);
         summary.harmony_entropy = 1.5;
         let report = topo.detect_anomalies(&summary);
-        assert!(!report.moral_hubris, "Hubris should reset when entropy increases");
+        assert!(
+            !report.moral_hubris,
+            "Hubris should reset when entropy increases"
+        );
         summary.harmony_entropy = 0.05;
         let report = topo.detect_anomalies(&summary);
-        assert!(!report.moral_hubris, "Hubris should not trigger immediately after reset");
+        assert!(
+            !report.moral_hubris,
+            "Hubris should not trigger immediately after reset"
+        );
     }
 
     #[test]
     fn test_hubris_below_threshold() {
         use super::*;
-        let config = MoralTopologyConfig { dim: 256, ..Default::default() };
+        let config = MoralTopologyConfig {
+            dim: 256,
+            ..Default::default()
+        };
         let mut anomaly_config = MoralAnomalyConfig::default();
         anomaly_config.hubris_min_streak = 3;
         anomaly_config.hubris_coherence_threshold = 0.9;
@@ -5437,14 +5460,20 @@ mod tests {
         summary.scenario_count = 10;
         for _ in 0..10 {
             let report = topo.detect_anomalies(&summary);
-            assert!(!report.moral_hubris, "Coherence below threshold should never trigger hubris");
+            assert!(
+                !report.moral_hubris,
+                "Coherence below threshold should never trigger hubris"
+            );
         }
     }
 
     #[test]
     fn test_hubris_composite_score() {
         use super::*;
-        let config = MoralTopologyConfig { dim: 256, ..Default::default() };
+        let config = MoralTopologyConfig {
+            dim: 256,
+            ..Default::default()
+        };
         let mut anomaly_config = MoralAnomalyConfig::default();
         anomaly_config.hubris_min_streak = 2;
         anomaly_config.hubris_coherence_threshold = 0.7;
@@ -5459,6 +5488,10 @@ mod tests {
         topo.detect_anomalies(&summary);
         let report = topo.detect_anomalies(&summary);
         assert!(report.moral_hubris, "Hubris should be detected");
-        assert!(report.anomaly_score >= 0.15 - 0.001, "Anomaly score should include hubris weight, got {}", report.anomaly_score);
+        assert!(
+            report.anomaly_score >= 0.15 - 0.001,
+            "Anomaly score should include hubris weight, got {}",
+            report.anomaly_score
+        );
     }
 }

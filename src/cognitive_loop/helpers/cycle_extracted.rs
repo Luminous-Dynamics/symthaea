@@ -15,11 +15,21 @@ use crate::cognitive_loop::feedback_state::Priority;
 
 /// Geometric mean of positive f32 values. Returns 1.0 for empty/invalid input.
 fn geometric_mean(factors: &[f32]) -> f32 {
-    let valid: Vec<f32> = factors.iter().copied().filter(|f| *f > 0.0 && f.is_finite()).collect();
-    if valid.is_empty() { return 1.0; }
+    let valid: Vec<f32> = factors
+        .iter()
+        .copied()
+        .filter(|f| *f > 0.0 && f.is_finite())
+        .collect();
+    if valid.is_empty() {
+        return 1.0;
+    }
     let log_sum: f32 = valid.iter().map(|f| f.ln()).sum();
     let mean = (log_sum / valid.len() as f32).exp();
-    if mean.is_finite() { mean } else { 1.0 }
+    if mean.is_finite() {
+        mean
+    } else {
+        1.0
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -123,7 +133,12 @@ impl CognitiveLoopService {
     /// Uses temporal signature pattern, prosody valence, and average prediction
     /// error to select Reflex / Cortical / DeepThought processing depth.
     pub(in crate::cognitive_loop) fn update_cognitive_depth(&mut self) {
-        let prior_pattern = self.language_comm.voice_coherence.temporal.classify_state().0;
+        let prior_pattern = self
+            .language_comm
+            .voice_coherence
+            .temporal
+            .classify_state()
+            .0;
         let prior_valence = self.emotion_contagion.prosody_valence();
         let prior_error = self.stats.avg_prediction_error;
         self.cognitive_depth =
@@ -253,25 +268,26 @@ impl CognitiveLoopService {
 
         // Contextual harmony weighting: domain-aware moral modulation
         // Science: Haidt (2001) — moral foundations vary across contexts
-        let contextual_weight_factor = if let Some(ref mut cw) = self.ethics_values.contextual_weights {
-            use crate::consciousness::contextual_weights::{ActionType, DomainClassifier};
-            let domain = DomainClassifier::new().classify(input);
-            let action_type = if moral_concern_detected {
-                ActionType::Governance
+        let contextual_weight_factor =
+            if let Some(ref mut cw) = self.ethics_values.contextual_weights {
+                use crate::consciousness::contextual_weights::{ActionType, DomainClassifier};
+                let domain = DomainClassifier::new().classify(input);
+                let action_type = if moral_concern_detected {
+                    ActionType::Governance
+                } else {
+                    ActionType::Basic
+                };
+                let weights = cw.get_all_weights(action_type, domain);
+                let weight_avg =
+                    weights.iter().map(|(_, w)| w).sum::<f32>() / weights.len().max(1) as f32;
+                if weight_avg.abs() < f32::EPSILON {
+                    1.0
+                } else {
+                    weight_avg
+                }
             } else {
-                ActionType::Basic
-            };
-            let weights = cw.get_all_weights(action_type, domain);
-            let weight_avg =
-                weights.iter().map(|(_, w)| w).sum::<f32>() / weights.len().max(1) as f32;
-            if weight_avg.abs() < f32::EPSILON {
                 1.0
-            } else {
-                weight_avg
-            }
-        } else {
-            1.0
-        };
+            };
         let moral_score = moral_score * contextual_weight_factor;
 
         // Value feedback: self-correcting moral alignment via TD-learning trend
@@ -400,7 +416,12 @@ impl CognitiveLoopService {
     /// Updates the unification engine with the result.
     pub(in crate::cognitive_loop) fn compute_unified_psi(&mut self) -> f64 {
         let coherence_psi = self.language_comm.voice_coherence.bridge.phi_contribution();
-        let voice_psi = self.language_comm.voice_coherence.voice.summary().phi_adjustment;
+        let voice_psi = self
+            .language_comm
+            .voice_coherence
+            .voice
+            .summary()
+            .phi_adjustment;
         let flow_psi = if self.flow_state.in_flow {
             self.flow_state.intensity * FLOW_PSI_WEIGHT
         } else {
@@ -421,7 +442,12 @@ impl CognitiveLoopService {
         // activity — this is the raw coherence, not the doubly-weighted phi_contribution.
         // Science: Tononi (2004) — Φ reflects the degree of information integration
         // in a system. An active recurrent network has non-trivial Φ by design.
-        let baseline_integration = self.language_comm.voice_coherence.bridge.smoothed_coherence() * 0.3;
+        let baseline_integration = self
+            .language_comm
+            .voice_coherence
+            .bridge
+            .smoothed_coherence()
+            * 0.3;
 
         let unified_psi = (baseline_integration
             + coherence_psi
@@ -588,7 +614,11 @@ impl CognitiveLoopService {
                 // Boost learning rate when free energy is high
                 if let Some(ref fe) = self.fep.agent.last_fe_components {
                     let fe_boost = (fe.total.abs() as f32 / 2.0).clamp(0.0, 1.5);
-                    self.scale_lr_pri("fep_free_energy", 1.0 + fe_boost * 0.5, Priority::Homeostatic);
+                    self.scale_lr_pri(
+                        "fep_free_energy",
+                        1.0 + fe_boost * 0.5,
+                        Priority::Homeostatic,
+                    );
                 }
             }
             1 => {
@@ -749,7 +779,11 @@ impl CognitiveLoopService {
         if affective_arousal > 0.7 {
             // Attenuated 50%: DA learning_rate_factor() already scales LR via the bath
             let arousal_suppress = ((affective_arousal - 0.7) * 0.25).min(0.08);
-            self.scale_lr_pri("affective_arousal_suppress", 1.0 - arousal_suppress, Priority::Homeostatic);
+            self.scale_lr_pri(
+                "affective_arousal_suppress",
+                1.0 - arousal_suppress,
+                Priority::Homeostatic,
+            );
 
             // Arousal trap detection (Yerkes-Dodson 1908 — inverted-U performance curve)
             if affective_arousal > 0.8 {
@@ -766,9 +800,17 @@ impl CognitiveLoopService {
                 let recovery_intensity =
                     (self.carryover.urgency.arousal_trap_counter - 5) as f32 / 5.0;
                 // Gradual LR dampening: attenuated 50% (NE exploration_delta handles arousal)
-                self.scale_lr_pri("arousal_trap_recovery", 1.0 - recovery_intensity * 0.1, Priority::Homeostatic);
+                self.scale_lr_pri(
+                    "arousal_trap_recovery",
+                    1.0 - recovery_intensity * 0.1,
+                    Priority::Homeostatic,
+                );
                 // Slight exploration boost: attenuated 50% (NE exploration_delta covers this)
-                self.adjust_exploration_pri("arousal_trap_recovery", recovery_intensity * 0.025, Priority::Homeostatic);
+                self.adjust_exploration_pri(
+                    "arousal_trap_recovery",
+                    recovery_intensity * 0.025,
+                    Priority::Homeostatic,
+                );
                 self.stats.arousal_recovery_cycles += 1;
                 tracing::debug!(
                     cycle = self.stats.total_cycles,
@@ -795,7 +837,11 @@ impl CognitiveLoopService {
                 // Low arousal enhances consolidation (Steriade 1996)
                 // Attenuated 50%: DA handles low-error consolidation boost via the bath
                 let consolidation_boost = ((0.3 - affective_arousal) * 0.3).min(0.05);
-                self.scale_lr_pri("low_arousal_consolidate", 1.0 + consolidation_boost, Priority::Homeostatic);
+                self.scale_lr_pri(
+                    "low_arousal_consolidate",
+                    1.0 + consolidation_boost,
+                    Priority::Homeostatic,
+                );
             }
         }
     }
@@ -819,7 +865,11 @@ impl CognitiveLoopService {
     ) -> (&'static str, f32) {
         let mut moral_steering_category: &str = "";
         if moral_concern_detected {
-            self.scale_exploration_pri("moral_concern", MORAL_CONCERN_EXPLORATION_DAMPEN, Priority::Safety);
+            self.scale_exploration_pri(
+                "moral_concern",
+                MORAL_CONCERN_EXPLORATION_DAMPEN,
+                Priority::Safety,
+            );
 
             self.self_model_tier.self_reflection.trust_threshold =
                 (self.self_model_tier.self_reflection.trust_threshold * 1.2).clamp(0.1, 0.95);
@@ -836,12 +886,26 @@ impl CognitiveLoopService {
             }
 
             if moral_judgment.consent_violation {
-                self.scale_confidence_pri("moral_consent_viol", 0.7, Priority::Safety);
+                // Confidence = 1.0 - moral_score: consent violations with
+                // low moral scores get maximum weight.
+                let violation_conf = (1.0 - moral_score).clamp(0.3, 1.0);
+                self.scale_confidence_weighted(
+                    "moral_consent_viol",
+                    0.7,
+                    Priority::Safety,
+                    violation_conf,
+                );
                 self.carryover.learning.subsystem_lr_factor *= 0.5;
                 moral_steering_category = "consent";
             } else if moral_judgment.violations.iter().any(|v| v.contains("harm")) {
+                let violation_conf = (1.0 - moral_score).clamp(0.3, 1.0);
                 self.scale_exploration_pri("harm_detected", 0.4, Priority::Safety);
-                self.scale_confidence_pri("moral_harm_detect", 0.85, Priority::Safety);
+                self.scale_confidence_weighted(
+                    "moral_harm_detect",
+                    0.85,
+                    Priority::Safety,
+                    violation_conf,
+                );
                 moral_steering_category = "harm";
             } else if moral_judgment
                 .violations
@@ -856,7 +920,15 @@ impl CognitiveLoopService {
                 moral_steering_category = "other";
             }
         } else if moral_score > MORAL_BENEFIT_THRESHOLD {
-            self.scale_confidence_pri("moral_benefit", MORAL_BENEFIT_CONFIDENCE_BOOST, Priority::Aesthetic);
+            // Confidence = moral_score: high-scoring moral assessments carry
+            // more weight than borderline ones.
+            // Science: Greene (2013) — moral intuition reliability scales with clarity.
+            self.scale_confidence_weighted(
+                "moral_benefit",
+                MORAL_BENEFIT_CONFIDENCE_BOOST,
+                Priority::Aesthetic,
+                moral_score.clamp(0.0, 1.0),
+            );
         }
 
         // Surprise-gated learning rate boost

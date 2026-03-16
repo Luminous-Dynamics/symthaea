@@ -280,9 +280,10 @@ impl CausalKnowledgeBridge {
         }
 
         // Also update adjacency weights
-        if let (Some(&cause_idx), Some(&effect_idx)) =
-            (self.nodes.get(&cause.to_lowercase()), self.nodes.get(&effect.to_lowercase()))
-        {
+        if let (Some(&cause_idx), Some(&effect_idx)) = (
+            self.nodes.get(&cause.to_lowercase()),
+            self.nodes.get(&effect.to_lowercase()),
+        ) {
             // Try exact case first, fall back to lowercase
             let cause_key = if self.nodes.contains_key(cause) {
                 cause.to_string()
@@ -359,7 +360,11 @@ impl CausalKnowledgeBridge {
             }
         }
 
-        results.sort_by(|a, b| b.1.abs().partial_cmp(&a.1.abs()).unwrap_or(std::cmp::Ordering::Equal));
+        results.sort_by(|a, b| {
+            b.1.abs()
+                .partial_cmp(&a.1.abs())
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         results
     }
 
@@ -391,13 +396,19 @@ impl CausalKnowledgeBridge {
                 let strength_a = self
                     .edges
                     .iter()
-                    .filter(|e| e.cause.to_lowercase() == confounder && e.effect.to_lowercase() == entity_a.to_lowercase())
+                    .filter(|e| {
+                        e.cause.to_lowercase() == confounder
+                            && e.effect.to_lowercase() == entity_a.to_lowercase()
+                    })
                     .map(|e| e.strength)
                     .fold(0.0_f32, f32::max);
                 let strength_b = self
                     .edges
                     .iter()
-                    .filter(|e| e.cause.to_lowercase() == confounder && e.effect.to_lowercase() == entity_b.to_lowercase())
+                    .filter(|e| {
+                        e.cause.to_lowercase() == confounder
+                            && e.effect.to_lowercase() == entity_b.to_lowercase()
+                    })
                     .map(|e| e.strength)
                     .fold(0.0_f32, f32::max);
                 (confounder, strength_a.max(strength_b))
@@ -414,7 +425,10 @@ impl CausalKnowledgeBridge {
         }
         let mut entities: Vec<_> = freq.into_iter().collect();
         entities.sort_by(|a, b| b.1.cmp(&a.1));
-        entities.into_iter().map(|(name, _)| name.to_string()).collect()
+        entities
+            .into_iter()
+            .map(|(name, _)| name.to_string())
+            .collect()
     }
 
     /// Export the causal graph as a DOT (Graphviz) string.
@@ -424,7 +438,11 @@ impl CausalKnowledgeBridge {
             if edge.is_negated {
                 continue;
             }
-            let style = if edge.is_inhibitory { " [style=dashed]" } else { "" };
+            let style = if edge.is_inhibitory {
+                " [style=dashed]"
+            } else {
+                ""
+            };
             out.push_str(&format!(
                 "  \"{}\" -> \"{}\" [label=\"{:.2}\"]{}\n",
                 edge.cause, edge.effect, edge.strength, style
@@ -441,7 +459,11 @@ impl CausalKnowledgeBridge {
             if edge.is_negated {
                 continue;
             }
-            let arrow = if edge.is_inhibitory { "-.->|inhibits|" } else { "-->|causes|" };
+            let arrow = if edge.is_inhibitory {
+                "-.->|inhibits|"
+            } else {
+                "-->|causes|"
+            };
             out.push_str(&format!("  {} {} {}\n", edge.cause, arrow, edge.effect));
         }
         out

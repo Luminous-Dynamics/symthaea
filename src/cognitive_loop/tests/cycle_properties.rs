@@ -168,8 +168,14 @@ fn test_cycle_metadata_floats_finite() {
         assert_finite_f32(m.attention.attention_schema_focus, "attention_schema_focus");
         assert_finite(m.resonance_frequency, "resonance_frequency");
         assert_finite(m.quantum_coherence_level, "quantum_coherence_level");
-        assert_finite(m.temporal.temporal_coherence_score, "temporal_coherence_score");
-        assert_finite(m.embodied.embodied_phi_modulation, "embodied_phi_modulation");
+        assert_finite(
+            m.temporal.temporal_coherence_score,
+            "temporal_coherence_score",
+        );
+        assert_finite(
+            m.embodied.embodied_phi_modulation,
+            "embodied_phi_modulation",
+        );
         assert_finite(m.embodied.embodied_agency, "embodied_agency");
         assert_finite(m.narrative_gwt_self_psi, "narrative_gwt_self_psi");
         assert_finite(m.narrative_self_psi, "narrative_self_psi");
@@ -185,8 +191,14 @@ fn test_cycle_metadata_floats_finite() {
         assert_finite_f32(m.embodied.affective_valence, "affective_valence");
         assert_finite_f32(m.embodied.affective_arousal, "affective_arousal");
         assert_finite(m.temporal.thermodynamic_entropy, "thermodynamic_entropy");
-        assert_finite(m.temporal.thermodynamic_free_energy, "thermodynamic_free_energy");
-        assert_finite(m.temporal.phenomenal_binding_strength, "phenomenal_binding_strength");
+        assert_finite(
+            m.temporal.thermodynamic_free_energy,
+            "thermodynamic_free_energy",
+        );
+        assert_finite(
+            m.temporal.phenomenal_binding_strength,
+            "phenomenal_binding_strength",
+        );
         assert_finite(
             m.hierarchical_total_free_energy,
             "hierarchical_total_free_energy",
@@ -199,7 +211,10 @@ fn test_cycle_metadata_floats_finite() {
             m.consciousness.consciousness_profile_composite,
             "consciousness_profile_composite",
         );
-        assert_finite(m.consciousness.synergy_enhanced_composite, "synergy_enhanced_composite");
+        assert_finite(
+            m.consciousness.synergy_enhanced_composite,
+            "synergy_enhanced_composite",
+        );
         assert_finite(
             m.harmonics.harmonic_field_coherence,
             "harmonic_field_coherence",
@@ -242,7 +257,10 @@ fn test_cycle_metadata_floats_finite() {
         );
         assert_finite(m.pipeline_consciousness, "pipeline_consciousness");
         assert_finite(m.multimodal_integrated_phi, "multimodal_integrated_phi");
-        assert_finite(m.consciousness.consciousness_state_level, "consciousness_state_level");
+        assert_finite(
+            m.consciousness.consciousness_state_level,
+            "consciousness_state_level",
+        );
         assert_finite_f32(m.epistemic_gate_confidence, "epistemic_gate_confidence");
         assert_finite(
             m.primitive_validation_phi_gain,
@@ -275,8 +293,14 @@ fn test_cycle_metadata_floats_finite() {
         assert_finite(m.ethics.empathic_tone_adj, "empathic_tone_adj");
 
         // ── Manager telemetry finiteness ──
-        assert_finite_f32(m.perception_attention_sensitivity, "perception_attention_sensitivity");
-        assert_finite_f32(m.perception_budget_utilization, "perception_budget_utilization");
+        assert_finite_f32(
+            m.perception_attention_sensitivity,
+            "perception_attention_sensitivity",
+        );
+        assert_finite_f32(
+            m.perception_budget_utilization,
+            "perception_budget_utilization",
+        );
         assert_finite_f32(m.perception_mean_coherence, "perception_mean_coherence");
         assert_finite_f32(m.drive_boredom, "drive_boredom");
         assert_finite_f32(m.drive_flow_intensity, "drive_flow_intensity");

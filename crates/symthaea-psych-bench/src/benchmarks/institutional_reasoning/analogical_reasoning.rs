@@ -155,12 +155,24 @@ impl AnalogicalReasoningBenchmark {
 
     /// All 18 institutional axiom names for similarity profile computation.
     const AXIOM_NAMES: &'static [&'static str] = &[
-        "REVOLUTION", "FAILED_STATE", "BORDER_DISPUTE", "LEGITIMATE_GOVERNANCE",
-        "REGULATORY_CAPTURE", "TRADE_AGREEMENT", "ECONOMIC_SANCTION",
-        "CIVIL_DISOBEDIENCE", "DEMOCRATIC_ELECTION", "ARMS_EMBARGO",
-        "SOCIAL_CONTRACT", "CORRUPTION",
-        "PEACE_TREATY", "FEDERATION", "CONSTITUTIONAL_CRISIS",
-        "IMPEACHMENT", "DIPLOMACY", "COLONIALISM",
+        "REVOLUTION",
+        "FAILED_STATE",
+        "BORDER_DISPUTE",
+        "LEGITIMATE_GOVERNANCE",
+        "REGULATORY_CAPTURE",
+        "TRADE_AGREEMENT",
+        "ECONOMIC_SANCTION",
+        "CIVIL_DISOBEDIENCE",
+        "DEMOCRATIC_ELECTION",
+        "ARMS_EMBARGO",
+        "SOCIAL_CONTRACT",
+        "CORRUPTION",
+        "PEACE_TREATY",
+        "FEDERATION",
+        "CONSTITUTIONAL_CRISIS",
+        "IMPEACHMENT",
+        "DIPLOMACY",
+        "COLONIALISM",
     ];
 
     fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> TrialResult {
@@ -200,7 +212,8 @@ impl AnalogicalReasoningBenchmark {
             let mut sims: Vec<f32> = Self::AXIOM_NAMES
                 .iter()
                 .filter_map(|&name| {
-                    algebra.get_encoding(name, &system)
+                    algebra
+                        .get_encoding(name, &system)
                         .map(|hv| result_hv.similarity(&hv))
                 })
                 .collect();
@@ -279,7 +292,11 @@ impl AnalogicalReasoningBenchmark {
                 }
                 // Profile divergence: 1 - cosine_similarity(fwd_profile, rev_profile)
                 if !fwd_profile.is_empty() {
-                    let dot: f64 = fwd_profile.iter().zip(&rev_profile).map(|(a, b)| a * b).sum();
+                    let dot: f64 = fwd_profile
+                        .iter()
+                        .zip(&rev_profile)
+                        .map(|(a, b)| a * b)
+                        .sum();
                     let mag_f: f64 = fwd_profile.iter().map(|x| x * x).sum::<f64>().sqrt();
                     let mag_r: f64 = rev_profile.iter().map(|x| x * x).sum::<f64>().sqrt();
                     if mag_f > 0.0 && mag_r > 0.0 {
@@ -409,9 +426,7 @@ mod tests {
         let result = AnalogicalReasoningBenchmark.run(&config);
         assert!(result.metrics.contains_key("analogical_transfer_accuracy"));
         assert!(result.metrics.contains_key("analogical_transfer_strength"));
-        assert!(result
-            .metrics
-            .contains_key("analogical_selectivity"));
+        assert!(result.metrics.contains_key("analogical_selectivity"));
     }
 
     #[test]
@@ -441,10 +456,7 @@ mod tests {
     fn test_selectivity_positive() {
         let config = BenchmarkConfig::default();
         let result = AnalogicalReasoningBenchmark.run(&config);
-        let sel = result
-            .metrics
-            .get("analogical_selectivity")
-            .unwrap();
+        let sel = result.metrics.get("analogical_selectivity").unwrap();
         // Selectivity measures how crisply the analogy maps to one axiom
         // (best - 2nd_best) / best. Should be positive and finite.
         assert!(
@@ -479,7 +491,8 @@ mod tests {
                     let mut sims: Vec<f32> = AnalogicalReasoningBenchmark::AXIOM_NAMES
                         .iter()
                         .filter_map(|&name| {
-                            algebra.get_encoding(name, &system)
+                            algebra
+                                .get_encoding(name, &system)
                                 .map(|hv| result_hv.similarity(&hv))
                         })
                         .collect();

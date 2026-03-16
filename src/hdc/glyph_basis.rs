@@ -710,10 +710,7 @@ impl GlyphRegistry {
 // Internal helpers — softmax, KL, entropy for N_FIELD_MODALITIES
 // ═══════════════════════════════════════════════════════════════════════════════
 
-fn softmax_m(
-    coords: &[f64; N_FIELD_MODALITIES],
-    inv_temp: f64,
-) -> [f64; N_FIELD_MODALITIES] {
+fn softmax_m(coords: &[f64; N_FIELD_MODALITIES], inv_temp: f64) -> [f64; N_FIELD_MODALITIES] {
     let max_val = coords.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
     let mut exp_vals = [0.0f64; N_FIELD_MODALITIES];
     let mut sum = 0.0;
@@ -731,10 +728,7 @@ fn softmax_m(
     exp_vals
 }
 
-fn kl_div_m(
-    q: &[f64; N_FIELD_MODALITIES],
-    p: &[f64; N_FIELD_MODALITIES],
-) -> f64 {
+fn kl_div_m(q: &[f64; N_FIELD_MODALITIES], p: &[f64; N_FIELD_MODALITIES]) -> f64 {
     let mut kl = 0.0;
     for i in 0..N_FIELD_MODALITIES {
         let qi = q[i].max(1e-12);
@@ -771,10 +765,7 @@ mod tests {
         for i in 0..N_FIELD_MODALITIES {
             for j in (i + 1)..N_FIELD_MODALITIES {
                 let sim = basis.vectors[i].similarity(&basis.vectors[j]).abs();
-                assert!(
-                    sim < 0.9,
-                    "Modality vectors {i} and {j} too similar: {sim}"
-                );
+                assert!(sim < 0.9, "Modality vectors {i} and {j} too similar: {sim}");
             }
         }
     }
@@ -888,14 +879,8 @@ mod tests {
         // Verify the GLYPH_DATA array has correct class distribution
         use super::super::glyph_registry_data::GLYPH_DATA;
         let meta_count = GLYPH_DATA.iter().filter(|g| g.class == "Meta").count();
-        let threshold_count = GLYPH_DATA
-            .iter()
-            .filter(|g| g.class == "Threshold")
-            .count();
-        let spiral_count = GLYPH_DATA
-            .iter()
-            .filter(|g| g.class == "Spiral")
-            .count();
+        let threshold_count = GLYPH_DATA.iter().filter(|g| g.class == "Threshold").count();
+        let spiral_count = GLYPH_DATA.iter().filter(|g| g.class == "Spiral").count();
 
         assert_eq!(meta_count, 4, "Expected 4 Meta entries in GLYPH_DATA");
         assert_eq!(
@@ -903,7 +888,11 @@ mod tests {
             "Expected 9 Threshold entries in GLYPH_DATA"
         );
         assert_eq!(spiral_count, 57, "Expected 57 Spiral entries in GLYPH_DATA");
-        assert_eq!(GLYPH_DATA.len(), 70, "GLYPH_DATA must have exactly 70 entries");
+        assert_eq!(
+            GLYPH_DATA.len(),
+            70,
+            "GLYPH_DATA must have exactly 70 entries"
+        );
     }
 
     #[test]
@@ -914,12 +903,12 @@ mod tests {
         // Encoding similar words to "Ethical Emergence" should find it or a close match
         let hv = encoder.encode("ethical emergence responsibility coherence birth");
         let (entry, sim) = registry.nearest(&hv).expect("Registry should find a match");
-        assert!(sim > 0.0, "Nearest similarity should be positive, got {sim}");
-        // The match should be from the Igniting or Integrated class
         assert!(
-            !entry.name.is_empty(),
-            "Nearest glyph should have a name"
+            sim > 0.0,
+            "Nearest similarity should be positive, got {sim}"
         );
+        // The match should be from the Igniting or Integrated class
+        assert!(!entry.name.is_empty(), "Nearest glyph should have a name");
     }
 
     #[test]

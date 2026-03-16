@@ -117,10 +117,7 @@ impl CausalChainBenchmark {
             return (1.0, 0);
         }
 
-        let meaningful = results
-            .iter()
-            .filter(|r| r.similarity > 0.55)
-            .count();
+        let meaningful = results.iter().filter(|r| r.similarity > 0.55).count();
         let coherence = meaningful as f64 / results.len() as f64;
 
         let mut steps_before_collapse = results.len();
@@ -324,9 +321,7 @@ mod tests {
                 Ok(results) => {
                     let mut current = start_hv.clone();
                     for (i, r) in results.iter().enumerate() {
-                        let comp_hv = algebra
-                            .get_encoding(case.removals[i], &system)
-                            .unwrap();
+                        let comp_hv = algebra.get_encoding(case.removals[i], &system).unwrap();
                         current = current.bind(&comp_hv);
                         let sim_start = current.similarity(&start_hv);
                         eprintln!(

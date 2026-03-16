@@ -2243,11 +2243,17 @@ mod tests {
         //   is_ahimsa && !self.restoration_tracker.is_restored(name)
         // So a restored violation no longer blocks courage override.
         let would_block = !tracker.is_restored("ahimsa_nonviolence");
-        assert!(!would_block, "Restored ahimsa violation should not block courage");
+        assert!(
+            !would_block,
+            "Restored ahimsa violation should not block courage"
+        );
 
         // Phase 5: But an unrestored different violation still blocks
         tracker.record_violation("prevent_suffering", 200);
         let suffering_blocks = !tracker.is_restored("prevent_suffering");
-        assert!(suffering_blocks, "Unrestored suffering violation should still block");
+        assert!(
+            suffering_blocks,
+            "Unrestored suffering violation should still block"
+        );
     }
 }

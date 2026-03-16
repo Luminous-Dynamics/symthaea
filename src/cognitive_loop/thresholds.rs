@@ -3022,6 +3022,36 @@ pub const KNOWLEDGE_EPISODIC_MAX_PER_DREAM: usize = 5;
 /// Minimum similarity for AGM-style contradiction resolution (demote weaker fact).
 pub const KNOWLEDGE_CONTRADICTION_RESOLUTION_THRESHOLD: f32 = 0.8;
 
+/// Blend weight for knowledge grounding in epistemic quality computation.
+/// Knowledge grounding contributes this fraction to effective_epistemic in ConsciousnessEquationV2.
+/// Science: Mercier & Sperber (2017) — argumentative theory of reasoning; grounded knowledge
+/// strengthens epistemic claims by anchoring them in verified factual content.
+pub const KNOWLEDGE_GROUNDING_EPISTEMIC_BLEND: f64 = 0.3;
+
+/// Dream consolidation weight boost when knowledge contradictions are active.
+/// Contradictions signal unresolved cognitive dissonance requiring offline integration.
+/// Science: Festinger (1957) — cognitive dissonance drives memory consolidation to resolve conflict.
+pub const DREAM_KNOWLEDGE_CONTRADICTION_BOOST: f64 = 0.2;
+
+/// Dream consolidation weight boost when causal chain depth exceeds threshold.
+/// Deep causal reasoning chains are structurally important and worth preserving.
+/// Science: Hobson & Friston (2012) — active inference in dreams consolidates causal models.
+pub const DREAM_KNOWLEDGE_CAUSAL_DEPTH_BOOST: f64 = 0.1;
+
+/// Minimum causal depth to trigger dream consolidation boost.
+/// Chains shorter than this are too shallow to warrant preferential consolidation.
+/// Science: Hobson & Friston (2012) — only multi-step causal chains benefit from dream replay.
+pub const DREAM_KNOWLEDGE_CAUSAL_DEPTH_THRESHOLD: f64 = 3.0;
+
+/// Attention boost when knowledge contradictions exceed salience threshold.
+/// Contradictions signal prediction errors requiring focused examination.
+/// Science: Clark (2013) — predictive processing allocates attention to prediction error sources.
+pub const KNOWLEDGE_ATTENTION_CONTRADICTION_BOOST: f64 = 0.3;
+
+/// Minimum contradiction signal to trigger attention reallocation.
+/// Below this threshold, contradictions are not salient enough to warrant focused attention.
+pub const KNOWLEDGE_ATTENTION_CONTRADICTION_THRESHOLD: f64 = 0.5;
+
 /// Minimum causal edge strength to flag as a confounding variable.
 /// Science: Confounders with weak links are noise; strong links warrant attention (Pearl 2009).
 pub const KNOWLEDGE_CONFOUNDER_STRENGTH_THRESHOLD: f32 = 0.3;
@@ -3734,6 +3764,29 @@ pub const SPECTRAL_PAC_THRESHOLD: f32 = 0.3;
 
 /// Confidence boost when theta-gamma PAC exceeds threshold.
 pub const SPECTRAL_PAC_CONFIDENCE_BOOST: f32 = 0.015;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// REASONING ENGINE → CONSCIOUSNESS FEEDBACK
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Max confidence boost from reasoning engine reliability (per cycle, additive).
+/// At reliability=1.0: (1.0 - 0.5) × 0.03 = +1.5% confidence.
+/// Science: Stanovich & West (2000) — System 2 (analytic) reliability
+/// calibrates metacognitive confidence in dual-process theory.
+pub const REASONING_RELIABILITY_CONFIDENCE_SCALE: f64 = 0.03;
+
+/// Minimum reasoning reliability for confidence boost.
+/// Below this, reasoning output is too uncertain to inform confidence.
+/// Science: Stanovich & West (2000) — System 2 must exceed threshold
+/// reliability before overriding System 1 intuitions.
+pub const REASONING_RELIABILITY_THRESHOLD: f64 = 0.7;
+
+/// Dream consolidation weight boost from high-reliability prediction failures.
+/// Surprising events that contradicted confident reasoning get more dream time.
+/// At reliability=1.0: (1.0 - 0.5) × 0.4 = +20% consolidation weight.
+/// Science: Hobson & Friston (2012) — predictive processing theory of dreaming;
+/// high-confidence prediction errors are preferentially consolidated.
+pub const DREAM_REASONING_RELIABILITY_SCALE: f64 = 0.4;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TESTS
@@ -4629,7 +4682,9 @@ mod tests {
         assert!(HIGH_QUALITY_SCORE_THRESHOLD > 0.5 && HIGH_QUALITY_SCORE_THRESHOLD < 1.0);
         assert!(CONSECUTIVE_HIGH_QUALITY_CYCLES >= 5 && CONSECUTIVE_HIGH_QUALITY_CYCLES <= 50);
         assert!(QUALITY_FLOOR_EXPLORATION_BOOST > 0.0 && QUALITY_FLOOR_EXPLORATION_BOOST < 0.1);
-        assert!(TEMPORAL_BINDING_HIGH_EXPLORE_SCALE > 0.9 && TEMPORAL_BINDING_HIGH_EXPLORE_SCALE < 1.1);
+        assert!(
+            TEMPORAL_BINDING_HIGH_EXPLORE_SCALE > 0.9 && TEMPORAL_BINDING_HIGH_EXPLORE_SCALE < 1.1
+        );
         assert!(GRADIENT_STABLE_DETECT_THRESHOLD > 0.0 && GRADIENT_STABLE_DETECT_THRESHOLD < 0.1);
         assert!(READINESS_REST_THRESHOLD > 0.8 && READINESS_REST_THRESHOLD < 1.0);
         assert!(READINESS_DEGRADED_THRESHOLD > 0.3 && READINESS_DEGRADED_THRESHOLD < 1.0);
@@ -4638,7 +4693,9 @@ mod tests {
         assert!(FATIGUE_RECOVERED_THRESHOLD > 0.0 && FATIGUE_RECOVERED_THRESHOLD < 0.3);
         assert!(GRADIENT_PREDICTION_OK_THRESHOLD > 0.0 && GRADIENT_PREDICTION_OK_THRESHOLD < 0.5);
         // Dynamics phase
-        assert!(RESONATOR_SUSTAINED_LOW_CONFIDENCE > 0.0 && RESONATOR_SUSTAINED_LOW_CONFIDENCE < 0.05);
+        assert!(
+            RESONATOR_SUSTAINED_LOW_CONFIDENCE > 0.0 && RESONATOR_SUSTAINED_LOW_CONFIDENCE < 0.05
+        );
         assert!(BROCA_COHERENT_THRESHOLD > 0.5 && BROCA_COHERENT_THRESHOLD < 1.0);
         assert!(BROCA_COHERENT_CONFIDENCE_SCALE > 0.0 && BROCA_COHERENT_CONFIDENCE_SCALE < 0.5);
         assert!(FEP_ACCURACY_HIGH_CONFIDENCE > 0.0 && FEP_ACCURACY_HIGH_CONFIDENCE < 0.05);
@@ -4651,11 +4708,21 @@ mod tests {
         assert!(ESCALATION_BLOCK_LR_SCALE > 0.0 && ESCALATION_BLOCK_LR_SCALE < 1.0);
         assert!(ESCALATION_THROTTLE_EXPLORATION > 0.0 && ESCALATION_THROTTLE_EXPLORATION < 0.5);
         // Cross-session constants
-        assert!(ALLOSTATIC_LOAD_DAMPEN_INCREMENT_SCALE > 0.0 && ALLOSTATIC_LOAD_DAMPEN_INCREMENT_SCALE < 1.0);
-        assert!(METACOGNITIVE_PREDICTION_EMA_DECAY > 0.5 && METACOGNITIVE_PREDICTION_EMA_DECAY < 1.0);
-        assert!(LIMITING_COMPONENT_ATTENTION_SCALE > 0.0 && LIMITING_COMPONENT_ATTENTION_SCALE < 2.0);
+        assert!(
+            ALLOSTATIC_LOAD_DAMPEN_INCREMENT_SCALE > 0.0
+                && ALLOSTATIC_LOAD_DAMPEN_INCREMENT_SCALE < 1.0
+        );
+        assert!(
+            METACOGNITIVE_PREDICTION_EMA_DECAY > 0.5 && METACOGNITIVE_PREDICTION_EMA_DECAY < 1.0
+        );
+        assert!(
+            LIMITING_COMPONENT_ATTENTION_SCALE > 0.0 && LIMITING_COMPONENT_ATTENTION_SCALE < 2.0
+        );
         assert!(METACOGNITION_DEPTH_NORMALIZER > 1.0 && METACOGNITION_DEPTH_NORMALIZER < 10.0);
-        assert!(KNOWLEDGE_CAUSAL_DEPTH_EXPLOIT_THRESHOLD > 0.0 && KNOWLEDGE_CAUSAL_DEPTH_EXPLOIT_THRESHOLD < 10.0);
+        assert!(
+            KNOWLEDGE_CAUSAL_DEPTH_EXPLOIT_THRESHOLD > 0.0
+                && KNOWLEDGE_CAUSAL_DEPTH_EXPLOIT_THRESHOLD < 10.0
+        );
     }
 
     #[test]
@@ -4666,38 +4733,80 @@ mod tests {
         assert!(HIER_LTC_PHI_CONVERGE_BOOST > 0.0 && HIER_LTC_PHI_CONVERGE_BOOST < 0.2);
         assert!(HIER_LTC_PHI_DIVERGE_THRESHOLD > HIER_LTC_PHI_CONVERGE_THRESHOLD); // diverge > converge
         assert!(HIER_LTC_PHI_DIVERGE_MAX > 0.0 && HIER_LTC_PHI_DIVERGE_MAX < 1.0);
-        assert!(HIER_LTC_PHI_DIVERGE_PENALTY_SCALE > 0.0 && HIER_LTC_PHI_DIVERGE_PENALTY_SCALE < 0.1);
+        assert!(
+            HIER_LTC_PHI_DIVERGE_PENALTY_SCALE > 0.0 && HIER_LTC_PHI_DIVERGE_PENALTY_SCALE < 0.1
+        );
 
         // Evolution coordinator
-        assert!(EVOLUTION_POSITIVE_DELTA_THRESHOLD > 0.0 && EVOLUTION_POSITIVE_DELTA_THRESHOLD < 0.1);
+        assert!(
+            EVOLUTION_POSITIVE_DELTA_THRESHOLD > 0.0 && EVOLUTION_POSITIVE_DELTA_THRESHOLD < 0.1
+        );
         assert!(EVOLUTION_POSITIVE_LR_SCALE > 0.0 && EVOLUTION_POSITIVE_LR_SCALE < 1.0);
-        assert!(EVOLUTION_POSITIVE_LR_CLAMP > 0.0 && EVOLUTION_POSITIVE_LR_CLAMP <= EVOLUTION_POSITIVE_LR_SCALE);
+        assert!(
+            EVOLUTION_POSITIVE_LR_CLAMP > 0.0
+                && EVOLUTION_POSITIVE_LR_CLAMP <= EVOLUTION_POSITIVE_LR_SCALE
+        );
         assert!(EVOLUTION_POSITIVE_CONF_SCALE > 0.0 && EVOLUTION_POSITIVE_CONF_SCALE < 0.5);
-        assert!(EVOLUTION_POSITIVE_CONF_CLAMP > 0.0 && EVOLUTION_POSITIVE_CONF_CLAMP <= EVOLUTION_POSITIVE_CONF_SCALE);
-        assert!(EVOLUTION_NEGATIVE_DELTA_THRESHOLD < 0.0 && EVOLUTION_NEGATIVE_DELTA_THRESHOLD > -0.1);
+        assert!(
+            EVOLUTION_POSITIVE_CONF_CLAMP > 0.0
+                && EVOLUTION_POSITIVE_CONF_CLAMP <= EVOLUTION_POSITIVE_CONF_SCALE
+        );
+        assert!(
+            EVOLUTION_NEGATIVE_DELTA_THRESHOLD < 0.0 && EVOLUTION_NEGATIVE_DELTA_THRESHOLD > -0.1
+        );
         assert!(EVOLUTION_NEGATIVE_EXPLORE_SCALE > 0.0 && EVOLUTION_NEGATIVE_EXPLORE_SCALE < 0.5);
-        assert!(EVOLUTION_NEGATIVE_EXPLORE_CLAMP > 0.0 && EVOLUTION_NEGATIVE_EXPLORE_CLAMP <= EVOLUTION_NEGATIVE_EXPLORE_SCALE);
+        assert!(
+            EVOLUTION_NEGATIVE_EXPLORE_CLAMP > 0.0
+                && EVOLUTION_NEGATIVE_EXPLORE_CLAMP <= EVOLUTION_NEGATIVE_EXPLORE_SCALE
+        );
 
         // Holographic
-        assert!(HOLOGRAPHIC_UNITY_CONFIDENCE_THRESHOLD > 0.3 && HOLOGRAPHIC_UNITY_CONFIDENCE_THRESHOLD < 1.0);
-        assert!(HOLOGRAPHIC_UNITY_CONFIDENCE_SCALE > 0.0 && HOLOGRAPHIC_UNITY_CONFIDENCE_SCALE < 0.2);
-        assert!(HOLOGRAPHIC_BINDING_STRONG_THRESHOLD > 0.3 && HOLOGRAPHIC_BINDING_STRONG_THRESHOLD < 1.0);
+        assert!(
+            HOLOGRAPHIC_UNITY_CONFIDENCE_THRESHOLD > 0.3
+                && HOLOGRAPHIC_UNITY_CONFIDENCE_THRESHOLD < 1.0
+        );
+        assert!(
+            HOLOGRAPHIC_UNITY_CONFIDENCE_SCALE > 0.0 && HOLOGRAPHIC_UNITY_CONFIDENCE_SCALE < 0.2
+        );
+        assert!(
+            HOLOGRAPHIC_BINDING_STRONG_THRESHOLD > 0.3
+                && HOLOGRAPHIC_BINDING_STRONG_THRESHOLD < 1.0
+        );
         assert!(HOLOGRAPHIC_BINDING_STRONG_LR > 1.0 && HOLOGRAPHIC_BINDING_STRONG_LR < 1.1);
-        assert!(HOLOGRAPHIC_BINDING_WEAK_UPPER > 0.0 && HOLOGRAPHIC_BINDING_WEAK_UPPER < HOLOGRAPHIC_BINDING_STRONG_THRESHOLD);
+        assert!(
+            HOLOGRAPHIC_BINDING_WEAK_UPPER > 0.0
+                && HOLOGRAPHIC_BINDING_WEAK_UPPER < HOLOGRAPHIC_BINDING_STRONG_THRESHOLD
+        );
         assert!(HOLOGRAPHIC_BINDING_WEAK_LR > 0.9 && HOLOGRAPHIC_BINDING_WEAK_LR < 1.0);
 
         // Differentiable consciousness
-        assert!(DIFF_CONSCIOUSNESS_WORKSPACE_SCALE > 0.5 && DIFF_CONSCIOUSNESS_WORKSPACE_SCALE < 1.0);
-        assert!(DIFF_CONSCIOUSNESS_RECURSION_DEFAULT > 0.0 && DIFF_CONSCIOUSNESS_RECURSION_DEFAULT < 1.0);
+        assert!(
+            DIFF_CONSCIOUSNESS_WORKSPACE_SCALE > 0.5 && DIFF_CONSCIOUSNESS_WORKSPACE_SCALE < 1.0
+        );
+        assert!(
+            DIFF_CONSCIOUSNESS_RECURSION_DEFAULT > 0.0
+                && DIFF_CONSCIOUSNESS_RECURSION_DEFAULT < 1.0
+        );
 
         // Consciousness gradient
-        assert!(CONSCIOUSNESS_GRADIENT_EXPLORE_THRESHOLD > 0.0 && CONSCIOUSNESS_GRADIENT_EXPLORE_THRESHOLD < 1.0);
-        assert!(CONSCIOUSNESS_GRADIENT_EXPLORE_SCALE > 0.0 && CONSCIOUSNESS_GRADIENT_EXPLORE_SCALE < 0.2);
+        assert!(
+            CONSCIOUSNESS_GRADIENT_EXPLORE_THRESHOLD > 0.0
+                && CONSCIOUSNESS_GRADIENT_EXPLORE_THRESHOLD < 1.0
+        );
+        assert!(
+            CONSCIOUSNESS_GRADIENT_EXPLORE_SCALE > 0.0
+                && CONSCIOUSNESS_GRADIENT_EXPLORE_SCALE < 0.2
+        );
 
         // Affective consciousness
         assert!(AFFECTIVE_DECAY_RATE > 0.0 && AFFECTIVE_DECAY_RATE < 0.2);
-        assert!(AFFECTIVE_NEGATIVE_VALENCE_THRESHOLD < 0.0 && AFFECTIVE_NEGATIVE_VALENCE_THRESHOLD > -1.0);
-        assert!(AFFECTIVE_NEGATIVE_CONFIDENCE_SCALE > 0.0 && AFFECTIVE_NEGATIVE_CONFIDENCE_SCALE < 0.1);
+        assert!(
+            AFFECTIVE_NEGATIVE_VALENCE_THRESHOLD < 0.0
+                && AFFECTIVE_NEGATIVE_VALENCE_THRESHOLD > -1.0
+        );
+        assert!(
+            AFFECTIVE_NEGATIVE_CONFIDENCE_SCALE > 0.0 && AFFECTIVE_NEGATIVE_CONFIDENCE_SCALE < 0.1
+        );
 
         // Synthetic grounding + epistemic gate
         assert!(SYNTHETIC_GROUNDING_SIM_THRESHOLD > 0.0 && SYNTHETIC_GROUNDING_SIM_THRESHOLD < 0.5);
@@ -4706,31 +4815,54 @@ mod tests {
 
         // Primitive validation
         assert!(PRIMITIVE_VALIDATION_P_THRESHOLD > 0.0 && PRIMITIVE_VALIDATION_P_THRESHOLD < 0.1);
-        assert!(PRIMITIVE_VALIDATION_POSITIVE_LR_SCALE > 0.0 && PRIMITIVE_VALIDATION_POSITIVE_LR_SCALE < 0.1);
+        assert!(
+            PRIMITIVE_VALIDATION_POSITIVE_LR_SCALE > 0.0
+                && PRIMITIVE_VALIDATION_POSITIVE_LR_SCALE < 0.1
+        );
         assert!(PRIMITIVE_VALIDATION_POSITIVE_LR_CLAMP >= PRIMITIVE_VALIDATION_POSITIVE_LR_SCALE);
         assert!(PRIMITIVE_VALIDATION_NEGATIVE_LR > 0.9 && PRIMITIVE_VALIDATION_NEGATIVE_LR < 1.0);
 
         // Cross-module feedback
         assert!(CONSCIOUSNESS_STATE_LOW_URGENCY > 0.0 && CONSCIOUSNESS_STATE_LOW_URGENCY < 0.5);
-        assert!(GRADIENT_STRONG_DIRECTION_THRESHOLD > 0.5 && GRADIENT_STRONG_DIRECTION_THRESHOLD < 2.0);
+        assert!(
+            GRADIENT_STRONG_DIRECTION_THRESHOLD > 0.5 && GRADIENT_STRONG_DIRECTION_THRESHOLD < 2.0
+        );
         assert!(GRADIENT_STRONG_BOREDOM_REDUCE > 0.0 && GRADIENT_STRONG_BOREDOM_REDUCE < 0.2);
-        assert!(GRADIENT_PLATEAU_UPPER > 0.0 && GRADIENT_PLATEAU_UPPER < GRADIENT_STRONG_DIRECTION_THRESHOLD);
-        assert!(GRADIENT_PLATEAU_BOREDOM_INCREMENT > 0.0 && GRADIENT_PLATEAU_BOREDOM_INCREMENT < 0.1);
+        assert!(
+            GRADIENT_PLATEAU_UPPER > 0.0
+                && GRADIENT_PLATEAU_UPPER < GRADIENT_STRONG_DIRECTION_THRESHOLD
+        );
+        assert!(
+            GRADIENT_PLATEAU_BOREDOM_INCREMENT > 0.0 && GRADIENT_PLATEAU_BOREDOM_INCREMENT < 0.1
+        );
 
         // Holographic unity LR modulation
         assert!(HOLOGRAPHIC_UNITY_LR_BOOST_THRESHOLD > HOLOGRAPHIC_UNITY_CONFIDENCE_THRESHOLD);
         assert!(HOLOGRAPHIC_UNITY_LR_BOOST_FACTOR > 1.0 && HOLOGRAPHIC_UNITY_LR_BOOST_FACTOR < 1.1);
         assert!(HOLOGRAPHIC_UNITY_LR_CLAMP_LOW > 0.5 && HOLOGRAPHIC_UNITY_LR_CLAMP_LOW < 1.0);
         assert!(HOLOGRAPHIC_UNITY_LR_CLAMP_HIGH > 1.0 && HOLOGRAPHIC_UNITY_LR_CLAMP_HIGH < 2.0);
-        assert!(HOLOGRAPHIC_UNITY_LR_DAMPEN_THRESHOLD > 0.0 && HOLOGRAPHIC_UNITY_LR_DAMPEN_THRESHOLD < 0.5);
-        assert!(HOLOGRAPHIC_UNITY_LR_DAMPEN_FACTOR > 0.9 && HOLOGRAPHIC_UNITY_LR_DAMPEN_FACTOR < 1.0);
+        assert!(
+            HOLOGRAPHIC_UNITY_LR_DAMPEN_THRESHOLD > 0.0
+                && HOLOGRAPHIC_UNITY_LR_DAMPEN_THRESHOLD < 0.5
+        );
+        assert!(
+            HOLOGRAPHIC_UNITY_LR_DAMPEN_FACTOR > 0.9 && HOLOGRAPHIC_UNITY_LR_DAMPEN_FACTOR < 1.0
+        );
 
         // Pipeline consciousness
-        assert!(PIPELINE_CONSCIOUSNESS_EPISTEMIC_THRESHOLD > 0.5 && PIPELINE_CONSCIOUSNESS_EPISTEMIC_THRESHOLD < 1.0);
-        assert!(PIPELINE_CONSCIOUSNESS_EPISTEMIC_NUDGE > 0.0 && PIPELINE_CONSCIOUSNESS_EPISTEMIC_NUDGE < 0.1);
+        assert!(
+            PIPELINE_CONSCIOUSNESS_EPISTEMIC_THRESHOLD > 0.5
+                && PIPELINE_CONSCIOUSNESS_EPISTEMIC_THRESHOLD < 1.0
+        );
+        assert!(
+            PIPELINE_CONSCIOUSNESS_EPISTEMIC_NUDGE > 0.0
+                && PIPELINE_CONSCIOUSNESS_EPISTEMIC_NUDGE < 0.1
+        );
 
         // Meta-reasoning
-        assert!(META_REASONING_CONFIDENCE_THRESHOLD > 0.5 && META_REASONING_CONFIDENCE_THRESHOLD < 1.0);
+        assert!(
+            META_REASONING_CONFIDENCE_THRESHOLD > 0.5 && META_REASONING_CONFIDENCE_THRESHOLD < 1.0
+        );
         assert!(META_REASONING_LR_BOOST_SCALE > 0.0 && META_REASONING_LR_BOOST_SCALE < 0.5);
 
         // Empathic compassion
@@ -4743,9 +4875,16 @@ mod tests {
     #[test]
     fn test_hotpath_remaining_constants() {
         // Knowledge grounding weights sum to 1.0
-        let weight_sum = KNOWLEDGE_GROUNDING_RELEVANCE_WEIGHT + KNOWLEDGE_GROUNDING_CERTAINTY_WEIGHT;
-        assert!((weight_sum - 1.0).abs() < 1e-6, "Grounding weights must sum to 1.0");
-        assert!(KNOWLEDGE_GROUNDING_RELEVANCE_WEIGHT > 0.0 && KNOWLEDGE_GROUNDING_RELEVANCE_WEIGHT < 1.0);
+        let weight_sum =
+            KNOWLEDGE_GROUNDING_RELEVANCE_WEIGHT + KNOWLEDGE_GROUNDING_CERTAINTY_WEIGHT;
+        assert!(
+            (weight_sum - 1.0).abs() < 1e-6,
+            "Grounding weights must sum to 1.0"
+        );
+        assert!(
+            KNOWLEDGE_GROUNDING_RELEVANCE_WEIGHT > 0.0
+                && KNOWLEDGE_GROUNDING_RELEVANCE_WEIGHT < 1.0
+        );
 
         // Phi scale boost sigmoid
         assert!(PHI_SCALE_BOOST_MAX_AMPLITUDE > 0.0 && PHI_SCALE_BOOST_MAX_AMPLITUDE < 0.5);
@@ -4753,8 +4892,14 @@ mod tests {
         assert!(PHI_SCALE_BOOST_CV_CENTER > 0.0);
 
         // Resonator consolidation
-        assert!(RESONATOR_CONSOLIDATION_PRECISION_SCALE > 0.0 && RESONATOR_CONSOLIDATION_PRECISION_SCALE < 0.5);
-        assert!(RESONATOR_CONSOLIDATION_PRECISION_MAX > 1.0 && RESONATOR_CONSOLIDATION_PRECISION_MAX < 5.0);
+        assert!(
+            RESONATOR_CONSOLIDATION_PRECISION_SCALE > 0.0
+                && RESONATOR_CONSOLIDATION_PRECISION_SCALE < 0.5
+        );
+        assert!(
+            RESONATOR_CONSOLIDATION_PRECISION_MAX > 1.0
+                && RESONATOR_CONSOLIDATION_PRECISION_MAX < 5.0
+        );
 
         // Goal LR
         assert!(GOAL_PRIORITY_LR_SCALE > 0.0 && GOAL_PRIORITY_LR_SCALE < 0.5);
@@ -4762,7 +4907,9 @@ mod tests {
         // Confidence crash
         assert!(CONFIDENCE_CRASH_MIN_PRIOR > 0.0 && CONFIDENCE_CRASH_MIN_PRIOR < 0.5);
         assert!(MODE_STABILITY_GRACE_THRESHOLD >= 1 && MODE_STABILITY_GRACE_THRESHOLD <= 10);
-        assert!(CONFIDENCE_CRASH_LIGHT_FREEZE_CYCLES >= 1 && CONFIDENCE_CRASH_LIGHT_FREEZE_CYCLES <= 5);
+        assert!(
+            CONFIDENCE_CRASH_LIGHT_FREEZE_CYCLES >= 1 && CONFIDENCE_CRASH_LIGHT_FREEZE_CYCLES <= 5
+        );
 
         // Social trust
         assert!(SOCIAL_TRUST_ITHOU_THRESHOLD > 0.0 && SOCIAL_TRUST_ITHOU_THRESHOLD < 1.0);
@@ -4774,11 +4921,17 @@ mod tests {
 
         // MCTS normalization
         let norm_sum = MCTS_EFFECTIVENESS_NORM_SCALE + MCTS_EFFECTIVENESS_NORM_OFFSET;
-        assert!((norm_sum - 1.0).abs() < 1e-6, "MCTS norm scale+offset should map max to 1.0");
+        assert!(
+            (norm_sum - 1.0).abs() < 1e-6,
+            "MCTS norm scale+offset should map max to 1.0"
+        );
 
         // Voice heartbeat
         assert!(VOICE_HEARTBEAT_BASE_RATE > 1.0 && VOICE_HEARTBEAT_BASE_RATE < 10.0);
-        assert!(VOICE_HEARTBEAT_COARTICULATION_WEIGHT > 0.0 && VOICE_HEARTBEAT_COARTICULATION_WEIGHT < 1.0);
+        assert!(
+            VOICE_HEARTBEAT_COARTICULATION_WEIGHT > 0.0
+                && VOICE_HEARTBEAT_COARTICULATION_WEIGHT < 1.0
+        );
         assert!(VOICE_HEARTBEAT_LISTENER_SUCCESS > VOICE_HEARTBEAT_LISTENER_FAIL);
     }
 
@@ -4787,13 +4940,21 @@ mod tests {
         // Persistence
         assert!(KNOWLEDGE_SAVE_INTERVAL >= 100 && KNOWLEDGE_SAVE_INTERVAL <= 5000);
         // Consciousness coupling
-        assert!(KNOWLEDGE_CONSCIOUSNESS_MODULATION > 0.0 && KNOWLEDGE_CONSCIOUSNESS_MODULATION < 0.1);
+        assert!(
+            KNOWLEDGE_CONSCIOUSNESS_MODULATION > 0.0 && KNOWLEDGE_CONSCIOUSNESS_MODULATION < 0.1
+        );
         // Dream consolidation
-        assert!(KNOWLEDGE_FORGET_CONFIDENCE_THRESHOLD > 0.0 && KNOWLEDGE_FORGET_CONFIDENCE_THRESHOLD < 0.5);
+        assert!(
+            KNOWLEDGE_FORGET_CONFIDENCE_THRESHOLD > 0.0
+                && KNOWLEDGE_FORGET_CONFIDENCE_THRESHOLD < 0.5
+        );
         assert!(KNOWLEDGE_CONSOLIDATION_BOOST > 0.0 && KNOWLEDGE_CONSOLIDATION_BOOST < 0.2);
         // Causal depth exploitation
         assert!(KNOWLEDGE_CAUSAL_DEPTH_EXPLOIT_THRESHOLD > 0.0);
-        assert!(KNOWLEDGE_CAUSAL_DEPTH_EXPLORE_DAMPEN > 0.0 && KNOWLEDGE_CAUSAL_DEPTH_EXPLORE_DAMPEN < 0.5);
+        assert!(
+            KNOWLEDGE_CAUSAL_DEPTH_EXPLORE_DAMPEN > 0.0
+                && KNOWLEDGE_CAUSAL_DEPTH_EXPLORE_DAMPEN < 0.5
+        );
         // Contradiction boosts
         assert!(KNOWLEDGE_CONTRADICTION_NE_BOOST > 0.0 && KNOWLEDGE_CONTRADICTION_NE_BOOST < 0.1);
         assert!(KNOWLEDGE_CONTRADICTION_SHT_BOOST > 0.0 && KNOWLEDGE_CONTRADICTION_SHT_BOOST < 0.1);
@@ -4807,7 +4968,36 @@ mod tests {
         assert!(KNOWLEDGE_EPISODIC_SALIENCE_BOOST > 0.0 && KNOWLEDGE_EPISODIC_SALIENCE_BOOST < 1.0);
         assert!(KNOWLEDGE_EPISODIC_MAX_PER_DREAM > 0 && KNOWLEDGE_EPISODIC_MAX_PER_DREAM <= 20);
         // AGM contradiction resolution
-        assert!(KNOWLEDGE_CONTRADICTION_RESOLUTION_THRESHOLD > 0.5 && KNOWLEDGE_CONTRADICTION_RESOLUTION_THRESHOLD <= 1.0);
+        assert!(
+            KNOWLEDGE_CONTRADICTION_RESOLUTION_THRESHOLD > 0.5
+                && KNOWLEDGE_CONTRADICTION_RESOLUTION_THRESHOLD <= 1.0
+        );
+        // Knowledge grounding epistemic blend
+        assert!(
+            KNOWLEDGE_GROUNDING_EPISTEMIC_BLEND > 0.0 && KNOWLEDGE_GROUNDING_EPISTEMIC_BLEND < 1.0
+        );
+        // Dream knowledge boosts
+        assert!(
+            DREAM_KNOWLEDGE_CONTRADICTION_BOOST > 0.0 && DREAM_KNOWLEDGE_CONTRADICTION_BOOST < 0.5
+        );
+        assert!(
+            DREAM_KNOWLEDGE_CAUSAL_DEPTH_BOOST > 0.0 && DREAM_KNOWLEDGE_CAUSAL_DEPTH_BOOST < 0.5
+        );
+        assert!(
+            DREAM_KNOWLEDGE_CAUSAL_DEPTH_THRESHOLD > 0.0
+                && DREAM_KNOWLEDGE_CAUSAL_DEPTH_THRESHOLD < 10.0
+        );
+        // Contradiction boost < contradiction boost (dreams more aggressive than attention)
+        assert!(DREAM_KNOWLEDGE_CAUSAL_DEPTH_BOOST < DREAM_KNOWLEDGE_CONTRADICTION_BOOST);
+        // Knowledge attention contradiction
+        assert!(
+            KNOWLEDGE_ATTENTION_CONTRADICTION_BOOST > 0.0
+                && KNOWLEDGE_ATTENTION_CONTRADICTION_BOOST < 1.0
+        );
+        assert!(
+            KNOWLEDGE_ATTENTION_CONTRADICTION_THRESHOLD > 0.0
+                && KNOWLEDGE_ATTENTION_CONTRADICTION_THRESHOLD < 1.0
+        );
     }
 
     #[test]
@@ -4828,27 +5018,42 @@ mod tests {
         // Bandwidth throttle
         assert!(RADIO_BANDWIDTH_THROTTLE_THRESHOLD > 0);
         // Connectivity penalties
-        assert!(RADIO_CONNECTIVITY_PENALTY_LOCAL_DOWN > 0.0 && RADIO_CONNECTIVITY_PENALTY_LOCAL_DOWN < 1.0);
-        assert!(RADIO_CONNECTIVITY_PENALTY_METRO_ONLY > 0.0 && RADIO_CONNECTIVITY_PENALTY_METRO_ONLY < RADIO_CONNECTIVITY_PENALTY_LOCAL_DOWN);
+        assert!(
+            RADIO_CONNECTIVITY_PENALTY_LOCAL_DOWN > 0.0
+                && RADIO_CONNECTIVITY_PENALTY_LOCAL_DOWN < 1.0
+        );
+        assert!(
+            RADIO_CONNECTIVITY_PENALTY_METRO_ONLY > 0.0
+                && RADIO_CONNECTIVITY_PENALTY_METRO_ONLY < RADIO_CONNECTIVITY_PENALTY_LOCAL_DOWN
+        );
         // Noise floor and PE
         assert!(RADIO_DEFAULT_NOISE_FLOOR_DBM < 0.0);
         assert!(RADIO_NOISE_ERROR_NORMALIZER > 0.0);
         assert!(RADIO_BLACKOUT_EXPLORATION_BOOST > 0.0 && RADIO_BLACKOUT_EXPLORATION_BOOST < 0.2);
         assert!(RADIO_LOSS_LR_DAMPEN_FACTOR > 0.0 && RADIO_LOSS_LR_DAMPEN_FACTOR < 1.0);
         assert!(RADIO_LOSS_LR_DAMPEN_MAX > 0.0 && RADIO_LOSS_LR_DAMPEN_MAX < 1.0);
-        assert!(RADIO_SPECTRUM_PE_SURPRISE_THRESHOLD > 0.0 && RADIO_SPECTRUM_PE_SURPRISE_THRESHOLD < 1.0);
+        assert!(
+            RADIO_SPECTRUM_PE_SURPRISE_THRESHOLD > 0.0
+                && RADIO_SPECTRUM_PE_SURPRISE_THRESHOLD < 1.0
+        );
         assert!(RADIO_SPECTRUM_PE_AROUSAL_MAX > 0.0 && RADIO_SPECTRUM_PE_AROUSAL_MAX < 0.5);
-        assert!(RADIO_SPECTRUM_PE_AROUSAL_SCALE > 0.0 && RADIO_SPECTRUM_PE_AROUSAL_SCALE < RADIO_SPECTRUM_PE_AROUSAL_MAX);
+        assert!(
+            RADIO_SPECTRUM_PE_AROUSAL_SCALE > 0.0
+                && RADIO_SPECTRUM_PE_AROUSAL_SCALE < RADIO_SPECTRUM_PE_AROUSAL_MAX
+        );
         // Waterfall
         assert!(RADIO_WATERFALL_CAPACITY >= 16 && RADIO_WATERFALL_CAPACITY <= 256);
-        assert!(RADIO_WATERFALL_MIN_SAMPLES >= 4 && RADIO_WATERFALL_MIN_SAMPLES < RADIO_WATERFALL_CAPACITY);
+        assert!(
+            RADIO_WATERFALL_MIN_SAMPLES >= 4
+                && RADIO_WATERFALL_MIN_SAMPLES < RADIO_WATERFALL_CAPACITY
+        );
         // Frequency hopping
         assert!(RADIO_HOP_COOLDOWN_CYCLES > 0 && RADIO_HOP_COOLDOWN_CYCLES <= 20);
         assert!(RADIO_HOP_SNR_IMPROVEMENT_DB > 0.0 && RADIO_HOP_SNR_IMPROVEMENT_DB < 20.0);
         // Peer discovery
         assert!(RADIO_BEACON_INTERVAL_CYCLES > 0);
         assert!(RADIO_BEACON_SIZE <= 50); // Must fit Regional MTU
-        // Relay routing
+                                          // Relay routing
         assert!(RADIO_MAX_RELAY_HOPS > 0 && RADIO_MAX_RELAY_HOPS <= 8);
         assert!(RADIO_MAX_ROUTE_ENTRIES > 0 && RADIO_MAX_ROUTE_ENTRIES <= 512);
         assert!(RADIO_ROUTE_EXPIRY_CYCLES > 0);
@@ -4868,34 +5073,56 @@ mod tests {
         // Safety & hop thresholds
         assert!(RADIO_SAFETY_JAMMING_THRESHOLD > 0 && RADIO_SAFETY_JAMMING_THRESHOLD <= 10);
         assert!(RADIO_AUTO_HOP_NOISE_THRESHOLD > 0.0 && RADIO_AUTO_HOP_NOISE_THRESHOLD < 30.0);
-        assert!(RADIO_BEACON_PEER_CONFIDENCE_BOOST > 0.0 && RADIO_BEACON_PEER_CONFIDENCE_BOOST < 0.1);
+        assert!(
+            RADIO_BEACON_PEER_CONFIDENCE_BOOST > 0.0 && RADIO_BEACON_PEER_CONFIDENCE_BOOST < 0.1
+        );
 
         // Synthetic observation bounds
-        assert!(RADIO_SYNTHETIC_SNR_ISOLATED > 0.0 && RADIO_SYNTHETIC_SNR_ISOLATED < RADIO_SYNTHETIC_SNR_BASE);
+        assert!(
+            RADIO_SYNTHETIC_SNR_ISOLATED > 0.0
+                && RADIO_SYNTHETIC_SNR_ISOLATED < RADIO_SYNTHETIC_SNR_BASE
+        );
         assert!(RADIO_SYNTHETIC_SNR_BASE > 0.0);
         assert!(RADIO_SYNTHETIC_SNR_PEER_BONUS > 0.0 && RADIO_SYNTHETIC_SNR_PEER_BONUS < 5.0);
         assert!(RADIO_SYNTHETIC_SNR_PHI_BONUS > 0.0 && RADIO_SYNTHETIC_SNR_PHI_BONUS < 20.0);
         assert!(RADIO_SYNTHETIC_PEER_CAP > 0.0 && RADIO_SYNTHETIC_PEER_CAP <= 50.0);
         assert!(RADIO_SYNTHETIC_NOISE_FLOOR_BASE < 0.0);
-        assert!(RADIO_SYNTHETIC_NOISE_FLOOR_RANGE > 0.0 && RADIO_SYNTHETIC_NOISE_FLOOR_RANGE < 30.0);
+        assert!(
+            RADIO_SYNTHETIC_NOISE_FLOOR_RANGE > 0.0 && RADIO_SYNTHETIC_NOISE_FLOOR_RANGE < 30.0
+        );
 
         // Energy-aware routing
         assert!(RADIO_ENERGY_AWARE_THRESHOLD > 0.0 && RADIO_ENERGY_AWARE_THRESHOLD < 1.0);
 
         // Strategy dampening: blackout > degraded
-        assert!(RADIO_BLACKOUT_STRATEGY_EXPLORATION_DAMPEN > RADIO_DEGRADED_STRATEGY_EXPLORATION_DAMPEN);
-        assert!(RADIO_BLACKOUT_STRATEGY_EXPLORATION_DAMPEN > 0.0 && RADIO_BLACKOUT_STRATEGY_EXPLORATION_DAMPEN < 0.5);
-        assert!(RADIO_DEGRADED_STRATEGY_EXPLORATION_DAMPEN > 0.0 && RADIO_DEGRADED_STRATEGY_EXPLORATION_DAMPEN < 0.3);
+        assert!(
+            RADIO_BLACKOUT_STRATEGY_EXPLORATION_DAMPEN > RADIO_DEGRADED_STRATEGY_EXPLORATION_DAMPEN
+        );
+        assert!(
+            RADIO_BLACKOUT_STRATEGY_EXPLORATION_DAMPEN > 0.0
+                && RADIO_BLACKOUT_STRATEGY_EXPLORATION_DAMPEN < 0.5
+        );
+        assert!(
+            RADIO_DEGRADED_STRATEGY_EXPLORATION_DAMPEN > 0.0
+                && RADIO_DEGRADED_STRATEGY_EXPLORATION_DAMPEN < 0.3
+        );
 
         // Neuromod coupling
         assert!(RADIO_JAMMING_NE_NUDGE > 0.0 && RADIO_JAMMING_NE_NUDGE < 0.1);
         assert!(RADIO_RECOVERY_DA_NUDGE > 0.0 && RADIO_RECOVERY_DA_NUDGE < 0.1);
-        assert!(RADIO_NEUROMOD_JAMMING_MIN_STREAK > 0 && RADIO_NEUROMOD_JAMMING_MIN_STREAK <= RADIO_SAFETY_JAMMING_THRESHOLD);
+        assert!(
+            RADIO_NEUROMOD_JAMMING_MIN_STREAK > 0
+                && RADIO_NEUROMOD_JAMMING_MIN_STREAK <= RADIO_SAFETY_JAMMING_THRESHOLD
+        );
 
         // Consciousness tier thresholds
         assert!(RADIO_CONSCIOUSNESS_HIGH_CONFIDENCE > RADIO_CONSCIOUSNESS_LOW_CONFIDENCE);
-        assert!(RADIO_CONSCIOUSNESS_HIGH_CONFIDENCE > 0.0 && RADIO_CONSCIOUSNESS_HIGH_CONFIDENCE < 1.0);
-        assert!(RADIO_CONSCIOUSNESS_LOW_CONFIDENCE > 0.0 && RADIO_CONSCIOUSNESS_LOW_CONFIDENCE < 1.0);
+        assert!(
+            RADIO_CONSCIOUSNESS_HIGH_CONFIDENCE > 0.0 && RADIO_CONSCIOUSNESS_HIGH_CONFIDENCE < 1.0
+        );
+        assert!(
+            RADIO_CONSCIOUSNESS_LOW_CONFIDENCE > 0.0 && RADIO_CONSCIOUSNESS_LOW_CONFIDENCE < 1.0
+        );
 
         // Beacon interval must exceed hop cooldown
         assert!(RADIO_BEACON_INTERVAL_CYCLES > RADIO_HOP_COOLDOWN_CYCLES);
@@ -4903,14 +5130,22 @@ mod tests {
 
     #[test]
     fn test_dynamics_startup_constants() {
-        assert!(CONFIDENCE_CRASH_FLOW_MULTIPLIER > 1.0_f64 && CONFIDENCE_CRASH_FLOW_MULTIPLIER < 3.0_f64);
+        assert!(
+            CONFIDENCE_CRASH_FLOW_MULTIPLIER > 1.0_f64
+                && CONFIDENCE_CRASH_FLOW_MULTIPLIER < 3.0_f64
+        );
         assert!(DYNAMICS_STARTUP_WARMUP_CYCLES > 0 && DYNAMICS_STARTUP_WARMUP_CYCLES <= 50);
         assert!(DYNAMICS_POST_BOOT_CYCLES > DYNAMICS_STARTUP_WARMUP_CYCLES);
-        assert!(RESONATOR_STARTUP_CYCLES > 0 && RESONATOR_STARTUP_CYCLES <= DYNAMICS_STARTUP_WARMUP_CYCLES);
+        assert!(
+            RESONATOR_STARTUP_CYCLES > 0
+                && RESONATOR_STARTUP_CYCLES <= DYNAMICS_STARTUP_WARMUP_CYCLES
+        );
         assert!(NEUROMOD_DELTA_THRESHOLD > 0.0 && NEUROMOD_DELTA_THRESHOLD < 0.01);
         assert!(AROUSAL_TRAP_RECOVERY_MIN_CYCLES > 0);
         assert!(AROUSAL_TRAP_RECOVERY_RAMP_CYCLES > 0.0);
-        assert!(ATTENTION_SENSITIVITY_BOOST_FACTOR > 1.0 && ATTENTION_SENSITIVITY_BOOST_FACTOR < 1.5);
+        assert!(
+            ATTENTION_SENSITIVITY_BOOST_FACTOR > 1.0 && ATTENTION_SENSITIVITY_BOOST_FACTOR < 1.5
+        );
         assert!(FEP_EFFICIENT_EXPLORATION_DAMPEN > 0.0 && FEP_EFFICIENT_EXPLORATION_DAMPEN < 1.0);
     }
 
@@ -4951,10 +5186,30 @@ mod tests {
         assert!(SPECTRAL_HISTORY_CAPACITY > SPECTRAL_MIN_HISTORY);
         assert!(SPECTRAL_MIN_HISTORY >= 16);
         assert!(SPECTRAL_INTERVAL > 60 && SPECTRAL_INTERVAL < 100);
-        assert!(SPECTRAL_GAMMA_CONSCIOUSNESS_BOOST > 0.0 && SPECTRAL_GAMMA_CONSCIOUSNESS_BOOST <= 0.1);
+        assert!(
+            SPECTRAL_GAMMA_CONSCIOUSNESS_BOOST > 0.0 && SPECTRAL_GAMMA_CONSCIOUSNESS_BOOST <= 0.1
+        );
         assert!(SPECTRAL_DELTA_REST_THRESHOLD > 0.3 && SPECTRAL_DELTA_REST_THRESHOLD <= 0.9);
-        assert!(SPECTRAL_ENTROPY_EXPLORATION_SCALE > 0.0 && SPECTRAL_ENTROPY_EXPLORATION_SCALE <= 0.1);
+        assert!(
+            SPECTRAL_ENTROPY_EXPLORATION_SCALE > 0.0 && SPECTRAL_ENTROPY_EXPLORATION_SCALE <= 0.1
+        );
         assert!(SPECTRAL_PAC_THRESHOLD > 0.0 && SPECTRAL_PAC_THRESHOLD < 1.0);
         assert!(SPECTRAL_PAC_CONFIDENCE_BOOST > 0.0 && SPECTRAL_PAC_CONFIDENCE_BOOST <= 0.1);
+    }
+
+    #[test]
+    fn test_reasoning_engine_feedback_constants() {
+        assert!(
+            REASONING_RELIABILITY_CONFIDENCE_SCALE > 0.0
+                && REASONING_RELIABILITY_CONFIDENCE_SCALE <= 0.1
+        );
+        assert!(REASONING_RELIABILITY_THRESHOLD > 0.5 && REASONING_RELIABILITY_THRESHOLD < 1.0);
+        assert!(
+            DREAM_REASONING_RELIABILITY_SCALE > 0.0 && DREAM_REASONING_RELIABILITY_SCALE <= 1.0
+        );
+        // Max confidence boost: (1.0 - 0.5) * 0.03 = 0.015 (modest)
+        assert!((1.0 - 0.5) * REASONING_RELIABILITY_CONFIDENCE_SCALE <= 0.02);
+        // Max dream boost: (1.0 - 0.5) * 0.4 = 0.2 (20%)
+        assert!((1.0 - 0.5) * DREAM_REASONING_RELIABILITY_SCALE <= 0.25);
     }
 }

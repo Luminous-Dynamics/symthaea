@@ -621,7 +621,9 @@ impl SqliteMemory {
             );
             match result {
                 Ok(_) => stored += 1,
-                Err(e) => tracing::warn!(id = %record.id, error = %e, "Batch store: skipped record"),
+                Err(e) => {
+                    tracing::warn!(id = %record.id, error = %e, "Batch store: skipped record")
+                }
             }
         }
 

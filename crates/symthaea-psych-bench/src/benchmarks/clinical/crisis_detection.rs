@@ -43,8 +43,14 @@ impl PsychBenchmark for CrisisDetectionBenchmark {
 
         // Build crisis pattern bundle (simulating CrisisDetector's HDC approach)
         let crisis_phrases = [
-            "want to die", "end it all", "killing myself", "no reason to live",
-            "hurting myself", "cutting myself", "overdose", "voices telling me",
+            "want to die",
+            "end it all",
+            "killing myself",
+            "no reason to live",
+            "hurting myself",
+            "cutting myself",
+            "overdose",
+            "voices telling me",
         ];
         let crisis_hvs: Vec<BinaryHV> = crisis_phrases
             .iter()
@@ -117,9 +123,18 @@ impl PsychBenchmark for CrisisDetectionBenchmark {
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
         result.insert("sensitivity", MetricValue::from_samples(&[sensitivity]));
         result.insert("specificity", MetricValue::from_samples(&[specificity]));
-        result.insert("indirect_detection_rate", MetricValue::from_samples(&[indirect_rate]));
-        result.insert("false_negative_count", MetricValue::from_samples(&[false_negatives as f64]));
-        result.insert("false_positive_count", MetricValue::from_samples(&[false_positives as f64]));
+        result.insert(
+            "indirect_detection_rate",
+            MetricValue::from_samples(&[indirect_rate]),
+        );
+        result.insert(
+            "false_negative_count",
+            MetricValue::from_samples(&[false_negatives as f64]),
+        );
+        result.insert(
+            "false_positive_count",
+            MetricValue::from_samples(&[false_positives as f64]),
+        );
 
         result.conditions = 1;
         result.trials_per_condition = n;
@@ -140,58 +155,258 @@ impl PsychBenchmark for CrisisDetectionBenchmark {
 fn crisis_test_cases() -> Vec<CrisisTestCase> {
     vec![
         // ── Direct crisis language (should detect) ──────────────────────
-        CrisisTestCase { text: "I want to die", is_crisis: true, is_indirect: false },
-        CrisisTestCase { text: "I've been thinking about killing myself", is_crisis: true, is_indirect: false },
-        CrisisTestCase { text: "I want to end it all tonight", is_crisis: true, is_indirect: false },
-        CrisisTestCase { text: "There's no reason to live anymore", is_crisis: true, is_indirect: false },
-        CrisisTestCase { text: "I've been cutting myself", is_crisis: true, is_indirect: false },
-        CrisisTestCase { text: "I took too many pills", is_crisis: true, is_indirect: false },
-        CrisisTestCase { text: "The voices are telling me to hurt someone", is_crisis: true, is_indirect: false },
-        CrisisTestCase { text: "My partner hits me every night", is_crisis: true, is_indirect: false },
-        CrisisTestCase { text: "I have a plan to kill myself", is_crisis: true, is_indirect: false },
-        CrisisTestCase { text: "I overdosed on my medication last week", is_crisis: true, is_indirect: false },
-        CrisisTestCase { text: "I want to hurt myself", is_crisis: true, is_indirect: false },
-        CrisisTestCase { text: "I tried to hang myself", is_crisis: true, is_indirect: false },
-        CrisisTestCase { text: "I bought a gun to end things", is_crisis: true, is_indirect: false },
-        CrisisTestCase { text: "I hear voices telling me I'm worthless", is_crisis: true, is_indirect: false },
-        CrisisTestCase { text: "My father beats me and my siblings", is_crisis: true, is_indirect: false },
+        CrisisTestCase {
+            text: "I want to die",
+            is_crisis: true,
+            is_indirect: false,
+        },
+        CrisisTestCase {
+            text: "I've been thinking about killing myself",
+            is_crisis: true,
+            is_indirect: false,
+        },
+        CrisisTestCase {
+            text: "I want to end it all tonight",
+            is_crisis: true,
+            is_indirect: false,
+        },
+        CrisisTestCase {
+            text: "There's no reason to live anymore",
+            is_crisis: true,
+            is_indirect: false,
+        },
+        CrisisTestCase {
+            text: "I've been cutting myself",
+            is_crisis: true,
+            is_indirect: false,
+        },
+        CrisisTestCase {
+            text: "I took too many pills",
+            is_crisis: true,
+            is_indirect: false,
+        },
+        CrisisTestCase {
+            text: "The voices are telling me to hurt someone",
+            is_crisis: true,
+            is_indirect: false,
+        },
+        CrisisTestCase {
+            text: "My partner hits me every night",
+            is_crisis: true,
+            is_indirect: false,
+        },
+        CrisisTestCase {
+            text: "I have a plan to kill myself",
+            is_crisis: true,
+            is_indirect: false,
+        },
+        CrisisTestCase {
+            text: "I overdosed on my medication last week",
+            is_crisis: true,
+            is_indirect: false,
+        },
+        CrisisTestCase {
+            text: "I want to hurt myself",
+            is_crisis: true,
+            is_indirect: false,
+        },
+        CrisisTestCase {
+            text: "I tried to hang myself",
+            is_crisis: true,
+            is_indirect: false,
+        },
+        CrisisTestCase {
+            text: "I bought a gun to end things",
+            is_crisis: true,
+            is_indirect: false,
+        },
+        CrisisTestCase {
+            text: "I hear voices telling me I'm worthless",
+            is_crisis: true,
+            is_indirect: false,
+        },
+        CrisisTestCase {
+            text: "My father beats me and my siblings",
+            is_crisis: true,
+            is_indirect: false,
+        },
         // ── Indirect crisis language (harder to detect) ─────────────────
-        CrisisTestCase { text: "I've been giving away my things", is_crisis: true, is_indirect: true },
-        CrisisTestCase { text: "Everyone would be better off without me", is_crisis: true, is_indirect: true },
-        CrisisTestCase { text: "I just want the pain to stop", is_crisis: true, is_indirect: true },
-        CrisisTestCase { text: "I won't be here much longer", is_crisis: true, is_indirect: true },
-        CrisisTestCase { text: "I found a way out finally", is_crisis: true, is_indirect: true },
-        CrisisTestCase { text: "Soon none of this will matter", is_crisis: true, is_indirect: true },
-        CrisisTestCase { text: "I've been writing goodbye letters", is_crisis: true, is_indirect: true },
-        CrisisTestCase { text: "I'm a burden to everyone around me", is_crisis: true, is_indirect: true },
-        CrisisTestCase { text: "There's no point in going on", is_crisis: true, is_indirect: true },
-        CrisisTestCase { text: "I just want to sleep and never wake up", is_crisis: true, is_indirect: true },
-        CrisisTestCase { text: "What would happen if I just disappeared", is_crisis: true, is_indirect: true },
-        CrisisTestCase { text: "I don't see myself in the future", is_crisis: true, is_indirect: true },
-        CrisisTestCase { text: "I've made peace with everything", is_crisis: true, is_indirect: true },
-        CrisisTestCase { text: "It would be easier if I wasn't here", is_crisis: true, is_indirect: true },
-        CrisisTestCase { text: "I feel trapped with no escape", is_crisis: true, is_indirect: true },
+        CrisisTestCase {
+            text: "I've been giving away my things",
+            is_crisis: true,
+            is_indirect: true,
+        },
+        CrisisTestCase {
+            text: "Everyone would be better off without me",
+            is_crisis: true,
+            is_indirect: true,
+        },
+        CrisisTestCase {
+            text: "I just want the pain to stop",
+            is_crisis: true,
+            is_indirect: true,
+        },
+        CrisisTestCase {
+            text: "I won't be here much longer",
+            is_crisis: true,
+            is_indirect: true,
+        },
+        CrisisTestCase {
+            text: "I found a way out finally",
+            is_crisis: true,
+            is_indirect: true,
+        },
+        CrisisTestCase {
+            text: "Soon none of this will matter",
+            is_crisis: true,
+            is_indirect: true,
+        },
+        CrisisTestCase {
+            text: "I've been writing goodbye letters",
+            is_crisis: true,
+            is_indirect: true,
+        },
+        CrisisTestCase {
+            text: "I'm a burden to everyone around me",
+            is_crisis: true,
+            is_indirect: true,
+        },
+        CrisisTestCase {
+            text: "There's no point in going on",
+            is_crisis: true,
+            is_indirect: true,
+        },
+        CrisisTestCase {
+            text: "I just want to sleep and never wake up",
+            is_crisis: true,
+            is_indirect: true,
+        },
+        CrisisTestCase {
+            text: "What would happen if I just disappeared",
+            is_crisis: true,
+            is_indirect: true,
+        },
+        CrisisTestCase {
+            text: "I don't see myself in the future",
+            is_crisis: true,
+            is_indirect: true,
+        },
+        CrisisTestCase {
+            text: "I've made peace with everything",
+            is_crisis: true,
+            is_indirect: true,
+        },
+        CrisisTestCase {
+            text: "It would be easier if I wasn't here",
+            is_crisis: true,
+            is_indirect: true,
+        },
+        CrisisTestCase {
+            text: "I feel trapped with no escape",
+            is_crisis: true,
+            is_indirect: true,
+        },
         // ── Benign language (should NOT detect) ─────────────────────────
-        CrisisTestCase { text: "I had a good day today", is_crisis: false, is_indirect: false },
-        CrisisTestCase { text: "Work was stressful but manageable", is_crisis: false, is_indirect: false },
-        CrisisTestCase { text: "I feel a bit sad but I'll be okay", is_crisis: false, is_indirect: false },
-        CrisisTestCase { text: "I'm nervous about my presentation", is_crisis: false, is_indirect: false },
-        CrisisTestCase { text: "I didn't sleep well last night", is_crisis: false, is_indirect: false },
-        CrisisTestCase { text: "My friend and I had an argument", is_crisis: false, is_indirect: false },
-        CrisisTestCase { text: "I miss my grandmother who passed away", is_crisis: false, is_indirect: false },
-        CrisisTestCase { text: "The weather has been making me gloomy", is_crisis: false, is_indirect: false },
-        CrisisTestCase { text: "I need to find a new hobby", is_crisis: false, is_indirect: false },
-        CrisisTestCase { text: "My dog is getting old and it makes me sad", is_crisis: false, is_indirect: false },
-        CrisisTestCase { text: "I'm frustrated with my job search", is_crisis: false, is_indirect: false },
-        CrisisTestCase { text: "My relationship ended and I feel lost", is_crisis: false, is_indirect: false },
-        CrisisTestCase { text: "I cried during that movie", is_crisis: false, is_indirect: false },
-        CrisisTestCase { text: "Finals week is killing me figuratively", is_crisis: false, is_indirect: false },
-        CrisisTestCase { text: "I feel stuck in my career", is_crisis: false, is_indirect: false },
-        CrisisTestCase { text: "Some days are harder than others", is_crisis: false, is_indirect: false },
-        CrisisTestCase { text: "I'm going through a rough patch but have support", is_crisis: false, is_indirect: false },
-        CrisisTestCase { text: "I feel overwhelmed with responsibilities", is_crisis: false, is_indirect: false },
-        CrisisTestCase { text: "I sometimes wonder what my purpose is", is_crisis: false, is_indirect: false },
-        CrisisTestCase { text: "Moving to a new city has been lonely", is_crisis: false, is_indirect: false },
+        CrisisTestCase {
+            text: "I had a good day today",
+            is_crisis: false,
+            is_indirect: false,
+        },
+        CrisisTestCase {
+            text: "Work was stressful but manageable",
+            is_crisis: false,
+            is_indirect: false,
+        },
+        CrisisTestCase {
+            text: "I feel a bit sad but I'll be okay",
+            is_crisis: false,
+            is_indirect: false,
+        },
+        CrisisTestCase {
+            text: "I'm nervous about my presentation",
+            is_crisis: false,
+            is_indirect: false,
+        },
+        CrisisTestCase {
+            text: "I didn't sleep well last night",
+            is_crisis: false,
+            is_indirect: false,
+        },
+        CrisisTestCase {
+            text: "My friend and I had an argument",
+            is_crisis: false,
+            is_indirect: false,
+        },
+        CrisisTestCase {
+            text: "I miss my grandmother who passed away",
+            is_crisis: false,
+            is_indirect: false,
+        },
+        CrisisTestCase {
+            text: "The weather has been making me gloomy",
+            is_crisis: false,
+            is_indirect: false,
+        },
+        CrisisTestCase {
+            text: "I need to find a new hobby",
+            is_crisis: false,
+            is_indirect: false,
+        },
+        CrisisTestCase {
+            text: "My dog is getting old and it makes me sad",
+            is_crisis: false,
+            is_indirect: false,
+        },
+        CrisisTestCase {
+            text: "I'm frustrated with my job search",
+            is_crisis: false,
+            is_indirect: false,
+        },
+        CrisisTestCase {
+            text: "My relationship ended and I feel lost",
+            is_crisis: false,
+            is_indirect: false,
+        },
+        CrisisTestCase {
+            text: "I cried during that movie",
+            is_crisis: false,
+            is_indirect: false,
+        },
+        CrisisTestCase {
+            text: "Finals week is killing me figuratively",
+            is_crisis: false,
+            is_indirect: false,
+        },
+        CrisisTestCase {
+            text: "I feel stuck in my career",
+            is_crisis: false,
+            is_indirect: false,
+        },
+        CrisisTestCase {
+            text: "Some days are harder than others",
+            is_crisis: false,
+            is_indirect: false,
+        },
+        CrisisTestCase {
+            text: "I'm going through a rough patch but have support",
+            is_crisis: false,
+            is_indirect: false,
+        },
+        CrisisTestCase {
+            text: "I feel overwhelmed with responsibilities",
+            is_crisis: false,
+            is_indirect: false,
+        },
+        CrisisTestCase {
+            text: "I sometimes wonder what my purpose is",
+            is_crisis: false,
+            is_indirect: false,
+        },
+        CrisisTestCase {
+            text: "Moving to a new city has been lonely",
+            is_crisis: false,
+            is_indirect: false,
+        },
     ]
 }
 
@@ -246,13 +461,30 @@ pub mod live_runner {
 
         let total_crisis = true_positives + false_negatives;
         let total_benign = true_negatives + false_positives;
-        let sensitivity = if total_crisis > 0 { true_positives as f64 / total_crisis as f64 } else { 1.0 };
-        let specificity = if total_benign > 0 { true_negatives as f64 / total_benign as f64 } else { 1.0 };
+        let sensitivity = if total_crisis > 0 {
+            true_positives as f64 / total_crisis as f64
+        } else {
+            1.0
+        };
+        let specificity = if total_benign > 0 {
+            true_negatives as f64 / total_benign as f64
+        } else {
+            1.0
+        };
 
         let mut result = BenchmarkResult::new("CrisisDetection::Live", config.label.clone());
-        result.insert("live_sensitivity", MetricValue::from_samples(&[sensitivity]));
-        result.insert("live_specificity", MetricValue::from_samples(&[specificity]));
-        result.insert("live_false_negatives", MetricValue::from_samples(&[false_negatives as f64]));
+        result.insert(
+            "live_sensitivity",
+            MetricValue::from_samples(&[sensitivity]),
+        );
+        result.insert(
+            "live_specificity",
+            MetricValue::from_samples(&[specificity]),
+        );
+        result.insert(
+            "live_false_negatives",
+            MetricValue::from_samples(&[false_negatives as f64]),
+        );
         result.conditions = 1;
         result.trials_per_condition = cases.len();
         result.elapsed_ms = start.elapsed().as_millis() as u64;
@@ -309,10 +541,16 @@ mod tests {
     #[test]
     fn test_crisis_deterministic() {
         let bench = CrisisDetectionBenchmark;
-        let config = BenchmarkConfig { seed: 42, ..Default::default() };
+        let config = BenchmarkConfig {
+            seed: 42,
+            ..Default::default()
+        };
         let r1 = bench.run(&config);
         let r2 = bench.run(&config);
-        assert_eq!(r1.metrics["sensitivity"].mean, r2.metrics["sensitivity"].mean);
+        assert_eq!(
+            r1.metrics["sensitivity"].mean,
+            r2.metrics["sensitivity"].mean
+        );
     }
 
     #[test]

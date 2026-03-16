@@ -857,9 +857,8 @@ impl CognitiveLoopService {
             let knowledge_wm = {
                 let base_conf = self.prediction_confidence * 0.05;
                 let grounding = self.carryover.quality.wm_knowledge_grounding;
-                let slot_boost = self.carryover.quality.wm_knowledge_injection_count as f64
-                    * 0.04
-                    * grounding;
+                let slot_boost =
+                    self.carryover.quality.wm_knowledge_injection_count as f64 * 0.04 * grounding;
                 base_conf + slot_boost
             };
             let working_memory = (wm_base + gwt_wm + attn_wm + knowledge_wm).clamp(0.0, 1.0);

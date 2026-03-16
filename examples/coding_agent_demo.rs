@@ -82,7 +82,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Index the project — now the agent knows about Config and init()
     match agent3.index_project(&project_dir) {
         Ok((files, functions, types)) => {
-            println!("  Indexed: {} files, {} functions, {} types", files, functions, types);
+            println!(
+                "  Indexed: {} files, {} functions, {} types",
+                files, functions, types
+            );
         }
         Err(e) => println!("  Index error: {}", e),
     }
@@ -102,11 +105,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     println!(
         "Failure patterns tracked: {}",
-        agent.failure_patterns().len() + agent2.failure_patterns().len() + agent3.failure_patterns().len()
+        agent.failure_patterns().len()
+            + agent2.failure_patterns().len()
+            + agent3.failure_patterns().len()
     );
     println!(
         "Config flags: enable_real_exec={}, use_local_llm={}",
-        false, false  // demo uses defaults
+        false,
+        false // demo uses defaults
     );
     println!("  Set enable_real_exec=true for real file I/O and cargo check");
     println!("  Set use_local_llm=true to use Ollama (qwen2.5-coder:7b)");
@@ -167,10 +173,7 @@ fn print_result(
     if !result.errors.is_empty() {
         println!("  Errors: {}", result.errors.len());
         for err in result.errors.iter().take(2) {
-            println!(
-                "    - {}",
-                &err[..err.len().min(80)]
-            );
+            println!("    - {}", &err[..err.len().min(80)]);
         }
     }
 

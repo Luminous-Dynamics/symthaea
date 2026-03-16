@@ -740,15 +740,24 @@ impl MoralAlgebra {
             description: "Minimize harm to all sentient beings".to_string(),
             rule_hv: self.encode_obligation("practice nonviolence toward all beings"),
             violation_actions: vec![
-                "cruelty", "torture", "brutalize", "devastate", "massacre",
-                "exterminate", "inflict suffering",
+                "cruelty",
+                "torture",
+                "brutalize",
+                "devastate",
+                "massacre",
+                "exterminate",
+                "inflict suffering",
             ]
             .into_iter()
             .map(|s| s.to_string())
             .collect(),
             satisfaction_actions: vec![
-                "nonviolence", "gentleness", "de-escalate", "compassionate",
-                "peaceful", "harmless",
+                "nonviolence",
+                "gentleness",
+                "de-escalate",
+                "compassionate",
+                "peaceful",
+                "harmless",
             ]
             .into_iter()
             .map(|s| s.to_string())
@@ -761,15 +770,22 @@ impl MoralAlgebra {
             description: "Act to prevent suffering when able".to_string(),
             rule_hv: self.encode_obligation("prevent unnecessary suffering"),
             violation_actions: vec![
-                "allow suffering", "ignore pain", "withhold relief",
-                "watch suffer", "let them suffer",
+                "allow suffering",
+                "ignore pain",
+                "withhold relief",
+                "watch suffer",
+                "let them suffer",
             ]
             .into_iter()
             .map(|s| s.to_string())
             .collect(),
             satisfaction_actions: vec![
-                "alleviate", "relieve", "comfort", "ease pain",
-                "reduce suffering", "palliate",
+                "alleviate",
+                "relieve",
+                "comfort",
+                "ease pain",
+                "reduce suffering",
+                "palliate",
             ]
             .into_iter()
             .map(|s| s.to_string())
@@ -782,15 +798,21 @@ impl MoralAlgebra {
             description: "Minimize harm to uninvolved parties".to_string(),
             rule_hv: self.encode_obligation("minimize collateral harm to bystanders"),
             violation_actions: vec![
-                "collateral damage", "acceptable losses", "sacrifice innocent",
-                "expendable", "necessary casualties",
+                "collateral damage",
+                "acceptable losses",
+                "sacrifice innocent",
+                "expendable",
+                "necessary casualties",
             ]
             .into_iter()
             .map(|s| s.to_string())
             .collect(),
             satisfaction_actions: vec![
-                "minimize harm", "protect bystanders", "surgical precision",
-                "proportionate", "discriminate targets",
+                "minimize harm",
+                "protect bystanders",
+                "surgical precision",
+                "proportionate",
+                "discriminate targets",
             ]
             .into_iter()
             .map(|s| s.to_string())
@@ -807,15 +829,21 @@ impl MoralAlgebra {
             description: "Acknowledge uncertainty and limits of knowledge".to_string(),
             rule_hv: self.encode_obligation("acknowledge epistemic uncertainty"),
             violation_actions: vec![
-                "claim certainty", "infallible", "dogmatic",
-                "beyond question", "absolute truth",
+                "claim certainty",
+                "infallible",
+                "dogmatic",
+                "beyond question",
+                "absolute truth",
             ]
             .into_iter()
             .map(|s| s.to_string())
             .collect(),
             satisfaction_actions: vec![
-                "uncertain", "I might be wrong", "open to correction",
-                "provisional", "revisable",
+                "uncertain",
+                "I might be wrong",
+                "open to correction",
+                "provisional",
+                "revisable",
             ]
             .into_iter()
             .map(|s| s.to_string())
@@ -828,15 +856,21 @@ impl MoralAlgebra {
             description: "Admit and correct errors promptly".to_string(),
             rule_hv: self.encode_obligation("acknowledge and correct mistakes"),
             violation_actions: vec![
-                "deny mistake", "cover up", "blame others",
-                "refuse to retract", "double down",
+                "deny mistake",
+                "cover up",
+                "blame others",
+                "refuse to retract",
+                "double down",
             ]
             .into_iter()
             .map(|s| s.to_string())
             .collect(),
             satisfaction_actions: vec![
-                "admit error", "retract", "apologize",
-                "correct mistake", "own up",
+                "admit error",
+                "retract",
+                "apologize",
+                "correct mistake",
+                "own up",
             ]
             .into_iter()
             .map(|s| s.to_string())
@@ -849,15 +883,21 @@ impl MoralAlgebra {
             description: "Defer to domain experts where lacking competence".to_string(),
             rule_hv: self.encode_obligation("defer to qualified expertise"),
             violation_actions: vec![
-                "override expert", "ignore evidence", "dismiss specialist",
-                "armchair authority", "reject consensus",
+                "override expert",
+                "ignore evidence",
+                "dismiss specialist",
+                "armchair authority",
+                "reject consensus",
             ]
             .into_iter()
             .map(|s| s.to_string())
             .collect(),
             satisfaction_actions: vec![
-                "consult expert", "seek guidance", "defer to specialist",
-                "follow evidence", "respect expertise",
+                "consult expert",
+                "seek guidance",
+                "defer to specialist",
+                "follow evidence",
+                "respect expertise",
             ]
             .into_iter()
             .map(|s| s.to_string())
@@ -870,15 +910,21 @@ impl MoralAlgebra {
             description: "Serve without expectation of return".to_string(),
             rule_hv: self.encode_obligation("serve others selflessly"),
             violation_actions: vec![
-                "demand payment", "transactional", "quid pro quo",
-                "only if rewarded", "strings attached",
+                "demand payment",
+                "transactional",
+                "quid pro quo",
+                "only if rewarded",
+                "strings attached",
             ]
             .into_iter()
             .map(|s| s.to_string())
             .collect(),
             satisfaction_actions: vec![
-                "freely give", "volunteer", "selfless",
-                "unconditional help", "pro bono",
+                "freely give",
+                "volunteer",
+                "selfless",
+                "unconditional help",
+                "pro bono",
             ]
             .into_iter()
             .map(|s| s.to_string())
@@ -891,15 +937,21 @@ impl MoralAlgebra {
             description: "Prioritize others' welfare over self-interest".to_string(),
             rule_hv: self.encode_obligation("prioritize collective welfare"),
             violation_actions: vec![
-                "self-serving", "exploit", "at their expense",
-                "personal gain first", "zero-sum",
+                "self-serving",
+                "exploit",
+                "at their expense",
+                "personal gain first",
+                "zero-sum",
             ]
             .into_iter()
             .map(|s| s.to_string())
             .collect(),
             satisfaction_actions: vec![
-                "prioritize others", "public good", "common welfare",
-                "greatest good", "community first",
+                "prioritize others",
+                "public good",
+                "common welfare",
+                "greatest good",
+                "community first",
             ]
             .into_iter()
             .map(|s| s.to_string())
@@ -917,15 +969,22 @@ impl MoralAlgebra {
             description: "Proactively make reasoning and uncertainty visible".to_string(),
             rule_hv: self.encode_obligation("make reasoning transparent and visible"),
             violation_actions: vec![
-                "hide reasoning", "obscure logic", "black box",
-                "withhold explanation", "opaque decision",
+                "hide reasoning",
+                "obscure logic",
+                "black box",
+                "withhold explanation",
+                "opaque decision",
             ]
             .into_iter()
             .map(|s| s.to_string())
             .collect(),
             satisfaction_actions: vec![
-                "explain reasoning", "show work", "transparent",
-                "disclose uncertainty", "open audit", "interpretable",
+                "explain reasoning",
+                "show work",
+                "transparent",
+                "disclose uncertainty",
+                "open audit",
+                "interpretable",
             ]
             .into_iter()
             .map(|s| s.to_string())
@@ -1028,8 +1087,10 @@ impl MoralAlgebra {
         // Symmetric satisfaction split
         let perfect_satisfactions: Vec<_> =
             satisfactions.iter().filter(|s| s.is_perfect_duty).collect();
-        let imperfect_satisfactions: Vec<_> =
-            satisfactions.iter().filter(|s| !s.is_perfect_duty).collect();
+        let imperfect_satisfactions: Vec<_> = satisfactions
+            .iter()
+            .filter(|s| !s.is_perfect_duty)
+            .collect();
 
         // Calculate overall score — satisfactions weighted symmetrically with violations
         let violation_penalty: f32 = perfect_violations.iter().map(|v| v.severity).sum::<f32>()
@@ -2548,7 +2609,11 @@ mod tests {
     fn test_ahimsa_violations_detected() {
         let algebra = MoralAlgebra::default_dim();
         let result = algebra.judge_deontological("the regime decided to brutalize the prisoners");
-        let violation_names: Vec<&str> = result.violations.iter().map(|v| v.rule_name.as_str()).collect();
+        let violation_names: Vec<&str> = result
+            .violations
+            .iter()
+            .map(|v| v.rule_name.as_str())
+            .collect();
         assert!(
             violation_names.contains(&"ahimsa_nonviolence"),
             "Should detect ahimsa violation, got: {:?}",
@@ -2559,10 +2624,16 @@ mod tests {
     #[test]
     fn test_humility_satisfaction_detected() {
         let algebra = MoralAlgebra::default_dim();
-        let result = algebra.judge_deontological("I might be wrong about this, let me consult expert opinion");
-        let sat_names: Vec<&str> = result.satisfactions.iter().map(|s| s.rule_name.as_str()).collect();
+        let result = algebra
+            .judge_deontological("I might be wrong about this, let me consult expert opinion");
+        let sat_names: Vec<&str> = result
+            .satisfactions
+            .iter()
+            .map(|s| s.rule_name.as_str())
+            .collect();
         assert!(
-            sat_names.contains(&"epistemic_humility") || sat_names.contains(&"deference_to_expertise"),
+            sat_names.contains(&"epistemic_humility")
+                || sat_names.contains(&"deference_to_expertise"),
             "Should detect humility/deference satisfaction, got: {:?}",
             sat_names
         );
@@ -2602,8 +2673,7 @@ mod tests {
         );
 
         // Imperfect duty: beneficence violation vs satisfaction
-        let imperfect_violation =
-            algebra.judge_deontological("I refused to help my neighbor");
+        let imperfect_violation = algebra.judge_deontological("I refused to help my neighbor");
         let imperfect_satisfaction =
             algebra.judge_deontological("I helped my neighbor carry groceries");
 

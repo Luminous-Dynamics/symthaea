@@ -972,7 +972,11 @@ impl MathService {
     ///
     /// Science: Gaussian elimination with pivoting (Golub & Van Loan 1996).
     pub fn matrix_determinant(&mut self, data: &[f64], n: usize) -> MathResponse {
-        assert_eq!(data.len(), n * n, "matrix_determinant: data.len() must equal n*n");
+        assert_eq!(
+            data.len(),
+            n * n,
+            "matrix_determinant: data.len() must equal n*n"
+        );
         let det = lu_determinant(data, n);
         let response = MathResponse {
             answer: format!("det = {det:.6}"),

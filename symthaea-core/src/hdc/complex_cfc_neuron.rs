@@ -132,21 +132,34 @@ impl ComplexCfcNeuron {
         let mut rng = SimpleRng::new(seed);
 
         // Initialize state near zero (small random values)
-        let state_re: Vec<f32> = (0..COMPLEX_DIM).map(|_| rng.next_f32() * 0.1 - 0.05).collect();
-        let state_im: Vec<f32> = (0..COMPLEX_DIM).map(|_| rng.next_f32() * 0.1 - 0.05).collect();
+        let state_re: Vec<f32> = (0..COMPLEX_DIM)
+            .map(|_| rng.next_f32() * 0.1 - 0.05)
+            .collect();
+        let state_im: Vec<f32> = (0..COMPLEX_DIM)
+            .map(|_| rng.next_f32() * 0.1 - 0.05)
+            .collect();
 
         // Initialize weights (Xavier-like: scale by 1/sqrt(dim))
         let scale = 1.0 / (COMPLEX_DIM as f32).sqrt();
-        let weight_re: Vec<f32> = (0..COMPLEX_DIM).map(|_| (rng.next_f32() * 2.0 - 1.0) * scale).collect();
-        let weight_im: Vec<f32> = (0..COMPLEX_DIM).map(|_| (rng.next_f32() * 2.0 - 1.0) * scale).collect();
-        let input_re: Vec<f32> = (0..COMPLEX_DIM).map(|_| (rng.next_f32() * 2.0 - 1.0) * scale).collect();
-        let input_im: Vec<f32> = (0..COMPLEX_DIM).map(|_| (rng.next_f32() * 2.0 - 1.0) * scale).collect();
+        let weight_re: Vec<f32> = (0..COMPLEX_DIM)
+            .map(|_| (rng.next_f32() * 2.0 - 1.0) * scale)
+            .collect();
+        let weight_im: Vec<f32> = (0..COMPLEX_DIM)
+            .map(|_| (rng.next_f32() * 2.0 - 1.0) * scale)
+            .collect();
+        let input_re: Vec<f32> = (0..COMPLEX_DIM)
+            .map(|_| (rng.next_f32() * 2.0 - 1.0) * scale)
+            .collect();
+        let input_im: Vec<f32> = (0..COMPLEX_DIM)
+            .map(|_| (rng.next_f32() * 2.0 - 1.0) * scale)
+            .collect();
 
         // Initialize eigenvalues: real part in [min, max], imaginary spread across freq range
         let eigen_re: Vec<f32> = (0..COMPLEX_DIM)
             .map(|_| {
                 let t = rng.next_f32(); // [0, 1)
-                config.eigenvalue_real_min + t * (config.eigenvalue_real_max - config.eigenvalue_real_min)
+                config.eigenvalue_real_min
+                    + t * (config.eigenvalue_real_max - config.eigenvalue_real_min)
             })
             .collect();
         let eigen_im: Vec<f32> = (0..COMPLEX_DIM)
@@ -511,7 +524,11 @@ mod tests {
             "State should be bounded, got norm={}",
             norm
         );
-        assert!(norm.is_finite(), "State should be finite, got norm={}", norm);
+        assert!(
+            norm.is_finite(),
+            "State should be finite, got norm={}",
+            norm
+        );
     }
 
     #[test]

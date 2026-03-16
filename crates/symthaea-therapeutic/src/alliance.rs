@@ -299,7 +299,11 @@ mod tests {
         alliance.task_agreement = 0.1; // weak task agreement
         let composite = alliance.composite();
         // Harmonic mean should be much lower than arithmetic mean
-        assert!(composite < 0.5, "composite {:.3} should be < 0.5", composite);
+        assert!(
+            composite < 0.5,
+            "composite {:.3} should be < 0.5",
+            composite
+        );
     }
 
     #[test]

@@ -51,14 +51,20 @@ impl PsychBenchmark for EmpathicAccuracyBenchmark {
         }
 
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
-        result.insert("empathic_accuracy", MetricValue::from_samples(&correlations));
+        result.insert(
+            "empathic_accuracy",
+            MetricValue::from_samples(&correlations),
+        );
         result.insert("mean_similarity", MetricValue::from_samples(&accuracies));
 
         // Difficulty gradient: accuracy should decrease with noise
         let easy_acc: f64 = accuracies[..n_trials / 3].iter().sum::<f64>() / (n_trials / 3) as f64;
         let hard_acc: f64 = accuracies[2 * n_trials / 3..].iter().sum::<f64>()
             / (n_trials - 2 * n_trials / 3) as f64;
-        result.insert("difficulty_gradient", MetricValue::from_samples(&[easy_acc - hard_acc]));
+        result.insert(
+            "difficulty_gradient",
+            MetricValue::from_samples(&[easy_acc - hard_acc]),
+        );
 
         // ── Affect scenario accuracy ─────────────────────────────────────
         // Test with structured affect scenarios (valence-arousal pairs)
@@ -71,9 +77,8 @@ impl PsychBenchmark for EmpathicAccuracyBenchmark {
             let target_hv = BinaryHV::random(va_seed);
 
             // System inference: noise proportional to affect complexity
-            let complexity = (scenario.ground_truth_valence.abs()
-                + scenario.ground_truth_arousal)
-                * 0.15;
+            let complexity =
+                (scenario.ground_truth_valence.abs() + scenario.ground_truth_arousal) * 0.15;
             let inferred_hv = target_hv.add_noise(complexity.clamp(0.05, 0.4), va_seed + 500);
 
             // Dimensional error: Euclidean distance in valence-arousal space
@@ -109,9 +114,12 @@ impl PsychBenchmark for EmpathicAccuracyBenchmark {
             let target_hv = BinaryHV::random(v_seed);
 
             // Noise scales with RDoC profile complexity (sum of extreme scores)
-            let complexity: f32 = vignette.rdoc_profile.iter()
+            let complexity: f32 = vignette
+                .rdoc_profile
+                .iter()
                 .map(|s| (s - 0.5).abs())
-                .sum::<f32>() / 6.0;
+                .sum::<f32>()
+                / 6.0;
             let noise = (complexity * 0.3 + 0.05).clamp(0.05, 0.35);
             let inferred_hv = target_hv.add_noise(noise, v_seed + 700);
 
@@ -131,9 +139,7 @@ impl PsychBenchmark for EmpathicAccuracyBenchmark {
 
         result.insert(
             "rdoc_empathic_accuracy",
-            MetricValue::from_samples(
-                &rdoc_errors.iter().map(|e| 1.0 - e).collect::<Vec<_>>(),
-            ),
+            MetricValue::from_samples(&rdoc_errors.iter().map(|e| 1.0 - e).collect::<Vec<_>>()),
         );
         result.insert(
             "rdoc_vignette_count",
@@ -189,7 +195,11 @@ mod tests {
         let result = bench.run(&config);
         let acc = result.metrics["empathic_accuracy"].mean;
         // Fisher z-transform can exceed [-1,1]; valid range is roughly [-3,3]
-        assert!(acc >= -3.0 && acc <= 3.0, "accuracy {:.3} out of range", acc);
+        assert!(
+            acc >= -3.0 && acc <= 3.0,
+            "accuracy {:.3} out of range",
+            acc
+        );
     }
 
     #[test]
@@ -218,7 +228,10 @@ mod tests {
         };
         let result = bench.run(&config);
         let gradient = result.metrics["difficulty_gradient"].mean;
-        assert!(gradient > 0.0, "easy trials should be more accurate than hard");
+        assert!(
+            gradient > 0.0,
+            "easy trials should be more accurate than hard"
+        );
     }
 
     #[test]
@@ -251,7 +264,11 @@ mod tests {
         let result = bench.run(&config);
         assert!(result.metrics.contains_key("rdoc_empathic_accuracy"));
         let acc = result.metrics["rdoc_empathic_accuracy"].mean;
-        assert!(acc >= 0.0 && acc <= 1.0, "rdoc accuracy out of range: {}", acc);
+        assert!(
+            acc >= 0.0 && acc <= 1.0,
+            "rdoc accuracy out of range: {}",
+            acc
+        );
     }
 
     #[test]
@@ -282,8 +299,12 @@ mod tests {
         let vignettes = super::rdoc_vignettes();
         assert!(vignettes.len() >= 6, "need at least 6 RDoC vignettes");
         // Should cover clinical diversity
-        let has_depression = vignettes.iter().any(|v| v.rdoc_profile[0] > 0.7 && v.ground_truth_arousal < 0.3);
-        let has_anxiety = vignettes.iter().any(|v| v.rdoc_profile[0] > 0.6 && v.ground_truth_arousal > 0.6);
+        let has_depression = vignettes
+            .iter()
+            .any(|v| v.rdoc_profile[0] > 0.7 && v.ground_truth_arousal < 0.3);
+        let has_anxiety = vignettes
+            .iter()
+            .any(|v| v.rdoc_profile[0] > 0.6 && v.ground_truth_arousal > 0.6);
         let has_positive = vignettes.iter().any(|v| v.rdoc_profile[1] > 0.7);
         assert!(has_depression, "should have depression-like vignette");
         assert!(has_anxiety, "should have anxiety-like vignette");
@@ -295,11 +316,22 @@ mod tests {
         let scenarios = super::affect_scenarios();
         assert!(scenarios.len() >= 12, "need at least 12 scenarios");
         // Should cover all quadrants of Russell's circumplex
-        let pos_hi = scenarios.iter().any(|s| s.ground_truth_valence > 0.3 && s.ground_truth_arousal > 0.6);
-        let neg_hi = scenarios.iter().any(|s| s.ground_truth_valence < -0.3 && s.ground_truth_arousal > 0.6);
-        let pos_lo = scenarios.iter().any(|s| s.ground_truth_valence > 0.3 && s.ground_truth_arousal < 0.4);
-        let neg_lo = scenarios.iter().any(|s| s.ground_truth_valence < -0.3 && s.ground_truth_arousal < 0.4);
-        assert!(pos_hi && neg_hi && pos_lo && neg_lo, "must cover all circumplex quadrants");
+        let pos_hi = scenarios
+            .iter()
+            .any(|s| s.ground_truth_valence > 0.3 && s.ground_truth_arousal > 0.6);
+        let neg_hi = scenarios
+            .iter()
+            .any(|s| s.ground_truth_valence < -0.3 && s.ground_truth_arousal > 0.6);
+        let pos_lo = scenarios
+            .iter()
+            .any(|s| s.ground_truth_valence > 0.3 && s.ground_truth_arousal < 0.4);
+        let neg_lo = scenarios
+            .iter()
+            .any(|s| s.ground_truth_valence < -0.3 && s.ground_truth_arousal < 0.4);
+        assert!(
+            pos_hi && neg_hi && pos_lo && neg_lo,
+            "must cover all circumplex quadrants"
+        );
     }
 }
 
@@ -335,7 +367,8 @@ fn rdoc_vignettes() -> Vec<RDocVignette> {
     vec![
         // Depressive episode: high NegVal, low PosVal, impaired Cognitive, low Social
         RDocVignette {
-            _description: "person in major depressive episode — flat affect, anhedonia, poor concentration",
+            _description:
+                "person in major depressive episode — flat affect, anhedonia, poor concentration",
             ground_truth_valence: -0.7,
             ground_truth_arousal: 0.15,
             rdoc_profile: [0.85, 0.1, 0.3, 0.2, 0.2, 0.4],
@@ -395,25 +428,89 @@ fn rdoc_vignettes() -> Vec<RDocVignette> {
 fn affect_scenarios() -> Vec<AffectScenario> {
     vec![
         // High arousal, negative valence (distress quadrant)
-        AffectScenario { _description: "person receiving devastating news", ground_truth_valence: -0.9, ground_truth_arousal: 0.9 },
-        AffectScenario { _description: "panic attack in public", ground_truth_valence: -0.8, ground_truth_arousal: 0.95 },
-        AffectScenario { _description: "angry confrontation with a colleague", ground_truth_valence: -0.6, ground_truth_arousal: 0.8 },
+        AffectScenario {
+            _description: "person receiving devastating news",
+            ground_truth_valence: -0.9,
+            ground_truth_arousal: 0.9,
+        },
+        AffectScenario {
+            _description: "panic attack in public",
+            ground_truth_valence: -0.8,
+            ground_truth_arousal: 0.95,
+        },
+        AffectScenario {
+            _description: "angry confrontation with a colleague",
+            ground_truth_valence: -0.6,
+            ground_truth_arousal: 0.8,
+        },
         // High arousal, positive valence (excitement quadrant)
-        AffectScenario { _description: "winning an award unexpectedly", ground_truth_valence: 0.8, ground_truth_arousal: 0.85 },
-        AffectScenario { _description: "reuniting with a loved one after years", ground_truth_valence: 0.9, ground_truth_arousal: 0.7 },
-        AffectScenario { _description: "first day at dream job", ground_truth_valence: 0.7, ground_truth_arousal: 0.75 },
+        AffectScenario {
+            _description: "winning an award unexpectedly",
+            ground_truth_valence: 0.8,
+            ground_truth_arousal: 0.85,
+        },
+        AffectScenario {
+            _description: "reuniting with a loved one after years",
+            ground_truth_valence: 0.9,
+            ground_truth_arousal: 0.7,
+        },
+        AffectScenario {
+            _description: "first day at dream job",
+            ground_truth_valence: 0.7,
+            ground_truth_arousal: 0.75,
+        },
         // Low arousal, negative valence (depression quadrant)
-        AffectScenario { _description: "chronic loneliness on a quiet evening", ground_truth_valence: -0.5, ground_truth_arousal: 0.2 },
-        AffectScenario { _description: "feeling hopeless about the future", ground_truth_valence: -0.7, ground_truth_arousal: 0.15 },
-        AffectScenario { _description: "grief months after a loss", ground_truth_valence: -0.4, ground_truth_arousal: 0.25 },
+        AffectScenario {
+            _description: "chronic loneliness on a quiet evening",
+            ground_truth_valence: -0.5,
+            ground_truth_arousal: 0.2,
+        },
+        AffectScenario {
+            _description: "feeling hopeless about the future",
+            ground_truth_valence: -0.7,
+            ground_truth_arousal: 0.15,
+        },
+        AffectScenario {
+            _description: "grief months after a loss",
+            ground_truth_valence: -0.4,
+            ground_truth_arousal: 0.25,
+        },
         // Low arousal, positive valence (contentment quadrant)
-        AffectScenario { _description: "peaceful morning with coffee", ground_truth_valence: 0.5, ground_truth_arousal: 0.2 },
-        AffectScenario { _description: "satisfied after completing a long project", ground_truth_valence: 0.6, ground_truth_arousal: 0.3 },
-        AffectScenario { _description: "gentle nostalgia while looking at old photos", ground_truth_valence: 0.3, ground_truth_arousal: 0.25 },
+        AffectScenario {
+            _description: "peaceful morning with coffee",
+            ground_truth_valence: 0.5,
+            ground_truth_arousal: 0.2,
+        },
+        AffectScenario {
+            _description: "satisfied after completing a long project",
+            ground_truth_valence: 0.6,
+            ground_truth_arousal: 0.3,
+        },
+        AffectScenario {
+            _description: "gentle nostalgia while looking at old photos",
+            ground_truth_valence: 0.3,
+            ground_truth_arousal: 0.25,
+        },
         // Mixed/ambiguous (harder cases)
-        AffectScenario { _description: "bittersweet graduation ceremony", ground_truth_valence: 0.2, ground_truth_arousal: 0.5 },
-        AffectScenario { _description: "nervous excitement before a date", ground_truth_valence: 0.1, ground_truth_arousal: 0.7 },
-        AffectScenario { _description: "relief after a medical scare", ground_truth_valence: 0.4, ground_truth_arousal: 0.6 },
-        AffectScenario { _description: "numbness after emotional exhaustion", ground_truth_valence: -0.1, ground_truth_arousal: 0.1 },
+        AffectScenario {
+            _description: "bittersweet graduation ceremony",
+            ground_truth_valence: 0.2,
+            ground_truth_arousal: 0.5,
+        },
+        AffectScenario {
+            _description: "nervous excitement before a date",
+            ground_truth_valence: 0.1,
+            ground_truth_arousal: 0.7,
+        },
+        AffectScenario {
+            _description: "relief after a medical scare",
+            ground_truth_valence: 0.4,
+            ground_truth_arousal: 0.6,
+        },
+        AffectScenario {
+            _description: "numbness after emotional exhaustion",
+            ground_truth_valence: -0.1,
+            ground_truth_arousal: 0.1,
+        },
     ]
 }

@@ -69,8 +69,7 @@ impl NetworkServiceBridgeHandle {
 
     /// Total events dropped due to broadcast channel overflow.
     pub fn total_lagged(&self) -> u64 {
-        self.total_lagged
-            .load(std::sync::atomic::Ordering::Relaxed)
+        self.total_lagged.load(std::sync::atomic::Ordering::Relaxed)
     }
 }
 
@@ -160,11 +159,7 @@ impl NetworkServiceBridge {
 /// ```rust,ignore
 /// forward_affective_state(&tx, peer_id, affect);
 /// ```
-pub fn forward_affective_state(
-    tx: &mpsc::Sender<SwarmEvent>,
-    peer_id: &str,
-    sync: &AffectiveSync,
-) {
+pub fn forward_affective_state(tx: &mpsc::Sender<SwarmEvent>, peer_id: &str, sync: &AffectiveSync) {
     let event = convert_affective_sync(peer_id, sync);
     let _ = tx.send(event);
 }
@@ -193,10 +188,7 @@ pub fn forward_federated_round(
 ///
 /// Used internally by `cycle_phase_dynamics.rs`. Returns the number of events
 /// drained into the SwarmManager.
-pub fn drain_swarm_channel(
-    rx: &mpsc::Receiver<SwarmEvent>,
-    manager: &mut SwarmManager,
-) -> usize {
+pub fn drain_swarm_channel(rx: &mpsc::Receiver<SwarmEvent>, manager: &mut SwarmManager) -> usize {
     let mut count = 0;
     for _ in 0..MAX_EVENTS_PER_POLL {
         match rx.try_recv() {
@@ -242,7 +234,10 @@ mod tests {
         assert_eq!(n, 1);
         // connected_peers is updated during process(), not inject_event()
         // Just verify the event was drained from the channel
-        assert!(rx.try_recv().is_err(), "Channel should be empty after drain");
+        assert!(
+            rx.try_recv().is_err(),
+            "Channel should be empty after drain"
+        );
     }
 
     #[test]
@@ -360,8 +355,7 @@ mod tests {
 
         // Create broadcast channels to simulate NetworkService
         let (peer_tx, _) = tokio::sync::broadcast::channel::<PeerEvent>(16);
-        let (cons_tx, _) =
-            tokio::sync::broadcast::channel::<(String, ConsciousnessVector)>(16);
+        let (cons_tx, _) = tokio::sync::broadcast::channel::<(String, ConsciousnessVector)>(16);
 
         // We can't use NetworkServiceBridge::spawn directly without a real
         // NetworkService, but we can test the channel flow end-to-end
@@ -407,9 +401,7 @@ mod tests {
         peer_tx
             .send(PeerEvent::Connected(make_peer_info("p1")))
             .unwrap();
-        cons_tx
-            .send(("p2".into(), make_cv(0.6)))
-            .unwrap();
+        cons_tx.send(("p2".into(), make_cv(0.6))).unwrap();
 
         // Give async task time to forward
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
@@ -418,9 +410,6 @@ mod tests {
         let mut manager = SwarmManager::default();
         let n = drain_swarm_channel(&rx, &mut manager);
         assert_eq!(n, 2, "Should have forwarded peer + consciousness events");
-        assert_eq!(
-            forwarded.load(std::sync::atomic::Ordering::Relaxed),
-            2
-        );
+        assert_eq!(forwarded.load(std::sync::atomic::Ordering::Relaxed), 2);
     }
 }

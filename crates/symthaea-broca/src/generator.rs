@@ -12,12 +12,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::controller::{LanguageController, LanguageControllerConfig};
 use crate::encoder::{ThoughtChannels, ThoughtLanguageEncoder};
+#[cfg(feature = "therapeutic")]
+use crate::gating::TherapeuticGate;
 use crate::gating::{
     confidence_adjusted_veto_threshold, consciousness_gated_max_tokens, CoherenceFeedback,
     EmotionalModulator, EpistemicGate, GatingConfig,
 };
-#[cfg(feature = "therapeutic")]
-use crate::gating::TherapeuticGate;
 use crate::tokenizer::BpeTokenizer;
 
 use symthaea_core::genesis::GenesisSeed;
@@ -1610,11 +1610,7 @@ mod tests {
         let tok = gen.tokenizer().clone();
         let mut dataset = TrainingDataset::default();
         for _ in 0..10 {
-            dataset.push(TrainingPair::new(
-                channels,
-                "hello world".to_string(),
-                &tok,
-            ));
+            dataset.push(TrainingPair::new(channels, "hello world".to_string(), &tok));
         }
 
         let train_config = TrainingConfig {
@@ -1655,10 +1651,7 @@ mod tests {
         // (weights changed, so even greedy sampling should differ)
         let changed = pre_train_result.token_ids != post_train_result.token_ids
             || pre_train_result.text != post_train_result.text;
-        assert!(
-            changed,
-            "Training should change generator behavior"
-        );
+        assert!(changed, "Training should change generator behavior");
     }
 
     // ── Capstone: intent fidelity benchmark ──
@@ -1717,10 +1710,8 @@ mod tests {
         let mut pair_count = 0;
         for i in 0..results.len() {
             for j in (i + 1)..results.len() {
-                let set_i: std::collections::HashSet<u32> =
-                    results[i].iter().copied().collect();
-                let set_j: std::collections::HashSet<u32> =
-                    results[j].iter().copied().collect();
+                let set_i: std::collections::HashSet<u32> = results[i].iter().copied().collect();
+                let set_j: std::collections::HashSet<u32> = results[j].iter().copied().collect();
                 let intersection = set_i.intersection(&set_j).count();
                 let union = set_i.union(&set_j).count();
                 let jaccard = if union > 0 {

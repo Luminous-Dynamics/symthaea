@@ -484,7 +484,9 @@ impl LanguageController {
                 // Target = state - d_output (gradient descent direction)
                 let target = neuron.state().subtract(&d_per_neuron);
                 let grads = neuron.backward(&layer_input, &target, dt);
-                neuron.apply_gradients(&grads, network_lr);
+                // Use no_decay variant: per-step weight decay of 0.0001 applied
+                // 67K times/epoch decays weights to ~0.1%, destroying the network.
+                neuron.apply_gradients_no_decay(&grads, network_lr);
             }
         }
 
@@ -521,7 +523,10 @@ impl LanguageController {
                 for neuron in layer.iter_mut() {
                     let target = neuron.state().subtract(&d_per_n0);
                     let grads = neuron.backward(&layer0_input, &target, dt);
-                    neuron.apply_gradients(&grads, network_lr * self.config.gradient_attenuation);
+                    neuron.apply_gradients_no_decay(
+                        &grads,
+                        network_lr * self.config.gradient_attenuation,
+                    );
                 }
             }
         }

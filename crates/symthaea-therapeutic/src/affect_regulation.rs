@@ -55,13 +55,13 @@ impl RegulationStrategy {
     /// Minimum alliance required to use this strategy.
     pub fn min_alliance(&self) -> f32 {
         match self {
-            Self::Grounding => 0.1,         // safe at any alliance level
-            Self::Validation => 0.1,        // always appropriate
-            Self::DistressTolerance => 0.2, // basic coping
-            Self::Defusion => 0.3,          // requires some trust
+            Self::Grounding => 0.1,            // safe at any alliance level
+            Self::Validation => 0.1,           // always appropriate
+            Self::DistressTolerance => 0.2,    // basic coping
+            Self::Defusion => 0.3,             // requires some trust
             Self::CognitiveReappraisal => 0.4, // requires cognitive engagement
-            Self::Containment => 0.5,       // requires strong therapeutic space
-            Self::ExposurePrep => 0.6,      // requires strong alliance
+            Self::Containment => 0.5,          // requires strong therapeutic space
+            Self::ExposurePrep => 0.6,         // requires strong alliance
         }
     }
 
@@ -361,9 +361,9 @@ impl RegulationEngine {
             let pref_safe = !is_crisis || dream_pref.crisis_safe();
             let pref_alliance_ok = alliance_level >= dream_pref.min_alliance();
             // Also check effectiveness: don't use dream-preferred if historically poor
-            let not_poor = self
-                .effectiveness(&dream_pref)
-                .map_or(true, |eff| eff.applications < 3 || eff.success_rate() >= 0.3);
+            let not_poor = self.effectiveness(&dream_pref).map_or(true, |eff| {
+                eff.applications < 3 || eff.success_rate() >= 0.3
+            });
             if pref_safe && pref_alliance_ok && not_poor {
                 return dream_pref;
             }
@@ -399,11 +399,7 @@ impl RegulationEngine {
     /// Apply a regulation strategy → neuromodulator delta.
     ///
     /// Intensity scales with client distress (higher distress = stronger intervention).
-    pub fn apply_strategy(
-        &mut self,
-        strategy: RegulationStrategy,
-        distress: f32,
-    ) -> NeuromodDelta {
+    pub fn apply_strategy(&mut self, strategy: RegulationStrategy, distress: f32) -> NeuromodDelta {
         self.active_strategy = Some(strategy);
         let intensity = distress.clamp(0.1, 1.0) * 0.15; // max 0.15 delta per cycle
 
@@ -745,17 +741,16 @@ mod tests {
         rdoc_high_neg.set_score(RDocDomain::NegativeValence, 0.9);
         let rdoc_default = RDocProfile::default();
 
-        let delta_high = engine.apply_strategy_rdoc(
-            RegulationStrategy::Validation, 0.5, &rdoc_high_neg,
-        );
-        let delta_default = engine.apply_strategy_rdoc(
-            RegulationStrategy::Validation, 0.5, &rdoc_default,
-        );
+        let delta_high =
+            engine.apply_strategy_rdoc(RegulationStrategy::Validation, 0.5, &rdoc_high_neg);
+        let delta_default =
+            engine.apply_strategy_rdoc(RegulationStrategy::Validation, 0.5, &rdoc_default);
         // High NegativeValence should produce stronger serotonin delta
         assert!(
             delta_high.serotonin.abs() > delta_default.serotonin.abs(),
             "serotonin should be amplified: {} vs {}",
-            delta_high.serotonin, delta_default.serotonin,
+            delta_high.serotonin,
+            delta_default.serotonin,
         );
     }
 
@@ -767,10 +762,14 @@ mod tests {
         let rdoc_default = RDocProfile::default();
 
         let delta_low = engine.apply_strategy_rdoc(
-            RegulationStrategy::CognitiveReappraisal, 0.5, &rdoc_low_pos,
+            RegulationStrategy::CognitiveReappraisal,
+            0.5,
+            &rdoc_low_pos,
         );
         let delta_default = engine.apply_strategy_rdoc(
-            RegulationStrategy::CognitiveReappraisal, 0.5, &rdoc_default,
+            RegulationStrategy::CognitiveReappraisal,
+            0.5,
+            &rdoc_default,
         );
         assert!(
             delta_low.dopamine.abs() > delta_default.dopamine.abs(),
@@ -784,12 +783,8 @@ mod tests {
         // as non-RDoC apply_strategy (within amplification factor).
         let mut engine = RegulationEngine::new();
         let rdoc = RDocProfile::default();
-        let delta_rdoc = engine.apply_strategy_rdoc(
-            RegulationStrategy::Grounding, 0.5, &rdoc,
-        );
-        let delta_plain = engine.apply_strategy(
-            RegulationStrategy::Grounding, 0.5,
-        );
+        let delta_rdoc = engine.apply_strategy_rdoc(RegulationStrategy::Grounding, 0.5, &rdoc);
+        let delta_plain = engine.apply_strategy(RegulationStrategy::Grounding, 0.5);
         // With default RDoC (moderate scores), amplification should be modest
         // GABA should still be positive and in the same ballpark
         assert!(delta_rdoc.gaba > 0.0);
@@ -811,7 +806,7 @@ mod tests {
         let mut engine = RegulationEngine::new();
         engine.incorporate_dream_wisdom(4, 0.5); // Validation
         engine.incorporate_dream_wisdom(4, 0.0); // Low improvement
-        // EMA should decay: 0.5*0.9 + 0.0*0.1 = 0.45
+                                                 // EMA should decay: 0.5*0.9 + 0.0*0.1 = 0.45
         let pref = engine.dream_preferred_strategy();
         assert_eq!(pref, Some(RegulationStrategy::Validation));
     }
@@ -908,9 +903,7 @@ mod tests {
         let rdoc = RDocProfile::default();
 
         // Without debt
-        let delta_no_debt = engine.apply_strategy_rdoc(
-            RegulationStrategy::Validation, 0.5, &rdoc,
-        );
+        let delta_no_debt = engine.apply_strategy_rdoc(RegulationStrategy::Validation, 0.5, &rdoc);
 
         // Accumulate serotonin debt
         let mut neg_rdoc = RDocProfile::default();
@@ -919,13 +912,13 @@ mod tests {
             engine.tick_debt(&neg_rdoc);
         }
 
-        let delta_with_debt = engine.apply_strategy_rdoc(
-            RegulationStrategy::Validation, 0.5, &rdoc,
-        );
+        let delta_with_debt =
+            engine.apply_strategy_rdoc(RegulationStrategy::Validation, 0.5, &rdoc);
         assert!(
             delta_with_debt.serotonin > delta_no_debt.serotonin,
             "Accumulated serotonin debt should amplify serotonin delta: {} vs {}",
-            delta_with_debt.serotonin, delta_no_debt.serotonin,
+            delta_with_debt.serotonin,
+            delta_no_debt.serotonin,
         );
     }
 
@@ -980,10 +973,15 @@ mod tests {
         engine.record_application_distress(0.6);
         engine.record_outcome(0.4); // delta = -0.2 (improvement)
 
-        let eff = engine.effectiveness(&RegulationStrategy::Validation).unwrap();
+        let eff = engine
+            .effectiveness(&RegulationStrategy::Validation)
+            .unwrap();
         assert_eq!(eff.applications, 1);
         assert_eq!(eff.successes, 1);
-        assert!(eff.mean_affect_delta < 0.0, "mean delta should be negative (improvement)");
+        assert!(
+            eff.mean_affect_delta < 0.0,
+            "mean delta should be negative (improvement)"
+        );
     }
 
     #[test]
@@ -995,7 +993,9 @@ mod tests {
             engine.record_application_distress(0.5);
             engine.record_outcome(0.5 + delta);
         }
-        let eff = engine.effectiveness(&RegulationStrategy::Grounding).unwrap();
+        let eff = engine
+            .effectiveness(&RegulationStrategy::Grounding)
+            .unwrap();
         assert_eq!(eff.applications, 4);
         assert_eq!(eff.successes, 3);
         assert!((eff.success_rate() - 0.75).abs() < 0.01);
@@ -1022,8 +1022,14 @@ mod tests {
             engine.record_application_distress(0.5);
             engine.record_outcome(0.5 + delta);
         }
-        assert_eq!(engine.most_effective_strategy(), Some(RegulationStrategy::Validation));
-        assert_eq!(engine.least_effective_strategy(), Some(RegulationStrategy::Grounding));
+        assert_eq!(
+            engine.most_effective_strategy(),
+            Some(RegulationStrategy::Validation)
+        );
+        assert_eq!(
+            engine.least_effective_strategy(),
+            Some(RegulationStrategy::Grounding)
+        );
     }
 
     #[test]

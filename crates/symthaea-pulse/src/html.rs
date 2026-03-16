@@ -16,7 +16,7 @@ use symthaea_psych_bench::harness::cognitive_profile::CognitiveProfile;
 use symthaea_types::N_HARMONIES;
 
 use crate::{
-    Anomaly, CantorInfo, DriveInfo, DreamInfo, GovernanceInfo, IntegrityInfo, KnowledgeInfo,
+    Anomaly, CantorInfo, DreamInfo, DriveInfo, GovernanceInfo, IntegrityInfo, KnowledgeInfo,
     LearningInfo, MoralCompass, Narrative, NeuroBath, PerceptionInfo, PulseDelta, PulseSnapshot,
     ReasoningInfo, SparklinePoint, SubstrateInfo, SwarmInfo, Vitals,
 };

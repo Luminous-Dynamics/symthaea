@@ -66,10 +66,7 @@ impl CognitiveLoopService {
                     .consciousness_profile_composite,
                 synergy_enhanced_composite: feedback.consciousness.synergy_enhanced_composite,
                 emergent_properties_count: feedback.consciousness.emergent_properties_count,
-                consciousness_state_label: feedback
-                    .consciousness
-                    .consciousness_state_label
-                    .clone(),
+                consciousness_state_label: feedback.consciousness.consciousness_state_label.clone(),
                 consciousness_state_level: feedback.consciousness.consciousness_state_level,
                 consciousness_weights: feedback.consciousness.consciousness_weights,
                 consciousness_weight_variance: feedback.consciousness.consciousness_weight_variance,
@@ -139,14 +136,21 @@ impl CognitiveLoopService {
                 dream_wisdom_count: feedback.memory.dream_wisdom_count,
                 continuity_replay_triggered: feedback.consciousness.continuity_replay_needed,
                 resonator_codebook_size: self
-                    .memory_consol.resonator_memory
+                    .memory_consol
+                    .resonator_memory
                     .as_ref()
                     .and_then(|m| m.resonator.codebooks.first())
                     .map(|cb| cb.len())
                     .unwrap_or(0),
-                resonator_episodes: self.memory_consol.resonator_memory.as_ref().map(|m| m.len()).unwrap_or(0),
+                resonator_episodes: self
+                    .memory_consol
+                    .resonator_memory
+                    .as_ref()
+                    .map(|m| m.len())
+                    .unwrap_or(0),
                 resonator_factorization_iters: self
-                    .memory_consol.resonator_memory
+                    .memory_consol
+                    .resonator_memory
                     .as_ref()
                     .map(|m| m.resonator.iterations())
                     .unwrap_or(0),
@@ -595,32 +599,25 @@ impl CognitiveLoopService {
             use super::thresholds::{
                 CONSCIOUSNESS_EMA_HIGH_THRESHOLD, CONSCIOUSNESS_EMA_LOW_THRESHOLD,
                 CONSCIOUSNESS_GRADIENT_CAUTION_THRESHOLD, EPISTEMIC_REJECTION_STREAK_THRESHOLD,
-                FULL_DAMPEN_FREEZE_THRESHOLD, MULTI_OBJ_FRONTIER_LARGE,
-                MULTI_OBJ_FRONTIER_SMALL, TEMPORAL_BINDING_DAMPEN_THRESHOLD,
-                TEMPORAL_BINDING_EXPLORE_THRESHOLD,
+                FULL_DAMPEN_FREEZE_THRESHOLD, MULTI_OBJ_FRONTIER_LARGE, MULTI_OBJ_FRONTIER_SMALL,
+                TEMPORAL_BINDING_DAMPEN_THRESHOLD, TEMPORAL_BINDING_EXPLORE_THRESHOLD,
             };
             let tb = perception.encoding.temporal_binding_strength;
             metadata.temporal_binding_feedback = self.stats.total_cycles > 15
                 && (tb < TEMPORAL_BINDING_EXPLORE_THRESHOLD
                     || tb > TEMPORAL_BINDING_DAMPEN_THRESHOLD);
-            metadata.consciousness_gradient_active = feedback
-                .consciousness
-                .consciousness_gradient_magnitude
-                > CONSCIOUSNESS_GRADIENT_CAUTION_THRESHOLD
-                || self.carryover.quality.consecutive_stable_gradient > 20;
-            metadata.startup_exploration_ramped = self.stats.total_cycles
-                <= super::thresholds::STARTUP_WARMUP_CYCLES;
-            metadata.epistemic_rejection_streak_recal = self
-                .carryover
-                .quality
-                .consecutive_epistemic_rejections
-                >= EPISTEMIC_REJECTION_STREAK_THRESHOLD
-                && self.stats.total_cycles > 20;
-            metadata.full_dampen_threshold_freeze = self
-                .carryover
-                .quality
-                .consecutive_full_dampen
-                >= FULL_DAMPEN_FREEZE_THRESHOLD;
+            metadata.consciousness_gradient_active =
+                feedback.consciousness.consciousness_gradient_magnitude
+                    > CONSCIOUSNESS_GRADIENT_CAUTION_THRESHOLD
+                    || self.carryover.quality.consecutive_stable_gradient > 20;
+            metadata.startup_exploration_ramped =
+                self.stats.total_cycles <= super::thresholds::STARTUP_WARMUP_CYCLES;
+            metadata.epistemic_rejection_streak_recal =
+                self.carryover.quality.consecutive_epistemic_rejections
+                    >= EPISTEMIC_REJECTION_STREAK_THRESHOLD
+                    && self.stats.total_cycles > 20;
+            metadata.full_dampen_threshold_freeze =
+                self.carryover.quality.consecutive_full_dampen >= FULL_DAMPEN_FREEZE_THRESHOLD;
             let ema = self.carryover.history.consciousness_ema;
             metadata.consciousness_ema_lr_bias = self.stats.total_cycles > 30
                 && (ema > CONSCIOUSNESS_EMA_HIGH_THRESHOLD
@@ -783,11 +780,19 @@ impl CognitiveLoopService {
         // ── Voice telemetry ──
         {
             let voice_summary = self.language_comm.voice_coherence.voice.summary();
-            metadata.voice_articulation_quality =
-                self.language_comm.voice_coherence.voice.smoothed_articulation();
-            metadata.voice_rate_stability = self.language_comm.voice_coherence.voice.rate_stability();
+            metadata.voice_articulation_quality = self
+                .language_comm
+                .voice_coherence
+                .voice
+                .smoothed_articulation();
+            metadata.voice_rate_stability =
+                self.language_comm.voice_coherence.voice.rate_stability();
             metadata.voice_confidence = voice_summary.voice_confidence;
-            metadata.voice_phi_adjustment = self.language_comm.voice_coherence.voice.compute_phi_adjustment();
+            metadata.voice_phi_adjustment = self
+                .language_comm
+                .voice_coherence
+                .voice
+                .compute_phi_adjustment();
         }
 
         // ── Perception Manager telemetry ──
@@ -874,7 +879,12 @@ impl CognitiveLoopService {
                     })
                     .collect(),
                 global_failure_streak: self.integrity_manager.global_failure_streak,
-                confidence_history: self.integrity_manager.confidence_history().iter().copied().collect(),
+                confidence_history: self
+                    .integrity_manager
+                    .confidence_history()
+                    .iter()
+                    .copied()
+                    .collect(),
             };
             // Integrity-aware consciousness gating: if integrity is compromised,
             // discount consciousness scores — the system should distrust its own
@@ -990,8 +1000,10 @@ impl CognitiveLoopService {
         // ── Therapeutic telemetry ──
         #[cfg(feature = "therapeutic")]
         {
-            metadata.therapeutic.therapeutic_client_distress = self.therapeutic_manager.client_distress();
-            metadata.therapeutic.therapeutic_alliance = self.therapeutic_manager.alliance_composite();
+            metadata.therapeutic.therapeutic_client_distress =
+                self.therapeutic_manager.client_distress();
+            metadata.therapeutic.therapeutic_alliance =
+                self.therapeutic_manager.alliance_composite();
             metadata.therapeutic.therapeutic_crisis_active = self.therapeutic_manager.crisis_active;
             metadata.therapeutic.therapeutic_crisis_type = self
                 .therapeutic_manager
@@ -1003,16 +1015,26 @@ impl CognitiveLoopService {
                 .active_strategy()
                 .map(|s| format!("{:?}", s))
                 .unwrap_or_default();
-            metadata.therapeutic.therapeutic_narrative_coherence = self.therapeutic_manager.narrative_coherence();
-            metadata.therapeutic.therapeutic_formulation_factors = self.therapeutic_manager.formulation.total_factors();
-            metadata.therapeutic.therapeutic_resilience_ratio = self.therapeutic_manager.formulation_resilience_ratio();
-            metadata.therapeutic.therapeutic_rupture_count = self.therapeutic_manager.alliance.rupture_count;
-            metadata.therapeutic.therapeutic_repair_count = self.therapeutic_manager.alliance.repair_count;
-            metadata.therapeutic.therapeutic_clinical_severity = self.therapeutic_manager.client_model.clinical_severity();
-            metadata.therapeutic.therapeutic_narrative_fragments = self.therapeutic_manager.narrative.fragments.len();
-            metadata.therapeutic.therapeutic_serotonin_debt = self.therapeutic_manager.regulation_engine.serotonin_debt();
-            metadata.therapeutic.therapeutic_dopamine_debt = self.therapeutic_manager.regulation_engine.dopamine_debt();
-            metadata.therapeutic.therapeutic_dream_accuracy = self.therapeutic_manager.dream_prediction_accuracy();
+            metadata.therapeutic.therapeutic_narrative_coherence =
+                self.therapeutic_manager.narrative_coherence();
+            metadata.therapeutic.therapeutic_formulation_factors =
+                self.therapeutic_manager.formulation.total_factors();
+            metadata.therapeutic.therapeutic_resilience_ratio =
+                self.therapeutic_manager.formulation_resilience_ratio();
+            metadata.therapeutic.therapeutic_rupture_count =
+                self.therapeutic_manager.alliance.rupture_count;
+            metadata.therapeutic.therapeutic_repair_count =
+                self.therapeutic_manager.alliance.repair_count;
+            metadata.therapeutic.therapeutic_clinical_severity =
+                self.therapeutic_manager.client_model.clinical_severity();
+            metadata.therapeutic.therapeutic_narrative_fragments =
+                self.therapeutic_manager.narrative.fragments.len();
+            metadata.therapeutic.therapeutic_serotonin_debt =
+                self.therapeutic_manager.regulation_engine.serotonin_debt();
+            metadata.therapeutic.therapeutic_dopamine_debt =
+                self.therapeutic_manager.regulation_engine.dopamine_debt();
+            metadata.therapeutic.therapeutic_dream_accuracy =
+                self.therapeutic_manager.dream_prediction_accuracy();
 
             // ── Scope Guard: check Broca output for scope violations ──
             // Runs BEFORE language_output is returned to caller.
@@ -1044,6 +1066,44 @@ impl CognitiveLoopService {
                 self.therapeutic_manager.alliance.withdrawal_count();
             metadata.therapeutic.therapeutic_confrontation_count =
                 self.therapeutic_manager.alliance.confrontation_count();
+
+            // ── Round 6: Formulation, RDoC, effectiveness, temporal coherence ──
+            let rdoc = &self.therapeutic_manager.client_model.rdoc_profile;
+            metadata.therapeutic.therapeutic_rdoc_profile = [
+                rdoc.score(symthaea_clinical::RDocDomain::NegativeValence),
+                rdoc.score(symthaea_clinical::RDocDomain::PositiveValence),
+                rdoc.score(symthaea_clinical::RDocDomain::CognitiveSystems),
+                rdoc.score(symthaea_clinical::RDocDomain::SocialProcesses),
+                rdoc.score(symthaea_clinical::RDocDomain::ArousalRegulatory),
+                rdoc.score(symthaea_clinical::RDocDomain::Sensorimotor),
+            ];
+            metadata.therapeutic.therapeutic_perpetuating_factors = self
+                .therapeutic_manager
+                .formulation
+                .perpetuating
+                .iter()
+                .map(|f| f.description.clone())
+                .collect();
+            metadata.therapeutic.therapeutic_protective_factors = self
+                .therapeutic_manager
+                .formulation
+                .protective
+                .iter()
+                .map(|f| f.description.clone())
+                .collect();
+            metadata.therapeutic.therapeutic_strategy_effectiveness =
+                symthaea_therapeutic::RegulationStrategy::ALL
+                    .iter()
+                    .filter_map(|s| {
+                        self.therapeutic_manager
+                            .regulation_engine
+                            .effectiveness(s)
+                            .filter(|eff| eff.applications > 0)
+                            .map(|eff| (format!("{:?}", s), eff.success_rate(), eff.applications))
+                    })
+                    .collect();
+            metadata.therapeutic.therapeutic_temporal_coherence =
+                self.therapeutic_manager.narrative.temporal_coherence();
         }
 
         // ── Nurture/attachment telemetry ──
@@ -1341,8 +1401,10 @@ impl CognitiveLoopService {
         // below bounds set in cycle_quality.rs. Re-clamp here to guarantee invariants.
         self.adaptive_behavior.exploration_factor =
             self.adaptive_behavior.exploration_factor.clamp(0.1, 3.0);
-        self.adaptive_behavior.learning_rate_multiplier =
-            self.adaptive_behavior.learning_rate_multiplier.clamp(0.1, 2.0);
+        self.adaptive_behavior.learning_rate_multiplier = self
+            .adaptive_behavior
+            .learning_rate_multiplier
+            .clamp(0.1, 2.0);
         self.curiosity_drive.boredom = self.curiosity_drive.boredom.clamp(0.0, 1.5);
 
         CycleResult {

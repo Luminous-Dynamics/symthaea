@@ -15,7 +15,8 @@ fn voice_coherence_bridge_default_state() {
     let service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
     // Bridge should start with zero smoothed coherence
     assert!(service
-        .language_comm.voice_coherence
+        .language_comm
+        .voice_coherence
         .bridge
         .smoothed_coherence()
         .is_finite());
@@ -38,7 +39,8 @@ fn voice_coherence_bridge_reset_restores_clean_state() {
     service.reset();
     // State should be clean
     assert!(service
-        .language_comm.voice_coherence
+        .language_comm
+        .voice_coherence
         .bridge
         .smoothed_coherence()
         .is_finite());
@@ -155,7 +157,8 @@ fn full_service_reset_restores_all_managers() {
     assert!((service.social_mgr.social.social_trust - 0.5).abs() < f32::EPSILON);
     assert!((service.social_mgr.social.relational_psi - 0.0).abs() < f64::EPSILON);
     assert!(service
-        .language_comm.voice_coherence
+        .language_comm
+        .voice_coherence
         .bridge
         .smoothed_coherence()
         .is_finite());

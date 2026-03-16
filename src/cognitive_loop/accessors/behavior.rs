@@ -212,7 +212,8 @@ impl CognitiveLoopService {
 
     /// Update listener prediction feedback
     pub fn update_listener_prediction(&mut self, success: f32) {
-        self.language_comm.voice_coherence
+        self.language_comm
+            .voice_coherence
             .voice
             .update_listener_prediction(success);
     }
@@ -227,7 +228,10 @@ impl CognitiveLoopService {
         let consciousness_level =
             super::super::snapshot::ConsciousnessSnapshot::compute_consciousness_level(
                 self.prediction_confidence as f32,
-                self.language_comm.voice_coherence.bridge.smoothed_coherence(),
+                self.language_comm
+                    .voice_coherence
+                    .bridge
+                    .smoothed_coherence(),
                 self.flow_state.intensity,
                 pattern_confidence,
             );
@@ -267,7 +271,11 @@ impl CognitiveLoopService {
             coherence_velocity: signals.coherence_velocity,
             cross_agreement: signals.cross_module_agreement,
             consciousness_level: signals.consciousness_level as f32,
-            articulation_quality: self.language_comm.voice_coherence.voice.smoothed_articulation(),
+            articulation_quality: self
+                .language_comm
+                .voice_coherence
+                .voice
+                .smoothed_articulation(),
             rate_stability: self.language_comm.voice_coherence.voice.rate_stability(),
             integrated_phi: self
                 .carryover
@@ -287,7 +295,11 @@ impl CognitiveLoopService {
     /// Get combined phi contribution from all feedback sources
     pub fn combined_phi_contribution(&self) -> f32 {
         self.language_comm.voice_coherence.bridge.phi_contribution()
-            + self.language_comm.voice_coherence.voice.compute_phi_adjustment()
+            + self
+                .language_comm
+                .voice_coherence
+                .voice
+                .compute_phi_adjustment()
     }
 
     /// Get the prediction-outcome coupling Modulation Index
@@ -314,8 +326,16 @@ impl CognitiveLoopService {
 
     /// Get combined learning rate modifier
     pub fn combined_learning_rate(&self) -> f32 {
-        let coherence_lr = self.language_comm.voice_coherence.bridge.effective_learning_rate();
-        let voice_modifier = self.language_comm.voice_coherence.voice.learning_rate_modifier();
+        let coherence_lr = self
+            .language_comm
+            .voice_coherence
+            .bridge
+            .effective_learning_rate();
+        let voice_modifier = self
+            .language_comm
+            .voice_coherence
+            .voice
+            .learning_rate_modifier();
         coherence_lr * voice_modifier
     }
 
@@ -447,11 +467,11 @@ impl CognitiveLoopService {
         let lr = metadata.actual_effective_lr as f64;
         (
             metadata.consciousness_level,
-            lr,                                // meta-awareness proxy
+            lr,                                 // meta-awareness proxy
             metadata.consciousness_level * 0.8, // coherence proxy
             metadata.consciousness_level * 0.6, // care activation proxy
             metadata.consciousness_level * 0.9, // quality proxy
-            lr.min(1.0),                       // epistemic confidence proxy
+            lr.min(1.0),                        // epistemic confidence proxy
         )
     }
 
@@ -706,17 +726,12 @@ impl CognitiveLoopService {
     /// Inject a swarm event into the SwarmManager for processing.
     ///
     /// Events are queued and drained during the next `process()` call (interval 41).
-    pub fn inject_swarm_event(
-        &mut self,
-        event: super::super::managers::swarm_manager::SwarmEvent,
-    ) {
+    pub fn inject_swarm_event(&mut self, event: super::super::managers::swarm_manager::SwarmEvent) {
         self.swarm_manager.inject_event(event);
     }
 
     /// Get the current swarm telemetry snapshot.
-    pub fn swarm_telemetry(
-        &self,
-    ) -> &super::super::managers::swarm_manager::SwarmTelemetry {
+    pub fn swarm_telemetry(&self) -> &super::super::managers::swarm_manager::SwarmTelemetry {
         self.swarm_manager.telemetry()
     }
 
@@ -750,8 +765,7 @@ impl CognitiveLoopService {
         use super::super::thresholds::{
             SWARM_ANOMALY_NE_CAP, SWARM_ANOMALY_NE_MULT, SWARM_CONTAGION_DA_CAP,
             SWARM_CONTAGION_DA_GAIN, SWARM_CONTAGION_DA_THRESHOLD, SWARM_OXY_CAP,
-            SWARM_OXY_HALFLIFE, SWARM_OXY_PER_SQRT_PEER, SWARM_PHI_SHT_CAP,
-            SWARM_PHI_SHT_GAIN,
+            SWARM_OXY_HALFLIFE, SWARM_OXY_PER_SQRT_PEER, SWARM_PHI_SHT_CAP, SWARM_PHI_SHT_GAIN,
         };
         let telem = self.swarm_manager.telemetry().clone();
 
@@ -760,14 +774,16 @@ impl CognitiveLoopService {
             let oxy_dose = ((telem.connected_peers as f32).sqrt() * SWARM_OXY_PER_SQRT_PEER)
                 .min(SWARM_OXY_CAP);
             if oxy_dose > super::super::thresholds::GOV_NEUROMOD_FLOOR {
-                self.neuromod.bath.inject("oxytocin", oxy_dose, SWARM_OXY_HALFLIFE);
+                self.neuromod
+                    .bath
+                    .inject("oxytocin", oxy_dose, SWARM_OXY_HALFLIFE);
             }
         }
 
         // Anomaly vigilance: sudden peer loss → NE (Arnsten 2009)
         if telem.anomaly_count > 0 {
-            let ne_nudge =
-                (SWARM_ANOMALY_NE_MULT * telem.anomaly_count.min(3) as f32).min(SWARM_ANOMALY_NE_CAP);
+            let ne_nudge = (SWARM_ANOMALY_NE_MULT * telem.anomaly_count.min(3) as f32)
+                .min(SWARM_ANOMALY_NE_CAP);
             self.neuromod
                 .bath
                 .noradrenaline
@@ -845,9 +861,7 @@ impl CognitiveLoopService {
     }
 
     /// Access the ethics and values manager.
-    pub fn ethics_values(
-        &self,
-    ) -> &super::super::ethics_values_manager::EthicsAndValuesManager {
+    pub fn ethics_values(&self) -> &super::super::ethics_values_manager::EthicsAndValuesManager {
         &self.ethics_values
     }
 
@@ -864,9 +878,7 @@ impl CognitiveLoopService {
     }
 
     /// Access the vision and sensory manager.
-    pub fn vision_sensory(
-        &self,
-    ) -> &super::super::vision_sensory_manager::VisionAndSensoryManager {
+    pub fn vision_sensory(&self) -> &super::super::vision_sensory_manager::VisionAndSensoryManager {
         &self.vision_sensory
     }
 }

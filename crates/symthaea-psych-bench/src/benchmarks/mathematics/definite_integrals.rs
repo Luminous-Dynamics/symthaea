@@ -219,7 +219,10 @@ impl PsychBenchmark for DefiniteIntegralsBenchmark {
             rel_errors.push(r.mean_relative_error);
         }
 
-        result.insert("integration_accuracy", MetricValue::from_samples(&accuracies));
+        result.insert(
+            "integration_accuracy",
+            MetricValue::from_samples(&accuracies),
+        );
         result.insert(
             "mean_relative_error",
             MetricValue::from_samples(&rel_errors),

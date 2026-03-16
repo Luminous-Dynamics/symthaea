@@ -105,7 +105,12 @@ impl ProposalCollector {
 
     /// Record a proposal from a named subsystem (default priority: Cognitive, confidence: 1.0).
     pub fn propose(&mut self, source: &'static str, proposal: FeedbackProposal) {
-        self.proposals.push(AttributedProposal { source, proposal, priority: Priority::default(), confidence: 1.0 });
+        self.proposals.push(AttributedProposal {
+            source,
+            proposal,
+            priority: Priority::default(),
+            confidence: 1.0,
+        });
         self.cached = None;
     }
 
@@ -116,7 +121,12 @@ impl ProposalCollector {
         proposal: FeedbackProposal,
         priority: Priority,
     ) {
-        self.proposals.push(AttributedProposal { source, proposal, priority, confidence: 1.0 });
+        self.proposals.push(AttributedProposal {
+            source,
+            proposal,
+            priority,
+            confidence: 1.0,
+        });
         self.cached = None;
     }
 
@@ -132,7 +142,12 @@ impl ProposalCollector {
         priority: Priority,
         confidence: f32,
     ) {
-        self.proposals.push(AttributedProposal { source, proposal, priority, confidence: confidence.clamp(0.0, 1.0) });
+        self.proposals.push(AttributedProposal {
+            source,
+            proposal,
+            priority,
+            confidence: confidence.clamp(0.0, 1.0),
+        });
         self.cached = None;
     }
 
@@ -212,15 +227,35 @@ impl ProposalCollector {
     /// - `Scale` proposals: priority-weighted geometric mean, then applied
     ///
     /// When all proposals share the same priority, reduces to unweighted consensus.
-    pub fn integrate(&mut self, base_value: f64, clamp_min: f64, clamp_max: f64) -> IntegrationResult {
+    pub fn integrate(
+        &mut self,
+        base_value: f64,
+        clamp_min: f64,
+        clamp_max: f64,
+    ) -> IntegrationResult {
         // Cache hit: same parameters → return cached effective value
         if let Some((cb, cmin, cmax, eff)) = self.cached {
-            if (cb - base_value).abs() < 1e-15 && (cmin - clamp_min).abs() < 1e-15 && (cmax - clamp_max).abs() < 1e-15 {
+            if (cb - base_value).abs() < 1e-15
+                && (cmin - clamp_min).abs() < 1e-15
+                && (cmax - clamp_max).abs() < 1e-15
+            {
                 return IntegrationResult {
                     effective: eff,
-                    n_sets: self.proposals.iter().filter(|p| matches!(p.proposal, FeedbackProposal::Set(_))).count(),
-                    n_adds: self.proposals.iter().filter(|p| matches!(p.proposal, FeedbackProposal::Add(_))).count(),
-                    n_scales: self.proposals.iter().filter(|p| matches!(p.proposal, FeedbackProposal::Scale(_))).count(),
+                    n_sets: self
+                        .proposals
+                        .iter()
+                        .filter(|p| matches!(p.proposal, FeedbackProposal::Set(_)))
+                        .count(),
+                    n_adds: self
+                        .proposals
+                        .iter()
+                        .filter(|p| matches!(p.proposal, FeedbackProposal::Add(_)))
+                        .count(),
+                    n_scales: self
+                        .proposals
+                        .iter()
+                        .filter(|p| matches!(p.proposal, FeedbackProposal::Scale(_)))
+                        .count(),
                 };
             }
         }
@@ -240,7 +275,11 @@ impl ProposalCollector {
         // Start from base or highest-priority Set (ties: last one wins)
         let mut value = if !sets.is_empty() {
             let max_pri = sets.iter().map(|(_, _, p)| *p).max().unwrap();
-            sets.iter().rev().find(|(_, _, p)| *p == max_pri).map(|(_, v, _)| *v).unwrap_or(base_value)
+            sets.iter()
+                .rev()
+                .find(|(_, _, p)| *p == max_pri)
+                .map(|(_, v, _)| *v)
+                .unwrap_or(base_value)
         } else {
             base_value
         };
@@ -255,7 +294,11 @@ impl ProposalCollector {
         }
         // Priority-weighted geometric mean of multiplicative proposals
         if !scales.is_empty() {
-            let valid: Vec<(f64, f64)> = scales.iter().filter(|(f, _)| *f > 0.0 && f.is_finite()).copied().collect();
+            let valid: Vec<(f64, f64)> = scales
+                .iter()
+                .filter(|(f, _)| *f > 0.0 && f.is_finite())
+                .copied()
+                .collect();
             if !valid.is_empty() {
                 let total_w: f64 = valid.iter().map(|(_, w)| w).sum();
                 if total_w > 0.0 {
@@ -283,15 +326,35 @@ impl ProposalCollector {
 
     /// Integrate without mutating (for read-only contexts like conflict_ratio callers).
     /// This is the uncached path — use sparingly.
-    pub fn integrate_readonly(&self, base_value: f64, clamp_min: f64, clamp_max: f64) -> IntegrationResult {
+    pub fn integrate_readonly(
+        &self,
+        base_value: f64,
+        clamp_min: f64,
+        clamp_max: f64,
+    ) -> IntegrationResult {
         // Check cache first
         if let Some((cb, cmin, cmax, eff)) = self.cached {
-            if (cb - base_value).abs() < 1e-15 && (cmin - clamp_min).abs() < 1e-15 && (cmax - clamp_max).abs() < 1e-15 {
+            if (cb - base_value).abs() < 1e-15
+                && (cmin - clamp_min).abs() < 1e-15
+                && (cmax - clamp_max).abs() < 1e-15
+            {
                 return IntegrationResult {
                     effective: eff,
-                    n_sets: self.proposals.iter().filter(|p| matches!(p.proposal, FeedbackProposal::Set(_))).count(),
-                    n_adds: self.proposals.iter().filter(|p| matches!(p.proposal, FeedbackProposal::Add(_))).count(),
-                    n_scales: self.proposals.iter().filter(|p| matches!(p.proposal, FeedbackProposal::Scale(_))).count(),
+                    n_sets: self
+                        .proposals
+                        .iter()
+                        .filter(|p| matches!(p.proposal, FeedbackProposal::Set(_)))
+                        .count(),
+                    n_adds: self
+                        .proposals
+                        .iter()
+                        .filter(|p| matches!(p.proposal, FeedbackProposal::Add(_)))
+                        .count(),
+                    n_scales: self
+                        .proposals
+                        .iter()
+                        .filter(|p| matches!(p.proposal, FeedbackProposal::Scale(_)))
+                        .count(),
                 };
             }
         }
@@ -318,21 +381,34 @@ impl ProposalCollector {
         let mut value = last_set.map_or(base_value, |(v, _)| v);
         if !adds.is_empty() {
             let tw: f64 = adds.iter().map(|(_, w)| w).sum();
-            if tw > 0.0 { value += adds.iter().map(|(d, w)| d * w).sum::<f64>() / tw; }
+            if tw > 0.0 {
+                value += adds.iter().map(|(d, w)| d * w).sum::<f64>() / tw;
+            }
         }
         if !scales.is_empty() {
-            let valid: Vec<(f64, f64)> = scales.iter().filter(|(f, _)| *f > 0.0 && f.is_finite()).copied().collect();
+            let valid: Vec<(f64, f64)> = scales
+                .iter()
+                .filter(|(f, _)| *f > 0.0 && f.is_finite())
+                .copied()
+                .collect();
             if !valid.is_empty() {
                 let tw: f64 = valid.iter().map(|(_, w)| w).sum();
                 if tw > 0.0 {
                     let wlog: f64 = valid.iter().map(|(f, w)| f.ln() * w).sum::<f64>();
                     let gm = (wlog / tw).exp();
-                    if gm.is_finite() { value *= gm; }
+                    if gm.is_finite() {
+                        value *= gm;
+                    }
                 }
             }
         }
         value = value.clamp(clamp_min, clamp_max);
-        IntegrationResult { effective: value, n_sets: sets_n, n_adds: adds.len(), n_scales: scales.len() }
+        IntegrationResult {
+            effective: value,
+            n_sets: sets_n,
+            n_adds: adds.len(),
+            n_scales: scales.len(),
+        }
     }
 }
 
@@ -774,32 +850,47 @@ impl FeedbackState {
 
     /// Effective prediction_confidence from cycle-start + proposals so far.
     pub fn effective_confidence(&mut self) -> f64 {
-        self.confidence.integrate(self.cycle_start_confidence, 0.01, 0.99).effective
+        self.confidence
+            .integrate(self.cycle_start_confidence, 0.01, 0.99)
+            .effective
     }
 
     /// Effective fep_lr_boost from cycle-start + proposals so far.
     pub fn effective_lr_boost(&mut self) -> f64 {
-        self.learning_rate.integrate(self.cycle_start_lr, 1.0, 3.0).effective
+        self.learning_rate
+            .integrate(self.cycle_start_lr, 1.0, 3.0)
+            .effective
     }
 
     /// Effective exploration_urge from cycle-start + proposals so far.
     pub fn effective_exploration(&mut self) -> f64 {
-        self.exploration.integrate(self.cycle_start_exploration, 0.0, 1.0).effective
+        self.exploration
+            .integrate(self.cycle_start_exploration, 0.0, 1.0)
+            .effective
     }
 
     /// Effective adaptive_threshold_scale from cycle-start + proposals so far.
     pub fn effective_threshold(&mut self) -> f64 {
-        self.threshold.integrate(self.cycle_start_threshold, 0.5, 2.0).effective
+        self.threshold
+            .integrate(self.cycle_start_threshold, 0.5, 2.0)
+            .effective
     }
 
     /// Compute a per-cycle feedback summary for diagnostics.
     pub fn feedback_summary(&self) -> FeedbackSummary {
         let total = self.total_proposals();
         let mut priority_counts = [0u32; 4];
-        for collector in [&self.confidence, &self.learning_rate, &self.exploration, &self.threshold] {
+        for collector in [
+            &self.confidence,
+            &self.learning_rate,
+            &self.exploration,
+            &self.threshold,
+        ] {
             for ap in collector.proposals() {
                 let idx = ap.priority as usize;
-                if idx < 4 { priority_counts[idx] += 1; }
+                if idx < 4 {
+                    priority_counts[idx] += 1;
+                }
             }
         }
         FeedbackSummary {
@@ -1419,15 +1510,25 @@ mod tests {
         let mut e = ProposalCollector::new();
         e.propose_with_priority("a", FeedbackProposal::Add(0.1), Priority::Cognitive);
         e.propose_with_priority("b", FeedbackProposal::Scale(0.9), Priority::Cognitive);
-        assert!((d.integrate(0.5, 0.0, 1.0).effective - e.integrate(0.5, 0.0, 1.0).effective).abs() < 1e-10);
+        assert!(
+            (d.integrate(0.5, 0.0, 1.0).effective - e.integrate(0.5, 0.0, 1.0).effective).abs()
+                < 1e-10
+        );
     }
 
     #[test]
     fn test_safety_outweighs_aesthetic_add() {
         let mut c = ProposalCollector::new();
         c.propose_with_priority("safety", FeedbackProposal::Add(0.2), Priority::Safety);
-        c.propose_with_priority("aesthetic", FeedbackProposal::Add(-0.2), Priority::Aesthetic);
-        assert!(c.integrate(0.5, 0.0, 1.0).effective > 0.5, "Safety should dominate");
+        c.propose_with_priority(
+            "aesthetic",
+            FeedbackProposal::Add(-0.2),
+            Priority::Aesthetic,
+        );
+        assert!(
+            c.integrate(0.5, 0.0, 1.0).effective > 0.5,
+            "Safety should dominate"
+        );
     }
 
     #[test]
@@ -1450,7 +1551,8 @@ mod tests {
         rev.propose_with_priority("c", FeedbackProposal::Scale(1.1), Priority::Homeostatic);
         rev.propose_with_priority("b", FeedbackProposal::Add(-0.05), Priority::Aesthetic);
         rev.propose_with_priority("a", FeedbackProposal::Add(0.1), Priority::Safety);
-        let diff = (fwd.integrate(0.5, 0.0, 1.0).effective - rev.integrate(0.5, 0.0, 1.0).effective).abs();
+        let diff =
+            (fwd.integrate(0.5, 0.0, 1.0).effective - rev.integrate(0.5, 0.0, 1.0).effective).abs();
         assert!(diff < 1e-10, "Order matters: diff={diff}");
     }
 
@@ -1458,10 +1560,20 @@ mod tests {
     fn test_feedback_summary_counts_priorities() {
         let mut state = FeedbackState::new();
         state.begin_cycle();
-        state.confidence.propose_with_priority("s1", FeedbackProposal::Add(0.1), Priority::Safety);
-        state.confidence.propose_with_priority("s2", FeedbackProposal::Add(0.05), Priority::Safety);
-        state.learning_rate.propose("fep", FeedbackProposal::Add(0.1));
-        state.exploration.propose_with_priority("flow", FeedbackProposal::Scale(1.1), Priority::Aesthetic);
+        state
+            .confidence
+            .propose_with_priority("s1", FeedbackProposal::Add(0.1), Priority::Safety);
+        state
+            .confidence
+            .propose_with_priority("s2", FeedbackProposal::Add(0.05), Priority::Safety);
+        state
+            .learning_rate
+            .propose("fep", FeedbackProposal::Add(0.1));
+        state.exploration.propose_with_priority(
+            "flow",
+            FeedbackProposal::Scale(1.1),
+            Priority::Aesthetic,
+        );
         let summary = state.feedback_summary();
         assert_eq!(summary.total_proposals, 4);
         assert_eq!(summary.priority_counts[Priority::Safety as usize], 2);

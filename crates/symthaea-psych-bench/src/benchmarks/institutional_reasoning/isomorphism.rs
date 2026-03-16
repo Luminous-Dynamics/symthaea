@@ -288,11 +288,7 @@ mod tests {
         let config = BenchmarkConfig::default();
         let result = InstitutionalIsomorphismBenchmark.run(&config);
         let ss = result.metrics["isomorphism_self_similarity"].mean;
-        assert!(
-            ss > 0.99,
-            "self-similarity should be ~1.0, got {:.4}",
-            ss
-        );
+        assert!(ss > 0.99, "self-similarity should be ~1.0, got {:.4}", ss);
     }
 
     #[test]

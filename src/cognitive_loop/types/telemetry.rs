@@ -1329,7 +1329,6 @@ pub struct CycleMetadata {
     // These booleans tell dashboards whether 0.0 means "feature disabled"
     // vs "measured as zero". Populated at metadata construction time from
     // compile-time feature flags and runtime config.
-
     /// Whether the `reasoning_engine` feature is compiled in and active.
     #[serde(default)]
     pub reasoning_engine_enabled: bool,

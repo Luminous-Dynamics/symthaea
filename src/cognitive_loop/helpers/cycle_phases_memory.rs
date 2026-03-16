@@ -105,7 +105,8 @@ impl CognitiveLoopService {
         let mut codebook_evictions: usize = 0;
         if self.stats.total_cycles % 97 == 0 && self.stats.total_cycles > 0 {
             let top_eps = self
-                .episodic_persistence.replay
+                .episodic_persistence
+                .replay
                 .as_ref()
                 .map(|replay| replay.get_top_episodes(3))
                 .unwrap_or_default();
@@ -535,7 +536,8 @@ impl CognitiveLoopService {
                 let mut depth_counts = [0usize; 8]; // depths 0-7
                 for d in 0..8 {
                     depth_counts[d] = self
-                        .cantor_dream.cleanup_engine
+                        .cantor_dream
+                        .cleanup_engine
                         .codebook
                         .count_by_prefix(&format!("d{d}_"));
                 }
@@ -549,7 +551,10 @@ impl CognitiveLoopService {
                 // Evict oldest entry from that stratum (FIFO — first match removed)
                 if depth_counts[max_stratum] > 2 {
                     let prefix = format!("d{max_stratum}_");
-                    self.cantor_dream.cleanup_engine.codebook.evict_by_prefix(&prefix);
+                    self.cantor_dream
+                        .cleanup_engine
+                        .codebook
+                        .evict_by_prefix(&prefix);
                 }
             }
 
@@ -618,16 +623,25 @@ impl CognitiveLoopService {
 
         // Memory coordinator: broadcast signals and process graduations
         {
-            let coord_phi = self.language_comm.voice_coherence.bridge.smoothed_coherence() as f64;
+            let coord_phi = self
+                .language_comm
+                .voice_coherence
+                .bridge
+                .smoothed_coherence() as f64;
             let coord_coherence = coherence as f64;
-            self.memory_consol.memory_coordinator.update_signals_with_sigma(
-                coord_phi,
-                coord_coherence,
-                self.carryover.consciousness.last_sigma,
-            );
+            self.memory_consol
+                .memory_coordinator
+                .update_signals_with_sigma(
+                    coord_phi,
+                    coord_coherence,
+                    self.carryover.consciousness.last_sigma,
+                );
 
             if let Some(ref mut replay) = self.episodic_persistence.replay {
-                let graduated = self.memory_consol.memory_coordinator.process_graduations(replay);
+                let graduated = self
+                    .memory_consol
+                    .memory_coordinator
+                    .process_graduations(replay);
                 if graduated > 0 {
                     tracing::debug!(
                         graduated,
@@ -649,7 +663,8 @@ impl CognitiveLoopService {
             use std::sync::atomic::Ordering;
 
             if !self
-                .episodic_persistence.flush_in_progress
+                .episodic_persistence
+                .flush_in_progress
                 .load(Ordering::Relaxed)
             {
                 if let Some(ref replay) = self.episodic_persistence.replay {
@@ -692,7 +707,10 @@ impl CognitiveLoopService {
                         std::thread::spawn(move || {
                             match db.store_batch_sync(&records) {
                                 Ok(n) => {
-                                    tracing::debug!(stored = n, "Memory flush: episodes persisted to SQLite");
+                                    tracing::debug!(
+                                        stored = n,
+                                        "Memory flush: episodes persisted to SQLite"
+                                    );
                                 }
                                 Err(e) => {
                                     tracing::warn!(error = %e, "Memory flush failed");

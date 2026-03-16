@@ -156,6 +156,69 @@ impl super::super::CognitiveLoopService {
     }
 
     // ═══════════════════════════════════════════════════════════════════════
+    // CONFIDENCE-WEIGHTED VARIANTS
+    // ═══════════════════════════════════════════════════════════════════════
+    // These use `propose_weighted()` to scale the priority weight by a
+    // confidence score (0.0–1.0). A low-confidence Safety signal (conf=0.3)
+    // gets weight 0.9, potentially less than a high-confidence Cognitive
+    // signal (1.0). Use these when the subsystem has a natural confidence
+    // metric (e.g., contradiction strength, moral score, honest confidence).
+
+    /// Adjust confidence with confidence-scaled priority weight.
+    #[inline]
+    pub(in crate::cognitive_loop) fn adjust_confidence_weighted(
+        &mut self,
+        source: &'static str,
+        delta: f32,
+        priority: super::super::feedback_state::Priority,
+        confidence: f32,
+    ) {
+        self.feedback_state.confidence.propose_weighted(
+            source,
+            FeedbackProposal::Add(delta as f64),
+            priority,
+            confidence,
+        );
+        self.prediction_confidence = self.feedback_state.effective_confidence();
+    }
+
+    /// Scale confidence with confidence-scaled priority weight.
+    #[inline]
+    pub(in crate::cognitive_loop) fn scale_confidence_weighted(
+        &mut self,
+        source: &'static str,
+        factor: f32,
+        priority: super::super::feedback_state::Priority,
+        confidence: f32,
+    ) {
+        self.feedback_state.confidence.propose_weighted(
+            source,
+            FeedbackProposal::Scale(factor as f64),
+            priority,
+            confidence,
+        );
+        self.prediction_confidence = self.feedback_state.effective_confidence();
+    }
+
+    /// Adjust exploration with confidence-scaled priority weight.
+    #[inline]
+    pub(in crate::cognitive_loop) fn adjust_exploration_weighted(
+        &mut self,
+        source: &'static str,
+        delta: f32,
+        priority: super::super::feedback_state::Priority,
+        confidence: f32,
+    ) {
+        self.feedback_state.exploration.propose_weighted(
+            source,
+            FeedbackProposal::Add(delta as f64),
+            priority,
+            confidence,
+        );
+        self.curiosity_drive.exploration_urge = self.feedback_state.effective_exploration();
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
     // MID-CYCLE EFFECTIVE VALUE ACCESSORS
     // ═══════════════════════════════════════════════════════════════════════
 
@@ -195,9 +258,11 @@ impl super::super::CognitiveLoopService {
         delta: f32,
         priority: super::super::feedback_state::Priority,
     ) {
-        self.feedback_state
-            .confidence
-            .propose_with_priority(source, FeedbackProposal::Add(delta as f64), priority);
+        self.feedback_state.confidence.propose_with_priority(
+            source,
+            FeedbackProposal::Add(delta as f64),
+            priority,
+        );
         self.prediction_confidence = self.feedback_state.effective_confidence();
     }
 
@@ -209,9 +274,11 @@ impl super::super::CognitiveLoopService {
         factor: f32,
         priority: super::super::feedback_state::Priority,
     ) {
-        self.feedback_state
-            .confidence
-            .propose_with_priority(source, FeedbackProposal::Scale(factor as f64), priority);
+        self.feedback_state.confidence.propose_with_priority(
+            source,
+            FeedbackProposal::Scale(factor as f64),
+            priority,
+        );
         self.prediction_confidence = self.feedback_state.effective_confidence();
     }
 
@@ -223,9 +290,11 @@ impl super::super::CognitiveLoopService {
         delta: f32,
         priority: super::super::feedback_state::Priority,
     ) {
-        self.feedback_state
-            .learning_rate
-            .propose_with_priority(source, FeedbackProposal::Add(delta as f64), priority);
+        self.feedback_state.learning_rate.propose_with_priority(
+            source,
+            FeedbackProposal::Add(delta as f64),
+            priority,
+        );
         self.fep.lr_boost = self.feedback_state.effective_lr_boost();
     }
 
@@ -237,9 +306,11 @@ impl super::super::CognitiveLoopService {
         factor: f32,
         priority: super::super::feedback_state::Priority,
     ) {
-        self.feedback_state
-            .learning_rate
-            .propose_with_priority(source, FeedbackProposal::Scale(factor as f64), priority);
+        self.feedback_state.learning_rate.propose_with_priority(
+            source,
+            FeedbackProposal::Scale(factor as f64),
+            priority,
+        );
         self.fep.lr_boost = self.feedback_state.effective_lr_boost();
     }
 
@@ -251,9 +322,11 @@ impl super::super::CognitiveLoopService {
         delta: f32,
         priority: super::super::feedback_state::Priority,
     ) {
-        self.feedback_state
-            .exploration
-            .propose_with_priority(source, FeedbackProposal::Add(delta as f64), priority);
+        self.feedback_state.exploration.propose_with_priority(
+            source,
+            FeedbackProposal::Add(delta as f64),
+            priority,
+        );
         self.curiosity_drive.exploration_urge = self.feedback_state.effective_exploration();
     }
 
@@ -265,9 +338,11 @@ impl super::super::CognitiveLoopService {
         factor: f32,
         priority: super::super::feedback_state::Priority,
     ) {
-        self.feedback_state
-            .exploration
-            .propose_with_priority(source, FeedbackProposal::Scale(factor as f64), priority);
+        self.feedback_state.exploration.propose_with_priority(
+            source,
+            FeedbackProposal::Scale(factor as f64),
+            priority,
+        );
         self.curiosity_drive.exploration_urge = self.feedback_state.effective_exploration();
     }
 
@@ -279,9 +354,11 @@ impl super::super::CognitiveLoopService {
         value: f32,
         priority: super::super::feedback_state::Priority,
     ) {
-        self.feedback_state
-            .exploration
-            .propose_with_priority(source, FeedbackProposal::Set(value as f64), priority);
+        self.feedback_state.exploration.propose_with_priority(
+            source,
+            FeedbackProposal::Set(value as f64),
+            priority,
+        );
         self.curiosity_drive.exploration_urge = self.feedback_state.effective_exploration();
     }
 }

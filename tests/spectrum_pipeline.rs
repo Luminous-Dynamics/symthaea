@@ -87,9 +87,18 @@ fn test_mesh_stats_propagate_to_tier_loss() {
     let telem = sm.telemetry();
 
     // All tiers should absorb some loss
-    assert!(telem.tier_loss_ema[0] > 0.0, "Local should absorb some loss");
-    assert!(telem.tier_loss_ema[1] > 0.0, "Metro should absorb some loss");
-    assert!(telem.tier_loss_ema[2] > 0.0, "Regional should absorb some loss");
+    assert!(
+        telem.tier_loss_ema[0] > 0.0,
+        "Local should absorb some loss"
+    );
+    assert!(
+        telem.tier_loss_ema[1] > 0.0,
+        "Metro should absorb some loss"
+    );
+    assert!(
+        telem.tier_loss_ema[2] > 0.0,
+        "Regional should absorb some loss"
+    );
 
     // Regional absorbs most (weight 1.0), Local least (weight 0.2)
     assert!(
@@ -154,7 +163,10 @@ fn test_beacon_discovers_peers() {
 
     // Same peer again → not new
     let is_new_again = sm2.process_beacon(&beacon, RadioTier::Local, 20.0);
-    assert!(!is_new_again, "Second beacon from same peer should not be new");
+    assert!(
+        !is_new_again,
+        "Second beacon from same peer should not be new"
+    );
 }
 
 /// Verify the full CLS snapshot includes network_critical field.
@@ -209,7 +221,10 @@ fn test_swarm_state_generates_synthetic_observations() {
     assert_eq!(sm.pending_observations().len(), 1);
 
     let obs = &sm.pending_observations()[0];
-    assert!(!obs.jammed, "Connected peers should not produce jammed observation");
+    assert!(
+        !obs.jammed,
+        "Connected peers should not produce jammed observation"
+    );
     assert!(obs.snr_db > 10.0, "Connected peers should have decent SNR");
 }
 
@@ -220,7 +235,10 @@ fn test_isolation_degrades_spectrum() {
     sm.ingest_swarm_state(0, 0.0, 0.05);
 
     let obs = &sm.pending_observations()[0];
-    assert!(obs.jammed, "Isolation with low connectivity should flag as jammed");
+    assert!(
+        obs.jammed,
+        "Isolation with low connectivity should flag as jammed"
+    );
     assert!(obs.snr_db < 5.0, "Isolated node should have poor SNR");
 }
 
@@ -253,7 +271,10 @@ fn test_energy_aware_routing_plentiful() {
     let sm = SpectrumManager::default();
     // Fresh manager: energy_spent_nj = 0 → normal routing path
     let result = sm.energy_aware_route(100, 1);
-    assert!(result.is_some(), "Should route successfully with plentiful energy");
+    assert!(
+        result.is_some(),
+        "Should route successfully with plentiful energy"
+    );
 }
 
 /// Verify delta compression stores peer state on Full, enabling Delta on subsequent calls.

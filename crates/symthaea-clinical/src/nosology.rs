@@ -306,8 +306,7 @@ mod tests {
         // Mood-Mild vs Mood-Severe should be more similar than Mood-Mild vs Anxiety-Mild
         let mood_mild = DiagnosticProfile::new(DiagnosticCategory::Mood, Severity::Mild, 0.8);
         let mood_severe = DiagnosticProfile::new(DiagnosticCategory::Mood, Severity::Severe, 0.8);
-        let anxiety_mild =
-            DiagnosticProfile::new(DiagnosticCategory::Anxiety, Severity::Mild, 0.8);
+        let anxiety_mild = DiagnosticProfile::new(DiagnosticCategory::Anxiety, Severity::Mild, 0.8);
 
         let within = mood_mild.similarity(&mood_severe);
         let between = mood_mild.similarity(&anxiety_mild);

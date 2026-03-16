@@ -190,18 +190,23 @@ impl ConsciousnessEngine {
                 core_values.insert(CoreComponent::Recursion, input.hot_depth);
                 core_values.insert(CoreComponent::Efficacy, 1.0 - input.prediction_error as f64);
 
-                // Approach C: Drift-driven epistemic humility
+                // Approach C: Drift-driven epistemic humility + knowledge grounding
                 // High moral drift → attenuate Knowledge component in EquationV2.
+                // Knowledge grounding blends in verified factual content as epistemic anchor.
                 // Science: Epistemic humility during value shifts — if your moral
                 // stance is changing rapidly, "knowledge" claims carry less weight.
+                // Science: Mercier & Sperber (2017) — grounded knowledge strengthens
+                // epistemic claims by anchoring them in verified factual content.
+                let blend = super::super::thresholds::KNOWLEDGE_GROUNDING_EPISTEMIC_BLEND;
                 let effective_epistemic = if self.moral_coupling.enabled {
                     let drift_ratio =
                         (input.moral_drift / self.moral_coupling.drift_saturation).min(1.0);
                     let attenuation =
                         1.0 - drift_ratio * self.moral_coupling.drift_epistemic_attenuation;
-                    input.epistemic_quality * attenuation
+                    let drift_attenuated = input.epistemic_quality * attenuation;
+                    drift_attenuated * (1.0 - blend) + input.knowledge_grounding * blend
                 } else {
-                    input.epistemic_quality
+                    input.epistemic_quality * (1.0 - blend) + input.knowledge_grounding * blend
                 };
                 core_values.insert(CoreComponent::Knowledge, effective_epistemic);
 
@@ -330,8 +335,7 @@ impl ConsciousnessEngine {
         // Neutral at 0.0 (no glyph data). Only active with feature `glyph_codex`.
         // Science: Jung (1959) — archetypal integration deepens conscious awareness.
         let glyph_coherence_factor = if input.glyph_coherence > 0.01 {
-            (input.glyph_coherence - 0.5)
-                * super::super::thresholds::GLYPH_CONSCIOUSNESS_MODULATION
+            (input.glyph_coherence - 0.5) * super::super::thresholds::GLYPH_CONSCIOUSNESS_MODULATION
         } else {
             0.0
         };

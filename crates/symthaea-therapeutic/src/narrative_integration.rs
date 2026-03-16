@@ -90,9 +90,9 @@ impl TherapeuticNarrative {
         for i in 0..self.fragments.len() {
             for j in (i + 1)..self.fragments.len() {
                 let sim = self.fragments[i].similarity(&self.fragments[j]);
-                let valence_diff =
-                    (self.fragments[i].emotional_valence - self.fragments[j].emotional_valence)
-                        .abs();
+                let valence_diff = (self.fragments[i].emotional_valence
+                    - self.fragments[j].emotional_valence)
+                    .abs();
                 // Similar topic (sim > 0.3) but opposing valence (diff > 1.0)
                 if sim > 0.3 && valence_diff > 1.0 {
                     contradictions.push((i, j));
@@ -159,27 +159,36 @@ impl TherapeuticNarrative {
         let n = self.fragments.len();
 
         // 1. Pacing regularity: normalized inverse variance of inter-fragment cycle gaps
-        let gaps: Vec<f32> = self.fragments.windows(2)
+        let gaps: Vec<f32> = self
+            .fragments
+            .windows(2)
             .map(|w| (w[1].cycle as f32 - w[0].cycle as f32).max(1.0))
             .collect();
         let mean_gap = gaps.iter().sum::<f32>() / gaps.len() as f32;
-        let gap_var = gaps.iter()
-            .map(|g| (g - mean_gap).powi(2))
-            .sum::<f32>() / gaps.len() as f32;
+        let gap_var = gaps.iter().map(|g| (g - mean_gap).powi(2)).sum::<f32>() / gaps.len() as f32;
         let pacing = 1.0 / (1.0 + gap_var / (mean_gap * mean_gap + 1.0)); // normalized [0,1]
 
         // 2. Valence smoothness: mean absolute valence change between adjacent fragments
-        let valence_changes: f32 = self.fragments.windows(2)
+        let valence_changes: f32 = self
+            .fragments
+            .windows(2)
             .map(|w| (w[1].emotional_valence - w[0].emotional_valence).abs())
-            .sum::<f32>() / (n - 1) as f32;
+            .sum::<f32>()
+            / (n - 1) as f32;
         let smoothness = 1.0 - valence_changes.clamp(0.0, 1.0); // lower change = smoother
 
         // 3. Integration trend: slope of integration level over fragment index
         let half = n / 2;
-        let early_integration: f32 = self.fragments[..half].iter()
-            .map(|f| f.integration_level).sum::<f32>() / half as f32;
-        let late_integration: f32 = self.fragments[half..].iter()
-            .map(|f| f.integration_level).sum::<f32>() / (n - half) as f32;
+        let early_integration: f32 = self.fragments[..half]
+            .iter()
+            .map(|f| f.integration_level)
+            .sum::<f32>()
+            / half as f32;
+        let late_integration: f32 = self.fragments[half..]
+            .iter()
+            .map(|f| f.integration_level)
+            .sum::<f32>()
+            / (n - half) as f32;
         let trend = ((late_integration - early_integration) + 0.5).clamp(0.0, 1.0); // 0.5 centered
 
         // Weighted combination
@@ -312,11 +321,17 @@ mod tests {
         for i in 0..8 {
             let valence = -0.2 + (i as f32 * 0.1); // -0.2 to +0.5
             narrative.integrate_fragment(NarrativeFragment::new(
-                &format!("session {i}"), (i * 10) as u64, valence, false,
+                &format!("session {i}"),
+                (i * 10) as u64,
+                valence,
+                false,
             ));
         }
         let tc = narrative.temporal_coherence();
-        assert!(tc > 0.4, "smooth narrative should have decent temporal coherence, got {tc}");
+        assert!(
+            tc > 0.4,
+            "smooth narrative should have decent temporal coherence, got {tc}"
+        );
         assert!(tc <= 1.0);
     }
 
@@ -328,12 +343,18 @@ mod tests {
         let cycles = [1, 2, 100, 101, 500, 501];
         for (i, (&v, &c)) in valences.iter().zip(cycles.iter()).enumerate() {
             narrative.integrate_fragment(NarrativeFragment::new(
-                &format!("chaos {i}"), c, v, false,
+                &format!("chaos {i}"),
+                c,
+                v,
+                false,
             ));
         }
         let tc = narrative.temporal_coherence();
         // Chaotic should score lower than smooth
-        assert!(tc < 0.6, "chaotic narrative should have low temporal coherence, got {tc}");
+        assert!(
+            tc < 0.6,
+            "chaotic narrative should have low temporal coherence, got {tc}"
+        );
     }
 
     #[test]
@@ -341,11 +362,17 @@ mod tests {
         let mut narrative = TherapeuticNarrative::new();
         for i in 0..10 {
             narrative.integrate_fragment(NarrativeFragment::new(
-                &format!("f{i}"), i as u64, if i % 2 == 0 { 1.0 } else { -1.0 }, i % 3 == 0,
+                &format!("f{i}"),
+                i as u64,
+                if i % 2 == 0 { 1.0 } else { -1.0 },
+                i % 3 == 0,
             ));
         }
         let tc = narrative.temporal_coherence();
-        assert!((0.0..=1.0).contains(&tc), "temporal coherence must be in [0,1], got {tc}");
+        assert!(
+            (0.0..=1.0).contains(&tc),
+            "temporal coherence must be in [0,1], got {tc}"
+        );
     }
 
     #[test]
@@ -355,11 +382,17 @@ mod tests {
         for i in 0..8 {
             let is_traumatic = i < 4;
             narrative.integrate_fragment(NarrativeFragment::new(
-                &format!("frag {i}"), (i * 5) as u64, 0.0, is_traumatic,
+                &format!("frag {i}"),
+                (i * 5) as u64,
+                0.0,
+                is_traumatic,
             ));
         }
         let tc = narrative.temporal_coherence();
         // Positive integration trend should boost score
-        assert!(tc > 0.3, "improving integration trend should contribute to coherence, got {tc}");
+        assert!(
+            tc > 0.3,
+            "improving integration trend should contribute to coherence, got {tc}"
+        );
     }
 }

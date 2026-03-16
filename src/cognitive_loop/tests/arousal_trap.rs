@@ -80,7 +80,11 @@ fn arousal_trap_confidence_bounded() {
             "confidence out of [0,1] at cycle {i}: {conf}"
         );
         assert!(
-            result.metadata.consciousness.consciousness_level.is_finite(),
+            result
+                .metadata
+                .consciousness
+                .consciousness_level
+                .is_finite(),
             "consciousness non-finite at cycle {i}"
         );
     }

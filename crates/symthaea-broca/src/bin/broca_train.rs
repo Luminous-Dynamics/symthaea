@@ -200,10 +200,7 @@ fn main() {
     // Print smoke test results if enabled
     if let Some(ref val) = validation {
         println!("\n--- Smoke Test ---");
-        println!(
-            "  Result: {}",
-            if val.passed { "PASSED" } else { "FAILED" }
-        );
+        println!("  Result: {}", if val.passed { "PASSED" } else { "FAILED" });
         println!("  Mean coherence: {:.4}", val.mean_coherence);
         for (intent, coh) in &val.intent_coherences {
             println!("  intent {intent}: coh={coh:.4}");

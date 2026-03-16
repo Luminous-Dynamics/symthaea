@@ -24,8 +24,8 @@
 
 #![cfg(feature = "epistemic_auditor")]
 
-use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 
 // ── Schema ────────────────────────────────────────────────────────────────────
 
@@ -626,9 +626,7 @@ impl EpistemicAuditor {
         let (total_graduations, total_rejections) = stmt
             .query_row(
                 duckdb::params![from as i64, to as i64],
-                |r: &duckdb::Row<'_>| {
-                    Ok((r.get::<_, i64>(0)? as u64, r.get::<_, i64>(1)? as u64))
-                },
+                |r: &duckdb::Row<'_>| Ok((r.get::<_, i64>(0)? as u64, r.get::<_, i64>(1)? as u64)),
             )
             .map_err(|e| format!("audit_summary: graduation query: {e}"))?;
 
@@ -700,7 +698,11 @@ impl EpistemicAuditor {
             "parquet" => "PARQUET",
             "csv" => "CSV",
             "json" => "JSON",
-            other => return Err(format!("Unsupported export format: {other}. Use parquet, csv, or json.")),
+            other => {
+                return Err(format!(
+                    "Unsupported export format: {other}. Use parquet, csv, or json."
+                ))
+            }
         };
 
         let conn = self.conn.lock().map_err(|e| format!("export: lock: {e}"))?;
@@ -740,13 +742,15 @@ impl EpistemicAuditor {
 
         // Neuromodulator averages
         let neuromod = {
-            let mut stmt = conn.prepare(
-                "SELECT AVG(dopamine_effective), AVG(serotonin_effective), \
+            let mut stmt = conn
+                .prepare(
+                    "SELECT AVG(dopamine_effective), AVG(serotonin_effective), \
                         AVG(noradrenaline_effective), AVG(acetylcholine_effective), \
                         AVG(gaba_effective), AVG(ei_balance_ratio), \
                         AVG(allostatic_load), AVG(sleep_pressure) \
-                 FROM neuromod_history WHERE cycle_id >= ? AND cycle_id < ?"
-            ).map_err(|e| format!("report neuromod: {e}"))?;
+                 FROM neuromod_history WHERE cycle_id >= ? AND cycle_id < ?",
+                )
+                .map_err(|e| format!("report neuromod: {e}"))?;
             stmt.query_row(
                 duckdb::params![from as i64, to as i64],
                 |r: &duckdb::Row<'_>| {
@@ -761,41 +765,50 @@ impl EpistemicAuditor {
                         r.get::<_, f64>(7).unwrap_or(0.0),
                     ))
                 },
-            ).map_err(|e| format!("report neuromod query: {e}"))?
+            )
+            .map_err(|e| format!("report neuromod query: {e}"))?
         };
 
         // Moral drift alerts
         let moral_drift_count: i64 = {
-            let mut stmt = conn.prepare(
-                "SELECT COUNT(*) FROM moral_audit \
-                 WHERE cycle_id >= ? AND cycle_id < ? AND drift_alert = true"
-            ).map_err(|e| format!("report moral_drift: {e}"))?;
+            let mut stmt = conn
+                .prepare(
+                    "SELECT COUNT(*) FROM moral_audit \
+                 WHERE cycle_id >= ? AND cycle_id < ? AND drift_alert = true",
+                )
+                .map_err(|e| format!("report moral_drift: {e}"))?;
             stmt.query_row(
                 duckdb::params![from as i64, to as i64],
                 |r: &duckdb::Row<'_>| r.get(0),
-            ).map_err(|e| format!("report moral_drift query: {e}"))?
+            )
+            .map_err(|e| format!("report moral_drift query: {e}"))?
         };
 
         // Substrate transitions
         let substrate_transitions: i64 = {
-            let mut stmt = conn.prepare(
-                "SELECT COUNT(*) FROM substrate_audit \
+            let mut stmt = conn
+                .prepare(
+                    "SELECT COUNT(*) FROM substrate_audit \
                  WHERE cycle_id >= ? AND cycle_id < ? \
-                   AND transition_count > 0"
-            ).map_err(|e| format!("report substrate: {e}"))?;
+                   AND transition_count > 0",
+                )
+                .map_err(|e| format!("report substrate: {e}"))?;
             stmt.query_row(
                 duckdb::params![from as i64, to as i64],
                 |r: &duckdb::Row<'_>| r.get(0),
-            ).map_err(|e| format!("report substrate query: {e}"))?
+            )
+            .map_err(|e| format!("report substrate query: {e}"))?
         };
 
         // Energy stats
         let energy = {
-            let mut stmt = conn.prepare(
-                "SELECT AVG(energy_this_cycle), AVG(cycle_duration_us), \
+            let mut stmt = conn
+                .prepare(
+                    "SELECT AVG(energy_this_cycle), AVG(cycle_duration_us), \
                         AVG(thermodynamic_load) \
-                 FROM energy_audit WHERE cycle_id >= ? AND cycle_id < ?"
-            ).map_err(|e| format!("report energy: {e}"))?;
+                 FROM energy_audit WHERE cycle_id >= ? AND cycle_id < ?",
+                )
+                .map_err(|e| format!("report energy: {e}"))?;
             stmt.query_row(
                 duckdb::params![from as i64, to as i64],
                 |r: &duckdb::Row<'_>| {
@@ -805,7 +818,8 @@ impl EpistemicAuditor {
                         r.get::<_, f64>(2).unwrap_or(0.0),
                     ))
                 },
-            ).map_err(|e| format!("report energy query: {e}"))?
+            )
+            .map_err(|e| format!("report energy query: {e}"))?
         };
 
         let grad_rate = if summary.total_graduations + summary.total_rejections > 0 {

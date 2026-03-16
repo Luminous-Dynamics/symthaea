@@ -68,12 +68,17 @@ fn test_auditor_phi_statistics() {
     let mut svc = make_audited_service();
 
     for i in 0..CYCLE_COUNT {
-        let input = if i % 2 == 0 { "cause leads to effect" } else { "randomness and noise" };
+        let input = if i % 2 == 0 {
+            "cause leads to effect"
+        } else {
+            "randomness and noise"
+        };
         let _result = svc.cycle(input);
     }
     svc.flush_audit();
 
-    let stats = svc.phi_statistics(0, CYCLE_COUNT as u64 + 1)
+    let stats = svc
+        .phi_statistics(0, CYCLE_COUNT as u64 + 1)
         .expect("phi_statistics should succeed");
 
     assert_eq!(stats.count, CYCLE_COUNT as u64);

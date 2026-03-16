@@ -117,7 +117,8 @@ impl EthicalEvaluator {
                     .to_string(),
                 severity: 0.8,
             });
-            modifications.push("Switch to crisis-safe intervention (grounding, validation)".to_string());
+            modifications
+                .push("Switch to crisis-safe intervention (grounding, validation)".to_string());
         }
 
         // ── Beneficence: Intervention should match evidence level ──
@@ -217,11 +218,10 @@ mod tests {
         let alliance = TherapeuticAlliance::new();
         let eval = EthicalEvaluator::evaluate(&intervention, &client, &alliance);
         assert!(!eval.approved);
-        assert!(
-            eval.constraints
-                .iter()
-                .any(|c| c.principle == EthicalPrinciple::Nonmaleficence)
-        );
+        assert!(eval
+            .constraints
+            .iter()
+            .any(|c| c.principle == EthicalPrinciple::Nonmaleficence));
     }
 
     #[test]
@@ -230,11 +230,10 @@ mod tests {
         let client = ClientModel::new();
         let alliance = TherapeuticAlliance::new(); // composite ≈ 0.3
         let eval = EthicalEvaluator::evaluate(&intervention, &client, &alliance);
-        assert!(
-            eval.constraints
-                .iter()
-                .any(|c| c.principle == EthicalPrinciple::Autonomy)
-        );
+        assert!(eval
+            .constraints
+            .iter()
+            .any(|c| c.principle == EthicalPrinciple::Autonomy));
     }
 
     #[test]
@@ -253,11 +252,10 @@ mod tests {
         alliance.goal_agreement = 0.7;
         alliance.task_agreement = 0.7;
         let eval = EthicalEvaluator::evaluate(&intervention, &client, &alliance);
-        assert!(
-            eval.constraints
-                .iter()
-                .any(|c| c.principle == EthicalPrinciple::Nonmaleficence)
-        );
+        assert!(eval
+            .constraints
+            .iter()
+            .any(|c| c.principle == EthicalPrinciple::Nonmaleficence));
     }
 
     #[test]
@@ -275,11 +273,10 @@ mod tests {
         alliance.goal_agreement = 0.5;
         alliance.task_agreement = 0.5;
         let eval = EthicalEvaluator::evaluate(&intervention, &client, &alliance);
-        assert!(
-            eval.constraints
-                .iter()
-                .any(|c| c.principle == EthicalPrinciple::Beneficence)
-        );
+        assert!(eval
+            .constraints
+            .iter()
+            .any(|c| c.principle == EthicalPrinciple::Beneficence));
     }
 
     #[test]

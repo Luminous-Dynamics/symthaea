@@ -44,8 +44,9 @@ use serde::{Deserialize, Serialize};
 use std::f64::consts::TAU; // 2π
 
 use crate::cognitive_loop::thresholds::{
-    CPG_AROUSAL_FREQ_SCALE, CPG_CRITICAL_DESYNC, CPG_DEFAULT_COUPLING_K, CPG_DESYNC_EXPLORATION_BOOST,
-    CPG_GALLOP_MIN_SYNC, CPG_INTERVAL, CPG_TROT_MIN_SYNC, CPG_WALK_MIN_SYNC,
+    CPG_AROUSAL_FREQ_SCALE, CPG_CRITICAL_DESYNC, CPG_DEFAULT_COUPLING_K,
+    CPG_DESYNC_EXPLORATION_BOOST, CPG_GALLOP_MIN_SYNC, CPG_INTERVAL, CPG_TROT_MIN_SYNC,
+    CPG_WALK_MIN_SYNC,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -178,11 +179,29 @@ impl GaitPreset {
         match self {
             GaitPreset::Walk => {
                 // LF=0, RF=π, LH=π, RH=0 (alternating)
-                [0.0, knee_lag, pi, pi + knee_lag, pi, pi + knee_lag, 0.0, knee_lag]
+                [
+                    0.0,
+                    knee_lag,
+                    pi,
+                    pi + knee_lag,
+                    pi,
+                    pi + knee_lag,
+                    0.0,
+                    knee_lag,
+                ]
             }
             GaitPreset::Trot => {
                 // LF=0, RF=π, LH=π, RH=0 (same as walk but different coupling)
-                [0.0, knee_lag, pi, pi + knee_lag, pi, pi + knee_lag, 0.0, knee_lag]
+                [
+                    0.0,
+                    knee_lag,
+                    pi,
+                    pi + knee_lag,
+                    pi,
+                    pi + knee_lag,
+                    0.0,
+                    knee_lag,
+                ]
             }
             GaitPreset::Gallop => {
                 // Front pair=0, back pair≈π/2 (90° offset)
@@ -832,7 +851,8 @@ mod tests {
             "Should trigger desync alert during active walk"
         );
         assert!(
-            output.flags & crate::cognitive_loop::subsystem_trait::output_flags::ANOMALY_DETECTED != 0,
+            output.flags & crate::cognitive_loop::subsystem_trait::output_flags::ANOMALY_DETECTED
+                != 0,
             "Should set ANOMALY_DETECTED flag"
         );
     }
@@ -856,7 +876,10 @@ mod tests {
             "Evenly spread phases should have near-zero sync: r={}",
             cpg.sync_index()
         );
-        assert!(output.arousal_delta > 0.0, "Critical desync should boost arousal");
+        assert!(
+            output.arousal_delta > 0.0,
+            "Critical desync should boost arousal"
+        );
     }
 
     #[test]
@@ -992,7 +1015,10 @@ mod tests {
     fn test_checkpoint_returns_bytes() {
         let cpg = default_cpg();
         let bytes = cpg.checkpoint();
-        assert!(!bytes.is_empty(), "Checkpoint should produce non-empty bytes");
+        assert!(
+            !bytes.is_empty(),
+            "Checkpoint should produce non-empty bytes"
+        );
     }
 
     #[test]
@@ -1013,7 +1039,11 @@ mod tests {
     fn test_sync_index_bounds() {
         let cpg = default_cpg();
         let r = cpg.compute_sync_index();
-        assert!(r >= 0.0 && r <= 1.0, "Sync index should be in [0,1], got {}", r);
+        assert!(
+            r >= 0.0 && r <= 1.0,
+            "Sync index should be in [0,1], got {}",
+            r
+        );
     }
 
     #[test]
@@ -1042,6 +1072,9 @@ mod tests {
 
         // Immediate next tick: cooldown should suppress
         cpg.process(&snapshot);
-        assert!(!cpg.telemetry().desync_alert, "Cooldown should suppress repeated alerts");
+        assert!(
+            !cpg.telemetry().desync_alert,
+            "Cooldown should suppress repeated alerts"
+        );
     }
 }

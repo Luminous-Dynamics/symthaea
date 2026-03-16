@@ -20,14 +20,14 @@
 //! APA Ethics Code (2017), Lambert (2013).
 
 use super::super::subsystem_trait::{CognitiveSubsystem, CycleSnapshot, SubsystemOutput};
-use symthaea_clinical::InterventionLibrary;
 use super::therapeutic_dream_bridge::TherapeuticDreamTracker;
+use symthaea_clinical::InterventionLibrary;
+use symthaea_therapeutic::affect_regulation::NeuromodDelta;
+use symthaea_therapeutic::client_model::CoreAffectSnapshot;
 use symthaea_therapeutic::{
     CaseFormulation, ClientModel, CrisisDetector, NarrativeFragment, RegulationEngine, ScopeGuard,
     TherapeuticAlliance, TherapeuticNarrative,
 };
-use symthaea_therapeutic::affect_regulation::NeuromodDelta;
-use symthaea_therapeutic::client_model::CoreAffectSnapshot;
 
 /// Serializable snapshot of therapeutic session state for persistence.
 #[derive(serde::Serialize)]
@@ -185,9 +185,7 @@ impl TherapeuticManager {
     }
 
     /// Get the currently active regulation strategy.
-    pub fn active_strategy(
-        &self,
-    ) -> Option<symthaea_therapeutic::RegulationStrategy> {
+    pub fn active_strategy(&self) -> Option<symthaea_therapeutic::RegulationStrategy> {
         self.regulation_engine.active_strategy
     }
 
@@ -403,12 +401,15 @@ impl TherapeuticManager {
         let (min_v, max_v, sum_v) = if trajectory.is_empty() {
             (0.0f32, 0.0f32, 0.0f32)
         } else {
-            trajectory.iter().fold(
-                (f32::MAX, f32::MIN, 0.0f32),
-                |(min, max, sum), snapshot| {
-                    (min.min(snapshot.valence), max.max(snapshot.valence), sum + snapshot.valence)
-                },
-            )
+            trajectory
+                .iter()
+                .fold((f32::MAX, f32::MIN, 0.0f32), |(min, max, sum), snapshot| {
+                    (
+                        min.min(snapshot.valence),
+                        max.max(snapshot.valence),
+                        sum + snapshot.valence,
+                    )
+                })
         };
         let mean_v = if trajectory.is_empty() {
             0.0
@@ -432,9 +433,9 @@ impl TherapeuticManager {
         let strategy_eff: Vec<(String, f32, u32)> = symthaea_therapeutic::RegulationStrategy::ALL
             .iter()
             .filter_map(|s| {
-                self.regulation_engine.effectiveness(s).map(|eff| {
-                    (format!("{:?}", s), eff.success_rate(), eff.applications)
-                })
+                self.regulation_engine
+                    .effectiveness(s)
+                    .map(|eff| (format!("{:?}", s), eff.success_rate(), eff.applications))
             })
             .filter(|(_, _, apps)| *apps > 0)
             .collect();
@@ -520,8 +521,7 @@ impl TherapeuticManager {
 
         let json = serde_json::to_string_pretty(&export)
             .map_err(|e| format!("JSON serialization failed: {}", e))?;
-        std::fs::write(path, json)
-            .map_err(|e| format!("File write failed: {}", e))?;
+        std::fs::write(path, json).map_err(|e| format!("File write failed: {}", e))?;
         Ok(())
     }
 }
@@ -539,11 +539,8 @@ impl CognitiveSubsystem for TherapeuticManager {
         let mut output = SubsystemOutput::NEUTRAL;
 
         // ── 1. Update client affect from cycle snapshot ────────────────────
-        let affect = CoreAffectSnapshot::new(
-            snapshot.valence,
-            snapshot.arousal,
-            snapshot.cycle_number,
-        );
+        let affect =
+            CoreAffectSnapshot::new(snapshot.valence, snapshot.arousal, snapshot.cycle_number);
         self.client_model.update_affect(affect);
 
         // ── 1b. Update RDoC profile from sustained affect patterns ────────
@@ -552,7 +549,8 @@ impl CognitiveSubsystem for TherapeuticManager {
 
         // ── 1c. Tick transmitter debt from sustained RDoC imbalance ────────
         // Accumulates serotonin/dopamine debt over time — amplifies future deltas.
-        self.regulation_engine.tick_debt(&self.client_model.rdoc_profile);
+        self.regulation_engine
+            .tick_debt(&self.client_model.rdoc_profile);
 
         // ── 2. Crisis detection (ALWAYS runs — safety critical) ────────────
         // NOTE: Do not reset crisis_active here — text-based crisis detection
@@ -564,10 +562,10 @@ impl CognitiveSubsystem for TherapeuticManager {
             self.crisis_active = false;
             self.last_crisis_type = None;
         }
-        if let Some(crisis_alert) = self.crisis_detector.detect_from_affect(
-            snapshot.valence,
-            snapshot.arousal,
-        ) {
+        if let Some(crisis_alert) = self
+            .crisis_detector
+            .detect_from_affect(snapshot.valence, snapshot.arousal)
+        {
             self.crisis_active = true;
             self.last_crisis_type = Some(crisis_alert.crisis_type_name().to_string());
             // Crisis → suppress learning, dampen exploration, maximize confidence
@@ -578,9 +576,9 @@ impl CognitiveSubsystem for TherapeuticManager {
         }
 
         // ── 3. Alliance dynamics ──────────────────────────────────────────
-        if let Some(rupture_type) =
-            self.alliance
-                .detect_rupture(snapshot.valence, snapshot.arousal)
+        if let Some(rupture_type) = self
+            .alliance
+            .detect_rupture(snapshot.valence, snapshot.arousal)
         {
             self.alliance
                 .register_rupture(rupture_type, snapshot.cycle_number);
@@ -663,7 +661,8 @@ impl CognitiveSubsystem for TherapeuticManager {
             ];
             // Record actual outcome for prior prediction, then predict next
             self.dream_tracker.record_actual_outcome(&rdoc_vec);
-            self.dream_tracker.record_prediction(rdoc_vec, snapshot.cycle_number);
+            self.dream_tracker
+                .record_prediction(rdoc_vec, snapshot.cycle_number);
         }
 
         // ── 8. Auto-checkpoint (every 100 cycles) ──────────────────────────
@@ -671,7 +670,8 @@ impl CognitiveSubsystem for TherapeuticManager {
 
         // ── 9. Formulation updates ──────────────────────────────────────────
         // Auto-detect clinical patterns from affect trajectory (Wichers 2015)
-        self.formulation.detect_patterns(&self.client_model.affect_trajectory, 30);
+        self.formulation
+            .detect_patterns(&self.client_model.affect_trajectory, 30);
 
         if self.client_model.affect_trend() < -0.1 && self.formulation.perpetuating.is_empty() {
             self.formulation
@@ -792,25 +792,32 @@ mod tests {
         manager.alliance.goal_agreement = 0.6;
 
         // Serialize
-        let json = manager.serialize_session().expect("serialize should succeed");
+        let json = manager
+            .serialize_session()
+            .expect("serialize should succeed");
         assert!(!json.is_empty());
 
         // Restore into fresh manager
         let mut restored = TherapeuticManager::new();
-        restored.restore_session(&json).expect("restore should succeed");
+        restored
+            .restore_session(&json)
+            .expect("restore should succeed");
         assert_eq!(restored.alliance.bond, 0.7);
         assert_eq!(restored.alliance.goal_agreement, 0.6);
-        assert_eq!(restored.client_model.cycle_count, manager.client_model.cycle_count);
+        assert_eq!(
+            restored.client_model.cycle_count,
+            manager.client_model.cycle_count
+        );
     }
 
     #[test]
     fn test_tick_debt_wired_in_process() {
         let mut manager = TherapeuticManager::new();
         // Set high negative valence RDoC to trigger debt accumulation
-        manager.client_model.rdoc_profile.set_score(
-            symthaea_clinical::RDocDomain::NegativeValence,
-            0.9,
-        );
+        manager
+            .client_model
+            .rdoc_profile
+            .set_score(symthaea_clinical::RDocDomain::NegativeValence, 0.9);
         for i in 0..100 {
             let snapshot = make_snapshot(-0.5, 0.7, i);
             manager.process(&snapshot);
@@ -1037,7 +1044,11 @@ mod tests {
         // Coherence should have been updated (non-zero after fragments)
         let coh = manager.narrative_coherence();
         assert!(coh.is_finite(), "coherence must be finite after fragments");
-        assert!(coh >= 0.0 && coh <= 1.0, "coherence must be in [0,1], got {}", coh);
+        assert!(
+            coh >= 0.0 && coh <= 1.0,
+            "coherence must be in [0,1], got {}",
+            coh
+        );
     }
 
     #[test]
@@ -1086,7 +1097,11 @@ mod tests {
         }
 
         // Crisis flag must be 0.0 or 1.0
-        assert!(vec[8] == 0.0 || vec[8] == 1.0, "crisis flag must be 0 or 1, got {}", vec[8]);
+        assert!(
+            vec[8] == 0.0 || vec[8] == 1.0,
+            "crisis flag must be 0 or 1, got {}",
+            vec[8]
+        );
 
         // Strategy ordinal must be in [-1, 6]
         assert!(
@@ -1156,26 +1171,34 @@ mod tests {
         let vec = manager.dream_action_vector();
         assert_eq!(vec.len(), 32);
         for (i, &val) in vec.iter().enumerate() {
-            assert!(val.is_finite(), "dream vec [{}] not finite after stress: {}", i, val);
+            assert!(
+                val.is_finite(),
+                "dream vec [{}] not finite after stress: {}",
+                i,
+                val
+            );
         }
     }
 
     #[test]
     fn test_update_rdoc_from_bath_wired() {
         let mut manager = TherapeuticManager::new();
-        let initial_neg = manager.client_model.rdoc_profile.score(
-            symthaea_clinical::RDocDomain::NegativeValence,
-        );
+        let initial_neg = manager
+            .client_model
+            .rdoc_profile
+            .score(symthaea_clinical::RDocDomain::NegativeValence);
         // Low serotonin + low GABA → should increase NegativeValence
         let bath = [0.5, 0.5, 0.1, 0.5, 0.1, 0.5, 0.5, 0.5];
         manager.update_rdoc_from_bath(&bath);
-        let new_neg = manager.client_model.rdoc_profile.score(
-            symthaea_clinical::RDocDomain::NegativeValence,
-        );
+        let new_neg = manager
+            .client_model
+            .rdoc_profile
+            .score(symthaea_clinical::RDocDomain::NegativeValence);
         assert!(
             new_neg > initial_neg,
             "NegativeValence should increase with low 5-HT: {} -> {}",
-            initial_neg, new_neg,
+            initial_neg,
+            new_neg,
         );
     }
 
@@ -1188,7 +1211,8 @@ mod tests {
         manager.process(&snapshot);
 
         assert_eq!(
-            manager.dream_tracker.predictions.len(), 1,
+            manager.dream_tracker.predictions.len(),
+            1,
             "dream tracker should record one prediction per process() call",
         );
     }
@@ -1254,17 +1278,20 @@ mod tests {
             assert!(
                 !output.valence_delta.is_nan(),
                 "valence_delta is NaN for extreme input ({}, {})",
-                v, a
+                v,
+                a
             );
             assert!(
                 !output.arousal_delta.is_nan(),
                 "arousal_delta is NaN for extreme input ({}, {})",
-                v, a
+                v,
+                a
             );
             assert!(
                 !output.lr_modulation.is_nan(),
                 "lr_modulation is NaN for extreme input ({}, {})",
-                v, a
+                v,
+                a
             );
         }
     }
@@ -1295,7 +1322,10 @@ mod tests {
 
         // Manually add a dream preference (ordinal 6 = ExposurePrep)
         manager.regulation_engine.incorporate_dream_wisdom(6, 0.5);
-        assert!(manager.regulation_engine.dream_preferred_strategy().is_some());
+        assert!(manager
+            .regulation_engine
+            .dream_preferred_strategy()
+            .is_some());
 
         // Simulate high prediction error (bad accuracy)
         for i in 0..10 {
@@ -1311,7 +1341,10 @@ mod tests {
         // Apply feedback — should clear dream preference
         manager.apply_dream_feedback();
         assert!(
-            manager.regulation_engine.dream_preferred_strategy().is_none(),
+            manager
+                .regulation_engine
+                .dream_preferred_strategy()
+                .is_none(),
             "dream preference should be cleared when accuracy is bad"
         );
     }
@@ -1392,8 +1425,15 @@ mod tests {
         }
 
         let result = manager.flush_telemetry(path);
-        assert!(result.is_ok(), "flush_telemetry should succeed: {:?}", result.err());
-        assert!(std::path::Path::new(path).exists(), "telemetry file should exist");
+        assert!(
+            result.is_ok(),
+            "flush_telemetry should succeed: {:?}",
+            result.err()
+        );
+        assert!(
+            std::path::Path::new(path).exists(),
+            "telemetry file should exist"
+        );
 
         // Verify valid JSON
         let contents = std::fs::read_to_string(path).unwrap();
@@ -1415,7 +1455,11 @@ mod tests {
             manager.process(&snapshot);
         }
         assert!(
-            manager.formulation.perpetuating.iter().any(|f| f.description.contains("low mood")),
+            manager
+                .formulation
+                .perpetuating
+                .iter()
+                .any(|f| f.description.contains("low mood")),
             "should auto-detect depression-like pattern in formulation"
         );
     }

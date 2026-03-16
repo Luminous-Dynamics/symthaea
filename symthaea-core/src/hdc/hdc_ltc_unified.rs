@@ -829,9 +829,7 @@ impl HdcLtcUnifiedNeuron {
                 // AVX2+FMA fast path: hand-written SIMD intrinsics
                 #[cfg(all(target_arch = "x86_64", feature = "simd"))]
                 {
-                    if crate::hdc::simd_detect::has_avx2()
-                        && crate::hdc::simd_detect::has_fma()
-                    {
+                    if crate::hdc::simd_detect::has_avx2() && crate::hdc::simd_detect::has_fma() {
                         unsafe {
                             fused_tanh_avx2(
                                 &mut self.state.values,
@@ -901,9 +899,7 @@ impl HdcLtcUnifiedNeuron {
                 // AVX2+FMA fast path
                 #[cfg(all(target_arch = "x86_64", feature = "simd"))]
                 {
-                    if crate::hdc::simd_detect::has_avx2()
-                        && crate::hdc::simd_detect::has_fma()
-                    {
+                    if crate::hdc::simd_detect::has_avx2() && crate::hdc::simd_detect::has_fma() {
                         unsafe {
                             fused_identity_avx2(
                                 &mut self.state.values,
@@ -949,9 +945,7 @@ impl HdcLtcUnifiedNeuron {
                 // AVX2+FMA fast path (reuses tanh kernel with custom pre_scale)
                 #[cfg(all(target_arch = "x86_64", feature = "simd"))]
                 {
-                    if crate::hdc::simd_detect::has_avx2()
-                        && crate::hdc::simd_detect::has_fma()
-                    {
+                    if crate::hdc::simd_detect::has_avx2() && crate::hdc::simd_detect::has_fma() {
                         unsafe {
                             fused_tanh_avx2(
                                 &mut self.state.values,
@@ -1539,16 +1533,40 @@ impl HdcLtcUnifiedNeuron {
 
     /// Apply BPTT gradients with SGD + momentum, weight decay, and norm clipping.
     pub fn apply_gradients(&mut self, grads: &HdcLtcGradients, lr: f32) {
+        self.apply_gradients_inner(grads, lr, true)
+    }
+
+    /// Apply gradients without per-step weight decay.
+    ///
+    /// Use this for BPTT training where thousands of gradient steps occur per
+    /// epoch. The standard `apply_gradients` applies weight_decay (default
+    /// 0.0001) per step, which over 67K steps/epoch decays weights to ~0.1%
+    /// of original (`(1-0.0001)^67646 ≈ 0.001`), destroying the network.
+    pub fn apply_gradients_no_decay(&mut self, grads: &HdcLtcGradients, lr: f32) {
+        self.apply_gradients_inner(grads, lr, false)
+    }
+
+    fn apply_gradients_inner(&mut self, grads: &HdcLtcGradients, lr: f32, apply_decay: bool) {
         let m = self.config.momentum;
-        let decay = self.config.weight_decay;
+        let decay_factor = if apply_decay {
+            1.0 - self.config.weight_decay
+        } else {
+            1.0
+        };
 
         // Weight HV update with momentum
         self.weight_momentum = self.weight_momentum.scale(m).add(&grads.dw.scale(-lr));
-        self.weight_hv = self.weight_hv.scale(1.0 - decay).add(&self.weight_momentum);
+        self.weight_hv = self
+            .weight_hv
+            .scale(decay_factor)
+            .add(&self.weight_momentum);
 
         // Input mask update with momentum
         self.input_momentum = self.input_momentum.scale(m).add(&grads.du.scale(-lr));
-        self.input_mask = self.input_mask.scale(1.0 - decay).add(&self.input_momentum);
+        self.input_mask = self
+            .input_mask
+            .scale(decay_factor)
+            .add(&self.input_momentum);
 
         // Tau modulator update (project scalar gradient onto tau_modulator direction)
         if grads.dtau_scalar.abs() > 1e-10 {
@@ -1873,6 +1891,16 @@ impl HdcLtcUnifiedNetwork {
             }
         }
         self.config.neuron_config.fourier_frequencies = freqs.to_vec();
+    }
+
+    /// Reset momentum on all neurons (call between BPTT epochs to prevent
+    /// accumulated directional bias from 67K+ steps).
+    pub fn reset_momentum(&mut self) {
+        for layer in &mut self.layers {
+            for neuron in layer {
+                neuron.reset_momentum();
+            }
+        }
     }
 
     /// Reset all neurons

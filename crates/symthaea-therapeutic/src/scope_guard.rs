@@ -147,7 +147,11 @@ impl ScopeGuard {
         if self.risk_phrases.iter().any(|p| lower.contains(p)) {
             return Some(ScopeViolation::RiskPrediction);
         }
-        if self.confidentiality_phrases.iter().any(|p| lower.contains(p)) {
+        if self
+            .confidentiality_phrases
+            .iter()
+            .any(|p| lower.contains(p))
+        {
             return Some(ScopeViolation::ConfidentialityClaim);
         }
 
@@ -174,7 +178,11 @@ impl ScopeGuard {
         if self.risk_phrases.iter().any(|p| lower.contains(p)) {
             violations.push(ScopeViolation::RiskPrediction);
         }
-        if self.confidentiality_phrases.iter().any(|p| lower.contains(p)) {
+        if self
+            .confidentiality_phrases
+            .iter()
+            .any(|p| lower.contains(p))
+        {
             violations.push(ScopeViolation::ConfidentialityClaim);
         }
 
@@ -249,8 +257,7 @@ mod tests {
     #[test]
     fn test_detect_confidentiality_claim() {
         let guard = ScopeGuard::new();
-        let result =
-            guard.check_response("Don't worry, this conversation is confidential.");
+        let result = guard.check_response("Don't worry, this conversation is confidential.");
         assert_eq!(result, Some(ScopeViolation::ConfidentialityClaim));
     }
 
@@ -351,12 +358,30 @@ mod proptests {
             ("decrease your dose", ScopeViolation::PrescriptionClaim),
             ("stop taking your", ScopeViolation::PrescriptionClaim),
             // Identity
-            ("as your therapist", ScopeViolation::ProfessionalIdentityClaim),
-            ("as your counselor", ScopeViolation::ProfessionalIdentityClaim),
-            ("as your psychologist", ScopeViolation::ProfessionalIdentityClaim),
-            ("in my clinical opinion", ScopeViolation::ProfessionalIdentityClaim),
-            ("my professional assessment", ScopeViolation::ProfessionalIdentityClaim),
-            ("in my therapeutic role", ScopeViolation::ProfessionalIdentityClaim),
+            (
+                "as your therapist",
+                ScopeViolation::ProfessionalIdentityClaim,
+            ),
+            (
+                "as your counselor",
+                ScopeViolation::ProfessionalIdentityClaim,
+            ),
+            (
+                "as your psychologist",
+                ScopeViolation::ProfessionalIdentityClaim,
+            ),
+            (
+                "in my clinical opinion",
+                ScopeViolation::ProfessionalIdentityClaim,
+            ),
+            (
+                "my professional assessment",
+                ScopeViolation::ProfessionalIdentityClaim,
+            ),
+            (
+                "in my therapeutic role",
+                ScopeViolation::ProfessionalIdentityClaim,
+            ),
             ("as a licensed", ScopeViolation::ProfessionalIdentityClaim),
             // Treatment plan
             ("your treatment plan", ScopeViolation::TreatmentPlan),
@@ -369,13 +394,28 @@ mod proptests {
             ("you are at low risk", ScopeViolation::RiskPrediction),
             ("your risk level is", ScopeViolation::RiskPrediction),
             ("i assess your risk as", ScopeViolation::RiskPrediction),
-            ("probability of self-harm is", ScopeViolation::RiskPrediction),
+            (
+                "probability of self-harm is",
+                ScopeViolation::RiskPrediction,
+            ),
             // Confidentiality
-            ("this conversation is confidential", ScopeViolation::ConfidentialityClaim),
-            ("therapist-client privilege", ScopeViolation::ConfidentialityClaim),
-            ("protected by confidentiality", ScopeViolation::ConfidentialityClaim),
+            (
+                "this conversation is confidential",
+                ScopeViolation::ConfidentialityClaim,
+            ),
+            (
+                "therapist-client privilege",
+                ScopeViolation::ConfidentialityClaim,
+            ),
+            (
+                "protected by confidentiality",
+                ScopeViolation::ConfidentialityClaim,
+            ),
             ("no one will know", ScopeViolation::ConfidentialityClaim),
-            ("this stays between us", ScopeViolation::ConfidentialityClaim),
+            (
+                "this stays between us",
+                ScopeViolation::ConfidentialityClaim,
+            ),
         ]
     }
 

@@ -828,10 +828,22 @@ unsafe fn intersection_neon(a: &[u8; 2048], b: &[u8; 2048], result: &mut [u8; 20
         let off1 = (i + 1) * 16;
         let off2 = (i + 2) * 16;
         let off3 = (i + 3) * 16;
-        vst1q_u8(r_ptr.add(off0), vandq_u8(vld1q_u8(a_ptr.add(off0)), vld1q_u8(b_ptr.add(off0))));
-        vst1q_u8(r_ptr.add(off1), vandq_u8(vld1q_u8(a_ptr.add(off1)), vld1q_u8(b_ptr.add(off1))));
-        vst1q_u8(r_ptr.add(off2), vandq_u8(vld1q_u8(a_ptr.add(off2)), vld1q_u8(b_ptr.add(off2))));
-        vst1q_u8(r_ptr.add(off3), vandq_u8(vld1q_u8(a_ptr.add(off3)), vld1q_u8(b_ptr.add(off3))));
+        vst1q_u8(
+            r_ptr.add(off0),
+            vandq_u8(vld1q_u8(a_ptr.add(off0)), vld1q_u8(b_ptr.add(off0))),
+        );
+        vst1q_u8(
+            r_ptr.add(off1),
+            vandq_u8(vld1q_u8(a_ptr.add(off1)), vld1q_u8(b_ptr.add(off1))),
+        );
+        vst1q_u8(
+            r_ptr.add(off2),
+            vandq_u8(vld1q_u8(a_ptr.add(off2)), vld1q_u8(b_ptr.add(off2))),
+        );
+        vst1q_u8(
+            r_ptr.add(off3),
+            vandq_u8(vld1q_u8(a_ptr.add(off3)), vld1q_u8(b_ptr.add(off3))),
+        );
     }
 }
 
@@ -847,10 +859,22 @@ unsafe fn union_neon(a: &[u8; 2048], b: &[u8; 2048], result: &mut [u8; 2048]) {
         let off1 = (i + 1) * 16;
         let off2 = (i + 2) * 16;
         let off3 = (i + 3) * 16;
-        vst1q_u8(r_ptr.add(off0), vorrq_u8(vld1q_u8(a_ptr.add(off0)), vld1q_u8(b_ptr.add(off0))));
-        vst1q_u8(r_ptr.add(off1), vorrq_u8(vld1q_u8(a_ptr.add(off1)), vld1q_u8(b_ptr.add(off1))));
-        vst1q_u8(r_ptr.add(off2), vorrq_u8(vld1q_u8(a_ptr.add(off2)), vld1q_u8(b_ptr.add(off2))));
-        vst1q_u8(r_ptr.add(off3), vorrq_u8(vld1q_u8(a_ptr.add(off3)), vld1q_u8(b_ptr.add(off3))));
+        vst1q_u8(
+            r_ptr.add(off0),
+            vorrq_u8(vld1q_u8(a_ptr.add(off0)), vld1q_u8(b_ptr.add(off0))),
+        );
+        vst1q_u8(
+            r_ptr.add(off1),
+            vorrq_u8(vld1q_u8(a_ptr.add(off1)), vld1q_u8(b_ptr.add(off1))),
+        );
+        vst1q_u8(
+            r_ptr.add(off2),
+            vorrq_u8(vld1q_u8(a_ptr.add(off2)), vld1q_u8(b_ptr.add(off2))),
+        );
+        vst1q_u8(
+            r_ptr.add(off3),
+            vorrq_u8(vld1q_u8(a_ptr.add(off3)), vld1q_u8(b_ptr.add(off3))),
+        );
     }
 }
 

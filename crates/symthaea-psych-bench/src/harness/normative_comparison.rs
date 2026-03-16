@@ -308,7 +308,12 @@ impl NormativeReport {
         // Enrich with cross-cultural metadata
         let cultural = super::baselines::BaselineCollection::cultural_metadata();
         for score in &mut scores {
-            let domain = score.benchmark.split("::").next().unwrap_or("").to_lowercase();
+            let domain = score
+                .benchmark
+                .split("::")
+                .next()
+                .unwrap_or("")
+                .to_lowercase();
             if let Some(meta) = cultural.get(domain.as_str()) {
                 score.sample_region = Some(meta.sample_region.to_string());
             }

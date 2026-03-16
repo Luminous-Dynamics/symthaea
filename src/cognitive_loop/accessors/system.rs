@@ -212,7 +212,8 @@ impl CognitiveLoopService {
     /// Evaluate temporal prediction horizon accuracy from the vision manifold.
     #[cfg(feature = "vision-manifold")]
     pub fn vision_evaluate_horizons(&self) -> Option<symthaea_vision_manifold::HorizonAccuracy> {
-        self.vision_sensory.vision_bridge
+        self.vision_sensory
+            .vision_bridge
             .as_ref()
             .map(|b| b.manifold().evaluate_horizons())
     }
@@ -246,7 +247,10 @@ impl CognitiveLoopService {
 
     /// Get the current inferred user state (if user state inference is enabled).
     pub fn user_state(&self) -> Option<&crate::user_state_inference::UserState> {
-        self.language_comm.user_state.as_ref().map(|usi| usi.state())
+        self.language_comm
+            .user_state
+            .as_ref()
+            .map(|usi| usi.state())
     }
 
     /// Inject L-SSM semantic prediction error from LLMOrgan after translation.
@@ -584,11 +588,7 @@ impl CognitiveLoopService {
 
     /// Counterfactual query: "If X hadn't happened, would Y still hold?"
     /// Returns (cause, necessity_score) pairs.
-    pub fn knowledge_counterfactual(
-        &self,
-        effect: &str,
-        max_depth: usize,
-    ) -> Vec<(String, f32)> {
+    pub fn knowledge_counterfactual(&self, effect: &str, max_depth: usize) -> Vec<(String, f32)> {
         if let Some(ref km) = self.knowledge_manager {
             km.counterfactual(effect, max_depth)
         } else {
@@ -628,7 +628,8 @@ impl CognitiveLoopService {
     /// Last Birkhoff aesthetic score (0.0-1.0) from the canvas pipeline.
     #[cfg(feature = "canvas")]
     pub fn canvas_aesthetic_score(&self) -> f32 {
-        self.motor_rendering.canvas_manager
+        self.motor_rendering
+            .canvas_manager
             .as_ref()
             .map(|m| m.last_telemetry().aesthetic_score)
             .unwrap_or(0.0)
@@ -637,13 +638,17 @@ impl CognitiveLoopService {
     /// Take the last generated canvas SVG (drains it).
     #[cfg(feature = "canvas")]
     pub fn take_canvas_svg(&mut self) -> Option<String> {
-        self.motor_rendering.canvas_manager.as_mut().and_then(|m| m.take_svg())
+        self.motor_rendering
+            .canvas_manager
+            .as_mut()
+            .and_then(|m| m.take_svg())
     }
 
     /// Last canvas generation time in microseconds.
     #[cfg(feature = "canvas")]
     pub fn canvas_generation_time_us(&self) -> u64 {
-        self.motor_rendering.canvas_manager
+        self.motor_rendering
+            .canvas_manager
             .as_ref()
             .map(|m| m.last_telemetry().generation_time_us)
             .unwrap_or(0)
@@ -676,9 +681,7 @@ impl CognitiveLoopService {
         (String, f32, symthaea_core::hdc::binary_hv::BinaryHV),
         symthaea_core::hdc::primitive_system::CompositionAlgebraError,
     > {
-        use symthaea_core::hdc::primitive_system::{
-            CompositionAlgebra, PrimitiveSystem,
-        };
+        use symthaea_core::hdc::primitive_system::{CompositionAlgebra, PrimitiveSystem};
 
         let system = PrimitiveSystem::global();
         let mut algebra = CompositionAlgebra::new();
@@ -701,9 +704,7 @@ impl CognitiveLoopService {
         Vec<symthaea_core::hdc::primitive_system::TransitionResult>,
         symthaea_core::hdc::primitive_system::CompositionAlgebraError,
     > {
-        use symthaea_core::hdc::primitive_system::{
-            CompositionAlgebra, PrimitiveSystem,
-        };
+        use symthaea_core::hdc::primitive_system::{CompositionAlgebra, PrimitiveSystem};
 
         let system = PrimitiveSystem::global();
         let mut algebra = CompositionAlgebra::new();

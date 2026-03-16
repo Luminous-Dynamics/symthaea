@@ -191,9 +191,7 @@ impl CognitiveLoopService {
             .as_ref()
             .map(|km| (km.signals().causal_depth, km.signals().novelty));
         if let Some((causal_depth, novelty)) = knowledge_signals {
-            if causal_depth
-                > super::thresholds::KNOWLEDGE_CAUSAL_DEPTH_EXPLOIT_THRESHOLD
-            {
+            if causal_depth > super::thresholds::KNOWLEDGE_CAUSAL_DEPTH_EXPLOIT_THRESHOLD {
                 self.adjust_exploration(
                     "knowledge_causal_deep",
                     -super::thresholds::KNOWLEDGE_CAUSAL_DEPTH_EXPLORE_DAMPEN,
@@ -584,7 +582,8 @@ impl CognitiveLoopService {
         // Query knowledge engine for moral precedent
         // Extracts facts tagged with ethics/social domains for grounded moral reasoning.
         let knowledge_moral_context: Vec<String> = self
-            .episodic_persistence.last_reasoning_context
+            .episodic_persistence
+            .last_reasoning_context
             .as_ref()
             .map(|ctx| {
                 ctx.relevant_facts
@@ -610,7 +609,11 @@ impl CognitiveLoopService {
                 let query_result = crate::knowledge::reasoning_context::KnowledgeQueryResult {
                     facts: ctx.relevant_facts.clone(),
                     causal_chains: Vec::new(),
-                    grounding_score: if ctx.epistemic_state.has_grounding { ctx.epistemic_state.confidence_multiplier.min(1.0) } else { 0.0 },
+                    grounding_score: if ctx.epistemic_state.has_grounding {
+                        ctx.epistemic_state.confidence_multiplier.min(1.0)
+                    } else {
+                        0.0
+                    },
                 };
                 query_result.confidence_multiplier()
             })
@@ -652,7 +655,8 @@ impl CognitiveLoopService {
                 CANTOR_HARMONY_INTERCONNECT_SCALE, CANTOR_HARMONY_STILLNESS_SCALE,
             };
             let meta_depth = self
-                .cantor_dream.broadcast_buffer
+                .cantor_dream
+                .broadcast_buffer
                 .last()
                 .map(|crhv| crhv.self_similarity() as f64)
                 .unwrap_or(0.0);
@@ -740,8 +744,14 @@ impl CognitiveLoopService {
                         hazard = ?report.matched_hazard,
                         "Topological immune system: THROTTLE — reducing exploration"
                     );
-                    self.adjust_exploration("escalation_throttle", -super::thresholds::ESCALATION_THROTTLE_EXPLORATION);
-                    self.adjust_confidence("escalation_throttle", -super::thresholds::ESCALATION_THROTTLE_CONFIDENCE);
+                    self.adjust_exploration(
+                        "escalation_throttle",
+                        -super::thresholds::ESCALATION_THROTTLE_EXPLORATION,
+                    );
+                    self.adjust_confidence(
+                        "escalation_throttle",
+                        -super::thresholds::ESCALATION_THROTTLE_CONFIDENCE,
+                    );
                     self.stats.escalation_warn_count += 1;
                     self.stats.escalation_throttle_count += 1;
                 }
@@ -753,9 +763,18 @@ impl CognitiveLoopService {
                         "Topological immune system: BLOCK — request rejected"
                     );
                     self.stats.escalation_blocked = true;
-                    self.adjust_exploration("escalation_block", -super::thresholds::ESCALATION_BLOCK_EXPLORATION);
-                    self.adjust_confidence("escalation_block", -super::thresholds::ESCALATION_BLOCK_CONFIDENCE);
-                    self.scale_lr("escalation_block", super::thresholds::ESCALATION_BLOCK_LR_SCALE);
+                    self.adjust_exploration(
+                        "escalation_block",
+                        -super::thresholds::ESCALATION_BLOCK_EXPLORATION,
+                    );
+                    self.adjust_confidence(
+                        "escalation_block",
+                        -super::thresholds::ESCALATION_BLOCK_CONFIDENCE,
+                    );
+                    self.scale_lr(
+                        "escalation_block",
+                        super::thresholds::ESCALATION_BLOCK_LR_SCALE,
+                    );
                     self.stats.escalation_warn_count += 1;
                     self.stats.escalation_throttle_count += 1;
                     self.stats.escalation_block_count += 1;

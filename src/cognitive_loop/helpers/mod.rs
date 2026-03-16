@@ -71,10 +71,10 @@ impl CognitiveLoopService {
     pub fn process_text_input(&mut self, embedding: &[f32]) -> Result<CycleResult> {
         use symthaea_core::hdc::ContinuousHV;
 
-        let bridge = self
-            .feature_integ.neural_bridge
-            .as_ref()
-            .ok_or_else(|| anyhow::anyhow!("Neural bridge not loaded (no probe weights found)"))?;
+        let bridge =
+            self.feature_integ.neural_bridge.as_ref().ok_or_else(|| {
+                anyhow::anyhow!("Neural bridge not loaded (no probe weights found)")
+            })?;
 
         let cycle_start = Instant::now();
         self.stats.total_cycles += 1;
@@ -168,10 +168,14 @@ impl CognitiveLoopService {
 
         // Pre-compute identity fields before moving output
         #[cfg(feature = "identity")]
-        let signed_output = self.mfdi_bridge.sign_output(&output).map_err(|e| {
-            tracing::debug!(error = %e, "MFDI output signing failed");
-            e
-        }).ok();
+        let signed_output = self
+            .mfdi_bridge
+            .sign_output(&output)
+            .map_err(|e| {
+                tracing::debug!(error = %e, "MFDI output signing failed");
+                e
+            })
+            .ok();
         #[cfg(feature = "identity")]
         let assurance_level = self.mfdi_bridge.assurance_level();
 
@@ -273,7 +277,11 @@ impl CognitiveLoopService {
         let tau_owned: Vec<ndarray::Array1<f32>> = self.temporal_network.all_tau_owned();
         let tau_refs: Vec<&ndarray::Array1<f32>> = tau_owned.iter().collect();
         self.language_comm.voice_coherence.bridge.update(&tau_refs);
-        let coherence = self.language_comm.voice_coherence.bridge.smoothed_coherence();
+        let coherence = self
+            .language_comm
+            .voice_coherence
+            .bridge
+            .smoothed_coherence();
 
         // Effective threshold matches cycle() behavior (adaptive scaling)
         let effective_threshold = self.config.learning_threshold

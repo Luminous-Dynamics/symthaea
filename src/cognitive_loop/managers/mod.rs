@@ -29,9 +29,9 @@
 pub mod drive_manager;
 pub mod learning_manager;
 pub mod memory_manager;
+pub mod network_service_bridge;
 pub mod perception_manager;
 pub mod swarm_manager;
-pub mod network_service_bridge;
 
 #[cfg(feature = "mycelix")]
 pub mod governance_manager;
@@ -42,12 +42,12 @@ pub mod radio_dispatcher;
 pub use drive_manager::DriveManager;
 pub use learning_manager::LearningManager;
 pub use memory_manager::MemoryManager;
-pub use perception_manager::PerceptionManager;
-pub use swarm_manager::SwarmManager;
 pub use network_service_bridge::{
     forward_affective_state, forward_federated_round, NetworkServiceBridge,
     NetworkServiceBridgeHandle,
 };
+pub use perception_manager::PerceptionManager;
+pub use swarm_manager::SwarmManager;
 
 #[cfg(feature = "mycelix")]
 pub use governance_manager::GovernanceManager;
@@ -72,13 +72,13 @@ pub use spectral_manager::{SpectralManager, SpectralManagerConfig, SpectralTelem
 pub mod glyph_manager;
 
 #[cfg(feature = "therapeutic")]
-pub mod therapeutic_manager;
-#[cfg(feature = "therapeutic")]
 pub mod therapeutic_dream_bridge;
+#[cfg(feature = "therapeutic")]
+pub mod therapeutic_manager;
 #[cfg(feature = "glyph_codex")]
 pub use glyph_manager::GlyphManager;
 
 #[cfg(feature = "therapeutic")]
-pub use therapeutic_manager::TherapeuticManager;
-#[cfg(feature = "therapeutic")]
 pub use therapeutic_dream_bridge::DreamableTherapeuticAction;
+#[cfg(feature = "therapeutic")]
+pub use therapeutic_manager::TherapeuticManager;

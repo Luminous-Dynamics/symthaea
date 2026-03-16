@@ -677,36 +677,85 @@ pub fn confidence_adjusted_veto_threshold(
 
 #[cfg(feature = "therapeutic")]
 pub const CANONICAL_VALIDATING_WORDS: &[&str] = &[
-    "understand", "hear", "sense", "notice", "appreciate", "acknowledge",
-    "valid", "natural", "makes sense", "that's understandable", "of course",
-    "completely", "reasonable", "normal", "brave", "courageous", "strength",
+    "understand",
+    "hear",
+    "sense",
+    "notice",
+    "appreciate",
+    "acknowledge",
+    "valid",
+    "natural",
+    "makes sense",
+    "that's understandable",
+    "of course",
+    "completely",
+    "reasonable",
+    "normal",
+    "brave",
+    "courageous",
+    "strength",
 ];
 
 #[cfg(feature = "therapeutic")]
 pub const CANONICAL_DIRECTIVE_WORDS: &[&str] = &[
-    "should", "must", "need to", "have to", "wrong", "correct",
-    "obviously", "clearly you", "just stop", "just do", "simply",
+    "should",
+    "must",
+    "need to",
+    "have to",
+    "wrong",
+    "correct",
+    "obviously",
+    "clearly you",
+    "just stop",
+    "just do",
+    "simply",
 ];
 
 #[cfg(feature = "therapeutic")]
 pub const CANONICAL_REFLECTIVE_WORDS: &[&str] = &[
-    "sounds like", "it seems", "i wonder", "what if", "tell me more",
-    "what comes up", "i'm curious", "how does that feel", "what would",
-    "when you say", "help me understand", "say more about",
+    "sounds like",
+    "it seems",
+    "i wonder",
+    "what if",
+    "tell me more",
+    "what comes up",
+    "i'm curious",
+    "how does that feel",
+    "what would",
+    "when you say",
+    "help me understand",
+    "say more about",
 ];
 
 /// Grounding/safety words — boosted during crisis protocol.
 #[cfg(feature = "therapeutic")]
 pub const CANONICAL_GROUNDING_WORDS: &[&str] = &[
-    "breathe", "ground", "safe", "here", "present", "feet", "hands",
-    "notice", "five things", "slow down", "right now", "moment",
+    "breathe",
+    "ground",
+    "safe",
+    "here",
+    "present",
+    "feet",
+    "hands",
+    "notice",
+    "five things",
+    "slow down",
+    "right now",
+    "moment",
 ];
 
 /// Crisis referral words — boosted during crisis (intent >= 6.5).
 #[cfg(feature = "therapeutic")]
 pub const CANONICAL_CRISIS_WORDS: &[&str] = &[
-    "988", "crisis line", "emergency", "call", "help", "support",
-    "not alone", "reach out", "someone who can help",
+    "988",
+    "crisis line",
+    "emergency",
+    "call",
+    "help",
+    "support",
+    "not alone",
+    "reach out",
+    "someone who can help",
 ];
 
 /// Therapeutic gating: modulates language generation based on clinical context.
@@ -744,17 +793,29 @@ impl TherapeuticGate {
 
         // Crisis mode (intent == 7.0): suppress all technique words, boost crisis protocol
         if intent >= 6.5 {
-            if CANONICAL_DIRECTIVE_WORDS.iter().any(|w| word_lower.contains(w)) {
+            if CANONICAL_DIRECTIVE_WORDS
+                .iter()
+                .any(|w| word_lower.contains(w))
+            {
                 logit -= 5.0;
             }
-            if CANONICAL_VALIDATING_WORDS.iter().any(|w| word_lower.contains(w)) {
+            if CANONICAL_VALIDATING_WORDS
+                .iter()
+                .any(|w| word_lower.contains(w))
+            {
                 logit += 2.0;
             }
             // Boost grounding and crisis referral language during crisis
-            if CANONICAL_GROUNDING_WORDS.iter().any(|w| word_lower.contains(w)) {
+            if CANONICAL_GROUNDING_WORDS
+                .iter()
+                .any(|w| word_lower.contains(w))
+            {
                 logit += 2.5;
             }
-            if CANONICAL_CRISIS_WORDS.iter().any(|w| word_lower.contains(w)) {
+            if CANONICAL_CRISIS_WORDS
+                .iter()
+                .any(|w| word_lower.contains(w))
+            {
                 logit += 3.0;
             }
             return logit;
@@ -762,34 +823,52 @@ impl TherapeuticGate {
 
         // High distress (>0.7): suppress directives, boost validating
         if distress > 0.7 {
-            if CANONICAL_DIRECTIVE_WORDS.iter().any(|w| word_lower.contains(w)) {
+            if CANONICAL_DIRECTIVE_WORDS
+                .iter()
+                .any(|w| word_lower.contains(w))
+            {
                 logit -= 3.0;
             }
-            if CANONICAL_VALIDATING_WORDS.iter().any(|w| word_lower.contains(w)) {
+            if CANONICAL_VALIDATING_WORDS
+                .iter()
+                .any(|w| word_lower.contains(w))
+            {
                 logit += 1.5;
             }
         }
 
         // Low alliance (<0.3): suppress challenges, boost empathy
         if alliance < 0.3 {
-            if CANONICAL_DIRECTIVE_WORDS.iter().any(|w| word_lower.contains(w)) {
+            if CANONICAL_DIRECTIVE_WORDS
+                .iter()
+                .any(|w| word_lower.contains(w))
+            {
                 logit -= 2.0;
             }
-            if CANONICAL_VALIDATING_WORDS.iter().any(|w| word_lower.contains(w)) {
+            if CANONICAL_VALIDATING_WORDS
+                .iter()
+                .any(|w| word_lower.contains(w))
+            {
                 logit += 1.0;
             }
         }
 
         // Depth > alliance: suppress (can't challenge before trust)
         if depth > alliance + 0.2 {
-            if CANONICAL_DIRECTIVE_WORDS.iter().any(|w| word_lower.contains(w)) {
+            if CANONICAL_DIRECTIVE_WORDS
+                .iter()
+                .any(|w| word_lower.contains(w))
+            {
                 logit -= 2.0;
             }
         }
 
         // Reflective intent (intent == 2.0): boost reflective words
         if (intent - 2.0).abs() < 0.5 {
-            if CANONICAL_REFLECTIVE_WORDS.iter().any(|w| word_lower.contains(w)) {
+            if CANONICAL_REFLECTIVE_WORDS
+                .iter()
+                .any(|w| word_lower.contains(w))
+            {
                 logit += 1.5;
             }
         }
@@ -1454,13 +1533,20 @@ mod tests {
         let mut feedback = CoherenceFeedback::with_veto_threshold(0.5, 0.15);
         let genesis = symthaea_core::genesis::GenesisSeed::from_phrase("veto-stress-saturation");
         let a = symthaea_core::hdc::ContinuousHV::from_genesis(
-            &genesis, "a", symthaea_core::hdc::HDC_DIMENSION,
+            &genesis,
+            "a",
+            symthaea_core::hdc::HDC_DIMENSION,
         );
         let b = symthaea_core::hdc::ContinuousHV::from_genesis(
-            &genesis, "b", symthaea_core::hdc::HDC_DIMENSION,
+            &genesis,
+            "b",
+            symthaea_core::hdc::HDC_DIMENSION,
         );
         let weight = feedback.update(&a, &b);
-        assert!(weight <= 3.0, "Binding weight must cap at 3.0, got {weight}");
+        assert!(
+            weight <= 3.0,
+            "Binding weight must cap at 3.0, got {weight}"
+        );
         assert!(weight >= 1.0, "Binding weight must be >= 1.0, got {weight}");
         assert!(weight.is_finite(), "Binding weight must be finite");
     }
@@ -1470,15 +1556,25 @@ mod tests {
         let mut feedback = CoherenceFeedback::with_veto_threshold(0.3, 0.15);
         let genesis = symthaea_core::genesis::GenesisSeed::from_phrase("veto-stress-osc");
         let a = symthaea_core::hdc::ContinuousHV::from_genesis(
-            &genesis, "similar-a", symthaea_core::hdc::HDC_DIMENSION,
+            &genesis,
+            "similar-a",
+            symthaea_core::hdc::HDC_DIMENSION,
         );
         let b = symthaea_core::hdc::ContinuousHV::from_genesis(
-            &genesis, "different-b", symthaea_core::hdc::HDC_DIMENSION,
+            &genesis,
+            "different-b",
+            symthaea_core::hdc::HDC_DIMENSION,
         );
         let mut veto_count = 0;
         for i in 0..20 {
-            if i % 2 == 0 { feedback.update(&a, &b); } else { feedback.update(&a, &a); }
-            if feedback.should_veto() { veto_count += 1; }
+            if i % 2 == 0 {
+                feedback.update(&a, &b);
+            } else {
+                feedback.update(&a, &a);
+            }
+            if feedback.should_veto() {
+                veto_count += 1;
+            }
         }
         assert_eq!(veto_count, 10, "Feedback reports veto state per-step");
     }
@@ -1490,7 +1586,10 @@ mod tests {
         for c in 0..=10 {
             let conf = c as f32 / 10.0;
             let threshold = confidence_adjusted_veto_threshold(0.20, conf, scale);
-            assert!(threshold <= prev + f32::EPSILON, "Must decrease: conf={conf}");
+            assert!(
+                threshold <= prev + f32::EPSILON,
+                "Must decrease: conf={conf}"
+            );
             assert!(threshold >= 0.0, "Must be non-negative");
             prev = threshold;
         }
@@ -1498,13 +1597,20 @@ mod tests {
 
     #[test]
     fn test_veto_zero_max_disables() {
-        let config = GatingConfig { max_vetoes: 0, ..GatingConfig::default() };
+        let config = GatingConfig {
+            max_vetoes: 0,
+            ..GatingConfig::default()
+        };
         assert_eq!(config.max_vetoes, 0);
     }
 
     #[test]
     fn test_veto_refractory_config() {
-        let config = GatingConfig { veto_refractory: 16, max_vetoes: 3, ..GatingConfig::default() };
+        let config = GatingConfig {
+            veto_refractory: 16,
+            max_vetoes: 3,
+            ..GatingConfig::default()
+        };
         assert_eq!(config.veto_refractory, 16);
         assert_eq!(config.max_vetoes, 3);
     }
@@ -1514,7 +1620,9 @@ mod tests {
         let mut feedback = CoherenceFeedback::with_veto_threshold(0.3, 0.99);
         let genesis = symthaea_core::genesis::GenesisSeed::from_phrase("veto-self-similar");
         let a = symthaea_core::hdc::ContinuousHV::from_genesis(
-            &genesis, "a", symthaea_core::hdc::HDC_DIMENSION,
+            &genesis,
+            "a",
+            symthaea_core::hdc::HDC_DIMENSION,
         );
         feedback.update(&a, &a);
         assert!(!feedback.should_veto(), "Self-similar should never veto");

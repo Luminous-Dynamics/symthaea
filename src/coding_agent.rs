@@ -165,11 +165,26 @@ enum TestFailureKind {
 /// Streaming events emitted during agent execution.
 #[derive(Debug, Clone)]
 pub enum AgentEvent {
-    PhaseTransition { from: TaskPhase, to: TaskPhase, iteration: usize },
+    PhaseTransition {
+        from: TaskPhase,
+        to: TaskPhase,
+        iteration: usize,
+    },
     Observation(String),
-    CodeGenerated { tier: BackendTier, bytes: usize, file: PathBuf },
-    TestResult { passed: bool, error_count: usize },
-    ConsciousnessSnapshot { phi: f32, prediction_error: f32, confidence_velocity: f32 },
+    CodeGenerated {
+        tier: BackendTier,
+        bytes: usize,
+        file: PathBuf,
+    },
+    TestResult {
+        passed: bool,
+        error_count: usize,
+    },
+    ConsciousnessSnapshot {
+        phi: f32,
+        prediction_error: f32,
+        confidence_velocity: f32,
+    },
     RetryStrategyChanged(RetryStrategy),
     RequestClarification(String),
     Done(AgentResult),
@@ -492,10 +507,7 @@ impl CodingAgent {
         let observation = format!("WARM_UP: preparing to work on: {}", self.task);
         for i in 0..cycles {
             let result = self.cognitive_loop.cycle(&observation);
-            let phi = result
-                .metadata
-                .consciousness
-                .consciousness_level;
+            let phi = result.metadata.consciousness.consciousness_level;
             tracing::debug!(
                 target: "symthaea::coding_agent",
                 cycle = i,
@@ -522,9 +534,8 @@ impl CodingAgent {
                 "Fast-fail: native exhausted, no code produced after {} iterations",
                 self.iteration
             );
-            self.observations.push(
-                "Fast-fail: task beyond native capability, no usable code generated".into(),
-            );
+            self.observations
+                .push("Fast-fail: task beyond native capability, no usable code generated".into());
             self.phase = TaskPhase::Done;
             return;
         }
@@ -547,7 +558,8 @@ impl CodingAgent {
         let phi = signals.phi;
         self.phi_trace.push(phi);
         self.prediction_error_history.push(signals.prediction_error);
-        self.confidence_velocity_history.push(signals.confidence_velocity);
+        self.confidence_velocity_history
+            .push(signals.confidence_velocity);
         // Keep histories bounded
         if self.prediction_error_history.len() > 10 {
             self.prediction_error_history.remove(0);
@@ -708,9 +720,17 @@ impl CodingAgent {
         // - Prediction error → 0.7+ (confirms need for external help)
         // - Phi → 0.5 (bypasses the consciousness < 0.2 → Native override)
         let (epistemic, prediction_error, phi) = if self.native_exhausted {
-            (EpistemicStatus::Uncertain, 0.7_f64.max(prediction_error as f64), 0.5)
+            (
+                EpistemicStatus::Uncertain,
+                0.7_f64.max(prediction_error as f64),
+                0.5,
+            )
         } else {
-            (Self::confidence_to_epistemic(confidence), prediction_error as f64, phi)
+            (
+                Self::confidence_to_epistemic(confidence),
+                prediction_error as f64,
+                phi,
+            )
         };
 
         // Build the generation prompt
@@ -781,9 +801,8 @@ impl CodingAgent {
                     tier = %result.tier,
                     "No real LLM available — fast-failing"
                 );
-                self.observations.push(
-                    "Fast-fail: no real LLM backend available for this task".into(),
-                );
+                self.observations
+                    .push("Fast-fail: no real LLM backend available for this task".into());
                 self.phase = TaskPhase::Done;
                 self.last_dispatch = Some(result);
                 return;
@@ -848,9 +867,8 @@ impl CodingAgent {
                             self.generated_code = Some(llm_result.output.clone());
                             self.native_exhausted = false;
                         } else {
-                            self.observations.push(
-                                "Native exhausted, LLM escalation attempted".into(),
-                            );
+                            self.observations
+                                .push("Native exhausted, LLM escalation attempted".into());
                         }
                         self.last_dispatch = Some(llm_result);
                         return; // already processed
@@ -892,7 +910,9 @@ impl CodingAgent {
         }
 
         // Try structured (line-aware) fix first
-        if let Some(fixed) = crate::language::code_executor::try_auto_fix_structured(&code, &structured) {
+        if let Some(fixed) =
+            crate::language::code_executor::try_auto_fix_structured(&code, &structured)
+        {
             let target = self.resolve_target_file();
             self.write_code_to_disk(&target, &fixed);
             self.generated_code = Some(fixed);
@@ -1006,7 +1026,9 @@ impl CodingAgent {
                     prompt.push_str("\nTry a completely different implementation approach.\n");
                 }
                 RetryStrategy::SimplifyScope => {
-                    prompt.push_str("\nSimplify the implementation — use the minimal viable approach.\n");
+                    prompt.push_str(
+                        "\nSimplify the implementation — use the minimal viable approach.\n",
+                    );
                 }
                 _ => {}
             }
@@ -1057,9 +1079,7 @@ impl CodingAgent {
     fn retrieve_experience_hints(&self) -> Vec<(String, String)> {
         if let Some(ref store) = self.experience_store {
             if let Ok(rt) = tokio::runtime::Runtime::new() {
-                return rt.block_on(async {
-                    store.error_hints_for(&self.task, 3).await
-                });
+                return rt.block_on(async { store.error_hints_for(&self.task, 3).await });
             }
         }
         Vec::new()
@@ -1073,15 +1093,19 @@ impl CodingAgent {
         if let Some(ref store) = self.experience_store {
             // First check cache (fast, no async)
             let self_task_lower = self.task.to_lowercase();
-            let self_words: std::collections::HashSet<String> =
-                self_task_lower.split_whitespace().map(|s| s.to_string()).collect();
+            let self_words: std::collections::HashSet<String> = self_task_lower
+                .split_whitespace()
+                .map(|s| s.to_string())
+                .collect();
             let cached: Vec<(String, String)> = store
                 .cached_successes()
                 .iter()
                 .filter(|(task, _)| {
                     let task_lower = task.to_lowercase();
-                    let task_words: std::collections::HashSet<String> =
-                        task_lower.split_whitespace().map(|s| s.to_string()).collect();
+                    let task_words: std::collections::HashSet<String> = task_lower
+                        .split_whitespace()
+                        .map(|s| s.to_string())
+                        .collect();
                     task_words.intersection(&self_words).count() >= 2
                 })
                 .take(3)
@@ -1125,7 +1149,6 @@ impl CodingAgent {
         if let Some(code) = Self::match_native_pattern(&task_lower) {
             return Some(code);
         }
-
 
         // No match — signal that native generation can't handle this task.
         // The caller should escalate to an LLM tier.
@@ -1240,19 +1263,31 @@ impl CodingAgent {
         }
 
         // ── Collections ──────────────────────────────────────────────
-        if task.contains("sum") && (task.contains("vec") || task.contains("list") || task.contains("array")) {
+        if task.contains("sum")
+            && (task.contains("vec") || task.contains("list") || task.contains("array"))
+        {
             return Some(
                 "/// Sum all elements in a slice.\npub fn sum_vec(v: &[i64]) -> i64 {\n    v.iter().sum()\n}\n"
                     .to_string(),
             );
         }
-        if task.contains("max") && (task.contains("vec") || task.contains("list") || task.contains("array") || task.contains("find")) {
+        if task.contains("max")
+            && (task.contains("vec")
+                || task.contains("list")
+                || task.contains("array")
+                || task.contains("find"))
+        {
             return Some(
                 "/// Find the maximum value in a slice.\npub fn find_max(v: &[i64]) -> Option<i64> {\n    v.iter().copied().max()\n}\n"
                     .to_string(),
             );
         }
-        if task.contains("min") && (task.contains("vec") || task.contains("list") || task.contains("array") || task.contains("find")) {
+        if task.contains("min")
+            && (task.contains("vec")
+                || task.contains("list")
+                || task.contains("array")
+                || task.contains("find"))
+        {
             return Some(
                 "/// Find the minimum value in a slice.\npub fn find_min(v: &[i64]) -> Option<i64> {\n    v.iter().copied().min()\n}\n"
                     .to_string(),
@@ -1397,7 +1432,14 @@ impl CodingAgent {
     fn extract_function_name(task: &str) -> Option<String> {
         let stop_words = ["a", "an", "the", "my", "our", "new", "simple", "basic"];
         // Look for explicit function names: "add a X function", "implement X", "create X"
-        let patterns = ["function ", "fn ", "method ", "implement ", "create ", "add "];
+        let patterns = [
+            "function ",
+            "fn ",
+            "method ",
+            "implement ",
+            "create ",
+            "add ",
+        ];
         for pattern in &patterns {
             if let Some(idx) = task.find(pattern) {
                 let after = &task[idx + pattern.len()..];
@@ -1417,10 +1459,16 @@ impl CodingAgent {
 
         // Fallback: use first multi-char word that looks like an identifier
         for word in task.split_whitespace() {
-            let clean: String = word.chars().filter(|c| c.is_alphanumeric() || *c == '_').collect();
+            let clean: String = word
+                .chars()
+                .filter(|c| c.is_alphanumeric() || *c == '_')
+                .collect();
             if clean.len() >= 3
                 && clean.chars().next().map_or(false, |c| c.is_alphabetic())
-                && !["the", "and", "for", "add", "that", "with", "from", "this", "into"].contains(&clean.to_lowercase().as_str())
+                && ![
+                    "the", "and", "for", "add", "that", "with", "from", "this", "into",
+                ]
+                .contains(&clean.to_lowercase().as_str())
             {
                 return Some(clean.to_lowercase());
             }
@@ -1703,15 +1751,25 @@ impl CodingAgent {
         // FEP-driven phase overrides: the consciousness loop can redirect the agent
         // regardless of the current phase (except Done).
         //
-        // Suppression rule: after 3+ iterations without generating any code,
-        // stop honoring ExplorationTrigger — the consciousness loop is being
-        // too cautious and the agent needs to actually attempt generation.
+        // Suppression rules:
+        // 1. After 3+ iterations without generating any code, stop honoring
+        //    ExplorationTrigger — the consciousness loop is being too cautious.
+        // 2. Never redirect away from Generating/Testing/Fixing when code has
+        //    been written — the agent needs to compile and test, not re-explore.
         let suppress_exploration = self.iteration >= 3 && self.generation_tiers.is_empty();
+        let has_code = self.generated_code.is_some();
+        let in_action_phase = matches!(
+            self.phase,
+            TaskPhase::Generating | TaskPhase::Testing | TaskPhase::Fixing
+        );
 
         if self.phase != TaskPhase::Done {
             match fep_command {
                 MotorCommandType::ExplorationTrigger => {
-                    if self.phase != TaskPhase::Understanding && !suppress_exploration {
+                    if self.phase != TaskPhase::Understanding
+                        && !suppress_exploration
+                        && !(has_code && in_action_phase)
+                    {
                         tracing::info!(
                             target: "symthaea::coding_agent",
                             from = %self.phase,
@@ -1729,7 +1787,10 @@ impl CodingAgent {
                     }
                 }
                 MotorCommandType::ReflectionInitiate => {
-                    if self.phase != TaskPhase::Planning && self.phase != TaskPhase::Understanding {
+                    if self.phase != TaskPhase::Planning
+                        && self.phase != TaskPhase::Understanding
+                        && !(has_code && in_action_phase)
+                    {
                         tracing::info!(
                             target: "symthaea::coding_agent",
                             from = %self.phase,
@@ -1741,7 +1802,9 @@ impl CodingAgent {
                     }
                 }
                 MotorCommandType::ExpectationReset => {
-                    if self.phase == TaskPhase::Generating || self.phase == TaskPhase::Fixing {
+                    if (self.phase == TaskPhase::Generating || self.phase == TaskPhase::Fixing)
+                        && !has_code
+                    {
                         self.observations
                             .push("FEP ExpectationReset: model mismatch, re-planning".into());
                         self.phase = TaskPhase::Planning;
@@ -1771,9 +1834,8 @@ impl CodingAgent {
                         issue = %quality_issue,
                         "Code quality gate: rejecting generated code"
                     );
-                    self.observations.push(format!(
-                        "Quality gate rejected code: {quality_issue}"
-                    ));
+                    self.observations
+                        .push(format!("Quality gate rejected code: {quality_issue}"));
                     // Record failure for the tier that produced this
                     if let Some(tier) = self.generation_tiers.last().copied() {
                         if let Some(ref mut dispatcher) = self.dispatcher {
@@ -1855,7 +1917,16 @@ impl CodingAgent {
                 }
             }
             TaskPhase::Testing => {
-                if let Some(ref result) = motor_result {
+                // Try motor result first; if none, run cargo check directly
+                let effective_result = motor_result.clone().or_else(|| {
+                    if self.generated_code.is_some() {
+                        self.run_cargo_check()
+                    } else {
+                        None
+                    }
+                });
+
+                if let Some(ref result) = effective_result {
                     // Record outcome into dispatcher stats for Bayesian routing
                     self.record_generation_outcome(result.success);
 
@@ -1869,21 +1940,24 @@ impl CodingAgent {
                         tracing::info!(target: "symthaea::coding_agent", "→ Fixing");
                     }
                 } else {
-                    // No motor result during testing — if we have generated code, consider done
-                    if self.generated_code.is_some() {
+                    // No code generated and no motor result
+                    self.phase_failures += 1;
+                    if self.phase_failures >= self.config.max_phase_failures {
                         self.phase = TaskPhase::Done;
-                        tracing::info!(target: "symthaea::coding_agent", "→ Done (code written, no test runner)");
-                    } else {
-                        self.phase_failures += 1;
-                        if self.phase_failures >= self.config.max_phase_failures {
-                            self.phase = TaskPhase::Done;
-                        }
                     }
                 }
             }
             TaskPhase::Fixing => {
                 let code_written = self.generated_code.is_some();
-                if let Some(ref result) = motor_result {
+                // Try motor result; if none and code was written, run cargo check directly
+                let effective_result = motor_result.clone().or_else(|| {
+                    if code_written {
+                        self.run_cargo_check()
+                    } else {
+                        None
+                    }
+                });
+                if let Some(ref result) = effective_result {
                     if result.success || code_written {
                         self.phase = TaskPhase::Testing;
                         self.phase_failures = 0;
@@ -1943,12 +2017,16 @@ impl CodingAgent {
         // Stuck detection: if Phi stays low for 3+ cycles and we're past the
         // initial phases, consciousness isn't engaging — try a different approach.
         // Only triggers after Generating has been attempted (not during initial ramp-up).
+        // NEVER overrides Testing or Fixing — the agent just wrote code and needs to
+        // compile/test it, not re-plan. Low Phi during testing is expected (the CfC
+        // hasn't learned coding-specific patterns yet).
         if self.phi_trace.len() >= 3
             && self.phase != TaskPhase::Done
             && self.phase != TaskPhase::Understanding
             && self.phase != TaskPhase::Planning
+            && self.phase != TaskPhase::Testing
+            && self.phase != TaskPhase::Fixing
             && !self.generation_tiers.is_empty()
-        // only after at least one generation
         {
             let recent: Vec<f32> = self.phi_trace.iter().rev().take(3).copied().collect();
             let all_low = recent.iter().all(|&p| p < 0.2);
@@ -2015,7 +2093,11 @@ impl CodingAgent {
 
                 // Track failure pattern frequency
                 let pattern = Self::normalize_error_pattern(error);
-                if let Some(entry) = self.failure_patterns.iter_mut().find(|(p, _)| *p == pattern) {
+                if let Some(entry) = self
+                    .failure_patterns
+                    .iter_mut()
+                    .find(|(p, _)| *p == pattern)
+                {
                     entry.1 += 1;
                 } else {
                     self.failure_patterns.push((pattern.clone(), 1));
@@ -2024,6 +2106,83 @@ impl CodingAgent {
                 // Store failure in persistent experience store
                 self.store_experience(error, false);
             }
+        }
+    }
+
+    /// Run `cargo check` directly in the working directory, bypassing the motor bridge.
+    ///
+    /// This is the direct execution path for the coding agent — the agent *knows*
+    /// it wants to compile, so we skip FEP motor confidence gating. Phi gating
+    /// still applies: we won't run commands if Phi is below the warm-up threshold.
+    fn run_cargo_check(&mut self) -> Option<MotorOutputResult> {
+        if !self.config.enable_real_exec {
+            // In simulated mode, check if generated code has basic syntax issues
+            return Some(MotorOutputResult {
+                success: self.generated_code.is_some(),
+                action_type: Some(ActionType::CargoCheck),
+                prediction_error: 0.0,
+                outcome: Some(crate::action::ActionOutcome::Success),
+                error: None,
+            });
+        }
+
+        let working_dir = &self.config.working_dir;
+
+        // Check if Cargo.toml exists
+        if !working_dir.join("Cargo.toml").exists() {
+            return Some(MotorOutputResult {
+                success: false,
+                action_type: Some(ActionType::CargoCheck),
+                prediction_error: 0.5,
+                outcome: None,
+                error: Some("No Cargo.toml in working directory".into()),
+            });
+        }
+
+        tracing::info!(
+            target: "symthaea::coding_agent",
+            dir = %working_dir.display(),
+            "Running cargo check (direct)"
+        );
+
+        match std::process::Command::new("cargo")
+            .args(["check", "--message-format=short"])
+            .current_dir(working_dir)
+            .output()
+        {
+            Ok(output) => {
+                let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+                let success = output.status.success();
+
+                if !success {
+                    self.last_test_output = Some(stderr.clone());
+                    self.observations.push(format!(
+                        "cargo check failed:\n{}",
+                        &stderr[..stderr.len().min(500)]
+                    ));
+                } else {
+                    self.observations.push("cargo check passed".into());
+                }
+
+                Some(MotorOutputResult {
+                    success,
+                    action_type: Some(ActionType::CargoCheck),
+                    prediction_error: if success { 0.0 } else { 0.8 },
+                    outcome: Some(crate::action::ActionOutcome::CommandOutput {
+                        stdout: output.stdout,
+                        stderr: output.stderr,
+                        exit_code: output.status.code().unwrap_or(-1),
+                    }),
+                    error: if success { None } else { Some(stderr) },
+                })
+            }
+            Err(e) => Some(MotorOutputResult {
+                success: false,
+                action_type: Some(ActionType::CargoCheck),
+                prediction_error: 1.0,
+                outcome: None,
+                error: Some(format!("Failed to run cargo: {e}")),
+            }),
         }
     }
 
@@ -2079,12 +2238,12 @@ impl CodingAgent {
 
         // Hallucinated imports: `use` of crates that don't exist in this project
         let hallucinated_crates = [
-            "use crate_name::",   // placeholder crate
-            "use my_crate::",     // LLM default naming
-            "use your_crate::",   // LLM addressing user
-            "use example::",      // example placeholder
-            "use foo::",          // test placeholder
-            "use bar::",          // test placeholder
+            "use crate_name::", // placeholder crate
+            "use my_crate::",   // LLM default naming
+            "use your_crate::", // LLM addressing user
+            "use example::",    // example placeholder
+            "use foo::",        // test placeholder
+            "use bar::",        // test placeholder
         ];
         for hc in &hallucinated_crates {
             if trimmed.contains(hc) {
@@ -2127,9 +2286,7 @@ impl CodingAgent {
             .lines()
             .filter_map(|l| {
                 let t = l.trim();
-                if (t.starts_with("pub fn ") || t.starts_with("fn "))
-                    && t.contains('(')
-                {
+                if (t.starts_with("pub fn ") || t.starts_with("fn ")) && t.contains('(') {
                     t.split('(').next()
                 } else {
                     None
@@ -2168,7 +2325,11 @@ impl CodingAgent {
             task: self.task.clone(),
             detail: detail.chars().take(500).collect(),
             success,
-            tier: self.generation_tiers.last().map(|t| t.to_string()).unwrap_or_default(),
+            tier: self
+                .generation_tiers
+                .last()
+                .map(|t| t.to_string())
+                .unwrap_or_default(),
             fix_hint: None,
         };
 
@@ -2218,7 +2379,11 @@ impl CodingAgent {
             task: self.task.clone(),
             detail: error_pattern.chars().take(300).collect(),
             success: true,
-            tier: self.generation_tiers.last().map(|t| t.to_string()).unwrap_or_default(),
+            tier: self
+                .generation_tiers
+                .last()
+                .map(|t| t.to_string())
+                .unwrap_or_default(),
             fix_hint: Some(fix_summary),
         };
 
@@ -2473,10 +2638,7 @@ impl CodingAgent {
             coherence
         );
         for m in &matches {
-            prompt.push_str(&format!(
-                "- {} (similarity={:.3})\n",
-                m.name, m.similarity
-            ));
+            prompt.push_str(&format!("- {} (similarity={:.3})\n", m.name, m.similarity));
             // Include source snippet if available
             if let Some(src) = self.source_cache.get(&m.path) {
                 let snippet = Self::extract_entity_source(src, &m.name, m.kind);
@@ -2516,9 +2678,8 @@ impl CodingAgent {
         }
 
         // All strategies exhausted — request clarification
-        let fallback = RetryStrategy::RequestClarification(
-            "All retry strategies exhausted.".to_string(),
-        );
+        let fallback =
+            RetryStrategy::RequestClarification("All retry strategies exhausted.".to_string());
         self.emit_state_changed(&fallback);
         fallback
     }
@@ -2656,7 +2817,8 @@ impl CodingAgent {
                 memory.update_file(path, &parsed);
             }
         }
-        self.source_cache.insert(path.to_path_buf(), source.to_string());
+        self.source_cache
+            .insert(path.to_path_buf(), source.to_string());
     }
 
     /// Build source-level context from CodebaseMemory matches.
@@ -2677,7 +2839,11 @@ impl CodingAgent {
                 let snippet = Self::extract_entity_source(source, &m.name, m.kind);
                 Some(format!(
                     "// {} — {:?} `{}` (similarity: {:.3})\n{}",
-                    m.path.display(), m.kind, m.name, m.similarity, snippet
+                    m.path.display(),
+                    m.kind,
+                    m.name,
+                    m.similarity,
+                    snippet
                 ))
             })
             .collect()
@@ -2709,11 +2875,21 @@ impl CodingAgent {
                 for j in i..lines.len().min(i + 30) {
                     out.push(lines[j]);
                     for ch in lines[j].chars() {
-                        if ch == '{' { depth += 1; started = true; }
-                        if ch == '}' { depth -= 1; }
+                        if ch == '{' {
+                            depth += 1;
+                            started = true;
+                        }
+                        if ch == '}' {
+                            depth -= 1;
+                        }
                     }
-                    if started && depth <= 0 { break; }
-                    if out.len() >= 20 { out.push("    // ... (truncated)"); break; }
+                    if started && depth <= 0 {
+                        break;
+                    }
+                    if out.len() >= 20 {
+                        out.push("    // ... (truncated)");
+                        break;
+                    }
                 }
                 return out.join("\n");
             }
@@ -2905,7 +3081,10 @@ mod tests {
         assert!(!result.phi_trace.is_empty());
         for phi in &result.phi_trace {
             assert!(phi.is_finite(), "phi must be finite");
-            assert!(*phi >= 0.0 && *phi <= 1.0, "phi must be in [0,1], got {phi}");
+            assert!(
+                *phi >= 0.0 && *phi <= 1.0,
+                "phi must be in [0,1], got {phi}"
+            );
         }
         // iterations_used should match phi_trace length
         assert_eq!(result.iterations_used, result.phi_trace.len());
@@ -2991,7 +3170,8 @@ mod tests {
         assert!(
             r2.phi_trace.len() <= r2.iterations_used + 1,
             "Run 2 phi trace ({}) should not carry over from run 1 ({})",
-            r2.phi_trace.len(), r1.phi_trace.len()
+            r2.phi_trace.len(),
+            r1.phi_trace.len()
         );
     }
 
@@ -3597,7 +3777,8 @@ mod tests {
 
         // Phi trace length should approximately match iterations used
         // (retry strategies may cause ±1 discrepancy at phase boundaries)
-        let diff = (result.phi_trace.len() as isize - result.iterations_used as isize).unsigned_abs();
+        let diff =
+            (result.phi_trace.len() as isize - result.iterations_used as isize).unsigned_abs();
         assert!(
             diff <= 1,
             "phi_trace length ({}) should be within 1 of iterations_used ({})",
@@ -3715,10 +3896,7 @@ mod tests {
 
         assert_eq!(iters_a, iters_b, "Iterations should be deterministic");
         assert_eq!(phase_a, phase_b, "Final phase should be deterministic");
-        assert_eq!(
-            trace_a, trace_b,
-            "Phi trace length should be deterministic"
-        );
+        assert_eq!(trace_a, trace_b, "Phi trace length should be deterministic");
     }
 
     // ── Telemetry bounds: AgentResult::to_telemetry_json edge cases ──────
@@ -3778,7 +3956,8 @@ mod tests {
 
     #[test]
     fn test_quality_gate_rejects_todo_stub() {
-        let code = "/// Generated.\npub fn generated() -> () {\n    // TODO: implement — task: foo\n}\n";
+        let code =
+            "/// Generated.\npub fn generated() -> () {\n    // TODO: implement — task: foo\n}\n";
         assert!(CodingAgent::check_code_quality(code).is_some());
     }
 
@@ -4086,7 +4265,9 @@ assertion `left == right` failed
         assert!(!events.is_empty(), "Should receive events");
 
         // Check for consciousness snapshots
-        let has_snapshot = events.iter().any(|e| matches!(e, AgentEvent::ConsciousnessSnapshot { .. }));
+        let has_snapshot = events
+            .iter()
+            .any(|e| matches!(e, AgentEvent::ConsciousnessSnapshot { .. }));
         assert!(has_snapshot, "Should have consciousness snapshots");
 
         // Check for Done event
@@ -4102,10 +4283,16 @@ assertion `left == right` failed
         assert_eq!(s1, RetryStrategy::DifferentTemplate);
 
         let s2 = agent.next_retry_strategy();
-        assert!(matches!(s2, RetryStrategy::DifferentBackend(BackendTier::LocalLlm)));
+        assert!(matches!(
+            s2,
+            RetryStrategy::DifferentBackend(BackendTier::LocalLlm)
+        ));
 
         let s3 = agent.next_retry_strategy();
-        assert!(matches!(s3, RetryStrategy::DifferentBackend(BackendTier::CloudLlm)));
+        assert!(matches!(
+            s3,
+            RetryStrategy::DifferentBackend(BackendTier::CloudLlm)
+        ));
 
         let s4 = agent.next_retry_strategy();
         assert_eq!(s4, RetryStrategy::SimplifyScope);
@@ -4177,7 +4364,10 @@ assertion `left == right` failed
         );
 
         let prompt = agent.build_generation_prompt();
-        assert!(prompt.contains("test failure"), "Should include structured test analysis");
+        assert!(
+            prompt.contains("test failure"),
+            "Should include structured test analysis"
+        );
         assert!(prompt.contains("test_fib"), "Should name the failing test");
     }
 
@@ -4198,7 +4388,11 @@ assertion `left == right` failed
 
         // Check that .symthaea/experience.db was created
         let db_path = dir.path().join(".symthaea/experience.db");
-        assert!(db_path.exists(), "Persistent DB should exist at {:?}", db_path);
+        assert!(
+            db_path.exists(),
+            "Persistent DB should exist at {:?}",
+            db_path
+        );
 
         // Create a second agent pointing at the same directory — it should
         // load the persisted experience store
@@ -4209,7 +4403,10 @@ assertion `left == right` failed
             ..Default::default()
         };
         let agent2 = CodingAgent::new(config2).unwrap();
-        assert!(agent2.has_experience_store(), "Second agent should load persistent store");
+        assert!(
+            agent2.has_experience_store(),
+            "Second agent should load persistent store"
+        );
     }
 
     #[test]
@@ -4251,7 +4448,8 @@ assertion `left == right` failed
         agent.index_project(dir.path()).unwrap();
 
         // Similar code should pass
-        let (passes, surprise) = agent.verify_generated_code_hdc("pub fn func_new(x: u32) -> u32 { x + 10 }");
+        let (passes, surprise) =
+            agent.verify_generated_code_hdc("pub fn func_new(x: u32) -> u32 { x + 10 }");
         // Surprise should be finite
         assert!(surprise.is_finite(), "Surprise should be finite");
         // With only 5 small files the centroid is weak — we mainly test no-crash here
@@ -4296,7 +4494,10 @@ assertion `left == right` failed
         // "Note that" in a doc comment should NOT be flagged
         let code = "/// Note that this returns None for empty inputs.\npub fn first(v: &[i32]) -> Option<&i32> {\n    v.first()\n}";
         let result = CodingAgent::check_code_quality(code);
-        assert!(result.is_none(), "Doc comments should not trigger explanation detection");
+        assert!(
+            result.is_none(),
+            "Doc comments should not trigger explanation detection"
+        );
     }
 
     // ── Warm-up & Learning Tests ────────────────────────────────────────
@@ -4321,7 +4522,8 @@ assertion `left == right` failed
             result.iterations_used
         );
         // Phi trace should only contain entries from real iterations, not warm-up
-        let diff = (result.phi_trace.len() as isize - result.iterations_used as isize).unsigned_abs();
+        let diff =
+            (result.phi_trace.len() as isize - result.iterations_used as isize).unsigned_abs();
         assert!(diff <= 1, "Phi trace should track real iterations");
     }
 
@@ -4398,7 +4600,10 @@ assertion `left == right` failed
     #[test]
     fn test_strip_code_fences() {
         // No fences → unchanged
-        assert_eq!(CodingAgent::strip_code_fences("fn main() {}"), "fn main() {}");
+        assert_eq!(
+            CodingAgent::strip_code_fences("fn main() {}"),
+            "fn main() {}"
+        );
 
         // ```rust ... ```
         assert_eq!(

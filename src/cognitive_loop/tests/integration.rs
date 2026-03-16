@@ -516,7 +516,11 @@ fn test_all_consciousness_modules_enabled() {
 
     let result = service.cycle("final check with all modules");
     assert!(result.prediction_error.is_finite());
-    assert!(result.metadata.consciousness.consciousness_level.is_finite());
+    assert!(result
+        .metadata
+        .consciousness
+        .consciousness_level
+        .is_finite());
     // Temporal consciousness should have valid coherence
     assert!(result.metadata.temporal.temporal_coherence_score >= 0.0);
     assert!(result.metadata.temporal.temporal_coherence_score <= 1.0);

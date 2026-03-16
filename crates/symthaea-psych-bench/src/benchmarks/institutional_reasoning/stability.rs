@@ -125,7 +125,11 @@ impl InstitutionalStabilityBenchmark {
 
         let variance = if ceilings.len() > 1 {
             let n = ceilings.len() as f64;
-            ceilings.iter().map(|x| (x - mean_stability).powi(2)).sum::<f64>() / (n - 1.0)
+            ceilings
+                .iter()
+                .map(|x| (x - mean_stability).powi(2))
+                .sum::<f64>()
+                / (n - 1.0)
         } else {
             0.0
         };
@@ -216,9 +220,7 @@ mod tests {
         let config = BenchmarkConfig::default();
         let result = InstitutionalStabilityBenchmark.run(&config);
         assert!(result.metrics.contains_key("institutional_stability"));
-        assert!(result
-            .metrics
-            .contains_key("institutional_min_stability"));
+        assert!(result.metrics.contains_key("institutional_min_stability"));
         assert!(result
             .metrics
             .contains_key("institutional_stability_variance"));
@@ -252,8 +254,9 @@ mod tests {
         eprintln!("\n  ── Per-axiom noise ceilings ──");
         for (idx, &axiom) in AXIOM_NAMES.iter().enumerate() {
             let axiom_seed = seed.wrapping_add(idx as u64 * 7919);
-            let ceiling =
-                InstitutionalStabilityBenchmark::axiom_noise_ceiling(&algebra, &system, axiom, axiom_seed);
+            let ceiling = InstitutionalStabilityBenchmark::axiom_noise_ceiling(
+                &algebra, &system, axiom, axiom_seed,
+            );
             let normalized = ceiling / 0.50;
             eprintln!("  {axiom:<25} ceiling={ceiling:.2}  norm={normalized:.4}");
         }

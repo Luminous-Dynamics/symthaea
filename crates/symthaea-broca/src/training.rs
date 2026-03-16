@@ -430,8 +430,12 @@ impl GradientDiagnostics {
 
         // Oscillating: high coefficient of variation (std/mean > 2.0)
         if mean > 1e-8 {
-            let variance =
-                self.grad_norms.iter().map(|&g| (g - mean).powi(2)).sum::<f32>() / n as f32;
+            let variance = self
+                .grad_norms
+                .iter()
+                .map(|&g| (g - mean).powi(2))
+                .sum::<f32>()
+                / n as f32;
             let cv = variance.sqrt() / mean;
             if cv > 2.0 {
                 anomalies.push(GradientAnomaly::Oscillating {
@@ -442,7 +446,10 @@ impl GradientDiagnostics {
 
         // Plateau: all norms within 1% of mean (no learning signal diversity)
         if n >= 10 && mean > 1e-8 {
-            let all_flat = self.grad_norms.iter().all(|&g| (g - mean).abs() < mean * 0.01);
+            let all_flat = self
+                .grad_norms
+                .iter()
+                .all(|&g| (g - mean).abs() < mean * 0.01);
             if all_flat {
                 anomalies.push(GradientAnomaly::Plateau { mean_norm: mean });
             }
@@ -822,9 +829,8 @@ pub fn train_with_adam(
                     coherence_count += 1;
                     if effective_coherence_weight > 0.0 {
                         // weight = 1.0 when coherence=1.0, lower when coherence drops
-                        let weight = (1.0
-                            - effective_coherence_weight * (1.0 - coherence))
-                            .max(0.05);
+                        let weight =
+                            (1.0 - effective_coherence_weight * (1.0 - coherence)).max(0.05);
                         raw_loss * weight
                     } else {
                         raw_loss
@@ -838,9 +844,9 @@ pub fn train_with_adam(
 
                 // Phased training: only enable CfC BPTT after network_warmup_epochs
                 // (force_train_network overrides when plateau anomaly detected)
-                let train_network_this_epoch =
-                    (config.train_network && epoch >= config.network_warmup_epochs)
-                        || force_train_network;
+                let train_network_this_epoch = (config.train_network
+                    && epoch >= config.network_warmup_epochs)
+                    || force_train_network;
 
                 // Compute gradient of CE loss w.r.t. output HV (for CfC BPTT)
                 let d_output = if train_network_this_epoch {
@@ -980,7 +986,8 @@ pub fn train_with_adam(
                             GradientAnomaly::Exploding { .. } => {
                                 lr_multiplier = (lr_multiplier * 0.5).max(0.01);
                                 tracing::warn!(
-                                    epoch, lr_multiplier,
+                                    epoch,
+                                    lr_multiplier,
                                     "Anomaly response: halved LR (exploding gradients)"
                                 );
                             }
@@ -988,14 +995,16 @@ pub fn train_with_adam(
                                 let max_mult = 10.0 * initial_lr;
                                 lr_multiplier = (lr_multiplier * 2.0).min(max_mult / initial_lr);
                                 tracing::warn!(
-                                    epoch, lr_multiplier,
+                                    epoch,
+                                    lr_multiplier,
                                     "Anomaly response: doubled LR (vanishing gradients)"
                                 );
                             }
                             GradientAnomaly::Oscillating { .. } => {
                                 effective_grad_clip *= 0.5;
                                 tracing::warn!(
-                                    epoch, effective_grad_clip,
+                                    epoch,
+                                    effective_grad_clip,
                                     "Anomaly response: tightened grad clip (oscillating)"
                                 );
                             }
@@ -1017,7 +1026,9 @@ pub fn train_with_adam(
                                     report.coherence_collapse_detected = true;
                                 }
                                 tracing::warn!(
-                                    epoch, mean_coherence, lr_multiplier,
+                                    epoch,
+                                    mean_coherence,
+                                    lr_multiplier,
                                     "Anomaly response: halved LR (coherence collapse)"
                                 );
                             }
@@ -1033,7 +1044,8 @@ pub fn train_with_adam(
                             report.anomaly_early_stopped = true;
                         }
                         tracing::warn!(
-                            epoch, consecutive_anomaly_epochs,
+                            epoch,
+                            consecutive_anomaly_epochs,
                             "Anomaly response: early stopping (3 consecutive anomalous epochs)"
                         );
                         break;
@@ -1092,8 +1104,7 @@ pub fn train_with_adam(
         let mean_coherence = if intent_coherences.is_empty() {
             0.0
         } else {
-            intent_coherences.iter().map(|(_, c)| c).sum::<f32>()
-                / intent_coherences.len() as f32
+            intent_coherences.iter().map(|(_, c)| c).sum::<f32>() / intent_coherences.len() as f32
         };
         let passed = mean_coherence >= config.smoke_test_coherence_threshold;
         if !passed {
@@ -1185,7 +1196,11 @@ fn compute_ce_gradient_wrt_output(
         // Compute ||e_i|| for normalization
         let emb_norm: f32 = emb_vals.iter().map(|v| v * v).sum::<f32>().sqrt().max(1e-8);
         // cos_i = similarity(output, emb[i]) — recover from scaled logit
-        let cos_i = if scale.abs() > 1e-6 { logits[i] / scale } else { 0.0 };
+        let cos_i = if scale.abs() > 1e-6 {
+            logits[i] / scale
+        } else {
+            0.0
+        };
 
         let scaled_error = scale * error;
         for (j, &ev) in emb_vals.iter().enumerate() {
@@ -1528,12 +1543,8 @@ pub fn compute_validation_loss_sampled(
         for (pos, &target_id) in pair.target_ids[..window_end].iter().enumerate() {
             let logits = if use_sampled {
                 neg_seed = neg_seed.wrapping_add(1);
-                let active = sample_negatives(
-                    target_id as usize,
-                    vocab_size,
-                    negative_samples,
-                    neg_seed,
-                );
+                let active =
+                    sample_negatives(target_id as usize, vocab_size, negative_samples, neg_seed);
                 generator.controller_mut().forward_step_sampled(
                     &thought_hv,
                     prev_token,
@@ -2372,7 +2383,10 @@ mod tests {
         // Should early-stop (3 consecutive anomalous epochs) or complete with reduced LR
         // Either way, all losses should be finite (anomaly response prevents divergence)
         for m in &metrics {
-            assert!(m.avg_loss.is_finite(), "Loss should remain finite with anomaly response");
+            assert!(
+                m.avg_loss.is_finite(),
+                "Loss should remain finite with anomaly response"
+            );
         }
     }
 
@@ -2496,7 +2510,10 @@ mod tests {
         let metrics = train(&mut gen, &dataset, &train_config);
         // Should complete without error and produce finite loss
         for m in &metrics {
-            assert!(m.avg_loss.is_finite(), "Loss should be finite with frozen embeddings");
+            assert!(
+                m.avg_loss.is_finite(),
+                "Loss should be finite with frozen embeddings"
+            );
         }
     }
 
@@ -2622,7 +2639,10 @@ mod tests {
             assert!(m.avg_loss.is_finite(), "No-coherence loss should be finite");
         }
         for m in &metrics_yes {
-            assert!(m.avg_loss.is_finite(), "Coherence-gated loss should be finite");
+            assert!(
+                m.avg_loss.is_finite(),
+                "Coherence-gated loss should be finite"
+            );
         }
 
         // Coherence-weighted loss should be lower (scaled down by weight)
@@ -2774,8 +2794,7 @@ mod tests {
             ..Default::default()
         };
 
-        let (_, _, _, _, validation) =
-            train_with_adam(&mut gen, &dataset, &train_config, None);
+        let (_, _, _, _, validation) = train_with_adam(&mut gen, &dataset, &train_config, None);
         let val = validation.expect("TrainingValidation should be Some when smoke test enabled");
         assert_eq!(val.intent_coherences.len(), 8, "Should test all 8 intents");
         assert!(val.mean_coherence.is_finite());
@@ -2881,7 +2900,11 @@ pub fn generate_therapeutic_training_data(tokenizer: &BpeTokenizer) -> TrainingD
         // Set base consciousness channels to reasonable defaults
         channels.set_consciousness(0.6, 0.5, 0.7);
         channels.set_emotion(
-            if distress > 0.5 { -(distress - 0.5) } else { 0.3 },
+            if distress > 0.5 {
+                -(distress - 0.5)
+            } else {
+                0.3
+            },
             distress.clamp(0.3, 0.8),
             0.7, // warmth
         );

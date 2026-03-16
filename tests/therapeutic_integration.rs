@@ -200,68 +200,96 @@ fn test_formulation_auto_detection() {
     }
 
     let ratio = service.therapeutic_manager_resilience_ratio();
-    assert!(ratio >= 0.0, "Resilience ratio should be non-negative, got {}", ratio);
+    assert!(
+        ratio >= 0.0,
+        "Resilience ratio should be non-negative, got {}",
+        ratio
+    );
 }
 
 // ── 11. Therapeutic gating unit test (Broca word modulation) ─────────
 
 #[test]
 fn test_therapeutic_gate_crisis_mode() {
-    use symthaea_broca::gating::TherapeuticGate;
     use symthaea_broca::encoder::ThoughtChannels;
+    use symthaea_broca::gating::TherapeuticGate;
 
     let mut channels = ThoughtChannels::default();
     channels.set_therapeutic(7.0, 0.5, 0.9, 0.5);
 
     let directive_logit = TherapeuticGate::apply("should", &channels, 0.5);
-    assert!(directive_logit < 0.5, "Directive 'should' suppressed in crisis, got {}", directive_logit);
+    assert!(
+        directive_logit < 0.5,
+        "Directive 'should' suppressed in crisis, got {}",
+        directive_logit
+    );
 
     let validating_logit = TherapeuticGate::apply("understand", &channels, 0.5);
-    assert!(validating_logit > 0.5, "Validating 'understand' boosted in crisis, got {}", validating_logit);
+    assert!(
+        validating_logit > 0.5,
+        "Validating 'understand' boosted in crisis, got {}",
+        validating_logit
+    );
 
     let crisis_logit = TherapeuticGate::apply("helpline", &channels, 0.5);
-    assert!(crisis_logit > 0.5, "Crisis word 'helpline' boosted, got {}", crisis_logit);
+    assert!(
+        crisis_logit > 0.5,
+        "Crisis word 'helpline' boosted, got {}",
+        crisis_logit
+    );
 }
 
 // ── 12. High distress suppresses directives ──────────────────────────
 
 #[test]
 fn test_therapeutic_gate_high_distress() {
-    use symthaea_broca::gating::TherapeuticGate;
     use symthaea_broca::encoder::ThoughtChannels;
+    use symthaea_broca::gating::TherapeuticGate;
 
     let mut channels = ThoughtChannels::default();
     channels.set_therapeutic(0.0, 0.2, 0.9, 0.3);
 
     let directive_logit = TherapeuticGate::apply("must", &channels, 0.5);
-    assert!(directive_logit < 0.5, "Directive 'must' suppressed under high distress, got {}", directive_logit);
+    assert!(
+        directive_logit < 0.5,
+        "Directive 'must' suppressed under high distress, got {}",
+        directive_logit
+    );
 
     let validating_logit = TherapeuticGate::apply("hear", &channels, 0.5);
-    assert!(validating_logit > 0.5, "Validating 'hear' boosted under high distress, got {}", validating_logit);
+    assert!(
+        validating_logit > 0.5,
+        "Validating 'hear' boosted under high distress, got {}",
+        validating_logit
+    );
 }
 
 // ── 13. Alliance gates intervention depth ────────────────────────────
 
 #[test]
 fn test_alliance_gates_intervention_depth() {
-    use symthaea_broca::gating::TherapeuticGate;
     use symthaea_broca::encoder::ThoughtChannels;
+    use symthaea_broca::gating::TherapeuticGate;
 
     let mut channels = ThoughtChannels::default();
     // Low alliance (0.2) but high depth (0.8) → depth > alliance + 0.2
     channels.set_therapeutic(0.0, 0.2, 0.3, 0.8);
 
     let directive_logit = TherapeuticGate::apply("need to", &channels, 0.5);
-    assert!(directive_logit < 0.5, "Depth-exceeding-alliance suppresses directives, got {}", directive_logit);
+    assert!(
+        directive_logit < 0.5,
+        "Depth-exceeding-alliance suppresses directives, got {}",
+        directive_logit
+    );
 }
 
 // ── 14. RDoC-aware neuromod deltas amplify domain-relevant transmitters ──
 
 #[test]
 fn test_rdoc_neuromod_bridge() {
+    use symthaea_clinical::rdoc::{RDocDomain, RDocProfile};
     use symthaea_therapeutic::affect_regulation::RegulationEngine;
     use symthaea_therapeutic::RegulationStrategy;
-    use symthaea_clinical::rdoc::{RDocDomain, RDocProfile};
 
     let mut engine = RegulationEngine::new();
 
@@ -270,8 +298,14 @@ fn test_rdoc_neuromod_bridge() {
     rdoc.set_score(RDocDomain::NegativeValence, 0.9);
 
     let delta = engine.apply_strategy_rdoc(RegulationStrategy::Validation, 0.6, &rdoc);
-    assert!(delta.serotonin > 0.0, "serotonin should be positive for Validation");
-    assert!(delta.oxytocin > 0.0, "oxytocin should be positive for Validation");
+    assert!(
+        delta.serotonin > 0.0,
+        "serotonin should be positive for Validation"
+    );
+    assert!(
+        delta.oxytocin > 0.0,
+        "oxytocin should be positive for Validation"
+    );
 }
 
 // ── 15. Therapeutic telemetry appears in CycleMetadata ──────────────

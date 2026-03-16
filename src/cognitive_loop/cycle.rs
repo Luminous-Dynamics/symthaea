@@ -68,14 +68,15 @@ impl CognitiveLoopService {
                     "{failure}"
                 );
                 self.integrity_manager.status.attestation_passed = false;
-                self.integrity_manager.status.anomalies.push(
-                    crate::integrity::IntegrityAnomaly {
+                self.integrity_manager
+                    .status
+                    .anomalies
+                    .push(crate::integrity::IntegrityAnomaly {
                         source: "live_attestation",
                         description: failure,
                         detected_at: std::time::Instant::now(),
                         severity: crate::integrity::AnomalySeverity::Critical,
-                    },
-                );
+                    });
             }
             // Escalate critical integrity anomalies to safety telemetry
             if self.integrity_manager.has_critical_anomaly() {
@@ -117,7 +118,10 @@ impl CognitiveLoopService {
             if frustration > 0.4 {
                 let ne_base = self.neuromod.bath.noradrenaline.baseline_val();
                 let ne_nudge = 0.03 * (frustration - 0.4);
-                self.neuromod.bath.noradrenaline.set_baseline(ne_base + ne_nudge);
+                self.neuromod
+                    .bath
+                    .noradrenaline
+                    .set_baseline(ne_base + ne_nudge);
             }
             if state.is_in_flow() {
                 let da_base = self.neuromod.bath.dopamine.baseline_val();
@@ -135,14 +139,16 @@ impl CognitiveLoopService {
         #[cfg(feature = "mesh")]
         {
             use super::thresholds::{
-                RADIO_JAMMING_NE_NUDGE, RADIO_RECOVERY_DA_NUDGE,
-                RADIO_NEUROMOD_JAMMING_MIN_STREAK,
+                RADIO_JAMMING_NE_NUDGE, RADIO_NEUROMOD_JAMMING_MIN_STREAK, RADIO_RECOVERY_DA_NUDGE,
             };
             let telem = self.spectrum_manager.telemetry();
             // Sustained jamming → NE arousal spike
             if telem.jamming_streak >= RADIO_NEUROMOD_JAMMING_MIN_STREAK {
                 let ne_base = self.neuromod.bath.noradrenaline.baseline_val();
-                self.neuromod.bath.noradrenaline.set_baseline(ne_base + RADIO_JAMMING_NE_NUDGE);
+                self.neuromod
+                    .bath
+                    .noradrenaline
+                    .set_baseline(ne_base + RADIO_JAMMING_NE_NUDGE);
             }
             // Recovery from blackout → DA relief
             if telem.network_health == 0 && self.stats.total_cycles > 1 {
@@ -150,7 +156,10 @@ impl CognitiveLoopService {
                     let had_recent_loss = telem.tier_loss_ema.iter().any(|&l| l > 0.01);
                     if had_recent_loss {
                         let da_base = self.neuromod.bath.dopamine.baseline_val();
-                        self.neuromod.bath.dopamine.set_baseline(da_base + RADIO_RECOVERY_DA_NUDGE);
+                        self.neuromod
+                            .bath
+                            .dopamine
+                            .set_baseline(da_base + RADIO_RECOVERY_DA_NUDGE);
                     }
                 }
             }

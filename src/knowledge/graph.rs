@@ -382,9 +382,7 @@ impl EnhancedKnowledgeGraph {
             })
             .collect();
 
-        distribution.sort_by(|a, b| {
-            a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal)
-        });
+        distribution.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
         distribution
     }
 
@@ -450,8 +448,7 @@ impl EnhancedKnowledgeGraph {
         }
 
         // Remove seeds from results (caller already has them)
-        let seed_ids: std::collections::HashSet<FactId> =
-            seeds.iter().map(|s| s.fact_id).collect();
+        let seed_ids: std::collections::HashSet<FactId> = seeds.iter().map(|s| s.fact_id).collect();
 
         let mut results: Vec<FactSearchResult> = activated
             .into_iter()

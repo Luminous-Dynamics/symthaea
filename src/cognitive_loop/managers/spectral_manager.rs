@@ -559,7 +559,11 @@ mod tests {
         }
 
         let pac = mgr.telemetry().theta_gamma_pac;
-        assert!(pac >= 0.0 && pac <= 1.0, "PAC should be in [0,1], got {}", pac);
+        assert!(
+            pac >= 0.0 && pac <= 1.0,
+            "PAC should be in [0,1], got {}",
+            pac
+        );
     }
 
     #[test]

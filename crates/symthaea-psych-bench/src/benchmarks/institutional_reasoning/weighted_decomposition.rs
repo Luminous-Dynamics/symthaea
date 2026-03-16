@@ -143,12 +143,12 @@ impl WeightedDecompositionBenchmark {
         // Uses multiple axioms for a robust estimate.
         let sensitivity_cases: &[(&str, &str, &str)] = &[
             // (axiom, high-weight component, low-weight component)
-            ("LEGITIMATE_GOVERNANCE", "LEGITIMACY", "TRUST"),      // w5 vs w1
-            ("REVOLUTION", "AUTHORITY", "PROHIBITION"),            // w5 vs w1
-            ("TRADE_AGREEMENT", "EXCHANGE", "TREATY"),             // w5 vs w1
-            ("ECONOMIC_SANCTION", "SANCTION", "PROHIBITION"),      // w5 vs w2
-            ("DEMOCRATIC_ELECTION", "LEGITIMACY", "COOPERATE"),    // w5 vs w1
-            ("CORRUPTION", "DEFECT", "AUTHORITY"),                 // w5 vs w1
+            ("LEGITIMATE_GOVERNANCE", "LEGITIMACY", "TRUST"), // w5 vs w1
+            ("REVOLUTION", "AUTHORITY", "PROHIBITION"),       // w5 vs w1
+            ("TRADE_AGREEMENT", "EXCHANGE", "TREATY"),        // w5 vs w1
+            ("ECONOMIC_SANCTION", "SANCTION", "PROHIBITION"), // w5 vs w2
+            ("DEMOCRATIC_ELECTION", "LEGITIMACY", "COOPERATE"), // w5 vs w1
+            ("CORRUPTION", "DEFECT", "AUTHORITY"),            // w5 vs w1
         ];
 
         let mut sensitivity_scores = Vec::new();

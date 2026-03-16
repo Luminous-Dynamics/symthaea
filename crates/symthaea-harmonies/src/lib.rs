@@ -1009,9 +1009,15 @@ mod tests {
             alignments.push(HarmonyAlignment::new(h, score, 0.8));
         }
         let mut result = AlignmentResult::from_alignments(alignments);
-        assert!(result.courage_override(), "Courage should fire without ahimsa violation");
+        assert!(
+            result.courage_override(),
+            "Courage should fire without ahimsa violation"
+        );
         result.set_ahimsa_violation(true);
-        assert!(!result.courage_override(), "Ahimsa violation should block courage override");
+        assert!(
+            !result.courage_override(),
+            "Ahimsa violation should block courage override"
+        );
     }
 
     #[test]
@@ -1024,6 +1030,9 @@ mod tests {
         }
         let mut result = AlignmentResult::from_alignments(alignments);
         result.set_ahimsa_violation(false);
-        assert!(result.courage_override(), "Should allow courage without ahimsa violation");
+        assert!(
+            result.courage_override(),
+            "Should allow courage without ahimsa violation"
+        );
     }
 }

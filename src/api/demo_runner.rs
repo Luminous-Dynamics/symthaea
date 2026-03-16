@@ -284,14 +284,18 @@ impl DemoRunner {
             data.therapeutic_dream_accuracy = m.therapeutic.therapeutic_dream_accuracy;
             data.therapeutic_resilience_ratio = m.therapeutic.therapeutic_resilience_ratio;
             data.therapeutic_rupture_count = m.therapeutic.therapeutic_rupture_count;
-            data.therapeutic_last_rupture_type = m.therapeutic.therapeutic_last_rupture_type.clone();
+            data.therapeutic_last_rupture_type =
+                m.therapeutic.therapeutic_last_rupture_type.clone();
             data.therapeutic_repair_rate = m.therapeutic.therapeutic_repair_rate;
             data.therapeutic_withdrawal_count = m.therapeutic.therapeutic_withdrawal_count;
             data.therapeutic_confrontation_count = m.therapeutic.therapeutic_confrontation_count;
             data.therapeutic_rdoc_profile = m.therapeutic.therapeutic_rdoc_profile;
-            data.therapeutic_perpetuating_factors = m.therapeutic.therapeutic_perpetuating_factors.clone();
-            data.therapeutic_protective_factors = m.therapeutic.therapeutic_protective_factors.clone();
-            data.therapeutic_strategy_effectiveness = m.therapeutic.therapeutic_strategy_effectiveness.clone();
+            data.therapeutic_perpetuating_factors =
+                m.therapeutic.therapeutic_perpetuating_factors.clone();
+            data.therapeutic_protective_factors =
+                m.therapeutic.therapeutic_protective_factors.clone();
+            data.therapeutic_strategy_effectiveness =
+                m.therapeutic.therapeutic_strategy_effectiveness.clone();
             data.therapeutic_temporal_coherence = m.therapeutic.therapeutic_temporal_coherence;
         }
 

@@ -64,7 +64,8 @@ impl CognitiveLoopService {
             } else if ema < CONSCIOUSNESS_EMA_LOW_THRESHOLD && ema > 0.0 {
                 self.stats.adaptive_learning_rate *= CONSCIOUSNESS_EMA_LR_DAMPEN;
             }
-            self.stats.adaptive_learning_rate = self.stats.adaptive_learning_rate.clamp(0.0001, 0.1);
+            self.stats.adaptive_learning_rate =
+                self.stats.adaptive_learning_rate.clamp(0.0001, 0.1);
         }
 
         // Snapshot exploration_urge for end-of-cycle budget clamping (Task B)
@@ -372,7 +373,11 @@ impl CognitiveLoopService {
             // Powers & Cisek (2021): outcome monitoring for closed-loop neuromodulation.
             if let Some(improved) = self.neuromod.calibration_validator.check_validation(
                 self.stats.avg_prediction_error as f64,
-                self.language_comm.voice_coherence.bridge.smoothed_coherence().into(),
+                self.language_comm
+                    .voice_coherence
+                    .bridge
+                    .smoothed_coherence()
+                    .into(),
                 self.neuromod.self_assessment.confidence_error_ema(),
                 self.stats.total_cycles as u64,
             ) {

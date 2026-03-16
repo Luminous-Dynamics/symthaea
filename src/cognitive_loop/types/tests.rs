@@ -168,15 +168,30 @@ fn cycle_metadata_flatten_produces_flat_json() {
     let value: serde_json::Value = serde_json::from_str(&json).expect("parse");
     let obj = value.as_object().expect("should be object");
     // Flattened fields appear as top-level keys (not nested)
-    assert!(obj.contains_key("consciousness_level"), "consciousness_level should be flat key");
-    assert!(obj.contains_key("body_phi_modulation"), "body_phi_modulation should be flat key");
-    assert!(obj.contains_key("temporal_coherence_score"), "temporal_coherence_score should be flat key");
-    assert!(obj.contains_key("structural_micro_phi"), "structural_micro_phi should be flat key");
+    assert!(
+        obj.contains_key("consciousness_level"),
+        "consciousness_level should be flat key"
+    );
+    assert!(
+        obj.contains_key("body_phi_modulation"),
+        "body_phi_modulation should be flat key"
+    );
+    assert!(
+        obj.contains_key("temporal_coherence_score"),
+        "temporal_coherence_score should be flat key"
+    );
+    assert!(
+        obj.contains_key("structural_micro_phi"),
+        "structural_micro_phi should be flat key"
+    );
     // No nested "consciousness", "embodied", "temporal", or "structural" sub-objects
     // (they're flattened, not nested)
     // Note: "consciousness" key should NOT exist as a nested object
     if let Some(v) = obj.get("consciousness") {
-        assert!(!v.is_object(), "consciousness should not be a nested object");
+        assert!(
+            !v.is_object(),
+            "consciousness should not be a nested object"
+        );
     }
 }
 

@@ -19,7 +19,9 @@ fn seed_to_array(seed: u64) -> [u8; 2048] {
     let mut arr = [0u8; 2048];
     let mut state = seed;
     for byte in arr.iter_mut() {
-        state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        state = state
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         *byte = (state >> 33) as u8;
     }
     arr

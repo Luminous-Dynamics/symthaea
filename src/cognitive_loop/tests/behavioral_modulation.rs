@@ -106,7 +106,10 @@ fn consciousness_state_level_telemetry_consistent() {
 
     for (i, r) in results.iter().enumerate() {
         let m = &r.metadata;
-        assert!(m.consciousness.consciousness_state_level.is_finite(), "NaN at cycle {i}");
+        assert!(
+            m.consciousness.consciousness_state_level.is_finite(),
+            "NaN at cycle {i}"
+        );
 
         // After warmup, bool should match threshold logic
         if i > 15 {

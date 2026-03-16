@@ -275,13 +275,18 @@ impl SandboxRoot {
     }
 
     /// Validate a path is inside the sandbox after canonicalization.
+    ///
+    /// Relative paths are resolved against the sandbox root. This allows
+    /// commands like `cargo check` with `working_dir: "."` to work correctly
+    /// when the sandbox root is the project directory.
     pub fn validate(&self, requested: &Path) -> Result<PathBuf, PolicyViolation> {
-        if !requested.is_absolute() {
-            return Err(PolicyViolation::SandboxEscape(format!(
-                "path must be absolute: {}",
-                requested.display()
-            )));
-        }
+        // Resolve relative paths against the sandbox root
+        let requested = if requested.is_absolute() {
+            requested.to_path_buf()
+        } else {
+            self.root.join(requested)
+        };
+        let requested = requested.as_path();
 
         let canonical = if requested.exists() {
             requested
