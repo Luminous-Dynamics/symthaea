@@ -21,5 +21,3 @@ blake3 = { workspace = true }
 serde_json = { workspace = true }
 proptest = "1.4"
 
-[lints]
-workspace = true
