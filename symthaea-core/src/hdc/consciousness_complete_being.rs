@@ -36,8 +36,6 @@
 //! └─────────────────────────────────────────────────────────────────────┘
 //! ```
 
-#![allow(dead_code)]
-
 use super::adaptive_topology::CognitiveMode;
 use super::binary_hv::BinaryHV;
 use super::consciousness_advanced_cognition::{

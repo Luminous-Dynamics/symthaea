@@ -230,6 +230,223 @@ impl CausalKnowledgeBridge {
         self.total_edges_discovered
     }
 
+    /// Import a causal edge directly from persistence (cause, effect, strength).
+    ///
+    /// Used during startup to restore edges from SQLite.
+    pub fn import_edge(&mut self, cause: String, effect: String, strength: f32) {
+        let edge = CausalEdge {
+            cause,
+            effect,
+            strength,
+            is_inhibitory: strength < 0.0,
+            is_negated: false,
+            source_text: String::new(),
+            discovered_at_cycle: 0,
+        };
+        self.add_edge(edge);
+    }
+
+    /// Export edges as (cause, effect, strength) triples for persistence.
+    ///
+    /// Alias for `export_edges()` used by the KnowledgeManager persistence snapshot.
+    pub fn export_edge_records(&self) -> Vec<(String, String, f32)> {
+        self.export_edges()
+    }
+
+    /// Update the strength of an existing causal edge based on prediction outcome.
+    ///
+    /// If the predicted effect occurred (`outcome_occurred = true`), strengthen the edge;
+    /// otherwise weaken it. Uses Rescorla-Wagner (1972) update rule.
+    pub fn update_strength_from_outcome(
+        &mut self,
+        cause: &str,
+        effect: &str,
+        outcome_occurred: bool,
+        learning_rate: f32,
+    ) {
+        let cause_lower = cause.to_lowercase();
+        let effect_lower = effect.to_lowercase();
+
+        for edge in &mut self.edges {
+            if edge.cause.to_lowercase() == cause_lower
+                && edge.effect.to_lowercase() == effect_lower
+            {
+                if outcome_occurred {
+                    edge.strength = (edge.strength + learning_rate).min(1.0);
+                } else {
+                    edge.strength = (edge.strength - learning_rate).max(0.0);
+                }
+            }
+        }
+
+        // Also update adjacency weights
+        if let (Some(&cause_idx), Some(&effect_idx)) =
+            (self.nodes.get(&cause.to_lowercase()), self.nodes.get(&effect.to_lowercase()))
+        {
+            // Try exact case first, fall back to lowercase
+            let cause_key = if self.nodes.contains_key(cause) {
+                cause.to_string()
+            } else {
+                cause.to_lowercase()
+            };
+            let effect_key = if self.nodes.contains_key(effect) {
+                effect.to_string()
+            } else {
+                effect.to_lowercase()
+            };
+            let _ = (cause_key, effect_key); // used for node lookup above
+
+            if let Some(adj) = self.adjacency.get_mut(&cause_idx) {
+                if let Some(entry) = adj.iter_mut().find(|(t, _)| *t == effect_idx) {
+                    if outcome_occurred {
+                        entry.1 = (entry.1 + learning_rate).min(1.0);
+                    } else {
+                        entry.1 = (entry.1 - learning_rate).max(0.0);
+                    }
+                }
+            }
+        }
+    }
+
+    /// Compute counterfactual necessity scores for an effect.
+    ///
+    /// Returns (cause_name, necessity_score) pairs, where necessity_score
+    /// approximates how necessary each cause is for the effect.
+    /// Science: Pearl (2000) — probability of necessity.
+    pub fn counterfactual_necessity(&self, effect: &str, max_results: usize) -> Vec<(String, f32)> {
+        let causes = self.causes_of(effect);
+        let mut results: Vec<(String, f32)> = causes
+            .iter()
+            .map(|e| {
+                // Approximate necessity: strength × (1 / number_of_causes)
+                // More causes → each individual cause is less necessary
+                let necessity = e.strength / causes.len().max(1) as f32;
+                (e.cause.clone(), necessity)
+            })
+            .collect();
+
+        results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        results.truncate(max_results);
+        results
+    }
+
+    /// Simulate a do-intervention: propagate effects of setting a variable.
+    ///
+    /// Returns (affected_variable, propagated_strength) pairs.
+    /// Science: Pearl (2009) — do-calculus, interventional distributions.
+    pub fn do_intervention(&self, intervention: &str, max_depth: usize) -> Vec<(String, f32)> {
+        let mut results = Vec::new();
+        let mut queue: Vec<(String, f32, usize)> = vec![(intervention.to_lowercase(), 1.0, 0)];
+        let mut visited = std::collections::HashSet::new();
+        visited.insert(intervention.to_lowercase());
+
+        while let Some((current, propagated_strength, depth)) = queue.pop() {
+            if depth >= max_depth {
+                continue;
+            }
+
+            let effects = self.effects_of(&current);
+            for edge in effects {
+                let effect_lower = edge.effect.to_lowercase();
+                if visited.contains(&effect_lower) {
+                    continue;
+                }
+                visited.insert(effect_lower.clone());
+
+                let new_strength = propagated_strength * edge.strength;
+                results.push((edge.effect.clone(), new_strength));
+                queue.push((effect_lower, new_strength, depth + 1));
+            }
+        }
+
+        results.sort_by(|a, b| b.1.abs().partial_cmp(&a.1.abs()).unwrap_or(std::cmp::Ordering::Equal));
+        results
+    }
+
+    /// Detect potential confounders between two entities.
+    ///
+    /// A confounder is a node that has causal edges to both entities.
+    /// Returns (confounder_name, max_strength) pairs.
+    /// Science: Pearl (2000) — backdoor criterion.
+    pub fn detect_confounders(&self, entity_a: &str, entity_b: &str) -> Vec<(String, f32)> {
+        let causes_a: std::collections::HashSet<String> = self
+            .causes_of(entity_a)
+            .iter()
+            .map(|e| e.cause.to_lowercase())
+            .collect();
+
+        let causes_b: std::collections::HashSet<String> = self
+            .causes_of(entity_b)
+            .iter()
+            .map(|e| e.cause.to_lowercase())
+            .collect();
+
+        // Confounders are common causes
+        let common: Vec<String> = causes_a.intersection(&causes_b).cloned().collect();
+
+        common
+            .into_iter()
+            .map(|confounder| {
+                // Strength = max of the two edge strengths
+                let strength_a = self
+                    .edges
+                    .iter()
+                    .filter(|e| e.cause.to_lowercase() == confounder && e.effect.to_lowercase() == entity_a.to_lowercase())
+                    .map(|e| e.strength)
+                    .fold(0.0_f32, f32::max);
+                let strength_b = self
+                    .edges
+                    .iter()
+                    .filter(|e| e.cause.to_lowercase() == confounder && e.effect.to_lowercase() == entity_b.to_lowercase())
+                    .map(|e| e.strength)
+                    .fold(0.0_f32, f32::max);
+                (confounder, strength_a.max(strength_b))
+            })
+            .collect()
+    }
+
+    /// All unique entity names, sorted by edge frequency (most-connected first).
+    pub fn all_entities(&self) -> Vec<String> {
+        let mut freq: std::collections::HashMap<&str, usize> = std::collections::HashMap::new();
+        for edge in &self.edges {
+            *freq.entry(edge.cause.as_str()).or_default() += 1;
+            *freq.entry(edge.effect.as_str()).or_default() += 1;
+        }
+        let mut entities: Vec<_> = freq.into_iter().collect();
+        entities.sort_by(|a, b| b.1.cmp(&a.1));
+        entities.into_iter().map(|(name, _)| name.to_string()).collect()
+    }
+
+    /// Export the causal graph as a DOT (Graphviz) string.
+    pub fn export_dot(&self) -> String {
+        let mut out = String::from("digraph causal {\n");
+        for edge in &self.edges {
+            if edge.is_negated {
+                continue;
+            }
+            let style = if edge.is_inhibitory { " [style=dashed]" } else { "" };
+            out.push_str(&format!(
+                "  \"{}\" -> \"{}\" [label=\"{:.2}\"]{}\n",
+                edge.cause, edge.effect, edge.strength, style
+            ));
+        }
+        out.push_str("}\n");
+        out
+    }
+
+    /// Export the causal graph as a Mermaid flowchart string.
+    pub fn export_mermaid(&self) -> String {
+        let mut out = String::from("graph LR\n");
+        for edge in &self.edges {
+            if edge.is_negated {
+                continue;
+            }
+            let arrow = if edge.is_inhibitory { "-.->|inhibits|" } else { "-->|causes|" };
+            out.push_str(&format!("  {} {} {}\n", edge.cause, arrow, edge.effect));
+        }
+        out
+    }
+
     /// Export edges as (cause, effect, strength) triples for the full causal reasoning crate
     pub fn export_edges(&self) -> Vec<(String, String, f32)> {
         self.edges
@@ -244,113 +461,6 @@ impl CausalKnowledgeBridge {
                 (e.cause.clone(), e.effect.clone(), strength)
             })
             .collect()
-    }
-
-    // ── Persistence Support ─────────────────────────────────────────────
-
-    /// Import an edge from a persistence record.
-    pub fn import_edge(&mut self, record: &super::persistence::CausalEdgeRecord) {
-        let edge = CausalEdge {
-            cause: record.cause.clone(),
-            effect: record.effect.clone(),
-            strength: record.strength,
-            is_inhibitory: record.is_inhibitory,
-            is_negated: false,
-            source_text: String::new(),
-            discovered_at_cycle: record.cycle,
-        };
-        self.add_edge(edge);
-    }
-
-    /// Export all edges as persistence records.
-    pub fn export_edge_records(&self) -> Vec<super::persistence::CausalEdgeRecord> {
-        self.edges
-            .iter()
-            .map(|e| super::persistence::CausalEdgeRecord {
-                cause: e.cause.clone(),
-                effect: e.effect.clone(),
-                strength: e.strength,
-                is_inhibitory: e.is_inhibitory,
-                cycle: e.discovered_at_cycle,
-            })
-            .collect()
-    }
-
-    // ── Visualization ─────────────────────────────────────────────────
-
-    /// Export the causal graph as a DOT (Graphviz) string.
-    ///
-    /// Edges are colored by strength (green=strong, red=weak).
-    /// Inhibitory edges are rendered with dashed lines.
-    pub fn export_dot(&self) -> String {
-        use std::fmt::Write;
-        let mut dot = String::with_capacity(512);
-        let _ = writeln!(dot, "digraph CausalKnowledge {{");
-        let _ = writeln!(dot, "  rankdir=LR;");
-        let _ = writeln!(dot, "  node [shape=box, style=rounded, fontsize=10];");
-
-        // Emit all nodes
-        for name in self.nodes.keys() {
-            let _ = writeln!(dot, "  \"{}\" ;", name);
-        }
-
-        // Emit edges with strength labels
-        for edge in &self.edges {
-            let style = if edge.is_inhibitory {
-                "dashed"
-            } else {
-                "solid"
-            };
-            let color = if edge.strength > 0.7 {
-                "#2d7d46" // strong green
-            } else if edge.strength > 0.3 {
-                "#b8860b" // moderate gold
-            } else {
-                "#c0392b" // weak red
-            };
-            let _ = writeln!(
-                dot,
-                "  \"{}\" -> \"{}\" [label=\"{:.2}\", style={}, color=\"{}\"];",
-                edge.cause, edge.effect, edge.strength, style, color
-            );
-        }
-
-        let _ = writeln!(dot, "}}");
-        dot
-    }
-
-    /// Export the causal graph as a Mermaid diagram string.
-    ///
-    /// Suitable for embedding in Markdown documentation.
-    pub fn export_mermaid(&self) -> String {
-        use std::fmt::Write;
-        let mut md = String::with_capacity(512);
-        let _ = writeln!(md, "graph LR");
-
-        for edge in &self.edges {
-            if edge.is_inhibitory {
-                let _ = writeln!(
-                    md,
-                    "  {}({}) -.->|inhibits| {}({})",
-                    sanitize_mermaid(&edge.cause),
-                    edge.cause,
-                    sanitize_mermaid(&edge.effect),
-                    edge.effect
-                );
-            } else {
-                let _ = writeln!(
-                    md,
-                    "  {}({}) -->|{:.2}| {}({})",
-                    sanitize_mermaid(&edge.cause),
-                    edge.cause,
-                    edge.strength,
-                    sanitize_mermaid(&edge.effect),
-                    edge.effect
-                );
-            }
-        }
-
-        md
     }
 
     // ── Internal ────────────────────────────────────────────────────────
@@ -374,13 +484,6 @@ impl CausalKnowledgeBridge {
             }
         }
     }
-}
-
-/// Sanitize a string for use as a Mermaid node ID (alphanumeric + underscore).
-fn sanitize_mermaid(s: &str) -> String {
-    s.chars()
-        .map(|c| if c.is_alphanumeric() { c } else { '_' })
-        .collect()
 }
 
 // ── Tests ──────────────────────────────────────────────────────────────────

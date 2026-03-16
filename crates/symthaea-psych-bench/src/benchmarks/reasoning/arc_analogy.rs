@@ -117,7 +117,7 @@ impl ArcAnalogyBenchmark {
         let grid_size = 5;
         let num_colors: u8 = 6;
         let pressure = config.time_pressure;
-        let noise_weight = 0.05 + pressure * 0.15;
+        let noise_weight = 0.04 + pressure * 0.10;
         let tick_scale = 1.0 - pressure * 0.4;
         let mut total_ticks: f64 = 0.0;
         let mut total_tasks: u32 = 0;

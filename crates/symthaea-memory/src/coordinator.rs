@@ -96,6 +96,8 @@ pub enum MemorySource {
     UserInteraction,
     /// Action outcome (verification signal)
     ActionFeedback,
+    /// Evicted from semantic ring buffer (survived full rotation)
+    SemanticEviction,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -289,6 +291,30 @@ impl MemoryCoordinator {
             .get(&content_hash)
             .copied()
             .unwrap_or(0)
+    }
+
+    /// Return the top-k most-retrieved memories, sorted descending by retrieval count.
+    ///
+    /// Returns a `Vec<(content_hash, retrieval_count)>` of at most `k` entries.
+    /// Entries with zero retrievals are never included.
+    ///
+    /// Used by the dream consolidation phase to identify candidate memories for
+    /// episodic→semantic promotion: memories retrieved ≥ N times across dream
+    /// replays are considered "well-consolidated" and eligible for semantic encoding.
+    pub fn most_replayed(&self, k: usize) -> Vec<(u64, u32)> {
+        if k == 0 {
+            return Vec::new();
+        }
+        let mut pairs: Vec<(u64, u32)> = self
+            .retrieval_counts
+            .iter()
+            .filter(|(_, &count)| count > 0)
+            .map(|(&hash, &count)| (hash, count))
+            .collect();
+        // Sort descending by count (stable so ties preserve HashMap order)
+        pairs.sort_unstable_by(|a, b| b.1.cmp(&a.1));
+        pairs.truncate(k);
+        pairs
     }
 
     /// Compute enriched episodic priority score incorporating cross-tier signals.

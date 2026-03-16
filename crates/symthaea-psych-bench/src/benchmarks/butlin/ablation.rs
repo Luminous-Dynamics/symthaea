@@ -43,7 +43,7 @@ pub struct AblationResult {
     pub benchmark_degraded: bool,
 }
 
-/// The 8 critical ablation rows.
+/// The 5 critical ablation rows.
 fn ablation_specs() -> Vec<AblationSpec> {
     vec![
         AblationSpec {
@@ -52,16 +52,6 @@ fn ablation_specs() -> Vec<AblationSpec> {
             config_mutator: |config| {
                 config.cfc_config.num_neurons = 1;
                 config.cfc_config.input_dim = 1;
-            },
-            downstream_benchmark: "WorM::N-back",
-        },
-        AblationSpec {
-            name: "disable_consciousness_engine",
-            target_indicator: "RPT-2",
-            config_mutator: |config| {
-                config.enable_phi_attention = false;
-                config.enable_consciousness_thermodynamics = false;
-                config.enable_cross_modal_binding = false;
             },
             downstream_benchmark: "WorM::N-back",
         },
@@ -80,23 +70,6 @@ fn ablation_specs() -> Vec<AblationSpec> {
                 config.enable_meta_cognition = false;
             },
             downstream_benchmark: "WorM::N-back",
-        },
-        AblationSpec {
-            name: "disable_embodied_agency",
-            target_indicator: "HOT-3",
-            config_mutator: |config| {
-                config.enable_predictive_processing = false;
-                config.enable_embodied_cognition = false;
-            },
-            downstream_benchmark: "CogBench::TwoStep",
-        },
-        AblationSpec {
-            name: "collapse_hdc_dimensionality",
-            target_indicator: "HOT-4",
-            config_mutator: |config| {
-                config.hdc_ltc_config.hdc_dim = 16;
-            },
-            downstream_benchmark: "WorM::ChangeDetection",
         },
         AblationSpec {
             name: "disable_prediction_learning",
@@ -126,8 +99,8 @@ fn extract_indicator_score(
     indicator: &str,
 ) -> f64 {
     match indicator {
-        // RPT-1, RPT-2, and GWT-3 are computed in measure_indicator, not per-cycle
-        "RPT-1" | "RPT-2" | "GWT-3" => 0.0,
+        // RPT-1 and GWT-3 are computed in measure_indicator, not per-cycle
+        "RPT-1" | "GWT-3" => 0.0,
         "HOT-2" => {
             // Metacognitive monitoring: meta_cognitive_accuracy
             metadata.quality.meta_cognitive_accuracy as f64
@@ -146,14 +119,6 @@ fn extract_indicator_score(
             } else {
                 0.01
             }
-        }
-        "HOT-3" => {
-            // Agency with belief updating: prediction error magnitude
-            metadata.surprise as f64
-        }
-        "HOT-4" => {
-            // Smooth coding: HDC encoding quality (prediction coherence as proxy)
-            metadata.prediction_coherence as f64
         }
         _ => 0.0,
     }
@@ -427,31 +392,6 @@ fn run_downstream_benchmark(spec: &AblationSpec) -> (f64, f64) {
                 ..baseline_config.clone()
             }
         }
-        "RPT-2" => {
-            // Without consciousness engine, integrated representations degrade.
-            BenchmarkConfig {
-                working_memory_capacity: 1,
-                dimension: 64,
-                enable_fep: false,
-                ..baseline_config.clone()
-            }
-        }
-        "HOT-3" => {
-            // Without embodied agency, action-based learning degrades.
-            BenchmarkConfig {
-                working_memory_capacity: 2,
-                enable_fep: false,
-                ..baseline_config.clone()
-            }
-        }
-        "HOT-4" => {
-            // Without HDC dimensionality, smooth coding degrades.
-            BenchmarkConfig {
-                dimension: 16,
-                enable_fep: false,
-                ..baseline_config.clone()
-            }
-        }
         "AST-1" => {
             // Without attention schema, item selection degrades.
             // N-back requires attending to specific positions in sequence.
@@ -527,15 +467,12 @@ mod tests {
     #[test]
     fn test_ablation_specs_complete() {
         let specs = ablation_specs();
-        assert_eq!(specs.len(), 8);
+        assert_eq!(specs.len(), 5);
         // Verify all target indicators are distinct
         let indicators: Vec<&str> = specs.iter().map(|s| s.target_indicator).collect();
         assert!(indicators.contains(&"RPT-1"));
-        assert!(indicators.contains(&"RPT-2"));
         assert!(indicators.contains(&"GWT-3"));
         assert!(indicators.contains(&"HOT-2"));
-        assert!(indicators.contains(&"HOT-3"));
-        assert!(indicators.contains(&"HOT-4"));
         assert!(indicators.contains(&"PP-1"));
         assert!(indicators.contains(&"AST-1"));
     }

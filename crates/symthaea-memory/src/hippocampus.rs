@@ -266,10 +266,7 @@ pub struct RecallResult {
 /// **Deprecated**: Use `MemoryCoordinator` + `EpisodicMemory` instead. This module
 /// duplicates their functionality, requires an async runtime (the cognitive loop is
 /// sync/rayon), and has zero call sites. Kept for type availability only.
-#[deprecated(
-    since = "1.10.0",
-    note = "Use MemoryCoordinator + EpisodicMemory instead"
-)]
+#[deprecated(since = "1.10.0", note = "Use MemoryCoordinator + EpisodicMemory instead")]
 #[allow(dead_code)] // RESERVED(future): hippocampal memory consolidation actor
 pub struct HippocampusActor {
     /// Memory store
@@ -310,6 +307,7 @@ pub struct HippocampusStats {
     pub avg_recall_time_ms: f32,
 }
 
+#[allow(deprecated)]
 impl HippocampusActor {
     /// Create a new hippocampus actor
     pub fn new(max_memories: usize) -> Self {
@@ -534,6 +532,7 @@ impl HippocampusActor {
     }
 }
 
+#[allow(deprecated)]
 impl Default for HippocampusActor {
     fn default() -> Self {
         Self::default_settings()

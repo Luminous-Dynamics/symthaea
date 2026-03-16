@@ -37,6 +37,7 @@ fn test_episodic_replay_result_fields() {
     let result = EpisodicReplayResult {
         surprise_replay_batch_size: 16,
         phasic_da_replay_boost: 4,
+        memory_db_flushed: false,
     };
     assert_eq!(result.surprise_replay_batch_size, 16);
     assert_eq!(result.phasic_da_replay_boost, 4);

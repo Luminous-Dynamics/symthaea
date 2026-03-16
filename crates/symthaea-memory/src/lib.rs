@@ -25,6 +25,7 @@ pub use episodic_replay::{
     bath_cosine_similarity, Episode, EpisodicMemory, EpisodicMemoryStats, EpisodicReplayConfig,
     ReplaySessionResult,
 };
+#[allow(deprecated)]
 pub use hippocampus::{
     EmotionalValence, HippocampusActor, HippocampusStats, MemoryTrace, RecallQuery, RecallResult,
 };

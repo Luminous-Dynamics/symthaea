@@ -179,7 +179,7 @@ impl ArcCompositionalBenchmark {
         let mut rng = seed ^ 0x9E3779B97F4A7C15;
         let num_colors: u8 = 6;
         let pressure = config.time_pressure;
-        let noise_weight = 0.05 + pressure * 0.15;
+        let noise_weight = 0.02 + pressure * 0.15 + config.encoding_noise * 0.20;
         let mut total_ticks: f64 = 0.0;
 
         // ── Part 1: Chained Transforms (5×5 grids) ──

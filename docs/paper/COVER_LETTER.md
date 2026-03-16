@@ -21,7 +21,7 @@ This paper presents Hyperdimensional Active Inference (HAI), the first integrati
 
 1. **Computational efficiency**: 7.9× total speedup over pymdp (1.9× belief inference, 15.8× action selection) on standard benchmarks (T-Maze, Grid World), with success rates improving from 10–16% to 88–100%.
 
-2. **Cross-domain validation**: 17 benchmarks spanning neuroscience (*C. elegans* connectome analysis, EEG seizure detection), ethics (92.9% on ETHICS benchmark via compositional moral algebra — no pretrained language models), signal processing (94.5% speaker identification on synthetic MFCC features), and federated learning (Byzantine tolerance validated to 34%).
+2. **Cross-domain validation**: 17 benchmarks spanning neuroscience (*C. elegans* connectome analysis, EEG seizure detection), ethics (92.9% on ETHICS benchmark via compositional moral algebra — no pretrained language models), signal processing (94.5% speaker identification), and federated learning (Byzantine tolerance validated to 34%).
 
 3. **Mathematical foundations**: 14 rigorous mathematics modules grounding HDC in established theory (information theory, IIT 3.0, Riemannian geometry, tensor algebra, causal calculus).
 

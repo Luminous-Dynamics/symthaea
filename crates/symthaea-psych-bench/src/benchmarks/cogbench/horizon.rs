@@ -64,7 +64,7 @@ impl HorizonBenchmark {
             // Exploration bonus: UCB-like term scaled by remaining horizon.
             // With longer horizon, information is more valuable (Wilson et al. 2014).
             let exploration_bonus = |count: u64| -> f64 {
-                let info_value = 0.50 / (count as f64 + 1.0).sqrt();
+                let info_value = 0.35 / (count as f64 + 1.0).sqrt();
                 info_value * (remaining / 6.0).min(1.0)
             };
 

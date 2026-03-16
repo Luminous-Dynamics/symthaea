@@ -67,9 +67,9 @@ fn test_external_mesh_survives_governance_interval() {
     // Verify telemetry still reports 3 agents (external mesh survived)
     let result = service.cycle("mesh check");
     assert_eq!(
-        result.metadata.governance_epistemic_agents, 3,
+        result.metadata.governance.governance_epistemic_agents, 3,
         "External mesh should survive governance interval, got {} agents",
-        result.metadata.governance_epistemic_agents
+        result.metadata.governance.governance_epistemic_agents
     );
 }
 
@@ -115,14 +115,14 @@ fn test_nan_inf_outcomes_produce_finite_state() {
             m.consciousness_level
         );
         assert!(
-            m.governance_reward_ema.is_finite(),
+            m.governance.governance_reward_ema.is_finite(),
             "Reward EMA should be finite after NaN outcome: {}",
-            m.governance_reward_ema
+            m.governance.governance_reward_ema
         );
         assert!(
-            m.governance_harmonic_delta_max.is_finite(),
+            m.governance.governance_harmonic_delta_max.is_finite(),
             "Harmonic delta max should be finite after NaN outcome: {}",
-            m.governance_harmonic_delta_max
+            m.governance.governance_harmonic_delta_max
         );
     }
 }
@@ -149,7 +149,7 @@ fn test_governance_lr_boost_in_telemetry() {
     let mut max_lr_boost = 0.0f64;
     for i in 0..50 {
         let result = service.cycle(&format!("lr boost {}", i));
-        max_lr_boost = max_lr_boost.max(result.metadata.governance_lr_boost);
+        max_lr_boost = max_lr_boost.max(result.metadata.governance.governance_lr_boost);
     }
 
     assert!(

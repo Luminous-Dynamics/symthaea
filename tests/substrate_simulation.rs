@@ -39,11 +39,11 @@ fn substrate_transfer_preserves_finite_dynamics() {
         let result = service.cycle("testing on silicon substrate");
         let m = &result.metadata;
         assert!(
-            m.valence_homeostasis_pull.is_finite(),
+            m.adaptive.valence_homeostasis_pull.is_finite(),
             "homeostasis NaN after bio→silicon at cycle {i}"
         );
         assert!(
-            m.social_trust_current >= 0.0 && m.social_trust_current <= 1.0,
+            m.social.social_trust_current >= 0.0 && m.social.social_trust_current <= 1.0,
             "social_trust out of range after switch at cycle {i}"
         );
     }
@@ -68,7 +68,7 @@ fn substrate_transfer_chain_all_eight() {
         for i in 0..10 {
             let result = service.cycle("multi-substrate chain test");
             assert!(
-                result.metadata.valence_homeostasis_pull.is_finite(),
+                result.metadata.adaptive.valence_homeostasis_pull.is_finite(),
                 "NaN on {:?} at cycle {i}",
                 substrate
             );
@@ -140,7 +140,7 @@ fn low_feasibility_substrates_still_run() {
     for i in 0..100 {
         let result = service.cycle("testing consciousness on constrained substrate");
         assert!(
-            result.metadata.valence_homeostasis_pull.is_finite(),
+            result.metadata.adaptive.valence_homeostasis_pull.is_finite(),
             "Dynamics crashed on low-feasibility substrate at cycle {i}"
         );
     }
@@ -271,7 +271,7 @@ fn per_region_runtime_reconfiguration() {
     for i in 0..50 {
         let result = service.cycle("testing with hybrid substrate");
         assert!(
-            result.metadata.valence_homeostasis_pull.is_finite(),
+            result.metadata.adaptive.valence_homeostasis_pull.is_finite(),
             "NaN after per-region reconfiguration at cycle {i}"
         );
     }
@@ -340,13 +340,13 @@ fn hybrid_substrate_soak_100_cycles() {
         let result = service.cycle(inputs[i % inputs.len()]);
         let m = &result.metadata;
         assert!(
-            m.valence_homeostasis_pull.is_finite(),
+            m.adaptive.valence_homeostasis_pull.is_finite(),
             "Hybrid substrate NaN at cycle {i}"
         );
         assert!(
-            m.social_trust_current >= 0.0 && m.social_trust_current <= 1.0,
+            m.social.social_trust_current >= 0.0 && m.social.social_trust_current <= 1.0,
             "social_trust out of range at cycle {i}: {}",
-            m.social_trust_current
+            m.social.social_trust_current
         );
     }
 }
@@ -363,7 +363,7 @@ fn soak_200_cycles_with_mid_run_substrate_switch() {
     for i in 0..100 {
         let result = service.cycle("silicon phase");
         assert!(
-            result.metadata.valence_homeostasis_pull.is_finite(),
+            result.metadata.adaptive.valence_homeostasis_pull.is_finite(),
             "Silicon phase NaN at cycle {i}"
         );
     }
@@ -375,11 +375,11 @@ fn soak_200_cycles_with_mid_run_substrate_switch() {
     for i in 0..100 {
         let result = service.cycle("quantum phase");
         assert!(
-            result.metadata.valence_homeostasis_pull.is_finite(),
+            result.metadata.adaptive.valence_homeostasis_pull.is_finite(),
             "Quantum phase NaN at cycle {i}"
         );
         assert!(
-            result.metadata.social_trust_current >= 0.0,
+            result.metadata.social.social_trust_current >= 0.0,
             "Social trust negative in quantum phase at cycle {i}"
         );
     }

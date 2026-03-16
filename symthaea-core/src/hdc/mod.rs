@@ -317,12 +317,11 @@ mod phi_tier_tests; // Unit tests for Φ tier implementations
 pub mod phi_topology_validation; // ContinuousHV-TieredPhi integration for topology validation
 pub mod real_hv; // Real-valued hypervectors for consciousness topologies
 pub mod spectral_connectivity; // Algebraic connectivity (λ₂) calculator - NOT IIT Φ!
-pub mod tiered_phi; // Multi-tier Φ (integrated information) approximation // Binary hypervector operations (BinaryHV)
-                    // simd_hv16 removed — all methods absorbed into BinaryHV
-pub mod simd_continuous;
-pub mod simd_ops; // SIMD intrinsics for BinaryHV (AVX2/SSE4.1) // SIMD intrinsics for ContinuousHV (AVX2/FMA/SSE4.1)
-                  // NOTE: simd_hv and optimized_hv are INCOMPATIBLE with 16,384-bit BinaryHV (they use 256-byte arrays)
-                  // Use BinaryHV::bind(), BinaryHV::bundle(), BinaryHV::similarity() directly instead
+pub mod tiered_phi; // Multi-tier Φ (integrated information) approximation
+pub mod simd_continuous; // SIMD intrinsics for ContinuousHV (AVX2/FMA/SSE4.1)
+pub mod simd_detect; // Unified SIMD feature detection (single source of truth for all modules)
+pub mod simd_ops; // SIMD intrinsics for BinaryHV (AVX-512/AVX2/SSE4.1/NEON)
+pub mod transposed_bundle; // Transposed bit-plane accumulator for fast majority-vote bundle
 pub mod hdc_trait; // Unified HyperdimensionalVector trait interface
                    // Performance optimization modules:
 pub mod algebraic_structures;
@@ -332,6 +331,8 @@ pub mod bootstrapping; // Cognitive bootstrapping - primitives to reasoning task
 pub mod calculus;
 pub mod celegans_connectome; // Revolutionary #100: C. elegans connectome validation (302 neurons)
 pub mod complex; // Complex number support (ℂ) with HDC encoding
+#[cfg(feature = "complex_cfc")]
+pub mod complex_cfc_neuron; // Complex-valued CfC neuron with native oscillation (Phase 3)
 pub mod computational_geometry; // Geometry: convex hull, intersection, point-in-polygon, area
 #[cfg(test)]
 mod consciousness_e2e_tests;

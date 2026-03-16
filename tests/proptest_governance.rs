@@ -186,7 +186,7 @@ proptest! {
         // Run enough cycles for governance to process multiple times
         for _ in 0..80 {
             let r = svc.cycle("harmonic stability");
-            let delta_max = r.metadata.governance_harmonic_delta_max;
+            let delta_max = r.metadata.governance.governance_harmonic_delta_max;
             prop_assert!(
                 delta_max.is_finite(),
                 "harmonic delta max not finite: {}",
@@ -214,7 +214,7 @@ proptest! {
             let _ = svc.cycle("community mode check");
         }
         let r = svc.cycle("final check");
-        let mode = &r.metadata.governance_community_mode;
+        let mode = &r.metadata.governance.governance_community_mode;
         prop_assert!(
             !mode.is_empty(),
             "Community mode should be set after governance processes"

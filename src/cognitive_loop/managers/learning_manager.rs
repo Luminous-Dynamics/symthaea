@@ -69,6 +69,21 @@ impl LearningManager {
     /// Minimum plasticity (always retain some learning capacity).
     const MIN_PLASTICITY: f32 = 0.1;
 
+    /// Current plasticity level [0.1, 0.95].
+    pub fn plasticity(&self) -> f32 {
+        self.plasticity
+    }
+
+    /// Whether in dream consolidation phase (low arousal sustained).
+    pub fn in_dream_phase(&self) -> bool {
+        self.in_dream_phase
+    }
+
+    /// Error trend direction: positive = errors increasing.
+    pub fn error_trend(&self) -> f32 {
+        self.error_trend
+    }
+
     fn mean_surprise(&self) -> f32 {
         if self.surprise_count == 0 {
             return 0.0;

@@ -22,10 +22,94 @@ use super::causal_bridge::CausalKnowledgeBridge;
 use super::encoding::KnowledgeEncoder;
 use super::extraction::{EntityType, KnowledgeExtractor};
 use super::graph::{ContradictionAlert, EnhancedKnowledgeGraph, FactSearchResult};
-use super::persistence::KnowledgePersistence;
+use super::persistence::{CausalEdgeRecord, KnowledgePersistence, OntologyRecord};
 use super::reasoning_context::{KnowledgeQueryResult, ReasoningContext};
 use std::collections::VecDeque;
 use symthaea_core::hdc::unified_hv::BinaryHV;
+
+// ── Calibration Audit ──────────────────────────────────────────────────────
+
+/// Calibration audit: tracks whether knowledge confidence scores are well-calibrated.
+/// Maintains a 10-bin histogram of (confidence_bucket, count, correct_count).
+/// Science: Guo et al. (2017) — On Calibration of Modern Neural Networks.
+#[derive(Debug, Clone)]
+pub struct CalibrationAudit {
+    /// 10 bins: [0.0-0.1), [0.1-0.2), ..., [0.9-1.0]
+    /// Each bin: (total_predictions, correct_predictions)
+    bins: [(u64, u64); 10],
+    /// Total samples tracked
+    total_samples: u64,
+}
+
+impl Default for CalibrationAudit {
+    fn default() -> Self {
+        Self {
+            bins: [(0, 0); 10],
+            total_samples: 0,
+        }
+    }
+}
+
+impl CalibrationAudit {
+    /// Record a prediction outcome: the fact had this confidence, and the prediction was correct/incorrect.
+    pub fn record(&mut self, confidence: f32, correct: bool) {
+        let bin = (confidence * 10.0).floor().min(9.0) as usize;
+        self.bins[bin].0 += 1;
+        if correct {
+            self.bins[bin].1 += 1;
+        }
+        self.total_samples += 1;
+    }
+
+    /// Expected Calibration Error: weighted average of |accuracy - confidence| per bin.
+    /// Lower is better (0.0 = perfectly calibrated).
+    pub fn ece(&self) -> f64 {
+        if self.total_samples == 0 {
+            return 0.0;
+        }
+
+        let mut ece = 0.0;
+        for (i, &(total, correct)) in self.bins.iter().enumerate() {
+            if total == 0 {
+                continue;
+            }
+            let bin_confidence = (i as f64 + 0.5) / 10.0; // Bin midpoint
+            let bin_accuracy = correct as f64 / total as f64;
+            let weight = total as f64 / self.total_samples as f64;
+            ece += weight * (bin_accuracy - bin_confidence).abs();
+        }
+        ece
+    }
+
+    /// Maximum Calibration Error: worst bin's |accuracy - confidence|.
+    pub fn mce(&self) -> f64 {
+        self.bins.iter().enumerate()
+            .filter(|(_, &(total, _))| total > 0)
+            .map(|(i, &(total, correct))| {
+                let bin_confidence = (i as f64 + 0.5) / 10.0;
+                let bin_accuracy = correct as f64 / total as f64;
+                (bin_accuracy - bin_confidence).abs()
+            })
+            .fold(0.0_f64, f64::max)
+    }
+
+    /// Per-bin summary: (bin_midpoint, total_count, accuracy).
+    pub fn bin_summary(&self) -> Vec<(f32, u64, f32)> {
+        self.bins.iter().enumerate()
+            .filter(|(_, &(total, _))| total > 0)
+            .map(|(i, &(total, correct))| {
+                let midpoint = (i as f32 + 0.5) / 10.0;
+                let accuracy = if total > 0 { correct as f32 / total as f32 } else { 0.0 };
+                (midpoint, total, accuracy)
+            })
+            .collect()
+    }
+
+    /// Total samples tracked.
+    pub fn total_samples(&self) -> u64 {
+        self.total_samples
+    }
+}
 
 // ── Telemetry ──────────────────────────────────────────────────────────────
 
@@ -58,6 +142,8 @@ pub struct KnowledgeTelemetry {
     pub best_search_similarity: f32,
     /// Number of domain tags in knowledge graph
     pub domain_count: u32,
+    /// Expected Calibration Error (0.0 = perfect, 1.0 = worst)
+    pub calibration_ece: f64,
 }
 
 /// Signals emitted by the knowledge engine for the cognitive loop
@@ -80,6 +166,9 @@ pub struct KnowledgeSignals {
     /// Causal depth: how many causal chain steps were traced
     /// Feeds → reasoning confidence
     pub causal_depth: f64,
+    /// Epistemic surprise: high when contradictions + novelty are both present.
+    /// Feeds → FEP learning signal boost (Friston 2010).
+    pub epistemic_surprise: f64,
 }
 
 // ── Configuration ──────────────────────────────────────────────────────────
@@ -156,6 +245,11 @@ pub struct KnowledgeManager {
     persistence: Option<KnowledgePersistence>,
     /// Save interval from config (cycles between persistence snapshots)
     save_interval: u64,
+    /// Ontology learning rate multiplier, modulated by prediction error
+    /// Science: Rescorla-Wagner (1972) — PE modulates learning rate
+    ontology_lr_multiplier: f32,
+    /// Calibration audit: tracks ECE across prediction outcomes
+    calibration_audit: CalibrationAudit,
 }
 
 impl Default for KnowledgeManager {
@@ -186,25 +280,20 @@ impl KnowledgeManager {
             if let Ok(edges) = p.load_causal_edges() {
                 let edge_count = edges.len();
                 for record in &edges {
-                    causal_bridge.import_edge(record);
+                    causal_bridge.import_edge(record.cause.clone(), record.effect.clone(), record.strength);
                 }
                 if edge_count > 0 {
-                    tracing::info!(
-                        count = edge_count,
-                        "Knowledge: loaded causal edges from SQLite"
-                    );
+                    tracing::info!(count = edge_count, "Knowledge: loaded causal edges from SQLite");
                 }
             }
             // Load existing ontology primitives
             if let Ok(records) = p.load_ontology() {
+                let onto_count = records.len();
                 for record in &records {
-                    ontology.import_record(record);
+                    ontology.import_ontology_record(record);
                 }
-                if !records.is_empty() {
-                    tracing::info!(
-                        count = records.len(),
-                        "Knowledge: loaded ontology from SQLite"
-                    );
+                if onto_count > 0 {
+                    tracing::info!(count = onto_count, "Knowledge: loaded ontology primitives from SQLite");
                 }
             }
             p
@@ -228,6 +317,8 @@ impl KnowledgeManager {
             last_causal_depth: 0,
             persistence,
             save_interval,
+            ontology_lr_multiplier: 1.0,
+            calibration_audit: CalibrationAudit::default(),
         }
     }
 
@@ -444,20 +535,6 @@ impl KnowledgeManager {
             telem.facts_inserted += 1;
             contradictions_detected += contradictions.len() as u32;
 
-            // Resolve high-confidence contradictions via belief revision
-            // AGM theory (Alchourrón et al. 1985) — contraction with entrenchment
-            let resolvable: Vec<_> = contradictions
-                .iter()
-                .filter(|a| {
-                    a.similarity
-                        > crate::cognitive_loop::thresholds::KNOWLEDGE_CONTRADICTION_RESOLUTION_THRESHOLD
-                })
-                .cloned()
-                .collect();
-            if !resolvable.is_empty() {
-                self.graph.resolve_contradictions(&resolvable);
-            }
-
             for alert in contradictions {
                 self.pending_alerts.push_back(alert);
             }
@@ -469,6 +546,35 @@ impl KnowledgeManager {
                     .process_relation(relation, &fact.source_text, current_cycle)
                 {
                     causal_edges_added += 1;
+                }
+            }
+
+            // Auto-detect IS-A relations from extracted text.
+            // Patterns: "X is a Y", "X is a type of Y", "X are Y"
+            // Science: Quillian (1967) — semantic networks.
+            for relation in &fact.relations {
+                let pred = relation.predicate.to_lowercase();
+                let is_isa = pred == "is"
+                    || pred == "is a"
+                    || pred == "is an"
+                    || pred == "are"
+                    || pred.contains("type of")
+                    || pred.contains("kind of")
+                    || pred.contains("form of")
+                    || pred.contains("subclass of");
+
+                if is_isa && !relation.is_negated && relation.confidence > 0.3 {
+                    let child = relation.subject.to_lowercase();
+                    let parent = relation.object.to_lowercase();
+                    // First ensure both exist in ontology
+                    if self.ontology.lookup(&self.encoder.encode_token(&child), current_cycle).is_some() {
+                        self.ontology.set_is_a(&child, &parent);
+                    } else {
+                        // Learn child, then set IS-A
+                        let child_hv = self.encoder.encode_token(&child);
+                        self.ontology.learn(&child, child_hv, vec![parent.clone()], current_cycle);
+                        self.ontology.set_is_a(&child, &parent);
+                    }
                 }
             }
 
@@ -495,6 +601,22 @@ impl KnowledgeManager {
         telem.causal_edges_added = causal_edges_added;
         telem.contradictions_detected = contradictions_detected;
 
+        // AGM-style contradiction resolution: demote weaker fact confidence
+        // (Alchourrón, Gärdenfors & Makinson 1985)
+        if !self.pending_alerts.is_empty() {
+            let threshold =
+                crate::cognitive_loop::thresholds::KNOWLEDGE_CONTRADICTION_RESOLUTION_THRESHOLD;
+            let resolvable: Vec<_> = self
+                .pending_alerts
+                .iter()
+                .filter(|a| a.similarity > threshold)
+                .cloned()
+                .collect();
+            if !resolvable.is_empty() {
+                self.graph.resolve_contradictions(&resolvable);
+            }
+        }
+
         // 5. Search knowledge graph for context
         self.do_search(input);
         telem.search_results = self.last_search_results.len() as u32;
@@ -518,6 +640,7 @@ impl KnowledgeManager {
         telem.causal_node_count = self.causal_bridge.node_count() as u32;
         telem.causal_edge_count = self.causal_bridge.edge_count() as u32;
         telem.domain_count = self.graph.domain_count() as u32;
+        telem.calibration_ece = self.calibration_audit.ece();
 
         self.last_telemetry = telem;
 
@@ -593,15 +716,24 @@ impl KnowledgeManager {
     pub fn persist_snapshot(&mut self) {
         if let Some(ref mut p) = self.persistence {
             let facts = self.graph.export_fact_records();
-            let edges = self.causal_bridge.export_edge_records();
+            let edge_tuples = self.causal_bridge.export_edge_records();
+            let edges: Vec<CausalEdgeRecord> = edge_tuples
+                .into_iter()
+                .map(|(cause, effect, strength)| CausalEdgeRecord {
+                    cause,
+                    effect,
+                    strength,
+                    is_inhibitory: false,
+                    cycle: 0,
+                })
+                .collect();
+            let ontology_records = self.ontology.export_ontology_records();
             if let Err(e) = p.save_facts(&facts) {
                 tracing::warn!(error = %e, "Knowledge persistence: failed to save facts");
             }
             if let Err(e) = p.save_causal_edges(&edges) {
                 tracing::warn!(error = %e, "Knowledge persistence: failed to save edges");
             }
-            // Persist adaptive ontology primitives
-            let ontology_records = self.ontology.export_records();
             if let Err(e) = p.save_ontology(&ontology_records) {
                 tracing::warn!(error = %e, "Knowledge persistence: failed to save ontology");
             }
@@ -676,17 +808,234 @@ impl KnowledgeManager {
         &mut self.graph
     }
 
-    /// Return source texts of the top-k highest-confidence facts.
+    /// Get the source texts of the top-k highest-confidence facts.
     ///
-    /// Used by dream consolidation to convert knowledge to episodic memories.
+    /// Used by episodic memory bridge during dream consolidation to promote
+    /// high-confidence knowledge into episodic memory for long-term retention.
     pub fn top_facts(&self, k: usize) -> Vec<String> {
-        let mut facts: Vec<_> = self
-            .graph
-            .all_facts()
-            .map(|f| (f.confidence, f.encoding.source_text.clone()))
+        let mut facts: Vec<_> = self.graph.all_facts().collect();
+        facts.sort_by(|a, b| {
+            b.encoding
+                .confidence
+                .partial_cmp(&a.encoding.confidence)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        facts
+            .iter()
+            .take(k)
+            .map(|f| f.encoding.source_text.clone())
+            .collect()
+    }
+
+    /// Top-k facts filtered by relevance to last search query.
+    /// Combines confidence (60%) and similarity (40%) for RAG-style grounding.
+    /// Science: Lewis et al. (2020) — retrieval-augmented generation.
+    pub fn top_grounded_facts(&self, k: usize) -> Vec<String> {
+        if self.last_search_results.is_empty() {
+            return self.top_facts(k);
+        }
+
+        let mut scored: Vec<(u64, f32)> = self.last_search_results.iter()
+            .map(|r| {
+                let combined = r.confidence * 0.6 + r.similarity * 0.4;
+                (r.fact_id, combined)
+            })
             .collect();
-        facts.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
-        facts.into_iter().take(k).map(|(_, text)| text).collect()
+        scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+
+        scored.iter()
+            .take(k)
+            .filter_map(|(id, _)| {
+                self.graph.all_facts()
+                    .find(|f| f.id == *id)
+                    .map(|f| f.encoding.source_text.clone())
+            })
+            .collect()
+    }
+
+    /// Search for facts within a cycle window (temporal scoping).
+    /// Returns facts inserted within [start_cycle, end_cycle].
+    /// Science: Tulving (1972) — episodic vs semantic temporal context.
+    pub fn search_temporal_window(
+        &self,
+        start_cycle: u64,
+        end_cycle: u64,
+        k: usize,
+    ) -> Vec<FactSearchResult> {
+        self.graph.all_facts()
+            .filter(|f| f.inserted_at_cycle >= start_cycle && f.inserted_at_cycle <= end_cycle)
+            .map(|f| FactSearchResult {
+                fact_id: f.id,
+                similarity: 1.0, // No query vector — temporal filter only
+                confidence: f.confidence,
+            })
+            .take(k)
+            .collect()
+    }
+
+    /// Search combining HDC similarity AND temporal recency.
+    /// Recent facts get a recency boost: score = similarity * (0.7 + 0.3 * recency).
+    /// Science: Anderson & Schooler (1991) — rational analysis of memory.
+    pub fn search_with_recency(
+        &mut self,
+        query: &BinaryHV,
+        k: usize,
+        recency_window: u64,
+    ) -> Vec<FactSearchResult> {
+        let mut results = self.graph.search(query, k * 2, self.current_cycle);
+
+        // Apply recency boost
+        for r in &mut results {
+            if let Some(fact) = self.graph.all_facts().find(|f| f.id == r.fact_id) {
+                let age = self.current_cycle.saturating_sub(fact.last_accessed_cycle);
+                let recency = if recency_window > 0 {
+                    1.0 - (age as f32 / recency_window as f32).min(1.0)
+                } else {
+                    0.0
+                };
+                r.similarity = r.similarity * (0.7 + 0.3 * recency);
+            }
+        }
+
+        results.sort_by(|a, b| b.similarity.partial_cmp(&a.similarity).unwrap_or(std::cmp::Ordering::Equal));
+        results.truncate(k);
+        results
+    }
+
+    /// Calibrate fact confidence based on prediction outcomes.
+    /// Accurate predictions boost confidence, inaccurate reduce.
+    /// Science: Jaynes (2003) — probability as extended logic.
+    pub fn calibrate_from_prediction(&mut self, prediction_error: f32) {
+        let boost = if prediction_error < 0.3 {
+            0.01 // Good prediction → slightly boost confidence
+        } else if prediction_error > 0.7 {
+            -0.02 // Bad prediction → reduce confidence
+        } else {
+            0.0
+        };
+
+        if boost != 0.0 {
+            for result in &self.last_search_results {
+                self.graph.adjust_confidence(result.fact_id, boost);
+            }
+        }
+
+        // Record calibration data for each search result
+        let correct = prediction_error < 0.5;
+        for result in &self.last_search_results {
+            self.calibration_audit.record(result.confidence, correct);
+        }
+
+        // Causal strength learning from prediction outcomes.
+        // Science: Rescorla-Wagner (1972) — prediction error drives causal learning.
+        let outcome_good = prediction_error < 0.4;
+        let causal_lr = 0.05 * (1.0 - prediction_error).max(0.1);
+
+        // Phase 1: collect causal-eligible fact first words from graph (immutable borrow).
+        // Gather fact_ids first to avoid holding &self.last_search_results across the graph borrow.
+        let search_fact_ids: Vec<u64> = self.last_search_results.iter()
+            .map(|r| r.fact_id)
+            .collect();
+        let causal_fact_words: Vec<String> = search_fact_ids.iter()
+            .filter_map(|&fact_id| {
+                self.graph.all_facts()
+                    .find(|f| f.id == fact_id)
+                    .filter(|f| f.has_causal_relations)
+                    .map(|f| {
+                        f.encoding.source_text
+                            .split_whitespace()
+                            .next()
+                            .unwrap_or("")
+                            .to_string()
+                    })
+            })
+            .filter(|w| !w.is_empty())
+            .collect();
+
+        // Phase 2: look up edges and collect (cause, effect) pairs (immutable borrow of bridge).
+        let causal_updates: Vec<(String, String)> = causal_fact_words.iter()
+            .filter_map(|first_word| {
+                let effects = self.causal_bridge.effects_of(first_word);
+                effects.first().map(|e| (e.cause.clone(), e.effect.clone()))
+            })
+            .collect();
+
+        // Phase 3: apply updates (mutable borrow of bridge only).
+        for (cause, effect) in &causal_updates {
+            self.causal_bridge.update_strength_from_outcome(cause, effect, outcome_good, causal_lr);
+        }
+    }
+
+    /// Get the calibration audit for external monitoring.
+    pub fn calibration_audit(&self) -> &CalibrationAudit {
+        &self.calibration_audit
+    }
+
+    /// Set ontology learning rate from prediction error.
+    /// High PE → faster learning; low PE → slower (already learned).
+    /// Science: Rescorla-Wagner (1972).
+    pub fn set_ontology_lr_from_pe(&mut self, prediction_error: f32) {
+        self.ontology_lr_multiplier = (0.5 + prediction_error * 1.5).clamp(0.3, 2.0);
+    }
+
+    /// Get per-domain uncertainty: (domain_name, avg_confidence, fact_count).
+    /// Sorted by confidence ascending (most uncertain first).
+    pub fn domain_uncertainty(&self) -> Vec<(String, f32, usize)> {
+        self.graph.domain_distribution()
+    }
+
+    /// Counterfactual query: find causes for an effect with necessity scores.
+    /// Science: Pearl (2000) — do-calculus.
+    pub fn counterfactual(&self, effect: &str, max_results: usize) -> Vec<(String, f32)> {
+        self.causal_bridge.counterfactual_necessity(effect, max_results)
+    }
+
+    /// Simulate an intervention: do(X) → propagated effects.
+    /// Science: Pearl (2009) — do-calculus.
+    pub fn do_intervention(&self, intervention: &str, max_depth: usize) -> Vec<(String, f32)> {
+        self.causal_bridge.do_intervention(intervention, max_depth)
+    }
+
+    /// Detect potential confounders between two entities.
+    /// Science: Pearl (2000) — backdoor criterion.
+    pub fn detect_confounders(&self, entity_a: &str, entity_b: &str) -> Vec<(String, f32)> {
+        self.causal_bridge.detect_confounders(entity_a, entity_b)
+    }
+
+    /// Update causal edge strength based on prediction outcome.
+    pub fn update_causal_strength(
+        &mut self,
+        cause: &str,
+        effect: &str,
+        outcome_occurred: bool,
+        learning_rate: f32,
+    ) {
+        self.causal_bridge.update_strength_from_outcome(cause, effect, outcome_occurred, learning_rate);
+    }
+
+    /// Find analogous facts in a target domain using HDC similarity.
+    /// Science: Gentner (1983) — structure mapping theory.
+    pub fn find_analogous(&self, source_id: u64, target_domain: &str, top_k: usize) -> Vec<(String, f32)> {
+        // Find the source fact's vector (clone to release borrow)
+        let source_vector = match self.graph.all_facts().find(|f| f.id == source_id) {
+            Some(f) => f.encoding.vector.clone(),
+            None => return Vec::new(),
+        };
+
+        // Search for similar facts in the target domain
+        let results = self.graph.search_domain(target_domain, &source_vector, top_k * 3);
+        results.iter()
+            .take(top_k)
+            .map(|r| (format!("fact:{}", r.fact_id), r.similarity))
+            .collect()
+    }
+
+    /// Get per-domain distribution: (domain_name, fact_count, avg_confidence).
+    pub fn domain_distribution(&self) -> Vec<(String, usize, f32)> {
+        self.graph.domain_distribution()
+            .into_iter()
+            .map(|(name, avg_conf, count)| (name, count, avg_conf))
+            .collect()
     }
 
     // ── Internal ────────────────────────────────────────────────────────
@@ -722,6 +1071,34 @@ impl KnowledgeManager {
         self.last_search_results =
             self.graph
                 .search(&query_hv, self.config.search_top_k, self.current_cycle);
+
+        // Spreading activation: expand search through HDC similarity neighbors.
+        // Science: Anderson (1983) ACT-R spreading activation.
+        if !self.last_search_results.is_empty() && self.graph.all_facts().count() > 5 {
+            let seeds = self.last_search_results.clone();
+            let spread_results = self.graph.spreading_activation_search(
+                &seeds,
+                2,    // 2 hops
+                0.5,  // 50% decay per hop
+                self.config.search_top_k * 2,
+                self.current_cycle,
+            );
+
+            // Merge: keep original results but add novel spread activations
+            for spread in &spread_results {
+                if !self.last_search_results.iter().any(|r| r.fact_id == spread.fact_id) {
+                    self.last_search_results.push(spread.clone());
+                }
+            }
+
+            // Re-sort by combined score and truncate
+            self.last_search_results.sort_by(|a, b| {
+                let score_a = a.similarity * 0.6 + a.confidence * 0.4;
+                let score_b = b.similarity * 0.6 + b.confidence * 0.4;
+                score_b.partial_cmp(&score_a).unwrap_or(std::cmp::Ordering::Equal)
+            });
+            self.last_search_results.truncate(self.config.search_top_k * 2);
+        }
 
         // Trace causal chains for extracted entities and update causal_depth
         let mut max_chain_depth: usize = 0;
@@ -772,6 +1149,9 @@ impl KnowledgeManager {
             novelty: (1.0 - avg_sim).clamp(0.0, 1.0),
             // Causal depth: normalized by max reasonable chain length (5 = deep chain)
             causal_depth: (self.last_causal_depth as f64 / 5.0).clamp(0.0, 1.0),
+            // Epistemic surprise: contradictions + novelty
+            epistemic_surprise: ((self.last_telemetry.contradictions_detected as f64 * 0.3).min(0.6)
+                + (1.0 - avg_sim) * 0.4).clamp(0.0, 1.0),
         };
     }
 }
@@ -791,6 +1171,10 @@ fn infer_domain(fact: &super::extraction::ExtractedFact) -> Option<String> {
             EntityType::Event => return Some("events".to_string()),
             EntityType::Quantity => return Some("economics".to_string()),
             EntityType::Process => return Some("science".to_string()),
+            #[cfg(feature = "therapeutic")]
+            EntityType::ClinicalConcept | EntityType::Symptom | EntityType::Intervention => {
+                return Some("clinical".to_string());
+            }
             _ => {}
         }
     }
@@ -882,7 +1266,7 @@ mod tests {
         // Some concepts should have been learned
         // (depends on extraction finding capitalized novel concepts)
         // The ontology should have at least attempted lookups
-        assert!(mgr.ontology().total_queries() >= 0);
+        let _ = mgr.ontology().total_queries(); // smoke: accessor doesn't panic
     }
 
     #[test]
@@ -1065,5 +1449,250 @@ mod tests {
                 causal_depth
             );
         }
+    }
+
+    // ── Lifecycle integration tests (hardening) ──
+
+    /// Full lifecycle: 100 cycles of processing, verify telemetry accumulates correctly
+    /// and all signals remain finite/bounded.
+    #[test]
+    fn test_100_cycle_lifecycle() {
+        let config = KnowledgeManagerConfig {
+            decay_interval: 10,
+            ..Default::default()
+        };
+        let mut mgr = KnowledgeManager::new(config);
+        mgr.bootstrap_entities();
+
+        let inputs = [
+            "The United States imposed sanctions on Russia.",
+            "Russia retaliated with energy export restrictions.",
+            "Oil prices increased globally due to supply constraints.",
+            "The European Union diversified energy sources.",
+            "China increased trade with Russia.",
+            "Inflation rose in the United States.",
+            "The Federal Reserve raised the interest rate.",
+            "A recession was predicted by economists.",
+            "Climate change accelerated deforestation in the Amazon.",
+            "The pandemic caused supply chain disruptions.",
+        ];
+
+        for cycle in 0..100 {
+            let input = inputs[cycle % inputs.len()];
+            let (telem, signals) = mgr.process(input, cycle as u64);
+
+            // All telemetry fields should be finite
+            assert!(telem.avg_confidence.is_finite(), "cycle {cycle}: avg_confidence not finite");
+            assert!(telem.best_search_similarity.is_finite(), "cycle {cycle}: best_search_similarity not finite");
+
+            // All signals bounded
+            assert!(signals.uncertainty >= 0.0 && signals.uncertainty <= 1.0,
+                "cycle {cycle}: uncertainty out of bounds: {}", signals.uncertainty);
+            assert!(signals.relevance >= 0.0 && signals.relevance <= 1.0,
+                "cycle {cycle}: relevance out of bounds: {}", signals.relevance);
+            assert!(signals.novelty >= 0.0 && signals.novelty <= 1.0,
+                "cycle {cycle}: novelty out of bounds: {}", signals.novelty);
+            assert!(signals.contradiction_signal.is_finite(),
+                "cycle {cycle}: contradiction_signal not finite");
+            assert!(signals.causal_depth.is_finite(),
+                "cycle {cycle}: causal_depth not finite");
+            assert!(signals.epistemic_surprise.is_finite(),
+                "cycle {cycle}: epistemic_surprise not finite");
+        }
+
+        // Graph should have accumulated facts
+        assert!(mgr.graph().len() > 0, "Graph should have facts after 100 cycles");
+
+        // Telemetry graph_size should match
+        let telem = mgr.telemetry();
+        assert_eq!(telem.graph_size, mgr.graph().len() as u32);
+    }
+
+    /// Process empty input: should not panic, should not add facts
+    #[test]
+    fn test_empty_input_processing() {
+        let mut mgr = KnowledgeManager::default();
+        mgr.bootstrap_entities();
+
+        let graph_before = mgr.graph().len();
+        mgr.process("", 1);
+
+        let telem = mgr.telemetry();
+        assert_eq!(telem.facts_extracted, 0);
+        assert_eq!(mgr.graph().len(), graph_before);
+        assert!(mgr.signals().uncertainty.is_finite());
+    }
+
+    /// Contradiction detection: contradictory facts should produce alerts
+    #[test]
+    fn test_contradiction_alert_pipeline() {
+        let mut mgr = KnowledgeManager::default();
+        mgr.bootstrap_entities();
+
+        // Insert similar but "contradictory" facts (same entities, negation)
+        mgr.process("Sanctions reduced oil supply.", 1);
+        mgr.process("Sanctions did not reduce oil supply.", 2);
+
+        // Drain alerts — may or may not trigger depending on HDC similarity
+        let alerts = mgr.drain_alerts();
+        // Regardless, drain should work without panic
+        let _ = alerts.len();
+
+        // Second drain should be empty
+        let alerts2 = mgr.drain_alerts();
+        assert!(alerts2.is_empty(), "Second drain should be empty");
+    }
+
+    /// Calibration audit: record predictions and verify ECE/MCE are bounded
+    #[test]
+    fn test_calibration_audit_bounds() {
+        let mut audit = CalibrationAudit::default();
+
+        // Record 100 predictions with varying confidence and correctness
+        for i in 0..100 {
+            let confidence = (i as f32) / 100.0;
+            let correct = i % 3 != 0; // 2/3 correct
+            audit.record(confidence, correct);
+        }
+
+        let ece = audit.ece();
+        let mce = audit.mce();
+
+        assert!(ece >= 0.0 && ece <= 1.0, "ECE should be in [0,1]: {ece}");
+        assert!(mce >= 0.0 && mce <= 1.0, "MCE should be in [0,1]: {mce}");
+        assert!(audit.total_samples() == 100);
+
+        let summary = audit.bin_summary();
+        assert!(!summary.is_empty(), "Should have non-empty bins");
+        for (midpoint, count, accuracy) in &summary {
+            assert!(*midpoint >= 0.0 && *midpoint <= 1.0);
+            assert!(*count > 0);
+            assert!(*accuracy >= 0.0 && *accuracy <= 1.0);
+        }
+    }
+
+    /// Calibration audit: empty audit should return 0
+    #[test]
+    fn test_calibration_audit_empty() {
+        let audit = CalibrationAudit::default();
+        assert_eq!(audit.ece(), 0.0);
+        assert_eq!(audit.mce(), 0.0);
+        assert_eq!(audit.total_samples(), 0);
+        assert!(audit.bin_summary().is_empty());
+    }
+
+    #[test]
+    fn test_calibration_audit_perfect() {
+        let mut audit = CalibrationAudit::default();
+
+        // Perfectly calibrated: 80% confidence facts are correct 80% of the time
+        for _ in 0..80 {
+            audit.record(0.85, true);
+        }
+        for _ in 0..20 {
+            audit.record(0.85, false);
+        }
+
+        assert_eq!(audit.total_samples(), 100);
+        // ECE should be low for near-perfect calibration
+        assert!(audit.ece() < 0.15);
+    }
+
+    #[test]
+    fn test_calibration_audit_overconfident() {
+        let mut audit = CalibrationAudit::default();
+
+        // Overconfident: 90% confidence but only 50% correct
+        for _ in 0..50 {
+            audit.record(0.95, true);
+        }
+        for _ in 0..50 {
+            audit.record(0.95, false);
+        }
+
+        // ECE should be high (overconfident by ~0.4)
+        assert!(audit.ece() > 0.3);
+    }
+
+    #[test]
+    fn test_calibration_audit_bin_boundaries() {
+        let mut audit = CalibrationAudit::default();
+
+        audit.record(0.0, false);   // Bin 0
+        audit.record(0.15, true);   // Bin 1
+        audit.record(0.55, true);   // Bin 5
+        audit.record(0.99, true);   // Bin 9
+
+        let summary = audit.bin_summary();
+        assert_eq!(summary.len(), 4); // 4 non-empty bins
+        assert_eq!(audit.total_samples(), 4);
+    }
+
+    /// Consolidation: prune + strengthen should work on populated graph
+    #[test]
+    fn test_consolidate_and_forget() {
+        let mut mgr = KnowledgeManager::default();
+        mgr.bootstrap_entities();
+
+        // Insert several facts
+        for i in 0..10 {
+            mgr.process(
+                &format!("Event {i} caused consequence {i} in the United States."),
+                i as u64,
+            );
+        }
+
+        let graph_before = mgr.graph().len();
+        let (pruned, strengthened) = mgr.consolidate_and_forget();
+
+        // Should not panic
+        let _ = pruned + strengthened;
+        // Graph size should not increase after consolidation
+        assert!(mgr.graph().len() <= graph_before);
+    }
+
+    /// Query interface: should return well-formed results
+    #[test]
+    fn test_query_interface() {
+        let mut mgr = KnowledgeManager::default();
+        mgr.bootstrap_entities();
+
+        mgr.process("Climate change caused severe flooding.", 1);
+        mgr.process("Flooding destroyed infrastructure.", 2);
+
+        let result = mgr.query("climate flooding");
+        // Result should have finite confidence values
+        for fact in &result.facts {
+            assert!(fact.confidence.is_finite());
+            assert!(fact.similarity.is_finite());
+        }
+    }
+
+    /// Processing interval: facts only extracted on-interval
+    #[test]
+    fn test_processing_interval() {
+        let config = KnowledgeManagerConfig {
+            processing_interval: 3,
+            ..Default::default()
+        };
+        let mut mgr = KnowledgeManager::new(config);
+        mgr.bootstrap_entities();
+
+        // Cycle 0: on interval (0 % 3 == 0), should extract
+        mgr.process("Sanctions caused oil shortage.", 0);
+        let after_0 = mgr.graph().len();
+
+        // Cycle 1: off interval, should skip extraction (but still search)
+        mgr.process("New fact about inflation.", 1);
+        let after_1 = mgr.graph().len();
+
+        // Cycle 3: on interval again
+        mgr.process("Another fact about trade.", 3);
+        let after_3 = mgr.graph().len();
+
+        assert!(after_0 > 0, "Should extract on cycle 0");
+        // Off-interval shouldn't add new facts
+        assert_eq!(after_1, after_0, "Should not extract on off-interval cycle");
+        assert!(after_3 >= after_0, "Should extract on cycle 3 (on interval)");
     }
 }

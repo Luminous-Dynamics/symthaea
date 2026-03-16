@@ -203,7 +203,7 @@ impl HintingBenchmark {
         // Time pressure: -0.4/unit flattens sigmoid gain, modeling hasty pragmatic inference;
         // at max pressure, ~20% accuracy drop matches ToM under cognitive load (Lin et al., 2010).
         let diff_model = difficulty_model_for("ToMBench::Hinting");
-        let sigmoid_gain = 0.25
+        let sigmoid_gain = 0.45
             * (1.0 - config.time_pressure * 0.4)
             * diff_model.signal_multiplier(config.difficulty);
         let p_correct = 1.0 / (1.0 + (-combined * sigmoid_gain).exp());
@@ -357,7 +357,7 @@ impl HintingBenchmark {
         let combined = keyword_score * 0.8 + geo_signal * 0.2;
         // Same SAT sigmoid gain as lightweight path (Lin et al., 2010).
         let diff_model = difficulty_model_for("ToMBench::Hinting");
-        let sigmoid_gain = 0.25
+        let sigmoid_gain = 0.45
             * (1.0 - config.time_pressure * 0.4)
             * diff_model.signal_multiplier(config.difficulty);
         let p_correct = 1.0 / (1.0 + (-combined * sigmoid_gain).exp());

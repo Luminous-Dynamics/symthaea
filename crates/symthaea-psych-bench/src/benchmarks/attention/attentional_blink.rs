@@ -66,7 +66,7 @@ impl AttentionalBlinkBenchmark {
 
         // Attention depletion model parameters
         let attention_capacity: f64 = 1.0;
-        let t1_cost: f64 = 0.98; // T1 processing depletes attention
+        let t1_cost: f64 = 0.75; // T1 processing depletes attention
         let recovery_rate: f64 = 0.12; // Per-lag recovery
 
         // Time pressure: base 0.30 matches ~50% T2|T1 accuracy at lag-2 (Raymond et al., 1992 AB);

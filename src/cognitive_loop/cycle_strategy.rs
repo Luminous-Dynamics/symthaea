@@ -13,19 +13,17 @@ use symthaea_core::hdc::predictive_encoder::EncodingResult;
 use super::helpers;
 use super::thresholds::{
     CONFIDENCE_SCALE_MIDPOINT, CONFIDENCE_SCALE_SENSITIVITY, EXPLORATION_SCALE_MIDPOINT,
-    EXPLORATION_SCALE_SENSITIVITY, KNOWLEDGE_CAUSAL_DEPTH_EXPLOIT_THRESHOLD,
-    KNOWLEDGE_CAUSAL_DEPTH_EXPLORE_DAMPEN, KNOWLEDGE_NOVELTY_EXPLORE_SCALE, MEMO_DIVERSITY_HIGH,
-    MEMO_DIVERSITY_HIGH_SCALE, MEMO_DIVERSITY_LOW, MEMO_DIVERSITY_LOW_SCALE,
-    MEMO_THRESHOLD_CEILING, MEMO_THRESHOLD_FLOOR, MORAL_CONCERN_THRESHOLD,
-    SOCIAL_COOPERATION_THRESHOLD, SOCIAL_TRUST_DEADZONE, SOCIAL_TRUST_EXPLORE_SCALE,
-    SOCIAL_TRUST_EXPLORE_THRESHOLD, SOCIAL_TRUST_MIDPOINT, SOCIAL_TRUST_OVERRIDE_THRESHOLD,
-    SOCIAL_TRUST_STRENGTH_SCALE, SOUL_ALIGNMENT_BOOST_LR_MAX, SOUL_ALIGNMENT_BOOST_LR_MIN,
-    SOUL_ALIGNMENT_BOOST_SCALE, SOUL_ALIGNMENT_BOOST_THRESHOLD, SOUL_ALIGNMENT_DAMPEN_LR_MAX,
-    SOUL_ALIGNMENT_DAMPEN_LR_MIN, SOUL_ALIGNMENT_DAMPEN_SCALE, SOUL_ALIGNMENT_DAMPEN_THRESHOLD,
-    SURPRISE_PE_EXCESS_CAP, SURPRISE_PE_SCALE_FACTOR, SURPRISE_PE_THRESHOLD,
-    THETA_BINDING_BOOST_THRESHOLD, THETA_BINDING_CLAMP_MAX, THETA_BINDING_CLAMP_MIN,
-    THETA_DEFAULT_SALIENCE, THETA_SALIENCE_CLAMP_MIN, TOM_MISMATCH_EMA_DECAY,
-    TOM_MISMATCH_EXPLORE_SCALE, TOM_MISMATCH_THRESHOLD,
+    EXPLORATION_SCALE_SENSITIVITY, MEMO_DIVERSITY_HIGH, MEMO_DIVERSITY_HIGH_SCALE,
+    MEMO_DIVERSITY_LOW, MEMO_DIVERSITY_LOW_SCALE, MEMO_THRESHOLD_CEILING, MEMO_THRESHOLD_FLOOR,
+    MORAL_CONCERN_THRESHOLD, SOCIAL_COOPERATION_THRESHOLD, SOCIAL_TRUST_DEADZONE,
+    SOCIAL_TRUST_EXPLORE_SCALE, SOCIAL_TRUST_EXPLORE_THRESHOLD, SOCIAL_TRUST_MIDPOINT,
+    SOCIAL_TRUST_OVERRIDE_THRESHOLD, SOCIAL_TRUST_STRENGTH_SCALE, SOUL_ALIGNMENT_BOOST_LR_MAX,
+    SOUL_ALIGNMENT_BOOST_LR_MIN, SOUL_ALIGNMENT_BOOST_SCALE, SOUL_ALIGNMENT_BOOST_THRESHOLD,
+    SOUL_ALIGNMENT_DAMPEN_LR_MAX, SOUL_ALIGNMENT_DAMPEN_LR_MIN, SOUL_ALIGNMENT_DAMPEN_SCALE,
+    SOUL_ALIGNMENT_DAMPEN_THRESHOLD, SURPRISE_PE_EXCESS_CAP, SURPRISE_PE_SCALE_FACTOR,
+    SURPRISE_PE_THRESHOLD, THETA_BINDING_BOOST_THRESHOLD, THETA_BINDING_CLAMP_MAX,
+    THETA_BINDING_CLAMP_MIN, THETA_DEFAULT_SALIENCE, THETA_SALIENCE_CLAMP_MIN,
+    TOM_MISMATCH_EMA_DECAY, TOM_MISMATCH_EXPLORE_SCALE, TOM_MISMATCH_THRESHOLD,
 };
 use super::{CognitiveLoopService, ModuleTimings, ResponseStrategy};
 
@@ -186,27 +184,53 @@ impl CognitiveLoopService {
         }
 
         // ── Knowledge signals → exploration modulation ──────────────────
-        // Causal depth biases toward exploitation; novelty boosts exploration.
-        // Science: Berlyne (1960) — epistemic curiosity from information gap.
-        // Extract knowledge signals first, then mutably borrow self for exploration adjustments
+        // Deep causal understanding → exploit (reduce exploration)
+        // High novelty → explore (boost exploration) — Berlyne (1960)
         let knowledge_signals = self
             .knowledge_manager
             .as_ref()
             .map(|km| (km.signals().causal_depth, km.signals().novelty));
-
         if let Some((causal_depth, novelty)) = knowledge_signals {
-            // Deep causal understanding → dampen exploration (exploit what we know)
-            if causal_depth > KNOWLEDGE_CAUSAL_DEPTH_EXPLOIT_THRESHOLD {
+            if causal_depth
+                > super::thresholds::KNOWLEDGE_CAUSAL_DEPTH_EXPLOIT_THRESHOLD
+            {
                 self.adjust_exploration(
                     "knowledge_causal_deep",
-                    -KNOWLEDGE_CAUSAL_DEPTH_EXPLORE_DAMPEN,
+                    -super::thresholds::KNOWLEDGE_CAUSAL_DEPTH_EXPLORE_DAMPEN,
                 );
             }
-
-            // High novelty → boost exploration (seek information)
             if novelty > 0.5 {
-                let boost = (novelty as f32 - 0.5) * KNOWLEDGE_NOVELTY_EXPLORE_SCALE;
+                let boost =
+                    (novelty as f32 - 0.5) * super::thresholds::KNOWLEDGE_NOVELTY_EXPLORE_SCALE;
                 self.adjust_exploration("knowledge_novelty", boost);
+            }
+        }
+
+        // ── Spectrum constraints → strategy modulation (Haykin 2005) ──────
+        // Low radio bandwidth forces conservative strategy: no exploration
+        // when we can't sync discoveries with the swarm. Blackout → Concise.
+        #[cfg(feature = "mesh")]
+        {
+            let net_health = self.spectrum_manager.network_health();
+            match net_health {
+                super::managers::radio_dispatcher::NetworkHealth::Blackout => {
+                    if selected_strategy == ResponseStrategy::Exploratory
+                        || selected_strategy == ResponseStrategy::Detailed
+                    {
+                        selected_strategy = ResponseStrategy::Concise;
+                    }
+                    self.adjust_exploration(
+                        "spectrum_blackout",
+                        -super::thresholds::RADIO_BLACKOUT_STRATEGY_EXPLORATION_DAMPEN,
+                    );
+                }
+                super::managers::radio_dispatcher::NetworkHealth::MetroOnly => {
+                    self.adjust_exploration(
+                        "spectrum_degraded",
+                        -super::thresholds::RADIO_DEGRADED_STRATEGY_EXPLORATION_DAMPEN,
+                    );
+                }
+                _ => {}
             }
         }
 
@@ -557,10 +581,10 @@ impl CognitiveLoopService {
         #[cfg(not(feature = "semantic-encoder"))]
         let semantic_emb_ref: Option<&[f32]> = None;
 
-        // Query knowledge engine for moral precedent (Item 7)
+        // Query knowledge engine for moral precedent
         // Extracts facts tagged with ethics/social domains for grounded moral reasoning.
         let knowledge_moral_context: Vec<String> = self
-            .last_reasoning_context
+            .episodic_persistence.last_reasoning_context
             .as_ref()
             .map(|ctx| {
                 ctx.relevant_facts
@@ -576,6 +600,22 @@ impl CognitiveLoopService {
             })
             .unwrap_or_default();
 
+        // Knowledge confidence multiplier: scales ethical confidence by knowledge grounding
+        // Science: Kahneman (2011) — epistemic uncertainty should constrain decision confidence
+        let knowledge_confidence_multiplier = self
+            .episodic_persistence
+            .last_reasoning_context
+            .as_ref()
+            .map(|ctx| {
+                let query_result = crate::knowledge::reasoning_context::KnowledgeQueryResult {
+                    facts: ctx.relevant_facts.clone(),
+                    causal_chains: Vec::new(),
+                    grounding_score: if ctx.epistemic_state.has_grounding { ctx.epistemic_state.confidence_multiplier.min(1.0) } else { 0.0 },
+                };
+                query_result.confidence_multiplier()
+            })
+            .unwrap_or(1.0);
+
         let ethics_output = self
             .ethics_engine
             .evaluate(&super::ethics_engine::EthicsEngineInput {
@@ -586,6 +626,7 @@ impl CognitiveLoopService {
                 stillness_boost,
                 semantic_embedding: semantic_emb_ref,
                 action_hv: Some(&hv16_cached),
+                knowledge_confidence_multiplier,
                 knowledge_moral_context,
             });
         module_timings.ethics_engine = ethics_output.total_us;
@@ -611,7 +652,7 @@ impl CognitiveLoopService {
                 CANTOR_HARMONY_INTERCONNECT_SCALE, CANTOR_HARMONY_STILLNESS_SCALE,
             };
             let meta_depth = self
-                .cantor_broadcast_buffer
+                .cantor_dream.broadcast_buffer
                 .last()
                 .map(|crhv| crhv.self_similarity() as f64)
                 .unwrap_or(0.0);
@@ -620,9 +661,9 @@ impl CognitiveLoopService {
                 self.ethics_engine
                     .nudge_harmony_coordinate(7, stillness_delta);
             }
-            if self.cantor_resonance_boost > 0.1 {
+            if self.cantor_dream.resonance_boost > 0.1 {
                 let interconnect_delta =
-                    self.cantor_resonance_boost as f64 * CANTOR_HARMONY_INTERCONNECT_SCALE;
+                    self.cantor_dream.resonance_boost as f64 * CANTOR_HARMONY_INTERCONNECT_SCALE;
                 self.ethics_engine
                     .nudge_harmony_coordinate(4, interconnect_delta);
             }
@@ -699,14 +740,8 @@ impl CognitiveLoopService {
                         hazard = ?report.matched_hazard,
                         "Topological immune system: THROTTLE — reducing exploration"
                     );
-                    self.adjust_exploration(
-                        "escalation_throttle",
-                        -super::thresholds::ESCALATION_THROTTLE_EXPLORATION,
-                    );
-                    self.adjust_confidence(
-                        "escalation_throttle",
-                        -super::thresholds::ESCALATION_THROTTLE_CONFIDENCE,
-                    );
+                    self.adjust_exploration("escalation_throttle", -super::thresholds::ESCALATION_THROTTLE_EXPLORATION);
+                    self.adjust_confidence("escalation_throttle", -super::thresholds::ESCALATION_THROTTLE_CONFIDENCE);
                     self.stats.escalation_warn_count += 1;
                     self.stats.escalation_throttle_count += 1;
                 }
@@ -718,18 +753,9 @@ impl CognitiveLoopService {
                         "Topological immune system: BLOCK — request rejected"
                     );
                     self.stats.escalation_blocked = true;
-                    self.adjust_exploration(
-                        "escalation_block",
-                        -super::thresholds::ESCALATION_BLOCK_EXPLORATION,
-                    );
-                    self.adjust_confidence(
-                        "escalation_block",
-                        -super::thresholds::ESCALATION_BLOCK_CONFIDENCE,
-                    );
-                    self.scale_lr(
-                        "escalation_block",
-                        super::thresholds::ESCALATION_BLOCK_LR_SCALE,
-                    );
+                    self.adjust_exploration("escalation_block", -super::thresholds::ESCALATION_BLOCK_EXPLORATION);
+                    self.adjust_confidence("escalation_block", -super::thresholds::ESCALATION_BLOCK_CONFIDENCE);
+                    self.scale_lr("escalation_block", super::thresholds::ESCALATION_BLOCK_LR_SCALE);
                     self.stats.escalation_warn_count += 1;
                     self.stats.escalation_throttle_count += 1;
                     self.stats.escalation_block_count += 1;

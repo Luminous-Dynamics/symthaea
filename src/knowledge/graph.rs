@@ -278,6 +278,15 @@ impl EnhancedKnowledgeGraph {
                 // Floor at 50% of initial
             }
 
+            // Clinical domain facts decay slower (established clinical knowledge
+            // persists longer than episodic observations).
+            // Science: clinical ontologies are stable over DSM revision cycles (~15 years).
+            #[cfg(feature = "therapeutic")]
+            if fact.domain.as_deref() == Some("clinical") {
+                fact.confidence = fact.confidence.max(fact.initial_confidence * 0.8);
+                // Floor at 80% of initial — clinical facts resist forgetting
+            }
+
             if fact.confidence < self.eviction_threshold {
                 to_evict.push(fact.id);
             }
@@ -305,11 +314,6 @@ impl EnhancedKnowledgeGraph {
     /// Drain pending contradiction alerts
     pub fn drain_contradictions(&mut self) -> Vec<ContradictionAlert> {
         std::mem::take(&mut self.pending_contradictions)
-    }
-
-    /// Iterate over all stored facts.
-    pub fn all_facts(&self) -> impl Iterator<Item = &TemporalFact> {
-        self.facts.values()
     }
 
     /// Number of facts currently stored
@@ -346,6 +350,250 @@ impl EnhancedKnowledgeGraph {
 
     pub fn total_contradictions(&self) -> u64 {
         self.total_contradictions
+    }
+
+    // ── Iteration ───────────────────────────────────────────────────────
+
+    /// Iterate over all stored facts.
+    pub fn all_facts(&self) -> impl Iterator<Item = &TemporalFact> {
+        self.facts.values()
+    }
+
+    /// Get per-domain distribution: (domain_name, avg_confidence, fact_count).
+    ///
+    /// Sorted by average confidence ascending (most uncertain first).
+    pub fn domain_distribution(&self) -> Vec<(String, f32, usize)> {
+        let mut distribution: Vec<(String, f32, usize)> = self
+            .domain_index
+            .iter()
+            .map(|(domain, ids)| {
+                let valid_facts: Vec<f32> = ids
+                    .iter()
+                    .filter_map(|id| self.facts.get(id))
+                    .map(|f| f.confidence)
+                    .collect();
+                let count = valid_facts.len();
+                let avg_conf = if count > 0 {
+                    valid_facts.iter().sum::<f32>() / count as f32
+                } else {
+                    0.0
+                };
+                (domain.clone(), avg_conf, count)
+            })
+            .collect();
+
+        distribution.sort_by(|a, b| {
+            a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal)
+        });
+        distribution
+    }
+
+    /// Adjust confidence of a specific fact by a delta.
+    ///
+    /// Clamps result to [0.0, 1.0]. Used by calibration feedback.
+    /// Science: Jaynes (2003) — probability as extended logic.
+    pub fn adjust_confidence(&mut self, fact_id: FactId, delta: f32) {
+        if let Some(fact) = self.facts.get_mut(&fact_id) {
+            fact.confidence = (fact.confidence + delta).clamp(0.0, 1.0);
+        }
+    }
+
+    /// Spreading activation search: expand from seed results through HDC similarity.
+    ///
+    /// Starting from `seeds`, finds facts similar to each seed (within `hops` rounds),
+    /// decaying activation by `decay_factor` per hop. Returns up to `max_results`.
+    /// Science: Anderson (1983) — ACT-R spreading activation.
+    pub fn spreading_activation_search(
+        &mut self,
+        seeds: &[FactSearchResult],
+        hops: usize,
+        decay_factor: f32,
+        max_results: usize,
+        current_cycle: u64,
+    ) -> Vec<FactSearchResult> {
+        let mut activated: HashMap<FactId, f32> = HashMap::new();
+        let mut frontier_ids: Vec<FactId> = seeds.iter().map(|s| s.fact_id).collect();
+
+        // Seed activation
+        for seed in seeds {
+            activated.insert(seed.fact_id, seed.similarity);
+        }
+
+        for hop in 0..hops {
+            let hop_decay = decay_factor.powi(hop as i32 + 1);
+            let mut next_frontier = Vec::new();
+
+            for &fid in &frontier_ids {
+                let query_vec = match self.facts.get(&fid) {
+                    Some(f) => f.encoding.vector.clone(),
+                    None => continue,
+                };
+
+                // Find similar facts
+                for fact in self.facts.values() {
+                    if activated.contains_key(&fact.id) {
+                        continue;
+                    }
+                    let sim = fact.encoding.vector.similarity(&query_vec);
+                    if sim > 0.1 {
+                        let decayed_sim = sim * hop_decay;
+                        activated.insert(fact.id, decayed_sim);
+                        next_frontier.push(fact.id);
+                    }
+                }
+            }
+
+            frontier_ids = next_frontier;
+            if frontier_ids.is_empty() {
+                break;
+            }
+        }
+
+        // Remove seeds from results (caller already has them)
+        let seed_ids: std::collections::HashSet<FactId> =
+            seeds.iter().map(|s| s.fact_id).collect();
+
+        let mut results: Vec<FactSearchResult> = activated
+            .into_iter()
+            .filter(|(id, _)| !seed_ids.contains(id))
+            .map(|(id, activation)| {
+                let confidence = self.facts.get(&id).map(|f| f.confidence).unwrap_or(0.0);
+                FactSearchResult {
+                    fact_id: id,
+                    similarity: activation,
+                    confidence,
+                }
+            })
+            .collect();
+
+        results.sort_by(|a, b| {
+            let score_a = a.similarity * a.confidence;
+            let score_b = b.similarity * b.confidence;
+            score_b
+                .partial_cmp(&score_a)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        results.truncate(max_results);
+
+        // Mark accessed
+        for result in &results {
+            if let Some(fact) = self.facts.get_mut(&result.fact_id) {
+                fact.last_accessed_cycle = current_cycle;
+            }
+        }
+
+        results
+    }
+
+    // ── Contradiction Resolution ────────────────────────────────────────
+
+    /// Resolve contradictions by demoting the weaker fact's confidence.
+    /// Science: AGM theory (Alchourrón et al. 1985) — belief contraction.
+    pub fn resolve_contradictions(&mut self, alerts: &[ContradictionAlert]) -> usize {
+        let mut resolved = 0;
+        for alert in alerts {
+            let weaker_id = if alert.higher_confidence_id == alert.new_fact_id {
+                alert.existing_fact_id
+            } else {
+                alert.new_fact_id
+            };
+            let should_remove = if let Some(fact) = self.facts.get_mut(&weaker_id) {
+                fact.confidence *= 0.5;
+                fact.contradiction_count += 1;
+                resolved += 1;
+                fact.confidence < 0.05
+            } else {
+                false
+            };
+            if should_remove {
+                self.remove_fact(weaker_id);
+            }
+        }
+        resolved
+    }
+
+    // ── Persistence Support ─────────────────────────────────────────────
+
+    /// Import a fact from a persistence record.
+    pub fn import_fact_record(&mut self, record: &super::persistence::FactRecord) {
+        if record.vector_bytes.len() != 2048 {
+            return;
+        }
+        let mut arr = [0u8; 2048];
+        arr.copy_from_slice(&record.vector_bytes);
+        let encoding = super::encoding::FactEncoding {
+            vector: symthaea_core::hdc::binary_hv::BinaryHV(arr),
+            role_vectors: std::collections::HashMap::new(),
+            source_text: record.source_text.clone(),
+            confidence: record.confidence,
+        };
+        let id: FactId = self.next_id;
+        self.next_id += 1;
+        let fact = TemporalFact {
+            id,
+            encoding,
+            inserted_at_cycle: record.cycle,
+            last_accessed_cycle: record.cycle,
+            confidence: record.confidence,
+            initial_confidence: record.confidence,
+            corroboration_count: 0,
+            contradiction_count: 0,
+            domain: record.domain.clone(),
+            has_causal_relations: record.is_causal,
+        };
+        if let Some(ref domain) = fact.domain {
+            self.domain_index
+                .entry(domain.clone())
+                .or_default()
+                .push(id);
+        }
+        self.facts.insert(id, fact);
+    }
+
+    /// Export all facts as persistence records.
+    pub fn export_fact_records(&self) -> Vec<super::persistence::FactRecord> {
+        self.facts
+            .values()
+            .map(|f| super::persistence::FactRecord {
+                vector_bytes: f.encoding.vector.0.to_vec(),
+                source_text: f.encoding.source_text.clone(),
+                confidence: f.confidence,
+                domain: f.domain.clone(),
+                cycle: f.inserted_at_cycle,
+                is_causal: f.has_causal_relations,
+            })
+            .collect()
+    }
+
+    // ── Dream Consolidation ─────────────────────────────────────────────
+
+    /// Prune non-causal facts below confidence threshold.
+    /// Science: Anderson & Schooler (1991) — power law of forgetting.
+    pub fn prune_low_confidence(&mut self, threshold: f32) -> usize {
+        let ids: Vec<FactId> = self
+            .facts
+            .iter()
+            .filter(|(_, f)| f.confidence < threshold && !f.has_causal_relations)
+            .map(|(&id, _)| id)
+            .collect();
+        let count = ids.len();
+        for id in ids {
+            self.remove_fact(id);
+        }
+        count
+    }
+
+    /// Strengthen causal facts, capped at initial_confidence.
+    /// Science: Stickgold & Walker (2013) — sleep-dependent consolidation.
+    pub fn strengthen_causal_facts(&mut self, boost: f32) -> usize {
+        let mut count = 0;
+        for fact in self.facts.values_mut() {
+            if fact.has_causal_relations && fact.confidence < fact.initial_confidence {
+                fact.confidence = (fact.confidence + boost).min(fact.initial_confidence);
+                count += 1;
+            }
+        }
+        count
     }
 
     // ── Internal ────────────────────────────────────────────────────────
@@ -427,142 +675,6 @@ impl EnhancedKnowledgeGraph {
                 }
             }
         }
-    }
-
-    // ── Contradiction Resolution ──────────────────────────────────────
-
-    /// Resolve contradictions by preferring higher-confidence or more-corroborated facts.
-    ///
-    /// Demotes the weaker fact's confidence by half rather than deleting it outright
-    /// (epistemic humility — the weaker claim may later be corroborated).
-    ///
-    /// Science: AGM theory (Alchourrón et al. 1985) — belief contraction with entrenchment.
-    ///
-    /// Returns the number of contradictions resolved.
-    pub fn resolve_contradictions(&mut self, alerts: &[ContradictionAlert]) -> usize {
-        let mut resolved = 0;
-        for alert in alerts {
-            // Identify the weaker fact (lower confidence × corroboration)
-            let weaker_id = if alert.higher_confidence_id == alert.new_fact_id {
-                alert.existing_fact_id
-            } else {
-                alert.new_fact_id
-            };
-
-            if let Some(fact) = self.facts.get_mut(&weaker_id) {
-                // Demote rather than delete — epistemically reversible
-                fact.confidence *= 0.5;
-                fact.contradiction_count += 1;
-
-                // If confidence drops below eviction threshold, remove
-                if fact.confidence < 0.05 {
-                    let id = fact.id;
-                    self.remove_fact(id);
-                }
-                resolved += 1;
-            }
-        }
-        resolved
-    }
-
-    // ── Persistence Support ─────────────────────────────────────────────
-
-    /// Import a fact from a persistence record.
-    ///
-    /// Reconstructs a `TemporalFact` from serialized bytes and metadata.
-    /// Used on startup to reload knowledge from SQLite.
-    pub fn import_fact_record(&mut self, record: &super::persistence::FactRecord) {
-        if record.vector_bytes.len() != 2048 {
-            return; // Invalid vector size
-        }
-        let mut arr = [0u8; 2048];
-        arr.copy_from_slice(&record.vector_bytes);
-        let hv = BinaryHV(arr);
-
-        let encoding = FactEncoding {
-            vector: hv,
-            role_vectors: std::collections::HashMap::new(),
-            source_text: record.source_text.clone(),
-            confidence: record.confidence,
-        };
-
-        let id = self.next_id;
-        self.next_id += 1;
-
-        let fact = TemporalFact {
-            id,
-            encoding,
-            inserted_at_cycle: record.cycle,
-            last_accessed_cycle: record.cycle,
-            confidence: record.confidence,
-            initial_confidence: record.confidence,
-            corroboration_count: 0,
-            contradiction_count: 0,
-            domain: record.domain.clone(),
-            has_causal_relations: record.is_causal,
-        };
-
-        if let Some(ref domain) = fact.domain {
-            self.domain_index
-                .entry(domain.clone())
-                .or_default()
-                .push(id);
-        }
-
-        self.facts.insert(id, fact);
-    }
-
-    /// Export all facts as persistence records.
-    pub fn export_fact_records(&self) -> Vec<super::persistence::FactRecord> {
-        self.facts
-            .values()
-            .map(|f| super::persistence::FactRecord {
-                vector_bytes: f.encoding.vector.0.to_vec(),
-                source_text: f.encoding.source_text.clone(),
-                confidence: f.confidence,
-                domain: f.domain.clone(),
-                cycle: f.inserted_at_cycle,
-                is_causal: f.has_causal_relations,
-            })
-            .collect()
-    }
-
-    /// Prune facts with confidence below threshold.
-    ///
-    /// Causal facts are protected from pruning (they support reasoning chains).
-    /// Returns the number of facts pruned.
-    ///
-    /// Science: Anderson & Schooler (1991) — power law of forgetting
-    pub fn prune_low_confidence(&mut self, threshold: f32) -> usize {
-        let to_remove: Vec<FactId> = self
-            .facts
-            .iter()
-            .filter(|(_, f)| f.confidence < threshold && !f.has_causal_relations)
-            .map(|(&id, _)| id)
-            .collect();
-        let count = to_remove.len();
-        for id in to_remove {
-            self.remove_fact(id);
-        }
-        count
-    }
-
-    /// Strengthen causal facts by boosting their confidence.
-    ///
-    /// During dream/rest consolidation, causal memory traces are reinforced.
-    /// Confidence is capped at the fact's initial_confidence (can't exceed original).
-    /// Returns the number of facts strengthened.
-    ///
-    /// Science: Stickgold & Walker (2013) — sleep-dependent memory consolidation
-    pub fn strengthen_causal_facts(&mut self, boost: f32) -> usize {
-        let mut count = 0;
-        for fact in self.facts.values_mut() {
-            if fact.has_causal_relations && fact.confidence < fact.initial_confidence {
-                fact.confidence = (fact.confidence + boost).min(fact.initial_confidence);
-                count += 1;
-            }
-        }
-        count
     }
 }
 

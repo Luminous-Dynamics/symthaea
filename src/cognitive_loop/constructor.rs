@@ -414,6 +414,11 @@ impl CognitiveLoopService {
         let (somatic_bridge_instance, pain_sender) =
             crate::infrastructure::somatic_error_bridge::SomaticErrorBridge::new();
 
+        // Thermal bridge: platform thermal state → CfC tau modulation
+        // Science: Angilletta (2009) thermal performance curves
+        let (thermal_bridge_instance, thermal_sender) =
+            crate::infrastructure::thermal_bridge::ThermalBridge::new();
+
         // SelfModelTierManager must be created before `config` is moved into the struct
         let self_model_tier = super::self_model_tier::SelfModelTierManager::new(&config);
 
@@ -478,6 +483,11 @@ impl CognitiveLoopService {
         let knowledge_ontology_max = config.knowledge_ontology_max;
         let knowledge_db_path = config.knowledge_db_path.clone();
         let enable_streaming_inference = config.enable_streaming_inference;
+        #[cfg(feature = "therapeutic")]
+        let therapeutic_crisis_threshold = config.therapeutic_crisis_threshold;
+
+        // Create swarm event channel eagerly so the sender is always available.
+        let (swarm_event_tx, swarm_event_rx) = std::sync::mpsc::channel();
 
         let mut service = Self {
             config,
@@ -498,9 +508,7 @@ impl CognitiveLoopService {
                         .as_deref()
                         .map(symthaea_core::genesis::GenesisSeed::from_phrase)
                         .unwrap_or_else(|| {
-                            symthaea_core::genesis::GenesisSeed::from_phrase(
-                                "symthaea-broca-default",
-                            )
+                            symthaea_core::genesis::GenesisSeed::from_phrase("symthaea-broca-default")
                         });
                     Some(super::broca_bridge::BrocaManager::new(
                         &genesis,
@@ -579,11 +587,7 @@ impl CognitiveLoopService {
                                 state ^= state << 13;
                                 state ^= state >> 7;
                                 state ^= state << 17;
-                                if state % 2 == 0 {
-                                    1.0
-                                } else {
-                                    -1.0
-                                }
+                                if state % 2 == 0 { 1.0 } else { -1.0 }
                             })
                             .collect()
                     };
@@ -679,11 +683,7 @@ impl CognitiveLoopService {
             },
             async_trainer,
             causal_enhancer,
-            phi_episodic_replay,
-            memory_db: None, // initialized below after struct creation
-            memory_flush_in_progress: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(
-                false,
-            )),
+            episodic_persistence: super::episodic_persistence_manager::EpisodicPersistenceManager::new(phi_episodic_replay),
             #[cfg(feature = "reasoning_engine")]
             reasoning_engine: Some(
                 crate::consciousness::reasoning_engine::ConsciousReasoningEngine::new(),
@@ -793,10 +793,7 @@ impl CognitiveLoopService {
                 None
             },
             // vision/foveation/broca inits moved to vision_sensory and language_comm managers above
-            #[cfg(feature = "canvas")]
-            canvas_manager: Some(super::canvas_bridge::CanvasManager::new()),
-            #[cfg(feature = "canvas")]
-            last_canvas_svg: None,
+            // canvas_manager, last_canvas_svg moved to motor_rendering manager
             psi_attestation_buffer: std::collections::VecDeque::with_capacity(attestation_buf_cap),
             policy_agreement_window: std::collections::VecDeque::with_capacity(20),
             master_equation: MasterConsciousnessEquation::default(),
@@ -831,7 +828,7 @@ impl CognitiveLoopService {
             } else {
                 None
             },
-            last_reasoning_context: None,
+            // last_reasoning_context moved to episodic_persistence manager
             experience_bus: Some(crate::experience::ExperienceBus::with_defaults()),
             // school_bridge + causal_consciousness moved to feature_integ manager
             thermodynamic_load: 0.0,
@@ -839,6 +836,8 @@ impl CognitiveLoopService {
             neuromod: super::neuromod_manager::NeuromodManager::default(),
             somatic_bridge: somatic_bridge_instance,
             pain_tx: Some(pain_sender),
+            thermal_bridge: thermal_bridge_instance,
+            thermal_tx: Some(thermal_sender),
             subsystem_collector: super::subsystem_trait::OutputCollector::new(),
             last_snapshot: None,
 
@@ -936,18 +935,29 @@ impl CognitiveLoopService {
             #[cfg(feature = "mycelix")]
             governance_mgr: super::managers::GovernanceManager::default(),
             swarm_manager: super::managers::SwarmManager::default(),
+            swarm_event_rx: std::sync::Mutex::new(Some(swarm_event_rx)),
+            swarm_event_tx,
             #[cfg(feature = "mesh")]
             spectrum_manager: super::managers::SpectrumManager::default(),
-            cantor_broadcast_buffer: Vec::with_capacity(32),
-            cantor_cleanup_engine: {
-                use symthaea_core::hdc::cantor_resonator_cleanup::*;
-                CantorCleanupEngine::with_codebook_capacity(
-                    super::thresholds::CANTOR_CODEBOOK_MAX_ENTRIES,
-                )
+            #[cfg(feature = "cpg")]
+            cpg_manager: super::managers::CpgManager::new(
+                super::managers::cpg_manager::CpgConfig::default(),
+            ),
+            #[cfg(feature = "spectral_state")]
+            spectral_manager: super::managers::SpectralManager::new(
+                super::managers::spectral_manager::SpectralManagerConfig::default(),
+            ),
+            #[cfg(feature = "therapeutic")]
+            therapeutic_manager: {
+                let mut tm = super::managers::TherapeuticManager::default();
+                tm.crisis_detector.set_threshold(therapeutic_crisis_threshold);
+                tm
             },
-            cantor_last_activation: 0.0,
-            cantor_dream_surprise: 0.0,
-            cantor_resonance_boost: 0.0,
+            cantor_dream: super::cantor_dream_manager::CantorDreamManager::new(super::thresholds::CANTOR_CODEBOOK_MAX_ENTRIES),
+            #[cfg(feature = "glyph_codex")]
+            glyph_manager: super::managers::GlyphManager::with_dim(
+                crate::hdc::moral_algebra::MORAL_DIM,
+            ),
             #[cfg(feature = "integrity")]
             integrity_manager: {
                 let mut im = crate::integrity::IntegrityManager::new();
@@ -996,24 +1006,20 @@ impl CognitiveLoopService {
                     0.125,
                     0.125,
                 ]);
-                // Register knowledge engine thresholds for integrity monitoring
-                im.register_knowledge_thresholds();
                 // Register governance thresholds for integrity monitoring
                 #[cfg(feature = "mycelix")]
                 im.register_governance_thresholds();
+                im.register_knowledge_thresholds();
                 // Apply substrate tau factor for temporal consistency scaling (#3)
                 im.set_substrate_tau_factor(substrate_tau_for_integrity);
                 // Install panic hook for crash forensics — dumps integrity snapshot to disk
                 crate::integrity::install_panic_hook();
                 im
             },
-            motor_output_bridge: None,
-            pending_motor_request: None,
-            last_motor_result: None,
-            last_motor_phi: 0.0,
+            motor_rendering: super::motor_rendering_manager::MotorRenderingManager::new(),
             math_service: super::math_service::MathService::new(),
-            #[cfg(feature = "scientific_method")]
-            scientific_method: crate::scientific_method::ScientificMethodEngine::new(),
+            #[cfg(feature = "epistemic_auditor")]
+            epistemic_auditor: None, // initialized below after struct construction
             resonant_speech: crate::resonant_speech::ResonantSpeech::new(),
             streaming_inference: if enable_streaming_inference {
                 // Cycle-aligned config: batch=1, max_latency=32ms (~31Hz loop)
@@ -1023,23 +1029,74 @@ impl CognitiveLoopService {
                     warmup_samples: 10,
                     ..crate::inference::StreamingConfig::low_latency()
                 };
-                Some(crate::inference::StreamingInference::with_default_network(
-                    si_config,
-                ))
+                Some(crate::inference::StreamingInference::with_default_network(si_config))
             } else {
                 None
             },
         };
+
+        // Initialize Epistemic Auditor if configured
+        #[cfg(feature = "epistemic_auditor")]
+        {
+            service.epistemic_auditor = service.config.epistemic_auditor_db_path.as_deref().map(|path| {
+                match super::epistemic_auditor::EpistemicAuditor::new(Some(path)) {
+                    Ok(auditor) => {
+                        tracing::info!(path, "Epistemic Auditor initialized (DuckDB)");
+                        Some(auditor)
+                    }
+                    Err(e) => {
+                        tracing::warn!(error = %e, "Epistemic Auditor init failed — auditing disabled");
+                        None
+                    }
+                }
+            }).flatten();
+        }
 
         // Initialize persistent memory database if configured
         if let Some(ref db_path) = service.config.memory_db_path {
             match crate::databases::SqliteMemory::new(db_path) {
                 Ok(db) => {
                     tracing::info!(path = %db_path, "Memory persistence database initialized");
-                    service.memory_db = Some(std::sync::Arc::new(db));
+                    service.episodic_persistence.db = Some(std::sync::Arc::new(db));
                 }
                 Err(e) => {
                     tracing::warn!(path = %db_path, error = %e, "Failed to open memory database — persistence disabled");
+                }
+            }
+        }
+
+        // Startup rehydration: load top-64 episodes from SQLite into episodic replay
+        if let Some(ref db) = service.episodic_persistence.db {
+            if let Some(ref mut replay) = service.episodic_persistence.replay {
+                let records = db.load_top_by_psi_sync(64);
+                let mut rehydrated = 0usize;
+                for record in records {
+                    // Convert BinaryHV to ContinuousHV via bipolar encoding (bit=1 → +1.0, bit=0 → -1.0)
+                    let dim = record.encoding.0.len() * 8;
+                    let mut values = Vec::with_capacity(dim);
+                    for byte in &record.encoding.0 {
+                        for bit in (0..8).rev() {
+                            if (byte >> bit) & 1 == 1 {
+                                values.push(1.0f32);
+                            } else {
+                                values.push(-1.0f32);
+                            }
+                        }
+                    }
+                    let input_hv = symthaea_core::hdc::unified_hv::ContinuousHV::from_vec(values);
+                    let output_hv = symthaea_core::hdc::unified_hv::ContinuousHV::zero(dim);
+                    let episode = crate::memory::episodic_replay::Episode::new(
+                        input_hv,
+                        output_hv,
+                        record.psi,
+                        record.timestamp_ms / 20, // convert ms back to approximate cycle number
+                    );
+                    if replay.store_if_significant(episode) {
+                        rehydrated += 1;
+                    }
+                }
+                if rehydrated > 0 {
+                    tracing::info!(episodes = rehydrated, "Startup rehydration: loaded episodes from SQLite");
                 }
             }
         }

@@ -55,7 +55,7 @@ impl GoNoGoBenchmark {
         let shared = ContinuousHV::random(dim, seed.wrapping_add(50));
         let go_unique = ContinuousHV::random(dim, seed.wrapping_add(100));
         let nogo_unique = ContinuousHV::random(dim, seed.wrapping_add(200));
-        let overlap: f32 = 0.45;
+        let overlap: f32 = 0.40;
         let go_proto =
             ContinuousHV::weighted_bundle(&[&go_unique, &shared], &[1.0 - overlap, overlap]);
         let nogo_proto =

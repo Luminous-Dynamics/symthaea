@@ -34,6 +34,8 @@ pub(in crate::cognitive_loop) struct EpisodicReplayResult {
     pub surprise_replay_batch_size: usize,
     /// Phasic DA burst replay boost (number of extra episodes, 0 if DA < threshold).
     pub phasic_da_replay_boost: usize,
+    /// Whether the memory database was flushed to disk this cycle.
+    pub memory_db_flushed: bool,
 }
 
 /// Result from the hyper-parameter optimization phase.

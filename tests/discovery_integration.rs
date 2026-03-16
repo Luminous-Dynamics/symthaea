@@ -300,19 +300,19 @@ fn test_voice_telemetry_populated() {
         let result = service.cycle("testing voice telemetry");
         let meta = &result.metadata;
         assert!(
-            meta.voice_articulation_quality.is_finite(),
+            meta.voice.voice_articulation_quality.is_finite(),
             "voice_articulation_quality should be finite"
         );
         assert!(
-            meta.voice_rate_stability.is_finite(),
+            meta.voice.voice_rate_stability.is_finite(),
             "voice_rate_stability should be finite"
         );
         assert!(
-            meta.voice_confidence.is_finite(),
+            meta.voice.voice_confidence.is_finite(),
             "voice_confidence should be finite"
         );
         assert!(
-            meta.voice_phi_adjustment.is_finite(),
+            meta.voice.voice_phi_adjustment.is_finite(),
             "voice_phi_adjustment should be finite"
         );
     }
@@ -328,20 +328,20 @@ fn test_social_trust_influences_telemetry() {
     let result = service.cycle("social trust test");
     let meta = &result.metadata;
     assert!(
-        (meta.social_trust_current - 0.9).abs() < 0.01,
+        (meta.social.social_trust_current - 0.9).abs() < 0.01,
         "social_trust_current should reflect set value: {}",
-        meta.social_trust_current
+        meta.social.social_trust_current
     );
     assert!(
-        (meta.social_cooperation_current - 0.8).abs() < 0.01,
+        (meta.social.social_cooperation_current - 0.8).abs() < 0.01,
         "social_cooperation_current should reflect set value: {}",
-        meta.social_cooperation_current
+        meta.social.social_cooperation_current
     );
     // social_learning_rate_factor should be > 1.0 for high trust
     assert!(
-        meta.social_learning_rate_factor > 1.0,
+        meta.social.social_learning_rate_factor > 1.0,
         "High trust should produce LR factor > 1.0: {}",
-        meta.social_learning_rate_factor
+        meta.social.social_learning_rate_factor
     );
 }
 
@@ -354,7 +354,7 @@ fn test_social_learning_rate_modulation() {
     // Low trust → LR factor near 0.8
     service.set_social_signals(0.0, 0.0, 0.5, 0, 0.0);
     let result = service.cycle("low trust");
-    let factor = result.metadata.social_learning_rate_factor;
+    let factor = result.metadata.social.social_learning_rate_factor;
     assert!(
         factor >= 0.79 && factor <= 1.21,
         "Social LR factor should be in [0.8, 1.2]: {factor}"
@@ -363,7 +363,7 @@ fn test_social_learning_rate_modulation() {
     // High trust → LR factor near 1.2
     service.set_social_signals(1.0, 1.0, 0.9, 5, 1.0);
     let result = service.cycle("high trust");
-    let factor = result.metadata.social_learning_rate_factor;
+    let factor = result.metadata.social.social_learning_rate_factor;
     assert!(
         factor >= 0.79 && factor <= 1.21,
         "Social LR factor should be in [0.8, 1.2]: {factor}"
@@ -466,7 +466,7 @@ fn test_gwt_consolidation_triggers_dream_recording() {
     // The dream phase should have run at least once in 51 cycles
     // (base interval is 20 cycles, or 5 cycles under high pressure)
     assert!(
-        final_result.metadata.cycle_duration_us > 0,
+        final_result.metadata.adaptive.cycle_duration_us > 0,
         "Cycle should complete successfully"
     );
 }

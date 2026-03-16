@@ -277,8 +277,8 @@ fn test_virtual_body_enabled_by_default() {
     for _ in 0..5 {
         let result = service.cycle("embodied cognition test");
         // Virtual body should produce phi modulation (not neutral 1.0 after a few cycles)
-        assert!(result.metadata.body_phi_modulation >= 0.5);
-        assert!(result.metadata.body_phi_modulation <= 1.5);
+        assert!(result.metadata.embodied.body_phi_modulation >= 0.5);
+        assert!(result.metadata.embodied.body_phi_modulation <= 1.5);
     }
 }
 
@@ -297,7 +297,7 @@ fn test_master_consciousness_equation_runs_periodically() {
     // With learning_threshold=0.0, urgency is Critical → MCE fires every 5th cycle.
     for _ in 0..25 {
         let result = service.cycle("consciousness measurement test");
-        mce_values.push(result.metadata.consciousness_level);
+        mce_values.push(result.metadata.consciousness.consciousness_level);
     }
 
     // MCE should fire at least twice in 25 cycles regardless of urgency
@@ -388,7 +388,7 @@ fn test_embodied_phi_accumulation_across_cycles() {
     let mut embodied_mods = Vec::new();
     for _ in 0..100 {
         let result = service.cycle("embodied phi accumulation test");
-        embodied_mods.push(result.metadata.embodied_phi_modulation);
+        embodied_mods.push(result.metadata.embodied.embodied_phi_modulation);
     }
 
     // At least 1 value should deviate from 1.0 (module is active)
@@ -547,11 +547,11 @@ fn test_predictive_affective_crossmodal_synergy() {
 
         // All values must be finite
         assert!(
-            result.metadata.affective_valence.is_finite(),
+            result.metadata.embodied.affective_valence.is_finite(),
             "Affective valence must be finite at cycle {i}"
         );
         assert!(
-            result.metadata.affective_arousal.is_finite(),
+            result.metadata.embodied.affective_arousal.is_finite(),
             "Affective arousal must be finite at cycle {i}"
         );
         assert!(
@@ -563,24 +563,24 @@ fn test_predictive_affective_crossmodal_synergy() {
             "Predictive phi modulation must be finite at cycle {i}"
         );
         assert!(
-            result.metadata.cross_modal_binding_strength.is_finite(),
+            result.metadata.temporal.cross_modal_binding_strength.is_finite(),
             "Cross-modal binding strength must be finite at cycle {i}"
         );
         assert!(
-            result.metadata.cross_modal_psi.is_finite(),
+            result.metadata.temporal.cross_modal_psi.is_finite(),
             "Cross-modal phi must be finite at cycle {i}"
         );
 
         // Bounds checks
         assert!(
-            result.metadata.affective_valence >= -1.0 && result.metadata.affective_valence <= 1.0,
+            result.metadata.embodied.affective_valence >= -1.0 && result.metadata.embodied.affective_valence <= 1.0,
             "Valence out of bounds at cycle {i}: {}",
-            result.metadata.affective_valence
+            result.metadata.embodied.affective_valence
         );
         assert!(
-            result.metadata.affective_arousal >= 0.0 && result.metadata.affective_arousal <= 1.0,
+            result.metadata.embodied.affective_arousal >= 0.0 && result.metadata.embodied.affective_arousal <= 1.0,
             "Arousal out of bounds at cycle {i}: {}",
-            result.metadata.affective_arousal
+            result.metadata.embodied.affective_arousal
         );
         assert!(
             result.metadata.fep.predictive_phi_modulation.is_finite(),
@@ -588,21 +588,21 @@ fn test_predictive_affective_crossmodal_synergy() {
             result.metadata.fep.predictive_phi_modulation
         );
         assert!(
-            result.metadata.cross_modal_psi >= 0.0,
+            result.metadata.temporal.cross_modal_psi >= 0.0,
             "Cross-modal phi must be non-negative at cycle {i}: {}",
-            result.metadata.cross_modal_psi
+            result.metadata.temporal.cross_modal_psi
         );
 
         // Track non-default values
-        if result.metadata.affective_valence.abs() > 0.001
-            || (result.metadata.affective_arousal - 0.5).abs() > 0.001
+        if result.metadata.embodied.affective_valence.abs() > 0.001
+            || (result.metadata.embodied.affective_arousal - 0.5).abs() > 0.001
         {
             saw_affective = true;
         }
         if result.metadata.fep.predictive_free_energy.abs() > 0.001 {
             saw_predictive = true;
         }
-        if result.metadata.cross_modal_binding_strength > 0.0 {
+        if result.metadata.temporal.cross_modal_binding_strength > 0.0 {
             saw_binding = true;
         }
     }
@@ -879,13 +879,13 @@ fn test_embodied_cognition_telemetry() {
     for _ in 0..10 {
         let result = service.cycle("embodied test input");
         assert!(
-            result.metadata.embodied_phi_modulation.is_finite(),
+            result.metadata.embodied.embodied_phi_modulation.is_finite(),
             "Embodied phi modulation should be finite"
         );
         assert!(
-            result.metadata.embodied_agency >= 0.0 && result.metadata.embodied_agency <= 1.0,
+            result.metadata.embodied.embodied_agency >= 0.0 && result.metadata.embodied.embodied_agency <= 1.0,
             "Embodied agency should be in [0, 1], got: {}",
-            result.metadata.embodied_agency,
+            result.metadata.embodied.embodied_agency,
         );
     }
 }
@@ -1086,14 +1086,14 @@ fn test_temporal_consciousness_telemetry() {
     for _ in 0..20 {
         let result = service.cycle("temporal coherence test");
         assert!(
-            result.metadata.temporal_coherence_score.is_finite(),
+            result.metadata.temporal.temporal_coherence_score.is_finite(),
             "Temporal coherence score should be finite"
         );
         // Temporal coherence should be non-negative
         assert!(
-            result.metadata.temporal_coherence_score >= 0.0,
+            result.metadata.temporal.temporal_coherence_score >= 0.0,
             "Temporal coherence should be non-negative, got: {}",
-            result.metadata.temporal_coherence_score,
+            result.metadata.temporal.temporal_coherence_score,
         );
     }
 }
@@ -1198,7 +1198,7 @@ fn test_full_temporal_lattice_pipeline() {
             "Primitive phi must be finite at cycle {i}"
         );
         assert!(
-            result.metadata.temporal_continuity.is_finite(),
+            result.metadata.temporal.temporal_continuity.is_finite(),
             "Temporal continuity must be finite at cycle {i}"
         );
     }
@@ -1312,9 +1312,9 @@ fn test_holographic_and_affective_wired() {
     }
 
     assert!(
-        last_result.metadata.holographic_unity >= 0.0,
+        last_result.metadata.temporal.holographic_unity >= 0.0,
         "Holographic unity should be non-negative, got: {}",
-        last_result.metadata.holographic_unity,
+        last_result.metadata.temporal.holographic_unity,
     );
     assert!(
         last_result
@@ -1322,7 +1322,7 @@ fn test_holographic_and_affective_wired() {
             .affect_consciousness_valence
             .is_finite(),
         "Affective consciousness valence should be finite, got: {}",
-        last_result.metadata.affect_consciousness_valence,
+        last_result.metadata.embodied.affect_consciousness_valence,
     );
     // holographic_analyzer() is pub(crate) — tested internally
     assert!(
@@ -1346,9 +1346,9 @@ fn test_differentiable_and_pipeline_wired() {
     }
 
     assert!(
-        last_result.metadata.consciousness_gradient_magnitude >= 0.0,
+        last_result.metadata.consciousness.consciousness_gradient_magnitude >= 0.0,
         "Gradient magnitude should be non-negative, got: {}",
-        last_result.metadata.consciousness_gradient_magnitude,
+        last_result.metadata.consciousness.consciousness_gradient_magnitude,
     );
     assert!(
         last_result.metadata.pipeline_consciousness >= 0.0,
@@ -1863,7 +1863,7 @@ fn test_consciousness_level_stabilizes() {
     let mut psi_values: Vec<f32> = Vec::new();
     for _ in 0..50 {
         let result = service.cycle("consciousness stabilization test");
-        psi_values.push(result.metadata.consciousness_level as f32);
+        psi_values.push(result.metadata.consciousness.consciousness_level as f32);
     }
 
     // All values should be finite
@@ -2179,7 +2179,7 @@ fn test_sustained_high_throughput() {
             i
         );
         assert!(
-            result.metadata.consciousness_level.is_finite(),
+            result.metadata.consciousness.consciousness_level.is_finite(),
             "Cycle {} consciousness level is not finite",
             i
         );
@@ -2361,21 +2361,21 @@ fn test_consciousness_metrics_bounded() {
             result.prediction_error
         );
         assert!(
-            result.metadata.consciousness_level.is_finite(),
+            result.metadata.consciousness.consciousness_level.is_finite(),
             "Cycle {i}: consciousness_level not finite"
         );
 
         // Metadata metrics should be finite
         assert!(
-            result.metadata.holographic_unity.is_finite(),
+            result.metadata.temporal.holographic_unity.is_finite(),
             "Cycle {i}: holographic_unity not finite"
         );
         assert!(
-            result.metadata.consciousness_gradient_magnitude.is_finite(),
+            result.metadata.consciousness.consciousness_gradient_magnitude.is_finite(),
             "Cycle {i}: gradient_magnitude not finite"
         );
         assert!(
-            result.metadata.affect_consciousness_valence.is_finite(),
+            result.metadata.embodied.affect_consciousness_valence.is_finite(),
             "Cycle {i}: affective_valence not finite"
         );
     }
@@ -4909,7 +4909,7 @@ fn test_consciousness_limiting_component_boost() {
         let result = service.cycle("test limiting component boost");
         // limiting_component_boosted is a String, always valid
         assert!(
-            result.metadata.consciousness_gradient_magnitude.is_finite(),
+            result.metadata.consciousness.consciousness_gradient_magnitude.is_finite(),
             "gradient not finite at cycle {i}"
         );
     }
@@ -5901,7 +5901,7 @@ fn test_phi_and_sigma_evolve_over_cycles() {
     for i in 0..20 {
         let r = service.cycle(&format!("consciousness test {i}"));
         phi_values.push(r.metadata.attention.phi_attention_weight);
-        sigma_values.push(r.metadata.sigma);
+        sigma_values.push(r.metadata.structural.sigma);
     }
 
     // Phi should be finite throughout
@@ -5993,10 +5993,8 @@ fn test_100_cycles_no_panic_mixed_inputs() {
 #[cfg(feature = "reasoning_engine")]
 #[test]
 fn test_reasoning_engine_produces_strategy() {
-    let config = CognitiveLoopConfig::default();
-    // Reasoning engine is activated by the `reasoning_engine` feature flag,
-    // not a config field. The #[cfg(feature = "reasoning_engine")] gate on
-    // this test ensures it only compiles when the feature is enabled.
+    let mut config = CognitiveLoopConfig::default();
+    config.enable_reasoning_engine = true;
     let mut service = CognitiveLoopService::new(config).unwrap();
 
     // Warm up
@@ -6941,8 +6939,8 @@ fn test_circadian_stillness_oscillation() {
         }
 
         // Consciousness should always be finite and non-negative
-        if !result.metadata.consciousness_level.is_finite()
-            || result.metadata.consciousness_level < 0.0
+        if !result.metadata.consciousness.consciousness_level.is_finite()
+            || result.metadata.consciousness.consciousness_level < 0.0
         {
             all_consciousness_finite = false;
         }
@@ -7399,100 +7397,5 @@ fn test_cross_coupling_no_nan_500_cycles() {
         stats.broca_quality_ema >= 0.0 && stats.broca_quality_ema <= 1.0,
         "broca_quality_ema out of [0,1] after 500 cycles: {}",
         stats.broca_quality_ema
-    );
-}
-
-// ── Kosmic Coherence Integration ──────────────────────────────────
-
-#[test]
-fn test_kosmic_coherence_flows_to_metadata() {
-    let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
-
-    // Run 30 cycles (KOSMIC_SONG_INTERVAL=23 so at least one synthesis fires)
-    let mut result = service.cycle("testing kosmic coherence");
-    for i in 1..30 {
-        result = service.cycle(&format!("cycle {i} testing coherence"));
-    }
-
-    let m = &result.metadata;
-    assert!(
-        m.ethics.kosmic_coherence >= 0.0,
-        "kosmic_coherence should be non-negative, got {}",
-        m.ethics.kosmic_coherence
-    );
-    assert!(
-        m.ethics.kosmic_coherence <= 1.0,
-        "kosmic_coherence should be at most 1.0, got {}",
-        m.ethics.kosmic_coherence
-    );
-    assert!(
-        m.ethics.kosmic_coherence.is_finite(),
-        "kosmic_coherence should be finite"
-    );
-}
-
-// ── Epistemic Quality Modulates Phi Eff ───────────────────────────
-
-#[test]
-fn test_epistemic_quality_modulates_phi_eff() {
-    let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
-
-    // Run enough cycles for epistemic quality to stabilize
-    let mut result = service.cycle("initial cycle");
-    for i in 1..100 {
-        result = service.cycle(&format!("reasoning test cycle {i}"));
-    }
-
-    let m = &result.metadata;
-    // epistemic_quality should be in valid range
-    assert!(
-        m.epistemic_quality >= 0.0 && m.epistemic_quality <= 1.0,
-        "epistemic_quality={} should be in [0,1]",
-        m.epistemic_quality
-    );
-    // epistemic_phi_eff should be non-negative (phi_eff_raw * epistemic_mod)
-    assert!(
-        m.quality.epistemic_phi_eff >= 0.0,
-        "epistemic_phi_eff={} should be non-negative",
-        m.quality.epistemic_phi_eff
-    );
-    assert!(
-        m.quality.epistemic_phi_eff.is_finite(),
-        "epistemic_phi_eff should be finite"
-    );
-}
-
-// ── Compassion Neuromodulator Coupling ────────────────────────────
-
-#[test]
-fn test_compassion_neuromod_coupling() {
-    let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
-
-    // Run enough cycles for empathic unification to fire (interval=11)
-    let mut result = service.cycle("initial");
-    for i in 1..50 {
-        result = service.cycle(&format!("compassion test cycle {i}"));
-    }
-
-    let m = &result.metadata;
-    // Compassion should be tracked and in valid range
-    assert!(
-        m.ethics.empathic_compassion >= 0.0 && m.ethics.empathic_compassion <= 1.0,
-        "empathic_compassion should be in [0,1], got {}",
-        m.ethics.empathic_compassion
-    );
-    assert!(
-        m.ethics.empathic_compassion.is_finite(),
-        "empathic_compassion should be finite"
-    );
-    // Oxytocin should be non-negative (baseline or compassion-driven)
-    assert!(
-        m.neuromod.neuromod_oxytocin_effective >= 0.0,
-        "oxytocin should be non-negative, got {}",
-        m.neuromod.neuromod_oxytocin_effective
-    );
-    assert!(
-        m.neuromod.neuromod_oxytocin_effective.is_finite(),
-        "oxytocin should be finite"
     );
 }

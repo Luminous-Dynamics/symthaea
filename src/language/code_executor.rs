@@ -531,7 +531,133 @@ impl Drop for CodeExecutor {
     }
 }
 
-/// Parse rustc error output into individual error messages
+/// A structured compilation error with optional location info.
+#[derive(Debug, Clone)]
+pub struct CompileError {
+    /// The full error message line.
+    pub message: String,
+    /// Rustc error code, if present (e.g., "E0308").
+    pub code: Option<String>,
+    /// Source file path from the error, if parsed.
+    pub file: Option<String>,
+    /// Line number in source, if parsed (1-indexed).
+    pub line: Option<usize>,
+    /// Column number in source, if parsed (1-indexed).
+    pub column: Option<usize>,
+    /// Error category for recovery strategy selection.
+    pub category: ErrorCategory,
+}
+
+/// Category of compilation error — determines recovery strategy.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ErrorCategory {
+    /// Type mismatch (E0308, E0277) — may be fixable with conversions
+    TypeMismatch,
+    /// Missing import (E0412, E0433) — fixable by adding `use`
+    MissingImport,
+    /// Borrow checker (E0382, E0502, E0505, E0596) — may need mut/clone/ref
+    BorrowError,
+    /// Lifetime error (E0106, E0621) — needs lifetime annotation
+    LifetimeError,
+    /// Unused code (warnings treated as errors)
+    UnusedCode,
+    /// Missing trait impl (E0277 for Display/Debug/Clone)
+    MissingImpl,
+    /// Syntax error — code is malformed
+    SyntaxError,
+    /// Timeout — execution took too long
+    Timeout,
+    /// Other/unknown error
+    Other,
+}
+
+impl CompileError {
+    /// Parse a structured error from a rustc error line and its context.
+    fn from_rustc_output(error_line: &str, context_lines: &[&str]) -> Self {
+        let code = Self::extract_error_code(error_line);
+        let category = Self::categorize(&code, error_line);
+
+        // Try to parse location from context: "--> src/file.rs:123:45"
+        let (file, line, column) = context_lines
+            .iter()
+            .find_map(|l| Self::parse_location(l))
+            .unwrap_or((None, None, None));
+
+        CompileError {
+            message: error_line.to_string(),
+            code,
+            file,
+            line,
+            column,
+            category,
+        }
+    }
+
+    /// Extract error code like "E0308" from "error[E0308]: ..."
+    fn extract_error_code(line: &str) -> Option<String> {
+        if let Some(start) = line.find("[E") {
+            if let Some(end) = line[start..].find(']') {
+                return Some(line[start + 1..start + end].to_string());
+            }
+        }
+        None
+    }
+
+    /// Parse location from rustc's "--> file:line:col" format.
+    fn parse_location(line: &str) -> Option<(Option<String>, Option<usize>, Option<usize>)> {
+        let trimmed = line.trim();
+        if !trimmed.starts_with("-->") {
+            return None;
+        }
+        let loc = trimmed.trim_start_matches("-->").trim();
+        let parts: Vec<&str> = loc.rsplitn(3, ':').collect();
+        match parts.len() {
+            3 => {
+                let col = parts[0].parse().ok();
+                let line = parts[1].parse().ok();
+                let file = Some(parts[2].to_string());
+                Some((file, line, col))
+            }
+            2 => {
+                let line = parts[0].parse().ok();
+                let file = Some(parts[1].to_string());
+                Some((file, line, None))
+            }
+            _ => None,
+        }
+    }
+
+    /// Categorize an error based on its code and message.
+    fn categorize(code: &Option<String>, message: &str) -> ErrorCategory {
+        if let Some(ref c) = code {
+            match c.as_str() {
+                "E0308" | "E0277" if message.contains("expected") => ErrorCategory::TypeMismatch,
+                "E0277" => ErrorCategory::MissingImpl,
+                "E0412" | "E0433" | "E0432" => ErrorCategory::MissingImport,
+                "E0382" | "E0502" | "E0505" | "E0596" | "E0507" => ErrorCategory::BorrowError,
+                "E0106" | "E0621" => ErrorCategory::LifetimeError,
+                _ => ErrorCategory::Other,
+            }
+        } else {
+            let lower = message.to_lowercase();
+            if lower.contains("unused") {
+                ErrorCategory::UnusedCode
+            } else if lower.contains("expected") && lower.contains("found") {
+                ErrorCategory::TypeMismatch
+            } else if lower.contains("cannot find") || lower.contains("not found") {
+                ErrorCategory::MissingImport
+            } else if lower.contains("cannot borrow") || lower.contains("move out of") {
+                ErrorCategory::BorrowError
+            } else if lower.contains("lifetime") {
+                ErrorCategory::LifetimeError
+            } else {
+                ErrorCategory::Other
+            }
+        }
+    }
+}
+
+/// Parse rustc error output into individual error messages (flat strings).
 fn parse_compile_errors(stderr: &str) -> Vec<String> {
     stderr
         .lines()
@@ -540,14 +666,43 @@ fn parse_compile_errors(stderr: &str) -> Vec<String> {
         .collect()
 }
 
+/// Parse rustc error output into structured errors with location info.
+///
+/// Groups error lines with their context (location, help suggestions)
+/// for line-number-aware auto-fix.
+pub fn parse_structured_errors(stderr: &str) -> Vec<CompileError> {
+    let lines: Vec<&str> = stderr.lines().collect();
+    let mut errors = Vec::new();
+    let mut i = 0;
+
+    while i < lines.len() {
+        if lines[i].starts_with("error") {
+            // Collect context lines (location, help, notes) until next error or blank
+            let error_line = lines[i];
+            let mut context = Vec::new();
+            let mut j = i + 1;
+            while j < lines.len()
+                && !lines[j].starts_with("error")
+                && !lines[j].starts_with("warning")
+                && j < i + 10
+            {
+                context.push(lines[j]);
+                j += 1;
+            }
+            errors.push(CompileError::from_rustc_output(error_line, &context));
+            i = j;
+        } else {
+            i += 1;
+        }
+    }
+    errors
+}
+
 /// Attempt to auto-fix common Rust compilation errors in source code.
 ///
-/// Applies mechanical fixes for well-known rustc error patterns:
-/// - E0308 `expected String, found &str` → `.to_string()`
-/// - E0308 `expected &str, found String` → `.as_str()`
-/// - E0596 `cannot borrow as mutable` → add `mut`
-/// - Missing `use` for common types → prepend import
-/// - `unused variable` → prefix with `_`
+/// Applies mechanical fixes for well-known rustc error patterns. When
+/// structured errors with line numbers are available (via `try_auto_fix_structured`),
+/// fixes are targeted to specific lines for higher accuracy.
 ///
 /// Returns `Some(fixed_source)` if any fix was applied, `None` otherwise.
 pub fn try_auto_fix(source: &str, errors: &[String]) -> Option<String> {
@@ -559,10 +714,8 @@ pub fn try_auto_fix(source: &str, errors: &[String]) -> Option<String> {
 
         // Missing mut: "cannot borrow `x` as mutable"
         if err_lower.contains("cannot borrow") && err_lower.contains("as mutable") {
-            // Find the variable name and add `mut` to its binding
             if let Some(var) = extract_between(error, "`", "`") {
                 let var_clean = var.trim_start_matches('*');
-                // Try "let VAR" → "let mut VAR"
                 let pattern = format!("let {}", var_clean);
                 let replacement = format!("let mut {}", var_clean);
                 if fixed.contains(&pattern) {
@@ -570,15 +723,6 @@ pub fn try_auto_fix(source: &str, errors: &[String]) -> Option<String> {
                     any_fix = true;
                 }
             }
-        }
-
-        // Type mismatch: expected String, found &str
-        if err_lower.contains("expected")
-            && err_lower.contains("string")
-            && err_lower.contains("&str")
-        {
-            // This is tricky to fix in place without line numbers, skip for now
-            // but add a note to the source
         }
 
         // Unused variable
@@ -591,7 +735,6 @@ pub fn try_auto_fix(source: &str, errors: &[String]) -> Option<String> {
                         fixed = fixed.replacen(&pattern, &replacement, 1);
                         any_fix = true;
                     }
-                    // Also try in function params
                     let param_pattern = format!("{}: ", var);
                     let param_replacement = format!("_{}: ", var);
                     if !any_fix && fixed.contains(&param_pattern) {
@@ -602,23 +745,15 @@ pub fn try_auto_fix(source: &str, errors: &[String]) -> Option<String> {
             }
         }
 
-        // Missing return type annotation — common with closures
-        if err_lower.contains("consider giving this closure") && err_lower.contains("return type") {
-            // Can't auto-fix without more context
-        }
-
-        // Missing #[derive(Debug)] — very common with LLM-generated structs
-        // Error: "`MyStruct` doesn't implement `Debug`"
+        // Missing #[derive(Debug)]
         if (err_lower.contains("doesn't implement") || err_lower.contains("does not implement"))
             && err_lower.contains("debug")
         {
             if let Some(type_name) = extract_between(error, "`", "`") {
-                // Find "struct TypeName" and prepend #[derive(Debug)]
                 let struct_pattern = format!("struct {}", type_name);
                 if let Some(pos) = fixed.find(&struct_pattern) {
-                    // Check if #[derive(...)] already exists on the line above
                     let before = &fixed[..pos];
-                    if !before.ends_with("]\n") && !before.contains(&format!("#[derive(Debug")) {
+                    if !before.ends_with("]\n") && !before.contains("#[derive(Debug") {
                         fixed.insert_str(pos, "#[derive(Debug, Clone)]\n");
                         any_fix = true;
                     }
@@ -626,40 +761,8 @@ pub fn try_auto_fix(source: &str, errors: &[String]) -> Option<String> {
             }
         }
 
-        // Missing Display impl — "doesn't implement `std::fmt::Display`"
-        if (err_lower.contains("doesn't implement") || err_lower.contains("does not implement"))
-            && err_lower.contains("display")
-        {
-            // If the error mentions a custom type, we can't auto-fix Display.
-            // But if the code uses `.to_string()` on something that needs Display,
-            // try wrapping with format!("{:?}") instead.
-        }
-
-        // Missing Clone/Copy — "cannot move out of"
-        if err_lower.contains("cannot move out of") {
-            // Try adding .clone() — crude but often works
-            if let Some(var) = extract_between(error, "`", "`") {
-                let var_clean = var.trim_start_matches('*');
-                // Only clone if the variable is used, not a field access
-                if !var_clean.contains('.') {
-                    let _use_pattern = format!("{}", var_clean);
-                    // Don't blindly add .clone() — too risky without line info
-                }
-            }
-        }
-
-        // Lifetime error: "missing lifetime specifier"
-        if err_lower.contains("missing lifetime specifier")
-            && err_lower.contains("expected named lifetime")
-        {
-            // Add 'a lifetime to &str returns — common LLM mistake
-            // e.g. fn foo(s: &str) -> &str → fn foo(s: &str) -> &str (needs lifetime)
-            // This is too context-dependent to auto-fix safely
-        }
-
-        // Dead code warning treated as error (deny(dead_code))
+        // Dead code warning treated as error
         if err_lower.contains("unused") && err_lower.contains("function") {
-            // Prefix function with _ or add #[allow(dead_code)]
             if let Some(fn_name) = extract_between(error, "`", "`") {
                 let fn_pattern = format!("fn {}", fn_name);
                 if let Some(pos) = fixed.find(&fn_pattern) {
@@ -688,6 +791,11 @@ pub fn try_auto_fix(source: &str, errors: &[String]) -> Option<String> {
         ("Ordering", "use std::cmp::Ordering;\n"),
         ("BinaryHeap", "use std::collections::BinaryHeap;\n"),
         ("VecDeque", "use std::collections::VecDeque;\n"),
+        ("Path", "use std::path::Path;\n"),
+        ("PathBuf", "use std::path::PathBuf;\n"),
+        ("Arc", "use std::sync::Arc;\n"),
+        ("Mutex", "use std::sync::Mutex;\n"),
+        ("Rc", "use std::rc::Rc;\n"),
     ];
 
     for error in errors {
@@ -703,6 +811,200 @@ pub fn try_auto_fix(source: &str, errors: &[String]) -> Option<String> {
 
     if any_fix {
         Some(fixed)
+    } else {
+        None
+    }
+}
+
+/// Enhanced auto-fix using structured errors with line numbers.
+///
+/// This is the line-number-aware version of `try_auto_fix`. When rustc provides
+/// location info (file:line:col), fixes are applied directly to the error line
+/// rather than using blind pattern matching. This enables fixes that the basic
+/// version can't do safely (type conversions, clone insertion, lifetime annotations).
+///
+/// Returns `Some(fixed_source)` if any fix was applied, `None` otherwise.
+pub fn try_auto_fix_structured(source: &str, errors: &[CompileError]) -> Option<String> {
+    let mut lines: Vec<String> = source.lines().map(|l| l.to_string()).collect();
+    let mut any_fix = false;
+    // Track line offsets from insertions (derive attributes, imports)
+    let mut line_offset: i64 = 0;
+
+    for error in errors {
+        let target_line = error.line.map(|l| ((l as i64 + line_offset) as usize).saturating_sub(1));
+
+        match error.category {
+            ErrorCategory::TypeMismatch => {
+                if let Some(idx) = target_line {
+                    if idx < lines.len() {
+                        let line = lines[idx].clone();
+                        // "expected String, found &str" → add .to_string()
+                        if error.message.contains("expected") && error.message.contains("String")
+                            && error.message.contains("&str")
+                        {
+                            if let Some(col) = error.column {
+                                let col_idx = col.saturating_sub(1);
+                                let before = &line[..col_idx.min(line.len())];
+                                if before.trim_end().ends_with('"')
+                                    || before.trim_end().ends_with(')')
+                                {
+                                    let trimmed = line.trim_end();
+                                    if !trimmed.ends_with(".to_string()") {
+                                        let new_line = if let Some(pos) = trimmed.rfind(';') {
+                                            format!("{}.to_string(){}", &trimmed[..pos], &trimmed[pos..])
+                                        } else if let Some(pos) = trimmed.rfind(',') {
+                                            format!("{}.to_string(){}", &trimmed[..pos], &trimmed[pos..])
+                                        } else {
+                                            format!("{}.to_string()", trimmed)
+                                        };
+                                        lines[idx] = new_line;
+                                        any_fix = true;
+                                    }
+                                }
+                            }
+                        }
+                        // "expected &str, found String" → add .as_str() or &
+                        if error.message.contains("expected") && error.message.contains("&str")
+                            && error.message.contains("found") && error.message.contains("String")
+                            && !error.message.contains("expected `String`")
+                        {
+                            let trimmed = line.trim_end();
+                            if !trimmed.ends_with(".as_str()") {
+                                if let Some(pos) = trimmed.rfind(';') {
+                                    lines[idx] = format!("{}.as_str(){}", &trimmed[..pos], &trimmed[pos..]);
+                                    any_fix = true;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            ErrorCategory::BorrowError => {
+                // "cannot move out of" → add .clone() at the error location
+                if error.message.contains("cannot move out of") {
+                    if let Some(var) = extract_between(&error.message, "`", "`") {
+                        let var_clean = var.trim_start_matches('*');
+                        if let Some(idx) = target_line {
+                            if idx < lines.len() {
+                                let line = &lines[idx];
+                                // Insert .clone() after the variable reference
+                                let pattern = var_clean;
+                                if let Some(pos) = line.find(pattern) {
+                                    let after_var = pos + pattern.len();
+                                    // Only add .clone() if not already there and variable is standalone
+                                    let after = &line[after_var..];
+                                    if !after.starts_with(".clone()") {
+                                        let next_char = after.chars().next();
+                                        if matches!(next_char, Some(')' | ',' | ';' | ' ' | '.')) {
+                                            let new_line = format!(
+                                                "{}{}.clone(){}",
+                                                &line[..after_var],
+                                                "",
+                                                &line[after_var..]
+                                            );
+                                            lines[idx] = new_line;
+                                            any_fix = true;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                // "cannot borrow as mutable" — handled by basic try_auto_fix
+            }
+
+            ErrorCategory::LifetimeError => {
+                // "missing lifetime specifier" on fn return type → add <'a>
+                if error.message.contains("missing lifetime specifier") {
+                    if let Some(idx) = target_line {
+                        if idx < lines.len() {
+                            let line = &lines[idx];
+                            // Pattern: "fn foo(s: &str) -> &str"
+                            // Fix: "fn foo<'a>(s: &'a str) -> &'a str"
+                            if line.contains("fn ") && line.contains("-> &") {
+                                let mut new_line = line.clone();
+                                // Add lifetime parameter to function
+                                if !new_line.contains("<'") {
+                                    if let Some(paren) = new_line.find('(') {
+                                        new_line.insert_str(paren, "<'a>");
+                                    }
+                                }
+                                // Add 'a to all bare &str / & references in return type
+                                if let Some(arrow) = new_line.find("-> &") {
+                                    let rest = &new_line[arrow..];
+                                    if !rest.contains("-> &'") {
+                                        new_line = new_line.replacen("-> &", "-> &'a ", 1);
+                                    }
+                                }
+                                // Add 'a to parameter references
+                                // Simple case: &str → &'a str, &T → &'a T
+                                let params_start = new_line.find('(').unwrap_or(0);
+                                let params_end = new_line.find(')').unwrap_or(new_line.len());
+                                if params_start < params_end {
+                                    let params = new_line[params_start..=params_end].to_string();
+                                    let fixed_params = params.replace(": &", ": &'a ");
+                                    if fixed_params != params {
+                                        new_line = format!(
+                                            "{}{}{}",
+                                            &new_line[..params_start],
+                                            fixed_params,
+                                            &new_line[params_end + 1..]
+                                        );
+                                    }
+                                }
+                                if new_line != *line {
+                                    lines[idx] = new_line;
+                                    any_fix = true;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            ErrorCategory::MissingImpl => {
+                // "doesn't implement Clone" → add #[derive(Clone)] above struct
+                let trait_name = if error.message.contains("Clone") {
+                    Some("Clone")
+                } else if error.message.contains("Default") {
+                    Some("Default")
+                } else if error.message.contains("PartialEq") {
+                    Some("PartialEq")
+                } else {
+                    None
+                };
+
+                if let Some(trait_name) = trait_name {
+                    if let Some(type_name) = extract_between(&error.message, "`", "`") {
+                        let struct_pattern = format!("struct {}", type_name);
+                        let insert_idx = lines.iter().enumerate().find_map(|(i, line)| {
+                            if line.contains(&struct_pattern) {
+                                Some(i)
+                            } else {
+                                None
+                            }
+                        });
+                        if let Some(i) = insert_idx {
+                            let derive = format!("#[derive({})]", trait_name);
+                            if i == 0 || !lines[i - 1].contains(&derive) {
+                                lines.insert(i, derive);
+                                line_offset += 1;
+                                any_fix = true;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Other categories handled by basic try_auto_fix
+            _ => {}
+        }
+    }
+
+    if any_fix {
+        Some(lines.join("\n"))
     } else {
         None
     }
@@ -914,5 +1216,147 @@ mod tests {
         let source = "fn main() {}";
         let errors = vec!["some unknown error we can't fix".to_string()];
         assert!(try_auto_fix(source, &errors).is_none());
+    }
+
+    // ── Phase D: Structured error parsing tests ─────────────────────────
+
+    #[test]
+    fn test_parse_structured_errors_with_location() {
+        let stderr = "error[E0308]: mismatched types\n  --> generated.rs:5:12\n  |\n5 |     let x: String = \"hello\";\n  |            ^^^^^^   ------- expected due to this value\n  = note: expected struct `String`\nerror: aborting due to previous error";
+        let errors = parse_structured_errors(stderr);
+        assert_eq!(errors.len(), 2); // E0308 + "aborting"
+        assert_eq!(errors[0].code, Some("E0308".to_string()));
+        assert_eq!(errors[0].file, Some("generated.rs".to_string()));
+        assert_eq!(errors[0].line, Some(5));
+        assert_eq!(errors[0].column, Some(12));
+        assert_eq!(errors[0].category, ErrorCategory::TypeMismatch);
+    }
+
+    #[test]
+    fn test_parse_structured_errors_no_location() {
+        let stderr = "error: aborting due to previous error";
+        let errors = parse_structured_errors(stderr);
+        assert_eq!(errors.len(), 1);
+        assert!(errors[0].line.is_none());
+        assert_eq!(errors[0].category, ErrorCategory::Other);
+    }
+
+    #[test]
+    fn test_error_category_classification() {
+        assert_eq!(
+            CompileError::categorize(&Some("E0308".into()), "expected `String`, found `&str`"),
+            ErrorCategory::TypeMismatch
+        );
+        assert_eq!(
+            CompileError::categorize(&Some("E0412".into()), "cannot find type"),
+            ErrorCategory::MissingImport
+        );
+        assert_eq!(
+            CompileError::categorize(&Some("E0596".into()), "cannot borrow"),
+            ErrorCategory::BorrowError
+        );
+        assert_eq!(
+            CompileError::categorize(&Some("E0106".into()), "missing lifetime"),
+            ErrorCategory::LifetimeError
+        );
+        assert_eq!(
+            CompileError::categorize(&None, "unused variable `x`"),
+            ErrorCategory::UnusedCode
+        );
+    }
+
+    #[test]
+    fn test_parse_location_formats() {
+        // Standard: --> file:line:col
+        let (f, l, c) = CompileError::parse_location("  --> src/main.rs:42:8").unwrap();
+        assert_eq!(f, Some("src/main.rs".to_string()));
+        assert_eq!(l, Some(42));
+        assert_eq!(c, Some(8));
+
+        // No column
+        let (f, l, c) = CompileError::parse_location("  --> src/lib.rs:10").unwrap();
+        assert_eq!(f, Some("src/lib.rs".to_string()));
+        assert_eq!(l, Some(10));
+        assert_eq!(c, None);
+
+        // Not a location line
+        assert!(CompileError::parse_location("  = note: something").is_none());
+    }
+
+    #[test]
+    fn test_structured_auto_fix_clone_insertion() {
+        let source = "fn main() {\n    let s = String::from(\"hello\");\n    let a = s;\n    let b = s;\n}";
+        let errors = vec![CompileError {
+            message: "cannot move out of `s` because it is borrowed".into(),
+            code: Some("E0382".into()),
+            file: Some("generated.rs".into()),
+            line: Some(4), // "let b = s;" is line 4
+            column: Some(13),
+            category: ErrorCategory::BorrowError,
+        }];
+        let fixed = try_auto_fix_structured(source, &errors);
+        assert!(fixed.is_some());
+        let fixed = fixed.unwrap();
+        assert!(fixed.contains("s.clone()"), "Should add .clone(): {fixed}");
+    }
+
+    #[test]
+    fn test_structured_auto_fix_lifetime() {
+        let source = "fn first_word(s: &str) -> &str {\n    &s[..1]\n}";
+        let errors = vec![CompileError {
+            message: "missing lifetime specifier".into(),
+            code: Some("E0106".into()),
+            file: Some("generated.rs".into()),
+            line: Some(1),
+            column: Some(27),
+            category: ErrorCategory::LifetimeError,
+        }];
+        let fixed = try_auto_fix_structured(source, &errors);
+        assert!(fixed.is_some());
+        let fixed = fixed.unwrap();
+        assert!(fixed.contains("<'a>"), "Should add lifetime parameter: {fixed}");
+        assert!(fixed.contains("-> &'a"), "Should annotate return type: {fixed}");
+    }
+
+    #[test]
+    fn test_structured_auto_fix_missing_derive() {
+        let source = "struct Point { x: f64, y: f64 }\nfn main() { let p = Point { x: 1.0, y: 2.0 }; let q = p.clone(); }";
+        let errors = vec![CompileError {
+            message: "`Point` doesn't implement `Clone`".into(),
+            code: Some("E0277".into()),
+            file: Some("generated.rs".into()),
+            line: Some(2),
+            column: Some(55),
+            category: ErrorCategory::MissingImpl,
+        }];
+        let fixed = try_auto_fix_structured(source, &errors);
+        assert!(fixed.is_some());
+        let fixed = fixed.unwrap();
+        assert!(fixed.contains("#[derive(Clone)]"), "Should add derive(Clone): {fixed}");
+    }
+
+    #[test]
+    fn test_auto_fix_missing_import_path_types() {
+        let source = "fn main() { let p = PathBuf::from(\".\"); }";
+        let errors = vec!["cannot find type `PathBuf` in this scope".to_string()];
+        let fixed = try_auto_fix(source, &errors);
+        assert!(fixed.is_some());
+        assert!(fixed.unwrap().contains("use std::path::PathBuf;"));
+    }
+
+    #[test]
+    fn test_auto_fix_missing_import_sync_types() {
+        let source = "fn main() { let a = Arc::new(42); }";
+        let errors = vec!["cannot find type `Arc` in this scope".to_string()];
+        let fixed = try_auto_fix(source, &errors);
+        assert!(fixed.is_some());
+        assert!(fixed.unwrap().contains("use std::sync::Arc;"));
+    }
+
+    #[test]
+    fn test_structured_auto_fix_no_errors() {
+        let source = "fn main() {}";
+        let errors: Vec<CompileError> = vec![];
+        assert!(try_auto_fix_structured(source, &errors).is_none());
     }
 }

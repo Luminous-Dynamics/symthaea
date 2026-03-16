@@ -20,7 +20,6 @@ and number theory modules hold across randomly generated inputs.
 */
 
 #![cfg(test)]
-#![allow(dead_code)]
 
 use crate::hdc::integer::IntegerArithmeticEngine;
 use crate::hdc::number_theory::NumberTheoryEngine;

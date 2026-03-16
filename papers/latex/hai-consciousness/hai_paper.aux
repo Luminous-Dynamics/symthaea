@@ -1,0 +1,249 @@
+\relax 
+\providecommand\hyper@newdestlabel[2]{}
+\providecommand\HyField@AuxAddToFields[1]{}
+\providecommand\HyField@AuxAddToCoFields[2]{}
+\citation{friston2010free}
+\citation{friston2017active}
+\citation{kanerva2009hyperdimensional}
+\@writefile{toc}{\contentsline {section}{\numberline {1}Introduction}{1}{section.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.1}The Challenge}{1}{subsection.1.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.2}Our Contribution}{1}{subsection.1.2}\protected@file@percent }
+\citation{friston2010free}
+\citation{parr2022active}
+\citation{feldman2010attention}
+\citation{kanerva2009hyperdimensional}
+\@writefile{toc}{\contentsline {section}{\numberline {2}Background}{2}{section.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.1}Free Energy Principle and Active Inference}{2}{subsection.2.1}\protected@file@percent }
+\newlabel{eq:free-energy}{{1}{2}{Free Energy Principle and Active Inference}{equation.1}{}}
+\newlabel{eq:efe}{{2}{2}{Free Energy Principle and Active Inference}{equation.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.2}Hyperdimensional Computing}{2}{subsection.2.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3}Mathematical Foundations}{2}{subsection.2.3}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Mathematical foundation modules and their theoretical contributions.}}{3}{table.caption.1}\protected@file@percent }
+\providecommand*\caption@xref[2]{\@setref\relax\@undefined{#1}}
+\newlabel{tab:foundations}{{1}{3}{Mathematical foundation modules and their theoretical contributions}{table.caption.1}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3}Hyperdimensional Active Inference}{3}{section.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.1}Free Energy in Hypervector Space}{3}{subsection.3.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2}Precision-Weighted Binding}{3}{subsection.3.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.3}Belief Updating}{3}{subsection.3.3}\protected@file@percent }
+\newlabel{eq:gradient}{{8}{3}{Belief Updating}{equation.8}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces \textbf  {HAI architecture overview.} Observations are encoded into 16,384-dimensional hypervectors via learned encoding. The active inference loop (center) performs belief updating via gradient descent on HDC free energy, with precision-weighted binding modulating the accuracy-complexity tradeoff. Expected free energy computation produces eight motor command types. CfC temporal dynamics (right) govern time-varying belief evolution.}}{4}{figure.caption.2}\protected@file@percent }
+\newlabel{fig:architecture}{{1}{4}{\textbf {HAI architecture overview.} Observations are encoded into 16,384-dimensional hypervectors via learned encoding. The active inference loop (center) performs belief updating via gradient descent on HDC free energy, with precision-weighted binding modulating the accuracy-complexity tradeoff. Expected free energy computation produces eight motor command types. CfC temporal dynamics (right) govern time-varying belief evolution}{figure.caption.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.4}Expected Free Energy and Motor Commands}{4}{subsection.3.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.5}Precision Dynamics}{4}{subsection.3.5}\protected@file@percent }
+\citation{heins2022pymdp}
+\citation{cohen1988statistical}
+\citation{heins2022pymdp}
+\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Motor command types from EFE minimization.}}{5}{table.caption.3}\protected@file@percent }
+\newlabel{tab:motor}{{2}{5}{Motor command types from EFE minimization}{table.caption.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.6}Temporal Difference Learning Integration}{5}{subsection.3.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {4}Experiments}{5}{section.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}Experimental Setup}{5}{subsection.4.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}Free Energy Convergence}{5}{subsection.4.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}Precision Dynamics Validation}{5}{subsection.4.3}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces \textbf  {Free energy convergence} over 20 belief updating iterations. $F$ decreases monotonically from ${\sim }2.3$ to ${\sim }0.4$, converging by iteration~15. KL divergence remains non-negative (mathematical validity check).}}{6}{figure.caption.4}\protected@file@percent }
+\newlabel{fig:convergence}{{2}{6}{\textbf {Free energy convergence} over 20 belief updating iterations. $F$ decreases monotonically from ${\sim }2.3$ to ${\sim }0.4$, converging by iteration~15. KL divergence remains non-negative (mathematical validity check)}{figure.caption.4}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces \textbf  {Precision dynamics} under three error regimes. Sensory precision $\pi _s$ increases with prediction error; prior precision $\pi _p$ decreases. Error bars show $\pm 1$ SE across 100 trials.}}{6}{figure.caption.5}\protected@file@percent }
+\newlabel{fig:precision}{{3}{6}{\textbf {Precision dynamics} under three error regimes. Sensory precision $\pi _s$ increases with prediction error; prior precision $\pi _p$ decreases. Error bars show $\pm 1$ SE across 100 trials}{figure.caption.5}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.4}Computational Efficiency}{6}{subsection.4.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.5}Extended Benchmark Validation}{6}{subsection.4.5}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces Precision response to prediction error magnitude.}}{7}{table.caption.6}\protected@file@percent }
+\newlabel{tab:precision}{{3}{7}{Precision response to prediction error magnitude}{table.caption.6}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces HAI vs.\ pymdp benchmark results.}}{7}{table.caption.7}\protected@file@percent }
+\newlabel{tab:benchmark}{{4}{7}{HAI vs.\ pymdp benchmark results}{table.caption.7}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.6}DOE Science \& Technology Challenge Coverage}{7}{subsection.4.6}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {5}{\ignorespaces Aggregate speedups with 95\% confidence intervals.}}{8}{table.caption.8}\protected@file@percent }
+\newlabel{tab:speedups}{{5}{8}{Aggregate speedups with 95\% confidence intervals}{table.caption.8}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces \textbf  {Scaling analysis.} HAI (Rust, 16,384-D HVs) vs.\ pymdp (Python, discrete categorical). All differences statistically significant ($p < 10^{-26}$, Cohen's $d > 1.8$).}}{8}{figure.caption.9}\protected@file@percent }
+\newlabel{fig:scaling}{{4}{8}{\textbf {Scaling analysis.} HAI (Rust, 16,384-D HVs) vs.\ pymdp (Python, discrete categorical). All differences statistically significant ($p < 10^{-26}$, Cohen's $d > 1.8$)}{figure.caption.9}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.7}Known Limitations}{8}{subsection.4.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.8}Ablation Study}{8}{subsection.4.8}\protected@file@percent }
+\newlabel{sec:ablation}{{4.8}{8}{Ablation Study}{subsection.4.8}{}}
+\citation{butlin2023consciousness}
+\@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces \textbf  {Benchmark validation radar} showing test pass rates across 18 domains. 11 benchmarks achieve 100\% pass rate; 7 show partial passes with documented limitations.}}{9}{figure.caption.10}\protected@file@percent }
+\newlabel{fig:radar}{{5}{9}{\textbf {Benchmark validation radar} showing test pass rates across 18 domains. 11 benchmarks achieve 100\% pass rate; 7 show partial passes with documented limitations}{figure.caption.10}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {6}{\ignorespaces Core benchmarks (all tests passing at $\geq $80\%).}}{10}{table.caption.11}\protected@file@percent }
+\newlabel{tab:core-benchmarks}{{6}{10}{Core benchmarks (all tests passing at $\geq $80\%)}{table.caption.11}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.9}Consciousness Indicator Evaluation}{10}{subsection.4.9}\protected@file@percent }
+\newlabel{sec:butlin}{{4.9}{10}{Consciousness Indicator Evaluation}{subsection.4.9}{}}
+\citation{cowan2001magical}
+\citation{wheeler2002binding}
+\@writefile{lot}{\contentsline {table}{\numberline {7}{\ignorespaces DOE S\&T Grand Challenge coverage. Each challenge is addressed by the unified HDC+CfC+FEP pipeline with domain-specific encoders and agents.}}{11}{table.caption.12}\protected@file@percent }
+\newlabel{tab:doe-challenges}{{7}{11}{DOE S\&T Grand Challenge coverage. Each challenge is addressed by the unified HDC+CfC+FEP pipeline with domain-specific encoders and agents}{table.caption.12}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {8}{\ignorespaces Consciousness advantage across three tasks. Recovery\%: fraction of post-shift error spike recovered. Reduce\%: prediction error reduction on interleaved multi-pattern input. Subsystems: count of active consciousness modules (of 7 measured).}}{11}{table.caption.13}\protected@file@percent }
+\newlabel{tab:consciousness-advantage}{{8}{11}{Consciousness advantage across three tasks. Recovery\%: fraction of post-shift error spike recovered. Reduce\%: prediction error reduction on interleaved multi-pattern input. Subsystems: count of active consciousness modules (of 7 measured)}{table.caption.13}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.10}Psychological Benchmark Suite}{11}{subsection.4.10}\protected@file@percent }
+\newlabel{sec:psych-bench}{{4.10}{11}{Psychological Benchmark Suite}{subsection.4.10}{}}
+\citation{heins2022pymdp}
+\citation{fountas2020deep,catal2020learning}
+\citation{rahimi2016robust,imani2019hierarchical}
+\citation{joshi2016language}
+\citation{neubert2019introduction}
+\citation{kim2020hdc}
+\citation{hersche2023neurovsa}
+\citation{hasani2021liquid}
+\citation{hasani2022closed}
+\citation{albantakis2023integrated}
+\citation{tononi2016integrated}
+\citation{toker2019information}
+\@writefile{lot}{\contentsline {table}{\numberline {9}{\ignorespaces Butlin et al.\ consciousness indicators evaluated against Symthaea's architecture. Scores (0--1) reflect strength of architectural evidence.}}{12}{table.caption.14}\protected@file@percent }
+\newlabel{tab:butlin}{{9}{12}{Butlin et al.\ consciousness indicators evaluated against Symthaea's architecture. Scores (0--1) reflect strength of architectural evidence}{table.caption.14}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {5}Related Work}{12}{section.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}Active Inference Implementations}{12}{subsection.5.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}Hyperdimensional Computing Applications}{12}{subsection.5.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}Liquid Neural Networks}{12}{subsection.5.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.4}Integrated Information Theory}{12}{subsection.5.4}\protected@file@percent }
+\citation{garcez2020neurosymbolic}
+\citation{manhaeve2018deepproblog}
+\citation{riegel2020logical}
+\citation{li2023scallop}
+\citation{mao2019neuro}
+\citation{diekelmann2010memory}
+\citation{miller2001integrative}
+\citation{clark2013whatever}
+\citation{graziano2013consciousness}
+\citation{baars1988cognitive}
+\citation{damasio1999feeling}
+\citation{buzsaki2006rhythms}
+\citation{dehaene2014consciousness}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.5}Neuro-Symbolic AI}{13}{subsection.5.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.6}Novelty Assessment}{13}{subsection.5.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {6}Discussion}{13}{section.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.1}Theoretical Implications}{13}{subsection.6.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.2}Cognitive Architecture Implications}{13}{subsection.6.2}\protected@file@percent }
+\citation{tononi2004information}
+\citation{casali2013consciousness}
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.3}When HDC Approximation Fails}{14}{subsection.6.3}\protected@file@percent }
+\newlabel{sec:hdc-fails}{{6.3}{14}{When HDC Approximation Fails}{subsection.6.3}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {6}{\ignorespaces \textbf  {$\lambda _2$-$\varPhi $ proxy validation.} $\lambda _2$ shows correct topological ordering (chain $<$ ring $<$ star $<$ complete) but exact $\varPhi $ degenerates to 0 for all weighted systems.}}{14}{figure.caption.16}\protected@file@percent }
+\newlabel{fig:lambda2}{{6}{14}{\textbf {$\lambda _2$-$\Phi $ proxy validation.} $\lambda _2$ shows correct topological ordering (chain $<$ ring $<$ star $<$ complete) but exact $\Phi $ degenerates to 0 for all weighted systems}{figure.caption.16}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.4}Divergence of Consciousness Measures}{14}{subsection.6.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.5}CfC Gradient Dynamics}{14}{subsection.6.5}\protected@file@percent }
+\newlabel{sec:cfc-gradients}{{6.5}{14}{CfC Gradient Dynamics}{subsection.6.5}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.6}Limitations}{14}{subsection.6.6}\protected@file@percent }
+\newlabel{sec:limitations}{{6.6}{14}{Limitations}{subsection.6.6}{}}
+\citation{hendrycks2021aligning}
+\citation{forbes2020social}
+\citation{hendrycks2021aligning}
+\citation{forbes2020social}
+\citation{tassa2018deepmind}
+\citation{haarnoja2018soft}
+\citation{barth2018distributed}
+\citation{fujimoto2018addressing}
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.7}Unified Federated Learning}{15}{subsection.6.7}\protected@file@percent }
+\newlabel{sec:fl}{{6.7}{15}{Unified Federated Learning}{subsection.6.7}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.8}ETHICS Benchmark: Compositional Moral Reasoning}{15}{subsection.6.8}\protected@file@percent }
+\newlabel{sec:ethics}{{6.8}{15}{ETHICS Benchmark: Compositional Moral Reasoning}{subsection.6.8}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.9}Humanoid Control}{15}{subsection.6.9}\protected@file@percent }
+\newlabel{sec:humanoid}{{6.9}{15}{Humanoid Control}{subsection.6.9}{}}
+\citation{todorov2012mujoco}
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.10}Flight Control: Emergent Moral Reasoning via EFE}{16}{subsection.6.10}\protected@file@percent }
+\newlabel{sec:flight-efe}{{6.10}{16}{Flight Control: Emergent Moral Reasoning via EFE}{subsection.6.10}{}}
+\newlabel{eq:efe-flight}{{14}{16}{Flight Control: Emergent Moral Reasoning via EFE}{equation.14}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.11}Voice Synthesis: LTC-Driven Articulatory Control}{16}{subsection.6.11}\protected@file@percent }
+\newlabel{sec:voice}{{6.11}{16}{Voice Synthesis: LTC-Driven Articulatory Control}{subsection.6.11}{}}
+\citation{friston2010free}
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.12}Hardware Embodiment: Servo-Sensor Integration}{17}{subsection.6.12}\protected@file@percent }
+\newlabel{sec:hal}{{6.12}{17}{Hardware Embodiment: Servo-Sensor Integration}{subsection.6.12}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.13}Ethical Considerations}{17}{subsection.6.13}\protected@file@percent }
+\newlabel{sec:ethical-considerations}{{6.13}{17}{Ethical Considerations}{subsection.6.13}{}}
+\citation{patanjali_yoga_sutras}
+\citation{whitcomb2017intellectual}
+\citation{nagel1970altruism}
+\citation{floridi2019unified}
+\citation{yazzie1994navajo}
+\citation{kruger1999unskilled}
+\citation{merritt2010moral}
+\citation{henrich2010weirdest}
+\@writefile{toc}{\contentsline {section}{\numberline {7}Conclusion}{18}{section.7}\protected@file@percent }
+\citation{hendrycks2021aligning}
+\citation{forbes2020social}
+\bibstyle{plos2015}
+\bibdata{references}
+\bibcite{friston2010free}{1}
+\bibcite{friston2017active}{2}
+\bibcite{kanerva2009hyperdimensional}{3}
+\bibcite{parr2022active}{4}
+\bibcite{feldman2010attention}{5}
+\bibcite{heins2022pymdp}{6}
+\bibcite{cohen1988statistical}{7}
+\bibcite{butlin2023consciousness}{8}
+\bibcite{cowan2001magical}{9}
+\bibcite{wheeler2002binding}{10}
+\bibcite{fountas2020deep}{11}
+\bibcite{catal2020learning}{12}
+\bibcite{rahimi2016robust}{13}
+\bibcite{imani2019hierarchical}{14}
+\bibcite{joshi2016language}{15}
+\newlabel{s1-data}{{7}{20}{S1 Data}{section*.32}{}}
+\newlabel{s2-data}{{7}{20}{S2 Data}{section*.33}{}}
+\newlabel{s3-code}{{7}{20}{S3 Code}{section*.34}{}}
+\bibcite{neubert2019introduction}{16}
+\bibcite{kim2020hdc}{17}
+\bibcite{hersche2023neurovsa}{18}
+\bibcite{hasani2021liquid}{19}
+\bibcite{hasani2022closed}{20}
+\bibcite{albantakis2023integrated}{21}
+\bibcite{tononi2016integrated}{22}
+\bibcite{toker2019information}{23}
+\bibcite{garcez2020neurosymbolic}{24}
+\bibcite{manhaeve2018deepproblog}{25}
+\bibcite{riegel2020logical}{26}
+\bibcite{li2023scallop}{27}
+\bibcite{mao2019neuro}{28}
+\bibcite{diekelmann2010memory}{29}
+\bibcite{miller2001integrative}{30}
+\bibcite{clark2013whatever}{31}
+\bibcite{graziano2013consciousness}{32}
+\bibcite{baars1988cognitive}{33}
+\bibcite{damasio1999feeling}{34}
+\bibcite{buzsaki2006rhythms}{35}
+\bibcite{dehaene2014consciousness}{36}
+\bibcite{tononi2004information}{37}
+\bibcite{casali2013consciousness}{38}
+\bibcite{hendrycks2021aligning}{39}
+\bibcite{forbes2020social}{40}
+\bibcite{tassa2018deepmind}{41}
+\bibcite{haarnoja2018soft}{42}
+\bibcite{barth2018distributed}{43}
+\bibcite{fujimoto2018addressing}{44}
+\bibcite{todorov2012mujoco}{45}
+\bibcite{patanjali_yoga_sutras}{46}
+\bibcite{whitcomb2017intellectual}{47}
+\bibcite{nagel1970altruism}{48}
+\bibcite{floridi2019unified}{49}
+\bibcite{yazzie1994navajo}{50}
+\bibcite{kruger1999unskilled}{51}
+\bibcite{merritt2010moral}{52}
+\bibcite{henrich2010weirdest}{53}
+\@writefile{toc}{\contentsline {section}{\numberline {A}Implementation Details}{23}{appendix.A}\protected@file@percent }
+\newlabel{app:implementation}{{A}{23}{Implementation Details}{appendix.A}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {B}Mathematical Derivations}{23}{appendix.B}\protected@file@percent }
+\newlabel{app:derivations}{{B}{23}{Mathematical Derivations}{appendix.B}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {B.1}Free Energy Gradient}{23}{subsection.B.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {B.2}Expected Free Energy Decomposition}{23}{subsection.B.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {C}Benchmark Methodology}{23}{appendix.C}\protected@file@percent }
+\newlabel{app:methodology}{{C}{23}{Benchmark Methodology}{appendix.C}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {C.1}Environment Specifications}{23}{subsection.C.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {C.2}Timing Methodology}{23}{subsection.C.2}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {10}{\ignorespaces Psychological benchmark results. All values are mean $\pm $ SD across 10 trials unless noted.}}{24}{table.caption.15}\protected@file@percent }
+\newlabel{tab:psych-bench}{{10}{24}{Psychological benchmark results. All values are mean $\pm $ SD across 10 trials unless noted}{table.caption.15}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {11}{\ignorespaces Federated learning summary. Byzantine tolerance validated on real MNIST ($784 \to 10$ softmax, 20 nodes, 40 rounds).}}{24}{table.caption.17}\protected@file@percent }
+\newlabel{tab:fl-summary}{{11}{24}{Federated learning summary. Byzantine tolerance validated on real MNIST ($784 \to 10$ softmax, 20 nodes, 40 rounds)}{table.caption.17}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {12}{\ignorespaces ETHICS benchmark results (500 test examples/category).}}{25}{table.caption.18}\protected@file@percent }
+\newlabel{tab:ethics}{{12}{25}{ETHICS benchmark results (500 test examples/category)}{table.caption.18}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {13}{\ignorespaces DMC Humanoid Stand: HDC-LTC-FEP vs.\ published baselines. Returns are normalized to $[0,1]$. Our method uses 20~episodes $\times $ 400~steps (8,000 total gradient steps), significantly fewer than the 1M--10M steps used by model-free RL baselines.}}{25}{table.caption.19}\protected@file@percent }
+\newlabel{tab:humanoid-stand}{{13}{25}{DMC Humanoid Stand: HDC-LTC-FEP vs.\ published baselines. Returns are normalized to $[0,1]$. Our method uses 20~episodes $\times $ 400~steps (8,000 total gradient steps), significantly fewer than the 1M--10M steps used by model-free RL baselines}{table.caption.19}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {14}{\ignorespaces Voice synthesis accuracy: LTC controller with LS output refinement vs.\ rule-based baseline. Error is Euclidean distance across F1--F3 (Hz). MCD is mel-cepstral distortion. Throughput measured at 200\,Hz motor rate.}}{25}{table.caption.22}\protected@file@percent }
+\newlabel{tab:voice-results}{{14}{25}{Voice synthesis accuracy: LTC controller with LS output refinement vs.\ rule-based baseline. Error is Euclidean distance across F1--F3 (Hz). MCD is mel-cepstral distortion. Throughput measured at 200\,Hz motor rate}{table.caption.22}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {7}{\ignorespaces EFE ablation: sweeping safety precision reveals a decision boundary at $\pi _{\text  {safety}} \approx 3.64$. Below the crossover, mission EFE dominates (red); above, the agent chooses interception (blue). Marker color indicates the winning rendezvous fraction: orange = 75\% (low $\pi $, mission-dominated), blue = 50\% (medium $\pi $), green = 25\% (high $\pi $, earliest arrival). Unlike a scalar danger model, the time-fraction approach makes intercept EFE scale with precision (no plateau), reflecting the nonzero danger during the drone's transit to the intercept point.}}{26}{figure.caption.20}\protected@file@percent }
+\newlabel{fig:efe-ablation}{{7}{26}{EFE ablation: sweeping safety precision reveals a decision boundary at $\pi _{\text {safety}} \approx 3.64$. Below the crossover, mission EFE dominates (red); above, the agent chooses interception (blue). Marker color indicates the winning rendezvous fraction: orange = 75\% (low $\pi $, mission-dominated), blue = 50\% (medium $\pi $), green = 25\% (high $\pi $, earliest arrival). Unlike a scalar danger model, the time-fraction approach makes intercept EFE scale with precision (no plateau), reflecting the nonzero danger during the drone's transit to the intercept point}{figure.caption.20}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {8}{\ignorespaces Multi-scenario EFE evaluation. Checkmarks indicate correct decisions. The agent intercepts when safety EFE dominates (Default, CloseBeam, Reversed, StaticThreat) and continues the mission otherwise (FarBeam, NoHuman, LowDanger).}}{27}{figure.caption.21}\protected@file@percent }
+\newlabel{fig:scenario-efe}{{8}{27}{Multi-scenario EFE evaluation. Checkmarks indicate correct decisions. The agent intercepts when safety EFE dominates (Default, CloseBeam, Reversed, StaticThreat) and continues the mission otherwise (FarBeam, NoHuman, LowDanger)}{figure.caption.21}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {9}{\ignorespaces \textbf  {Voice pipeline accuracy.} Left: per-vowel formant error (Hz). Center: per-consonant error. Right: summary metrics comparing LTC vs.\ rule-based baseline.}}{28}{figure.caption.23}\protected@file@percent }
+\newlabel{fig:voice-pipeline}{{9}{28}{\textbf {Voice pipeline accuracy.} Left: per-vowel formant error (Hz). Center: per-consonant error. Right: summary metrics comparing LTC vs.\ rule-based baseline}{figure.caption.23}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {10}{\ignorespaces \textbf  {Spectral evaluation.} Left: F1--F2 vowel formant space showing targets (circles) and achieved values (crosses). Right: intonation-specific F0 contours at 120\,Hz base pitch.}}{29}{figure.caption.24}\protected@file@percent }
+\newlabel{fig:spectral-eval}{{10}{29}{\textbf {Spectral evaluation.} Left: F1--F2 vowel formant space showing targets (circles) and achieved values (crosses). Right: intonation-specific F0 contours at 120\,Hz base pitch}{figure.caption.24}{}}
+\newlabel{LastPage}{{C.2}{29}{Timing Methodology}{page.29}{}}
+\gdef\lastpage@lastpage{29}
+\gdef\lastpage@lastpageHy{29}
+\gdef \@abspage@last{29}

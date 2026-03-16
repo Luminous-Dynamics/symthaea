@@ -26,10 +26,24 @@ pub struct BrocaConsciousnessSignals {
     pub meta_awareness: f32,
     /// Coherence (0..1).
     pub coherence: f32,
-    /// Knowledge-grounded context: relevant facts from the knowledge engine.
-    /// When non-empty, boosts epistemic confidence for grounded generation.
-    /// Science: Barsalou (2008) — grounded cognition reduces hallucination.
+    /// Knowledge grounding (0..1). How well current reasoning is supported by stored knowledge.
+    /// High grounding enables more confident, factual generation.
+    /// Science: Baddeley (2000) — semantic grounding improves production coherence.
+    pub knowledge_grounding: f32,
+    /// Top-k relevant knowledge facts for context-grounded generation.
     pub knowledge_context: Vec<String>,
+    /// Therapeutic intent (0=validate .. 7=crisis). Only used with `therapeutic` feature.
+    #[cfg(feature = "therapeutic")]
+    pub therapeutic_intent: f32,
+    /// Therapeutic alliance quality (0..1).
+    #[cfg(feature = "therapeutic")]
+    pub alliance_quality: f32,
+    /// Client distress level (0..1).
+    #[cfg(feature = "therapeutic")]
+    pub client_distress_level: f32,
+    /// Intervention depth (0..1).
+    #[cfg(feature = "therapeutic")]
+    pub intervention_depth: f32,
 }
 
 // Re-export telemetry type from the types module.
@@ -127,16 +141,10 @@ impl BrocaManager {
 
         let start = std::time::Instant::now();
 
-        // Knowledge grounding → epistemic confidence boost.
-        // When knowledge context is available, the system has factual basis for claims.
-        // Science: Barsalou (2008) — grounded cognition reduces hallucination risk.
-        let grounding_boost = (signals.knowledge_context.len() as f32 * 0.1).min(0.3);
-        let grounded_confidence = (signals.epistemic_confidence + grounding_boost).min(1.0);
-
         // Build thought channels from consciousness signals
         let mut channels = ThoughtChannels::default();
         // Map epistemic confidence to epistemic ordinal (invert: 1.0=Certain→0, 0.0=OutOfDomain→4)
-        channels.set_epistemic((1.0 - grounded_confidence) * 4.0);
+        channels.set_epistemic((1.0 - signals.epistemic_confidence) * 4.0);
         channels.set_emotion(
             signals.emotional_valence,
             signals.emotional_arousal,
@@ -146,6 +154,15 @@ impl BrocaManager {
             signals.consciousness_level,
             signals.meta_awareness,
             signals.coherence,
+        );
+
+        // Set therapeutic channels from manager state
+        #[cfg(feature = "therapeutic")]
+        channels.set_therapeutic(
+            signals.therapeutic_intent,
+            signals.alliance_quality,
+            signals.client_distress_level,
+            signals.intervention_depth,
         );
 
         // Multi-turn context: use generate_continuing() after the first turn

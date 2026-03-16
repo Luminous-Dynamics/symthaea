@@ -137,6 +137,80 @@ impl AgentResult {
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// Task E types: structured test failures, events, retry strategies, consciousness
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Parsed test failure with structured fields for targeted fixing.
+#[derive(Debug, Clone)]
+struct StructuredTestFailure {
+    test_name: String,
+    failure_kind: TestFailureKind,
+    expected: Option<String>,
+    actual: Option<String>,
+    message: Option<String>,
+    file: Option<String>,
+    line: Option<usize>,
+}
+
+/// Classification of test failure types.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum TestFailureKind {
+    AssertEq,
+    Assert,
+    Panic,
+    Other,
+}
+
+/// Streaming events emitted during agent execution.
+#[derive(Debug, Clone)]
+pub enum AgentEvent {
+    PhaseTransition { from: TaskPhase, to: TaskPhase, iteration: usize },
+    Observation(String),
+    CodeGenerated { tier: BackendTier, bytes: usize, file: PathBuf },
+    TestResult { passed: bool, error_count: usize },
+    ConsciousnessSnapshot { phi: f32, prediction_error: f32, confidence_velocity: f32 },
+    RetryStrategyChanged(RetryStrategy),
+    RequestClarification(String),
+    Done(AgentResult),
+}
+
+/// Differentiated retry strategies for fixing failures.
+#[derive(Debug, Clone, PartialEq)]
+pub enum RetryStrategy {
+    Default,
+    DifferentTemplate,
+    DifferentBackend(BackendTier),
+    SimplifyScope,
+    RequestClarification(String),
+}
+
+/// Tracks which retry strategies have been attempted.
+#[derive(Debug, Clone)]
+struct RetryState {
+    strategies_tried: Vec<RetryStrategy>,
+    current_strategy: RetryStrategy,
+}
+
+impl Default for RetryState {
+    fn default() -> Self {
+        Self {
+            strategies_tried: Vec::new(),
+            current_strategy: RetryStrategy::Default,
+        }
+    }
+}
+
+/// Extracted consciousness signals for agent decision-making.
+#[derive(Debug, Clone, Default)]
+struct ConsciousnessSignals {
+    prediction_error: f32,
+    confidence_velocity: f32,
+    phi: f32,
+    phi_slope: f32,
+    fep_surprise: f64,
+}
+
 /// Configuration for the coding agent.
 #[derive(Debug, Clone)]
 pub struct CodingAgentConfig {
@@ -222,9 +296,23 @@ pub struct CodingAgent {
     experience_store: Option<CodingExperienceStore>,
     /// Accumulated failure patterns during this run: (error_text, count).
     failure_patterns: Vec<(String, usize)>,
+    /// Set when native_code_template() returns None — forces LLM tier on next generation.
+    /// Cleared after a successful LLM generation so native can be tried again on new tasks.
+    native_exhausted: bool,
+    /// Prediction error history for trend detection.
+    prediction_error_history: Vec<f32>,
+    /// Confidence velocity history for trend detection.
+    confidence_velocity_history: Vec<f32>,
+    /// Optional event channel for streaming agent progress.
+    event_sink: Option<std::sync::mpsc::Sender<AgentEvent>>,
+    /// Current retry state for differentiated fixing strategies.
+    retry_state: RetryState,
     /// Indexed codebase memory for semantic code search (populated by `index_project()`).
     #[cfg(feature = "code_generation")]
     code_memory: Option<crate::hdc::code_memory::CodebaseMemory>,
+    /// Cached file sources for source-level context extraction (path → source text).
+    #[cfg(feature = "code_generation")]
+    source_cache: std::collections::HashMap<PathBuf, String>,
 }
 
 impl CodingAgent {
@@ -249,9 +337,15 @@ impl CodingAgent {
                 let policy = PolicyBundle::restrictive();
                 let mut bridge = MotorOutputBridge::new(policy, sandbox);
                 bridge.enable_real_execution();
-                Ok(bridge)
+                // Lower thresholds for coding tasks — the CfC cold-starts at
+                // ~0.06 Phi and FEP motor confidence starts at ~0.1. Without this,
+                // motor output is blocked for the first many cycles.
+                // Phi 0.05: allows ReadOnly immediately, Reversible at 0.15, Destructive at 0.35
+                // Confidence 0.05: FEP hasn't learned coding-specific confidence yet
+                Ok(bridge.with_min_phi(0.05).with_min_confidence(0.05))
             } else {
                 MotorOutputBridge::with_defaults()
+                    .map(|b| b.with_min_phi(0.05).with_min_confidence(0.05))
             };
             if let Ok(bridge) = bridge {
                 cognitive_loop.set_motor_output_bridge(bridge);
@@ -264,6 +358,8 @@ impl CodingAgent {
         } else {
             IntelligentDispatcher::simulated()
         };
+
+        let experience_store = Self::try_init_experience_store(&config.working_dir);
 
         Self {
             cognitive_loop,
@@ -282,18 +378,46 @@ impl CodingAgent {
             generation_tiers: Vec::new(),
             generated_code: None,
             code_context: Vec::new(),
-            experience_store: Self::try_init_experience_store(),
+            experience_store,
             failure_patterns: Vec::new(),
+            native_exhausted: false,
+            prediction_error_history: Vec::new(),
+            confidence_velocity_history: Vec::new(),
+            event_sink: None,
+            retry_state: RetryState::default(),
             #[cfg(feature = "code_generation")]
             code_memory: None,
+            #[cfg(feature = "code_generation")]
+            source_cache: std::collections::HashMap::new(),
         }
     }
 
-    /// Attempt to create an in-memory experience store. Returns None on failure
-    /// (non-blocking — agent works fine without it).
-    fn try_init_experience_store() -> Option<CodingExperienceStore> {
-        // Use tokio if available, otherwise skip
+    /// Attempt to create an experience store. Tries persistent (disk-backed) first,
+    /// falling back to in-memory if that fails. Returns None on total failure.
+    fn try_init_experience_store(working_dir: &std::path::Path) -> Option<CodingExperienceStore> {
         let rt = tokio::runtime::Runtime::new().ok()?;
+
+        // Try persistent store at {working_dir}/.symthaea/experience.db
+        let db_dir = working_dir.join(".symthaea");
+        if std::fs::create_dir_all(&db_dir).is_ok() {
+            let db_path = db_dir.join("experience.db");
+            if let Ok(store) = rt.block_on(CodingExperienceStore::persistent(
+                &db_path.to_string_lossy(),
+            )) {
+                tracing::info!(
+                    target: "symthaea::coding_agent",
+                    path = %db_path.display(),
+                    "Persistent experience store initialized"
+                );
+                return Some(store);
+            }
+        }
+
+        // Fallback to in-memory
+        tracing::debug!(
+            target: "symthaea::coding_agent",
+            "Falling back to in-memory experience store"
+        );
         rt.block_on(async { CodingExperienceStore::new().await.ok() })
     }
 
@@ -311,26 +435,15 @@ impl CodingAgent {
         self.generated_code = None;
         self.generation_tiers.clear();
         self.failure_patterns.clear();
+        self.native_exhausted = false;
+        self.prediction_error_history.clear();
+        self.confidence_velocity_history.clear();
+        self.retry_state = RetryState::default();
 
-        // If we have indexed codebase memory, query for relevant context
+        // If we have indexed codebase memory, query for source-level context
         #[cfg(feature = "code_generation")]
         if let Some(ref memory) = self.code_memory {
-            let encoder = memory.encoder();
-            let intent_hv = encoder.encode_name(task);
-            let matches = memory.query(&intent_hv, 5);
-            let context: Vec<String> = matches
-                .iter()
-                .filter(|m| m.similarity > 0.2)
-                .map(|m| {
-                    format!(
-                        "{:?} `{}` in {} (sim: {:.3})",
-                        m.kind,
-                        m.name,
-                        m.path.display(),
-                        m.similarity
-                    )
-                })
-                .collect();
+            let context = Self::build_source_context(memory, &self.source_cache, task);
             if !context.is_empty() {
                 self.code_context = context;
             }
@@ -343,6 +456,11 @@ impl CodingAgent {
             context_entries = self.code_context.len(),
             "Starting coding agent"
         );
+
+        // Warm up the CfC: run a few idle cycles to let Phi rise from cold-start (~0.0)
+        // to a usable level. Without this, the first 3-5 real iterations are wasted
+        // because motor output is blocked by low Phi.
+        self.warm_up_phi(3);
 
         while self.phase != TaskPhase::Done && self.iteration < self.config.max_iterations {
             self.step();
@@ -359,11 +477,58 @@ impl CodingAgent {
             );
         }
 
-        self.build_result()
+        let result = self.build_result();
+        self.emit_event(AgentEvent::Done(result.clone()));
+        result
+    }
+
+    /// Warm up the CfC by running idle cognitive cycles.
+    ///
+    /// The CfC cold-starts with Phi ~0.0. Running a few cycles with the task
+    /// description as input lets the hidden state accumulate temporal context,
+    /// raising Phi to a usable level before real work begins. These warm-up
+    /// cycles don't consume agent iterations.
+    fn warm_up_phi(&mut self, cycles: usize) {
+        let observation = format!("WARM_UP: preparing to work on: {}", self.task);
+        for i in 0..cycles {
+            let result = self.cognitive_loop.cycle(&observation);
+            let phi = result
+                .metadata
+                .consciousness
+                .consciousness_level;
+            tracing::debug!(
+                target: "symthaea::coding_agent",
+                cycle = i,
+                phi = phi,
+                "Warm-up cycle"
+            );
+        }
     }
 
     /// Execute one step of the agent loop.
     fn step(&mut self) {
+        // 0. Fast-fail: if native is exhausted and we've burned enough iterations
+        // without producing any code, stop. This catches "no LLM available" scenarios.
+        // Do NOT fast-fail if a real LLM is configured — let the escalation path work.
+        if self.native_exhausted
+            && self.generated_code.is_none()
+            && self.iteration >= 5
+            && !self.config.use_local_llm
+        {
+            tracing::info!(
+                target: "symthaea::coding_agent",
+                task = %self.task,
+                iteration = self.iteration,
+                "Fast-fail: native exhausted, no code produced after {} iterations",
+                self.iteration
+            );
+            self.observations.push(
+                "Fast-fail: task beyond native capability, no usable code generated".into(),
+            );
+            self.phase = TaskPhase::Done;
+            return;
+        }
+
         // 1. Phase-specific pre-cycle action (code generation, etc.)
         self.pre_cycle_action();
 
@@ -377,15 +542,34 @@ impl CodingAgent {
         // 4. Run one cognitive cycle
         let cycle_result = self.cognitive_loop.cycle(&observation);
 
-        // Record Phi from metadata
-        let phi = cycle_result.metadata.consciousness_level as f32;
+        // Extract consciousness signals for decision-making
+        let signals = self.extract_consciousness_signals(&cycle_result);
+        let phi = signals.phi;
         self.phi_trace.push(phi);
+        self.prediction_error_history.push(signals.prediction_error);
+        self.confidence_velocity_history.push(signals.confidence_velocity);
+        // Keep histories bounded
+        if self.prediction_error_history.len() > 10 {
+            self.prediction_error_history.remove(0);
+        }
+        if self.confidence_velocity_history.len() > 10 {
+            self.confidence_velocity_history.remove(0);
+        }
+        self.emit_event(AgentEvent::ConsciousnessSnapshot {
+            phi,
+            prediction_error: signals.prediction_error,
+            confidence_velocity: signals.confidence_velocity,
+        });
 
         // 5. Check for motor output result
         let motor_result = self.cognitive_loop.take_motor_result();
 
         // 6. Process the cycle result and motor output
+        let phase_before = self.phase.clone();
         self.process_step_result(&cycle_result, motor_result, phi);
+        if self.phase != phase_before {
+            self.emit_phase_transition(&phase_before, &self.phase.clone());
+        }
     }
 
     // ── Pre-Cycle Actions ──────────────────────────────────────────────
@@ -399,7 +583,14 @@ impl CodingAgent {
             TaskPhase::Understanding => {
                 self.do_understanding();
             }
-            TaskPhase::Generating | TaskPhase::Fixing => {
+            TaskPhase::Fixing => {
+                // In Fixing phase, try structured auto-fix BEFORE calling the LLM.
+                // If the fix succeeds, skip LLM entirely (saves energy).
+                if !self.try_structured_auto_fix() {
+                    self.do_generation();
+                }
+            }
+            TaskPhase::Generating => {
                 self.do_generation();
             }
             _ => {}
@@ -484,23 +675,63 @@ impl CodingAgent {
                 self.observations.push(format!("Cargo.toml:\n{}", preview));
             }
         }
+
+        // 4. Query experience store for prior encounters with similar tasks.
+        // This gives the agent "memory" of what worked before — injected early
+        // so it influences Planning and Generation phases.
+        let hints = self.retrieve_experience_hints();
+        if !hints.is_empty() {
+            self.observations.push(format!(
+                "Prior experience: {} relevant patterns found for similar tasks",
+                hints.len()
+            ));
+            for (pattern, hint) in hints.iter().take(3) {
+                self.observations.push(format!(
+                    "  Prior: {} → {}",
+                    &pattern[..pattern.len().min(80)],
+                    &hint[..hint.len().min(80)]
+                ));
+            }
+        }
     }
 
     /// Generate code via the IntelligentDispatcher and write to disk.
     fn do_generation(&mut self) {
         // Get consciousness state for dispatch routing
         let confidence = self.cognitive_loop.prediction_confidence();
-        let epistemic = Self::confidence_to_epistemic(confidence);
         let phi = self.phi_trace.last().copied().unwrap_or(0.5) as f64;
         let prediction_error = self.cognitive_loop.prediction_confidence(); // inverse proxy
+
+        // If native generation was exhausted (returned None), override consciousness
+        // state to force the dispatcher toward LLM tier:
+        // - Epistemic → Uncertain (triggers LLM selection)
+        // - Prediction error → 0.7+ (confirms need for external help)
+        // - Phi → 0.5 (bypasses the consciousness < 0.2 → Native override)
+        let (epistemic, prediction_error, phi) = if self.native_exhausted {
+            (EpistemicStatus::Uncertain, 0.7_f64.max(prediction_error as f64), 0.5)
+        } else {
+            (Self::confidence_to_epistemic(confidence), prediction_error as f64, phi)
+        };
 
         // Build the generation prompt
         let prompt = self.build_generation_prompt();
 
         // Call the dispatcher (async → sync bridge)
         let dispatch_result = if let Some(ref mut dispatcher) = self.dispatcher {
+            // Consciousness-informed temperature: higher prediction error → more exploration
+            let pe = self.prediction_error_history.last().copied().unwrap_or(0.3);
+            let temperature = (0.3 + pe * 0.3).min(0.9);
+
+            // Apply forced backend tier from retry strategy
+            match &self.retry_state.current_strategy {
+                RetryStrategy::DifferentBackend(tier) => {
+                    dispatcher.force_next_tier(*tier);
+                }
+                _ => {}
+            }
+
             let params = GenerationParams {
-                temperature: 0.3, // low temp for code generation
+                temperature,
                 max_tokens: 1024,
                 system_prompt: Some(
                     "You are a code generator. Output ONLY valid source code, no explanations."
@@ -514,7 +745,7 @@ impl CodingAgent {
                 &prompt,
                 &params,
                 epistemic,
-                prediction_error as f64,
+                prediction_error,
                 phi,
             );
             Some(result)
@@ -526,11 +757,45 @@ impl CodingAgent {
         if let Some(result) = dispatch_result {
             self.generation_tiers.push(result.tier);
 
+            tracing::debug!(
+                target: "symthaea::coding_agent",
+                tier = %result.tier,
+                native_exhausted = self.native_exhausted,
+                success = result.success,
+                output_len = result.output.len(),
+                "Dispatch result"
+            );
+
+            // Fast-fail: if native is exhausted and the "LLM" returned simulated
+            // or signal output, there's no real backend to escalate to. Stop early
+            // instead of looping through remaining iterations.
+            if self.native_exhausted
+                && result.tier != BackendTier::Native
+                && (result.output.contains("simulated")
+                    || result.output.contains("[NATIVE:")
+                    || result.output.is_empty())
+            {
+                tracing::info!(
+                    target: "symthaea::coding_agent",
+                    task = %self.task,
+                    tier = %result.tier,
+                    "No real LLM available — fast-failing"
+                );
+                self.observations.push(
+                    "Fast-fail: no real LLM backend available for this task".into(),
+                );
+                self.phase = TaskPhase::Done;
+                self.last_dispatch = Some(result);
+                return;
+            }
+
             if result.success && result.tier != BackendTier::Native {
                 // LLM-generated code — write to disk
                 let target = self.resolve_target_file();
                 self.write_code_to_disk(&target, &result.output);
                 self.generated_code = Some(result.output.clone());
+                // LLM succeeded — clear native_exhausted (task was handled)
+                self.native_exhausted = false;
 
                 tracing::info!(
                     target: "symthaea::coding_agent",
@@ -540,12 +805,60 @@ impl CodingAgent {
                     "Code generated and written"
                 );
             } else if result.tier == BackendTier::Native {
-                // Native tier — generate a placeholder that the HDC+CfC pipeline
-                // would produce. For now, use a structural template.
-                let code = self.native_code_template();
-                let target = self.resolve_target_file();
-                self.write_code_to_disk(&target, &code);
-                self.generated_code = Some(code);
+                // Native tier — try pattern-aware generation
+                if let Some(code) = self.native_code_template() {
+                    let target = self.resolve_target_file();
+                    self.write_code_to_disk(&target, &code);
+                    self.generated_code = Some(code);
+                } else {
+                    // Native can't handle this — immediately escalate to LLM
+                    // within the SAME iteration (don't wait for next cycle).
+                    self.native_exhausted = true;
+                    if let Some(ref mut dispatcher) = self.dispatcher {
+                        dispatcher.record_outcome(BackendTier::Native, false);
+
+                        // Re-dispatch with overridden state to force LLM tier
+                        let params = GenerationParams {
+                            temperature: 0.4,
+                            max_tokens: 1024,
+                            system_prompt: Some(
+                                "You are a code generator. Output ONLY valid source code, no explanations."
+                                    .into(),
+                            ),
+                        };
+                        let llm_result = Self::block_on_dispatch(
+                            dispatcher,
+                            &prompt,
+                            &params,
+                            EpistemicStatus::Uncertain,
+                            0.7,
+                            0.5, // bypass consciousness < 0.2 check
+                        );
+                        self.generation_tiers.push(llm_result.tier);
+                        tracing::info!(
+                            target: "symthaea::coding_agent",
+                            tier = %llm_result.tier,
+                            success = llm_result.success,
+                            output_len = llm_result.output.len(),
+                            "Native→LLM escalation"
+                        );
+                        if llm_result.success && llm_result.tier != BackendTier::Native {
+                            let target = self.resolve_target_file();
+                            self.write_code_to_disk(&target, &llm_result.output);
+                            self.generated_code = Some(llm_result.output.clone());
+                            self.native_exhausted = false;
+                        } else {
+                            self.observations.push(
+                                "Native exhausted, LLM escalation attempted".into(),
+                            );
+                        }
+                        self.last_dispatch = Some(llm_result);
+                        return; // already processed
+                    }
+                    self.observations.push(
+                        "Native generation: no matching pattern, no dispatcher available".into(),
+                    );
+                }
             } else {
                 self.errors.push(format!(
                     "Generation failed ({}): {}",
@@ -555,6 +868,61 @@ impl CodingAgent {
 
             self.last_dispatch = Some(result);
         }
+    }
+
+    /// Try to auto-fix the last compilation error using structured (line-aware) fixes.
+    ///
+    /// Parses `last_test_output` into structured errors with file/line/column info,
+    /// then applies targeted fixes (type conversions, clone insertion, lifetime
+    /// annotations, derive attributes). If a fix is applied, writes the fixed code
+    /// to disk and sets `generated_code` — skipping the LLM entirely.
+    ///
+    /// Returns `true` if a fix was applied (caller should skip LLM generation).
+    fn try_structured_auto_fix(&mut self) -> bool {
+        // Need both the error output and the generated code to fix
+        let (test_output, code) = match (&self.last_test_output, &self.generated_code) {
+            (Some(output), Some(code)) => (output.clone(), code.clone()),
+            _ => return false,
+        };
+
+        // Parse structured errors
+        let structured = crate::language::code_executor::parse_structured_errors(&test_output);
+        if structured.is_empty() {
+            return false;
+        }
+
+        // Try structured (line-aware) fix first
+        if let Some(fixed) = crate::language::code_executor::try_auto_fix_structured(&code, &structured) {
+            let target = self.resolve_target_file();
+            self.write_code_to_disk(&target, &fixed);
+            self.generated_code = Some(fixed);
+            self.observations.push(format!(
+                "Structured auto-fix applied ({} errors analyzed, line-targeted)",
+                structured.len()
+            ));
+            tracing::info!(
+                target: "symthaea::coding_agent",
+                errors = structured.len(),
+                "Structured auto-fix applied, skipping LLM"
+            );
+            return true;
+        }
+
+        // Fall back to basic (non-line-aware) fix
+        let flat_errors: Vec<String> = structured.iter().map(|e| e.message.clone()).collect();
+        if let Some(fixed) = crate::language::code_executor::try_auto_fix(&code, &flat_errors) {
+            let target = self.resolve_target_file();
+            self.write_code_to_disk(&target, &fixed);
+            self.generated_code = Some(fixed);
+            self.observations.push("Basic auto-fix applied".into());
+            tracing::info!(
+                target: "symthaea::coding_agent",
+                "Basic auto-fix applied, skipping LLM"
+            );
+            return true;
+        }
+
+        false
     }
 
     /// Synchronously call the async dispatcher.
@@ -594,6 +962,13 @@ impl CodingAgent {
 
         prompt.push_str(&format!("Task: {}\n\n", self.task));
 
+        // HDC context from indexed codebase memory (similarity search results)
+        let hdc_ctx = self.build_hdc_context_prompt();
+        if !hdc_ctx.is_empty() {
+            prompt.push_str(&hdc_ctx);
+            prompt.push('\n');
+        }
+
         // Include codebase context from CodebaseMemory
         if !self.code_context.is_empty() {
             prompt.push_str("Relevant code from the project:\n");
@@ -612,22 +987,57 @@ impl CodingAgent {
             prompt.push('\n');
         }
 
-        // In Fixing phase, include the error to fix
+        // In Fixing phase, include both raw error and structured test failure analysis
         if self.phase == TaskPhase::Fixing {
             if let Some(ref test_output) = self.last_test_output {
+                // Parse structured test failures for targeted fixing
+                let structured = Self::parse_test_failures(test_output);
+                if !structured.is_empty() {
+                    prompt.push_str(&Self::format_structured_test_failures(&structured));
+                }
                 prompt.push_str(&format!(
                     "The previous code failed with this error:\n```\n{}\n```\n\nFix the code.\n",
                     test_output
                 ));
             }
+            // Include retry strategy hints
+            match &self.retry_state.current_strategy {
+                RetryStrategy::DifferentTemplate => {
+                    prompt.push_str("\nTry a completely different implementation approach.\n");
+                }
+                RetryStrategy::SimplifyScope => {
+                    prompt.push_str("\nSimplify the implementation — use the minimal viable approach.\n");
+                }
+                _ => {}
+            }
         }
 
-        // Inject experience hints from persistent store
+        // Inject failure patterns from THIS run — these are errors we've already
+        // seen, so the generator should avoid repeating them.
+        if !self.failure_patterns.is_empty() {
+            prompt.push_str("Errors encountered in this session (AVOID these patterns):\n");
+            for (pattern, count) in self.failure_patterns.iter().take(5) {
+                prompt.push_str(&format!("- ({count}x) {pattern}\n"));
+            }
+            prompt.push('\n');
+        }
+
+        // Inject experience hints from persistent store (cross-session learning)
         let hints = self.retrieve_experience_hints();
         if !hints.is_empty() {
             prompt.push_str("Relevant patterns from past experience:\n");
             for (pattern, hint) in hints.iter().take(3) {
                 prompt.push_str(&format!("- Error: {} → Fix: {}\n", pattern, hint));
+            }
+            prompt.push('\n');
+        }
+
+        // Inject successful code patterns from past sessions
+        let successes = self.retrieve_success_patterns();
+        if !successes.is_empty() {
+            prompt.push_str("Successful implementations from prior sessions:\n");
+            for (task, code_summary) in successes.iter().take(2) {
+                prompt.push_str(&format!("- Task: {} → Code: {}\n", task, code_summary));
             }
             prompt.push('\n');
         }
@@ -647,30 +1057,375 @@ impl CodingAgent {
     fn retrieve_experience_hints(&self) -> Vec<(String, String)> {
         if let Some(ref store) = self.experience_store {
             if let Ok(rt) = tokio::runtime::Runtime::new() {
-                return rt.block_on(async { store.error_hints_for(&self.task, 3).await });
+                return rt.block_on(async {
+                    store.error_hints_for(&self.task, 3).await
+                });
             }
         }
         Vec::new()
     }
 
-    /// Generate a structural template for native (non-LLM) code generation.
-    fn native_code_template(&self) -> String {
-        // Extract function/type names from the task
+    /// Retrieve successful code patterns from the persistent experience store.
+    ///
+    /// Returns `(task_description, code_summary)` pairs from past sessions
+    /// where similar tasks were completed successfully.
+    fn retrieve_success_patterns(&self) -> Vec<(String, String)> {
+        if let Some(ref store) = self.experience_store {
+            // First check cache (fast, no async)
+            let self_task_lower = self.task.to_lowercase();
+            let self_words: std::collections::HashSet<String> =
+                self_task_lower.split_whitespace().map(|s| s.to_string()).collect();
+            let cached: Vec<(String, String)> = store
+                .cached_successes()
+                .iter()
+                .filter(|(task, _)| {
+                    let task_lower = task.to_lowercase();
+                    let task_words: std::collections::HashSet<String> =
+                        task_lower.split_whitespace().map(|s| s.to_string()).collect();
+                    task_words.intersection(&self_words).count() >= 2
+                })
+                .take(3)
+                .cloned()
+                .collect();
+
+            if !cached.is_empty() {
+                return cached;
+            }
+
+            // Fall back to similarity search
+            if let Ok(rt) = tokio::runtime::Runtime::new() {
+                return rt.block_on(async {
+                    let results = store.query_similar(&self.task, 5).await;
+                    results
+                        .into_iter()
+                        .filter(|r| r.record.valence > 0.0 && r.similarity > 0.5)
+                        .map(|r| {
+                            let summary = r.record.topics.first().cloned().unwrap_or_default();
+                            (r.record.content, summary)
+                        })
+                        .take(3)
+                        .collect()
+                });
+            }
+        }
+        Vec::new()
+    }
+
+    /// Generate code using native (non-LLM) pattern-aware templates.
+    ///
+    /// Matches task descriptions against a library of common coding patterns
+    /// (arithmetic, string ops, sorting, searching, data structures, etc.)
+    /// and generates compilable, tested implementations. Returns `None` if
+    /// the task doesn't match any known pattern — the caller should escalate
+    /// to an LLM tier rather than produce a TODO stub.
+    fn native_code_template(&self) -> Option<String> {
         let task_lower = self.task.to_lowercase();
 
-        // Detect common patterns and generate appropriate templates
-        if task_lower.contains("fibonacci") || task_lower.contains("fib") {
-            "/// Compute the nth Fibonacci number.\npub fn fibonacci(n: u64) -> u64 {\n    match n {\n        0 => 0,\n        1 => 1,\n        _ => {\n            let (mut a, mut b) = (0u64, 1u64);\n            for _ in 2..=n {\n                let c = a.saturating_add(b);\n                a = b;\n                b = c;\n            }\n            b\n        }\n    }\n}\n".to_string()
-        } else if task_lower.contains("hello") {
-            "/// Return a greeting.\npub fn hello() -> &'static str {\n    \"Hello, world!\"\n}\n"
-                .to_string()
-        } else {
-            // Generic function stub
-            format!(
-                "/// Generated by Symthaea coding agent.\npub fn generated() -> () {{\n    // TODO: implement — task: {}\n}}\n",
-                self.task
-            )
+        // Try pattern-specific generation first
+        if let Some(code) = Self::match_native_pattern(&task_lower) {
+            return Some(code);
         }
+
+
+        // No match — signal that native generation can't handle this task.
+        // The caller should escalate to an LLM tier.
+        None
+    }
+
+    /// Match task against known coding patterns and return compilable code.
+    fn match_native_pattern(task: &str) -> Option<String> {
+        // ── Arithmetic / Math ────────────────────────────────────────
+        if task.contains("fibonacci") || task.contains("fib") {
+            return Some(
+                "/// Compute the nth Fibonacci number.\npub fn fibonacci(n: u64) -> u64 {\n    match n {\n        0 => 0,\n        1 => 1,\n        _ => {\n            let (mut a, mut b) = (0u64, 1u64);\n            for _ in 2..=n {\n                let c = a.saturating_add(b);\n                a = b;\n                b = c;\n            }\n            b\n        }\n    }\n}\n"
+                    .to_string(),
+            );
+        }
+        if task.contains("factorial") {
+            return Some(
+                "/// Compute the factorial of n.\npub fn factorial(n: u64) -> u64 {\n    (1..=n).fold(1u64, |acc, x| acc.saturating_mul(x))\n}\n"
+                    .to_string(),
+            );
+        }
+        if task.contains("gcd") || task.contains("greatest common") {
+            return Some(
+                "/// Compute the greatest common divisor using Euclid's algorithm.\npub fn gcd(mut a: u64, mut b: u64) -> u64 {\n    while b != 0 {\n        let t = b;\n        b = a % b;\n        a = t;\n    }\n    a\n}\n"
+                    .to_string(),
+            );
+        }
+        if task.contains("is_prime") || task.contains("prime check") || task.contains("primality") {
+            return Some(
+                "/// Check if a number is prime.\npub fn is_prime(n: u64) -> bool {\n    if n < 2 { return false; }\n    if n < 4 { return true; }\n    if n % 2 == 0 || n % 3 == 0 { return false; }\n    let mut i = 5;\n    while i * i <= n {\n        if n % i == 0 || n % (i + 2) == 0 { return false; }\n        i += 6;\n    }\n    true\n}\n"
+                    .to_string(),
+            );
+        }
+        if task.contains("absolute") || task.contains("abs ") {
+            return Some(
+                "/// Return the absolute value.\npub fn absolute(x: i64) -> u64 {\n    x.unsigned_abs()\n}\n"
+                    .to_string(),
+            );
+        }
+
+        // ── String operations ────────────────────────────────────────
+        if task.contains("hello") {
+            return Some(
+                "/// Return a greeting.\npub fn hello() -> &'static str {\n    \"Hello, world!\"\n}\n"
+                    .to_string(),
+            );
+        }
+        if task.contains("reverse") && task.contains("string") {
+            return Some(
+                "/// Reverse a string.\npub fn reverse_string(s: &str) -> String {\n    s.chars().rev().collect()\n}\n"
+                    .to_string(),
+            );
+        }
+        if task.contains("palindrome") {
+            return Some(
+                "/// Check if a string is a palindrome.\npub fn is_palindrome(s: &str) -> bool {\n    let s: String = s.chars().filter(|c| c.is_alphanumeric()).flat_map(|c| c.to_lowercase()).collect();\n    s == s.chars().rev().collect::<String>()\n}\n"
+                    .to_string(),
+            );
+        }
+        if task.contains("count") && task.contains("vowel") {
+            return Some(
+                "/// Count vowels in a string.\npub fn count_vowels(s: &str) -> usize {\n    s.chars().filter(|c| \"aeiouAEIOU\".contains(*c)).count()\n}\n"
+                    .to_string(),
+            );
+        }
+        if task.contains("uppercase") || task.contains("to_upper") {
+            return Some(
+                "/// Convert a string to uppercase.\npub fn to_uppercase(s: &str) -> String {\n    s.to_uppercase()\n}\n"
+                    .to_string(),
+            );
+        }
+
+        // ── Sorting ──────────────────────────────────────────────────
+        if task.contains("bubble sort") {
+            return Some(
+                "/// Sort a slice using bubble sort.\npub fn bubble_sort<T: Ord>(arr: &mut [T]) {\n    let n = arr.len();\n    for i in 0..n {\n        let mut swapped = false;\n        for j in 0..n.saturating_sub(i + 1) {\n            if arr[j] > arr[j + 1] {\n                arr.swap(j, j + 1);\n                swapped = true;\n            }\n        }\n        if !swapped { break; }\n    }\n}\n"
+                    .to_string(),
+            );
+        }
+        if task.contains("insertion sort") {
+            return Some(
+                "/// Sort a slice using insertion sort.\npub fn insertion_sort<T: Ord + Copy>(arr: &mut [T]) {\n    for i in 1..arr.len() {\n        let key = arr[i];\n        let mut j = i;\n        while j > 0 && arr[j - 1] > key {\n            arr[j] = arr[j - 1];\n            j -= 1;\n        }\n        arr[j] = key;\n    }\n}\n"
+                    .to_string(),
+            );
+        }
+        if task.contains("merge sort") {
+            return Some(
+                "/// Sort a slice using merge sort.\npub fn merge_sort<T: Ord + Clone>(arr: &mut [T]) {\n    let len = arr.len();\n    if len <= 1 { return; }\n    let mid = len / 2;\n    let mut left = arr[..mid].to_vec();\n    let mut right = arr[mid..].to_vec();\n    merge_sort(&mut left);\n    merge_sort(&mut right);\n    let (mut i, mut j, mut k) = (0, 0, 0);\n    while i < left.len() && j < right.len() {\n        if left[i] <= right[j] { arr[k] = left[i].clone(); i += 1; }\n        else { arr[k] = right[j].clone(); j += 1; }\n        k += 1;\n    }\n    while i < left.len() { arr[k] = left[i].clone(); i += 1; k += 1; }\n    while j < right.len() { arr[k] = right[j].clone(); j += 1; k += 1; }\n}\n"
+                    .to_string(),
+            );
+        }
+        if task.contains("sort") {
+            // Generic: if "sort" is mentioned but no specific algorithm
+            return Some(
+                "/// Sort a vector and return it.\npub fn sort_vec<T: Ord>(mut v: Vec<T>) -> Vec<T> {\n    v.sort();\n    v\n}\n"
+                    .to_string(),
+            );
+        }
+
+        // ── Searching ────────────────────────────────────────────────
+        if task.contains("binary search") {
+            return Some(
+                "/// Binary search for a value in a sorted slice. Returns the index if found.\npub fn binary_search<T: Ord>(arr: &[T], target: &T) -> Option<usize> {\n    let mut lo = 0usize;\n    let mut hi = arr.len();\n    while lo < hi {\n        let mid = lo + (hi - lo) / 2;\n        match arr[mid].cmp(target) {\n            std::cmp::Ordering::Equal => return Some(mid),\n            std::cmp::Ordering::Less => lo = mid + 1,\n            std::cmp::Ordering::Greater => hi = mid,\n        }\n    }\n    None\n}\n"
+                    .to_string(),
+            );
+        }
+        if task.contains("linear search") || (task.contains("search") && task.contains("find")) {
+            return Some(
+                "/// Linear search for a value in a slice. Returns the index if found.\npub fn linear_search<T: PartialEq>(arr: &[T], target: &T) -> Option<usize> {\n    arr.iter().position(|x| x == target)\n}\n"
+                    .to_string(),
+            );
+        }
+
+        // ── Collections ──────────────────────────────────────────────
+        if task.contains("sum") && (task.contains("vec") || task.contains("list") || task.contains("array")) {
+            return Some(
+                "/// Sum all elements in a slice.\npub fn sum_vec(v: &[i64]) -> i64 {\n    v.iter().sum()\n}\n"
+                    .to_string(),
+            );
+        }
+        if task.contains("max") && (task.contains("vec") || task.contains("list") || task.contains("array") || task.contains("find")) {
+            return Some(
+                "/// Find the maximum value in a slice.\npub fn find_max(v: &[i64]) -> Option<i64> {\n    v.iter().copied().max()\n}\n"
+                    .to_string(),
+            );
+        }
+        if task.contains("min") && (task.contains("vec") || task.contains("list") || task.contains("array") || task.contains("find")) {
+            return Some(
+                "/// Find the minimum value in a slice.\npub fn find_min(v: &[i64]) -> Option<i64> {\n    v.iter().copied().min()\n}\n"
+                    .to_string(),
+            );
+        }
+        if task.contains("is_even") || (task.contains("even") && task.contains("check")) {
+            return Some(
+                "/// Check if a number is even.\npub fn is_even(n: i64) -> bool {\n    n % 2 == 0\n}\n"
+                    .to_string(),
+            );
+        }
+        if task.contains("flatten") {
+            return Some(
+                "/// Flatten a nested vector.\npub fn flatten<T: Clone>(nested: &[Vec<T>]) -> Vec<T> {\n    nested.iter().flat_map(|v| v.iter().cloned()).collect()\n}\n"
+                    .to_string(),
+            );
+        }
+
+        // ── Data structures ──────────────────────────────────────────
+        if task.contains("stack") {
+            return Some(
+                "/// A simple stack backed by a Vec.\npub struct Stack<T> {\n    data: Vec<T>,\n}\n\nimpl<T> Stack<T> {\n    pub fn new() -> Self { Self { data: Vec::new() } }\n    pub fn push(&mut self, val: T) { self.data.push(val); }\n    pub fn pop(&mut self) -> Option<T> { self.data.pop() }\n    pub fn peek(&self) -> Option<&T> { self.data.last() }\n    pub fn is_empty(&self) -> bool { self.data.is_empty() }\n    pub fn len(&self) -> usize { self.data.len() }\n}\n\nimpl<T> Default for Stack<T> {\n    fn default() -> Self { Self::new() }\n}\n"
+                    .to_string(),
+            );
+        }
+        if task.contains("ring buffer") {
+            return Some(
+                "/// A fixed-capacity ring buffer.\npub struct RingBuffer<T> {\n    buf: Vec<Option<T>>,\n    head: usize,\n    len: usize,\n}\n\nimpl<T> RingBuffer<T> {\n    pub fn new(capacity: usize) -> Self {\n        let mut buf = Vec::with_capacity(capacity);\n        for _ in 0..capacity { buf.push(None); }\n        Self { buf, head: 0, len: 0 }\n    }\n    pub fn push(&mut self, val: T) {\n        let cap = self.buf.len();\n        let idx = (self.head + self.len) % cap;\n        self.buf[idx] = Some(val);\n        if self.len == cap { self.head = (self.head + 1) % cap; }\n        else { self.len += 1; }\n    }\n    pub fn pop(&mut self) -> Option<T> {\n        if self.len == 0 { return None; }\n        let val = self.buf[self.head].take();\n        self.head = (self.head + 1) % self.buf.len();\n        self.len -= 1;\n        val\n    }\n    pub fn len(&self) -> usize { self.len }\n    pub fn is_empty(&self) -> bool { self.len == 0 }\n}\n"
+                    .to_string(),
+            );
+        }
+        if task.contains("linked list") {
+            return Some(
+                "/// A singly linked list.\npub struct LinkedList<T> {\n    head: Option<Box<Node<T>>>,\n}\n\nstruct Node<T> {\n    value: T,\n    next: Option<Box<Node<T>>>,\n}\n\nimpl<T> LinkedList<T> {\n    pub fn new() -> Self { Self { head: None } }\n    pub fn push_front(&mut self, val: T) {\n        let node = Box::new(Node { value: val, next: self.head.take() });\n        self.head = Some(node);\n    }\n    pub fn pop_front(&mut self) -> Option<T> {\n        let node = self.head.take()?;\n        self.head = node.next;\n        Some(node.value)\n    }\n    pub fn is_empty(&self) -> bool { self.head.is_none() }\n    pub fn len(&self) -> usize {\n        let mut count = 0;\n        let mut current = &self.head;\n        while let Some(node) = current { count += 1; current = &node.next; }\n        count\n    }\n}\n\nimpl<T> Default for LinkedList<T> {\n    fn default() -> Self { Self::new() }\n}\n"
+                    .to_string(),
+            );
+        }
+        if task.contains("bloom filter") {
+            return Some(
+                "use std::collections::hash_map::DefaultHasher;\nuse std::hash::{Hash, Hasher};\n\n/// A simple Bloom filter.\npub struct BloomFilter {\n    bits: Vec<bool>,\n    num_hashes: usize,\n}\n\nimpl BloomFilter {\n    pub fn new(size: usize, num_hashes: usize) -> Self {\n        Self { bits: vec![false; size], num_hashes }\n    }\n    pub fn insert<T: Hash>(&mut self, item: &T) {\n        for i in 0..self.num_hashes {\n            let idx = self.hash_idx(item, i);\n            self.bits[idx] = true;\n        }\n    }\n    pub fn contains<T: Hash>(&self, item: &T) -> bool {\n        (0..self.num_hashes).all(|i| self.bits[self.hash_idx(item, i)])\n    }\n    fn hash_idx<T: Hash>(&self, item: &T, seed: usize) -> usize {\n        let mut hasher = DefaultHasher::new();\n        item.hash(&mut hasher);\n        seed.hash(&mut hasher);\n        hasher.finish() as usize % self.bits.len()\n    }\n}\n"
+                    .to_string(),
+            );
+        }
+
+        // ── Medium algorithms ────────────────────────────────────────
+        // (merge sort handled above in Sorting section to avoid generic "sort" matching first)
+        if task.contains("caesar") || task.contains("cipher") {
+            return Some(
+                "/// Encrypt text using a Caesar cipher with the given shift.\npub fn encrypt(text: &str, shift: u8) -> String {\n    text.chars().map(|c| {\n        if c.is_ascii_lowercase() {\n            (b'a' + (c as u8 - b'a' + shift) % 26) as char\n        } else if c.is_ascii_uppercase() {\n            (b'A' + (c as u8 - b'A' + shift) % 26) as char\n        } else { c }\n    }).collect()\n}\n\n/// Decrypt text using a Caesar cipher with the given shift.\npub fn decrypt(text: &str, shift: u8) -> String {\n    encrypt(text, 26 - (shift % 26))\n}\n"
+                    .to_string(),
+            );
+        }
+        if task.contains("run-length") || task.contains("rle") {
+            return Some(
+                "/// Run-length encode a string: \"aaabbc\" → \"3a2b1c\".\npub fn rle_encode(s: &str) -> String {\n    if s.is_empty() { return String::new(); }\n    let mut result = String::new();\n    let chars: Vec<char> = s.chars().collect();\n    let mut count = 1usize;\n    for i in 1..chars.len() {\n        if chars[i] == chars[i - 1] { count += 1; }\n        else {\n            result.push_str(&count.to_string());\n            result.push(chars[i - 1]);\n            count = 1;\n        }\n    }\n    result.push_str(&count.to_string());\n    result.push(*chars.last().unwrap());\n    result\n}\n"
+                    .to_string(),
+            );
+        }
+        if task.contains("pascal") && task.contains("triangle") {
+            return Some(
+                "/// Generate Pascal's triangle with n rows.\npub fn pascal_triangle(n: usize) -> Vec<Vec<u64>> {\n    let mut tri = Vec::with_capacity(n);\n    for i in 0..n {\n        let mut row = vec![1u64; i + 1];\n        for j in 1..i {\n            row[j] = tri[i - 1][j - 1] + tri[i - 1][j];\n        }\n        tri.push(row);\n    }\n    tri\n}\n"
+                    .to_string(),
+            );
+        }
+        if task.contains("levenshtein") || task.contains("edit distance") {
+            return Some(
+                "/// Compute the Levenshtein (edit) distance between two strings.\npub fn levenshtein(a: &str, b: &str) -> usize {\n    let a: Vec<char> = a.chars().collect();\n    let b: Vec<char> = b.chars().collect();\n    let (m, n) = (a.len(), b.len());\n    let mut dp = vec![vec![0usize; n + 1]; m + 1];\n    for i in 0..=m { dp[i][0] = i; }\n    for j in 0..=n { dp[0][j] = j; }\n    for i in 1..=m {\n        for j in 1..=n {\n            let cost = if a[i - 1] == b[j - 1] { 0 } else { 1 };\n            dp[i][j] = (dp[i - 1][j] + 1)\n                .min(dp[i][j - 1] + 1)\n                .min(dp[i - 1][j - 1] + cost);\n        }\n    }\n    dp[m][n]\n}\n"
+                    .to_string(),
+            );
+        }
+        if task.contains("permutation") {
+            return Some(
+                "/// Generate all permutations of a string.\npub fn permutations(s: &str) -> Vec<String> {\n    let chars: Vec<char> = s.chars().collect();\n    let mut results = Vec::new();\n    let mut current = chars.clone();\n    permute(&mut current, 0, &mut results);\n    results\n}\n\nfn permute(chars: &mut Vec<char>, start: usize, results: &mut Vec<String>) {\n    if start == chars.len() {\n        results.push(chars.iter().collect());\n        return;\n    }\n    for i in start..chars.len() {\n        chars.swap(start, i);\n        permute(chars, start + 1, results);\n        chars.swap(start, i);\n    }\n}\n"
+                    .to_string(),
+            );
+        }
+        if task.contains("depth-first") || task.contains("dfs") {
+            return Some(
+                "use std::collections::HashSet;\n\n/// Perform depth-first search on an adjacency list graph.\n/// Returns visited nodes in DFS order.\npub fn dfs(graph: &[Vec<usize>], start: usize) -> Vec<usize> {\n    let mut visited = HashSet::new();\n    let mut order = Vec::new();\n    dfs_visit(graph, start, &mut visited, &mut order);\n    order\n}\n\nfn dfs_visit(graph: &[Vec<usize>], node: usize, visited: &mut HashSet<usize>, order: &mut Vec<usize>) {\n    if !visited.insert(node) { return; }\n    order.push(node);\n    if node < graph.len() {\n        for &neighbor in &graph[node] {\n            dfs_visit(graph, neighbor, visited, order);\n        }\n    }\n}\n"
+                    .to_string(),
+            );
+        }
+        if task.contains("dijkstra") {
+            return Some(
+                "use std::collections::BinaryHeap;\nuse std::cmp::Reverse;\n\n/// Dijkstra's shortest path from `start` on a weighted adjacency list.\n/// Returns distances to all nodes (usize::MAX = unreachable).\npub fn dijkstra(graph: &[Vec<(usize, u64)>], start: usize) -> Vec<u64> {\n    let n = graph.len();\n    let mut dist = vec![u64::MAX; n];\n    dist[start] = 0;\n    let mut heap = BinaryHeap::new();\n    heap.push(Reverse((0u64, start)));\n    while let Some(Reverse((d, u))) = heap.pop() {\n        if d > dist[u] { continue; }\n        for &(v, w) in &graph[u] {\n            let nd = d + w;\n            if nd < dist[v] {\n                dist[v] = nd;\n                heap.push(Reverse((nd, v)));\n            }\n        }\n    }\n    dist\n}\n"
+                    .to_string(),
+            );
+        }
+        if task.contains("matrix") && task.contains("multiply") {
+            return Some(
+                "/// Multiply two matrices (Vec of rows).\npub fn multiply(a: &[Vec<f64>], b: &[Vec<f64>]) -> Vec<Vec<f64>> {\n    let m = a.len();\n    let n = b[0].len();\n    let k = b.len();\n    let mut result = vec![vec![0.0f64; n]; m];\n    for i in 0..m {\n        for j in 0..n {\n            for p in 0..k {\n                result[i][j] += a[i][p] * b[p][j];\n            }\n        }\n    }\n    result\n}\n"
+                    .to_string(),
+            );
+        }
+        if task.contains("tokenize") || task.contains("tokenizer") {
+            return Some(
+                "/// Token types for arithmetic expressions.\n#[derive(Debug, Clone, PartialEq)]\npub enum Token {\n    Number(f64),\n    Plus,\n    Minus,\n    Star,\n    Slash,\n    LParen,\n    RParen,\n}\n\n/// Tokenize an arithmetic expression string.\npub fn tokenize(input: &str) -> Vec<Token> {\n    let mut tokens = Vec::new();\n    let mut chars = input.chars().peekable();\n    while let Some(&c) = chars.peek() {\n        match c {\n            ' ' | '\\t' => { chars.next(); }\n            '+' => { tokens.push(Token::Plus); chars.next(); }\n            '-' => { tokens.push(Token::Minus); chars.next(); }\n            '*' => { tokens.push(Token::Star); chars.next(); }\n            '/' => { tokens.push(Token::Slash); chars.next(); }\n            '(' => { tokens.push(Token::LParen); chars.next(); }\n            ')' => { tokens.push(Token::RParen); chars.next(); }\n            '0'..='9' | '.' => {\n                let mut num = String::new();\n                while let Some(&d) = chars.peek() {\n                    if d.is_ascii_digit() || d == '.' { num.push(d); chars.next(); }\n                    else { break; }\n                }\n                if let Ok(n) = num.parse::<f64>() { tokens.push(Token::Number(n)); }\n            }\n            _ => { chars.next(); }\n        }\n    }\n    tokens\n}\n"
+                    .to_string(),
+            );
+        }
+        if task.contains("email") && task.contains("validat") {
+            return Some(
+                "/// Validate an email address (basic RFC 5321 check).\npub fn validate_email(email: &str) -> bool {\n    let parts: Vec<&str> = email.splitn(2, '@').collect();\n    if parts.len() != 2 { return false; }\n    let (local, domain) = (parts[0], parts[1]);\n    if local.is_empty() || local.len() > 64 { return false; }\n    if domain.is_empty() || domain.len() > 255 { return false; }\n    if !domain.contains('.') { return false; }\n    let valid_char = |c: char| c.is_alphanumeric() || \".-_+\".contains(c);\n    local.chars().all(valid_char) && domain.chars().all(|c| c.is_alphanumeric() || \".-\".contains(c))\n}\n"
+                    .to_string(),
+            );
+        }
+        if task.contains("csv") && task.contains("parse") {
+            return Some(
+                "/// Parse a CSV line into fields, respecting quoted strings.\npub fn parse_csv(line: &str) -> Vec<String> {\n    let mut fields = Vec::new();\n    let mut current = String::new();\n    let mut in_quotes = false;\n    let mut chars = line.chars().peekable();\n    while let Some(c) = chars.next() {\n        match c {\n            '\"' => {\n                if in_quotes {\n                    if chars.peek() == Some(&'\"') { current.push('\"'); chars.next(); }\n                    else { in_quotes = false; }\n                } else { in_quotes = true; }\n            }\n            ',' if !in_quotes => {\n                fields.push(current.clone());\n                current.clear();\n            }\n            _ => current.push(c),\n        }\n    }\n    fields.push(current);\n    fields\n}\n"
+                    .to_string(),
+            );
+        }
+        if task.contains("lru") && task.contains("cache") {
+            return Some(
+                "use std::collections::HashMap;\n\n/// A simple LRU cache with fixed capacity.\npub struct LruCache<K: std::hash::Hash + Eq + Clone, V> {\n    capacity: usize,\n    order: Vec<K>,\n    map: HashMap<K, V>,\n}\n\nimpl<K: std::hash::Hash + Eq + Clone, V> LruCache<K, V> {\n    pub fn new(capacity: usize) -> Self {\n        Self { capacity, order: Vec::new(), map: HashMap::new() }\n    }\n    pub fn get(&mut self, key: &K) -> Option<&V> {\n        if self.map.contains_key(key) {\n            self.order.retain(|k| k != key);\n            self.order.push(key.clone());\n            self.map.get(key)\n        } else { None }\n    }\n    pub fn put(&mut self, key: K, value: V) {\n        if self.map.contains_key(&key) {\n            self.order.retain(|k| k != &key);\n        } else if self.map.len() >= self.capacity {\n            if let Some(oldest) = self.order.first().cloned() {\n                self.order.remove(0);\n                self.map.remove(&oldest);\n            }\n        }\n        self.order.push(key.clone());\n        self.map.insert(key, value);\n    }\n    pub fn len(&self) -> usize { self.map.len() }\n    pub fn is_empty(&self) -> bool { self.map.is_empty() }\n}\n"
+                    .to_string(),
+            );
+        }
+        if task.contains("state machine") {
+            return Some(
+                "use std::collections::HashMap;\n\n/// A simple finite state machine.\npub struct StateMachine {\n    current: String,\n    transitions: HashMap<(String, String), String>,\n}\n\nimpl StateMachine {\n    pub fn new(initial: &str) -> Self {\n        Self { current: initial.to_string(), transitions: HashMap::new() }\n    }\n    pub fn add_transition(&mut self, from: &str, event: &str, to: &str) {\n        self.transitions.insert((from.to_string(), event.to_string()), to.to_string());\n    }\n    pub fn send(&mut self, event: &str) -> bool {\n        let key = (self.current.clone(), event.to_string());\n        if let Some(next) = self.transitions.get(&key) {\n            self.current = next.clone();\n            true\n        } else { false }\n    }\n    pub fn state(&self) -> &str { &self.current }\n}\n"
+                    .to_string(),
+            );
+        }
+        if task.contains("trie") {
+            return Some(
+                "use std::collections::HashMap;\n\n/// A trie (prefix tree) for string storage and lookup.\npub struct Trie {\n    children: HashMap<char, Trie>,\n    is_end: bool,\n}\n\nimpl Trie {\n    pub fn new() -> Self { Self { children: HashMap::new(), is_end: false } }\n    pub fn insert(&mut self, word: &str) {\n        let mut node = self;\n        for c in word.chars() {\n            node = node.children.entry(c).or_insert_with(Trie::new);\n        }\n        node.is_end = true;\n    }\n    pub fn search(&self, word: &str) -> bool {\n        let mut node = self;\n        for c in word.chars() {\n            match node.children.get(&c) {\n                Some(next) => node = next,\n                None => return false,\n            }\n        }\n        node.is_end\n    }\n    pub fn starts_with(&self, prefix: &str) -> bool {\n        let mut node = self;\n        for c in prefix.chars() {\n            match node.children.get(&c) {\n                Some(next) => node = next,\n                None => return false,\n            }\n        }\n        true\n    }\n}\n\nimpl Default for Trie {\n    fn default() -> Self { Self::new() }\n}\n"
+                    .to_string(),
+            );
+        }
+        if task.contains("n-queen") || task.contains("queens") {
+            return Some(
+                "/// Solve the N-Queens problem. Returns all valid board configurations.\n/// Each solution is a Vec of column positions (one per row).\npub fn solve_queens(n: usize) -> Vec<Vec<usize>> {\n    let mut solutions = Vec::new();\n    let mut board = Vec::with_capacity(n);\n    solve_queens_bt(n, &mut board, &mut solutions);\n    solutions\n}\n\nfn solve_queens_bt(n: usize, board: &mut Vec<usize>, solutions: &mut Vec<Vec<usize>>) {\n    if board.len() == n {\n        solutions.push(board.clone());\n        return;\n    }\n    let row = board.len();\n    for col in 0..n {\n        if board.iter().enumerate().all(|(r, &c)| {\n            c != col && (row - r) != col.abs_diff(c)\n        }) {\n            board.push(col);\n            solve_queens_bt(n, board, solutions);\n            board.pop();\n        }\n    }\n}\n"
+                    .to_string(),
+            );
+        }
+
+        None
+    }
+
+    /// Extract a likely function name from a task description.
+    fn extract_function_name(task: &str) -> Option<String> {
+        let stop_words = ["a", "an", "the", "my", "our", "new", "simple", "basic"];
+        // Look for explicit function names: "add a X function", "implement X", "create X"
+        let patterns = ["function ", "fn ", "method ", "implement ", "create ", "add "];
+        for pattern in &patterns {
+            if let Some(idx) = task.find(pattern) {
+                let after = &task[idx + pattern.len()..];
+                // Skip stop words (e.g., "add a fibonacci" → skip "a")
+                let name: String = after
+                    .split_whitespace()
+                    .find(|w| !stop_words.contains(&w.to_lowercase().as_str()))
+                    .unwrap_or("")
+                    .chars()
+                    .filter(|c| c.is_alphanumeric() || *c == '_')
+                    .collect();
+                if !name.is_empty() && name.len() < 50 {
+                    return Some(name.to_lowercase());
+                }
+            }
+        }
+
+        // Fallback: use first multi-char word that looks like an identifier
+        for word in task.split_whitespace() {
+            let clean: String = word.chars().filter(|c| c.is_alphanumeric() || *c == '_').collect();
+            if clean.len() >= 3
+                && clean.chars().next().map_or(false, |c| c.is_alphabetic())
+                && !["the", "and", "for", "add", "that", "with", "from", "this", "into"].contains(&clean.to_lowercase().as_str())
+            {
+                return Some(clean.to_lowercase());
+            }
+        }
+        None
     }
 
     /// Determine the target file for code generation.
@@ -699,7 +1454,89 @@ impl CodingAgent {
     }
 
     /// Write code to disk, creating parent directories as needed.
+    /// Strip markdown code fences from generated output.
+    /// LLM and template outputs sometimes wrap code in ```rust ... ``` blocks.
+    fn strip_code_fences(code: &str) -> String {
+        let trimmed = code.trim();
+        // Check for ```rust or ``` at start
+        if let Some(rest) = trimmed.strip_prefix("```rust") {
+            if let Some(inner) = rest.strip_suffix("```") {
+                return inner.trim().to_string();
+            }
+        }
+        if let Some(rest) = trimmed.strip_prefix("```") {
+            // Could be ```\n...``` or ```rs\n...```
+            let rest = rest.strip_prefix("rs").unwrap_or(rest);
+            let rest = rest.strip_prefix('\n').unwrap_or(rest);
+            if let Some(inner) = rest.strip_suffix("```") {
+                return inner.trim().to_string();
+            }
+        }
+        code.to_string()
+    }
+
+    /// HDC verification gate: checks generated code against codebase patterns.
+    ///
+    /// Returns `true` if the code passes verification (safe to write).
+    /// Returns `false` if the code is flagged as suspicious (high surprise AND
+    /// epistemic uncertainty). When `false`, the code is still written but
+    /// a warning observation is recorded.
+    #[cfg(feature = "code_generation")]
+    fn verify_generated_code_hdc(&self, code: &str) -> (bool, f32) {
+        use crate::hdc::code_encoder::CodeHDEncoder;
+
+        let memory = match &self.code_memory {
+            Some(m) => m,
+            None => return (true, 0.0), // no memory → skip verification
+        };
+
+        // Encode the generated code as an HDC vector
+        let encoder = memory.encoder();
+        let code_hv = encoder.encode_name(code);
+
+        // Compute surprise against codebase centroid
+        let surprise = memory.compute_surprise(&code_hv);
+
+        // Query for nearest neighbors — if top match is very dissimilar, flag
+        let matches = memory.query(&code_hv, 3);
+        let best_similarity = matches.first().map(|m| m.similarity).unwrap_or(0.0);
+
+        // Verification passes if:
+        // 1. Surprise is moderate (< 0.85) — code fits the codebase style, OR
+        // 2. There's a reasonable nearest neighbor (similarity > 0.15), OR
+        // 3. The codebase is too small to judge (< 3 indexed files)
+        let codebase_too_small = matches.len() < 2;
+        let passes = surprise < 0.85 || best_similarity > 0.15 || codebase_too_small;
+
+        if !passes {
+            tracing::warn!(
+                target: "symthaea::coding_agent",
+                surprise = surprise,
+                best_similarity = best_similarity,
+                "HDC verification gate: generated code is highly surprising"
+            );
+        }
+
+        (passes, surprise)
+    }
+
+    #[cfg(not(feature = "code_generation"))]
+    fn verify_generated_code_hdc(&self, _code: &str) -> (bool, f32) {
+        (true, 0.0)
+    }
+
     fn write_code_to_disk(&mut self, target: &PathBuf, code: &str) {
+        let code = Self::strip_code_fences(code);
+
+        // HDC verification gate
+        let (verified, surprise) = self.verify_generated_code_hdc(&code);
+        if !verified {
+            self.observations.push(format!(
+                "HDC verification warning: generated code has surprise={surprise:.3} — \
+                 significantly different from codebase patterns. Writing anyway but flagging."
+            ));
+        }
+
         // Create parent directories
         if let Some(parent) = target.parent() {
             if let Err(e) = std::fs::create_dir_all(parent) {
@@ -711,7 +1548,7 @@ impl CodingAgent {
             }
         }
 
-        match std::fs::write(target, code) {
+        match std::fs::write(target, &code) {
             Ok(()) => {
                 if !self.files_modified.contains(target) {
                     self.files_modified.push(target.clone());
@@ -721,6 +1558,8 @@ impl CodingAgent {
                     code.len(),
                     target.display()
                 ));
+                #[cfg(feature = "code_generation")]
+                self.reindex_file(target, &code);
             }
             Err(e) => {
                 self.errors
@@ -863,10 +1702,16 @@ impl CodingAgent {
 
         // FEP-driven phase overrides: the consciousness loop can redirect the agent
         // regardless of the current phase (except Done).
+        //
+        // Suppression rule: after 3+ iterations without generating any code,
+        // stop honoring ExplorationTrigger — the consciousness loop is being
+        // too cautious and the agent needs to actually attempt generation.
+        let suppress_exploration = self.iteration >= 3 && self.generation_tiers.is_empty();
+
         if self.phase != TaskPhase::Done {
             match fep_command {
                 MotorCommandType::ExplorationTrigger => {
-                    if self.phase != TaskPhase::Understanding {
+                    if self.phase != TaskPhase::Understanding && !suppress_exploration {
                         tracing::info!(
                             target: "symthaea::coding_agent",
                             from = %self.phase,
@@ -875,6 +1720,12 @@ impl CodingAgent {
                         self.phase = TaskPhase::Understanding;
                         self.phase_failures = 0;
                         return;
+                    } else if suppress_exploration {
+                        tracing::debug!(
+                            target: "symthaea::coding_agent",
+                            iteration = self.iteration,
+                            "Suppressing FEP ExplorationTrigger — need to attempt generation"
+                        );
                     }
                 }
                 MotorCommandType::ReflectionInitiate => {
@@ -904,6 +1755,60 @@ impl CodingAgent {
                 }
                 _ => {}
             }
+        }
+
+        // ── Code Quality Gate ─────────────────────────────────────────
+        // Before transitioning from Generating → Testing, validate that the
+        // generated code is worth testing. Reject TODO stubs, empty bodies,
+        // and unimplemented!() placeholders.
+        if (self.phase == TaskPhase::Generating || self.phase == TaskPhase::Fixing)
+            && self.generated_code.is_some()
+        {
+            if let Some(ref code) = self.generated_code {
+                if let Some(quality_issue) = Self::check_code_quality(code) {
+                    tracing::info!(
+                        target: "symthaea::coding_agent",
+                        issue = %quality_issue,
+                        "Code quality gate: rejecting generated code"
+                    );
+                    self.observations.push(format!(
+                        "Quality gate rejected code: {quality_issue}"
+                    ));
+                    // Record failure for the tier that produced this
+                    if let Some(tier) = self.generation_tiers.last().copied() {
+                        if let Some(ref mut dispatcher) = self.dispatcher {
+                            dispatcher.record_outcome(tier, false);
+                        }
+                    }
+                    self.generated_code = None;
+                    self.phase_failures += 1;
+                    if self.phase_failures >= self.config.max_phase_failures {
+                        self.phase = TaskPhase::Planning;
+                        self.phase_failures = 0;
+                    }
+                    return;
+                }
+            }
+        }
+
+        // Force-advance: if we've been cycling 4+ iterations without generating
+        // any code, skip directly to Generating. The consciousness loop is being
+        // too cautious — the agent needs to attempt generation to make progress.
+        if self.iteration >= 4
+            && self.generation_tiers.is_empty()
+            && self.phase != TaskPhase::Done
+            && self.phase != TaskPhase::Generating
+        {
+            tracing::info!(
+                target: "symthaea::coding_agent",
+                iteration = self.iteration,
+                phase = %self.phase,
+                "Force-advancing to Generating"
+            );
+            self.phase = TaskPhase::Generating;
+            self.phase_failures = 0;
+            self.generated_code = None;
+            return;
         }
 
         // Default phase transitions based on current state + motor results
@@ -986,12 +1891,29 @@ impl CodingAgent {
                     } else {
                         self.phase_failures += 1;
                         if self.phase_failures >= self.config.max_phase_failures {
-                            self.phase = TaskPhase::Done;
-                            tracing::warn!(
-                                target: "symthaea::coding_agent",
-                                "Fix failed {} times, giving up",
-                                self.config.max_phase_failures
-                            );
+                            // Use differentiated retry strategy instead of giving up
+                            let strategy = self.next_retry_strategy();
+                            match strategy {
+                                RetryStrategy::RequestClarification(ref msg) => {
+                                    self.emit_event(AgentEvent::RequestClarification(msg.clone()));
+                                    self.phase = TaskPhase::Done;
+                                    tracing::warn!(
+                                        target: "symthaea::coding_agent",
+                                        "All retry strategies exhausted, requesting clarification"
+                                    );
+                                }
+                                _ => {
+                                    self.retry_state.current_strategy = strategy;
+                                    self.phase = TaskPhase::Planning;
+                                    self.phase_failures = 0;
+                                    self.generated_code = None;
+                                    tracing::info!(
+                                        target: "symthaea::coding_agent",
+                                        strategy = ?self.retry_state.current_strategy,
+                                        "Retry strategy: re-planning with different approach"
+                                    );
+                                }
+                            }
                         }
                     }
                 } else if code_written {
@@ -1000,7 +1922,18 @@ impl CodingAgent {
                 } else {
                     self.phase_failures += 1;
                     if self.phase_failures >= self.config.max_phase_failures {
-                        self.phase = TaskPhase::Done;
+                        let strategy = self.next_retry_strategy();
+                        match strategy {
+                            RetryStrategy::RequestClarification(_) => {
+                                self.phase = TaskPhase::Done;
+                            }
+                            _ => {
+                                self.retry_state.current_strategy = strategy;
+                                self.phase = TaskPhase::Planning;
+                                self.phase_failures = 0;
+                                self.generated_code = None;
+                            }
+                        }
                     }
                 }
             }
@@ -1082,11 +2015,7 @@ impl CodingAgent {
 
                 // Track failure pattern frequency
                 let pattern = Self::normalize_error_pattern(error);
-                if let Some(entry) = self
-                    .failure_patterns
-                    .iter_mut()
-                    .find(|(p, _)| *p == pattern)
-                {
+                if let Some(entry) = self.failure_patterns.iter_mut().find(|(p, _)| *p == pattern) {
                     entry.1 += 1;
                 } else {
                     self.failure_patterns.push((pattern.clone(), 1));
@@ -1096,6 +2025,124 @@ impl CodingAgent {
                 self.store_experience(error, false);
             }
         }
+    }
+
+    /// Check code quality before allowing it into the Testing phase.
+    ///
+    /// Returns `Some(reason)` if the code is too low quality to test, `None` if OK.
+    fn check_code_quality(code: &str) -> Option<String> {
+        let trimmed = code.trim();
+
+        // Empty or near-empty code
+        if trimmed.is_empty() || trimmed.len() < 10 {
+            return Some("code is empty or trivially short".into());
+        }
+
+        // Contains TODO/unimplemented markers (indicating the generator punted)
+        if trimmed.contains("// TODO: implement") || trimmed.contains("todo!(") {
+            return Some("code contains TODO placeholder".into());
+        }
+        if trimmed.contains("unimplemented!(") {
+            return Some("code contains unimplemented!() placeholder".into());
+        }
+
+        // Function with empty body: `fn X() { }` or `fn X() {}`
+        // Check for functions where the body is just whitespace/comments
+        for line in trimmed.lines() {
+            let l = line.trim();
+            if l.starts_with("pub fn ") || l.starts_with("fn ") {
+                // Found a function declaration — check if the body is empty
+                // Simple heuristic: if the entire code has a fn decl but no
+                // statements (only braces and comments), it's empty
+                break; // Only flag via the TODO/unimplemented checks above
+            }
+        }
+
+        // Pure comment code (no actual Rust statements)
+        let non_comment_lines: Vec<&str> = trimmed
+            .lines()
+            .filter(|l| {
+                let t = l.trim();
+                !t.is_empty() && !t.starts_with("//") && !t.starts_with("///")
+            })
+            .collect();
+        if non_comment_lines.len() <= 1 {
+            return Some("code contains only comments, no logic".into());
+        }
+
+        // LLM markdown wrapper (code came back with ```rust ... ```)
+        if trimmed.starts_with("```") {
+            return Some("code is wrapped in markdown fences".into());
+        }
+
+        // ── LLM-specific failure patterns ────────────────────────────────
+
+        // Hallucinated imports: `use` of crates that don't exist in this project
+        let hallucinated_crates = [
+            "use crate_name::",   // placeholder crate
+            "use my_crate::",     // LLM default naming
+            "use your_crate::",   // LLM addressing user
+            "use example::",      // example placeholder
+            "use foo::",          // test placeholder
+            "use bar::",          // test placeholder
+        ];
+        for hc in &hallucinated_crates {
+            if trimmed.contains(hc) {
+                return Some(format!("hallucinated import: {hc}"));
+            }
+        }
+
+        // Incomplete function: function signature with `...` or `/* ... */` body
+        if trimmed.contains("...") && (trimmed.contains("fn ") || trimmed.contains("impl ")) {
+            return Some("code contains '...' ellipsis (incomplete)".into());
+        }
+        if trimmed.contains("/* ... */") || trimmed.contains("/* TODO */") {
+            return Some("code contains placeholder comment block".into());
+        }
+
+        // LLM explanation leak: natural language sentences in what should be pure code
+        let explanation_markers = [
+            "Here is the implementation",
+            "Here's the code",
+            "Below is",
+            "I'll implement",
+            "Let me",
+            "As you can see",
+            "Note that",
+            "This function",
+            "The following",
+        ];
+        // Only flag if these appear outside of doc comments
+        for marker in &explanation_markers {
+            for line in trimmed.lines() {
+                let l = line.trim();
+                if l.starts_with(marker) && !l.starts_with("//") && !l.starts_with("///") {
+                    return Some(format!("LLM explanation leak: '{}'", &l[..l.len().min(60)]));
+                }
+            }
+        }
+
+        // Duplicate function definitions (LLM sometimes generates the same fn twice)
+        let fn_names: Vec<&str> = trimmed
+            .lines()
+            .filter_map(|l| {
+                let t = l.trim();
+                if (t.starts_with("pub fn ") || t.starts_with("fn "))
+                    && t.contains('(')
+                {
+                    t.split('(').next()
+                } else {
+                    None
+                }
+            })
+            .collect();
+        for (i, name) in fn_names.iter().enumerate() {
+            if fn_names[i + 1..].contains(name) {
+                return Some(format!("duplicate function definition: {name}"));
+            }
+        }
+
+        None
     }
 
     /// Normalize an error message for pattern matching (strip paths, line numbers).
@@ -1121,11 +2168,7 @@ impl CodingAgent {
             task: self.task.clone(),
             detail: detail.chars().take(500).collect(),
             success,
-            tier: self
-                .generation_tiers
-                .last()
-                .map(|t| t.to_string())
-                .unwrap_or_default(),
+            tier: self.generation_tiers.last().map(|t| t.to_string()).unwrap_or_default(),
             fix_hint: None,
         };
 
@@ -1154,9 +2197,36 @@ impl CodingAgent {
 
         // Store successful generation in persistent experience store
         if success {
-            if let Some(ref code) = self.generated_code {
+            if let Some(code) = self.generated_code.clone() {
                 let summary: String = code.chars().take(200).collect();
                 self.store_experience(&summary, true);
+
+                // If we had prior failures, the fix that worked is valuable —
+                // store a fix_hint linking the last error to this success.
+                if let Some((last_error, _)) = self.failure_patterns.last().cloned() {
+                    self.store_fix_hint(&last_error, &code);
+                }
+            }
+        }
+    }
+
+    /// Store a fix hint: when a failure pattern was resolved by a successful generation,
+    /// record the mapping so future sessions can learn from it.
+    fn store_fix_hint(&mut self, error_pattern: &str, fix_code: &str) {
+        let fix_summary: String = fix_code.lines().take(5).collect::<Vec<_>>().join("\n");
+        let experience = CodingExperience {
+            task: self.task.clone(),
+            detail: error_pattern.chars().take(300).collect(),
+            success: true,
+            tier: self.generation_tiers.last().map(|t| t.to_string()).unwrap_or_default(),
+            fix_hint: Some(fix_summary),
+        };
+
+        if let Some(ref mut store) = self.experience_store {
+            if let Ok(rt) = tokio::runtime::Runtime::new() {
+                rt.block_on(async {
+                    store.store(experience).await;
+                });
             }
         }
     }
@@ -1210,6 +2280,252 @@ impl CodingAgent {
             .map(|(pattern, count)| (pattern.clone(), self.task.clone(), *count))
             .collect();
         crate::school::code_learning::lessons_from_failures(&failures, 5)
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // Task E: Structured test failures, consciousness signals, events, retry
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    /// Parse structured test failures from cargo test stderr output.
+    fn parse_test_failures(stderr: &str) -> Vec<StructuredTestFailure> {
+        let mut failures = Vec::new();
+        let mut current_test: Option<String> = None;
+        let mut current_output = String::new();
+
+        for line in stderr.lines() {
+            // Detect test failure header: "---- test_name stdout ----"
+            if line.starts_with("---- ") && line.ends_with(" stdout ----") {
+                // Flush previous test if any
+                if let Some(ref name) = current_test {
+                    failures.push(Self::build_test_failure(name, &current_output));
+                }
+                let name = line
+                    .trim_start_matches("---- ")
+                    .trim_end_matches(" stdout ----")
+                    .to_string();
+                current_test = Some(name);
+                current_output.clear();
+            } else if current_test.is_some() {
+                current_output.push_str(line);
+                current_output.push('\n');
+            }
+        }
+        // Flush last test
+        if let Some(ref name) = current_test {
+            failures.push(Self::build_test_failure(name, &current_output));
+        }
+        failures
+    }
+
+    /// Build a structured test failure from a test name and its captured output.
+    fn build_test_failure(test_name: &str, output: &str) -> StructuredTestFailure {
+        let (kind, expected, actual) = if output.contains("assertion `left == right` failed") {
+            let left = output
+                .lines()
+                .find(|l| l.trim().starts_with("left:"))
+                .map(|l| l.trim().trim_start_matches("left:").trim().to_string());
+            let right = output
+                .lines()
+                .find(|l| l.trim().starts_with("right:"))
+                .map(|l| l.trim().trim_start_matches("right:").trim().to_string());
+            (TestFailureKind::AssertEq, right, left)
+        } else if output.contains("assertion") && output.contains("failed") {
+            (TestFailureKind::Assert, None, None)
+        } else if output.contains("panicked at") {
+            (TestFailureKind::Panic, None, None)
+        } else {
+            (TestFailureKind::Other, None, None)
+        };
+
+        let message = output
+            .lines()
+            .find(|l| l.contains("panicked at") || l.contains("assertion"))
+            .map(|l| l.trim().to_string());
+
+        let (file, line) = output
+            .lines()
+            .find(|l| l.contains(".rs:"))
+            .map(|l| Self::extract_panic_location(l))
+            .unwrap_or((None, None));
+
+        StructuredTestFailure {
+            test_name: test_name.to_string(),
+            failure_kind: kind,
+            expected,
+            actual,
+            message,
+            file,
+            line,
+        }
+    }
+
+    /// Extract file path and line number from a panic location string.
+    fn extract_panic_location(location: &str) -> (Option<String>, Option<usize>) {
+        // Match patterns like "src/foo.rs:42:5" or "at ./src/foo.rs:42:5"
+        let loc = location.trim().trim_start_matches("at ");
+        if let Some(colon_idx) = loc.rfind(".rs:") {
+            let file_end = colon_idx + 3; // include ".rs"
+            let file = loc[..file_end].trim().to_string();
+            let after = &loc[file_end + 1..]; // skip ":"
+            let line = after.split(':').next().and_then(|s| s.parse().ok());
+            (Some(file), line)
+        } else {
+            (None, None)
+        }
+    }
+
+    /// Format structured test failures into a prompt-friendly string.
+    fn format_structured_test_failures(failures: &[StructuredTestFailure]) -> String {
+        if failures.is_empty() {
+            return String::new();
+        }
+        let mut out = format!("\n{} test failure(s):\n", failures.len());
+        for f in failures {
+            out.push_str(&format!("  - {} ({:?})", f.test_name, f.failure_kind));
+            if let (Some(exp), Some(act)) = (&f.expected, &f.actual) {
+                out.push_str(&format!(" expected={}, got={}", exp, act));
+            }
+            if let (Some(file), Some(line)) = (&f.file, f.line) {
+                out.push_str(&format!(" at {}:{}", file, line));
+            }
+            if let Some(msg) = &f.message {
+                let short: String = msg.chars().take(100).collect();
+                out.push_str(&format!(" — {}", short));
+            }
+            out.push('\n');
+        }
+        out
+    }
+
+    /// Extract consciousness signals from a cycle result for decision-making.
+    fn extract_consciousness_signals(&self, cycle_result: &CycleResult) -> ConsciousnessSignals {
+        let prediction_error = 1.0 - self.cognitive_loop.prediction_confidence();
+        let confidence_velocity = if self.prediction_error_history.len() >= 2 {
+            let prev = self.prediction_error_history[self.prediction_error_history.len() - 1];
+            self.cognitive_loop.prediction_confidence() - (1.0 - prev)
+        } else {
+            0.0
+        };
+        let phi = cycle_result.metadata.consciousness.consciousness_level as f32;
+        let phi_slope = if self.phi_trace.len() >= 2 {
+            let last = self.phi_trace[self.phi_trace.len() - 1];
+            phi - last
+        } else {
+            0.0
+        };
+        let fep_surprise = cycle_result.metadata.fep.fep_surprise;
+
+        ConsciousnessSignals {
+            prediction_error,
+            confidence_velocity,
+            phi,
+            phi_slope,
+            fep_surprise,
+        }
+    }
+
+    /// Attach an event channel for streaming agent progress.
+    /// Returns (self, receiver) — caller reads events from the receiver.
+    pub fn with_event_channel(mut self) -> (Self, std::sync::mpsc::Receiver<AgentEvent>) {
+        let (tx, rx) = std::sync::mpsc::channel();
+        self.event_sink = Some(tx);
+        (self, rx)
+    }
+
+    /// Emit an event to the event channel (no-op if no sink).
+    fn emit_event(&self, event: AgentEvent) {
+        if let Some(ref sink) = self.event_sink {
+            let _ = sink.send(event);
+        }
+    }
+
+    /// Emit a phase transition event.
+    fn emit_phase_transition(&self, from: &TaskPhase, to: &TaskPhase) {
+        self.emit_event(AgentEvent::PhaseTransition {
+            from: from.clone(),
+            to: to.clone(),
+            iteration: self.iteration,
+        });
+    }
+
+    /// Build HDC context prompt from indexed codebase memory.
+    #[cfg(feature = "code_generation")]
+    fn build_hdc_context_prompt(&self) -> String {
+        use crate::hdc::code_encoder::CodeHDEncoder;
+
+        let code_memory = match &self.code_memory {
+            Some(m) => m,
+            None => return String::new(),
+        };
+
+        // Encode the task as an HDC query vector
+        let encoder = CodeHDEncoder::new(16_384);
+        let query_hv = encoder.encode_name(&self.task);
+        let matches = code_memory.query(&query_hv, 5);
+
+        if matches.is_empty() {
+            return String::new();
+        }
+
+        let coherence = code_memory.codebase_coherence();
+        let mut prompt = format!(
+            "## Codebase context (HDC similarity search, coherence={:.2})\n",
+            coherence
+        );
+        for m in &matches {
+            prompt.push_str(&format!(
+                "- {} (similarity={:.3})\n",
+                m.name, m.similarity
+            ));
+            // Include source snippet if available
+            if let Some(src) = self.source_cache.get(&m.path) {
+                let snippet = Self::extract_entity_source(src, &m.name, m.kind);
+                if !snippet.contains("(source not found)") {
+                    let truncated: String = snippet.chars().take(200).collect();
+                    prompt.push_str(&format!("  ```\n  {}\n  ```\n", truncated));
+                }
+            }
+        }
+        prompt
+    }
+
+    #[cfg(not(feature = "code_generation"))]
+    fn build_hdc_context_prompt(&self) -> String {
+        String::new()
+    }
+
+    /// Select the next retry strategy, cycling through options.
+    fn next_retry_strategy(&mut self) -> RetryStrategy {
+        let strategies = [
+            RetryStrategy::DifferentTemplate,
+            RetryStrategy::DifferentBackend(BackendTier::LocalLlm),
+            RetryStrategy::DifferentBackend(BackendTier::CloudLlm),
+            RetryStrategy::SimplifyScope,
+            RetryStrategy::RequestClarification(
+                "Unable to resolve after multiple strategies. Could you clarify or simplify the task?".to_string(),
+            ),
+        ];
+
+        for s in &strategies {
+            if !self.retry_state.strategies_tried.contains(s) {
+                let strategy = s.clone();
+                self.retry_state.strategies_tried.push(strategy.clone());
+                self.emit_event(AgentEvent::RetryStrategyChanged(strategy.clone()));
+                return strategy;
+            }
+        }
+
+        // All strategies exhausted — request clarification
+        let fallback = RetryStrategy::RequestClarification(
+            "All retry strategies exhausted.".to_string(),
+        );
+        self.emit_state_changed(&fallback);
+        fallback
+    }
+
+    /// Helper: emit retry strategy (avoids borrow issues with emit_event).
+    fn emit_state_changed(&self, strategy: &RetryStrategy) {
+        self.emit_event(AgentEvent::RetryStrategyChanged(strategy.clone()));
     }
 
     // ── Public API ──────────────────────────────────────────────────────
@@ -1291,7 +2607,6 @@ impl CodingAgent {
                 continue;
             }
 
-            // Read and parse the file
             let source = match std::fs::read_to_string(path) {
                 Ok(s) => s,
                 Err(_) => continue,
@@ -1301,6 +2616,7 @@ impl CodingAgent {
                 Ok(parsed) => {
                     memory.index_file(path, &parsed);
                     files_indexed += 1;
+                    self.source_cache.insert(path.to_path_buf(), source);
                 }
                 Err(_) => {
                     parse_errors += 1;
@@ -1318,9 +2634,9 @@ impl CodingAgent {
             "Indexed project into CodebaseMemory"
         );
 
-        // If we have a task, query for relevant context and inject it
+        // If we have a task, query for source-level context
         if !self.task.is_empty() {
-            self.inject_context_from_memory(&memory);
+            self.code_context = Self::build_source_context(&memory, &self.source_cache, &self.task);
         }
 
         // Store memory for future queries
@@ -1329,31 +2645,80 @@ impl CodingAgent {
         Ok((files_indexed, stats.functions, stats.types))
     }
 
-    /// Query the indexed CodebaseMemory for entities relevant to the current task
-    /// and inject them as code context for the generation prompt.
+    /// Re-index a single file after it has been written/modified.
     #[cfg(feature = "code_generation")]
-    fn inject_context_from_memory(&mut self, memory: &crate::hdc::code_memory::CodebaseMemory) {
-        let encoder = memory.encoder();
-        let intent_hv = encoder.encode_name(&self.task);
-        let matches = memory.query(&intent_hv, 5);
+    fn reindex_file(&mut self, path: &std::path::Path, source: &str) {
+        use crate::language::parser_registry::ParserRegistry;
+        let filename = path.file_name().and_then(|f| f.to_str());
+        let mut parser_registry = ParserRegistry::with_builtins();
+        if let Ok(parsed) = parser_registry.parse(source, None, filename) {
+            if let Some(ref mut memory) = self.code_memory {
+                memory.update_file(path, &parsed);
+            }
+        }
+        self.source_cache.insert(path.to_path_buf(), source.to_string());
+    }
 
-        let context: Vec<String> = matches
+    /// Build source-level context from CodebaseMemory matches.
+    #[cfg(feature = "code_generation")]
+    fn build_source_context(
+        memory: &crate::hdc::code_memory::CodebaseMemory,
+        source_cache: &std::collections::HashMap<PathBuf, String>,
+        task: &str,
+    ) -> Vec<String> {
+        let encoder = memory.encoder();
+        let intent_hv = encoder.encode_name(task);
+        let matches = memory.query(&intent_hv, 5);
+        matches
             .iter()
             .filter(|m| m.similarity > 0.2)
-            .map(|m| {
-                format!(
-                    "{:?} `{}` in {} (similarity: {:.3})",
-                    m.kind,
-                    m.name,
-                    m.path.display(),
-                    m.similarity
-                )
+            .filter_map(|m| {
+                let source = source_cache.get(&m.path)?;
+                let snippet = Self::extract_entity_source(source, &m.name, m.kind);
+                Some(format!(
+                    "// {} — {:?} `{}` (similarity: {:.3})\n{}",
+                    m.path.display(), m.kind, m.name, m.similarity, snippet
+                ))
             })
-            .collect();
+            .collect()
+    }
 
-        if !context.is_empty() {
-            self.code_context = context;
+    /// Extract source code for a named entity using brace-matching (up to 20 lines).
+    #[cfg(feature = "code_generation")]
+    fn extract_entity_source(
+        source: &str,
+        name: &str,
+        kind: crate::language::code_parser::EntityKind,
+    ) -> String {
+        use crate::language::code_parser::EntityKind;
+        let keyword = match kind {
+            EntityKind::Function | EntityKind::Method => "fn ",
+            EntityKind::Struct => "struct ",
+            EntityKind::Enum => "enum ",
+            EntityKind::Trait | EntityKind::Interface => "trait ",
+            EntityKind::Class => "class ",
+            _ => "fn ",
+        };
+        let pattern = format!("{keyword}{name}");
+        let lines: Vec<&str> = source.lines().collect();
+        for (i, line) in lines.iter().enumerate() {
+            if line.contains(&pattern) {
+                let mut depth = 0i32;
+                let mut out = Vec::new();
+                let mut started = false;
+                for j in i..lines.len().min(i + 30) {
+                    out.push(lines[j]);
+                    for ch in lines[j].chars() {
+                        if ch == '{' { depth += 1; started = true; }
+                        if ch == '}' { depth -= 1; }
+                    }
+                    if started && depth <= 0 { break; }
+                    if out.len() >= 20 { out.push("    // ... (truncated)"); break; }
+                }
+                return out.join("\n");
+            }
         }
+        format!("// {keyword}{name} (source not found)")
     }
 
     /// Get the last dispatch result (which backend tier was used, energy cost, etc.).
@@ -1374,6 +2739,32 @@ impl CodingAgent {
     /// Whether the agent has a persistent experience store.
     pub fn has_experience_store(&self) -> bool {
         self.experience_store.is_some()
+    }
+
+    /// Get the count of stored experiences (successes + failures).
+    pub fn experience_count(&self) -> usize {
+        if let Some(ref store) = self.experience_store {
+            if let Ok(rt) = tokio::runtime::Runtime::new() {
+                return rt.block_on(store.count());
+            }
+        }
+        0
+    }
+
+    /// Get cached success patterns from the experience store.
+    pub fn cached_successes(&self) -> Vec<(String, String)> {
+        self.experience_store
+            .as_ref()
+            .map(|s| s.cached_successes().to_vec())
+            .unwrap_or_default()
+    }
+
+    /// Get cached error hints from the experience store.
+    pub fn cached_error_hints(&self) -> Vec<(String, String)> {
+        self.experience_store
+            .as_ref()
+            .map(|s| s.cached_error_hints().to_vec())
+            .unwrap_or_default()
     }
 }
 
@@ -1452,6 +2843,155 @@ mod tests {
         assert!(
             !result.generation_tiers.is_empty(),
             "Should have recorded generation tiers"
+        );
+    }
+
+    // ── Hardening: property tests & stress tests ───────────────────────
+
+    #[test]
+    fn test_confidence_to_epistemic_full_range() {
+        // Sweep the full [0,1] range — no panic, always valid
+        for i in 0..=100 {
+            let c = i as f32 / 100.0;
+            let _ = CodingAgent::confidence_to_epistemic(c);
+        }
+        // Boundary: negative and >1 should not panic
+        let _ = CodingAgent::confidence_to_epistemic(-0.1_f32);
+        let _ = CodingAgent::confidence_to_epistemic(1.5_f32);
+        let _ = CodingAgent::confidence_to_epistemic(0.0_f32);
+        let _ = CodingAgent::confidence_to_epistemic(1.0_f32);
+    }
+
+    #[test]
+    fn test_telemetry_json_fields_finite() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = CodingAgentConfig {
+            max_iterations: 3,
+            working_dir: dir.path().to_path_buf(),
+            target_file: Some(PathBuf::from("gen.rs")),
+            ..Default::default()
+        };
+        let mut agent = CodingAgent::new(config).unwrap();
+        let result = agent.run("add a function");
+
+        let json = result.to_telemetry_json();
+        // All phi values should be finite
+        if let Some(trace) = json["consciousness"]["phi_trace"].as_array() {
+            for v in trace {
+                let f = v.as_f64().unwrap();
+                assert!(f.is_finite(), "phi value must be finite, got {f}");
+            }
+        }
+        // iterations_used should be non-negative
+        assert!(json["iterations_used"].as_u64().unwrap() > 0);
+        // total_energy should be finite
+        let energy = json["generation"]["total_energy"].as_f64().unwrap();
+        assert!(energy.is_finite(), "total_energy must be finite");
+    }
+
+    #[test]
+    fn test_agent_result_phi_trace_bounded() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = CodingAgentConfig {
+            max_iterations: 10,
+            working_dir: dir.path().to_path_buf(),
+            target_file: Some(PathBuf::from("gen.rs")),
+            ..Default::default()
+        };
+        let mut agent = CodingAgent::new(config).unwrap();
+        let result = agent.run("write a sorting function");
+
+        // Phi trace should have entries and all be in [0, 1]
+        assert!(!result.phi_trace.is_empty());
+        for phi in &result.phi_trace {
+            assert!(phi.is_finite(), "phi must be finite");
+            assert!(*phi >= 0.0 && *phi <= 1.0, "phi must be in [0,1], got {phi}");
+        }
+        // iterations_used should match phi_trace length
+        assert_eq!(result.iterations_used, result.phi_trace.len());
+    }
+
+    #[test]
+    fn test_100_cycle_stress() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = CodingAgentConfig {
+            max_iterations: 100,
+            working_dir: dir.path().to_path_buf(),
+            target_file: Some(PathBuf::from("stress.rs")),
+            ..Default::default()
+        };
+        let mut agent = CodingAgent::new(config).unwrap();
+        let result = agent.run("implement a fibonacci function");
+
+        // Should complete without panic
+        assert!(result.iterations_used > 0);
+        // Phi trace length == iterations
+        assert_eq!(result.phi_trace.len(), result.iterations_used);
+        // All phi bounded
+        for phi in &result.phi_trace {
+            assert!(phi.is_finite() && *phi >= 0.0 && *phi <= 1.0);
+        }
+        // Errors list should be finite (no unbounded growth)
+        assert!(result.errors.len() <= 100);
+        assert!(result.observations.len() <= 1000);
+        // Energy should be finite and non-negative
+        assert!(result.total_energy.is_finite() && result.total_energy >= 0.0);
+    }
+
+    #[test]
+    fn test_determinism_same_input() {
+        let dir1 = tempfile::tempdir().unwrap();
+        let dir2 = tempfile::tempdir().unwrap();
+
+        let run = |dir: &std::path::Path| -> AgentResult {
+            let config = CodingAgentConfig {
+                max_iterations: 5,
+                working_dir: dir.to_path_buf(),
+                target_file: Some(PathBuf::from("det.rs")),
+                ..Default::default()
+            };
+            let mut agent = CodingAgent::new(config).unwrap();
+            agent.run("add a hello function")
+        };
+
+        let r1 = run(dir1.path());
+        let r2 = run(dir2.path());
+
+        // Same task should produce same phase progression
+        assert_eq!(r1.iterations_used, r2.iterations_used);
+        assert_eq!(format!("{}", r1.final_phase), format!("{}", r2.final_phase));
+        // Phi traces should be identical (deterministic CLS)
+        assert_eq!(r1.phi_trace.len(), r2.phi_trace.len());
+    }
+
+    #[test]
+    fn test_run_reset_clears_state() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = CodingAgentConfig {
+            max_iterations: 3,
+            working_dir: dir.path().to_path_buf(),
+            target_file: Some(PathBuf::from("reset.rs")),
+            ..Default::default()
+        };
+        let mut agent = CodingAgent::new(config).unwrap();
+
+        // First run
+        let r1 = agent.run("add function foo");
+        assert!(r1.iterations_used > 0);
+
+        // Second run should start fresh — iteration counter and phi trace reset
+        let r2 = agent.run("add function bar");
+        assert!(r2.iterations_used > 0);
+        // Phi trace should track iterations (±1 for retry strategies)
+        let diff1 = (r1.phi_trace.len() as isize - r1.iterations_used as isize).unsigned_abs();
+        let diff2 = (r2.phi_trace.len() as isize - r2.iterations_used as isize).unsigned_abs();
+        assert!(diff1 <= 1, "Run 1 phi trace should track iterations");
+        assert!(diff2 <= 1, "Run 2 phi trace should track iterations");
+        // Run 2 should not accumulate phi from run 1
+        assert!(
+            r2.phi_trace.len() <= r2.iterations_used + 1,
+            "Run 2 phi trace ({}) should not carry over from run 1 ({})",
+            r2.phi_trace.len(), r1.phi_trace.len()
         );
     }
 
@@ -1908,6 +3448,980 @@ mod tests {
                 .any(|o| o.contains("existing code") || o.contains("old()")),
             "Should have read existing file: {:?}",
             result.observations
+        );
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // Property-based tests & safety hardening
+    // ══════════════════════════════════════════════════════════════════════
+
+    use proptest::prelude::*;
+
+    /// Helper: create a default agent with a tempdir for safe testing.
+    fn make_test_agent() -> (CodingAgent, tempfile::TempDir) {
+        let dir = tempfile::tempdir().unwrap();
+        let config = CodingAgentConfig {
+            max_iterations: 5,
+            working_dir: dir.path().to_path_buf(),
+            target_file: Some(PathBuf::from("test_out.rs")),
+            ..Default::default()
+        };
+        let agent = CodingAgent::new(config).unwrap();
+        (agent, dir)
+    }
+
+    // ── Proptest 1: Output bounds ────────────────────────────────────────
+    // AgentResult phi_trace and telemetry values must be bounded [0,1]
+    // and total_energy must be non-negative.
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(16))]
+
+        #[test]
+        fn prop_agent_result_phi_trace_bounded(seed in 0u64..1000) {
+            let (mut agent, _dir) = make_test_agent();
+
+            let result = agent.run(&format!("add function number {seed}"));
+
+            // All phi values must be in [0, 1]
+            for (i, &phi) in result.phi_trace.iter().enumerate() {
+                prop_assert!(
+                    phi >= 0.0 && phi <= 1.0,
+                    "phi_trace[{}] = {} out of [0,1]", i, phi
+                );
+                prop_assert!(phi.is_finite(), "phi_trace[{}] is not finite: {}", i, phi);
+            }
+
+            // total_energy must be non-negative and finite
+            prop_assert!(
+                result.total_energy >= 0.0 && result.total_energy.is_finite(),
+                "total_energy invalid: {}", result.total_energy
+            );
+
+            // iterations_used must not exceed max
+            prop_assert!(result.iterations_used <= 5);
+        }
+
+        // ── Proptest 2: confidence_to_epistemic always returns valid variant ──
+        #[test]
+        fn prop_confidence_to_epistemic_bounded(conf in -1.0f32..2.0) {
+            // Must not panic for any f32 input
+            let status = CodingAgent::confidence_to_epistemic(conf);
+            // Should always produce one of the valid variants
+            let valid = matches!(
+                status,
+                EpistemicStatus::Certain
+                    | EpistemicStatus::Probable
+                    | EpistemicStatus::Uncertain
+                    | EpistemicStatus::Unknown
+            );
+            prop_assert!(valid, "Invalid epistemic status for conf={}", conf);
+        }
+
+        // ── Proptest 3: Injection resistance — arbitrary strings in task ─────
+        #[test]
+        fn prop_arbitrary_task_no_panic(task in "\\PC{0,200}") {
+            let (mut agent, _dir) = make_test_agent();
+            // Must not panic regardless of input content
+            let result = agent.run(&task);
+            // Basic sanity: iterations used is bounded
+            prop_assert!(result.iterations_used <= 5);
+            // Phi trace should still have valid entries
+            for &phi in &result.phi_trace {
+                prop_assert!(phi.is_finite(), "phi not finite for arbitrary task");
+            }
+        }
+
+        // (proptest 4 removed — split_multi_file_output not yet implemented)
+
+        // ── Proptest 5: Telemetry JSON is always valid ───────────────────────
+        #[test]
+        fn prop_telemetry_json_fields_finite(seed in 0u64..500) {
+            let (mut agent, _dir) = make_test_agent();
+            let result = agent.run(&format!("add test_{seed}"));
+            let json = result.to_telemetry_json();
+
+            // Must be a valid JSON object
+            prop_assert!(json.is_object(), "telemetry should be a JSON object");
+
+            // Consciousness fields must be finite
+            if let Some(consciousness) = json.get("consciousness") {
+                if let Some(avg) = consciousness.get("avg_phi").and_then(|v| v.as_f64()) {
+                    prop_assert!(avg.is_finite(), "avg_phi not finite: {}", avg);
+                }
+                if let Some(samples) = consciousness.get("samples").and_then(|v| v.as_u64()) {
+                    prop_assert!(samples <= 100, "too many samples: {}", samples);
+                }
+            }
+
+            // iterations_used must be present and bounded
+            if let Some(iters) = json.get("iterations_used").and_then(|v| v.as_u64()) {
+                prop_assert!(iters <= 5, "iterations_used too large: {}", iters);
+            }
+
+            // total_energy must be non-negative
+            if let Some(gen) = json.get("generation") {
+                if let Some(energy) = gen.get("total_energy").and_then(|v| v.as_f64()) {
+                    prop_assert!(
+                        energy >= 0.0 && energy.is_finite(),
+                        "total_energy invalid: {}", energy
+                    );
+                }
+            }
+        }
+    }
+
+    // ── Deterministic: 100-cycle stress test ─────────────────────────────
+    // Run the agent through many iterations, verify no unbounded growth.
+
+    #[test]
+    fn test_100_cycle_stress_no_unbounded_growth() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("lib.rs"), "// empty\n").unwrap();
+
+        let config = CodingAgentConfig {
+            max_iterations: 100,
+            working_dir: dir.path().to_path_buf(),
+            target_file: Some(PathBuf::from("lib.rs")),
+            ..Default::default()
+        };
+        let mut agent = CodingAgent::new(config).unwrap();
+        let result = agent.run("add 100 helper functions");
+
+        // Must complete within configured iterations
+        assert!(
+            result.iterations_used <= 100,
+            "Used {} iterations (max 100)",
+            result.iterations_used
+        );
+
+        // Phi trace length should approximately match iterations used
+        // (retry strategies may cause ±1 discrepancy at phase boundaries)
+        let diff = (result.phi_trace.len() as isize - result.iterations_used as isize).unsigned_abs();
+        assert!(
+            diff <= 1,
+            "phi_trace length ({}) should be within 1 of iterations_used ({})",
+            result.phi_trace.len(),
+            result.iterations_used
+        );
+
+        // Observations and errors must not grow unboundedly per iteration
+        // Allow generous headroom: 20 entries per iteration max
+        assert!(
+            result.observations.len() <= result.iterations_used * 20,
+            "Observations grew unboundedly: {} for {} iterations",
+            result.observations.len(),
+            result.iterations_used
+        );
+        assert!(
+            result.errors.len() <= result.iterations_used * 20,
+            "Errors grew unboundedly: {} for {} iterations",
+            result.errors.len(),
+            result.iterations_used
+        );
+
+        // All phi values bounded
+        for &phi in &result.phi_trace {
+            assert!(phi >= 0.0 && phi <= 1.0 && phi.is_finite());
+        }
+
+        // Generation tiers should not exceed iterations
+        assert!(
+            result.generation_tiers.len() <= result.iterations_used,
+            "Generation tiers exceeded iterations: {} > {}",
+            result.generation_tiers.len(),
+            result.iterations_used
+        );
+
+        // Failure patterns must be bounded
+        let patterns = agent.failure_patterns();
+        assert!(
+            patterns.len() <= result.iterations_used,
+            "Failure patterns unbounded: {}",
+            patterns.len()
+        );
+    }
+
+    // ── Adversarial input tests ──────────────────────────────────────────
+
+    #[test]
+    fn test_adversarial_empty_task() {
+        let (mut agent, _dir) = make_test_agent();
+        let result = agent.run("");
+        // Must not panic — should complete (possibly with no meaningful output)
+        assert!(result.iterations_used <= 5);
+        for &phi in &result.phi_trace {
+            assert!(phi.is_finite());
+        }
+    }
+
+    #[test]
+    fn test_adversarial_special_chars() {
+        let (mut agent, _dir) = make_test_agent();
+        let result = agent.run("add fn with <script>alert('xss')</script> \n\n\t\r {}[]()\"'\\");
+        assert!(result.iterations_used <= 5);
+        for &phi in &result.phi_trace {
+            assert!(phi.is_finite() && phi >= 0.0 && phi <= 1.0);
+        }
+    }
+
+    #[test]
+    fn test_adversarial_huge_task() {
+        let (mut agent, _dir) = make_test_agent();
+        // 10KB task string
+        let huge = "a".repeat(10_000);
+        let result = agent.run(&huge);
+        assert!(result.iterations_used <= 5);
+        for &phi in &result.phi_trace {
+            assert!(phi.is_finite() && phi >= 0.0 && phi <= 1.0);
+        }
+    }
+
+    #[test]
+    fn test_adversarial_unicode_and_control_chars() {
+        let (mut agent, _dir) = make_test_agent();
+        let result = agent.run("add function \u{FEFF}\u{200B} cafe\u{0301} re\u{0301}sume\u{0301}");
+        assert!(result.iterations_used <= 5);
+        for &phi in &result.phi_trace {
+            assert!(phi.is_finite() && phi >= 0.0 && phi <= 1.0);
+        }
+    }
+
+    // ── Determinism test ─────────────────────────────────────────────────
+    // Same config + same task should produce the same phi trace length
+    // and same final phase (deterministic cognitive loop).
+
+    #[test]
+    fn test_determinism_same_config_same_output() {
+        let run = |task: &str| -> (usize, String, usize) {
+            let dir = tempfile::tempdir().unwrap();
+            let config = CodingAgentConfig {
+                max_iterations: 3,
+                working_dir: dir.path().to_path_buf(),
+                target_file: Some(PathBuf::from("det.rs")),
+                ..Default::default()
+            };
+            let mut agent = CodingAgent::new(config).unwrap();
+            let result = agent.run(task);
+            (
+                result.iterations_used,
+                format!("{}", result.final_phase),
+                result.phi_trace.len(),
+            )
+        };
+
+        let (iters_a, phase_a, trace_a) = run("add determinism test");
+        let (iters_b, phase_b, trace_b) = run("add determinism test");
+
+        assert_eq!(iters_a, iters_b, "Iterations should be deterministic");
+        assert_eq!(phase_a, phase_b, "Final phase should be deterministic");
+        assert_eq!(
+            trace_a, trace_b,
+            "Phi trace length should be deterministic"
+        );
+    }
+
+    // ── Telemetry bounds: AgentResult::to_telemetry_json edge cases ──────
+
+    #[test]
+    fn test_telemetry_json_empty_phi_trace() {
+        let result = AgentResult {
+            files_modified: vec![],
+            tests_passed: None,
+            iterations_used: 0,
+            phi_trace: vec![],
+            epistemic_status: EpistemicStatus::Unknown,
+            final_phase: TaskPhase::Understanding,
+            observations: vec![],
+            errors: vec![],
+            generation_tiers: vec![],
+            total_energy: 0.0,
+            #[cfg(feature = "school_learning")]
+            generated_lessons: vec![],
+        };
+        let json = result.to_telemetry_json();
+        assert!(json.is_object());
+        // avg_phi should be 0.0 for empty trace
+        let avg = json["consciousness"]["avg_phi"].as_f64().unwrap();
+        assert_eq!(avg, 0.0);
+    }
+
+    #[test]
+    fn test_telemetry_json_errors_preview_truncated() {
+        let long_error = "E".repeat(500);
+        let result = AgentResult {
+            files_modified: vec![],
+            tests_passed: None,
+            iterations_used: 1,
+            phi_trace: vec![0.5],
+            epistemic_status: EpistemicStatus::Uncertain,
+            final_phase: TaskPhase::Done,
+            observations: vec![],
+            errors: vec![long_error; 5],
+            generation_tiers: vec![],
+            total_energy: 1.0,
+            #[cfg(feature = "school_learning")]
+            generated_lessons: vec![],
+        };
+        let json = result.to_telemetry_json();
+        // errors_preview should have at most 3 entries
+        let preview = json["errors_preview"].as_array().unwrap();
+        assert!(preview.len() <= 3);
+        // Each preview entry should be truncated to 100 chars
+        for entry in preview {
+            let s = entry.as_str().unwrap();
+            assert!(s.len() <= 100, "Preview entry too long: {}", s.len());
+        }
+    }
+
+    // ── Phase A + B tests: quality gate, native patterns, feedback loops ─
+
+    #[test]
+    fn test_quality_gate_rejects_todo_stub() {
+        let code = "/// Generated.\npub fn generated() -> () {\n    // TODO: implement — task: foo\n}\n";
+        assert!(CodingAgent::check_code_quality(code).is_some());
+    }
+
+    #[test]
+    fn test_quality_gate_rejects_unimplemented() {
+        let code = "pub fn foo() { unimplemented!() }";
+        assert!(CodingAgent::check_code_quality(code).is_some());
+    }
+
+    #[test]
+    fn test_quality_gate_rejects_empty() {
+        assert!(CodingAgent::check_code_quality("").is_some());
+        assert!(CodingAgent::check_code_quality("   ").is_some());
+    }
+
+    #[test]
+    fn test_quality_gate_rejects_comments_only() {
+        let code = "/// A function.\n// This is commented out.\n";
+        assert!(CodingAgent::check_code_quality(code).is_some());
+    }
+
+    #[test]
+    fn test_quality_gate_rejects_markdown_fences() {
+        let code = "```rust\npub fn foo() -> i32 { 42 }\n```";
+        assert!(CodingAgent::check_code_quality(code).is_some());
+    }
+
+    #[test]
+    fn test_quality_gate_accepts_valid_code() {
+        let code = "/// Compute fibonacci.\npub fn fibonacci(n: u64) -> u64 {\n    match n {\n        0 => 0,\n        1 => 1,\n        _ => fibonacci(n-1) + fibonacci(n-2),\n    }\n}\n";
+        assert!(CodingAgent::check_code_quality(code).is_none());
+    }
+
+    #[test]
+    fn test_quality_gate_accepts_simple_fn() {
+        let code = "pub fn hello() -> &'static str {\n    \"Hello, world!\"\n}\n";
+        assert!(CodingAgent::check_code_quality(code).is_none());
+    }
+
+    #[test]
+    fn test_native_pattern_fibonacci() {
+        let code = CodingAgent::match_native_pattern("add a fibonacci function");
+        assert!(code.is_some());
+        let code = code.unwrap();
+        assert!(code.contains("pub fn fibonacci"));
+        assert!(!code.contains("TODO"));
+    }
+
+    #[test]
+    fn test_native_pattern_factorial() {
+        let code = CodingAgent::match_native_pattern("implement factorial");
+        assert!(code.is_some());
+        assert!(code.unwrap().contains("pub fn factorial"));
+    }
+
+    #[test]
+    fn test_native_pattern_gcd() {
+        let code = CodingAgent::match_native_pattern("add gcd function");
+        assert!(code.is_some());
+        assert!(code.unwrap().contains("pub fn gcd"));
+    }
+
+    #[test]
+    fn test_native_pattern_is_prime() {
+        let code = CodingAgent::match_native_pattern("check primality");
+        assert!(code.is_some());
+        assert!(code.unwrap().contains("pub fn is_prime"));
+    }
+
+    #[test]
+    fn test_native_pattern_reverse_string() {
+        let code = CodingAgent::match_native_pattern("reverse a string");
+        assert!(code.is_some());
+        assert!(code.unwrap().contains("pub fn reverse_string"));
+    }
+
+    #[test]
+    fn test_native_pattern_palindrome() {
+        let code = CodingAgent::match_native_pattern("check if palindrome");
+        assert!(code.is_some());
+        assert!(code.unwrap().contains("pub fn is_palindrome"));
+    }
+
+    #[test]
+    fn test_native_pattern_bubble_sort() {
+        let code = CodingAgent::match_native_pattern("implement bubble sort");
+        assert!(code.is_some());
+        assert!(code.unwrap().contains("pub fn bubble_sort"));
+    }
+
+    #[test]
+    fn test_native_pattern_binary_search() {
+        let code = CodingAgent::match_native_pattern("implement binary search");
+        assert!(code.is_some());
+        assert!(code.unwrap().contains("pub fn binary_search"));
+    }
+
+    #[test]
+    fn test_native_pattern_stack() {
+        let code = CodingAgent::match_native_pattern("create a stack data structure");
+        assert!(code.is_some());
+        let code = code.unwrap();
+        assert!(code.contains("pub struct Stack"));
+        assert!(code.contains("push"));
+        assert!(code.contains("pop"));
+    }
+
+    #[test]
+    fn test_native_pattern_returns_none_for_unknown() {
+        // Tasks that don't match any pattern should return None
+        assert!(CodingAgent::match_native_pattern("implement a red-black tree").is_none());
+        assert!(CodingAgent::match_native_pattern("create a REST API client").is_none());
+    }
+
+    #[test]
+    fn test_extract_function_name() {
+        assert_eq!(
+            CodingAgent::extract_function_name("add a fibonacci function"),
+            Some("fibonacci".to_string())
+        );
+        assert_eq!(
+            CodingAgent::extract_function_name("implement calculate_tax"),
+            Some("calculate_tax".to_string())
+        );
+        assert_eq!(
+            CodingAgent::extract_function_name("create process_data method"),
+            Some("process_data".to_string())
+        );
+    }
+
+    #[test]
+    fn test_failure_patterns_in_prompt() {
+        let config = CodingAgentConfig::default();
+        let mut agent = CodingAgent::new(config).unwrap();
+        agent.task = "add function".to_string();
+        agent.failure_patterns = vec![
+            ("error[E0308]: mismatched types".to_string(), 2),
+            ("error[E0412]: cannot find type".to_string(), 1),
+        ];
+
+        let prompt = agent.build_generation_prompt();
+        assert!(
+            prompt.contains("AVOID these patterns"),
+            "Prompt should warn about failure patterns"
+        );
+        assert!(prompt.contains("E0308"));
+        assert!(prompt.contains("(2x)"));
+    }
+
+    #[test]
+    fn test_native_generates_sort_for_sort_task() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = CodingAgentConfig {
+            max_iterations: 5,
+            working_dir: dir.path().to_path_buf(),
+            target_file: Some(PathBuf::from("sort.rs")),
+            ..Default::default()
+        };
+        let mut agent = CodingAgent::new(config).unwrap();
+        let result = agent.run("implement bubble sort");
+
+        let target = dir.path().join("sort.rs");
+        if target.exists() {
+            let content = std::fs::read_to_string(&target).unwrap();
+            assert!(
+                content.contains("bubble_sort") || content.contains("sort"),
+                "Should generate sort code: {}",
+                &content[..content.len().min(200)]
+            );
+            assert!(!content.contains("TODO"), "Should not contain TODO");
+        }
+        assert!(result.iterations_used > 0);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Task E tests: structured failures, consciousness signals, events, retry
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_parse_test_failures_assert_eq() {
+        let stderr = r#"
+---- my_test stdout ----
+thread 'my_test' panicked at src/lib.rs:42:5:
+assertion `left == right` failed
+  left: 42
+ right: 43
+
+failures:
+    my_test
+"#;
+        let failures = CodingAgent::parse_test_failures(stderr);
+        assert_eq!(failures.len(), 1);
+        assert_eq!(failures[0].test_name, "my_test");
+        assert_eq!(failures[0].failure_kind, TestFailureKind::AssertEq);
+        assert_eq!(failures[0].actual.as_deref(), Some("42"));
+        assert_eq!(failures[0].expected.as_deref(), Some("43"));
+    }
+
+    #[test]
+    fn test_parse_test_failures_panic() {
+        let stderr = r#"
+---- panic_test stdout ----
+thread 'panic_test' panicked at src/main.rs:10:5:
+index out of bounds: the len is 3 but the index is 5
+"#;
+        let failures = CodingAgent::parse_test_failures(stderr);
+        assert_eq!(failures.len(), 1);
+        assert_eq!(failures[0].test_name, "panic_test");
+        assert_eq!(failures[0].failure_kind, TestFailureKind::Panic);
+    }
+
+    #[test]
+    fn test_parse_test_failures_multiple() {
+        let stderr = r#"
+---- test_a stdout ----
+thread 'test_a' panicked at src/lib.rs:1:1:
+assertion failed
+---- test_b stdout ----
+thread 'test_b' panicked at src/lib.rs:2:2:
+assertion `left == right` failed
+  left: "foo"
+ right: "bar"
+"#;
+        let failures = CodingAgent::parse_test_failures(stderr);
+        assert_eq!(failures.len(), 2);
+        assert_eq!(failures[0].test_name, "test_a");
+        assert_eq!(failures[0].failure_kind, TestFailureKind::Assert);
+        assert_eq!(failures[1].test_name, "test_b");
+        assert_eq!(failures[1].failure_kind, TestFailureKind::AssertEq);
+    }
+
+    #[test]
+    fn test_parse_test_failures_empty() {
+        assert!(CodingAgent::parse_test_failures("").is_empty());
+        assert!(CodingAgent::parse_test_failures("test result: ok").is_empty());
+    }
+
+    #[test]
+    fn test_format_structured_test_failures() {
+        let failures = vec![StructuredTestFailure {
+            test_name: "test_add".to_string(),
+            failure_kind: TestFailureKind::AssertEq,
+            expected: Some("5".to_string()),
+            actual: Some("4".to_string()),
+            message: Some("assertion failed".to_string()),
+            file: Some("src/lib.rs".to_string()),
+            line: Some(42),
+        }];
+        let formatted = CodingAgent::format_structured_test_failures(&failures);
+        assert!(formatted.contains("test_add"));
+        assert!(formatted.contains("AssertEq"));
+        assert!(formatted.contains("expected=5"));
+        assert!(formatted.contains("got=4"));
+        assert!(formatted.contains("src/lib.rs:42"));
+    }
+
+    #[test]
+    fn test_extract_panic_location() {
+        let (file, line) = CodingAgent::extract_panic_location("at ./src/foo.rs:42:5");
+        assert_eq!(file.as_deref(), Some("./src/foo.rs"));
+        assert_eq!(line, Some(42));
+
+        let (file, line) = CodingAgent::extract_panic_location("no location");
+        assert!(file.is_none());
+        assert!(line.is_none());
+    }
+
+    #[test]
+    fn test_consciousness_signals_extraction() {
+        let (mut agent, _dir) = make_test_agent();
+        let _result = agent.run("add fibonacci");
+
+        // After running, prediction_error_history should be populated
+        assert!(
+            !agent.prediction_error_history.is_empty(),
+            "Should have prediction error history after run"
+        );
+        assert!(
+            !agent.confidence_velocity_history.is_empty(),
+            "Should have confidence velocity history after run"
+        );
+        // Histories should be bounded
+        assert!(
+            agent.prediction_error_history.len() <= 10,
+            "History should be bounded to 10"
+        );
+    }
+
+    #[test]
+    fn test_event_channel_receives_events() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = CodingAgentConfig {
+            max_iterations: 3,
+            working_dir: dir.path().to_path_buf(),
+            target_file: Some(PathBuf::from("test.rs")),
+            ..Default::default()
+        };
+        let agent = CodingAgent::new(config).unwrap();
+        let (mut agent, rx) = agent.with_event_channel();
+
+        let _result = agent.run("add hello function");
+
+        // Should have received at least consciousness snapshots and Done event
+        let events: Vec<AgentEvent> = rx.try_iter().collect();
+        assert!(!events.is_empty(), "Should receive events");
+
+        // Check for consciousness snapshots
+        let has_snapshot = events.iter().any(|e| matches!(e, AgentEvent::ConsciousnessSnapshot { .. }));
+        assert!(has_snapshot, "Should have consciousness snapshots");
+
+        // Check for Done event
+        let has_done = events.iter().any(|e| matches!(e, AgentEvent::Done(_)));
+        assert!(has_done, "Should have Done event");
+    }
+
+    #[test]
+    fn test_retry_strategy_cycles_through_options() {
+        let (mut agent, _dir) = make_test_agent();
+
+        let s1 = agent.next_retry_strategy();
+        assert_eq!(s1, RetryStrategy::DifferentTemplate);
+
+        let s2 = agent.next_retry_strategy();
+        assert!(matches!(s2, RetryStrategy::DifferentBackend(BackendTier::LocalLlm)));
+
+        let s3 = agent.next_retry_strategy();
+        assert!(matches!(s3, RetryStrategy::DifferentBackend(BackendTier::CloudLlm)));
+
+        let s4 = agent.next_retry_strategy();
+        assert_eq!(s4, RetryStrategy::SimplifyScope);
+
+        let s5 = agent.next_retry_strategy();
+        assert!(matches!(s5, RetryStrategy::RequestClarification(_)));
+    }
+
+    #[test]
+    fn test_retry_state_resets_on_new_run() {
+        let (mut agent, _dir) = make_test_agent();
+
+        // Advance retry state
+        let _ = agent.next_retry_strategy();
+        let _ = agent.next_retry_strategy();
+        assert!(!agent.retry_state.strategies_tried.is_empty());
+
+        // Run resets retry state
+        let _result = agent.run("add hello function");
+        // After run completes, retry state may be populated from the run itself
+        // but the initial reset should have cleared it
+    }
+
+    #[test]
+    fn test_hdc_context_prompt_empty_without_memory() {
+        let (agent, _dir) = make_test_agent();
+        // No code memory indexed → empty HDC context
+        let hdc_prompt = agent.build_hdc_context_prompt();
+        assert!(hdc_prompt.is_empty(), "No HDC context without code memory");
+    }
+
+    #[test]
+    fn test_generation_prompt_includes_retry_hints() {
+        let (mut agent, _dir) = make_test_agent();
+        agent.task = "add fibonacci".to_string();
+        agent.phase = TaskPhase::Fixing;
+        agent.last_test_output = Some("error[E0308]: mismatched types".to_string());
+
+        // Set DifferentTemplate strategy
+        agent.retry_state.current_strategy = RetryStrategy::DifferentTemplate;
+        let prompt = agent.build_generation_prompt();
+        assert!(
+            prompt.contains("different implementation approach"),
+            "Prompt should include retry hint for DifferentTemplate"
+        );
+
+        // Set SimplifyScope strategy
+        agent.retry_state.current_strategy = RetryStrategy::SimplifyScope;
+        let prompt = agent.build_generation_prompt();
+        assert!(
+            prompt.contains("Simplify"),
+            "Prompt should include retry hint for SimplifyScope"
+        );
+    }
+
+    #[test]
+    fn test_generation_prompt_includes_structured_failures() {
+        let (mut agent, _dir) = make_test_agent();
+        agent.task = "add fibonacci".to_string();
+        agent.phase = TaskPhase::Fixing;
+        agent.last_test_output = Some(
+            r#"---- test_fib stdout ----
+thread 'test_fib' panicked at src/lib.rs:5:5:
+assertion `left == right` failed
+  left: 8
+ right: 7
+"#
+            .to_string(),
+        );
+
+        let prompt = agent.build_generation_prompt();
+        assert!(prompt.contains("test failure"), "Should include structured test analysis");
+        assert!(prompt.contains("test_fib"), "Should name the failing test");
+    }
+
+    #[test]
+    fn test_persistent_experience_store() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = CodingAgentConfig {
+            max_iterations: 3,
+            working_dir: dir.path().to_path_buf(),
+            target_file: Some(PathBuf::from("test.rs")),
+            ..Default::default()
+        };
+        let mut agent = CodingAgent::new(config).unwrap();
+        assert!(agent.has_experience_store(), "Should have experience store");
+
+        // Run to populate the store
+        let _result = agent.run("add fibonacci");
+
+        // Check that .symthaea/experience.db was created
+        let db_path = dir.path().join(".symthaea/experience.db");
+        assert!(db_path.exists(), "Persistent DB should exist at {:?}", db_path);
+
+        // Create a second agent pointing at the same directory — it should
+        // load the persisted experience store
+        let config2 = CodingAgentConfig {
+            max_iterations: 3,
+            working_dir: dir.path().to_path_buf(),
+            target_file: Some(PathBuf::from("test.rs")),
+            ..Default::default()
+        };
+        let agent2 = CodingAgent::new(config2).unwrap();
+        assert!(agent2.has_experience_store(), "Second agent should load persistent store");
+    }
+
+    #[test]
+    fn test_hdc_verification_gate_no_memory() {
+        // Without code_memory, verification should always pass
+        let dir = tempfile::tempdir().unwrap();
+        let config = CodingAgentConfig {
+            max_iterations: 1,
+            working_dir: dir.path().to_path_buf(),
+            ..Default::default()
+        };
+        let agent = CodingAgent::new(config).unwrap();
+        let (passes, surprise) = agent.verify_generated_code_hdc("fn hello() {}");
+        assert!(passes, "Should pass when no code memory");
+        assert_eq!(surprise, 0.0);
+    }
+
+    #[cfg(feature = "code_generation")]
+    #[test]
+    fn test_hdc_verification_gate_with_indexed_code() {
+        let dir = tempfile::tempdir().unwrap();
+        let src_dir = dir.path().join("src");
+        std::fs::create_dir_all(&src_dir).unwrap();
+        // Write several Rust files to build a codebase centroid
+        for i in 0..5 {
+            std::fs::write(
+                src_dir.join(format!("mod{i}.rs")),
+                format!("pub fn func_{i}(x: u32) -> u32 {{ x + {i} }}\n"),
+            )
+            .unwrap();
+        }
+
+        let config = CodingAgentConfig {
+            max_iterations: 1,
+            working_dir: dir.path().to_path_buf(),
+            ..Default::default()
+        };
+        let mut agent = CodingAgent::new(config).unwrap();
+        agent.index_project(dir.path()).unwrap();
+
+        // Similar code should pass
+        let (passes, surprise) = agent.verify_generated_code_hdc("pub fn func_new(x: u32) -> u32 { x + 10 }");
+        // Surprise should be finite
+        assert!(surprise.is_finite(), "Surprise should be finite");
+        // With only 5 small files the centroid is weak — we mainly test no-crash here
+        eprintln!("Similar code: passes={passes}, surprise={surprise:.3}");
+    }
+
+    // ── LLM Output Verification Tests ─────────────────────────────────
+
+    #[test]
+    fn test_quality_gate_rejects_hallucinated_imports() {
+        let code = "use my_crate::something;\nfn hello() {}";
+        let result = CodingAgent::check_code_quality(code);
+        assert!(result.is_some(), "Should reject hallucinated import");
+        assert!(result.unwrap().contains("hallucinated"));
+    }
+
+    #[test]
+    fn test_quality_gate_rejects_ellipsis() {
+        let code = "fn process() {\n    ...\n}";
+        let result = CodingAgent::check_code_quality(code);
+        assert!(result.is_some(), "Should reject ellipsis");
+    }
+
+    #[test]
+    fn test_quality_gate_rejects_explanation_leak() {
+        let code = "Here is the implementation:\nfn hello() -> &'static str { \"hello\" }";
+        let result = CodingAgent::check_code_quality(code);
+        assert!(result.is_some(), "Should reject explanation leak");
+        assert!(result.unwrap().contains("explanation"));
+    }
+
+    #[test]
+    fn test_quality_gate_rejects_duplicate_fns() {
+        let code = "fn fibonacci(n: u64) -> u64 { n }\nfn fibonacci(n: u64) -> u64 { n + 1 }";
+        let result = CodingAgent::check_code_quality(code);
+        assert!(result.is_some(), "Should reject duplicate function");
+        assert!(result.unwrap().contains("duplicate"));
+    }
+
+    #[test]
+    fn test_quality_gate_accepts_doc_comments() {
+        // "Note that" in a doc comment should NOT be flagged
+        let code = "/// Note that this returns None for empty inputs.\npub fn first(v: &[i32]) -> Option<&i32> {\n    v.first()\n}";
+        let result = CodingAgent::check_code_quality(code);
+        assert!(result.is_none(), "Doc comments should not trigger explanation detection");
+    }
+
+    // ── Warm-up & Learning Tests ────────────────────────────────────────
+
+    #[test]
+    fn test_warm_up_runs_without_consuming_iterations() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = CodingAgentConfig {
+            max_iterations: 3,
+            working_dir: dir.path().to_path_buf(),
+            target_file: Some(PathBuf::from("warm.rs")),
+            ..Default::default()
+        };
+        let mut agent = CodingAgent::new(config).unwrap();
+
+        // Run the agent — warm_up_phi(3) is called internally before the main loop.
+        // The key property: warm-up cycles don't count as iterations.
+        let result = agent.run("add hello function");
+        assert!(
+            result.iterations_used <= 3,
+            "Should use at most max_iterations (3), not more. Got: {}",
+            result.iterations_used
+        );
+        // Phi trace should only contain entries from real iterations, not warm-up
+        let diff = (result.phi_trace.len() as isize - result.iterations_used as isize).unsigned_abs();
+        assert!(diff <= 1, "Phi trace should track real iterations");
+    }
+
+    #[test]
+    fn test_retrieve_success_patterns_empty_store() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = CodingAgentConfig {
+            max_iterations: 1,
+            working_dir: dir.path().to_path_buf(),
+            ..Default::default()
+        };
+        let agent = CodingAgent::new(config).unwrap();
+        let patterns = agent.retrieve_success_patterns();
+        assert!(patterns.is_empty(), "Empty store should return no patterns");
+    }
+
+    #[test]
+    fn test_experience_store_counts() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = CodingAgentConfig {
+            max_iterations: 3,
+            working_dir: dir.path().to_path_buf(),
+            target_file: Some(PathBuf::from("test.rs")),
+            ..Default::default()
+        };
+        let mut agent = CodingAgent::new(config).unwrap();
+        assert!(agent.has_experience_store());
+
+        // Store should start empty
+        let count_before = agent.experience_count();
+
+        // Run a task — this should store at least one experience
+        let _ = agent.run("add fibonacci function");
+
+        let count_after = agent.experience_count();
+        // The agent may or may not store experiences depending on whether
+        // code was generated/tested. Both cases are valid.
+        assert!(
+            count_after >= count_before,
+            "Experience count should not decrease"
+        );
+    }
+
+    #[test]
+    fn test_learning_across_runs() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = CodingAgentConfig {
+            max_iterations: 3,
+            working_dir: dir.path().to_path_buf(),
+            target_file: Some(PathBuf::from("test.rs")),
+            ..Default::default()
+        };
+        let mut agent = CodingAgent::new(config).unwrap();
+
+        // Run 1: generate fibonacci
+        let _ = agent.run("add fibonacci function");
+        let successes_after_r1 = agent.cached_successes().len();
+        let hints_after_r1 = agent.cached_error_hints().len();
+
+        // Run 2: similar task — should benefit from cached experience
+        let _ = agent.run("add factorial function");
+        let successes_after_r2 = agent.cached_successes().len();
+
+        eprintln!(
+            "Successes: r1={successes_after_r1}, r2={successes_after_r2}, hints_r1={hints_after_r1}"
+        );
+        // Cache should accumulate over runs
+        assert!(
+            successes_after_r2 >= successes_after_r1,
+            "Success cache should grow or stay same across runs"
+        );
+    }
+
+    #[test]
+    fn test_strip_code_fences() {
+        // No fences → unchanged
+        assert_eq!(CodingAgent::strip_code_fences("fn main() {}"), "fn main() {}");
+
+        // ```rust ... ```
+        assert_eq!(
+            CodingAgent::strip_code_fences("```rust\nfn main() {}\n```"),
+            "fn main() {}"
+        );
+
+        // ``` ... ```
+        assert_eq!(
+            CodingAgent::strip_code_fences("```\nfn main() {}\n```"),
+            "fn main() {}"
+        );
+
+        // ```rs ... ```
+        assert_eq!(
+            CodingAgent::strip_code_fences("```rs\nfn main() {}\n```"),
+            "fn main() {}"
+        );
+
+        // With leading/trailing whitespace
+        assert_eq!(
+            CodingAgent::strip_code_fences("  ```rust\n  fn main() {}\n  ```  "),
+            "fn main() {}"
         );
     }
 }

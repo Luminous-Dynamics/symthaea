@@ -108,8 +108,8 @@ pub fn cycle_result_to_thought_channels(result: &CycleResult) -> ThoughtChannels
     channels.set_epistemic(epistemic);
 
     // Emotion from CycleMetadata affective bridge
-    let valence = result.metadata.affective_valence;
-    let arousal = result.metadata.affective_arousal;
+    let valence = result.metadata.embodied.affective_valence;
+    let arousal = result.metadata.embodied.affective_arousal;
     let warmth = 0.5; // Default neutral warmth (no direct source in CycleResult)
     channels.set_emotion(valence, arousal, warmth);
 

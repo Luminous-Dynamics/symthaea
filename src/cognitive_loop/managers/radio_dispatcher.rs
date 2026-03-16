@@ -21,7 +21,7 @@
 use super::super::subsystem_trait::{
     output_flags, CognitiveSubsystem, CycleSnapshot, SubsystemOutput,
 };
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // RADIO TIER — Physical layer abstraction
@@ -77,6 +77,10 @@ pub struct TierProfile {
     pub latency_ms: u32,
     /// Expected packet delivery reliability (0.0–1.0).
     pub reliability: f32,
+    /// Energy cost per bit in nanojoules (nJ/bit).
+    /// Used for energy-aware tier selection when power budget is constrained.
+    /// Basis: Friedman et al. (2013), Semtech SX1276 datasheet.
+    pub energy_per_bit_nj: f64,
 }
 
 impl RadioTier {
@@ -93,6 +97,7 @@ impl RadioTier {
                 duty_cycle: 1.0,
                 latency_ms: 5,
                 reliability: 0.99,
+                energy_per_bit_nj: RADIO_ENERGY_PER_BIT_LOCAL,
             },
             RadioTier::Metro => TierProfile {
                 mtu: 250,
@@ -104,6 +109,7 @@ impl RadioTier {
                 duty_cycle: 0.01,                // 1% EU LoRa duty cycle
                 latency_ms: 500,
                 reliability: 0.85,
+                energy_per_bit_nj: RADIO_ENERGY_PER_BIT_METRO,
             },
             RadioTier::Regional => TierProfile {
                 mtu: 50,
@@ -115,6 +121,7 @@ impl RadioTier {
                 duty_cycle: 0.5,                 // 50% (amateur HF)
                 latency_ms: 5_000,
                 reliability: 0.70,
+                energy_per_bit_nj: RADIO_ENERGY_PER_BIT_REGIONAL,
             },
         }
     }
@@ -566,6 +573,586 @@ impl RegulatoryConstraints {
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// SPECTRUM WATERFALL — Time-series observation buffer
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Timestamped spectrum observation for waterfall buffer.
+#[derive(Debug, Clone)]
+struct WaterfallEntry {
+    /// Cycle number when observed.
+    cycle: u64,
+    /// Mean noise floor across all observations that cycle (dBm).
+    noise_floor_dbm: f64,
+    /// Mean SNR across all observations that cycle (dB).
+    snr_db: f64,
+    /// Whether jamming was detected this cycle.
+    jammed: bool,
+    /// Number of raw observations aggregated.
+    observation_count: u32,
+}
+
+/// Ring buffer of spectrum observations for pattern detection.
+///
+/// Maintains a fixed-capacity window of aggregated per-cycle spectrum state.
+/// Enables periodic interference detection and noise floor trend analysis.
+///
+/// Basis: Haykin (2005) — cognitive radio spectrum sensing requires
+/// temporal context for reliable detection.
+struct SpectrumWaterfall {
+    /// Ring buffer of entries (oldest at front).
+    entries: VecDeque<WaterfallEntry>,
+    /// Maximum entries to keep.
+    capacity: usize,
+}
+
+impl SpectrumWaterfall {
+    fn new(capacity: usize) -> Self {
+        Self {
+            entries: VecDeque::with_capacity(capacity),
+            capacity,
+        }
+    }
+
+    /// Record a cycle's aggregated spectrum state.
+    fn push(&mut self, entry: WaterfallEntry) {
+        if self.entries.len() >= self.capacity {
+            self.entries.pop_front();
+        }
+        self.entries.push_back(entry);
+    }
+
+    /// Mean noise floor across all entries (dBm).
+    fn mean_noise_floor(&self) -> Option<f64> {
+        if self.entries.is_empty() {
+            return None;
+        }
+        let sum: f64 = self.entries.iter().map(|e| e.noise_floor_dbm).sum();
+        Some(sum / self.entries.len() as f64)
+    }
+
+    /// Noise floor variance (for trend detection).
+    fn noise_floor_variance(&self) -> Option<f64> {
+        let mean = self.mean_noise_floor()?;
+        if self.entries.len() < 2 {
+            return None;
+        }
+        let var: f64 = self
+            .entries
+            .iter()
+            .map(|e| (e.noise_floor_dbm - mean).powi(2))
+            .sum::<f64>()
+            / (self.entries.len() - 1) as f64;
+        Some(var)
+    }
+
+    /// Fraction of recent entries with jamming detected (0.0–1.0).
+    fn jamming_ratio(&self) -> f64 {
+        if self.entries.is_empty() {
+            return 0.0;
+        }
+        let jammed = self.entries.iter().filter(|e| e.jammed).count();
+        jammed as f64 / self.entries.len() as f64
+    }
+
+    /// Detect periodic interference pattern.
+    ///
+    /// Returns estimated period (in cycles) if a repeating noise spike is found.
+    /// Uses simple peak detection on noise floor — looks for regularly-spaced
+    /// entries where noise is >1 std dev above mean.
+    fn detect_periodic_interference(&self) -> Option<u32> {
+        let mean = self.mean_noise_floor()?;
+        let var = self.noise_floor_variance()?;
+        let std_dev = var.sqrt();
+        if std_dev < 1.0 || self.entries.len() < RADIO_WATERFALL_MIN_SAMPLES {
+            return None;
+        }
+
+        // Find indices of noise spikes (>1 std dev above mean)
+        let spike_cycles: Vec<u64> = self
+            .entries
+            .iter()
+            .filter(|e| e.noise_floor_dbm > mean + std_dev)
+            .map(|e| e.cycle)
+            .collect();
+
+        if spike_cycles.len() < 3 {
+            return None;
+        }
+
+        // Check for consistent inter-spike intervals
+        let intervals: Vec<u64> = spike_cycles.windows(2).map(|w| w[1] - w[0]).collect();
+        let mean_interval = intervals.iter().sum::<u64>() as f64 / intervals.len() as f64;
+
+        // Check variance of intervals — periodic if low
+        let interval_var: f64 = intervals
+            .iter()
+            .map(|&i| (i as f64 - mean_interval).powi(2))
+            .sum::<f64>()
+            / intervals.len() as f64;
+
+        if interval_var < mean_interval * 0.5 && mean_interval > 1.0 {
+            Some(mean_interval as u32)
+        } else {
+            None
+        }
+    }
+
+    /// Number of entries currently stored.
+    fn len(&self) -> usize {
+        self.entries.len()
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ADAPTIVE COMPRESSION — Tier-aware encoding strategies
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Compression strategy selected based on target radio tier and payload type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CompressionStrategy {
+    /// Full 2048-byte BinaryHV — Local tier only.
+    Full,
+    /// XOR + RLE delta — Metro tier, typical 50-200 bytes.
+    Delta,
+    /// BLAKE3 hash only (32 bytes) — Regional tier, consensus verification.
+    HashOnly,
+}
+
+impl CompressionStrategy {
+    /// Select strategy based on target tier and whether a previous state exists.
+    pub fn for_tier(tier: RadioTier, has_previous: bool) -> Self {
+        match tier {
+            RadioTier::Local => CompressionStrategy::Full,
+            RadioTier::Metro => {
+                if has_previous {
+                    CompressionStrategy::Delta
+                } else {
+                    CompressionStrategy::Full // Must send full on first contact
+                }
+            }
+            RadioTier::Regional => CompressionStrategy::HashOnly,
+        }
+    }
+}
+
+/// Result of tier-adaptive compression.
+#[derive(Debug, Clone)]
+pub struct TierCompressedPayload {
+    /// The compression strategy used.
+    pub strategy: CompressionStrategy,
+    /// Compressed payload bytes (wire format).
+    pub data: Vec<u8>,
+    /// Original uncompressed size.
+    pub original_size: usize,
+}
+
+impl TierCompressedPayload {
+    /// Wire size in bytes.
+    pub fn wire_size(&self) -> usize {
+        self.data.len()
+    }
+
+    /// Compression ratio (0.0 = perfect, 1.0 = no compression).
+    pub fn compression_ratio(&self) -> f64 {
+        if self.original_size == 0 {
+            return 1.0;
+        }
+        self.data.len() as f64 / self.original_size as f64
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// FEC — Forward Error Correction (Reed-Solomon approximation)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Simple XOR-based FEC for Metro/Regional tiers.
+///
+/// Not full Reed-Solomon (would require a GF(2^8) library), but provides
+/// single-block recovery via XOR parity. For N data blocks, produces 1 parity
+/// block that can recover any single lost block.
+///
+/// Basis: Lin & Costello (2004) — error control coding fundamentals.
+///
+/// NOTE: For LoRa fragmentation, use `swarm::mesh::lora_fragment::FragmentAssembler`
+/// which provides the same XOR FEC integrated with CRC-16 and reassembly.
+/// This encoder is for non-LoRa payloads (Metro/Regional custom frames).
+pub struct FecEncoder;
+
+impl FecEncoder {
+    /// Encode data with XOR parity FEC.
+    ///
+    /// Splits data into `block_size`-byte blocks and appends one XOR parity block.
+    /// Returns the data with parity appended.
+    pub fn encode(data: &[u8], block_size: usize) -> Vec<u8> {
+        if data.len() < RADIO_FEC_MIN_PAYLOAD || block_size == 0 {
+            return data.to_vec();
+        }
+
+        let mut result = data.to_vec();
+        let mut parity = vec![0u8; block_size];
+
+        for chunk in data.chunks(block_size) {
+            for (i, &b) in chunk.iter().enumerate() {
+                parity[i] ^= b;
+            }
+        }
+
+        result.extend_from_slice(&parity);
+        result
+    }
+
+    /// Decode FEC-encoded data, recovering from a single lost block.
+    ///
+    /// `lost_block_index`: which block (0-based) was lost. If `None`, just strips parity.
+    pub fn decode(encoded: &[u8], block_size: usize, lost_block_index: Option<usize>) -> Vec<u8> {
+        if block_size == 0 || encoded.len() <= block_size {
+            return encoded.to_vec();
+        }
+
+        let data_len = encoded.len() - block_size;
+        let parity = &encoded[data_len..];
+        let mut data = encoded[..data_len].to_vec();
+
+        if let Some(lost_idx) = lost_block_index {
+            let start = lost_idx * block_size;
+            let end = (start + block_size).min(data_len);
+
+            // Recover: parity XOR all other blocks
+            let mut recovered = parity.to_vec();
+            for (block_idx, chunk) in data.chunks(block_size).enumerate() {
+                if block_idx != lost_idx {
+                    for (i, &b) in chunk.iter().enumerate() {
+                        if i < recovered.len() {
+                            recovered[i] ^= b;
+                        }
+                    }
+                }
+            }
+
+            // Write recovered block
+            for i in start..end {
+                if i - start < recovered.len() {
+                    data[i] = recovered[i - start];
+                }
+            }
+        }
+
+        data
+    }
+
+    /// Calculate FEC overhead for a given data size and block size.
+    pub fn overhead(data_len: usize, block_size: usize) -> usize {
+        if data_len < RADIO_FEC_MIN_PAYLOAD || block_size == 0 {
+            0
+        } else {
+            block_size
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PEER DISCOVERY — Lightweight beacon protocol
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Discovery beacon broadcast on Regional/Metro tiers.
+///
+/// Minimal payload (24 bytes) designed to fit within Regional MTU (50 bytes):
+/// - 8 bytes: node ID
+/// - 8 bytes: capabilities hash
+/// - 4 bytes: cycle counter (for liveliness)
+/// - 4 bytes: network health + tier mask + reserved
+#[derive(Debug, Clone)]
+pub struct DiscoveryBeacon {
+    /// First 8 bytes of the node's identity.
+    pub node_id: [u8; 8],
+    /// Hash of the node's capabilities (features, firmware version, etc.).
+    pub capabilities_hash: [u8; 8],
+    /// Cycle counter at beacon time (monotonically increasing).
+    pub cycle_counter: u32,
+    /// Current network health level (0-3).
+    pub network_health: u8,
+    /// Bitmask of available tiers (bit 0 = Local, 1 = Metro, 2 = Regional).
+    pub tier_mask: u8,
+}
+
+impl DiscoveryBeacon {
+    /// Serialize to wire format (24 bytes).
+    pub fn to_bytes(&self) -> [u8; RADIO_BEACON_SIZE] {
+        let mut buf = [0u8; RADIO_BEACON_SIZE];
+        buf[0..8].copy_from_slice(&self.node_id);
+        buf[8..16].copy_from_slice(&self.capabilities_hash);
+        buf[16..20].copy_from_slice(&self.cycle_counter.to_le_bytes());
+        buf[20] = self.network_health;
+        buf[21] = self.tier_mask;
+        // 22-23: reserved
+        buf
+    }
+
+    /// Deserialize from wire format.
+    pub fn from_bytes(data: &[u8; RADIO_BEACON_SIZE]) -> Self {
+        let mut node_id = [0u8; 8];
+        node_id.copy_from_slice(&data[0..8]);
+        let mut capabilities_hash = [0u8; 8];
+        capabilities_hash.copy_from_slice(&data[8..16]);
+        let cycle_counter = u32::from_le_bytes([data[16], data[17], data[18], data[19]]);
+        Self {
+            node_id,
+            capabilities_hash,
+            cycle_counter,
+            network_health: data[20],
+            tier_mask: data[21],
+        }
+    }
+
+    /// Generate tier mask from availability array.
+    pub fn tier_mask_from(available: &[bool; 3]) -> u8 {
+        let mut mask = 0u8;
+        if available[0] { mask |= 0x01; }
+        if available[1] { mask |= 0x02; }
+        if available[2] { mask |= 0x04; }
+        mask
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MULTI-HOP RELAY ROUTING — Mesh route table
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// A route to a peer via zero or more relay hops.
+#[derive(Debug, Clone)]
+pub struct RouteEntry {
+    /// Destination node ID (first 8 bytes).
+    pub destination: [u8; 8],
+    /// Next-hop node ID (direct neighbor to forward to).
+    pub next_hop: [u8; 8],
+    /// Number of hops to destination (0 = direct neighbor).
+    pub hop_count: u8,
+    /// Best tier to reach next hop.
+    pub tier: RadioTier,
+    /// Cycle when this route was last refreshed.
+    pub last_seen_cycle: u64,
+    /// Estimated link quality (0.0–1.0).
+    pub link_quality: f32,
+}
+
+/// Mesh routing table with TTL-based expiry.
+///
+/// Routes are learned from beacon reception and forwarded route advertisements.
+/// Stale routes are pruned each cycle to prevent routing to departed nodes.
+///
+/// Basis: Perkins & Royer (1999) — Ad hoc On-Demand Distance Vector (AODV).
+pub struct RouteTable {
+    /// Known routes, keyed by destination node ID.
+    routes: HashMap<[u8; 8], RouteEntry>,
+    /// Maximum entries.
+    capacity: usize,
+}
+
+impl RouteTable {
+    fn new(capacity: usize) -> Self {
+        Self {
+            routes: HashMap::with_capacity(capacity),
+            capacity,
+        }
+    }
+
+    /// Add or update a route. Prefers shorter hop counts and higher link quality.
+    pub fn update(&mut self, entry: RouteEntry) {
+        if let Some(existing) = self.routes.get(&entry.destination) {
+            // Only update if better (fewer hops, or same hops but better quality)
+            if entry.hop_count < existing.hop_count
+                || (entry.hop_count == existing.hop_count
+                    && entry.link_quality > existing.link_quality)
+            {
+                self.routes.insert(entry.destination, entry);
+            } else {
+                // Just refresh the timestamp
+                if let Some(e) = self.routes.get_mut(&entry.destination) {
+                    e.last_seen_cycle = entry.last_seen_cycle;
+                }
+            }
+        } else if self.routes.len() < self.capacity {
+            self.routes.insert(entry.destination, entry);
+        }
+    }
+
+    /// Look up the best route to a destination.
+    pub fn lookup(&self, destination: &[u8; 8]) -> Option<&RouteEntry> {
+        self.routes.get(destination)
+    }
+
+    /// Prune routes older than `max_age_cycles` from `current_cycle`.
+    pub fn prune(&mut self, current_cycle: u64, max_age_cycles: u64) {
+        self.routes
+            .retain(|_, entry| current_cycle.saturating_sub(entry.last_seen_cycle) < max_age_cycles);
+    }
+
+    /// Number of known routes.
+    pub fn len(&self) -> usize {
+        self.routes.len()
+    }
+
+    /// All known destinations.
+    pub fn destinations(&self) -> Vec<[u8; 8]> {
+        self.routes.keys().copied().collect()
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MESH ENCRYPTION — Per-peer session encryption
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Per-peer encryption session state.
+///
+/// Uses a pre-shared key model (PSK) with per-peer derived keys.
+/// In production, this would use X25519 key exchange; here we model
+/// the session state and nonce management.
+///
+/// Basis: Bernstein (2008) — ChaCha20-Poly1305 AEAD construction.
+#[derive(Debug, Clone)]
+pub struct PeerSession {
+    /// Peer node ID.
+    pub peer_id: [u8; 8],
+    /// Shared session key (32 bytes, derived from PSK + peer IDs).
+    pub session_key: [u8; 32],
+    /// Outgoing nonce counter (monotonically increasing, prevents replay).
+    pub tx_nonce_counter: u64,
+    /// Last received nonce (for replay detection).
+    pub rx_nonce_seen: u64,
+    /// Cycle when this session was established.
+    pub established_cycle: u64,
+}
+
+impl PeerSession {
+    /// Create a new session with a derived key.
+    ///
+    /// In production, `session_key` would come from X25519 DH + HKDF.
+    /// Here we accept it as a parameter.
+    pub fn new(peer_id: [u8; 8], session_key: [u8; 32], cycle: u64) -> Self {
+        Self {
+            peer_id,
+            session_key,
+            tx_nonce_counter: 0,
+            rx_nonce_seen: 0,
+            established_cycle: cycle,
+        }
+    }
+
+    /// Generate the next nonce (12 bytes: 4 zero + 8 counter LE).
+    pub fn next_nonce(&mut self) -> [u8; RADIO_CRYPTO_NONCE_SIZE] {
+        self.tx_nonce_counter += 1;
+        let mut nonce = [0u8; RADIO_CRYPTO_NONCE_SIZE];
+        nonce[4..12].copy_from_slice(&self.tx_nonce_counter.to_le_bytes());
+        nonce
+    }
+
+    /// Check if a received nonce is valid (not replayed).
+    pub fn check_nonce(&mut self, nonce_counter: u64) -> bool {
+        if nonce_counter <= self.rx_nonce_seen {
+            return false; // Replay detected
+        }
+        self.rx_nonce_seen = nonce_counter;
+        true
+    }
+}
+
+/// Mesh encryption manager — tracks per-peer session keys and nonces.
+///
+/// In a real deployment, this would integrate with Mycelix identity
+/// for peer authentication and X25519 key exchange.
+pub struct MeshEncryption {
+    /// Active sessions keyed by peer node ID.
+    sessions: HashMap<[u8; 8], PeerSession>,
+    /// Maximum sessions.
+    capacity: usize,
+}
+
+impl MeshEncryption {
+    fn new(capacity: usize) -> Self {
+        Self {
+            sessions: HashMap::with_capacity(capacity),
+            capacity,
+        }
+    }
+
+    /// Register a peer session.
+    pub fn add_session(&mut self, session: PeerSession) {
+        if self.sessions.len() < self.capacity {
+            self.sessions.insert(session.peer_id, session);
+        }
+    }
+
+    /// Get a session for a peer.
+    pub fn get_session(&self, peer_id: &[u8; 8]) -> Option<&PeerSession> {
+        self.sessions.get(peer_id)
+    }
+
+    /// Get a mutable session for a peer.
+    pub fn get_session_mut(&mut self, peer_id: &[u8; 8]) -> Option<&mut PeerSession> {
+        self.sessions.get_mut(peer_id)
+    }
+
+    /// Remove a peer session.
+    pub fn remove_session(&mut self, peer_id: &[u8; 8]) -> Option<PeerSession> {
+        self.sessions.remove(peer_id)
+    }
+
+    /// Number of active sessions.
+    pub fn session_count(&self) -> usize {
+        self.sessions.len()
+    }
+
+    /// Encrypt plaintext using XOR scrambling (test/simulation placeholder).
+    ///
+    /// **WARNING: NOT cryptographically secure.** For production mesh encryption,
+    /// use `swarm::mesh::mod.rs` which implements real ChaCha20-Poly1305 via the
+    /// `chacha20poly1305` crate (feature: `mesh-encryption`).
+    ///
+    /// This placeholder preserves the API shape for unit testing session
+    /// management (nonce tracking, replay detection) without requiring
+    /// the full crypto dependency chain.
+    pub fn encrypt(key: &[u8; 32], nonce: &[u8; RADIO_CRYPTO_NONCE_SIZE], plaintext: &[u8]) -> Vec<u8> {
+        let mut ciphertext = plaintext.to_vec();
+        for (i, byte) in ciphertext.iter_mut().enumerate() {
+            *byte ^= key[i % 32] ^ nonce[i % RADIO_CRYPTO_NONCE_SIZE];
+        }
+        // 16-byte simulated auth tag
+        let mut tag = [0u8; 16];
+        for (i, &b) in ciphertext.iter().enumerate() {
+            tag[i % 16] ^= b;
+        }
+        ciphertext.extend_from_slice(&tag);
+        ciphertext
+    }
+
+    /// Decrypt ciphertext using XOR scrambling (test/simulation placeholder).
+    ///
+    /// **WARNING: NOT cryptographically secure.** See `encrypt()` doc.
+    pub fn decrypt(key: &[u8; 32], nonce: &[u8; RADIO_CRYPTO_NONCE_SIZE], ciphertext: &[u8]) -> Option<Vec<u8>> {
+        if ciphertext.len() < 16 {
+            return None;
+        }
+        let data_len = ciphertext.len() - 16;
+        let data = &ciphertext[..data_len];
+        let tag = &ciphertext[data_len..];
+
+        let mut expected_tag = [0u8; 16];
+        for (i, &b) in data.iter().enumerate() {
+            expected_tag[i % 16] ^= b;
+        }
+        if tag != expected_tag {
+            return None;
+        }
+
+        let mut plaintext = data.to_vec();
+        for (i, byte) in plaintext.iter_mut().enumerate() {
+            *byte ^= key[i % 32] ^ nonce[i % RADIO_CRYPTO_NONCE_SIZE];
+        }
+        Some(plaintext)
+    }
+}
+
 /// Spectrum Manager — electromagnetic environment as sensory modality.
 ///
 /// Implements `CognitiveSubsystem` at interval 53 (co-prime with all existing
@@ -580,6 +1167,12 @@ impl RegulatoryConstraints {
 /// 2. **Jamming detection**: SNR collapse → arousal spike + exploration (frequency search)
 /// 3. **Tier degradation**: Radio failures → safety escalation proposal
 /// 4. **Spectrum prediction error**: Expected vs observed noise floor → surprise
+///
+/// ## Hardware Integration
+///
+/// When a `RadioHardware` implementation is attached via `set_hardware()`,
+/// the manager polls real SNR and availability from hardware each cycle.
+/// Without hardware, it relies on manually-fed `SpectrumObservation`s.
 pub struct SpectrumManager {
     // ── Tier state ───────────────────────────────────────────────────────
     /// Current tier availability.
@@ -615,6 +1208,42 @@ pub struct SpectrumManager {
 
     // ── Telemetry ────────────────────────────────────────────────────────
     last_telemetry: SpectrumTelemetry,
+
+    // ── Hardware abstraction ──────────────────────────────────────────
+    /// Optional physical radio hardware (polled each cycle for SNR/availability).
+    hardware: Option<Box<dyn RadioHardware>>,
+    /// Region-aware regulatory database for frequency/power validation.
+    regulatory_db: RegulatoryDatabase,
+
+    // ── Waterfall (spectrum history) ─────────────────────────────────
+    /// Time-series spectrum observation buffer for pattern detection.
+    waterfall: SpectrumWaterfall,
+
+    // ── Frequency hopping ────────────────────────────────────────────
+    /// Cycles since last frequency hop (cooldown).
+    hop_cooldown: u32,
+
+    // ── Peer discovery ───────────────────────────────────────────────
+    /// This node's ID (first 8 bytes).
+    node_id: [u8; 8],
+    /// Cycles since last beacon broadcast.
+    beacon_counter: u32,
+
+    // ── Multi-hop routing ────────────────────────────────────────────
+    /// Mesh route table for multi-hop relay.
+    route_table: RouteTable,
+    /// Current cycle counter (for route expiry).
+    current_cycle: u64,
+
+    // ── Encryption ───────────────────────────────────────────────────
+    /// Per-peer encryption session manager.
+    encryption: MeshEncryption,
+
+    // ── Energy tracking ──────────────────────────────────────────────
+    /// Cumulative energy spent this cycle (nJ).
+    energy_spent_nj: f64,
+    /// Energy budget per cycle (nJ).
+    energy_budget_nj: f64,
 }
 
 /// Telemetry snapshot for the Spectrum Manager.
@@ -636,6 +1265,20 @@ pub struct SpectrumTelemetry {
     pub epistemic_discount: f64,
     /// Number of degradation streak cycles.
     pub degradation_streak: u32,
+    /// Per-tier AIMD bandwidth budgets [Local, Metro, Regional].
+    pub tier_budgets: [u64; 3],
+    /// Waterfall depth (number of stored observations).
+    pub waterfall_depth: usize,
+    /// Periodic interference period (cycles), if detected.
+    pub periodic_interference: Option<u32>,
+    /// Known mesh peers (route table size).
+    pub known_peers: usize,
+    /// Active encryption sessions.
+    pub encryption_sessions: usize,
+    /// Energy spent this cycle (nJ).
+    pub energy_spent_nj: f64,
+    /// Jamming ratio from waterfall (0.0–1.0).
+    pub waterfall_jamming_ratio: f64,
 }
 
 impl Default for SpectrumManager {
@@ -652,31 +1295,60 @@ impl Default for SpectrumManager {
             classifier: PayloadClassifier::default(),
             pending_observations: Vec::with_capacity(16),
             jamming_streak: 0,
-            predicted_noise_floor: -100.0, // dBm, typical quiet band
+            predicted_noise_floor: RADIO_DEFAULT_NOISE_FLOOR_DBM,
             regulatory: RegulatoryConstraints::default(),
             network_health: NetworkHealth::AllTiersUp,
             degradation_streak: 0,
             peer_last_hv: Vec::new(),
             last_telemetry: SpectrumTelemetry::default(),
+            hardware: None,
+            regulatory_db: RegulatoryDatabase::new(RegulatoryRegion::IsmGlobal),
+            waterfall: SpectrumWaterfall::new(RADIO_WATERFALL_CAPACITY),
+            hop_cooldown: 0,
+            node_id: [0u8; 8],
+            beacon_counter: 0,
+            route_table: RouteTable::new(RADIO_MAX_ROUTE_ENTRIES),
+            current_cycle: 0,
+            encryption: MeshEncryption::new(RADIO_CRYPTO_MAX_PEERS),
+            energy_spent_nj: 0.0,
+            energy_budget_nj: RADIO_ENERGY_BUDGET_PER_CYCLE,
         }
     }
 }
 
 // Re-export named constants from thresholds.rs for local use.
 use super::super::thresholds::{
+    RADIO_BEACON_INTERVAL_CYCLES, RADIO_BEACON_SIZE, RADIO_BLACKOUT_EXPLORATION_BOOST,
+    RADIO_CRYPTO_MAX_PEERS, RADIO_CRYPTO_NONCE_SIZE, RADIO_DEFAULT_NOISE_FLOOR_DBM,
     RADIO_DEGRADATION_CONFIDENCE_DROP as DEGRADATION_CONFIDENCE_DROP,
+    RADIO_ENERGY_BUDGET_PER_CYCLE, RADIO_ENERGY_PER_BIT_LOCAL, RADIO_ENERGY_PER_BIT_METRO,
+    RADIO_ENERGY_PER_BIT_REGIONAL, RADIO_FEC_MIN_PAYLOAD,
+    RADIO_HOP_COOLDOWN_CYCLES, RADIO_HOP_SNR_IMPROVEMENT_DB,
     RADIO_JAMMING_AROUSAL_SPIKE as JAMMING_AROUSAL_SPIKE,
     RADIO_JAMMING_EXPLORATION_BOOST as JAMMING_EXPLORATION_BOOST,
-    RADIO_JAMMING_SNR_THRESHOLD as JAMMING_SNR_THRESHOLD,
-    RADIO_MAX_DELTA_PEERS as MAX_DELTA_PEERS,
-    RADIO_NOISE_FLOOR_EMA_ALPHA as NOISE_FLOOR_EMA_ALPHA,
+    RADIO_JAMMING_SNR_THRESHOLD as JAMMING_SNR_THRESHOLD, RADIO_LOSS_LR_DAMPEN_FACTOR,
+    RADIO_LOSS_LR_DAMPEN_MAX, RADIO_MAX_DELTA_PEERS as MAX_DELTA_PEERS,
+    RADIO_MAX_RELAY_HOPS, RADIO_MAX_ROUTE_ENTRIES, RADIO_NOISE_ERROR_NORMALIZER,
+    RADIO_NOISE_FLOOR_EMA_ALPHA as NOISE_FLOOR_EMA_ALPHA, RADIO_ROUTE_EXPIRY_CYCLES,
+    RADIO_SPECTRUM_PE_AROUSAL_MAX, RADIO_SPECTRUM_PE_AROUSAL_SCALE,
+    RADIO_SPECTRUM_PE_SURPRISE_THRESHOLD,
     RADIO_TIER_DEGRADED_LOSS as TIER_DEGRADED_LOSS,
     RADIO_TIER_LOSS_EMA_ALPHA as TIER_LOSS_EMA_ALPHA,
+    RADIO_WATERFALL_CAPACITY, RADIO_WATERFALL_MIN_SAMPLES,
+    RADIO_SAFETY_JAMMING_THRESHOLD, RADIO_AUTO_HOP_NOISE_THRESHOLD,
+    RADIO_BEACON_PEER_CONFIDENCE_BOOST,
+    RADIO_SYNTHETIC_SNR_ISOLATED, RADIO_SYNTHETIC_SNR_BASE,
+    RADIO_SYNTHETIC_SNR_PEER_BONUS, RADIO_SYNTHETIC_SNR_PHI_BONUS,
+    RADIO_SYNTHETIC_PEER_CAP, RADIO_SYNTHETIC_NOISE_FLOOR_BASE,
+    RADIO_SYNTHETIC_NOISE_FLOOR_RANGE,
+    RADIO_ENERGY_AWARE_THRESHOLD,
+    RADIO_CONSCIOUSNESS_HIGH_CONFIDENCE,
+    RADIO_CONSCIOUSNESS_LOW_CONFIDENCE,
 };
 
 impl SpectrumManager {
     /// Create with specific regulatory constraints.
-    pub fn with_regulatory(regulatory: RegulatoryConstraints) -> Self {
+    pub(crate) fn with_regulatory(regulatory: RegulatoryConstraints) -> Self {
         Self {
             regulatory,
             ..Self::default()
@@ -703,6 +1375,102 @@ impl SpectrumManager {
         self.tier_loss_ema[idx] *= 1.0 - TIER_LOSS_EMA_ALPHA;
     }
 
+    /// Ingest mesh network statistics to update tier loss EMAs.
+    ///
+    /// Maps real mesh packet counters into per-tier loss estimates.
+    /// This bridges the gap between `swarm::mesh::MeshStats` (actual network)
+    /// and SpectrumManager (cognitive model of the spectrum).
+    ///
+    /// `dropped` and `total_sent` come from the mesh layer's counters.
+    /// The loss ratio is applied to all tiers weighted by their expected reliability.
+    pub fn ingest_mesh_stats(&mut self, dropped: u64, total_sent: u64) {
+        if total_sent == 0 {
+            return;
+        }
+        let loss_ratio = (dropped as f64 / total_sent as f64).clamp(0.0, 1.0);
+        // Spread loss across tiers: Local absorbs least (high reliability),
+        // Regional absorbs most (low reliability).
+        let weights = [0.2, 0.5, 1.0]; // Local, Metro, Regional
+        for (i, &w) in weights.iter().enumerate() {
+            let tier_loss = (loss_ratio * w).clamp(0.0, 1.0);
+            self.tier_loss_ema[i] =
+                self.tier_loss_ema[i] * (1.0 - TIER_LOSS_EMA_ALPHA) + tier_loss * TIER_LOSS_EMA_ALPHA;
+        }
+        // Keep telemetry in sync so callers see updated values
+        self.last_telemetry.tier_loss_ema = self.tier_loss_ema;
+    }
+
+    /// Ingest swarm peer state for bidirectional Swarm→Spectrum coupling.
+    ///
+    /// Uses peer connectivity data to generate synthetic spectrum observations,
+    /// enabling the waterfall model to track network health even without SDR
+    /// hardware. This closes the Swarm→Spectrum feedback loop.
+    ///
+    /// Science: Network-level perception modulates physical-layer awareness
+    /// (Pentland 2014 — "Social Physics").
+    pub fn ingest_swarm_state(&mut self, connected_peers: usize, mean_peer_phi: f64, connectivity_ema: f64) {
+        // Synthesize a spectrum observation from swarm state.
+        // More peers + higher connectivity → better SNR estimate.
+        // Zero peers → poor SNR (isolation → degraded perception).
+        let peer_snr = if connected_peers == 0 {
+            RADIO_SYNTHETIC_SNR_ISOLATED
+        } else {
+            let peer_factor = (connected_peers as f64).min(RADIO_SYNTHETIC_PEER_CAP).ln_1p()
+                / RADIO_SYNTHETIC_PEER_CAP.ln_1p();
+            let phi_factor = mean_peer_phi.clamp(0.0, 1.0);
+            // Base SNR + peer bonus + phi bonus
+            RADIO_SYNTHETIC_SNR_BASE
+                + peer_factor * RADIO_SYNTHETIC_SNR_PEER_BONUS
+                + phi_factor * RADIO_SYNTHETIC_SNR_PHI_BONUS
+        };
+
+        let noise_floor = RADIO_SYNTHETIC_NOISE_FLOOR_BASE
+            - connectivity_ema.clamp(0.0, 1.0) * RADIO_SYNTHETIC_NOISE_FLOOR_RANGE;
+
+        self.pending_observations.push(SpectrumObservation {
+            frequency_hz: 900_000_000, // Nominal mesh frequency
+            noise_floor_dbm: noise_floor as f32,
+            snr_db: peer_snr as f32,
+            jammed: connected_peers == 0 && connectivity_ema < 0.1,
+        });
+    }
+
+    /// Pending spectrum observations (for diagnostics/testing).
+    pub fn pending_observations(&self) -> &[SpectrumObservation] {
+        &self.pending_observations
+    }
+
+    /// Get the last spectrum prediction error for FEP integration.
+    ///
+    /// Returns the prediction error from the most recent waterfall processing.
+    /// Consumers can blend this into the global FEP surprise signal.
+    pub fn spectrum_prediction_error(&self) -> f64 {
+        self.last_telemetry.spectrum_prediction_error
+    }
+
+    /// Whether jamming has persisted beyond the safety escalation threshold.
+    ///
+    /// When true, SafetyAgent should escalate safety level (analogous to
+    /// `integrity_critical` for tamper detection).
+    pub fn is_network_critical(&self) -> bool {
+        self.jamming_streak >= RADIO_SAFETY_JAMMING_THRESHOLD
+            || self.network_health == NetworkHealth::Blackout
+    }
+
+    /// Network connectivity factor for consciousness coupling [0.0, 1.0].
+    ///
+    /// 1.0 = all tiers healthy, 0.0 = blackout.
+    /// Used by ConsciousnessEngine to modulate unified consciousness ±2%.
+    /// Science: Cacioppo & Patrick (2008) — social isolation impairs higher cognition.
+    pub fn connectivity_factor(&self) -> f64 {
+        match self.network_health {
+            NetworkHealth::AllTiersUp => 1.0,
+            NetworkHealth::LocalDown => 0.7,
+            NetworkHealth::MetroOnly => 0.4,
+            NetworkHealth::Blackout => 0.0,
+        }
+    }
+
     /// Set tier availability (called by radio hardware monitor).
     pub fn set_tier_available(&mut self, tier: RadioTier, available: bool) {
         let idx = tier as usize;
@@ -717,7 +1485,7 @@ impl SpectrumManager {
     }
 
     /// Get the payload classifier for routing decisions.
-    pub fn classifier(&self) -> &PayloadClassifier {
+    pub(crate) fn classifier(&self) -> &PayloadClassifier {
         &self.classifier
     }
 
@@ -726,11 +1494,32 @@ impl SpectrumManager {
         &self.last_telemetry
     }
 
+    /// Validate that a transmission on the given tier and frequency is allowed
+    /// by the regulatory database.
+    ///
+    /// Returns `true` if the frequency and power are within legal limits.
+    /// This should be called before any actual transmission to the mesh layer.
+    pub fn validate_transmission(&self, tier: RadioTier, frequency_hz: u64, power_dbm: f32) -> bool {
+        self.regulatory_db
+            .bands_for_tier(tier)
+            .iter()
+            .any(|band| {
+                frequency_hz >= band.freq_min_hz
+                    && frequency_hz <= band.freq_max_hz
+                    && power_dbm <= band.max_eirp_dbm
+            })
+    }
+
+    /// Get the regulatory region.
+    pub fn regulatory_region(&self) -> RegulatoryRegion {
+        self.regulatory_db.region()
+    }
+
     /// Compute a compressed delta for a BinaryHV relative to a peer's last state.
     ///
     /// If no previous state exists for this peer, returns a full vector.
     /// Updates the peer's last-known state after compression.
-    pub fn compress_delta(
+    fn compress_delta(
         &mut self,
         peer_id: &[u8; 8],
         current_hv: &[u8; 2048],
@@ -757,18 +1546,43 @@ impl SpectrumManager {
         delta
     }
 
-    /// Route a payload through the classifier.
-    pub fn route(
+    /// Route a payload through the classifier, with energy-aware override.
+    ///
+    /// When the energy budget is over 50% spent, `energy_aware_route()` takes
+    /// precedence — preferring the lowest energy-per-bit tier that fits the
+    /// payload, regardless of normal routing preferences.
+    ///
+    /// Basis: Friedman et al. (2013) — energy-proportional radio usage.
+    pub(crate) fn route(
         &self,
         class: PayloadClass,
         payload_size: usize,
         urgency: u8,
     ) -> Option<RoutingDecision> {
+        // Energy-constrained path: override normal routing when budget is tight
+        let budget_fraction = if self.energy_budget_nj > 0.0 {
+            self.energy_spent_nj / self.energy_budget_nj
+        } else {
+            0.0
+        };
+        if budget_fraction > RADIO_ENERGY_AWARE_THRESHOLD {
+            if let Some(tier) = self.energy_aware_route(payload_size, urgency) {
+                return Some(RoutingDecision::Routed {
+                    tier,
+                    fragmented: payload_size > tier.profile().mtu,
+                    estimated_fragments: if payload_size > tier.profile().mtu {
+                        (payload_size + tier.profile().mtu - 1) / tier.profile().mtu
+                    } else {
+                        1
+                    },
+                });
+            }
+        }
         self.classifier.route(class, payload_size, urgency)
     }
 
     /// Get the regulatory constraints.
-    pub fn regulatory(&self) -> &RegulatoryConstraints {
+    pub(crate) fn regulatory(&self) -> &RegulatoryConstraints {
         &self.regulatory
     }
 
@@ -776,7 +1590,7 @@ impl SpectrumManager {
     ///
     /// Returns only the budgets of tiers that are currently available.
     /// Used by Broca cadence throttling to limit speech when bandwidth is low.
-    pub fn available_bandwidth(&self) -> u64 {
+    pub(crate) fn available_bandwidth(&self) -> u64 {
         self.tier_budget
             .iter()
             .zip(self.tier_available.iter())
@@ -806,6 +1620,70 @@ impl SpectrumManager {
             }
         }
         None
+    }
+
+    /// Select tier based on consciousness confidence level.
+    ///
+    /// High-confidence critical actions route on reliable tiers (Local preferred).
+    /// Low-confidence exploratory actions route on energy-efficient tiers.
+    /// This closes the consciousness→spectrum bidirectional feedback loop.
+    ///
+    /// Science: Resource allocation proportional to certainty —
+    /// uncertain actions don't warrant expensive transmission (Friston 2010).
+    pub fn consciousness_aware_tier(
+        &self,
+        payload_size: usize,
+        confidence: f64,
+    ) -> Option<RadioTier> {
+        if confidence > RADIO_CONSCIOUSNESS_HIGH_CONFIDENCE {
+            // High confidence: prefer most reliable available tier
+            for &tier in &RadioTier::ALL {
+                if self.tier_available[tier as usize] && payload_size <= tier.profile().mtu {
+                    return Some(tier);
+                }
+            }
+        } else if confidence < RADIO_CONSCIOUSNESS_LOW_CONFIDENCE {
+            // Low confidence: prefer most energy-efficient available tier
+            let mut candidates: Vec<(RadioTier, f64)> = RadioTier::ALL
+                .iter()
+                .copied()
+                .filter(|&t| self.tier_available[t as usize])
+                .filter(|&t| payload_size <= t.profile().mtu || t == RadioTier::Local)
+                .map(|t| (t, t.profile().energy_per_bit_nj))
+                .collect();
+            candidates.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+            return candidates.first().map(|&(tier, _)| tier);
+        }
+        // Medium confidence: normal routing (let classifier decide)
+        None
+    }
+
+    /// Create a SpectrumManager with a specific regulatory region.
+    pub(crate) fn with_region(region: RegulatoryRegion) -> Self {
+        let db = RegulatoryDatabase::new(region);
+        let regulatory = db.to_legacy_constraints();
+        let mut sm = Self::default();
+        sm.regulatory = regulatory;
+        sm.regulatory_db = db;
+        sm
+    }
+
+    /// Attach radio hardware to this manager.
+    ///
+    /// When hardware is attached, `process()` will poll SNR and availability
+    /// from it before processing observations.
+    pub(crate) fn set_hardware(&mut self, hardware: Box<dyn RadioHardware>) {
+        self.hardware = Some(hardware);
+    }
+
+    /// Get the hardware identifier, if hardware is attached.
+    pub(crate) fn hardware_id(&self) -> Option<&str> {
+        self.hardware.as_ref().map(|h| h.hardware_id())
+    }
+
+    /// Get the regulatory database.
+    pub(crate) fn regulatory_db(&self) -> &RegulatoryDatabase {
+        &self.regulatory_db
     }
 
     // ── Internal ─────────────────────────────────────────────────────────
@@ -852,11 +1730,24 @@ impl SpectrumManager {
         }
 
         // Compute spectrum prediction error
-        let noise_error = ((mean_noise - self.predicted_noise_floor).abs() / 50.0).min(1.0);
+        let noise_error =
+            ((mean_noise - self.predicted_noise_floor).abs() / RADIO_NOISE_ERROR_NORMALIZER)
+                .min(1.0);
 
         // Update predicted noise floor via EMA
         self.predicted_noise_floor = self.predicted_noise_floor * (1.0 - NOISE_FLOOR_EMA_ALPHA)
             + mean_noise * NOISE_FLOOR_EMA_ALPHA;
+
+        // Record into waterfall for pattern detection
+        let mean_snr = observations.iter().map(|o| o.snr_db as f64).sum::<f64>()
+            / observations.len() as f64;
+        self.waterfall.push(WaterfallEntry {
+            cycle: self.current_cycle,
+            noise_floor_dbm: mean_noise,
+            snr_db: mean_snr,
+            jammed: jammed_count > 0,
+            observation_count: observations.len() as u32,
+        });
 
         noise_error
     }
@@ -868,9 +1759,16 @@ impl SpectrumManager {
             tier_loss_ema: self.tier_loss_ema,
             jamming_streak: self.jamming_streak,
             spectrum_prediction_error: spectrum_pe,
-            avg_delta_compression: 0.0, // Updated externally when deltas are computed
+            avg_delta_compression: 0.0,
             epistemic_discount: self.network_health.epistemic_discount(),
             degradation_streak: self.degradation_streak,
+            tier_budgets: self.tier_budget,
+            waterfall_depth: self.waterfall.len(),
+            periodic_interference: self.waterfall.detect_periodic_interference(),
+            known_peers: self.route_table.len(),
+            encryption_sessions: self.encryption.session_count(),
+            energy_spent_nj: self.energy_spent_nj,
+            waterfall_jamming_ratio: self.waterfall.jamming_ratio(),
         };
     }
 
@@ -880,6 +1778,323 @@ impl SpectrumManager {
             .iter()
             .zip(self.tier_available.iter())
             .any(|(&loss, &avail)| avail && loss > TIER_DEGRADED_LOSS)
+    }
+
+    // ── Item 1: AIMD congestion control ──────────────────────────────
+
+    /// Tick AIMD bandwidth control for all tiers.
+    ///
+    /// Called each process cycle:
+    /// - Healthy tier (low loss): additive increase toward ceiling
+    /// - Congested tier (high loss): multiplicative decrease toward floor
+    ///
+    /// Basis: Jacobson (1988) — AIMD achieves fair bandwidth allocation
+    /// and converges to optimal throughput under varied conditions.
+    fn tick_aimd(&mut self) {
+        for (idx, tier) in RadioTier::ALL.iter().enumerate() {
+            if !self.tier_available[idx] {
+                continue;
+            }
+
+            let profile = tier.profile();
+            let loss = self.tier_loss_ema[idx];
+
+            if loss > TIER_DEGRADED_LOSS {
+                // Multiplicative decrease: budget *= decrease_factor
+                let new_budget =
+                    (self.tier_budget[idx] as f64 * profile.decrease_factor) as u64;
+                self.tier_budget[idx] = new_budget.max(profile.bandwidth_min);
+            } else {
+                // Additive increase: budget += additive_increase
+                self.tier_budget[idx] = (self.tier_budget[idx] + profile.additive_increase)
+                    .min(profile.bandwidth_max);
+            }
+        }
+    }
+
+    // ── Item 2: Adaptive tier compression ────────────────────────────
+
+    /// Compress a BinaryHV for a specific radio tier.
+    ///
+    /// Selects compression strategy based on tier MTU:
+    /// - Local: full 2048-byte vector
+    /// - Metro: XOR + RLE delta (50-200 bytes typical)
+    /// - Regional: 32-byte hash for consensus verification only
+    pub fn compress_for_tier(
+        &mut self,
+        peer_id: &[u8; 8],
+        current_hv: &[u8; 2048],
+        tier: RadioTier,
+    ) -> TierCompressedPayload {
+        let has_previous = self.peer_last_hv.iter().any(|(id, _)| id == peer_id);
+        let strategy = CompressionStrategy::for_tier(tier, has_previous);
+
+        let data = match strategy {
+            CompressionStrategy::Full => {
+                // Store peer state so subsequent calls can use delta
+                if let Some(entry) = self.peer_last_hv.iter_mut().find(|(id, _)| id == peer_id) {
+                    entry.1 = *current_hv;
+                } else if self.peer_last_hv.len() < MAX_DELTA_PEERS {
+                    self.peer_last_hv.push((*peer_id, *current_hv));
+                }
+                current_hv.to_vec()
+            }
+            CompressionStrategy::Delta => {
+                let delta = self.compress_delta(peer_id, current_hv);
+                delta.rle_data
+            }
+            CompressionStrategy::HashOnly => {
+                // Simple hash: XOR fold 2048 bytes into 32 bytes
+                let mut hash = [0u8; 32];
+                for (i, &b) in current_hv.iter().enumerate() {
+                    hash[i % 32] ^= b;
+                }
+                // Update peer state even though we only sent a hash
+                if let Some(entry) = self.peer_last_hv.iter_mut().find(|(id, _)| id == peer_id) {
+                    entry.1 = *current_hv;
+                } else if self.peer_last_hv.len() < MAX_DELTA_PEERS {
+                    self.peer_last_hv.push((*peer_id, *current_hv));
+                }
+                hash.to_vec()
+            }
+        };
+
+        // Track energy cost
+        let bits = data.len() as f64 * 8.0;
+        self.energy_spent_nj += bits * tier.profile().energy_per_bit_nj;
+
+        TierCompressedPayload {
+            strategy,
+            data,
+            original_size: 2048,
+        }
+    }
+
+    // ── Item 6: Cognitive frequency hopping ──────────────────────────
+
+    /// Evaluate whether to hop frequencies based on waterfall analysis.
+    ///
+    /// Returns the suggested frequency (Hz) if a hop would improve SNR,
+    /// or None if current frequency is acceptable.
+    ///
+    /// Basis: Haykin (2005) — cognitive radio uses spectrum sensing
+    /// to find and exploit unused frequencies.
+    pub fn suggest_frequency_hop(&mut self, tier: RadioTier) -> Option<u64> {
+        // Cooldown check
+        if self.hop_cooldown > 0 {
+            return None;
+        }
+
+        // Need enough waterfall data
+        if self.waterfall.len() < RADIO_WATERFALL_MIN_SAMPLES {
+            return None;
+        }
+
+        // Only hop if we're experiencing bad conditions
+        let current_mean_snr = self.waterfall.entries.back()
+            .map(|e| e.snr_db)?;
+
+        if current_mean_snr > JAMMING_SNR_THRESHOLD as f64 + RADIO_HOP_SNR_IMPROVEMENT_DB as f64 {
+            return None; // Current frequency is fine
+        }
+
+        // Find best band for this tier from regulatory database
+        let bands = self.regulatory_db.bands_for_tier(tier);
+        if bands.is_empty() {
+            return None;
+        }
+
+        // Select center of the widest allowed band (simple heuristic)
+        let best_band = bands.iter().max_by_key(|b| b.freq_max_hz - b.freq_min_hz)?;
+        let center_freq = (best_band.freq_min_hz + best_band.freq_max_hz) / 2;
+
+        // Check if this is different from current frequency
+        if let Some(ref hw) = self.hardware {
+            if hw.current_frequency(tier) == Some(center_freq) {
+                return None; // Already on the best frequency
+            }
+        }
+
+        self.hop_cooldown = RADIO_HOP_COOLDOWN_CYCLES;
+        Some(center_freq)
+    }
+
+    // ── Item 7: Energy-aware routing ─────────────────────────────────
+
+    /// Select the most energy-efficient tier that can carry the payload.
+    ///
+    /// When energy budget is constrained (>50% spent), prefers the
+    /// lowest energy-per-bit tier that has sufficient MTU.
+    ///
+    /// Basis: Friedman et al. (2013) — energy-proportional radio usage.
+    pub fn energy_aware_route(
+        &self,
+        payload_size: usize,
+        urgency: u8,
+    ) -> Option<RadioTier> {
+        let budget_fraction = self.energy_spent_nj / self.energy_budget_nj;
+
+        // If energy is plentiful (< 50% spent), use normal routing
+        if budget_fraction < 0.5 {
+            return self.route(
+                PayloadClass::ConsciousnessDelta,
+                payload_size,
+                urgency,
+            )
+            .and_then(|d| match d {
+                RoutingDecision::Routed { tier, .. } => Some(tier),
+                _ => None,
+            });
+        }
+
+        // Energy-constrained: sort available tiers by energy_per_bit ascending
+        let mut candidates: Vec<(RadioTier, f64)> = RadioTier::ALL
+            .iter()
+            .copied()
+            .filter(|&t| self.tier_available[t as usize])
+            .filter(|&t| payload_size <= t.profile().mtu || t == RadioTier::Local)
+            .map(|t| (t, t.profile().energy_per_bit_nj))
+            .collect();
+
+        candidates.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+        candidates.first().map(|&(tier, _)| tier)
+    }
+
+    /// Reset energy tracking for a new cycle.
+    pub fn reset_energy(&mut self) {
+        self.energy_spent_nj = 0.0;
+    }
+
+    // ── Item 8: Peer discovery ───────────────────────────────────────
+
+    /// Set this node's identity.
+    pub fn set_node_id(&mut self, node_id: [u8; 8]) {
+        self.node_id = node_id;
+    }
+
+    /// Generate a discovery beacon if the interval has elapsed.
+    ///
+    /// Returns `Some(beacon)` when it's time to broadcast.
+    pub fn generate_beacon(&mut self, capabilities_hash: &[u8; 8]) -> Option<DiscoveryBeacon> {
+        self.beacon_counter += 1;
+        if self.beacon_counter < RADIO_BEACON_INTERVAL_CYCLES {
+            return None;
+        }
+        self.beacon_counter = 0;
+
+        Some(DiscoveryBeacon {
+            node_id: self.node_id,
+            capabilities_hash: *capabilities_hash,
+            cycle_counter: self.current_cycle as u32,
+            network_health: self.network_health.safety_suggestion(),
+            tier_mask: DiscoveryBeacon::tier_mask_from(&self.tier_available),
+        })
+    }
+
+    /// Process a received discovery beacon — update route table.
+    ///
+    /// Returns `true` if this is a newly discovered peer (not previously in route table).
+    /// Callers can use this to trigger SwarmEvent::PeerJoined via the swarm manager.
+    pub fn process_beacon(&mut self, beacon: &DiscoveryBeacon, received_on: RadioTier, snr: f32) -> bool {
+        let is_new = self.route_table.lookup(&beacon.node_id).is_none();
+        let link_quality = (snr / 30.0).clamp(0.0, 1.0);
+        self.route_table.update(RouteEntry {
+            destination: beacon.node_id,
+            next_hop: beacon.node_id, // Direct neighbor
+            hop_count: 0,
+            tier: received_on,
+            last_seen_cycle: self.current_cycle,
+            link_quality,
+        });
+        is_new
+    }
+
+    // ── Item 9: Multi-hop relay routing ──────────────────────────────
+
+    /// Look up the best route to a destination peer.
+    pub fn find_route(&self, destination: &[u8; 8]) -> Option<&RouteEntry> {
+        self.route_table.lookup(destination)
+    }
+
+    /// Route table accessor.
+    pub fn route_table(&self) -> &RouteTable {
+        &self.route_table
+    }
+
+    /// Wrap a payload for relay forwarding.
+    ///
+    /// Returns `(next_hop, relay_header + payload)` or `None` if no route exists.
+    /// Relay header: [dest: 8][src: 8][ttl: 1][hop_count: 1] = 18 bytes.
+    pub fn prepare_relay(
+        &self,
+        destination: &[u8; 8],
+        payload: &[u8],
+    ) -> Option<([u8; 8], Vec<u8>)> {
+        let route = self.route_table.lookup(destination)?;
+        if route.hop_count >= RADIO_MAX_RELAY_HOPS {
+            return None; // TTL exceeded
+        }
+
+        let mut relay_packet = Vec::with_capacity(18 + payload.len());
+        relay_packet.extend_from_slice(destination);   // 8 bytes dest
+        relay_packet.extend_from_slice(&self.node_id); // 8 bytes src
+        relay_packet.push(RADIO_MAX_RELAY_HOPS - route.hop_count); // TTL
+        relay_packet.push(route.hop_count + 1);        // Current hop count
+        relay_packet.extend_from_slice(payload);
+
+        Some((route.next_hop, relay_packet))
+    }
+
+    // ── Item 11: Encryption ──────────────────────────────────────────
+
+    /// Get the encryption manager.
+    pub fn encryption(&self) -> &MeshEncryption {
+        &self.encryption
+    }
+
+    /// Get the encryption manager mutably.
+    pub fn encryption_mut(&mut self) -> &mut MeshEncryption {
+        &mut self.encryption
+    }
+
+    /// Encrypt a payload for a specific peer.
+    ///
+    /// Returns encrypted payload with nonce prepended, or `None` if no session.
+    pub fn encrypt_for_peer(&mut self, peer_id: &[u8; 8], payload: &[u8]) -> Option<Vec<u8>> {
+        let session = self.encryption.get_session_mut(peer_id)?;
+        let nonce = session.next_nonce();
+        let key = session.session_key;
+        let encrypted = MeshEncryption::encrypt(&key, &nonce, payload);
+
+        // Prepend nonce counter (8 bytes) for receiver to reconstruct nonce
+        let mut result = Vec::with_capacity(8 + encrypted.len());
+        result.extend_from_slice(&session.tx_nonce_counter.to_le_bytes());
+        result.extend_from_slice(&encrypted);
+        Some(result)
+    }
+
+    /// Decrypt a payload from a specific peer.
+    ///
+    /// Expects format: [nonce_counter: 8 bytes][ciphertext + tag].
+    pub fn decrypt_from_peer(&mut self, peer_id: &[u8; 8], encrypted: &[u8]) -> Option<Vec<u8>> {
+        if encrypted.len() < 8 {
+            return None;
+        }
+        let nonce_counter = u64::from_le_bytes([
+            encrypted[0], encrypted[1], encrypted[2], encrypted[3],
+            encrypted[4], encrypted[5], encrypted[6], encrypted[7],
+        ]);
+
+        let session = self.encryption.get_session_mut(peer_id)?;
+        if !session.check_nonce(nonce_counter) {
+            return None; // Replay detected
+        }
+
+        let mut nonce = [0u8; RADIO_CRYPTO_NONCE_SIZE];
+        nonce[4..12].copy_from_slice(&nonce_counter.to_le_bytes());
+        let key = session.session_key;
+
+        MeshEncryption::decrypt(&key, &nonce, &encrypted[8..])
     }
 }
 
@@ -894,6 +2109,25 @@ impl CognitiveSubsystem for SpectrumManager {
 
     fn process(&mut self, _snapshot: &CycleSnapshot) -> SubsystemOutput {
         let mut output = SubsystemOutput::NEUTRAL;
+
+        // ── 0. Poll hardware for SNR if available ────────────────────────
+        if let Some(ref hw) = self.hardware {
+            for &tier in &RadioTier::ALL {
+                let avail = hw.is_available(tier);
+                if self.tier_available[tier as usize] != avail {
+                    self.tier_available[tier as usize] = avail;
+                    self.classifier.set_tier_available(tier, avail);
+                }
+                if let Some(snr) = hw.current_snr(tier) {
+                    self.pending_observations.push(SpectrumObservation {
+                        frequency_hz: hw.current_frequency(tier).unwrap_or(0),
+                        noise_floor_dbm: -100.0 + snr, // Approximate from SNR
+                        snr_db: snr,
+                        jammed: snr < JAMMING_SNR_THRESHOLD,
+                    });
+                }
+            }
+        }
 
         // ── 1. Process spectrum observations ─────────────────────────────
         let spectrum_pe = self.process_observations();
@@ -921,7 +2155,7 @@ impl CognitiveSubsystem for SpectrumManager {
         if self.network_health == NetworkHealth::Blackout {
             output.flags |= output_flags::ESCALATE_URGENCY;
             // Isolation drives exploration (seeking new connections)
-            output.exploration_delta += 0.05;
+            output.exploration_delta += RADIO_BLACKOUT_EXPLORATION_BOOST;
         }
 
         // ── 5. Tier loss → learning rate dampening ───────────────────────
@@ -932,16 +2166,47 @@ impl CognitiveSubsystem for SpectrumManager {
                 .iter()
                 .cloned()
                 .fold(0.0f64, f64::max);
-            output.lr_modulation = 1.0 - (max_loss * 0.2).min(0.15);
+            output.lr_modulation =
+                1.0 - (max_loss * RADIO_LOSS_LR_DAMPEN_FACTOR).min(RADIO_LOSS_LR_DAMPEN_MAX);
         }
 
         // ── 6. Spectrum prediction error → surprise signal ───────────────
-        if spectrum_pe > 0.5 {
-            output.arousal_delta += (spectrum_pe as f32 * 0.05).min(0.08);
+        if spectrum_pe > RADIO_SPECTRUM_PE_SURPRISE_THRESHOLD {
+            output.arousal_delta +=
+                (spectrum_pe as f32 * RADIO_SPECTRUM_PE_AROUSAL_SCALE).min(RADIO_SPECTRUM_PE_AROUSAL_MAX);
             output.flags |= output_flags::ANOMALY_DETECTED;
         }
 
-        // ── 7. Update telemetry ──────────────────────────────────────────
+        // ── 7. AIMD bandwidth control ─────────────────────────────────
+        self.tick_aimd();
+
+        // ── 8. Hop cooldown tick ──────────────────────────────────────
+        self.hop_cooldown = self.hop_cooldown.saturating_sub(1);
+        self.current_cycle += 1;
+
+        // ── 9. Route table maintenance ────────────────────────────────
+        self.route_table.prune(self.current_cycle, RADIO_ROUTE_EXPIRY_CYCLES);
+
+        // ── 10. Reset per-cycle energy ────────────────────────────────
+        self.energy_spent_nj = 0.0;
+
+        // ── 11. Auto frequency hopping ──────────────────────────────
+        // When waterfall shows persistent poor conditions, attempt cognitive hop.
+        // Haykin (2005): observe → decide → act cycle for cognitive radio.
+        if self.waterfall.len() >= RADIO_WATERFALL_MIN_SAMPLES
+            && self.waterfall.mean_noise_floor().unwrap_or(f64::MIN) > RADIO_AUTO_HOP_NOISE_THRESHOLD
+            && self.hop_cooldown == 0
+        {
+            // Try to hop each degraded tier
+            for &tier in &RadioTier::ALL {
+                if self.suggest_frequency_hop(tier).is_some() {
+                    output.flags |= output_flags::ANOMALY_DETECTED;
+                    break; // One hop per cycle
+                }
+            }
+        }
+
+        // ── 12. Update telemetry ──────────────────────────────────────
         self.update_telemetry(spectrum_pe);
 
         output
@@ -1013,6 +2278,357 @@ impl CognitiveSubsystem for SpectrumManager {
         );
 
         Ok(())
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// RADIO HARDWARE TRAIT — Physical radio abstraction
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Errors from radio hardware operations.
+#[derive(Debug, Clone)]
+pub enum RadioError {
+    /// Hardware not available or powered off.
+    Unavailable,
+    /// Payload exceeds tier MTU.
+    PayloadTooLarge { max: usize, got: usize },
+    /// Regulatory constraint would be violated.
+    RegulatoryViolation(String),
+    /// Hardware-specific error.
+    HardwareError(String),
+    /// Channel busy (carrier sense).
+    ChannelBusy,
+    /// Frequency out of allowed band.
+    FrequencyOutOfBand { freq_hz: u64, band: String },
+}
+
+impl std::fmt::Display for RadioError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RadioError::Unavailable => write!(f, "radio hardware unavailable"),
+            RadioError::PayloadTooLarge { max, got } => {
+                write!(f, "payload too large: {} bytes (max {})", got, max)
+            }
+            RadioError::RegulatoryViolation(msg) => write!(f, "regulatory violation: {}", msg),
+            RadioError::HardwareError(msg) => write!(f, "hardware error: {}", msg),
+            RadioError::ChannelBusy => write!(f, "channel busy"),
+            RadioError::FrequencyOutOfBand { freq_hz, band } => {
+                write!(f, "frequency {} Hz out of band {}", freq_hz, band)
+            }
+        }
+    }
+}
+
+/// Abstraction over physical radio hardware for mesh networking.
+///
+/// Implementations handle actual RF transmission/reception while
+/// `SpectrumManager` handles cognitive-level decisions.
+///
+/// Basis: Clark & Chalmers (1998) — extended mind via radio as cognitive prosthesis.
+pub trait RadioHardware: Send + Sync {
+    /// Transmit a payload on the specified tier. Returns bytes actually sent.
+    fn transmit(&mut self, tier: RadioTier, payload: &[u8]) -> Result<usize, RadioError>;
+    /// Receive pending data from a tier. Returns `(payload, snr_db)`.
+    fn receive(&mut self, tier: RadioTier) -> Result<Option<(Vec<u8>, f32)>, RadioError>;
+    /// Query current signal-to-noise ratio for a tier.
+    fn current_snr(&self, tier: RadioTier) -> Option<f32>;
+    /// Query whether a tier's hardware is available/powered.
+    fn is_available(&self, tier: RadioTier) -> bool;
+    /// Set transmit power (dBm) for a tier, respecting regulatory limits.
+    fn set_tx_power(&mut self, tier: RadioTier, power_dbm: f32) -> Result<(), RadioError>;
+    /// Get current frequency (Hz) for a tier.
+    fn current_frequency(&self, tier: RadioTier) -> Option<u64>;
+    /// Tune to a specific frequency (Hz), respecting regulatory constraints.
+    fn tune(&mut self, tier: RadioTier, frequency_hz: u64) -> Result<(), RadioError>;
+    /// Hardware-specific name/identifier (e.g., "HackRF One", "RFM95W LoRa").
+    fn hardware_id(&self) -> &str;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MOCK RADIO HARDWARE — Testing implementation
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Mock radio hardware for testing. Configurable SNR, availability per tier,
+/// collects transmitted payloads for assertion.
+pub struct MockRadioHardware {
+    available: [bool; 3],
+    snr: [f32; 3],
+    frequency: [u64; 3],
+    tx_power: [f32; 3],
+    transmitted: Vec<(usize, Vec<u8>)>,
+    receive_queue: VecDeque<(usize, Vec<u8>, f32)>,
+    regulatory_db: Option<RegulatoryDatabase>,
+}
+
+impl MockRadioHardware {
+    /// Create a mock with all tiers available and default SNR.
+    pub fn new() -> Self {
+        Self {
+            available: [true, true, true],
+            snr: [30.0, 15.0, 5.0],
+            frequency: [2_450_000_000, 915_000_000, 7_100_000],
+            tx_power: [20.0, 14.0, 30.0],
+            transmitted: Vec::new(),
+            receive_queue: VecDeque::new(),
+            regulatory_db: None,
+        }
+    }
+
+    pub fn set_available(&mut self, tier: RadioTier, available: bool) {
+        self.available[tier as usize] = available;
+    }
+
+    pub fn set_snr(&mut self, tier: RadioTier, snr_db: f32) {
+        self.snr[tier as usize] = snr_db;
+    }
+
+    pub fn transmitted_payloads(&self) -> &[(usize, Vec<u8>)] {
+        &self.transmitted
+    }
+
+    pub fn inject_receive(&mut self, tier: RadioTier, payload: Vec<u8>, snr_db: f32) {
+        self.receive_queue.push_back((tier as usize, payload, snr_db));
+    }
+
+    pub fn set_regulatory_db(&mut self, db: RegulatoryDatabase) {
+        self.regulatory_db = Some(db);
+    }
+}
+
+impl RadioHardware for MockRadioHardware {
+    fn transmit(&mut self, tier: RadioTier, payload: &[u8]) -> Result<usize, RadioError> {
+        if !self.available[tier as usize] { return Err(RadioError::Unavailable); }
+        let mtu = tier.profile().mtu;
+        if payload.len() > mtu {
+            return Err(RadioError::PayloadTooLarge { max: mtu, got: payload.len() });
+        }
+        self.transmitted.push((tier as usize, payload.to_vec()));
+        Ok(payload.len())
+    }
+
+    fn receive(&mut self, tier: RadioTier) -> Result<Option<(Vec<u8>, f32)>, RadioError> {
+        if !self.available[tier as usize] { return Err(RadioError::Unavailable); }
+        let idx = tier as usize;
+        if let Some(pos) = self.receive_queue.iter().position(|(t, _, _)| *t == idx) {
+            let (_, payload, snr) = self.receive_queue.remove(pos).unwrap();
+            Ok(Some((payload, snr)))
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn current_snr(&self, tier: RadioTier) -> Option<f32> {
+        if self.available[tier as usize] { Some(self.snr[tier as usize]) } else { None }
+    }
+
+    fn is_available(&self, tier: RadioTier) -> bool { self.available[tier as usize] }
+
+    fn set_tx_power(&mut self, tier: RadioTier, power_dbm: f32) -> Result<(), RadioError> {
+        if !self.available[tier as usize] { return Err(RadioError::Unavailable); }
+        if let Some(ref db) = self.regulatory_db {
+            let freq = self.frequency[tier as usize];
+            if let Some(max_power) = db.max_power_for_frequency(freq) {
+                if power_dbm > max_power {
+                    return Err(RadioError::RegulatoryViolation(format!(
+                        "power {} dBm exceeds max {} dBm for frequency {} Hz", power_dbm, max_power, freq
+                    )));
+                }
+            }
+        }
+        self.tx_power[tier as usize] = power_dbm;
+        Ok(())
+    }
+
+    fn current_frequency(&self, tier: RadioTier) -> Option<u64> {
+        if self.available[tier as usize] { Some(self.frequency[tier as usize]) } else { None }
+    }
+
+    fn tune(&mut self, tier: RadioTier, frequency_hz: u64) -> Result<(), RadioError> {
+        if !self.available[tier as usize] { return Err(RadioError::Unavailable); }
+        if let Some(ref db) = self.regulatory_db {
+            if !db.is_frequency_allowed(frequency_hz, tier) {
+                return Err(RadioError::FrequencyOutOfBand {
+                    freq_hz: frequency_hz,
+                    band: format!("{:?} bands", db.region()),
+                });
+            }
+        }
+        self.frequency[tier as usize] = frequency_hz;
+        Ok(())
+    }
+
+    fn hardware_id(&self) -> &str { "MockRadioHardware v1.0" }
+}
+
+/// No-op radio hardware that always returns `Unavailable`.
+/// Used when mesh feature is enabled but no physical radio exists.
+pub struct NullRadioHardware;
+
+impl RadioHardware for NullRadioHardware {
+    fn transmit(&mut self, _: RadioTier, _: &[u8]) -> Result<usize, RadioError> { Err(RadioError::Unavailable) }
+    fn receive(&mut self, _: RadioTier) -> Result<Option<(Vec<u8>, f32)>, RadioError> { Err(RadioError::Unavailable) }
+    fn current_snr(&self, _: RadioTier) -> Option<f32> { None }
+    fn is_available(&self, _: RadioTier) -> bool { false }
+    fn set_tx_power(&mut self, _: RadioTier, _: f32) -> Result<(), RadioError> { Err(RadioError::Unavailable) }
+    fn current_frequency(&self, _: RadioTier) -> Option<u64> { None }
+    fn tune(&mut self, _: RadioTier, _: u64) -> Result<(), RadioError> { Err(RadioError::Unavailable) }
+    fn hardware_id(&self) -> &str { "NullRadioHardware" }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// REGULATORY DATABASE — Region-aware frequency allocations
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// ITU regulatory region.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum RegulatoryRegion {
+    /// FCC Part 15 (unlicensed) + Part 97 (amateur). US/Canada.
+    FccUs,
+    /// ETSI EN 300 220 (SRD) + EN 301 893 (5 GHz). EU/EEA/UK.
+    EtsiEu,
+    /// ARIB STD-T108. Japan.
+    AribJp,
+    /// Generic ISM (international fallback).
+    IsmGlobal,
+}
+
+/// License requirement for a frequency band.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LicenseType {
+    Unlicensed,
+    LightLicense,
+    Amateur,
+    Licensed,
+}
+
+/// A specific frequency allocation within a regulatory region.
+#[derive(Debug, Clone)]
+pub struct BandAllocation {
+    pub name: String,
+    pub freq_min_hz: u64,
+    pub freq_max_hz: u64,
+    pub max_eirp_dbm: f32,
+    pub duty_cycle_max: Option<f32>,
+    pub channel_bw_hz: u32,
+    pub tier: RadioTier,
+    pub license: LicenseType,
+}
+
+/// Regional regulatory database with band allocations.
+///
+/// Pre-populated with real-world spectrum allocations.
+/// Basis: FCC Part 15/97, ETSI EN 300 220, ITU Radio Regulations.
+#[derive(Debug, Clone)]
+pub struct RegulatoryDatabase {
+    region: RegulatoryRegion,
+    bands: Vec<BandAllocation>,
+}
+
+impl RegulatoryDatabase {
+    pub fn new(region: RegulatoryRegion) -> Self {
+        let bands = match region {
+            RegulatoryRegion::FccUs => Self::fcc_us_bands(),
+            RegulatoryRegion::EtsiEu => Self::etsi_eu_bands(),
+            RegulatoryRegion::AribJp => Self::arib_jp_bands(),
+            RegulatoryRegion::IsmGlobal => Self::ism_global_bands(),
+        };
+        Self { region, bands }
+    }
+
+    pub fn region(&self) -> RegulatoryRegion { self.region }
+    pub fn bands(&self) -> &[BandAllocation] { &self.bands }
+
+    pub fn bands_for_tier(&self, tier: RadioTier) -> Vec<&BandAllocation> {
+        self.bands.iter().filter(|b| b.tier == tier).collect()
+    }
+
+    pub fn is_frequency_allowed(&self, freq_hz: u64, tier: RadioTier) -> bool {
+        self.bands.iter().any(|b| b.tier == tier && freq_hz >= b.freq_min_hz && freq_hz <= b.freq_max_hz)
+    }
+
+    pub fn max_power_for_frequency(&self, freq_hz: u64) -> Option<f32> {
+        self.bands.iter()
+            .filter(|b| freq_hz >= b.freq_min_hz && freq_hz <= b.freq_max_hz)
+            .map(|b| b.max_eirp_dbm)
+            .fold(None, |acc, p| Some(acc.map_or(p, |a: f32| a.max(p))))
+    }
+
+    pub fn duty_cycle_for_band(&self, freq_hz: u64) -> Option<f32> {
+        self.bands.iter()
+            .find(|b| freq_hz >= b.freq_min_hz && freq_hz <= b.freq_max_hz)
+            .and_then(|b| b.duty_cycle_max)
+    }
+
+    pub fn available_bandwidth(&self, tier: RadioTier) -> u64 {
+        self.bands.iter().filter(|b| b.tier == tier).map(|b| b.freq_max_hz - b.freq_min_hz).sum()
+    }
+
+    /// Convert to legacy `RegulatoryConstraints` for backward compatibility.
+    pub fn to_legacy_constraints(&self) -> RegulatoryConstraints {
+        let allowed_bands: Vec<(u64, u64)> = self.bands.iter()
+            .filter(|b| b.license == LicenseType::Unlicensed)
+            .map(|b| (b.freq_min_hz, b.freq_max_hz)).collect();
+        let max_power = self.bands.iter()
+            .filter(|b| b.license == LicenseType::Unlicensed)
+            .map(|b| b.max_eirp_dbm)
+            .fold(f32::NEG_INFINITY, f32::max);
+        let region = match self.region {
+            RegulatoryRegion::FccUs => "US", RegulatoryRegion::EtsiEu => "EU",
+            RegulatoryRegion::AribJp => "JP", RegulatoryRegion::IsmGlobal => "GLOBAL",
+        }.to_string();
+        RegulatoryConstraints {
+            allowed_bands,
+            max_power_dbm: if max_power.is_finite() { max_power } else { 0.0 },
+            region,
+        }
+    }
+
+    fn fcc_us_bands() -> Vec<BandAllocation> {
+        vec![
+            BandAllocation { name: "ISM 915 MHz".into(), freq_min_hz: 902_000_000, freq_max_hz: 928_000_000,
+                max_eirp_dbm: 30.0, duty_cycle_max: None, channel_bw_hz: 500_000, tier: RadioTier::Metro, license: LicenseType::Unlicensed },
+            BandAllocation { name: "ISM 2.4 GHz".into(), freq_min_hz: 2_400_000_000, freq_max_hz: 2_483_500_000,
+                max_eirp_dbm: 36.0, duty_cycle_max: None, channel_bw_hz: 22_000_000, tier: RadioTier::Local, license: LicenseType::Unlicensed },
+            BandAllocation { name: "U-NII-3 5.8 GHz".into(), freq_min_hz: 5_725_000_000, freq_max_hz: 5_850_000_000,
+                max_eirp_dbm: 36.0, duty_cycle_max: None, channel_bw_hz: 20_000_000, tier: RadioTier::Local, license: LicenseType::Unlicensed },
+            BandAllocation { name: "HF 80m Amateur".into(), freq_min_hz: 3_500_000, freq_max_hz: 4_000_000,
+                max_eirp_dbm: 61.76, duty_cycle_max: Some(0.5), channel_bw_hz: 3_000, tier: RadioTier::Regional, license: LicenseType::Amateur },
+            BandAllocation { name: "HF 40m Amateur".into(), freq_min_hz: 7_000_000, freq_max_hz: 7_300_000,
+                max_eirp_dbm: 61.76, duty_cycle_max: Some(0.5), channel_bw_hz: 3_000, tier: RadioTier::Regional, license: LicenseType::Amateur },
+            BandAllocation { name: "HF 20m Amateur (NVIS)".into(), freq_min_hz: 14_000_000, freq_max_hz: 14_350_000,
+                max_eirp_dbm: 61.76, duty_cycle_max: Some(0.5), channel_bw_hz: 3_000, tier: RadioTier::Regional, license: LicenseType::Amateur },
+        ]
+    }
+
+    fn etsi_eu_bands() -> Vec<BandAllocation> {
+        vec![
+            BandAllocation { name: "SRD 868 MHz (1%)".into(), freq_min_hz: 868_000_000, freq_max_hz: 868_600_000,
+                max_eirp_dbm: 14.0, duty_cycle_max: Some(0.01), channel_bw_hz: 125_000, tier: RadioTier::Metro, license: LicenseType::Unlicensed },
+            BandAllocation { name: "SRD 869 MHz (10%)".into(), freq_min_hz: 869_400_000, freq_max_hz: 869_650_000,
+                max_eirp_dbm: 27.0, duty_cycle_max: Some(0.10), channel_bw_hz: 125_000, tier: RadioTier::Metro, license: LicenseType::Unlicensed },
+            BandAllocation { name: "ISM 2.4 GHz".into(), freq_min_hz: 2_400_000_000, freq_max_hz: 2_483_500_000,
+                max_eirp_dbm: 20.0, duty_cycle_max: None, channel_bw_hz: 22_000_000, tier: RadioTier::Local, license: LicenseType::Unlicensed },
+            BandAllocation { name: "RLAN 5 GHz".into(), freq_min_hz: 5_150_000_000, freq_max_hz: 5_350_000_000,
+                max_eirp_dbm: 23.0, duty_cycle_max: None, channel_bw_hz: 20_000_000, tier: RadioTier::Local, license: LicenseType::Unlicensed },
+        ]
+    }
+
+    fn arib_jp_bands() -> Vec<BandAllocation> {
+        vec![
+            BandAllocation { name: "ARIB 920 MHz".into(), freq_min_hz: 920_000_000, freq_max_hz: 928_000_000,
+                max_eirp_dbm: 20.0, duty_cycle_max: Some(0.10), channel_bw_hz: 200_000, tier: RadioTier::Metro, license: LicenseType::Unlicensed },
+            BandAllocation { name: "ISM 2.4 GHz".into(), freq_min_hz: 2_400_000_000, freq_max_hz: 2_483_500_000,
+                max_eirp_dbm: 20.0, duty_cycle_max: None, channel_bw_hz: 22_000_000, tier: RadioTier::Local, license: LicenseType::Unlicensed },
+        ]
+    }
+
+    fn ism_global_bands() -> Vec<BandAllocation> {
+        vec![
+            BandAllocation { name: "ISM 433 MHz".into(), freq_min_hz: 433_050_000, freq_max_hz: 434_790_000,
+                max_eirp_dbm: 10.0, duty_cycle_max: Some(0.10), channel_bw_hz: 25_000, tier: RadioTier::Metro, license: LicenseType::Unlicensed },
+            BandAllocation { name: "ISM 2.4 GHz".into(), freq_min_hz: 2_400_000_000, freq_max_hz: 2_500_000_000,
+                max_eirp_dbm: 20.0, duty_cycle_max: None, channel_bw_hz: 22_000_000, tier: RadioTier::Local, license: LicenseType::Unlicensed },
+        ]
     }
 }
 
@@ -1494,5 +3110,1076 @@ mod tests {
         // Military frequencies should be blocked
         assert!(!reg.is_allowed(300_000_000)); // UHF military
         assert!(!reg.is_allowed(50_000_000));  // VHF
+    }
+
+    // ── RadioHardware trait ──────────────────────────────────────────────
+
+    #[test]
+    fn test_mock_hardware_transmit_receive() {
+        let mut hw = MockRadioHardware::new();
+
+        // Transmit on Local tier
+        let payload = b"hello mesh";
+        let sent = hw.transmit(RadioTier::Local, payload).unwrap();
+        assert_eq!(sent, payload.len());
+
+        // Verify transmitted payloads
+        assert_eq!(hw.transmitted_payloads().len(), 1);
+        assert_eq!(hw.transmitted_payloads()[0].0, RadioTier::Local as usize);
+        assert_eq!(hw.transmitted_payloads()[0].1, payload.to_vec());
+
+        // Inject receive data and read it back
+        let recv_data = b"world".to_vec();
+        hw.inject_receive(RadioTier::Metro, recv_data.clone(), 12.5);
+
+        let received = hw.receive(RadioTier::Metro).unwrap().unwrap();
+        assert_eq!(received.0, recv_data);
+        assert!((received.1 - 12.5).abs() < 0.01);
+
+        // No more data on Metro
+        assert!(hw.receive(RadioTier::Metro).unwrap().is_none());
+    }
+
+    #[test]
+    fn test_mock_hardware_payload_too_large() {
+        let mut hw = MockRadioHardware::new();
+
+        // Metro MTU is 250 bytes — try to send 300
+        let big_payload = vec![0u8; 300];
+        let result = hw.transmit(RadioTier::Metro, &big_payload);
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            RadioError::PayloadTooLarge { max, got } => {
+                assert_eq!(max, 250);
+                assert_eq!(got, 300);
+            }
+            other => panic!("Expected PayloadTooLarge, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_mock_hardware_unavailable_tier() {
+        let mut hw = MockRadioHardware::new();
+        hw.set_available(RadioTier::Regional, false);
+
+        assert!(!hw.is_available(RadioTier::Regional));
+        assert!(hw.current_snr(RadioTier::Regional).is_none());
+        assert!(hw.current_frequency(RadioTier::Regional).is_none());
+
+        let result = hw.transmit(RadioTier::Regional, b"test");
+        assert!(matches!(result, Err(RadioError::Unavailable)));
+    }
+
+    #[test]
+    fn test_null_hardware_always_unavailable() {
+        let mut hw = NullRadioHardware;
+
+        assert!(!hw.is_available(RadioTier::Local));
+        assert!(!hw.is_available(RadioTier::Metro));
+        assert!(!hw.is_available(RadioTier::Regional));
+
+        assert!(hw.current_snr(RadioTier::Local).is_none());
+        assert!(hw.current_frequency(RadioTier::Local).is_none());
+        assert_eq!(hw.hardware_id(), "NullRadioHardware");
+
+        assert!(matches!(
+            hw.transmit(RadioTier::Local, b"test"),
+            Err(RadioError::Unavailable)
+        ));
+        assert!(matches!(
+            hw.receive(RadioTier::Local),
+            Err(RadioError::Unavailable)
+        ));
+        assert!(matches!(
+            hw.set_tx_power(RadioTier::Local, 10.0),
+            Err(RadioError::Unavailable)
+        ));
+        assert!(matches!(
+            hw.tune(RadioTier::Local, 2_450_000_000),
+            Err(RadioError::Unavailable)
+        ));
+    }
+
+    #[test]
+    fn test_mock_hardware_snr() {
+        let mut hw = MockRadioHardware::new();
+        hw.set_snr(RadioTier::Local, 42.0);
+        assert_eq!(hw.current_snr(RadioTier::Local), Some(42.0));
+    }
+
+    #[test]
+    fn test_mock_hardware_tune_and_frequency() {
+        let mut hw = MockRadioHardware::new();
+        hw.tune(RadioTier::Local, 2_412_000_000).unwrap();
+        assert_eq!(hw.current_frequency(RadioTier::Local), Some(2_412_000_000));
+    }
+
+    #[test]
+    fn test_mock_hardware_tx_power() {
+        let mut hw = MockRadioHardware::new();
+        hw.set_tx_power(RadioTier::Metro, 14.0).unwrap();
+        // No assertion on internal state — success is sufficient
+    }
+
+    #[test]
+    fn test_mock_hardware_id() {
+        let hw = MockRadioHardware::new();
+        assert_eq!(hw.hardware_id(), "MockRadioHardware v1.0");
+    }
+
+    // ── RegulatoryDatabase ───────────────────────────────────────────────
+
+    #[test]
+    fn test_regulatory_fcc_lora_band() {
+        let db = RegulatoryDatabase::new(RegulatoryRegion::FccUs);
+        // 915 MHz should be allowed for Metro tier (LoRa)
+        assert!(db.is_frequency_allowed(915_000_000, RadioTier::Metro));
+        // 902 MHz (band edge) should be allowed
+        assert!(db.is_frequency_allowed(902_000_000, RadioTier::Metro));
+        // 928 MHz (band edge) should be allowed
+        assert!(db.is_frequency_allowed(928_000_000, RadioTier::Metro));
+    }
+
+    #[test]
+    fn test_regulatory_fcc_outside_band() {
+        let db = RegulatoryDatabase::new(RegulatoryRegion::FccUs);
+        // 850 MHz is not in any FCC ISM band
+        assert!(!db.is_frequency_allowed(850_000_000, RadioTier::Metro));
+        // 900 MHz is just below the 902 MHz band
+        assert!(!db.is_frequency_allowed(900_000_000, RadioTier::Metro));
+    }
+
+    #[test]
+    fn test_regulatory_etsi_duty_cycle() {
+        let db = RegulatoryDatabase::new(RegulatoryRegion::EtsiEu);
+        // 868.3 MHz should have 1% duty cycle (SRD band h1.4)
+        let duty = db.duty_cycle_for_band(868_300_000);
+        assert!(duty.is_some(), "868 MHz band should have a duty cycle");
+        assert!(
+            (duty.unwrap() - 0.01).abs() < 0.001,
+            "Expected 1% duty cycle, got {}",
+            duty.unwrap()
+        );
+    }
+
+    #[test]
+    fn test_regulatory_bands_for_tier() {
+        let db = RegulatoryDatabase::new(RegulatoryRegion::FccUs);
+
+        let local_bands = db.bands_for_tier(RadioTier::Local);
+        assert!(
+            local_bands.len() >= 2,
+            "FCC should have at least 2 Local bands (2.4 GHz + 5.8 GHz)"
+        );
+        for band in &local_bands {
+            assert_eq!(band.tier, RadioTier::Local);
+        }
+
+        let metro_bands = db.bands_for_tier(RadioTier::Metro);
+        assert!(
+            !metro_bands.is_empty(),
+            "FCC should have Metro bands (915 MHz ISM)"
+        );
+
+        let regional_bands = db.bands_for_tier(RadioTier::Regional);
+        assert!(
+            !regional_bands.is_empty(),
+            "FCC should have Regional bands (HF amateur)"
+        );
+        for band in &regional_bands {
+            assert_eq!(band.license, LicenseType::Amateur);
+        }
+    }
+
+    #[test]
+    fn test_regulatory_max_power() {
+        let db = RegulatoryDatabase::new(RegulatoryRegion::FccUs);
+
+        // 915 MHz: 30 dBm EIRP
+        let power = db.max_power_for_frequency(915_000_000);
+        assert!(power.is_some());
+        assert!((power.unwrap() - 30.0).abs() < 0.1);
+
+        // 2.45 GHz: 36 dBm EIRP
+        let power = db.max_power_for_frequency(2_450_000_000);
+        assert!(power.is_some());
+        assert!((power.unwrap() - 36.0).abs() < 0.1);
+
+        // Out-of-band: None
+        assert!(db.max_power_for_frequency(100_000_000).is_none());
+    }
+
+    #[test]
+    fn test_regulatory_available_bandwidth() {
+        let db = RegulatoryDatabase::new(RegulatoryRegion::FccUs);
+
+        // Metro tier: 902-928 MHz = 26 MHz
+        let metro_bw = db.available_bandwidth(RadioTier::Metro);
+        assert_eq!(metro_bw, 26_000_000);
+
+        // Local tier: 2.4 GHz (83.5 MHz) + 5.8 GHz (125 MHz) = 208.5 MHz
+        let local_bw = db.available_bandwidth(RadioTier::Local);
+        assert!(
+            local_bw > 200_000_000,
+            "Local bandwidth should be > 200 MHz, got {}",
+            local_bw
+        );
+    }
+
+    #[test]
+    fn test_regulatory_etsi_region() {
+        let db = RegulatoryDatabase::new(RegulatoryRegion::EtsiEu);
+        assert_eq!(db.region(), RegulatoryRegion::EtsiEu);
+
+        // EU should NOT have 915 MHz band
+        assert!(!db.is_frequency_allowed(915_000_000, RadioTier::Metro));
+
+        // EU should have 868 MHz
+        assert!(db.is_frequency_allowed(868_300_000, RadioTier::Metro));
+
+        // EU 2.4 GHz power is 20 dBm (vs US 36 dBm)
+        let power = db.max_power_for_frequency(2_450_000_000);
+        assert!(power.is_some());
+        assert!((power.unwrap() - 20.0).abs() < 0.1);
+    }
+
+    #[test]
+    fn test_regulatory_ism_global_fallback() {
+        let db = RegulatoryDatabase::new(RegulatoryRegion::IsmGlobal);
+
+        // 2.4 GHz should always be available globally
+        assert!(db.is_frequency_allowed(2_450_000_000, RadioTier::Local));
+
+        // 433 MHz should be available for Metro
+        assert!(db.is_frequency_allowed(433_500_000, RadioTier::Metro));
+    }
+
+    #[test]
+    fn test_regulatory_to_legacy_constraints() {
+        let db = RegulatoryDatabase::new(RegulatoryRegion::FccUs);
+        let legacy = db.to_legacy_constraints();
+
+        assert_eq!(legacy.region, "US");
+        assert!(legacy.is_allowed(915_000_000));
+        assert!(legacy.is_allowed(2_450_000_000));
+        // HF amateur bands should not be in legacy (they require Amateur license)
+        assert!(
+            !legacy.is_allowed(7_100_000),
+            "Amateur bands should not appear in legacy unlicensed constraints"
+        );
+    }
+
+    // ── Hardware + Regulatory integration ────────────────────────────────
+
+    #[test]
+    fn test_hardware_regulatory_integration() {
+        let mut hw = MockRadioHardware::new();
+        let db = RegulatoryDatabase::new(RegulatoryRegion::FccUs);
+        hw.set_regulatory_db(db);
+
+        // Valid tune: 915 MHz for Metro → should work
+        hw.tune(RadioTier::Metro, 915_000_000).unwrap();
+
+        // Invalid tune: 850 MHz is not in any FCC band
+        let result = hw.tune(RadioTier::Metro, 850_000_000);
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            RadioError::FrequencyOutOfBand { freq_hz, .. } => {
+                assert_eq!(freq_hz, 850_000_000);
+            }
+            other => panic!("Expected FrequencyOutOfBand, got {:?}", other),
+        }
+
+        // Valid power: 20 dBm on 915 MHz (max is 30 dBm)
+        hw.tune(RadioTier::Metro, 915_000_000).unwrap();
+        hw.set_tx_power(RadioTier::Metro, 20.0).unwrap();
+
+        // Invalid power: 35 dBm on 915 MHz (max is 30 dBm)
+        let result = hw.set_tx_power(RadioTier::Metro, 35.0);
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), RadioError::RegulatoryViolation(_)));
+    }
+
+    // ── SpectrumManager + hardware integration ──────────────────────────
+
+    #[test]
+    fn test_spectrum_manager_with_hardware() {
+        let mut sm = SpectrumManager::with_region(RegulatoryRegion::FccUs);
+
+        let hw = MockRadioHardware::new();
+        sm.set_hardware(Box::new(hw));
+
+        assert_eq!(sm.hardware_id(), Some("MockRadioHardware v1.0"));
+
+        // Process should pick up SNR from hardware
+        let snapshot = CycleSnapshot::default();
+        let _output = sm.process(&snapshot);
+
+        // Telemetry should reflect all tiers up (mock default)
+        assert!(sm.telemetry().tier_available[0]);
+    }
+
+    #[test]
+    fn test_spectrum_manager_with_region() {
+        let sm = SpectrumManager::with_region(RegulatoryRegion::EtsiEu);
+        assert_eq!(sm.regulatory_db().region(), RegulatoryRegion::EtsiEu);
+
+        // Legacy constraints should match
+        assert!(sm.regulatory().is_allowed(868_300_000));
+    }
+
+    #[test]
+    fn test_spectrum_manager_hardware_down_tier() {
+        let mut sm = SpectrumManager::default();
+
+        let mut hw = MockRadioHardware::new();
+        hw.set_available(RadioTier::Local, false);
+        sm.set_hardware(Box::new(hw));
+
+        let snapshot = CycleSnapshot::default();
+        let output = sm.process(&snapshot);
+
+        // Local should be detected as unavailable via hardware poll
+        assert!(!sm.tier_available[0]);
+        assert!(
+            output.confidence_delta < 0.0,
+            "Hardware-detected tier loss should reduce confidence"
+        );
+    }
+
+    // ── Item 1: AIMD ─────────────────────────────────────────────────
+
+    #[test]
+    fn test_aimd_additive_increase_on_healthy() {
+        let mut sm = SpectrumManager::default();
+        let initial_budget = sm.tier_budget[0]; // Local
+        // Loss is 0 (healthy) → additive increase
+        sm.tick_aimd();
+        assert!(
+            sm.tier_budget[0] > initial_budget,
+            "Healthy tier should increase budget: {} -> {}",
+            initial_budget,
+            sm.tier_budget[0]
+        );
+    }
+
+    #[test]
+    fn test_aimd_multiplicative_decrease_on_congestion() {
+        let mut sm = SpectrumManager::default();
+        // Simulate high loss on Metro
+        sm.tier_loss_ema[1] = 0.8; // Above TIER_DEGRADED_LOSS
+        let initial_budget = sm.tier_budget[1];
+        sm.tick_aimd();
+        assert!(
+            sm.tier_budget[1] < initial_budget,
+            "Congested tier should decrease budget: {} -> {}",
+            initial_budget,
+            sm.tier_budget[1]
+        );
+    }
+
+    #[test]
+    fn test_aimd_respects_floor_and_ceiling() {
+        let mut sm = SpectrumManager::default();
+        let local_profile = RadioTier::Local.profile();
+
+        // Push budget to ceiling
+        for _ in 0..200 {
+            sm.tick_aimd();
+        }
+        assert!(
+            sm.tier_budget[0] <= local_profile.bandwidth_max,
+            "Budget should not exceed ceiling"
+        );
+
+        // Force heavy loss → decrease
+        sm.tier_loss_ema[0] = 0.99;
+        for _ in 0..200 {
+            sm.tick_aimd();
+        }
+        assert!(
+            sm.tier_budget[0] >= local_profile.bandwidth_min,
+            "Budget should not fall below floor"
+        );
+    }
+
+    #[test]
+    fn test_aimd_skips_unavailable_tiers() {
+        let mut sm = SpectrumManager::default();
+        sm.tier_available[2] = false; // Regional down
+        let initial = sm.tier_budget[2];
+        sm.tick_aimd();
+        assert_eq!(sm.tier_budget[2], initial, "Down tier budget should not change");
+    }
+
+    // ── Item 2: Adaptive compression ─────────────────────────────────
+
+    #[test]
+    fn test_compress_for_tier_local_full() {
+        let mut sm = SpectrumManager::default();
+        let peer_id = [1u8; 8];
+        let hv = [0xAA; 2048];
+        let result = sm.compress_for_tier(&peer_id, &hv, RadioTier::Local);
+        assert_eq!(result.strategy, CompressionStrategy::Full);
+        assert_eq!(result.data.len(), 2048);
+    }
+
+    #[test]
+    fn test_compress_for_tier_metro_delta() {
+        let mut sm = SpectrumManager::default();
+        let peer_id = [2u8; 8];
+        let hv1 = [0xAA; 2048];
+        // First call: full (no previous)
+        let r1 = sm.compress_for_tier(&peer_id, &hv1, RadioTier::Metro);
+        assert_eq!(r1.strategy, CompressionStrategy::Full);
+
+        // Second call: delta (previous exists)
+        let mut hv2 = hv1;
+        hv2[100] = 0xBB;
+        let r2 = sm.compress_for_tier(&peer_id, &hv2, RadioTier::Metro);
+        assert_eq!(r2.strategy, CompressionStrategy::Delta);
+        assert!(r2.data.len() < 100, "Delta should be small");
+    }
+
+    #[test]
+    fn test_compress_for_tier_regional_hash() {
+        let mut sm = SpectrumManager::default();
+        let peer_id = [3u8; 8];
+        let hv = [0xCC; 2048];
+        let result = sm.compress_for_tier(&peer_id, &hv, RadioTier::Regional);
+        assert_eq!(result.strategy, CompressionStrategy::HashOnly);
+        assert_eq!(result.data.len(), 32);
+    }
+
+    #[test]
+    fn test_compress_for_tier_tracks_energy() {
+        let mut sm = SpectrumManager::default();
+        let peer_id = [4u8; 8];
+        let hv = [0xDD; 2048];
+        sm.compress_for_tier(&peer_id, &hv, RadioTier::Local);
+        assert!(sm.energy_spent_nj > 0.0, "Should track energy cost");
+    }
+
+    // ── Item 3: Waterfall ────────────────────────────────────────────
+
+    #[test]
+    fn test_waterfall_records_observations() {
+        let mut sm = SpectrumManager::default();
+        sm.inject_observation(SpectrumObservation {
+            frequency_hz: 915_000_000,
+            noise_floor_dbm: -90.0,
+            snr_db: 20.0,
+            jammed: false,
+        });
+        let snapshot = CycleSnapshot::default();
+        sm.process(&snapshot);
+        assert_eq!(sm.waterfall.len(), 1);
+    }
+
+    #[test]
+    fn test_waterfall_mean_noise_floor() {
+        let mut wf = SpectrumWaterfall::new(64);
+        for i in 0..10 {
+            wf.push(WaterfallEntry {
+                cycle: i,
+                noise_floor_dbm: -90.0 + i as f64,
+                snr_db: 20.0,
+                jammed: false,
+                observation_count: 1,
+            });
+        }
+        let mean = wf.mean_noise_floor().unwrap();
+        assert!((mean - (-85.5)).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_waterfall_jamming_ratio() {
+        let mut wf = SpectrumWaterfall::new(64);
+        for i in 0..10 {
+            wf.push(WaterfallEntry {
+                cycle: i,
+                noise_floor_dbm: -90.0,
+                snr_db: 20.0,
+                jammed: i % 2 == 0, // 5 out of 10 jammed
+                observation_count: 1,
+            });
+        }
+        assert!((wf.jamming_ratio() - 0.5).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_waterfall_capacity_bounded() {
+        let mut wf = SpectrumWaterfall::new(4);
+        for i in 0..10 {
+            wf.push(WaterfallEntry {
+                cycle: i,
+                noise_floor_dbm: -90.0,
+                snr_db: 20.0,
+                jammed: false,
+                observation_count: 1,
+            });
+        }
+        assert_eq!(wf.len(), 4);
+    }
+
+    #[test]
+    fn test_waterfall_periodic_detection() {
+        let mut wf = SpectrumWaterfall::new(64);
+        // Insert regular spikes every 10 cycles
+        for i in 0..40 {
+            let noise = if i % 10 == 0 { -50.0 } else { -90.0 }; // Spike
+            wf.push(WaterfallEntry {
+                cycle: i,
+                noise_floor_dbm: noise,
+                snr_db: if i % 10 == 0 { 2.0 } else { 20.0 },
+                jammed: i % 10 == 0,
+                observation_count: 1,
+            });
+        }
+        let period = wf.detect_periodic_interference();
+        assert!(period.is_some(), "Should detect periodic interference");
+        assert_eq!(period.unwrap(), 10);
+    }
+
+    // ── Item 6: Frequency hopping ────────────────────────────────────
+
+    #[test]
+    fn test_frequency_hop_cooldown() {
+        let mut sm = SpectrumManager::default();
+        sm.hop_cooldown = 3;
+        assert!(sm.suggest_frequency_hop(RadioTier::Metro).is_none());
+    }
+
+    #[test]
+    fn test_frequency_hop_needs_waterfall_data() {
+        let mut sm = SpectrumManager::default();
+        // Empty waterfall → no hop
+        assert!(sm.suggest_frequency_hop(RadioTier::Metro).is_none());
+    }
+
+    // ── Item 7: Energy-aware routing ─────────────────────────────────
+
+    #[test]
+    fn test_energy_per_bit_in_profile() {
+        let local = RadioTier::Local.profile();
+        let metro = RadioTier::Metro.profile();
+        let regional = RadioTier::Regional.profile();
+        // Wi-Fi > LoRa in energy/bit
+        assert!(local.energy_per_bit_nj > metro.energy_per_bit_nj);
+        // HF >> LoRa
+        assert!(regional.energy_per_bit_nj > metro.energy_per_bit_nj);
+    }
+
+    #[test]
+    fn test_energy_aware_route_normal() {
+        let sm = SpectrumManager::default();
+        // Energy plentiful → normal routing
+        let route = sm.energy_aware_route(100, 1);
+        assert!(route.is_some());
+    }
+
+    #[test]
+    fn test_energy_aware_route_constrained() {
+        let mut sm = SpectrumManager::default();
+        // Spend >50% of budget → energy-constrained mode
+        sm.energy_spent_nj = sm.energy_budget_nj * 0.6;
+        let route = sm.energy_aware_route(100, 1);
+        // Should prefer lowest energy tier that fits
+        assert!(route.is_some());
+        let tier = route.unwrap();
+        // Metro has lowest energy_per_bit among tiers that fit 100 bytes
+        assert_eq!(tier, RadioTier::Metro);
+    }
+
+    // ── Item 8: Peer discovery ───────────────────────────────────────
+
+    #[test]
+    fn test_beacon_serialization_roundtrip() {
+        let beacon = DiscoveryBeacon {
+            node_id: [1, 2, 3, 4, 5, 6, 7, 8],
+            capabilities_hash: [0xAA; 8],
+            cycle_counter: 42,
+            network_health: 1,
+            tier_mask: 0x07,
+        };
+        let bytes = beacon.to_bytes();
+        assert_eq!(bytes.len(), RADIO_BEACON_SIZE);
+        let decoded = DiscoveryBeacon::from_bytes(&bytes);
+        assert_eq!(decoded.node_id, beacon.node_id);
+        assert_eq!(decoded.capabilities_hash, beacon.capabilities_hash);
+        assert_eq!(decoded.cycle_counter, 42);
+        assert_eq!(decoded.network_health, 1);
+        assert_eq!(decoded.tier_mask, 0x07);
+    }
+
+    #[test]
+    fn test_beacon_tier_mask() {
+        assert_eq!(DiscoveryBeacon::tier_mask_from(&[true, true, true]), 0x07);
+        assert_eq!(DiscoveryBeacon::tier_mask_from(&[true, false, false]), 0x01);
+        assert_eq!(DiscoveryBeacon::tier_mask_from(&[false, true, true]), 0x06);
+        assert_eq!(DiscoveryBeacon::tier_mask_from(&[false, false, false]), 0x00);
+    }
+
+    #[test]
+    fn test_beacon_interval() {
+        let mut sm = SpectrumManager::default();
+        sm.set_node_id([1u8; 8]);
+        let caps = [0xABu8; 8];
+
+        // Should not generate before interval
+        for _ in 0..RADIO_BEACON_INTERVAL_CYCLES - 1 {
+            assert!(sm.generate_beacon(&caps).is_none());
+        }
+        // Should generate at interval
+        let beacon = sm.generate_beacon(&caps);
+        assert!(beacon.is_some());
+        assert_eq!(beacon.unwrap().node_id, [1u8; 8]);
+    }
+
+    #[test]
+    fn test_process_beacon_adds_route() {
+        let mut sm = SpectrumManager::default();
+        let beacon = DiscoveryBeacon {
+            node_id: [42u8; 8],
+            capabilities_hash: [0; 8],
+            cycle_counter: 100,
+            network_health: 0,
+            tier_mask: 0x07,
+        };
+        sm.process_beacon(&beacon, RadioTier::Metro, 15.0);
+        assert_eq!(sm.route_table.len(), 1);
+        let route = sm.route_table.lookup(&[42u8; 8]).unwrap();
+        assert_eq!(route.hop_count, 0);
+        assert_eq!(route.tier, RadioTier::Metro);
+    }
+
+    // ── Item 9: Multi-hop relay ──────────────────────────────────────
+
+    #[test]
+    fn test_route_table_update_and_lookup() {
+        let mut rt = RouteTable::new(128);
+        rt.update(RouteEntry {
+            destination: [1u8; 8],
+            next_hop: [2u8; 8],
+            hop_count: 1,
+            tier: RadioTier::Metro,
+            last_seen_cycle: 100,
+            link_quality: 0.8,
+        });
+        assert_eq!(rt.len(), 1);
+        let route = rt.lookup(&[1u8; 8]).unwrap();
+        assert_eq!(route.hop_count, 1);
+        assert_eq!(route.next_hop, [2u8; 8]);
+    }
+
+    #[test]
+    fn test_route_table_prefers_shorter_hops() {
+        let mut rt = RouteTable::new(128);
+        rt.update(RouteEntry {
+            destination: [1u8; 8],
+            next_hop: [2u8; 8],
+            hop_count: 3,
+            tier: RadioTier::Metro,
+            last_seen_cycle: 100,
+            link_quality: 0.8,
+        });
+        // Better route with fewer hops
+        rt.update(RouteEntry {
+            destination: [1u8; 8],
+            next_hop: [3u8; 8],
+            hop_count: 1,
+            tier: RadioTier::Local,
+            last_seen_cycle: 101,
+            link_quality: 0.9,
+        });
+        let route = rt.lookup(&[1u8; 8]).unwrap();
+        assert_eq!(route.hop_count, 1);
+        assert_eq!(route.next_hop, [3u8; 8]);
+    }
+
+    #[test]
+    fn test_route_table_prune() {
+        let mut rt = RouteTable::new(128);
+        rt.update(RouteEntry {
+            destination: [1u8; 8],
+            next_hop: [2u8; 8],
+            hop_count: 1,
+            tier: RadioTier::Metro,
+            last_seen_cycle: 10,
+            link_quality: 0.8,
+        });
+        // Prune with current_cycle far ahead
+        rt.prune(600, 500);
+        assert_eq!(rt.len(), 0, "Stale route should be pruned");
+    }
+
+    #[test]
+    fn test_prepare_relay() {
+        let mut sm = SpectrumManager::default();
+        sm.set_node_id([10u8; 8]);
+        // Add a route
+        sm.route_table.update(RouteEntry {
+            destination: [20u8; 8],
+            next_hop: [15u8; 8],
+            hop_count: 1,
+            tier: RadioTier::Metro,
+            last_seen_cycle: 0,
+            link_quality: 0.9,
+        });
+
+        let payload = b"hello";
+        let result = sm.prepare_relay(&[20u8; 8], payload);
+        assert!(result.is_some());
+        let (next_hop, packet) = result.unwrap();
+        assert_eq!(next_hop, [15u8; 8]);
+        // Header: 8 (dest) + 8 (src) + 1 (ttl) + 1 (hop) + 5 (payload) = 23
+        assert_eq!(packet.len(), 23);
+        // Check destination in header
+        assert_eq!(&packet[0..8], &[20u8; 8]);
+        // Check source in header
+        assert_eq!(&packet[8..16], &[10u8; 8]);
+    }
+
+    // ── Item 10: FEC ─────────────────────────────────────────────────
+
+    #[test]
+    fn test_fec_encode_decode_no_loss() {
+        let data = b"hello world, this is a test of FEC encoding!";
+        let encoded = FecEncoder::encode(data, 16);
+        assert!(encoded.len() > data.len()); // Parity added
+        let decoded = FecEncoder::decode(&encoded, 16, None);
+        assert_eq!(&decoded, data);
+    }
+
+    #[test]
+    fn test_fec_recover_lost_block() {
+        let data = vec![0xAA; 64]; // 4 blocks of 16
+        let encoded = FecEncoder::encode(&data, 16);
+
+        // Corrupt block 2 (bytes 32-47)
+        let mut corrupted = encoded.clone();
+        for i in 32..48 {
+            corrupted[i] = 0x00;
+        }
+
+        let recovered = FecEncoder::decode(&corrupted, 16, Some(2));
+        assert_eq!(&recovered[..64], &data[..]);
+    }
+
+    #[test]
+    fn test_fec_small_payload_passthrough() {
+        let data = b"tiny";
+        let encoded = FecEncoder::encode(data, 16);
+        // Below RADIO_FEC_MIN_PAYLOAD → no FEC
+        assert_eq!(encoded.len(), data.len());
+    }
+
+    #[test]
+    fn test_fec_overhead() {
+        assert_eq!(FecEncoder::overhead(100, 16), 16);
+        assert_eq!(FecEncoder::overhead(10, 16), 0); // Below min
+    }
+
+    // ── Item 11: Encryption ──────────────────────────────────────────
+
+    #[test]
+    fn test_encryption_roundtrip() {
+        let key = [42u8; 32];
+        let nonce = [1u8; RADIO_CRYPTO_NONCE_SIZE];
+        let plaintext = b"secret consciousness data";
+
+        let encrypted = MeshEncryption::encrypt(&key, &nonce, plaintext);
+        assert_ne!(&encrypted[..plaintext.len()], plaintext);
+
+        let decrypted = MeshEncryption::decrypt(&key, &nonce, &encrypted);
+        assert!(decrypted.is_some());
+        assert_eq!(&decrypted.unwrap(), plaintext);
+    }
+
+    #[test]
+    fn test_encryption_auth_tag_failure() {
+        let key = [42u8; 32];
+        let nonce = [1u8; RADIO_CRYPTO_NONCE_SIZE];
+        let plaintext = b"secret data";
+
+        let mut encrypted = MeshEncryption::encrypt(&key, &nonce, plaintext);
+        // Tamper with auth tag
+        let len = encrypted.len();
+        encrypted[len - 1] ^= 0xFF;
+
+        assert!(MeshEncryption::decrypt(&key, &nonce, &encrypted).is_none());
+    }
+
+    #[test]
+    fn test_peer_session_nonce_monotonic() {
+        let mut session = PeerSession::new([1u8; 8], [2u8; 32], 0);
+        let n1 = session.next_nonce();
+        let n2 = session.next_nonce();
+        assert_ne!(n1, n2);
+        assert_eq!(session.tx_nonce_counter, 2);
+    }
+
+    #[test]
+    fn test_peer_session_replay_detection() {
+        let mut session = PeerSession::new([1u8; 8], [2u8; 32], 0);
+        assert!(session.check_nonce(1)); // First nonce: OK
+        assert!(session.check_nonce(2)); // Second: OK
+        assert!(!session.check_nonce(1)); // Replay: rejected
+        assert!(!session.check_nonce(2)); // Replay: rejected
+        assert!(session.check_nonce(3)); // New: OK
+    }
+
+    #[test]
+    fn test_spectrum_manager_encrypt_decrypt() {
+        let mut sm = SpectrumManager::default();
+        let peer_id = [5u8; 8];
+        let session = PeerSession::new(peer_id, [99u8; 32], 0);
+        sm.encryption_mut().add_session(session);
+
+        let plaintext = b"consciousness vector";
+        let encrypted = sm.encrypt_for_peer(&peer_id, plaintext).unwrap();
+        let decrypted = sm.decrypt_from_peer(&peer_id, &encrypted).unwrap();
+        assert_eq!(&decrypted, plaintext);
+    }
+
+    #[test]
+    fn test_encryption_no_session() {
+        let mut sm = SpectrumManager::default();
+        assert!(sm.encrypt_for_peer(&[9u8; 8], b"test").is_none());
+    }
+
+    #[test]
+    fn test_mesh_encryption_capacity() {
+        let mut enc = MeshEncryption::new(2);
+        enc.add_session(PeerSession::new([1u8; 8], [1u8; 32], 0));
+        enc.add_session(PeerSession::new([2u8; 8], [2u8; 32], 0));
+        enc.add_session(PeerSession::new([3u8; 8], [3u8; 32], 0)); // Over capacity
+        assert_eq!(enc.session_count(), 2); // Capped at 2
+    }
+
+    // ── Telemetry includes new fields ────────────────────────────────
+
+    #[test]
+    fn test_telemetry_includes_new_fields() {
+        let mut sm = SpectrumManager::default();
+        sm.inject_observation(SpectrumObservation {
+            frequency_hz: 915_000_000,
+            noise_floor_dbm: -90.0,
+            snr_db: 20.0,
+            jammed: false,
+        });
+        let snapshot = CycleSnapshot::default();
+        sm.process(&snapshot);
+
+        let t = sm.telemetry();
+        assert!(t.tier_budgets[0] > 0); // AIMD budgets populated
+        assert_eq!(t.waterfall_depth, 1);
+        assert_eq!(t.known_peers, 0);
+        assert_eq!(t.encryption_sessions, 0);
+    }
+
+    // ── Item 1: Mesh→Spectrum feedback ──────────────────────────────
+
+    #[test]
+    fn test_ingest_mesh_stats_updates_loss_ema() {
+        let mut sm = SpectrumManager::default();
+        sm.ingest_mesh_stats(50, 100); // 50% loss
+        let t = sm.telemetry();
+        assert!(t.tier_loss_ema[0] > 0.0, "Local loss should increase");
+        assert!(t.tier_loss_ema[1] > t.tier_loss_ema[0], "Metro should absorb more");
+        assert!(t.tier_loss_ema[2] > t.tier_loss_ema[1], "Regional should absorb most");
+    }
+
+    #[test]
+    fn test_ingest_mesh_stats_zero_dropped() {
+        let mut sm = SpectrumManager::default();
+        sm.ingest_mesh_stats(0, 100);
+        let t = sm.telemetry();
+        for &loss in &t.tier_loss_ema {
+            assert!(loss.abs() < 1e-10, "No drops should not increase loss");
+        }
+    }
+
+    #[test]
+    fn test_ingest_mesh_stats_zero_total() {
+        let mut sm = SpectrumManager::default();
+        sm.ingest_mesh_stats(10, 0); // Should be no-op
+        let t = sm.telemetry();
+        for &loss in &t.tier_loss_ema {
+            assert!(loss.abs() < 1e-10);
+        }
+    }
+
+    // ── Item 2: Safety escalation ───────────────────────────────────
+
+    #[test]
+    fn test_network_critical_on_blackout() {
+        let mut sm = SpectrumManager::default();
+        sm.set_tier_available(RadioTier::Local, false);
+        sm.set_tier_available(RadioTier::Metro, false);
+        sm.set_tier_available(RadioTier::Regional, false);
+        assert!(sm.is_network_critical());
+    }
+
+    #[test]
+    fn test_network_not_critical_all_up() {
+        let sm = SpectrumManager::default();
+        assert!(!sm.is_network_critical());
+    }
+
+    // ── Item 3: Connectivity factor ─────────────────────────────────
+
+    #[test]
+    fn test_connectivity_factor_all_up() {
+        let sm = SpectrumManager::default();
+        assert!((sm.connectivity_factor() - 1.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_connectivity_factor_blackout() {
+        let mut sm = SpectrumManager::default();
+        sm.set_tier_available(RadioTier::Local, false);
+        sm.set_tier_available(RadioTier::Metro, false);
+        sm.set_tier_available(RadioTier::Regional, false);
+        assert!((sm.connectivity_factor() - 0.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_connectivity_factor_local_down() {
+        let mut sm = SpectrumManager::default();
+        sm.set_tier_available(RadioTier::Local, false);
+        assert!((sm.connectivity_factor() - 0.7).abs() < 1e-10);
+    }
+
+    // ── Item 9: Beacon→SwarmManager ──────────────────────────────────
+
+    #[test]
+    fn test_process_beacon_returns_true_for_new_peer() {
+        let mut sm = SpectrumManager::default();
+        let beacon = DiscoveryBeacon {
+            node_id: [42u8; 8],
+            capabilities_hash: [0; 8],
+            cycle_counter: 100,
+            network_health: 0,
+            tier_mask: 0b111,
+        };
+        let is_new = sm.process_beacon(&beacon, RadioTier::Local, 15.0);
+        assert!(is_new, "First beacon from peer should be new");
+
+        let is_new_again = sm.process_beacon(&beacon, RadioTier::Local, 15.0);
+        assert!(!is_new_again, "Second beacon from same peer should not be new");
+    }
+
+    // ── Item 10: Regulatory validation ──────────────────────────────
+
+    #[test]
+    fn test_validate_transmission_ism_band() {
+        let sm = SpectrumManager::default(); // ISM Global
+        // 433 MHz ISM band (Metro tier in ISM Global), 10.0 dBm max
+        assert!(sm.validate_transmission(RadioTier::Metro, 433_500_000, 10.0));
+    }
+
+    #[test]
+    fn test_validate_transmission_out_of_band() {
+        let sm = SpectrumManager::default();
+        // 100 MHz — not in any ISM allocation
+        assert!(!sm.validate_transmission(RadioTier::Metro, 100_000_000, 14.0));
+    }
+
+    // ── Item 3: Synthetic observations from swarm state ────────────────
+
+    #[test]
+    fn test_ingest_swarm_state_generates_observation() {
+        let mut sm = SpectrumManager::default();
+        assert_eq!(sm.pending_observations.len(), 0);
+        sm.ingest_swarm_state(5, 0.6, 0.8);
+        assert_eq!(sm.pending_observations.len(), 1);
+        let obs = &sm.pending_observations[0];
+        assert!(!obs.jammed, "Connected peers should not be jammed");
+        assert!(obs.snr_db > RADIO_SYNTHETIC_SNR_BASE as f32, "Peers should boost SNR");
+    }
+
+    #[test]
+    fn test_ingest_swarm_state_isolated_is_jammed() {
+        let mut sm = SpectrumManager::default();
+        sm.ingest_swarm_state(0, 0.0, 0.05);
+        let obs = &sm.pending_observations[0];
+        assert!(obs.jammed, "Zero peers + low connectivity should be jammed");
+        assert!(
+            (obs.snr_db - RADIO_SYNTHETIC_SNR_ISOLATED as f32).abs() < 1e-3,
+            "Isolated SNR should be {}",
+            RADIO_SYNTHETIC_SNR_ISOLATED
+        );
+    }
+
+    #[test]
+    fn test_ingest_swarm_state_snr_increases_with_peers() {
+        let mut sm = SpectrumManager::default();
+        sm.ingest_swarm_state(1, 0.5, 0.5);
+        let snr1 = sm.pending_observations[0].snr_db;
+
+        let mut sm2 = SpectrumManager::default();
+        sm2.ingest_swarm_state(20, 0.5, 0.5);
+        let snr20 = sm2.pending_observations[0].snr_db;
+
+        assert!(snr20 > snr1, "More peers should increase SNR");
+    }
+
+    #[test]
+    fn test_spectrum_prediction_error_accessor() {
+        let sm = SpectrumManager::default();
+        // Default telemetry: PE = 0.0
+        assert!((sm.spectrum_prediction_error() - 0.0).abs() < 1e-10);
+    }
+
+    // ── Consciousness-aware tier selection ─────────────────────────────
+
+    #[test]
+    fn test_consciousness_aware_high_confidence_prefers_local() {
+        let sm = SpectrumManager::default();
+        let tier = sm.consciousness_aware_tier(40, 0.9);
+        assert_eq!(tier, Some(RadioTier::Local), "High confidence should prefer Local");
+    }
+
+    #[test]
+    fn test_consciousness_aware_low_confidence_prefers_metro() {
+        let sm = SpectrumManager::default();
+        let tier = sm.consciousness_aware_tier(40, 0.1);
+        // Metro has lowest energy_per_bit (20 nJ) among available tiers
+        assert_eq!(tier, Some(RadioTier::Metro), "Low confidence should prefer Metro (lowest energy)");
+    }
+
+    #[test]
+    fn test_consciousness_aware_medium_confidence_defers() {
+        let sm = SpectrumManager::default();
+        let tier = sm.consciousness_aware_tier(40, 0.5);
+        assert_eq!(tier, None, "Medium confidence should defer to normal routing");
+    }
+
+    #[test]
+    fn test_consciousness_aware_respects_mtu() {
+        let sm = SpectrumManager::default();
+        // Large payload (2048B) with high confidence → Local (mtu=1500)
+        // Regional MTU=50, Metro MTU=250, so only Local can fit
+        let tier = sm.consciousness_aware_tier(1000, 0.9);
+        assert_eq!(tier, Some(RadioTier::Local), "Only Local can fit 1000B payload");
+    }
+
+    // ── Energy-aware routing ──────────────────────────────────────────
+
+    #[test]
+    fn test_energy_aware_route_activates_above_threshold() {
+        let mut sm = SpectrumManager::default();
+        // Below threshold: normal routing
+        sm.energy_spent_nj = sm.energy_budget_nj * 0.3;
+        let r1 = sm.energy_aware_route(100, 1);
+        assert!(r1.is_some());
+
+        // Above threshold: energy-constrained routing
+        sm.energy_spent_nj = sm.energy_budget_nj * 0.6;
+        let r2 = sm.energy_aware_route(100, 1);
+        assert!(r2.is_some());
+        // Energy-constrained should prefer Metro (20 nJ/bit) over Local (50 nJ/bit)
+        assert_eq!(r2, Some(RadioTier::Metro));
     }
 }

@@ -68,6 +68,25 @@ impl CognitiveLoopService {
                 phi_weighted_surprise,
             );
 
+            // Therapeutic dream recording: encode current therapeutic state as a
+            // dream action so the dream engine can generate counterfactual therapeutic
+            // scenarios. Only records when therapeutic manager has an active strategy
+            // and surprise is meaningful.
+            // Science: Barrett (2001) — dreams process emotional concerns;
+            // Cartwright (2010) — dream content reflects waking emotional regulation.
+            #[cfg(feature = "therapeutic")]
+            if self.therapeutic_manager.active_strategy().is_some() && phi_weighted_surprise > 0.3 {
+                let therapeutic_action = self.therapeutic_manager.dream_action_vector();
+                // Use client RDoC profile as dream state, current compressed state as outcome
+                let therapeutic_dream_state: Vec<f32> = therapeutic_action[0..6].to_vec();
+                dream.record(
+                    &therapeutic_dream_state,
+                    therapeutic_action,
+                    &dream_outcome,
+                    phi_weighted_surprise * 0.8, // Slightly lower priority than primary events
+                );
+            }
+
             // Dream during Cruise urgency (low-error steady state) or periodically.
             // Consolidation pressure modulates frequency: when GWT broadcasts pile up
             // faster than they're processed, dream more often to integrate them.
@@ -163,6 +182,27 @@ impl CognitiveLoopService {
                 self.dream_feedback_bridge.process_insight(insight);
             }
 
+            // Feed therapeutic dream wisdom back into regulation engine.
+            // When the dream engine discovers a counterfactual therapeutic action
+            // that would have improved Phi, bias future strategy selection accordingly.
+            // Science: Barrett (2001) — dreams process emotional concerns, informing
+            // waking regulation; Cartwright (2010) — dream rehearsal improves coping.
+            #[cfg(feature = "therapeutic")]
+            for wisdom in dream.wisdom().iter() {
+                // Therapeutic actions encode strategy ordinal at index 9
+                if wisdom.better_action.len() > 9 && wisdom.phi_improvement > 0.01 {
+                    let strategy_ordinal = wisdom.better_action[9];
+                    if strategy_ordinal >= 0.0 && strategy_ordinal <= 6.0 {
+                        self.therapeutic_manager
+                            .regulation_engine
+                            .incorporate_dream_wisdom(
+                                strategy_ordinal as u8,
+                                wisdom.phi_improvement,
+                            );
+                    }
+                }
+            }
+
             // Apply wisdom: if we have accumulated wisdom, modulate exploration
             // toward states where dream counterfactuals found Phi improvements
             if !dream.wisdom().is_empty() {
@@ -213,45 +253,52 @@ impl CognitiveLoopService {
             }
         }
 
-        // Knowledge consolidation during rest/stillness: prune weak facts,
-        // strengthen causal memory traces. Runs every 50 cycles during Cruise
-        // urgency or Sacred Stillness activation.
-        // Science: Stickgold & Walker (2013) — sleep-dependent memory consolidation
-        if matches!(urgency, super::super::CycleUrgency::Cruise)
-            || self.stats.circadian_stillness_boost > 0.1
-        {
-            if let Some(ref mut km) = self.knowledge_manager {
-                if self.stats.total_cycles % 50 == 0 {
-                    let (pruned, consolidated) = km.consolidate_and_forget();
-                    if pruned > 0 || consolidated > 0 {
-                        tracing::debug!(
-                            pruned,
-                            consolidated,
-                            cycle = self.stats.total_cycles,
-                            "Knowledge dream consolidation"
+        // ── Knowledge → Episodic memory bridge ───────────────────────────
+        // Promote high-confidence facts to episodic memory during dreams.
+        // Science: Tse et al. (2007) — schema-consistent facts consolidate rapidly
+        if let Some(ref km) = self.knowledge_manager {
+            if let Some(ref mut bus) = self.experience_bus {
+                let signals = km.signals();
+                if signals.relevance > 0.3 {
+                    let top_facts = km.top_facts(
+                        super::super::thresholds::KNOWLEDGE_EPISODIC_MAX_PER_DREAM,
+                    );
+                    for fact_text in &top_facts {
+                        let mut memory = crate::experience::EpisodicMemory::new(
+                            &format!("knowledge_fact_{}", self.stats.total_cycles),
+                            fact_text,
                         );
+                        memory.salience =
+                            super::super::thresholds::KNOWLEDGE_EPISODIC_SALIENCE_BOOST;
+                        memory.prediction_error = 0.1;
+                        bus.record_experience(memory);
                     }
+                }
+            }
+        }
 
-                    // Convert high-confidence knowledge facts to episodic memories
-                    // for dream replay. Dudai (2012) — grounded memories consolidate.
-                    if let Some(ref mut bus) = self.experience_bus {
-                        let signals = km.signals();
-                        if signals.relevance > 0.3 {
-                            let top_facts = km.top_facts(
-                                super::super::thresholds::KNOWLEDGE_EPISODIC_MAX_PER_DREAM,
-                            );
-                            for fact_text in &top_facts {
-                                let mut memory = crate::experience::EpisodicMemory::new(
-                                    &format!("knowledge_consolidation_{}", self.stats.total_cycles),
-                                    fact_text,
-                                );
-                                memory.salience =
-                                    super::super::thresholds::KNOWLEDGE_EPISODIC_SALIENCE_BOOST;
-                                memory.prediction_error = 0.1; // Low PE — confirmed knowledge
-                                bus.record_experience(memory);
-                            }
-                        }
-                    }
+        // ── Item 7: Episodic → semantic promotion ────────────────────────────
+        // When episodic memories survive 3+ dream replays (tracked via coordinator
+        // retrieval counts), distill them into semantic knowledge graph facts.
+        // Science: Stickgold & Walker (2013) — sleep-dependent memory consolidation;
+        //          McClelland et al. (1995) — complementary learning systems theory.
+        if let Some(ref mut km) = self.knowledge_manager {
+            let top = self
+                .memory_consol
+                .memory_coordinator
+                .most_replayed(5);
+            for (content_hash, replay_count) in &top {
+                if *replay_count >= 3 {
+                    let label = format!("episode_0x{:016x}", content_hash);
+                    km.process(
+                        &format!("Consolidated: {}", label),
+                        self.stats.total_cycles as u64,
+                    );
+                    tracing::trace!(
+                        label = %label,
+                        replays = replay_count,
+                        "Episodic→semantic promotion: consolidated episode into knowledge graph"
+                    );
                 }
             }
         }

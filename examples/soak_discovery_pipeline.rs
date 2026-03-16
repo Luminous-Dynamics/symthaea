@@ -122,11 +122,11 @@ fn main() {
             let input = inputs[i % inputs.len()];
             let result = service.cycle(input);
             let m = &result.metadata;
-            arts.push(m.voice_articulation_quality);
-            if m.voice_articulation_quality.is_finite()
-                && m.voice_rate_stability.is_finite()
-                && m.voice_confidence.is_finite()
-                && m.voice_phi_adjustment.is_finite()
+            arts.push(m.voice.voice_articulation_quality);
+            if m.voice.voice_articulation_quality.is_finite()
+                && m.voice.voice_rate_stability.is_finite()
+                && m.voice.voice_confidence.is_finite()
+                && m.voice.voice_phi_adjustment.is_finite()
             {
                 voice_finite_count += 1;
             }

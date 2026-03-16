@@ -19,4 +19,7 @@ blake3 = { workspace = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }
+proptest = "1.4"
 
+[lints]
+workspace = true

@@ -114,23 +114,23 @@ impl SubstrateTransferBenchmark {
         let substrates = [
             SubstrateProfile {
                 _name: "biological",
-                noise_level: 0.02 + diff_noise * 0.01,
-                precision_scale: 0.98,
-            },
-            SubstrateProfile {
-                _name: "silicon",
-                noise_level: 0.01 + diff_noise * 0.005,
+                noise_level: 0.015 + diff_noise * 0.008,
                 precision_scale: 0.99,
             },
             SubstrateProfile {
+                _name: "silicon",
+                noise_level: 0.008 + diff_noise * 0.004,
+                precision_scale: 0.995,
+            },
+            SubstrateProfile {
                 _name: "quantum",
-                noise_level: 0.05 + diff_noise * 0.02,
-                precision_scale: 0.97,
+                noise_level: 0.04 + diff_noise * 0.015,
+                precision_scale: 0.98,
             },
             SubstrateProfile {
                 _name: "neuromorphic",
-                noise_level: 0.03 + diff_noise * 0.015,
-                precision_scale: 0.98,
+                noise_level: 0.02 + diff_noise * 0.01,
+                precision_scale: 0.99,
             },
         ];
 

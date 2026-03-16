@@ -149,7 +149,7 @@ struct TrialResult {
 impl ArcScalingBenchmark {
     fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> TrialResult {
         let seed = config.trial_seed("reasoning", "arc_scaling", trial_idx);
-        let noise_weight = 0.05 + config.time_pressure * 0.15;
+        let noise_weight = 0.04 + config.time_pressure * 0.12;
         let num_tasks = 16; // per probe
 
         // Grid scaling: vary grid size, keep dimension fixed

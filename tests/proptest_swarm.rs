@@ -12,9 +12,7 @@ Science: Hatfield et al. (1993), Heinrichs et al. (2003)
 */
 
 use proptest::prelude::*;
-use symthaea::cognitive_loop::{
-    CognitiveLoopConfig, CognitiveLoopService, SwarmEvent, SwarmTelemetry,
-};
+use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService, SwarmEvent};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Strategies

@@ -24,8 +24,7 @@ impl CognitiveLoopService {
 
     /// Get a complete snapshot of current consciousness state
     pub fn consciousness_snapshot(&self) -> ConsciousnessSnapshot {
-        let (pattern, pattern_confidence) =
-            self.language_comm.voice_coherence.temporal.classify_state();
+        let (pattern, pattern_confidence) = self.language_comm.voice_coherence.temporal.classify_state();
         let temporal_summary = self.language_comm.voice_coherence.temporal.summary();
         let reflection_summary = self.self_model_tier.self_reflection.summary();
         let thresholds = self.self_model_tier.self_reflection.get_thresholds();
@@ -33,10 +32,7 @@ impl CognitiveLoopService {
 
         let consciousness_level = ConsciousnessSnapshot::compute_consciousness_level(
             self.prediction_confidence as f32,
-            self.language_comm
-                .voice_coherence
-                .bridge
-                .smoothed_coherence(),
+            self.language_comm.voice_coherence.bridge.smoothed_coherence(),
             self.flow_state.intensity,
             pattern_confidence,
         );
@@ -78,11 +74,7 @@ impl CognitiveLoopService {
             flow_threshold: thresholds.flow_error,
             boredom_threshold: thresholds.boredom,
             trust_threshold: thresholds.trust,
-            temporal_coherence: self
-                .language_comm
-                .voice_coherence
-                .bridge
-                .smoothed_coherence(),
+            temporal_coherence: self.language_comm.voice_coherence.bridge.smoothed_coherence(),
             tau_mean: temporal_summary.features.mean,
             tau_trend: temporal_summary.features.trend,
             cognitive_depth: self.cognitive_depth,
@@ -129,6 +121,16 @@ impl CognitiveLoopService {
                     false
                 }
             },
+            network_critical: {
+                #[cfg(feature = "mesh")]
+                {
+                    self.spectrum_manager.is_network_critical()
+                }
+                #[cfg(not(feature = "mesh"))]
+                {
+                    false
+                }
+            },
             avg_cycle_time_us: self.stats.avg_cycle_time_us,
             cycles_per_second: self.stats.cycles_per_second,
         }
@@ -149,10 +151,7 @@ impl CognitiveLoopService {
         let (_, pattern_confidence) = self.language_comm.voice_coherence.temporal.classify_state();
         ConsciousnessSnapshot::compute_consciousness_level(
             self.prediction_confidence as f32,
-            self.language_comm
-                .voice_coherence
-                .bridge
-                .smoothed_coherence(),
+            self.language_comm.voice_coherence.bridge.smoothed_coherence(),
             self.flow_state.intensity,
             pattern_confidence,
         )
@@ -160,18 +159,12 @@ impl CognitiveLoopService {
 
     /// Check if current state matches a specific consciousness pattern
     pub fn is_consciousness_state(&self, pattern: ConsciousnessPattern) -> bool {
-        self.language_comm
-            .voice_coherence
-            .temporal
-            .is_state(pattern)
+        self.language_comm.voice_coherence.temporal.is_state(pattern)
     }
 
     /// Get similarity to a specific consciousness pattern
     pub fn consciousness_pattern_similarity(&self, pattern: ConsciousnessPattern) -> f32 {
-        self.language_comm
-            .voice_coherence
-            .temporal
-            .similarity_to(pattern)
+        self.language_comm.voice_coherence.temporal.similarity_to(pattern)
     }
 
     // ═══════════════════════════════════════════════════════════════════════

@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 //! # Computational Geometry Engine
 //!
 //! Basic computational geometry with HDC encoding: points, lines, polygons,

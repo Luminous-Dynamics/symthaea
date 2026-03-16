@@ -56,8 +56,10 @@ impl WeightedDecompositionBenchmark {
                 expected_far: "TRADE_AGREEMENT",
             },
             DecompositionCase {
-                composite: "TRADE_AGREEMENT",
-                removed: "RECIPROCATE",
+                // ARMS_EMBARGO(SANCTION:5,ENFORCEMENT:2,PROHIBITION:1) -PROHIBITION
+                // Residual dominated by SANCTION+ENFORCEMENT → nearest ECONOMIC_SANCTION
+                composite: "ARMS_EMBARGO",
+                removed: "PROHIBITION",
                 expected_near: "ECONOMIC_SANCTION",
                 expected_far: "CIVIL_DISOBEDIENCE",
             },
@@ -136,44 +138,38 @@ impl WeightedDecompositionBenchmark {
         let unweighted_accuracy = Self::eval_accuracy(&unweighted_algebra, &system, &cases);
 
         // ── Weight sensitivity ──
-        // Compare: does removing a high-weight component cause a larger
-        // similarity shift than removing a low-weight one?
-        // High-weight removals: LEGITIMACY from LEGITIMATE_GOVERNANCE (weight 3)
-        // Low-weight removals: COOPERATE from DEMOCRATIC_ELECTION (weight 1)
-        let mut sensitivity_pairs = Vec::new();
+        // For each axiom, compare removing its highest-weight component vs
+        // its lowest-weight component. The delta should be larger for high-weight.
+        // Uses multiple axioms for a robust estimate.
+        let sensitivity_cases: &[(&str, &str, &str)] = &[
+            // (axiom, high-weight component, low-weight component)
+            ("LEGITIMATE_GOVERNANCE", "LEGITIMACY", "TRUST"),      // w5 vs w1
+            ("REVOLUTION", "AUTHORITY", "PROHIBITION"),            // w5 vs w1
+            ("TRADE_AGREEMENT", "EXCHANGE", "TREATY"),             // w5 vs w1
+            ("ECONOMIC_SANCTION", "SANCTION", "PROHIBITION"),      // w5 vs w2
+            ("DEMOCRATIC_ELECTION", "LEGITIMACY", "COOPERATE"),    // w5 vs w1
+            ("CORRUPTION", "DEFECT", "AUTHORITY"),                 // w5 vs w1
+        ];
 
-        // High-weight removal
-        if let (Some(comp_hv), Ok((_n, _s, res_hv))) = (
-            weighted_algebra.get_encoding("LEGITIMATE_GOVERNANCE", &system),
-            weighted_algebra.query_decomposition("LEGITIMATE_GOVERNANCE", "LEGITIMACY", &system),
-        ) {
-            let delta_high = 1.0 - res_hv.similarity(&comp_hv) as f64;
-            sensitivity_pairs.push(("high", delta_high));
+        let mut sensitivity_scores = Vec::new();
+        for &(axiom, high_comp, low_comp) in sensitivity_cases {
+            let comp_hv = match weighted_algebra.get_encoding(axiom, &system) {
+                Some(hv) => hv,
+                None => continue,
+            };
+            let high_res = weighted_algebra.query_decomposition(axiom, high_comp, &system);
+            let low_res = weighted_algebra.query_decomposition(axiom, low_comp, &system);
+            if let (Ok((_n1, _s1, high_hv)), Ok((_n2, _s2, low_hv))) = (high_res, low_res) {
+                let delta_high = 1.0 - high_hv.similarity(&comp_hv) as f64;
+                let delta_low = 1.0 - low_hv.similarity(&comp_hv) as f64;
+                sensitivity_scores.push((delta_high - delta_low).max(0.0));
+            }
         }
 
-        // Low-weight removal
-        if let (Some(comp_hv), Ok((_n, _s, res_hv))) = (
-            weighted_algebra.get_encoding("DEMOCRATIC_ELECTION", &system),
-            weighted_algebra.query_decomposition("DEMOCRATIC_ELECTION", "COOPERATE", &system),
-        ) {
-            let delta_low = 1.0 - res_hv.similarity(&comp_hv) as f64;
-            sensitivity_pairs.push(("low", delta_low));
-        }
-
-        let weight_sensitivity = if sensitivity_pairs.len() == 2 {
-            let high = sensitivity_pairs
-                .iter()
-                .find(|(l, _)| *l == "high")
-                .map(|(_, v)| *v)
-                .unwrap_or(0.0);
-            let low = sensitivity_pairs
-                .iter()
-                .find(|(l, _)| *l == "low")
-                .map(|(_, v)| *v)
-                .unwrap_or(0.0);
-            (high - low).max(0.0)
-        } else {
+        let weight_sensitivity = if sensitivity_scores.is_empty() {
             0.0
+        } else {
+            sensitivity_scores.iter().sum::<f64>() / sensitivity_scores.len() as f64
         };
 
         let weighted_vs_unweighted_delta = weighted_accuracy - unweighted_accuracy;
@@ -280,5 +276,67 @@ mod tests {
         for (key, val) in &result.metrics {
             assert!(val.mean.is_finite(), "metric {key} is not finite");
         }
+    }
+
+    #[test]
+    fn test_weighted_per_case_diagnostic() {
+        let system = PrimitiveSystem::new();
+        let mut algebra = CompositionAlgebra::new();
+        algebra.load_institutional_axioms_weighted(&system);
+
+        let cases = WeightedDecompositionBenchmark::cases();
+        for case in &cases {
+            let near_hv = match algebra.get_encoding(case.expected_near, &system) {
+                Some(hv) => hv,
+                None => {
+                    eprintln!("[ERR] missing near encoding: {}", case.expected_near);
+                    continue;
+                }
+            };
+            let far_hv = match algebra.get_encoding(case.expected_far, &system) {
+                Some(hv) => hv,
+                None => {
+                    eprintln!("[ERR] missing far encoding: {}", case.expected_far);
+                    continue;
+                }
+            };
+            let residual = match algebra.query_decomposition(case.composite, case.removed, &system)
+            {
+                Ok((_name, _sim, hv)) => hv,
+                Err(e) => {
+                    eprintln!("[ERR] {}-{}: {e}", case.composite, case.removed);
+                    continue;
+                }
+            };
+            let sim_near = residual.similarity(&near_hv);
+            let sim_far = residual.similarity(&far_hv);
+            let pass = if sim_near > sim_far { "PASS" } else { "FAIL" };
+            // Also show query_decomposition nearest for failing cases
+            let (nearest, nearest_sim, _) = algebra
+                .query_decomposition(case.composite, case.removed, &system)
+                .unwrap();
+            eprintln!(
+                "[{pass}] {}-{} => near({})={:.4}, far({})={:.4}, actual_nearest={} sim={:.4}",
+                case.composite,
+                case.removed,
+                case.expected_near,
+                sim_near,
+                case.expected_far,
+                sim_far,
+                nearest,
+                nearest_sim,
+            );
+        }
+    }
+
+    #[test]
+    fn test_print_weighted_decomposition_scores() {
+        let config = BenchmarkConfig::default();
+        let result = WeightedDecompositionBenchmark.run(&config);
+        eprintln!("\n═══ Weighted Decomposition Benchmark Scores ═══");
+        for (key, val) in &result.metrics {
+            eprintln!("  {key:<40} mean={:.4}  sd={:.4}", val.mean, val.std_dev);
+        }
+        eprintln!("═════════════════════════════════════════════════\n");
     }
 }

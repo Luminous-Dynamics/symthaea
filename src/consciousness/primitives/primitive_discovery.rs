@@ -413,11 +413,8 @@ impl PatternDetector {
 
             if tier_hvs.len() >= 2 {
                 // Bundle all HVs in this tier to create centroid
-                let mut centroid = *tier_hvs[0];
-                for hv in &tier_hvs[1..] {
-                    centroid = BinaryHV::bundle(&[centroid, *(*hv)]);
-                }
-                self.tier_centroids.insert(*tier, centroid);
+                let owned: Vec<BinaryHV> = tier_hvs.iter().map(|hv| **hv).collect();
+                self.tier_centroids.insert(*tier, BinaryHV::bundle(&owned));
             }
         }
     }

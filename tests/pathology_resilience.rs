@@ -264,7 +264,7 @@ fn test_cognitive_loop_feels_injected_pain() {
 
     // Get baseline thermodynamic_load from a clean cycle
     let clean_result = service.cycle("baseline input");
-    let baseline_thermo = clean_result.metadata.thermodynamic_load;
+    let baseline_thermo = clean_result.metadata.temporal.thermodynamic_load;
 
     // Inject pain through the service's pain channel
     let tx = service
@@ -284,16 +284,16 @@ fn test_cognitive_loop_feels_injected_pain() {
 
     // Verify stress was recorded in metadata
     assert!(
-        stressed_result.metadata.somatic_stress > 0.0,
+        stressed_result.metadata.embodied.somatic_stress > 0.0,
         "Somatic stress should be > 0 after injected errors, got {}",
-        stressed_result.metadata.somatic_stress
+        stressed_result.metadata.embodied.somatic_stress
     );
 
     // Thermodynamic load should increase (pain raises metabolic cost)
     assert!(
-        stressed_result.metadata.thermodynamic_load >= baseline_thermo,
+        stressed_result.metadata.temporal.thermodynamic_load >= baseline_thermo,
         "Thermodynamic load should not decrease under stress: baseline={baseline_thermo}, stressed={}",
-        stressed_result.metadata.thermodynamic_load
+        stressed_result.metadata.temporal.thermodynamic_load
     );
 }
 
@@ -320,14 +320,14 @@ fn test_cognitive_loop_recovers_after_pain() {
 
     // Record stress peak
     let peak_result = service.cycle("under attack");
-    let peak_stress = peak_result.metadata.somatic_stress;
+    let peak_stress = peak_result.metadata.embodied.somatic_stress;
     assert!(peak_stress > 0.3, "Should have significant stress at peak");
 
     // Run clean cycles and verify recovery
     let mut final_stress = peak_stress;
     for i in 0..30 {
         let result = service.cycle(&format!("recovery cycle {i}"));
-        final_stress = result.metadata.somatic_stress;
+        final_stress = result.metadata.embodied.somatic_stress;
     }
 
     assert!(
@@ -400,7 +400,7 @@ fn test_sustained_attack_triggers_high_somatic_stress() {
         })
         .unwrap();
         let result = service.cycle(&format!("attack cycle {i}"));
-        max_stress = max_stress.max(result.metadata.somatic_stress);
+        max_stress = max_stress.max(result.metadata.embodied.somatic_stress);
     }
 
     assert!(

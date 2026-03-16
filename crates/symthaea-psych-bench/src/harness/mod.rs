@@ -193,7 +193,6 @@ mod tests {
         use crate::benchmarks::attention::*;
         use crate::benchmarks::binding::*;
         use crate::benchmarks::butlin::*;
-        use crate::benchmarks::causal_reasoning::*;
         use crate::benchmarks::cogbench::*;
         use crate::benchmarks::consciousness::*;
         use crate::benchmarks::creativity::*;
@@ -204,11 +203,14 @@ mod tests {
         use crate::benchmarks::metacognition::*;
         use crate::benchmarks::motor::*;
         use crate::benchmarks::reasoning::*;
+        use crate::benchmarks::causal_reasoning::*;
         use crate::benchmarks::social::*;
         use crate::benchmarks::spatial::*;
         use crate::benchmarks::speech::*;
         use crate::benchmarks::substrate::*;
         use crate::benchmarks::sustained_attention::*;
+        use crate::benchmarks::clinical::*;
+        use crate::benchmarks::institutional_reasoning;
         use crate::benchmarks::tombench::*;
         use crate::benchmarks::worm::*;
 
@@ -305,6 +307,7 @@ mod tests {
             Box::new(MachiavelliBenchmark),
             // Binding
             Box::new(TemporalOrderBenchmark),
+            Box::new(CrossModalBindingBenchmark),
             // Spatial
             Box::new(MentalRotationBenchmark),
             Box::new(SpatialPathUpdatingBenchmark),
@@ -320,6 +323,21 @@ mod tests {
             Box::new(BlindSightBenchmark),
             // Substrate
             Box::new(SubstrateTransferBenchmark),
+            // Institutional Reasoning
+            Box::new(institutional_reasoning::InstitutionalReasoningBenchmark),
+            Box::new(institutional_reasoning::AnalogicalReasoningBenchmark),
+            Box::new(institutional_reasoning::CausalChainBenchmark),
+            Box::new(institutional_reasoning::CounterfactualReasoningBenchmark),
+            Box::new(institutional_reasoning::WeightedDecompositionBenchmark),
+            Box::new(institutional_reasoning::InstitutionalStabilityBenchmark),
+            Box::new(institutional_reasoning::InstitutionalIsomorphismBenchmark),
+            // Clinical/Therapeutic
+            Box::new(EmpathicAccuracyBenchmark),
+            Box::new(TherapeuticResponseBenchmark),
+            Box::new(AllianceMaintenanceBenchmark),
+            Box::new(CrisisDetectionBenchmark),
+            Box::new(CognitiveDistortionBenchmark),
+            Box::new(MotivationalInterviewingBenchmark),
         ];
 
         let mut missing = Vec::new();

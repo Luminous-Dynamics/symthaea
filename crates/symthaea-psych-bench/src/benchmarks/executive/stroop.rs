@@ -63,7 +63,9 @@ impl StroopBenchmark {
 
         // Reading automaticity: how strongly the word activates its color.
         // Difficulty amplifies interference (reading automaticity).
-        let base_automaticity: f32 = 0.45;
+        // 0.35 calibrated to produce ~10% Stroop effect (MacLeod, 1991).
+        // Higher values (0.45) produced superhuman interference resistance.
+        let base_automaticity: f32 = 0.35;
         let reading_automaticity: f32 = (base_automaticity
             * diff_model.interference_multiplier(config.difficulty) as f32)
             .min(0.95);

@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 //! # Fast Fourier Transform Engine
 //!
 //! Cooley-Tukey radix-2 FFT and inverse FFT with HDC encoding.

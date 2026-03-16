@@ -36,7 +36,6 @@ impl CognitiveLoopService {
         let cycle_start = Instant::now();
         self.stats.total_cycles += 1;
         self.substrate_manager.tick_energy(&self.config);
-        self.substrate_manager.tick_transition(&self.config);
 
         // Integrity: run tamper detection (temporal every cycle, canaries at co-prime intervals)
         #[cfg(feature = "integrity")]
@@ -69,15 +68,14 @@ impl CognitiveLoopService {
                     "{failure}"
                 );
                 self.integrity_manager.status.attestation_passed = false;
-                self.integrity_manager
-                    .status
-                    .anomalies
-                    .push(crate::integrity::IntegrityAnomaly {
+                self.integrity_manager.status.anomalies.push(
+                    crate::integrity::IntegrityAnomaly {
                         source: "live_attestation",
                         description: failure,
                         detected_at: std::time::Instant::now(),
                         severity: crate::integrity::AnomalySeverity::Critical,
-                    });
+                    },
+                );
             }
             // Escalate critical integrity anomalies to safety telemetry
             if self.integrity_manager.has_critical_anomaly() {
@@ -119,10 +117,7 @@ impl CognitiveLoopService {
             if frustration > 0.4 {
                 let ne_base = self.neuromod.bath.noradrenaline.baseline_val();
                 let ne_nudge = 0.03 * (frustration - 0.4);
-                self.neuromod
-                    .bath
-                    .noradrenaline
-                    .set_baseline(ne_base + ne_nudge);
+                self.neuromod.bath.noradrenaline.set_baseline(ne_base + ne_nudge);
             }
             if state.is_in_flow() {
                 let da_base = self.neuromod.bath.dopamine.baseline_val();
@@ -134,104 +129,56 @@ impl CognitiveLoopService {
             }
         }
 
-        // Cantor fractal depth → neuromodulator coupling (Hasselmo 2006)
-        // Deep CRHV recursion signals focused recurrent processing:
-        //   - Boosts ACh (sustained attention, cortical recurrence)
-        //   - Dampens NE (reduces alerting/scanning, shifts to focused mode)
-        // Only fires when we have recent broadcast data.
-        if let Some(last_crhv) = self.cantor_broadcast_buffer.last() {
-            let depth_norm =
-                last_crhv.depth as f32 / crate::cognitive_loop::thresholds::CANTOR_DEPTH_MAX as f32;
-            if depth_norm > 0.3 {
-                let ach_base = self.neuromod.bath.acetylcholine.baseline_val();
-                let ach_nudge =
-                    crate::cognitive_loop::thresholds::CANTOR_DEPTH_ACH_BOOST * depth_norm;
-                self.neuromod
-                    .bath
-                    .acetylcholine
-                    .set_baseline(ach_base + ach_nudge);
-
+        // Spectrum → neuromodulator coupling (Aston-Jones & Cohen 2005; Schultz 1997)
+        // Sustained jamming activates threat axis (NE up, locus coeruleus)
+        // Network recovery triggers reward relief (DA nudge)
+        #[cfg(feature = "mesh")]
+        {
+            use super::thresholds::{
+                RADIO_JAMMING_NE_NUDGE, RADIO_RECOVERY_DA_NUDGE,
+                RADIO_NEUROMOD_JAMMING_MIN_STREAK,
+            };
+            let telem = self.spectrum_manager.telemetry();
+            // Sustained jamming → NE arousal spike
+            if telem.jamming_streak >= RADIO_NEUROMOD_JAMMING_MIN_STREAK {
                 let ne_base = self.neuromod.bath.noradrenaline.baseline_val();
-                let ne_nudge =
-                    crate::cognitive_loop::thresholds::CANTOR_DEPTH_NE_DAMPEN * depth_norm;
-                self.neuromod
-                    .bath
-                    .noradrenaline
-                    .set_baseline(ne_base + ne_nudge);
+                self.neuromod.bath.noradrenaline.set_baseline(ne_base + RADIO_JAMMING_NE_NUDGE);
             }
+            // Recovery from blackout → DA relief
+            if telem.network_health == 0 && self.stats.total_cycles > 1 {
+                if telem.degradation_streak == 0 && telem.jamming_streak == 0 {
+                    let had_recent_loss = telem.tier_loss_ema.iter().any(|&l| l > 0.01);
+                    if had_recent_loss {
+                        let da_base = self.neuromod.bath.dopamine.baseline_val();
+                        self.neuromod.bath.dopamine.set_baseline(da_base + RADIO_RECOVERY_DA_NUDGE);
+                    }
+                }
+            }
+        }
+
+        // ── Pre-phase: Text-based crisis detection (safety-critical) ─────
+        // Runs BEFORE perception so crisis state is available for safety precheck.
+        // Science: C-SSRS screening protocol — catch indirect expressions early.
+        #[cfg(feature = "therapeutic")]
+        if self.config.enable_therapeutic {
+            self.therapeutic_manager.detect_crisis_from_text(input);
+            // Apply dream feedback to strategy selection (accuracy-gated exploration)
+            self.therapeutic_manager.apply_dream_feedback();
         }
 
         // ═══════════════════════════════════════════════════════════════════
         // PHASE 1: PERCEPTION
         // Safety checks, encoding, moral evaluation, strategy, urgency
         // ═══════════════════════════════════════════════════════════════════
-        let _phase1_t = Instant::now();
         let perception = match self.phase_perception(input, cycle_start, &mut module_timings) {
             Ok(p) => p,
             Err(blocked) => return *blocked,
         };
 
-        // ── Knowledge Engine: extract, encode, store, search ────────────
-        // Runs between perception and dynamics so knowledge signals are
-        // available for the reasoning engine and FEP active inference.
-        // Science: top-down knowledge priming (Bar 2004), predictive coding
-        if let Some(ref mut km) = self.knowledge_manager {
-            let cycle_id = self.stats.total_cycles;
-            let (_telem, signals) = km.process(input, cycle_id as u64);
-
-            // Knowledge uncertainty → dampen epistemic confidence
-            // High uncertainty = we don't know about this topic → caution
-            if signals.uncertainty > 0.5 {
-                self.carryover.quality.last_epistemic_confidence *=
-                    1.0 - 0.2 * (signals.uncertainty - 0.5) as f32;
-            }
-
-            // Knowledge contradiction → boost prediction error (surprise)
-            // Contradictions indicate our model is wrong → heightened learning
-            if signals.contradiction_signal > 0.0 {
-                let ne_base = self.neuromod.bath.noradrenaline.baseline_val();
-                self.neuromod
-                    .bath
-                    .noradrenaline
-                    .set_baseline(ne_base + 0.02 * signals.contradiction_signal as f32);
-            }
-
-            // Knowledge relevance → boost confidence (we know about this)
-            if signals.relevance > 0.3 {
-                self.carryover.quality.last_epistemic_confidence =
-                    (self.carryover.quality.last_epistemic_confidence
-                        + 0.1 * signals.relevance as f32)
-                        .min(1.0);
-            }
-
-            // Knowledge novelty → boost exploration drive
-            if signals.novelty > 0.6 {
-                self.carryover.quality.last_exploration_bonus +=
-                    0.05 * (signals.novelty - 0.6) as f32;
-            }
-
-            // Item 4: Causal depth → exploitation bias (Pearl 2009)
-            // Deep causal chains = we understand the structure → exploit, don't explore
-            if signals.causal_depth > super::thresholds::KNOWLEDGE_CAUSAL_DEPTH_EXPLOIT_THRESHOLD {
-                let dampen = (signals.causal_depth
-                    - super::thresholds::KNOWLEDGE_CAUSAL_DEPTH_EXPLOIT_THRESHOLD)
-                    as f32
-                    * super::thresholds::KNOWLEDGE_CAUSAL_DEPTH_EXPLORE_DAMPEN;
-                self.carryover.quality.last_exploration_bonus =
-                    (self.carryover.quality.last_exploration_bonus - dampen).max(0.0);
-            }
-
-            // Item 2: Assemble reasoning context for downstream consumers
-            self.last_reasoning_context =
-                Some(crate::knowledge::ReasoningContext::from_manager(km, input));
-        }
-
         // ═══════════════════════════════════════════════════════════════════
         // PHASE 2: DYNAMICS
         // CfC step, prediction, FEP, training, parallel post-processing
         // ═══════════════════════════════════════════════════════════════════
-        module_timings.phase_perception = _phase1_t.elapsed().as_micros() as u64;
-        let _phase2_t = Instant::now();
         let mut dynamics =
             self.phase_dynamics(input, &perception, cycle_start, &mut module_timings);
 
@@ -247,26 +194,12 @@ impl CognitiveLoopService {
         // PHASE 3: FEEDBACK
         // Consciousness metrics, quality gating, homeostasis, dream engine
         // ═══════════════════════════════════════════════════════════════════
-        module_timings.phase_dynamics = _phase2_t.elapsed().as_micros() as u64;
-        let _phase3_t = Instant::now();
         let feedback = self.phase_feedback(input, &perception, &mut dynamics, &mut module_timings);
-
-        // ═══════════════════════════════════════════════════════════════════
-        // STREAMING INFERENCE: Push perception encoding, poll outputs
-        // ═══════════════════════════════════════════════════════════════════
-        if let Some(ref si) = self.streaming_inference {
-            let encoding = ndarray::Array1::from_vec(perception.encoding.compressed_state.clone());
-            si.push(encoding);
-            // Drain outputs — future: feed into learning or downstream
-            let _outputs = si.poll_all();
-        }
 
         // ═══════════════════════════════════════════════════════════════════
         // PHASE 4: OUTPUT
         // Metadata assembly, telemetry, CycleResult construction
         // ═══════════════════════════════════════════════════════════════════
-        module_timings.phase_feedback = _phase3_t.elapsed().as_micros() as u64;
-        let _phase4_t = Instant::now();
         self.phase_output(
             input,
             cycle_start,
@@ -630,7 +563,7 @@ mod tests {
     fn cycle_metadata_somatic_stress_finite() {
         let mut s = make_service();
         let result = s.cycle("somatic check");
-        assert!(result.metadata.somatic_stress.is_finite());
+        assert!(result.metadata.embodied.somatic_stress.is_finite());
     }
 
     #[test]
@@ -641,16 +574,16 @@ mod tests {
             s.cycle("populate MCE");
         }
         let result = s.cycle("check consciousness");
-        assert!(result.metadata.consciousness_level >= 0.0);
-        assert!(result.metadata.consciousness_level <= 1.0);
+        assert!(result.metadata.consciousness.consciousness_level >= 0.0);
+        assert!(result.metadata.consciousness.consciousness_level <= 1.0);
     }
 
     #[test]
     fn cycle_metadata_thermodynamic_load_bounded() {
         let mut s = make_service();
         let result = s.cycle("thermo check");
-        assert!(result.metadata.thermodynamic_load >= 0.0);
-        assert!(result.metadata.thermodynamic_load <= 1.0);
+        assert!(result.metadata.temporal.thermodynamic_load >= 0.0);
+        assert!(result.metadata.temporal.thermodynamic_load <= 1.0);
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -738,9 +671,9 @@ mod tests {
             s.cycle("warmup");
         }
         let r = s.cycle("consciousness check");
-        assert!(r.metadata.consciousness_level.is_finite());
-        assert!(r.metadata.consciousness_level >= 0.0);
-        assert!(r.metadata.consciousness_level <= 1.0);
+        assert!(r.metadata.consciousness.consciousness_level.is_finite());
+        assert!(r.metadata.consciousness.consciousness_level >= 0.0);
+        assert!(r.metadata.consciousness.consciousness_level <= 1.0);
         assert!(r.metadata.primitive_psi.is_finite());
     }
 
@@ -759,8 +692,8 @@ mod tests {
     fn feedback_temporal_fields_finite() {
         let mut s = make_service();
         let r = s.cycle("temporal check");
-        assert!(r.metadata.temporal_continuity.is_finite());
-        assert!(r.metadata.temporal_coherence_score.is_finite());
+        assert!(r.metadata.temporal.temporal_continuity.is_finite());
+        assert!(r.metadata.temporal.temporal_coherence_score.is_finite());
     }
 
     #[test]
@@ -800,26 +733,26 @@ mod tests {
     fn feedback_holographic_fields_finite() {
         let mut s = make_service();
         let r = s.cycle("holographic check");
-        assert!(r.metadata.holographic_unity.is_finite());
-        assert!(r.metadata.holographic_binding.is_finite());
+        assert!(r.metadata.temporal.holographic_unity.is_finite());
+        assert!(r.metadata.temporal.holographic_binding.is_finite());
     }
 
     #[test]
     fn feedback_phenomenal_binding_fields() {
         let mut s = make_service();
         let r = s.cycle("phenomenal check");
-        assert!(r.metadata.phenomenal_binding_strength.is_finite());
-        let _ = r.metadata.phenomenal_fragmented;
+        assert!(r.metadata.temporal.phenomenal_binding_strength.is_finite());
+        let _ = r.metadata.temporal.phenomenal_fragmented;
     }
 
     #[test]
     fn feedback_affective_fields_bounded() {
         let mut s = make_service();
         let r = s.cycle("affective check");
-        assert!(r.metadata.affective_valence.is_finite());
-        assert!(r.metadata.affective_arousal.is_finite());
-        assert!(r.metadata.body_valence.is_finite());
-        assert!(r.metadata.body_arousal.is_finite());
+        assert!(r.metadata.embodied.affective_valence.is_finite());
+        assert!(r.metadata.embodied.affective_arousal.is_finite());
+        assert!(r.metadata.embodied.body_valence.is_finite());
+        assert!(r.metadata.embodied.body_arousal.is_finite());
     }
 
     #[test]
@@ -878,10 +811,10 @@ mod tests {
         let mut s = make_service();
         let r = s.cycle("sigma check");
         // May be None on first cycle — just verify finitely populated if present
-        if let Some(sigma) = r.metadata.sigma {
+        if let Some(sigma) = r.metadata.structural.sigma {
             assert!(sigma.is_finite());
         }
-        if let Some(phi) = r.metadata.spectral_mip_phi {
+        if let Some(phi) = r.metadata.structural.spectral_mip_phi {
             assert!(phi.is_finite());
         }
     }

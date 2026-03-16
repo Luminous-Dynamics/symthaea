@@ -88,7 +88,7 @@ fn consciousness_metrics_nonzero() {
     // consciousness_level updates every 10 cycles, so check later results
     let any_cl = results[10..]
         .iter()
-        .any(|r| r.metadata.consciousness_level > 0.0);
+        .any(|r| r.metadata.consciousness.consciousness_level > 0.0);
     assert!(any_cl, "consciousness_level should be > 0 after 10 cycles");
 }
 
@@ -351,11 +351,11 @@ fn profile_comparison_full_vs_default() {
     // (more subsystems active → richer integration).
     let full_max_cl = full_results
         .iter()
-        .map(|r| r.metadata.consciousness_level)
+        .map(|r| r.metadata.consciousness.consciousness_level)
         .fold(0.0f64, f64::max);
     let default_max_cl = default_results
         .iter()
-        .map(|r| r.metadata.consciousness_level)
+        .map(|r| r.metadata.consciousness.consciousness_level)
         .fold(0.0f64, f64::max);
 
     assert!(

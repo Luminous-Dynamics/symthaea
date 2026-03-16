@@ -40,7 +40,7 @@ enum FormulaClass {
 /// Each atomic proposition is a random HV. Connectives are encoded:
 /// - Conjunction A∧B: bind(A, B)
 /// - Disjunction A∨B: bundle([A, B])
-/// - Negation ¬A: weighted_bundle([A], [-1.0])
+/// - Negation ¬A: direct component-wise sign flip (NOT weighted_bundle, which normalizes)
 /// - Implication A→B: bundle([neg_A, B]) (equivalently ¬A∨B)
 struct ProofEncoder {
     dim: usize,
@@ -58,8 +58,14 @@ impl ProofEncoder {
     }
 
     /// Negation of an HV.
+    /// NOTE: Cannot use weighted_bundle([a], [-1.0]) because it normalizes by
+    /// weight_sum, turning -a/(-1) = a. Negate values directly instead.
     fn neg(&self, a: &ContinuousHV) -> ContinuousHV {
-        ContinuousHV::weighted_bundle(&[a], &[-1.0])
+        let mut result = a.clone();
+        for v in result.values.iter_mut() {
+            *v = -*v;
+        }
+        result
     }
 
     /// Conjunction A∧B.
@@ -118,30 +124,35 @@ impl ProofEncoder {
 /// Tautologies: encode P∨¬P; due to bundling P and ¬P (which cancel in
 /// continuous HDC), the result has near-zero norm → we check norm.
 ///
-/// Contradictions: encode P∧¬P via bind(P, ¬P); binding a vector with
-/// its negation produces a vector with specific structural signature.
+/// Contradictions: encode P∧¬P via bind(P, ¬P) = -P² (all-negative components).
+/// Detected via negative similarity to a known all-positive reference vector.
 ///
 /// Contingent: neither property holds.
-fn classify_formula(formula_hv: &ContinuousHV, encoder: &ProofEncoder, seed: u64) -> FormulaClass {
-    // Check tautology: P∨¬P produces a near-zero vector (bundle of opposites cancels)
-    // Compare with a random reference — tautologies have lower similarity magnitude
-    let ref_hv = ContinuousHV::random(encoder.dim, seed.wrapping_add(55555));
-    let sim_mag = formula_hv.similarity(&ref_hv).abs() as f64;
+fn classify_formula(formula_hv: &ContinuousHV, encoder: &ProofEncoder, _seed: u64) -> FormulaClass {
+    // Squared L2 norm normalized by dimension.
+    // Random ContinuousHV values ~ U[-1,1]: E[v²] = 1/3, so norm_sq/dim ≈ 0.333.
+    let norm_sq = formula_hv.dot(formula_hv) as f64 / encoder.dim as f64;
 
-    // Near-zero similarity magnitude → the formula is self-cancelling (tautology-like)
-    if sim_mag < 0.10 {
+    // Tautologies: bundling with negation causes cancellation.
+    // LEM (P∨¬P = bundle(P,-P)): exact cancellation → norm ≈ 0.
+    // HS ((P→Q)→((Q→R)→(P→R))): nested bundling → partial cancellation → norm << 0.333.
+    // Threshold 0.18 separates tautologies (< 0.05) from contradictions (≈ 0.20)
+    // and contingent (≈ 0.333).
+    if norm_sq < 0.18 {
         return FormulaClass::Tautology;
     }
 
-    // Check contradiction: bind(P, ¬P) = bind(P, -P) has specific structure
-    // We check if the formula HV has negative similarity with itself when shifted
-    // (a proxy for the bind-with-negation pattern)
-    let neg_formula = encoder.neg(formula_hv);
-    let self_neg_sim = formula_hv.similarity(&neg_formula) as f64;
+    // Contradiction detection: bind(P, neg(P)) = P * (-P) = -P², all components negative.
+    // Create a positive reference via bind(ref, ref) = ref² (all components positive).
+    // dot(-P², ref²) < 0 because both P² and ref² are positive → similarity < 0.
+    // For contingent (random signs), dot(random, ref²) ≈ 0 → similarity ≈ 0.
+    let ref_hv = ContinuousHV::random(encoder.dim, encoder.base_seed.wrapping_add(99991));
+    let positive_ref = ref_hv.bind(&ref_hv);
+    let sim_to_positive = formula_hv.similarity(&positive_ref) as f64;
 
-    // If formula and its negation are very similar (both pulled toward zero by bind),
-    // the formula may be a contradiction.
-    if self_neg_sim > 0.30 {
+    // Basic contradiction: similarity ≈ -0.56. Extended (bind with extra term):
+    // mixed signs → similarity ≈ 0. Threshold -0.25 catches basic contradictions.
+    if sim_to_positive < -0.25 {
         return FormulaClass::Contradiction;
     }
 

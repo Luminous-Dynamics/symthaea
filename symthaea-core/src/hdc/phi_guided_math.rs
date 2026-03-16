@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 //! # Φ-Guided Math Domain Selection
 //!
 //! A consciousness-driven mathematical computation engine that uses Integrated

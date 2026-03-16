@@ -63,6 +63,9 @@ pub struct OntologyRecord {
     pub utility: f64,
     pub created_at_cycle: u64,
     pub last_used_cycle: u64,
+    /// IS-A parent concept name, if any (NULL in SQLite when absent).
+    /// Science: Quillian (1967) — semantic networks; Collins & Loftus (1975).
+    pub is_a_parent: Option<String>,
 }
 
 impl Default for KnowledgePersistence {
@@ -254,8 +257,8 @@ impl KnowledgePersistence {
             let mut stmt = tx
                 .prepare_cached(
                     "INSERT OR REPLACE INTO knowledge_ontology
-                     (name, vector_blob, usage_count, utility, created_at_cycle, last_used_cycle)
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                     (name, vector_blob, usage_count, utility, created_at_cycle, last_used_cycle, is_a_parent)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
                 )
                 .map_err(|e| format!("Prepare: {e}"))?;
 
@@ -267,6 +270,7 @@ impl KnowledgePersistence {
                     r.utility,
                     r.created_at_cycle as i64,
                     r.last_used_cycle as i64,
+                    r.is_a_parent,
                 ])
                 .map_err(|e| format!("Insert ontology: {e}"))?;
             }
@@ -290,7 +294,7 @@ impl KnowledgePersistence {
 
         let mut stmt = conn
             .prepare(
-                "SELECT name, vector_blob, usage_count, utility, created_at_cycle, last_used_cycle
+                "SELECT name, vector_blob, usage_count, utility, created_at_cycle, last_used_cycle, is_a_parent
                  FROM knowledge_ontology ORDER BY utility DESC",
             )
             .map_err(|e| format!("Prepare: {e}"))?;
@@ -304,6 +308,7 @@ impl KnowledgePersistence {
                     utility: row.get(3)?,
                     created_at_cycle: row.get::<_, i64>(4)? as u64,
                     last_used_cycle: row.get::<_, i64>(5)? as u64,
+                    is_a_parent: row.get(6)?,
                 })
             })
             .map_err(|e| format!("Query: {e}"))?
@@ -359,7 +364,8 @@ impl KnowledgePersistence {
                 usage_count INTEGER NOT NULL,
                 utility REAL NOT NULL,
                 created_at_cycle INTEGER NOT NULL,
-                last_used_cycle INTEGER NOT NULL
+                last_used_cycle INTEGER NOT NULL,
+                is_a_parent TEXT
             );
             CREATE INDEX IF NOT EXISTS idx_facts_domain ON knowledge_facts(domain);
             CREATE INDEX IF NOT EXISTS idx_facts_cycle ON knowledge_facts(cycle);",

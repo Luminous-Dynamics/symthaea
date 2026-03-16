@@ -130,7 +130,7 @@ proptest! {
                 "LR invalid at cycle {}: {}", i, result.metadata.actual_effective_lr
             );
             prop_assert!(
-                result.metadata.consciousness_level.is_finite(),
+                result.metadata.consciousness.consciousness_level.is_finite(),
                 "consciousness non-finite at cycle {}", i
             );
         }

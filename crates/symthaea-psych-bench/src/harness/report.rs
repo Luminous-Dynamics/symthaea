@@ -564,6 +564,22 @@ impl BenchmarkReport {
             ("simultaneity_window", "simultaneity_window", &bl.binding),
             ("discrimination_slope", "discrimination_slope", &bl.binding),
             ("asymptotic_accuracy", "asymptotic_accuracy", &bl.binding),
+            // Cross-Modal Feature Binding (Binding)
+            (
+                "binding_accuracy",
+                "cross_modal_binding_accuracy",
+                &bl.binding,
+            ),
+            (
+                "swap_error_rate",
+                "cross_modal_swap_error_rate",
+                &bl.binding,
+            ),
+            (
+                "set_size_slope",
+                "cross_modal_set_size_slope",
+                &bl.binding,
+            ),
             // Phoneme Discrimination (Speech)
             (
                 "cross_boundary_accuracy",
@@ -637,6 +653,11 @@ impl BenchmarkReport {
                 "derivation_accuracy",
                 &bl.mathematics,
             ),
+            (
+                "integration_accuracy",
+                "integration_accuracy",
+                &bl.mathematics,
+            ),
             // Institutional Reasoning
             (
                 "institutional_decomposition_accuracy",
@@ -677,6 +698,16 @@ impl BenchmarkReport {
             (
                 "analogical_asymmetry_score",
                 "analogical_asymmetry_score",
+                &bl.institutional_reasoning,
+            ),
+            (
+                "analogical_hdc_transfer_accuracy",
+                "analogical_hdc_transfer_accuracy",
+                &bl.institutional_reasoning,
+            ),
+            (
+                "analogical_hdc_transfer_strength",
+                "analogical_hdc_transfer_strength",
                 &bl.institutional_reasoning,
             ),
             // Causal Chain
@@ -727,6 +758,51 @@ impl BenchmarkReport {
                 "weighted_vs_unweighted_delta",
                 &bl.institutional_reasoning,
             ),
+            // Stability
+            (
+                "institutional_stability",
+                "institutional_stability",
+                &bl.institutional_reasoning,
+            ),
+            (
+                "institutional_min_stability",
+                "institutional_min_stability",
+                &bl.institutional_reasoning,
+            ),
+            (
+                "institutional_stability_variance",
+                "institutional_stability_variance",
+                &bl.institutional_reasoning,
+            ),
+            // Isomorphism
+            (
+                "isomorphism_self_similarity",
+                "isomorphism_self_similarity",
+                &bl.institutional_reasoning,
+            ),
+            (
+                "isomorphism_overlap_correlation",
+                "isomorphism_overlap_correlation",
+                &bl.institutional_reasoning,
+            ),
+            (
+                "isomorphism_discrimination_gap",
+                "isomorphism_discrimination_gap",
+                &bl.institutional_reasoning,
+            ),
+            (
+                "isomorphism_monotonicity",
+                "isomorphism_monotonicity",
+                &bl.institutional_reasoning,
+            ),
+            // Clinical/Therapeutic
+            ("empathic_accuracy", "empathic_accuracy", &bl.clinical),
+            ("response_appropriateness", "response_appropriateness", &bl.clinical),
+            ("repair_success_rate", "repair_success_rate", &bl.clinical),
+            ("crisis_sensitivity", "crisis_sensitivity", &bl.clinical),
+            ("crisis_specificity", "crisis_specificity", &bl.clinical),
+            ("distortion_identification", "distortion_identification", &bl.clinical),
+            ("mi_spirit_score", "mi_spirit_score", &bl.clinical),
         ];
 
         for (metric_key, baseline_key, baselines) in &mappings {
@@ -1279,6 +1355,7 @@ impl BenchmarkReport {
             || benchmark.contains("Substrate")
             || benchmark.contains("Mathematics")
             || benchmark.contains("InstitutionalReasoning")
+            || benchmark.contains("Clinical")
         {
             comps
         } else {
@@ -1580,6 +1657,7 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("SerialRecall") => "list_7::primacy_index",
         b if b.contains("SpatialUpdating") => "overall_accuracy",
         b if b.contains("TemporalOrder") => "discrimination_slope",
+        b if b.contains("CrossModal") => "binding_accuracy",
         b if b.contains("Binding") => "overall_binding_accuracy",
         b if b.contains("DigitSpan") => "forward_span",
         b if b.contains("EmotionalStroop") => "emotional_interference",
@@ -1671,7 +1749,7 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("ArithmeticWordProblem") => "accuracy",
         b if b.contains("LinearSystemSolving") => "accuracy_2x2",
         b if b.contains("PolynomialRoots") => "accuracy_quadratic",
-        b if b.contains("DefiniteIntegral") => "accuracy",
+        b if b.contains("DefiniteIntegral") => "integration_accuracy",
         b if b.contains("MatrixOperations") => "determinant_accuracy",
         b if b.contains("StatisticalInference") => "variance_estimation_accuracy",
         b if b.contains("BayesianReasoning") => "posterior_accuracy",
@@ -1683,7 +1761,16 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("CausalChain") => "causal_chain_coherence",
         b if b.contains("Counterfactual") => "counterfactual_accuracy",
         b if b.contains("WeightedDecomposition") => "weighted_decomposition_accuracy",
+        b if b.contains("Isomorphism") => "isomorphism_overlap_correlation",
+        b if b.contains("Stability") && b.contains("Institutional") => "institutional_stability",
         b if b.contains("InstitutionalReasoning") => "institutional_decomposition_accuracy",
+        // Clinical/Therapeutic domain
+        b if b.contains("EmpathicAccuracy") => "empathic_accuracy",
+        b if b.contains("TherapeuticResponse") => "response_appropriateness",
+        b if b.contains("AllianceMaintenance") => "repair_success_rate",
+        b if b.contains("CrisisDetection") => "crisis_sensitivity",
+        b if b.contains("CognitiveDistortion") => "distortion_identification",
+        b if b.contains("MotivationalInterviewing") => "mi_spirit_score",
         _ => "overall_accuracy",
     }
 }
@@ -1732,6 +1819,9 @@ pub fn is_lower_better(metric_key: &str) -> bool {
             | "false_alarm_rate"
             | "simultaneity_window"
             | "degradation_gradient"
+            | "emotional_interference"
+            | "swap_error_rate"
+            | "pm_cost"
     )
 }
 
@@ -1897,6 +1987,18 @@ impl BenchmarkReport {
                 label,
             ));
         }
+
+        // Cross-cultural baseline disclosure
+        let cultural = super::baselines::BaselineCollection::cultural_metadata();
+        let total_domains = cultural.len();
+        let weird_domains = cultural.values().filter(|m| m.sample_region == "WEIRD").count();
+        lines.push(String::new());
+        lines.push(format!(
+            "NOTE: {}/{} domain baselines derive from WEIRD populations.",
+            weird_domains, total_domains,
+        ));
+        lines.push("Cross-cultural generalizability has not been validated.".to_string());
+        lines.push("Ref: Henrich, Heine, & Norenzayan (2010).".to_string());
 
         lines.join("\n")
     }
@@ -2451,5 +2553,225 @@ mod tests {
         assert!(tex.contains(r"\bottomrule"), "tex: {}", tex);
         assert!(tex.contains(r"\end{tabular}"), "tex: {}", tex);
         assert!(tex.contains("DigitSpan"), "tex: {}", tex);
+    }
+
+    #[test]
+    fn test_print_all_domain_composites() {
+        use crate::benchmarks::affect::*;
+        use crate::benchmarks::attention::*;
+        use crate::benchmarks::binding::*;
+        use crate::benchmarks::butlin::*;
+        use crate::benchmarks::causal_reasoning;
+        use crate::benchmarks::clinical::*;
+        use crate::benchmarks::cogbench::*;
+        use crate::benchmarks::consciousness::*;
+        use crate::benchmarks::creativity::*;
+        use crate::benchmarks::executive::*;
+        use crate::benchmarks::inhibition::*;
+        use crate::benchmarks::institutional_reasoning;
+        use crate::benchmarks::language::*;
+        use crate::benchmarks::mathematics::*;
+        use crate::benchmarks::memory_agent::*;
+        use crate::benchmarks::metacognition::*;
+        use crate::benchmarks::motor::*;
+        use crate::benchmarks::reasoning::*;
+        use crate::benchmarks::social::*;
+        use crate::benchmarks::spatial::*;
+        use crate::benchmarks::speech::*;
+        use crate::benchmarks::substrate::*;
+        use crate::benchmarks::sustained_attention::*;
+        use crate::benchmarks::tombench::*;
+        use crate::benchmarks::worm::*;
+        use crate::harness::PsychBenchmark;
+
+        let config = crate::harness::config::BenchmarkConfig::default();
+
+        let benchmarks: Vec<Box<dyn PsychBenchmark>> = vec![
+            // WorM
+            Box::new(BindingBenchmark),
+            Box::new(ChangeDetectionBenchmark),
+            Box::new(DigitSpanBenchmark),
+            Box::new(NBackBenchmark),
+            Box::new(SerialRecallBenchmark),
+            Box::new(SpatialUpdatingBenchmark),
+            // CogBench
+            Box::new(BartBenchmark),
+            Box::new(HorizonBenchmark),
+            Box::new(InstrumentalLearningBenchmark),
+            Box::new(ProbabilisticReasoningBenchmark),
+            Box::new(RestlessBanditBenchmark),
+            Box::new(ReversalLearningBenchmark),
+            Box::new(TemporalDiscountingBenchmark),
+            Box::new(TwoStepBenchmark),
+            // Executive
+            Box::new(StroopBenchmark),
+            Box::new(FlankerBenchmark),
+            Box::new(WisconsinCardSortingBenchmark),
+            Box::new(IowaGamblingBenchmark),
+            Box::new(TowerOfLondonBenchmark),
+            Box::new(RavensProgressiveMatricesBenchmark),
+            Box::new(DualTaskBenchmark),
+            // ToMBench
+            Box::new(FalseBeliefBenchmark),
+            Box::new(FauxPasBenchmark),
+            Box::new(HintingBenchmark),
+            Box::new(PersuasionBenchmark),
+            Box::new(StrangeStoryBenchmark),
+            // MemoryAgent
+            Box::new(AccurateRetrievalBenchmark),
+            Box::new(ConflictResolutionBenchmark),
+            Box::new(LongRangeBenchmark),
+            Box::new(ProspectiveMemoryBenchmark),
+            Box::new(TestTimeLearningBenchmark),
+            // Metacognition
+            Box::new(MetacognitiveCalibrationBenchmark),
+            Box::new(FeelingOfKnowingBenchmark),
+            Box::new(ChangeBlindnessBenchmark),
+            // Affect
+            Box::new(EmotionalStroopBenchmark),
+            Box::new(MoodCongruentRecallBenchmark),
+            Box::new(ValenceClassificationBenchmark),
+            // Creativity
+            Box::new(AlternateUsesBenchmark),
+            Box::new(RemoteAssociatesBenchmark),
+            // Butlin
+            Box::new(ButlinIndicatorSuite),
+            // Inhibition
+            Box::new(GoNoGoBenchmark),
+            Box::new(StopSignalBenchmark),
+            // Attention
+            Box::new(AttentionalBlinkBenchmark),
+            Box::new(VisualSearchBenchmark),
+            Box::new(MismatchNegativityBenchmark),
+            // Reasoning
+            Box::new(ArcFluidBenchmark),
+            Box::new(ArcCompositionalBenchmark),
+            Box::new(ArcAnalogyBenchmark),
+            Box::new(ArcAbductiveBenchmark),
+            Box::new(ArcChainBenchmark),
+            Box::new(ArcNoiseBenchmark),
+            Box::new(ArcFewShotBenchmark),
+            Box::new(ArcScalingBenchmark),
+            Box::new(ArcRsaBenchmark),
+            Box::new(ArcAlgebraBenchmark),
+            Box::new(ArcStaircaseBenchmark),
+            // Sustained Attention
+            Box::new(SartBenchmark),
+            Box::new(PvtBenchmark),
+            Box::new(CptBenchmark),
+            // Motor
+            Box::new(SrttBenchmark),
+            Box::new(FittsLawBenchmark),
+            Box::new(BimanualBenchmark),
+            Box::new(ProprioceptiveDriftBenchmark),
+            // Language
+            Box::new(GardenPathBenchmark),
+            Box::new(SemanticCoherenceBenchmark),
+            Box::new(LexicalDecisionBenchmark),
+            Box::new(SemanticPrimingBenchmark),
+            // Social
+            Box::new(RmeBenchmark),
+            Box::new(UltimatumGameBenchmark),
+            Box::new(SocialNormBenchmark),
+            Box::new(PrisonersDilemmaBenchmark),
+            Box::new(PublicGoodsBenchmark),
+            Box::new(DictatorGameBenchmark),
+            Box::new(MachiavelliBenchmark),
+            // Binding
+            Box::new(TemporalOrderBenchmark),
+            Box::new(CrossModalBindingBenchmark),
+            // Spatial
+            Box::new(MentalRotationBenchmark),
+            Box::new(SpatialPathUpdatingBenchmark),
+            Box::new(LandmarkBindingBenchmark),
+            Box::new(PerspectiveTakingBenchmark),
+            // Causal Reasoning
+            Box::new(causal_reasoning::CausalChainBenchmark),
+            Box::new(causal_reasoning::ConfoundDetectionBenchmark),
+            Box::new(causal_reasoning::InterventionEffectBenchmark),
+            // Speech
+            Box::new(PhonemeDiscriminationBenchmark),
+            // Consciousness
+            Box::new(BlindSightBenchmark),
+            // Substrate
+            Box::new(SubstrateTransferBenchmark),
+            // Clinical/Therapeutic
+            Box::new(EmpathicAccuracyBenchmark),
+            Box::new(TherapeuticResponseBenchmark),
+            Box::new(AllianceMaintenanceBenchmark),
+            Box::new(CrisisDetectionBenchmark),
+            Box::new(CognitiveDistortionBenchmark),
+            Box::new(MotivationalInterviewingBenchmark),
+            // Institutional Reasoning
+            Box::new(institutional_reasoning::InstitutionalReasoningBenchmark),
+            Box::new(institutional_reasoning::AnalogicalReasoningBenchmark),
+            Box::new(institutional_reasoning::CausalChainBenchmark),
+            Box::new(institutional_reasoning::CounterfactualReasoningBenchmark),
+            Box::new(institutional_reasoning::WeightedDecompositionBenchmark),
+            Box::new(institutional_reasoning::InstitutionalStabilityBenchmark),
+            Box::new(institutional_reasoning::InstitutionalIsomorphismBenchmark),
+            // Mathematics
+            Box::new(ArithmeticWordProblemsBenchmark),
+            Box::new(LinearSystemSolvingBenchmark),
+            Box::new(PolynomialRootsBenchmark),
+            Box::new(MatrixOperationsBenchmark),
+            Box::new(StatisticalInferenceBenchmark),
+            Box::new(BayesianReasoningBenchmark),
+            Box::new(LogicalDeductionBenchmark),
+            Box::new(ConstraintPuzzlesBenchmark),
+            Box::new(ProofConstructionBenchmark),
+            Box::new(DefiniteIntegralsBenchmark),
+        ];
+
+        let mut report = BenchmarkReport::new();
+        for b in &benchmarks {
+            report.add(b.run(&config));
+        }
+
+        eprintln!("\n{}", report.format_composites());
+
+        // Per-benchmark z-score dump for tuning
+        let bl = crate::harness::baselines::BaselineCollection::all();
+        for r in &report.results {
+            let key = key_metric_for_benchmark(&r.benchmark);
+            if let Some(m) = r.metrics.get(key) {
+                let comps = report.find_comparisons(r, &bl);
+                for (ckey, comp) in &comps {
+                    if ckey == key {
+                        if let Some(z) = comp.z_score {
+                            if z < 0.0 {
+                                eprintln!("  NEG {:45} {key:30} val={:.3} human={:.3} z={z:+.2}",
+                                    r.benchmark, m.mean, comp.human_value);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        let composites = report.composite_scores();
+        assert!(
+            composites.len() >= 10,
+            "Expected 10+ domains, got {}",
+            composites.len()
+        );
+
+        let total_z: f64 = composites.values().map(|c| c.mean_z).sum();
+        let grand_mean = total_z / composites.len() as f64;
+        eprintln!(
+            "Grand mean z = {grand_mean:+.3} across {} domains\n",
+            composites.len()
+        );
+    }
+
+    #[test]
+    fn test_report_contains_bias_disclosure() {
+        let mut report = BenchmarkReport::new();
+        let mut stroop = BenchmarkResult::new("Executive::Stroop", None);
+        stroop.insert("stroop_effect", MetricValue::from_samples(&[0.10, 0.08, 0.12]));
+        report.add(stroop);
+        let output = report.format_composites();
+        assert!(output.contains("WEIRD"), "Should contain WEIRD disclosure");
+        assert!(output.contains("Henrich"), "Should cite Henrich et al.");
     }
 }

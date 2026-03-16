@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 //! # Temporal Simulation Bridge
 //!
 //! Connects physics simulation trajectories to temporal consciousness and

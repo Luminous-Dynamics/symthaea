@@ -233,108 +233,201 @@ impl Default for IntegrityInfo {
     }
 }
 
-/// Cantor fractal HDC subsystem telemetry for pulse visualization.
-#[derive(Serialize, Deserialize, Default, Clone)]
-pub struct CantorInfo {
-    /// Number of CRHVs pending dream consolidation.
-    pub buffer_occupancy: u32,
-    /// Codebook size (persistent entries from dream consolidation).
-    pub codebook_size: u32,
-    /// Codebook capacity (max entries before eviction).
-    pub codebook_capacity: u32,
-    /// Depth of most recent CRHV (adaptive: 2–7).
-    pub last_depth: u8,
-    /// Self-similarity (metacognitive depth) of most recent CRHV.
-    pub metacognitive_depth: f32,
-    /// Dream consolidation surprise EMA.
-    pub dream_surprise: f32,
-    /// Resonance boost from coherent CRHV pairs.
-    pub resonance_boost: f32,
-    /// Rolling depth histogram (counts per depth 2–7).
-    pub depth_histogram: [u32; 6],
-}
-
-/// Governance status for the Pulse card (feature: mycelix).
-#[derive(Serialize, Deserialize, Default, Clone)]
-pub struct GovernanceInfo {
-    /// Exponential moving average of governance reward signal.
-    pub reward_ema: f64,
-    /// Number of pending governance events.
-    pub pending_events: usize,
-    /// Number of pending governance outcomes.
-    pub pending_outcomes: usize,
-    /// Confidence delta from last governance processing.
-    pub confidence_delta: f64,
-    /// Collective Phi from the most recent tally.
-    pub collective_phi: f64,
-    /// Rolling 30-cycle history of reward EMA for sparkline.
-    #[serde(default)]
-    pub reward_history: Vec<f64>,
-    /// Number of collective blind spots.
-    #[serde(default)]
-    pub blind_spot_count: usize,
-    /// Maximum blind spot severity (0.0–1.0).
-    #[serde(default)]
-    pub max_blind_spot_severity: f64,
-    /// Community mode label.
-    #[serde(default)]
-    pub community_mode: String,
-    /// Max absolute harmonic delta.
-    #[serde(default)]
-    pub harmonic_delta_max: f64,
-    /// Number of agents in epistemic mesh.
-    #[serde(default)]
-    pub epistemic_agents: usize,
-    /// LR boost from governance prediction error.
-    #[serde(default)]
-    pub lr_boost: f64,
-}
-
-/// Swarm network telemetry for Pulse visualization.
-#[derive(Serialize, Deserialize, Default, Clone)]
+/// Swarm peer consciousness integration snapshot.
+#[derive(Serialize, Deserialize, Default)]
 pub struct SwarmInfo {
-    /// Number of connected peers.
     pub connected_peers: usize,
-    /// Connectivity EMA (0.0–1.0).
-    pub connectivity_ema: f64,
-    /// Mean peer Phi across the swarm.
-    pub mean_peer_phi: f64,
-    /// Affective contagion intensity.
-    pub affective_contagion: f64,
-    /// Federated learning confidence.
-    pub federated_confidence: f64,
-    /// Network anomaly count.
-    pub anomaly_count: u32,
+    pub connectivity_ema: f32,
+    pub mean_peer_phi: f32,
+    pub affective_contagion: f32,
+    pub federated_confidence: f32,
+    pub anomaly_count: usize,
 }
 
-/// Knowledge engine telemetry for Pulse visualization.
-#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+/// Governance metacognition snapshot.
+#[derive(Serialize, Deserialize, Default)]
+pub struct GovernanceInfo {
+    pub reward_ema: f32,
+    pub pending_events: usize,
+    pub pending_outcomes: usize,
+    pub collective_phi: f32,
+    pub confidence_delta: f32,
+    pub community_mode: String,
+    pub blind_spot_count: usize,
+    pub max_blind_spot_severity: f32,
+    pub epistemic_agents: usize,
+    pub harmonic_delta_max: f32,
+    pub lr_boost: f32,
+    pub reward_history: Vec<f32>,
+}
+
+/// Knowledge engine reasoning snapshot.
+#[derive(Serialize, Deserialize, Default)]
 pub struct KnowledgeInfo {
-    /// Total facts in knowledge graph.
-    pub graph_size: u32,
-    /// Average confidence across stored facts.
+    pub graph_size: usize,
+    pub domain_count: usize,
+    pub causal_nodes: usize,
+    pub causal_edges: usize,
+    pub max_chain_depth: usize,
+    pub uncertainty: f32,
     pub avg_confidence: f32,
-    /// Number of causal edges discovered.
-    pub causal_edges: u32,
-    /// Number of causal nodes.
-    pub causal_nodes: u32,
-    /// Learned primitives in adaptive ontology.
-    pub ontology_size: u32,
-    /// Average ontology utility.
-    pub avg_ontology_utility: f64,
-    /// Number of domain tags.
-    pub domain_count: u32,
-    /// Current uncertainty signal (0-1).
-    pub uncertainty: f64,
-    /// Current novelty signal (0-1).
-    pub novelty: f64,
-    /// Number of contradictions detected this session.
-    pub contradictions: u32,
-    /// Best search similarity this cycle.
-    pub best_similarity: f32,
-    /// Rolling 30-cycle history of uncertainty for sparkline.
+    pub novelty: f32,
+    pub ontology_size: usize,
+    pub calibration_samples: usize,
+    pub calibration_ece: f32,
     #[serde(default)]
-    pub uncertainty_history: Vec<f64>,
+    pub calibration_mce: f32,
+    pub contradictions: usize,
+    #[serde(default)]
+    pub confounder_count: usize,
+    pub uncertainty_history: Vec<f32>,
+}
+
+/// Cantor fractal HDC snapshot.
+#[derive(Serialize, Deserialize, Default)]
+pub struct CantorInfo {
+    pub codebook_capacity: usize,
+    pub codebook_size: usize,
+    pub buffer_occupancy: f32,
+    pub last_depth: usize,
+    pub dream_surprise: f32,
+    pub metacognitive_depth: usize,
+    pub resonance_boost: f32,
+    pub depth_histogram: Vec<usize>,
+}
+
+/// Glyph Codex symbolic consciousness snapshot.
+#[derive(Serialize, Deserialize, Default)]
+pub struct GlyphInfo {
+    /// Dominant Field Modality name (e.g., "Resonant", "Threshold").
+    pub dominant_modality: String,
+    /// Glyph coherence score (0.0–0.95).
+    pub coherence: f32,
+    /// Name of the nearest resonant glyph.
+    pub resonant_glyph: String,
+    /// Spiral position (0.0–56.0).
+    pub spiral_position: f32,
+    /// Coherence history for sparkline.
+    pub coherence_history: Vec<f32>,
+}
+
+/// Spectrum / radio mesh snapshot.
+#[derive(Serialize, Deserialize, Default)]
+pub struct SpectrumInfo {
+    pub network_health: String,
+    pub tier_available: u8,
+    pub jamming_streak: u32,
+    pub prediction_error: f64,
+    pub epistemic_discount: f64,
+    pub degradation_streak: u32,
+    pub tier_budgets: [u64; 3],
+    pub waterfall_depth: usize,
+    pub periodic_interference: Option<u32>,
+    pub known_peers: usize,
+    pub encryption_sessions: usize,
+    pub energy_spent_nj: f64,
+    pub jamming_ratio: f64,
+    pub health_history: Vec<u8>,
+    /// Per-tier loss EMAs [Local, Metro, Regional] for detailed visualization.
+    #[serde(default)]
+    pub tier_loss_ema: [f64; 3],
+}
+
+/// Perception and attention snapshot.
+#[derive(Serialize, Deserialize, Default)]
+pub struct PerceptionInfo {
+    #[serde(default)]
+    pub attention_focus: f32,
+    #[serde(default)]
+    pub attention_fatigue: f32,
+    #[serde(default)]
+    pub attention_prediction_accuracy: f32,
+    #[serde(default)]
+    pub gwt_broadcast: bool,
+    #[serde(default)]
+    pub gwt_coalition_size: u32,
+    #[serde(default)]
+    pub cross_modal_binding: f32,
+}
+
+/// Drive and curiosity snapshot.
+#[derive(Serialize, Deserialize, Default)]
+pub struct DriveInfo {
+    #[serde(default)]
+    pub curiosity_pressure: f32,
+    #[serde(default)]
+    pub exploration_action: bool,
+    #[serde(default)]
+    pub novelty_bonus: f32,
+    #[serde(default)]
+    pub fep_action: usize,
+    #[serde(default)]
+    pub predictive_free_energy: f64,
+    #[serde(default)]
+    pub surprise_triggered: bool,
+}
+
+/// Learning rate and plasticity snapshot.
+#[derive(Serialize, Deserialize, Default)]
+pub struct LearningInfo {
+    #[serde(default)]
+    pub effective_lr: f32,
+    #[serde(default)]
+    pub lr_cognitive_mod: f32,
+    #[serde(default)]
+    pub lr_meta_mod: f32,
+    #[serde(default)]
+    pub prediction_error: f32,
+    #[serde(default)]
+    pub prediction_coherence: f32,
+    #[serde(default)]
+    pub surprise_replay_batch: usize,
+    /// Total feedback proposals this cycle.
+    #[serde(default)]
+    pub feedback_proposal_count: u32,
+    /// Average conflict ratio across feedback channels (0.0–0.5).
+    #[serde(default)]
+    pub feedback_conflict_ratio: f32,
+    /// Feedback proposals per priority: [Aesthetic, Cognitive, Homeostatic, Safety].
+    #[serde(default)]
+    pub feedback_priority_counts: [u32; 4],
+    /// Feedback signal diversity (0.0–1.0).
+    #[serde(default)]
+    pub feedback_diversity: f32,
+}
+
+/// Reasoning engine snapshot (meaningful only when reasoning_engine feature is enabled).
+#[derive(Serialize, Deserialize, Default)]
+pub struct ReasoningInfo {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default)]
+    pub chain_depth: usize,
+    #[serde(default)]
+    pub chain_confidence: f32,
+    #[serde(default)]
+    pub plan_confidence: f32,
+    #[serde(default)]
+    pub gate_blocked: bool,
+    #[serde(default)]
+    pub meta_reasoning_confidence: f64,
+}
+
+/// Dream and memory consolidation snapshot.
+#[derive(Serialize, Deserialize, Default)]
+pub struct DreamInfo {
+    #[serde(default)]
+    pub dream_insights: usize,
+    #[serde(default)]
+    pub dream_phi_improvement: f32,
+    #[serde(default)]
+    pub dream_wisdom_count: usize,
+    #[serde(default)]
+    pub is_consolidating: bool,
+    #[serde(default)]
+    pub codebook_size: usize,
+    #[serde(default)]
+    pub codebook_diversity: f32,
 }
 
 /// Full JSON-serializable pulse snapshot for comparison mode.
@@ -351,13 +444,27 @@ pub struct PulseSnapshot {
     #[serde(default)]
     pub integrity: IntegrityInfo,
     #[serde(default)]
-    pub cantor: CantorInfo,
+    pub swarm: SwarmInfo,
     #[serde(default)]
     pub governance: GovernanceInfo,
     #[serde(default)]
-    pub swarm: SwarmInfo,
-    #[serde(default)]
     pub knowledge: KnowledgeInfo,
+    #[serde(default)]
+    pub cantor: CantorInfo,
+    #[serde(default)]
+    pub glyph: GlyphInfo,
+    #[serde(default)]
+    pub spectrum: SpectrumInfo,
+    #[serde(default)]
+    pub perception: PerceptionInfo,
+    #[serde(default)]
+    pub drive: DriveInfo,
+    #[serde(default)]
+    pub learning: LearningInfo,
+    #[serde(default)]
+    pub reasoning: ReasoningInfo,
+    #[serde(default)]
+    pub dream: DreamInfo,
 }
 
 /// Computed delta between two pulse snapshots for the comparison view.
@@ -987,10 +1094,10 @@ fn main() -> Result<()> {
         let result = service.cycle(input);
         let m = &result.metadata;
         sparkline.push(SparklinePoint {
-            consciousness: m.consciousness_level,
+            consciousness: m.consciousness.consciousness_level,
             prediction_error: result.prediction_error,
-            phi: m.spectral_mip_phi.unwrap_or(0.0),
-            somatic_stress: m.somatic_stress,
+            phi: m.structural.spectral_mip_phi.unwrap_or(0.0),
+            somatic_stress: m.embodied.somatic_stress,
             dopamine: m.neuromod.dopamine_effective,
             serotonin: m.neuromod.serotonin_effective,
             harmony_coords: m.harmonics.harmony_coordinates,
@@ -1017,21 +1124,21 @@ fn main() -> Result<()> {
 
     // ── 3. Extract snapshots ────────────────────────────────────────────
     let vitals = Vitals {
-        consciousness_level: m.consciousness_level,
-        spectral_phi: m.spectral_mip_phi,
-        sigma: m.sigma,
+        consciousness_level: m.consciousness.consciousness_level,
+        spectral_phi: m.structural.spectral_mip_phi,
+        sigma: m.structural.sigma,
         pipeline_consciousness: m.pipeline_consciousness,
         substrate_effective_feasibility: m.substrate.substrate_effective_feasibility,
         substrate_honest_confidence: m.substrate.substrate_honest_confidence,
         cycle_duration_us: m.cycle_duration_us,
         prediction_error: result.prediction_error,
-        temporal_coherence: m.temporal_coherence_score,
-        phenomenal_binding: m.phenomenal_binding_strength,
+        temporal_coherence: m.temporal.temporal_coherence_score,
+        phenomenal_binding: m.temporal.phenomenal_binding_strength,
         living_mind_vitality: m.living_mind_vitality,
-        somatic_stress: m.somatic_stress,
-        thermodynamic_load: m.thermodynamic_load,
+        somatic_stress: m.embodied.somatic_stress,
+        thermodynamic_load: m.temporal.thermodynamic_load,
         urgency: format!("{:?}", m.urgency),
-        consciousness_state: m.consciousness_state_label.clone(),
+        consciousness_state: m.consciousness.consciousness_state_label.clone(),
         error_pattern: m.error_pattern.clone(),
         selected_strategy: m.selected_strategy.clone(),
         total_cycles: total,
@@ -1081,7 +1188,7 @@ fn main() -> Result<()> {
     let narrative = Narrative {
         reasoning: m.reasoning_narrative.clone(),
         guiding_question: m.harmonics.guiding_question.clone(),
-        consciousness_state: m.consciousness_state_label.clone(),
+        consciousness_state: m.consciousness.consciousness_state_label.clone(),
         error_pattern: m.error_pattern.clone(),
         selected_strategy: m.selected_strategy.clone(),
     };
@@ -1162,44 +1269,55 @@ fn main() -> Result<()> {
             global_failure_streak: m.integrity.global_failure_streak,
             confidence_history: m.integrity.confidence_history.clone(),
         },
-        cantor: CantorInfo {
-            buffer_occupancy: m.cantor_buffer_occupancy,
-            codebook_size: m.cantor_codebook_size,
-            codebook_capacity: 256,
-            last_depth: m.cantor_last_depth,
-            metacognitive_depth: m.cantor_metacognitive_depth,
-            dream_surprise: m.cantor_dream_surprise,
-            resonance_boost: m.cantor_resonance_boost,
-            depth_histogram: [0; 6], // populated from codebook labels in watch mode
-        },
-        governance: GovernanceInfo {
-            reward_ema: m.governance_reward_ema,
-            pending_events: m.governance_pending_events,
-            pending_outcomes: m.governance_pending_outcomes,
-            confidence_delta: m.governance_confidence_delta,
-            collective_phi: m.governance_collective_phi,
-            reward_history: Vec::new(),
-            blind_spot_count: m.governance_blind_spot_count,
-            max_blind_spot_severity: m.governance_max_blind_spot_severity,
-            community_mode: m.governance_community_mode.clone(),
-            harmonic_delta_max: m.governance_harmonic_delta_max,
-            epistemic_agents: m.governance_epistemic_agents,
-            lr_boost: m.governance_lr_boost,
-        },
         swarm: SwarmInfo::default(),
-        knowledge: KnowledgeInfo {
-            graph_size: m.knowledge_graph_size,
-            avg_confidence: m.knowledge_avg_confidence,
-            causal_edges: m.knowledge_causal_edges,
-            causal_nodes: 0,
-            ontology_size: m.knowledge_ontology_size,
-            avg_ontology_utility: 0.0,
-            domain_count: 0,
-            uncertainty: m.knowledge_uncertainty,
-            novelty: m.knowledge_novelty,
-            contradictions: m.knowledge_contradictions,
-            best_similarity: 0.0,
-            uncertainty_history: Vec::new(),
+        governance: GovernanceInfo::default(),
+        knowledge: KnowledgeInfo::default(),
+        cantor: CantorInfo::default(),
+        glyph: GlyphInfo::default(),
+        spectrum: SpectrumInfo::default(),
+        perception: PerceptionInfo {
+            attention_focus: m.attention.attention_schema_focus,
+            attention_fatigue: m.attention.attention_fatigue,
+            attention_prediction_accuracy: m.attention.attention_prediction_accuracy,
+            gwt_broadcast: m.attention.gwt_broadcast,
+            gwt_coalition_size: m.attention.gwt_coalition_size,
+            cross_modal_binding: m.temporal.cross_modal_binding_strength,
+        },
+        drive: DriveInfo {
+            curiosity_pressure: m.neuromod.dopamine_effective,
+            exploration_action: m.exploration_action.is_some(),
+            novelty_bonus: m.resonator_error_exploration_mod,
+            fep_action: m.fep.fep_action,
+            predictive_free_energy: m.fep.predictive_free_energy,
+            surprise_triggered: m.surprise_triggered,
+        },
+        learning: LearningInfo {
+            effective_lr: m.actual_effective_lr,
+            lr_cognitive_mod: m.lr_cognitive_mod,
+            lr_meta_mod: m.lr_meta_mod,
+            prediction_error: result.prediction_error,
+            prediction_coherence: m.prediction_coherence,
+            surprise_replay_batch: m.memory.surprise_replay_batch_size,
+            feedback_proposal_count: m.feedback_proposal_count,
+            feedback_conflict_ratio: m.feedback_conflict_ratio,
+            feedback_priority_counts: m.feedback_priority_counts,
+            feedback_diversity: m.feedback_diversity,
+        },
+        reasoning: ReasoningInfo {
+            enabled: m.reasoning_engine_enabled,
+            chain_depth: m.reasoning_chain_depth,
+            chain_confidence: m.reasoning_chain_confidence,
+            plan_confidence: m.reasoning_plan_confidence,
+            gate_blocked: m.reasoning_gate_blocked,
+            meta_reasoning_confidence: m.meta_reasoning_confidence,
+        },
+        dream: DreamInfo {
+            dream_insights: m.memory.dream_insights,
+            dream_phi_improvement: m.memory.dream_phi_improvement,
+            dream_wisdom_count: m.memory.dream_wisdom_count,
+            is_consolidating: m.is_consolidating,
+            codebook_size: m.memory.resonator_codebook_size,
+            codebook_diversity: m.memory.codebook_diversity,
         },
     };
 
@@ -1339,17 +1457,15 @@ fn main() -> Result<()> {
             // Run more measurement cycles
             let mut watch_sparkline: Vec<SparklinePoint> = Vec::with_capacity(measurement);
             let mut watch_result = None;
-            let mut watch_reward_history: Vec<f64> = Vec::with_capacity(measurement);
             for i in 0..measurement {
                 let input = inputs[(cycle_count + i) % inputs.len()];
                 let result = service.cycle(input);
                 let wm = &result.metadata;
-                watch_reward_history.push(wm.governance_reward_ema);
                 watch_sparkline.push(SparklinePoint {
-                    consciousness: wm.consciousness_level,
+                    consciousness: wm.consciousness.consciousness_level,
                     prediction_error: result.prediction_error,
-                    phi: wm.spectral_mip_phi.unwrap_or(0.0),
-                    somatic_stress: wm.somatic_stress,
+                    phi: wm.structural.spectral_mip_phi.unwrap_or(0.0),
+                    somatic_stress: wm.embodied.somatic_stress,
                     dopamine: wm.neuromod.dopamine_effective,
                     serotonin: wm.neuromod.serotonin_effective,
                     harmony_coords: wm.harmonics.harmony_coordinates,
@@ -1371,21 +1487,21 @@ fn main() -> Result<()> {
                 timestamp: watch_timestamp.clone(),
                 profile: profile_name.clone(),
                 vitals: Vitals {
-                    consciousness_level: wm.consciousness_level,
-                    spectral_phi: wm.spectral_mip_phi,
-                    sigma: wm.sigma,
+                    consciousness_level: wm.consciousness.consciousness_level,
+                    spectral_phi: wm.structural.spectral_mip_phi,
+                    sigma: wm.structural.sigma,
                     pipeline_consciousness: wm.pipeline_consciousness,
                     substrate_effective_feasibility: wm.substrate.substrate_effective_feasibility,
                     substrate_honest_confidence: wm.substrate.substrate_honest_confidence,
                     cycle_duration_us: wm.cycle_duration_us,
                     prediction_error: wr.prediction_error,
-                    temporal_coherence: wm.temporal_coherence_score,
-                    phenomenal_binding: wm.phenomenal_binding_strength,
+                    temporal_coherence: wm.temporal.temporal_coherence_score,
+                    phenomenal_binding: wm.temporal.phenomenal_binding_strength,
                     living_mind_vitality: wm.living_mind_vitality,
-                    somatic_stress: wm.somatic_stress,
-                    thermodynamic_load: wm.thermodynamic_load,
+                    somatic_stress: wm.embodied.somatic_stress,
+                    thermodynamic_load: wm.temporal.thermodynamic_load,
                     urgency: format!("{:?}", wm.urgency),
-                    consciousness_state: wm.consciousness_state_label.clone(),
+                    consciousness_state: wm.consciousness.consciousness_state_label.clone(),
                     error_pattern: wm.error_pattern.clone(),
                     selected_strategy: wm.selected_strategy.clone(),
                     total_cycles: cycle_count,
@@ -1431,7 +1547,7 @@ fn main() -> Result<()> {
                 narrative: Narrative {
                     reasoning: wm.reasoning_narrative.clone(),
                     guiding_question: wm.harmonics.guiding_question.clone(),
-                    consciousness_state: wm.consciousness_state_label.clone(),
+                    consciousness_state: wm.consciousness.consciousness_state_label.clone(),
                     error_pattern: wm.error_pattern.clone(),
                     selected_strategy: wm.selected_strategy.clone(),
                 },
@@ -1448,44 +1564,61 @@ fn main() -> Result<()> {
                     global_failure_streak: wm.integrity.global_failure_streak,
                     confidence_history: wm.integrity.confidence_history.clone(),
                 },
-                cantor: CantorInfo {
-                    buffer_occupancy: wm.cantor_buffer_occupancy,
-                    codebook_size: wm.cantor_codebook_size,
-                    codebook_capacity: 256,
-                    last_depth: wm.cantor_last_depth,
-                    metacognitive_depth: wm.cantor_metacognitive_depth,
-                    dream_surprise: wm.cantor_dream_surprise,
-                    resonance_boost: wm.cantor_resonance_boost,
-                    depth_histogram: [0; 6],
-                },
-                governance: GovernanceInfo {
-                    reward_ema: wm.governance_reward_ema,
-                    pending_events: wm.governance_pending_events,
-                    pending_outcomes: wm.governance_pending_outcomes,
-                    confidence_delta: wm.governance_confidence_delta,
-                    collective_phi: wm.governance_collective_phi,
-                    reward_history: watch_reward_history,
-                    blind_spot_count: wm.governance_blind_spot_count,
-                    max_blind_spot_severity: wm.governance_max_blind_spot_severity,
-                    community_mode: wm.governance_community_mode.clone(),
-                    harmonic_delta_max: wm.governance_harmonic_delta_max,
-                    epistemic_agents: wm.governance_epistemic_agents,
-                    lr_boost: wm.governance_lr_boost,
-                },
                 swarm: SwarmInfo::default(),
-                knowledge: KnowledgeInfo {
-                    graph_size: wm.knowledge_graph_size,
-                    avg_confidence: wm.knowledge_avg_confidence,
-                    causal_edges: wm.knowledge_causal_edges,
-                    causal_nodes: 0,
-                    ontology_size: wm.knowledge_ontology_size,
-                    avg_ontology_utility: 0.0,
-                    domain_count: 0,
-                    uncertainty: wm.knowledge_uncertainty,
-                    novelty: wm.knowledge_novelty,
-                    contradictions: wm.knowledge_contradictions,
-                    best_similarity: 0.0,
-                    uncertainty_history: Vec::new(),
+                governance: GovernanceInfo::default(),
+                knowledge: KnowledgeInfo::default(),
+                cantor: CantorInfo::default(),
+                glyph: GlyphInfo {
+                    dominant_modality: wm.glyph_dominant_modality.clone(),
+                    coherence: wm.glyph_coherence,
+                    resonant_glyph: wm.glyph_resonant_name.clone(),
+                    spiral_position: wm.glyph_spiral_position,
+                    coherence_history: Vec::new(), // TODO: accumulate across cycles
+                },
+                spectrum: SpectrumInfo::default(),
+                perception: PerceptionInfo {
+                    attention_focus: wm.attention.attention_schema_focus,
+                    attention_fatigue: wm.attention.attention_fatigue,
+                    attention_prediction_accuracy: wm.attention.attention_prediction_accuracy,
+                    gwt_broadcast: wm.attention.gwt_broadcast,
+                    gwt_coalition_size: wm.attention.gwt_coalition_size,
+                    cross_modal_binding: wm.temporal.cross_modal_binding_strength,
+                },
+                drive: DriveInfo {
+                    curiosity_pressure: wm.neuromod.dopamine_effective,
+                    exploration_action: wm.exploration_action.is_some(),
+                    novelty_bonus: wm.resonator_error_exploration_mod,
+                    fep_action: wm.fep.fep_action,
+                    predictive_free_energy: wm.fep.predictive_free_energy,
+                    surprise_triggered: wm.surprise_triggered,
+                },
+                learning: LearningInfo {
+                    effective_lr: wm.actual_effective_lr,
+                    lr_cognitive_mod: wm.lr_cognitive_mod,
+                    lr_meta_mod: wm.lr_meta_mod,
+                    prediction_error: result.prediction_error,
+                    prediction_coherence: wm.prediction_coherence,
+                    surprise_replay_batch: wm.memory.surprise_replay_batch_size,
+                    feedback_proposal_count: wm.feedback_proposal_count,
+                    feedback_conflict_ratio: wm.feedback_conflict_ratio,
+                    feedback_priority_counts: wm.feedback_priority_counts,
+                    feedback_diversity: wm.feedback_diversity,
+                },
+                reasoning: ReasoningInfo {
+                    enabled: wm.reasoning_engine_enabled,
+                    chain_depth: wm.reasoning_chain_depth,
+                    chain_confidence: wm.reasoning_chain_confidence,
+                    plan_confidence: wm.reasoning_plan_confidence,
+                    gate_blocked: wm.reasoning_gate_blocked,
+                    meta_reasoning_confidence: wm.meta_reasoning_confidence,
+                },
+                dream: DreamInfo {
+                    dream_insights: wm.memory.dream_insights,
+                    dream_phi_improvement: wm.memory.dream_phi_improvement,
+                    dream_wisdom_count: wm.memory.dream_wisdom_count,
+                    is_consolidating: wm.is_consolidating,
+                    codebook_size: wm.memory.resonator_codebook_size,
+                    codebook_diversity: wm.memory.codebook_diversity,
                 },
             };
 
@@ -1653,10 +1786,17 @@ mod tests {
                 make_sparkline_point(0.42, 0.33, 3.14),
             ],
             integrity: IntegrityInfo::default(),
-            cantor: CantorInfo::default(),
-            governance: GovernanceInfo::default(),
             swarm: SwarmInfo::default(),
+            governance: GovernanceInfo::default(),
             knowledge: KnowledgeInfo::default(),
+            cantor: CantorInfo::default(),
+            glyph: GlyphInfo::default(),
+            spectrum: SpectrumInfo::default(),
+            perception: PerceptionInfo::default(),
+            drive: DriveInfo::default(),
+            learning: LearningInfo::default(),
+            reasoning: ReasoningInfo::default(),
+            dream: DreamInfo::default(),
         }
     }
 
@@ -1780,11 +1920,7 @@ mod tests {
             .map(|_| make_sparkline_point(0.5, 0.3, 1.0))
             .collect();
         let result = detect_anomalies(&points);
-        assert!(
-            result.is_empty(),
-            "constant data should have no anomalies, got {}",
-            result.len()
-        );
+        assert!(result.is_empty(), "constant data should have no anomalies, got {}", result.len());
     }
 
     #[test]
@@ -1836,11 +1972,7 @@ mod tests {
             points.push(make_sparkline_point(c, 0.9, 0.0));
         }
         let result = detect_anomalies(&points);
-        assert!(
-            result.len() <= 8,
-            "anomalies should be truncated to 8, got {}",
-            result.len()
-        );
+        assert!(result.len() <= 8, "anomalies should be truncated to 8, got {}", result.len());
     }
 
     // ── PulseDelta tests ─────────────────────────────────────────────────
@@ -1931,9 +2063,6 @@ mod tests {
             color: "#e8c547",
         }];
         let report = generate_session_report(&v, &b, &c, &sparkline, &anomalies, None, &[]);
-        assert!(
-            report.contains("C(t) Surge"),
-            "report should list anomaly kinds"
-        );
+        assert!(report.contains("C(t) Surge"), "report should list anomaly kinds");
     }
 }

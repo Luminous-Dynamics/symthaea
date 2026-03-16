@@ -70,6 +70,12 @@ impl KnowledgeEncoder {
             SemanticRole::Location,
             SemanticRole::Cause,
             SemanticRole::Result,
+            #[cfg(feature = "therapeutic")]
+            SemanticRole::TherapeuticTarget,
+            #[cfg(feature = "therapeutic")]
+            SemanticRole::ProtectiveFactor,
+            #[cfg(feature = "therapeutic")]
+            SemanticRole::RiskFactor,
         ];
 
         for (i, role) in roles.iter().enumerate() {
@@ -88,6 +94,12 @@ impl KnowledgeEncoder {
             EntityType::Artifact,
             EntityType::Process,
             EntityType::Property,
+            #[cfg(feature = "therapeutic")]
+            EntityType::ClinicalConcept,
+            #[cfg(feature = "therapeutic")]
+            EntityType::Symptom,
+            #[cfg(feature = "therapeutic")]
+            EntityType::Intervention,
         ];
 
         for (i, etype) in types.iter().enumerate() {

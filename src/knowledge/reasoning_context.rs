@@ -10,6 +10,7 @@
 
 use super::graph::FactSearchResult;
 use super::manager::{KnowledgeManager, KnowledgeSignals};
+use crate::cognitive_loop::thresholds;
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -31,6 +32,12 @@ pub struct ReasoningContext {
     pub epistemic_state: EpistemicState,
     /// Natural language summary of the context (for LLM injection)
     pub summary: String,
+    /// Cross-domain analogies: (source_fact_text, similarity_score).
+    /// Science: Gentner (1983) — structure mapping theory.
+    pub analogies: Vec<(String, f32)>,
+    /// Counterfactual necessity scores: (cause, necessity_score).
+    /// Science: Pearl (2000) — do-calculus for causal counterfactuals.
+    pub counterfactuals: Vec<(String, f32)>,
 }
 
 /// A fact from the knowledge graph with provenance
@@ -119,6 +126,8 @@ impl Default for ReasoningContext {
                 confidence_multiplier: 0.3,
             },
             summary: String::new(),
+            analogies: Vec::new(),
+            counterfactuals: Vec::new(),
         }
     }
 }
@@ -168,12 +177,45 @@ impl ReasoningContext {
         // 4. Generate natural language summary
         let summary = generate_summary(&relevant_facts, &causal_chains, &epistemic_state);
 
+        // 5. Counterfactual necessity for causal chain roots
+        let counterfactuals: Vec<(String, f32)> = causal_chains
+            .iter()
+            .take(3)
+            .flat_map(|chain| {
+                manager
+                    .causal_bridge()
+                    .counterfactual_necessity(&chain.root, 3)
+            })
+            .collect();
+
+        // 6. Detect confounders between causal chain roots (Pearl backdoor criterion)
+        let mut contradictions: Vec<String> = Vec::new();
+        let chain_roots: Vec<&str> = causal_chains.iter().map(|c| c.root.as_str()).collect();
+        for i in 0..chain_roots.len() {
+            for j in (i + 1)..chain_roots.len() {
+                let confounders = manager.detect_confounders(chain_roots[i], chain_roots[j]);
+                for (confounder, strength) in &confounders {
+                    if *strength > thresholds::KNOWLEDGE_CONFOUNDER_STRENGTH_THRESHOLD {
+                        contradictions.push(format!(
+                            "Confounder: '{}' (strength {:.2}) may cause both '{}' and '{}'",
+                            confounder, strength, chain_roots[i], chain_roots[j]
+                        ));
+                    }
+                }
+            }
+        }
+
+        let mut epistemic_state = epistemic_state;
+        epistemic_state.contradiction_count = contradictions.len();
+
         Self {
             relevant_facts,
             causal_chains,
-            contradictions: Vec::new(),
+            contradictions,
             epistemic_state,
             summary,
+            analogies: Vec::new(), // Populated by cycle.rs analogical transfer
+            counterfactuals,
         }
     }
 
@@ -355,6 +397,7 @@ mod tests {
             relevance: 0.8,
             novelty: 0.2,
             causal_depth: 0.5,
+            epistemic_surprise: 0.0,
         };
         let mult = compute_confidence_multiplier(&signals, true);
         assert!(mult > 0.5); // Good grounding → high confidence

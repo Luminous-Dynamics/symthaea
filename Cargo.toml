@@ -55,6 +55,8 @@ members = [
     "crates/symthaea-spore",
     "crates/symthaea-crucible",
     "crates/symthaea-canvas",
+    "crates/symthaea-clinical",
+    "crates/symthaea-therapeutic",
 ]
 
 [workspace.dependencies]
@@ -88,6 +90,7 @@ rusqlite = { version = "0.37", features = ["bundled"] }
 dashmap = "5.5"
 lru = "0.16"
 rayon = "1.10"
+proptest = "1.4"
 
 [package]
 name = "symthaea"
@@ -190,6 +193,10 @@ symthaea-broca = { path = "crates/symthaea-broca", optional = true }
 # Symthaea Canvas - Living topology UI: cognitive geometry → SVG
 symthaea-canvas = { path = "crates/symthaea-canvas", optional = true }
 
+# Symthaea Clinical - Clinical assessment and therapeutic reasoning
+symthaea-clinical = { path = "crates/symthaea-clinical", optional = true }
+symthaea-therapeutic = { path = "crates/symthaea-therapeutic", optional = true }
+
 # Symthaea Nix - Conscious NixOS mind (HDC + active inference)
 symthaea-nix = { path = "crates/symthaea-nix", optional = true }
 
@@ -246,6 +253,10 @@ iroh = { version = "0.96", optional = true }
 # LanceDB: Columnar vector storage backend (optional)
 # Implementation: src/databases/lance_client.rs
 lancedb = { version = "0.23", optional = true }
+
+# DuckDB: Epistemic Auditor analytics backend (optional, bundled for reproducibility)
+# Note: does NOT conflict with rusqlite (libduckdb-sys has no links="sqlite3")
+duckdb = { version = "1.1", features = ["bundled"], optional = true }
 arrow-array = { workspace = true, optional = true }
 arrow-schema = { workspace = true, optional = true }
 futures = { version = "0.3", optional = true }
@@ -407,10 +418,16 @@ vision-manifold-camera = ["vision-manifold", "symthaea-vision-manifold/camera"] 
 foveation = ["dep:symthaea-foveation", "vision-manifold"]  # Foveation bridge for active vision (dorsal→ventral dispatch)
 foveation-perception = ["foveation", "symthaea-foveation/perception"]  # Foveation with real SigLIP/OCR/Moondream models
 integrity = []  # Hardware integrity / tamper detection framework (attestation, temporal checks, canaries)
+glyph_codex = []  # Glyph Codex: symbolic consciousness field (70 glyphs, 11 Field Modality basis vectors)
 semantic-encoder = ["symthaea-embeddings/embed-channel"]  # Background Qwen3 embedding channel for cognitive loop telemetry
 # Neural Bridge v2: BGE-M3 via Candle (LLM as Semantic Sensor)
 neural-bridge = ["candle-core", "candle-nn", "candle-transformers", "tokenizers", "hf-hub", "dep:sha2"]
 neural-bridge-cuda = ["neural-bridge", "candle-core/cuda", "candle-nn/cuda", "candle-transformers/cuda"]
+
+# ── Motor / Embodiment ─────────────────────────────────────────────
+cpg = []                                    # Central Pattern Generator (Kuramoto coupled oscillators)
+complex_cfc = ["symthaea-core/complex_cfc"] # Complex-valued CfC neuron with native oscillation
+spectral_state = []                         # Spectral twin: frequency-domain CfC state analysis
 
 # ── Distributed / Network ──────────────────────────────────────────
 mesh = []                                   # Physical mesh radio (LoRa + B.A.T.M.A.N. + Yggdrasil)
@@ -437,6 +454,7 @@ ssm-power = ["dep:symthaea-ssm", "mesh", "school_learning"]  # Diagonal SSM sens
 ssm-power-hal = ["ssm-power", "hal", "symthaea-hal/linux", "dep:linux-embedded-hal"]
 ssm_language = ["dep:symthaea-broca"]          # Native CfC-HDC language center (SSM Broca's area)
 canvas = ["dep:symthaea-canvas"]               # Living topology UI: cognitive geometry → animated SVG
+therapeutic = ["dep:symthaea-clinical", "dep:symthaea-therapeutic", "ssm_language", "symthaea-broca/therapeutic"]
 liquid-mamba = ["ssm_language", "symthaea-broca/mamba"]  # Liquid-Mamba fusion: pre-trained Mamba SSM + HDC consciousness gating
 humanoid-mujoco = ["humanoid", "symthaea-humanoid/mujoco"]  # Humanoid with MuJoCo physics
 humanoid-viewer = ["humanoid-mujoco", "symthaea-humanoid/viewer"]  # Humanoid with MuJoCo viewer
@@ -445,6 +463,8 @@ humanoid-viewer = ["humanoid-mujoco", "symthaea-humanoid/viewer"]  # Humanoid wi
 # DuckDB is an unconditional dep. Others deferred:
 # - cozo: graph_builder 0.4.1 rayon compat
 lancedb-backend = ["dep:lancedb", "dep:arrow-array", "dep:arrow-schema", "dep:futures"]
+# Note: duckdb optional dep declared in [dependencies] as duckdb = { optional = true }
+epistemic_auditor = ["symthaea-core/duck", "dep:duckdb"]  # DuckDB-backed consciousness telemetry audit trail
 
 # ── Consciousness & Reasoning (code-level cfg gates) ────────────────
 multi_agent = ["full_consciousness"]        # Multi-agent trust scoring (byzantine, causal consensus)

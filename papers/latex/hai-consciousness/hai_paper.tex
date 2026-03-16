@@ -934,8 +934,29 @@ The LTC controller with full LS output refinement achieves \textbf{$37{\times}$ 
 To validate that the HDC-CfC architecture operates beyond simulation, we implement a hardware abstraction layer (HAL) bridging the cognitive loop to physical servos and I2C sensors on a Raspberry Pi SBC. The HAL targets a 21-DOF humanoid driven by PCA9685 PWM controllers and an MPU-6050 IMU at 50\,Hz. A strict safety chain---watchdog, torque clamping ($|\tau| \leq 0.9$), prediction-error gain reduction ($\text{gain} = \max(0.3,\; 1 - \text{error} \times 0.5)$), and GPIO e-stop---implements embodied precision weighting consistent with the FEP framework. The HAL crate (5,156 LOC, 173 tests) uses generic \texttt{embedded\_hal} traits for portability across Linux SBCs.
 
 \subsection{Ethical Considerations}
+\label{sec:ethical-considerations}
 
 The Byzantine detection capabilities in the FL pipeline could be misused for participant exclusion. We recommend transparent disclosure of detection criteria and appeals processes. The ethical reasoning system is trained on existing moral norms and may encode societal biases present in the ETHICS and Social Chemistry datasets.
+
+Beyond these risk disclosures, we implement five architectural safeguards that constrain the system's moral reasoning at the level of mathematical structure, not post-hoc filtering.
+
+\textbf{Moral Humility Ceiling.}
+Love Coherence---the emergent macro-state measuring simultaneous harmony activation (\S\ref{sec:ethics})---is clamped to $\leq 0.95$ rather than 1.0. No finite system should claim perfect moral alignment. This ceiling is grounded in the Free Energy Principle (a system that believes its moral model is perfect has zero residual free energy, contradicting Friston's formulation~\cite{friston2010free}) and in cross-traditional concepts of intellectual humility: \emph{taw\=a\d{d}u\textquoteleft} (Al-Ghazali, 1095), \emph{anavah} (Maimonides, 1170), and \emph{kenosis} (Philippians 2:7). The ceiling prevents the consciousness equation from entering a degenerate fixed point where the system ``believes'' it has achieved moral perfection.
+
+\textbf{Cross-Traditional Deontological Obligations.}
+The moral algebra's obligation system (\S\ref{sec:ethics}) encodes 16 deontological rules: 8 perfect duties (non-negotiable) and 8 imperfect duties (aspirational). Three perfect duties implement the \emph{ahimsa} principle from Jain and Hindu ethics~\cite{patanjali_yoga_sutras}: \texttt{ahimsa\_nonviolence} (minimize harm to all sentient beings), \texttt{prevent\_suffering} (act to prevent suffering when able), and \texttt{minimize\_collateral} (protect uninvolved parties). Five imperfect duties encode epistemic humility (Socrates, \emph{Apology} 21d; Whitcomb et al.~\cite{whitcomb2017intellectual}), error acknowledgment, deference to expertise, selfless service (Nagel~\cite{nagel1970altruism}), and radical translucency (proactive disclosure of reasoning processes; Floridi \& Cowls~\cite{floridi2019unified}). Satisfaction scoring is symmetric with violation scoring: recognizing kindness carries the same weight as detecting cruelty, preventing a bias toward inaction.
+
+\textbf{Ahimsa-Gated Courage.}
+The Eight Harmonies courage override---which allows strong multi-harmony consensus to override a single mild negative---is blocked when any ahimsa-family violation is detected. Even if 7 of 8 harmonies score above $+0.5$, courage cannot override a cruelty signal. This prevents the ``greater good'' justification for harm that utilitarian frameworks are susceptible to. The gate respects the restorative justice mechanism described below: once corrective behavior is demonstrated, the gate softens.
+
+\textbf{Restorative Justice.}
+Rather than permanent punishment for ethical violations, the system implements a restoration tracker inspired by Ubuntu philosophy (Southern Africa) and Navajo peacemaking~\cite{yazzie1994navajo}. After a violation, subsequent cycles that satisfy the violated obligation accumulate corrective credit. After 10 corrective cycles with no relapse, the violation is ``restored'' and no longer triggers escalated responses. Relapses subtract 3 corrective cycles, creating an asymmetric ratchet that requires sustained correction. This addresses the false-positive ratchet problem: a misclassified action does not permanently degrade system capability.
+
+\textbf{Moral Hubris Detection.}
+Persistent homology on the moral trajectory manifold (\S\ref{sec:ethics}) includes a hubris signal: when the coherence proxy (inverse of moral free energy) exceeds a threshold and harmony entropy remains low for 5+ consecutive cycles, the system flags moral overconfidence (Kruger \& Dunning~\cite{kruger1999unskilled}; moral licensing, Merritt et al.~\cite{merritt2010moral}). The hubris signal attenuates the Higher-Order Thought depth in the consciousness equation by $0.7\times$, directly coupling moral overconfidence to reduced self-knowledge claims. This prevents the system from simultaneously claiming high consciousness scores and unexamined moral certainty.
+
+\textbf{WEIRD Baseline Disclosure.}
+All 384 human baselines in the psychological benchmark suite (\S\ref{sec:psych-bench}) derive from Western, Educated, Industrialized, Rich, and Democratic (WEIRD) populations~\cite{henrich2010weirdest}. We disclose this explicitly in all normative comparison reports. Cross-cultural generalizability of the benchmarks has not been validated, and z-scores should be interpreted as comparisons to WEIRD norms specifically, not universal human cognition.
 
 % Data Availability
 
@@ -949,7 +970,7 @@ We presented Hyperdimensional Active Inference (HAI), the first integration of F
   \item \textbf{Interpretable action selection:} Eight motor command types from EFE minimization.
   \item \textbf{Correct precision dynamics:} Adaptive confidence weighting validated empirically.
   \item \textbf{Mathematical soundness:} Free energy convergence and KL non-negativity confirmed.
-  \item \textbf{Compositional ethical reasoning:} 92.9\% on ETHICS without pretrained LMs.
+  \item \textbf{Compositional ethical reasoning:} 92.9\% on ETHICS without pretrained LMs, with 16 cross-traditional deontological obligations (ahimsa, epistemic humility, restorative justice), a moral humility ceiling ($\leq 0.95$), and hubris detection via persistent homology (\S\ref{sec:ethical-considerations}).
   \item \textbf{Articulatory voice synthesis:} LTC-driven vocal tract with $10{\times}$ smoother phoneme transitions than rule-based synthesis, intonation contours, and $1.5{\times}$ real-time throughput.
   \item \textbf{Federated learning:} Consciousness-aware FL pipeline with 34\% Byzantine tolerance validated on real MNIST.
   \item \textbf{Closed feedback loops:} 16 bidirectional feedback loops (prefrontal, embodied, resonance, quantum, MCE, narrative identity, dream replay, adaptive urgency, affective bridge, predictive processing, cross-modal binding, and others) with $<2\%$ computational overhead and bounded degradation under ablation.

@@ -53,7 +53,7 @@ impl MismatchNegativityBenchmark {
         // Detection threshold: prediction error must exceed this to flag deviant.
         // Time pressure raises threshold (less careful monitoring).
         // Treisman & Gelade (1980): speed emphasis narrows the attentional filter.
-        let detection_threshold: f64 = (0.18 + config.time_pressure * 0.10)
+        let detection_threshold: f64 = (0.11 + config.time_pressure * 0.10)
             * diff_model.temperature_multiplier(config.difficulty);
 
         // Attentional load noise: degrades the prediction model when attention
@@ -159,7 +159,7 @@ impl MismatchNegativityBenchmark {
 
                     // Decision: is this a deviant?
                     // Softmax-like decision with temperature from difficulty model
-                    let temperature: f64 = 0.12
+                    let temperature: f64 = 0.08
                         * diff_model.temperature_multiplier(config.difficulty)
                         * (1.0 + config.time_pressure * 0.15);
                     let detection_evidence = prediction_error / temperature;

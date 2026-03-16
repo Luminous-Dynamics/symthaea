@@ -107,7 +107,7 @@ fn bench_subsystem_impact(c: &mut Criterion) {
                 enable_surprise_exploration: false,
                 enable_prefrontal: false,
                 causal_enhancement: false,
-                episodic_replay: false,
+                episodic_replay_training: false,
                 ..Default::default()
             },
         ),
@@ -136,7 +136,7 @@ fn bench_subsystem_impact(c: &mut Criterion) {
                 enable_surprise_exploration: true,
                 enable_prefrontal: true,
                 causal_enhancement: true,
-                episodic_replay: true,
+                episodic_replay_training: true,
                 ..Default::default()
             },
         ),
@@ -243,7 +243,7 @@ fn bench_sustained_throughput(c: &mut Criterion) {
                 enable_prefrontal: false,
                 enable_meta_cognition: false,
                 causal_enhancement: false,
-                episodic_replay: false,
+                episodic_replay_training: false,
                 ..Default::default()
             },
         ),
@@ -255,7 +255,7 @@ fn bench_sustained_throughput(c: &mut Criterion) {
                 enable_prefrontal: true,
                 enable_meta_cognition: true,
                 causal_enhancement: true,
-                episodic_replay: true,
+                episodic_replay_training: true,
                 ..Default::default()
             },
         ),

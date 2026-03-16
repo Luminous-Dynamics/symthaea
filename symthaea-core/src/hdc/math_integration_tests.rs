@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 //! # Mathematical Foundations Integration Tests
 //!
 //! Cross-module tests verifying the coherence of the mathematical system:

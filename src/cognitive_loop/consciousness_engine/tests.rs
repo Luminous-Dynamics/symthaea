@@ -48,6 +48,7 @@ fn make_input<'a>(
         cantor_metacognitive_depth: 0.5,
         governance_collective_phi: 0.0,
         knowledge_grounding: 0.5,
+        glyph_coherence: 0.0,
     }
 }
 
@@ -142,7 +143,8 @@ fn test_equation_v2_feedback_deltas() {
             hot_depth: 0.5,
             cantor_metacognitive_depth: 0.5,
             governance_collective_phi: 0.0,
-            knowledge_grounding: 0.5,
+        knowledge_grounding: 0.5,
+        glyph_coherence: 0.0,
         };
         let output = engine.measure(&input);
 
@@ -214,7 +216,8 @@ fn test_low_consciousness_boosts_exploration() {
             hot_depth: 0.5,
             cantor_metacognitive_depth: 0.5,
             governance_collective_phi: 0.0,
-            knowledge_grounding: 0.5,
+        knowledge_grounding: 0.5,
+        glyph_coherence: 0.0,
         };
         let output = engine.measure(&input);
 
@@ -288,6 +291,7 @@ fn test_high_sht_2a_boosts_consciousness() {
         cantor_metacognitive_depth: 0.5,
         governance_collective_phi: 0.0,
         knowledge_grounding: 0.5,
+        glyph_coherence: 0.0,
     };
     let out_base = engine.measure(&input_baseline);
 
@@ -332,6 +336,7 @@ fn test_high_gaba_a_dampens_consciousness() {
         cantor_metacognitive_depth: 0.5,
         governance_collective_phi: 0.0,
         knowledge_grounding: 0.5,
+        glyph_coherence: 0.0,
     };
     let out_base = engine.measure(&input_baseline);
 
@@ -376,6 +381,7 @@ fn test_attractor_depresses_consciousness() {
         cantor_metacognitive_depth: 0.5,
         governance_collective_phi: 0.0,
         knowledge_grounding: 0.5,
+        glyph_coherence: 0.0,
     };
     let out_no = engine.measure(&input_no_attractor);
 
@@ -421,6 +427,7 @@ fn test_bath_modulation_clamped() {
         cantor_metacognitive_depth: 0.5,
         governance_collective_phi: 0.0,
         knowledge_grounding: 0.5,
+        glyph_coherence: 0.0,
     };
     let out = engine.measure(&input);
     assert!(
@@ -1010,7 +1017,8 @@ fn test_substrate_feasibility_affects_consciousness() {
             hot_depth: 0.5,
             cantor_metacognitive_depth: 0.5,
             governance_collective_phi: 0.0,
-            knowledge_grounding: 0.5,
+        knowledge_grounding: 0.5,
+        glyph_coherence: 0.0,
         };
         out_full = Some(engine1.measure(&input_full));
 
@@ -1097,7 +1105,8 @@ fn test_reduced_substrate_capabilities_lower_consciousness() {
             hot_depth: 0.5,
             cantor_metacognitive_depth: 0.5,
             governance_collective_phi: 0.0,
-            knowledge_grounding: 0.5,
+        knowledge_grounding: 0.5,
+        glyph_coherence: 0.0,
         };
         out_bio = Some(engine_bio.measure(&input_bio));
 

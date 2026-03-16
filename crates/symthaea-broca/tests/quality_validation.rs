@@ -171,7 +171,7 @@ fn test_training_convergence_trajectory() {
         embedding_target_norm: 128.0,
     };
 
-    let (metrics, _, _) = train_with_adam(&mut gen, &dataset, &train_cfg, None);
+    let (metrics, _, _, _, _) = train_with_adam(&mut gen, &dataset, &train_cfg, None);
     assert_eq!(metrics.len(), 30, "Should complete all 30 epochs");
 
     // Verify no NaN or Inf in any epoch
@@ -280,7 +280,7 @@ fn test_checkpoint_training_resume() {
     };
 
     // Phase 1: train 10 epochs
-    let (metrics_phase1, adam_state, _) = train_with_adam(&mut gen, &dataset, &train_cfg, None);
+    let (metrics_phase1, adam_state, _, _, _) = train_with_adam(&mut gen, &dataset, &train_cfg, None);
     assert_eq!(metrics_phase1.len(), 10);
     let loss_at_10 = metrics_phase1.last().unwrap().avg_loss;
 
@@ -309,7 +309,7 @@ fn test_checkpoint_training_resume() {
         embedding_target_norm: 128.0,
     };
 
-    let (metrics_phase2, _, _) =
+    let (metrics_phase2, _, _, _, _) =
         train_with_adam(&mut resumed_gen, &dataset, &resume_cfg, loaded_adam);
     assert_eq!(metrics_phase2.len(), 10);
 
@@ -681,7 +681,7 @@ fn test_training_with_diverse_thoughts() {
         embedding_target_norm: 128.0,
     };
 
-    let (metrics, _, _) = train_with_adam(&mut gen, &dataset, &train_cfg, None);
+    let (metrics, _, _, _, _) = train_with_adam(&mut gen, &dataset, &train_cfg, None);
 
     // Loss should decrease
     let first_loss = metrics[0].avg_loss;
@@ -1040,7 +1040,7 @@ fn test_generate_then_train_no_corruption() {
         embedding_target_norm: 128.0,
     };
 
-    let (metrics, _, _) = train_with_adam(&mut gen, &dataset, &train_cfg, None);
+    let (metrics, _, _, _, _) = train_with_adam(&mut gen, &dataset, &train_cfg, None);
     assert_eq!(
         metrics.len(),
         3,
@@ -1137,7 +1137,7 @@ fn test_training_gradient_health_after_diverse_training() {
         embedding_target_norm: 128.0,
     };
 
-    let (metrics, adam_state, diag) = train_with_adam(&mut gen, &dataset, &train_cfg, None);
+    let (metrics, adam_state, diag, _, _) = train_with_adam(&mut gen, &dataset, &train_cfg, None);
     assert_eq!(metrics.len(), 10);
 
     // All losses must be finite and non-negative

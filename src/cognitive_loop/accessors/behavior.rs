@@ -212,8 +212,7 @@ impl CognitiveLoopService {
 
     /// Update listener prediction feedback
     pub fn update_listener_prediction(&mut self, success: f32) {
-        self.language_comm
-            .voice_coherence
+        self.language_comm.voice_coherence
             .voice
             .update_listener_prediction(success);
     }
@@ -228,10 +227,7 @@ impl CognitiveLoopService {
         let consciousness_level =
             super::super::snapshot::ConsciousnessSnapshot::compute_consciousness_level(
                 self.prediction_confidence as f32,
-                self.language_comm
-                    .voice_coherence
-                    .bridge
-                    .smoothed_coherence(),
+                self.language_comm.voice_coherence.bridge.smoothed_coherence(),
                 self.flow_state.intensity,
                 pattern_confidence,
             );
@@ -271,11 +267,7 @@ impl CognitiveLoopService {
             coherence_velocity: signals.coherence_velocity,
             cross_agreement: signals.cross_module_agreement,
             consciousness_level: signals.consciousness_level as f32,
-            articulation_quality: self
-                .language_comm
-                .voice_coherence
-                .voice
-                .smoothed_articulation(),
+            articulation_quality: self.language_comm.voice_coherence.voice.smoothed_articulation(),
             rate_stability: self.language_comm.voice_coherence.voice.rate_stability(),
             integrated_phi: self
                 .carryover
@@ -295,11 +287,7 @@ impl CognitiveLoopService {
     /// Get combined phi contribution from all feedback sources
     pub fn combined_phi_contribution(&self) -> f32 {
         self.language_comm.voice_coherence.bridge.phi_contribution()
-            + self
-                .language_comm
-                .voice_coherence
-                .voice
-                .compute_phi_adjustment()
+            + self.language_comm.voice_coherence.voice.compute_phi_adjustment()
     }
 
     /// Get the prediction-outcome coupling Modulation Index
@@ -326,16 +314,8 @@ impl CognitiveLoopService {
 
     /// Get combined learning rate modifier
     pub fn combined_learning_rate(&self) -> f32 {
-        let coherence_lr = self
-            .language_comm
-            .voice_coherence
-            .bridge
-            .effective_learning_rate();
-        let voice_modifier = self
-            .language_comm
-            .voice_coherence
-            .voice
-            .learning_rate_modifier();
+        let coherence_lr = self.language_comm.voice_coherence.bridge.effective_learning_rate();
+        let voice_modifier = self.language_comm.voice_coherence.voice.learning_rate_modifier();
         coherence_lr * voice_modifier
     }
 
@@ -467,11 +447,11 @@ impl CognitiveLoopService {
         let lr = metadata.actual_effective_lr as f64;
         (
             metadata.consciousness_level,
-            lr,                                 // meta-awareness proxy
+            lr,                                // meta-awareness proxy
             metadata.consciousness_level * 0.8, // coherence proxy
             metadata.consciousness_level * 0.6, // care activation proxy
             metadata.consciousness_level * 0.9, // quality proxy
-            lr.min(1.0),                        // epistemic confidence proxy
+            lr.min(1.0),                       // epistemic confidence proxy
         )
     }
 
@@ -704,15 +684,39 @@ impl CognitiveLoopService {
     // SWARM MANAGER ACCESSORS
     // ========================================================================
 
+    /// Get a clone of the swarm event sender.
+    ///
+    /// The channel is created eagerly at CLS construction. Clone the returned
+    /// sender and pass it to async components (NetworkServiceBridge, Hyperfeel,
+    /// FederatedAggregator, ContinuousMind) so they can inject events into the
+    /// cognitive loop. The receiver is drained non-blocking in Phase B.
+    pub fn swarm_event_sender(
+        &self,
+    ) -> std::sync::mpsc::Sender<super::super::managers::swarm_manager::SwarmEvent> {
+        self.swarm_event_tx.clone()
+    }
+
+    /// Backwards-compatible alias for `swarm_event_sender()`.
+    pub fn create_swarm_event_channel(
+        &self,
+    ) -> std::sync::mpsc::Sender<super::super::managers::swarm_manager::SwarmEvent> {
+        self.swarm_event_sender()
+    }
+
     /// Inject a swarm event into the SwarmManager for processing.
     ///
     /// Events are queued and drained during the next `process()` call (interval 41).
-    pub fn inject_swarm_event(&mut self, event: super::super::managers::swarm_manager::SwarmEvent) {
+    pub fn inject_swarm_event(
+        &mut self,
+        event: super::super::managers::swarm_manager::SwarmEvent,
+    ) {
         self.swarm_manager.inject_event(event);
     }
 
     /// Get the current swarm telemetry snapshot.
-    pub fn swarm_telemetry(&self) -> &super::super::managers::swarm_manager::SwarmTelemetry {
+    pub fn swarm_telemetry(
+        &self,
+    ) -> &super::super::managers::swarm_manager::SwarmTelemetry {
         self.swarm_manager.telemetry()
     }
 
@@ -731,35 +735,50 @@ impl CognitiveLoopService {
         self.swarm_manager.mean_peer_phi()
     }
 
-    /// Apply swarm-driven neuromodulatory effects.
+    // ========================================================================
+    // SWARM NEUROMODULATORY COUPLING
+    // ========================================================================
+
+    /// Apply swarm-derived neuromodulatory effects to the bath.
     ///
-    /// Social bonding → oxytocin (Zak 2012), network anomaly → NE (Arnsten 2009),
-    /// high collective Φ → serotonin (social satisfaction, Crockett 2009).
+    /// Mapping (all doses use named constants from `thresholds.rs`):
+    /// - Peer connectivity → oxytocin injection (social buffering, Zak 2012)
+    /// - Network anomalies → NE baseline nudge (arousal/vigilance, Arnsten 2009)
+    /// - High mean peer Φ → 5-HT baseline nudge (social confidence, Crockett 2009)
+    /// - Strong affective contagion → DA baseline nudge (reward salience, Schultz 1997)
     pub(crate) fn apply_swarm_neuromod(&mut self) {
+        use super::super::thresholds::{
+            SWARM_ANOMALY_NE_CAP, SWARM_ANOMALY_NE_MULT, SWARM_CONTAGION_DA_CAP,
+            SWARM_CONTAGION_DA_GAIN, SWARM_CONTAGION_DA_THRESHOLD, SWARM_OXY_CAP,
+            SWARM_OXY_HALFLIFE, SWARM_OXY_PER_SQRT_PEER, SWARM_PHI_SHT_CAP,
+            SWARM_PHI_SHT_GAIN,
+        };
         let telem = self.swarm_manager.telemetry().clone();
 
-        // Social bonding: connected peers → oxytocin (Zak 2012)
-        // Sqrt for diminishing returns, capped at 0.08
+        // Social buffering: peer count → oxytocin (Zak 2012)
         if telem.connected_peers > 0 {
-            let oxy_dose = ((telem.connected_peers as f32).sqrt() * 0.02).min(0.08);
-            if oxy_dose > 0.01 {
-                self.neuromod.bath.inject("oxytocin", oxy_dose, 60);
+            let oxy_dose = ((telem.connected_peers as f32).sqrt() * SWARM_OXY_PER_SQRT_PEER)
+                .min(SWARM_OXY_CAP);
+            if oxy_dose > super::super::thresholds::GOV_NEUROMOD_FLOOR {
+                self.neuromod.bath.inject("oxytocin", oxy_dose, SWARM_OXY_HALFLIFE);
             }
         }
 
-        // Network anomaly → NE spike (Arnsten 2009)
+        // Anomaly vigilance: sudden peer loss → NE (Arnsten 2009)
         if telem.anomaly_count > 0 {
-            let ne_nudge = (0.03 * telem.anomaly_count.min(3) as f32).min(0.09);
+            let ne_nudge =
+                (SWARM_ANOMALY_NE_MULT * telem.anomaly_count.min(3) as f32).min(SWARM_ANOMALY_NE_CAP);
             self.neuromod
                 .bath
                 .noradrenaline
                 .adjust_baseline(ne_nudge, 0.2, 0.8);
         }
 
-        // High collective Φ → serotonin boost (social satisfaction)
+        // Collective coherence: high peer Φ → 5-HT (Crockett 2009)
         if telem.mean_peer_phi > 0.5 {
-            let sht_nudge = ((telem.mean_peer_phi - 0.5) * 0.04).min(0.03) as f32;
-            if sht_nudge > 0.01 {
+            let sht_nudge = ((telem.mean_peer_phi - 0.5) * SWARM_PHI_SHT_GAIN as f64)
+                .min(SWARM_PHI_SHT_CAP as f64) as f32;
+            if sht_nudge > super::super::thresholds::GOV_NEUROMOD_FLOOR {
                 self.neuromod
                     .bath
                     .serotonin
@@ -767,9 +786,10 @@ impl CognitiveLoopService {
             }
         }
 
-        // Affective contagion → DA modulation (shared positive affect)
-        if telem.affective_contagion > 0.05 {
-            let da_nudge = (telem.affective_contagion * 0.03).min(0.04) as f32;
+        // Affective contagion: strong emotional sync → DA (Schultz 1997)
+        if telem.affective_contagion > SWARM_CONTAGION_DA_THRESHOLD {
+            let da_nudge = (telem.affective_contagion * SWARM_CONTAGION_DA_GAIN as f64)
+                .min(SWARM_CONTAGION_DA_CAP as f64) as f32;
             self.neuromod
                 .bath
                 .dopamine
@@ -777,32 +797,27 @@ impl CognitiveLoopService {
         }
     }
 
-    /// Cross-couple SwarmManager and GovernanceManager signals.
+    /// Bidirectional coupling between SwarmManager and GovernanceManager.
     ///
-    /// - Peer consciousness (mean_peer_phi) modulates governance confidence
-    /// - Governance reward signal modulates swarm connectivity expectations
-    ///
-    /// Science: Woolley et al. (2010) collective intelligence factor
+    /// - High peer Φ → governance confidence boost (Woolley 2010: collective intelligence)
+    /// - Network anomalies → governance confidence decrease (uncertainty signal)
+    /// - Positive governance reward EMA → expected peer growth (success attracts)
     #[cfg(feature = "mycelix")]
     pub(crate) fn cross_couple_swarm_governance(&mut self) {
         let swarm_telem = self.swarm_manager.telemetry().clone();
 
-        // 1. High peer phi → governance confidence boost
-        // When the swarm is collectively conscious, governance decisions
-        // get a confidence uplift (Woolley 2010 collective intelligence)
+        // Collective intelligence: high peer Φ → governance confidence (Woolley 2010)
         if swarm_telem.mean_peer_phi > 0.3 && swarm_telem.connected_peers > 1 {
             let phi_boost = ((swarm_telem.mean_peer_phi - 0.3) * 0.05).min(0.03);
             self.governance_mgr.nudge_confidence(phi_boost);
         }
 
-        // 2. Network anomalies → reduce governance confidence
-        // Unreliable network → less trust in collective decisions
+        // Network instability: anomalies → lower governance confidence
         if swarm_telem.anomaly_count > 2 {
             self.governance_mgr.nudge_confidence(-0.02);
         }
 
-        // 3. Governance reward → swarm expected peers adjustment
-        // Positive governance outcomes → attract more peers (growth signal)
+        // Success attracts: positive governance rewards → grow expected peers
         let reward = self.governance_mgr.reward_ema();
         if reward > 0.05 {
             let current = self.swarm_manager.expected_peers();
@@ -830,7 +845,9 @@ impl CognitiveLoopService {
     }
 
     /// Access the ethics and values manager.
-    pub fn ethics_values(&self) -> &super::super::ethics_values_manager::EthicsAndValuesManager {
+    pub fn ethics_values(
+        &self,
+    ) -> &super::super::ethics_values_manager::EthicsAndValuesManager {
         &self.ethics_values
     }
 
@@ -847,7 +864,9 @@ impl CognitiveLoopService {
     }
 
     /// Access the vision and sensory manager.
-    pub fn vision_sensory(&self) -> &super::super::vision_sensory_manager::VisionAndSensoryManager {
+    pub fn vision_sensory(
+        &self,
+    ) -> &super::super::vision_sensory_manager::VisionAndSensoryManager {
         &self.vision_sensory
     }
 }

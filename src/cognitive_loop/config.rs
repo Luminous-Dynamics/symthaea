@@ -222,6 +222,13 @@ pub struct CognitiveLoopConfig {
     #[serde(default)]
     pub memory_db_path: Option<String>,
 
+    /// Path to the DuckDB database for the epistemic auditor (audit trail).
+    /// When `Some`, consciousness telemetry is buffered and periodically flushed
+    /// to DuckDB for retrospective analysis. When `None`, no auditor overhead.
+    /// Requires the `epistemic_auditor` feature flag.
+    #[serde(default)]
+    pub epistemic_auditor_db_path: Option<String>,
+
     /// Configuration for episodic memory replay.
     pub episodic_replay_config: crate::memory::episodic_replay::EpisodicReplayConfig,
 
@@ -514,6 +521,31 @@ pub struct CognitiveLoopConfig {
     pub physics_bridge_blend_weight: f32,
 
     // ── Broca SSM Language Center ──────────────────────────────────────
+    // ── Therapeutic Psychology ────────────────────────────────────────
+    /// Enable therapeutic psychology subsystem.
+    /// When true and `therapeutic` feature is enabled, activates the
+    /// TherapeuticManager (client model, alliance, crisis detection,
+    /// regulation strategies, scope guard). Safety-critical crisis
+    /// detection runs every invocation.
+    /// Science: Bordin (1979), Safran & Muran (2000), Lambert (2013).
+    #[cfg(feature = "therapeutic")]
+    pub enable_therapeutic: bool,
+
+    /// Crisis detection sensitivity threshold (lower = more sensitive).
+    /// Range: 0.01 to 0.5. Default: 0.15.
+    /// Lower values catch more crisis indicators but may produce
+    /// false positives. Safety-critical: err toward sensitivity.
+    #[cfg(feature = "therapeutic")]
+    pub therapeutic_crisis_threshold: f32,
+
+    /// Whether to run text-based crisis detection on every input.
+    /// When true, CrisisDetector::detect(input_text) runs alongside
+    /// affect-based detection. Slightly more expensive but catches
+    /// explicit crisis language that affect alone may miss.
+    /// Default: true (safety-critical).
+    #[cfg(feature = "therapeutic")]
+    pub therapeutic_text_crisis_detection: bool,
+
     /// Enable Broca SSM language generation in the cognitive loop.
     /// When true and `ssm_language` feature is enabled, generates text
     /// from HDC-encoded thoughts with consciousness-gated quality control.
@@ -558,6 +590,13 @@ pub struct CognitiveLoopConfig {
     /// 0.1 = gradual EMA blend over ~10 cycles (set by `enable_substrate_simulation()`).
     /// Science: Bostrom (2003) gradual substrate transfer.
     pub substrate_transition_alpha: f32,
+
+    /// Enable thermal-adaptive CfC frequency modulation.
+    /// When enabled, platform thermal reports (via ThermalBridge channel)
+    /// modulate the CfC delta_t as the 10th tau factor.
+    /// Science: Angilletta (2009) thermal performance curves.
+    /// Default: false (desktop). Set true for mobile profiles.
+    pub enable_thermal_adaptation: bool,
 
     // ── Vision Manifold Integration ─────────────────────────────────────
     /// Enable the internal VisionBridge in the cognitive loop (default false).
@@ -671,6 +710,7 @@ impl Default for CognitiveLoopConfig {
             episodic_replay_training: false,
             memory_graduation: true,
             memory_db_path: None,
+            epistemic_auditor_db_path: None,
             episodic_replay_config: crate::memory::episodic_replay::EpisodicReplayConfig::default(),
             enable_surprise_exploration: false,
             enable_prefrontal: false,
@@ -729,6 +769,12 @@ impl Default for CognitiveLoopConfig {
             physics_bridge_query_interval: 10,
             #[cfg(feature = "physics-bridge")]
             physics_bridge_blend_weight: 0.1,
+            #[cfg(feature = "therapeutic")]
+            enable_therapeutic: true, // On by default when feature is compiled in
+            #[cfg(feature = "therapeutic")]
+            therapeutic_crisis_threshold: 0.15,
+            #[cfg(feature = "therapeutic")]
+            therapeutic_text_crisis_detection: true, // Safety-critical: on by default
             #[cfg(feature = "ssm_language")]
             enable_broca_language: false,
             #[cfg(feature = "ssm_language")]
@@ -736,6 +782,7 @@ impl Default for CognitiveLoopConfig {
             enable_energy_budget: false,
             energy_budget_joules_per_sec: None,
             substrate_transition_alpha: super::thresholds::SUBSTRATE_TRANSITION_ALPHA_DEFAULT,
+            enable_thermal_adaptation: false,
             #[cfg(feature = "vision-manifold")]
             enable_vision_manifold: false,
             #[cfg(feature = "vision-manifold")]

@@ -325,11 +325,16 @@ impl ConsciousnessEngine {
             0.0
         };
 
-        // Knowledge grounding modulation: grounded cognition enhances consciousness,
-        // ungrounded reasoning dampens it. Neutral at 0.5.
-        // Science: Barsalou (2008) — grounded cognition; Clark (2013) — predictive processing
-        let knowledge_grounding_factor = (input.knowledge_grounding - 0.5)
-            * super::super::thresholds::KNOWLEDGE_CONSCIOUSNESS_MODULATION;
+        // Glyph coherence → consciousness coupling
+        // High symbolic integration across 11 Field Modalities → consciousness boost ±2%.
+        // Neutral at 0.0 (no glyph data). Only active with feature `glyph_codex`.
+        // Science: Jung (1959) — archetypal integration deepens conscious awareness.
+        let glyph_coherence_factor = if input.glyph_coherence > 0.01 {
+            (input.glyph_coherence - 0.5)
+                * super::super::thresholds::GLYPH_CONSCIOUSNESS_MODULATION
+        } else {
+            0.0
+        };
 
         unified_consciousness = (unified_consciousness
             + sht_2a_boost as f64
@@ -338,7 +343,7 @@ impl ConsciousnessEngine {
             + moral_dampen
             + cantor_depth_factor
             + governance_phi_factor
-            + knowledge_grounding_factor)
+            + glyph_coherence_factor)
             .clamp(0.0, 1.0);
 
         let total_us = total_start.elapsed().as_micros() as u64;

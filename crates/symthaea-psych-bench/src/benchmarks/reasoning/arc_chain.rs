@@ -136,7 +136,7 @@ impl ArcChainBenchmark {
         let tasks_per_chain = 3;
 
         let pressure = config.time_pressure;
-        let noise_weight = 0.05 + pressure * 0.15;
+        let noise_weight = 0.03 + pressure * 0.12;
         let tick_scale = 1.0 - pressure * 0.4;
 
         xor_shift(&mut rng);

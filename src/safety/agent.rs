@@ -53,11 +53,6 @@ pub struct SafetyMetrics {
     /// Default: false (when integrity feature is not enabled).
     #[serde(default)]
     pub integrity_critical: bool,
-    /// Network degradation level from SpectrumManager (0=healthy, 1=local down,
-    /// 2=metro only, 3=blackout). Values >=2 escalate safety level by one step.
-    /// Default: 0 (when mesh feature is not enabled).
-    #[serde(default)]
-    pub network_degradation: u8,
 }
 
 impl SafetyMetrics {
@@ -84,7 +79,6 @@ impl SafetyMetrics {
                 0.0 // assume worst-case coherence
             },
             integrity_critical: snap.integrity_critical,
-            network_degradation: 0,
         }
     }
 }
@@ -226,22 +220,6 @@ impl SafetyAgent {
             reasons.push(
                 "integrity: critical anomaly detected (attestation/canary failure)".to_string(),
             );
-            level = escalate(level);
-        }
-
-        // Network degradation: metro-only (2) or blackout (3) means the mesh
-        // can no longer relay consciousness telemetry or safety signals reliably.
-        // Escalate one level to reflect reduced observability.
-        if metrics.network_degradation >= 2 {
-            reasons.push(format!(
-                "network: degradation level {} ({})",
-                metrics.network_degradation,
-                match metrics.network_degradation {
-                    2 => "metro only",
-                    3 => "blackout",
-                    _ => "severe",
-                }
-            ));
             level = escalate(level);
         }
 
@@ -565,7 +543,6 @@ mod tests {
             prediction_error: pred_error,
             temporal_coherence,
             integrity_critical: false,
-            network_degradation: 0,
         }
     }
 
@@ -581,7 +558,6 @@ mod tests {
             prediction_error: pred_error,
             temporal_coherence,
             integrity_critical,
-            network_degradation: 0,
         }
     }
 
@@ -1145,58 +1121,5 @@ mod tests {
             SafetyLevel::Yellow,
             "Final level should be trend-escalated Yellow"
         );
-    }
-
-    // ── Network degradation escalation (mesh feature) ───────────────────
-
-    #[test]
-    fn test_network_degradation_metro_only_escalates() {
-        let mut agent = SafetyAgent::new();
-        let m = SafetyMetrics {
-            network_degradation: 2,
-            ..metrics(0.8, 0.1, 0.7)
-        };
-        let a = agent.assess(m);
-        assert_eq!(a.level, SafetyLevel::Yellow);
-        assert!(a.reasons.iter().any(|r| r.contains("metro only")));
-    }
-
-    #[test]
-    fn test_network_degradation_blackout_escalates() {
-        let mut agent = SafetyAgent::new();
-        let m = SafetyMetrics {
-            network_degradation: 3,
-            ..metrics(0.8, 0.1, 0.7)
-        };
-        let a = agent.assess(m);
-        assert_eq!(a.level, SafetyLevel::Yellow);
-        assert!(a.reasons.iter().any(|r| r.contains("blackout")));
-    }
-
-    #[test]
-    fn test_network_degradation_local_down_no_escalation() {
-        let mut agent = SafetyAgent::new();
-        let m = SafetyMetrics {
-            network_degradation: 1,
-            ..metrics(0.8, 0.1, 0.7)
-        };
-        let a = agent.assess(m);
-        assert_eq!(a.level, SafetyLevel::Green);
-    }
-
-    #[test]
-    fn test_network_degradation_stacks_with_integrity() {
-        let mut agent = SafetyAgent::new();
-        let m = SafetyMetrics {
-            cycle: 0,
-            consciousness_level: 0.8,
-            prediction_error: 0.1,
-            temporal_coherence: 0.7,
-            integrity_critical: true,
-            network_degradation: 2,
-        };
-        // Green + integrity escalation (->Yellow) + network escalation (->Orange)
-        let a = agent.assess(m);
-        assert_eq!(a.level, SafetyLevel::Orange);
     }
 }

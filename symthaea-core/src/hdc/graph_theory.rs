@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 //! # Graph Theory & Combinatorics Engine
 //!
 //! Graph data structure with HDC-encoded nodes/edges, standard graph algorithms,

@@ -611,6 +611,16 @@ impl ContinuousMind {
                     }
                 }
 
+                // Forward PeerLeft events to CLS SwarmManager for each expired peer.
+                if let Some(ref tx) = self.swarm_event_tx {
+                    for id in &expired_ids {
+                        let peer_id = crate::swarm::mesh::hex_short(id);
+                        let _ = tx.send(crate::cognitive_loop::SwarmEvent::PeerLeft {
+                            peer_id,
+                        });
+                    }
+                }
+
                 tracing::debug!(
                     target: "symthaea::mind::mesh",
                     expired = expired_ids.len(),
@@ -637,6 +647,15 @@ impl ContinuousMind {
                 replay_count = self.mesh_replay_buffer.len(),
                 "Mesh partition detected — flushing replay buffer"
             );
+
+            // Forward mass-disconnect topology change to CLS SwarmManager.
+            if let Some(ref tx) = self.swarm_event_tx {
+                let _ = tx.send(crate::cognitive_loop::SwarmEvent::TopologyChange {
+                    connected_peers: self.mesh_peers.peer_count(),
+                    mass_disconnect: true,
+                });
+            }
+
             let replays: Vec<_> = self.mesh_replay_buffer.drain(..).collect();
             for packet in replays {
                 self.mesh_outbox
@@ -738,6 +757,15 @@ impl ContinuousMind {
             self.mesh_peers.update(packet);
 
             if is_new_peer {
+                // Forward PeerJoined to CLS SwarmManager via mpsc channel.
+                if let Some(ref tx) = self.swarm_event_tx {
+                    let peer_id = crate::swarm::mesh::hex_short(&packet.source_id);
+                    let _ = tx.send(crate::cognitive_loop::SwarmEvent::PeerJoined {
+                        peer_id,
+                        trust_level: 0.5, // initial neutral trust
+                    });
+                }
+
                 for replay_pkt in self.mesh_replay_buffer.iter() {
                     self.mesh_outbox.push(crate::swarm::mesh::MeshOutbound {
                         packet: replay_pkt.clone(),
@@ -767,7 +795,19 @@ impl ContinuousMind {
                     if let Some(ref mut hf) = self.hyperfeel {
                         if let Some(affect) = packet.extract_affective() {
                             let peer_id = crate::swarm::mesh::hex_short(&packet.source_id);
-                            hf.receive_peer_state(peer_id, affect);
+                            hf.receive_peer_state(peer_id.clone(), affect.clone());
+
+                            // Forward affective state to CLS SwarmManager via mpsc channel.
+                            // AffectiveState (Hyperfeel) → SwarmEvent::AffectiveSync (SwarmManager).
+                            if let Some(ref tx) = self.swarm_event_tx {
+                                let event = crate::cognitive_loop::SwarmEvent::AffectiveSync {
+                                    peer_id,
+                                    valence: affect.valence as f64,
+                                    arousal: affect.arousal as f64,
+                                    intensity: affect.intensity as f64,
+                                };
+                                let _ = tx.send(event);
+                            }
                         }
                     }
                 }
@@ -1133,15 +1173,27 @@ impl ContinuousMind {
 
         // Step 2: Aggregate every 10 ticks if we have enough contributions
         if self.state.tick.is_multiple_of(10) && federated.pending_contributions() >= 2 {
+            let n_contributors = federated.pending_contributions();
             if let Some(aggregated) = federated.aggregate() {
                 let lr = 0.01f32;
                 federated.apply_gradient(&aggregated, lr);
 
+                let round = federated.aggregation_round();
                 tracing::info!(
                     target: "symthaea::mind::federated",
-                    round = federated.aggregation_round(),
+                    round,
                     "Applied federated gradient aggregation"
                 );
+
+                // Forward federated round result to CLS SwarmManager.
+                // Quality and trust estimated from contributor count (more peers → higher confidence).
+                if let Some(ref tx) = self.swarm_event_tx {
+                    let quality = (n_contributors as f64 / 10.0).min(1.0); // saturates at 10 contributors
+                    let trust = (n_contributors as f64 / 5.0).min(1.0);    // saturates at 5
+                    crate::cognitive_loop::forward_federated_round(
+                        tx, n_contributors, quality, trust,
+                    );
+                }
             }
         }
 

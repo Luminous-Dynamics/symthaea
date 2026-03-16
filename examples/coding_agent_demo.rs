@@ -59,6 +59,37 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     print_result("hello", &result2, &working_dir);
 
+    // ── Demo 3: Index project + context-aware generation ────────────────
+    println!("━━━ Demo 3: Project-aware generation ━━━");
+
+    // Create a project structure to index
+    let project_dir = temp_dir.path().join("project");
+    std::fs::create_dir_all(project_dir.join("src"))?;
+    std::fs::write(
+        project_dir.join("src/lib.rs"),
+        "pub struct Config { pub name: String }\npub fn init(config: Config) -> bool { true }\n",
+    )?;
+
+    let config3 = CodingAgentConfig {
+        max_iterations: 3,
+        working_dir: project_dir.clone(),
+        target_file: Some(PathBuf::from("src/utils.rs")),
+        ..Default::default()
+    };
+
+    let mut agent3 = CodingAgent::new(config3)?;
+
+    // Index the project — now the agent knows about Config and init()
+    match agent3.index_project(&project_dir) {
+        Ok((files, functions, types)) => {
+            println!("  Indexed: {} files, {} functions, {} types", files, functions, types);
+        }
+        Err(e) => println!("  Index error: {}", e),
+    }
+
+    let result3 = agent3.run("add a helper function that creates a default Config");
+    print_result("project-aware", &result3, &project_dir);
+
     // ── Summary ─────────────────────────────────────────────────────────
     println!("━━━ Summary ━━━");
     println!(
@@ -71,8 +102,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     println!(
         "Failure patterns tracked: {}",
-        agent.failure_patterns().len() + agent2.failure_patterns().len()
+        agent.failure_patterns().len() + agent2.failure_patterns().len() + agent3.failure_patterns().len()
     );
+    println!(
+        "Config flags: enable_real_exec={}, use_local_llm={}",
+        false, false  // demo uses defaults
+    );
+    println!("  Set enable_real_exec=true for real file I/O and cargo check");
+    println!("  Set use_local_llm=true to use Ollama (qwen2.5-coder:7b)");
 
     Ok(())
 }
@@ -130,7 +167,10 @@ fn print_result(
     if !result.errors.is_empty() {
         println!("  Errors: {}", result.errors.len());
         for err in result.errors.iter().take(2) {
-            println!("    - {}", &err[..err.len().min(80)]);
+            println!(
+                "    - {}",
+                &err[..err.len().min(80)]
+            );
         }
     }
 

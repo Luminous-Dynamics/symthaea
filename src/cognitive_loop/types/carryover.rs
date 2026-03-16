@@ -144,6 +144,10 @@ pub(crate) struct LearningState {
     // ── Phase 17: Predictive Self-Tuning ──────────────────────────────
     /// Self-model accuracy EMA (how well past predictions matched outcomes)
     pub(crate) self_model_accuracy: f32,
+    /// Cognitive group geometric mean (flow x semantic x reasoning x curiosity)
+    pub(crate) lr_cognitive_mod: f32,
+    /// Meta-learning group geometric mean (FEP x MCE x subsystem)
+    pub(crate) lr_meta_mod: f32,
 }
 
 impl Default for LearningState {
@@ -154,6 +158,8 @@ impl Default for LearningState {
             adaptive_threshold_scale: 1.0,
             subsystem_lr_factor: 1.0,
             self_model_accuracy: 0.5,
+            lr_cognitive_mod: 1.0,
+            lr_meta_mod: 1.0,
         }
     }
 }
@@ -289,6 +295,11 @@ pub(crate) struct QualityMetrics {
     // ── Session 20: Measurement & Consolidation ─────────────────────────
     /// Cumulative activation counts for each named mechanism (lifetime, not per-cycle).
     pub(crate) mechanism_activations: std::collections::HashMap<&'static str, u32>,
+    // ── Knowledge Engine: Working Memory Injection ─────────────────────
+    /// Grounding quality of knowledge facts injected into working memory (Baddeley 2000).
+    pub(crate) wm_knowledge_grounding: f64,
+    /// Number of knowledge facts injected into working memory this cycle.
+    pub(crate) wm_knowledge_injection_count: u8,
 }
 
 impl Default for QualityMetrics {
@@ -351,6 +362,8 @@ impl Default for QualityMetrics {
             consecutive_high_agreement: 0,
             in_flow_state: false,
             mechanism_activations: std::collections::HashMap::new(),
+            wm_knowledge_grounding: 0.0,
+            wm_knowledge_injection_count: 0,
         }
     }
 }

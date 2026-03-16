@@ -675,6 +675,129 @@ pub fn confidence_adjusted_veto_threshold(
     base_threshold * (1.0 - rc * scale)
 }
 
+#[cfg(feature = "therapeutic")]
+pub const CANONICAL_VALIDATING_WORDS: &[&str] = &[
+    "understand", "hear", "sense", "notice", "appreciate", "acknowledge",
+    "valid", "natural", "makes sense", "that's understandable", "of course",
+    "completely", "reasonable", "normal", "brave", "courageous", "strength",
+];
+
+#[cfg(feature = "therapeutic")]
+pub const CANONICAL_DIRECTIVE_WORDS: &[&str] = &[
+    "should", "must", "need to", "have to", "wrong", "correct",
+    "obviously", "clearly you", "just stop", "just do", "simply",
+];
+
+#[cfg(feature = "therapeutic")]
+pub const CANONICAL_REFLECTIVE_WORDS: &[&str] = &[
+    "sounds like", "it seems", "i wonder", "what if", "tell me more",
+    "what comes up", "i'm curious", "how does that feel", "what would",
+    "when you say", "help me understand", "say more about",
+];
+
+/// Grounding/safety words — boosted during crisis protocol.
+#[cfg(feature = "therapeutic")]
+pub const CANONICAL_GROUNDING_WORDS: &[&str] = &[
+    "breathe", "ground", "safe", "here", "present", "feet", "hands",
+    "notice", "five things", "slow down", "right now", "moment",
+];
+
+/// Crisis referral words — boosted during crisis (intent >= 6.5).
+#[cfg(feature = "therapeutic")]
+pub const CANONICAL_CRISIS_WORDS: &[&str] = &[
+    "988", "crisis line", "emergency", "call", "help", "support",
+    "not alone", "reach out", "someone who can help",
+];
+
+/// Therapeutic gating: modulates language generation based on clinical context.
+///
+/// Adjusts token logits using client distress, therapeutic alliance quality,
+/// intervention depth, and therapeutic intent channels. Suppresses harmful
+/// or premature clinical language under high distress / low alliance.
+#[cfg(feature = "therapeutic")]
+pub struct TherapeuticGate;
+
+#[cfg(feature = "therapeutic")]
+impl TherapeuticGate {
+    /// Apply therapeutic gating to all logits in-place using the tokenizer vocabulary.
+    pub fn apply_to_logits(
+        logits: &mut [f32],
+        channels: &super::encoder::ThoughtChannels,
+        tokenizer: &BpeTokenizer,
+    ) {
+        for id in 0..logits.len() {
+            let word = tokenizer.token_str(id as u32);
+            if !word.is_empty() {
+                logits[id] = Self::apply(word, channels, logits[id]);
+            }
+        }
+    }
+
+    pub fn apply(word: &str, channels: &super::encoder::ThoughtChannels, base_logit: f32) -> f32 {
+        let distress = channels.client_distress_level();
+        let alliance = channels.alliance_quality();
+        let intent = channels.therapeutic_intent();
+        let depth = channels.intervention_depth();
+        let word_lower = word.to_lowercase();
+
+        let mut logit = base_logit;
+
+        // Crisis mode (intent == 7.0): suppress all technique words, boost crisis protocol
+        if intent >= 6.5 {
+            if CANONICAL_DIRECTIVE_WORDS.iter().any(|w| word_lower.contains(w)) {
+                logit -= 5.0;
+            }
+            if CANONICAL_VALIDATING_WORDS.iter().any(|w| word_lower.contains(w)) {
+                logit += 2.0;
+            }
+            // Boost grounding and crisis referral language during crisis
+            if CANONICAL_GROUNDING_WORDS.iter().any(|w| word_lower.contains(w)) {
+                logit += 2.5;
+            }
+            if CANONICAL_CRISIS_WORDS.iter().any(|w| word_lower.contains(w)) {
+                logit += 3.0;
+            }
+            return logit;
+        }
+
+        // High distress (>0.7): suppress directives, boost validating
+        if distress > 0.7 {
+            if CANONICAL_DIRECTIVE_WORDS.iter().any(|w| word_lower.contains(w)) {
+                logit -= 3.0;
+            }
+            if CANONICAL_VALIDATING_WORDS.iter().any(|w| word_lower.contains(w)) {
+                logit += 1.5;
+            }
+        }
+
+        // Low alliance (<0.3): suppress challenges, boost empathy
+        if alliance < 0.3 {
+            if CANONICAL_DIRECTIVE_WORDS.iter().any(|w| word_lower.contains(w)) {
+                logit -= 2.0;
+            }
+            if CANONICAL_VALIDATING_WORDS.iter().any(|w| word_lower.contains(w)) {
+                logit += 1.0;
+            }
+        }
+
+        // Depth > alliance: suppress (can't challenge before trust)
+        if depth > alliance + 0.2 {
+            if CANONICAL_DIRECTIVE_WORDS.iter().any(|w| word_lower.contains(w)) {
+                logit -= 2.0;
+            }
+        }
+
+        // Reflective intent (intent == 2.0): boost reflective words
+        if (intent - 2.0).abs() < 0.5 {
+            if CANONICAL_REFLECTIVE_WORDS.iter().any(|w| word_lower.contains(w)) {
+                logit += 1.5;
+            }
+        }
+
+        logit
+    }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // TESTS
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1324,6 +1447,80 @@ mod tests {
         );
     }
 
+    // ── Veto Stress Tests ─────────────────────────────────────────────────
+
+    #[test]
+    fn test_veto_binding_weight_saturation() {
+        let mut feedback = CoherenceFeedback::with_veto_threshold(0.5, 0.15);
+        let genesis = symthaea_core::genesis::GenesisSeed::from_phrase("veto-stress-saturation");
+        let a = symthaea_core::hdc::ContinuousHV::from_genesis(
+            &genesis, "a", symthaea_core::hdc::HDC_DIMENSION,
+        );
+        let b = symthaea_core::hdc::ContinuousHV::from_genesis(
+            &genesis, "b", symthaea_core::hdc::HDC_DIMENSION,
+        );
+        let weight = feedback.update(&a, &b);
+        assert!(weight <= 3.0, "Binding weight must cap at 3.0, got {weight}");
+        assert!(weight >= 1.0, "Binding weight must be >= 1.0, got {weight}");
+        assert!(weight.is_finite(), "Binding weight must be finite");
+    }
+
+    #[test]
+    fn test_veto_coherence_oscillation() {
+        let mut feedback = CoherenceFeedback::with_veto_threshold(0.3, 0.15);
+        let genesis = symthaea_core::genesis::GenesisSeed::from_phrase("veto-stress-osc");
+        let a = symthaea_core::hdc::ContinuousHV::from_genesis(
+            &genesis, "similar-a", symthaea_core::hdc::HDC_DIMENSION,
+        );
+        let b = symthaea_core::hdc::ContinuousHV::from_genesis(
+            &genesis, "different-b", symthaea_core::hdc::HDC_DIMENSION,
+        );
+        let mut veto_count = 0;
+        for i in 0..20 {
+            if i % 2 == 0 { feedback.update(&a, &b); } else { feedback.update(&a, &a); }
+            if feedback.should_veto() { veto_count += 1; }
+        }
+        assert_eq!(veto_count, 10, "Feedback reports veto state per-step");
+    }
+
+    #[test]
+    fn test_veto_confidence_threshold_monotonic() {
+        let scale = 0.3;
+        let mut prev = f32::INFINITY;
+        for c in 0..=10 {
+            let conf = c as f32 / 10.0;
+            let threshold = confidence_adjusted_veto_threshold(0.20, conf, scale);
+            assert!(threshold <= prev + f32::EPSILON, "Must decrease: conf={conf}");
+            assert!(threshold >= 0.0, "Must be non-negative");
+            prev = threshold;
+        }
+    }
+
+    #[test]
+    fn test_veto_zero_max_disables() {
+        let config = GatingConfig { max_vetoes: 0, ..GatingConfig::default() };
+        assert_eq!(config.max_vetoes, 0);
+    }
+
+    #[test]
+    fn test_veto_refractory_config() {
+        let config = GatingConfig { veto_refractory: 16, max_vetoes: 3, ..GatingConfig::default() };
+        assert_eq!(config.veto_refractory, 16);
+        assert_eq!(config.max_vetoes, 3);
+    }
+
+    #[test]
+    fn test_veto_self_similar_never_triggers() {
+        let mut feedback = CoherenceFeedback::with_veto_threshold(0.3, 0.99);
+        let genesis = symthaea_core::genesis::GenesisSeed::from_phrase("veto-self-similar");
+        let a = symthaea_core::hdc::ContinuousHV::from_genesis(
+            &genesis, "a", symthaea_core::hdc::HDC_DIMENSION,
+        );
+        feedback.update(&a, &a);
+        assert!(!feedback.should_veto(), "Self-similar should never veto");
+        assert!((feedback.coherence() - 1.0).abs() < 0.01);
+    }
+
     #[cfg(feature = "mamba")]
     mod backend_tests {
         use super::*;
@@ -1380,6 +1577,145 @@ mod tests {
             assert!(
                 modified_count > 0,
                 "Gate should modify logits at backend token positions"
+            );
+        }
+    }
+
+    // ── Therapeutic gating tests ─────────────────────────────────────────────
+
+    #[cfg(feature = "therapeutic")]
+    mod therapeutic_gate_tests {
+        use super::super::*;
+        use crate::encoder::ThoughtChannels;
+
+        /// High distress should suppress directive words and boost validating words.
+        #[test]
+        fn test_high_distress_suppresses_directives() {
+            let mut channels = ThoughtChannels::default();
+            channels.channels[26] = 0.9; // client_distress_level = high
+
+            let should_logit = TherapeuticGate::apply("should", &channels, 0.0);
+            assert!(
+                should_logit < 0.0,
+                "Directive 'should' should be suppressed under high distress: {}",
+                should_logit,
+            );
+        }
+
+        #[test]
+        fn test_high_distress_boosts_validating() {
+            let mut channels = ThoughtChannels::default();
+            channels.channels[26] = 0.9; // client_distress_level = high
+
+            let understand_logit = TherapeuticGate::apply("understand", &channels, 0.0);
+            assert!(
+                understand_logit > 0.0,
+                "Validating 'understand' should be boosted under high distress: {}",
+                understand_logit,
+            );
+        }
+
+        #[test]
+        fn test_low_alliance_suppresses_directives() {
+            let mut channels = ThoughtChannels::default();
+            channels.channels[25] = 0.1; // alliance_quality = low
+
+            let must_logit = TherapeuticGate::apply("must", &channels, 0.0);
+            assert!(
+                must_logit < 0.0,
+                "Directive 'must' should be suppressed under low alliance: {}",
+                must_logit,
+            );
+        }
+
+        #[test]
+        fn test_crisis_mode_suppresses_directives_boosts_crisis() {
+            let mut channels = ThoughtChannels::default();
+            channels.channels[24] = 7.0; // therapeutic_intent = crisis
+
+            let should_logit = TherapeuticGate::apply("should", &channels, 0.0);
+            let call_logit = TherapeuticGate::apply("call", &channels, 0.0);
+            let breathe_logit = TherapeuticGate::apply("breathe", &channels, 0.0);
+
+            assert!(
+                should_logit < 0.0,
+                "Crisis mode should suppress directives: {}",
+                should_logit,
+            );
+            assert!(
+                call_logit > 0.0,
+                "Crisis mode should boost crisis referral words: {}",
+                call_logit,
+            );
+            assert!(
+                breathe_logit > 0.0,
+                "Crisis mode should boost grounding words: {}",
+                breathe_logit,
+            );
+        }
+
+        #[test]
+        fn test_depth_exceeds_alliance_suppresses() {
+            let mut channels = ThoughtChannels::default();
+            channels.channels[25] = 0.3; // alliance
+            channels.channels[27] = 0.8; // depth > alliance + 0.2
+
+            let correct_logit = TherapeuticGate::apply("correct", &channels, 0.0);
+            assert!(
+                correct_logit < 0.0,
+                "High depth with low alliance should suppress directives: {}",
+                correct_logit,
+            );
+        }
+
+        #[test]
+        fn test_reflective_intent_boosts_reflective() {
+            let mut channels = ThoughtChannels::default();
+            channels.channels[24] = 2.0; // therapeutic_intent = reflect
+
+            let wonder_logit = TherapeuticGate::apply("I wonder", &channels, 0.0);
+            assert!(
+                wonder_logit > 0.0,
+                "Reflective intent should boost reflective words: {}",
+                wonder_logit,
+            );
+        }
+
+        #[test]
+        fn test_neutral_state_no_modification() {
+            let channels = ThoughtChannels::default();
+            // Default: distress=0, alliance=0.5, intent=0, depth=0
+            let hello_logit = TherapeuticGate::apply("hello", &channels, 1.0);
+            assert!(
+                (hello_logit - 1.0).abs() < 1e-6,
+                "Neutral state should not modify non-therapeutic word: {}",
+                hello_logit,
+            );
+        }
+
+        #[test]
+        fn test_e2e_high_distress_directive_vs_validating_spread() {
+            let mut channels = ThoughtChannels::default();
+            channels.channels[26] = 0.9; // High distress
+
+            let directive_words = ["should", "must", "wrong"];
+            let validating_words = ["understand", "hear", "notice"];
+
+            let dir_sum: f32 = directive_words
+                .iter()
+                .map(|w| TherapeuticGate::apply(w, &channels, 0.0))
+                .sum();
+            let val_sum: f32 = validating_words
+                .iter()
+                .map(|w| TherapeuticGate::apply(w, &channels, 0.0))
+                .sum();
+
+            assert!(
+                val_sum > dir_sum,
+                "Under high distress, validating words should have higher total logit \
+                 than directive words: val={} vs dir={}",
+                val_sum,
+                dir_sum,
             );
         }
     }

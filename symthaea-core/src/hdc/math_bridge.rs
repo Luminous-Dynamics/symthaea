@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 //! # Unified Math Bridge
 //!
 //! Connects the numeric tower (numeric_tower.rs) and complex arithmetic (complex.rs)

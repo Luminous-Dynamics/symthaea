@@ -129,6 +129,7 @@ pub(crate) mod biorhythm_manager;
 pub(crate) mod consciousness_engine;
 pub(crate) mod consciousness_monitor_tier;
 pub(crate) mod consciousness_state_manager;
+pub(crate) mod ethics_values_manager;
 mod constructor;
 mod cycle;
 mod cycle_consciousness;
@@ -142,15 +143,11 @@ mod cycle_quality;
 mod cycle_strategy;
 mod cycle_subsystems;
 pub(crate) mod ethics_engine;
-pub(crate) mod ethics_values_manager;
-pub(crate) mod feature_integration_manager;
 pub(crate) mod feedback_state;
 pub(crate) mod fep_module;
 pub(crate) mod gwt_manager;
 mod helpers;
-pub(crate) mod language_comm_manager;
 pub(crate) mod managers;
-pub(crate) mod memory_consolidation_manager;
 mod moral;
 pub mod motor_output_bridge;
 pub(crate) mod neuromod_manager;
@@ -161,13 +158,22 @@ pub(crate) mod primitive_tier;
 pub(crate) mod self_model_tier;
 pub(crate) mod social_manager;
 pub(crate) mod substrate_manager;
+pub(crate) mod language_comm_manager;
+pub(crate) mod vision_sensory_manager;
+pub(crate) mod memory_consolidation_manager;
+pub(crate) mod feature_integration_manager;
 #[cfg(feature = "support")]
 pub(crate) mod support_manager;
-pub(crate) mod vision_sensory_manager;
+pub(crate) mod cantor_dream_manager;
+pub(crate) mod motor_rendering_manager;
+pub(crate) mod episodic_persistence_manager;
 pub use substrate_manager::SubstrateTransitionRecord;
 pub(crate) mod subsystem_trait;
 #[allow(dead_code)] // Registry of tuning constants — many reserved for future wiring
 pub(crate) mod thresholds;
+
+#[cfg(feature = "epistemic_auditor")]
+pub(crate) mod epistemic_auditor;
 pub(crate) mod virtual_body;
 pub(crate) mod voice_coherence_bridge;
 
@@ -185,10 +191,17 @@ pub use physics_integration::ParetoContext;
 #[cfg(feature = "mycelix")]
 pub use managers::governance_manager::{GovernanceEvent, GovernanceEventKind, GovernanceOutcome};
 
-#[cfg(feature = "mesh")]
-use managers::SpectrumManager;
-
 pub use managers::swarm_manager::{SwarmEvent, SwarmTelemetry};
+pub use managers::network_service_bridge::{
+    forward_affective_state, forward_federated_round, NetworkServiceBridge,
+    NetworkServiceBridgeHandle,
+};
+
+#[cfg(feature = "mesh")]
+pub use managers::{
+    CompressedDelta, NetworkHealth, PayloadClass, PayloadClassifier, RadioTier, RoutingDecision,
+    SpectrumManager, SpectrumObservation, SpectrumTelemetry,
+};
 
 pub mod calibration;
 pub mod math_service;
@@ -380,18 +393,8 @@ pub struct CognitiveLoopService {
     /// - Suggests interventions for exploration
     causal_enhancer: Option<CausalLoopEnhancer>,
 
-    /// Episodic memory replay for high-Phi moment consolidation.
-    /// When enabled via `config.memory_graduation`, stores high-consciousness episodes
-    /// and periodically replays them to reinforce important patterns.
-    phi_episodic_replay: Option<crate::memory::episodic_replay::EpisodicMemory>,
-
-    /// Persistent memory database for cross-session episode storage.
-    /// Created when `config.memory_db_path` is `Some`. Episodes are periodically
-    /// flushed (every 199 cycles) via a background thread.
-    memory_db: Option<std::sync::Arc<crate::databases::SqliteMemory>>,
-
-    /// Guard to prevent overlapping memory flushes. When true, a flush is in progress.
-    memory_flush_in_progress: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    /// Episodic persistence: replay, database, flush guard, reasoning context.
+    pub(crate) episodic_persistence: episodic_persistence_manager::EpisodicPersistenceManager,
 
     /// Conscious Reasoning Engine: unified 7-step reasoning cycle
     /// Composes epistemic conflict, temporal planning, counterfactual reasoning,
@@ -472,6 +475,7 @@ pub struct CognitiveLoopService {
     pub(crate) consciousness_state: consciousness_state_manager::ConsciousnessStateManager,
 
     // contextual_weights, phi_attention, negation_detector moved to ethics_values_manager
+
     /// All primitive-consciousness-gated subsystems, grouped into a single manager.
     /// See `primitive_tier::PrimitiveTierManager` for field list.
     primitive_tier: primitive_tier::PrimitiveTierManager,
@@ -488,6 +492,7 @@ pub struct CognitiveLoopService {
     carryover: CycleCarryover,
 
     // soul moved to ethics_values_manager
+
     /// Attention visualizer for debugging attention flow.
     /// When present, captures attention snapshots each cycle for
     /// ASCII heatmaps, JSON export, and Graphviz flow graphs.
@@ -497,6 +502,7 @@ pub struct CognitiveLoopService {
     pub(crate) social_mgr: SocialManager,
 
     // user_state moved to language_comm_manager
+
     /// Resonant speech generator: adapts response complexity to user cognitive load.
     /// Uses neuromod bath signals + USI to determine response profile each cycle.
     /// Science: Ritter et al. (2019) — adaptive complexity reduces cognitive overload.
@@ -519,15 +525,8 @@ pub struct CognitiveLoopService {
     // vision_bridge, vision_frame_buffer, cross_manifold_predictor, foveation_manager moved to vision_sensory_manager
 
     // broca_manager, last_broca_text moved to language_comm_manager
-    /// Canvas living topology: consciousness-driven SVG generation.
-    /// When enabled via `canvas` feature, generates real-time topology SVGs
-    /// from cognitive telemetry with EMA-smoothed aesthetic mapping.
-    #[cfg(feature = "canvas")]
-    pub(crate) canvas_manager: Option<canvas_bridge::CanvasManager>,
 
-    /// Most recent canvas SVG, drained into `CycleResult.canvas_svg` each cycle.
-    #[cfg(feature = "canvas")]
-    pub(crate) last_canvas_svg: Option<String>,
+    // canvas_manager, last_canvas_svg moved to motor_rendering manager
 
     /// Buffer of PsiAttestationRecords ready for governance bridge consumption.
     /// Populated when `config.enable_psi_attestation` is true.
@@ -575,16 +574,14 @@ pub struct CognitiveLoopService {
     /// Science: Kanerva (2009) HDC, Pearl (2009) Causality, Carey (2009) conceptual change.
     knowledge_manager: Option<crate::knowledge::KnowledgeManager>,
 
-    /// Last assembled reasoning context from the knowledge engine.
-    /// Contains grounded facts, causal chains, and epistemic state.
-    /// Populated after knowledge engine processes each cycle's input.
-    last_reasoning_context: Option<crate::knowledge::ReasoningContext>,
+    // last_reasoning_context moved to episodic_persistence manager
 
     /// Experience integration bus for principled signal tracking and harmonic reasoning.
     /// Bridges cognitive loop signals to Eight Harmonies wisdom system.
     experience_bus: Option<crate::experience::ExperienceBus>,
 
     // school_bridge + causal_consciousness moved to feature_integ manager
+
     /// Thermodynamic load (0.0 to 1.0, where 1.0 = 6W limit reached).
     pub(crate) thermodynamic_load: f32,
 
@@ -602,6 +599,15 @@ pub struct CognitiveLoopService {
     /// Pain channel sender for distributing to subsystems.
     /// Subsystems clone this to report infrastructure errors.
     pub(crate) pain_tx: Option<crate::infrastructure::somatic_error_bridge::PainSender>,
+
+    /// Thermal bridge: converts platform thermal state into CfC tau modulation.
+    /// Hardware heat → tau slowdown → slower integration → less heat generated.
+    /// Science: Angilletta (2009) thermal performance curves.
+    pub(crate) thermal_bridge: crate::infrastructure::thermal_bridge::ThermalBridge,
+
+    /// Thermal channel sender for platform integration code.
+    /// Android PowerManager / iOS ProcessInfo / Linux sysfs thermal zones.
+    pub(crate) thermal_tx: Option<crate::infrastructure::thermal_bridge::ThermalSender>,
 
     /// Subsystem output collector (Phase 2.3 staged computation model).
     /// Collects SubsystemOutput proposals during Phase B (COMPUTE),
@@ -623,6 +629,7 @@ pub struct CognitiveLoopService {
     pub(super) substrate_manager: substrate_manager::SubstrateManager,
 
     // physics_integration moved to feature_integ manager
+
     /// Cycle at which consciousness weights first converged (0 = not yet).
     convergence_cycle: usize,
 
@@ -661,66 +668,52 @@ pub struct CognitiveLoopService {
     /// collective Φ modulation. Implements CognitiveSubsystem at interval 41.
     swarm_manager: managers::SwarmManager,
 
-    /// Spectrum Manager: Multi-band radio dispatch — SDR as sensory modality.
+    /// Receiver for swarm events from external async P2P layer.
+    /// Drained non-blocking in Phase B before `swarm_manager.process()`.
+    /// Created eagerly at construction; clone `swarm_event_tx` to inject events.
+    swarm_event_rx: std::sync::Mutex<Option<std::sync::mpsc::Receiver<managers::swarm_manager::SwarmEvent>>>,
+
+    /// Sender half of the swarm event channel. Clone via `swarm_event_sender()` to
+    /// inject events from async components (NetworkService, Hyperfeel, mesh layer).
+    swarm_event_tx: std::sync::mpsc::Sender<managers::swarm_manager::SwarmEvent>,
+
+    /// Spectrum Manager: Multi-band radio dispatch, AIMD congestion, delta compression.
     /// Implements CognitiveSubsystem at interval 53. Feature-gated behind `mesh`.
     #[cfg(feature = "mesh")]
     pub(crate) spectrum_manager: SpectrumManager,
+
+    /// CPG Manager: Kuramoto coupled oscillators for rhythmic motor timing.
+    /// Implements CognitiveSubsystem at interval 59. Feature-gated behind `cpg`.
+    #[cfg(feature = "cpg")]
+    cpg_manager: managers::CpgManager,
+
+    /// Spectral Twin Manager: frequency-domain analysis of CfC hidden state.
+    /// Maintains rolling state history, computes band power / PAC / entropy.
+    /// Implements CognitiveSubsystem at interval 67. Feature-gated behind `spectral_state`.
+    #[cfg(feature = "spectral_state")]
+    spectral_manager: managers::SpectralManager,
+
+    /// Therapeutic Manager: client model, alliance, crisis detection, regulation.
+    /// Implements CognitiveSubsystem at interval 11. Feature-gated behind `therapeutic`.
+    #[cfg(feature = "therapeutic")]
+    therapeutic_manager: managers::TherapeuticManager,
+
+    /// Glyph Manager: symbolic consciousness field, 11 Field Modality basis vectors,
+    /// 70-glyph registry, developmental spiral tracking.
+    /// Implements CognitiveSubsystem at interval 43. Feature-gated behind `glyph_codex`.
+    #[cfg(feature = "glyph_codex")]
+    glyph_manager: managers::GlyphManager,
 
     /// Integrity Manager: BLAKE3 attestation, temporal consistency, behavioral canaries.
     /// Runs tamper detection at co-prime intervals. Feature-gated behind `integrity`.
     #[cfg(feature = "integrity")]
     integrity_manager: crate::integrity::IntegrityManager,
 
-    /// Cantor broadcast buffer: CRHVs created from GWT broadcasts for dream consolidation.
-    /// When a thought becomes "conscious" (enters workspace and is broadcast), it gets
-    /// wrapped as a Cantor Recursive Hypervector preserving multi-scale structure.
-    /// During dream consolidation, the CantorCleanupEngine factorizes these through
-    /// the resonator codebook, preventing metacognitive amnesia (loss of faint peripheral
-    /// Cantor layers at shift/27, shift/81).
-    /// Science: Baars (1988) + Stickgold (2005) — conscious broadcast → fractal dreaming.
-    cantor_broadcast_buffer: Vec<symthaea_core::hdc::cantor_recursive_hv::CantorRecursiveHV>,
+    /// Cantor dream: broadcast buffer, cleanup engine, activation, surprise, resonance.
+    pub(crate) cantor_dream: cantor_dream_manager::CantorDreamManager,
 
-    /// Persistent Cantor cleanup engine: codebook accumulates across dream cycles.
-    /// Unlike the previous ephemeral approach (rebuild each dream), this engine retains
-    /// learned representations so dream consolidation genuinely strengthens memories
-    /// over the brain's lifetime.
-    /// Science: Born & Wilhelm (2012) — sleep spindle replay strengthens stable traces;
-    ///          Walker (2009) — offline consolidation requires persistent memory stores.
-    cantor_cleanup_engine: symthaea_core::hdc::cantor_resonator_cleanup::CantorCleanupEngine,
-
-    /// Last GWT activation strength, used for adaptive CRHV depth.
-    /// Stronger activations (higher workspace competition score) produce deeper fractals.
-    /// Science: Dehaene et al. (2006) — ignition strength varies with stimulus salience;
-    ///          stronger ignition recruits more recurrent cortical layers.
-    cantor_last_activation: f32,
-
-    /// EMA of dream consolidation surprise (|pre_ss − post_ss|).
-    /// High surprise signals the codebook is encountering novel fractal structure.
-    /// Science: Friston (2010) — free-energy surprise drives plasticity updates;
-    ///          unexpected outcomes signal model inadequacy requiring learning.
-    cantor_dream_surprise: f32,
-
-    /// Resonance boost from coherent CRHV pairs in the broadcast buffer.
-    /// When multiple CRHVs share high similarity (>0.8), the resulting coalition
-    /// amplifies workspace integration — a "fractal choir" effect.
-    /// Science: Edelman & Tononi (2000) — reentrant cortical signaling
-    ///          creates dynamic coalitions; Singer (1999) — binding by synchrony.
-    cantor_resonance_boost: f32,
-
-    /// Motor output bridge: translates FEP MotorOutput commands into real-world
-    /// actions (file I/O, shell commands, tests) via SimpleExecutor.
-    /// When `None`, MotorOutput commands are no-ops (default behavior).
-    motor_output_bridge: Option<motor_output_bridge::MotorOutputBridge>,
-
-    /// Pending motor action request (string data for the next MotorOutput dispatch).
-    /// Set externally before a cycle to provide path/content/args for motor commands.
-    pub(crate) pending_motor_request: Option<motor_output_bridge::MotorActionRequest>,
-
-    /// Last motor output result for FEP feedback.
-    pub(crate) last_motor_result: Option<motor_output_bridge::MotorOutputResult>,
-
-    /// Phi value used for motor gating in the most recent motor execution (telemetry).
-    pub(crate) last_motor_phi: f64,
+    /// Motor rendering: output bridge, pending request, last result, phi, canvas.
+    pub(crate) motor_rendering: motor_rendering_manager::MotorRenderingManager,
 
     /// Math Service: unified math dispatcher routing queries to Phase 1-3 solvers
     /// (linear algebra, root finding, quadrature, statistics, optimization, FFT,
@@ -728,11 +721,9 @@ pub struct CognitiveLoopService {
     /// Tracks telemetry and stores solved-problem episodes for analogical retrieval.
     math_service: math_service::MathService,
 
-    /// Scientific method engine — hypothesis-test-update cycle for scientific reasoning.
-    /// Bayesian belief updates + HDC contradiction detection + MathService bridge.
-    /// Science: Popper (1959) — falsification; Jaynes (2003) — probability as logic.
-    #[cfg(feature = "scientific_method")]
-    scientific_method: crate::scientific_method::ScientificMethodEngine,
+    /// Epistemic Auditor: DuckDB-backed consciousness telemetry audit trail.
+    #[cfg(feature = "epistemic_auditor")]
+    pub(crate) epistemic_auditor: Option<epistemic_auditor::EpistemicAuditor>,
 }
 
 // MetricsProvider impl is in metrics_provider.rs

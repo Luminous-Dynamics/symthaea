@@ -567,31 +567,6 @@ impl IntegrityManager {
         );
     }
 
-    /// Register knowledge engine threshold constants for tamper detection.
-    ///
-    /// These control confidence thresholds, consciousness modulation, and
-    /// persistence intervals. Tampering could silently distort knowledge
-    /// grounding — e.g., disabling confidence decay or inflating consciousness scores.
-    pub fn register_knowledge_thresholds(&mut self) {
-        use crate::cognitive_loop::thresholds;
-        let constants: Vec<f32> = vec![
-            thresholds::KNOWLEDGE_SAVE_INTERVAL as f32,
-            thresholds::KNOWLEDGE_CONSCIOUSNESS_MODULATION as f32,
-            thresholds::KNOWLEDGE_FORGET_CONFIDENCE_THRESHOLD,
-            thresholds::KNOWLEDGE_CONSOLIDATION_BOOST,
-            thresholds::KNOWLEDGE_CAUSAL_DEPTH_EXPLOIT_THRESHOLD as f32,
-            thresholds::KNOWLEDGE_CAUSAL_DEPTH_EXPLORE_DAMPEN,
-            thresholds::KNOWLEDGE_CONTRADICTION_NE_BOOST,
-            thresholds::KNOWLEDGE_CONTRADICTION_SHT_BOOST,
-        ];
-        let hash = attestation::blake3_hash_f32_slice(&constants);
-        self.attestation.register(
-            "knowledge_thresholds",
-            hash,
-            Box::new(move || attestation::blake3_hash_f32_slice(&constants)),
-        );
-    }
-
     /// Verify live safety thresholds against the registered baseline.
     ///
     /// Called from the cognitive cycle with current threshold values. This catches

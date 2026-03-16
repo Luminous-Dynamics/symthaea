@@ -160,23 +160,26 @@ impl ArcAbductiveBenchmark {
                 let true_input_hv = encoder.encode_grid(&true_input);
                 let test_output_hv = encoder.encode_grid(&test_output);
 
-                // Unbind: estimated_input = bind(output_hv, rule_hv)
-                // This gives output² × input (correlated with input)
-                let estimated_input = test_output_hv.bind(&consensus_rule);
-                let estimated_input = estimated_input.normalize();
+                // Forward candidate matching: for each candidate input, compute
+                // candidate.bind(rule) → predicted output, compare to test_output.
+                // Correct input produces input² * output (positive bias with output),
+                // while wrong inputs produce random correlation.
 
-                // Unbinding similarity: cosine(estimated, true_input)
+                // Unbinding similarity (backward, for diagnostic)
+                let estimated_input = test_output_hv.bind(&consensus_rule).normalize();
                 let unbind_sim = estimated_input.similarity(&true_input_hv) as f64;
                 unbinding_sims.push(unbind_sim);
 
-                // 4-AFC: correct input vs 3 random distractor inputs
-                let correct_sim = estimated_input.similarity(&true_input_hv) as f64;
+                // 4-AFC via forward matching: apply rule to each candidate, compare to output
+                let correct_predicted = true_input_hv.bind(&consensus_rule);
+                let correct_sim = correct_predicted.similarity(&test_output_hv) as f64;
                 let mut best_distractor_sim = f64::NEG_INFINITY;
                 for _ in 0..3 {
                     xor_shift(&mut rng);
                     let distractor_input = gen_grid(&mut rng, grid_size, num_colors);
                     let distractor_hv = encoder.encode_grid(&distractor_input);
-                    let dist_sim = estimated_input.similarity(&distractor_hv) as f64;
+                    let dist_predicted = distractor_hv.bind(&consensus_rule);
+                    let dist_sim = dist_predicted.similarity(&test_output_hv) as f64;
                     if dist_sim > best_distractor_sim {
                         best_distractor_sim = dist_sim;
                     }

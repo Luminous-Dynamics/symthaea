@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 //! # Constraint Satisfaction Problem (CSP) Solver
 //!
 //! Framework for solving constraint satisfaction problems with arc consistency,

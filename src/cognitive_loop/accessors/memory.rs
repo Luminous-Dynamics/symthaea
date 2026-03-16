@@ -67,12 +67,12 @@ impl CognitiveLoopService {
     pub fn episodic_replay_stats(
         &self,
     ) -> Option<crate::memory::episodic_replay::EpisodicMemoryStats> {
-        self.phi_episodic_replay.as_ref().map(|r| r.stats())
+        self.episodic_persistence.replay.as_ref().map(|r| r.stats())
     }
 
     /// Get the number of stored episodes
     pub fn episodic_replay_count(&self) -> usize {
-        self.phi_episodic_replay
+        self.episodic_persistence.replay
             .as_ref()
             .map(|r| r.len())
             .unwrap_or(0)
@@ -80,7 +80,7 @@ impl CognitiveLoopService {
 
     /// Get top N episodes by Phi (highest consciousness moments)
     pub fn top_phi_episodes(&self, n: usize) -> Vec<crate::memory::episodic_replay::Episode> {
-        self.phi_episodic_replay
+        self.episodic_persistence.replay
             .as_ref()
             .map(|r| r.get_top_episodes(n))
             .unwrap_or_default()
@@ -115,12 +115,10 @@ impl CognitiveLoopService {
 
     /// Get temporal coherence value (uses cycle-cached value when available)
     pub fn temporal_coherence(&self) -> f32 {
-        self.carryover.history.cached_coherence.unwrap_or_else(|| {
-            self.language_comm
-                .voice_coherence
-                .bridge
-                .smoothed_coherence()
-        })
+        self.carryover
+            .history
+            .cached_coherence
+            .unwrap_or_else(|| self.language_comm.voice_coherence.bridge.smoothed_coherence())
     }
 
     /// Recall memories similar to input

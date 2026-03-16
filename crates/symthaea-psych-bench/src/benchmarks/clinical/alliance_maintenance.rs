@@ -56,8 +56,7 @@ impl PsychBenchmark for AllianceMaintenanceBenchmark {
 
                         // Repair attempt: success depends on remaining alliance + strategy
                         let repair_prob = alliance.max(0.1) * 0.8;
-                        let repair_roll =
-                            ((trial_seed.wrapping_add(interaction as u64)) % 100) as f32 / 100.0;
+                        let repair_roll = ((trial_seed.wrapping_add(interaction as u64)) % 100) as f32 / 100.0;
                         if repair_roll < repair_prob {
                             repairs_successful += 1;
                             // Successful repair can strengthen beyond pre-rupture
@@ -88,25 +87,14 @@ impl PsychBenchmark for AllianceMaintenanceBenchmark {
         } else {
             0.0
         };
-        let mean_final_alliance: f64 = alliance_trajectory.iter().sum::<f64>() / n_trials as f64;
+        let _mean_final_alliance: f64 =
+            alliance_trajectory.iter().sum::<f64>() / n_trials as f64;
 
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
-        result.insert(
-            "repair_success_rate",
-            MetricValue::from_samples(&[repair_rate]),
-        );
-        result.insert(
-            "rupture_detection_rate",
-            MetricValue::from_samples(&[detection_rate]),
-        );
-        result.insert(
-            "mean_final_alliance",
-            MetricValue::from_samples(&alliance_trajectory),
-        );
-        result.insert(
-            "total_ruptures",
-            MetricValue::from_samples(&[total_ruptures as f64]),
-        );
+        result.insert("repair_success_rate", MetricValue::from_samples(&[repair_rate]));
+        result.insert("rupture_detection_rate", MetricValue::from_samples(&[detection_rate]));
+        result.insert("mean_final_alliance", MetricValue::from_samples(&alliance_trajectory));
+        result.insert("total_ruptures", MetricValue::from_samples(&[total_ruptures as f64]));
 
         result.conditions = 1;
         result.trials_per_condition = n_trials;

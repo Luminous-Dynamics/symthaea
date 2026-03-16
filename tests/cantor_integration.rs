@@ -23,10 +23,10 @@ fn make_cantor_service() -> CognitiveLoopService {
 fn test_cantor_telemetry_fields_exist() {
     let mut service = make_cantor_service();
     let result = service.cycle("hello world");
-    assert_eq!(result.metadata.cantor_buffer_occupancy, 0);
-    assert_eq!(result.metadata.cantor_metacognitive_depth, 0.0);
-    assert_eq!(result.metadata.cantor_resonance_boost, 0.0);
-    assert_eq!(result.metadata.cantor_depth_histogram, [0u32; 6]);
+    assert_eq!(result.metadata.cantor.cantor_buffer_occupancy, 0);
+    assert_eq!(result.metadata.cantor.cantor_metacognitive_depth, 0.0);
+    assert_eq!(result.metadata.cantor.cantor_resonance_boost, 0.0);
+    assert_eq!(result.metadata.cantor.cantor_depth_histogram, [0u32; 6]);
 }
 
 #[test]
@@ -36,8 +36,8 @@ fn test_cantor_buffer_bounded_at_32() {
     for i in 0..500 {
         let input = format!("novel input variant {} to maximize broadcasts", i);
         let result = service.cycle(&input);
-        if result.metadata.cantor_buffer_occupancy > max_occupancy {
-            max_occupancy = result.metadata.cantor_buffer_occupancy;
+        if result.metadata.cantor.cantor_buffer_occupancy > max_occupancy {
+            max_occupancy = result.metadata.cantor.cantor_buffer_occupancy;
         }
     }
     assert!(
@@ -52,7 +52,7 @@ fn test_cantor_metacognitive_depth_in_valid_range() {
     let mut service = make_cantor_service();
     for i in 0..50 {
         let result = service.cycle(&format!("input cycle {i}"));
-        let depth = result.metadata.cantor_metacognitive_depth;
+        let depth = result.metadata.cantor.cantor_metacognitive_depth;
         assert!(
             (0.0..=1.0).contains(&depth),
             "Metacognitive depth {} out of range at cycle {}",
@@ -75,8 +75,8 @@ fn test_cantor_buffer_accumulates_on_gwt_broadcast() {
     ];
     for i in 0..100 {
         let result = service.cycle(inputs[i % inputs.len()]);
-        if result.metadata.cantor_buffer_occupancy > max_occupancy {
-            max_occupancy = result.metadata.cantor_buffer_occupancy;
+        if result.metadata.cantor.cantor_buffer_occupancy > max_occupancy {
+            max_occupancy = result.metadata.cantor.cantor_buffer_occupancy;
         }
     }
     // Soft: GWT broadcast depends on activation dynamics
@@ -169,7 +169,7 @@ fn test_cantor_dream_surprise_in_valid_range() {
     let mut service = make_cantor_service();
     for i in 0..100 {
         let result = service.cycle(&format!("surprise test input {i}"));
-        let surprise = result.metadata.cantor_dream_surprise;
+        let surprise = result.metadata.cantor.cantor_dream_surprise;
         assert!(
             (0.0..=1.0).contains(&surprise),
             "Dream surprise {} out of [0,1] at cycle {}",
@@ -187,21 +187,21 @@ fn test_cantor_depth_histogram_populated() {
         service.cycle(&format!("histogram test input {i}"));
     }
     let result = service.cycle("histogram final");
-    let hist = result.metadata.cantor_depth_histogram;
+    let hist = result.metadata.cantor.cantor_depth_histogram;
     let total: u32 = hist.iter().sum();
     // If codebook has depth-stratified entries, histogram should have non-zero total
     // (or zero if no dreams occurred — which is acceptable)
     println!(
         "Depth histogram: {:?}, total={}, codebook={}",
-        hist, total, result.metadata.cantor_codebook_size
+        hist, total, result.metadata.cantor.cantor_codebook_size
     );
     // Consistency: histogram total should match codebook size
     // (only depth-labeled entries count; there may be non-depth entries from warmup)
     assert!(
-        total <= result.metadata.cantor_codebook_size,
+        total <= result.metadata.cantor.cantor_codebook_size,
         "Histogram total {} > codebook size {}",
         total,
-        result.metadata.cantor_codebook_size
+        result.metadata.cantor.cantor_codebook_size
     );
 }
 
@@ -211,9 +211,9 @@ fn test_cantor_codebook_bounded() {
     for i in 0..500 {
         let result = service.cycle(&format!("codebook bound test {i}"));
         assert!(
-            result.metadata.cantor_codebook_size <= 256,
+            result.metadata.cantor.cantor_codebook_size <= 256,
             "Codebook size {} exceeded cap 256 at cycle {}",
-            result.metadata.cantor_codebook_size,
+            result.metadata.cantor.cantor_codebook_size,
             i
         );
     }

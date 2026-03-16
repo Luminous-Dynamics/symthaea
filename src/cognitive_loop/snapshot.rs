@@ -216,6 +216,14 @@ pub struct ConsciousnessSnapshot {
     pub integrity_critical: bool,
 
     // ═══════════════════════════════════════════════════════════════════════════
+    // MESH NETWORK
+    // ═══════════════════════════════════════════════════════════════════════════
+    /// Whether the network is in a critical state (all radio tiers down or sustained jamming).
+    /// Feature-gated behind `mesh`; defaults to false.
+    #[serde(default)]
+    pub network_critical: bool,
+
+    // ═══════════════════════════════════════════════════════════════════════════
     // PERFORMANCE METRICS
     // ═══════════════════════════════════════════════════════════════════════════
     /// Average cycle time in microseconds (EMA).
@@ -385,6 +393,7 @@ mod tests {
             empathic_compassion: 0.5,
             sigma: None,
             integrity_critical: false,
+            network_critical: false,
             avg_cycle_time_us: 100.0,
             cycles_per_second: 50.0,
         }

@@ -73,7 +73,10 @@ pub use evaluation::{EvalConfig, EvalResult, IntentScore};
 pub use gating::{CoherenceFeedback, EmotionalModulator, EpistemicGate, GatingConfig};
 pub use generator::{BrocaConfig, BrocaGenerator, GenerationResult, SamplingStrategy};
 pub use tokenizer::BpeTokenizer;
-pub use training::{GradientDiagnostics, TrainingDataset, TrainingPair};
+pub use training::{
+    AnomalyReport, GradientAnomaly, GradientDiagnostics, TrainingDataset, TrainingPair,
+    TrainingValidation,
+};
 
 #[cfg(feature = "mamba")]
 pub use checkpoint::ProjectionCheckpoint;

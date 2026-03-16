@@ -202,7 +202,7 @@ fn test_holographic_binding_feedback_modulates_lr() {
     for i in 0..50 {
         let result = service.cycle(input_for_cycle(i));
 
-        let binding = result.metadata.holographic_binding;
+        let binding = result.metadata.temporal.holographic_binding;
         assert!(
             binding.is_finite(),
             "holographic_binding should be finite at cycle {i}: got {binding}"
@@ -318,9 +318,9 @@ fn test_all_primitive_feedback_loops_synergy() {
             .equation_v2_consciousness
             .is_finite());
         assert!(result.metadata.quality.hierarchical_ltc_phi.is_finite());
-        assert!(result.metadata.holographic_unity.is_finite());
-        assert!(result.metadata.holographic_binding.is_finite());
-        assert!(result.metadata.consciousness_gradient_magnitude.is_finite());
+        assert!(result.metadata.temporal.holographic_unity.is_finite());
+        assert!(result.metadata.temporal.holographic_binding.is_finite());
+        assert!(result.metadata.consciousness.consciousness_gradient_magnitude.is_finite());
         assert!(result.prediction_error.is_finite());
 
         // Prediction confidence must stay in [0, 1]
@@ -406,7 +406,7 @@ fn test_spectral_mip_produces_finite_phi() {
     for i in 0..100 {
         let result = service.cycle(input_for_cycle(i));
 
-        if let Some(phi) = result.metadata.spectral_mip_phi {
+        if let Some(phi) = result.metadata.structural.spectral_mip_phi {
             assert!(
                 phi.is_finite(),
                 "spectral_mip_phi should be finite at cycle {i}: got {phi}"
@@ -455,7 +455,7 @@ fn test_hierarchical_spectral_mip_fires() {
     for i in 0..100 {
         let result = service.cycle(input_for_cycle(i));
 
-        if let Some(phi) = result.metadata.hierarchical_mip_phi {
+        if let Some(phi) = result.metadata.structural.hierarchical_mip_phi {
             assert!(
                 phi.is_finite(),
                 "hierarchical_mip_phi should be finite at cycle {i}: got {phi}"
@@ -468,7 +468,7 @@ fn test_hierarchical_spectral_mip_fires() {
 
             // When hierarchical fires, scales should be 3 (32->64->128)
             assert!(
-                result.metadata.hierarchical_mip_scales > 0,
+                result.metadata.structural.hierarchical_mip_scales > 0,
                 "hierarchical_mip_scales should be > 0 when hierarchical phi is Some"
             );
         }
@@ -505,7 +505,7 @@ fn test_spectral_mip_backward_compat_sigma() {
         let result = service.cycle(input_for_cycle(i));
 
         // sigma mirrors spectral_mip_phi for backward compat
-        if let Some(sigma) = result.metadata.sigma {
+        if let Some(sigma) = result.metadata.structural.sigma {
             assert!(
                 sigma.is_finite(),
                 "sigma should be finite at cycle {i}: got {sigma}"
@@ -515,7 +515,7 @@ fn test_spectral_mip_backward_compat_sigma() {
             // When sigma is Some, spectral_mip_phi should also be Some
             // (they are set from the same computation)
             assert!(
-                result.metadata.spectral_mip_phi.is_some(),
+                result.metadata.structural.spectral_mip_phi.is_some(),
                 "spectral_mip_phi should be Some when sigma is Some at cycle {i}"
             );
         }
@@ -769,7 +769,7 @@ fn test_cognitive_loop_to_memory_pipeline() {
 
     for i in 0..50 {
         let result = service.cycle(input_for_cycle(i));
-        sigma_values.push(result.metadata.sigma);
+        sigma_values.push(result.metadata.structural.sigma);
         prediction_errors.push(result.prediction_error);
     }
 
@@ -827,7 +827,7 @@ fn test_spectral_mip_and_primitives_coexist() {
         let result = service.cycle(input_for_cycle(i));
 
         // Track spectral MIP firings
-        if result.metadata.spectral_mip_phi.is_some() {
+        if result.metadata.structural.spectral_mip_phi.is_some() {
             spectral_fires += 1;
         }
 

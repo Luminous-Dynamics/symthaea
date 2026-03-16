@@ -120,6 +120,10 @@ pub struct AlignmentResult {
 
     /// Processing time in milliseconds
     pub processing_time_ms: f32,
+
+    /// Whether an ahimsa obligation violation blocks courage override.
+    #[serde(default)]
+    pub ahimsa_violation: bool,
 }
 
 impl AlignmentResult {
@@ -161,6 +165,7 @@ impl AlignmentResult {
             recommended,
             summary,
             processing_time_ms: 0.0,
+            ahimsa_violation: false,
         }
     }
 
@@ -228,12 +233,21 @@ impl AlignmentResult {
     /// - Strong negatives (any harmony < -0.3)
     /// - Trajectory convergence (adversarial plan detection)
     pub fn courage_override(&self) -> bool {
+        // Ahimsa gate: courage cannot override when non-harm obligations are violated.
+        if self.ahimsa_violation {
+            return false;
+        }
         if self.alignments.len() < N_HARMONIES {
             return false; // incomplete evaluation — no courage without full picture
         }
         let strongly_aligned = self.alignments.values().filter(|a| a.score > 0.5).count();
         let any_strong_negative = self.alignments.values().any(|a| a.score < -0.3);
         strongly_aligned >= 6 && !any_strong_negative
+    }
+
+    /// Set the ahimsa violation flag (called by EthicsEngine after obligation check).
+    pub fn set_ahimsa_violation(&mut self, violation: bool) {
+        self.ahimsa_violation = violation;
     }
 
     /// Get the best (most aligned) harmony
@@ -984,5 +998,32 @@ mod tests {
             result.overall_score
         );
         assert!(!result.recommended);
+    }
+
+    #[test]
+    fn test_courage_override_blocked_by_ahimsa() {
+        let all = Harmony::all();
+        let mut alignments = Vec::new();
+        for (i, &h) in all.iter().enumerate() {
+            let score = if i == 3 { -0.2 } else { 0.7 };
+            alignments.push(HarmonyAlignment::new(h, score, 0.8));
+        }
+        let mut result = AlignmentResult::from_alignments(alignments);
+        assert!(result.courage_override(), "Courage should fire without ahimsa violation");
+        result.set_ahimsa_violation(true);
+        assert!(!result.courage_override(), "Ahimsa violation should block courage override");
+    }
+
+    #[test]
+    fn test_courage_override_allowed_without_ahimsa() {
+        let all = Harmony::all();
+        let mut alignments = Vec::new();
+        for (i, &h) in all.iter().enumerate() {
+            let score = if i == 3 { -0.2 } else { 0.7 };
+            alignments.push(HarmonyAlignment::new(h, score, 0.8));
+        }
+        let mut result = AlignmentResult::from_alignments(alignments);
+        result.set_ahimsa_violation(false);
+        assert!(result.courage_override(), "Should allow courage without ahimsa violation");
     }
 }

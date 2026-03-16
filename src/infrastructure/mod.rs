@@ -24,6 +24,7 @@ pub mod pagination;
 pub mod sandbox;
 pub mod somatic_error_bridge;
 pub mod task_supervisor;
+pub mod thermal_bridge;
 
 pub use auth::{AuthError, AuthProvider, AuthToken};
 pub use cache::{CacheStats, HdcCache, LruCache};
@@ -39,3 +40,4 @@ pub use somatic_error_bridge::{
     InfrastructureError, PainSender, SomaticErrorBridge, SomaticSignals,
 };
 pub use task_supervisor::TaskSupervisor;
+pub use thermal_bridge::{ThermalBridge, ThermalLevel, ThermalSender, ThermalSignals};

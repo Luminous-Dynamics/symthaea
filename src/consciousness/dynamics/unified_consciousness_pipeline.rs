@@ -413,19 +413,21 @@ impl UnifiedConsciousnessPipeline {
     /// Encode sensory input into HDC representation
     pub fn encode_sensory(&mut self, input: &[f64]) -> BinaryHV {
         // Create hypervector from input features
-        let mut result = BinaryHV::zero();
-
-        for (i, &value) in input.iter().enumerate() {
-            if value.abs() > 0.01 {
-                // Bind feature index with feature value encoding
+        let feature_hvs: Vec<BinaryHV> = input
+            .iter()
+            .enumerate()
+            .filter(|(_, &value)| value.abs() > 0.01)
+            .map(|(i, &value)| {
                 let index_hv = BinaryHV::random(i as u64);
                 let value_hv = BinaryHV::random((value * 1000.0) as u64);
-                let feature_hv = index_hv.bind(&value_hv);
-
-                // Bundle into result
-                result = BinaryHV::bundle(&[result, feature_hv]);
-            }
-        }
+                index_hv.bind(&value_hv)
+            })
+            .collect();
+        let result = if feature_hvs.is_empty() {
+            BinaryHV::zero()
+        } else {
+            BinaryHV::bundle(&feature_hvs)
+        };
 
         // Store in semantic memory
         self.semantic_memory.push(result);

@@ -43,7 +43,7 @@ This document formalizes Symthaea's software development lifecycle for complianc
 
 - **Psych-bench regression**: Weekly CI job runs psychological benchmark battery against normative baselines (Stroop, Flanker, N-back, StopSignal, CPT, PVT, DualTask, UG, RME).
 - **Phi validation**: Spectral MIP finder validated against exhaustive search (r=0.99, rho=0.93, 62 data points).
-- **Moral accuracy**: Ethics pipeline validated at 92.9% on Hendrycks ETHICS (4 categories, 2K test).
+- **Moral accuracy**: Ethics pipeline validated at 91.1% moral classification accuracy.
 
 ### 1.5 Deployment
 

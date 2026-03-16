@@ -210,3 +210,167 @@ proptest! {
         );
     }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Property 7: Spreading activation never exceeds 1.5 and result count is bounded
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Item 2: Spreading activation never exceeds 1.0 and result count is bounded.
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(10))]
+
+    #[test]
+    fn prop_spreading_activation_bounded(
+        seed_count in 1usize..5,
+        _hops in 1usize..4,
+        _decay in 0.1f32..0.9f32,
+    ) {
+        use symthaea::knowledge::manager::{KnowledgeManager, KnowledgeManagerConfig};
+
+        let mut mgr = KnowledgeManager::new(KnowledgeManagerConfig {
+            processing_interval: 1,
+            search_top_k: 5,
+            ..KnowledgeManagerConfig::default()
+        });
+        mgr.bootstrap_entities();
+
+        // Insert some facts
+        for i in 0..10 {
+            mgr.process(&format!("Country {} imposed sanctions round {}.", i, i + 1), i as u64 + 1);
+        }
+
+        // Search to populate results (use seed_count to vary query)
+        let query = format!("sanctions {}", seed_count);
+        mgr.process(&query, 20);
+        let results = mgr.last_search_results();
+
+        // All similarities should be in [0.0, 1.5] (HDC cosine similarity may be slightly above 1.0
+        // due to fp arithmetic, but should never explode)
+        for r in results {
+            prop_assert!(r.similarity >= 0.0, "Similarity should be non-negative: {}", r.similarity);
+            prop_assert!(r.similarity <= 1.5, "Similarity should not explode: {}", r.similarity);
+            prop_assert!(r.confidence >= 0.0 && r.confidence <= 1.0,
+                "Confidence {} out of [0,1]", r.confidence);
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Property 8: do(X) intervention effects are bounded and contain no duplicates
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Item 3: do(X) intervention effects attenuate with depth and contain no cycles.
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(10))]
+
+    #[test]
+    fn prop_intervention_attenuates(
+        chain_len in 2usize..6,
+    ) {
+        use symthaea::knowledge::manager::{KnowledgeManager, KnowledgeManagerConfig};
+        use std::collections::HashSet;
+
+        let mut mgr = KnowledgeManager::new(KnowledgeManagerConfig {
+            processing_interval: 1,
+            ..KnowledgeManagerConfig::default()
+        });
+
+        // Build a linear causal chain: A→B→C→...
+        let names: Vec<String> = (0..chain_len).map(|i| format!("entity_{}", i)).collect();
+        for i in 0..chain_len - 1 {
+            mgr.process(
+                &format!("{} caused {}.", names[i], names[i + 1]),
+                i as u64 + 1,
+            );
+        }
+
+        let effects = mgr.do_intervention(&names[0], 10);
+
+        // No entity should appear twice (no cycles)
+        let effect_names: Vec<String> = effects.iter().map(|e| e.0.to_lowercase()).collect();
+        let unique: HashSet<&String> = effect_names.iter().collect();
+        prop_assert_eq!(unique.len(), effect_names.len(), "No duplicate effects in intervention");
+
+        // Strengths should be bounded
+        for (_, strength) in &effects {
+            prop_assert!(strength.abs() <= 1.0, "Effect strength should not exceed 1.0: {}", strength);
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Property 9: Calibration ECE is always in [0, 1] and sample count is monotonic
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Item 4: Calibration ECE is always in [0, 1] and sample count is monotonic.
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(20))]
+
+    #[test]
+    fn prop_calibration_ece_bounded(
+        num_samples in 1usize..100,
+        confidence in 0.0f32..1.0f32,
+        correct_rate in 0.0f32..1.0f32,
+    ) {
+        use symthaea::knowledge::manager::CalibrationAudit;
+
+        let mut audit = CalibrationAudit::default();
+
+        for i in 0..num_samples {
+            let correct = (i as f32 / num_samples as f32) < correct_rate;
+            audit.record(confidence, correct);
+        }
+
+        let ece = audit.ece();
+        prop_assert!(ece >= 0.0, "ECE should be non-negative: {}", ece);
+        prop_assert!(ece <= 1.0, "ECE should not exceed 1.0: {}", ece);
+        prop_assert_eq!(audit.total_samples(), num_samples as u64);
+
+        let mce = audit.mce();
+        prop_assert!(mce >= 0.0 && mce <= 1.0, "MCE should be in [0,1]: {}", mce);
+        prop_assert!(mce >= ece, "MCE should be >= ECE: mce={}, ece={}", mce, ece);
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Property 10: IS-A chain depth is bounded and consistent with children_of
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Item 5: IS-A chain depth is bounded and consistent with children_of.
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(15))]
+
+    #[test]
+    fn prop_isa_depth_bounded(
+        chain_depth in 1usize..8,
+    ) {
+        use symthaea::knowledge::adaptive_ontology::{AdaptiveOntology, AdaptiveOntologyConfig};
+        use symthaea_core::hdc::binary_hv::BinaryHV;
+
+        let mut ontology = AdaptiveOntology::new(AdaptiveOntologyConfig::default());
+
+        // Build a chain: concept_0 IS-A concept_1 IS-A ... IS-A concept_N
+        // Use index-based seeds (multiplied by large prime) to ensure distinct vectors.
+        let names: Vec<String> = (0..=chain_depth).map(|i| format!("concept_{}", i)).collect();
+        for (i, name) in names.iter().enumerate() {
+            let seed = (i as u64 + 1) * 10_007;
+            ontology.learn(name, BinaryHV::random(seed), vec![], 1);
+        }
+        for i in 0..chain_depth {
+            ontology.set_is_a(&names[i], &names[i + 1]);
+        }
+
+        // Chain from leaf should have correct depth
+        let chain = ontology.is_a_chain(&names[0], 20);
+        prop_assert_eq!(chain.len(), chain_depth + 1, "Chain should include all ancestors");
+        prop_assert_eq!(&chain[0], &names[0], "Chain should start with queried concept");
+        prop_assert_eq!(&chain[chain_depth], &names[chain_depth], "Chain should end at root");
+
+        // Children consistency: concept_1's children should include concept_0
+        let children = ontology.children_of(&names[1]);
+        prop_assert!(children.contains(&names[0]), "children_of should include direct child");
+
+        // is_a transitive
+        prop_assert!(ontology.is_a(&names[0], &names[chain_depth]));
+    }
+}

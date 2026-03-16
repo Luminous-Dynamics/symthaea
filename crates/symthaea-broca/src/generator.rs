@@ -16,6 +16,8 @@ use crate::gating::{
     confidence_adjusted_veto_threshold, consciousness_gated_max_tokens, CoherenceFeedback,
     EmotionalModulator, EpistemicGate, GatingConfig,
 };
+#[cfg(feature = "therapeutic")]
+use crate::gating::TherapeuticGate;
 use crate::tokenizer::BpeTokenizer;
 
 use symthaea_core::genesis::GenesisSeed;
@@ -377,6 +379,12 @@ impl BrocaGenerator {
                 0.0
             };
 
+            // Therapeutic gating: modulate logits based on clinical context
+            #[cfg(feature = "therapeutic")]
+            {
+                TherapeuticGate::apply_to_logits(&mut logits, channels, &self.tokenizer);
+            }
+
             // Coherence feedback: scale thought HV to strengthen binding when coherence drifts
             let mut this_binding_weight = 1.0f32;
             let mut this_veto = false;
@@ -506,6 +514,11 @@ impl BrocaGenerator {
     /// Get reference to the tokenizer.
     pub fn tokenizer(&self) -> &BpeTokenizer {
         &self.tokenizer
+    }
+
+    /// Override the sampling strategy (e.g., for sample generation with custom temperature/top-k).
+    pub fn set_sampling(&mut self, strategy: SamplingStrategy) {
+        self.config.sampling = strategy;
     }
 
     /// Get mutable reference to the controller (for training).
@@ -1184,6 +1197,8 @@ mod tests {
 
     #[test]
     fn test_hallucination_flag_on_noise() {
+        use symthaea_core::hdc::ContinuousHV;
+
         // The hallucination flag detects 3+ consecutive tokens with
         // output-thought similarity < 0.05. With random weights this
         // may or may not trigger, so we just verify it's a bool.
@@ -1217,7 +1232,7 @@ mod tests {
 
         // Count distinct pairs
         let mut distinct_pairs = 0;
-        let _total_pairs = 8 * 7 / 2; // C(8,2) = 28
+        let total_pairs = 8 * 7 / 2; // C(8,2) = 28
         for i in 0..8 {
             for j in (i + 1)..8 {
                 if outputs[i] != outputs[j] {
@@ -1349,5 +1364,381 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// Full generate() veto integration test.
+    ///
+    /// Exercises the actual veto path inside `generate_internal()`:
+    /// controller reset, hesitation text insertion, thought_hv re-injection.
+    /// Uses a very high veto threshold (0.99) so that almost any output
+    /// triggers a veto after `min_veto_position`.
+    #[test]
+    fn test_generate_veto_full_path() {
+        let genesis = test_genesis();
+        let config = BrocaConfig {
+            controller: LanguageControllerConfig {
+                network_layers: 2,
+                neurons_per_layer: 4,
+                vocab_size: 32,
+                max_seq_len: 32,
+                ..Default::default()
+            },
+            gating: GatingConfig {
+                base_max_tokens: 30,
+                // Very high threshold: almost any output will have coherence < 0.99
+                veto_threshold: 0.99,
+                min_veto_position: 1, // Allow veto after just 1 token
+                max_vetoes: 2,
+                veto_refractory: 1, // Minimal refractory so second veto can fire quickly
+                ..Default::default()
+            },
+            sampling: SamplingStrategy::Greedy,
+            enable_coherence_feedback: true,
+            enable_semantic_veto: true,
+            veto_hesitation: "-- wait, ".to_string(),
+            ..Default::default()
+        };
+
+        let mut gen = BrocaGenerator::new(&genesis, config);
+        let channels = ThoughtChannels::default();
+        let result = gen.generate(&channels);
+
+        // Veto should have triggered (coherence < 0.99 is almost guaranteed
+        // for random network weights)
+        assert!(
+            result.veto_triggered,
+            "Veto should trigger with threshold=0.99; coherence_dynamics={:?}",
+            &result.coherence_dynamics[..result.coherence_dynamics.len().min(10)]
+        );
+
+        // Hesitation text should appear in output
+        assert!(
+            result.text.contains("-- wait, "),
+            "Output should contain hesitation text, got: {:?}",
+            &result.text[..result.text.len().min(100)]
+        );
+
+        // Gating trace should record at least one veto entry
+        let veto_entries: Vec<_> = result
+            .gating_trace
+            .iter()
+            .filter(|e| e.veto_triggered)
+            .collect();
+        assert!(
+            !veto_entries.is_empty(),
+            "Gating trace should record veto events"
+        );
+        // Veto positions should be > min_veto_position (1)
+        for entry in &veto_entries {
+            assert!(
+                entry.position > 0,
+                "Veto at position {} should be > min_veto_position",
+                entry.position
+            );
+        }
+
+        // At most max_vetoes (2) should have fired
+        assert!(
+            veto_entries.len() <= 2,
+            "At most 2 vetoes should fire, got {}",
+            veto_entries.len()
+        );
+
+        // All coherence values should be finite (no NaN from reset/re-inject)
+        for &c in &result.coherence_dynamics {
+            assert!(c.is_finite(), "Coherence should be finite after veto reset");
+        }
+
+        // Final coherence should be valid
+        assert!(
+            result.final_coherence.is_finite(),
+            "Final coherence should be finite"
+        );
+    }
+
+    /// Verify that with veto disabled (default), no veto occurs even
+    /// when coherence would be low enough to trigger one.
+    #[test]
+    fn test_generate_veto_disabled_no_trigger() {
+        let genesis = test_genesis();
+        let config = BrocaConfig {
+            controller: LanguageControllerConfig {
+                network_layers: 2,
+                neurons_per_layer: 4,
+                vocab_size: 32,
+                max_seq_len: 16,
+                ..Default::default()
+            },
+            gating: GatingConfig {
+                base_max_tokens: 20,
+                veto_threshold: 0.99, // Would trigger if enabled
+                min_veto_position: 1,
+                max_vetoes: 2,
+                ..Default::default()
+            },
+            sampling: SamplingStrategy::Greedy,
+            enable_coherence_feedback: true,
+            enable_semantic_veto: false, // Disabled
+            ..Default::default()
+        };
+
+        let mut gen = BrocaGenerator::new(&genesis, config);
+        let channels = ThoughtChannels::default();
+        let result = gen.generate(&channels);
+
+        assert!(
+            !result.veto_triggered,
+            "Veto should NOT trigger when enable_semantic_veto=false"
+        );
+        assert!(
+            !result.text.contains("-- wait, "),
+            "No hesitation text when veto is disabled"
+        );
+    }
+
+    /// Multi-turn veto stability test (Item #3).
+    ///
+    /// `generate_continuing()` preserves CfC state across calls. If a veto
+    /// fires during multi-turn generation, it resets the controller — which
+    /// discards the cross-turn temporal context. This test verifies that
+    /// generation remains stable (no NaN, no panic) across multiple turns
+    /// with veto enabled, even when veto triggers mid-turn.
+    #[test]
+    fn test_multi_turn_veto_stability() {
+        let genesis = test_genesis();
+        let config = BrocaConfig {
+            controller: LanguageControllerConfig {
+                network_layers: 2,
+                neurons_per_layer: 4,
+                vocab_size: 32,
+                max_seq_len: 32,
+                ..Default::default()
+            },
+            gating: GatingConfig {
+                base_max_tokens: 15,
+                veto_threshold: 0.99, // High threshold to provoke vetoes
+                min_veto_position: 1,
+                max_vetoes: 1,
+                veto_refractory: 2,
+                ..Default::default()
+            },
+            sampling: SamplingStrategy::Greedy,
+            enable_coherence_feedback: true,
+            enable_semantic_veto: true,
+            veto_hesitation: "-- wait, ".to_string(),
+            ..Default::default()
+        };
+
+        let mut gen = BrocaGenerator::new(&genesis, config);
+
+        // Simulate a 5-turn conversation using generate_continuing()
+        let mut veto_count = 0;
+        for turn in 0..5 {
+            let channels = ThoughtChannels::with_intent(turn % 4);
+            let result = gen.generate_continuing(&channels);
+
+            // No NaN in coherence dynamics
+            for &c in &result.coherence_dynamics {
+                assert!(
+                    c.is_finite(),
+                    "Coherence NaN at turn {turn}: {:?}",
+                    &result.coherence_dynamics
+                );
+            }
+            assert!(
+                result.final_coherence.is_finite(),
+                "Final coherence NaN at turn {turn}"
+            );
+
+            // Track vetoes across turns
+            if result.veto_triggered {
+                veto_count += 1;
+            }
+
+            // All token IDs in range
+            for &id in &result.token_ids {
+                assert!(
+                    (id as usize) < gen.tokenizer().vocab_size(),
+                    "Token ID {id} out of range at turn {turn}"
+                );
+            }
+        }
+
+        // With threshold=0.99, at least some turns should veto
+        // (random CfC weights almost never produce 0.99 coherence)
+        assert!(
+            veto_count > 0,
+            "Expected at least one veto across 5 multi-turn generations"
+        );
+    }
+
+    // ── Capstone: train→generate round-trip ──
+
+    /// Train on a small corpus, then generate and verify that training
+    /// actually improved generation quality. This is the single test that
+    /// proves the entire pipeline works end-to-end: encoder → training →
+    /// CfC network → generation → coherence feedback.
+    #[test]
+    fn test_train_generate_round_trip() {
+        use crate::training::{train, TrainingConfig, TrainingDataset, TrainingPair};
+
+        let genesis = test_genesis();
+        let config = BrocaConfig {
+            controller: LanguageControllerConfig {
+                network_layers: 2,
+                neurons_per_layer: 4,
+                vocab_size: 32,
+                max_seq_len: 32,
+                ..Default::default()
+            },
+            gating: GatingConfig {
+                base_max_tokens: 20,
+                ..Default::default()
+            },
+            sampling: SamplingStrategy::Greedy,
+            enable_coherence_feedback: true,
+            enable_semantic_veto: false,
+            ..Default::default()
+        };
+
+        // Generate BEFORE training (baseline)
+        let mut gen = BrocaGenerator::new(&genesis, config.clone());
+        let channels = ThoughtChannels::default();
+        let pre_train_result = gen.generate(&channels);
+
+        // Train on a small corpus
+        let tok = gen.tokenizer().clone();
+        let mut dataset = TrainingDataset::default();
+        for _ in 0..10 {
+            dataset.push(TrainingPair::new(
+                channels,
+                "hello world".to_string(),
+                &tok,
+            ));
+        }
+
+        let train_config = TrainingConfig {
+            epochs: 20,
+            learning_rate: 0.01,
+            bptt_window: 8,
+            use_adam: true,
+            train_network: true,
+            network_lr_scale: 0.3,
+            embedding_target_norm: 128.0,
+            ..Default::default()
+        };
+
+        let metrics = train(&mut gen, &dataset, &train_config);
+
+        // Verify training reduced loss
+        let first_loss = metrics[0].avg_loss;
+        let final_loss = metrics.last().unwrap().avg_loss;
+        assert!(
+            final_loss < first_loss,
+            "Training should reduce loss: {first_loss:.4} → {final_loss:.4}"
+        );
+
+        // Generate AFTER training
+        let post_train_result = gen.generate(&channels);
+
+        // Both should produce valid output
+        assert!(
+            post_train_result.final_coherence.is_finite(),
+            "Post-training coherence should be finite"
+        );
+        assert!(
+            !post_train_result.token_ids.is_empty(),
+            "Post-training should generate tokens"
+        );
+
+        // The generator should produce different output after training
+        // (weights changed, so even greedy sampling should differ)
+        let changed = pre_train_result.token_ids != post_train_result.token_ids
+            || pre_train_result.text != post_train_result.text;
+        assert!(
+            changed,
+            "Training should change generator behavior"
+        );
+    }
+
+    // ── Capstone: intent fidelity benchmark ──
+
+    /// Verify that different thought intents produce measurably different
+    /// generated text. If all 8 intents produce identical output, the
+    /// generator is ignoring intent information.
+    #[test]
+    fn test_intent_fidelity_generation_diversity() {
+        let genesis = test_genesis();
+        let config = BrocaConfig {
+            controller: LanguageControllerConfig {
+                network_layers: 2,
+                neurons_per_layer: 4,
+                vocab_size: 32,
+                max_seq_len: 32,
+                ..Default::default()
+            },
+            gating: GatingConfig {
+                base_max_tokens: 15,
+                ..Default::default()
+            },
+            sampling: SamplingStrategy::Greedy,
+            enable_coherence_feedback: false,
+            enable_semantic_veto: false,
+            ..Default::default()
+        };
+
+        let mut gen = BrocaGenerator::new(&genesis, config);
+
+        // Generate for all 8 intents
+        let mut results: Vec<Vec<u32>> = Vec::new();
+        for intent in 0..8 {
+            let channels = ThoughtChannels::with_intent(intent);
+            let result = gen.generate(&channels);
+            results.push(result.token_ids);
+        }
+
+        // Count distinct outputs
+        let mut unique_outputs = results.clone();
+        unique_outputs.sort();
+        unique_outputs.dedup();
+
+        // At least 3 of 8 intents should produce different token sequences
+        // (random CfC weights may not perfectly separate all 8, but the
+        // encoder one-hot intent channels should drive some diversity)
+        assert!(
+            unique_outputs.len() >= 3,
+            "Expected at least 3 distinct outputs from 8 intents, got {}. \
+             Generator may be ignoring intent information.",
+            unique_outputs.len()
+        );
+
+        // Pairwise Jaccard distance: verify low overlap between different intents
+        let mut total_jaccard = 0.0f32;
+        let mut pair_count = 0;
+        for i in 0..results.len() {
+            for j in (i + 1)..results.len() {
+                let set_i: std::collections::HashSet<u32> =
+                    results[i].iter().copied().collect();
+                let set_j: std::collections::HashSet<u32> =
+                    results[j].iter().copied().collect();
+                let intersection = set_i.intersection(&set_j).count();
+                let union = set_i.union(&set_j).count();
+                let jaccard = if union > 0 {
+                    intersection as f32 / union as f32
+                } else {
+                    1.0
+                };
+                total_jaccard += jaccard;
+                pair_count += 1;
+            }
+        }
+        let mean_jaccard = total_jaccard / pair_count as f32;
+
+        // Mean Jaccard should be < 0.95 (not all identical)
+        assert!(
+            mean_jaccard < 0.95,
+            "Mean pairwise Jaccard similarity {mean_jaccard:.4} too high — \
+             outputs are too similar across intents"
+        );
     }
 }

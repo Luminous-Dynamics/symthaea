@@ -12,6 +12,8 @@
 use std::collections::HashMap;
 use symthaea_core::hdc::unified_hv::{BinaryHV, HDC_DIMENSION};
 
+use crate::knowledge::persistence::OntologyRecord;
+
 // ── Types ──────────────────────────────────────────────────────────────────
 
 /// Usage statistics for a learned primitive
@@ -32,6 +34,9 @@ pub struct PrimitiveUsage {
     pub last_used_cycle: u64,
     /// Whether this primitive was composed from existing ones
     pub parent_names: Vec<String>,
+    /// IS-A parent concept name (e.g., "dog" is_a "animal").
+    /// Science: Quillian (1967) — semantic networks; Collins & Loftus (1975).
+    pub is_a_parent: Option<String>,
 }
 
 /// Configuration for the adaptive ontology
@@ -207,11 +212,22 @@ impl AdaptiveOntology {
             created_at_cycle: current_cycle,
             last_used_cycle: current_cycle,
             parent_names,
+            is_a_parent: None,
         };
 
         self.primitives.insert(name.to_string(), usage);
         self.total_created += 1;
         true
+    }
+
+    /// Set the IS-A parent for a primitive (taxonomic relation).
+    ///
+    /// Example: `set_is_a("dog", "animal")` means "dog IS-A animal".
+    /// Science: Quillian (1967) — semantic networks; Collins & Loftus (1975).
+    pub fn set_is_a(&mut self, child: &str, parent: &str) {
+        if let Some(usage) = self.primitives.get_mut(child) {
+            usage.is_a_parent = Some(parent.to_string());
+        }
     }
 
     /// Record utility feedback for a primitive.
@@ -285,48 +301,44 @@ impl AdaptiveOntology {
         sum / self.primitives.len() as f64
     }
 
-    /// Export ontology primitives as persistence records.
-    pub fn export_records(&self) -> Vec<super::persistence::OntologyRecord> {
+    /// Export all primitives as persistence records for SQLite storage.
+    pub fn export_ontology_records(&self) -> Vec<OntologyRecord> {
         self.primitives
             .values()
-            .map(|p| super::persistence::OntologyRecord {
-                name: p.name.clone(),
-                vector_bytes: p.vector.0.to_vec(),
-                usage_count: p.usage_count,
-                utility: p.utility,
-                created_at_cycle: p.created_at_cycle,
-                last_used_cycle: p.last_used_cycle,
+            .map(|u| OntologyRecord {
+                name: u.name.clone(),
+                vector_bytes: u.vector.0.to_vec(),
+                usage_count: u.usage_count,
+                utility: u.utility,
+                created_at_cycle: u.created_at_cycle,
+                last_used_cycle: u.last_used_cycle,
+                is_a_parent: u.is_a_parent.clone(),
             })
             .collect()
     }
 
-    /// Import a primitive from a persistence record.
+    /// Import a primitive from a persistence record loaded from SQLite.
     ///
-    /// Skips if already at capacity or primitive already exists.
-    pub fn import_record(&mut self, record: &super::persistence::OntologyRecord) {
-        if self.primitives.contains_key(&record.name) {
+    /// Silently skips records whose vector bytes are the wrong length.
+    pub fn import_ontology_record(&mut self, record: &OntologyRecord) {
+        if record.vector_bytes.len() < BinaryHV::BYTES {
             return;
         }
-        if self.primitives.len() >= self.config.max_primitives {
-            return;
+        let mut arr = [0u8; BinaryHV::BYTES];
+        arr.copy_from_slice(&record.vector_bytes[..BinaryHV::BYTES]);
+        let vector = BinaryHV(arr);
+        // Use `learn` to insert without overwriting existing primitives
+        // (it merges via Hebbian update if a similar primitive already exists).
+        self.learn(&record.name, vector, Vec::new(), record.created_at_cycle);
+        // Restore persisted statistics if the primitive was inserted (not merged).
+        if let Some(u) = self.primitives.get_mut(&record.name) {
+            u.usage_count = u.usage_count.max(record.usage_count);
+            u.utility = record.utility;
+            u.last_used_cycle = record.last_used_cycle;
+            if record.is_a_parent.is_some() {
+                u.is_a_parent = record.is_a_parent.clone();
+            }
         }
-        if record.vector_bytes.len() != 2048 {
-            return;
-        }
-        let mut arr = [0u8; 2048];
-        arr.copy_from_slice(&record.vector_bytes);
-        self.primitives.insert(
-            record.name.clone(),
-            PrimitiveUsage {
-                name: record.name.clone(),
-                vector: BinaryHV(arr),
-                usage_count: record.usage_count,
-                utility: record.utility,
-                created_at_cycle: record.created_at_cycle,
-                last_used_cycle: record.last_used_cycle,
-                parent_names: Vec::new(),
-            },
-        );
     }
 }
 

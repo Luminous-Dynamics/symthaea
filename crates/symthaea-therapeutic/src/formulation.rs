@@ -143,6 +143,71 @@ impl CaseFormulation {
             && !self.perpetuating.is_empty()
             && !self.protective.is_empty()
     }
+
+    /// Auto-detect formulation factors from affect trajectory patterns.
+    ///
+    /// Detects three clinically meaningful patterns:
+    /// - **Depression-like**: Sustained low valence + low arousal (negative valence mean < -0.3, arousal mean < 0.4)
+    /// - **Anxiety-like**: Sustained negative valence + high arousal (negative valence mean < -0.2, arousal mean > 0.65)
+    /// - **Dysregulation**: High affect variability (valence std dev > 0.4)
+    ///
+    /// Only adds factors not already present. Requires at least `min_window` snapshots.
+    ///
+    /// Science: Wichers et al. (2015) — affect dynamics as early warning signals.
+    pub fn detect_patterns(&mut self, trajectory: &std::collections::VecDeque<super::client_model::CoreAffectSnapshot>, min_window: usize) {
+        if trajectory.len() < min_window {
+            return;
+        }
+
+        let n = trajectory.len() as f32;
+        let mean_valence = trajectory.iter().map(|a| a.valence).sum::<f32>() / n;
+        let mean_arousal = trajectory.iter().map(|a| a.arousal).sum::<f32>() / n;
+        let valence_var = trajectory.iter()
+            .map(|a| (a.valence - mean_valence).powi(2))
+            .sum::<f32>() / n;
+        let valence_std = valence_var.sqrt();
+
+        let has_factor = |factors: &[FormulationFactor], pattern: &str| -> bool {
+            factors.iter().any(|f| f.description.contains(pattern))
+        };
+
+        // Depression-like: sustained low valence + low arousal
+        if mean_valence < -0.3 && mean_arousal < 0.4
+            && !has_factor(&self.perpetuating, "low mood")
+        {
+            let confidence = ((-mean_valence - 0.3) * 2.0).clamp(0.3, 0.9);
+            self.add_perpetuating("persistent low mood and low activation pattern", confidence);
+        }
+
+        // Anxiety-like: negative valence + high arousal
+        if mean_valence < -0.2 && mean_arousal > 0.65
+            && !has_factor(&self.perpetuating, "anxious activation")
+        {
+            let confidence = ((mean_arousal - 0.65) * 3.0 + 0.3).clamp(0.3, 0.9);
+            self.add_perpetuating("sustained anxious activation pattern", confidence);
+        }
+
+        // Dysregulation: high variability in valence
+        if valence_std > 0.4
+            && !has_factor(&self.perpetuating, "affect dysregulation")
+        {
+            let confidence = ((valence_std - 0.4) * 2.0 + 0.3).clamp(0.3, 0.9);
+            self.add_perpetuating("affect dysregulation — high emotional variability", confidence);
+        }
+
+        // Protective: if recent trend is improving (last quarter vs first quarter)
+        if trajectory.len() >= 20 {
+            let quarter = trajectory.len() / 4;
+            let early_mean: f32 = trajectory.iter().take(quarter).map(|a| a.valence).sum::<f32>() / quarter as f32;
+            let late_mean: f32 = trajectory.iter().rev().take(quarter).map(|a| a.valence).sum::<f32>() / quarter as f32;
+            if late_mean - early_mean > 0.2
+                && !has_factor(&self.protective, "improving affect trajectory")
+            {
+                let confidence = ((late_mean - early_mean - 0.2) * 2.0 + 0.5).clamp(0.5, 0.9);
+                self.add_protective("improving affect trajectory", confidence);
+            }
+        }
+    }
 }
 
 impl Default for CaseFormulation {
@@ -216,5 +281,96 @@ mod tests {
             confidence: 0.7,
         });
         assert_eq!(form.belief_chains.len(), 1);
+    }
+
+    // ── Pattern detection tests ──────────────────────────────────────────
+
+    use std::collections::VecDeque;
+    use crate::client_model::CoreAffectSnapshot;
+
+    fn make_trajectory(valence: f32, arousal: f32, n: usize) -> VecDeque<CoreAffectSnapshot> {
+        (0..n).map(|i| CoreAffectSnapshot::new(valence, arousal, i as u64)).collect()
+    }
+
+    #[test]
+    fn test_detect_depression_pattern() {
+        let mut form = CaseFormulation::new();
+        let traj = make_trajectory(-0.5, 0.2, 40);
+        form.detect_patterns(&traj, 20);
+        assert!(
+            form.perpetuating.iter().any(|f| f.description.contains("low mood")),
+            "should detect depression-like pattern"
+        );
+    }
+
+    #[test]
+    fn test_detect_anxiety_pattern() {
+        let mut form = CaseFormulation::new();
+        let traj = make_trajectory(-0.4, 0.8, 40);
+        form.detect_patterns(&traj, 20);
+        assert!(
+            form.perpetuating.iter().any(|f| f.description.contains("anxious activation")),
+            "should detect anxiety-like pattern"
+        );
+    }
+
+    #[test]
+    fn test_detect_dysregulation_pattern() {
+        let mut form = CaseFormulation::new();
+        // Alternating extreme valence → high std dev
+        let mut traj: VecDeque<CoreAffectSnapshot> = VecDeque::new();
+        for i in 0..40 {
+            let v = if i % 2 == 0 { 0.8 } else { -0.8 };
+            traj.push_back(CoreAffectSnapshot::new(v, 0.5, i as u64));
+        }
+        form.detect_patterns(&traj, 20);
+        assert!(
+            form.perpetuating.iter().any(|f| f.description.contains("dysregulation")),
+            "should detect dysregulation pattern"
+        );
+    }
+
+    #[test]
+    fn test_detect_improving_trajectory() {
+        let mut form = CaseFormulation::new();
+        let mut traj: VecDeque<CoreAffectSnapshot> = VecDeque::new();
+        for i in 0..40 {
+            let v = -0.5 + (i as f32 / 40.0); // -0.5 to +0.5
+            traj.push_back(CoreAffectSnapshot::new(v, 0.5, i as u64));
+        }
+        form.detect_patterns(&traj, 20);
+        assert!(
+            form.protective.iter().any(|f| f.description.contains("improving")),
+            "should detect improving trajectory as protective factor"
+        );
+    }
+
+    #[test]
+    fn test_detect_no_pattern_insufficient_data() {
+        let mut form = CaseFormulation::new();
+        let traj = make_trajectory(-0.5, 0.2, 5); // too few
+        form.detect_patterns(&traj, 20);
+        assert_eq!(form.perpetuating.len(), 0, "should not detect with insufficient data");
+    }
+
+    #[test]
+    fn test_detect_no_duplicate_patterns() {
+        let mut form = CaseFormulation::new();
+        let traj = make_trajectory(-0.5, 0.2, 40);
+        form.detect_patterns(&traj, 20);
+        form.detect_patterns(&traj, 20); // second call
+        let low_mood_count = form.perpetuating.iter()
+            .filter(|f| f.description.contains("low mood"))
+            .count();
+        assert_eq!(low_mood_count, 1, "should not duplicate pattern factors");
+    }
+
+    #[test]
+    fn test_neutral_trajectory_no_patterns() {
+        let mut form = CaseFormulation::new();
+        let traj = make_trajectory(0.0, 0.5, 40);
+        form.detect_patterns(&traj, 20);
+        assert!(form.perpetuating.is_empty(), "neutral trajectory should not trigger patterns");
+        assert!(form.protective.is_empty());
     }
 }

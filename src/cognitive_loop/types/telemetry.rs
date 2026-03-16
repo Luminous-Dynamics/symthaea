@@ -152,6 +152,185 @@ pub struct NeuromodTelemetry {
     pub inhibition_errors_this_cycle: u8,
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// CONSCIOUSNESS-LEVEL METRICS — master consciousness equation + weights
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Consciousness equation outputs and dynamic weight convergence telemetry.
+///
+/// Groups the master consciousness level, profile composite, synergy scores,
+/// gradient analysis, and weight convergence tracking that were previously
+/// flat fields on `CycleMetadata`.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ConsciousnessLevelMetrics {
+    /// Master Consciousness Equation level (0.0 to 1.0).
+    /// Comprehensive consciousness metric combining Phi, broadcast, working memory,
+    /// attention, recurrence, embodiment, knowledge, narrative, and social factors.
+    /// Updated every 10th cycle; 0.0 when not yet computed.
+    pub consciousness_level: f64,
+    /// Multi-dimensional consciousness composite score (0.0 when off).
+    pub consciousness_profile_composite: f64,
+    /// Synergy-enhanced composite (non-linear dimension interactions, 0.0 when off).
+    pub synergy_enhanced_composite: f64,
+    /// Number of emergent consciousness properties detected (0 when off).
+    pub emergent_properties_count: usize,
+    /// Detected consciousness state label (e.g., "Awake", "Alert", "" when off).
+    pub consciousness_state_label: String,
+    /// Consciousness state level (0.0–1.0, from NSM grounding, 0.0 when off).
+    pub consciousness_state_level: f64,
+    /// Dynamic consciousness weights [spectral, equation, pipeline, multimodal].
+    pub consciousness_weights: [f64; 4],
+    /// Weight stability variance (0.0 = stable, >0.01 = oscillating).
+    pub consciousness_weight_variance: f64,
+    /// Layer disagreement score (0.0 = agreement, higher = divergence).
+    #[serde(default)]
+    pub consciousness_layer_disagreement: f64,
+    /// Weakest consciousness layer label (empty when not computed).
+    #[serde(default)]
+    pub consciousness_weakest_layer: String,
+    /// Differentiable consciousness gradient magnitude (0.0 when off).
+    pub consciousness_gradient_magnitude: f64,
+    /// Limiting component identified by gradient analysis ("" when off).
+    pub consciousness_limiting_component: String,
+    /// Weight convergence state label (Initializing/Converging/Converged/Oscillating).
+    pub weight_convergence_state: String,
+    /// Cycle at which weights converged (0 if not yet).
+    pub convergence_cycle: usize,
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// EMBODIED-AFFECT METRICS — body, affect, mood, somatic
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Embodied cognition and affective state telemetry.
+///
+/// Groups body model, affective bridge, mood temperature, and somatic stress
+/// that were previously flat fields on `CycleMetadata`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EmbodiedAffectMetrics {
+    /// Virtual body phi modulation (1.0 = neutral, >1 = body boosts consciousness).
+    pub body_phi_modulation: f64,
+    /// Virtual body affect valence (-1 to 1).
+    pub body_valence: f32,
+    /// Virtual body affect arousal (0 to 1).
+    pub body_arousal: f32,
+    /// Embodied cognition phi modulation (1.0 = neutral).
+    /// 1.0 when embodied cognition is not enabled.
+    pub embodied_phi_modulation: f64,
+    /// Embodied cognition agency score (0.0 to 1.0).
+    /// 0.0 when embodied cognition is not enabled.
+    pub embodied_agency: f64,
+    /// Affective bridge valence (-1 to 1, 0.0 when off).
+    pub affective_valence: f32,
+    /// Affective bridge arousal (0 to 1, 0.5 when off — neutral).
+    pub affective_arousal: f32,
+    /// Affective consciousness valence (-1.0 to 1.0, 0.0 when off).
+    pub affect_consciousness_valence: f32,
+    /// Affective consciousness arousal (0.0–1.0, 0.0 when off).
+    pub affect_consciousness_arousal: f32,
+    /// Affective bias: cognitive temperature (0.0 to 2.0).
+    pub mood_temperature: f32,
+    /// Somatic stress from infrastructure errors (0.0 = healthy, 1.0 = critical).
+    /// Fed by the SomaticErrorBridge: lock poisoning, task panics, DB failures.
+    pub somatic_stress: f64,
+}
+
+impl Default for EmbodiedAffectMetrics {
+    fn default() -> Self {
+        Self {
+            body_phi_modulation: 1.0,
+            embodied_phi_modulation: 1.0,
+            affective_arousal: 0.5,
+            mood_temperature: 1.0,
+            body_valence: 0.0,
+            body_arousal: 0.0,
+            embodied_agency: 0.0,
+            affective_valence: 0.0,
+            affect_consciousness_valence: 0.0,
+            affect_consciousness_arousal: 0.0,
+            somatic_stress: 0.0,
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// STRUCTURAL PHI METRICS — hierarchical decomposition + spectral MIP
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Structural Phi decomposition and spectral MIP telemetry.
+///
+/// Groups micro/meso/macro Phi, sigma, spectral and hierarchical MIP that
+/// were previously flat fields on `CycleMetadata`.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct StructuralPhiMetrics {
+    /// Micro-Phi: within-cluster integration (0 when not computed).
+    pub structural_micro_phi: f64,
+    /// Meso-Phi: inter-cluster integration (0 when not computed).
+    pub structural_meso_phi: f64,
+    /// Macro-Phi: global spectral MIP (0 when not computed).
+    pub structural_macro_phi: f64,
+    /// Bottleneck score: gap between macro and meso Phi.
+    pub structural_bottleneck: f64,
+    /// Emergence ratio: macro / (micro + meso); > 1.0 = emergent.
+    pub structural_emergence_ratio: f64,
+    /// Number of detected clusters in hierarchical decomposition.
+    pub structural_num_clusters: usize,
+    /// Σ (Sigma) — Synergistic integration via covariance-based Phi* (Layer 2).
+    /// `None` when not computed this cycle (only computed every N cycles).
+    pub sigma: Option<f64>,
+    /// Spectral MIP Phi — O(n³) Fiedler-ordered MIP approximation (Layer 2+).
+    /// `None` when not computed this cycle (only computed every 50 cycles).
+    pub spectral_mip_phi: Option<f64>,
+    /// Hierarchical spectral MIP Phi (multi-scale: 32→64→128 components).
+    /// Uses coarser scales to focus finer scales on the MIP boundary region.
+    /// `None` when not computed this cycle (only computed every 100 cycles).
+    pub hierarchical_mip_phi: Option<f64>,
+    /// Number of scales used in hierarchical MIP (0 when not computed).
+    pub hierarchical_mip_scales: usize,
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TEMPORAL-PHENOMENAL METRICS — temporal coherence, binding, thermodynamics
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Temporal consciousness, phenomenal binding, and thermodynamic telemetry.
+///
+/// Groups temporal coherence/continuity, phenomenal binding, holographic unity,
+/// cross-modal binding, and thermodynamic fields that were previously flat
+/// fields on `CycleMetadata`.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct TemporalPhenomenalMetrics {
+    /// Temporal consciousness coherence (0.0 to 1.0).
+    /// 0.0 when temporal consciousness is not enabled.
+    pub temporal_coherence_score: f64,
+    /// Whether temporal consciousness analysis detected a discontinuity.
+    pub temporal_discontinuity: bool,
+    /// Number of causal chains detected by temporal analyzer (0 when off).
+    pub temporal_causal_chains: usize,
+    /// Temporal continuity ratio (0.0–1.0, 0.0 when off).
+    pub temporal_continuity: f64,
+    /// Longest causal chain length (0 when off).
+    pub temporal_max_chain_length: usize,
+    /// Phenomenal binding strength Ψ (0.0 when off).
+    pub phenomenal_binding_strength: f64,
+    /// Whether phenomenal binding detected fragmentation.
+    pub phenomenal_fragmented: bool,
+    /// Holographic consciousness unity score (0.0–1.0, 0.0 when off).
+    pub holographic_unity: f64,
+    /// Holographic binding strength (0.0 when off).
+    pub holographic_binding: f64,
+    /// Cross-modal binding strength (0.0 when off).
+    pub cross_modal_binding_strength: f32,
+    /// Cross-modal integration Phi (0.0 when off).
+    pub cross_modal_psi: f64,
+    /// Consciousness thermodynamic entropy (0.0 when off).
+    pub thermodynamic_entropy: f64,
+    /// Consciousness thermodynamic free energy (0.0 when off).
+    pub thermodynamic_free_energy: f64,
+    /// Thermodynamic load (0.0 to 1.0, where 1.0 = 6W limit reached).
+    pub thermodynamic_load: f32,
+}
+
 /// Metadata about internal decision-making during a cycle.
 ///
 /// Provides observability into which subsystems influenced the cycle's output,
@@ -211,20 +390,13 @@ pub struct CycleMetadata {
     /// Narrative self-model's integrated information (0.0 = off/no self, >0 = active self-Φ)
     pub narrative_self_psi: f64,
 
-    /// Virtual body phi modulation (1.0 = neutral, >1 = body boosts consciousness)
-    pub body_phi_modulation: f64,
+    /// Consciousness equation outputs, weights, and convergence telemetry.
+    #[serde(flatten, default)]
+    pub consciousness: ConsciousnessLevelMetrics,
 
-    /// Virtual body affect valence (-1 to 1)
-    pub body_valence: f32,
-
-    /// Virtual body affect arousal (0 to 1)
-    pub body_arousal: f32,
-
-    /// Master Consciousness Equation level (0.0 to 1.0).
-    /// Comprehensive consciousness metric combining Phi, broadcast, working memory,
-    /// attention, recurrence, embodiment, knowledge, narrative, and social factors.
-    /// Updated every 10th cycle; 0.0 when not yet computed.
-    pub consciousness_level: f64,
+    /// Embodied cognition, affective state, mood, and somatic stress telemetry.
+    #[serde(flatten, default)]
+    pub embodied: EmbodiedAffectMetrics,
 
     /// Predictive self-model safety score (1.0 = safe, 0.0 = unsafe).
     /// 0.0 when predictive self is not enabled.
@@ -242,20 +414,13 @@ pub struct CycleMetadata {
     /// 0.0 when quantum coherence is not enabled.
     pub quantum_coherence_level: f64,
 
-    /// Temporal consciousness coherence (0.0 to 1.0).
-    /// 0.0 when temporal consciousness is not enabled.
-    pub temporal_coherence_score: f64,
+    /// Temporal consciousness, phenomenal binding, and thermodynamic telemetry.
+    #[serde(flatten, default)]
+    pub temporal: TemporalPhenomenalMetrics,
 
-    /// Whether temporal consciousness analysis detected a discontinuity.
-    pub temporal_discontinuity: bool,
-
-    /// Embodied cognition phi modulation (1.0 = neutral).
-    /// 1.0 when embodied cognition is not enabled.
-    pub embodied_phi_modulation: f64,
-
-    /// Embodied cognition agency score (0.0 to 1.0).
-    /// 0.0 when embodied cognition is not enabled.
-    pub embodied_agency: f64,
+    /// Structural Phi decomposition and spectral MIP telemetry.
+    #[serde(flatten, default)]
+    pub structural: StructuralPhiMetrics,
 
     /// Whether the narrative-GWT integration vetoed this cycle's action.
     pub narrative_gwt_veto: bool,
@@ -267,16 +432,6 @@ pub struct CycleMetadata {
     /// Measures overall "aliveness" of the system via life-mind continuity.
     /// 0.0 when full_consciousness feature is not enabled.
     pub living_mind_vitality: f64,
-
-    /// Thermodynamic load (0.0 to 1.0, where 1.0 = 6W limit reached).
-    pub thermodynamic_load: f32,
-
-    /// Somatic stress from infrastructure errors (0.0 = healthy, 1.0 = critical).
-    /// Fed by the SomaticErrorBridge: lock poisoning, task panics, DB failures.
-    pub somatic_stress: f64,
-
-    /// Affective bias: cognitive temperature (0.0 to 2.0).
-    pub mood_temperature: f32,
 
     /// Unified Living Mind coherence (0.0 to 1.0).
     /// Measures integration quality of autopoietic, enactive, and predictive subsystems.
@@ -295,42 +450,12 @@ pub struct CycleMetadata {
     #[serde(flatten)]
     pub fep: FepTelemetry,
 
-    /// Cross-modal binding strength (0.0 when off).
-    pub cross_modal_binding_strength: f32,
-
-    /// Cross-modal integration Phi (0.0 when off).
-    pub cross_modal_psi: f64,
-
-    /// Affective bridge valence (-1 to 1, 0.0 when off).
-    pub affective_valence: f32,
-
-    /// Affective bridge arousal (0 to 1, 0.5 when off — neutral).
-    pub affective_arousal: f32,
-
-    /// Consciousness thermodynamic entropy (0.0 when off).
-    pub thermodynamic_entropy: f64,
-
-    /// Consciousness thermodynamic free energy (0.0 when off).
-    pub thermodynamic_free_energy: f64,
-
-    /// Phenomenal binding strength Ψ (0.0 when off).
-    pub phenomenal_binding_strength: f64,
-
-    /// Whether phenomenal binding detected fragmentation.
-    pub phenomenal_fragmented: bool,
-
     /// Hierarchical total free energy (0.0 when off).
     pub hierarchical_total_free_energy: f64,
 
     /// Phi estimate from primitive consciousness decomposition (0.0 when off).
     pub primitive_psi: f64,
 
-    /// Number of causal chains detected by temporal analyzer (0 when off).
-    pub temporal_causal_chains: usize,
-    /// Temporal continuity ratio (0.0–1.0, 0.0 when off).
-    pub temporal_continuity: f64,
-    /// Longest causal chain length (0 when off).
-    pub temporal_max_chain_length: usize,
     /// Primitive lattice height (depth of cognitive integration, 0 when off).
     pub lattice_height: usize,
     /// Primitive lattice width (max parallelism at any level, 0 when off).
@@ -358,12 +483,6 @@ pub struct CycleMetadata {
     pub multi_obj_frontier_size: usize,
 
     // ── Session 2: Consciousness Profile + Synergies + Context ─────────────
-    /// Multi-dimensional consciousness composite score (0.0 when off).
-    pub consciousness_profile_composite: f64,
-    /// Synergy-enhanced composite (non-linear dimension interactions, 0.0 when off).
-    pub synergy_enhanced_composite: f64,
-    /// Number of emergent consciousness properties detected (0 when off).
-    pub emergent_properties_count: usize,
     /// Current reasoning context detected from input (empty when off).
     pub reasoning_context: String,
     /// Context-aware Phi weight for current context (0.0 when off).
@@ -403,30 +522,14 @@ pub struct CycleMetadata {
     pub epistemic_conflict_count: usize,
 
     // ── Session 6: Holographic + Differentiable + Affective + Pipeline + MultiModal ──
-    /// Holographic consciousness unity score (0.0–1.0, 0.0 when off).
-    pub holographic_unity: f64,
-    /// Holographic binding strength (0.0 when off).
-    pub holographic_binding: f64,
-    /// Differentiable consciousness gradient magnitude (0.0 when off).
-    pub consciousness_gradient_magnitude: f64,
-    /// Limiting component identified by gradient analysis ("" when off).
-    pub consciousness_limiting_component: String,
     /// Equation V2 limiting component from ConsciousnessEngine ("" when off).
     pub eq_v2_limiting_component: String,
-    /// Affective consciousness valence (-1.0 to 1.0, 0.0 when off).
-    pub affect_consciousness_valence: f32,
-    /// Affective consciousness arousal (0.0–1.0, 0.0 when off).
-    pub affect_consciousness_arousal: f32,
     /// Unified pipeline consciousness score (0.0 when off).
     pub pipeline_consciousness: f64,
     /// Multi-modal integrated phi (0.0 when off).
     pub multimodal_integrated_phi: f64,
 
     // ── Session 7: Synthetic States + Epistemic Gate ────────────────────
-    /// Detected consciousness state label (e.g., "Awake", "Alert", "" when off).
-    pub consciousness_state_label: String,
-    /// Consciousness state level (0.0–1.0, from NSM grounding, 0.0 when off).
-    pub consciousness_state_level: f64,
     /// Epistemic gate confidence (0.0–1.0, 0.5 when off).
     pub epistemic_gate_confidence: f32,
     /// Whether epistemic gate approved the current cycle's action.
@@ -463,6 +566,24 @@ pub struct CycleMetadata {
     /// 0.0 when no learning occurred.
     pub actual_effective_lr: f32,
 
+    /// Cognitive group geometric mean (flow x semantic x reasoning x curiosity). 1.0 = neutral.
+    pub lr_cognitive_mod: f32,
+
+    /// Meta-learning group geometric mean (FEP x MCE x subsystem). 1.0 = neutral.
+    pub lr_meta_mod: f32,
+
+    /// Total feedback proposals this cycle across all 4 channels.
+    pub feedback_proposal_count: u32,
+
+    /// Average conflict ratio across feedback channels (0.0 = unanimous, 0.5 = max conflict).
+    pub feedback_conflict_ratio: f32,
+
+    /// Feedback proposal counts per priority: [Aesthetic, Cognitive, Homeostatic, Safety].
+    pub feedback_priority_counts: [u32; 4],
+
+    /// Feedback signal diversity (unique sources / total proposals).
+    pub feedback_diversity: f32,
+
     /// Cycle reward signal (internal + external blend, -1.0 to 1.0).
     pub cycle_reward: f32,
 
@@ -478,50 +599,6 @@ pub struct CycleMetadata {
     /// Support subsystem expected free energy (0.0 when not computed).
     pub support_efe: f64,
 
-    /// Σ (Sigma) — Synergistic integration via covariance-based Phi* (Layer 2).
-    /// `None` when not computed this cycle (only computed every N cycles).
-    pub sigma: Option<f64>,
-
-    /// Spectral MIP Phi — O(n³) Fiedler-ordered MIP approximation (Layer 2+).
-    /// `None` when not computed this cycle (only computed every 50 cycles).
-    pub spectral_mip_phi: Option<f64>,
-
-    /// Hierarchical spectral MIP Phi (multi-scale: 32→64→128 components).
-    /// Uses coarser scales to focus finer scales on the MIP boundary region.
-    /// `None` when not computed this cycle (only computed every 100 cycles).
-    pub hierarchical_mip_phi: Option<f64>,
-
-    /// Number of scales used in hierarchical MIP (0 when not computed).
-    pub hierarchical_mip_scales: usize,
-
-    // ── Structural Phi decomposition ────────────────────────────────
-    /// Micro-Phi: within-cluster integration (0 when not computed).
-    pub structural_micro_phi: f64,
-    /// Meso-Phi: inter-cluster integration (0 when not computed).
-    pub structural_meso_phi: f64,
-    /// Macro-Phi: global spectral MIP (0 when not computed).
-    pub structural_macro_phi: f64,
-    /// Bottleneck score: gap between macro and meso Phi.
-    pub structural_bottleneck: f64,
-    /// Emergence ratio: macro / (micro + meso); > 1.0 = emergent.
-    pub structural_emergence_ratio: f64,
-    /// Number of detected clusters in hierarchical decomposition.
-    pub structural_num_clusters: usize,
-
-    // ── Dynamic consciousness weights ───────────────────────────────
-    /// Dynamic consciousness weights [spectral, equation, pipeline, multimodal].
-    pub consciousness_weights: [f64; 4],
-    /// Weight stability variance (0.0 = stable, >0.01 = oscillating).
-    pub consciousness_weight_variance: f64,
-    /// Disagreement between consciousness layers: max(layers) - min(layers).
-    /// High disagreement (>0.3) indicates layer conflict. 0.0 when <2 layers active.
-    #[serde(default)]
-    pub consciousness_layer_disagreement: f64,
-    /// Which consciousness layer reported the lowest value this cycle.
-    /// Empty when not computed or all layers inactive.
-    #[serde(default)]
-    pub consciousness_weakest_layer: String,
-
     // ── Substrate & Convergence Telemetry ──────────────────────────────
     /// Effective substrate feasibility [0,1] used in consciousness equation.
     /// Legacy field — identical to `substrate_effective_feasibility`.
@@ -533,15 +610,16 @@ pub struct CycleMetadata {
     #[serde(default)]
     pub substrate: super::SubstrateTelemetry,
 
+    /// Thermal telemetry snapshot (from ThermalBridge).
+    /// Reports platform thermal state and CfC tau modulation.
+    /// Science: Angilletta (2009) thermal performance curves.
+    #[serde(default)]
+    pub thermal: super::ThermalTelemetry,
+
     /// Integrity telemetry snapshot (from IntegrityManager).
     /// Reports tamper detection: attestation, temporal, canaries.
     #[serde(default)]
     pub integrity: super::IntegrityTelemetry,
-
-    /// Weight convergence state label (Initializing/Converging/Converged/Oscillating).
-    pub weight_convergence_state: String,
-    /// Cycle at which weights converged (0 if not yet).
-    pub convergence_cycle: usize,
 
     /// Per-module timing (microseconds). 0 = module disabled or not run this cycle.
     pub module_timings_us: ModuleTimings,
@@ -711,15 +789,6 @@ pub struct CycleMetadata {
     /// 0 = no subsystems using the new CognitiveSubsystem trait yet.
     pub subsystem_integration_contributors: u32,
 
-    /// Per-manager proposal magnitudes (which managers moved the needle this cycle).
-    #[serde(default)]
-    pub managers: ManagerTelemetry,
-
-    /// Reasoning engine internal diagnostics (Φ_eff decomposition, budget, tiers).
-    /// All zeros when `reasoning_engine` feature is disabled.
-    #[serde(default)]
-    pub reasoning_engine_telemetry: ReasoningEngineTelemetry,
-
     // ── Nurture Attachment Telemetry ─────────────────────────────────────
     /// Current attachment style (e.g., "Forming", "Secure"). Empty when nurture disabled.
     pub attachment_style: Option<String>,
@@ -791,54 +860,6 @@ pub struct CycleMetadata {
     #[serde(default)]
     pub gwt_perception_broadcasts: u32,
 
-    // ── Cantor Fractal Telemetry ─────────────────────────────────────────
-    /// Metacognitive depth: self-similarity of most recent GWT-promoted CRHV.
-    /// Science: Hofstadter (1979) — strange loops; Metzinger (2003) — self-model depth.
-    #[serde(default)]
-    pub cantor_metacognitive_depth: f32,
-    /// Number of CRHVs pending dream consolidation in the broadcast buffer.
-    #[serde(default)]
-    pub cantor_buffer_occupancy: u32,
-    /// Number of entries in the persistent Cantor cleanup codebook.
-    /// Grows over the brain's lifetime as dream consolidation strengthens traces.
-    #[serde(default)]
-    pub cantor_codebook_size: u32,
-    /// Depth of the most recent CRHV (adaptive: 2–7 based on GWT activation).
-    #[serde(default)]
-    pub cantor_last_depth: u8,
-    /// EMA of dream consolidation surprise (self-similarity delta).
-    /// Non-zero values indicate the codebook is actively learning from novel fractal structure.
-    #[serde(default)]
-    pub cantor_dream_surprise: f32,
-    /// Resonance boost from coherent CRHV pairs in the broadcast buffer.
-    /// Non-zero when multiple GWT-promoted fractals form a "resonant coalition".
-    #[serde(default)]
-    pub cantor_resonance_boost: f32,
-    /// Depth histogram: entries per CRHV depth stratum (depths 2-7, indices 0-5).
-    /// Reflects diversity of fractal abstraction levels in the codebook.
-    #[serde(default)]
-    pub cantor_depth_histogram: [u32; 6],
-
-    // ── Motor Output Bridge Telemetry ───────────────────────────────────
-    /// Whether the motor output bridge executed an action this cycle.
-    #[serde(default)]
-    pub motor_action_executed: bool,
-    /// Whether the motor action succeeded (false if skipped or failed).
-    #[serde(default)]
-    pub motor_action_success: bool,
-    /// Action type index that was executed (0–7, 255 = none).
-    #[serde(default = "default_motor_action_type")]
-    pub motor_action_type: u8,
-    /// Phi value used for motor gating this cycle (0.0 when bridge inactive).
-    #[serde(default)]
-    pub motor_phi_used: f64,
-    /// Motor prediction error (0.0 = matched expectation, 1.0 = total surprise).
-    #[serde(default)]
-    pub motor_prediction_error: f64,
-    /// Whether the motor bridge is installed and available.
-    #[serde(default)]
-    pub motor_bridge_active: bool,
-
     // ── Social Coherence Telemetry ──────────────────────────────────────
     /// Current social trust level (0.0–1.0) from Mind module's SocialCoherence.
     #[serde(default)]
@@ -868,17 +889,6 @@ pub struct CycleMetadata {
     #[serde(default)]
     pub tom_exploration_triggered: bool,
 
-    // ── User State Inference Telemetry ───────────────────────────────────
-    /// User cognitive load (0.0 = low, 1.0 = high). 0.0 when USI disabled.
-    #[serde(default)]
-    pub user_cognitive_load: f32,
-    /// User frustration level (0.0 = calm, 1.0 = very frustrated). 0.0 when USI disabled.
-    #[serde(default)]
-    pub user_frustration: f32,
-    /// User engagement level (0.0 = disengaged, 1.0 = highly engaged). 0.5 when USI disabled.
-    #[serde(default = "default_half_f32")]
-    pub user_engagement: f32,
-
     // ── Vision Manifold Telemetry ───────────────────────────────────────
     /// Vision manifold telemetry (None when vision-manifold feature disabled or not active).
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -898,12 +908,6 @@ pub struct CycleMetadata {
     /// Broca SSM language generation telemetry (None when ssm_language feature disabled or not active).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub broca: Option<BrocaGenerationTelemetry>,
-
-    // ── Canvas Living Topology Telemetry ─────────────────────────────────
-    /// Canvas SVG generation telemetry (None when canvas feature disabled or not active).
-    #[cfg(feature = "canvas")]
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub canvas: Option<super::canvas_bridge::CanvasTelemetry>,
 
     // ── Adaptive Dynamics Telemetry (Sessions 2-4) ───────────────────────
     /// Epistemic uncertainty: prediction disagreement across horizons (0.0–1.0).
@@ -1126,39 +1130,37 @@ pub struct CycleMetadata {
     /// Whether narrative self-phi modulated confidence or exploration.
     #[serde(default)]
     pub narrative_self_phi_modulated: bool,
-    /// Whether epistemic phi drove confidence modulation.
+    /// Whether epistemic Phi (phi_eff) modulated LR or exploration.
     #[serde(default)]
     pub epistemic_phi_modulated: bool,
-    /// Whether phenomenal binding strength modulated LR or exploration.
+    /// Whether phenomenal binding strength modulated confidence or threshold.
     #[serde(default)]
     pub phenomenal_binding_modulated: bool,
-    /// Whether temporal coherence score modulated confidence or exploration.
+    /// Whether temporal coherence modulated LR or confidence.
     #[serde(default)]
     pub temporal_coherence_modulated: bool,
-    /// Whether holographic unity modulated LR or confidence.
+    /// Whether holographic unity modulated exploration or LR.
     #[serde(default)]
     pub holographic_unity_modulated: bool,
-    /// Whether harmonies alignment modulated exploration or confidence.
+    /// Whether harmonies alignment modulated confidence or exploration.
     #[serde(default)]
     pub harmonies_alignment_modulated: bool,
-    /// Whether consciousness gradient modulated LR.
+    /// Whether consciousness gradient magnitude modulated LR.
     #[serde(default)]
     pub consciousness_gradient_lr_modulated: bool,
-    /// Whether value cache hit rate modulated confidence.
+    /// Whether value cache confidence modulated exploration or LR.
     #[serde(default)]
     pub value_cache_confidence_modulated: bool,
-
-    // ── Session 18: Orphaned Signal Behavioral Wiring ────────────────────
-    /// Whether consciousness state level modulated LR this cycle.
+    /// Whether consciousness state level (high/low extremes) triggered modulation.
     #[serde(default)]
     pub consciousness_state_modulated: bool,
-    /// Whether living mind vitality modulated confidence or LR this cycle.
+    /// Whether living mind vitality modulated confidence or LR.
     #[serde(default)]
     pub living_mind_vitality_modulated: bool,
-    /// Whether living mind coherence modulated exploration this cycle.
+    /// Whether living mind coherence modulated confidence or LR.
     #[serde(default)]
     pub living_mind_coherence_modulated: bool,
-    /// Whether MCTS plan effectiveness modulated confidence or exploration this cycle.
+    /// Whether MCTS plan effectiveness triggered modulation (high or low extremes).
     #[serde(default)]
     pub mcts_effectiveness_modulated: bool,
 
@@ -1225,257 +1227,203 @@ pub struct CycleMetadata {
     #[serde(default)]
     pub error_bifurcation_response: bool,
 
-    // ── Session 17: Adaptive Homeostasis & Emergent Dynamics ─────────────
-    /// Whether allostatic overload reduced cognitive budget.
-    #[serde(default)]
-    pub allostatic_overload_active: bool,
-    /// Current allostatic load (0.0–1.0).
-    #[serde(default)]
-    pub allostatic_load: f32,
-    /// Whether exploration decay was applied.
-    #[serde(default)]
-    pub exploration_decay_applied: bool,
-    /// Whether consciousness acceleration triggered dampening.
-    #[serde(default)]
-    pub consciousness_accel_active: bool,
-    /// Whether adaptive warmup exited early due to stability.
-    #[serde(default)]
-    pub adaptive_warmup_early_exit: bool,
-    /// Whether proposal saturation triggered wait-and-see.
-    #[serde(default)]
-    pub proposal_saturation_active: bool,
-    /// Whether Phi-gated LR floor dampened learning rate.
-    #[serde(default)]
-    pub phi_gated_lr_floor_active: bool,
-    /// Whether rhythmic exploration oscillation was active.
-    #[serde(default)]
-    pub rhythmic_exploration_active: bool,
+    // ── Therapeutic Telemetry ─────────────────────────────────────────────
+    /// Therapeutic subsystem telemetry (client state, alliance, crisis, regulation).
+    #[cfg(feature = "therapeutic")]
+    #[serde(flatten, default)]
+    pub therapeutic: TherapeuticTelemetry,
 
-    // ── Session 18: Predictive Coding & Metacognitive Refinement ───────────
-    /// Whether PE variance dampened learning rate.
+    // ── Perception Manager Telemetry ────────────────────────────────────────
+    /// Perception attention sensitivity [0.5, 2.0]. Modulates perceptual thresholds.
+    /// Science: Yerkes & Dodson (1908) — optimal arousal modulates sensitivity.
+    #[serde(default = "default_one_f32")]
+    pub perception_attention_sensitivity: f32,
+    /// Perception budget utilization (EMA) [0, 1]. Lavie (2005) perceptual load.
     #[serde(default)]
-    pub pe_variance_damping_active: bool,
-    /// Current confidence calibration drift magnitude.
+    pub perception_budget_utilization: f32,
+    /// Whether perception is in vigilant mode (high attention, low coherence + high PE).
     #[serde(default)]
-    pub confidence_calibration_drift: f32,
-    /// Whether LR momentum smoothing clipped a delta.
-    #[serde(default)]
-    pub lr_momentum_active: bool,
-    /// Whether metacognitive surprise boosted exploration.
-    #[serde(default)]
-    pub metacognitive_surprise_active: bool,
-    /// Current sleep pressure (0.0–1.0).
-    #[serde(default)]
-    pub sleep_pressure: f32,
-    /// Whether gradient sign flip dampening fired.
-    #[serde(default)]
-    pub gradient_sign_flip_active: bool,
-    /// Exploration-exploitation balance ratio (0.0–1.0, 0.5 = balanced).
-    #[serde(default)]
-    pub explore_exploit_balance: f32,
-    /// Whether proposal conflict cancellation occurred.
-    #[serde(default)]
-    pub proposal_conflict_detected: bool,
+    pub perception_vigilant: bool,
+    /// Mean perceptual coherence from rolling 8-cycle history [0, 1].
+    /// Science: Damasio (1994) — cross-modal binding strength.
+    #[serde(default = "default_half_f32")]
+    pub perception_mean_coherence: f32,
 
-    // ── Session 19: Embodied Cognition & Environmental Coupling ────────────
-    /// Whether arousal-gated LR modulation fired.
+    // ── Drive Manager Telemetry ───────────────────────────────────────────
+    /// Drive boredom level [0, 0.8]. Sustained low PE → exploration urge.
+    /// Science: Eastwood et al. (2012) — boredom as failed engagement.
     #[serde(default)]
-    pub arousal_lr_modulated: bool,
-    /// Whether novelty habituation dampened exploration.
+    pub drive_boredom: f32,
+    /// Drive flow intensity [0, 1]. Optimal challenge-skill balance.
+    /// Science: Csikszentmihalyi (1990) — flow state intensity.
     #[serde(default)]
-    pub novelty_habituation_active: bool,
-    /// Current fatigue level (0.0–1.0).
+    pub drive_flow_intensity: f32,
+    /// Whether currently in flow state (sustained low error + high coherence).
     #[serde(default)]
-    pub fatigue_level: f32,
-    /// Whether recovery was detected (fatigue clearing).
+    pub drive_in_flow: bool,
+    /// Adaptive exploration threshold [0.05, 0.8]. Surprise must exceed this.
+    /// Science: Friston (2010) — precision-weighted surprise modulates exploration.
     #[serde(default)]
-    pub recovery_detected: bool,
-    /// Environmental predictability (0.0–1.0).
-    #[serde(default)]
-    pub env_predictability: f32,
-    /// Whether proposal budget was exceeded (feedback_state proposals > max).
-    #[serde(default)]
-    pub proposal_budget_exceeded: bool,
-    /// Readiness score (0.0–1.0, composite of PE/sleep/fatigue).
-    #[serde(default)]
-    pub readiness_score: f32,
-    /// Whether flow/resonance state is active.
-    #[serde(default)]
-    pub flow_state_active: bool,
+    pub drive_exploration_threshold: f32,
 
-    // ── Session 20: Measurement & Consolidation ───────────────────────────
-    /// Unified readiness score (0.3–1.0), the sole resource-depletion LR gate.
+    // ── Learning Manager Telemetry ────────────────────────────────────────
+    /// Learning plasticity level [0.1, 0.95]. How open the system is to learning.
+    /// Science: Abraham & Bear (1996) — metaplasticity BCM rule.
+    #[serde(default = "default_half_f32")]
+    pub learning_plasticity: f32,
+    /// Whether in dream consolidation phase (low arousal sustained ≥15 cycles).
+    /// Science: Walker (2017) — NREM sleep facilitates memory integration.
     #[serde(default)]
-    pub unified_readiness_score: f32,
-    /// Number of distinct mechanism activations this cycle.
+    pub learning_in_dream_phase: bool,
+    /// Learning error trend: positive = errors increasing, negative = improving.
     #[serde(default)]
-    pub mechanism_activation_count: u32,
-    /// Whether compound dampening would have crushed LR below 0.3 (pre-consolidation).
-    #[serde(default)]
-    pub compound_dampening_prevented: bool,
+    pub learning_error_trend: f32,
 
-    // ── Session 21: Housekeeping & Measurement ──────────────────────────────
-    /// Number of distinct LR proposal sources this cycle (contribution breadth).
+    // ── Causal Explanation Narrative Telemetry ─────────────────────────────
+    /// Causal self-explanation narrative summary (generated every 47 cycles).
+    /// Science: Wierzbicka (1996) — NSM-grounded causal transparency.
     #[serde(default)]
-    pub lr_proposal_source_count: u32,
-    /// Dominant LR proposal source name (highest magnitude contribution).
-    #[serde(default)]
-    pub lr_dominant_source: String,
-    /// Whether sleep pressure passive recovery is active (readiness > 0.9).
-    #[serde(default)]
-    pub sleep_pressure_recovering: bool,
+    pub consciousness_causal_narrative: String,
 
-    // ── Governance telemetry (feature: mycelix) ─────────────────────────────
-    /// Governance reward EMA — running average of governance outcome rewards.
-    /// Positive = aligned outcomes, negative = misaligned. 0.0 when no outcomes.
-    #[serde(default)]
-    pub governance_reward_ema: f64,
-    /// Number of governance events pending in the GovernanceManager queue.
-    #[serde(default)]
-    pub governance_pending_events: usize,
-    /// Number of governance outcomes pending processing.
-    #[serde(default)]
-    pub governance_pending_outcomes: usize,
-    /// Cumulative governance confidence delta this cycle (from SubsystemOutput).
-    #[serde(default)]
-    pub governance_confidence_delta: f64,
-    /// Last collective Phi observed from a governance tally (0.0 if none).
-    #[serde(default)]
-    pub governance_collective_phi: f64,
-    /// Number of collective blind spots detected by the epistemic mesh.
-    #[serde(default)]
-    pub governance_blind_spot_count: usize,
-    /// Maximum blind spot severity (0.0–1.0). Higher = more agents uncertain.
-    #[serde(default)]
-    pub governance_max_blind_spot_severity: f64,
-    /// Community mode label (e.g. "Exploratory", "Protective", "Creative", "Reflective").
-    #[serde(default)]
-    pub governance_community_mode: String,
-    /// Maximum absolute harmonic delta this cycle (governance influence on harmonies).
-    #[serde(default)]
-    pub governance_harmonic_delta_max: f64,
-    /// Number of agents in the epistemic mesh (0 = no mesh data).
-    #[serde(default)]
-    pub governance_epistemic_agents: usize,
-    /// LR boost from governance prediction error (1.0 = no boost, >1.0 = high PE boosted learning).
-    #[serde(default)]
-    pub governance_lr_boost: f64,
-
-    // ── Swarm telemetry ────────────────────────────────────────────────────
-    /// Number of connected swarm peers.
-    #[serde(default)]
-    pub swarm_connected_peers: usize,
-    /// Connectivity EMA [0, 1] — ratio of connected/expected peers.
-    #[serde(default)]
-    pub swarm_connectivity_ema: f64,
-    /// Average peer Φ across connected peers.
-    #[serde(default)]
-    pub swarm_mean_peer_phi: f64,
-    /// Affective contagion strength this cycle.
-    #[serde(default)]
-    pub swarm_affective_contagion: f64,
-    /// Federated learning trust confidence.
-    #[serde(default)]
-    pub swarm_federated_confidence: f64,
-    /// Number of anomaly events (mass disconnects) since last reset.
-    #[serde(default)]
-    pub swarm_anomaly_count: u32,
-
-    // ── Knowledge Engine Telemetry ──────────────────────────────────────
-    /// Number of facts in the knowledge graph (0 if engine disabled).
+    // ── Knowledge Engine Telemetry ─────────────────────────────────────────
+    /// Total facts stored in the knowledge graph (0 when knowledge engine disabled).
     #[serde(default)]
     pub knowledge_graph_size: u32,
-    /// Average confidence across stored knowledge facts.
+    /// Best cosine similarity from the most recent knowledge search (0.0 when disabled).
     #[serde(default)]
-    pub knowledge_avg_confidence: f32,
-    /// Number of causal edges discovered.
+    pub knowledge_best_similarity: f32,
+    /// Total causal edges in the knowledge causal bridge (0 when disabled).
     #[serde(default)]
     pub knowledge_causal_edges: u32,
-    /// Knowledge uncertainty signal (0.0 = fully known, 1.0 = unknown territory).
+    /// Epistemic surprise signal: novelty + contradiction (0.0 when disabled).
+    /// Science: Friston (2010) — epistemic surprise drives active inference.
     #[serde(default)]
-    pub knowledge_uncertainty: f64,
-    /// Knowledge novelty signal (0.0 = familiar, 1.0 = completely novel).
+    pub knowledge_epistemic_surprise: f64,
+    /// Expected Calibration Error (0.0 = perfect, 1.0 = worst, 0.0 when disabled).
+    /// Science: Guo et al. (2017) — calibration of confidence scores.
     #[serde(default)]
-    pub knowledge_novelty: f64,
-    /// Number of contradictions detected this cycle.
+    pub knowledge_calibration_ece: f64,
+    /// Number of contradictions detected this cycle (0 when disabled).
     #[serde(default)]
     pub knowledge_contradictions: u32,
-    /// Number of learned primitives in the adaptive ontology.
-    #[serde(default)]
-    pub knowledge_ontology_size: u32,
 
-    // ── Math Service Telemetry ──────────────────────────────────────────
-    /// Whether math intent was detected in this cycle's input.
+    // ── Glyph Codex Telemetry ─────────────────────────────────────────────
+    /// Dominant glyph field modality name (e.g., "Resonant", "Threshold").
+    /// Empty when glyph_codex feature is disabled.
     #[serde(default)]
-    pub math_detected: bool,
-    /// Classified math problem type (empty if no math detected).
+    pub glyph_dominant_modality: String,
+    /// Glyph coherence score (0.0–0.95). Measures symbolic integration
+    /// across all 11 Field Modalities. 0.0 when glyph_codex is disabled.
     #[serde(default)]
-    pub math_problem_type: String,
-    /// Phi from the math computation (0.0 if no math).
+    pub glyph_coherence: f32,
+    /// Name of the nearest resonant glyph (e.g., "Ethical Emergence").
+    /// Empty when below quiet threshold or glyph_codex is disabled.
     #[serde(default)]
-    pub math_phi: f64,
-    /// Epistemic confidence in the math result (0.0 if no math).
+    pub glyph_resonant_name: String,
+    /// Spiral position (0.0–56.0) tracking developmental progression.
+    /// 0.0 when glyph_codex is disabled.
     #[serde(default)]
-    pub math_confidence: f64,
-    /// Total math problems solved since startup.
-    #[serde(default)]
-    pub math_problems_solved: usize,
-    /// Average Phi across all math solutions.
-    #[serde(default)]
-    pub math_avg_phi: f64,
-    /// Whether the math solver was dispatched this cycle.
-    #[serde(default)]
-    pub math_solved: bool,
-    /// Whether multi-path verification succeeded for this cycle's math problem.
-    #[serde(default)]
-    pub math_multipath_verified: bool,
-    /// Human-readable answer from the math solver (empty if not solved).
-    #[serde(default)]
-    pub math_answer: String,
-    /// Epistemic caveat from the math solver (e.g., "small sample", "did not converge").
-    #[serde(default)]
-    pub math_epistemic_caveat: String,
-    /// Error bound on the numerical result (0.0 if N/A).
-    #[serde(default)]
-    pub math_error_bound: f64,
-    /// Whether memory recall found a similar past problem (Phase 7c).
-    #[serde(default)]
-    pub math_memory_hit: bool,
-    /// Phi from the best recalled episode (Phase 7c).
-    #[serde(default)]
-    pub math_recalled_phi: f64,
-    /// Whether the expression parser successfully parsed the input.
-    #[serde(default)]
-    pub math_expression_parsed: bool,
-    /// Strategy transferred from past episode memory (Phase 7c).
-    #[serde(default)]
-    pub math_strategy_transfer: String,
+    pub glyph_spiral_position: f32,
 
-    // ── Spectrum / Radio telemetry ──────────────────────────────────────
-    /// Network health level from SpectrumManager (0=AllUp, 1=LocalDown, 2=MetroOnly, 3=Blackout).
-    #[cfg(feature = "mesh")]
+    // ── Feature Availability Flags ──────────────────────────────────────
+    // These booleans tell dashboards whether 0.0 means "feature disabled"
+    // vs "measured as zero". Populated at metadata construction time from
+    // compile-time feature flags and runtime config.
+
+    /// Whether the `reasoning_engine` feature is compiled in and active.
     #[serde(default)]
-    pub spectrum_network_health: u8,
-    /// Per-tier availability [Local, Metro, Regional].
-    #[cfg(feature = "mesh")]
+    pub reasoning_engine_enabled: bool,
+    /// Whether the `mesh` feature is compiled in and active.
     #[serde(default)]
-    pub spectrum_tier_available: [bool; 3],
-    /// Consecutive jamming cycles.
-    #[cfg(feature = "mesh")]
+    pub mesh_enabled: bool,
+    /// Whether the `ssm_language` (Broca) feature is compiled in and active.
     #[serde(default)]
-    pub spectrum_jamming_streak: u32,
-    /// Spectrum prediction error (0.0-1.0).
-    #[cfg(feature = "mesh")]
+    pub ssm_language_enabled: bool,
+}
+
+/// Therapeutic subsystem telemetry for CycleMetadata.
+///
+/// Tracks client state, alliance, crisis detection, regulation strategy,
+/// narrative coherence, and case formulation — all zero/false when the
+/// `therapeutic` feature is disabled.
+#[cfg(feature = "therapeutic")]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct TherapeuticTelemetry {
+    /// Client distress level (0.0–1.0, RDoC-derived).
     #[serde(default)]
-    pub spectrum_prediction_error: f64,
-    /// Epistemic discount from network degradation.
-    #[cfg(feature = "mesh")]
+    pub therapeutic_client_distress: f32,
+    /// Therapeutic alliance composite (0.0–1.0, Bordin bond/goals/tasks).
     #[serde(default)]
-    pub spectrum_epistemic_discount: f64,
-    /// Degradation streak cycle count.
-    #[cfg(feature = "mesh")]
+    pub therapeutic_alliance: f32,
+    /// Whether a crisis was detected this cycle.
     #[serde(default)]
-    pub spectrum_degradation_streak: u32,
+    pub therapeutic_crisis_active: bool,
+    /// Crisis type name (empty if no crisis).
+    #[serde(default)]
+    pub therapeutic_crisis_type: String,
+    /// Active regulation strategy name (empty if none).
+    #[serde(default)]
+    pub therapeutic_strategy: String,
+    /// Narrative coherence (0.0–1.0, fragment integration quality).
+    #[serde(default)]
+    pub therapeutic_narrative_coherence: f32,
+    /// Case formulation factor count (predisposing + precipitating + perpetuating + protective).
+    #[serde(default)]
+    pub therapeutic_formulation_factors: usize,
+    /// Case formulation resilience ratio (protective / total, 0.0–1.0).
+    #[serde(default)]
+    pub therapeutic_resilience_ratio: f32,
+    /// Alliance rupture count (cumulative).
+    #[serde(default)]
+    pub therapeutic_rupture_count: u32,
+    /// Alliance repair count (cumulative).
+    #[serde(default)]
+    pub therapeutic_repair_count: u32,
+    /// RDoC clinical severity composite (0.0–1.0).
+    #[serde(default)]
+    pub therapeutic_clinical_severity: f32,
+    /// Number of narrative fragments recorded.
+    #[serde(default)]
+    pub therapeutic_narrative_fragments: usize,
+    /// Serotonin debt from sustained negative valence (0.0–1.0, Jans et al. 2007).
+    #[serde(default)]
+    pub therapeutic_serotonin_debt: f32,
+    /// Dopamine debt from sustained low positive valence (0.0–1.0).
+    #[serde(default)]
+    pub therapeutic_dopamine_debt: f32,
+    /// Dream prediction accuracy (lower = better, 1.0 = no data).
+    #[serde(default)]
+    pub therapeutic_dream_accuracy: f32,
+    /// Scope violation detected in Broca output this cycle (empty = none).
+    #[serde(default)]
+    pub therapeutic_scope_violation: String,
+    /// Last rupture type ("Withdrawal", "Confrontation", or empty).
+    #[serde(default)]
+    pub therapeutic_last_rupture_type: String,
+    /// Repair success rate (0.0–1.0, 1.0 = no ruptures or all repaired).
+    #[serde(default = "default_one_f32")]
+    pub therapeutic_repair_rate: f32,
+    /// Withdrawal rupture count (cumulative).
+    #[serde(default)]
+    pub therapeutic_withdrawal_count: u32,
+    /// Confrontation rupture count (cumulative).
+    #[serde(default)]
+    pub therapeutic_confrontation_count: u32,
+    /// RDoC 6-domain profile [NegVal, PosVal, Cognitive, Social, Arousal, Sensorimotor].
+    #[serde(default)]
+    pub therapeutic_rdoc_profile: [f32; 6],
+    /// Perpetuating factor descriptions from case formulation.
+    #[serde(default)]
+    pub therapeutic_perpetuating_factors: Vec<String>,
+    /// Protective factor descriptions from case formulation.
+    #[serde(default)]
+    pub therapeutic_protective_factors: Vec<String>,
+    /// Strategy effectiveness: Vec of (name, mean_effectiveness, use_count).
+    #[serde(default)]
+    pub therapeutic_strategy_effectiveness: Vec<(String, f32, u32)>,
+    /// Narrative temporal coherence (Adler 2012) [0.0–1.0].
+    #[serde(default)]
+    pub therapeutic_temporal_coherence: f32,
 }
 
 fn default_response_profile() -> String {
@@ -1488,10 +1436,6 @@ fn default_one_f32() -> f32 {
 
 fn default_half_f32() -> f32 {
     0.5
-}
-
-fn default_motor_action_type() -> u8 {
-    255
 }
 
 /// Vision manifold telemetry snapshot for CycleMetadata.
@@ -1796,17 +1740,6 @@ pub struct EthicalTelemetry {
     pub empathic_tone_adj: f64,
     /// Empathic tone adjustment applied to speech rate (-1.0 to 1.0, 0.0 = no change).
     pub empathic_speech_rate_mod: f32,
-    /// KosmicSong coherence: Phi × HarmonicAlignment × MoralClarity (0.0–1.0).
-    pub kosmic_coherence: f32,
-    /// Soul coherence — essence-values similarity (0.0–1.0). 0.0 when soul disabled.
-    #[serde(default)]
-    pub soul_coherence: f32,
-    /// Soul growth potential from self-assessment (0.0–1.0). 0.0 when soul disabled.
-    #[serde(default)]
-    pub soul_growth_potential: f32,
-    /// Soul average value alignment trend (0.0–1.0). 0.0 when soul disabled.
-    #[serde(default)]
-    pub soul_avg_value_alignment: f32,
     /// β₀: connected components in moral space (1 = unified).
     pub moral_topo_beta_0: usize,
     /// β₁: 1-cycles (circular reasoning patterns).
@@ -1848,19 +1781,6 @@ pub struct EthicalTelemetry {
     /// Name of matched hazard signature template (e.g. "weaponization"), if any.
     #[serde(default)]
     pub moral_matched_hazard: Option<String>,
-    /// Current escalation level from the topological immune system.
-    /// Log (default) → Warn → Throttle → Block.
-    #[serde(default)]
-    pub moral_escalation_level: crate::hdc::moral_topology::EscalationLevel,
-    /// Number of entries in the escalation audit log.
-    #[serde(default)]
-    pub moral_audit_log_len: usize,
-    /// Fingerprint velocity: rate of directional change in harmony space.
-    #[serde(default)]
-    pub moral_fingerprint_velocity: f64,
-    /// Wasserstein distance between current and previous persistence diagrams.
-    #[serde(default)]
-    pub moral_persistence_distance: f64,
     /// Harmony entropy (moral breadth): Shannon entropy of harmony variance distribution.
     /// Range: [0, ln(8)] ≈ [0, 2.08]. Higher = broader moral engagement.
     #[serde(default)]
@@ -1955,69 +1875,6 @@ pub struct FeedbackTelemetry {
     pub feedback_trace_exploration: Vec<(String, String)>,
     /// Per-proposal trace for threshold (populated when `trace_feedback = true`).
     pub feedback_trace_threshold: Vec<(String, String)>,
-}
-
-/// Per-manager telemetry: which managers fired and what they proposed.
-/// Each field is the manager's SubsystemOutput magnitude (0.0 = neutral/not run).
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct ManagerTelemetry {
-    /// Drive manager confidence delta (curiosity, flow, boredom, exploration).
-    pub drive_confidence_delta: f32,
-    /// Drive manager exploration delta.
-    pub drive_exploration_delta: f32,
-    /// Memory manager confidence delta (episodic, semantic, resonator).
-    pub memory_confidence_delta: f32,
-    /// Memory manager LR modulation factor.
-    pub memory_lr_modulation: f32,
-    /// Learning manager confidence delta (FEP, dream, school).
-    pub learning_confidence_delta: f32,
-    /// Learning manager LR modulation factor.
-    pub learning_lr_modulation: f32,
-    /// Perception manager confidence delta (attention, multi-modal, social).
-    pub perception_confidence_delta: f32,
-    /// Perception manager exploration delta.
-    pub perception_exploration_delta: f32,
-}
-
-/// Reasoning engine internal diagnostics — surfaces values computed inside
-/// `ConsciousReasoningEngine::reason()` that are not captured by the top-level
-/// `reasoning_*` fields on CycleMetadata.
-///
-/// All fields default to 0/false so the struct is inert when the
-/// `reasoning_engine` feature is disabled.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct ReasoningEngineTelemetry {
-    /// Raw Φ_eff before epistemic quality modulation: Φ × R^γ.
-    pub phi_eff_raw: f32,
-    /// Final Φ_eff after epistemic modulation: phi_eff_raw × epistemic_mod.
-    pub phi_eff: f32,
-    /// Epistemic quality modulation factor (0.5–1.0).
-    /// Floor at 0.5 so even zero-quality claims retain 50% of their Φ_eff.
-    pub epistemic_mod: f32,
-    /// Current γ exponent used in R^γ (self-calibrating).
-    pub gamma: f32,
-    /// Theory reliability R (0.0–1.0) from calibrator.
-    pub reliability: f32,
-    /// Fraction of reasoning budget consumed (0.0–1.0).
-    /// 0.0 when budget tracking is unavailable.
-    pub budget_consumed: f32,
-    /// Wall-clock time of the reasoning cycle (microseconds).
-    pub wall_time_us: u64,
-    /// Number of reasoning steps that executed (1–7 depending on tier).
-    pub steps_taken: u32,
-    /// Highest reasoning tier reached (0 = Tier0, 1 = Tier1, 2 = Tier2).
-    pub tier_reached: u32,
-    /// Number of tool gate evaluations performed (0, 1, or 2).
-    pub gate_checks: u32,
-    /// Whether the budget was exceeded before all steps completed.
-    pub budget_exceeded: bool,
-    /// Expected Value of Simulation (EVS) — decides whether MCTS planning runs.
-    /// 0.0 when Tier 0 only.
-    pub evs: f32,
-    /// MCTS iterations completed (0 when planning did not run).
-    pub mcts_iterations: u32,
-    /// Whether MCTS simulation actually ran.
-    pub did_simulate: bool,
 }
 
 /// Per-module execution timings in microseconds for overhead profiling.
@@ -2123,8 +1980,6 @@ pub struct ModuleTimings {
     pub ethics_engine_value: u64,
     /// Ethics engine sub-component: Harmonies integrator
     pub ethics_engine_harmonies: u64,
-    /// Math service: intent classification + solver dispatch
-    pub math_service: u64,
     // ── Mid-cycle sections (Session 10 instrumentation) ──
     /// World model: sensory update + stiffness/level-error feedback
     pub world_model: u64,
@@ -2142,14 +1997,6 @@ pub struct ModuleTimings {
     pub dream_cycle: u64,
     /// Moral topology: persistent homology analysis on moral scenarios
     pub moral_topology: u64,
-
-    // ── Phase-level timings (top-level pipeline phases) ──
-    /// Phase 1: Perception (safety, encoding, moral eval, strategy, urgency).
-    pub phase_perception: u64,
-    /// Phase 2: Dynamics (CfC step, prediction, FEP, training, post-processing).
-    pub phase_dynamics: u64,
-    /// Phase 3: Feedback (consciousness, quality gating, homeostasis, dream).
-    pub phase_feedback: u64,
-    /// Phase 4: Output (metadata assembly, telemetry, CycleResult construction).
-    pub phase_output: u64,
+    /// Math service: dynamic math problem solving (statistics, linear algebra, FFT, etc.)
+    pub math_service: u64,
 }

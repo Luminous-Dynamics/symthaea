@@ -219,7 +219,7 @@ impl PsychBenchmark for DefiniteIntegralsBenchmark {
             rel_errors.push(r.mean_relative_error);
         }
 
-        result.insert("accuracy", MetricValue::from_samples(&accuracies));
+        result.insert("integration_accuracy", MetricValue::from_samples(&accuracies));
         result.insert(
             "mean_relative_error",
             MetricValue::from_samples(&rel_errors),
@@ -247,7 +247,7 @@ mod tests {
     #[test]
     fn test_integrals_runs_and_has_metrics() {
         let result = DefiniteIntegralsBenchmark.run(&test_config());
-        assert!(result.metrics.contains_key("accuracy"));
+        assert!(result.metrics.contains_key("integration_accuracy"));
         assert!(result.metrics.contains_key("mean_relative_error"));
     }
 

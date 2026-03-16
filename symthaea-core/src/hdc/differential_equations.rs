@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 //! # Differential Equations Engine
 //!
 //! Numerical ODE/PDE solvers exposed through the HDC math interface, with

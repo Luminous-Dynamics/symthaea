@@ -91,7 +91,7 @@ If classified as High-Risk, Symthaea must satisfy Articles 8-15. Current complia
 | Monitoring/functioning description | **Implemented** | CycleMetadata (75+ fields), SafetyAgent, SelfAssessmentMonitor |
 | Risk management system | **Implemented** | `AI_RISK_REGISTER.md` |
 | Changes made during lifecycle | **Partial** | Git history; ADR system started but sparse |
-| Performance metrics | **Implemented** | Phi validation (r=0.99), moral classification (92.9% Hendrycks ETHICS), CfC cycle time (4.3ms raw text cycle), psych-bench baselines |
+| Performance metrics | **Implemented** | Phi validation (r=0.99), moral classification (91.1%), CfC cycle time (4.3ms), psych-bench baselines |
 | Post-market monitoring plan | **Not yet** | System not yet deployed |
 
 ### Article 12: Record-Keeping (Logging)
@@ -128,7 +128,7 @@ If classified as High-Risk, Symthaea must satisfy Articles 8-15. Current complia
 
 | Requirement | Status | Implementation |
 |-------------|--------|----------------|
-| Appropriate accuracy levels | **Implemented** | Phi r=0.99, moral classification 92.9% (Hendrycks ETHICS), CfC 234Hz raw text cycle (~31Hz full loop) |
+| Appropriate accuracy levels | **Implemented** | Phi r=0.99, moral classification 91.1%, CfC 234Hz release mode |
 | Resilience to errors/inconsistencies | **Implemented** | NaN-safe clamping in SafetyMetrics, proptest stability validation, homeostasis regulation |
 | Resilience to adversarial attempts | **Partial** | SafetyGateway blocks dangerous inputs; no adversarial ML robustness testing |
 | Cybersecurity measures | **Implemented** | PQC readiness documented; Holochain cryptographic integrity; Ed25519 signatures |

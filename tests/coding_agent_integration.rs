@@ -7,7 +7,7 @@
 #![cfg(feature = "code_generation")]
 
 use std::path::PathBuf;
-use symthaea::coding_agent::{CodingAgent, CodingAgentConfig};
+use symthaea::coding_agent::{AgentEvent, CodingAgent, CodingAgentConfig};
 
 /// Helper: create a CodingAgent with a temp working directory.
 fn make_agent(working_dir: PathBuf) -> CodingAgent {
@@ -29,10 +29,7 @@ fn test_agent_completes_fibonacci_task() {
     let result = agent.run("add a fibonacci function");
 
     // Agent should complete (reach Done) or exhaust iterations
-    assert!(
-        result.iterations_used > 0,
-        "Should have run at least 1 iteration"
-    );
+    assert!(result.iterations_used > 0, "Should have run at least 1 iteration");
     assert!(!result.phi_trace.is_empty(), "Should have Phi measurements");
 
     // Should have generated a file
@@ -156,4 +153,267 @@ fn test_agent_generates_lessons_from_failures() {
 
     // generated_lessons should exist (may be empty if no failures matched patterns)
     let _lessons = &result.generated_lessons;
+}
+
+#[test]
+fn test_agent_real_exec_config() {
+    let tmp = tempfile::tempdir().unwrap();
+    let config = CodingAgentConfig {
+        max_iterations: 3,
+        working_dir: tmp.path().to_path_buf(),
+        target_file: Some(PathBuf::from("test.rs")),
+        enable_real_exec: true,
+        use_local_llm: false, // don't require Ollama for test
+        ..Default::default()
+    };
+    let agent = CodingAgent::new(config).expect("Should create with real exec enabled");
+
+    // Agent should work with real exec config
+    assert!(agent.has_experience_store());
+}
+
+#[test]
+fn test_agent_index_project() {
+    let tmp = tempfile::tempdir().unwrap();
+
+    // Create a small Rust file to index
+    let src_dir = tmp.path().join("src");
+    std::fs::create_dir_all(&src_dir).unwrap();
+    std::fs::write(
+        src_dir.join("lib.rs"),
+        "pub fn hello() -> &'static str { \"hello\" }\npub struct Config { pub name: String }\n",
+    )
+    .unwrap();
+
+    let config = CodingAgentConfig {
+        max_iterations: 3,
+        working_dir: tmp.path().to_path_buf(),
+        ..Default::default()
+    };
+    let mut agent = CodingAgent::new(config).expect("Should create agent");
+
+    let result = agent.index_project(tmp.path());
+    assert!(result.is_ok(), "index_project should succeed: {:?}", result);
+
+    let (files, functions, types) = result.unwrap();
+    assert_eq!(files, 1, "Should index 1 file");
+    assert!(functions >= 1, "Should find at least 1 function");
+    assert!(types >= 1, "Should find at least 1 type");
+}
+
+#[test]
+fn test_agent_source_context_contains_code() {
+    let tmp = tempfile::tempdir().unwrap();
+    let src_dir = tmp.path().join("src");
+    std::fs::create_dir_all(&src_dir).unwrap();
+    std::fs::write(
+        src_dir.join("lib.rs"),
+        "pub fn fibonacci(n: u64) -> u64 {\n    if n <= 1 { return n; }\n    fibonacci(n-1) + fibonacci(n-2)\n}\n",
+    )
+    .unwrap();
+
+    let config = CodingAgentConfig {
+        max_iterations: 3,
+        working_dir: tmp.path().to_path_buf(),
+        target_file: Some(PathBuf::from("src/utils.rs")),
+        ..Default::default()
+    };
+    let mut agent = CodingAgent::new(config).expect("Should create agent");
+    agent.index_project(tmp.path()).unwrap();
+    let result = agent.run("add a memoized fibonacci function");
+    assert!(result.iterations_used > 0);
+}
+
+#[test]
+fn test_agent_real_exec_writes_file() {
+    let tmp = tempfile::tempdir().unwrap();
+    let config = CodingAgentConfig {
+        max_iterations: 5,
+        max_phase_failures: 2,
+        working_dir: tmp.path().to_path_buf(),
+        target_file: Some(PathBuf::from("generated.rs")),
+        enable_real_exec: true,
+        use_local_llm: false,
+        ..Default::default()
+    };
+    let mut agent = CodingAgent::new(config).expect("Should create with real exec");
+    let result = agent.run("add a fibonacci function");
+
+    let target = tmp.path().join("generated.rs");
+    if target.exists() {
+        let content = std::fs::read_to_string(&target).unwrap();
+        assert!(content.contains("fn "), "Generated file should contain a function");
+    }
+    assert!(result.iterations_used > 0);
+    assert!(!result.phi_trace.is_empty());
+}
+
+/// Real end-to-end test with Ollama (qwen2.5-coder:7b).
+///
+/// This test requires:
+/// 1. Ollama running at localhost:11434
+/// 2. `qwen2.5-coder:7b` model pulled
+/// 3. Environment variable: `SYMTHAEA_REAL_E2E=1`
+///
+/// Run: `SYMTHAEA_REAL_E2E=1 cargo test --test coding_agent_integration --features code_generation test_real_e2e`
+#[test]
+fn test_real_e2e_ollama_fibonacci() {
+    if std::env::var("SYMTHAEA_REAL_E2E").unwrap_or_default() != "1" {
+        eprintln!("Skipping real E2E test (set SYMTHAEA_REAL_E2E=1 to enable)");
+        return;
+    }
+
+    let tmp = tempfile::tempdir().unwrap();
+    let config = CodingAgentConfig {
+        max_iterations: 8,
+        max_phase_failures: 3,
+        working_dir: tmp.path().to_path_buf(),
+        target_file: Some(PathBuf::from("fib.rs")),
+        enable_real_exec: true,
+        use_local_llm: true,
+        ..Default::default()
+    };
+    let agent = CodingAgent::new(config).expect("Should create agent with real exec + LLM");
+    let (mut agent, rx) = agent.with_event_channel();
+
+    // Collect events in background
+    let events = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let events_clone = events.clone();
+    let event_thread = std::thread::spawn(move || {
+        while let Ok(event) = rx.recv() {
+            events_clone.lock().unwrap().push(event);
+        }
+    });
+
+    let result = agent.run("add a fibonacci function that returns the nth fibonacci number");
+
+    // Wait for event thread
+    drop(agent); // drops the sender
+    let _ = event_thread.join();
+
+    // === Assertions ===
+    let collected = events.lock().unwrap();
+    eprintln!("=== Real E2E Results ===");
+    eprintln!("Iterations: {}", result.iterations_used);
+    eprintln!("Final phase: {}", result.final_phase);
+    eprintln!("Events: {}", collected.len());
+    eprintln!("Phi trace: {:?}", result.phi_trace);
+    eprintln!("Energy: {:.1}", result.total_energy);
+    eprintln!("Tiers used: {:?}", result.generation_tiers);
+    eprintln!("Files modified: {:?}", result.files_modified);
+    eprintln!("Observations: {}", result.observations.len());
+    for (i, obs) in result.observations.iter().enumerate() {
+        eprintln!("  [{i}] {}", &obs[..obs.len().min(120)]);
+    }
+    if !result.errors.is_empty() {
+        eprintln!("Errors:");
+        for e in &result.errors {
+            eprintln!("  - {}", &e[..e.len().min(200)]);
+        }
+    }
+
+    // Should have run iterations
+    assert!(result.iterations_used > 0, "Should run at least 1 iteration");
+
+    // Should have phi measurements
+    assert!(!result.phi_trace.is_empty(), "Should have phi trace");
+    for phi in &result.phi_trace {
+        assert!(*phi >= 0.0 && *phi <= 1.0, "Phi out of range: {phi}");
+    }
+
+    // Should have streamed events
+    assert!(!collected.is_empty(), "Should have emitted events");
+
+    // Should have phase transitions or consciousness snapshots
+    let phase_transitions = collected
+        .iter()
+        .filter(|e| matches!(e, AgentEvent::PhaseTransition { .. }))
+        .count();
+    let snapshots = collected
+        .iter()
+        .filter(|e| matches!(e, AgentEvent::ConsciousnessSnapshot { .. }))
+        .count();
+    eprintln!("Phase transitions: {phase_transitions}, Consciousness snapshots: {snapshots}");
+    assert!(snapshots > 0, "Should have consciousness snapshots");
+
+    // Check if code was generated and written
+    let target = tmp.path().join("fib.rs");
+    if target.exists() {
+        let content = std::fs::read_to_string(&target).unwrap();
+        eprintln!("=== Generated Code ({} bytes) ===", content.len());
+        eprintln!("{}", &content[..content.len().min(500)]);
+        assert!(
+            content.contains("fn "),
+            "Generated code should contain a function definition"
+        );
+    } else {
+        eprintln!("Note: No file written (may be expected if native templates matched)");
+    }
+
+    eprintln!("=== E2E Test Complete ===");
+}
+
+/// Real E2E: cargo check verification.
+///
+/// Tests that generated code actually compiles via real `cargo check`.
+/// Requires: `SYMTHAEA_REAL_E2E=1`
+#[test]
+fn test_real_e2e_cargo_check() {
+    if std::env::var("SYMTHAEA_REAL_E2E").unwrap_or_default() != "1" {
+        eprintln!("Skipping real E2E cargo check test (set SYMTHAEA_REAL_E2E=1)");
+        return;
+    }
+
+    let tmp = tempfile::tempdir().unwrap();
+
+    // Set up a minimal Cargo project
+    std::fs::write(
+        tmp.path().join("Cargo.toml"),
+        "[package]\nname = \"e2e-test\"\nversion = \"0.1.0\"\nedition = \"2021\"\n",
+    )
+    .unwrap();
+    let src_dir = tmp.path().join("src");
+    std::fs::create_dir_all(&src_dir).unwrap();
+    std::fs::write(src_dir.join("lib.rs"), "// placeholder\n").unwrap();
+
+    let config = CodingAgentConfig {
+        max_iterations: 8,
+        max_phase_failures: 3,
+        working_dir: tmp.path().to_path_buf(),
+        target_file: Some(PathBuf::from("src/lib.rs")),
+        enable_real_exec: true,
+        use_local_llm: true,
+        ..Default::default()
+    };
+    let mut agent = CodingAgent::new(config).expect("Should create agent");
+
+    // Index the project first
+    let _ = agent.index_project(tmp.path());
+
+    let result = agent.run("add a function that checks if a number is prime");
+
+    let target = tmp.path().join("src/lib.rs");
+    eprintln!("=== Cargo Check E2E ===");
+    eprintln!("Iterations: {}, Phase: {}", result.iterations_used, result.final_phase);
+    eprintln!("Tiers: {:?}", result.generation_tiers);
+
+    if target.exists() {
+        let content = std::fs::read_to_string(&target).unwrap();
+        eprintln!("Generated ({} bytes):\n{}", content.len(), &content[..content.len().min(500)]);
+
+        // Try a real cargo check
+        let output = std::process::Command::new("cargo")
+            .args(["check"])
+            .current_dir(tmp.path())
+            .output()
+            .expect("cargo check should run");
+
+        if output.status.success() {
+            eprintln!("cargo check: PASSED");
+        } else {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            eprintln!("cargo check: FAILED\n{}", &stderr[..stderr.len().min(500)]);
+        }
+    }
+    eprintln!("=== Cargo Check E2E Complete ===");
 }

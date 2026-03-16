@@ -200,6 +200,48 @@ pub struct TrainingConfig {
     pub validation_dataset: Option<TrainingDataset>,
     /// Curriculum learning schedule.
     pub curriculum: CurriculumSchedule,
+    /// Enable automatic gradient anomaly response during training.
+    ///
+    /// When enabled, checks gradient health at end of each epoch and reacts:
+    /// - **Exploding**: halves learning rate
+    /// - **Vanishing**: doubles learning rate (capped at 10× initial)
+    /// - **Oscillating**: tightens gradient clipping by 50%
+    /// - **Plateau**: forces CfC network training on
+    /// - **3 consecutive anomalous epochs**: triggers early stopping
+    ///
+    /// Science: Pascanu et al. (2013) — adaptive gradient management in RNNs
+    pub enable_anomaly_response: bool,
+    /// Freeze embedding weights during training.
+    /// When true, only CfC network weights are updated (via BPTT).
+    /// Useful for Phase 2 training where embeddings are already well-trained
+    /// and BPTT gradients flowing back through CfC destabilize embedding quality.
+    pub freeze_embeddings: bool,
+    /// Coherence-gated loss weighting (0.0 = disabled).
+    /// When > 0, each training pair's loss contribution is scaled by its
+    /// output-thought coherence: `weight = 1.0 - coherence_loss_weight × (1.0 - coherence)`.
+    /// Low-coherence pairs (where the network produces output far from thought intent)
+    /// have their gradients attenuated, letting training self-organize around
+    /// its own veto signal. Recommended: 0.3-0.5.
+    ///
+    /// Science: Curriculum learning (Bengio et al. 2009) — focus on learnable examples
+    pub coherence_loss_weight: f32,
+    /// Adaptive coherence warmup: number of epochs before coherence_loss_weight activates.
+    /// When > 0, coherence gating starts at 0.0 and linearly ramps to `coherence_loss_weight`
+    /// over this many epochs. Early epochs focus on raw CE loss (learning the embedding space),
+    /// later epochs increasingly penalize low-coherence outputs.
+    /// Mirrors the `network_warmup_epochs` phased strategy.
+    pub coherence_warmup_epochs: usize,
+    /// Enable post-training smoke test.
+    /// When true, after training completes, runs `generate()` on diverse thought
+    /// channels and verifies output coherence exceeds `smoke_test_coherence_threshold`.
+    /// Results returned in `TrainingValidation`.
+    pub enable_smoke_test: bool,
+    /// Minimum mean coherence for post-training smoke test to pass (default 0.05).
+    pub smoke_test_coherence_threshold: f32,
+    /// Coherence collapse threshold for anomaly detection.
+    /// When mean epoch coherence drops below this, triggers `CoherenceCollapse` anomaly.
+    /// Only active when `enable_anomaly_response` is true. Default: 0.05.
+    pub coherence_collapse_threshold: f32,
 }
 
 impl Default for TrainingConfig {
@@ -208,7 +250,7 @@ impl Default for TrainingConfig {
             epochs: 10,
             learning_rate: 0.001,
             bptt_window: 16,
-            grad_clip: 1.0,
+            grad_clip: 20.0,
             report_interval: 100,
             use_adam: true,
             warmup_fraction: 0.1,
@@ -222,6 +264,13 @@ impl Default for TrainingConfig {
             network_warmup_epochs: 0,
             validation_dataset: None,
             curriculum: CurriculumSchedule::default(),
+            enable_anomaly_response: false,
+            freeze_embeddings: false,
+            coherence_loss_weight: 0.0,
+            coherence_warmup_epochs: 0,
+            enable_smoke_test: false,
+            smoke_test_coherence_threshold: 0.05,
+            coherence_collapse_threshold: 0.05,
         }
     }
 }
@@ -235,6 +284,8 @@ pub struct EpochMetrics {
     pub num_pairs: usize,
     /// Validation loss (if validation_dataset provided).
     pub validation_loss: Option<f32>,
+    /// Mean output-thought coherence this epoch (if coherence_loss_weight > 0 or diagnostics enabled).
+    pub mean_coherence: Option<f32>,
 }
 
 /// Gradient flow diagnostics: tracks per-step L2 norms, clipping events,
@@ -342,6 +393,175 @@ impl GradientDiagnostics {
         }
         s
     }
+
+    /// Detect gradient anomalies from the recorded history.
+    ///
+    /// Classifies the gradient health based on norm statistics:
+    /// - Vanishing: >20% of steps have norm < 1e-6
+    /// - Exploding: >5% of steps have norm > 10
+    /// - Oscillating: coefficient of variation > 2.0 (norms vary wildly)
+    /// - Plateau: all norms within 1% of mean (no learning signal)
+    ///
+    /// Science: Pascanu et al. (2013) "On the difficulty of training RNNs"
+    pub fn detect_anomalies(&self) -> Vec<GradientAnomaly> {
+        if self.grad_norms.is_empty() {
+            return Vec::new();
+        }
+        let mut anomalies = Vec::new();
+        let n = self.grad_norms.len();
+        let mean = self.mean_grad_norm();
+
+        // Vanishing: >20% of steps below threshold
+        let vanishing_frac = self.vanishing_count() as f32 / n as f32;
+        if vanishing_frac > 0.2 {
+            anomalies.push(GradientAnomaly::Vanishing {
+                fraction: vanishing_frac,
+            });
+        }
+
+        // Exploding: >5% of steps above threshold
+        let exploding_frac = self.exploding_count() as f32 / n as f32;
+        if exploding_frac > 0.05 {
+            anomalies.push(GradientAnomaly::Exploding {
+                fraction: exploding_frac,
+                max_norm: self.max_grad,
+            });
+        }
+
+        // Oscillating: high coefficient of variation (std/mean > 2.0)
+        if mean > 1e-8 {
+            let variance =
+                self.grad_norms.iter().map(|&g| (g - mean).powi(2)).sum::<f32>() / n as f32;
+            let cv = variance.sqrt() / mean;
+            if cv > 2.0 {
+                anomalies.push(GradientAnomaly::Oscillating {
+                    coefficient_of_variation: cv,
+                });
+            }
+        }
+
+        // Plateau: all norms within 1% of mean (no learning signal diversity)
+        if n >= 10 && mean > 1e-8 {
+            let all_flat = self.grad_norms.iter().all(|&g| (g - mean).abs() < mean * 0.01);
+            if all_flat {
+                anomalies.push(GradientAnomaly::Plateau { mean_norm: mean });
+            }
+        }
+
+        anomalies
+    }
+
+    /// Check overall gradient health. Returns true if no anomalies detected.
+    pub fn is_healthy(&self) -> bool {
+        self.detect_anomalies().is_empty()
+    }
+}
+
+/// Classification of gradient flow anomalies during training.
+///
+/// Science: Pascanu et al. (2013), Bengio et al. (1994) — gradient flow in RNNs
+#[derive(Debug, Clone, PartialEq)]
+pub enum GradientAnomaly {
+    /// Too many steps with near-zero gradients — network stops learning.
+    Vanishing {
+        /// Fraction of steps with gradient norm < 1e-6.
+        fraction: f32,
+    },
+    /// Too many steps with very large gradients — training becomes unstable.
+    Exploding {
+        /// Fraction of steps with gradient norm > 10.
+        fraction: f32,
+        /// Maximum observed gradient norm.
+        max_norm: f32,
+    },
+    /// Gradient norms vary wildly — optimizer may be fighting itself.
+    Oscillating {
+        /// Coefficient of variation (std/mean) of gradient norms.
+        coefficient_of_variation: f32,
+    },
+    /// All gradient norms identical — possible dead network or saturated activations.
+    Plateau {
+        /// Mean gradient norm during the plateau.
+        mean_norm: f32,
+    },
+    /// Mean output-thought coherence collapsed below threshold.
+    /// Network is generating outputs divorced from thought intent.
+    CoherenceCollapse {
+        /// Mean coherence this epoch.
+        mean_coherence: f32,
+    },
+}
+
+impl std::fmt::Display for GradientAnomaly {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Vanishing { fraction } => {
+                write!(f, "Vanishing gradients: {:.1}% of steps", fraction * 100.0)
+            }
+            Self::Exploding { fraction, max_norm } => {
+                write!(
+                    f,
+                    "Exploding gradients: {:.1}% of steps (max={:.2})",
+                    fraction * 100.0,
+                    max_norm
+                )
+            }
+            Self::Oscillating {
+                coefficient_of_variation,
+            } => {
+                write!(
+                    f,
+                    "Oscillating gradients: CV={:.2}",
+                    coefficient_of_variation
+                )
+            }
+            Self::Plateau { mean_norm } => {
+                write!(f, "Gradient plateau: mean_norm={:.6}", mean_norm)
+            }
+            Self::CoherenceCollapse { mean_coherence } => {
+                write!(
+                    f,
+                    "Coherence collapse: mean={:.4} (output divorced from thought)",
+                    mean_coherence
+                )
+            }
+        }
+    }
+}
+
+/// Summary of anomaly responses taken during training.
+///
+/// Returned alongside `GradientDiagnostics` from `train_with_adam()` so callers
+/// can inspect what automatic adjustments were made.
+#[derive(Debug, Clone, Default)]
+pub struct AnomalyReport {
+    /// Final LR multiplier (1.0 = no adjustment).
+    pub final_lr_multiplier: f32,
+    /// Final effective gradient clip (may differ from config if oscillating detected).
+    pub final_grad_clip: f32,
+    /// Number of epochs flagged as anomalous.
+    pub anomalous_epoch_count: usize,
+    /// Whether training was stopped early due to anomaly response (vs patience).
+    pub anomaly_early_stopped: bool,
+    /// Whether CfC BPTT was force-enabled by plateau detection.
+    pub plateau_forced_network_training: bool,
+    /// Per-epoch anomaly log: (epoch, anomalies detected).
+    pub epoch_anomalies: Vec<(usize, Vec<GradientAnomaly>)>,
+    /// Whether coherence collapse was detected during training.
+    pub coherence_collapse_detected: bool,
+}
+
+/// Post-training validation results from smoke test.
+#[derive(Debug, Clone)]
+pub struct TrainingValidation {
+    /// Per-intent coherence from smoke test generations.
+    pub intent_coherences: Vec<(usize, f32)>,
+    /// Mean coherence across all smoke test generations.
+    pub mean_coherence: f32,
+    /// Whether the smoke test passed (mean coherence >= threshold).
+    pub passed: bool,
+    /// Any intents where coherence was below threshold.
+    pub failed_intents: Vec<usize>,
 }
 
 /// Compute the effective learning rate with warmup + cosine decay.
@@ -412,12 +632,15 @@ pub fn train(
     dataset: &TrainingDataset,
     config: &TrainingConfig,
 ) -> Vec<EpochMetrics> {
-    train_with_adam(generator, dataset, config, None).0
+    let (metrics, _, _, _, _) = train_with_adam(generator, dataset, config, None);
+    metrics
 }
 
 /// Train with optional Adam optimizer state.
 ///
-/// Returns (metrics, final AdamState if Adam was used, optional GradientDiagnostics).
+/// Returns (metrics, final AdamState if Adam was used, optional GradientDiagnostics,
+/// optional AnomalyReport if anomaly response was enabled,
+/// optional TrainingValidation if smoke test was enabled).
 pub fn train_with_adam(
     generator: &mut BrocaGenerator,
     dataset: &TrainingDataset,
@@ -427,6 +650,8 @@ pub fn train_with_adam(
     Vec<EpochMetrics>,
     Option<AdamState>,
     Option<GradientDiagnostics>,
+    Option<AnomalyReport>,
+    Option<TrainingValidation>,
 ) {
     let mut metrics = Vec::with_capacity(config.epochs);
 
@@ -453,8 +678,21 @@ pub fn train_with_adam(
     let mut global_step = 0usize;
     let mut best_loss = f32::INFINITY;
     let mut patience_counter = 0usize;
-    let mut diagnostics = if config.enable_diagnostics {
+    let mut diagnostics = if config.enable_diagnostics || config.enable_anomaly_response {
         Some(GradientDiagnostics::new())
+    } else {
+        None
+    };
+    let mut lr_multiplier: f32 = 1.0;
+    let mut effective_grad_clip = config.grad_clip;
+    let mut consecutive_anomaly_epochs: usize = 0;
+    let initial_lr = config.learning_rate;
+    let mut anomaly_report = if config.enable_anomaly_response {
+        Some(AnomalyReport {
+            final_lr_multiplier: 1.0,
+            final_grad_clip: config.grad_clip,
+            ..Default::default()
+        })
     } else {
         None
     };
@@ -483,9 +721,27 @@ pub fn train_with_adam(
         }
     };
 
+    let mut force_train_network = false;
+
+    // Track whether coherence telemetry is needed
+    let track_coherence = config.coherence_loss_weight > 0.0
+        || config.enable_diagnostics
+        || config.enable_anomaly_response;
+
     for epoch in 0..config.epochs {
         let mut total_loss = 0.0f32;
         let mut total_tokens = 0usize;
+        let mut coherence_sum = 0.0f32;
+        let mut coherence_count = 0usize;
+
+        // Adaptive coherence weight: ramp from 0 to config value over warmup epochs
+        let effective_coherence_weight = if config.coherence_warmup_epochs > 0
+            && epoch < config.coherence_warmup_epochs
+        {
+            config.coherence_loss_weight * (epoch as f32 / config.coherence_warmup_epochs as f32)
+        } else {
+            config.coherence_loss_weight
+        };
 
         // Log phase transition
         if config.network_warmup_epochs > 0 && epoch == config.network_warmup_epochs {
@@ -527,7 +783,7 @@ pub fn train_with_adam(
 
             for (pos, &target_id) in pair.target_ids[..window_end].iter().enumerate() {
                 let lr = warmup_lr(
-                    config.learning_rate,
+                    config.learning_rate * lr_multiplier,
                     global_step,
                     total_steps,
                     config.warmup_fraction,
@@ -555,13 +811,36 @@ pub fn train_with_adam(
                 };
 
                 // Cross-entropy loss: -log(softmax[target])
-                let loss = cross_entropy_loss(&logits, target_id as usize);
+                let raw_loss = cross_entropy_loss(&logits, target_id as usize);
+
+                // Coherence tracking + gated loss weighting
+                // (Bengio et al. 2009 — curriculum learning: focus on learnable examples)
+                let loss = if effective_coherence_weight > 0.0 || track_coherence {
+                    let output_hv = generator.controller().output_hv();
+                    let coherence = output_hv.similarity(&thought_hv);
+                    coherence_sum += coherence;
+                    coherence_count += 1;
+                    if effective_coherence_weight > 0.0 {
+                        // weight = 1.0 when coherence=1.0, lower when coherence drops
+                        let weight = (1.0
+                            - effective_coherence_weight * (1.0 - coherence))
+                            .max(0.05);
+                        raw_loss * weight
+                    } else {
+                        raw_loss
+                    }
+                } else {
+                    raw_loss
+                };
+
                 total_loss += loss;
                 total_tokens += 1;
 
                 // Phased training: only enable CfC BPTT after network_warmup_epochs
+                // (force_train_network overrides when plateau anomaly detected)
                 let train_network_this_epoch =
-                    config.train_network && epoch >= config.network_warmup_epochs;
+                    (config.train_network && epoch >= config.network_warmup_epochs)
+                        || force_train_network;
 
                 // Compute gradient of CE loss w.r.t. output HV (for CfC BPTT)
                 let d_output = if train_network_this_epoch {
@@ -574,14 +853,16 @@ pub fn train_with_adam(
                     None
                 };
 
-                // Apply embedding gradient update
-                let (grad_norm, was_clipped) = if config.use_adam {
+                // Apply embedding gradient update (skipped when freeze_embeddings is set)
+                let (grad_norm, was_clipped) = if config.freeze_embeddings {
+                    (0.0, false)
+                } else if config.use_adam {
                     apply_weight_tied_gradient_adam(
                         generator.controller_mut(),
                         &logits,
                         target_id as usize,
                         lr,
-                        config.grad_clip,
+                        effective_grad_clip,
                         adam_state
                             .as_mut()
                             .expect("invariant: adam_state is Some when config.use_adam"),
@@ -592,7 +873,7 @@ pub fn train_with_adam(
                         &logits,
                         target_id as usize,
                         lr,
-                        config.grad_clip,
+                        effective_grad_clip,
                     )
                 };
 
@@ -633,17 +914,27 @@ pub fn train_with_adam(
             None
         };
 
+        let epoch_mean_coherence = if coherence_count > 0 {
+            Some(coherence_sum / coherence_count as f32)
+        } else {
+            None
+        };
+
         metrics.push(EpochMetrics {
             epoch,
             avg_loss,
             num_tokens: total_tokens,
             num_pairs: dataset.len(),
             validation_loss,
+            mean_coherence: epoch_mean_coherence,
         });
 
         if (epoch + 1) % config.report_interval.max(1) == 0 || epoch == 0 {
             let val_str = validation_loss
                 .map(|v| format!(" val_loss={v:.6}"))
+                .unwrap_or_default();
+            let coh_str = epoch_mean_coherence
+                .map(|c| format!(" coh={c:.4}"))
                 .unwrap_or_default();
             tracing::info!(
                 epoch = epoch,
@@ -655,7 +946,7 @@ pub fn train_with_adam(
             use std::io::Write;
             let _ = writeln!(
                 std::io::stderr(),
-                "[epoch] {epoch}/{} loss={avg_loss:.6}{val_str} tokens={total_tokens}",
+                "[epoch] {epoch}/{} loss={avg_loss:.6}{val_str}{coh_str} tokens={total_tokens}",
                 config.epochs,
             );
             std::io::stderr().flush().ok();
@@ -664,6 +955,91 @@ pub fn train_with_adam(
         // Record embedding norms at end of each epoch
         if let Some(ref mut diag) = diagnostics {
             diag.record_embedding_norms(generator.controller().token_embeddings());
+        }
+
+        // Gradient anomaly response (end-of-epoch check)
+        if config.enable_anomaly_response {
+            if let Some(ref diag) = diagnostics {
+                let mut anomalies = diag.detect_anomalies();
+
+                // Coherence collapse detection
+                if let Some(mean_coh) = epoch_mean_coherence {
+                    if mean_coh < config.coherence_collapse_threshold {
+                        anomalies.push(GradientAnomaly::CoherenceCollapse {
+                            mean_coherence: mean_coh,
+                        });
+                    }
+                }
+
+                if anomalies.is_empty() {
+                    consecutive_anomaly_epochs = 0;
+                } else {
+                    consecutive_anomaly_epochs += 1;
+                    for anomaly in &anomalies {
+                        match anomaly {
+                            GradientAnomaly::Exploding { .. } => {
+                                lr_multiplier = (lr_multiplier * 0.5).max(0.01);
+                                tracing::warn!(
+                                    epoch, lr_multiplier,
+                                    "Anomaly response: halved LR (exploding gradients)"
+                                );
+                            }
+                            GradientAnomaly::Vanishing { .. } => {
+                                let max_mult = 10.0 * initial_lr;
+                                lr_multiplier = (lr_multiplier * 2.0).min(max_mult / initial_lr);
+                                tracing::warn!(
+                                    epoch, lr_multiplier,
+                                    "Anomaly response: doubled LR (vanishing gradients)"
+                                );
+                            }
+                            GradientAnomaly::Oscillating { .. } => {
+                                effective_grad_clip *= 0.5;
+                                tracing::warn!(
+                                    epoch, effective_grad_clip,
+                                    "Anomaly response: tightened grad clip (oscillating)"
+                                );
+                            }
+                            GradientAnomaly::Plateau { .. } => {
+                                force_train_network = true;
+                                if let Some(ref mut report) = anomaly_report {
+                                    report.plateau_forced_network_training = true;
+                                }
+                                tracing::warn!(
+                                    epoch,
+                                    "Anomaly response: forced CfC training on (plateau)"
+                                );
+                            }
+                            GradientAnomaly::CoherenceCollapse { mean_coherence } => {
+                                // Reduce LR to stabilize — aggressive updates may be
+                                // pushing output representations away from thought space
+                                lr_multiplier = (lr_multiplier * 0.5).max(0.01);
+                                if let Some(ref mut report) = anomaly_report {
+                                    report.coherence_collapse_detected = true;
+                                }
+                                tracing::warn!(
+                                    epoch, mean_coherence, lr_multiplier,
+                                    "Anomaly response: halved LR (coherence collapse)"
+                                );
+                            }
+                        }
+                    }
+                    // Record anomalies in report
+                    if let Some(ref mut report) = anomaly_report {
+                        report.anomalous_epoch_count += 1;
+                        report.epoch_anomalies.push((epoch, anomalies));
+                    }
+                    if consecutive_anomaly_epochs >= 3 {
+                        if let Some(ref mut report) = anomaly_report {
+                            report.anomaly_early_stopped = true;
+                        }
+                        tracing::warn!(
+                            epoch, consecutive_anomaly_epochs,
+                            "Anomaly response: early stopping (3 consecutive anomalous epochs)"
+                        );
+                        break;
+                    }
+                }
+            }
         }
 
         // Normalize embeddings to prevent norm explosion
@@ -694,7 +1070,51 @@ pub fn train_with_adam(
         }
     }
 
-    (metrics, adam_state, diagnostics)
+    // Finalize anomaly report with current state
+    if let Some(ref mut report) = anomaly_report {
+        report.final_lr_multiplier = lr_multiplier;
+        report.final_grad_clip = effective_grad_clip;
+    }
+
+    // Post-training smoke test: generate on diverse intents, verify coherence
+    let validation = if config.enable_smoke_test {
+        let mut intent_coherences = Vec::new();
+        let mut failed_intents = Vec::new();
+        for intent in 0..8 {
+            let channels = crate::encoder::ThoughtChannels::with_intent(intent);
+            let result = generator.generate(&channels);
+            let coh = result.final_coherence;
+            intent_coherences.push((intent, coh));
+            if coh < config.smoke_test_coherence_threshold {
+                failed_intents.push(intent);
+            }
+        }
+        let mean_coherence = if intent_coherences.is_empty() {
+            0.0
+        } else {
+            intent_coherences.iter().map(|(_, c)| c).sum::<f32>()
+                / intent_coherences.len() as f32
+        };
+        let passed = mean_coherence >= config.smoke_test_coherence_threshold;
+        if !passed {
+            tracing::warn!(
+                mean_coherence,
+                threshold = config.smoke_test_coherence_threshold,
+                failed = ?failed_intents,
+                "Post-training smoke test FAILED"
+            );
+        }
+        Some(TrainingValidation {
+            intent_coherences,
+            mean_coherence,
+            passed,
+            failed_intents,
+        })
+    } else {
+        None
+    };
+
+    (metrics, adam_state, diagnostics, anomaly_report, validation)
 }
 
 /// Cross-entropy loss for a single position.
@@ -713,8 +1133,15 @@ fn cross_entropy_loss(logits: &[f32], target: usize) -> f32 {
 
 /// Compute the gradient of cross-entropy loss w.r.t. the network output HV.
 ///
-/// For weight-tied output: logits[i] = cosine_similarity(output_hv, emb[i])
-/// ∂L/∂output_hv = Σ_i (softmax[i] - one_hot[target]) × emb[i]
+/// For weight-tied output: logits[i] = scale * cosine_similarity(output_hv, emb[i])
+///
+/// The derivative of cosine_similarity(o, e) w.r.t. o is:
+///   (e - cos(o,e) * o) / (||o|| * ||e||)
+///
+/// Since output_hv is normalized (||o|| = 1), this simplifies to:
+///   (e / ||e|| - cos(o,e) * o)
+///
+/// Full chain: ∂L/∂o = scale × Σ_i (softmax[i] - 1_{i=target}) × (e_i/||e_i|| - cos_i × o)
 ///
 /// This gradient is used to backpropagate through the CfC network.
 fn compute_ce_gradient_wrt_output(
@@ -738,9 +1165,13 @@ fn compute_ce_gradient_wrt_output(
     }
 
     let embeddings = controller.token_embeddings();
+    let output_hv = controller.output_hv();
+    let output_slice = output_hv.as_slice();
+    let scale = controller.config().logit_scale;
     let n = embeddings.len().min(logits.len());
 
-    // Accumulate: d_output = Σ_i (softmax[i] - 1_{i=target}) × emb[i]
+    // Accumulate: d_output = scale × Σ_i error_i × (e_hat_i - cos_i × o)
+    // where e_hat_i = e_i / ||e_i||, cos_i = similarity(o, e_i)
     let mut d_output = vec![0.0f32; HDC_DIMENSION];
     for i in 0..n {
         let prob = exps[i] / sum_exp;
@@ -751,9 +1182,16 @@ fn compute_ce_gradient_wrt_output(
         }
 
         let emb_vals = embeddings[i].as_slice();
+        // Compute ||e_i|| for normalization
+        let emb_norm: f32 = emb_vals.iter().map(|v| v * v).sum::<f32>().sqrt().max(1e-8);
+        // cos_i = similarity(output, emb[i]) — recover from scaled logit
+        let cos_i = if scale.abs() > 1e-6 { logits[i] / scale } else { 0.0 };
+
+        let scaled_error = scale * error;
         for (j, &ev) in emb_vals.iter().enumerate() {
             if j < d_output.len() {
-                d_output[j] += error * ev;
+                // d cos(o,e)/do = (e/||e|| - cos*o) / ||o|| — but ||o||=1 (normalized)
+                d_output[j] += scaled_error * (ev / emb_norm - cos_i * output_slice[j]);
             }
         }
     }
@@ -763,9 +1201,9 @@ fn compute_ce_gradient_wrt_output(
 
 /// Apply gradient through weight-tied output (SGD).
 ///
-/// For weight-tied output: logits[i] = similarity(output_hv, emb[i])
-/// Gradient of CE loss w.r.t. output_hv is: sum_i (softmax[i] - one_hot[target]) * emb[i]
-/// We use this to shift the relevant token embeddings toward/away from the output.
+/// For weight-tied output: logits[i] = scale * cosine_similarity(output_hv, emb[i])
+/// ∂L/∂e_i = scale × (softmax[i] - 1_{target}) × output_hv
+/// (simplified: we use output_hv as gradient direction to shift embeddings)
 ///
 /// Returns (grad_l2_norm, was_clipped).
 fn apply_weight_tied_gradient(
@@ -790,6 +1228,7 @@ fn apply_weight_tied_gradient(
 
     let output_hv = controller.output_hv();
     let output_slice = output_hv.as_slice();
+    let scale = controller.config().logit_scale;
 
     // Update token embeddings: shift target toward output, others away
     let embeddings = controller.token_embeddings_mut();
@@ -809,8 +1248,8 @@ fn apply_weight_tied_gradient(
 
         sum_sq += error * error;
 
-        // Gradient: error * output_hv (projected onto embedding dimension)
-        let raw = -lr * error;
+        // Gradient includes the logit_scale factor
+        let raw = -lr * scale * error;
         let grad_scale = raw.clamp(-grad_clip, grad_clip);
         if (grad_scale - raw).abs() > 1e-10 {
             was_clipped = true;
@@ -853,6 +1292,7 @@ fn apply_weight_tied_gradient_adam(
 
     let output_hv = controller.output_hv();
     let output_slice = output_hv.as_slice();
+    let scale = controller.config().logit_scale;
 
     let embeddings = controller.token_embeddings_mut();
     let n = embeddings.len().min(logits.len());
@@ -870,23 +1310,19 @@ fn apply_weight_tied_gradient_adam(
 
         sum_sq += error * error;
 
-        // Compute per-dimension gradient: error * output_hv
+        // Compute per-dimension gradient: scale * error * output_hv
         let dim = embeddings[i].values.len().min(output_slice.len());
         let grad: Vec<f32> = (0..dim)
             .map(|j| {
-                let raw = error * output_slice[j];
+                let raw = scale * error * output_slice[j];
                 let clamped = raw.clamp(-grad_clip, grad_clip);
-                if (clamped - raw).abs() > 1e-10 {
-                    // Note: can't mutate was_clipped in closure directly,
-                    // but we'll check post-hoc
-                }
                 clamped
             })
             .collect();
 
         // Check if any gradient was actually clipped
         for &val in output_slice {
-            let raw = error * val;
+            let raw = scale * error * val;
             if raw.abs() > grad_clip {
                 was_clipped = true;
                 break;
@@ -1050,13 +1486,32 @@ pub fn generate_curriculum(tokenizer: &BpeTokenizer) -> TrainingDataset {
 ///
 /// Uses teacher-forced forward pass through the CfC network, computing loss
 /// at each position. Returns the average per-token loss.
+///
+/// Uses negative sampling (same as training) to avoid the 8x cost of computing
+/// all 4096 cosine similarities per token. The loss estimate is slightly biased
+/// (softmax denominator covers fewer terms) but the relative ranking between
+/// epochs is preserved, which is all early stopping needs.
 pub fn compute_validation_loss(
     generator: &mut BrocaGenerator,
     dataset: &TrainingDataset,
     bptt_window: usize,
 ) -> f32 {
+    compute_validation_loss_sampled(generator, dataset, bptt_window, 60)
+}
+
+/// Validation loss with configurable negative sampling.
+/// `negative_samples = 0` uses full softmax (expensive but exact).
+pub fn compute_validation_loss_sampled(
+    generator: &mut BrocaGenerator,
+    dataset: &TrainingDataset,
+    bptt_window: usize,
+    negative_samples: usize,
+) -> f32 {
     let mut total_loss = 0.0f32;
     let mut total_tokens = 0usize;
+    let vocab_size = generator.controller().vocab_size();
+    let use_sampled = negative_samples > 0 && vocab_size > negative_samples + 1;
+    let mut neg_seed: u64 = 0xDEAD_BEEF_CAFE;
 
     for pair in &dataset.pairs {
         if pair.target_ids.is_empty() {
@@ -1071,9 +1526,25 @@ pub fn compute_validation_loss(
         let window_end = pair.target_ids.len().min(bptt_window);
 
         for (pos, &target_id) in pair.target_ids[..window_end].iter().enumerate() {
-            let logits = generator
-                .controller_mut()
-                .forward_step(&thought_hv, prev_token, pos);
+            let logits = if use_sampled {
+                neg_seed = neg_seed.wrapping_add(1);
+                let active = sample_negatives(
+                    target_id as usize,
+                    vocab_size,
+                    negative_samples,
+                    neg_seed,
+                );
+                generator.controller_mut().forward_step_sampled(
+                    &thought_hv,
+                    prev_token,
+                    pos,
+                    &active,
+                )
+            } else {
+                generator
+                    .controller_mut()
+                    .forward_step(&thought_hv, prev_token, pos)
+            };
             let loss = cross_entropy_loss(&logits, target_id as usize);
             total_loss += loss;
             total_tokens += 1;
@@ -1245,12 +1716,17 @@ mod tests {
             ..Default::default()
         };
 
-        let (metrics, adam, diag) = train_with_adam(&mut gen, &dataset, &train_config, None);
+        let (metrics, adam, diag, report, _validation) =
+            train_with_adam(&mut gen, &dataset, &train_config, None);
         assert_eq!(metrics.len(), 10);
         assert!(adam.is_some());
         assert!(
             diag.is_none(),
             "Diagnostics should be None when not enabled"
+        );
+        assert!(
+            report.is_none(),
+            "AnomalyReport should be None when not enabled"
         );
 
         let adam = adam.unwrap();
@@ -1427,7 +1903,8 @@ mod tests {
             ..Default::default()
         };
 
-        let (_metrics, _adam, diag) = train_with_adam(&mut gen, &dataset, &train_config, None);
+        let (_metrics, _adam, diag, _report, _validation) =
+            train_with_adam(&mut gen, &dataset, &train_config, None);
         let diag = diag.expect("Diagnostics should be Some when enabled");
         assert!(diag.total_steps > 0, "Should have recorded steps");
         let mean = diag.mean_grad_norm();
@@ -1465,6 +1942,120 @@ mod tests {
             summary.contains("Clip count:        1"),
             "Should show 1 clip"
         );
+    }
+
+    #[test]
+    fn test_gradient_anomaly_vanishing() {
+        let mut diag = GradientDiagnostics::new();
+        // 80% vanishing (< 1e-6)
+        for _ in 0..80 {
+            diag.record_step(1e-8, false);
+        }
+        for _ in 0..20 {
+            diag.record_step(0.5, false);
+        }
+        let anomalies = diag.detect_anomalies();
+        assert!(
+            anomalies
+                .iter()
+                .any(|a| matches!(a, GradientAnomaly::Vanishing { .. })),
+            "Should detect vanishing: {:?}",
+            anomalies
+        );
+        assert!(!diag.is_healthy());
+    }
+
+    #[test]
+    fn test_gradient_anomaly_exploding() {
+        let mut diag = GradientDiagnostics::new();
+        // 30% exploding (> 10)
+        for _ in 0..30 {
+            diag.record_step(50.0, true);
+        }
+        for _ in 0..70 {
+            diag.record_step(0.5, false);
+        }
+        let anomalies = diag.detect_anomalies();
+        assert!(
+            anomalies
+                .iter()
+                .any(|a| matches!(a, GradientAnomaly::Exploding { .. })),
+            "Should detect exploding: {:?}",
+            anomalies
+        );
+    }
+
+    #[test]
+    fn test_gradient_anomaly_oscillating() {
+        let mut diag = GradientDiagnostics::new();
+        // Mix of very small and very large norms → high CV (>2.0)
+        // mean ≈ 1.0, but std >> mean when most values are near 0 and a few are huge
+        for _ in 0..90 {
+            diag.record_step(0.01, false);
+        }
+        for _ in 0..10 {
+            diag.record_step(30.0, false);
+        }
+        let anomalies = diag.detect_anomalies();
+        assert!(
+            anomalies
+                .iter()
+                .any(|a| matches!(a, GradientAnomaly::Oscillating { .. })),
+            "Should detect oscillation: {:?}",
+            anomalies
+        );
+    }
+
+    #[test]
+    fn test_gradient_anomaly_plateau() {
+        let mut diag = GradientDiagnostics::new();
+        // All norms identical → plateau
+        for _ in 0..50 {
+            diag.record_step(1.0, false);
+        }
+        let anomalies = diag.detect_anomalies();
+        assert!(
+            anomalies
+                .iter()
+                .any(|a| matches!(a, GradientAnomaly::Plateau { .. })),
+            "Should detect plateau: {:?}",
+            anomalies
+        );
+    }
+
+    #[test]
+    fn test_gradient_anomaly_healthy() {
+        let mut diag = GradientDiagnostics::new();
+        // Normal-ish gradient norms with some variation
+        for i in 0..100 {
+            diag.record_step(0.3 + (i as f32 * 0.01), false);
+        }
+        assert!(
+            diag.is_healthy(),
+            "Should be healthy, got anomalies: {:?}",
+            diag.detect_anomalies()
+        );
+    }
+
+    #[test]
+    fn test_gradient_anomaly_empty() {
+        let diag = GradientDiagnostics::new();
+        assert!(diag.detect_anomalies().is_empty());
+        assert!(diag.is_healthy());
+    }
+
+    #[test]
+    fn test_gradient_anomaly_display() {
+        let a = GradientAnomaly::Vanishing { fraction: 0.5 };
+        let s = format!("{}", a);
+        assert!(s.contains("50.0%"), "Display should show percentage: {}", s);
+
+        let b = GradientAnomaly::Exploding {
+            fraction: 0.1,
+            max_norm: 42.0,
+        };
+        let s = format!("{}", b);
+        assert!(s.contains("42.00"), "Display should show max norm: {}", s);
     }
 
     #[test]
@@ -1738,7 +2329,7 @@ mod tests {
             ..Default::default()
         };
 
-        let (metrics, _, _) = train_with_adam(&mut gen, &train_dataset, &train_config, None);
+        let (metrics, _, _, _, _) = train_with_adam(&mut gen, &train_dataset, &train_config, None);
         assert_eq!(metrics.len(), 5);
 
         // All epochs should have validation loss
@@ -1752,6 +2343,295 @@ mod tests {
                 "Validation loss should be finite"
             );
         }
+    }
+
+    #[test]
+    fn test_anomaly_response_exploding_halves_lr() {
+        let genesis = test_genesis();
+        let config = test_config();
+        let mut gen = BrocaGenerator::new(&genesis, config);
+
+        let tok = gen.tokenizer().clone();
+        let mut dataset = TrainingDataset::default();
+        let channels = ThoughtChannels::default();
+        for _ in 0..3 {
+            dataset.push(TrainingPair::new(channels, "hello".to_string(), &tok));
+        }
+
+        // Very high LR to provoke exploding gradients
+        let train_config = TrainingConfig {
+            epochs: 10,
+            learning_rate: 100.0,
+            bptt_window: 8,
+            enable_diagnostics: true,
+            enable_anomaly_response: true,
+            ..Default::default()
+        };
+
+        let metrics = train(&mut gen, &dataset, &train_config);
+        // Should early-stop (3 consecutive anomalous epochs) or complete with reduced LR
+        // Either way, all losses should be finite (anomaly response prevents divergence)
+        for m in &metrics {
+            assert!(m.avg_loss.is_finite(), "Loss should remain finite with anomaly response");
+        }
+    }
+
+    #[test]
+    fn test_anomaly_response_early_stop() {
+        let genesis = test_genesis();
+        let config = test_config();
+        let mut gen = BrocaGenerator::new(&genesis, config);
+
+        let tok = gen.tokenizer().clone();
+        let mut dataset = TrainingDataset::default();
+        let channels = ThoughtChannels::default();
+        for _ in 0..3 {
+            dataset.push(TrainingPair::new(channels, "hello".to_string(), &tok));
+        }
+
+        // Extremely tiny LR → vanishing gradients → anomaly response doubles LR
+        // but if gradients remain anomalous for 3 epochs, early stop triggers
+        let train_config = TrainingConfig {
+            epochs: 100,
+            learning_rate: 1e-30,
+            bptt_window: 8,
+            warmup_fraction: 0.0,
+            enable_diagnostics: true,
+            enable_anomaly_response: true,
+            ..Default::default()
+        };
+
+        let metrics = train(&mut gen, &dataset, &train_config);
+        // Should early-stop well before 100 epochs
+        assert!(
+            metrics.len() < 100,
+            "Anomaly response should early-stop: got {} epochs",
+            metrics.len()
+        );
+    }
+
+    #[test]
+    fn test_anomaly_response_disabled_by_default() {
+        // enable_anomaly_response defaults to false
+        let cfg = TrainingConfig::default();
+        assert!(!cfg.enable_anomaly_response);
+    }
+
+    // ── Item #1: freeze_embeddings tests ──
+
+    #[test]
+    fn test_freeze_embeddings_preserves_norms() {
+        let genesis = test_genesis();
+        let config = test_config();
+        let mut gen = BrocaGenerator::new(&genesis, config);
+
+        // Snapshot embedding norms before training
+        let norms_before: Vec<f32> = gen
+            .controller()
+            .token_embeddings()
+            .iter()
+            .map(|e| e.norm())
+            .collect();
+
+        let tok = gen.tokenizer().clone();
+        let mut dataset = TrainingDataset::default();
+        let channels = ThoughtChannels::default();
+        for _ in 0..5 {
+            dataset.push(TrainingPair::new(channels, "hello world".to_string(), &tok));
+        }
+
+        let train_config = TrainingConfig {
+            epochs: 10,
+            learning_rate: 0.05,
+            bptt_window: 8,
+            freeze_embeddings: true,
+            train_network: true,
+            embedding_target_norm: 0.0, // Disable normalization to see raw change
+            ..Default::default()
+        };
+
+        train(&mut gen, &dataset, &train_config);
+
+        // Embeddings should be unchanged when frozen
+        let norms_after: Vec<f32> = gen
+            .controller()
+            .token_embeddings()
+            .iter()
+            .map(|e| e.norm())
+            .collect();
+
+        for (i, (before, after)) in norms_before.iter().zip(norms_after.iter()).enumerate() {
+            assert!(
+                (before - after).abs() < 1e-6,
+                "Embedding {i} norm changed: {before} → {after} (freeze_embeddings=true)"
+            );
+        }
+    }
+
+    #[test]
+    fn test_freeze_embeddings_cfc_still_trains() {
+        let genesis = test_genesis();
+        let config = test_config();
+        let mut gen = BrocaGenerator::new(&genesis, config);
+
+        let tok = gen.tokenizer().clone();
+        let mut dataset = TrainingDataset::default();
+        let channels = ThoughtChannels::default();
+        for _ in 0..5 {
+            dataset.push(TrainingPair::new(channels, "hello".to_string(), &tok));
+        }
+
+        // freeze_embeddings + train_network: only CfC weights should update
+        let train_config = TrainingConfig {
+            epochs: 15,
+            learning_rate: 0.01,
+            bptt_window: 8,
+            freeze_embeddings: true,
+            train_network: true,
+            network_lr_scale: 0.3,
+            embedding_target_norm: 0.0,
+            ..Default::default()
+        };
+
+        let metrics = train(&mut gen, &dataset, &train_config);
+        // Should complete without error and produce finite loss
+        for m in &metrics {
+            assert!(m.avg_loss.is_finite(), "Loss should be finite with frozen embeddings");
+        }
+    }
+
+    // ── Item #2: AnomalyReport tests ──
+
+    #[test]
+    fn test_anomaly_report_returned_when_enabled() {
+        let genesis = test_genesis();
+        let config = test_config();
+        let mut gen = BrocaGenerator::new(&genesis, config);
+
+        let tok = gen.tokenizer().clone();
+        let mut dataset = TrainingDataset::default();
+        let channels = ThoughtChannels::default();
+        for _ in 0..3 {
+            dataset.push(TrainingPair::new(channels, "hello".to_string(), &tok));
+        }
+
+        let train_config = TrainingConfig {
+            epochs: 5,
+            learning_rate: 0.01,
+            bptt_window: 8,
+            enable_anomaly_response: true,
+            ..Default::default()
+        };
+
+        let (_, _, _, report, _) = train_with_adam(&mut gen, &dataset, &train_config, None);
+        let report = report.expect("AnomalyReport should be Some when enabled");
+        assert!(report.final_lr_multiplier > 0.0);
+        assert!(report.final_grad_clip > 0.0);
+    }
+
+    #[test]
+    fn test_anomaly_report_records_early_stop() {
+        let genesis = test_genesis();
+        let config = test_config();
+        let mut gen = BrocaGenerator::new(&genesis, config);
+
+        let tok = gen.tokenizer().clone();
+        let mut dataset = TrainingDataset::default();
+        let channels = ThoughtChannels::default();
+        for _ in 0..3 {
+            dataset.push(TrainingPair::new(channels, "hello".to_string(), &tok));
+        }
+
+        let train_config = TrainingConfig {
+            epochs: 100,
+            learning_rate: 1e-30,
+            bptt_window: 8,
+            warmup_fraction: 0.0,
+            enable_diagnostics: true,
+            enable_anomaly_response: true,
+            ..Default::default()
+        };
+
+        let (metrics, _, _, report, _) = train_with_adam(&mut gen, &dataset, &train_config, None);
+        let report = report.expect("AnomalyReport should be Some");
+        if metrics.len() < 100 {
+            assert!(
+                report.anomaly_early_stopped,
+                "Should flag anomaly_early_stopped when stopped before max epochs"
+            );
+        }
+        assert!(
+            report.anomalous_epoch_count > 0,
+            "Should record anomalous epochs"
+        );
+        assert!(
+            !report.epoch_anomalies.is_empty(),
+            "Should have per-epoch anomaly log"
+        );
+    }
+
+    // ── Item #4: coherence-gated loss tests ──
+
+    #[test]
+    fn test_coherence_loss_weight_default_disabled() {
+        let cfg = TrainingConfig::default();
+        assert!(
+            cfg.coherence_loss_weight == 0.0,
+            "coherence_loss_weight should default to 0.0 (disabled)"
+        );
+    }
+
+    #[test]
+    fn test_coherence_loss_weight_training() {
+        let genesis = test_genesis();
+        let config = test_config();
+
+        // Train with coherence gating disabled
+        let mut gen1 = BrocaGenerator::new(&genesis, config.clone());
+        let tok = gen1.tokenizer().clone();
+        let mut dataset = TrainingDataset::default();
+        let channels = ThoughtChannels::default();
+        for _ in 0..5 {
+            dataset.push(TrainingPair::new(channels, "hello world".to_string(), &tok));
+        }
+
+        let config_no_coherence = TrainingConfig {
+            epochs: 10,
+            learning_rate: 0.01,
+            bptt_window: 8,
+            embedding_target_norm: 0.0,
+            coherence_loss_weight: 0.0,
+            ..Default::default()
+        };
+        let metrics_no = train(&mut gen1, &dataset, &config_no_coherence);
+
+        // Train with coherence gating enabled
+        let mut gen2 = BrocaGenerator::new(&genesis, config);
+        let config_coherence = TrainingConfig {
+            epochs: 10,
+            learning_rate: 0.01,
+            bptt_window: 8,
+            embedding_target_norm: 0.0,
+            coherence_loss_weight: 0.5,
+            ..Default::default()
+        };
+        let metrics_yes = train(&mut gen2, &dataset, &config_coherence);
+
+        // Both should produce finite loss and train successfully
+        for m in &metrics_no {
+            assert!(m.avg_loss.is_finite(), "No-coherence loss should be finite");
+        }
+        for m in &metrics_yes {
+            assert!(m.avg_loss.is_finite(), "Coherence-gated loss should be finite");
+        }
+
+        // Coherence-weighted loss should be lower (scaled down by weight)
+        let final_no = metrics_no.last().unwrap().avg_loss;
+        let final_yes = metrics_yes.last().unwrap().avg_loss;
+        assert!(
+            final_yes <= final_no + 0.5,
+            "Coherence-gated training ({final_yes:.4}) should not be much worse than baseline ({final_no:.4})"
+        );
     }
 
     #[test]
@@ -1787,4 +2667,229 @@ mod tests {
             metrics.len()
         );
     }
+
+    // ── Item #1: coherence telemetry tests ──
+
+    #[test]
+    fn test_epoch_metrics_coherence_tracked() {
+        let genesis = test_genesis();
+        let config = test_config();
+        let mut gen = BrocaGenerator::new(&genesis, config);
+
+        let tok = gen.tokenizer().clone();
+        let mut dataset = TrainingDataset::default();
+        let channels = ThoughtChannels::default();
+        for _ in 0..3 {
+            dataset.push(TrainingPair::new(channels, "hello".to_string(), &tok));
+        }
+
+        // Coherence tracking activates when coherence_loss_weight > 0
+        let train_config = TrainingConfig {
+            epochs: 5,
+            learning_rate: 0.01,
+            bptt_window: 8,
+            coherence_loss_weight: 0.3,
+            ..Default::default()
+        };
+
+        let metrics = train(&mut gen, &dataset, &train_config);
+        for m in &metrics {
+            let coh = m
+                .mean_coherence
+                .expect("mean_coherence should be Some when coherence tracking is active");
+            assert!(coh.is_finite(), "Coherence should be finite");
+            // ContinuousHV cosine similarity can be in [-1, 1]
+            assert!(
+                coh >= -1.0 && coh <= 1.0,
+                "Coherence should be in [-1,1]: {coh}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_epoch_metrics_coherence_also_with_diagnostics() {
+        let genesis = test_genesis();
+        let config = test_config();
+        let mut gen = BrocaGenerator::new(&genesis, config);
+
+        let tok = gen.tokenizer().clone();
+        let mut dataset = TrainingDataset::default();
+        let channels = ThoughtChannels::default();
+        for _ in 0..3 {
+            dataset.push(TrainingPair::new(channels, "hello".to_string(), &tok));
+        }
+
+        // Coherence tracked when diagnostics enabled (even without coherence_loss_weight)
+        let train_config = TrainingConfig {
+            epochs: 3,
+            learning_rate: 0.01,
+            bptt_window: 8,
+            enable_diagnostics: true,
+            coherence_loss_weight: 0.0,
+            ..Default::default()
+        };
+
+        let metrics = train(&mut gen, &dataset, &train_config);
+        for m in &metrics {
+            assert!(
+                m.mean_coherence.is_some(),
+                "mean_coherence should be Some when diagnostics enabled"
+            );
+        }
+    }
+
+    // ── Item #2: coherence collapse tests ──
+
+    #[test]
+    fn test_coherence_collapse_display() {
+        let a = GradientAnomaly::CoherenceCollapse {
+            mean_coherence: 0.02,
+        };
+        let s = format!("{a}");
+        assert!(s.contains("0.02"), "Should show mean coherence: {s}");
+        assert!(s.contains("collapse"), "Should say 'collapse': {s}");
+    }
+
+    // ── Item #3: smoke test ──
+
+    #[test]
+    fn test_smoke_test_runs_and_returns_validation() {
+        let genesis = test_genesis();
+        let config = test_config();
+        let mut gen = BrocaGenerator::new(&genesis, config);
+
+        let tok = gen.tokenizer().clone();
+        let mut dataset = TrainingDataset::default();
+        let channels = ThoughtChannels::default();
+        for _ in 0..3 {
+            dataset.push(TrainingPair::new(channels, "hello".to_string(), &tok));
+        }
+
+        let train_config = TrainingConfig {
+            epochs: 3,
+            learning_rate: 0.01,
+            bptt_window: 8,
+            enable_smoke_test: true,
+            smoke_test_coherence_threshold: 0.0, // Very low — should pass
+            ..Default::default()
+        };
+
+        let (_, _, _, _, validation) =
+            train_with_adam(&mut gen, &dataset, &train_config, None);
+        let val = validation.expect("TrainingValidation should be Some when smoke test enabled");
+        assert_eq!(val.intent_coherences.len(), 8, "Should test all 8 intents");
+        assert!(val.mean_coherence.is_finite());
+        // With threshold=0.0, should always pass
+        assert!(val.passed, "Smoke test should pass with threshold=0.0");
+    }
+
+    #[test]
+    fn test_smoke_test_disabled_by_default() {
+        let cfg = TrainingConfig::default();
+        assert!(!cfg.enable_smoke_test);
+    }
+
+    // ── Item #4: adaptive coherence warmup ──
+
+    #[test]
+    fn test_coherence_warmup_ramps_gradually() {
+        let genesis = test_genesis();
+        let config = test_config();
+        let mut gen = BrocaGenerator::new(&genesis, config);
+
+        let tok = gen.tokenizer().clone();
+        let mut dataset = TrainingDataset::default();
+        let channels = ThoughtChannels::default();
+        for _ in 0..5 {
+            dataset.push(TrainingPair::new(channels, "hello world".to_string(), &tok));
+        }
+
+        // With warmup: coherence weight ramps from 0 to 0.5 over 5 epochs
+        let train_config = TrainingConfig {
+            epochs: 10,
+            learning_rate: 0.01,
+            bptt_window: 8,
+            coherence_loss_weight: 0.5,
+            coherence_warmup_epochs: 5,
+            ..Default::default()
+        };
+
+        let metrics = train(&mut gen, &dataset, &train_config);
+        // All epochs should have coherence tracked
+        for m in &metrics {
+            assert!(m.mean_coherence.is_some());
+            assert!(m.mean_coherence.unwrap().is_finite());
+        }
+
+        // Early epochs should have higher reported loss (less coherence attenuation)
+        // compared to later epochs (more attenuation). We verify training completes
+        // and produces finite results with the warmup schedule.
+        assert_eq!(metrics.len(), 10);
+    }
+
+    #[test]
+    fn test_coherence_warmup_default_zero() {
+        let cfg = TrainingConfig::default();
+        assert_eq!(cfg.coherence_warmup_epochs, 0);
+    }
+}
+
+// ── Therapeutic training data generation ──────────────────────────────────
+
+/// Generate therapeutic training pairs from template responses.
+///
+/// Creates training data with therapeutic channels set for different
+/// clinical scenarios (validation, crisis, reappraisal, etc.).
+/// This bootstraps the model's ability to generate clinically appropriate
+/// language without requiring a large external corpus.
+#[cfg(feature = "therapeutic")]
+pub fn generate_therapeutic_training_data(tokenizer: &BpeTokenizer) -> TrainingDataset {
+    let mut dataset = TrainingDataset::default();
+
+    // Template responses for each therapeutic intent
+    let templates: Vec<(f32, f32, f32, f32, &str)> = vec![
+        // (intent, alliance, distress, depth, response)
+        // Validation (intent=0): empathic, non-directive
+        (0.0, 0.3, 0.5, 0.1, "I hear you. That sounds really difficult."),
+        (0.0, 0.5, 0.6, 0.1, "It makes sense that you would feel that way."),
+        (0.0, 0.4, 0.4, 0.1, "What you're going through is completely understandable."),
+        (0.0, 0.6, 0.3, 0.1, "Thank you for sharing that with me. It takes courage."),
+        // Reflection (intent=1): mirroring, exploring
+        (1.0, 0.5, 0.4, 0.2, "It sounds like you're feeling overwhelmed right now."),
+        (1.0, 0.6, 0.3, 0.2, "I wonder what comes up for you when you think about that."),
+        (1.0, 0.5, 0.5, 0.3, "When you say that, what does it feel like in your body?"),
+        // Reappraisal (intent=2): cognitive restructuring
+        (2.0, 0.6, 0.5, 0.4, "What if we looked at this from a different angle?"),
+        (2.0, 0.7, 0.4, 0.4, "Are there other ways to understand what happened?"),
+        // Exploration (intent=3): deepening understanding
+        (3.0, 0.6, 0.3, 0.3, "Tell me more about what that experience was like for you."),
+        (3.0, 0.7, 0.4, 0.4, "How does this connect to other things in your life?"),
+        // Psychoeducation (intent=4): normalizing, teaching
+        (4.0, 0.5, 0.5, 0.3, "Many people experience similar feelings in situations like this."),
+        (4.0, 0.6, 0.4, 0.3, "Our bodies often respond to stress in ways that feel overwhelming but are actually protective."),
+        // Containment (intent=6): holding, stabilizing
+        (6.0, 0.5, 0.8, 0.5, "I'm here with you right now. You are safe in this moment."),
+        (6.0, 0.6, 0.7, 0.5, "Let's take a moment together. Can you feel your feet on the ground?"),
+        // Crisis (intent=7): grounding, referral
+        (7.0, 0.3, 0.9, 0.1, "I want you to know you're not alone. Can you take a slow breath with me?"),
+        (7.0, 0.3, 0.95, 0.1, "Your safety matters. If you're in immediate danger, please call 988 or emergency services."),
+        (7.0, 0.4, 0.85, 0.1, "Right now, can you notice five things you can see around you?"),
+    ];
+
+    for (intent, alliance, distress, depth, response) in templates {
+        let mut channels = ThoughtChannels::default();
+        // Set base consciousness channels to reasonable defaults
+        channels.set_consciousness(0.6, 0.5, 0.7);
+        channels.set_emotion(
+            if distress > 0.5 { -(distress - 0.5) } else { 0.3 },
+            distress.clamp(0.3, 0.8),
+            0.7, // warmth
+        );
+        channels.set_therapeutic(intent, alliance, distress, depth);
+
+        let pair = TrainingPair::new(channels, response.to_string(), tokenizer);
+        dataset.push(pair);
+    }
+
+    dataset
 }

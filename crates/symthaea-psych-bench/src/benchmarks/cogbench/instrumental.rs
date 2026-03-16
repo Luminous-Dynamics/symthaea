@@ -36,7 +36,7 @@ impl InstrumentalLearningBenchmark {
 
         // Explicit action-value tracking (EMA of rewards per action)
         let mut action_reward = [0.5f64; 2]; // prior: neutral
-        let reward_lr = 0.4; // Fast EMA for reward learning
+        let reward_lr = 0.3; // EMA for reward learning
 
         // Track contingency sensitivity: proportion of correct choices
         // (action 0 is always the higher-reward action)

@@ -304,7 +304,7 @@ Changes to this charter follow the Class A change procedure (Section 3.2), inclu
 | Term | Definition |
 |------|-----------|
 | **Consciousness metrics** | Proxy measurements (Phi, GWT ignition, HOT depth, master consciousness score) computed by the ConsciousnessEquationV2. These are theoretical metrics, not claims of phenomenal consciousness. |
-| **Cognitive loop** | The core processing pipeline (~31Hz full loop, 234Hz raw text cycle in release): perception -> dynamics -> feedback -> output. |
+| **Cognitive loop** | The core processing pipeline that runs at 50Hz (234Hz release): perception -> dynamics -> feedback -> output. |
 | **Safety-critical parameter** | Any constant, threshold, or configuration value that directly affects safety monitoring, ethical evaluation, consciousness scoring, or governance permissions. |
 | **Consciousness credential** | A time-limited (24h TTL) verifiable credential issued by the Mycelix identity bridge that encodes an agent's 4D consciousness profile and governance tier. |
 | **Eight Harmonies** | The value framework (Reciprocity, Flourishing, Compassion, Autonomy, Justice, Creativity, Stewardship) that guides all system design and ethical evaluation. |

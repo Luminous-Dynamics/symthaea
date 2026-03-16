@@ -36,6 +36,12 @@ pub enum SemanticRole {
     Cause,
     /// What results from the event
     Result,
+    #[cfg(feature = "therapeutic")]
+    TherapeuticTarget,
+    #[cfg(feature = "therapeutic")]
+    ProtectiveFactor,
+    #[cfg(feature = "therapeutic")]
+    RiskFactor,
 }
 
 /// Entity types for knowledge graph nodes
@@ -53,6 +59,12 @@ pub enum EntityType {
     Process,
     /// An abstract relation or property
     Property,
+    #[cfg(feature = "therapeutic")]
+    ClinicalConcept,
+    #[cfg(feature = "therapeutic")]
+    Symptom,
+    #[cfg(feature = "therapeutic")]
+    Intervention,
 }
 
 /// An extracted entity from text
@@ -434,6 +446,49 @@ impl KnowledgeExtractor {
         {
             EntityType::Event
         } else {
+            // Clinical entity classification (therapeutic feature)
+            #[cfg(feature = "therapeutic")]
+            {
+                if lower.contains("disorder")
+                    || lower.contains("syndrome")
+                    || lower.contains("diagnosis")
+                    || lower.contains("dsm")
+                    || lower.contains("icd")
+                    || lower.contains("comorbid")
+                    || lower.contains("pathology")
+                    || lower.contains("etiology")
+                    || lower.contains("prognosis")
+                    || lower.contains("psychopathology")
+                {
+                    return EntityType::ClinicalConcept;
+                } else if lower.contains("symptom")
+                    || lower.contains("insomnia")
+                    || lower.contains("anhedonia")
+                    || lower.contains("rumination")
+                    || lower.contains("dissociation")
+                    || lower.contains("flashback")
+                    || lower.contains("hallucination")
+                    || lower.contains("delusion")
+                    || lower.contains("ideation")
+                    || lower.contains("dysphoria")
+                    || lower.contains("hypervigilance")
+                    || lower.contains("agoraphobia")
+                {
+                    return EntityType::Symptom;
+                } else if lower.contains("therapy")
+                    || lower.contains("intervention")
+                    || lower.contains("treatment")
+                    || lower.contains("medication")
+                    || lower.contains("cbt")
+                    || lower.contains("dbt")
+                    || lower.contains("emdr")
+                    || lower.contains("psychotherapy")
+                    || lower.contains("counseling")
+                    || lower.contains("rehabilitation")
+                {
+                    return EntityType::Intervention;
+                }
+            }
             // Default: if it looks like a proper noun, likely Person or Organization
             if phrase.split_whitespace().count() <= 3 {
                 EntityType::Person // Best guess for short proper nouns
@@ -546,7 +601,27 @@ impl KnowledgeExtractor {
                     SemanticRole::Patient
                 }
             } else {
-                SemanticRole::Patient
+                // Clinical role assignment (therapeutic feature)
+                #[cfg(feature = "therapeutic")]
+                {
+                    if entity.entity_type == EntityType::Symptom
+                        || entity.entity_type == EntityType::ClinicalConcept
+                    {
+                        if lower.contains("protective") || lower.contains("resilience") || lower.contains("strength") {
+                            SemanticRole::ProtectiveFactor
+                        } else if lower.contains("risk") || lower.contains("vulnerability") || lower.contains("predispos") {
+                            SemanticRole::RiskFactor
+                        } else {
+                            SemanticRole::TherapeuticTarget
+                        }
+                    } else {
+                        SemanticRole::Patient
+                    }
+                }
+                #[cfg(not(feature = "therapeutic"))]
+                {
+                    SemanticRole::Patient
+                }
             };
             roles.insert(entity.text.clone(), role);
         }

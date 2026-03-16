@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 //! # Complex Number Support for Hyperdimensional Computing
 //!
 //! This module extends Symthaea's mathematical cognition to the complex plane.

@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 //! # Statistics & Probability Engine
 //!
 //! Probability distributions, descriptive statistics, hypothesis testing,

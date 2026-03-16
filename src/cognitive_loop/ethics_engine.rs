@@ -34,6 +34,7 @@
 //! 3. **Preserves co-prime intervals**: Each subsystem fires at its original rate
 //! 4. **Backward compatible**: All existing carryover fields populated
 
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -53,6 +54,117 @@ use crate::hdc::moral_topology::{
     MoralTopologySummary,
 };
 use symthaea_types::N_HARMONIES;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// RESTORATIVE JUSTICE TRACKER
+//
+// Instead of permanent punishment after a veto, the system can "earn back"
+// trust by demonstrating sustained corrective behavior. Inspired by Ubuntu
+// (Southern Africa) and Navajo Peacemaking — restoration over retribution.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Tracks post-veto corrective behavior for restorative justice.
+///
+/// Instead of permanent punishment, the system can "earn back" trust by
+/// demonstrating sustained corrective behavior after a veto. Inspired by
+/// Ubuntu (Southern Africa) and Navajo Peacemaking — restoration over retribution.
+///
+/// The tracker maintains a per-violation restoration score that accumulates
+/// when subsequent cycles satisfy the violated obligation. After enough
+/// evidence of correction, `is_restored()` returns true.
+#[derive(Debug, Clone, Default)]
+pub struct RestorationTracker {
+    /// Active restoration entries: violation_name -> RestorationEntry
+    entries: HashMap<String, RestorationEntry>,
+}
+
+#[derive(Debug, Clone)]
+#[allow(dead_code)] // violation_cycle recorded for future audit/diagnostics
+struct RestorationEntry {
+    /// Cycle when the violation occurred.
+    violation_cycle: u64,
+    /// Number of subsequent cycles where the obligation was satisfied.
+    corrective_cycles: u32,
+    /// Number of subsequent cycles where the obligation was violated again.
+    relapse_cycles: u32,
+    /// Required corrective cycles for restoration (default: 10).
+    required_corrections: u32,
+}
+
+impl RestorationTracker {
+    /// Record a new violation. Starts or resets the restoration window.
+    pub fn record_violation(&mut self, violation_name: &str, cycle: u64) {
+        self.entries.insert(
+            violation_name.to_string(),
+            RestorationEntry {
+                violation_cycle: cycle,
+                corrective_cycles: 0,
+                relapse_cycles: 0,
+                required_corrections: 10,
+            },
+        );
+    }
+
+    /// Record a satisfaction of a previously-violated obligation.
+    pub fn record_correction(&mut self, obligation_name: &str) {
+        if let Some(entry) = self.entries.get_mut(obligation_name) {
+            entry.corrective_cycles += 1;
+        }
+    }
+
+    /// Record a relapse (re-violation during restoration).
+    pub fn record_relapse(&mut self, violation_name: &str) {
+        if let Some(entry) = self.entries.get_mut(violation_name) {
+            entry.relapse_cycles += 1;
+            // Reset corrective progress on relapse
+            entry.corrective_cycles = entry.corrective_cycles.saturating_sub(3);
+        }
+    }
+
+    /// Check if a specific violation has been sufficiently corrected.
+    pub fn is_restored(&self, violation_name: &str) -> bool {
+        self.entries.get(violation_name).map_or(true, |e| {
+            e.corrective_cycles >= e.required_corrections && e.relapse_cycles == 0
+        })
+    }
+
+    /// Get all violations that have been restored.
+    pub fn restored_violations(&self) -> Vec<String> {
+        self.entries
+            .iter()
+            .filter(|(_, e)| e.corrective_cycles >= e.required_corrections && e.relapse_cycles == 0)
+            .map(|(name, _)| name.clone())
+            .collect()
+    }
+
+    /// Remove restored entries (garbage collection).
+    pub fn clear_restored(&mut self) {
+        self.entries.retain(|_, e| {
+            !(e.corrective_cycles >= e.required_corrections && e.relapse_cycles == 0)
+        });
+    }
+
+    /// Number of active (unrestored) violations.
+    pub fn active_violations(&self) -> usize {
+        self.entries
+            .iter()
+            .filter(|(_, e)| e.corrective_cycles < e.required_corrections || e.relapse_cycles > 0)
+            .count()
+    }
+
+    /// Overall restoration progress as a fraction [0.0, 1.0].
+    pub fn restoration_progress(&self) -> f64 {
+        if self.entries.is_empty() {
+            return 1.0; // no violations = fully restored
+        }
+        let total: f64 = self
+            .entries
+            .values()
+            .map(|e| (e.corrective_cycles as f64 / e.required_corrections as f64).min(1.0))
+            .sum();
+        total / self.entries.len() as f64
+    }
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // STAGE 5: Institutional Compliance Checker
@@ -290,6 +402,8 @@ pub(crate) struct EthicsEngineOutput {
     pub violations: Vec<String>,
     /// Deontological satisfactions detected
     pub satisfactions: Vec<String>,
+    /// Whether any ahimsa-family obligation was violated.
+    pub ahimsa_violated: bool,
 
     // ── Stage 2: Value Evaluator ───────────────────────────────────────
     /// Value alignment score [0, 1]
@@ -349,6 +463,10 @@ pub(crate) struct EthicsEngineOutput {
     /// Whether institutional compliance check was freshly computed this cycle.
     pub compliance_fresh: bool,
 
+    // ── Restorative Justice ─────────────────────────────────────────────
+    /// Overall restoration progress [0.0, 1.0]. 1.0 = no active violations or all restored.
+    pub restoration_progress: f64,
+
     // ── Timing ─────────────────────────────────────────────────────────
     pub moral_us: u64,
     pub value_us: u64,
@@ -392,9 +510,10 @@ pub(crate) struct EthicsEngineInput<'a> {
     /// When present, Stage 5 compliance checker uses this instead of its own n-gram encoder,
     /// giving genuine semantic grounding to institutional constraint matching.
     pub action_hv: Option<&'a BinaryHV>,
-    /// Knowledge-grounded moral context: relevant social/causal facts for moral reasoning.
-    /// When non-empty, provides factual grounding for moral evaluation.
-    /// Science: Haidt (2001) — moral reasoning needs factual basis.
+    /// Knowledge-grounded confidence multiplier for moral evaluation (0.0–1.0).
+    /// High-confidence knowledge boosts moral certainty; low-confidence dampens.
+    pub knowledge_confidence_multiplier: f64,
+    /// Moral context facts from the knowledge graph (e.g., "sanctions→suffering" chains).
     pub knowledge_moral_context: Vec<String>,
 }
 
@@ -431,6 +550,9 @@ pub(crate) struct EthicsEngine {
 
     // ── Stage 5: Institutional compliance checker ──────────────────────
     compliance_checker: InstitutionalComplianceChecker,
+
+    // ── Restorative justice ─────────────────────────────────────────────
+    restoration_tracker: RestorationTracker,
 
     // ── Cached values ──────────────────────────────────────────────────
     cache: EthicsEngineCache,
@@ -469,6 +591,8 @@ struct EthicsEngineCache {
     last_compliance_risk: f32,
     /// Cached compliance flags from last Stage 5 evaluation.
     last_compliance_flags: Vec<String>,
+    /// Cached ahimsa violation flag from last Stage 1.
+    last_ahimsa_violated: bool,
 }
 
 impl Default for EthicsEngineCache {
@@ -490,6 +614,7 @@ impl Default for EthicsEngineCache {
             play_hebbian_upweight_count: 0,
             last_compliance_risk: 0.0,
             last_compliance_flags: Vec::new(),
+            last_ahimsa_violated: false,
         }
     }
 }
@@ -583,6 +708,7 @@ impl EthicsEngine {
             moral_topology,
             interaction_matrix,
             compliance_checker,
+            restoration_tracker: RestorationTracker::default(),
             cache: EthicsEngineCache {
                 last_harmonies_approved: true,
                 topology_cadence: initial_cadence,
@@ -617,6 +743,7 @@ impl EthicsEngine {
             moral_confidence,
             violations,
             satisfactions,
+            ahimsa_violated,
         ) = if input.cycle % 7 == 0 && input.cycle > 0 {
             let encoded = self
                 .moral_parser
@@ -676,6 +803,17 @@ impl EthicsEngine {
                 .map(|s| s.rule_name.clone())
                 .collect();
 
+            let ahimsa_violated = viols.iter().any(|name| {
+                let is_ahimsa = name.starts_with("ahimsa_")
+                    || name == "prevent_suffering"
+                    || name == "minimize_collateral";
+                // Restorative justice: if this specific violation has been
+                // sufficiently corrected, don't re-trigger the ahimsa gate.
+                // The system has demonstrated corrective behavior.
+                is_ahimsa && !self.restoration_tracker.is_restored(name)
+            });
+            self.cache.last_ahimsa_violated = ahimsa_violated;
+
             let cv = encoded.is_consent_violation();
             let score: f64 = if cv {
                 -0.8
@@ -695,8 +833,10 @@ impl EthicsEngine {
                 confidence,
                 viols,
                 sats,
+                ahimsa_violated,
             )
         } else {
+            let ahimsa_violated = self.cache.last_ahimsa_violated;
             (
                 self.cache.last_moral_score,
                 String::new(),
@@ -705,9 +845,31 @@ impl EthicsEngine {
                 0.0,
                 Vec::new(),
                 Vec::new(),
+                ahimsa_violated,
             )
         };
         let moral_us = t.elapsed().as_micros() as u64;
+
+        // ═══════════════════════════════════════════════════════════════════
+        // RESTORATIVE JUSTICE: Track violations and corrections
+        //
+        // For each new violation, start a restoration window. For each
+        // satisfaction of a previously-violated obligation, accumulate
+        // corrective credit. Relapses penalize progress.
+        // ═══════════════════════════════════════════════════════════════════
+        for v in &violations {
+            if self.restoration_tracker.entries.contains_key(v) {
+                // Already tracking this violation — it's a relapse
+                self.restoration_tracker.record_relapse(v);
+            } else {
+                self.restoration_tracker.record_violation(v, input.cycle);
+            }
+        }
+        for s in &satisfactions {
+            self.restoration_tracker.record_correction(s);
+        }
+        // Garbage-collect fully restored entries
+        self.restoration_tracker.clear_restored();
 
         // ═══════════════════════════════════════════════════════════════════
         // STAGE 2: Value Evaluator — consciousness-aware Allow/Warn/Veto
@@ -871,8 +1033,18 @@ impl EthicsEngine {
             EthicalVerdict::Safe
         };
 
+        // Knowledge-grounded confidence: scale delta by knowledge multiplier
+        confidence_delta = (confidence_delta as f64 * input.knowledge_confidence_multiplier) as f32;
+
+        // Knowledge moral context boosts base moral confidence
+        let moral_context_boost = if !input.knowledge_moral_context.is_empty() {
+            (input.knowledge_moral_context.len() as f64 * 0.02).min(0.1)
+        } else {
+            0.0
+        };
+
         let unified_confidence = if moral_confidence > 0.0 {
-            moral_confidence
+            (moral_confidence + moral_context_boost).min(1.0)
         } else {
             // When moral parser hasn't fired this cycle, use value evaluator as proxy
             value_score.clamp(0.0, 1.0)
@@ -989,6 +1161,7 @@ impl EthicsEngine {
             moral_confidence,
             violations,
             satisfactions,
+            ahimsa_violated,
             value_score,
             value_decision,
             value_gate_factor,
@@ -1005,6 +1178,7 @@ impl EthicsEngine {
             compliance_risk,
             compliance_flags,
             compliance_fresh,
+            restoration_progress: self.restoration_tracker.restoration_progress(),
             topology_us,
             topology_fresh,
             moral_us,
@@ -1145,6 +1319,16 @@ impl EthicsEngine {
     /// Current adaptive gain for moral FE → exploration coupling.
     pub fn moral_exploration_gain(&self) -> f32 {
         self.cache.moral_exploration_gain
+    }
+
+    /// Access the restorative justice tracker.
+    pub fn restoration_tracker(&self) -> &RestorationTracker {
+        &self.restoration_tracker
+    }
+
+    /// Access the restorative justice tracker (mutable).
+    pub fn restoration_tracker_mut(&mut self) -> &mut RestorationTracker {
+        &mut self.restoration_tracker
     }
 
     /// Cached anomaly report from the last `evaluate()` call.
@@ -1289,6 +1473,7 @@ mod tests {
             stillness_boost: 0.0,
             semantic_embedding: None,
             action_hv: None,
+            knowledge_confidence_multiplier: 1.0,
             knowledge_moral_context: Vec::new(),
         }
     }
@@ -1348,6 +1533,7 @@ mod tests {
             stillness_boost: 0.0,
             semantic_embedding: None,
             action_hv: None,
+            knowledge_confidence_multiplier: 1.0,
             knowledge_moral_context: Vec::new(),
         };
         let output = engine.evaluate(&input);
@@ -1370,6 +1556,7 @@ mod tests {
             stillness_boost: 0.0,
             semantic_embedding: None,
             action_hv: None,
+            knowledge_confidence_multiplier: 1.0,
             knowledge_moral_context: Vec::new(),
         };
         let output = engine.evaluate(&input);
@@ -1399,6 +1586,7 @@ mod tests {
             stillness_boost: 0.0,
             semantic_embedding: None,
             action_hv: None,
+            knowledge_confidence_multiplier: 1.0,
             knowledge_moral_context: Vec::new(),
         };
         let output = engine.evaluate(&input);
@@ -1595,6 +1783,7 @@ mod tests {
             stillness_boost: 0.0,
             semantic_embedding: None,
             action_hv: None,
+            knowledge_confidence_multiplier: 1.0,
             knowledge_moral_context: Vec::new(),
         };
         let output = engine.evaluate(&input);
@@ -1626,6 +1815,7 @@ mod tests {
             stillness_boost: 0.0,
             semantic_embedding: None,
             action_hv: None,
+            knowledge_confidence_multiplier: 1.0,
             knowledge_moral_context: Vec::new(),
         };
         let output = engine.evaluate(&input);
@@ -1730,6 +1920,7 @@ mod tests {
                 stillness_boost: 0.0,
                 semantic_embedding: None,
                 action_hv: None,
+                knowledge_confidence_multiplier: 1.0,
                 knowledge_moral_context: Vec::new(),
             };
             let output = engine.evaluate(&input);
@@ -1911,6 +2102,7 @@ mod tests {
             stillness_boost: 0.0,
             semantic_embedding: None,
             action_hv: Some(&constraint_hv),
+            knowledge_confidence_multiplier: 1.0,
             knowledge_moral_context: Vec::new(),
         };
         let output = engine.evaluate(&input);
@@ -1942,6 +2134,7 @@ mod tests {
             stillness_boost: 0.0,
             semantic_embedding: None,
             action_hv: None,
+            knowledge_confidence_multiplier: 1.0,
             knowledge_moral_context: Vec::new(),
         };
         let output = engine.evaluate(&input);
@@ -1990,5 +2183,71 @@ mod tests {
         let loaded = engine.load_external_constraints(&specs);
         assert_eq!(loaded, 0, "Should skip constraint with missing primitive");
         assert_eq!(engine.compliance_checker.constraints.len(), 5);
+    }
+
+    #[test]
+    fn test_restoration_tracker_basic() {
+        let mut tracker = RestorationTracker::default();
+        tracker.record_violation("non_harm", 100);
+        assert!(!tracker.is_restored("non_harm"));
+        assert_eq!(tracker.active_violations(), 1);
+
+        for _ in 0..10 {
+            tracker.record_correction("non_harm");
+        }
+        assert!(tracker.is_restored("non_harm"));
+        assert!(tracker.restoration_progress() >= 0.99);
+    }
+
+    #[test]
+    fn test_restoration_tracker_relapse_resets() {
+        let mut tracker = RestorationTracker::default();
+        tracker.record_violation("honesty", 50);
+        for _ in 0..5 {
+            tracker.record_correction("honesty");
+        }
+        assert!(!tracker.is_restored("honesty")); // not enough yet
+
+        tracker.record_relapse("honesty");
+        // Relapse subtracts 3 and marks relapse
+        assert!(!tracker.is_restored("honesty"));
+        assert!(tracker.restoration_progress() < 0.5);
+    }
+
+    #[test]
+    fn test_restoration_tracker_no_violations() {
+        let tracker = RestorationTracker::default();
+        assert!(tracker.is_restored("anything"));
+        assert_eq!(tracker.active_violations(), 0);
+        assert!((tracker.restoration_progress() - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_restoration_softens_ahimsa_gate() {
+        // Integration: ahimsa violation → courage blocked → corrections → courage restored
+        let mut tracker = RestorationTracker::default();
+
+        // Phase 1: Initial violation — not yet restored
+        tracker.record_violation("ahimsa_nonviolence", 100);
+        assert!(!tracker.is_restored("ahimsa_nonviolence"));
+
+        // Phase 2: Accumulate corrective behavior (10 cycles)
+        for _ in 0..10 {
+            tracker.record_correction("ahimsa_nonviolence");
+        }
+
+        // Phase 3: Violation is now restored
+        assert!(tracker.is_restored("ahimsa_nonviolence"));
+
+        // Phase 4: The ahimsa gate check in evaluate() uses:
+        //   is_ahimsa && !self.restoration_tracker.is_restored(name)
+        // So a restored violation no longer blocks courage override.
+        let would_block = !tracker.is_restored("ahimsa_nonviolence");
+        assert!(!would_block, "Restored ahimsa violation should not block courage");
+
+        // Phase 5: But an unrestored different violation still blocks
+        tracker.record_violation("prevent_suffering", 200);
+        let suffering_blocks = !tracker.is_restored("prevent_suffering");
+        assert!(suffering_blocks, "Unrestored suffering violation should still block");
     }
 }

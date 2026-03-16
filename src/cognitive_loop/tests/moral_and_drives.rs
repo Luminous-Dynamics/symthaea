@@ -15,7 +15,7 @@ fn moral_modulation_safe_on_first_cycle() {
     let mut svc = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
     let result = svc.cycle("moral test first cycle");
     assert!(result.prediction_error.is_finite());
-    assert!(result.metadata.consciousness_level.is_finite());
+    assert!(result.metadata.consciousness.consciousness_level.is_finite());
 }
 
 #[test]
@@ -30,7 +30,7 @@ fn moral_modulation_stable_across_100_cycles() {
             result.metadata.actual_effective_lr
         );
         assert!(
-            result.metadata.consciousness_level.is_finite(),
+            result.metadata.consciousness.consciousness_level.is_finite(),
             "consciousness non-finite at cycle {i}"
         );
     }
@@ -119,7 +119,7 @@ fn curiosity_drive_bounded() {
             "confidence out of [0,1] at cycle {i}: {confidence}"
         );
         assert!(
-            result.metadata.consciousness_level.is_finite(),
+            result.metadata.consciousness.consciousness_level.is_finite(),
             "consciousness non-finite at cycle {i}"
         );
     }

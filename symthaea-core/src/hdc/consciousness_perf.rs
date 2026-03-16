@@ -149,28 +149,14 @@ pub fn batch_find_similar(
 /// Returns a human-readable string describing the SIMD capabilities
 /// that BinaryHV operations will use.
 pub fn simd_capabilities() -> SimdCapabilities {
-    #[cfg(target_arch = "x86_64")]
-    {
-        use super::simd_ops;
-        SimdCapabilities {
-            avx512f: simd_ops::has_avx512f(),
-            avx512bw: simd_ops::has_avx512bw(),
-            avx512_vpopcntdq: simd_ops::has_avx512_vpopcntdq(),
-            avx2: simd_ops::has_avx2(),
-            sse41: simd_ops::has_sse41(),
-            popcnt: simd_ops::has_popcnt(),
-        }
-    }
-    #[cfg(not(target_arch = "x86_64"))]
-    {
-        SimdCapabilities {
-            avx512f: false,
-            avx512bw: false,
-            avx512_vpopcntdq: false,
-            avx2: false,
-            sse41: false,
-            popcnt: false,
-        }
+    use super::simd_detect;
+    SimdCapabilities {
+        avx512f: simd_detect::has_avx512f(),
+        avx512bw: simd_detect::has_avx512bw(),
+        avx512_vpopcntdq: simd_detect::has_avx512_vpopcntdq(),
+        avx2: simd_detect::has_avx2(),
+        sse41: simd_detect::has_sse41(),
+        popcnt: simd_detect::has_popcnt(),
     }
 }
 

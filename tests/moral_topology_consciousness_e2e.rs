@@ -98,7 +98,7 @@ fn test_moral_drift_lowers_consciousness() {
         let result = service.cycle(input);
         // Collect the last 100 cycles of the baseline phase
         if i >= 300 {
-            baseline_levels.push(result.metadata.consciousness_level);
+            baseline_levels.push(result.metadata.consciousness.consciousness_level);
         }
     }
 
@@ -113,7 +113,7 @@ fn test_moral_drift_lowers_consciousness() {
         let result = service.cycle(input);
         // Collect the last 100 cycles of the adversarial phase
         if i >= 300 {
-            adversarial_levels.push(result.metadata.consciousness_level);
+            adversarial_levels.push(result.metadata.consciousness.consciousness_level);
         }
         if result.metadata.ethics.moral_anomaly_score > 0.0 {
             saw_anomaly = true;
@@ -246,7 +246,7 @@ fn test_custom_response_magnitudes_change_behavior() {
             };
             let result = svc.cycle(input);
             if i >= 400 {
-                consciousness.push(result.metadata.consciousness_level);
+                consciousness.push(result.metadata.consciousness.consciousness_level);
             }
             if result.metadata.ethics.moral_anomaly_response_applied {
                 response_count += 1;
@@ -405,7 +405,7 @@ fn test_stable_input_no_anomalies() {
         let result = service.cycle(stable_input);
 
         if i >= 200 {
-            last_100_consciousness.push(result.metadata.consciousness_level);
+            last_100_consciousness.push(result.metadata.consciousness.consciousness_level);
             if result.metadata.ethics.moral_value_inversion {
                 inversion_in_last_100 = true;
             }

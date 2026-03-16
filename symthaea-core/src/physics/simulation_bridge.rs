@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 //! # Simulation Bridge: Physics Encoding ↔ Dynamical Simulation
 //!
 //! This module bridges the existing physics ENCODING modules (classical_mechanics,

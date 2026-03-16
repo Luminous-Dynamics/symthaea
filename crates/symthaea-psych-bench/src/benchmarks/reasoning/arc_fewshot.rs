@@ -111,7 +111,7 @@ impl ArcFewShotBenchmark {
         let tasks_per_type = 4;
 
         let pressure = config.time_pressure;
-        let noise_weight = 0.05 + pressure * 0.15;
+        let noise_weight = 0.04 + pressure * 0.12;
         let tick_scale = 1.0 - pressure * 0.4;
 
         let encoder = GridEncoder::new(dim, grid_size, grid_size, num_colors as usize, seed);

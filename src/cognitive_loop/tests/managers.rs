@@ -15,8 +15,7 @@ fn voice_coherence_bridge_default_state() {
     let service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
     // Bridge should start with zero smoothed coherence
     assert!(service
-        .language_comm
-        .voice_coherence
+        .language_comm.voice_coherence
         .bridge
         .smoothed_coherence()
         .is_finite());
@@ -39,8 +38,7 @@ fn voice_coherence_bridge_reset_restores_clean_state() {
     service.reset();
     // State should be clean
     assert!(service
-        .language_comm
-        .voice_coherence
+        .language_comm.voice_coherence
         .bridge
         .smoothed_coherence()
         .is_finite());
@@ -157,8 +155,7 @@ fn full_service_reset_restores_all_managers() {
     assert!((service.social_mgr.social.social_trust - 0.5).abs() < f32::EPSILON);
     assert!((service.social_mgr.social.relational_psi - 0.0).abs() < f64::EPSILON);
     assert!(service
-        .language_comm
-        .voice_coherence
+        .language_comm.voice_coherence
         .bridge
         .smoothed_coherence()
         .is_finite());
@@ -318,7 +315,7 @@ fn consciousness_behavior_coupling_validation() {
             // Skip warmup; collect (prev_consciousness, current_pe)
             pairs.push((prev_consciousness, pe));
         }
-        prev_consciousness = m.consciousness_level;
+        prev_consciousness = m.consciousness.consciousness_level;
     }
 
     // Split into above-median and below-median consciousness groups
@@ -374,7 +371,7 @@ fn diagnostic_round5_trajectory() {
             let m = &result.metadata;
             eprintln!(
                 "Cycle {i}: C={:.4} softmin={:.4} weighted={:.4} btl={} N={:.4} Soc={:.4}",
-                m.consciousness_level,
+                m.consciousness.consciousness_level,
                 m.mce_softmin,
                 m.mce_weighted_sum,
                 m.mce_bottleneck,

@@ -425,7 +425,10 @@ impl HarmonyInteractionMatrix {
         // 4. Final score: all three factors must be high for love coherence
         // Remap harmony_mean from [-1, 1] to [0, 1] for multiplication
         let mean_01 = ((harmony_mean + 1.0) / 2.0).clamp(0.0, 1.0);
-        let value = (mean_01 * (1.0 - tension_ratio) * diversity_factor).clamp(0.0, 1.0);
+        // Moral humility: no finite system achieves perfect love coherence.
+        // Inline constant (0.95) to avoid circular dependency with cognitive_loop::thresholds.
+        // Canonical value: crate::cognitive_loop::thresholds::MORAL_HUMILITY_CEILING
+        let value = (mean_01 * (1.0 - tension_ratio) * diversity_factor).clamp(0.0, 0.95);
 
         LoveCoherence {
             harmony_mean,
@@ -897,6 +900,23 @@ mod tests {
             top_2.contains(&1),
             "Care words should project onto PanSentientFlourishing, top-2: {:?}",
             top_2
+        );
+    }
+
+    #[test]
+    fn test_love_coherence_humility_ceiling() {
+        let matrix = HarmonyInteractionMatrix::default();
+        let coords = [0.9; N_HARMONIES];
+        let lc = matrix.love_coherence(&coords);
+        assert!(
+            lc.value <= 0.95,
+            "Love coherence should never exceed moral humility ceiling (0.95), got {}",
+            lc.value
+        );
+        assert!(
+            lc.value > 0.7,
+            "Maximally aligned coords should still yield high love coherence, got {}",
+            lc.value
         );
     }
 }

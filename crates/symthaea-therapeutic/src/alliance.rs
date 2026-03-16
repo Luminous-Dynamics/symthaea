@@ -218,6 +218,40 @@ impl TherapeuticAlliance {
         self.repair_count as f32 / self.rupture_count as f32
     }
 
+    /// Count of withdrawal ruptures.
+    pub fn withdrawal_count(&self) -> u32 {
+        self.history
+            .iter()
+            .filter(|r| r.rupture_type == RuptureType::Withdrawal)
+            .count() as u32
+    }
+
+    /// Count of confrontation ruptures.
+    pub fn confrontation_count(&self) -> u32 {
+        self.history
+            .iter()
+            .filter(|r| r.rupture_type == RuptureType::Confrontation)
+            .count() as u32
+    }
+
+    /// Last rupture type (if any).
+    pub fn last_rupture_type(&self) -> Option<RuptureType> {
+        self.history.back().map(|r| r.rupture_type)
+    }
+
+    /// Whether the most recent rupture was repaired.
+    pub fn last_rupture_repaired(&self) -> bool {
+        self.history.back().map_or(true, |r| r.repaired)
+    }
+
+    /// Alliance trajectory: recent composite values for trend analysis.
+    /// Returns up to `n` most recent EMA-smoothed values (1 per grow/rupture/repair call).
+    pub fn alliance_trend_direction(&self) -> f32 {
+        // Compare current EMA to initial (0.3).
+        // Positive = growing, negative = declining.
+        self.alliance_ema - 0.3
+    }
+
     fn clamp_all(&mut self) {
         self.bond = self.bond.clamp(0.0, 1.0);
         self.goal_agreement = self.goal_agreement.clamp(0.0, 1.0);

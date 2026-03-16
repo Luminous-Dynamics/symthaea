@@ -135,10 +135,7 @@ impl PsychBenchmark for ConfoundDetectionBenchmark {
             if config.trial_trace {
                 let mut extra = BTreeMap::new();
                 extra.insert("reversal_magnitude".to_string(), r.reversal_magnitude);
-                extra.insert(
-                    "confounder_identification".to_string(),
-                    r.confounder_identification,
-                );
+                extra.insert("confounder_identification".to_string(), r.confounder_identification);
                 trace.push(TrialOutcome {
                     trial_idx: t,
                     correct: r.confounder_identification > 0.5,

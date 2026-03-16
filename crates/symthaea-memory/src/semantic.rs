@@ -173,12 +173,7 @@ impl SemanticMemory {
     /// * `hdc` - HDC vector representation of the input
     /// * `error` - Prediction error after CfC processed this input
     /// * `category` - Optional category label
-    pub fn store(
-        &mut self,
-        hdc: Vec<f32>,
-        error: f32,
-        category: Option<String>,
-    ) -> Option<SemanticEntry> {
+    pub fn store(&mut self, hdc: Vec<f32>, error: f32, category: Option<String>) -> Option<SemanticEntry> {
         let timestamp = self.stats.total_stored;
         let entry = SemanticEntry {
             hdc_vector: hdc,

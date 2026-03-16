@@ -294,60 +294,32 @@ impl MathService {
         let b = HdcVector::new(b_data.to_vec());
         let (x, result) = self.linalg.solve(&a, &b);
 
-        // Phase 7a: Phi-guided verification via residual check.
-        // Compute ||Ax - b||₂ to independently verify the solution.
-        // Science: Golub & Van Loan (1996) — backward error analysis.
-        let residual_norm = {
-            let mut residual = 0.0;
-            for i in 0..rows {
-                let mut ax_i = 0.0;
-                for j in 0..cols {
-                    ax_i += a_data[i * cols + j] * x.data[j];
-                }
-                residual += (ax_i - b_data[i]).powi(2);
-            }
-            residual.sqrt()
-        };
-        let residual_verified = residual_norm < 1e-8;
-
-        // Multi-path: engine's internal verification + our residual check
-        let multipath_verified = result.verified || residual_verified;
-        let phi = if multipath_verified {
-            result.phi * 1.2 // Boost for verified solutions
-        } else {
-            result.phi
-        };
-
         let answer = format!(
-            "Solution: [{}] (residual: {:.2e})",
+            "Solution: [{}]",
             x.data
                 .iter()
                 .map(|v| format!("{:.6}", v))
                 .collect::<Vec<_>>()
-                .join(", "),
-            residual_norm
+                .join(", ")
         );
 
-        self.record_solve(MathProblemType::LinearSystem, phi);
+        self.record_solve(MathProblemType::LinearSystem, result.phi);
 
         let response = MathResponse {
             answer,
             numerical_result: None,
             vector_result: Some(x.data),
             encoding: result.encoding,
-            phi,
-            confidence: if multipath_verified { 0.99 } else { 0.5 },
-            multipath_verified,
+            phi: result.phi,
+            confidence: if result.verified { 0.95 } else { 0.5 },
+            multipath_verified: result.verified,
             problem_type: MathProblemType::LinearSystem,
-            epistemic_caveat: if !multipath_verified {
-                Some(format!(
-                    "Solution not verified; residual norm: {:.2e}",
-                    residual_norm
-                ))
+            epistemic_caveat: if !result.verified {
+                Some("Solution not multi-path verified; condition number may be high".into())
             } else {
                 None
             },
-            error_bound: Some(residual_norm),
+            error_bound: None,
         };
 
         self.store_episode(&response, "linear_system");
@@ -972,31 +944,6 @@ impl MathService {
         response
     }
 
-    /// Transfer solution strategy from a recalled episode (Phase 7c).
-    ///
-    /// Given a classified problem type and a recalled episode, determine if the
-    /// recalled episode suggests a better approach. Returns `Some(transferred_type)`
-    /// when the recalled type differs and has high confidence from past success.
-    ///
-    /// Science: Gentner (1983) — structure-mapping theory of analogical reasoning;
-    ///          Holyoak & Thagard (1995) — analogical constraint satisfaction.
-    pub fn transfer_strategy(
-        &self,
-        classified: MathProblemType,
-        query: &BinaryHV,
-    ) -> Option<MathProblemType> {
-        let recalled = self.recall_similar(query, 1);
-        let ep = recalled.first()?;
-        let sim = query.similarity(&ep.problem_encoding) as f64;
-
-        // Only transfer if similarity is high and the recalled type differs
-        if sim > 0.6 && ep.problem_type != classified && ep.phi > 0.3 {
-            Some(ep.problem_type)
-        } else {
-            None
-        }
-    }
-
     /// Rank multiple candidate solutions by Phi (Phase 7a: prefer elegant solutions).
     pub fn rank_by_phi(responses: &[MathResponse]) -> Vec<(usize, f64)> {
         let mut ranked: Vec<(usize, f64)> = responses
@@ -1025,11 +972,7 @@ impl MathService {
     ///
     /// Science: Gaussian elimination with pivoting (Golub & Van Loan 1996).
     pub fn matrix_determinant(&mut self, data: &[f64], n: usize) -> MathResponse {
-        assert_eq!(
-            data.len(),
-            n * n,
-            "matrix_determinant: data.len() must equal n*n"
-        );
+        assert_eq!(data.len(), n * n, "matrix_determinant: data.len() must equal n*n");
         let det = lu_determinant(data, n);
         let response = MathResponse {
             answer: format!("det = {det:.6}"),
@@ -1096,63 +1039,6 @@ impl MathService {
         let type_name = format!("{:?}", problem_type);
         *self.telemetry.by_type.entry(type_name).or_insert(0) += 1;
     }
-}
-
-// ─── Expression Parsing ─────────────────────────────────────────────────────
-
-/// Parse a simple mathematical expression string into a callable closure.
-///
-/// Supports basic forms: `x^N`, `N*x`, `sin(x)`, `cos(x)`, `exp(x)`, `x - C`.
-/// Returns `None` for expressions that cannot be parsed.
-///
-/// Basis: lightweight symbolic dispatch for cognitive loop math routing.
-pub fn parse_expression(input: &str) -> Option<Box<dyn Fn(f64) -> f64>> {
-    let s = input.trim().to_lowercase();
-
-    // x^N  (e.g. "x^2 - 4")
-    if let Some(rest) = s.strip_prefix("x^") {
-        if let Some((exp_str, tail)) = rest.split_once(|c: char| c == ' ' || c == '-' || c == '+') {
-            if let Ok(exp) = exp_str.trim().parse::<f64>() {
-                let tail = tail.trim();
-                let offset: f64 = tail.parse().unwrap_or(0.0);
-                // Determine sign: if we split on '-', offset is subtracted
-                if rest.contains('-') {
-                    return Some(Box::new(move |x: f64| x.powf(exp) - offset.abs()));
-                } else {
-                    return Some(Box::new(move |x: f64| x.powf(exp) + offset));
-                }
-            }
-        }
-        // Plain x^N
-        if let Ok(exp) = rest.trim().parse::<f64>() {
-            return Some(Box::new(move |x: f64| x.powf(exp)));
-        }
-    }
-
-    // sin(x)
-    if s.contains("sin") {
-        return Some(Box::new(|x: f64| x.sin()));
-    }
-    // cos(x)
-    if s.contains("cos") {
-        return Some(Box::new(|x: f64| x.cos()));
-    }
-    // exp(x)
-    if s.contains("exp") {
-        return Some(Box::new(|x: f64| x.exp()));
-    }
-
-    // x * x or x*x
-    if s == "x * x" || s == "x*x" {
-        return Some(Box::new(|x: f64| x * x));
-    }
-
-    // Plain "x"
-    if s == "x" {
-        return Some(Box::new(|x: f64| x));
-    }
-
-    None
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
@@ -1538,58 +1424,5 @@ mod tests {
             root
         );
         assert!(response.answer.contains("methods converged"));
-    }
-
-    #[test]
-    fn test_linear_system_residual_verification() {
-        let mut service = MathService::new();
-        // Solve: [2, 1; 1, 3] x = [5, 10] → x = [1, 3]
-        let a = vec![2.0, 1.0, 1.0, 3.0];
-        let b = vec![5.0, 10.0];
-        let response = service.solve_linear_system(&a, 2, 2, &b);
-        assert!(response.multipath_verified, "should be residual-verified");
-        assert!(response.phi > 0.0);
-        assert!(response.error_bound.is_some());
-        let residual = response.error_bound.unwrap();
-        assert!(residual < 1e-8, "residual should be tiny, got {}", residual);
-        assert!(response.answer.contains("residual"));
-    }
-
-    #[test]
-    fn test_strategy_transfer_from_memory() {
-        let mut service = MathService::new();
-        // Solve several root-finding problems to build memory
-        for _ in 0..5 {
-            service.find_root_phi_guided(&|x: f64| x * x - 4.0, 0.0, 3.0);
-        }
-        // Verify memory has entries
-        assert!(!service.memory().is_empty());
-        // Query with a random encoding — won't match strongly
-        let query = BinaryHV::random(12345);
-        let transfer = service.transfer_strategy(MathProblemType::Unknown, &query);
-        // Can't guarantee a match with random query, but API shouldn't panic
-        let _ = transfer;
-    }
-
-    #[test]
-    #[cfg(feature = "scientific_method")]
-    fn test_scientific_method_full_cycle() {
-        use crate::scientific_method::ScientificMethodEngine;
-
-        let mut engine = ScientificMethodEngine::new();
-        let mut math = MathService::new();
-
-        // Hypothesize about data
-        let hid = engine.hypothesize("Data mean is approximately 10", 0.5);
-        let data = vec![9.5, 10.2, 10.1, 9.8, 10.4];
-        let result = engine.numerical_experiment(&mut math, hid, &data, 0.5);
-        assert!(result.is_some());
-
-        // Update beliefs
-        engine.update_beliefs();
-
-        let report = engine.generate_report();
-        assert_eq!(report.total_experiments, 1);
-        assert!(report.total_phi > 0.0);
     }
 }

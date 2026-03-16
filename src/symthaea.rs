@@ -3327,6 +3327,35 @@ impl Symthaea {
     }
 
     // ========================================================================
+    // Swarm / P2P State
+    // ========================================================================
+
+    /// Wire this Symthaea instance to a CognitiveLoopService's swarm channel.
+    ///
+    /// Connects the Mind's async event sources (Hyperfeel affective state,
+    /// FederatedAggregator round results, mesh peer join/leave/topology) to
+    /// the CLS SwarmManager. Call once after creating both objects.
+    ///
+    /// ```ignore
+    /// let cls = CognitiveLoopService::new(config)?;
+    /// symthaea.wire_swarm_channel(&cls);
+    /// ```
+    pub fn wire_swarm_channel(&mut self, cls: &crate::cognitive_loop::CognitiveLoopService) {
+        self.mind.set_swarm_channel(cls.swarm_event_sender());
+    }
+
+    /// Install a raw swarm event sender on the ContinuousMind.
+    ///
+    /// Lower-level than `wire_swarm_channel()` — use when you don't have a
+    /// direct CLS reference but already have a cloned sender.
+    pub fn set_swarm_channel(
+        &mut self,
+        tx: std::sync::mpsc::Sender<crate::cognitive_loop::SwarmEvent>,
+    ) {
+        self.mind.set_swarm_channel(tx);
+    }
+
+    // ========================================================================
     // Calibration (Brier Score Integration)
     // ========================================================================
 

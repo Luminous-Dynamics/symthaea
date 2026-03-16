@@ -198,7 +198,7 @@ fn test_consciousness_responds_to_engagement() {
     let mut low_engagement_consciousness: Vec<f64> = Vec::new();
     for _ in 0..50 {
         let result = service.cycle(monotone);
-        low_engagement_consciousness.push(result.metadata.consciousness_level);
+        low_engagement_consciousness.push(result.metadata.consciousness.consciousness_level);
     }
 
     // Phase 2: 50 cycles of rich, varied, cognitively demanding input
@@ -212,7 +212,7 @@ fn test_consciousness_responds_to_engagement() {
     let mut high_engagement_consciousness: Vec<f64> = Vec::new();
     for i in 0..50 {
         let result = service.cycle(rich_inputs[i % rich_inputs.len()]);
-        high_engagement_consciousness.push(result.metadata.consciousness_level);
+        high_engagement_consciousness.push(result.metadata.consciousness.consciousness_level);
     }
 
     let low_avg: f64 = low_engagement_consciousness.iter().sum::<f64>()
@@ -294,14 +294,14 @@ fn test_500_cycle_behavioral_demonstration() {
 
         let result = service.cycle(input);
         pe_history.push(result.prediction_error);
-        consciousness_history.push(result.metadata.consciousness_level);
+        consciousness_history.push(result.metadata.consciousness.consciousness_level);
 
         if milestone_cycles.contains(&cycle) {
             let stats = service.stats();
             milestones.push(Milestone {
                 cycle,
                 prediction_error: stats.avg_prediction_error,
-                consciousness: result.metadata.consciousness_level,
+                consciousness: result.metadata.consciousness.consciousness_level,
                 learning_cycles: stats.learning_cycles,
                 boredom: service.boredom(),
                 exploration: service.exploration_factor(),
@@ -449,8 +449,8 @@ fn test_full_profile_vs_default_consciousness() {
         let dr = default_svc.cycle(input);
         let fr = full_svc.cycle(input);
 
-        default_consciousness.push(dr.metadata.consciousness_level);
-        full_consciousness.push(fr.metadata.consciousness_level);
+        default_consciousness.push(dr.metadata.consciousness.consciousness_level);
+        full_consciousness.push(fr.metadata.consciousness.consciousness_level);
         default_pe.push(dr.prediction_error);
         full_pe.push(fr.prediction_error);
     }

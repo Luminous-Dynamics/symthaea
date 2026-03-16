@@ -105,7 +105,7 @@ impl CognitiveLoopService {
         let mut codebook_evictions: usize = 0;
         if self.stats.total_cycles % 97 == 0 && self.stats.total_cycles > 0 {
             let top_eps = self
-                .phi_episodic_replay
+                .episodic_persistence.replay
                 .as_ref()
                 .map(|replay| replay.get_top_episodes(3))
                 .unwrap_or_default();
@@ -298,7 +298,7 @@ impl CognitiveLoopService {
         //   (b) semantic memory returned zero hits (retrieval miss)
         // The periodic 100-cycle floor is still enforced by should_replay().
         let _t = Instant::now();
-        if let Some(ref mut replay) = self.phi_episodic_replay {
+        if let Some(ref mut replay) = self.episodic_persistence.replay {
             let avg_err = self.stats.avg_prediction_error;
             let error_spike = avg_err > 0.01 && prediction_error > avg_err * 2.0;
             let semantic_miss = self.memory_consol.semantic_memory.stats().semantic_misses > 0
@@ -325,7 +325,8 @@ impl CognitiveLoopService {
         // - Episodic replay needs &mut temporal_network for CfC retraining
         // - Memory coordinator needs &mut phi_episodic_replay after replay completes
         let _t = Instant::now();
-        if let Some(ref mut replay) = self.phi_episodic_replay {
+        let mut memory_db_flushed = false;
+        if let Some(ref mut replay) = self.episodic_persistence.replay {
             let coherence_summary = self.language_comm.voice_coherence.bridge.summary();
             let current_phi = coherence_summary.smoothed_coherence as f64;
 
@@ -500,7 +501,7 @@ impl CognitiveLoopService {
         // refreshes the codebook from resonator memory AND retains prior consolidated entries.
         // Science: Walker (2009) — memory consolidation requires stable, long-lived stores;
         //          Diekelmann & Born (2010) — repeated replay progressively strengthens traces.
-        if !self.cantor_broadcast_buffer.is_empty() {
+        if !self.cantor_dream.broadcast_buffer.is_empty() {
             // Refresh persistent engine's codebook from resonator memory (additive — new entries
             // supplement existing consolidated knowledge rather than replacing it)
             if let Some(ref res_mem) = self.memory_consol.resonator_memory {
@@ -513,13 +514,13 @@ impl CognitiveLoopService {
                             }
                         }
                         let bhv = symthaea_core::hdc::BinaryHV(bytes);
-                        self.cantor_cleanup_engine.codebook.add(label, bhv);
+                        self.cantor_dream.cleanup_engine.codebook.add(label, bhv);
                     }
                 }
             }
 
             // Drain the buffer — each CRHV gets cleaned and rebuilt
-            let crhvs: Vec<_> = self.cantor_broadcast_buffer.drain(..).collect();
+            let crhvs: Vec<_> = self.cantor_dream.broadcast_buffer.drain(..).collect();
             let mut dream_surprise_sum = 0.0f32;
             let mut dream_count = 0u32;
 
@@ -529,12 +530,12 @@ impl CognitiveLoopService {
             // Science: He et al. (2016) — residual learning preserves information
             // at different abstraction levels; each depth is a distinct abstraction.
             let codebook_cap = crate::cognitive_loop::thresholds::CANTOR_CODEBOOK_MAX_ENTRIES;
-            if self.cantor_cleanup_engine.codebook.len() > codebook_cap * 3 / 4 {
+            if self.cantor_dream.cleanup_engine.codebook.len() > codebook_cap * 3 / 4 {
                 // Count entries per depth stratum (encoded in label as "d{depth}_...")
                 let mut depth_counts = [0usize; 8]; // depths 0-7
                 for d in 0..8 {
                     depth_counts[d] = self
-                        .cantor_cleanup_engine
+                        .cantor_dream.cleanup_engine
                         .codebook
                         .count_by_prefix(&format!("d{d}_"));
                 }
@@ -548,13 +549,13 @@ impl CognitiveLoopService {
                 // Evict oldest entry from that stratum (FIFO — first match removed)
                 if depth_counts[max_stratum] > 2 {
                     let prefix = format!("d{max_stratum}_");
-                    self.cantor_cleanup_engine.codebook.evict_by_prefix(&prefix);
+                    self.cantor_dream.cleanup_engine.codebook.evict_by_prefix(&prefix);
                 }
             }
 
             for crhv in &crhvs {
                 let pre_ss = crhv.self_similarity();
-                let result = self.cantor_cleanup_engine.cleanup(crhv);
+                let result = self.cantor_dream.cleanup_engine.cleanup(crhv);
                 let post_ss = result.cleaned.self_similarity();
                 dream_surprise_sum += (pre_ss - post_ss).abs();
                 dream_count += 1;
@@ -568,9 +569,9 @@ impl CognitiveLoopService {
                     // Depth-stratified label: "d{depth}_dream_consolidated_{N}"
                     let label = format!(
                         "d{}_dream_consolidated_{}",
-                        crhv.depth, self.cantor_cleanup_engine.cleanups_performed
+                        crhv.depth, self.cantor_dream.cleanup_engine.cleanups_performed
                     );
-                    self.cantor_cleanup_engine.codebook.add_if_diverse(
+                    self.cantor_dream.cleanup_engine.codebook.add_if_diverse(
                         &label,
                         result.cleaned.base,
                         crate::cognitive_loop::thresholds::CANTOR_CODEBOOK_DIVERSITY_THRESHOLD,
@@ -581,21 +582,21 @@ impl CognitiveLoopService {
             if dream_count > 0 {
                 let batch_surprise = dream_surprise_sum / dream_count as f32;
                 let decay = crate::cognitive_loop::thresholds::CANTOR_SURPRISE_EMA_DECAY;
-                self.cantor_dream_surprise =
-                    decay * self.cantor_dream_surprise + (1.0 - decay) * batch_surprise;
+                self.cantor_dream.dream_surprise =
+                    decay * self.cantor_dream.dream_surprise + (1.0 - decay) * batch_surprise;
             }
             // Feed surprise into FEP learning signal — novel fractal structure
             // indicates model inadequacy requiring plasticity boost.
-            if self.cantor_dream_surprise > 0.01 {
-                self.fep.learning_signal += self.cantor_dream_surprise * 0.2;
+            if self.cantor_dream.dream_surprise > 0.01 {
+                self.fep.learning_signal += self.cantor_dream.dream_surprise * 0.2;
                 self.fep.learning_signal = self.fep.learning_signal.clamp(-1.0, 1.0);
             }
             tracing::debug!(
-                cleanups = self.cantor_cleanup_engine.cleanups_performed,
-                layers_cleaned = self.cantor_cleanup_engine.layers_cleaned,
-                layers_failed = self.cantor_cleanup_engine.layers_failed,
-                codebook_size = self.cantor_cleanup_engine.codebook.len(),
-                dream_surprise = self.cantor_dream_surprise,
+                cleanups = self.cantor_dream.cleanup_engine.cleanups_performed,
+                layers_cleaned = self.cantor_dream.cleanup_engine.layers_cleaned,
+                layers_failed = self.cantor_dream.cleanup_engine.layers_failed,
+                codebook_size = self.cantor_dream.cleanup_engine.codebook.len(),
+                dream_surprise = self.cantor_dream.dream_surprise,
                 "Cantor dream consolidation complete (persistent engine)"
             );
         }
@@ -606,7 +607,7 @@ impl CognitiveLoopService {
             && self.stats.total_cycles % 50 == 0
             && self.stats.total_cycles > 50
         {
-            if let Some(ref mut replay) = self.phi_episodic_replay {
+            if let Some(ref mut replay) = self.episodic_persistence.replay {
                 // Variance = E[X²] - E[X]² (from EMA-tracked moments)
                 let error_variance = (self.stats.avg_prediction_error_sq
                     - self.stats.avg_prediction_error * self.stats.avg_prediction_error)
@@ -617,25 +618,16 @@ impl CognitiveLoopService {
 
         // Memory coordinator: broadcast signals and process graduations
         {
-            let coord_phi = self
-                .language_comm
-                .voice_coherence
-                .bridge
-                .smoothed_coherence() as f64;
+            let coord_phi = self.language_comm.voice_coherence.bridge.smoothed_coherence() as f64;
             let coord_coherence = coherence as f64;
-            self.memory_consol
-                .memory_coordinator
-                .update_signals_with_sigma(
-                    coord_phi,
-                    coord_coherence,
-                    self.carryover.consciousness.last_sigma,
-                );
+            self.memory_consol.memory_coordinator.update_signals_with_sigma(
+                coord_phi,
+                coord_coherence,
+                self.carryover.consciousness.last_sigma,
+            );
 
-            if let Some(ref mut replay) = self.phi_episodic_replay {
-                let graduated = self
-                    .memory_consol
-                    .memory_coordinator
-                    .process_graduations(replay);
+            if let Some(ref mut replay) = self.episodic_persistence.replay {
+                let graduated = self.memory_consol.memory_coordinator.process_graduations(replay);
                 if graduated > 0 {
                     tracing::debug!(
                         graduated,
@@ -652,16 +644,19 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         if self.stats.total_cycles % 199 == 0
             && self.stats.total_cycles > 0
-            && self.memory_db.is_some()
+            && self.episodic_persistence.db.is_some()
         {
             use std::sync::atomic::Ordering;
 
-            if !self.memory_flush_in_progress.load(Ordering::Relaxed) {
-                if let Some(ref replay) = self.phi_episodic_replay {
+            if !self
+                .episodic_persistence.flush_in_progress
+                .load(Ordering::Relaxed)
+            {
+                if let Some(ref replay) = self.episodic_persistence.replay {
                     let top_episodes = replay.get_top_episodes(16);
                     if !top_episodes.is_empty() {
-                        let db = self.memory_db.as_ref().unwrap().clone();
-                        let flush_guard = self.memory_flush_in_progress.clone();
+                        let db = self.episodic_persistence.db.as_ref().unwrap().clone();
+                        let flush_guard = self.episodic_persistence.flush_in_progress.clone();
                         flush_guard.store(true, Ordering::Relaxed);
 
                         let records: Vec<crate::databases::MemoryRecord> = top_episodes
@@ -693,13 +688,11 @@ impl CognitiveLoopService {
                             })
                             .collect();
 
+                        memory_db_flushed = true;
                         std::thread::spawn(move || {
                             match db.store_batch_sync(&records) {
                                 Ok(n) => {
-                                    tracing::debug!(
-                                        stored = n,
-                                        "Memory flush: episodes persisted to SQLite"
-                                    );
+                                    tracing::debug!(stored = n, "Memory flush: episodes persisted to SQLite");
                                 }
                                 Err(e) => {
                                     tracing::warn!(error = %e, "Memory flush failed");
@@ -717,6 +710,7 @@ impl CognitiveLoopService {
         EpisodicReplayResult {
             surprise_replay_batch_size,
             phasic_da_replay_boost,
+            memory_db_flushed,
         }
     }
 }

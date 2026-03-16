@@ -38,9 +38,9 @@ proptest! {
         for i in 0..cycles {
             let result = service.cycle(&format!("codebook prop input {i}"));
             prop_assert!(
-                result.metadata.cantor_codebook_size <= 256,
+                result.metadata.cantor.cantor_codebook_size <= 256,
                 "Codebook size {} exceeded cap at cycle {}",
-                result.metadata.cantor_codebook_size, i
+                result.metadata.cantor.cantor_codebook_size, i
             );
         }
     }
@@ -51,7 +51,7 @@ proptest! {
         let mut service = make_cantor_service();
         for i in 0..cycles {
             let result = service.cycle(&format!("surprise prop input {i}"));
-            let s = result.metadata.cantor_dream_surprise;
+            let s = result.metadata.cantor.cantor_dream_surprise;
             prop_assert!(
                 (0.0..=1.0).contains(&s),
                 "Dream surprise {} out of [0,1] at cycle {}", s, i
@@ -65,7 +65,7 @@ proptest! {
         let mut service = make_cantor_service();
         for i in 0..cycles {
             let result = service.cycle(&format!("resonance prop input {i}"));
-            let r = result.metadata.cantor_resonance_boost;
+            let r = result.metadata.cantor.cantor_resonance_boost;
             prop_assert!(
                 (0.0..=1.0).contains(&r),
                 "Resonance boost {} out of [0,1] at cycle {}", r, i
@@ -79,7 +79,7 @@ proptest! {
         let mut service = make_cantor_service();
         for i in 0..cycles {
             let result = service.cycle(&format!("metacog prop input {i}"));
-            let d = result.metadata.cantor_metacognitive_depth;
+            let d = result.metadata.cantor.cantor_metacognitive_depth;
             prop_assert!(
                 (0.0..=1.0).contains(&d),
                 "Metacognitive depth {} out of [0,1] at cycle {}", d, i
@@ -94,9 +94,9 @@ proptest! {
         for i in 0..cycles {
             let result = service.cycle(&format!("buffer prop input {i}"));
             prop_assert!(
-                result.metadata.cantor_buffer_occupancy <= 32,
+                result.metadata.cantor.cantor_buffer_occupancy <= 32,
                 "Buffer {} exceeded cap at cycle {}",
-                result.metadata.cantor_buffer_occupancy, i
+                result.metadata.cantor.cantor_buffer_occupancy, i
             );
         }
     }

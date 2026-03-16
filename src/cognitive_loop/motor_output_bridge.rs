@@ -150,6 +150,8 @@ pub struct MotorOutputBridge {
     executor: SimpleExecutor,
     /// Minimum Phi required for any motor output (overrides policy if higher).
     min_phi_override: Option<f64>,
+    /// Minimum motor confidence required for execution (default 0.3).
+    min_confidence: f64,
 }
 
 impl MotorOutputBridge {
@@ -161,6 +163,7 @@ impl MotorOutputBridge {
             registry: Self::coding_registry(),
             executor: SimpleExecutor::from_env(),
             min_phi_override: None,
+            min_confidence: 0.3,
         }
     }
 
@@ -173,12 +176,24 @@ impl MotorOutputBridge {
             registry: Self::coding_registry(),
             executor: SimpleExecutor::from_env(),
             min_phi_override: None,
+            min_confidence: 0.3,
         })
     }
 
     /// Override the minimum Phi threshold for motor output execution.
     pub fn with_min_phi(mut self, min_phi: f64) -> Self {
         self.min_phi_override = Some(min_phi);
+        self
+    }
+
+    /// Override the minimum motor confidence threshold.
+    ///
+    /// In agentic coding contexts, the FEP's motor confidence starts low
+    /// because it hasn't been trained on coding-specific actions. Lowering
+    /// this threshold allows the coding agent to execute actions while the
+    /// FEP learns appropriate confidence levels.
+    pub fn with_min_confidence(mut self, min_confidence: f64) -> Self {
+        self.min_confidence = min_confidence;
         self
     }
 
@@ -217,6 +232,42 @@ impl MotorOutputBridge {
         })
     }
 
+    /// Infer the action type from the `MotorActionRequest` fields when FEP motor
+    /// parameters don't decode to a valid `ActionType`.
+    fn infer_action_type(request: &MotorActionRequest) -> Option<ActionType> {
+        // Cargo commands: check program name + args
+        if let Some(ref prog) = request.program {
+            if prog == "cargo" || prog.ends_with("/cargo") {
+                if request.args.iter().any(|a| a == "check") {
+                    return Some(ActionType::CargoCheck);
+                }
+                if request.args.iter().any(|a| a == "test") {
+                    return Some(ActionType::CargoTest);
+                }
+            }
+            // Git commit
+            if prog == "git" || prog.ends_with("/git") {
+                if request.args.iter().any(|a| a == "commit") {
+                    return Some(ActionType::GitCommit);
+                }
+            }
+            // Any other program → RunCommand
+            return Some(ActionType::RunCommand);
+        }
+
+        // Content present → Write
+        if request.content.is_some() && request.target_path.is_some() {
+            return Some(ActionType::Write);
+        }
+
+        // Target path only → Read
+        if request.target_path.is_some() {
+            return Some(ActionType::Read);
+        }
+
+        None
+    }
+
     /// Execute a motor command, translating parameters into ActionIR and running
     /// through the persistent SimpleExecutor with policy validation and Phi gating.
     pub fn execute(
@@ -237,22 +288,29 @@ impl MotorOutputBridge {
         }
 
         // 2. Low confidence → skip (FEP isn't sure this is the right action)
-        if motor_confidence < 0.3 {
+        if motor_confidence < self.min_confidence {
             return MotorOutputResult::skipped(&format!(
-                "Motor confidence {motor_confidence:.3} too low for execution"
+                "Motor confidence {motor_confidence:.3} too low for execution (threshold {:.3})",
+                self.min_confidence
             ));
         }
 
-        // 3. Decode action type from parameters[0]
-        let action_type = match motor_params
+        // 3. Decode action type from parameters[0], falling back to inference from request context.
+        // The FEP's motor parameters may not map to our ActionType encoding (the FEP uses
+        // MotorCommandType indices, not ActionType indices). When parameters[0] doesn't decode
+        // to a valid ActionType, we infer the action from the MotorActionRequest fields.
+        let action_type = motor_params
             .first()
             .and_then(|&v| ActionType::from_param(v))
-        {
-            Some(at) => at,
-            None => {
-                return MotorOutputResult::skipped("No valid action type in motor parameters");
-            }
-        };
+            .or_else(|| Self::infer_action_type(request))
+            .unwrap_or_else(|| {
+                // Last resort: if there's a target path, try Read; otherwise skip
+                if request.target_path.is_some() {
+                    ActionType::Read
+                } else {
+                    return ActionType::List; // will be caught by registry
+                }
+            });
 
         // 4. Build ActionContext from the request
         let action_context = ActionContext {
@@ -378,13 +436,54 @@ mod tests {
     }
 
     #[test]
-    fn test_no_params_skips() {
+    fn test_no_params_infers_from_request() {
         let mut bridge = MotorOutputBridge::with_defaults().unwrap();
-        let request = MotorActionRequest::default();
 
+        // Empty request + no params → falls back to List
+        let request = MotorActionRequest::default();
         let result = bridge.execute(&[], 0.8, 0.9, &request);
-        assert!(!result.success);
-        assert!(result.error.unwrap().contains("No valid action type"));
+        assert_eq!(result.action_type, Some(ActionType::List));
+
+        // Request with content + path → infers Write
+        let write_request = MotorActionRequest {
+            target_path: Some(PathBuf::from("/tmp/symthaea/motor_bridge/out.txt")),
+            content: Some("hello".into()),
+            ..Default::default()
+        };
+        let result = bridge.execute(&[], 0.8, 0.9, &write_request);
+        assert_eq!(result.action_type, Some(ActionType::Write));
+
+        // Request with program → infers RunCommand
+        let cmd_request = MotorActionRequest {
+            program: Some("echo".into()),
+            args: vec!["hi".into()],
+            ..Default::default()
+        };
+        let result = bridge.execute(&[], 0.8, 0.9, &cmd_request);
+        assert_eq!(result.action_type, Some(ActionType::RunCommand));
+    }
+
+    #[test]
+    fn test_infer_cargo_commands() {
+        let mut bridge = MotorOutputBridge::with_defaults().unwrap();
+
+        let check_request = MotorActionRequest {
+            target_path: Some(PathBuf::from("/tmp/symthaea/motor_bridge/")),
+            program: Some("cargo".into()),
+            args: vec!["check".into()],
+            ..Default::default()
+        };
+        let result = bridge.execute(&[], 0.8, 0.9, &check_request);
+        assert_eq!(result.action_type, Some(ActionType::CargoCheck));
+
+        let test_request = MotorActionRequest {
+            target_path: Some(PathBuf::from("/tmp/symthaea/motor_bridge/")),
+            program: Some("cargo".into()),
+            args: vec!["test".into()],
+            ..Default::default()
+        };
+        let result = bridge.execute(&[], 0.8, 0.9, &test_request);
+        assert_eq!(result.action_type, Some(ActionType::CargoTest));
     }
 
     #[test]

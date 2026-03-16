@@ -58,7 +58,7 @@ impl ChangeDetectionBenchmark {
             // Time pressure: +0.10/unit adds encoding degradation, reflecting reduced dwell time
             // in visual WM consolidation under speed emphasis (Vogel et al., 2006).
             let diff_model = difficulty_model_for("WorM::ChangeDetection");
-            let noise_frac = (0.05 * set_size as f32 + config.time_pressure as f32 * 0.10)
+            let noise_frac = (0.03 * set_size as f32 + config.time_pressure as f32 * 0.10)
                 * diff_model.interference_multiplier(config.difficulty) as f32;
             let encoding_noise_seed = rng_state.wrapping_add(700 + pos as u64);
             let noisy_hv = if noise_frac > 0.01 {

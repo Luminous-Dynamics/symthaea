@@ -6,7 +6,7 @@ description = "Symthaea Spore: WASM consciousness kernel (~500KB) for browser, e
 license = "MIT"
 
 [lib]
-crate-type = ["cdylib", "rlib"]
+crate-type = ["cdylib", "staticlib", "rlib"]
 
 [dependencies]
 symthaea-core = { path = "../../symthaea-core", default-features = false }
@@ -33,3 +33,6 @@ uuid = { version = "1.6", features = ["rng-getrandom"] }
 [features]
 default = []
 wasm = ["dep:wasm-bindgen", "dep:serde-wasm-bindgen", "dep:console_error_panic_hook"]
+# Native mobile FFI: C-compatible extern functions for iOS (staticlib) and Android (cdylib/JNI).
+# Produces symthaea_spore.h via cbindgen for Swift/Kotlin consumption.
+native-ffi = []

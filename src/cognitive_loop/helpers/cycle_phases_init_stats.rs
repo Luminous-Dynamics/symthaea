@@ -34,29 +34,19 @@ impl CognitiveLoopService {
         } else {
             1.0
         };
-        if startup_suppressed && !self.carryover.quality.adaptive_warmup_exited {
+        if startup_suppressed {
             self.stats.startup_suppressed_cycles += 1;
             // Ramp learning rate from 20% → 100% over warmup period
             let lr_scale = 0.2 + 0.8 * startup_warmup_progress;
             self.stats.adaptive_learning_rate *= lr_scale;
             // Session 16 Item 3: Startup exploration ramp.
+            // Instead of flat suppression, ramp from STARTUP_EXPLORATION_INITIAL to 1.0.
+            // Early cycles get heavily constrained; later warmup cycles less so.
+            // Science: Hopfield (1982) — settling time requires graded exploration.
             let explore_ramp = super::super::thresholds::STARTUP_EXPLORATION_INITIAL
                 + (1.0 - super::super::thresholds::STARTUP_EXPLORATION_INITIAL)
                     * startup_warmup_progress;
             self.scale_exploration("startup_warmup", explore_ramp);
-
-            // S17-5: Adaptive warmup exit. Smith (2018).
-            if self.stats.total_cycles
-                >= super::super::thresholds::ADAPTIVE_WARMUP_MIN_CYCLES as usize
-            {
-                let grad = self.carryover.quality.prev_gradient_magnitude;
-                let ema = self.carryover.history.consciousness_ema;
-                if grad < super::super::thresholds::ADAPTIVE_WARMUP_GRADIENT_THRESHOLD
-                    && ema > super::super::thresholds::ADAPTIVE_WARMUP_EMA_THRESHOLD
-                {
-                    self.carryover.quality.adaptive_warmup_exited = true;
-                }
-            }
         }
 
         // Session 16 Item 6: Consciousness EMA → learning rate initialization bias.
@@ -74,8 +64,7 @@ impl CognitiveLoopService {
             } else if ema < CONSCIOUSNESS_EMA_LOW_THRESHOLD && ema > 0.0 {
                 self.stats.adaptive_learning_rate *= CONSCIOUSNESS_EMA_LR_DAMPEN;
             }
-            self.stats.adaptive_learning_rate =
-                self.stats.adaptive_learning_rate.clamp(0.0001, 0.1);
+            self.stats.adaptive_learning_rate = self.stats.adaptive_learning_rate.clamp(0.0001, 0.1);
         }
 
         // Snapshot exploration_urge for end-of-cycle budget clamping (Task B)
@@ -273,6 +262,12 @@ impl CognitiveLoopService {
         self.neuromod.bath.apply_stress(somatic_stress_level);
 
         // ═══════════════════════════════════════════════════════════════════════
+        // THERMOCEPTION: Drain platform thermal reports and update tau modulation
+        // Science: Angilletta (2009) thermal performance curves
+        // ═══════════════════════════════════════════════════════════════════════
+        self.thermal_bridge.update();
+
+        // ═══════════════════════════════════════════════════════════════════════
         // NEUROMODULATOR BATH: Produce from previous cycle's signals (Phase A)
         // Science: Doya (2002) — DA/NE/5-HT/ACh unify metalearning modulation.
         // Uses carryover values (previous cycle) to avoid ordering dependencies.
@@ -377,11 +372,7 @@ impl CognitiveLoopService {
             // Powers & Cisek (2021): outcome monitoring for closed-loop neuromodulation.
             if let Some(improved) = self.neuromod.calibration_validator.check_validation(
                 self.stats.avg_prediction_error as f64,
-                self.language_comm
-                    .voice_coherence
-                    .bridge
-                    .smoothed_coherence()
-                    .into(),
+                self.language_comm.voice_coherence.bridge.smoothed_coherence().into(),
                 self.neuromod.self_assessment.confidence_error_ema(),
                 self.stats.total_cycles as u64,
             ) {
@@ -574,9 +565,9 @@ impl CognitiveLoopService {
         }
 
         // Populate v0.8.0 Resonance Metadata
-        metadata.thermodynamic_load = self.thermodynamic_load;
-        metadata.somatic_stress = self.somatic_bridge.systemic_stress();
-        metadata.mood_temperature = self.mood_temperature;
+        metadata.temporal.thermodynamic_load = self.thermodynamic_load;
+        metadata.embodied.somatic_stress = self.somatic_bridge.systemic_stress();
+        metadata.embodied.mood_temperature = self.mood_temperature;
         // Phase 2.2: feedback proposal attribution telemetry
         metadata.feedback.feedback_confidence_proposals =
             self.feedback_state.confidence.len() as u32;

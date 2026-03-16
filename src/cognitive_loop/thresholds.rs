@@ -55,6 +55,11 @@ pub const NEGATION_POLARITY_THRESHOLD: f32 = 0.5;
 /// Negation dampening factor applied to moral evaluation.
 pub const NEGATION_DAMPENING: f32 = 0.3;
 
+/// Maximum Love Coherence — no finite system claims perfect moral alignment.
+/// Basis: Residual free energy (Friston 2010); tawāḍuʿ (Al-Ghazali 1095),
+/// anavah (Maimonides 1170), kenosis (Philippians 2:7).
+pub const MORAL_HUMILITY_CEILING: f64 = 0.95;
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // CONSCIOUSNESS / EXPLORATION
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -986,6 +991,16 @@ pub const EMPATHIC_COMPASSION_DA_THRESHOLD: f64 = 0.8;
 
 /// Dopamine production scale from empathic compassion.
 pub const EMPATHIC_COMPASSION_DA_SCALE: f32 = 0.08;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// EPISTEMIC AUDITOR
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Epistemic Auditor DuckDB flush cadence (cycles between flushes).
+/// 1009 is prime and co-prime to all existing cadences (7, 11, 13, 41, 47, 53, 97, 199, 499, 997).
+/// At 31Hz, this is ~32.5 seconds between flushes.
+/// Science: intermittent self-reflection avoids metacognitive overhead (Flavell 1979).
+pub const EPISTEMIC_AUDITOR_FLUSH_CADENCE: u64 = 1009;
 
 /// 4. `ATTENTION_BUDGET_US > 0` (nonzero budget)
 /// 5. `POLICY_MIN_WINDOW < POLICY_WINDOW_SIZE`
@@ -2503,6 +2518,53 @@ pub const GOV_COLLECTIVE_PHI_ECB: f32 = 0.01;
 pub const GOV_CONSCIOUSNESS_MODULATION: f64 = 0.04; // ±2% at extremes (0.04 × 0.5 = 0.02)
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// GLYPH CODEX — SYMBOLIC CONSCIOUSNESS COUPLING
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Glyph coherence → consciousness modulation strength (±2%).
+/// High symbolic integration across 11 Field Modalities deepens conscious awareness.
+/// Basis: Jung (1959) — archetypal integration; Grof (1985) — consciousness cartography.
+pub const GLYPH_CONSCIOUSNESS_MODULATION: f64 = 0.04; // ±2% at extremes (0.04 × 0.5 = 0.02)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SWARM NEUROMODULATORY COUPLING
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Oxytocin dose per √(connected_peers). Diminishing returns via sqrt.
+/// Basis: Zak (2012) — social bonding → oxytocin release.
+pub const SWARM_OXY_PER_SQRT_PEER: f32 = 0.02;
+
+/// Maximum oxytocin dose from peer bonding (caps sqrt scaling).
+pub const SWARM_OXY_CAP: f32 = 0.08;
+
+/// Oxytocin injection half-life (cycles) for peer bonding signal.
+pub const SWARM_OXY_HALFLIFE: u32 = 60;
+
+/// NE baseline nudge multiplier per anomaly (capped at 3 anomalies).
+/// Basis: Arnsten (2009) — network disruption → noradrenergic alarm.
+pub const SWARM_ANOMALY_NE_MULT: f32 = 0.03;
+
+/// Maximum NE nudge from network anomalies.
+pub const SWARM_ANOMALY_NE_CAP: f32 = 0.09;
+
+/// 5-HT gain from peer Phi delta (mean_peer_phi - 0.5).
+/// Basis: Crockett (2009) — collective flourishing → serotonin (social satisfaction).
+pub const SWARM_PHI_SHT_GAIN: f32 = 0.04;
+
+/// Maximum 5-HT nudge from high collective Phi.
+pub const SWARM_PHI_SHT_CAP: f32 = 0.03;
+
+/// DA gain from affective contagion intensity.
+/// Basis: Schultz (1997) — shared positive affect → dopaminergic reward.
+pub const SWARM_CONTAGION_DA_GAIN: f32 = 0.03;
+
+/// Maximum DA nudge from affective contagion.
+pub const SWARM_CONTAGION_DA_CAP: f32 = 0.04;
+
+/// Minimum affective contagion to trigger DA modulation.
+pub const SWARM_CONTAGION_DA_THRESHOLD: f64 = 0.05;
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // FEP PRAGMATIC VALUE MODULATION
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -2945,32 +3007,24 @@ pub const KNOWLEDGE_FORGET_CONFIDENCE_THRESHOLD: f32 = 0.1;
 /// Confidence boost applied to causal facts during dream consolidation.
 pub const KNOWLEDGE_CONSOLIDATION_BOOST: f32 = 0.05;
 
-/// NE baseline nudge per unit of knowledge uncertainty above 0.5.
-/// Basis: Bouret & Sara (2005) — LC-NE system signals unexpected uncertainty.
+/// NE baseline boost per unit of knowledge uncertainty above 0.5 (Bouret & Sara 2005).
 pub const KNOWLEDGE_UNCERTAINTY_NE_SCALE: f32 = 0.015;
-
-/// DA baseline nudge when causal chain depth exceeds threshold (reward from understanding).
-/// Basis: Schultz (1997) — dopamine encodes positive prediction errors.
+/// DA baseline nudge when causal chain depth exceeds threshold (Schultz 1997).
 pub const KNOWLEDGE_CAUSAL_DEPTH_DA_NUDGE: f32 = 0.01;
-
-/// 5-HT stability nudge when knowledge grounding is high (> 0.6).
-/// Basis: Cools et al. (2008) — serotonin promotes patience/stability under certainty.
+/// 5-HT baseline nudge for grounded, low-uncertainty knowledge (Cools et al. 2008).
 pub const KNOWLEDGE_GROUNDING_SHT_NUDGE: f32 = 0.005;
-
-/// Exploration boost scale from knowledge novelty signal.
-/// Basis: Berlyne (1960) — epistemic curiosity driven by information gap.
+/// Exploration boost scale for novel knowledge signals (novelty > 0.5).
 pub const KNOWLEDGE_NOVELTY_EXPLORE_SCALE: f32 = 0.08;
-
-/// Confidence multiplier for grounded facts in episodic salience.
-/// Basis: Dudai (2012) — high-confidence memories preferentially consolidated.
+/// Salience boost for knowledge facts promoted to episodic memory during dreams.
 pub const KNOWLEDGE_EPISODIC_SALIENCE_BOOST: f32 = 0.15;
-
-/// Maximum number of knowledge facts converted to episodic memories per dream cycle.
+/// Max facts to promote per dream consolidation cycle.
 pub const KNOWLEDGE_EPISODIC_MAX_PER_DREAM: usize = 5;
-
-/// Similarity threshold above which contradictions trigger belief revision.
-/// Basis: AGM theory (Alchourrón et al. 1985) — belief contraction and revision.
+/// Minimum similarity for AGM-style contradiction resolution (demote weaker fact).
 pub const KNOWLEDGE_CONTRADICTION_RESOLUTION_THRESHOLD: f32 = 0.8;
+
+/// Minimum causal edge strength to flag as a confounding variable.
+/// Science: Confounders with weak links are noise; strong links warrant attention (Pearl 2009).
+pub const KNOWLEDGE_CONFOUNDER_STRENGTH_THRESHOLD: f32 = 0.3;
 
 /// Maximum attention contribution from limiting component analysis (cap).
 pub const LIMITING_COMPONENT_ATTENTION_MAX: f32 = 0.1;
@@ -3047,6 +3101,11 @@ pub const BROCA_COHERENT_THRESHOLD: f32 = 0.7;
 /// Applied as: (coherence - BROCA_COHERENT_THRESHOLD) * SCALE → adjust_confidence.
 /// Science: Pickering & Garrod (2013) — coherent language production reinforces cognitive confidence.
 pub const BROCA_COHERENT_CONFIDENCE_SCALE: f32 = 0.1;
+
+/// Exploration damping when Broca semantic veto fires.
+/// A veto means the model rejected incoherent output → exploitation is safer than exploration.
+/// Science: Pickering & Garrod (2013) — veto = self-correction → reduce drift.
+pub const BROCA_VETO_EXPLORATION_SCALE: f32 = -0.02;
 
 /// Exploration boost when causal graph is sparse (few patterns learned).
 /// Science: Pearl (2009) — sparse causal knowledge → explore to discover structure.
@@ -3320,51 +3379,361 @@ pub const VOICE_HEARTBEAT_LISTENER_SUCCESS: f32 = 0.8;
 pub const VOICE_HEARTBEAT_LISTENER_FAIL: f32 = 0.3;
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// RADIO / SPECTRUM MANAGER
+// Radio / Spectrum Manager (mesh feature)
+// Science: Haykin (2005) — cognitive radio, spectrum sensing and dynamic access.
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// SNR threshold below which a band is considered jammed (dB).
-/// Basis: Shannon (1948) — channel capacity drops to zero at negative SNR.
-pub const RADIO_JAMMING_SNR_THRESHOLD: f32 = -3.0;
+/// SNR threshold below which a channel is considered jammed (dB).
+/// Science: Haykin (2005) — cognitive radio spectrum sensing threshold.
+pub const RADIO_JAMMING_SNR_THRESHOLD: f32 = 5.0;
 
-/// Arousal spike from jamming detection (fraction of max arousal).
-/// Basis: Arnsten (2009) — threat detection triggers noradrenergic arousal.
-pub const RADIO_JAMMING_AROUSAL_SPIKE: f64 = 0.06;
+/// Arousal spike when jamming is detected (threat response).
+/// Science: LeDoux (2003) — amygdala rapid threat detection.
+pub const RADIO_JAMMING_AROUSAL_SPIKE: f64 = 0.04;
 
-/// Exploration boost per consecutive jamming cycle (search for clear frequency).
-/// Basis: Friston (2010) — active inference drives epistemic foraging under uncertainty.
-pub const RADIO_JAMMING_EXPLORATION_BOOST: f64 = 0.04;
+/// Exploration boost per jamming streak cycle (frequency-hopping search).
+/// Science: Berlyne (1960) — curiosity under uncertainty.
+pub const RADIO_JAMMING_EXPLORATION_BOOST: f64 = 0.02;
 
-/// Confidence drop per network degradation level (0=none, 3=blackout).
-/// Basis: Woolley et al. (2010) — collective intelligence degrades with reduced connectivity.
-pub const RADIO_DEGRADATION_CONFIDENCE_DROP: f64 = 0.02;
+/// Confidence drop per network degradation level.
+/// Science: Slovic (1993) — trust asymmetry (harder to build than destroy).
+pub const RADIO_DEGRADATION_CONFIDENCE_DROP: f64 = 0.03;
 
-/// EMA alpha for per-tier packet loss tracking.
-/// Basis: Jacobson (1988) — EWMA smoothing for network round-trip estimation.
-pub const RADIO_TIER_LOSS_EMA_ALPHA: f64 = 0.1;
+/// EMA alpha for tier packet-loss tracking (higher = faster response).
+/// Science: Roberts (1959) — exponential smoothing for signal tracking.
+pub const RADIO_TIER_LOSS_EMA_ALPHA: f64 = 0.15;
 
-/// Packet loss EMA threshold above which a tier is considered degraded.
-/// Basis: empirical — >30% loss renders a tier unreliable for consciousness sync.
-pub const RADIO_TIER_DEGRADED_LOSS: f64 = 0.3;
+/// Tier loss EMA threshold above which a tier is considered degraded.
+pub const RADIO_TIER_DEGRADED_LOSS: f64 = 0.5;
 
-/// EMA alpha for spectrum noise floor prediction.
-/// Basis: Welch (1967) — exponential smoothing for spectral estimation.
-pub const RADIO_NOISE_FLOOR_EMA_ALPHA: f64 = 0.15;
+/// EMA alpha for predicted noise floor tracking.
+pub const RADIO_NOISE_FLOOR_EMA_ALPHA: f64 = 0.1;
 
-/// Maximum tracked peers for delta compression state (prevents unbounded memory).
+/// Maximum number of peers tracked for delta compression.
+/// Prevents unbounded memory growth in dense networks.
 pub const RADIO_MAX_DELTA_PEERS: usize = 64;
 
-/// Bandwidth threshold (bytes/sec) below which Broca speech generation is throttled.
-/// Basis: Shannon (1948) — channel capacity limits information throughput.
-pub const RADIO_BANDWIDTH_THROTTLE_THRESHOLD: u64 = 10_000;
+/// Total bandwidth (bytes/s) below which Broca speech rate is throttled.
+/// Science: Shannon (1948) — channel capacity constrains information throughput.
+pub const RADIO_BANDWIDTH_THROTTLE_THRESHOLD: u64 = 500;
 
-/// SwarmManager connectivity modifier when Local tier is down.
-/// Basis: Clark & Chalmers (1998) — extended mind thesis; reduced bandwidth =
-/// reduced cognitive extension to the swarm.
+/// Connectivity penalty when local tier is down (0.0-1.0 multiplier on swarm EMA).
+/// Science: Dunbar (1998) — local network loss degrades social cognition.
 pub const RADIO_CONNECTIVITY_PENALTY_LOCAL_DOWN: f64 = 0.7;
 
-/// SwarmManager connectivity modifier when only Metro (LoRa) is available.
+/// Connectivity penalty when only metro tier remains (greater degradation).
 pub const RADIO_CONNECTIVITY_PENALTY_METRO_ONLY: f64 = 0.4;
+
+/// Default noise floor estimate (dBm) for SpectrumManager initialization.
+/// Science: Typical thermal noise floor for UHF receivers (Johnson-Nyquist noise).
+pub const RADIO_DEFAULT_NOISE_FLOOR_DBM: f64 = -100.0;
+
+/// Normalizer for spectrum prediction error computation.
+/// Science: Maps absolute dBm deviation to [0,1] range (50 dBm = full surprise).
+pub const RADIO_NOISE_ERROR_NORMALIZER: f64 = 50.0;
+
+/// Exploration boost when all radio tiers are down (blackout).
+/// Science: Isolation drives exploration to seek new connections (foraging theory).
+pub const RADIO_BLACKOUT_EXPLORATION_BOOST: f64 = 0.05;
+
+/// Factor applied to max tier loss for learning rate dampening.
+/// Science: Unreliable communication → reduce gradient confidence (Jacobson 1988).
+pub const RADIO_LOSS_LR_DAMPEN_FACTOR: f64 = 0.2;
+
+/// Maximum LR dampening from tier loss (caps reduction at 15%).
+/// Science: Even severe packet loss shouldn't halt learning entirely.
+pub const RADIO_LOSS_LR_DAMPEN_MAX: f64 = 0.15;
+
+/// Spectrum prediction error threshold to trigger surprise signal.
+/// Science: Signal detection theory — only significant deviations are informative.
+pub const RADIO_SPECTRUM_PE_SURPRISE_THRESHOLD: f64 = 0.5;
+
+/// Maximum arousal contribution from spectrum prediction error.
+/// Science: Bounded arousal prevents runaway excitation (Yerkes-Dodson 1908).
+pub const RADIO_SPECTRUM_PE_AROUSAL_MAX: f32 = 0.08;
+
+/// Arousal scale factor for spectrum prediction error.
+/// Science: Linear mapping from PE magnitude to arousal delta.
+pub const RADIO_SPECTRUM_PE_AROUSAL_SCALE: f32 = 0.05;
+
+/// Waterfall ring buffer capacity (spectrum observations kept for pattern detection).
+/// Science: ~64 observations at 53-cycle interval ≈ 3400 cycles of history.
+pub const RADIO_WATERFALL_CAPACITY: usize = 64;
+
+/// Minimum observations to compute waterfall statistics (mean, variance).
+/// Science: Central limit theorem — need ≥8 samples for stable estimates.
+pub const RADIO_WATERFALL_MIN_SAMPLES: usize = 8;
+
+/// Frequency hop cooldown — minimum cycles between frequency changes.
+/// Science: Avoid thrashing; allow SNR to stabilize after a hop (settle time).
+pub const RADIO_HOP_COOLDOWN_CYCLES: u32 = 5;
+
+/// SNR improvement threshold to trigger a frequency hop (dB).
+/// Science: Only hop if predicted SNR gain exceeds measurement noise floor.
+pub const RADIO_HOP_SNR_IMPROVEMENT_DB: f32 = 3.0;
+
+/// Peer discovery beacon interval (cycles between beacon transmissions).
+/// Science: Balance discovery latency vs duty cycle budget (Heinrichs 2003).
+pub const RADIO_BEACON_INTERVAL_CYCLES: u32 = 100;
+
+/// Peer discovery beacon payload size (bytes). Must fit Regional MTU (50 bytes).
+pub const RADIO_BEACON_SIZE: usize = 24;
+
+/// Maximum hops for multi-hop relay routing (TTL).
+/// Science: Prevents routing loops; 4 hops covers typical mesh diameter.
+pub const RADIO_MAX_RELAY_HOPS: u8 = 4;
+
+/// Maximum routing table entries (prevents unbounded memory growth).
+pub const RADIO_MAX_ROUTE_ENTRIES: usize = 128;
+
+/// Route expiry in cycles (stale routes are pruned).
+/// Science: Mobile mesh topology changes — stale routes cause packet loss.
+pub const RADIO_ROUTE_EXPIRY_CYCLES: u64 = 500;
+
+/// FEC overhead ratio for Metro tier (Reed-Solomon parity bytes / data bytes).
+/// Science: RS(255,223) = 14% overhead, corrects up to 16 byte errors.
+pub const RADIO_FEC_OVERHEAD_RATIO: f32 = 0.14;
+
+/// FEC minimum payload size (bytes). Below this, FEC overhead exceeds benefit.
+pub const RADIO_FEC_MIN_PAYLOAD: usize = 32;
+
+/// Energy cost per bit for Wi-Fi (nJ/bit). Based on 802.11n measurements.
+/// Science: Friedman et al. (2013) — measured Wi-Fi energy consumption.
+pub const RADIO_ENERGY_PER_BIT_LOCAL: f64 = 50.0;
+
+/// Energy cost per bit for LoRa (nJ/bit). Based on SX1276 datasheet.
+/// Science: Semtech SX1276 datasheet — ~20 nJ/bit at SF7.
+pub const RADIO_ENERGY_PER_BIT_METRO: f64 = 20.0;
+
+/// Energy cost per bit for HF (nJ/bit). Based on 100W HF at ~50 bps.
+/// Science: Amateur radio power measurements — high power, low throughput.
+pub const RADIO_ENERGY_PER_BIT_REGIONAL: f64 = 2_000_000.0;
+
+/// Energy budget per cycle (nJ). When exhausted, prefer lowest-energy tier.
+/// Science: Bounded energy prevents thermal runaway in embedded systems.
+pub const RADIO_ENERGY_BUDGET_PER_CYCLE: f64 = 100_000_000.0;
+
+/// ChaCha20-Poly1305 nonce size (bytes). Per RFC 8439.
+pub const RADIO_CRYPTO_NONCE_SIZE: usize = 12;
+
+/// Maximum peers in the encryption key table.
+pub const RADIO_CRYPTO_MAX_PEERS: usize = 64;
+
+/// Safety-critical jamming threshold: consecutive jammed observations before escalation.
+/// Science: Military EW doctrine — 3+ consecutive jammed scans = sustained threat (Poisel 2011).
+pub const RADIO_SAFETY_JAMMING_THRESHOLD: u32 = 3;
+
+/// Auto-hop noise floor threshold (dBm above ambient). If noise > ambient + this, auto-hop triggers.
+/// Science: Adaptive frequency hopping in Bluetooth (IEEE 802.15.1) uses 10 dB threshold.
+pub const RADIO_AUTO_HOP_NOISE_THRESHOLD: f64 = 10.0;
+
+/// Confidence boost when a beacon confirms a new peer (~0.01 per new peer).
+/// Science: Social buffering — connected nodes stabilize confidence (Heinrichs et al. 2003).
+pub const RADIO_BEACON_PEER_CONFIDENCE_BOOST: f64 = 0.01;
+
+/// Synthetic SNR for isolated nodes (0 connected peers) — very poor signal.
+/// Science: Represents complete isolation, below jamming threshold.
+pub const RADIO_SYNTHETIC_SNR_ISOLATED: f64 = 3.0;
+
+/// Base synthetic SNR for connected nodes before peer/phi bonuses.
+pub const RADIO_SYNTHETIC_SNR_BASE: f64 = 15.0;
+
+/// Per-peer SNR bonus for synthetic observations (diminishing returns via cap).
+pub const RADIO_SYNTHETIC_SNR_PEER_BONUS: f64 = 1.0;
+
+/// Phi-based SNR bonus: collective consciousness coherence improves signal quality.
+pub const RADIO_SYNTHETIC_SNR_PHI_BONUS: f64 = 5.0;
+
+/// Maximum peers contributing to synthetic SNR bonus (diminishing returns cap).
+pub const RADIO_SYNTHETIC_PEER_CAP: f64 = 10.0;
+
+/// Base noise floor for synthetic observations (dBm).
+pub const RADIO_SYNTHETIC_NOISE_FLOOR_BASE: f64 = -95.0;
+
+/// Noise floor range for random variation in synthetic observations.
+pub const RADIO_SYNTHETIC_NOISE_FLOOR_RANGE: f64 = 10.0;
+
+/// Energy-aware routing activation threshold: fraction of energy budget spent
+/// before switching to energy-efficient tier selection.
+/// Science: Adaptive power management in WSN (Heinzelman et al. 2000, LEACH protocol).
+pub const RADIO_ENERGY_AWARE_THRESHOLD: f64 = 0.5;
+
+/// Exploration dampening when network is in full blackout (all tiers down).
+/// Science: Conservation of resources under extreme stress (Hobfoll 1989).
+pub const RADIO_BLACKOUT_STRATEGY_EXPLORATION_DAMPEN: f32 = 0.15;
+
+/// Exploration dampening when network is degraded (metro-only).
+/// Science: Moderate stress reduces exploratory behavior (Yerkes-Dodson 1908).
+pub const RADIO_DEGRADED_STRATEGY_EXPLORATION_DAMPEN: f32 = 0.05;
+
+/// NE baseline nudge during sustained jamming (≥3 consecutive cycles).
+/// Science: Locus coeruleus NE response to sustained threat (Aston-Jones & Cohen 2005).
+pub const RADIO_JAMMING_NE_NUDGE: f32 = 0.02;
+
+/// DA baseline nudge on network recovery (jamming/degradation → healthy).
+/// Science: Reward prediction error signal on threat resolution (Schultz 1997).
+pub const RADIO_RECOVERY_DA_NUDGE: f32 = 0.015;
+
+/// Minimum consecutive jamming cycles before neuromod coupling activates.
+pub const RADIO_NEUROMOD_JAMMING_MIN_STREAK: u32 = 3;
+
+/// Consciousness-aware tier selection: high-confidence threshold.
+/// Above this, prefer reliable (Local) tier for important transmissions.
+pub const RADIO_CONSCIOUSNESS_HIGH_CONFIDENCE: f64 = 0.7;
+
+/// Consciousness-aware tier selection: low-confidence threshold.
+/// Below this, prefer energy-efficient (Metro) tier to conserve resources.
+pub const RADIO_CONSCIOUSNESS_LOW_CONFIDENCE: f64 = 0.3;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DYNAMICS PHASE — STARTUP GUARDS & MISCELLANEOUS
+// Science: Cognitive systems require warmup before reliable inference.
+// Smaller thresholds gate cheap operations; larger thresholds gate expensive ones.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Flow-state multiplier for confidence crash threshold (×1.5 = more tolerant).
+/// Science: Csikszentmihalyi (1990) — flow tolerates transient perturbation.
+pub const CONFIDENCE_CRASH_FLOW_MULTIPLIER: f64 = 1.5;
+
+/// Minimum cycles before confidence crash detection activates.
+/// Science: Burns & Burns (2008) — early estimates are unreliable (small-sample bias).
+pub const DYNAMICS_STARTUP_WARMUP_CYCLES: usize = 10;
+
+/// Minimum cycles before PE variance, homeostasis recalibration, and
+/// error-level analysis fire. Higher bar for second-order statistics.
+/// Science: Yu & Dayan (2005) — variance estimates need ≥20 samples.
+pub const DYNAMICS_POST_BOOT_CYCLES: usize = 20;
+
+/// Minimum cycles before resonator prediction error influences exploration.
+/// Science: McClelland et al. (1995) — resonator needs initial encoding phase.
+pub const RESONATOR_STARTUP_CYCLES: usize = 5;
+
+/// Minimum absolute neuromod delta to inject (below = noise, skip injection).
+/// Science: Faisal et al. (2008) — neural noise floor; sub-threshold signals waste energy.
+pub const NEUROMOD_DELTA_THRESHOLD: f32 = 0.001;
+
+/// Arousal trap counter threshold before recovery ramp begins.
+/// Science: Yerkes-Dodson (1908) — recovery begins only after sustained hyper-arousal.
+pub const AROUSAL_TRAP_RECOVERY_MIN_CYCLES: u32 = 5;
+
+/// Arousal trap ramp duration (recovery intensity 0→1 over this many cycles after min).
+/// Science: Yerkes-Dodson (1908) — gradual recovery prevents oscillatory relapse.
+pub const AROUSAL_TRAP_RECOVERY_RAMP_CYCLES: f32 = 5.0;
+
+/// Attention sensitivity boost when world-model sensory mismatch detected.
+/// Science: Friston (2010) — hierarchical PE mismatch sharpens attention.
+pub const ATTENTION_SENSITIVITY_BOOST_FACTOR: f32 = 1.08;
+
+/// Exploration dampening when FEP indicates efficient model (accuracy>0.5, complexity<0.5).
+/// Science: Friston (2010) — low complexity = good model evidence → exploit.
+pub const FEP_EFFICIENT_EXPLORATION_DAMPEN: f32 = 0.8;
+
+// ── Fourier Motor Rhythm Injection ───────────────────────────────────────────
+
+/// Alpha-band frequency for motor planning in the Fourier basis injection.
+/// Science: Pfurtscheller (1999) — alpha (8-12 Hz) desynchronization during motor planning.
+pub const FOURIER_MOTOR_ALPHA_HZ: f32 = 8.0;
+
+/// Beta-band frequency for motor execution in the Fourier basis injection.
+/// Science: Pfurtscheller & Lopes da Silva (1999) — beta (13-30 Hz) synchronization
+/// during steady motor output, desynchronization before movement onset.
+pub const FOURIER_MOTOR_BETA_HZ: f32 = 13.0;
+
+/// Low-gamma frequency for fine motor control in the Fourier basis injection.
+/// Science: Crone et al. (1998) — gamma (30-100 Hz) activity in sensorimotor cortex.
+pub const FOURIER_MOTOR_GAMMA_HZ: f32 = 30.0;
+
+/// Amplitude of motor-rhythm Fourier basis injection into equilibrium computation.
+pub const FOURIER_MOTOR_AMPLITUDE: f32 = 0.15;
+
+/// Safety cap on Fourier amplitude.
+pub const FOURIER_AMPLITUDE_MAX: f32 = 0.5;
+
+// ── Central Pattern Generator (CPG) ─────────────────────────────────────────
+
+/// Default Kuramoto coupling strength K.
+/// Science: Kuramoto (1975) — critical coupling for synchronization onset.
+pub const CPG_DEFAULT_COUPLING_K: f64 = 2.0;
+
+/// Arousal-to-frequency modulation gain.
+/// Science: Grillner (2006) — descending drive modulates CPG frequency.
+pub const CPG_AROUSAL_FREQ_SCALE: f64 = 0.5;
+
+/// Minimum Kuramoto order parameter r for walk gait.
+pub const CPG_WALK_MIN_SYNC: f64 = 0.7;
+
+/// Minimum Kuramoto order parameter r for trot gait.
+pub const CPG_TROT_MIN_SYNC: f64 = 0.6;
+
+/// Minimum Kuramoto order parameter r for gallop gait.
+pub const CPG_GALLOP_MIN_SYNC: f64 = 0.4;
+
+/// Critical desynchronization threshold (total motor incoherence).
+pub const CPG_CRITICAL_DESYNC: f64 = 0.2;
+
+/// Exploration boost when CPG is desynchronized during idle.
+/// Science: Grillner (2006) — CPG free-run during rest.
+pub const CPG_DESYNC_EXPLORATION_BOOST: f32 = 0.02;
+
+/// CPG subsystem firing interval (co-prime with 7, 11, 13, 19, 29, 37, 41, 53).
+pub const CPG_INTERVAL: u32 = 59;
+
+// ── Complex CfC Neuron (Phase 3) ────────────────────────────────────────────
+
+/// Minimum real part of eigenvalues (stability bound — must be negative).
+/// Science: Gu et al. (2022) — S4 diagonal state-space models use negative real eigenvalues.
+pub const COMPLEX_CFC_EIGENVALUE_REAL_MIN: f32 = -1.0;
+
+/// Maximum real part of eigenvalues (must be negative for bounded dynamics).
+pub const COMPLEX_CFC_EIGENVALUE_REAL_MAX: f32 = -0.01;
+
+/// Lowest motor-relevant oscillation frequency.
+/// Science: Brown (1911) — CPG locomotion rhythms start at ~1 Hz.
+pub const COMPLEX_CFC_MOTOR_FREQ_MIN_HZ: f32 = 1.0;
+
+/// Highest motor-relevant oscillation frequency (gamma band).
+pub const COMPLEX_CFC_MOTOR_FREQ_MAX_HZ: f32 = 50.0;
+
+/// Eigenvalue learning rate (conservative to prevent constraint violations).
+pub const COMPLEX_CFC_EIGENVALUE_LR: f32 = 0.001;
+
+// ── Spectral Twin Manager (Phase 4) ─────────────────────────────────────────
+
+/// Sample rate for spectral analysis (Hz). Matches measured cognitive loop rate.
+pub const SPECTRAL_SAMPLE_RATE: f64 = 31.0;
+
+/// Ring buffer capacity for CfC state history (cycles).
+/// 128 cycles at 31 Hz = ~4 seconds of state history.
+pub const SPECTRAL_HISTORY_CAPACITY: u32 = 128;
+
+/// Minimum history samples before spectral analysis is meaningful.
+/// Below this, Welch's method doesn't have enough data for stable PSD.
+pub const SPECTRAL_MIN_HISTORY: u32 = 32;
+
+/// Spectral manager firing interval (co-prime with 7,11,13,19,29,37,41,53,59).
+pub const SPECTRAL_INTERVAL: u32 = 67;
+
+/// Relative gamma power threshold for consciousness boost.
+/// When gamma band power exceeds 30% of total, boost confidence.
+/// Science: Gamma oscillations correlate with conscious binding (Crick & Koch 2003).
+pub const SPECTRAL_GAMMA_CONSCIOUSNESS_BOOST: f32 = 0.02;
+
+/// Relative delta power threshold for requesting rest.
+/// When delta exceeds 60% of total, the system is in a "sleep-like" state.
+/// Science: Delta dominance characterizes N3 sleep (Steriade 2006).
+pub const SPECTRAL_DELTA_REST_THRESHOLD: f32 = 0.6;
+
+/// Spectral entropy to exploration scaling.
+/// High entropy (broadband) = rich content = exploration boost.
+/// Science: Spectral entropy correlates with consciousness level (Viertiö-Oja 2004).
+pub const SPECTRAL_ENTROPY_EXPLORATION_SCALE: f32 = 0.01;
+
+/// Theta-gamma PAC threshold for consciousness confidence boost.
+/// Science: Canolty & Knight (2010) — PAC reflects information integration.
+pub const SPECTRAL_PAC_THRESHOLD: f32 = 0.3;
+
+/// Confidence boost when theta-gamma PAC exceeds threshold.
+pub const SPECTRAL_PAC_CONFIDENCE_BOOST: f32 = 0.015;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TESTS
@@ -4260,9 +4629,7 @@ mod tests {
         assert!(HIGH_QUALITY_SCORE_THRESHOLD > 0.5 && HIGH_QUALITY_SCORE_THRESHOLD < 1.0);
         assert!(CONSECUTIVE_HIGH_QUALITY_CYCLES >= 5 && CONSECUTIVE_HIGH_QUALITY_CYCLES <= 50);
         assert!(QUALITY_FLOOR_EXPLORATION_BOOST > 0.0 && QUALITY_FLOOR_EXPLORATION_BOOST < 0.1);
-        assert!(
-            TEMPORAL_BINDING_HIGH_EXPLORE_SCALE > 0.9 && TEMPORAL_BINDING_HIGH_EXPLORE_SCALE < 1.1
-        );
+        assert!(TEMPORAL_BINDING_HIGH_EXPLORE_SCALE > 0.9 && TEMPORAL_BINDING_HIGH_EXPLORE_SCALE < 1.1);
         assert!(GRADIENT_STABLE_DETECT_THRESHOLD > 0.0 && GRADIENT_STABLE_DETECT_THRESHOLD < 0.1);
         assert!(READINESS_REST_THRESHOLD > 0.8 && READINESS_REST_THRESHOLD < 1.0);
         assert!(READINESS_DEGRADED_THRESHOLD > 0.3 && READINESS_DEGRADED_THRESHOLD < 1.0);
@@ -4271,9 +4638,7 @@ mod tests {
         assert!(FATIGUE_RECOVERED_THRESHOLD > 0.0 && FATIGUE_RECOVERED_THRESHOLD < 0.3);
         assert!(GRADIENT_PREDICTION_OK_THRESHOLD > 0.0 && GRADIENT_PREDICTION_OK_THRESHOLD < 0.5);
         // Dynamics phase
-        assert!(
-            RESONATOR_SUSTAINED_LOW_CONFIDENCE > 0.0 && RESONATOR_SUSTAINED_LOW_CONFIDENCE < 0.05
-        );
+        assert!(RESONATOR_SUSTAINED_LOW_CONFIDENCE > 0.0 && RESONATOR_SUSTAINED_LOW_CONFIDENCE < 0.05);
         assert!(BROCA_COHERENT_THRESHOLD > 0.5 && BROCA_COHERENT_THRESHOLD < 1.0);
         assert!(BROCA_COHERENT_CONFIDENCE_SCALE > 0.0 && BROCA_COHERENT_CONFIDENCE_SCALE < 0.5);
         assert!(FEP_ACCURACY_HIGH_CONFIDENCE > 0.0 && FEP_ACCURACY_HIGH_CONFIDENCE < 0.05);
@@ -4286,21 +4651,11 @@ mod tests {
         assert!(ESCALATION_BLOCK_LR_SCALE > 0.0 && ESCALATION_BLOCK_LR_SCALE < 1.0);
         assert!(ESCALATION_THROTTLE_EXPLORATION > 0.0 && ESCALATION_THROTTLE_EXPLORATION < 0.5);
         // Cross-session constants
-        assert!(
-            ALLOSTATIC_LOAD_DAMPEN_INCREMENT_SCALE > 0.0
-                && ALLOSTATIC_LOAD_DAMPEN_INCREMENT_SCALE < 1.0
-        );
-        assert!(
-            METACOGNITIVE_PREDICTION_EMA_DECAY > 0.5 && METACOGNITIVE_PREDICTION_EMA_DECAY < 1.0
-        );
-        assert!(
-            LIMITING_COMPONENT_ATTENTION_SCALE > 0.0 && LIMITING_COMPONENT_ATTENTION_SCALE < 2.0
-        );
+        assert!(ALLOSTATIC_LOAD_DAMPEN_INCREMENT_SCALE > 0.0 && ALLOSTATIC_LOAD_DAMPEN_INCREMENT_SCALE < 1.0);
+        assert!(METACOGNITIVE_PREDICTION_EMA_DECAY > 0.5 && METACOGNITIVE_PREDICTION_EMA_DECAY < 1.0);
+        assert!(LIMITING_COMPONENT_ATTENTION_SCALE > 0.0 && LIMITING_COMPONENT_ATTENTION_SCALE < 2.0);
         assert!(METACOGNITION_DEPTH_NORMALIZER > 1.0 && METACOGNITION_DEPTH_NORMALIZER < 10.0);
-        assert!(
-            KNOWLEDGE_CAUSAL_DEPTH_EXPLOIT_THRESHOLD > 0.0
-                && KNOWLEDGE_CAUSAL_DEPTH_EXPLOIT_THRESHOLD < 10.0
-        );
+        assert!(KNOWLEDGE_CAUSAL_DEPTH_EXPLOIT_THRESHOLD > 0.0 && KNOWLEDGE_CAUSAL_DEPTH_EXPLOIT_THRESHOLD < 10.0);
     }
 
     #[test]
@@ -4311,80 +4666,38 @@ mod tests {
         assert!(HIER_LTC_PHI_CONVERGE_BOOST > 0.0 && HIER_LTC_PHI_CONVERGE_BOOST < 0.2);
         assert!(HIER_LTC_PHI_DIVERGE_THRESHOLD > HIER_LTC_PHI_CONVERGE_THRESHOLD); // diverge > converge
         assert!(HIER_LTC_PHI_DIVERGE_MAX > 0.0 && HIER_LTC_PHI_DIVERGE_MAX < 1.0);
-        assert!(
-            HIER_LTC_PHI_DIVERGE_PENALTY_SCALE > 0.0 && HIER_LTC_PHI_DIVERGE_PENALTY_SCALE < 0.1
-        );
+        assert!(HIER_LTC_PHI_DIVERGE_PENALTY_SCALE > 0.0 && HIER_LTC_PHI_DIVERGE_PENALTY_SCALE < 0.1);
 
         // Evolution coordinator
-        assert!(
-            EVOLUTION_POSITIVE_DELTA_THRESHOLD > 0.0 && EVOLUTION_POSITIVE_DELTA_THRESHOLD < 0.1
-        );
+        assert!(EVOLUTION_POSITIVE_DELTA_THRESHOLD > 0.0 && EVOLUTION_POSITIVE_DELTA_THRESHOLD < 0.1);
         assert!(EVOLUTION_POSITIVE_LR_SCALE > 0.0 && EVOLUTION_POSITIVE_LR_SCALE < 1.0);
-        assert!(
-            EVOLUTION_POSITIVE_LR_CLAMP > 0.0
-                && EVOLUTION_POSITIVE_LR_CLAMP <= EVOLUTION_POSITIVE_LR_SCALE
-        );
+        assert!(EVOLUTION_POSITIVE_LR_CLAMP > 0.0 && EVOLUTION_POSITIVE_LR_CLAMP <= EVOLUTION_POSITIVE_LR_SCALE);
         assert!(EVOLUTION_POSITIVE_CONF_SCALE > 0.0 && EVOLUTION_POSITIVE_CONF_SCALE < 0.5);
-        assert!(
-            EVOLUTION_POSITIVE_CONF_CLAMP > 0.0
-                && EVOLUTION_POSITIVE_CONF_CLAMP <= EVOLUTION_POSITIVE_CONF_SCALE
-        );
-        assert!(
-            EVOLUTION_NEGATIVE_DELTA_THRESHOLD < 0.0 && EVOLUTION_NEGATIVE_DELTA_THRESHOLD > -0.1
-        );
+        assert!(EVOLUTION_POSITIVE_CONF_CLAMP > 0.0 && EVOLUTION_POSITIVE_CONF_CLAMP <= EVOLUTION_POSITIVE_CONF_SCALE);
+        assert!(EVOLUTION_NEGATIVE_DELTA_THRESHOLD < 0.0 && EVOLUTION_NEGATIVE_DELTA_THRESHOLD > -0.1);
         assert!(EVOLUTION_NEGATIVE_EXPLORE_SCALE > 0.0 && EVOLUTION_NEGATIVE_EXPLORE_SCALE < 0.5);
-        assert!(
-            EVOLUTION_NEGATIVE_EXPLORE_CLAMP > 0.0
-                && EVOLUTION_NEGATIVE_EXPLORE_CLAMP <= EVOLUTION_NEGATIVE_EXPLORE_SCALE
-        );
+        assert!(EVOLUTION_NEGATIVE_EXPLORE_CLAMP > 0.0 && EVOLUTION_NEGATIVE_EXPLORE_CLAMP <= EVOLUTION_NEGATIVE_EXPLORE_SCALE);
 
         // Holographic
-        assert!(
-            HOLOGRAPHIC_UNITY_CONFIDENCE_THRESHOLD > 0.3
-                && HOLOGRAPHIC_UNITY_CONFIDENCE_THRESHOLD < 1.0
-        );
-        assert!(
-            HOLOGRAPHIC_UNITY_CONFIDENCE_SCALE > 0.0 && HOLOGRAPHIC_UNITY_CONFIDENCE_SCALE < 0.2
-        );
-        assert!(
-            HOLOGRAPHIC_BINDING_STRONG_THRESHOLD > 0.3
-                && HOLOGRAPHIC_BINDING_STRONG_THRESHOLD < 1.0
-        );
+        assert!(HOLOGRAPHIC_UNITY_CONFIDENCE_THRESHOLD > 0.3 && HOLOGRAPHIC_UNITY_CONFIDENCE_THRESHOLD < 1.0);
+        assert!(HOLOGRAPHIC_UNITY_CONFIDENCE_SCALE > 0.0 && HOLOGRAPHIC_UNITY_CONFIDENCE_SCALE < 0.2);
+        assert!(HOLOGRAPHIC_BINDING_STRONG_THRESHOLD > 0.3 && HOLOGRAPHIC_BINDING_STRONG_THRESHOLD < 1.0);
         assert!(HOLOGRAPHIC_BINDING_STRONG_LR > 1.0 && HOLOGRAPHIC_BINDING_STRONG_LR < 1.1);
-        assert!(
-            HOLOGRAPHIC_BINDING_WEAK_UPPER > 0.0
-                && HOLOGRAPHIC_BINDING_WEAK_UPPER < HOLOGRAPHIC_BINDING_STRONG_THRESHOLD
-        );
+        assert!(HOLOGRAPHIC_BINDING_WEAK_UPPER > 0.0 && HOLOGRAPHIC_BINDING_WEAK_UPPER < HOLOGRAPHIC_BINDING_STRONG_THRESHOLD);
         assert!(HOLOGRAPHIC_BINDING_WEAK_LR > 0.9 && HOLOGRAPHIC_BINDING_WEAK_LR < 1.0);
 
         // Differentiable consciousness
-        assert!(
-            DIFF_CONSCIOUSNESS_WORKSPACE_SCALE > 0.5 && DIFF_CONSCIOUSNESS_WORKSPACE_SCALE < 1.0
-        );
-        assert!(
-            DIFF_CONSCIOUSNESS_RECURSION_DEFAULT > 0.0
-                && DIFF_CONSCIOUSNESS_RECURSION_DEFAULT < 1.0
-        );
+        assert!(DIFF_CONSCIOUSNESS_WORKSPACE_SCALE > 0.5 && DIFF_CONSCIOUSNESS_WORKSPACE_SCALE < 1.0);
+        assert!(DIFF_CONSCIOUSNESS_RECURSION_DEFAULT > 0.0 && DIFF_CONSCIOUSNESS_RECURSION_DEFAULT < 1.0);
 
         // Consciousness gradient
-        assert!(
-            CONSCIOUSNESS_GRADIENT_EXPLORE_THRESHOLD > 0.0
-                && CONSCIOUSNESS_GRADIENT_EXPLORE_THRESHOLD < 1.0
-        );
-        assert!(
-            CONSCIOUSNESS_GRADIENT_EXPLORE_SCALE > 0.0
-                && CONSCIOUSNESS_GRADIENT_EXPLORE_SCALE < 0.2
-        );
+        assert!(CONSCIOUSNESS_GRADIENT_EXPLORE_THRESHOLD > 0.0 && CONSCIOUSNESS_GRADIENT_EXPLORE_THRESHOLD < 1.0);
+        assert!(CONSCIOUSNESS_GRADIENT_EXPLORE_SCALE > 0.0 && CONSCIOUSNESS_GRADIENT_EXPLORE_SCALE < 0.2);
 
         // Affective consciousness
         assert!(AFFECTIVE_DECAY_RATE > 0.0 && AFFECTIVE_DECAY_RATE < 0.2);
-        assert!(
-            AFFECTIVE_NEGATIVE_VALENCE_THRESHOLD < 0.0
-                && AFFECTIVE_NEGATIVE_VALENCE_THRESHOLD > -1.0
-        );
-        assert!(
-            AFFECTIVE_NEGATIVE_CONFIDENCE_SCALE > 0.0 && AFFECTIVE_NEGATIVE_CONFIDENCE_SCALE < 0.1
-        );
+        assert!(AFFECTIVE_NEGATIVE_VALENCE_THRESHOLD < 0.0 && AFFECTIVE_NEGATIVE_VALENCE_THRESHOLD > -1.0);
+        assert!(AFFECTIVE_NEGATIVE_CONFIDENCE_SCALE > 0.0 && AFFECTIVE_NEGATIVE_CONFIDENCE_SCALE < 0.1);
 
         // Synthetic grounding + epistemic gate
         assert!(SYNTHETIC_GROUNDING_SIM_THRESHOLD > 0.0 && SYNTHETIC_GROUNDING_SIM_THRESHOLD < 0.5);
@@ -4393,54 +4706,31 @@ mod tests {
 
         // Primitive validation
         assert!(PRIMITIVE_VALIDATION_P_THRESHOLD > 0.0 && PRIMITIVE_VALIDATION_P_THRESHOLD < 0.1);
-        assert!(
-            PRIMITIVE_VALIDATION_POSITIVE_LR_SCALE > 0.0
-                && PRIMITIVE_VALIDATION_POSITIVE_LR_SCALE < 0.1
-        );
+        assert!(PRIMITIVE_VALIDATION_POSITIVE_LR_SCALE > 0.0 && PRIMITIVE_VALIDATION_POSITIVE_LR_SCALE < 0.1);
         assert!(PRIMITIVE_VALIDATION_POSITIVE_LR_CLAMP >= PRIMITIVE_VALIDATION_POSITIVE_LR_SCALE);
         assert!(PRIMITIVE_VALIDATION_NEGATIVE_LR > 0.9 && PRIMITIVE_VALIDATION_NEGATIVE_LR < 1.0);
 
         // Cross-module feedback
         assert!(CONSCIOUSNESS_STATE_LOW_URGENCY > 0.0 && CONSCIOUSNESS_STATE_LOW_URGENCY < 0.5);
-        assert!(
-            GRADIENT_STRONG_DIRECTION_THRESHOLD > 0.5 && GRADIENT_STRONG_DIRECTION_THRESHOLD < 2.0
-        );
+        assert!(GRADIENT_STRONG_DIRECTION_THRESHOLD > 0.5 && GRADIENT_STRONG_DIRECTION_THRESHOLD < 2.0);
         assert!(GRADIENT_STRONG_BOREDOM_REDUCE > 0.0 && GRADIENT_STRONG_BOREDOM_REDUCE < 0.2);
-        assert!(
-            GRADIENT_PLATEAU_UPPER > 0.0
-                && GRADIENT_PLATEAU_UPPER < GRADIENT_STRONG_DIRECTION_THRESHOLD
-        );
-        assert!(
-            GRADIENT_PLATEAU_BOREDOM_INCREMENT > 0.0 && GRADIENT_PLATEAU_BOREDOM_INCREMENT < 0.1
-        );
+        assert!(GRADIENT_PLATEAU_UPPER > 0.0 && GRADIENT_PLATEAU_UPPER < GRADIENT_STRONG_DIRECTION_THRESHOLD);
+        assert!(GRADIENT_PLATEAU_BOREDOM_INCREMENT > 0.0 && GRADIENT_PLATEAU_BOREDOM_INCREMENT < 0.1);
 
         // Holographic unity LR modulation
         assert!(HOLOGRAPHIC_UNITY_LR_BOOST_THRESHOLD > HOLOGRAPHIC_UNITY_CONFIDENCE_THRESHOLD);
         assert!(HOLOGRAPHIC_UNITY_LR_BOOST_FACTOR > 1.0 && HOLOGRAPHIC_UNITY_LR_BOOST_FACTOR < 1.1);
         assert!(HOLOGRAPHIC_UNITY_LR_CLAMP_LOW > 0.5 && HOLOGRAPHIC_UNITY_LR_CLAMP_LOW < 1.0);
         assert!(HOLOGRAPHIC_UNITY_LR_CLAMP_HIGH > 1.0 && HOLOGRAPHIC_UNITY_LR_CLAMP_HIGH < 2.0);
-        assert!(
-            HOLOGRAPHIC_UNITY_LR_DAMPEN_THRESHOLD > 0.0
-                && HOLOGRAPHIC_UNITY_LR_DAMPEN_THRESHOLD < 0.5
-        );
-        assert!(
-            HOLOGRAPHIC_UNITY_LR_DAMPEN_FACTOR > 0.9 && HOLOGRAPHIC_UNITY_LR_DAMPEN_FACTOR < 1.0
-        );
+        assert!(HOLOGRAPHIC_UNITY_LR_DAMPEN_THRESHOLD > 0.0 && HOLOGRAPHIC_UNITY_LR_DAMPEN_THRESHOLD < 0.5);
+        assert!(HOLOGRAPHIC_UNITY_LR_DAMPEN_FACTOR > 0.9 && HOLOGRAPHIC_UNITY_LR_DAMPEN_FACTOR < 1.0);
 
         // Pipeline consciousness
-        assert!(
-            PIPELINE_CONSCIOUSNESS_EPISTEMIC_THRESHOLD > 0.5
-                && PIPELINE_CONSCIOUSNESS_EPISTEMIC_THRESHOLD < 1.0
-        );
-        assert!(
-            PIPELINE_CONSCIOUSNESS_EPISTEMIC_NUDGE > 0.0
-                && PIPELINE_CONSCIOUSNESS_EPISTEMIC_NUDGE < 0.1
-        );
+        assert!(PIPELINE_CONSCIOUSNESS_EPISTEMIC_THRESHOLD > 0.5 && PIPELINE_CONSCIOUSNESS_EPISTEMIC_THRESHOLD < 1.0);
+        assert!(PIPELINE_CONSCIOUSNESS_EPISTEMIC_NUDGE > 0.0 && PIPELINE_CONSCIOUSNESS_EPISTEMIC_NUDGE < 0.1);
 
         // Meta-reasoning
-        assert!(
-            META_REASONING_CONFIDENCE_THRESHOLD > 0.5 && META_REASONING_CONFIDENCE_THRESHOLD < 1.0
-        );
+        assert!(META_REASONING_CONFIDENCE_THRESHOLD > 0.5 && META_REASONING_CONFIDENCE_THRESHOLD < 1.0);
         assert!(META_REASONING_LR_BOOST_SCALE > 0.0 && META_REASONING_LR_BOOST_SCALE < 0.5);
 
         // Empathic compassion
@@ -4453,16 +4743,9 @@ mod tests {
     #[test]
     fn test_hotpath_remaining_constants() {
         // Knowledge grounding weights sum to 1.0
-        let weight_sum =
-            KNOWLEDGE_GROUNDING_RELEVANCE_WEIGHT + KNOWLEDGE_GROUNDING_CERTAINTY_WEIGHT;
-        assert!(
-            (weight_sum - 1.0).abs() < 1e-6,
-            "Grounding weights must sum to 1.0"
-        );
-        assert!(
-            KNOWLEDGE_GROUNDING_RELEVANCE_WEIGHT > 0.0
-                && KNOWLEDGE_GROUNDING_RELEVANCE_WEIGHT < 1.0
-        );
+        let weight_sum = KNOWLEDGE_GROUNDING_RELEVANCE_WEIGHT + KNOWLEDGE_GROUNDING_CERTAINTY_WEIGHT;
+        assert!((weight_sum - 1.0).abs() < 1e-6, "Grounding weights must sum to 1.0");
+        assert!(KNOWLEDGE_GROUNDING_RELEVANCE_WEIGHT > 0.0 && KNOWLEDGE_GROUNDING_RELEVANCE_WEIGHT < 1.0);
 
         // Phi scale boost sigmoid
         assert!(PHI_SCALE_BOOST_MAX_AMPLITUDE > 0.0 && PHI_SCALE_BOOST_MAX_AMPLITUDE < 0.5);
@@ -4470,14 +4753,8 @@ mod tests {
         assert!(PHI_SCALE_BOOST_CV_CENTER > 0.0);
 
         // Resonator consolidation
-        assert!(
-            RESONATOR_CONSOLIDATION_PRECISION_SCALE > 0.0
-                && RESONATOR_CONSOLIDATION_PRECISION_SCALE < 0.5
-        );
-        assert!(
-            RESONATOR_CONSOLIDATION_PRECISION_MAX > 1.0
-                && RESONATOR_CONSOLIDATION_PRECISION_MAX < 5.0
-        );
+        assert!(RESONATOR_CONSOLIDATION_PRECISION_SCALE > 0.0 && RESONATOR_CONSOLIDATION_PRECISION_SCALE < 0.5);
+        assert!(RESONATOR_CONSOLIDATION_PRECISION_MAX > 1.0 && RESONATOR_CONSOLIDATION_PRECISION_MAX < 5.0);
 
         // Goal LR
         assert!(GOAL_PRIORITY_LR_SCALE > 0.0 && GOAL_PRIORITY_LR_SCALE < 0.5);
@@ -4485,9 +4762,7 @@ mod tests {
         // Confidence crash
         assert!(CONFIDENCE_CRASH_MIN_PRIOR > 0.0 && CONFIDENCE_CRASH_MIN_PRIOR < 0.5);
         assert!(MODE_STABILITY_GRACE_THRESHOLD >= 1 && MODE_STABILITY_GRACE_THRESHOLD <= 10);
-        assert!(
-            CONFIDENCE_CRASH_LIGHT_FREEZE_CYCLES >= 1 && CONFIDENCE_CRASH_LIGHT_FREEZE_CYCLES <= 5
-        );
+        assert!(CONFIDENCE_CRASH_LIGHT_FREEZE_CYCLES >= 1 && CONFIDENCE_CRASH_LIGHT_FREEZE_CYCLES <= 5);
 
         // Social trust
         assert!(SOCIAL_TRUST_ITHOU_THRESHOLD > 0.0 && SOCIAL_TRUST_ITHOU_THRESHOLD < 1.0);
@@ -4499,42 +4774,12 @@ mod tests {
 
         // MCTS normalization
         let norm_sum = MCTS_EFFECTIVENESS_NORM_SCALE + MCTS_EFFECTIVENESS_NORM_OFFSET;
-        assert!(
-            (norm_sum - 1.0).abs() < 1e-6,
-            "MCTS norm scale+offset should map max to 1.0"
-        );
+        assert!((norm_sum - 1.0).abs() < 1e-6, "MCTS norm scale+offset should map max to 1.0");
 
         // Voice heartbeat
         assert!(VOICE_HEARTBEAT_BASE_RATE > 1.0 && VOICE_HEARTBEAT_BASE_RATE < 10.0);
-        assert!(
-            VOICE_HEARTBEAT_COARTICULATION_WEIGHT > 0.0
-                && VOICE_HEARTBEAT_COARTICULATION_WEIGHT < 1.0
-        );
+        assert!(VOICE_HEARTBEAT_COARTICULATION_WEIGHT > 0.0 && VOICE_HEARTBEAT_COARTICULATION_WEIGHT < 1.0);
         assert!(VOICE_HEARTBEAT_LISTENER_SUCCESS > VOICE_HEARTBEAT_LISTENER_FAIL);
-    }
-
-    #[test]
-    fn test_radio_spectrum_params() {
-        assert!(
-            RADIO_JAMMING_SNR_THRESHOLD < 0.0,
-            "jamming SNR must be negative"
-        );
-        assert!(RADIO_JAMMING_AROUSAL_SPIKE > 0.0 && RADIO_JAMMING_AROUSAL_SPIKE < 0.5);
-        assert!(RADIO_JAMMING_EXPLORATION_BOOST > 0.0 && RADIO_JAMMING_EXPLORATION_BOOST < 0.5);
-        assert!(RADIO_DEGRADATION_CONFIDENCE_DROP > 0.0 && RADIO_DEGRADATION_CONFIDENCE_DROP < 0.1);
-        assert!(RADIO_TIER_LOSS_EMA_ALPHA > 0.0 && RADIO_TIER_LOSS_EMA_ALPHA < 1.0);
-        assert!(RADIO_TIER_DEGRADED_LOSS > 0.0 && RADIO_TIER_DEGRADED_LOSS < 1.0);
-        assert!(RADIO_NOISE_FLOOR_EMA_ALPHA > 0.0 && RADIO_NOISE_FLOOR_EMA_ALPHA < 1.0);
-        assert!(RADIO_MAX_DELTA_PEERS >= 8 && RADIO_MAX_DELTA_PEERS <= 256);
-        assert!(RADIO_BANDWIDTH_THROTTLE_THRESHOLD > 0);
-        assert!(
-            RADIO_CONNECTIVITY_PENALTY_LOCAL_DOWN > 0.0
-                && RADIO_CONNECTIVITY_PENALTY_LOCAL_DOWN < 1.0
-        );
-        assert!(
-            RADIO_CONNECTIVITY_PENALTY_METRO_ONLY > 0.0
-                && RADIO_CONNECTIVITY_PENALTY_METRO_ONLY < RADIO_CONNECTIVITY_PENALTY_LOCAL_DOWN
-        );
     }
 
     #[test]
@@ -4542,37 +4787,174 @@ mod tests {
         // Persistence
         assert!(KNOWLEDGE_SAVE_INTERVAL >= 100 && KNOWLEDGE_SAVE_INTERVAL <= 5000);
         // Consciousness coupling
-        assert!(
-            KNOWLEDGE_CONSCIOUSNESS_MODULATION > 0.0 && KNOWLEDGE_CONSCIOUSNESS_MODULATION < 0.1
-        );
+        assert!(KNOWLEDGE_CONSCIOUSNESS_MODULATION > 0.0 && KNOWLEDGE_CONSCIOUSNESS_MODULATION < 0.1);
         // Dream consolidation
-        assert!(
-            KNOWLEDGE_FORGET_CONFIDENCE_THRESHOLD > 0.0
-                && KNOWLEDGE_FORGET_CONFIDENCE_THRESHOLD < 0.5
-        );
+        assert!(KNOWLEDGE_FORGET_CONFIDENCE_THRESHOLD > 0.0 && KNOWLEDGE_FORGET_CONFIDENCE_THRESHOLD < 0.5);
         assert!(KNOWLEDGE_CONSOLIDATION_BOOST > 0.0 && KNOWLEDGE_CONSOLIDATION_BOOST < 0.2);
         // Causal depth exploitation
         assert!(KNOWLEDGE_CAUSAL_DEPTH_EXPLOIT_THRESHOLD > 0.0);
-        assert!(
-            KNOWLEDGE_CAUSAL_DEPTH_EXPLORE_DAMPEN > 0.0
-                && KNOWLEDGE_CAUSAL_DEPTH_EXPLORE_DAMPEN < 0.5
-        );
+        assert!(KNOWLEDGE_CAUSAL_DEPTH_EXPLORE_DAMPEN > 0.0 && KNOWLEDGE_CAUSAL_DEPTH_EXPLORE_DAMPEN < 0.5);
         // Contradiction boosts
         assert!(KNOWLEDGE_CONTRADICTION_NE_BOOST > 0.0 && KNOWLEDGE_CONTRADICTION_NE_BOOST < 0.1);
         assert!(KNOWLEDGE_CONTRADICTION_SHT_BOOST > 0.0 && KNOWLEDGE_CONTRADICTION_SHT_BOOST < 0.1);
         // Neuromod coupling
-        assert!(KNOWLEDGE_UNCERTAINTY_NE_SCALE > 0.0 && KNOWLEDGE_UNCERTAINTY_NE_SCALE < 0.05);
-        assert!(KNOWLEDGE_CAUSAL_DEPTH_DA_NUDGE > 0.0 && KNOWLEDGE_CAUSAL_DEPTH_DA_NUDGE < 0.05);
-        assert!(KNOWLEDGE_GROUNDING_SHT_NUDGE > 0.0 && KNOWLEDGE_GROUNDING_SHT_NUDGE < 0.02);
-        // Exploration
-        assert!(KNOWLEDGE_NOVELTY_EXPLORE_SCALE > 0.0 && KNOWLEDGE_NOVELTY_EXPLORE_SCALE < 0.2);
+        assert!(KNOWLEDGE_UNCERTAINTY_NE_SCALE > 0.0 && KNOWLEDGE_UNCERTAINTY_NE_SCALE < 0.1);
+        assert!(KNOWLEDGE_CAUSAL_DEPTH_DA_NUDGE > 0.0 && KNOWLEDGE_CAUSAL_DEPTH_DA_NUDGE < 0.1);
+        assert!(KNOWLEDGE_GROUNDING_SHT_NUDGE > 0.0 && KNOWLEDGE_GROUNDING_SHT_NUDGE < 0.1);
+        // Exploration modulation
+        assert!(KNOWLEDGE_NOVELTY_EXPLORE_SCALE > 0.0 && KNOWLEDGE_NOVELTY_EXPLORE_SCALE < 0.5);
         // Episodic bridge
-        assert!(KNOWLEDGE_EPISODIC_SALIENCE_BOOST > 0.0 && KNOWLEDGE_EPISODIC_SALIENCE_BOOST < 0.5);
+        assert!(KNOWLEDGE_EPISODIC_SALIENCE_BOOST > 0.0 && KNOWLEDGE_EPISODIC_SALIENCE_BOOST < 1.0);
         assert!(KNOWLEDGE_EPISODIC_MAX_PER_DREAM > 0 && KNOWLEDGE_EPISODIC_MAX_PER_DREAM <= 20);
-        // Contradiction resolution
-        assert!(
-            KNOWLEDGE_CONTRADICTION_RESOLUTION_THRESHOLD > 0.5
-                && KNOWLEDGE_CONTRADICTION_RESOLUTION_THRESHOLD < 1.0
-        );
+        // AGM contradiction resolution
+        assert!(KNOWLEDGE_CONTRADICTION_RESOLUTION_THRESHOLD > 0.5 && KNOWLEDGE_CONTRADICTION_RESOLUTION_THRESHOLD <= 1.0);
+    }
+
+    #[test]
+    fn test_radio_spectrum_params() {
+        // Jamming
+        assert!(RADIO_JAMMING_SNR_THRESHOLD > 0.0 && RADIO_JAMMING_SNR_THRESHOLD < 20.0);
+        assert!(RADIO_JAMMING_AROUSAL_SPIKE > 0.0 && RADIO_JAMMING_AROUSAL_SPIKE < 0.2);
+        assert!(RADIO_JAMMING_EXPLORATION_BOOST > 0.0 && RADIO_JAMMING_EXPLORATION_BOOST < 0.1);
+        // Degradation
+        assert!(RADIO_DEGRADATION_CONFIDENCE_DROP > 0.0 && RADIO_DEGRADATION_CONFIDENCE_DROP < 0.1);
+        // EMA alphas
+        assert!(RADIO_TIER_LOSS_EMA_ALPHA > 0.0 && RADIO_TIER_LOSS_EMA_ALPHA < 1.0);
+        assert!(RADIO_NOISE_FLOOR_EMA_ALPHA > 0.0 && RADIO_NOISE_FLOOR_EMA_ALPHA < 1.0);
+        // Tier degraded threshold
+        assert!(RADIO_TIER_DEGRADED_LOSS > 0.0 && RADIO_TIER_DEGRADED_LOSS < 1.0);
+        // Peer cap
+        assert!(RADIO_MAX_DELTA_PEERS > 0 && RADIO_MAX_DELTA_PEERS <= 256);
+        // Bandwidth throttle
+        assert!(RADIO_BANDWIDTH_THROTTLE_THRESHOLD > 0);
+        // Connectivity penalties
+        assert!(RADIO_CONNECTIVITY_PENALTY_LOCAL_DOWN > 0.0 && RADIO_CONNECTIVITY_PENALTY_LOCAL_DOWN < 1.0);
+        assert!(RADIO_CONNECTIVITY_PENALTY_METRO_ONLY > 0.0 && RADIO_CONNECTIVITY_PENALTY_METRO_ONLY < RADIO_CONNECTIVITY_PENALTY_LOCAL_DOWN);
+        // Noise floor and PE
+        assert!(RADIO_DEFAULT_NOISE_FLOOR_DBM < 0.0);
+        assert!(RADIO_NOISE_ERROR_NORMALIZER > 0.0);
+        assert!(RADIO_BLACKOUT_EXPLORATION_BOOST > 0.0 && RADIO_BLACKOUT_EXPLORATION_BOOST < 0.2);
+        assert!(RADIO_LOSS_LR_DAMPEN_FACTOR > 0.0 && RADIO_LOSS_LR_DAMPEN_FACTOR < 1.0);
+        assert!(RADIO_LOSS_LR_DAMPEN_MAX > 0.0 && RADIO_LOSS_LR_DAMPEN_MAX < 1.0);
+        assert!(RADIO_SPECTRUM_PE_SURPRISE_THRESHOLD > 0.0 && RADIO_SPECTRUM_PE_SURPRISE_THRESHOLD < 1.0);
+        assert!(RADIO_SPECTRUM_PE_AROUSAL_MAX > 0.0 && RADIO_SPECTRUM_PE_AROUSAL_MAX < 0.5);
+        assert!(RADIO_SPECTRUM_PE_AROUSAL_SCALE > 0.0 && RADIO_SPECTRUM_PE_AROUSAL_SCALE < RADIO_SPECTRUM_PE_AROUSAL_MAX);
+        // Waterfall
+        assert!(RADIO_WATERFALL_CAPACITY >= 16 && RADIO_WATERFALL_CAPACITY <= 256);
+        assert!(RADIO_WATERFALL_MIN_SAMPLES >= 4 && RADIO_WATERFALL_MIN_SAMPLES < RADIO_WATERFALL_CAPACITY);
+        // Frequency hopping
+        assert!(RADIO_HOP_COOLDOWN_CYCLES > 0 && RADIO_HOP_COOLDOWN_CYCLES <= 20);
+        assert!(RADIO_HOP_SNR_IMPROVEMENT_DB > 0.0 && RADIO_HOP_SNR_IMPROVEMENT_DB < 20.0);
+        // Peer discovery
+        assert!(RADIO_BEACON_INTERVAL_CYCLES > 0);
+        assert!(RADIO_BEACON_SIZE <= 50); // Must fit Regional MTU
+        // Relay routing
+        assert!(RADIO_MAX_RELAY_HOPS > 0 && RADIO_MAX_RELAY_HOPS <= 8);
+        assert!(RADIO_MAX_ROUTE_ENTRIES > 0 && RADIO_MAX_ROUTE_ENTRIES <= 512);
+        assert!(RADIO_ROUTE_EXPIRY_CYCLES > 0);
+        // FEC
+        assert!(RADIO_FEC_OVERHEAD_RATIO > 0.0 && RADIO_FEC_OVERHEAD_RATIO < 0.5);
+        assert!(RADIO_FEC_MIN_PAYLOAD > 0 && RADIO_FEC_MIN_PAYLOAD < 256);
+        // Energy
+        assert!(RADIO_ENERGY_PER_BIT_LOCAL > 0.0);
+        assert!(RADIO_ENERGY_PER_BIT_METRO > 0.0);
+        assert!(RADIO_ENERGY_PER_BIT_REGIONAL > RADIO_ENERGY_PER_BIT_METRO); // HF is most expensive
+        assert!(RADIO_ENERGY_PER_BIT_LOCAL > RADIO_ENERGY_PER_BIT_METRO); // Wi-Fi > LoRa
+        assert!(RADIO_ENERGY_BUDGET_PER_CYCLE > 0.0);
+        // Crypto
+        assert_eq!(RADIO_CRYPTO_NONCE_SIZE, 12); // RFC 8439
+        assert!(RADIO_CRYPTO_MAX_PEERS > 0 && RADIO_CRYPTO_MAX_PEERS <= 256);
+
+        // Safety & hop thresholds
+        assert!(RADIO_SAFETY_JAMMING_THRESHOLD > 0 && RADIO_SAFETY_JAMMING_THRESHOLD <= 10);
+        assert!(RADIO_AUTO_HOP_NOISE_THRESHOLD > 0.0 && RADIO_AUTO_HOP_NOISE_THRESHOLD < 30.0);
+        assert!(RADIO_BEACON_PEER_CONFIDENCE_BOOST > 0.0 && RADIO_BEACON_PEER_CONFIDENCE_BOOST < 0.1);
+
+        // Synthetic observation bounds
+        assert!(RADIO_SYNTHETIC_SNR_ISOLATED > 0.0 && RADIO_SYNTHETIC_SNR_ISOLATED < RADIO_SYNTHETIC_SNR_BASE);
+        assert!(RADIO_SYNTHETIC_SNR_BASE > 0.0);
+        assert!(RADIO_SYNTHETIC_SNR_PEER_BONUS > 0.0 && RADIO_SYNTHETIC_SNR_PEER_BONUS < 5.0);
+        assert!(RADIO_SYNTHETIC_SNR_PHI_BONUS > 0.0 && RADIO_SYNTHETIC_SNR_PHI_BONUS < 20.0);
+        assert!(RADIO_SYNTHETIC_PEER_CAP > 0.0 && RADIO_SYNTHETIC_PEER_CAP <= 50.0);
+        assert!(RADIO_SYNTHETIC_NOISE_FLOOR_BASE < 0.0);
+        assert!(RADIO_SYNTHETIC_NOISE_FLOOR_RANGE > 0.0 && RADIO_SYNTHETIC_NOISE_FLOOR_RANGE < 30.0);
+
+        // Energy-aware routing
+        assert!(RADIO_ENERGY_AWARE_THRESHOLD > 0.0 && RADIO_ENERGY_AWARE_THRESHOLD < 1.0);
+
+        // Strategy dampening: blackout > degraded
+        assert!(RADIO_BLACKOUT_STRATEGY_EXPLORATION_DAMPEN > RADIO_DEGRADED_STRATEGY_EXPLORATION_DAMPEN);
+        assert!(RADIO_BLACKOUT_STRATEGY_EXPLORATION_DAMPEN > 0.0 && RADIO_BLACKOUT_STRATEGY_EXPLORATION_DAMPEN < 0.5);
+        assert!(RADIO_DEGRADED_STRATEGY_EXPLORATION_DAMPEN > 0.0 && RADIO_DEGRADED_STRATEGY_EXPLORATION_DAMPEN < 0.3);
+
+        // Neuromod coupling
+        assert!(RADIO_JAMMING_NE_NUDGE > 0.0 && RADIO_JAMMING_NE_NUDGE < 0.1);
+        assert!(RADIO_RECOVERY_DA_NUDGE > 0.0 && RADIO_RECOVERY_DA_NUDGE < 0.1);
+        assert!(RADIO_NEUROMOD_JAMMING_MIN_STREAK > 0 && RADIO_NEUROMOD_JAMMING_MIN_STREAK <= RADIO_SAFETY_JAMMING_THRESHOLD);
+
+        // Consciousness tier thresholds
+        assert!(RADIO_CONSCIOUSNESS_HIGH_CONFIDENCE > RADIO_CONSCIOUSNESS_LOW_CONFIDENCE);
+        assert!(RADIO_CONSCIOUSNESS_HIGH_CONFIDENCE > 0.0 && RADIO_CONSCIOUSNESS_HIGH_CONFIDENCE < 1.0);
+        assert!(RADIO_CONSCIOUSNESS_LOW_CONFIDENCE > 0.0 && RADIO_CONSCIOUSNESS_LOW_CONFIDENCE < 1.0);
+
+        // Beacon interval must exceed hop cooldown
+        assert!(RADIO_BEACON_INTERVAL_CYCLES > RADIO_HOP_COOLDOWN_CYCLES);
+    }
+
+    #[test]
+    fn test_dynamics_startup_constants() {
+        assert!(CONFIDENCE_CRASH_FLOW_MULTIPLIER > 1.0_f64 && CONFIDENCE_CRASH_FLOW_MULTIPLIER < 3.0_f64);
+        assert!(DYNAMICS_STARTUP_WARMUP_CYCLES > 0 && DYNAMICS_STARTUP_WARMUP_CYCLES <= 50);
+        assert!(DYNAMICS_POST_BOOT_CYCLES > DYNAMICS_STARTUP_WARMUP_CYCLES);
+        assert!(RESONATOR_STARTUP_CYCLES > 0 && RESONATOR_STARTUP_CYCLES <= DYNAMICS_STARTUP_WARMUP_CYCLES);
+        assert!(NEUROMOD_DELTA_THRESHOLD > 0.0 && NEUROMOD_DELTA_THRESHOLD < 0.01);
+        assert!(AROUSAL_TRAP_RECOVERY_MIN_CYCLES > 0);
+        assert!(AROUSAL_TRAP_RECOVERY_RAMP_CYCLES > 0.0);
+        assert!(ATTENTION_SENSITIVITY_BOOST_FACTOR > 1.0 && ATTENTION_SENSITIVITY_BOOST_FACTOR < 1.5);
+        assert!(FEP_EFFICIENT_EXPLORATION_DAMPEN > 0.0 && FEP_EFFICIENT_EXPLORATION_DAMPEN < 1.0);
+    }
+
+    #[test]
+    fn test_fourier_motor_constants() {
+        assert!(FOURIER_MOTOR_ALPHA_HZ > 0.0 && FOURIER_MOTOR_ALPHA_HZ <= 15.0);
+        assert!(FOURIER_MOTOR_BETA_HZ > FOURIER_MOTOR_ALPHA_HZ && FOURIER_MOTOR_BETA_HZ <= 35.0);
+        assert!(FOURIER_MOTOR_GAMMA_HZ > FOURIER_MOTOR_BETA_HZ && FOURIER_MOTOR_GAMMA_HZ <= 100.0);
+        assert!(FOURIER_MOTOR_AMPLITUDE > 0.0 && FOURIER_MOTOR_AMPLITUDE <= FOURIER_AMPLITUDE_MAX);
+        assert!(FOURIER_AMPLITUDE_MAX > 0.0 && FOURIER_AMPLITUDE_MAX <= 1.0);
+    }
+
+    #[test]
+    fn test_cpg_constants() {
+        assert!(CPG_DEFAULT_COUPLING_K > 0.0 && CPG_DEFAULT_COUPLING_K <= 10.0);
+        assert!(CPG_AROUSAL_FREQ_SCALE > 0.0 && CPG_AROUSAL_FREQ_SCALE <= 2.0);
+        assert!(CPG_WALK_MIN_SYNC > CPG_TROT_MIN_SYNC);
+        assert!(CPG_TROT_MIN_SYNC > CPG_GALLOP_MIN_SYNC);
+        assert!(CPG_GALLOP_MIN_SYNC > CPG_CRITICAL_DESYNC);
+        assert!(CPG_WALK_MIN_SYNC <= 1.0 && CPG_CRITICAL_DESYNC >= 0.0);
+        assert!(CPG_DESYNC_EXPLORATION_BOOST > 0.0 && CPG_DESYNC_EXPLORATION_BOOST <= 0.1);
+        assert!(CPG_INTERVAL > 50 && CPG_INTERVAL < 100);
+    }
+
+    #[test]
+    fn test_complex_cfc_constants() {
+        assert!(COMPLEX_CFC_EIGENVALUE_REAL_MIN < 0.0);
+        assert!(COMPLEX_CFC_EIGENVALUE_REAL_MAX < 0.0);
+        assert!(COMPLEX_CFC_EIGENVALUE_REAL_MIN < COMPLEX_CFC_EIGENVALUE_REAL_MAX);
+        assert!(COMPLEX_CFC_MOTOR_FREQ_MIN_HZ > 0.0);
+        assert!(COMPLEX_CFC_MOTOR_FREQ_MAX_HZ > COMPLEX_CFC_MOTOR_FREQ_MIN_HZ);
+        assert!(COMPLEX_CFC_EIGENVALUE_LR > 0.0 && COMPLEX_CFC_EIGENVALUE_LR < 0.1);
+    }
+
+    #[test]
+    fn test_spectral_constants() {
+        assert!(SPECTRAL_SAMPLE_RATE > 0.0 && SPECTRAL_SAMPLE_RATE < 100.0);
+        assert!(SPECTRAL_HISTORY_CAPACITY > SPECTRAL_MIN_HISTORY);
+        assert!(SPECTRAL_MIN_HISTORY >= 16);
+        assert!(SPECTRAL_INTERVAL > 60 && SPECTRAL_INTERVAL < 100);
+        assert!(SPECTRAL_GAMMA_CONSCIOUSNESS_BOOST > 0.0 && SPECTRAL_GAMMA_CONSCIOUSNESS_BOOST <= 0.1);
+        assert!(SPECTRAL_DELTA_REST_THRESHOLD > 0.3 && SPECTRAL_DELTA_REST_THRESHOLD <= 0.9);
+        assert!(SPECTRAL_ENTROPY_EXPLORATION_SCALE > 0.0 && SPECTRAL_ENTROPY_EXPLORATION_SCALE <= 0.1);
+        assert!(SPECTRAL_PAC_THRESHOLD > 0.0 && SPECTRAL_PAC_THRESHOLD < 1.0);
+        assert!(SPECTRAL_PAC_CONFIDENCE_BOOST > 0.0 && SPECTRAL_PAC_CONFIDENCE_BOOST <= 0.1);
     }
 }

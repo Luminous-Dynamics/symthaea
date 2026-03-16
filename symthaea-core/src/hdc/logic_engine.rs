@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 //! # Logic Engine
 //!
 //! Propositional and first-order logic with SAT solving, natural deduction,

@@ -225,7 +225,7 @@ fn test_embodied_phi_modulation_affects_unified_psi() {
     // Both should produce valid results
     assert!(baseline_result.prediction_error.is_finite());
     assert!(embodied_result.prediction_error.is_finite());
-    assert!(embodied_result.metadata.embodied_phi_modulation.is_finite());
+    assert!(embodied_result.metadata.embodied.embodied_phi_modulation.is_finite());
     // The embodied phi modulation should be non-trivial (not exactly 1.0 after 20 cycles)
     // (lenient — we just verify the feedback path exists and doesn't break)
 }
@@ -437,15 +437,15 @@ fn test_cycle_with_affective_bridge() {
     let result = service.cycle("affective check");
     // Affective valence should be in valid range
     assert!(
-        result.metadata.affective_valence >= -1.0 && result.metadata.affective_valence <= 1.0,
+        result.metadata.embodied.affective_valence >= -1.0 && result.metadata.embodied.affective_valence <= 1.0,
         "Affective valence out of range: {}",
-        result.metadata.affective_valence
+        result.metadata.embodied.affective_valence
     );
     // Affective arousal should be in valid range
     assert!(
-        result.metadata.affective_arousal >= 0.0 && result.metadata.affective_arousal <= 1.0,
+        result.metadata.embodied.affective_arousal >= 0.0 && result.metadata.embodied.affective_arousal <= 1.0,
         "Affective arousal out of range: {}",
-        result.metadata.affective_arousal
+        result.metadata.embodied.affective_arousal
     );
 }
 
@@ -493,14 +493,14 @@ fn test_cycle_with_cross_modal_binding() {
     let result = service.cycle("binding check");
     // Cross-modal binding strength should be finite
     assert!(
-        result.metadata.cross_modal_binding_strength.is_finite(),
+        result.metadata.temporal.cross_modal_binding_strength.is_finite(),
         "Cross-modal binding strength should be finite"
     );
     // Cross-modal Phi should be finite and non-negative
     assert!(
-        result.metadata.cross_modal_psi.is_finite() && result.metadata.cross_modal_psi >= 0.0,
+        result.metadata.temporal.cross_modal_psi.is_finite() && result.metadata.temporal.cross_modal_psi >= 0.0,
         "Cross-modal Phi should be finite and >= 0: {}",
-        result.metadata.cross_modal_psi
+        result.metadata.temporal.cross_modal_psi
     );
 }
 
@@ -526,10 +526,10 @@ fn test_predictive_affective_crossmodal_synergy() {
     // All 6 new metadata fields should be populated with valid values
     assert!(result.metadata.fep.predictive_free_energy.is_finite());
     assert!(result.metadata.fep.predictive_phi_modulation.is_finite());
-    assert!(result.metadata.cross_modal_binding_strength.is_finite());
-    assert!(result.metadata.cross_modal_psi.is_finite());
-    assert!(result.metadata.affective_valence >= -1.0 && result.metadata.affective_valence <= 1.0);
-    assert!(result.metadata.affective_arousal >= 0.0 && result.metadata.affective_arousal <= 1.0);
+    assert!(result.metadata.temporal.cross_modal_binding_strength.is_finite());
+    assert!(result.metadata.temporal.cross_modal_psi.is_finite());
+    assert!(result.metadata.embodied.affective_valence >= -1.0 && result.metadata.embodied.affective_valence <= 1.0);
+    assert!(result.metadata.embodied.affective_arousal >= 0.0 && result.metadata.embodied.affective_arousal <= 1.0);
 }
 
 #[test]
@@ -608,11 +608,11 @@ fn test_social_signals_modulate_affect() {
 
     // With high trust (0.9) and cooperation (0.8), affect should be active
     assert!(
-        result.metadata.affective_valence.is_finite(),
+        result.metadata.embodied.affective_valence.is_finite(),
         "Affective valence should be finite with social signals"
     );
     assert!(
-        result.metadata.affective_arousal.is_finite(),
+        result.metadata.embodied.affective_arousal.is_finite(),
         "Affective arousal should be finite with social signals"
     );
 }
@@ -639,7 +639,7 @@ fn test_predictive_crossmodal_bidirectional_feedback() {
         "Predictive free energy should be non-negative"
     );
     assert!(
-        result.metadata.cross_modal_binding_strength >= 0.0,
+        result.metadata.temporal.cross_modal_binding_strength >= 0.0,
         "Cross-modal binding strength should be non-negative"
     );
 }
@@ -983,10 +983,7 @@ fn test_coherence_field_wired_when_enabled() {
     })
     .unwrap();
 
-    assert!(
-        service.vision_sensory.coherence_field.is_some(),
-        "CoherenceField should be Some"
-    );
+    assert!(service.vision_sensory.coherence_field.is_some(), "CoherenceField should be Some");
 
     // Run a cycle — should not panic, coherence field gets hormone modulation
     let r = service.cycle("coherence test input");
@@ -1051,9 +1048,9 @@ fn test_coherence_field_modulates_consciousness() {
     for i in 0..5 {
         let r = service.cycle(&format!("coherence consciousness test {i}"));
         assert!(
-            r.metadata.consciousness_level >= 0.0 && r.metadata.consciousness_level <= 1.0,
+            r.metadata.consciousness.consciousness_level >= 0.0 && r.metadata.consciousness.consciousness_level <= 1.0,
             "consciousness_level out of bounds: {}",
-            r.metadata.consciousness_level
+            r.metadata.consciousness.consciousness_level
         );
     }
     // Verify the coherence field has a valid value
@@ -1122,7 +1119,7 @@ fn test_consciousness_monitor_feedback_loops() {
         if result.metadata.quantum_coherence_level > 0.0 {
             had_nonzero_qc = true;
         }
-        if result.metadata.temporal_coherence_score > 0.0 {
+        if result.metadata.temporal.temporal_coherence_score > 0.0 {
             had_nonzero_temporal = true;
         }
     }
@@ -1168,10 +1165,10 @@ fn test_consciousness_thermodynamics_integration() {
         let result = service.cycle(input);
         assert!(result.prediction_error.is_finite());
 
-        if result.metadata.thermodynamic_entropy > 0.0 {
+        if result.metadata.temporal.thermodynamic_entropy > 0.0 {
             had_nonzero_entropy = true;
         }
-        if result.metadata.thermodynamic_free_energy.abs() > 0.0 {
+        if result.metadata.temporal.thermodynamic_free_energy.abs() > 0.0 {
             had_nonzero_free_energy = true;
         }
     }
@@ -1206,7 +1203,7 @@ fn test_phenomenal_binding_integration() {
         let result = service.cycle(input);
         assert!(result.prediction_error.is_finite());
 
-        if result.metadata.phenomenal_binding_strength > 0.0 {
+        if result.metadata.temporal.phenomenal_binding_strength > 0.0 {
             had_nonzero_binding = true;
         }
     }
@@ -1270,11 +1267,11 @@ fn test_thermodynamics_binding_hfe_synergy() {
         let result = service.cycle(input);
 
         // All metadata fields should be bounded
-        assert!(result.metadata.thermodynamic_entropy >= 0.0);
-        assert!(result.metadata.phenomenal_binding_strength >= 0.0);
+        assert!(result.metadata.temporal.thermodynamic_entropy >= 0.0);
+        assert!(result.metadata.temporal.phenomenal_binding_strength >= 0.0);
         assert!(
-            result.metadata.phenomenal_binding_strength <= 1.0
-                || !result.metadata.phenomenal_fragmented
+            result.metadata.temporal.phenomenal_binding_strength <= 1.0
+                || !result.metadata.temporal.phenomenal_fragmented
         );
         // Module timings should be under 500ms budget each (relaxed for CI load)
         assert!(
