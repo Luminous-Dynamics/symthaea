@@ -16,7 +16,7 @@
 ## 2. Build Verification
 
 - [ ] `just resilience-test` — 80 Rust tests pass, 0 type errors
-- [ ] `cd observatory && npx vitest run` — 54 frontend tests pass
+- [ ] `cd observatory && npx vitest run` — 75 frontend tests pass (5 suites)
 - [ ] `just resilience-build` completes (requires `hc` in PATH via `nix develop`)
 - [ ] WASM zomes compiled for all 8 DNAs (identity, finance, commons, civic, governance, hearth, knowledge, supplychain)
 
@@ -37,8 +37,9 @@ Start the Observatory without a conductor and verify all routes render:
 - [ ] `/care-circles` — circles list
 - [ ] `/shelter` — units list, placement form
 - [ ] `/supplies` — inventory with category filter, low-stock badges, export
-- [ ] `/admin` — operator dashboard with domain counts, activity log
+- [ ] `/admin` — operator dashboard with domain counts, activity log, community config panel, queue inspector
 - [ ] `/print` — print summary renders, "Print" button works
+- [ ] Error boundary — navigate to invalid route, verify styled error page with "Back to Dashboard"
 
 ## 4. Mobile Verification
 
@@ -48,6 +49,8 @@ Open on a phone (or Chrome DevTools mobile emulator):
 - [ ] Forms usable on 360px width (send message, record exchange, etc.)
 - [ ] PWA install prompt appears (Android) or "Add to Home Screen" works (iOS)
 - [ ] Connection quality indicator visible
+- [ ] Locale selector visible in nav bar (English selected, others disabled with "(v0.2)")
+- [ ] Emergency notification triggers haptic feedback on supported devices
 
 ## 5. Offline Verification
 
@@ -55,6 +58,8 @@ Open on a phone (or Chrome DevTools mobile emulator):
 - [ ] Submit a TEND exchange — queued silently, badge shows "1 queued"
 - [ ] Re-enable network — queue auto-flushes, toast confirms "1 item synced"
 - [ ] App loads from cache when offline (service worker)
+- [ ] Queue retries use exponential backoff (1s, 2s, 4s... capped at 30s)
+- [ ] Queue inspector on `/admin` shows pending items with status badges
 
 ## 6. Conductor Verification (Live Mode)
 
@@ -68,6 +73,7 @@ With conductor running:
 ## 7. Operator Setup
 
 - [ ] Operator visits `/admin` — all domain counts load
+- [ ] Configure community name, location, and contact info in `/admin` Community Config panel
 - [ ] Set up value basket at `/value-anchor` with local prices:
   - Bread (750g): enter current TEND price
   - Mealie meal (2.5kg): enter current TEND price
@@ -110,11 +116,12 @@ Only if deploying LoRa mesh for internet outage resilience:
 
 ## Known Limitations (v0.1.0)
 
-- **Language**: English only. Afrikaans/Zulu/Sotho translations planned for v0.2.
+- **Language**: English only. i18n scaffolding in place (70+ string keys). Afrikaans/Zulu/Sotho translations planned for v0.2.
 - **hc CLI**: Must be in PATH for `hc dna pack` (use `nix develop` environment).
-- **Push notifications**: Only work when the browser tab is open (not true push via service worker subscription). Sufficient for 30s polling.
+- **Push notifications**: Only work when the browser tab is open (not true push via service worker subscription). Sufficient for 30s polling. Haptic feedback requires device vibration API.
 - **Mesh bridge**: Requires physical LoRa hardware for real mesh. Loopback transport available for testing.
 - **Single operator**: No multi-operator role system yet. Any user can access `/admin`.
+- **Community config**: Stored in localStorage — not synced across devices. Operator should configure on the primary device.
 
 ---
 
