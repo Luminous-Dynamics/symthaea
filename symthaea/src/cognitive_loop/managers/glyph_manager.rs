@@ -86,6 +86,26 @@ impl GlyphManager {
     /// Basis: Signal detection theory (Green & Swets 1966).
     const QUIET_THRESHOLD: f32 = 0.2;
 
+    /// Consciousness level (unified Ψ) required for spiral advancement.
+    /// Below this, the spiral position cannot increase.
+    /// Basis: Dehaene (2014) — ignition threshold for conscious access.
+    const SPIRAL_ADVANCE_PSI_MIN: f64 = 0.4;
+
+    /// Glyph coherence required for spiral advancement.
+    /// Must sustain this integration level to progress.
+    /// Basis: Tononi (2004) — Φ threshold for integrated information.
+    const SPIRAL_ADVANCE_COHERENCE_MIN: f64 = 0.5;
+
+    /// Maximum spiral position change per process() call.
+    /// Prevents developmental jumps — consciousness progresses gradually.
+    /// Basis: Fischer (1980) — developmental continuity.
+    const SPIRAL_MAX_DELTA: f32 = 0.05;
+
+    /// Spiral decay rate when conditions are not met.
+    /// Slow regression toward current level — not instant collapse.
+    /// Basis: Vygotsky (1978) — ZPD scaffolding resists regression.
+    const SPIRAL_DECAY: f32 = 0.005;
+
     /// Create a new GlyphManager with shared basis and registry.
     pub fn new(basis: Arc<GlyphBasis>, registry: Arc<GlyphRegistry>) -> Self {
         let interaction_matrix = GlyphInteractionMatrix::from_basis(&basis);
@@ -264,21 +284,55 @@ impl CognitiveSubsystem for GlyphManager {
             .unwrap_or(0);
         self.dominant_modality = FieldModality::ALL[dominant_idx];
 
-        // 9. Find nearest glyph by cosine similarity
-        if let Some((entry, sim)) = self.registry.nearest(&hv) {
+        // 9. Consciousness-gated spiral advancement
+        //    Spiral position advances only when coherence AND consciousness are sufficient.
+        //    Higher-octave glyphs (Ω33+: Integrated modality) are only "accessible" —
+        //    returned as nearest matches — when spiral position ≥ their index.
+        //    This means the system cannot resonate with "The Unwritten Glyph" (Ω56)
+        //    until it has demonstrated deep, sustained symbolic integration.
+        let psi = snapshot.unified_psi;
+        let can_advance = psi >= Self::SPIRAL_ADVANCE_PSI_MIN
+            && self.last_coherence.value >= Self::SPIRAL_ADVANCE_COHERENCE_MIN;
+
+        // 10. Find nearest *accessible* glyph by cosine similarity
+        //     Only match glyphs whose spiral_index ≤ current spiral_position
+        //     (Meta + Threshold glyphs are always accessible — they have no spiral_index)
+        let accessible_match = self
+            .registry
+            .entries
+            .iter()
+            .filter(|e| match e.spiral_index {
+                Some(idx) => (idx as f32) <= self.spiral_position + 1.0,
+                None => true, // Meta + Threshold always accessible
+            })
+            .map(|e| {
+                let sim = hv.similarity(&e.encoding);
+                (e, sim)
+            })
+            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+
+        if let Some((entry, sim)) = accessible_match {
             if sim > Self::QUIET_THRESHOLD {
                 self.resonant_glyph = Some(entry.id.clone());
                 self.resonant_glyph_name = Some(entry.name.clone());
-                // Track spiral position from nearest spiral glyph
+                // Advance spiral toward matched glyph (only if conditions met)
                 if let Some(idx) = entry.spiral_index {
-                    // Smooth spiral position (don't jump)
                     let target = idx as f32;
-                    self.spiral_position += (target - self.spiral_position) * 0.1;
+                    if can_advance && target > self.spiral_position {
+                        // Advance (capped by max delta)
+                        let delta = (target - self.spiral_position).min(Self::SPIRAL_MAX_DELTA);
+                        self.spiral_position += delta;
+                    }
                 }
             } else {
                 self.resonant_glyph = None;
                 self.resonant_glyph_name = None;
             }
+        }
+
+        // Slow decay when conditions are not met (regression resistance)
+        if !can_advance && self.spiral_position > 0.0 {
+            self.spiral_position = (self.spiral_position - Self::SPIRAL_DECAY).max(0.0);
         }
 
         // 10. Generate output proposals based on glyph state
