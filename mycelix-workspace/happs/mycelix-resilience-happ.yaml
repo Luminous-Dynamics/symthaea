@@ -1,28 +1,33 @@
 ---
-# Mycelix Resilience hApp Bundle
-# 8-DNA subset for community resilience deployment:
-# TEND mutual credit, food/water tracking, mutual aid, emergency comms,
-# household emergency planning, community knowledge, supply chain.
+# Mycelix Resilience Kit — 8-DNA hApp Bundle
 #
-# Cuts unified bundle from 10 → 8 DNAs for faster startup and lower memory.
-# Governance included because TEND and Currency Mint require proposal authorization.
+# Subset of the unified 10-DNA manifest optimized for community resilience:
+# TEND mutual credit, food tracking, mutual aid, emergency comms,
+# water systems, supplies, household/hearth, knowledge commons.
+#
+# Omits: personal (sovereign vault), commons_land (property/housing),
+#        attribution, health — these can be added later.
 #
 # Usage:
-#   hc app pack happs/ --manifest mycelix-resilience-happ.yaml
-#   hc sandbox call install-app mycelix-resilience.happ
+#   just resilience-build    (builds 8 DNAs + packs this manifest)
+#   hc app pack . -o mycelix-resilience.happ
 
 manifest_version: "0"
 name: mycelix-resilience
 description: |
-  Community Resilience Kit — essential economic infrastructure:
-  - Identity: DID registry, consciousness gating (tier source)
-  - Finance: TEND mutual credit, Currency Mint, Payments, Price Oracle
-  - Commons Care: Mutual aid, food production, water safety, care, transport
-  - Civic: Emergency communications
-  - Governance: Proposal authorization (required by TEND/Mint)
-  - Hearth: Household emergency plans, shared resources, family coordination
-  - Knowledge: Community expertise, claims, fact-checking
-  - Supplychain: Inventory tracking, stock levels, verification
+  Community resilience infrastructure — 8-DNA subset for deployment
+  in resource-constrained environments.
+
+  Included:
+  - Identity: DID registry, MFA, trust credentials, recovery
+  - Finance: TEND mutual credit, payments, currency mint
+  - Commons Care: Mutual aid, food production, care, transport
+  - Civic: Emergency comms, justice, media
+  - Governance: Proposals, voting, DKG, constitution (TEND authorization)
+  - Hearth: Kinship, household coordination, emergency plans
+  - Knowledge: Claims, verification, community knowledge base
+  - Supply Chain: Provenance tracking, inventory management
+
   Enables cross-cluster calls between all roles via OtherRole dispatch.
 
 roles:
@@ -108,7 +113,7 @@ roles:
       strategy: create
       deferred: false
     dna:
-      path: ./supplychain/holochain/dna/supplychain.dna
+      path: ./supplychain/dna/mycelix_supplychain.dna
       modifiers:
         network_seed: ~
         properties: ~

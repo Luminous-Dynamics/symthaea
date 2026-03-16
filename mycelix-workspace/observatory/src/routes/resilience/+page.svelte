@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
+  import { browser } from '$app/environment';
   import { createFreshness } from '$lib/freshness';
   import FreshnessBar from '$lib/components/FreshnessBar.svelte';
   import { conductorStatus } from '$lib/stores';
@@ -149,6 +150,20 @@
 
   onDestroy(() => stopPolling());
 
+  function loadCommunityName(): string {
+    if (!browser) return 'Mycelix Community';
+    try {
+      const raw = localStorage.getItem('mycelix-community-config');
+      if (raw) {
+        const cfg = JSON.parse(raw);
+        if (cfg.name) return cfg.name;
+      }
+    } catch { /* ignore */ }
+    return 'Mycelix Community';
+  }
+
+  const communityName = loadCommunityName();
+
   function statusDotColor(status: CardStatus): string {
     switch (status) {
       case 'ok': return 'bg-green-400';
@@ -166,7 +181,7 @@
   <!-- Header -->
   <div class="max-w-6xl mx-auto mb-8">
     <h1 class="text-3xl font-bold text-white">Mycelix Resilience Kit</h1>
-    <p class="text-gray-400 mt-1">Roodepoort Community</p>
+    <p class="text-gray-400 mt-1">{communityName}</p>
   </div>
 
   <FreshnessBar {lastUpdated} {loadError} {refreshing} {refresh} />

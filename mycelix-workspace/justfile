@@ -118,13 +118,16 @@ resilience-up: resilience-build
     @echo "  Value Anchor: http://localhost:5173/value-anchor"
     @echo "  Emergency:    http://localhost:5173/emergency"
 
-# Run all resilience-related tests (mesh-bridge + price oracle + Observatory type-check)
+# Run all resilience-related tests (mesh-bridge + price oracle + Observatory vitest + type-check)
 resilience-test:
     @echo "Running mesh-bridge tests..."
     @cd mesh-bridge && cargo test
     @echo ""
     @echo "Running price oracle unit tests..."
     @cd ../mycelix-finance && cargo test --lib -p price_oracle -p price_oracle_integrity
+    @echo ""
+    @echo "Running Observatory vitest (75 tests)..."
+    @cd observatory && npx vitest run
     @echo ""
     @echo "Running Observatory type-check (resilience routes)..."
     @cd observatory && npx svelte-check 2>&1 | tee /tmp/svelte-check.log | tail -1; \
@@ -135,6 +138,10 @@ resilience-test:
       fi
     @echo ""
     @echo "All resilience tests passed!"
+
+# Smoke test: build Observatory, check all routes return 200
+resilience-smoke:
+    @./scripts/smoke-test.sh
 
 # ============================================================
 # DEVELOPMENT

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { browser } from '$app/environment';
   import {
     getBalance,
     getOracleState,
@@ -31,7 +32,35 @@
   let waterSystems: WaterSystem[] = [];
   let lowStock: LowStockItem[] = [];
 
-  const communityName = 'Roodepoort Resilience DAO';
+  // Read community config from localStorage (set via /admin Community Config panel)
+  function loadCommunityName(): string {
+    if (!browser) return 'Mycelix Resilience DAO';
+    try {
+      const raw = localStorage.getItem('mycelix-community-config');
+      if (raw) {
+        const cfg = JSON.parse(raw);
+        if (cfg.name) return cfg.name;
+      }
+    } catch { /* ignore parse errors */ }
+    return 'Mycelix Resilience DAO';
+  }
+
+  function loadCommunityContact(): { name: string; phone: string } | null {
+    if (!browser) return null;
+    try {
+      const raw = localStorage.getItem('mycelix-community-config');
+      if (raw) {
+        const cfg = JSON.parse(raw);
+        if (cfg.contactName || cfg.contactPhone) {
+          return { name: cfg.contactName || '', phone: cfg.contactPhone || '' };
+        }
+      }
+    } catch { /* ignore parse errors */ }
+    return null;
+  }
+
+  const communityName = loadCommunityName();
+  const communityContact = loadCommunityContact();
 
   // ============================================================================
   // Derived values
@@ -291,6 +320,9 @@
     <!-- ================================================================ -->
     <footer class="print-footer">
       <hr class="section-rule" />
+      {#if communityContact}
+        <p class="contact-line">Operator: {communityContact.name}{communityContact.phone ? ` — ${communityContact.phone}` : ''}</p>
+      {/if}
       <p>Mycelix Observatory — {communityName} — Printed for offline use</p>
     </footer>
   {/if}
@@ -444,6 +476,12 @@
     text-align: center;
     font-size: 10px;
     color: #888;
+  }
+
+  .contact-line {
+    margin: 0 0 2px 0;
+    font-weight: 600;
+    color: #555;
   }
 
   /* ---- Utility ---- */
