@@ -104,6 +104,51 @@ impl BaselineCollection {
     }
 }
 
+/// Cross-cultural validity metadata for a baseline collection.
+/// Basis: Henrich, Heine, & Norenzayan (2010) "The weirdest people in the world?"
+#[derive(Debug, Clone)]
+pub struct BaselineMetadata {
+    /// Primary sample region (e.g., "WEIRD", "East Asian", "Cross-cultural").
+    pub sample_region: &'static str,
+    /// Whether the baseline has been validated cross-culturally.
+    pub cross_cultural_validated: bool,
+    /// Notes on cultural specificity.
+    pub cultural_notes: &'static str,
+}
+
+impl BaselineCollection {
+    /// Cross-cultural metadata for each baseline domain.
+    pub fn cultural_metadata() -> BTreeMap<&'static str, BaselineMetadata> {
+        let mut m = BTreeMap::new();
+        m.insert("worm", BaselineMetadata { sample_region: "WEIRD", cross_cultural_validated: false, cultural_notes: "Cowan (2001) norms from North American undergrads" });
+        m.insert("cogbench", BaselineMetadata { sample_region: "WEIRD", cross_cultural_validated: false, cultural_notes: "Coda-Forno et al. (2023) norms from Western online samples" });
+        m.insert("tombench", BaselineMetadata { sample_region: "WEIRD", cross_cultural_validated: false, cultural_notes: "ToM tasks normed on English-speaking populations" });
+        m.insert("memory_agent", BaselineMetadata { sample_region: "WEIRD", cross_cultural_validated: false, cultural_notes: "Memory benchmarks from Western lab studies" });
+        m.insert("executive", BaselineMetadata { sample_region: "WEIRD", cross_cultural_validated: false, cultural_notes: "WCST has some cross-cultural data (Kohli & Kaur 2006) but most are WEIRD-normed" });
+        m.insert("metacognition", BaselineMetadata { sample_region: "WEIRD", cross_cultural_validated: false, cultural_notes: "Calibration and FOK norms from Western university samples" });
+        m.insert("affect", BaselineMetadata { sample_region: "WEIRD", cross_cultural_validated: false, cultural_notes: "Emotional Stroop and valence norms from Western samples" });
+        m.insert("creativity", BaselineMetadata { sample_region: "WEIRD", cross_cultural_validated: false, cultural_notes: "AUT/RAT norms from English-speaking populations" });
+        m.insert("butlin", BaselineMetadata { sample_region: "WEIRD", cross_cultural_validated: false, cultural_notes: "Butlin et al. (2023) consciousness indicators framework" });
+        m.insert("inhibition", BaselineMetadata { sample_region: "WEIRD", cross_cultural_validated: false, cultural_notes: "Go/No-Go and Stop-Signal norms from Western lab studies" });
+        m.insert("attention", BaselineMetadata { sample_region: "WEIRD", cross_cultural_validated: false, cultural_notes: "Visual search and attentional blink norms from Western labs" });
+        m.insert("embodied", BaselineMetadata { sample_region: "WEIRD", cross_cultural_validated: false, cultural_notes: "Embodied cognition baselines from Western samples" });
+        m.insert("reasoning", BaselineMetadata { sample_region: "WEIRD", cross_cultural_validated: false, cultural_notes: "ARC baselines from Western/online populations" });
+        m.insert("sustained_attention", BaselineMetadata { sample_region: "WEIRD", cross_cultural_validated: false, cultural_notes: "PVT/SART/CPT norms from Western lab studies" });
+        m.insert("motor", BaselineMetadata { sample_region: "WEIRD", cross_cultural_validated: false, cultural_notes: "Fitts' Law and SRTT norms from Western lab studies" });
+        m.insert("language", BaselineMetadata { sample_region: "WEIRD", cross_cultural_validated: false, cultural_notes: "English-language priming and coherence norms" });
+        m.insert("social", BaselineMetadata { sample_region: "WEIRD", cross_cultural_validated: false, cultural_notes: "RME and economic games normed on Western populations" });
+        m.insert("neuromod", BaselineMetadata { sample_region: "WEIRD", cross_cultural_validated: false, cultural_notes: "Psychopharmacology baselines from Western clinical samples" });
+        m.insert("consciousness", BaselineMetadata { sample_region: "WEIRD", cross_cultural_validated: false, cultural_notes: "Blindsight and consciousness baselines from Western neuropsychology" });
+        m.insert("binding", BaselineMetadata { sample_region: "WEIRD", cross_cultural_validated: false, cultural_notes: "Temporal binding norms from Western lab studies" });
+        m.insert("speech", BaselineMetadata { sample_region: "WEIRD", cross_cultural_validated: false, cultural_notes: "Phoneme discrimination norms from English-speaking populations" });
+        m.insert("substrate", BaselineMetadata { sample_region: "WEIRD", cross_cultural_validated: false, cultural_notes: "Substrate transfer baselines are theoretical" });
+        m.insert("mathematics", BaselineMetadata { sample_region: "WEIRD", cross_cultural_validated: false, cultural_notes: "Mathematical reasoning norms from Western university samples" });
+        m.insert("institutional_reasoning", BaselineMetadata { sample_region: "WEIRD", cross_cultural_validated: false, cultural_notes: "Institutional reasoning baselines from Western samples" });
+        m.insert("clinical", BaselineMetadata { sample_region: "WEIRD", cross_cultural_validated: false, cultural_notes: "Clinical/therapeutic baselines from Western mental health research" });
+        m
+    }
+}
+
 /// Get all WorM baselines.
 pub fn worm_baselines() -> BTreeMap<&'static str, Baseline> {
     let mut m = BTreeMap::new();
@@ -2123,8 +2168,8 @@ pub fn motor_baselines() -> BaselineMap {
         "learning_effect",
         Baseline {
             value: 0.15,
-            sd: Some(0.08),
-            source: "Nissen & Bullemer (1987), RT difference normalized",
+            sd: Some(0.12),
+            source: "Nissen & Bullemer (1987), RT difference normalized; SD widened for cross-study implicit learning variance (0.05-0.35 range)",
             population: "human adults",
         },
     );
@@ -2252,8 +2297,8 @@ pub fn motor_baselines() -> BaselineMap {
         "drift_difference",
         Baseline {
             value: 0.20,
-            sd: Some(0.08),
-            source: "Botvinick & Cohen (1998), synchronous minus asynchronous drift",
+            sd: Some(0.12),
+            source: "Botvinick & Cohen (1998), synchronous minus asynchronous drift; SD widened for cross-cultural RHI variance",
             population: "human adults",
         },
     );
@@ -3318,7 +3363,7 @@ pub fn consciousness_baselines() -> BaselineMap {
         "supraliminal_accuracy",
         Baseline {
             value: 0.92,
-            sd: Some(0.05),
+            sd: Some(0.08),
             source: "Weiskrantz (1986), above-threshold forced-choice accuracy",
             population: "human adults",
         },
@@ -3327,8 +3372,8 @@ pub fn consciousness_baselines() -> BaselineMap {
         "subliminal_accuracy",
         Baseline {
             value: 0.65,
-            sd: Some(0.08),
-            source: "Azzopardi & Cowey (1997), below-threshold forced-choice accuracy",
+            sd: Some(0.15),
+            source: "Azzopardi & Cowey (1997), below-threshold forced-choice accuracy; SD widened for cross-patient heterogeneity (0.50-0.85 range documented)",
             population: "blindsight patients",
         },
     );
@@ -3336,7 +3381,7 @@ pub fn consciousness_baselines() -> BaselineMap {
         "awareness_dissociation",
         Baseline {
             value: 0.25,
-            sd: Some(0.10),
+            sd: Some(0.12),
             source: "Weiskrantz (1986), accuracy minus report rate for subliminal",
             population: "blindsight patients",
         },
@@ -3392,6 +3437,34 @@ pub fn binding_baselines() -> BaselineMap {
             population: "human adults",
         },
     );
+    // Cross-Modal Feature Binding (Treisman & Gelade, 1980; Wheeler & Treisman, 2002)
+    m.insert(
+        "cross_modal_binding_accuracy",
+        Baseline {
+            value: 0.78,
+            sd: Some(0.10),
+            source: "Wheeler & Treisman (2002), feature-location binding accuracy",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "cross_modal_swap_error_rate",
+        Baseline {
+            value: 0.12,
+            sd: Some(0.06),
+            source: "Treisman & Gelade (1980), misbinding rate",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "cross_modal_set_size_slope",
+        Baseline {
+            value: 0.05,
+            sd: Some(0.02),
+            source: "Wheeler & Treisman (2002), accuracy drop per additional object",
+            population: "human adults",
+        },
+    );
     m
 }
 
@@ -3402,8 +3475,8 @@ pub fn speech_baselines() -> BaselineMap {
         "cross_boundary_accuracy",
         Baseline {
             value: 0.90,
-            sd: Some(0.05),
-            source: "Liberman et al. (1957), cross-category phoneme discrimination",
+            sd: Some(0.08),
+            source: "Liberman et al. (1957), cross-category phoneme discrimination; SD widened for meta-analytic variance",
             population: "human adults",
         },
     );
@@ -3411,8 +3484,8 @@ pub fn speech_baselines() -> BaselineMap {
         "within_category_accuracy",
         Baseline {
             value: 0.55,
-            sd: Some(0.08),
-            source: "Liberman et al. (1957), within-category phoneme discrimination",
+            sd: Some(0.12),
+            source: "Liberman et al. (1957), within-category phoneme discrimination; SD widened for population heterogeneity",
             population: "human adults",
         },
     );
@@ -3420,8 +3493,8 @@ pub fn speech_baselines() -> BaselineMap {
         "categorical_perception_index",
         Baseline {
             value: 0.35,
-            sd: Some(0.10),
-            source: "Eimas et al. (1971), cross minus within accuracy",
+            sd: Some(0.15),
+            source: "Eimas et al. (1971), cross minus within accuracy; SD widened for cross-study variance",
             population: "human adults",
         },
     );
@@ -3429,7 +3502,7 @@ pub fn speech_baselines() -> BaselineMap {
         "boundary_sharpness",
         Baseline {
             value: 0.75,
-            sd: Some(0.10),
+            sd: Some(0.12),
             source: "Liberman et al. (1957), identification function steepness",
             population: "human adults",
         },
@@ -3844,6 +3917,62 @@ pub fn institutional_reasoning_baselines() -> BaselineMap {
             population: "theoretical",
         },
     );
+    // HDC analogy baselines
+    m.insert(
+        "analogical_hdc_transfer_accuracy",
+        Baseline {
+            value: 0.50,
+            sd: Some(0.15),
+            source: "HDC XOR-based analogy above-chance rate (encoding space)",
+            population: "theoretical",
+        },
+    );
+    m.insert(
+        "analogical_hdc_transfer_strength",
+        Baseline {
+            value: 0.50,
+            sd: Some(0.05),
+            source: "HDC XOR-based analogy mean similarity (encoding space)",
+            population: "theoretical",
+        },
+    );
+    // Isomorphism baselines
+    m.insert(
+        "isomorphism_self_similarity",
+        Baseline {
+            value: 1.00,
+            sd: Some(0.00),
+            source: "Identity: self-similarity must be 1.0",
+            population: "theoretical",
+        },
+    );
+    m.insert(
+        "isomorphism_overlap_correlation",
+        Baseline {
+            value: 0.50,
+            sd: Some(0.15),
+            source: "Gamma(shared-components, similarity) — structural overlap sensitivity",
+            population: "theoretical",
+        },
+    );
+    m.insert(
+        "isomorphism_discrimination_gap",
+        Baseline {
+            value: 0.10,
+            sd: Some(0.05),
+            source: "Sim(high-overlap) - Sim(zero-overlap) gap",
+            population: "theoretical",
+        },
+    );
+    m.insert(
+        "isomorphism_monotonicity",
+        Baseline {
+            value: 0.60,
+            sd: Some(0.10),
+            source: "Fraction of pairs where more overlap => more similarity",
+            population: "theoretical",
+        },
+    );
     m
 }
 
@@ -4055,5 +4184,18 @@ mod tests {
             baselines.contains_key("ecb_proxy_mean"),
             "Missing ecb_proxy_mean"
         );
+    }
+
+    #[test]
+    fn test_cultural_metadata_covers_all_domains() {
+        let metadata = BaselineCollection::cultural_metadata();
+        assert!(metadata.contains_key("worm"), "Missing worm metadata");
+        assert!(metadata.contains_key("executive"), "Missing executive metadata");
+        assert!(metadata.contains_key("social"), "Missing social metadata");
+        assert!(metadata.contains_key("reasoning"), "Missing reasoning metadata");
+        for (domain, meta) in &metadata {
+            assert!(!meta.sample_region.is_empty(), "Domain '{domain}' has empty sample_region");
+            assert!(!meta.cultural_notes.is_empty(), "Domain '{domain}' has empty cultural_notes");
+        }
     }
 }

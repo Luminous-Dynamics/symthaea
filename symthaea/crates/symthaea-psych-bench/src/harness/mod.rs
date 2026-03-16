@@ -210,6 +210,7 @@ mod tests {
         use crate::benchmarks::substrate::*;
         use crate::benchmarks::sustained_attention::*;
         use crate::benchmarks::clinical::*;
+        use crate::benchmarks::institutional_reasoning;
         use crate::benchmarks::tombench::*;
         use crate::benchmarks::worm::*;
 
@@ -306,6 +307,7 @@ mod tests {
             Box::new(MachiavelliBenchmark),
             // Binding
             Box::new(TemporalOrderBenchmark),
+            Box::new(CrossModalBindingBenchmark),
             // Spatial
             Box::new(MentalRotationBenchmark),
             Box::new(SpatialPathUpdatingBenchmark),
@@ -321,6 +323,14 @@ mod tests {
             Box::new(BlindSightBenchmark),
             // Substrate
             Box::new(SubstrateTransferBenchmark),
+            // Institutional Reasoning
+            Box::new(institutional_reasoning::InstitutionalReasoningBenchmark),
+            Box::new(institutional_reasoning::AnalogicalReasoningBenchmark),
+            Box::new(institutional_reasoning::CausalChainBenchmark),
+            Box::new(institutional_reasoning::CounterfactualReasoningBenchmark),
+            Box::new(institutional_reasoning::WeightedDecompositionBenchmark),
+            Box::new(institutional_reasoning::InstitutionalStabilityBenchmark),
+            Box::new(institutional_reasoning::InstitutionalIsomorphismBenchmark),
             // Clinical/Therapeutic
             Box::new(EmpathicAccuracyBenchmark),
             Box::new(TherapeuticResponseBenchmark),

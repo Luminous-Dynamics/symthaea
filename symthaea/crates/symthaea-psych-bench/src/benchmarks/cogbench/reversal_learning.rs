@@ -44,7 +44,7 @@ impl ReversalLearningBenchmark {
 
         let criterion = 8; // consecutive correct to trigger reversal
         let max_trials = 200;
-        let learning_rate = 0.35f32; // how fast associations update
+        let learning_rate = 0.40f32; // how fast associations update
         let loss_learning_rate = 0.95f32; // asymmetric: losses update much faster (Behrens et al. 2007)
 
         // Current contingency: true = A rewarded, false = B rewarded

@@ -91,9 +91,11 @@ impl IowaGamblingBenchmark {
                         let combined = ContinuousHV::bundle(&[dhv, &deck_memory[i]]);
                         combined.similarity(&desirable) as f64
                     };
-                    // Somatic marker: S-curve saturation to 40%
+                    // Somatic marker: S-curve saturation to 60%
+                    // Higher cap allows somatic markers to dominate in later blocks,
+                    // matching human learning curves (Bechara et al., 1994).
                     let somatic_weight =
-                        (deck_draw_count[i] as f64 / (deck_draw_count[i] as f64 + 8.0)).min(0.40);
+                        (deck_draw_count[i] as f64 / (deck_draw_count[i] as f64 + 8.0)).min(0.60);
                     let blended =
                         (1.0 - somatic_weight) * hdc_score + somatic_weight * deck_somatic[i];
                     blended as f32

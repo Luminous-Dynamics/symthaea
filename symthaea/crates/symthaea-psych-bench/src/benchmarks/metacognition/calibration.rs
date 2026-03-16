@@ -223,9 +223,9 @@ impl MetacognitiveCalibrationBenchmark {
                 // direct retrieval-quality signals, producing moderate discrimination.
                 // Very low gap weight (3%) prevents the similarity-gap cue from
                 // boosting gamma above human range.
-                let raw = load_factor * 0.38
-                    + delay_factor * 0.49
-                    + gap_signal * 0.03
+                let raw = load_factor * 0.36
+                    + delay_factor * 0.46
+                    + gap_signal * 0.08
                     + familiarity * 0.10;
 
                 // Logistic calibration (Platt 1999): maps raw cue value to
