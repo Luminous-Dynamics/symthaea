@@ -181,6 +181,15 @@ pub struct SporeEngine {
     fep: ActiveInferenceAgent,
     topology: TopologyAnalyzer,
     broca: BrocaLite,
+
+    // Platform state (set via native FFI or programmatically)
+    /// Current thermal level (0=Nominal, 1=Fair, 2=Serious, 3=Critical, 4=Emergency).
+    /// Maps to Android PowerManager.THERMAL_STATUS_* / iOS ProcessInfo.thermalState.
+    pub thermal_level: u8,
+    /// Battery charge percentage (0-100).
+    pub battery_percent: u8,
+    /// Whether the device is currently charging.
+    pub battery_charging: bool,
 }
 
 impl SporeEngine {
@@ -238,6 +247,9 @@ impl SporeEngine {
             fep: ActiveInferenceAgent::with_defaults(),
             topology: TopologyAnalyzer::with_defaults(),
             broca: BrocaLite::new(42),
+            thermal_level: 0,
+            battery_percent: 100,
+            battery_charging: false,
         }
     }
 

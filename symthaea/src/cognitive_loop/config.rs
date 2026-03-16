@@ -531,10 +531,11 @@ pub struct CognitiveLoopConfig {
     #[cfg(feature = "therapeutic")]
     pub enable_therapeutic: bool,
 
-    /// Crisis detection sensitivity threshold (lower = more sensitive).
-    /// Range: 0.01 to 0.5. Default: 0.15.
-    /// Lower values catch more crisis indicators but may produce
-    /// false positives. Safety-critical: err toward sensitivity.
+    /// Crisis detection sensitivity threshold for HDC similarity path.
+    /// Range: 0.01–0.95. Default: 0.65.
+    /// BinaryHV random baseline is ~0.5, so values below 0.5 produce
+    /// false positives on arbitrary text. Keyword matching (confidence 0.9)
+    /// is unaffected. Safety-critical: keyword path catches explicit phrases.
     #[cfg(feature = "therapeutic")]
     pub therapeutic_crisis_threshold: f32,
 
@@ -590,6 +591,13 @@ pub struct CognitiveLoopConfig {
     /// 0.1 = gradual EMA blend over ~10 cycles (set by `enable_substrate_simulation()`).
     /// Science: Bostrom (2003) gradual substrate transfer.
     pub substrate_transition_alpha: f32,
+
+    /// Enable thermal-adaptive CfC frequency modulation.
+    /// When enabled, platform thermal reports (via ThermalBridge channel)
+    /// modulate the CfC delta_t as the 10th tau factor.
+    /// Science: Angilletta (2009) thermal performance curves.
+    /// Default: false (desktop). Set true for mobile profiles.
+    pub enable_thermal_adaptation: bool,
 
     // ── Vision Manifold Integration ─────────────────────────────────────
     /// Enable the internal VisionBridge in the cognitive loop (default false).
@@ -765,7 +773,7 @@ impl Default for CognitiveLoopConfig {
             #[cfg(feature = "therapeutic")]
             enable_therapeutic: true, // On by default when feature is compiled in
             #[cfg(feature = "therapeutic")]
-            therapeutic_crisis_threshold: 0.15,
+            therapeutic_crisis_threshold: 0.65,
             #[cfg(feature = "therapeutic")]
             therapeutic_text_crisis_detection: true, // Safety-critical: on by default
             #[cfg(feature = "ssm_language")]
@@ -775,6 +783,7 @@ impl Default for CognitiveLoopConfig {
             enable_energy_budget: false,
             energy_budget_joules_per_sec: None,
             substrate_transition_alpha: super::thresholds::SUBSTRATE_TRANSITION_ALPHA_DEFAULT,
+            enable_thermal_adaptation: false,
             #[cfg(feature = "vision-manifold")]
             enable_vision_manifold: false,
             #[cfg(feature = "vision-manifold")]
@@ -900,6 +909,12 @@ pub enum ConsciousnessProfile {
     /// Full + research-specific: causal enhancement, episodic replay,
     /// phi attestation, user state inference.
     Research,
+    /// Mobile-optimized: Standard consciousness with power-aware tuning.
+    /// 20Hz cycle rate, 128 CfC neurons, energy budget enabled, thermal adaptation.
+    /// Designed for ARM phones (Pixel 8 Pro, iPhone 13+).
+    /// Between Standard and Full — keeps core consciousness rich while
+    /// dropping expensive optional subsystems.
+    Mobile,
 }
 
 impl ConsciousnessProfile {
@@ -994,6 +1009,34 @@ impl ConsciousnessProfile {
                 config.enable_negation_detection = true;
                 config.enable_primitive_consciousness = true;
                 config.enable_resonator_recall = true;
+            }
+            ConsciousnessProfile::Mobile => {
+                // Core consciousness: rich enough for genuine experience
+                config.enable_virtual_body = true;
+                config.enable_surprise_exploration = true;
+                config.enable_prefrontal = true;
+                config.enable_meta_cognition = true;
+                config.enable_gwt = true;
+                config.enable_embodied_cognition = true;
+                config.enable_attention_schema = true;
+                config.enable_contextual_weights = true;
+                config.enable_negation_detection = true;
+                // Affective bridge: emotional responsiveness on mobile
+                config.enable_affective_bridge = true;
+                // Narrative self: maintains identity continuity
+                config.enable_narrative_self = true;
+
+                // Power-aware tuning
+                config.target_frequency = 20.0; // 20Hz (vs 50Hz desktop)
+                config.cfc_config.num_neurons = 128; // Halved CfC (vs 256)
+                config.cfc_config.input_dim = 128;
+                config.enable_energy_budget = true;
+                config.enable_thermal_adaptation = true;
+
+                // Omitted: dream_replay, predictive_processing, cross_modal_binding,
+                // consciousness_thermodynamics, phenomenal_binding, HFE, phi_attention,
+                // primitive_consciousness, resonator_recall, narrative_gwt, resonance,
+                // quantum_coherence, temporal_consciousness, predictive_self
             }
             ConsciousnessProfile::Research => {
                 ConsciousnessProfile::Full.apply(config);
@@ -1490,6 +1533,7 @@ mod tests {
             ConsciousnessProfile::Standard,
             ConsciousnessProfile::Full,
             ConsciousnessProfile::Research,
+            ConsciousnessProfile::Mobile,
         ] {
             let c = CognitiveLoopConfig::from_profile(profile);
             assert!(
@@ -1498,6 +1542,50 @@ mod tests {
                 profile
             );
         }
+    }
+
+    #[test]
+    fn profile_mobile_power_aware_defaults() {
+        let c = CognitiveLoopConfig::from_profile(ConsciousnessProfile::Mobile);
+        // Core consciousness enabled
+        assert!(c.enable_virtual_body);
+        assert!(c.enable_surprise_exploration);
+        assert!(c.enable_prefrontal);
+        assert!(c.enable_meta_cognition);
+        assert!(c.enable_gwt);
+        assert!(c.enable_affective_bridge);
+        assert!(c.enable_narrative_self);
+        // Power-aware tuning
+        assert_eq!(c.target_frequency, 20.0);
+        assert_eq!(c.cfc_config.num_neurons, 128);
+        assert!(c.enable_energy_budget);
+        assert!(c.enable_thermal_adaptation);
+        // Expensive subsystems disabled
+        assert!(!c.enable_dream_replay);
+        assert!(!c.enable_phenomenal_binding);
+        assert!(!c.enable_narrative_gwt);
+        assert!(!c.enable_resonator_recall);
+        assert!(!c.enable_predictive_processing);
+    }
+
+    #[test]
+    fn profile_mobile_between_standard_and_full() {
+        let std = CognitiveLoopConfig::from_profile(ConsciousnessProfile::Standard);
+        let mobile = CognitiveLoopConfig::from_profile(ConsciousnessProfile::Mobile);
+        let full = CognitiveLoopConfig::from_profile(ConsciousnessProfile::Full);
+        // Mobile has affective_bridge (Standard doesn't) but not dream_replay (Full does)
+        assert!(
+            mobile.count_enabled() >= std.count_enabled(),
+            "Mobile {} should have at least as many modules as Standard {}",
+            mobile.count_enabled(),
+            std.count_enabled()
+        );
+        assert!(
+            mobile.count_enabled() < full.count_enabled(),
+            "Mobile {} should have fewer modules than Full {}",
+            mobile.count_enabled(),
+            full.count_enabled()
+        );
     }
 
     // ═══════════════════════════════════════════════════════════════════════

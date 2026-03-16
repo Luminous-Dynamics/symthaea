@@ -126,10 +126,10 @@ mod identity_integration;
 // ── Impl-block submodules (split from this file) ────────────────────────────
 mod accessors;
 pub(crate) mod biorhythm_manager;
+pub(crate) mod cantor_dream_manager;
 pub(crate) mod consciousness_engine;
 pub(crate) mod consciousness_monitor_tier;
 pub(crate) mod consciousness_state_manager;
-pub(crate) mod ethics_values_manager;
 mod constructor;
 mod cycle;
 mod cycle_consciousness;
@@ -142,14 +142,20 @@ mod cycle_phase_perception;
 mod cycle_quality;
 mod cycle_strategy;
 mod cycle_subsystems;
+pub(crate) mod episodic_persistence_manager;
 pub(crate) mod ethics_engine;
+pub(crate) mod ethics_values_manager;
+pub(crate) mod feature_integration_manager;
 pub(crate) mod feedback_state;
 pub(crate) mod fep_module;
 pub(crate) mod gwt_manager;
 mod helpers;
+pub(crate) mod language_comm_manager;
 pub(crate) mod managers;
+pub(crate) mod memory_consolidation_manager;
 mod moral;
 pub mod motor_output_bridge;
+pub(crate) mod motor_rendering_manager;
 pub(crate) mod neuromod_manager;
 pub(crate) mod neuromodulators;
 mod phase_results;
@@ -158,15 +164,9 @@ pub(crate) mod primitive_tier;
 pub(crate) mod self_model_tier;
 pub(crate) mod social_manager;
 pub(crate) mod substrate_manager;
-pub(crate) mod language_comm_manager;
-pub(crate) mod vision_sensory_manager;
-pub(crate) mod memory_consolidation_manager;
-pub(crate) mod feature_integration_manager;
 #[cfg(feature = "support")]
 pub(crate) mod support_manager;
-pub(crate) mod cantor_dream_manager;
-pub(crate) mod motor_rendering_manager;
-pub(crate) mod episodic_persistence_manager;
+pub(crate) mod vision_sensory_manager;
 pub use substrate_manager::SubstrateTransitionRecord;
 pub(crate) mod subsystem_trait;
 #[allow(dead_code)] // Registry of tuning constants — many reserved for future wiring
@@ -191,11 +191,11 @@ pub use physics_integration::ParetoContext;
 #[cfg(feature = "mycelix")]
 pub use managers::governance_manager::{GovernanceEvent, GovernanceEventKind, GovernanceOutcome};
 
-pub use managers::swarm_manager::{SwarmEvent, SwarmTelemetry};
 pub use managers::network_service_bridge::{
     forward_affective_state, forward_federated_round, NetworkServiceBridge,
     NetworkServiceBridgeHandle,
 };
+pub use managers::swarm_manager::{SwarmEvent, SwarmTelemetry};
 
 #[cfg(feature = "mesh")]
 pub use managers::{
@@ -475,7 +475,6 @@ pub struct CognitiveLoopService {
     pub(crate) consciousness_state: consciousness_state_manager::ConsciousnessStateManager,
 
     // contextual_weights, phi_attention, negation_detector moved to ethics_values_manager
-
     /// All primitive-consciousness-gated subsystems, grouped into a single manager.
     /// See `primitive_tier::PrimitiveTierManager` for field list.
     primitive_tier: primitive_tier::PrimitiveTierManager,
@@ -492,7 +491,6 @@ pub struct CognitiveLoopService {
     carryover: CycleCarryover,
 
     // soul moved to ethics_values_manager
-
     /// Attention visualizer for debugging attention flow.
     /// When present, captures attention snapshots each cycle for
     /// ASCII heatmaps, JSON export, and Graphviz flow graphs.
@@ -502,7 +500,6 @@ pub struct CognitiveLoopService {
     pub(crate) social_mgr: SocialManager,
 
     // user_state moved to language_comm_manager
-
     /// Resonant speech generator: adapts response complexity to user cognitive load.
     /// Uses neuromod bath signals + USI to determine response profile each cycle.
     /// Science: Ritter et al. (2019) — adaptive complexity reduces cognitive overload.
@@ -527,7 +524,6 @@ pub struct CognitiveLoopService {
     // broca_manager, last_broca_text moved to language_comm_manager
 
     // canvas_manager, last_canvas_svg moved to motor_rendering manager
-
     /// Buffer of PsiAttestationRecords ready for governance bridge consumption.
     /// Populated when `config.enable_psi_attestation` is true.
     /// Capacity bound: attestation_buffer_capacity (max 256) — evict before push.
@@ -575,13 +571,11 @@ pub struct CognitiveLoopService {
     knowledge_manager: Option<crate::knowledge::KnowledgeManager>,
 
     // last_reasoning_context moved to episodic_persistence manager
-
     /// Experience integration bus for principled signal tracking and harmonic reasoning.
     /// Bridges cognitive loop signals to Eight Harmonies wisdom system.
     experience_bus: Option<crate::experience::ExperienceBus>,
 
     // school_bridge + causal_consciousness moved to feature_integ manager
-
     /// Thermodynamic load (0.0 to 1.0, where 1.0 = 6W limit reached).
     pub(crate) thermodynamic_load: f32,
 
@@ -629,7 +623,6 @@ pub struct CognitiveLoopService {
     pub(super) substrate_manager: substrate_manager::SubstrateManager,
 
     // physics_integration moved to feature_integ manager
-
     /// Cycle at which consciousness weights first converged (0 = not yet).
     convergence_cycle: usize,
 
@@ -671,7 +664,8 @@ pub struct CognitiveLoopService {
     /// Receiver for swarm events from external async P2P layer.
     /// Drained non-blocking in Phase B before `swarm_manager.process()`.
     /// Created eagerly at construction; clone `swarm_event_tx` to inject events.
-    swarm_event_rx: std::sync::Mutex<Option<std::sync::mpsc::Receiver<managers::swarm_manager::SwarmEvent>>>,
+    swarm_event_rx:
+        std::sync::Mutex<Option<std::sync::mpsc::Receiver<managers::swarm_manager::SwarmEvent>>>,
 
     /// Sender half of the swarm event channel. Clone via `swarm_event_sender()` to
     /// inject events from async components (NetworkService, Hyperfeel, mesh layer).
@@ -681,6 +675,17 @@ pub struct CognitiveLoopService {
     /// Implements CognitiveSubsystem at interval 53. Feature-gated behind `mesh`.
     #[cfg(feature = "mesh")]
     pub(crate) spectrum_manager: SpectrumManager,
+
+    /// CPG Manager: Kuramoto coupled oscillators for rhythmic motor timing.
+    /// Implements CognitiveSubsystem at interval 59. Feature-gated behind `cpg`.
+    #[cfg(feature = "cpg")]
+    cpg_manager: managers::CpgManager,
+
+    /// Spectral Twin Manager: frequency-domain analysis of CfC hidden state.
+    /// Maintains rolling state history, computes band power / PAC / entropy.
+    /// Implements CognitiveSubsystem at interval 67. Feature-gated behind `spectral_state`.
+    #[cfg(feature = "spectral_state")]
+    spectral_manager: managers::SpectralManager,
 
     /// Therapeutic Manager: client model, alliance, crisis detection, regulation.
     /// Implements CognitiveSubsystem at interval 11. Feature-gated behind `therapeutic`.

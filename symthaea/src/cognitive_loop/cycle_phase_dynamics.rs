@@ -37,78 +37,190 @@ use rayon::join as rayon_join;
 use std::borrow::Cow;
 use std::time::Instant;
 
+use super::feedback_state::Priority;
 use super::helpers;
 use super::phase_results::{
     DynAttention, DynCore, DynFep, DynGuidance, DynHomeostasis, DynMath, DynNeuromod, DynReasoning,
     DynResonator, DynamicsPhaseResult, PerceptionPhaseResult,
 };
 use super::thresholds::{
-    ALEATORIC_UNCERTAINTY_DEFAULT, AROUSAL_RECOVERY_TAU_SCALE, AROUSAL_TAU_DEADZONE,
-    AROUSAL_TAU_SENSITIVITY, ATTENTION_BUDGET_US, BINDING_CONFIDENCE_THRESHOLD,
-    BINDING_LOW_THRESHOLD, BINDING_STRONG_CONFIDENCE_SCALE, BINDING_STRONG_RELIEF_SCALE,
-    BINDING_WEAK_CAUTION_SCALE, BINDING_WEAK_CONFIDENCE_SCALE, CAUSAL_ATTENTION_CONFIDENCE_SCALE,
-    CAUSAL_ATTENTION_STRENGTH_THRESHOLD, CAUSAL_CONFIDENCE_DENSE_THRESHOLD,
-    CAUSAL_CONFIDENCE_MODERATE_THRESHOLD, CAUSAL_DENSE_CONFIDENCE_SCALE,
-    CAUSAL_MODERATE_CONFIDENCE_SCALE, CODEBOOK_FAMILIAR_TAU_SCALE, CODEBOOK_FAMILIAR_THRESHOLD,
-    CODEBOOK_NOVEL_TAU_SCALE, CODEBOOK_NOVEL_THRESHOLD, COHERENCE_CONFIDENCE_BOOST,
-    COHERENCE_HIGH_THRESHOLD, COHERENCE_LOW_DAMPEN_SCALE, COHERENCE_LOW_THRESHOLD,
-    COHERENCE_PREDICTION_EMA, COHERENCE_VELOCITY_BUDGET_CONTRACT, COHERENCE_VELOCITY_BUDGET_EXPAND,
-    COHERENCE_VELOCITY_BUDGET_THRESHOLD, COHERENCE_VELOCITY_TAU_BOOST,
-    COHERENCE_VELOCITY_TAU_DAMPEN, COHERENCE_VELOCITY_TAU_THRESHOLD,
-    CONFIDENCE_CRASH_EXPLORATION_BOOST, CONFIDENCE_CRASH_FREEZE_CYCLES, CONFIDENCE_CRASH_THRESHOLD,
-    CONFIDENCE_VELOCITY_BOOST_SCALE, CONFIDENCE_VELOCITY_DAMPEN_SCALE,
-    CONFIDENCE_VELOCITY_NEGATIVE_THRESHOLD, CONFIDENCE_VELOCITY_POSITIVE_THRESHOLD,
-    DOMINANCE_CONFIDENCE_THRESHOLD, DOMINANCE_CONFIDENT, DOMINANCE_DEFAULT, DOMINANCE_FLOW_BASE,
-    DOMINANCE_FLOW_SCALE, EPISTEMIC_EXPLORE_SCALE, EPISTEMIC_EXPLORE_THRESHOLD,
-    EPISTEMIC_LOW_DAMPEN, EPISTEMIC_LOW_THRESHOLD, EPISTEMIC_OSCILLATION_MULTIPLIER,
-    EPISTEMIC_OSCILLATION_THRESHOLD, EPISTEMIC_SEMANTIC_BOOST_SCALE,
-    EPISTEMIC_SEMANTIC_BOOST_THRESHOLD, EPISTEMIC_SEMANTIC_CAUTION_BASE,
-    EPISTEMIC_SEMANTIC_CAUTION_SCALE, EPISTEMIC_SEMANTIC_CAUTION_THRESHOLD,
-    EPISTEMIC_UNCERTAINTY_DEFAULT, FEP_ACCURACY_CONFIDENCE_THRESHOLD, FEP_COMPLEXITY_THRESHOLD,
-    FEP_LEARNING_PLASTICITY_THRESHOLD, FEP_PRAGMATIC_EXPLOIT_SCALE,
-    FEP_PRAGMATIC_EXPLOIT_THRESHOLD, FEP_PRAGMATIC_EXPLORE_SCALE, FEP_PRAGMATIC_EXPLORE_THRESHOLD,
-    FEP_SURPRISE_TAU_SCALE, FEP_TD_ERROR_DISCOVERY_THRESHOLD, GOAL_PRIORITY_EXPLORATION_THRESHOLD,
-    GOAL_PRIORITY_LR_THRESHOLD, HOMEOSTASIS_AROUSAL_TARGET, HOMEOSTASIS_EFFICIENCY_EMA,
-    HOMEOSTASIS_EFFICIENCY_HIGH, HOMEOSTASIS_EFFICIENCY_LOW, HOMEOSTASIS_EMOTIONAL_INERTIA,
-    HOMEOSTASIS_NEUROMOD_STEP, HOMEOSTASIS_PULL_CRITICAL, HOMEOSTASIS_PULL_CRUISE,
-    HOMEOSTASIS_PULL_INCREASE, HOMEOSTASIS_PULL_NORMAL, HOMEOSTASIS_PULL_REDUCTION,
-    HOMEOSTASIS_RECALIBRATE_HIGH, HOMEOSTASIS_RECALIBRATE_LOW, HORIZON_PE_CONTRACT_RATE,
-    HORIZON_PE_CONTRACT_THRESHOLD, HORIZON_PE_EXPAND_RATE, HORIZON_PE_EXPAND_THRESHOLD,
-    HORIZON_SLOPE_CONTRACT_CAP, HORIZON_SLOPE_CONTRACT_RATE, HORIZON_SLOPE_EXPAND_CAP,
-    HORIZON_SLOPE_EXPAND_RATE, HORIZON_SLOPE_THRESHOLD, MCTS_CONSOLIDATE_CONFIDENCE_SCALE,
-    MCTS_EFFECTIVENESS_CONFIDENCE_SCALE, MCTS_EFFECTIVENESS_EMA, MCTS_EFFECTIVENESS_EXPLORE_SCALE,
-    MCTS_EFFECTIVENESS_HIGH, MCTS_EFFECTIVENESS_LOW, MCTS_EXPLOIT_LR_SCALE, MCTS_EXPLORE_SCALE,
-    MCTS_PLAN_CONFIDENCE_THRESHOLD, MCTS_PLAN_WEIGHT_SCALE, MEMORY_RECALL_TOP_K,
-    PE_VARIANCE_DAMPEN_SCALE, PE_VARIANCE_MAX_EFFECT, PE_VARIANCE_THRESHOLD,
-    POLICY_FULL_AGREEMENT_BOOST, POLICY_MIN_WINDOW, POLICY_SOFT_THRESHOLD, POLICY_TEMP_BASE,
-    POLICY_TEMP_RANGE, POLICY_WINDOW_SIZE, PREDICTION_HORIZON_MAX_SCALE,
-    PREDICTION_HORIZON_MIN_SCALE, PREDICTIVE_BUDGET_GATING_RATIO, QUANTUM_COHERENCE_BOOST_SCALE,
-    QUANTUM_COHERENCE_THRESHOLD, RESONANCE_TAU_CENTER, RESONANCE_TAU_SCALE,
-    RESONATOR_CONSOLIDATION_THRESHOLD, RESONATOR_ERROR_CONFIDENCE_DAMPEN,
-    RESONATOR_ERROR_EXPLORATION_SCALE, RESONATOR_ERROR_EXPLORATION_THRESHOLD,
-    RESONATOR_FAMILIAR_LR_SCALE, RESONATOR_LOW_ERROR_CONFIDENCE_SCALE,
-    RESONATOR_LOW_ERROR_THRESHOLD, RESONATOR_NOVEL_LR_SCALE, RESONATOR_NOVEL_THRESHOLD,
-    RESONATOR_SIMILARITY_PRIME_THRESHOLD, SELF_MODEL_ACCURACY_EMA, SELF_MODEL_CONFIDENCE_WEIGHT,
-    SELF_MODEL_HIGH_THRESHOLD, SELF_MODEL_HIGH_TRUST_BOOST, SELF_MODEL_LOW_CONFIDENCE_SCALE,
-    SELF_MODEL_LOW_THRESHOLD, SELF_MODEL_URGENCY_WEIGHT, SELF_MODEL_WEIGHT_BONUS,
-    SELF_MODEL_WEIGHT_HIGH_THRESHOLD, SELF_MODEL_WEIGHT_LOW_THRESHOLD, SELF_MODEL_WEIGHT_PENALTY,
-    SLEEP_PRESSURE_LR_DAMPEN_SCALE, SLEEP_PRESSURE_LR_FACTOR_MIN, SLEEP_PRESSURE_LR_THRESHOLD,
-    THALAMIC_DEEP_BUDGET_SCALE, THALAMIC_DEEP_LR_FACTOR, THALAMIC_DEEP_SALIENCE,
-    THALAMIC_REFLEX_BUDGET_SCALE, THALAMIC_REFLEX_LR_FACTOR, THALAMIC_REFLEX_SALIENCE,
-    TRAINING_BASE_IMPORTANCE, TRANSITION_COST_MAX_EFFECT, TRANSITION_COST_STRENGTH_SCALE,
-    TRANSITION_COST_THRESHOLD, WM_MISMATCH_CONFIDENCE_SCALE, WM_MISMATCH_LR_SCALE,
-    WORLD_MODEL_SPONGINESS_THRESHOLD, WORLD_MODEL_SPONGY_LR_SCALE, WORLD_MODEL_STIFFNESS_LR_SCALE,
-    WORLD_MODEL_STIFFNESS_THRESHOLD,
+    ALEATORIC_UNCERTAINTY_DEFAULT,
+    AROUSAL_RECOVERY_TAU_SCALE,
+    AROUSAL_TAU_DEADZONE,
+    AROUSAL_TAU_SENSITIVITY,
     // Phase 1a: dynamics startup & miscellaneous
-    AROUSAL_TRAP_RECOVERY_MIN_CYCLES, AROUSAL_TRAP_RECOVERY_RAMP_CYCLES,
-    ATTENTION_SENSITIVITY_BOOST_FACTOR, CONFIDENCE_CRASH_FLOW_MULTIPLIER,
-    DYNAMICS_POST_BOOT_CYCLES, DYNAMICS_STARTUP_WARMUP_CYCLES,
-    FEP_EFFICIENT_EXPLORATION_DAMPEN, KNOWLEDGE_CAUSAL_DEPTH_DA_NUDGE,
-    KNOWLEDGE_CAUSAL_DEPTH_EXPLOIT_THRESHOLD, KNOWLEDGE_CONTRADICTION_NE_BOOST,
-    KNOWLEDGE_CONTRADICTION_SHT_BOOST, KNOWLEDGE_GROUNDING_CERTAINTY_WEIGHT,
-    KNOWLEDGE_GROUNDING_RELEVANCE_WEIGHT, KNOWLEDGE_GROUNDING_SHT_NUDGE,
-    KNOWLEDGE_NOVELTY_EXPLORE_SCALE, KNOWLEDGE_UNCERTAINTY_NE_SCALE, NEUROMOD_DELTA_THRESHOLD,
+    AROUSAL_TRAP_RECOVERY_MIN_CYCLES,
+    AROUSAL_TRAP_RECOVERY_RAMP_CYCLES,
+    ATTENTION_BUDGET_US,
+    ATTENTION_SENSITIVITY_BOOST_FACTOR,
+    BINDING_CONFIDENCE_THRESHOLD,
+    BINDING_LOW_THRESHOLD,
+    BINDING_STRONG_CONFIDENCE_SCALE,
+    BINDING_STRONG_RELIEF_SCALE,
+    BINDING_WEAK_CAUTION_SCALE,
+    BINDING_WEAK_CONFIDENCE_SCALE,
+    CAUSAL_ATTENTION_CONFIDENCE_SCALE,
+    CAUSAL_ATTENTION_STRENGTH_THRESHOLD,
+    CAUSAL_CONFIDENCE_DENSE_THRESHOLD,
+    CAUSAL_CONFIDENCE_MODERATE_THRESHOLD,
+    CAUSAL_DENSE_CONFIDENCE_SCALE,
+    CAUSAL_MODERATE_CONFIDENCE_SCALE,
+    CODEBOOK_FAMILIAR_TAU_SCALE,
+    CODEBOOK_FAMILIAR_THRESHOLD,
+    CODEBOOK_NOVEL_TAU_SCALE,
+    CODEBOOK_NOVEL_THRESHOLD,
+    COHERENCE_CONFIDENCE_BOOST,
+    COHERENCE_HIGH_THRESHOLD,
+    COHERENCE_LOW_DAMPEN_SCALE,
+    COHERENCE_LOW_THRESHOLD,
+    COHERENCE_PREDICTION_EMA,
+    COHERENCE_VELOCITY_BUDGET_CONTRACT,
+    COHERENCE_VELOCITY_BUDGET_EXPAND,
+    COHERENCE_VELOCITY_BUDGET_THRESHOLD,
+    COHERENCE_VELOCITY_TAU_BOOST,
+    COHERENCE_VELOCITY_TAU_DAMPEN,
+    COHERENCE_VELOCITY_TAU_THRESHOLD,
+    CONFIDENCE_CRASH_EXPLORATION_BOOST,
+    CONFIDENCE_CRASH_FLOW_MULTIPLIER,
+    CONFIDENCE_CRASH_FREEZE_CYCLES,
+    CONFIDENCE_CRASH_THRESHOLD,
+    CONFIDENCE_VELOCITY_BOOST_SCALE,
+    CONFIDENCE_VELOCITY_DAMPEN_SCALE,
+    CONFIDENCE_VELOCITY_NEGATIVE_THRESHOLD,
+    CONFIDENCE_VELOCITY_POSITIVE_THRESHOLD,
+    DOMINANCE_CONFIDENCE_THRESHOLD,
+    DOMINANCE_CONFIDENT,
+    DOMINANCE_DEFAULT,
+    DOMINANCE_FLOW_BASE,
+    DOMINANCE_FLOW_SCALE,
+    DYNAMICS_POST_BOOT_CYCLES,
+    DYNAMICS_STARTUP_WARMUP_CYCLES,
+    EPISTEMIC_EXPLORE_SCALE,
+    EPISTEMIC_EXPLORE_THRESHOLD,
+    EPISTEMIC_LOW_DAMPEN,
+    EPISTEMIC_LOW_THRESHOLD,
+    EPISTEMIC_OSCILLATION_MULTIPLIER,
+    EPISTEMIC_OSCILLATION_THRESHOLD,
+    EPISTEMIC_SEMANTIC_BOOST_SCALE,
+    EPISTEMIC_SEMANTIC_BOOST_THRESHOLD,
+    EPISTEMIC_SEMANTIC_CAUTION_BASE,
+    EPISTEMIC_SEMANTIC_CAUTION_SCALE,
+    EPISTEMIC_SEMANTIC_CAUTION_THRESHOLD,
+    EPISTEMIC_UNCERTAINTY_DEFAULT,
+    FEP_ACCURACY_CONFIDENCE_THRESHOLD,
+    FEP_COMPLEXITY_THRESHOLD,
+    FEP_EFFICIENT_EXPLORATION_DAMPEN,
+    FEP_LEARNING_PLASTICITY_THRESHOLD,
+    FEP_PRAGMATIC_EXPLOIT_SCALE,
+    FEP_PRAGMATIC_EXPLOIT_THRESHOLD,
+    FEP_PRAGMATIC_EXPLORE_SCALE,
+    FEP_PRAGMATIC_EXPLORE_THRESHOLD,
+    FEP_SURPRISE_TAU_SCALE,
+    FEP_TD_ERROR_DISCOVERY_THRESHOLD,
+    GOAL_PRIORITY_EXPLORATION_THRESHOLD,
+    GOAL_PRIORITY_LR_THRESHOLD,
+    HOMEOSTASIS_AROUSAL_TARGET,
+    HOMEOSTASIS_EFFICIENCY_EMA,
+    HOMEOSTASIS_EFFICIENCY_HIGH,
+    HOMEOSTASIS_EFFICIENCY_LOW,
+    HOMEOSTASIS_EMOTIONAL_INERTIA,
+    HOMEOSTASIS_NEUROMOD_STEP,
+    HOMEOSTASIS_PULL_CRITICAL,
+    HOMEOSTASIS_PULL_CRUISE,
+    HOMEOSTASIS_PULL_INCREASE,
+    HOMEOSTASIS_PULL_NORMAL,
+    HOMEOSTASIS_PULL_REDUCTION,
+    HOMEOSTASIS_RECALIBRATE_HIGH,
+    HOMEOSTASIS_RECALIBRATE_LOW,
+    HORIZON_PE_CONTRACT_RATE,
+    HORIZON_PE_CONTRACT_THRESHOLD,
+    HORIZON_PE_EXPAND_RATE,
+    HORIZON_PE_EXPAND_THRESHOLD,
+    HORIZON_SLOPE_CONTRACT_CAP,
+    HORIZON_SLOPE_CONTRACT_RATE,
+    HORIZON_SLOPE_EXPAND_CAP,
+    HORIZON_SLOPE_EXPAND_RATE,
+    HORIZON_SLOPE_THRESHOLD,
+    KNOWLEDGE_ATTENTION_CONTRADICTION_BOOST,
+    KNOWLEDGE_ATTENTION_CONTRADICTION_THRESHOLD,
+    KNOWLEDGE_CAUSAL_DEPTH_DA_NUDGE,
+    KNOWLEDGE_CAUSAL_DEPTH_EXPLOIT_THRESHOLD,
+    KNOWLEDGE_CONTRADICTION_NE_BOOST,
+    KNOWLEDGE_CONTRADICTION_SHT_BOOST,
+    KNOWLEDGE_GROUNDING_CERTAINTY_WEIGHT,
+    KNOWLEDGE_GROUNDING_RELEVANCE_WEIGHT,
+    KNOWLEDGE_GROUNDING_SHT_NUDGE,
+    KNOWLEDGE_NOVELTY_EXPLORE_SCALE,
+    KNOWLEDGE_UNCERTAINTY_NE_SCALE,
+    MCTS_CONSOLIDATE_CONFIDENCE_SCALE,
+    MCTS_EFFECTIVENESS_CONFIDENCE_SCALE,
+    MCTS_EFFECTIVENESS_EMA,
+    MCTS_EFFECTIVENESS_EXPLORE_SCALE,
+    MCTS_EFFECTIVENESS_HIGH,
+    MCTS_EFFECTIVENESS_LOW,
+    MCTS_EXPLOIT_LR_SCALE,
+    MCTS_EXPLORE_SCALE,
+    MCTS_PLAN_CONFIDENCE_THRESHOLD,
+    MCTS_PLAN_WEIGHT_SCALE,
+    MEMORY_RECALL_TOP_K,
+    NEUROMOD_DELTA_THRESHOLD,
+    PE_VARIANCE_DAMPEN_SCALE,
+    PE_VARIANCE_MAX_EFFECT,
+    PE_VARIANCE_THRESHOLD,
+    POLICY_FULL_AGREEMENT_BOOST,
+    POLICY_MIN_WINDOW,
+    POLICY_SOFT_THRESHOLD,
+    POLICY_TEMP_BASE,
+    POLICY_TEMP_RANGE,
+    POLICY_WINDOW_SIZE,
+    PREDICTION_HORIZON_MAX_SCALE,
+    PREDICTION_HORIZON_MIN_SCALE,
+    PREDICTIVE_BUDGET_GATING_RATIO,
+    QUANTUM_COHERENCE_BOOST_SCALE,
+    QUANTUM_COHERENCE_THRESHOLD,
+    RESONANCE_TAU_CENTER,
+    RESONANCE_TAU_SCALE,
+    RESONATOR_CONSOLIDATION_THRESHOLD,
+    RESONATOR_ERROR_CONFIDENCE_DAMPEN,
+    RESONATOR_ERROR_EXPLORATION_SCALE,
+    RESONATOR_ERROR_EXPLORATION_THRESHOLD,
+    RESONATOR_FAMILIAR_LR_SCALE,
+    RESONATOR_LOW_ERROR_CONFIDENCE_SCALE,
+    RESONATOR_LOW_ERROR_THRESHOLD,
+    RESONATOR_NOVEL_LR_SCALE,
+    RESONATOR_NOVEL_THRESHOLD,
+    RESONATOR_SIMILARITY_PRIME_THRESHOLD,
     RESONATOR_STARTUP_CYCLES,
+    SELF_MODEL_ACCURACY_EMA,
+    SELF_MODEL_CONFIDENCE_WEIGHT,
+    SELF_MODEL_HIGH_THRESHOLD,
+    SELF_MODEL_HIGH_TRUST_BOOST,
+    SELF_MODEL_LOW_CONFIDENCE_SCALE,
+    SELF_MODEL_LOW_THRESHOLD,
+    SELF_MODEL_URGENCY_WEIGHT,
+    SELF_MODEL_WEIGHT_BONUS,
+    SELF_MODEL_WEIGHT_HIGH_THRESHOLD,
+    SELF_MODEL_WEIGHT_LOW_THRESHOLD,
+    SELF_MODEL_WEIGHT_PENALTY,
+    SLEEP_PRESSURE_LR_DAMPEN_SCALE,
+    SLEEP_PRESSURE_LR_FACTOR_MIN,
+    SLEEP_PRESSURE_LR_THRESHOLD,
+    THALAMIC_DEEP_BUDGET_SCALE,
+    THALAMIC_DEEP_LR_FACTOR,
+    THALAMIC_DEEP_SALIENCE,
+    THALAMIC_REFLEX_BUDGET_SCALE,
+    THALAMIC_REFLEX_LR_FACTOR,
+    THALAMIC_REFLEX_SALIENCE,
+    TRAINING_BASE_IMPORTANCE,
+    TRANSITION_COST_MAX_EFFECT,
+    TRANSITION_COST_STRENGTH_SCALE,
+    TRANSITION_COST_THRESHOLD,
+    WM_MISMATCH_CONFIDENCE_SCALE,
+    WM_MISMATCH_LR_SCALE,
+    WORLD_MODEL_SPONGINESS_THRESHOLD,
+    WORLD_MODEL_SPONGY_LR_SCALE,
+    WORLD_MODEL_STIFFNESS_LR_SCALE,
+    WORLD_MODEL_STIFFNESS_THRESHOLD,
 };
 #[cfg(feature = "vision-manifold")]
 use super::thresholds::{
@@ -116,7 +228,6 @@ use super::thresholds::{
     VISION_TRAINING_IMPORTANCE_SCALE,
 };
 use super::training::TrainingSample;
-use super::feedback_state::Priority;
 use super::{
     ActionHint, AdaptiveBehavior, CognitiveLoopService, CycleLearningResult, TrainingMethod,
 };
@@ -313,7 +424,8 @@ impl CognitiveLoopService {
                             }
                             super::managers::radio_dispatcher::NetworkHealth::Blackout => 0.0,
                         };
-                        self.swarm_manager.set_connectivity_modifier(connectivity_penalty);
+                        self.swarm_manager
+                            .set_connectivity_modifier(connectivity_penalty);
                     }
                 }
 
@@ -374,22 +486,36 @@ impl CognitiveLoopService {
                     if let Some(delta) = self.therapeutic_manager.last_neuromod_delta {
                         let half_life = 30_u32; // ~30 cycles for therapeutic effects
                         if delta.serotonin.abs() > NEUROMOD_DELTA_THRESHOLD {
-                            self.neuromod.bath.inject("serotonin", delta.serotonin, half_life);
+                            self.neuromod
+                                .bath
+                                .inject("serotonin", delta.serotonin, half_life);
                         }
                         if delta.dopamine.abs() > NEUROMOD_DELTA_THRESHOLD {
-                            self.neuromod.bath.inject("dopamine", delta.dopamine, half_life);
+                            self.neuromod
+                                .bath
+                                .inject("dopamine", delta.dopamine, half_life);
                         }
                         if delta.noradrenaline.abs() > NEUROMOD_DELTA_THRESHOLD {
-                            self.neuromod.bath.inject("noradrenaline", delta.noradrenaline, half_life);
+                            self.neuromod.bath.inject(
+                                "noradrenaline",
+                                delta.noradrenaline,
+                                half_life,
+                            );
                         }
                         if delta.oxytocin.abs() > NEUROMOD_DELTA_THRESHOLD {
-                            self.neuromod.bath.inject("oxytocin", delta.oxytocin, half_life);
+                            self.neuromod
+                                .bath
+                                .inject("oxytocin", delta.oxytocin, half_life);
                         }
                         if delta.gaba.abs() > NEUROMOD_DELTA_THRESHOLD {
                             self.neuromod.bath.inject("gaba", delta.gaba, half_life);
                         }
                         if delta.acetylcholine.abs() > NEUROMOD_DELTA_THRESHOLD {
-                            self.neuromod.bath.inject("acetylcholine", delta.acetylcholine, half_life);
+                            self.neuromod.bath.inject(
+                                "acetylcholine",
+                                delta.acetylcholine,
+                                half_life,
+                            );
                         }
                     }
                 }
@@ -473,14 +599,28 @@ impl CognitiveLoopService {
                 // Science: Kanerva (2009) HDC, Pearl (2009) Causality.
                 if let Some(ref mut km) = self.knowledge_manager {
                     let (_telem, sigs) = km.process(input, cycle_num);
-                    let sigs = sigs.clone(); // release borrow
+
+                    // Extract scalar fields to release the borrow on km,
+                    // avoiding a full KnowledgeSignals clone per cycle.
+                    let sigs_uncertainty = sigs.uncertainty;
+                    let sigs_causal_depth = sigs.causal_depth;
+                    let sigs_relevance = sigs.relevance;
+                    let sigs_contradiction = sigs.contradiction_signal;
+
+                    // ── Write carryover + telemetry (needs &mut km / &km) ──
+                    let grounding = (sigs_relevance * KNOWLEDGE_GROUNDING_RELEVANCE_WEIGHT
+                        + (1.0 - sigs_uncertainty) * KNOWLEDGE_GROUNDING_CERTAINTY_WEIGHT)
+                        .clamp(0.0, 1.0);
+                    self.carryover.quality.wm_knowledge_grounding = grounding;
+                    self.carryover.quality.wm_knowledge_injection_count =
+                        km.telemetry().facts_inserted.min(255) as u8;
 
                     // ── Neuromod coupling from knowledge signals ──────────
                     // High uncertainty → NE vigilance (Yu & Dayan 2005)
-                    if sigs.uncertainty > 0.5 {
+                    if sigs_uncertainty > 0.5 {
                         let ne_base = self.neuromod.bath.noradrenaline.baseline_val();
-                        let ne_nudge = KNOWLEDGE_UNCERTAINTY_NE_SCALE
-                            * (sigs.uncertainty as f32 - 0.5);
+                        let ne_nudge =
+                            KNOWLEDGE_UNCERTAINTY_NE_SCALE * (sigs_uncertainty as f32 - 0.5);
                         self.neuromod
                             .bath
                             .noradrenaline
@@ -488,54 +628,63 @@ impl CognitiveLoopService {
                     }
 
                     // High causal depth → DA reward for deep reasoning (Schultz 1997)
-                    if sigs.causal_depth > KNOWLEDGE_CAUSAL_DEPTH_EXPLOIT_THRESHOLD {
+                    if sigs_causal_depth > KNOWLEDGE_CAUSAL_DEPTH_EXPLOIT_THRESHOLD {
                         let da_base = self.neuromod.bath.dopamine.baseline_val();
-                        self.neuromod
-                            .bath
-                            .dopamine
-                            .set_baseline((da_base + KNOWLEDGE_CAUSAL_DEPTH_DA_NUDGE).clamp(0.0, 1.0));
+                        self.neuromod.bath.dopamine.set_baseline(
+                            (da_base + KNOWLEDGE_CAUSAL_DEPTH_DA_NUDGE).clamp(0.0, 1.0),
+                        );
                     }
 
                     // High relevance → 5-HT grounding confidence (Cools et al. 2008)
-                    if sigs.relevance > 0.5 && sigs.uncertainty < 0.5 {
+                    if sigs_relevance > 0.5 && sigs_uncertainty < 0.5 {
                         let sht_base = self.neuromod.bath.serotonin.baseline_val();
-                        self.neuromod
-                            .bath
-                            .serotonin
-                            .set_baseline((sht_base + KNOWLEDGE_GROUNDING_SHT_NUDGE).clamp(0.0, 1.0));
+                        self.neuromod.bath.serotonin.set_baseline(
+                            (sht_base + KNOWLEDGE_GROUNDING_SHT_NUDGE).clamp(0.0, 1.0),
+                        );
                     }
 
                     // Contradiction → NE + 5-HT (cognitive dissonance, Festinger 1957)
-                    if sigs.contradiction_signal > 0.0 {
+                    if sigs_contradiction > 0.0 {
                         let ne_base = self.neuromod.bath.noradrenaline.baseline_val();
-                        self.neuromod
-                            .bath
-                            .noradrenaline
-                            .set_baseline((ne_base + KNOWLEDGE_CONTRADICTION_NE_BOOST).clamp(0.0, 1.0));
+                        self.neuromod.bath.noradrenaline.set_baseline(
+                            (ne_base + KNOWLEDGE_CONTRADICTION_NE_BOOST).clamp(0.0, 1.0),
+                        );
                         let sht_base = self.neuromod.bath.serotonin.baseline_val();
-                        self.neuromod
-                            .bath
-                            .serotonin
-                            .set_baseline((sht_base + KNOWLEDGE_CONTRADICTION_SHT_BOOST).clamp(0.0, 1.0));
+                        self.neuromod.bath.serotonin.set_baseline(
+                            (sht_base + KNOWLEDGE_CONTRADICTION_SHT_BOOST).clamp(0.0, 1.0),
+                        );
                     }
-
-                    // ── Write carryover fields for working memory integration ──
-                    let grounding = (sigs.relevance * KNOWLEDGE_GROUNDING_RELEVANCE_WEIGHT
-                        + (1.0 - sigs.uncertainty) * KNOWLEDGE_GROUNDING_CERTAINTY_WEIGHT)
-                        .clamp(0.0, 1.0);
-                    self.carryover.quality.wm_knowledge_grounding = grounding;
-                    self.carryover.quality.wm_knowledge_injection_count =
-                        km.telemetry().facts_inserted.min(255) as u8;
 
                     // ── Drain contradiction alerts → exploration boost ─────
+                    // Confidence = contradiction_signal strength: strong contradictions
+                    // get full weight, weak ones are discounted.
+                    // Science: Festinger (1957) — dissonance strength scales with confidence.
                     let alerts = km.drain_alerts();
                     if !alerts.is_empty() {
-                        let boost = (alerts.len() as f32 * KNOWLEDGE_NOVELTY_EXPLORE_SCALE)
-                            .min(0.2);
-                        self.adjust_exploration("knowledge_contradictions", boost);
+                        let boost =
+                            (alerts.len() as f32 * KNOWLEDGE_NOVELTY_EXPLORE_SCALE).min(0.2);
+                        let contra_conf = sigs_contradiction.clamp(0.0, 1.0) as f32;
+                        self.adjust_exploration_weighted(
+                            "knowledge_contradictions",
+                            boost,
+                            Priority::Cognitive,
+                            contra_conf.max(0.3), // floor at 0.3 so alerts always have some weight
+                        );
+                    }
+
+                    // ── Knowledge contradiction → attention reallocation ─────
+                    // When contradictions exceed salience threshold, boost exploration
+                    // to allocate more cognitive resources toward examining the conflict.
+                    // Science: Clark (2013) — predictive processing allocates attention
+                    // to prediction error sources; contradictions are high-PE events.
+                    if sigs_contradiction > KNOWLEDGE_ATTENTION_CONTRADICTION_THRESHOLD {
+                        let intensity = (sigs_contradiction
+                            - KNOWLEDGE_ATTENTION_CONTRADICTION_THRESHOLD)
+                            .min(1.0);
+                        let boost = (intensity * KNOWLEDGE_ATTENTION_CONTRADICTION_BOOST) as f32;
+                        self.adjust_exploration("knowledge_attention_realloc", boost);
                     }
                 }
-
             }
         }
 
@@ -615,13 +764,19 @@ impl CognitiveLoopService {
             if confidence_crash_detected {
                 // Session 11 Item 5: Grace period — lighter freeze after recent mode transition.
                 // Post-transition confidence drops are expected, not emergencies.
-                let freeze_duration = if self.carryover.urgency.mode_stability_counter < super::thresholds::MODE_STABILITY_GRACE_THRESHOLD {
+                let freeze_duration = if self.carryover.urgency.mode_stability_counter
+                    < super::thresholds::MODE_STABILITY_GRACE_THRESHOLD
+                {
                     super::thresholds::CONFIDENCE_CRASH_LIGHT_FREEZE_CYCLES // Light freeze: mode just changed, drop is expected
                 } else {
                     CONFIDENCE_CRASH_FREEZE_CYCLES // Full freeze
                 };
                 self.carryover.quality.crash_freeze_remaining = freeze_duration;
-                self.adjust_exploration_pri("confidence_crash", CONFIDENCE_CRASH_EXPLORATION_BOOST, Priority::Safety);
+                self.adjust_exploration_pri(
+                    "confidence_crash",
+                    CONFIDENCE_CRASH_EXPLORATION_BOOST,
+                    Priority::Safety,
+                );
                 tracing::debug!(
                     "Confidence crash detected: {prev_conf:.3} → {current_conf:.3} (drop={drop:.3}), \
                      freezing LR for {freeze_duration} cycles"
@@ -649,7 +804,9 @@ impl CognitiveLoopService {
         let pe_variance = self.stats.avg_prediction_error_sq
             - self.stats.avg_prediction_error * self.stats.avg_prediction_error;
         let pe_variance = pe_variance.max(0.0); // Clamp numerical noise
-        if pe_variance > PE_VARIANCE_THRESHOLD && self.stats.total_cycles > DYNAMICS_POST_BOOT_CYCLES {
+        if pe_variance > PE_VARIANCE_THRESHOLD
+            && self.stats.total_cycles > DYNAMICS_POST_BOOT_CYCLES
+        {
             // High variance = unstable errors → dampen confidence proportionally
             let variance_dampen = 1.0
                 - (pe_variance - PE_VARIANCE_THRESHOLD).min(PE_VARIANCE_MAX_EFFECT)
@@ -662,7 +819,11 @@ impl CognitiveLoopService {
             let coherence_boost = (self.carryover.consciousness.quantum_coherence
                 - QUANTUM_COHERENCE_THRESHOLD) as f32
                 * QUANTUM_COHERENCE_BOOST_SCALE;
-            self.adjust_exploration_pri("quantum_coherence", coherence_boost, Priority::Homeostatic);
+            self.adjust_exploration_pri(
+                "quantum_coherence",
+                coherence_boost,
+                Priority::Homeostatic,
+            );
         }
 
         // ── Foveation → dynamics coupling ────────────────────────────────
@@ -682,11 +843,23 @@ impl CognitiveLoopService {
                 && fov_conf > FOVEATION_HIGH_CONFIDENCE_THRESHOLD
             {
                 // Familiar scene: dampen exploration, boost confidence
-                self.scale_exploration_pri("foveation_familiar", FOVEATION_FAMILIAR_EXPLORATION_DAMPEN, Priority::Homeostatic);
-                self.scale_confidence_pri("foveation_familiar", FOVEATION_CONFIDENCE_BOOST, Priority::Homeostatic);
+                self.scale_exploration_pri(
+                    "foveation_familiar",
+                    FOVEATION_FAMILIAR_EXPLORATION_DAMPEN,
+                    Priority::Homeostatic,
+                );
+                self.scale_confidence_pri(
+                    "foveation_familiar",
+                    FOVEATION_CONFIDENCE_BOOST,
+                    Priority::Homeostatic,
+                );
             } else if fov_count > 0 && fov_conf < FOVEATION_HIGH_CONFIDENCE_THRESHOLD {
                 // Novel objects: boost learning rate
-                self.scale_lr_pri("foveation_novel", FOVEATION_NOVEL_LR_BOOST, Priority::Homeostatic);
+                self.scale_lr_pri(
+                    "foveation_novel",
+                    FOVEATION_NOVEL_LR_BOOST,
+                    Priority::Homeostatic,
+                );
             }
         }
 
@@ -775,11 +948,27 @@ impl CognitiveLoopService {
         // Sustained overshoot (>1.15) → system is overcorrecting → dampen LR.
         // Sustained undershoot (<0.85) → system is sluggish → boost LR.
         // Science: Turrigiano (2008) — homeostatic failure triggers synaptic recalibration.
-        if eff > HOMEOSTASIS_RECALIBRATE_HIGH && self.stats.total_cycles > DYNAMICS_POST_BOOT_CYCLES {
-            self.scale_lr_pri("homeostasis_overcorrect", 1.0 - HOMEOSTASIS_NEUROMOD_STEP, Priority::Homeostatic);
-            self.scale_exploration_pri("homeostasis_overcorrect", 1.0 + HOMEOSTASIS_NEUROMOD_STEP, Priority::Homeostatic);
-        } else if eff < HOMEOSTASIS_RECALIBRATE_LOW && eff > 0.0 && self.stats.total_cycles > DYNAMICS_POST_BOOT_CYCLES {
-            self.scale_lr_pri("homeostasis_sluggish", 1.0 + HOMEOSTASIS_NEUROMOD_STEP, Priority::Homeostatic);
+        if eff > HOMEOSTASIS_RECALIBRATE_HIGH && self.stats.total_cycles > DYNAMICS_POST_BOOT_CYCLES
+        {
+            self.scale_lr_pri(
+                "homeostasis_overcorrect",
+                1.0 - HOMEOSTASIS_NEUROMOD_STEP,
+                Priority::Homeostatic,
+            );
+            self.scale_exploration_pri(
+                "homeostasis_overcorrect",
+                1.0 + HOMEOSTASIS_NEUROMOD_STEP,
+                Priority::Homeostatic,
+            );
+        } else if eff < HOMEOSTASIS_RECALIBRATE_LOW
+            && eff > 0.0
+            && self.stats.total_cycles > DYNAMICS_POST_BOOT_CYCLES
+        {
+            self.scale_lr_pri(
+                "homeostasis_sluggish",
+                1.0 + HOMEOSTASIS_NEUROMOD_STEP,
+                Priority::Homeostatic,
+            );
         }
 
         // Session 10 Item 3: Coherence velocity → CfC tau modulation.
@@ -871,9 +1060,11 @@ impl CognitiveLoopService {
         let voice_heartbeat = crate::voice::VoiceOutputMetrics {
             articulation_score: coherence.clamp(0.0, 1.0),
             formant_accuracy: (1.0 - prediction_error).clamp(0.0, 1.0),
-            speech_rate: super::thresholds::VOICE_HEARTBEAT_BASE_RATE * self.adaptive_behavior.speech_rate_multiplier,
+            speech_rate: super::thresholds::VOICE_HEARTBEAT_BASE_RATE
+                * self.adaptive_behavior.speech_rate_multiplier,
             pitch_stability: pattern_confidence,
-            coarticulation_smoothness: coherence.clamp(0.0, 1.0) * super::thresholds::VOICE_HEARTBEAT_COARTICULATION_WEIGHT,
+            coarticulation_smoothness: coherence.clamp(0.0, 1.0)
+                * super::thresholds::VOICE_HEARTBEAT_COARTICULATION_WEIGHT,
             listener_prediction: if prediction_error < self.config.learning_threshold {
                 super::thresholds::VOICE_HEARTBEAT_LISTENER_SUCCESS
             } else {
@@ -908,8 +1099,16 @@ impl CognitiveLoopService {
             // Sensory-abstract mismatch → slow consolidation + dampen confidence.
             // Hierarchical decomposition is breaking → protect abstract representations.
             // Science: Friston (2010) — hierarchical level misalignment = high free energy.
-            self.scale_lr_pri("wm_sensory_mismatch", WM_MISMATCH_LR_SCALE, Priority::Homeostatic);
-            self.scale_confidence_pri("wm_sensory_mismatch", WM_MISMATCH_CONFIDENCE_SCALE, Priority::Homeostatic);
+            self.scale_lr_pri(
+                "wm_sensory_mismatch",
+                WM_MISMATCH_LR_SCALE,
+                Priority::Homeostatic,
+            );
+            self.scale_confidence_pri(
+                "wm_sensory_mismatch",
+                WM_MISMATCH_CONFIDENCE_SCALE,
+                Priority::Homeostatic,
+            );
         }
 
         // 10d. Update prediction confidence
@@ -951,8 +1150,16 @@ impl CognitiveLoopService {
                     excess * CROSS_MANIFOLD_EXPLORATION_SCALE,
                     Priority::Homeostatic,
                 );
-                self.scale_confidence_pri("cross_manifold_error", CROSS_MANIFOLD_CONFIDENCE_DAMPEN, Priority::Homeostatic);
-                self.scale_lr_pri("cross_manifold_error", CROSS_MANIFOLD_LR_BOOST, Priority::Homeostatic);
+                self.scale_confidence_pri(
+                    "cross_manifold_error",
+                    CROSS_MANIFOLD_CONFIDENCE_DAMPEN,
+                    Priority::Homeostatic,
+                );
+                self.scale_lr_pri(
+                    "cross_manifold_error",
+                    CROSS_MANIFOLD_LR_BOOST,
+                    Priority::Homeostatic,
+                );
             }
         }
 
@@ -977,7 +1184,11 @@ impl CognitiveLoopService {
             // Long-term error (500ms+, index 2) → planning uncertainty
             if let Some(&long_err) = perception.vision_horizon_errors.get(2) {
                 if long_err > VISION_LONG_HORIZON_CONFIDENCE_THRESHOLD {
-                    self.scale_confidence_pri("vision_horizon_long", VISION_HORIZON_CONFIDENCE_DAMPEN, Priority::Homeostatic);
+                    self.scale_confidence_pri(
+                        "vision_horizon_long",
+                        VISION_HORIZON_CONFIDENCE_DAMPEN,
+                        Priority::Homeostatic,
+                    );
                 }
             }
         }
@@ -993,7 +1204,10 @@ impl CognitiveLoopService {
                 } else {
                     0.0
                 };
-                let effectiveness = (raw_effectiveness * super::thresholds::MCTS_EFFECTIVENESS_NORM_SCALE + super::thresholds::MCTS_EFFECTIVENESS_NORM_OFFSET).clamp(0.0, 1.0);
+                let effectiveness = (raw_effectiveness
+                    * super::thresholds::MCTS_EFFECTIVENESS_NORM_SCALE
+                    + super::thresholds::MCTS_EFFECTIVENESS_NORM_OFFSET)
+                    .clamp(0.0, 1.0);
                 if effectiveness > MCTS_EFFECTIVENESS_HIGH {
                     self.adjust_confidence(
                         "mcts_effective",
@@ -1051,9 +1265,14 @@ impl CognitiveLoopService {
         let (fep_accuracy, fep_complexity, fep_surprise, fep_td_error) =
             if let Some((acc, comp, surp, pe)) = fep_vals {
                 if acc > FEP_ACCURACY_CONFIDENCE_THRESHOLD {
-                    self.adjust_confidence(
+                    // Confidence = FEP accuracy: models with high accuracy
+                    // get full weight; marginal accuracy is discounted.
+                    // Science: Friston (2010) — model evidence scales with accuracy.
+                    self.adjust_confidence_weighted(
                         "fep_accuracy_high",
                         super::thresholds::FEP_ACCURACY_HIGH_CONFIDENCE,
+                        Priority::Homeostatic,
+                        acc.clamp(0.0, 1.0) as f32,
                     );
                 }
                 if comp > FEP_COMPLEXITY_THRESHOLD {
@@ -1121,10 +1340,15 @@ impl CognitiveLoopService {
                     0.0
                 };
                 if edge_count > 5 && avg_confidence > CAUSAL_CONFIDENCE_DENSE_THRESHOLD as f64 {
-                    self.adjust_confidence(
+                    // Confidence = avg_confidence of causal edges: denser, more
+                    // confident graphs carry more weight in the consensus.
+                    // Science: Pearl (2000) — causal confidence scales with evidence.
+                    self.adjust_confidence_weighted(
                         "causal_graph_dense",
                         (avg_confidence as f32 - CAUSAL_CONFIDENCE_DENSE_THRESHOLD)
                             * CAUSAL_DENSE_CONFIDENCE_SCALE,
+                        Priority::Cognitive,
+                        avg_confidence.clamp(0.0, 1.0) as f32,
                     );
                 } else if edge_count >= 3
                     && avg_confidence > CAUSAL_CONFIDENCE_MODERATE_THRESHOLD as f64
@@ -1132,10 +1356,12 @@ impl CognitiveLoopService {
                     // Session 13 Item 1: Fill dead zone for moderate causal density.
                     // 3-5 edges with decent confidence = emerging structure → small boost.
                     // Science: Pearl (2000) — partial causal knowledge still informative.
-                    self.adjust_confidence(
+                    self.adjust_confidence_weighted(
                         "causal_graph_emerging",
                         (avg_confidence as f32 - CAUSAL_CONFIDENCE_MODERATE_THRESHOLD)
                             * CAUSAL_MODERATE_CONFIDENCE_SCALE,
+                        Priority::Cognitive,
+                        avg_confidence.clamp(0.0, 1.0) as f32,
                     );
                 }
                 if edge_count < 2 && self.stats.total_cycles > 200 {
@@ -1412,7 +1638,7 @@ impl CognitiveLoopService {
                     }
                 };
 
-            let dm = if let Some(ref resp) = response {
+            let dm = if let Some(resp) = response {
                 // Math Phi → consciousness coupling: boost prediction confidence
                 // when math produces high-Phi verified results.
                 if resp.multipath_verified && resp.phi > 0.3 {
@@ -1435,13 +1661,14 @@ impl CognitiveLoopService {
                     self.neuromod.bath.dopamine.set_baseline(da_base + 0.01);
                 }
 
+                // Move owned fields (answer, epistemic_caveat) instead of cloning.
                 DynMath {
                     solved: true,
                     phi: resp.phi,
                     confidence: resp.confidence,
                     multipath_verified: resp.multipath_verified,
-                    answer: resp.answer.clone(),
-                    epistemic_caveat: resp.epistemic_caveat.clone(),
+                    answer: resp.answer,
+                    epistemic_caveat: resp.epistemic_caveat,
                     error_bound: resp.error_bound,
                 }
             } else {
@@ -1576,7 +1803,11 @@ impl CognitiveLoopService {
                 }
                 MotorCommandType::MotorOutput => {
                     if let Some(ref mut bridge) = self.motor_rendering.output_bridge {
-                        let request = self.motor_rendering.pending_request.take().unwrap_or_default();
+                        let request = self
+                            .motor_rendering
+                            .pending_request
+                            .take()
+                            .unwrap_or_default();
                         // Use actual consciousness level for Phi gating,
                         // falling back to coherence if not yet computed.
                         // Coherence alone is a poor Phi proxy — it measures voice
@@ -1969,9 +2200,7 @@ impl CognitiveLoopService {
                     }
                 }
 
-                reasoning_narrative = reasoning_result.narrative.clone();
-
-                // Populate internal reasoning engine diagnostics.
+                // Populate internal reasoning engine diagnostics (all Copy fields).
                 re_phi_eff_raw = reasoning_result.phi_eff_raw as f32;
                 re_phi_eff = reasoning_result.phi_eff as f32;
                 re_epistemic_mod = reasoning_result.epistemic_mod as f32;
@@ -1994,6 +2223,9 @@ impl CognitiveLoopService {
                     BT::Tier1 => 5, // + decide + plan
                     BT::Tier2 => 7, // + analyze + narrative
                 };
+
+                // Move narrative last — avoids cloning an Option<String>.
+                reasoning_narrative = reasoning_result.narrative;
                 // Budget consumed: wall_time / available_budget.
                 if available_us > 0 {
                     re_budget_consumed =
@@ -2364,10 +2596,18 @@ impl CognitiveLoopService {
         };
 
         // ── Phase 21: Phenomenal binding → prediction confidence ─────────
+        // Confidence = cached_binding: strong binding carries full weight,
+        // weak binding is discounted in the consensus.
+        // Science: Treisman (1998) — binding confidence tracks integration strength.
         let binding_confidence_mod = if cached_binding > BINDING_CONFIDENCE_THRESHOLD {
             let conf_boost =
                 (cached_binding - BINDING_CONFIDENCE_THRESHOLD) * BINDING_STRONG_CONFIDENCE_SCALE;
-            self.adjust_confidence("binding_strong", conf_boost);
+            self.adjust_confidence_weighted(
+                "binding_strong",
+                conf_boost,
+                Priority::Cognitive,
+                cached_binding.clamp(0.0, 1.0),
+            );
             self.stats.binding_confidence_mod_count += 1;
             conf_boost
         } else if cached_binding < BINDING_LOW_THRESHOLD && cached_binding > 0.0 {
@@ -2515,16 +2755,25 @@ impl CognitiveLoopService {
         // Science: McClelland et al. (1995) — complementary learning systems.
         if resonator_best_sim > RESONATOR_CONSOLIDATION_THRESHOLD {
             self.fep.agent.precision.prior_precision = (self.fep.agent.precision.prior_precision
-                + (resonator_best_sim - RESONATOR_CONSOLIDATION_THRESHOLD) as f64 * super::thresholds::RESONATOR_CONSOLIDATION_PRECISION_SCALE)
+                + (resonator_best_sim - RESONATOR_CONSOLIDATION_THRESHOLD) as f64
+                    * super::thresholds::RESONATOR_CONSOLIDATION_PRECISION_SCALE)
                 .min(super::thresholds::RESONATOR_CONSOLIDATION_PRECISION_MAX);
             if self.stats.total_cycles > DYNAMICS_STARTUP_WARMUP_CYCLES {
-                self.scale_lr_pri("resonator_familiar", RESONATOR_FAMILIAR_LR_SCALE, Priority::Aesthetic);
+                self.scale_lr_pri(
+                    "resonator_familiar",
+                    RESONATOR_FAMILIAR_LR_SCALE,
+                    Priority::Aesthetic,
+                );
             }
         } else if resonator_best_sim < RESONATOR_NOVEL_THRESHOLD
             && resonator_best_sim > 0.0
             && self.stats.total_cycles > DYNAMICS_STARTUP_WARMUP_CYCLES
         {
-            self.scale_lr_pri("resonator_novel", RESONATOR_NOVEL_LR_SCALE, Priority::Aesthetic);
+            self.scale_lr_pri(
+                "resonator_novel",
+                RESONATOR_NOVEL_LR_SCALE,
+                Priority::Aesthetic,
+            );
         }
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -2540,7 +2789,8 @@ impl CognitiveLoopService {
             if goal_priority > GOAL_PRIORITY_LR_THRESHOLD
                 && !matches!(urgency, super::CycleUrgency::Critical)
             {
-                let goal_lr_boost = (goal_priority - GOAL_PRIORITY_LR_THRESHOLD) * super::thresholds::GOAL_PRIORITY_LR_SCALE;
+                let goal_lr_boost = (goal_priority - GOAL_PRIORITY_LR_THRESHOLD)
+                    * super::thresholds::GOAL_PRIORITY_LR_SCALE;
                 self.scale_lr("goal_priority", 1.0 + goal_lr_boost);
             }
             if prediction_error < self.config.learning_threshold
@@ -2677,8 +2927,10 @@ impl CognitiveLoopService {
         if self.carryover.urgency.arousal_trap_counter > AROUSAL_TRAP_RECOVERY_MIN_CYCLES {
             // Recovery intensity ramps from 0→1 over the ramp window, then stays at 1.0.
             // BUG FIX: Previously capped at counter=10, leaving extended traps unassisted.
-            let recovery_intensity =
-                ((self.carryover.urgency.arousal_trap_counter - AROUSAL_TRAP_RECOVERY_MIN_CYCLES) as f32 / AROUSAL_TRAP_RECOVERY_RAMP_CYCLES).min(1.0);
+            let recovery_intensity = ((self.carryover.urgency.arousal_trap_counter
+                - AROUSAL_TRAP_RECOVERY_MIN_CYCLES) as f32
+                / AROUSAL_TRAP_RECOVERY_RAMP_CYCLES)
+                .min(1.0);
             arousal_recovery_tau_factor = 1.0 + recovery_intensity * AROUSAL_RECOVERY_TAU_SCALE;
             arousal_recovery_active = true;
         } else {
@@ -2701,9 +2953,13 @@ impl CognitiveLoopService {
         // Session 11 Item 3: Gate behind cycle > 5 to avoid spurious velocity from default init.
         let coherence_velocity_tau_factor = {
             let cv = self.carryover.quality.coherence_velocity;
-            if self.stats.total_cycles > RESONATOR_STARTUP_CYCLES && cv > COHERENCE_VELOCITY_TAU_THRESHOLD {
+            if self.stats.total_cycles > RESONATOR_STARTUP_CYCLES
+                && cv > COHERENCE_VELOCITY_TAU_THRESHOLD
+            {
                 COHERENCE_VELOCITY_TAU_BOOST
-            } else if self.stats.total_cycles > RESONATOR_STARTUP_CYCLES && cv < -COHERENCE_VELOCITY_TAU_THRESHOLD {
+            } else if self.stats.total_cycles > RESONATOR_STARTUP_CYCLES
+                && cv < -COHERENCE_VELOCITY_TAU_THRESHOLD
+            {
                 COHERENCE_VELOCITY_TAU_DAMPEN
             } else {
                 1.0
@@ -2814,7 +3070,12 @@ impl CognitiveLoopService {
             // Aleatoric ≈ mean within-dimension variance across predictions
             // Use min length across all prediction vectors — HierarchicalCfC can produce
             // jagged vectors, and indexing by [0].len() would panic on shorter ones.
-            let dim = raw_predictions.iter().map(|p| p.len()).min().unwrap_or(0).max(1);
+            let dim = raw_predictions
+                .iter()
+                .map(|p| p.len())
+                .min()
+                .unwrap_or(0)
+                .max(1);
             let n = raw_predictions.len() as f32;
             let mut mean_var = 0.0f32;
             for d in 0..dim {
@@ -2905,14 +3166,18 @@ impl CognitiveLoopService {
         if level_errors.len() >= 2 && self.stats.total_cycles > DYNAMICS_STARTUP_WARMUP_CYCLES {
             let sensory_error = level_errors[0];
             let abstract_error = level_errors[level_errors.len() - 1];
-            if abstract_error > sensory_error * super::thresholds::WORLD_MODEL_CONFUSION_RATIO && abstract_error > super::thresholds::WORLD_MODEL_ERROR_FLOOR {
+            if abstract_error > sensory_error * super::thresholds::WORLD_MODEL_CONFUSION_RATIO
+                && abstract_error > super::thresholds::WORLD_MODEL_ERROR_FLOOR
+            {
                 self.adjust_exploration_pri(
                     "conceptual_confusion",
                     super::thresholds::CONCEPTUAL_CONFUSION_EXPLORATION,
                     Priority::Homeostatic,
                 );
             }
-            wm_sensory_mismatch = sensory_error > abstract_error * super::thresholds::WORLD_MODEL_MISMATCH_RATIO && sensory_error > super::thresholds::WORLD_MODEL_ERROR_FLOOR;
+            wm_sensory_mismatch = sensory_error
+                > abstract_error * super::thresholds::WORLD_MODEL_MISMATCH_RATIO
+                && sensory_error > super::thresholds::WORLD_MODEL_ERROR_FLOOR;
         }
         module_timings.world_model = _t.elapsed().as_micros() as u64;
 
@@ -3234,7 +3499,8 @@ impl CognitiveLoopService {
                     CANTOR_SURPRISE_BROCA_THRESHOLD,
                 };
                 let depth_boost = if self
-                    .cantor_dream.broadcast_buffer
+                    .cantor_dream
+                    .broadcast_buffer
                     .last()
                     .map(|crhv| crhv.depth > 5)
                     .unwrap_or(false)
@@ -3243,12 +3509,12 @@ impl CognitiveLoopService {
                 } else {
                     0
                 };
-                let surprise_boost = if self.cantor_dream.dream_surprise > CANTOR_SURPRISE_BROCA_THRESHOLD
-                {
-                    CANTOR_SURPRISE_BROCA_SPACING_BOOST
-                } else {
-                    0
-                };
+                let surprise_boost =
+                    if self.cantor_dream.dream_surprise > CANTOR_SURPRISE_BROCA_THRESHOLD {
+                        CANTOR_SURPRISE_BROCA_SPACING_BOOST
+                    } else {
+                        0
+                    };
                 depth_boost + surprise_boost
             };
             // Glyph modality → Broca cadence spacing: Threshold/Metaharmonic = +2 cycles.
@@ -3262,9 +3528,15 @@ impl CognitiveLoopService {
             #[cfg(not(feature = "glyph_codex"))]
             let glyph_spacing_boost: usize = 0;
             let broca_min_spacing = if self.stats.tom_prediction_mismatch_ema > 0.5 {
-                5 + fatigue_spacing_boost + governance_spacing_boost + cantor_spacing_boost + glyph_spacing_boost
+                5 + fatigue_spacing_boost
+                    + governance_spacing_boost
+                    + cantor_spacing_boost
+                    + glyph_spacing_boost
             } else {
-                7 + fatigue_spacing_boost + governance_spacing_boost + cantor_spacing_boost + glyph_spacing_boost
+                7 + fatigue_spacing_boost
+                    + governance_spacing_boost
+                    + cantor_spacing_boost
+                    + glyph_spacing_boost
             };
             let broca_should_generate = broca_psi > 0.4
                 && broca_novelty
@@ -3348,9 +3620,13 @@ impl CognitiveLoopService {
                             match self.therapeutic_manager.active_strategy() {
                                 Some(symthaea_therapeutic::RegulationStrategy::Validation) => 0.0,
                                 Some(symthaea_therapeutic::RegulationStrategy::Defusion) => 1.0,
-                                Some(symthaea_therapeutic::RegulationStrategy::CognitiveReappraisal) => 2.0,
+                                Some(
+                                    symthaea_therapeutic::RegulationStrategy::CognitiveReappraisal,
+                                ) => 2.0,
                                 Some(symthaea_therapeutic::RegulationStrategy::ExposurePrep) => 3.0,
-                                Some(symthaea_therapeutic::RegulationStrategy::DistressTolerance) => 4.0,
+                                Some(
+                                    symthaea_therapeutic::RegulationStrategy::DistressTolerance,
+                                ) => 4.0,
                                 Some(symthaea_therapeutic::RegulationStrategy::Containment) => 6.0,
                                 Some(symthaea_therapeutic::RegulationStrategy::Grounding) => 4.0,
                                 None => 0.0,
@@ -3361,11 +3637,13 @@ impl CognitiveLoopService {
                         #[cfg(feature = "therapeutic")]
                         client_distress_level: self.therapeutic_manager.client_distress(),
                         #[cfg(feature = "therapeutic")]
-                        intervention_depth: self.therapeutic_manager.active_strategy()
+                        intervention_depth: self
+                            .therapeutic_manager
+                            .active_strategy()
                             .map(|s| s.min_alliance()) // depth ≈ min_alliance required
                             .unwrap_or(0.0),
                     };
-                    if let Some(result) = broca.generate(signals) {
+                    if let Some(mut result) = broca.generate(signals) {
                         // Surface the generated text for consumers
                         if !result.text.is_empty() {
                             // Scope guard: check generated text for scope violations
@@ -3374,12 +3652,15 @@ impl CognitiveLoopService {
                             // Science: APA Ethics Code (2017) principle 2.01 — boundaries of competence
                             #[cfg(feature = "therapeutic")]
                             let text = if self.config.enable_therapeutic {
-                                self.therapeutic_manager.scope_guard.apply_disclaimers(&result.text)
+                                self.therapeutic_manager
+                                    .scope_guard
+                                    .apply_disclaimers(&result.text)
                             } else {
                                 result.text.clone()
                             };
+                            // Move the owned String instead of cloning when no scope guard needed.
                             #[cfg(not(feature = "therapeutic"))]
-                            let text = result.text.clone();
+                            let text = std::mem::take(&mut result.text);
                             self.language_comm.last_broca_text = Some(text);
                         }
 
@@ -3502,7 +3783,11 @@ impl CognitiveLoopService {
                 // reduces sensory search need (Levelt 1989 — monitoring loop).
                 if self.stats.broca_quality_ema > 0.7 {
                     let contraction = 1.0 - (self.stats.broca_quality_ema - 0.7) * 0.15; // [0.955, 1.0]
-                    self.scale_confidence_pri("broca_attention_contract", contraction, Priority::Aesthetic);
+                    self.scale_confidence_pri(
+                        "broca_attention_contract",
+                        contraction,
+                        Priority::Aesthetic,
+                    );
                 }
             }
         }

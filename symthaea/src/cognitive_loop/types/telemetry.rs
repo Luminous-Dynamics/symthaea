@@ -1329,7 +1329,6 @@ pub struct CycleMetadata {
     // These booleans tell dashboards whether 0.0 means "feature disabled"
     // vs "measured as zero". Populated at metadata construction time from
     // compile-time feature flags and runtime config.
-
     /// Whether the `reasoning_engine` feature is compiled in and active.
     #[serde(default)]
     pub reasoning_engine_enabled: bool,
@@ -1409,6 +1408,21 @@ pub struct TherapeuticTelemetry {
     /// Confrontation rupture count (cumulative).
     #[serde(default)]
     pub therapeutic_confrontation_count: u32,
+    /// RDoC 6-domain profile [NegVal, PosVal, Cognitive, Social, Arousal, Sensorimotor].
+    #[serde(default)]
+    pub therapeutic_rdoc_profile: [f32; 6],
+    /// Perpetuating factor descriptions from case formulation.
+    #[serde(default)]
+    pub therapeutic_perpetuating_factors: Vec<String>,
+    /// Protective factor descriptions from case formulation.
+    #[serde(default)]
+    pub therapeutic_protective_factors: Vec<String>,
+    /// Strategy effectiveness: Vec of (name, mean_effectiveness, use_count).
+    #[serde(default)]
+    pub therapeutic_strategy_effectiveness: Vec<(String, f32, u32)>,
+    /// Narrative temporal coherence (Adler 2012) [0.0–1.0].
+    #[serde(default)]
+    pub therapeutic_temporal_coherence: f32,
 }
 
 fn default_response_profile() -> String {

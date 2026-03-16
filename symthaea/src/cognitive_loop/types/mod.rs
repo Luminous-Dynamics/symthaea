@@ -73,6 +73,33 @@ fn default_one_f32_substrate() -> f32 {
     1.0
 }
 
+// ── Thermal Telemetry ─────────────────────────────────────────────────────
+
+/// Thermal telemetry snapshot from ThermalBridge.
+///
+/// Reports platform thermal state and its effect on CfC tau modulation.
+/// Populated each cycle from `thermal_bridge.signals()`.
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct ThermalTelemetry {
+    /// Current platform thermal level (0=Nominal, 1=Fair, 2=Serious, 3=Critical, 4=Emergency).
+    #[serde(default)]
+    pub thermal_level: u8,
+    /// EMA-smoothed CfC tau factor from thermal state [1.0, 2.5].
+    /// Multiplied into delta_t as the 10th modulation factor.
+    #[serde(default = "default_one_f64_thermal")]
+    pub thermal_tau_factor: f64,
+    /// Whether the thermal bridge recommends a consciousness profile downgrade.
+    #[serde(default)]
+    pub should_reduce_profile: bool,
+    /// Recommended frequency cap from thermal state (None = no override).
+    #[serde(default)]
+    pub target_frequency_override: Option<f32>,
+}
+
+fn default_one_f64_thermal() -> f64 {
+    1.0
+}
+
 // ── Integrity Telemetry ───────────────────────────────────────────────────
 
 /// Integrity telemetry snapshot from IntegrityManager.

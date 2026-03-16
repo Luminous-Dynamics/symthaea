@@ -35,7 +35,7 @@
 //!     result.epistemic_status.evidence_level);
 //! ```
 
-#![deny(unsafe_code)]
+#![cfg_attr(not(feature = "native-ffi"), deny(unsafe_code))]
 
 pub mod broca;
 pub mod config;
@@ -47,6 +47,9 @@ pub mod topology;
 
 #[cfg(feature = "wasm")]
 pub mod wasm_bindings;
+
+#[cfg(feature = "native-ffi")]
+pub mod native_ffi;
 
 pub use config::SporeConfig;
 pub use engine::SporeEngine;
