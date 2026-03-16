@@ -211,6 +211,10 @@ impl CodeExecutor {
 
                 // If tests, run the compiled test binary
                 if test_source.is_some() {
+                    // Allow the generated binary in the sandbox
+                    if let Some(path_str) = output_path.to_str() {
+                        self.sandbox.allow_command(path_str);
+                    }
                     match self
                         .sandbox
                         .run(output_path.to_str().unwrap_or("./generated"), &[])
