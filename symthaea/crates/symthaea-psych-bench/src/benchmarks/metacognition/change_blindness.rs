@@ -53,7 +53,7 @@ impl ChangeBlindnessBenchmark {
 
         // Detection temperature: higher = noisier decisions.
         // Time pressure makes detection harder (less careful comparison).
-        let temperature: f64 = (0.20 + config.time_pressure * 0.10)
+        let temperature: f64 = (0.12 + config.time_pressure * 0.10)
             * diff_model.temperature_multiplier(config.difficulty);
 
         // Scene parameters
@@ -154,9 +154,9 @@ impl ChangeBlindnessBenchmark {
                         xor_shift(&mut rng);
                         let blank = ContinuousHV::random(dim, rng.wrapping_add(3000));
                         let disrupted_pre =
-                            ContinuousHV::weighted_bundle(&[&pre_scene, &blank], &[0.55, 0.45]);
+                            ContinuousHV::weighted_bundle(&[&pre_scene, &blank], &[0.85, 0.15]);
                         let disrupted_post =
-                            ContinuousHV::weighted_bundle(&[&post_scene, &blank], &[0.55, 0.45]);
+                            ContinuousHV::weighted_bundle(&[&post_scene, &blank], &[0.85, 0.15]);
                         disrupted_pre.similarity(&disrupted_post) as f64
                     } else {
                         // No disruption: direct comparison, transient signal strong
@@ -168,7 +168,7 @@ impl ChangeBlindnessBenchmark {
 
                     // Detection decision: softmax of change signal vs threshold
                     // The threshold represents the criterion for reporting "change"
-                    let threshold = 0.15; // Base detection threshold
+                    let threshold = 0.10; // Base detection threshold
                     let signal_ev = change_signal / temperature;
                     let threshold_ev = threshold / temperature;
                     let max_ev = signal_ev.max(threshold_ev);

@@ -57,7 +57,7 @@ impl FeelingOfKnowingBenchmark {
         // the encoding range (~0.40-0.85) is the primary discriminative signal.
         // Lichtenstein et al. (1982): calibration degrades under time pressure.
         let fok_noise_range: f64 =
-            (0.04 + config.time_pressure * 0.08) / diff_model.signal_multiplier(config.difficulty);
+            (0.025 + config.time_pressure * 0.08) / diff_model.signal_multiplier(config.difficulty);
 
         // ── Study phase ──
         // Encode cue-target pairs into memory traces with varying quality.

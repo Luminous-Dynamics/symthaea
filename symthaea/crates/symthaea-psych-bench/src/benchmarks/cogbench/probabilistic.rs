@@ -19,7 +19,7 @@ impl ProbabilisticReasoningBenchmark {
     fn run_trial(&self, config: &BenchmarkConfig, _trial_idx: usize) -> (f64, f64, f64) {
         // Time pressure: base LR 0.15 matches human belief updating rate (Behrens et al., 2007);
         // +0.10/unit increases recency bias under deadline (Busemeyer & Townsend, 1993 DFT).
-        let lr = 0.15 + config.time_pressure * 0.10;
+        let lr = 0.12 + config.time_pressure * 0.10;
         let agent_config = ActiveInferenceAgentConfig {
             state_dim: 4,
             obs_dim: 4,

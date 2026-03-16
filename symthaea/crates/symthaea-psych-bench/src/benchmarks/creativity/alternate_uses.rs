@@ -124,7 +124,7 @@ impl AlternateUsesBenchmark {
             // Time pressure: -0.02/unit lowers minimum originality, +0.10/unit raises max similarity;
             // models relaxed quality criteria under deadline (Silvia et al., 2008; Beaty et al., 2014 AUT).
             let lower_bound = (0.04 - config.time_pressure * 0.02) as f32;
-            let upper_bound = (0.55 + config.time_pressure * 0.10) as f32;
+            let upper_bound = (0.62 + config.time_pressure * 0.10) as f32;
             attempts_since_last += 1;
             if sim > lower_bound && sim < upper_bound {
                 accepted_uses.push(use_hv);

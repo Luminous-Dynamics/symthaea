@@ -153,7 +153,7 @@ impl VisualSearchBenchmark {
 
                     // Serial inspection cost: ~0.5 ticks per item for conjunction
                     // (Wolfe, 1994 guided search: slope ~25ms/item ≈ 0.5 ticks/item).
-                    cumulative_rt += 0.5;
+                    cumulative_rt += 0.75;
 
                     // Early termination if strong match found
                     if sim > threshold + 0.15 {

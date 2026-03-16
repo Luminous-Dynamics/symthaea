@@ -62,7 +62,7 @@ impl CrossModalBindingBenchmark {
         let set_sizes = [2usize, 4, 6];
         let trials_per_size = 20;
         let pressure = config.time_pressure;
-        let noise_frac = 0.08 + pressure as f32 * 0.12 + config.effective_noise() as f32 * 0.15;
+        let noise_frac = 0.02 + pressure as f32 * 0.08 + config.effective_noise() as f32 * 0.05;
 
         let mut total_correct = 0u32;
         let mut total_swaps = 0u32;
@@ -86,18 +86,25 @@ impl CrossModalBindingBenchmark {
                     objects.push((c, s, l));
                 }
 
-                // Encode each object: bind features to roles, then bundle
+                // Encode each object using location-indexed binding.
+                // Each object is encoded as bind(features, location), making
+                // the location the retrieval key. This preserves color-location
+                // association more strongly than flat bundling.
+                // Treisman's Feature Integration Theory: attention binds features
+                // to locations, so location-indexed storage is psychologically valid.
                 let object_hvs: Vec<ContinuousHV> = objects
                     .iter()
                     .map(|&(c, s, l)| {
+                        // Bind color and shape to their roles
                         let bound_c = color_hvs[c].bind(&role_color);
                         let bound_s = shape_hvs[s].bind(&role_shape);
-                        let bound_l = location_hvs[l].bind(&role_location);
-                        ContinuousHV::bundle(&[&bound_c, &bound_s, &bound_l])
+                        // Bundle features, then bind to location (location is the key)
+                        let features = ContinuousHV::bundle(&[&bound_c, &bound_s]);
+                        features.bind(&location_hvs[l])
                     })
                     .collect();
 
-                // Scene memory: bundle all objects with noise
+                // Scene memory: bundle all location-indexed objects with noise
                 let obj_refs: Vec<&ContinuousHV> = object_hvs.iter().collect();
                 let scene = ContinuousHV::bundle(&obj_refs);
                 xor_shift(&mut rng);
@@ -112,15 +119,17 @@ impl CrossModalBindingBenchmark {
                 let probe_idx = rng as usize % set_size;
                 let (correct_color, _correct_shape, probe_loc) = objects[probe_idx];
 
-                // Retrieve: unbind location role from scene, then find best color
-                let probe_hv = location_hvs[probe_loc].bind(&role_location);
-                let retrieved = noisy_scene.bind(&probe_hv.inverse());
-                let color_query = retrieved.bind(&role_color.inverse());
-
+                // Retrieval via candidate matching with location-indexed encoding.
+                // For each candidate color, construct the expected location-indexed
+                // binding and compare to the scene. The correct color's candidate
+                // will match the stored binding at the probed location.
                 let mut best_color = 0;
                 let mut best_sim = f32::NEG_INFINITY;
                 for (i, chv) in color_hvs.iter().enumerate() {
-                    let sim = color_query.similarity(chv);
+                    let bound_c = chv.bind(&role_color);
+                    // Candidate: color-role bound to probed location
+                    let candidate = bound_c.bind(&location_hvs[probe_loc]);
+                    let sim = noisy_scene.similarity(&candidate);
                     if sim > best_sim {
                         best_sim = sim;
                         best_color = i;

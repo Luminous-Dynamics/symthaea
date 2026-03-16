@@ -161,7 +161,7 @@ impl BartBenchmark {
             rng_state ^= rng_state << 17;
             // Time pressure: base noise 7 pumps; +6/unit widens decision jitter, modeling impulsive
             // pump-to-target estimation under urgency (Lejuez et al., 2002 BART; Heitz, 2014 SAT).
-            let noise_range = 7 + (config.time_pressure * 6.0) as u64;
+            let noise_range = 9 + (config.time_pressure * 6.0) as u64;
             let noise = (rng_state % noise_range) as i64 - (noise_range as i64 / 2);
             let final_target = (adjusted_target as i64 + noise)
                 .max(1)

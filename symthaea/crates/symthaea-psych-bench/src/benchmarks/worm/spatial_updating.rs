@@ -82,7 +82,7 @@ impl SpatialUpdatingBenchmark {
         // modeling reduced search depth under speed emphasis (Luce, 1986 sequential sampling).
         let diff_model = difficulty_model_for("WorM::SpatialUpdating");
         let interference = config.difficulty as f32
-            * 0.35
+            * 0.20
             * diff_model.interference_multiplier(config.difficulty) as f32;
         let degraded_sim = (max_sim - interference).max(0.0);
         let threshold = 0.3 * diff_model.temperature_multiplier(config.difficulty) as f32

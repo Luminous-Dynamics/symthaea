@@ -71,7 +71,7 @@ impl NBackBenchmark {
         // Time pressure widens the acceptance window (lower threshold → more false alarms).
         // Encoding noise degrades similarity signal, further reducing discriminability.
         let noise = config.effective_noise();
-        let base_threshold = 0.45 - config.time_pressure * 0.30 - noise * 0.15;
+        let base_threshold = 0.50 - config.time_pressure * 0.25 - noise * 0.15;
         let match_threshold = (base_threshold / temp_mult).max(0.05) as f32;
 
         for (i, &item) in sequence.iter().enumerate() {
