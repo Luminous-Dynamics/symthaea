@@ -1054,9 +1054,10 @@ pub fn select_best_plan(
     }
 
     // Among feasible, prefer non-destructive plans
-    let safe: Vec<_> = feasible
+    let safe: Vec<(usize, &PlanCandidate)> = feasible
         .iter()
         .filter(|(_, c)| c.profile.max_destructiveness != DestructivenessLevel::Destructive)
+        .cloned()
         .collect();
 
     let pool = if safe.is_empty() { &feasible } else { &safe };
