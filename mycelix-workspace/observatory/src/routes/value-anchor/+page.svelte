@@ -341,7 +341,7 @@
             <div>
               <label for="report-evidence" class="text-xs text-gray-400">Evidence (optional)</label>
               <input id="report-evidence" type="text" bind:value={reportEvidence}
-                placeholder="Pick n Pay Roodepoort, 2026-03-14"
+                placeholder="e.g. Local shop, 2026-03-14"
                 maxlength="512"
                 class="w-full mt-1 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-green-500" />
             </div>

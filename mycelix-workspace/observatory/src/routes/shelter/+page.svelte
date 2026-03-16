@@ -200,11 +200,13 @@
 
 <!-- Placement Request Form Overlay -->
 {#if selectedUnitId !== null}
+  <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
   <div
     class="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
     on:click|self={closeRequestForm}
     on:keydown={e => { if (e.key === 'Escape') closeRequestForm(); }}
     role="dialog"
+    tabindex="-1"
     aria-modal="true"
     aria-label="Request placement form"
   >

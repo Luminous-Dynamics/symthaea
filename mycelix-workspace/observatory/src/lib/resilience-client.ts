@@ -267,7 +267,9 @@ export interface EmergencyChannel {
 // TEND Client
 // ============================================================================
 
-const DEFAULT_DAO = 'roodepoort-resilience';
+// Read DAO identifier from community config (set in community-config.json)
+import { getDefaultDao } from './community';
+const DEFAULT_DAO = getDefaultDao();
 
 export async function getBalance(memberDid: string, daoDid = DEFAULT_DAO): Promise<BalanceInfo> {
   if (!isConnected()) return mockBalance(memberDid, daoDid);

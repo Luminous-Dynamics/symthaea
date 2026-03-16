@@ -18,6 +18,7 @@
   import { connectionHealth, connectionQuality, connectionLabel, qualityColor } from '$lib/connection-health';
   import { queueCount, getQueue, removeItem, clearQueue, type QueuedSubmission } from '$lib/offline-queue';
   import { createFreshness } from '$lib/freshness';
+  import { getCommunityConfig } from '$lib/community';
   import FreshnessBar from '$lib/components/FreshnessBar.svelte';
   import { browser } from '$app/environment';
 
@@ -148,9 +149,10 @@
     contactEmail: string;
   }
 
+  const communityDefaults = getCommunityConfig();
   const defaultConfig: CommunityConfig = {
-    name: 'Roodepoort Community',
-    location: 'Roodepoort, Gauteng, South Africa',
+    name: communityDefaults.community_name,
+    location: '',
     contactName: '',
     contactPhone: '',
     contactEmail: '',

@@ -30,8 +30,10 @@
     status: CardStatus;
   }
 
+  import { getDefaultDao } from '$lib/community';
+
   const DEFAULT_MEMBER = 'did:key:local-operator';
-  const DEFAULT_DAO = 'dao:roodepoort';
+  const DEFAULT_DAO = getDefaultDao();
 
   let cards: DomainCard[] = [
     { domain: 'TEND', metric: '--', color: 'bg-green-500', borderColor: 'border-green-700', textColor: 'text-green-400', link: '/tend', status: 'loading' },

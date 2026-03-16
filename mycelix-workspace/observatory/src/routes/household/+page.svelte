@@ -231,7 +231,7 @@
               <!-- Contacts -->
               <div>
                 <div class="flex items-center justify-between mb-2">
-                  <label class="text-xs text-gray-400 uppercase tracking-wider">Emergency Contacts</label>
+                  <span class="text-xs text-gray-400 uppercase tracking-wider">Emergency Contacts</span>
                   <button type="button" on:click={addContact}
                     class="text-xs px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded transition-colors">
                     + Add Contact

@@ -247,7 +247,7 @@
           </div>
           <div>
             <label for="ploc" class="text-xs text-gray-400">Location</label>
-            <input id="ploc" bind:value={plotLocation} placeholder="Florida, Roodepoort"
+            <input id="ploc" bind:value={plotLocation} placeholder="e.g. 12 Main St, Suburb"
               class="w-full mt-1 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-green-500" />
           </div>
           <div>
