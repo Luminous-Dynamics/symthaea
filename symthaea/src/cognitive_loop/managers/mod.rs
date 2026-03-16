@@ -58,10 +58,26 @@ pub use radio_dispatcher::{
     SpectrumManager, SpectrumObservation, SpectrumTelemetry,
 };
 
+#[cfg(feature = "cpg")]
+pub mod cpg_manager;
+#[cfg(feature = "cpg")]
+pub use cpg_manager::{CpgConfig, CpgManager, CpgTelemetry, GaitPreset};
+
+#[cfg(feature = "spectral_state")]
+pub mod spectral_manager;
+#[cfg(feature = "spectral_state")]
+pub use spectral_manager::{SpectralManager, SpectralManagerConfig, SpectralTelemetry};
+
+#[cfg(feature = "glyph_codex")]
+pub mod glyph_manager;
+
 #[cfg(feature = "therapeutic")]
 pub mod therapeutic_manager;
 #[cfg(feature = "therapeutic")]
 pub mod therapeutic_dream_bridge;
+#[cfg(feature = "glyph_codex")]
+pub use glyph_manager::GlyphManager;
+
 #[cfg(feature = "therapeutic")]
 pub use therapeutic_manager::TherapeuticManager;
 #[cfg(feature = "therapeutic")]

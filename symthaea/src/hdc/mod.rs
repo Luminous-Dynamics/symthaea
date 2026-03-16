@@ -383,6 +383,14 @@ pub mod harmony_basis;
 /// Persistent homology on moral scenario hypervectors.
 pub mod moral_topology;
 
+/// Glyph Codex: symbolic consciousness field basis vectors and registry.
+#[cfg(feature = "glyph_codex")]
+pub mod glyph_basis;
+
+/// Embedded glyph registry data (70 entries from Primary Glyph Registry CSV).
+#[cfg(feature = "glyph_codex")]
+pub mod glyph_registry_data;
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // LOCAL MODULES - Narrative Reasoning
 // ═══════════════════════════════════════════════════════════════════════════════

@@ -984,6 +984,20 @@ impl CognitiveLoopService {
                     metadata.therapeutic.therapeutic_scope_violation = format!("{:?}", violation);
                 }
             }
+
+            // ── Alliance rupture-repair enriched telemetry ──
+            metadata.therapeutic.therapeutic_last_rupture_type = self
+                .therapeutic_manager
+                .alliance
+                .last_rupture_type()
+                .map(|rt| format!("{:?}", rt))
+                .unwrap_or_default();
+            metadata.therapeutic.therapeutic_repair_rate =
+                self.therapeutic_manager.alliance.repair_rate();
+            metadata.therapeutic.therapeutic_withdrawal_count =
+                self.therapeutic_manager.alliance.withdrawal_count();
+            metadata.therapeutic.therapeutic_confrontation_count =
+                self.therapeutic_manager.alliance.confrontation_count();
         }
 
         // ── Nurture/attachment telemetry ──

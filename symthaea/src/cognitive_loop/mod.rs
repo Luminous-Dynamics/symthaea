@@ -600,6 +600,15 @@ pub struct CognitiveLoopService {
     /// Subsystems clone this to report infrastructure errors.
     pub(crate) pain_tx: Option<crate::infrastructure::somatic_error_bridge::PainSender>,
 
+    /// Thermal bridge: converts platform thermal state into CfC tau modulation.
+    /// Hardware heat → tau slowdown → slower integration → less heat generated.
+    /// Science: Angilletta (2009) thermal performance curves.
+    pub(crate) thermal_bridge: crate::infrastructure::thermal_bridge::ThermalBridge,
+
+    /// Thermal channel sender for platform integration code.
+    /// Android PowerManager / iOS ProcessInfo / Linux sysfs thermal zones.
+    pub(crate) thermal_tx: Option<crate::infrastructure::thermal_bridge::ThermalSender>,
+
     /// Subsystem output collector (Phase 2.3 staged computation model).
     /// Collects SubsystemOutput proposals during Phase B (COMPUTE),
     /// integrates them in Phase C for consensus-averaged state updates.
@@ -677,6 +686,12 @@ pub struct CognitiveLoopService {
     /// Implements CognitiveSubsystem at interval 11. Feature-gated behind `therapeutic`.
     #[cfg(feature = "therapeutic")]
     therapeutic_manager: managers::TherapeuticManager,
+
+    /// Glyph Manager: symbolic consciousness field, 11 Field Modality basis vectors,
+    /// 70-glyph registry, developmental spiral tracking.
+    /// Implements CognitiveSubsystem at interval 43. Feature-gated behind `glyph_codex`.
+    #[cfg(feature = "glyph_codex")]
+    glyph_manager: managers::GlyphManager,
 
     /// Integrity Manager: BLAKE3 attestation, temporal consistency, behavioral canaries.
     /// Runs tamper detection at co-prime intervals. Feature-gated behind `integrity`.

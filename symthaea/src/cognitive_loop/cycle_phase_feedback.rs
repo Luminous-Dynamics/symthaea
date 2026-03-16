@@ -536,6 +536,7 @@ impl CognitiveLoopService {
         let EpisodicReplayResult {
             surprise_replay_batch_size,
             phasic_da_replay_boost,
+            memory_db_flushed,
         } = self.run_episodic_replay_and_memory_phase(
             &cycle_state,
             dynamics.fep.fep_surprise as f32, // memory_context_boost already handled
@@ -768,23 +769,47 @@ impl CognitiveLoopService {
                 // Moral topology → consciousness coupling
                 moral_drift: self.ethics_engine.moral_topology().moral_drift(20),
                 moral_anomaly_score: self.ethics_engine.last_anomaly_report().anomaly_score,
-                // Coherence field → consciousness coupling (McEwen 2007)
-                coherence_field_integration: self
-                    .coherence_field
-                    .as_ref()
-                    .map(|cf| cf.coherence as f64)
-                    .unwrap_or(0.5), // neutral when disabled
                 // HOT recursion depth: meta_cognition depth × substrate HOT capability
-                hot_depth: self
-                    .self_model_tier
-                    .meta_cognition
-                    .as_ref()
-                    .map(|mc| {
-                        let normalized_depth = mc.depth() as f64 / 3.0;
-                        normalized_depth
-                            * self.substrate_manager.hot_capability(&self.config)
-                    })
-                    .unwrap_or(0.5), // preserve backward compat when disabled
+                // Attenuated by moral hubris: overconfidence undermines self-knowledge.
+                // Basis: Kruger & Dunning (1999) — miscalibrated self-assessment.
+                hot_depth: {
+                    let raw_hot = self
+                        .self_model_tier
+                        .meta_cognition
+                        .as_ref()
+                        .map(|mc| {
+                            let normalized_depth = mc.depth() as f64 / 3.0;
+                            normalized_depth
+                                * self.substrate_manager.hot_capability(&self.config)
+                        })
+                        .unwrap_or(0.5); // preserve backward compat when disabled
+                    // Hubris attenuates HOT: can't claim deep self-knowledge while
+                    // morally overconfident. 0.7× during hubris, 1.0× otherwise.
+                    if self.ethics_engine.last_anomaly_report().moral_hubris {
+                        raw_hot * 0.7
+                    } else {
+                        raw_hot
+                    }
+                },
+                // Cantor metacognitive depth: derived from dream surprise EMA
+                // Higher surprise = richer fractal structure = deeper self-reference
+                cantor_metacognitive_depth: (self.cantor_dream.dream_surprise as f64).clamp(0.0, 1.0),
+                // Governance collective Phi: inter-agent consciousness integration
+                governance_collective_phi: {
+                    #[cfg(feature = "mycelix")]
+                    { self.governance_mgr.last_collective_phi() }
+                    #[cfg(not(feature = "mycelix"))]
+                    { 0.0 }
+                },
+                // Knowledge grounding: neutral when no reasoning context available
+                knowledge_grounding: 0.5,
+                // Glyph coherence: symbolic consciousness field integration
+                glyph_coherence: {
+                    #[cfg(feature = "glyph_codex")]
+                    { self.glyph_manager.last_coherence().value }
+                    #[cfg(not(feature = "glyph_codex"))]
+                    { 0.0 }
+                },
             },
         );
         self.consciousness_engine
@@ -810,7 +835,7 @@ impl CognitiveLoopService {
                 self.carryover.learning.subsystem_lr_factor.clamp(0.8, 1.2);
         }
         if let Some(consolidation_boost) = consciousness_output.episodic_consolidation_boost {
-            if let Some(ref mut replay) = self.phi_episodic_replay {
+            if let Some(ref mut replay) = self.episodic_persistence.replay {
                 replay.boost_recent_consolidation(consolidation_boost);
             }
         }
@@ -1026,20 +1051,23 @@ impl CognitiveLoopService {
 
         // Soul experience integration
         let _t = Instant::now();
-        if let Some(ref mut soul) = self.soul {
+        {
             let moral_score = self
-                .last_moral_judgment
-                .as_ref()
+                .last_moral_judgment()
                 .map(|j| j.moral_score)
                 .unwrap_or(0.0);
-            let experience = crate::soul::Experience {
-                embedding: encoding_hdv.clone(),
-                value_alignment: moral_score,
-                emotional_valence: self.emotion_contagion.valence,
-                lessons: Vec::new(),
-                timestamp: self.stats.total_cycles as u64,
-            };
-            soul.integrate_experience(experience);
+            let valence = self.emotion_contagion.valence;
+            let cycles = self.stats.total_cycles as u64;
+            if let Some(ref mut soul) = self.ethics_values.soul {
+                let experience = crate::soul::Experience {
+                    embedding: encoding_hdv.clone(),
+                    value_alignment: moral_score,
+                    emotional_valence: valence,
+                    lessons: Vec::new(),
+                    timestamp: cycles,
+                };
+                soul.integrate_experience(experience);
+            }
         }
         module_timings.soul_experience = _t.elapsed().as_micros() as u64;
 
@@ -1111,8 +1139,7 @@ impl CognitiveLoopService {
         let fep_confidence = (1.0 - dynamics.fep.fep_surprise.min(1.0)).max(0.0) as f32;
         let resonator_confidence = dynamics.resonator.resonator_best_sim;
         let moral_confidence = self
-            .last_moral_judgment
-            .as_ref()
+            .last_moral_judgment()
             .map(|j| (j.moral_score + 1.0) / 2.0)
             .unwrap_or(0.5);
         let mcts_confidence = self
@@ -1134,8 +1161,8 @@ impl CognitiveLoopService {
             .map(|s| (s - mean_signal).powi(2))
             .sum::<f32>()
             / signals.len() as f32;
-        let cross_module_agreement =
-            (1.0 - (variance * CROSS_MODULE_VARIANCE_AMPLIFICATION).sqrt()).clamp(0.0, 1.0);
+        let cross_module_agreement: f32 =
+            (1.0_f32 - (variance * CROSS_MODULE_VARIANCE_AMPLIFICATION as f32).sqrt()).clamp(0.0, 1.0);
         if cross_module_agreement > CROSS_MODULE_AGREEMENT_HIGH {
             self.adjust_confidence(
                 "cross_mod_agree",
@@ -1464,6 +1491,7 @@ impl CognitiveLoopService {
                 empathic_compassion,
                 empathic_tone_adj,
                 empathic_speech_rate_mod,
+                kosmic_coherence: self.carryover.quality.last_kosmic_coherence,
             },
             evolution: FbEvolution {
                 hierarchical_ltc_phi,
@@ -1491,6 +1519,7 @@ impl CognitiveLoopService {
                 codebook_diversity,
                 codebook_utilization_rate,
                 surprise_replay_batch_size,
+                memory_db_flushed,
             },
             support: FbSupport {
                 support_triage_count,

@@ -436,10 +436,16 @@ vision-manifold-camera = ["vision-manifold", "symthaea-vision-manifold/camera"] 
 foveation = ["dep:symthaea-foveation", "vision-manifold"]  # Foveation bridge for active vision (dorsal→ventral dispatch)
 foveation-perception = ["foveation", "symthaea-foveation/perception"]  # Foveation with real SigLIP/OCR/Moondream models
 integrity = []  # Hardware integrity / tamper detection framework (attestation, temporal checks, canaries)
+glyph_codex = []  # Glyph Codex: symbolic consciousness field (70 glyphs, 11 Field Modality basis vectors)
 semantic-encoder = ["symthaea-embeddings/embed-channel"]  # Background Qwen3 embedding channel for cognitive loop telemetry
 # Neural Bridge v2: BGE-M3 via Candle (LLM as Semantic Sensor)
 neural-bridge = ["candle-core", "candle-nn", "candle-transformers", "tokenizers", "hf-hub", "dep:sha2"]
 neural-bridge-cuda = ["neural-bridge", "candle-core/cuda", "candle-nn/cuda", "candle-transformers/cuda"]
+
+# ── Motor / Embodiment ─────────────────────────────────────────────
+cpg = []                                    # Central Pattern Generator (Kuramoto coupled oscillators)
+complex_cfc = ["symthaea-core/complex_cfc"] # Complex-valued CfC neuron with native oscillation
+spectral_state = []                         # Spectral twin: frequency-domain CfC state analysis
 
 # ── Distributed / Network ──────────────────────────────────────────
 mesh = []                                   # Physical mesh radio (LoRa + B.A.T.M.A.N. + Yggdrasil)

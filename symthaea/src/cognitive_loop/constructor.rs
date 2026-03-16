@@ -414,6 +414,11 @@ impl CognitiveLoopService {
         let (somatic_bridge_instance, pain_sender) =
             crate::infrastructure::somatic_error_bridge::SomaticErrorBridge::new();
 
+        // Thermal bridge: platform thermal state → CfC tau modulation
+        // Science: Angilletta (2009) thermal performance curves
+        let (thermal_bridge_instance, thermal_sender) =
+            crate::infrastructure::thermal_bridge::ThermalBridge::new();
+
         // SelfModelTierManager must be created before `config` is moved into the struct
         let self_model_tier = super::self_model_tier::SelfModelTierManager::new(&config);
 
@@ -831,6 +836,8 @@ impl CognitiveLoopService {
             neuromod: super::neuromod_manager::NeuromodManager::default(),
             somatic_bridge: somatic_bridge_instance,
             pain_tx: Some(pain_sender),
+            thermal_bridge: thermal_bridge_instance,
+            thermal_tx: Some(thermal_sender),
             subsystem_collector: super::subsystem_trait::OutputCollector::new(),
             last_snapshot: None,
 
@@ -939,6 +946,10 @@ impl CognitiveLoopService {
                 tm
             },
             cantor_dream: super::cantor_dream_manager::CantorDreamManager::new(super::thresholds::CANTOR_CODEBOOK_MAX_ENTRIES),
+            #[cfg(feature = "glyph_codex")]
+            glyph_manager: super::managers::GlyphManager::with_dim(
+                crate::hdc::moral_algebra::MORAL_DIM,
+            ),
             #[cfg(feature = "integrity")]
             integrity_manager: {
                 let mut im = crate::integrity::IntegrityManager::new();

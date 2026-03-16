@@ -1296,6 +1296,18 @@ pub struct TherapeuticTelemetry {
     /// Scope violation detected in Broca output this cycle (empty = none).
     #[serde(default)]
     pub therapeutic_scope_violation: String,
+    /// Last rupture type ("Withdrawal", "Confrontation", or empty).
+    #[serde(default)]
+    pub therapeutic_last_rupture_type: String,
+    /// Repair success rate (0.0–1.0, 1.0 = no ruptures or all repaired).
+    #[serde(default = "default_one_f32")]
+    pub therapeutic_repair_rate: f32,
+    /// Withdrawal rupture count (cumulative).
+    #[serde(default)]
+    pub therapeutic_withdrawal_count: u32,
+    /// Confrontation rupture count (cumulative).
+    #[serde(default)]
+    pub therapeutic_confrontation_count: u32,
 }
 
 fn default_response_profile() -> String {

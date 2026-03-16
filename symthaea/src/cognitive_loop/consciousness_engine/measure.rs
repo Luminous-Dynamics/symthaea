@@ -325,13 +325,25 @@ impl ConsciousnessEngine {
             0.0
         };
 
+        // Glyph coherence → consciousness coupling
+        // High symbolic integration across 11 Field Modalities → consciousness boost ±2%.
+        // Neutral at 0.0 (no glyph data). Only active with feature `glyph_codex`.
+        // Science: Jung (1959) — archetypal integration deepens conscious awareness.
+        let glyph_coherence_factor = if input.glyph_coherence > 0.01 {
+            (input.glyph_coherence - 0.5)
+                * super::super::thresholds::GLYPH_CONSCIOUSNESS_MODULATION
+        } else {
+            0.0
+        };
+
         unified_consciousness = (unified_consciousness
             + sht_2a_boost as f64
             + gaba_a_dampen as f64
             + entropy_factor
             + moral_dampen
             + cantor_depth_factor
-            + governance_phi_factor)
+            + governance_phi_factor
+            + glyph_coherence_factor)
             .clamp(0.0, 1.0);
 
         let total_us = total_start.elapsed().as_micros() as u64;

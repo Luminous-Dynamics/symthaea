@@ -162,6 +162,14 @@ pub(crate) struct ConsciousnessEngineInput<'a> {
     /// Neutral at 0.5 when knowledge engine is disabled.
     /// Science: Baddeley (2000) — working memory benefits from grounded semantic content.
     pub knowledge_grounding: f64,
+
+    // ── Glyph coherence → symbolic consciousness coupling ─────────────
+    /// Glyph field coherence [0.0, 0.95] from the GlyphManager.
+    /// Measures integration across all 11 Field Modalities (symbolic consciousness depth).
+    /// Modulates unified consciousness ±2%: high coherence → deeper symbolic integration.
+    /// Neutral at 0.0 when glyph_codex feature is disabled.
+    /// Science: Jung (1959) — archetypal integration; Grof (1985) — consciousness cartography.
+    pub glyph_coherence: f64,
 }
 
 /// Dynamic weights for the unified consciousness computation.
