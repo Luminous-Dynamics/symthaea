@@ -36,6 +36,9 @@ const EXPECTED_ROLES: &[&str] = &[
     "commons_care",
     "civic",
     "governance",
+    "hearth",
+    "knowledge",
+    "supplychain",
 ];
 
 /// The role→zome mappings that resilience-client.ts depends on.
@@ -44,7 +47,17 @@ const EXPECTED_ZOME_ROUTES: &[(&str, &str)] = &[
     ("finance", "price_oracle"),
     ("commons_care", "food_production"),
     ("commons_care", "mutualaid_timebank"),
+    ("commons_care", "water_capture"),
+    ("commons_care", "water_purity"),
+    ("commons_care", "care_circles"),
+    ("commons_care", "housing_units"),
     ("civic", "emergency_comms"),
+    ("hearth", "hearth_kinship"),
+    ("hearth", "hearth_emergency"),
+    ("hearth", "hearth_resources"),
+    ("knowledge", "claims"),
+    ("knowledge", "graph"),
+    ("supplychain", "inventory_coordinator"),
 ];
 
 #[test]
@@ -77,11 +90,11 @@ fn test_manifest_has_all_expected_roles() {
         );
     }
 
-    // Exactly 5 roles — no bloat
+    // Exactly 8 roles — no bloat
     assert_eq!(
         manifest.roles.len(),
-        5,
-        "Expected exactly 5 roles, found {}",
+        8,
+        "Expected exactly 8 roles, found {}",
         manifest.roles.len()
     );
 }

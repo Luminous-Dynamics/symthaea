@@ -3,7 +3,7 @@
 #
 # Automated setup for community deployment:
 #   1. Checks prerequisites (Docker, just, Nix)
-#   2. Builds the 5-DNA resilience hApp
+#   2. Builds the 8-DNA resilience hApp
 #   3. Starts conductor + Observatory
 #   4. Prints access URLs
 #
@@ -45,6 +45,14 @@ check_prerequisites() {
     if [[ "${1:-}" == "--docker" ]]; then
         check_command docker "Install: https://docs.docker.com/get-docker/"
         check_command docker-compose "Install: https://docs.docker.com/compose/install/"
+
+        # Warn on ARM64 — mesh-bridge Docker image requires x86_64
+        local arch
+        arch=$(uname -m)
+        if [[ "$arch" == "aarch64" || "$arch" == "arm64" ]]; then
+            warn "Detected ARM64 ($arch). Mesh bridge Docker image is x86_64 only."
+            warn "Conductor and Observatory will work, but mesh bridge may fail to build."
+        fi
     else
         check_command just "Install: cargo install just"
         check_command holochain "Install via nix develop"
@@ -90,8 +98,16 @@ deploy_dry_run() {
     echo ""
     info "--- Port availability ---"
     for port in 5173 8888 4444 9100; do
-        if ss -tlnp 2>/dev/null | grep -q ":${port} " || \
-           lsof -i ":${port}" &>/dev/null; then
+        local port_in_use=false
+        if command -v ss &>/dev/null; then
+            ss -tlnp 2>/dev/null | grep -q ":${port} " && port_in_use=true
+        elif command -v lsof &>/dev/null; then
+            lsof -i ":${port}" &>/dev/null && port_in_use=true
+        else
+            info "  Port $port: skipped (no ss or lsof available)"
+            continue
+        fi
+        if $port_in_use; then
             warn "  Port $port: IN USE (may conflict)"
             errors=$((errors + 1))
         else
@@ -100,12 +116,21 @@ deploy_dry_run() {
     done
 
     echo ""
+    info "--- Architecture ---"
+    local arch
+    arch=$(uname -m)
+    info "  Architecture: $arch"
+    if [[ "$arch" == "aarch64" || "$arch" == "arm64" ]]; then
+        warn "  ARM64 detected — mesh bridge Docker image is x86_64 only"
+    fi
+
+    echo ""
     info "--- Disk space ---"
     local avail_mb
     avail_mb=$(df -m "$WORKSPACE_DIR" 2>/dev/null | awk 'NR==2 {print $4}')
     if [ -n "$avail_mb" ]; then
-        if [ "$avail_mb" -lt 2048 ]; then
-            warn "  Available: ${avail_mb}MB — recommend at least 2GB"
+        if [ "$avail_mb" -lt 5120 ]; then
+            warn "  Available: ${avail_mb}MB — recommend at least 5GB (Rust build + hApp bundles)"
             errors=$((errors + 1))
         else
             info "  Available: ${avail_mb}MB"
@@ -163,12 +188,18 @@ deploy_local() {
     echo ""
     info "Resilience Kit is running!"
     echo ""
-    echo "  Dashboard:        http://localhost:5173/"
+    echo "  Resilience Hub:   http://localhost:5173/resilience"
     echo "  TEND Exchange:    http://localhost:5173/tend"
     echo "  Food Tracking:    http://localhost:5173/food"
     echo "  Mutual Aid:       http://localhost:5173/mutual-aid"
     echo "  Emergency Comms:  http://localhost:5173/emergency"
     echo "  Value Anchor:     http://localhost:5173/value-anchor"
+    echo "  Water Systems:    http://localhost:5173/water"
+    echo "  Household:        http://localhost:5173/household"
+    echo "  Knowledge:        http://localhost:5173/knowledge"
+    echo "  Care Circles:     http://localhost:5173/care-circles"
+    echo "  Shelter:          http://localhost:5173/shelter"
+    echo "  Supplies:         http://localhost:5173/supplies"
     echo ""
     echo "  Stop:  just stop"
     echo ""
@@ -245,12 +276,27 @@ check_status() {
     # Observatory
     echo ""
     info "--- Observatory ---"
+    local obs_url=""
     if curl -sf -o /dev/null --connect-timeout 2 http://localhost:5173/ 2>/dev/null; then
         info "  http://localhost:5173/: REACHABLE"
+        obs_url="http://localhost:5173"
     elif curl -sf -o /dev/null --connect-timeout 2 http://localhost/ 2>/dev/null; then
         info "  http://localhost/: REACHABLE (Docker/nginx)"
+        obs_url="http://localhost"
     else
         warn "  Observatory: NOT reachable"
+    fi
+
+    # Conductor ↔ Observatory connectivity
+    if [ -n "$obs_url" ]; then
+        echo ""
+        info "--- Conductor ↔ Observatory ---"
+        # Check if Observatory can reach resilience routes
+        if curl -sf -o /dev/null --connect-timeout 2 "${obs_url}/resilience" 2>/dev/null; then
+            info "  Resilience dashboard: REACHABLE"
+        else
+            warn "  Resilience dashboard: NOT reachable (route may not be built)"
+        fi
     fi
 
     # Mesh bridge health

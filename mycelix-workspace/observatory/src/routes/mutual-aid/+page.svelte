@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { writable } from 'svelte/store';
   import {
     getServiceOffers,
@@ -9,6 +9,10 @@
     type AidOffer,
     type AidRequest,
   } from '$lib/resilience-client';
+  import { toasts } from '$lib/toast';
+  import { exportAidOffersCsv, exportAidRequestsCsv } from '$lib/data-export';
+  import { createFreshness } from '$lib/freshness';
+  import FreshnessBar from '$lib/components/FreshnessBar.svelte';
 
   // ============================================================================
   // Stores
@@ -35,26 +39,55 @@
   let showRequestForm = false;
 
   let submitting = false;
+  let loading = true;
+
+  // Search & filter
+  let searchQuery = '';
+  let filterCategory = '';
 
   const categories = ['Care', 'Transport', 'Food', 'Maintenance', 'Education', 'Childcare', 'Tech', 'Admin', 'Other'];
   const urgencyLevels: AidRequest['urgency'][] = ['low', 'medium', 'high', 'critical'];
+
+  function matchesSearch(...fields: string[]): boolean {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    return fields.some(f => f && f.toLowerCase().includes(q));
+  }
+
+  function matchesCategory(category: string): boolean {
+    return !filterCategory || category === filterCategory;
+  }
+
+  $: filteredOffers = $offers.filter(o => matchesSearch(o.title, o.description) && matchesCategory(o.category));
+  $: filteredRequests = $requests.filter(r => matchesSearch(r.title, r.description) && matchesCategory(r.category));
+
+  // ============================================================================
+  // Freshness — 2min polling
+  // ============================================================================
+
+  async function fetchData() {
+    const [o, r] = await Promise.all([
+      getServiceOffers(),
+      getServiceRequests(),
+    ]);
+    offers.set(o);
+    requests.set(r);
+  }
+
+  const freshness = createFreshness(fetchData, 120_000);
+  const { lastUpdated, loadError, refreshing, startPolling, stopPolling, refresh } = freshness;
 
   // ============================================================================
   // Lifecycle
   // ============================================================================
 
   onMount(async () => {
-    try {
-      const [o, r] = await Promise.all([
-        getServiceOffers(),
-        getServiceRequests(),
-      ]);
-      offers.set(o);
-      requests.set(r);
-    } catch (e) {
-      console.warn('[MutualAid] Failed to load data, using defaults:', e);
-    }
+    await refresh();
+    loading = false;
+    startPolling();
   });
+
+  onDestroy(() => stopPolling());
 
   async function handleCreateOffer() {
     if (!offerTitle || !offerDesc) return;
@@ -65,6 +98,9 @@
       offerTitle = '';
       offerDesc = '';
       showOfferForm = false;
+      toasts.success('Offer posted');
+    } catch (e) {
+      toasts.error(e instanceof Error ? e.message : 'Failed to post offer');
     } finally {
       submitting = false;
     }
@@ -79,6 +115,9 @@
       reqTitle = '';
       reqDesc = '';
       showRequestForm = false;
+      toasts.success('Request posted');
+    } catch (e) {
+      toasts.error(e instanceof Error ? e.message : 'Failed to post request');
     } finally {
       submitting = false;
     }
@@ -99,11 +138,14 @@
   <title>Mutual Aid | Mycelix Observatory</title>
 </svelte:head>
 
+{#if loading}
+  <div class="text-white p-8 text-center text-gray-400">Loading mutual aid data...</div>
+{:else}
 <div class="text-white">
   <header class="bg-gray-800/50 border-b border-gray-700 px-4 py-2">
     <div class="container mx-auto flex justify-between items-center">
       <div class="flex items-center gap-2">
-        <span class="text-xl">&#x1F932;</span>
+        <span class="text-xl" aria-hidden="true">&#x1F932;</span>
         <div>
           <h1 class="text-lg font-bold">Mutual Aid Timebank</h1>
           <p class="text-xs text-gray-400">Community care, neighbor to neighbor</p>
@@ -123,6 +165,7 @@
   </header>
 
   <main class="container mx-auto p-6">
+    <FreshnessBar {lastUpdated} {loadError} {refreshing} {refresh} />
     <!-- Stats -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
       <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
@@ -153,6 +196,24 @@
         class="px-4 py-2 bg-orange-600 hover:bg-orange-700 rounded text-sm font-medium transition-colors">
         + Request Help
       </button>
+    </div>
+
+    <!-- Search & Category Filter -->
+    <div class="mb-6 space-y-3">
+      <input type="text" bind:value={searchQuery} placeholder="Search offers & requests..."
+        class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500" />
+      <div class="flex flex-wrap gap-2">
+        <button on:click={() => filterCategory = ''}
+          class="px-3 py-1 rounded-full text-sm transition-colors {filterCategory === '' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}">
+          All
+        </button>
+        {#each categories as cat}
+          <button on:click={() => filterCategory = cat}
+            class="px-3 py-1 rounded-full text-sm transition-colors {filterCategory === cat ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}">
+            {cat}
+          </button>
+        {/each}
+      </div>
     </div>
 
     <!-- Offer Form -->
@@ -248,17 +309,17 @@
         <div class="flex gap-1">
           <button on:click={() => tab = 'offers'}
             class="px-3 py-1 rounded text-sm {tab === 'offers' ? 'bg-green-600' : 'bg-gray-700 hover:bg-gray-600'} transition-colors">
-            Offers ({$offers.length})
+            Offers ({filteredOffers.length})
           </button>
           <button on:click={() => tab = 'requests'}
             class="px-3 py-1 rounded text-sm {tab === 'requests' ? 'bg-orange-600' : 'bg-gray-700 hover:bg-gray-600'} transition-colors">
-            Requests ({$requests.length})
+            Requests ({filteredRequests.length})
           </button>
         </div>
       </div>
       <div class="p-4 space-y-3">
         {#if tab === 'offers'}
-          {#each $offers as offer}
+          {#each filteredOffers as offer}
             <div class="p-4 bg-gray-700/50 rounded-lg hover:bg-gray-700/70 transition-colors">
               <div class="flex justify-between items-start">
                 <div>
@@ -281,10 +342,10 @@
               </div>
             </div>
           {:else}
-            <p class="text-gray-500 text-center py-8">No offers yet. Be the first to help!</p>
+            <p class="text-gray-500 text-center py-8">{searchQuery || filterCategory ? 'No matching offers' : 'No offers yet. Be the first to help!'}</p>
           {/each}
         {:else}
-          {#each $requests as request}
+          {#each filteredRequests as request}
             <div class="p-4 bg-gray-700/50 rounded-lg hover:bg-gray-700/70 transition-colors">
               <div class="flex justify-between items-start">
                 <div>
@@ -307,14 +368,26 @@
               </div>
             </div>
           {:else}
-            <p class="text-gray-500 text-center py-8">No requests yet</p>
+            <p class="text-gray-500 text-center py-8">{searchQuery || filterCategory ? 'No matching requests' : 'No requests yet'}</p>
           {/each}
         {/if}
       </div>
     </div>
 
-    <footer class="mt-8 text-center text-gray-500 text-sm">
+    <div class="mt-6 flex justify-end gap-2">
+      <button on:click={() => exportAidOffersCsv($offers)}
+        class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded text-xs text-gray-300 transition-colors">
+        Export Offers CSV
+      </button>
+      <button on:click={() => exportAidRequestsCsv($requests)}
+        class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded text-xs text-gray-300 transition-colors">
+        Export Requests CSV
+      </button>
+    </div>
+
+    <footer class="mt-4 text-center text-gray-500 text-sm">
       <p>Mutual Aid Timebank &middot; Mycelix Commons</p>
     </footer>
   </main>
 </div>
+{/if}

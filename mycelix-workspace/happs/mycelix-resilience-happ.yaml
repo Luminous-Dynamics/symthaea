@@ -1,0 +1,115 @@
+---
+# Mycelix Resilience hApp Bundle
+# 8-DNA subset for community resilience deployment:
+# TEND mutual credit, food/water tracking, mutual aid, emergency comms,
+# household emergency planning, community knowledge, supply chain.
+#
+# Cuts unified bundle from 10 → 8 DNAs for faster startup and lower memory.
+# Governance included because TEND and Currency Mint require proposal authorization.
+#
+# Usage:
+#   hc app pack happs/ --manifest mycelix-resilience-happ.yaml
+#   hc sandbox call install-app mycelix-resilience.happ
+
+manifest_version: "0"
+name: mycelix-resilience
+description: |
+  Community Resilience Kit — essential economic infrastructure:
+  - Identity: DID registry, consciousness gating (tier source)
+  - Finance: TEND mutual credit, Currency Mint, Payments, Price Oracle
+  - Commons Care: Mutual aid, food production, water safety, care, transport
+  - Civic: Emergency communications
+  - Governance: Proposal authorization (required by TEND/Mint)
+  - Hearth: Household emergency plans, shared resources, family coordination
+  - Knowledge: Community expertise, claims, fact-checking
+  - Supplychain: Inventory tracking, stock levels, verification
+  Enables cross-cluster calls between all roles via OtherRole dispatch.
+
+roles:
+  - name: identity
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./identity/dna/mycelix_identity_dna.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0
+
+  - name: finance
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./finance/dna/mycelix_finance.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0
+
+  - name: commons_care
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./commons/dna/mycelix_commons_care.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0
+
+  - name: civic
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./civic/dna/mycelix_civic.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0
+
+  - name: governance
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./governance/dna/mycelix_governance_dna.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0
+
+  - name: hearth
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./hearth/dna/mycelix_hearth.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0
+
+  - name: knowledge
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./knowledge/dna/mycelix_knowledge.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0
+
+  - name: supplychain
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./supplychain/holochain/dna/supplychain.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0

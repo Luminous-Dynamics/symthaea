@@ -1,3 +1,8 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@media print {
+  nav, .fixed, .toast-container { display: none !important; }
+  body { background: white !important; color: black !important; }
+}

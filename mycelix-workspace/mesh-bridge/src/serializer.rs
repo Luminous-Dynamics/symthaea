@@ -12,6 +12,14 @@ pub enum RelayType {
     TendExchange = 1,
     FoodHarvest = 2,
     EmergencyMessage = 3,
+    WaterAlert = 4,
+    HearthAlert = 5,
+    KnowledgeClaim = 6,
+    CareCircleUpdate = 7,
+    ShelterUpdate = 8,
+    SupplyUpdate = 9,
+    MutualAidOffer = 10,
+    PriceReport = 11,
     Heartbeat = 255,
 }
 
@@ -55,6 +63,75 @@ pub struct EmergencyRelay {
     pub channel_id: String,
     pub content: String,
     pub priority: String,
+}
+
+/// Water contamination alert relay.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct WaterAlertRelay {
+    pub system_id: String,
+    pub alert_type: String,
+    pub severity: String,
+    pub description: String,
+}
+
+/// Hearth emergency alert relay.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct HearthAlertRelay {
+    pub hearth_id: String,
+    pub alert_type: String,
+    pub message: String,
+}
+
+/// Knowledge claim relay — community fact-sharing over mesh.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct KnowledgeClaimRelay {
+    pub claim_text: String,
+    pub tags: Vec<String>,
+    pub empirical: u8,
+    pub normative: u8,
+    pub materiality: u8,
+}
+
+/// Care circle update relay.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CareCircleRelay {
+    pub circle_id: String,
+    pub update_type: String,
+    pub details: String,
+}
+
+/// Shelter availability update relay.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ShelterRelay {
+    pub unit_id: String,
+    pub status: String,
+    pub bedrooms: u8,
+}
+
+/// Supply inventory update relay.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct SupplyRelay {
+    pub item_id: String,
+    pub item_name: String,
+    pub quantity: f32,
+    pub category: String,
+}
+
+/// Mutual aid offer/request relay.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct MutualAidRelay {
+    pub offer_type: String,
+    pub title: String,
+    pub description: String,
+    pub category: String,
+}
+
+/// Price report relay for oracle consensus.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PriceReportRelay {
+    pub item_name: String,
+    pub price_tend: f32,
+    pub evidence: String,
 }
 
 impl RelayPayload {
@@ -248,6 +325,14 @@ mod tests {
                 Just(RelayType::TendExchange),
                 Just(RelayType::FoodHarvest),
                 Just(RelayType::EmergencyMessage),
+                Just(RelayType::WaterAlert),
+                Just(RelayType::HearthAlert),
+                Just(RelayType::KnowledgeClaim),
+                Just(RelayType::CareCircleUpdate),
+                Just(RelayType::ShelterUpdate),
+                Just(RelayType::SupplyUpdate),
+                Just(RelayType::MutualAidOffer),
+                Just(RelayType::PriceReport),
                 Just(RelayType::Heartbeat),
             ],
             origin in proptest::array::uniform8(0u8..),
@@ -356,5 +441,61 @@ mod tests {
         frames.reverse();
         let reassembled = reassemble(&frames).unwrap();
         assert_eq!(reassembled, data);
+    }
+
+    #[test]
+    fn test_e2e_new_relay_types_roundtrip() {
+        let origin = [11, 22, 33, 44, 55, 66, 77, 88];
+
+        // Water alert
+        let water = WaterAlertRelay {
+            system_id: "rainwater-tank-3".into(),
+            alert_type: "Contamination".into(),
+            severity: "High".into(),
+            description: "E. coli detected in sector 7 tank".into(),
+        };
+        let water_data = bincode::serialize(&water).unwrap();
+        let water_payload = RelayPayload::new(RelayType::WaterAlert, origin, water_data);
+        let decoded = RelayPayload::from_bytes(&water_payload.to_bytes()).unwrap();
+        assert_eq!(decoded.relay_type, RelayType::WaterAlert);
+        let inner: WaterAlertRelay = bincode::deserialize(&decoded.data).unwrap();
+        assert_eq!(inner.system_id, "rainwater-tank-3");
+
+        // Knowledge claim
+        let knowledge = KnowledgeClaimRelay {
+            claim_text: "Moringa leaves can purify water".into(),
+            tags: vec!["water".into(), "purification".into()],
+            empirical: 2, normative: 1, materiality: 2,
+        };
+        let knowledge_data = bincode::serialize(&knowledge).unwrap();
+        let knowledge_payload = RelayPayload::new(RelayType::KnowledgeClaim, origin, knowledge_data);
+        let decoded = RelayPayload::from_bytes(&knowledge_payload.to_bytes()).unwrap();
+        assert_eq!(decoded.relay_type, RelayType::KnowledgeClaim);
+        let inner: KnowledgeClaimRelay = bincode::deserialize(&decoded.data).unwrap();
+        assert_eq!(inner.tags.len(), 2);
+
+        // Supply update
+        let supply = SupplyRelay {
+            item_id: "med-001".into(), item_name: "First aid kits".into(),
+            quantity: 8.0, category: "Medical".into(),
+        };
+        let supply_data = bincode::serialize(&supply).unwrap();
+        let supply_payload = RelayPayload::new(RelayType::SupplyUpdate, origin, supply_data);
+        let decoded = RelayPayload::from_bytes(&supply_payload.to_bytes()).unwrap();
+        assert_eq!(decoded.relay_type, RelayType::SupplyUpdate);
+        let inner: SupplyRelay = bincode::deserialize(&decoded.data).unwrap();
+        assert_eq!(inner.item_name, "First aid kits");
+
+        // Price report
+        let price = PriceReportRelay {
+            item_name: "Bread (700g)".into(), price_tend: 0.18,
+            evidence: "Shoprite Florida, 2026-03-15".into(),
+        };
+        let price_data = bincode::serialize(&price).unwrap();
+        let price_payload = RelayPayload::new(RelayType::PriceReport, origin, price_data);
+        let decoded = RelayPayload::from_bytes(&price_payload.to_bytes()).unwrap();
+        assert_eq!(decoded.relay_type, RelayType::PriceReport);
+        let inner: PriceReportRelay = bincode::deserialize(&decoded.data).unwrap();
+        assert!((inner.price_tend - 0.18).abs() < f32::EPSILON);
     }
 }

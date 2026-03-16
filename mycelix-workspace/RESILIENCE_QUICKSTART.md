@@ -1,17 +1,27 @@
 # Mycelix Resilience Kit — Quickstart
 
-Community economic resilience infrastructure for when times get tough.
+**v0.1.0** — Community economic resilience infrastructure for when times get tough.
 TEND mutual credit, food tracking, mutual aid, emergency comms, and a local price basket — all running on Holochain with optional offline LoRa mesh.
 
 ## What You Get
 
 | Feature | Description | Route |
 |---------|-------------|-------|
-| **TEND Exchange** | Mutual credit: 1 TEND = 1 hour of labor. Record exchanges, view balances, browse the service marketplace. | `/tend` |
-| **Food Production** | Track community plots, crops, and harvests. Food sovereignty data. | `/food` |
-| **Mutual Aid** | Post/browse service offers and requests. Timebank marketplace. | `/mutual-aid` |
-| **Emergency Comms** | Priority messaging (Flash/Immediate/Priority/Routine) with mesh relay. | `/emergency` |
-| **Value Anchor** | Local price basket so "1 TEND" has real purchasing power meaning. | `/value-anchor` |
+| **Resilience Dashboard** | Single-pane-of-glass: all 11 domains at a glance. | `/resilience` |
+| **TEND Exchange** | Mutual credit: 1 TEND = 1 hour of labor. Search/filter marketplace. | `/tend` |
+| **Food Production** | Track community plots, crops, and harvests. CSV export. | `/food` |
+| **Mutual Aid** | Post/browse service offers and requests. Search + category filter. | `/mutual-aid` |
+| **Emergency Comms** | Priority messaging with push notifications + 30s auto-refresh. | `/emergency` |
+| **Value Anchor** | Local price basket — SARS-compliant tax export. | `/value-anchor` |
+| **Water Systems** | Rainwater harvesting, quality readings, contamination alerts. | `/water` |
+| **Household Emergency** | Per-hearth emergency plans, contacts, shared resources, alerts. | `/household` |
+| **Community Knowledge** | Shared knowledge graph — claims, confidence levels, tags. | `/knowledge` |
+| **Care Circles** | Neighbourhood care groups for mutual support. | `/care-circles` |
+| **Shelter & Housing** | Available units, occupancy tracking, placement requests. | `/shelter` |
+| **Supply Chain** | Community inventory: stock levels, reorder alerts. CSV export. | `/supplies` |
+| **Operator Dashboard** | System health, domain counts, low-stock alerts, activity log. | `/admin` |
+| **Welcome / Onboarding** | 3-step guided introduction for new community members. | `/welcome` |
+| **Print Summary** | Printable community report (TEND, food, contacts, water, stock). | `/print` |
 
 ## Quick Start (Local)
 
@@ -41,13 +51,30 @@ nix develop
 
 ## What's Running
 
-- **Holochain Conductor** — 5-DNA hApp (identity, finance, commons, civic, governance)
+- **Holochain Conductor** — 8-DNA hApp (identity, finance, commons, civic, governance, hearth, knowledge, supplychain)
 - **Observatory** — SvelteKit dashboard at port 5173 (or 80 via nginx in Docker)
 - **Mesh Bridge** (optional) — LoRa/WiFi-direct relay for offline operation
+
+## First Run
+
+On first visit, new users see an onboarding flow at `/welcome` explaining what the kit does and how to get started. This can be revisited anytime or skipped permanently.
 
 ## Demo Mode
 
 If no Holochain conductor is detected, the Observatory runs in **demo mode** with simulated data. All features are visible and interactive — data just isn't persisted to the DHT. This is useful for training and familiarization.
+
+## Offline Support
+
+The kit is a **Progressive Web App** (PWA) — install it to your home screen on any device.
+
+- **Service worker** caches the app shell for instant loading
+- **Offline queue** stores submissions (TEND exchanges, etc.) in IndexedDB when the conductor is unreachable
+- **Auto-sync** flushes the queue when connectivity returns, or tap "Sync" manually
+- **Connection indicator** in the nav bar shows real-time connection quality
+
+## Emergency Notifications
+
+Enable browser notifications on the Emergency page to receive alerts for **Flash** and **Immediate** priority messages — even when the tab is in the background. The emergency route auto-refreshes every 30 seconds.
 
 ## Setting Up the Value Basket
 
@@ -95,7 +122,17 @@ Range: 10-15km line of sight. Auto-switches to mesh on internet loss, resyncs wh
 just resilience-test
 ```
 
-Runs: mesh-bridge (54 tests), price oracle (21 tests), Observatory type-check.
+Runs: mesh-bridge (59 tests), price oracle (21 tests), Observatory type-check (0 errors).
+
+```bash
+cd observatory && npx vitest run
+```
+
+Runs: 54 frontend unit tests (freshness, data-export, offline-queue, value-basket).
+
+**Total: 134 tests across Rust + TypeScript.**
+
+For day-to-day usage of each feature, see `RESILIENCE_OPERATOR_GUIDE.md`.
 
 ## Pre-deployment Check
 
@@ -128,7 +165,7 @@ Community Member
       |
   Observatory (SvelteKit)
       |
-  Holochain Conductor (5 DNAs)
+  Holochain Conductor (8 DNAs)
       |                    |
   DHT Gossip (internet)    Mesh Bridge (LoRa/BATMAN)
       |                    |

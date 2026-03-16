@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { writable } from 'svelte/store';
   import {
     getChannels,
@@ -10,6 +10,17 @@
     type EmergencyMessage,
     type EmergencyPriority,
   } from '$lib/resilience-client';
+  import { toasts } from '$lib/toast';
+  import { exportEmergencyMessagesCsv } from '$lib/data-export';
+  import { createFreshness } from '$lib/freshness';
+  import FreshnessBar from '$lib/components/FreshnessBar.svelte';
+  import {
+    requestPermission,
+    isSupported,
+    isEnabled,
+    notifyEmergency,
+    pushEnabled,
+  } from '$lib/push-notifications';
 
   // ============================================================================
   // Stores
@@ -28,28 +39,63 @@
   let newChannelName = '';
   let newChannelDesc = '';
   let showChannelForm = false;
+  let loading = true;
+
+  // Push notification state
+  let notifSupported = false;
+  let notifBannerDismissed = false;
+  const seenMessageIds = new Set<string>();
 
   const priorities: EmergencyPriority[] = ['Flash', 'Immediate', 'Priority', 'Routine'];
+
+  // ============================================================================
+  // Freshness — 30s polling (emergency is safety-critical)
+  // ============================================================================
+
+  async function fetchData() {
+    const ch = await getChannels();
+    channels.set(ch);
+    const sel = $selectedChannel;
+    if (sel) {
+      const msgs = await getMessages(sel.id);
+      // Detect new Flash/Immediate messages and send push notifications
+      for (const msg of msgs) {
+        if (!seenMessageIds.has(msg.id)) {
+          seenMessageIds.add(msg.id);
+          if (msg.priority === 'Flash' || msg.priority === 'Immediate') {
+            notifyEmergency(msg);
+          }
+        }
+      }
+      messages.set(msgs);
+    } else if (ch.length > 0) {
+      selectChannel(ch[0]);
+    }
+  }
+
+  const freshness = createFreshness(fetchData, 30_000);
+  const { lastUpdated, loadError, refreshing, startPolling, stopPolling, refresh } = freshness;
 
   // ============================================================================
   // Lifecycle
   // ============================================================================
 
   onMount(async () => {
-    try {
-      const ch = await getChannels();
-      channels.set(ch);
-      if (ch.length > 0) {
-        selectChannel(ch[0]);
-      }
-    } catch (e) {
-      console.warn('[Emergency] Failed to load channels, using defaults:', e);
-    }
+    notifSupported = isSupported();
+    await refresh();
+    loading = false;
+    startPolling();
   });
+
+  onDestroy(() => stopPolling());
 
   async function selectChannel(ch: EmergencyChannel) {
     selectedChannel.set(ch);
     const msgs = await getMessages(ch.id);
+    // Seed seen IDs so existing messages don't trigger notifications
+    for (const msg of msgs) {
+      seenMessageIds.add(msg.id);
+    }
     messages.set(msgs);
   }
 
@@ -62,6 +108,9 @@
       messages.update(list => [...list, msg]);
       msgContent = '';
       msgPriority = 'Routine';
+      toasts.success('Message sent');
+    } catch (e) {
+      toasts.error(e instanceof Error ? e.message : 'Failed to send message');
     } finally {
       submitting = false;
     }
@@ -77,6 +126,9 @@
       newChannelDesc = '';
       showChannelForm = false;
       selectChannel(ch);
+      toasts.success('Channel created');
+    } catch (e) {
+      toasts.error(e instanceof Error ? e.message : 'Failed to create channel');
     } finally {
       submitting = false;
     }
@@ -113,17 +165,39 @@
   <title>Emergency Comms | Mycelix Observatory</title>
 </svelte:head>
 
+{#if loading}
+  <div class="text-white p-8 text-center text-gray-400">Loading emergency channels...</div>
+{:else}
 <div class="text-white">
   <header class="bg-gray-800/50 border-b border-gray-700 px-4 py-2">
     <div class="container mx-auto flex justify-between items-center">
       <div class="flex items-center gap-2">
-        <span class="text-xl">&#x1F6A8;</span>
+        <span class="text-xl" aria-hidden="true">&#x1F6A8;</span>
         <div>
           <h1 class="text-lg font-bold">Emergency Communications</h1>
           <p class="text-xs text-gray-400">Priority messaging for community resilience</p>
         </div>
       </div>
       <div class="flex items-center gap-3">
+        {#if notifSupported}
+          <button
+            on:click={async () => {
+              if (isEnabled()) {
+                pushEnabled.set(false);
+              } else {
+                await requestPermission();
+              }
+            }}
+            class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors
+              {$pushEnabled && isEnabled()
+                ? 'bg-green-600/20 text-green-400 border border-green-500/50'
+                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}"
+            title={$pushEnabled && isEnabled() ? 'Notifications enabled' : 'Enable push notifications'}
+          >
+            <span aria-hidden="true">{$pushEnabled && isEnabled() ? '\u{1F514}' : '\u{1F515}'}</span>
+            {$pushEnabled && isEnabled() ? 'Notifications on' : 'Enable notifications'}
+          </button>
+        {/if}
         <div class="text-right">
           <p class="text-xs text-gray-400">Channels</p>
           <p class="text-lg font-bold">{$channels.length}</p>
@@ -133,13 +207,36 @@
   </header>
 
   <main class="container mx-auto p-6">
+    <FreshnessBar {lastUpdated} {loadError} {refreshing} {refresh} />
+
+    {#if notifSupported && !isEnabled() && !notifBannerDismissed}
+      <div class="mb-4 flex items-center justify-between bg-orange-900/30 border border-orange-700 rounded-lg px-4 py-3">
+        <p class="text-sm text-orange-300">
+          Enable notifications to receive Flash and Immediate alerts even when this tab is in the background.
+        </p>
+        <div class="flex items-center gap-2 ml-4 shrink-0">
+          <button
+            on:click={async () => { await requestPermission(); notifBannerDismissed = true; }}
+            class="px-3 py-1 bg-orange-600 hover:bg-orange-700 rounded text-xs font-medium text-white transition-colors">
+            Enable
+          </button>
+          <button
+            on:click={() => notifBannerDismissed = true}
+            class="px-2 py-1 text-gray-400 hover:text-gray-200 text-xs transition-colors">
+            Dismiss
+          </button>
+        </div>
+      </div>
+    {/if}
+
     <div class="grid grid-cols-1 lg:grid-cols-4 gap-6" style="min-height: 60vh;">
       <!-- Channel List -->
       <div class="bg-gray-800 rounded-lg border border-gray-700">
         <div class="p-4 border-b border-gray-700 flex justify-between items-center">
           <h2 class="text-sm font-semibold">Channels</h2>
           <button on:click={() => showChannelForm = !showChannelForm}
-            class="text-xs px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded transition-colors">
+            class="text-xs px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+            aria-label="New channel">
             + New
           </button>
         </div>
@@ -148,8 +245,10 @@
           <div class="p-3 border-b border-gray-700 bg-gray-700/50">
             <form on:submit|preventDefault={handleCreateChannel} class="space-y-2">
               <input bind:value={newChannelName} placeholder="Channel name"
+                aria-label="Channel name"
                 class="w-full bg-gray-600 border border-gray-500 rounded px-2 py-1 text-sm focus:outline-none focus:border-blue-500" />
               <input bind:value={newChannelDesc} placeholder="Description"
+                aria-label="Channel description"
                 class="w-full bg-gray-600 border border-gray-500 rounded px-2 py-1 text-sm focus:outline-none focus:border-blue-500" />
               <button type="submit" disabled={submitting || !newChannelName.trim()}
                 class="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 rounded px-2 py-1 text-xs font-medium">
@@ -195,9 +294,11 @@
                   <div class="flex items-center gap-2 text-xs text-gray-400">
                     <span>{formatTime(msg.sent_at)}</span>
                     {#if msg.synced}
-                      <span class="text-green-400" title="Synced">&#x2713;</span>
+                      <span class="text-green-400" title="Synced" aria-hidden="true">&#x2713;</span>
+                      <span class="sr-only">Synced</span>
                     {:else}
-                      <span class="text-yellow-400 animate-pulse" title="Pending sync">&#x25CF;</span>
+                      <span class="text-yellow-400 animate-pulse" title="Pending sync" aria-hidden="true">&#x25CF;</span>
+                      <span class="sr-only">Pending sync</span>
                     {/if}
                   </div>
                 </div>
@@ -210,14 +311,16 @@
 
           <!-- Send Form -->
           <div class="p-4 border-t border-gray-700">
-            <form on:submit|preventDefault={handleSend} class="flex gap-2">
+            <form on:submit|preventDefault={handleSend} class="flex flex-col sm:flex-row gap-2">
               <select bind:value={msgPriority}
-                class="bg-gray-700 border border-gray-600 rounded px-2 py-2 text-sm focus:outline-none focus:border-blue-500 w-32">
+                aria-label="Message priority"
+                class="bg-gray-700 border border-gray-600 rounded px-2 py-2 text-sm focus:outline-none focus:border-blue-500 w-full sm:w-32">
                 {#each priorities as p}
                   <option value={p}>{p}</option>
                 {/each}
               </select>
               <input bind:value={msgContent} placeholder="Type message..."
+                aria-label="Message content"
                 class="flex-1 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500" />
               <button type="submit" disabled={submitting || !msgContent.trim()}
                 class="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded px-4 py-2 text-sm font-medium transition-colors">
@@ -228,7 +331,7 @@
         {:else}
           <div class="flex-1 flex items-center justify-center text-gray-500">
             <div class="text-center">
-              <p class="text-4xl mb-2">&#x1F4E1;</p>
+              <p class="text-4xl mb-2" aria-hidden="true">&#x1F4E1;</p>
               <p>Select a channel to view messages</p>
             </div>
           </div>
@@ -256,8 +359,16 @@
       </div>
     </div>
 
-    <footer class="mt-8 text-center text-gray-500 text-sm">
+    <div class="mt-6 flex justify-end">
+      <button on:click={() => exportEmergencyMessagesCsv($messages)}
+        class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded text-xs text-gray-300 transition-colors">
+        Export Messages CSV
+      </button>
+    </div>
+
+    <footer class="mt-4 text-center text-gray-500 text-sm">
       <p>Emergency Communications &middot; Mycelix Civic</p>
     </footer>
   </main>
 </div>
+{/if}

@@ -4,7 +4,11 @@
 //! deserializes them, deduplicates by content hash, and replays
 //! as zome calls on the local Holochain conductor.
 
-use crate::serializer::{self, EmergencyRelay, FoodRelay, RelayPayload, RelayType, TendRelay};
+use crate::serializer::{
+    self, CareCircleRelay, EmergencyRelay, FoodRelay, HearthAlertRelay, KnowledgeClaimRelay,
+    MutualAidRelay, PriceReportRelay, RelayPayload, RelayType, ShelterRelay, SupplyRelay,
+    TendRelay, WaterAlertRelay,
+};
 use crate::transport::MeshTransport;
 use crate::BridgeMetrics;
 use anyhow::Result;
@@ -288,6 +292,82 @@ async fn replay_payload(
                 input,
             )
             .await?;
+        }
+        RelayType::WaterAlert => {
+            let water: WaterAlertRelay = bincode::deserialize(&payload.data)?;
+            tracing::info!("Replaying water alert: {} — {}", water.system_id, water.severity);
+            let input = ExternIO::encode(serde_json::json!({
+                "system_id": water.system_id, "alert_type": water.alert_type,
+                "severity": water.severity, "description": water.description,
+            }))?;
+            ws.call_zome(ZomeCallTarget::RoleName("commons_care".to_string().into()),
+                "water_purity".into(), "raise_alert".into(), input).await?;
+        }
+        RelayType::HearthAlert => {
+            let hearth: HearthAlertRelay = bincode::deserialize(&payload.data)?;
+            tracing::info!("Replaying hearth alert: {}", hearth.hearth_id);
+            let input = ExternIO::encode(serde_json::json!({
+                "hearth_id": hearth.hearth_id, "alert_type": hearth.alert_type, "message": hearth.message,
+            }))?;
+            ws.call_zome(ZomeCallTarget::RoleName("hearth".to_string().into()),
+                "hearth_emergency".into(), "raise_alert".into(), input).await?;
+        }
+        RelayType::KnowledgeClaim => {
+            let claim: KnowledgeClaimRelay = bincode::deserialize(&payload.data)?;
+            tracing::info!("Replaying knowledge claim: {}...", &claim.claim_text[..claim.claim_text.len().min(40)]);
+            let input = ExternIO::encode(serde_json::json!({
+                "claim_text": claim.claim_text, "tags": claim.tags,
+                "empirical": claim.empirical, "normative": claim.normative, "materiality": claim.materiality,
+            }))?;
+            ws.call_zome(ZomeCallTarget::RoleName("knowledge".to_string().into()),
+                "claims".into(), "submit_claim".into(), input).await?;
+        }
+        RelayType::CareCircleUpdate => {
+            let circle: CareCircleRelay = bincode::deserialize(&payload.data)?;
+            tracing::info!("Replaying care circle update: {}", circle.circle_id);
+            let input = ExternIO::encode(serde_json::json!({
+                "circle_id": circle.circle_id, "update_type": circle.update_type, "details": circle.details,
+            }))?;
+            ws.call_zome(ZomeCallTarget::RoleName("commons_care".to_string().into()),
+                "care_circles".into(), "post_update".into(), input).await?;
+        }
+        RelayType::ShelterUpdate => {
+            let shelter: ShelterRelay = bincode::deserialize(&payload.data)?;
+            tracing::info!("Replaying shelter update: unit {}", shelter.unit_id);
+            let input = ExternIO::encode(serde_json::json!({
+                "unit_id": shelter.unit_id, "status": shelter.status, "bedrooms": shelter.bedrooms,
+            }))?;
+            ws.call_zome(ZomeCallTarget::RoleName("commons_care".to_string().into()),
+                "housing_units".into(), "update_status".into(), input).await?;
+        }
+        RelayType::SupplyUpdate => {
+            let supply: SupplyRelay = bincode::deserialize(&payload.data)?;
+            tracing::info!("Replaying supply update: {} ({})", supply.item_name, supply.quantity);
+            let input = ExternIO::encode(serde_json::json!({
+                "item_id": supply.item_id, "item_name": supply.item_name,
+                "quantity": supply.quantity, "category": supply.category,
+            }))?;
+            ws.call_zome(ZomeCallTarget::RoleName("supplychain".to_string().into()),
+                "inventory_coordinator".into(), "update_stock".into(), input).await?;
+        }
+        RelayType::MutualAidOffer => {
+            let aid: MutualAidRelay = bincode::deserialize(&payload.data)?;
+            tracing::info!("Replaying mutual aid {}: {}", aid.offer_type, aid.title);
+            let input = ExternIO::encode(serde_json::json!({
+                "title": aid.title, "description": aid.description, "category": aid.category,
+            }))?;
+            let fn_name = if aid.offer_type == "Request" { "create_service_request" } else { "create_service_offer" };
+            ws.call_zome(ZomeCallTarget::RoleName("commons_care".to_string().into()),
+                "mutualaid_timebank".into(), fn_name.into(), input).await?;
+        }
+        RelayType::PriceReport => {
+            let price: PriceReportRelay = bincode::deserialize(&payload.data)?;
+            tracing::info!("Replaying price report: {} = {} TEND", price.item_name, price.price_tend);
+            let input = ExternIO::encode(serde_json::json!({
+                "item_name": price.item_name, "price_tend": price.price_tend, "evidence": price.evidence,
+            }))?;
+            ws.call_zome(ZomeCallTarget::RoleName("finance".to_string().into()),
+                "price_oracle".into(), "report_price".into(), input).await?;
         }
         RelayType::Heartbeat => unreachable!(), // handled above
     }

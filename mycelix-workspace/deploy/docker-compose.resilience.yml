@@ -1,14 +1,14 @@
 # Mycelix Resilience Kit — Docker Compose Override
 #
-# Runs the 5-DNA resilience hApp (identity + finance + commons-care + civic + governance)
-# instead of the full 10-DNA unified bundle.
+# Runs the 8-DNA resilience hApp (identity + finance + commons-care + civic + governance + hearth + knowledge + supplychain)
+# instead of the full unified bundle.
 #
 # Usage:
 #   cd deploy/
 #   docker-compose -f docker-compose.prod.yml -f docker-compose.resilience.yml up -d
 #
 # Prerequisites:
-#   just resilience-build   (builds the 5 DNAs and packs the hApp)
+#   just resilience-build   (builds the 8 DNAs and packs the hApp)
 
 services:
   conductor:

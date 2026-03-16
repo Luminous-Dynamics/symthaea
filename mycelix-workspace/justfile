@@ -83,12 +83,12 @@ logs:
 # RESILIENCE KIT
 # ============================================================
 
-# Build only the 5 resilience DNAs (identity + finance + commons-care + civic + governance)
-resilience-build: build-identity build-finance build-commons build-civic build-governance
-    @echo "Packing resilience hApp (5 DNAs)..."
+# Build all 8 resilience DNAs (identity + finance + commons-care + civic + governance + hearth + knowledge + supplychain)
+resilience-build: build-identity build-finance build-commons build-civic build-governance build-hearth build-knowledge build-supplychain
+    @echo "Packing resilience hApp (8 DNAs)..."
     @cd happs && ln -sf mycelix-resilience-happ.yaml happ.yaml && hc app pack . -o mycelix-resilience.happ; rm -f happ.yaml
     @echo ""
-    @echo "Resilience hApp packed: happs/mycelix-resilience.happ"
+    @echo "Resilience hApp packed: happs/mycelix-resilience.happ (8 DNAs)"
 
 # Build (if needed) and start resilience kit: conductor + Observatory
 resilience-up: resilience-build
@@ -128,7 +128,7 @@ resilience-test:
     @echo ""
     @echo "Running Observatory type-check (resilience routes)..."
     @cd observatory && npx svelte-check 2>&1 | tee /tmp/svelte-check.log | tail -1; \
-      if grep -q "routes/tend\|routes/food\|routes/mutual-aid\|routes/emergency\|routes/value-anchor\|lib/resilience-client\|lib/value-basket\|lib/community\|lib/tax-export" /tmp/svelte-check.log | grep -q "ERROR"; then \
+      if grep "routes/tend\|routes/food\|routes/mutual-aid\|routes/emergency\|routes/value-anchor\|routes/water\|routes/household\|routes/knowledge\|routes/care-circles\|routes/shelter\|routes/supplies\|lib/resilience-client\|lib/value-basket\|lib/community\|lib/tax-export" /tmp/svelte-check.log | grep -q "ERROR"; then \
         echo "  FAIL: Errors in resilience code"; exit 1; \
       else \
         echo "  Resilience routes: 0 errors"; \

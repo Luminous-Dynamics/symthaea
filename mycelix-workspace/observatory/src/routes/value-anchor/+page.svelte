@@ -21,6 +21,7 @@
   import { conductorStatus$ } from '$lib/conductor';
   import { generateTaxExport, exportToCsv, downloadExport } from '$lib/tax-export';
   import { getCommunityConfig } from '$lib/community';
+  import { toasts } from '$lib/toast';
 
   // ============================================================================
   // State
@@ -70,6 +71,7 @@
     if (ok) {
       reportStatus = 'cooldown';
       reportEvidence = '';
+      toasts.success('Price reported');
       reportCooldownSecs = 30;
       cooldownInterval = setInterval(() => {
         reportCooldownSecs -= 1;
@@ -81,6 +83,7 @@
       }, 1000);
     } else {
       reportStatus = 'error';
+      toasts.error('Failed to report price');
       setTimeout(() => { reportStatus = 'idle'; }, 2000);
     }
   }
@@ -100,8 +103,10 @@
     if (importBasket(importJson)) {
       importJson = '';
       showImportExport = false;
+      toasts.success('Basket updated');
     } else {
       importError = 'Invalid JSON format';
+      toasts.error('Invalid basket JSON format');
     }
   }
 
@@ -162,13 +167,13 @@
   <header class="bg-gray-800/50 border-b border-gray-700 px-4 py-2">
     <div class="container mx-auto flex justify-between items-center">
       <div class="flex items-center gap-2">
-        <span class="text-xl">&#x2696;</span>
+        <span class="text-xl" aria-hidden="true">&#x2696;</span>
         <div>
           <h1 class="text-lg font-bold">Value Anchor</h1>
           <p class="text-xs text-gray-400">{RESILIENCE_BASKET_NAME}</p>
         </div>
       </div>
-      <div class="flex items-center gap-4">
+      <div class="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4">
         <!-- Connection status -->
         <div class="text-xs">
           {#if $conductorStatus$ === 'connected'}
@@ -269,11 +274,12 @@
         <!-- Price list -->
         <div class="p-4 space-y-2">
           {#each displayItems as item (item.key)}
-            <div class="p-3 bg-gray-700/50 rounded-lg flex justify-between items-center">
+            <div class="p-3 bg-gray-700/50 rounded-lg flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
               <div class="flex items-center gap-3">
                 <!-- Source indicator -->
                 <div class="w-2 h-2 rounded-full {item.source === 'consensus' ? 'bg-green-400' : 'bg-yellow-400'}"
-                  title="{item.source === 'consensus' ? 'DHT Consensus' : 'Personal Estimate'}"></div>
+                  title="{item.source === 'consensus' ? 'DHT Consensus' : 'Personal Estimate'}"
+                  aria-hidden="true"></div>
                 <div>
                   <p class="font-medium text-sm">{item.name}</p>
                   <p class="text-xs text-gray-400">{item.unit}</p>
@@ -294,7 +300,8 @@
                   <span class="text-sm font-bold text-yellow-400">{item.price_tend.toFixed(2)} TEND</span>
                 {/if}
                 <button on:click={() => handleSelectItem(item.key)}
-                  class="text-xs text-blue-400 hover:text-blue-300">report</button>
+                  class="text-xs text-blue-400 hover:text-blue-300"
+                  aria-label="Report price for {item.name}">report</button>
               </div>
             </div>
           {:else}

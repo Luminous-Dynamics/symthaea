@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { writable } from 'svelte/store';
   import {
     getAllPlots,
@@ -16,6 +16,14 @@
     type ResourceType,
     type NutrientSummary,
   } from '$lib/resilience-client';
+  import { toasts } from '$lib/toast';
+  import { exportHarvestsCsv, exportPlotsCsv } from '$lib/data-export';
+  import { createFreshness } from '$lib/freshness';
+  import FreshnessBar from '$lib/components/FreshnessBar.svelte';
+
+  function resourceLabel(type: string): string {
+    return (RESOURCE_TYPE_LABELS as Record<string, string>)[type] ?? type;
+  }
 
   // ============================================================================
   // Stores
@@ -48,27 +56,39 @@
   let showResourceForm = false;
 
   let submitting = false;
+  let loading = true;
 
   const plotTypes = ['Raised beds', 'Open field', 'Greenhouse tunnel', 'Container garden', 'Vertical garden', 'Rooftop'];
+
+  // ============================================================================
+  // Freshness — 2min polling
+  // ============================================================================
+
+  async function fetchData() {
+    const [p, ri, ns] = await Promise.all([
+      getAllPlots(),
+      getCommunityInputs(),
+      getNutrientSummary(),
+    ]);
+    plots.set(p);
+    resourceInputs.set(ri);
+    nutrientSummary.set(ns);
+  }
+
+  const freshness = createFreshness(fetchData, 120_000);
+  const { lastUpdated, loadError, refreshing, startPolling, stopPolling, refresh } = freshness;
 
   // ============================================================================
   // Lifecycle
   // ============================================================================
 
   onMount(async () => {
-    try {
-      const [p, ri, ns] = await Promise.all([
-        getAllPlots(),
-        getCommunityInputs(),
-        getNutrientSummary(),
-      ]);
-      plots.set(p);
-      resourceInputs.set(ri);
-      nutrientSummary.set(ns);
-    } catch (e) {
-      console.warn('[Food] Failed to load data, using defaults:', e);
-    }
+    await refresh();
+    loading = false;
+    startPolling();
   });
+
+  onDestroy(() => stopPolling());
 
   async function handleRegisterPlot() {
     if (!plotName || !plotLocation || plotArea <= 0) return;
@@ -80,6 +100,9 @@
       plotLocation = '';
       plotArea = 20;
       showPlotForm = false;
+      toasts.success('Plot registered');
+    } catch (e) {
+      toasts.error(e instanceof Error ? e.message : 'Failed to register plot');
     } finally {
       submitting = false;
     }
@@ -95,6 +118,9 @@
       harvestKg = 1;
       harvestNotes = '';
       showHarvestForm = false;
+      toasts.success('Harvest recorded');
+    } catch (e) {
+      toasts.error(e instanceof Error ? e.message : 'Failed to record harvest');
     } finally {
       submitting = false;
     }
@@ -114,6 +140,9 @@
       riPlotId = '';
       riNotes = '';
       showResourceForm = false;
+      toasts.success('Input logged');
+    } catch (e) {
+      toasts.error(e instanceof Error ? e.message : 'Failed to log input');
     } finally {
       submitting = false;
     }
@@ -145,11 +174,14 @@
   <title>Food Production | Mycelix Observatory</title>
 </svelte:head>
 
+{#if loading}
+  <div class="text-white p-8 text-center text-gray-400">Loading food production data...</div>
+{:else}
 <div class="text-white">
   <header class="bg-gray-800/50 border-b border-gray-700 px-4 py-2">
     <div class="container mx-auto flex justify-between items-center">
       <div class="flex items-center gap-2">
-        <span class="text-xl">&#x1F331;</span>
+        <span class="text-xl" aria-hidden="true">&#x1F331;</span>
         <div>
           <h1 class="text-lg font-bold">Food Production</h1>
           <p class="text-xs text-gray-400">Community growing, harvest tracking</p>
@@ -165,6 +197,7 @@
   </header>
 
   <main class="container mx-auto p-6">
+    <FreshnessBar {lastUpdated} {loadError} {refreshing} {refresh} />
     <!-- Stats -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
       <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
@@ -329,7 +362,7 @@
     {#if $nutrientSummary}
       <div class="bg-gray-800 rounded-lg border border-gray-700 p-6 mb-6">
         <h2 class="text-sm font-semibold text-gray-300 mb-4 flex items-center gap-2">
-          <span>&#x1F33E;</span> Community Nutrient Summary
+          <span aria-hidden="true">&#x1F33E;</span> Community Nutrient Summary
         </h2>
         <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">
           <div class="bg-gray-700/50 rounded p-3">
@@ -358,7 +391,7 @@
             <p class="text-xs text-gray-400">By Resource Type</p>
             {#each $nutrientSummary.total_kg_by_type as [type, kg]}
               <div class="flex justify-between items-center text-sm">
-                <span class="text-gray-300">{RESOURCE_TYPE_LABELS[type] ?? type}</span>
+                <span class="text-gray-300">{resourceLabel(type)}</span>
                 <span class="text-gray-400">{kg.toFixed(1)} kg</span>
               </div>
             {/each}
@@ -372,7 +405,7 @@
       <div class="bg-gray-800 rounded-lg border border-gray-700 mb-6">
         <div class="p-4 border-b border-gray-700">
           <h2 class="text-lg font-semibold flex items-center gap-2">
-            <span>&#x267B;</span> Recent Contributions
+            <span aria-hidden="true">&#x267B;</span> Recent Contributions
           </h2>
         </div>
         <div class="p-4 space-y-2">
@@ -398,7 +431,7 @@
     <div class="bg-gray-800 rounded-lg border border-gray-700">
       <div class="p-4 border-b border-gray-700">
         <h2 class="text-lg font-semibold flex items-center gap-2">
-          <span>&#x1F33F;</span> Community Plots
+          <span aria-hidden="true">&#x1F33F;</span> Community Plots
         </h2>
       </div>
       <div class="p-4 space-y-3">
@@ -425,8 +458,20 @@
       </div>
     </div>
 
-    <footer class="mt-8 text-center text-gray-500 text-sm">
+    <div class="mt-6 flex justify-end gap-2">
+      <button on:click={() => exportPlotsCsv($plots)}
+        class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded text-xs text-gray-300 transition-colors">
+        Export Plots CSV
+      </button>
+      <button on:click={() => exportHarvestsCsv($harvests)}
+        class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded text-xs text-gray-300 transition-colors">
+        Export Harvests CSV
+      </button>
+    </div>
+
+    <footer class="mt-4 text-center text-gray-500 text-sm">
       <p>Food Production Tracker &middot; Mycelix Commons</p>
     </footer>
   </main>
 </div>
+{/if}

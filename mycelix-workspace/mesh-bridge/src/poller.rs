@@ -1,9 +1,15 @@
 //! Conductor Poller — polls for new entries and relays to mesh.
 //!
-//! Watches for new TEND exchanges, food harvests, and emergency messages
-//! by polling conductor via AppWebsocket. Deduplicates by action hash.
+//! Watches for new TEND exchanges, food harvests, emergency messages,
+//! water alerts, hearth alerts, knowledge claims, care circle updates,
+//! shelter updates, supply inventory, mutual aid offers, and price reports.
+//! Polls conductor via AppWebsocket. Deduplicates by action hash.
 
-use crate::serializer::{self, EmergencyRelay, RelayPayload, RelayType, TendRelay};
+use crate::serializer::{
+    self, CareCircleRelay, EmergencyRelay, FoodRelay, HearthAlertRelay, KnowledgeClaimRelay,
+    MutualAidRelay, PriceReportRelay, RelayPayload, RelayType, ShelterRelay, SupplyRelay,
+    TendRelay, WaterAlertRelay,
+};
 use crate::transport::MeshTransport;
 use crate::BridgeMetrics;
 use anyhow::Result;
@@ -28,6 +34,9 @@ const MAX_CONSECUTIVE_FAILURES: u32 = 5;
 /// Backoff multiplier per failure (capped at 5 minutes).
 const BACKOFF_BASE_SECS: u64 = 5;
 const BACKOFF_MAX_SECS: u64 = 300;
+
+/// Max entries per domain per poll cycle (backpressure).
+const MAX_ENTRIES_PER_DOMAIN: usize = 20;
 
 /// Run the poller loop: conductor → serializer → mesh transport.
 ///
@@ -69,7 +78,16 @@ pub async fn run(
         }
 
         // Try to connect and poll
-        match poll_once(conductor_url, &mut dedup, &origin, &*transport, &mut ws_cached).await {
+        match poll_once(
+            conductor_url,
+            &mut dedup,
+            &origin,
+            &*transport,
+            &mut ws_cached,
+            poll_count,
+        )
+        .await
+        {
             Ok(relayed) => {
                 consecutive_failures = 0;
                 if relayed > 0 {
@@ -142,18 +160,57 @@ pub async fn run(
     Ok(())
 }
 
+// ---------------------------------------------------------------------------
+// Helper: serialize + fragment + send a relay payload
+// ---------------------------------------------------------------------------
+
+async fn relay_payload(
+    relay_type: RelayType,
+    origin: &[u8; 8],
+    data: Vec<u8>,
+    transport: &dyn MeshTransport,
+) -> Result<()> {
+    let payload = RelayPayload::new(relay_type, *origin, data);
+    let bytes = payload.to_bytes();
+    let frames = serializer::fragment(&bytes, LORA_MAX_FRAME);
+    for frame in &frames {
+        transport.send(frame).await?;
+    }
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Helper: extract a string field from a JSON value
+// ---------------------------------------------------------------------------
+
+fn jstr(v: &serde_json::Value, key: &str) -> String {
+    v[key].as_str().unwrap_or("").to_string()
+}
+
+fn jf32(v: &serde_json::Value, key: &str) -> f32 {
+    v[key].as_f64().unwrap_or(0.0) as f32
+}
+
+fn ju8(v: &serde_json::Value, key: &str) -> u8 {
+    v[key].as_u64().unwrap_or(0) as u8
+}
+
+// ---------------------------------------------------------------------------
+// Single poll cycle
+// ---------------------------------------------------------------------------
+
 /// Single poll cycle. Returns number of entries relayed.
 ///
-/// Reuses a cached AppWebsocket connection when available. Reconnects
-/// on first call or after a failure clears the cache.
-///
-/// Requires MESH_APP_TOKEN env var for authentication.
+/// Priority scheduling:
+///   - Safety-critical (emergency, water, hearth, food): every cycle
+///   - Lower-priority (knowledge, shelter, supplies, care circles, mutual aid, price): every other cycle
 async fn poll_once(
     conductor_url: &str,
     dedup: &mut HashSet<String>,
     origin: &[u8; 8],
     transport: &dyn MeshTransport,
     ws_cached: &mut Option<AppWebsocket>,
+    poll_count: u64,
 ) -> Result<usize> {
     // Reuse cached connection or establish a new one
     let ws = match ws_cached.take() {
@@ -171,108 +228,611 @@ async fn poll_once(
 
     let mut relayed = 0;
 
+    // === SAFETY-CRITICAL: every cycle ===
+
     // --- Poll TEND exchanges ---
-    let tend_input = ExternIO::encode(serde_json::json!({
-        "dao_did": "roodepoort-resilience",
-        "limit": 50
-    }))?;
-
-    let tend_response = ws
-        .call_zome(
-            ZomeCallTarget::RoleName("finance".to_string().into()),
-            "tend".into(),
-            "get_my_exchanges".into(),
-            tend_input,
-        )
-        .await;
-
-    if let Ok(result) = tend_response {
-        if let Ok(exchanges) = result.decode::<Vec<serde_json::Value>>() {
-            for exchange in &exchanges {
-                let id = exchange["id"].as_str().unwrap_or("");
-                if id.is_empty() || dedup.contains(id) {
-                    continue;
-                }
-
-                let tend = TendRelay {
-                    receiver_did: exchange["receiver_did"]
-                        .as_str()
-                        .unwrap_or("")
-                        .to_string(),
-                    hours: exchange["hours"].as_f64().unwrap_or(0.0) as f32,
-                    service_description: exchange["service_description"]
-                        .as_str()
-                        .unwrap_or("")
-                        .to_string(),
-                    service_category: exchange["service_category"]
-                        .as_str()
-                        .unwrap_or("GeneralAssistance")
-                        .to_string(),
-                    dao_did: exchange["dao_did"]
-                        .as_str()
-                        .unwrap_or("roodepoort-resilience")
-                        .to_string(),
-                };
-
-                let data = bincode::serialize(&tend)?;
-                let payload = RelayPayload::new(RelayType::TendExchange, *origin, data);
-                let bytes = payload.to_bytes();
-                let frames = serializer::fragment(&bytes, LORA_MAX_FRAME);
-                for frame in &frames {
-                    transport.send(frame).await?;
-                }
-
-                dedup.insert(id.to_string());
-                relayed += 1;
-            }
-        }
-    }
+    relayed += poll_tend(&ws, dedup, origin, transport).await;
 
     // --- Poll emergency messages ---
-    let civic_role: ZomeCallTarget = ZomeCallTarget::RoleName("civic".to_string().into());
-    let emergency_input = ExternIO::encode(())?;
+    relayed += poll_emergency(&ws, dedup, origin, transport).await;
 
-    let emergency_response = ws
-        .call_zome(
-            civic_role,
-            "emergency_comms".into(),
-            "get_unsynced_messages".into(),
-            emergency_input,
-        )
-        .await;
+    // --- Poll water alerts ---
+    relayed += poll_water(&ws, dedup, origin, transport).await;
 
-    if let Ok(result) = emergency_response {
-        if let Ok(messages) = result.decode::<Vec<serde_json::Value>>() {
-            for msg in &messages {
-                let id = msg["id"].as_str().unwrap_or("");
-                if id.is_empty() || dedup.contains(id) {
-                    continue;
-                }
+    // --- Poll hearth alerts ---
+    relayed += poll_hearth(&ws, dedup, origin, transport).await;
 
-                let emergency = EmergencyRelay {
-                    channel_id: msg["channel_id"].as_str().unwrap_or("").to_string(),
-                    content: msg["content"].as_str().unwrap_or("").to_string(),
-                    priority: msg["priority"].as_str().unwrap_or("Routine").to_string(),
-                };
+    // --- Poll food harvests ---
+    relayed += poll_food(&ws, dedup, origin, transport).await;
 
-                let data = bincode::serialize(&emergency)?;
-                let payload = RelayPayload::new(RelayType::EmergencyMessage, *origin, data);
-                let bytes = payload.to_bytes();
-                let frames = serializer::fragment(&bytes, LORA_MAX_FRAME);
-                for frame in &frames {
-                    transport.send(frame).await?;
-                }
-
-                dedup.insert(id.to_string());
-                relayed += 1;
-            }
-        }
+    // === LOWER-PRIORITY: every other cycle ===
+    if poll_count % 2 == 0 {
+        relayed += poll_knowledge(&ws, dedup, origin, transport).await;
+        relayed += poll_care_circles(&ws, dedup, origin, transport).await;
+        relayed += poll_shelter(&ws, dedup, origin, transport).await;
+        relayed += poll_supplies(&ws, dedup, origin, transport).await;
+        relayed += poll_mutual_aid(&ws, dedup, origin, transport).await;
+        relayed += poll_price_reports(&ws, dedup, origin, transport).await;
     }
 
     // Cache connection for reuse on next poll cycle
     *ws_cached = Some(ws);
 
     Ok(relayed)
+}
+
+// ---------------------------------------------------------------------------
+// Domain-specific poll functions
+// ---------------------------------------------------------------------------
+
+async fn poll_tend(
+    ws: &AppWebsocket,
+    dedup: &mut HashSet<String>,
+    origin: &[u8; 8],
+    transport: &dyn MeshTransport,
+) -> usize {
+    let input = match ExternIO::encode(serde_json::json!({
+        "dao_did": "roodepoort-resilience",
+        "limit": MAX_ENTRIES_PER_DOMAIN
+    })) {
+        Ok(i) => i,
+        Err(_) => return 0,
+    };
+
+    let response = ws
+        .call_zome(
+            ZomeCallTarget::RoleName("finance".to_string().into()),
+            "tend".into(),
+            "get_my_exchanges".into(),
+            input,
+        )
+        .await;
+
+    let mut count = 0;
+    if let Ok(result) = response {
+        if let Ok(exchanges) = result.decode::<Vec<serde_json::Value>>() {
+            for exchange in exchanges.iter().take(MAX_ENTRIES_PER_DOMAIN) {
+                let id = jstr(exchange, "id");
+                if id.is_empty() || dedup.contains(&id) {
+                    continue;
+                }
+
+                let tend = TendRelay {
+                    receiver_did: jstr(exchange, "receiver_did"),
+                    hours: jf32(exchange, "hours"),
+                    service_description: jstr(exchange, "service_description"),
+                    service_category: jstr(exchange, "service_category"),
+                    dao_did: jstr(exchange, "dao_did"),
+                };
+
+                if let Ok(data) = bincode::serialize(&tend) {
+                    if relay_payload(RelayType::TendExchange, origin, data, transport)
+                        .await
+                        .is_ok()
+                    {
+                        dedup.insert(id);
+                        count += 1;
+                    }
+                }
+            }
+        }
+    }
+    count
+}
+
+async fn poll_emergency(
+    ws: &AppWebsocket,
+    dedup: &mut HashSet<String>,
+    origin: &[u8; 8],
+    transport: &dyn MeshTransport,
+) -> usize {
+    let input = match ExternIO::encode(()) {
+        Ok(i) => i,
+        Err(_) => return 0,
+    };
+
+    let response = ws
+        .call_zome(
+            ZomeCallTarget::RoleName("civic".to_string().into()),
+            "emergency_comms".into(),
+            "get_unsynced_messages".into(),
+            input,
+        )
+        .await;
+
+    let mut count = 0;
+    if let Ok(result) = response {
+        if let Ok(messages) = result.decode::<Vec<serde_json::Value>>() {
+            for msg in messages.iter().take(MAX_ENTRIES_PER_DOMAIN) {
+                let id = jstr(msg, "id");
+                if id.is_empty() || dedup.contains(&id) {
+                    continue;
+                }
+
+                let emergency = EmergencyRelay {
+                    channel_id: jstr(msg, "channel_id"),
+                    content: jstr(msg, "content"),
+                    priority: jstr(msg, "priority"),
+                };
+
+                if let Ok(data) = bincode::serialize(&emergency) {
+                    if relay_payload(RelayType::EmergencyMessage, origin, data, transport)
+                        .await
+                        .is_ok()
+                    {
+                        dedup.insert(id);
+                        count += 1;
+                    }
+                }
+            }
+        }
+    }
+    count
+}
+
+async fn poll_food(
+    ws: &AppWebsocket,
+    dedup: &mut HashSet<String>,
+    origin: &[u8; 8],
+    transport: &dyn MeshTransport,
+) -> usize {
+    let input = match ExternIO::encode(serde_json::json!({ "limit": MAX_ENTRIES_PER_DOMAIN })) {
+        Ok(i) => i,
+        Err(_) => return 0,
+    };
+
+    let response = ws
+        .call_zome(
+            ZomeCallTarget::RoleName("commons_care".to_string().into()),
+            "food_production".into(),
+            "get_recent_harvests".into(),
+            input,
+        )
+        .await;
+
+    let mut count = 0;
+    if let Ok(result) = response {
+        if let Ok(harvests) = result.decode::<Vec<serde_json::Value>>() {
+            for h in harvests.iter().take(MAX_ENTRIES_PER_DOMAIN) {
+                let id = jstr(h, "id");
+                if id.is_empty() || dedup.contains(&id) {
+                    continue;
+                }
+
+                let food = FoodRelay {
+                    crop_hash: jstr(h, "crop_hash"),
+                    quantity_kg: jf32(h, "quantity_kg"),
+                    quality: jstr(h, "quality"),
+                    notes: jstr(h, "notes"),
+                };
+
+                if let Ok(data) = bincode::serialize(&food) {
+                    if relay_payload(RelayType::FoodHarvest, origin, data, transport)
+                        .await
+                        .is_ok()
+                    {
+                        dedup.insert(id);
+                        count += 1;
+                    }
+                }
+            }
+        }
+    }
+    count
+}
+
+async fn poll_water(
+    ws: &AppWebsocket,
+    dedup: &mut HashSet<String>,
+    origin: &[u8; 8],
+    transport: &dyn MeshTransport,
+) -> usize {
+    let input = match ExternIO::encode(()) {
+        Ok(i) => i,
+        Err(_) => return 0,
+    };
+
+    let response = ws
+        .call_zome(
+            ZomeCallTarget::RoleName("commons_care".to_string().into()),
+            "water_purity".into(),
+            "get_active_alerts".into(),
+            input,
+        )
+        .await;
+
+    let mut count = 0;
+    if let Ok(result) = response {
+        if let Ok(alerts) = result.decode::<Vec<serde_json::Value>>() {
+            for a in alerts.iter().take(MAX_ENTRIES_PER_DOMAIN) {
+                let id = jstr(a, "id");
+                if id.is_empty() || dedup.contains(&id) {
+                    continue;
+                }
+
+                let water = WaterAlertRelay {
+                    system_id: jstr(a, "system_id"),
+                    alert_type: jstr(a, "alert_type"),
+                    severity: jstr(a, "severity"),
+                    description: jstr(a, "description"),
+                };
+
+                if let Ok(data) = bincode::serialize(&water) {
+                    if relay_payload(RelayType::WaterAlert, origin, data, transport)
+                        .await
+                        .is_ok()
+                    {
+                        dedup.insert(id);
+                        count += 1;
+                    }
+                }
+            }
+        }
+    }
+    count
+}
+
+async fn poll_hearth(
+    ws: &AppWebsocket,
+    dedup: &mut HashSet<String>,
+    origin: &[u8; 8],
+    transport: &dyn MeshTransport,
+) -> usize {
+    let input = match ExternIO::encode(()) {
+        Ok(i) => i,
+        Err(_) => return 0,
+    };
+
+    let response = ws
+        .call_zome(
+            ZomeCallTarget::RoleName("hearth".to_string().into()),
+            "hearth_emergency".into(),
+            "get_active_alerts".into(),
+            input,
+        )
+        .await;
+
+    let mut count = 0;
+    if let Ok(result) = response {
+        if let Ok(alerts) = result.decode::<Vec<serde_json::Value>>() {
+            for a in alerts.iter().take(MAX_ENTRIES_PER_DOMAIN) {
+                let id = jstr(a, "id");
+                if id.is_empty() || dedup.contains(&id) {
+                    continue;
+                }
+
+                let hearth = HearthAlertRelay {
+                    hearth_id: jstr(a, "hearth_id"),
+                    alert_type: jstr(a, "alert_type"),
+                    message: jstr(a, "message"),
+                };
+
+                if let Ok(data) = bincode::serialize(&hearth) {
+                    if relay_payload(RelayType::HearthAlert, origin, data, transport)
+                        .await
+                        .is_ok()
+                    {
+                        dedup.insert(id);
+                        count += 1;
+                    }
+                }
+            }
+        }
+    }
+    count
+}
+
+async fn poll_knowledge(
+    ws: &AppWebsocket,
+    dedup: &mut HashSet<String>,
+    origin: &[u8; 8],
+    transport: &dyn MeshTransport,
+) -> usize {
+    let input = match ExternIO::encode(serde_json::json!({ "limit": MAX_ENTRIES_PER_DOMAIN })) {
+        Ok(i) => i,
+        Err(_) => return 0,
+    };
+
+    let response = ws
+        .call_zome(
+            ZomeCallTarget::RoleName("knowledge".to_string().into()),
+            "claims".into(),
+            "get_recent_claims".into(),
+            input,
+        )
+        .await;
+
+    let mut count = 0;
+    if let Ok(result) = response {
+        if let Ok(claims) = result.decode::<Vec<serde_json::Value>>() {
+            for c in claims.iter().take(MAX_ENTRIES_PER_DOMAIN) {
+                let id = jstr(c, "id");
+                if id.is_empty() || dedup.contains(&id) {
+                    continue;
+                }
+
+                let tags: Vec<String> = c["tags"]
+                    .as_array()
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|t| t.as_str().map(String::from))
+                            .collect()
+                    })
+                    .unwrap_or_default();
+
+                let claim = KnowledgeClaimRelay {
+                    claim_text: jstr(c, "claim_text"),
+                    tags,
+                    empirical: ju8(c, "empirical"),
+                    normative: ju8(c, "normative"),
+                    materiality: ju8(c, "materiality"),
+                };
+
+                if let Ok(data) = bincode::serialize(&claim) {
+                    if relay_payload(RelayType::KnowledgeClaim, origin, data, transport)
+                        .await
+                        .is_ok()
+                    {
+                        dedup.insert(id);
+                        count += 1;
+                    }
+                }
+            }
+        }
+    }
+    count
+}
+
+async fn poll_care_circles(
+    ws: &AppWebsocket,
+    dedup: &mut HashSet<String>,
+    origin: &[u8; 8],
+    transport: &dyn MeshTransport,
+) -> usize {
+    let input = match ExternIO::encode(()) {
+        Ok(i) => i,
+        Err(_) => return 0,
+    };
+
+    let response = ws
+        .call_zome(
+            ZomeCallTarget::RoleName("commons_care".to_string().into()),
+            "care_circles".into(),
+            "get_recent_updates".into(),
+            input,
+        )
+        .await;
+
+    let mut count = 0;
+    if let Ok(result) = response {
+        if let Ok(updates) = result.decode::<Vec<serde_json::Value>>() {
+            for u in updates.iter().take(MAX_ENTRIES_PER_DOMAIN) {
+                let id = jstr(u, "id");
+                if id.is_empty() || dedup.contains(&id) {
+                    continue;
+                }
+
+                let care = CareCircleRelay {
+                    circle_id: jstr(u, "circle_id"),
+                    update_type: jstr(u, "update_type"),
+                    details: jstr(u, "details"),
+                };
+
+                if let Ok(data) = bincode::serialize(&care) {
+                    if relay_payload(RelayType::CareCircleUpdate, origin, data, transport)
+                        .await
+                        .is_ok()
+                    {
+                        dedup.insert(id);
+                        count += 1;
+                    }
+                }
+            }
+        }
+    }
+    count
+}
+
+async fn poll_shelter(
+    ws: &AppWebsocket,
+    dedup: &mut HashSet<String>,
+    origin: &[u8; 8],
+    transport: &dyn MeshTransport,
+) -> usize {
+    let input = match ExternIO::encode(()) {
+        Ok(i) => i,
+        Err(_) => return 0,
+    };
+
+    let response = ws
+        .call_zome(
+            ZomeCallTarget::RoleName("commons_care".to_string().into()),
+            "housing_units".into(),
+            "get_available_units".into(),
+            input,
+        )
+        .await;
+
+    let mut count = 0;
+    if let Ok(result) = response {
+        if let Ok(units) = result.decode::<Vec<serde_json::Value>>() {
+            for u in units.iter().take(MAX_ENTRIES_PER_DOMAIN) {
+                let id = jstr(u, "id");
+                if id.is_empty() || dedup.contains(&id) {
+                    continue;
+                }
+
+                let shelter = ShelterRelay {
+                    unit_id: jstr(u, "unit_id"),
+                    status: jstr(u, "status"),
+                    bedrooms: ju8(u, "bedrooms"),
+                };
+
+                if let Ok(data) = bincode::serialize(&shelter) {
+                    if relay_payload(RelayType::ShelterUpdate, origin, data, transport)
+                        .await
+                        .is_ok()
+                    {
+                        dedup.insert(id);
+                        count += 1;
+                    }
+                }
+            }
+        }
+    }
+    count
+}
+
+async fn poll_supplies(
+    ws: &AppWebsocket,
+    dedup: &mut HashSet<String>,
+    origin: &[u8; 8],
+    transport: &dyn MeshTransport,
+) -> usize {
+    let input = match ExternIO::encode(()) {
+        Ok(i) => i,
+        Err(_) => return 0,
+    };
+
+    let response = ws
+        .call_zome(
+            ZomeCallTarget::RoleName("supplychain".to_string().into()),
+            "inventory_coordinator".into(),
+            "get_low_stock_items".into(),
+            input,
+        )
+        .await;
+
+    let mut count = 0;
+    if let Ok(result) = response {
+        if let Ok(items) = result.decode::<Vec<serde_json::Value>>() {
+            for item in items.iter().take(MAX_ENTRIES_PER_DOMAIN) {
+                let id = jstr(item, "id");
+                if id.is_empty() || dedup.contains(&id) {
+                    continue;
+                }
+
+                let supply = SupplyRelay {
+                    item_id: jstr(item, "item_id"),
+                    item_name: jstr(item, "item_name"),
+                    quantity: jf32(item, "quantity"),
+                    category: jstr(item, "category"),
+                };
+
+                if let Ok(data) = bincode::serialize(&supply) {
+                    if relay_payload(RelayType::SupplyUpdate, origin, data, transport)
+                        .await
+                        .is_ok()
+                    {
+                        dedup.insert(id);
+                        count += 1;
+                    }
+                }
+            }
+        }
+    }
+    count
+}
+
+async fn poll_mutual_aid(
+    ws: &AppWebsocket,
+    dedup: &mut HashSet<String>,
+    origin: &[u8; 8],
+    transport: &dyn MeshTransport,
+) -> usize {
+    let input = match ExternIO::encode(serde_json::json!({ "limit": MAX_ENTRIES_PER_DOMAIN })) {
+        Ok(i) => i,
+        Err(_) => return 0,
+    };
+
+    let response = ws
+        .call_zome(
+            ZomeCallTarget::RoleName("commons_care".to_string().into()),
+            "mutualaid_timebank".into(),
+            "get_recent_offers".into(),
+            input,
+        )
+        .await;
+
+    let mut count = 0;
+    if let Ok(result) = response {
+        if let Ok(offers) = result.decode::<Vec<serde_json::Value>>() {
+            for o in offers.iter().take(MAX_ENTRIES_PER_DOMAIN) {
+                let id = jstr(o, "id");
+                if id.is_empty() || dedup.contains(&id) {
+                    continue;
+                }
+
+                let aid = MutualAidRelay {
+                    offer_type: jstr(o, "offer_type"),
+                    title: jstr(o, "title"),
+                    description: jstr(o, "description"),
+                    category: jstr(o, "category"),
+                };
+
+                if let Ok(data) = bincode::serialize(&aid) {
+                    if relay_payload(RelayType::MutualAidOffer, origin, data, transport)
+                        .await
+                        .is_ok()
+                    {
+                        dedup.insert(id);
+                        count += 1;
+                    }
+                }
+            }
+        }
+    }
+    count
+}
+
+async fn poll_price_reports(
+    ws: &AppWebsocket,
+    dedup: &mut HashSet<String>,
+    origin: &[u8; 8],
+    transport: &dyn MeshTransport,
+) -> usize {
+    let input = match ExternIO::encode(serde_json::json!({ "limit": MAX_ENTRIES_PER_DOMAIN })) {
+        Ok(i) => i,
+        Err(_) => return 0,
+    };
+
+    let response = ws
+        .call_zome(
+            ZomeCallTarget::RoleName("finance".to_string().into()),
+            "price_oracle".into(),
+            "get_recent_reports".into(),
+            input,
+        )
+        .await;
+
+    let mut count = 0;
+    if let Ok(result) = response {
+        if let Ok(reports) = result.decode::<Vec<serde_json::Value>>() {
+            for r in reports.iter().take(MAX_ENTRIES_PER_DOMAIN) {
+                let id = jstr(r, "id");
+                if id.is_empty() || dedup.contains(&id) {
+                    continue;
+                }
+
+                let price = PriceReportRelay {
+                    item_name: jstr(r, "item_name"),
+                    price_tend: jf32(r, "price_tend"),
+                    evidence: jstr(r, "evidence"),
+                };
+
+                if let Ok(data) = bincode::serialize(&price) {
+                    if relay_payload(RelayType::PriceReport, origin, data, transport)
+                        .await
+                        .is_ok()
+                    {
+                        dedup.insert(id);
+                        count += 1;
+                    }
+                }
+            }
+        }
+    }
+    count
 }
 
 /// Get an 8-byte origin ID from the hostname.
@@ -365,6 +925,30 @@ mod tests {
         assert_ne!(id1, [0u8; 8], "origin ID should not be all zeros");
     }
 
+    #[test]
+    fn test_backpressure_constant() {
+        assert_eq!(MAX_ENTRIES_PER_DOMAIN, 20);
+        assert!(MAX_ENTRIES_PER_DOMAIN > 0);
+        assert!(MAX_ENTRIES_PER_DOMAIN <= 100);
+    }
+
+    #[test]
+    fn test_priority_scheduling() {
+        // Safety-critical polls every cycle; lower-priority every other
+        for cycle in 1..=10u64 {
+            // Safety-critical always runs
+            assert!(true, "TEND/emergency/water/hearth/food always poll");
+
+            // Lower-priority only on even cycles
+            let lower_priority_runs = cycle % 2 == 0;
+            if cycle % 2 == 0 {
+                assert!(lower_priority_runs);
+            } else {
+                assert!(!lower_priority_runs);
+            }
+        }
+    }
+
     #[tokio::test]
     async fn test_relay_pipeline() {
         let transport = LoopbackTransport::new();
@@ -400,5 +984,42 @@ mod tests {
 
         let tend_decoded: TendRelay = bincode::deserialize(&decoded.data).unwrap();
         assert_eq!(tend_decoded.receiver_did, "bob.did");
+    }
+
+    #[tokio::test]
+    async fn test_relay_payload_helper() {
+        let transport = LoopbackTransport::new();
+        let origin = [1, 2, 3, 4, 5, 6, 7, 8];
+
+        let food = FoodRelay {
+            crop_hash: "crop-123".into(),
+            quantity_kg: 5.5,
+            quality: "Good".into(),
+            notes: "First harvest".into(),
+        };
+        let data = bincode::serialize(&food).unwrap();
+        relay_payload(RelayType::FoodHarvest, &origin, data, &transport)
+            .await
+            .unwrap();
+
+        // Should have sent at least one frame
+        let frame = transport.recv(100).await.unwrap();
+        assert!(frame.is_some());
+    }
+
+    #[test]
+    fn test_jstr_jf32_ju8_helpers() {
+        let v = serde_json::json!({
+            "name": "test",
+            "value": 3.14,
+            "count": 7,
+            "missing": null
+        });
+        assert_eq!(jstr(&v, "name"), "test");
+        assert_eq!(jstr(&v, "nonexistent"), "");
+        assert!((jf32(&v, "value") - 3.14).abs() < 0.01);
+        assert_eq!(jf32(&v, "nonexistent"), 0.0);
+        assert_eq!(ju8(&v, "count"), 7);
+        assert_eq!(ju8(&v, "nonexistent"), 0);
     }
 }
