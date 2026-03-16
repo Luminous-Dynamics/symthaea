@@ -39,7 +39,7 @@ pub(crate) enum Priority {
 }
 
 impl Priority {
-    /// Weight multiplier for this priority tier.
+    /// Base weight multiplier for this priority tier.
     pub fn weight(self) -> f64 {
         match self {
             Priority::Aesthetic => 0.5,
@@ -47,6 +47,16 @@ impl Priority {
             Priority::Homeostatic => 2.0,
             Priority::Safety => 3.0,
         }
+    }
+
+    /// Confidence-scaled weight: `base_weight × confidence`.
+    ///
+    /// A high-confidence Safety signal (conf=0.9) gets weight 2.7,
+    /// while a low-confidence one (conf=0.3) gets weight 0.9 —
+    /// potentially less than a high-confidence Cognitive signal (1.0).
+    /// This prevents low-quality safety signals from drowning real cognitive work.
+    pub fn weighted(self, confidence: f32) -> f64 {
+        self.weight() * confidence.clamp(0.0, 1.0) as f64
     }
 }
 
@@ -65,6 +75,9 @@ pub(crate) struct AttributedProposal {
     pub proposal: FeedbackProposal,
     /// Priority tier (higher = more weight in consensus)
     pub priority: Priority,
+    /// Confidence in the proposal (0.0–1.0). Scales the priority weight.
+    /// 1.0 = full weight (default), 0.5 = half weight.
+    pub confidence: f32,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -77,28 +90,50 @@ pub(crate) struct AttributedProposal {
 #[derive(Debug, Clone)]
 pub(crate) struct ProposalCollector {
     proposals: Vec<AttributedProposal>,
+    /// Cached integration result — invalidated on every `propose()`, lazily
+    /// recomputed on `integrate()`. Avoids O(n²) when helpers sync fields.
+    cached: Option<(f64, f64, f64, f64)>, // (base, min, max, effective)
 }
 
 impl ProposalCollector {
     pub fn new() -> Self {
         Self {
             proposals: Vec::with_capacity(32),
+            cached: None,
         }
     }
 
-    /// Record a proposal from a named subsystem (default priority: Cognitive).
+    /// Record a proposal from a named subsystem (default priority: Cognitive, confidence: 1.0).
     pub fn propose(&mut self, source: &'static str, proposal: FeedbackProposal) {
-        self.proposals.push(AttributedProposal { source, proposal, priority: Priority::default() });
+        self.proposals.push(AttributedProposal { source, proposal, priority: Priority::default(), confidence: 1.0 });
+        self.cached = None;
     }
 
-    /// Record a proposal with an explicit priority tier.
+    /// Record a proposal with an explicit priority tier (confidence: 1.0).
     pub fn propose_with_priority(
         &mut self,
         source: &'static str,
         proposal: FeedbackProposal,
         priority: Priority,
     ) {
-        self.proposals.push(AttributedProposal { source, proposal, priority });
+        self.proposals.push(AttributedProposal { source, proposal, priority, confidence: 1.0 });
+        self.cached = None;
+    }
+
+    /// Record a proposal with confidence-scaled priority (#7 adaptive scaling).
+    ///
+    /// Effective weight = `priority.weight() × confidence`. A low-confidence
+    /// Safety signal (conf=0.3) gets weight 0.9, potentially less than a
+    /// high-confidence Cognitive signal (1.0).
+    pub fn propose_weighted(
+        &mut self,
+        source: &'static str,
+        proposal: FeedbackProposal,
+        priority: Priority,
+        confidence: f32,
+    ) {
+        self.proposals.push(AttributedProposal { source, proposal, priority, confidence: confidence.clamp(0.0, 1.0) });
+        self.cached = None;
     }
 
     /// Number of proposals collected this cycle.
@@ -109,6 +144,7 @@ impl ProposalCollector {
     /// Clear all proposals (called at cycle start).
     pub fn clear(&mut self) {
         self.proposals.clear();
+        self.cached = None;
     }
 
     /// Iterate over proposals for inspection.
@@ -176,13 +212,24 @@ impl ProposalCollector {
     /// - `Scale` proposals: priority-weighted geometric mean, then applied
     ///
     /// When all proposals share the same priority, reduces to unweighted consensus.
-    pub fn integrate(&self, base_value: f64, clamp_min: f64, clamp_max: f64) -> IntegrationResult {
+    pub fn integrate(&mut self, base_value: f64, clamp_min: f64, clamp_max: f64) -> IntegrationResult {
+        // Cache hit: same parameters → return cached effective value
+        if let Some((cb, cmin, cmax, eff)) = self.cached {
+            if (cb - base_value).abs() < 1e-15 && (cmin - clamp_min).abs() < 1e-15 && (cmax - clamp_max).abs() < 1e-15 {
+                return IntegrationResult {
+                    effective: eff,
+                    n_sets: self.proposals.iter().filter(|p| matches!(p.proposal, FeedbackProposal::Set(_))).count(),
+                    n_adds: self.proposals.iter().filter(|p| matches!(p.proposal, FeedbackProposal::Add(_))).count(),
+                    n_scales: self.proposals.iter().filter(|p| matches!(p.proposal, FeedbackProposal::Scale(_))).count(),
+                };
+            }
+        }
         let mut sets: Vec<(&'static str, f64, Priority)> = Vec::new();
         let mut adds: Vec<(f64, f64)> = Vec::new(); // (delta, weight)
         let mut scales: Vec<(f64, f64)> = Vec::new(); // (factor, weight)
 
         for ap in &self.proposals {
-            let w = ap.priority.weight();
+            let w = ap.priority.weight() * ap.confidence.clamp(0.0, 1.0) as f64;
             match ap.proposal {
                 FeedbackProposal::Set(v) => sets.push((ap.source, v, ap.priority)),
                 FeedbackProposal::Add(d) => adds.push((d, w)),
@@ -223,12 +270,69 @@ impl ProposalCollector {
 
         value = value.clamp(clamp_min, clamp_max);
 
+        // Cache for subsequent calls with same parameters
+        self.cached = Some((base_value, clamp_min, clamp_max, value));
+
         IntegrationResult {
             effective: value,
             n_sets: sets.len(),
             n_adds: adds.len(),
             n_scales: scales.len(),
         }
+    }
+
+    /// Integrate without mutating (for read-only contexts like conflict_ratio callers).
+    /// This is the uncached path — use sparingly.
+    pub fn integrate_readonly(&self, base_value: f64, clamp_min: f64, clamp_max: f64) -> IntegrationResult {
+        // Check cache first
+        if let Some((cb, cmin, cmax, eff)) = self.cached {
+            if (cb - base_value).abs() < 1e-15 && (cmin - clamp_min).abs() < 1e-15 && (cmax - clamp_max).abs() < 1e-15 {
+                return IntegrationResult {
+                    effective: eff,
+                    n_sets: self.proposals.iter().filter(|p| matches!(p.proposal, FeedbackProposal::Set(_))).count(),
+                    n_adds: self.proposals.iter().filter(|p| matches!(p.proposal, FeedbackProposal::Add(_))).count(),
+                    n_scales: self.proposals.iter().filter(|p| matches!(p.proposal, FeedbackProposal::Scale(_))).count(),
+                };
+            }
+        }
+        // Full compute without caching
+        let mut sets_n = 0usize;
+        let mut adds: Vec<(f64, f64)> = Vec::new();
+        let mut scales: Vec<(f64, f64)> = Vec::new();
+        let mut last_set: Option<(f64, Priority)> = None;
+
+        for ap in &self.proposals {
+            let w = ap.priority.weight();
+            match ap.proposal {
+                FeedbackProposal::Set(v) => {
+                    sets_n += 1;
+                    if last_set.map_or(true, |(_, p)| ap.priority >= p) {
+                        last_set = Some((v, ap.priority));
+                    }
+                }
+                FeedbackProposal::Add(d) => adds.push((d, w)),
+                FeedbackProposal::Scale(f) => scales.push((f, w)),
+            }
+        }
+
+        let mut value = last_set.map_or(base_value, |(v, _)| v);
+        if !adds.is_empty() {
+            let tw: f64 = adds.iter().map(|(_, w)| w).sum();
+            if tw > 0.0 { value += adds.iter().map(|(d, w)| d * w).sum::<f64>() / tw; }
+        }
+        if !scales.is_empty() {
+            let valid: Vec<(f64, f64)> = scales.iter().filter(|(f, _)| *f > 0.0 && f.is_finite()).copied().collect();
+            if !valid.is_empty() {
+                let tw: f64 = valid.iter().map(|(_, w)| w).sum();
+                if tw > 0.0 {
+                    let wlog: f64 = valid.iter().map(|(f, w)| f.ln() * w).sum::<f64>();
+                    let gm = (wlog / tw).exp();
+                    if gm.is_finite() { value *= gm; }
+                }
+            }
+        }
+        value = value.clamp(clamp_min, clamp_max);
+        IntegrationResult { effective: value, n_sets: sets_n, n_adds: adds.len(), n_scales: scales.len() }
     }
 }
 
@@ -669,22 +773,22 @@ impl FeedbackState {
     // ── Mid-cycle effective value accessors ─────────────────────────────
 
     /// Effective prediction_confidence from cycle-start + proposals so far.
-    pub fn effective_confidence(&self) -> f64 {
+    pub fn effective_confidence(&mut self) -> f64 {
         self.confidence.integrate(self.cycle_start_confidence, 0.01, 0.99).effective
     }
 
     /// Effective fep_lr_boost from cycle-start + proposals so far.
-    pub fn effective_lr_boost(&self) -> f64 {
+    pub fn effective_lr_boost(&mut self) -> f64 {
         self.learning_rate.integrate(self.cycle_start_lr, 1.0, 3.0).effective
     }
 
     /// Effective exploration_urge from cycle-start + proposals so far.
-    pub fn effective_exploration(&self) -> f64 {
+    pub fn effective_exploration(&mut self) -> f64 {
         self.exploration.integrate(self.cycle_start_exploration, 0.0, 1.0).effective
     }
 
     /// Effective adaptive_threshold_scale from cycle-start + proposals so far.
-    pub fn effective_threshold(&self) -> f64 {
+    pub fn effective_threshold(&mut self) -> f64 {
         self.threshold.integrate(self.cycle_start_threshold, 0.5, 2.0).effective
     }
 
@@ -757,7 +861,7 @@ mod tests {
 
     #[test]
     fn test_empty_collector_returns_base() {
-        let collector = ProposalCollector::new();
+        let mut collector = ProposalCollector::new();
         let result = collector.integrate(0.5, 0.0, 1.0);
         assert!((result.effective - 0.5).abs() < 1e-10);
         assert_eq!(result.n_sets, 0);

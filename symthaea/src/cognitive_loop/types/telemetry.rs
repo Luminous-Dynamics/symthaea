@@ -572,6 +572,18 @@ pub struct CycleMetadata {
     /// Meta-learning group geometric mean (FEP x MCE x subsystem). 1.0 = neutral.
     pub lr_meta_mod: f32,
 
+    /// Total feedback proposals this cycle across all 4 channels.
+    pub feedback_proposal_count: u32,
+
+    /// Average conflict ratio across feedback channels (0.0 = unanimous, 0.5 = max conflict).
+    pub feedback_conflict_ratio: f32,
+
+    /// Feedback proposal counts per priority: [Aesthetic, Cognitive, Homeostatic, Safety].
+    pub feedback_priority_counts: [u32; 4],
+
+    /// Feedback signal diversity (unique sources / total proposals).
+    pub feedback_diversity: f32,
+
     /// Cycle reward signal (internal + external blend, -1.0 to 1.0).
     pub cycle_reward: f32,
 
@@ -1221,6 +1233,80 @@ pub struct CycleMetadata {
     #[serde(flatten, default)]
     pub therapeutic: TherapeuticTelemetry,
 
+    // ── Perception Manager Telemetry ────────────────────────────────────────
+    /// Perception attention sensitivity [0.5, 2.0]. Modulates perceptual thresholds.
+    /// Science: Yerkes & Dodson (1908) — optimal arousal modulates sensitivity.
+    #[serde(default = "default_one_f32")]
+    pub perception_attention_sensitivity: f32,
+    /// Perception budget utilization (EMA) [0, 1]. Lavie (2005) perceptual load.
+    #[serde(default)]
+    pub perception_budget_utilization: f32,
+    /// Whether perception is in vigilant mode (high attention, low coherence + high PE).
+    #[serde(default)]
+    pub perception_vigilant: bool,
+    /// Mean perceptual coherence from rolling 8-cycle history [0, 1].
+    /// Science: Damasio (1994) — cross-modal binding strength.
+    #[serde(default = "default_half_f32")]
+    pub perception_mean_coherence: f32,
+
+    // ── Drive Manager Telemetry ───────────────────────────────────────────
+    /// Drive boredom level [0, 0.8]. Sustained low PE → exploration urge.
+    /// Science: Eastwood et al. (2012) — boredom as failed engagement.
+    #[serde(default)]
+    pub drive_boredom: f32,
+    /// Drive flow intensity [0, 1]. Optimal challenge-skill balance.
+    /// Science: Csikszentmihalyi (1990) — flow state intensity.
+    #[serde(default)]
+    pub drive_flow_intensity: f32,
+    /// Whether currently in flow state (sustained low error + high coherence).
+    #[serde(default)]
+    pub drive_in_flow: bool,
+    /// Adaptive exploration threshold [0.05, 0.8]. Surprise must exceed this.
+    /// Science: Friston (2010) — precision-weighted surprise modulates exploration.
+    #[serde(default)]
+    pub drive_exploration_threshold: f32,
+
+    // ── Learning Manager Telemetry ────────────────────────────────────────
+    /// Learning plasticity level [0.1, 0.95]. How open the system is to learning.
+    /// Science: Abraham & Bear (1996) — metaplasticity BCM rule.
+    #[serde(default = "default_half_f32")]
+    pub learning_plasticity: f32,
+    /// Whether in dream consolidation phase (low arousal sustained ≥15 cycles).
+    /// Science: Walker (2017) — NREM sleep facilitates memory integration.
+    #[serde(default)]
+    pub learning_in_dream_phase: bool,
+    /// Learning error trend: positive = errors increasing, negative = improving.
+    #[serde(default)]
+    pub learning_error_trend: f32,
+
+    // ── Causal Explanation Narrative Telemetry ─────────────────────────────
+    /// Causal self-explanation narrative summary (generated every 47 cycles).
+    /// Science: Wierzbicka (1996) — NSM-grounded causal transparency.
+    #[serde(default)]
+    pub consciousness_causal_narrative: String,
+
+    // ── Knowledge Engine Telemetry ─────────────────────────────────────────
+    /// Total facts stored in the knowledge graph (0 when knowledge engine disabled).
+    #[serde(default)]
+    pub knowledge_graph_size: u32,
+    /// Best cosine similarity from the most recent knowledge search (0.0 when disabled).
+    #[serde(default)]
+    pub knowledge_best_similarity: f32,
+    /// Total causal edges in the knowledge causal bridge (0 when disabled).
+    #[serde(default)]
+    pub knowledge_causal_edges: u32,
+    /// Epistemic surprise signal: novelty + contradiction (0.0 when disabled).
+    /// Science: Friston (2010) — epistemic surprise drives active inference.
+    #[serde(default)]
+    pub knowledge_epistemic_surprise: f64,
+    /// Expected Calibration Error (0.0 = perfect, 1.0 = worst, 0.0 when disabled).
+    /// Science: Guo et al. (2017) — calibration of confidence scores.
+    #[serde(default)]
+    pub knowledge_calibration_ece: f64,
+    /// Number of contradictions detected this cycle (0 when disabled).
+    #[serde(default)]
+    pub knowledge_contradictions: u32,
+
     // ── Glyph Codex Telemetry ─────────────────────────────────────────────
     /// Dominant glyph field modality name (e.g., "Resonant", "Threshold").
     /// Empty when glyph_codex feature is disabled.
@@ -1238,6 +1324,21 @@ pub struct CycleMetadata {
     /// 0.0 when glyph_codex is disabled.
     #[serde(default)]
     pub glyph_spiral_position: f32,
+
+    // ── Feature Availability Flags ──────────────────────────────────────
+    // These booleans tell dashboards whether 0.0 means "feature disabled"
+    // vs "measured as zero". Populated at metadata construction time from
+    // compile-time feature flags and runtime config.
+
+    /// Whether the `reasoning_engine` feature is compiled in and active.
+    #[serde(default)]
+    pub reasoning_engine_enabled: bool,
+    /// Whether the `mesh` feature is compiled in and active.
+    #[serde(default)]
+    pub mesh_enabled: bool,
+    /// Whether the `ssm_language` (Broca) feature is compiled in and active.
+    #[serde(default)]
+    pub ssm_language_enabled: bool,
 }
 
 /// Therapeutic subsystem telemetry for CycleMetadata.

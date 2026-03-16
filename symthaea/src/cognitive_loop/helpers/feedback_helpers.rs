@@ -161,25 +161,25 @@ impl super::super::CognitiveLoopService {
 
     /// Current effective prediction_confidence: cycle-start snapshot + accumulated proposals.
     #[inline]
-    pub(in crate::cognitive_loop) fn current_confidence(&self) -> f64 {
+    pub(in crate::cognitive_loop) fn current_confidence(&mut self) -> f64 {
         self.feedback_state.effective_confidence()
     }
 
     /// Current effective fep_lr_boost: cycle-start snapshot + accumulated proposals.
     #[inline]
-    pub(in crate::cognitive_loop) fn current_lr_boost(&self) -> f64 {
+    pub(in crate::cognitive_loop) fn current_lr_boost(&mut self) -> f64 {
         self.feedback_state.effective_lr_boost()
     }
 
     /// Current effective exploration_urge: cycle-start snapshot + accumulated proposals.
     #[inline]
-    pub(in crate::cognitive_loop) fn current_exploration(&self) -> f64 {
+    pub(in crate::cognitive_loop) fn current_exploration(&mut self) -> f64 {
         self.feedback_state.effective_exploration()
     }
 
     /// Current effective adaptive_threshold_scale: cycle-start snapshot + accumulated proposals.
     #[inline]
-    pub(in crate::cognitive_loop) fn current_threshold(&self) -> f64 {
+    pub(in crate::cognitive_loop) fn current_threshold(&mut self) -> f64 {
         self.feedback_state.effective_threshold()
     }
 

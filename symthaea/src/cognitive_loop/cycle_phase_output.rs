@@ -316,6 +316,19 @@ impl CognitiveLoopService {
             },
             lr_cognitive_mod: self.carryover.learning.lr_cognitive_mod,
             lr_meta_mod: self.carryover.learning.lr_meta_mod,
+            feedback_proposal_count: {
+                let s = self.feedback_state.feedback_summary();
+                // Store summary fields inline — avoids double-borrow
+                let count = s.total_proposals;
+                // We'll set the other fields below after this block
+                count
+            },
+            feedback_conflict_ratio: self.feedback_state.avg_conflict_ratio(),
+            feedback_priority_counts: {
+                let s = self.feedback_state.feedback_summary();
+                s.priority_counts
+            },
+            feedback_diversity: self.feedback_state.signal_diversity(),
             cycle_reward: dynamics.core.cycle_reward,
             support_triage_count: feedback.support.support_triage_count,
             support_alert_fired: feedback.support.support_alert_fired,
@@ -777,6 +790,39 @@ impl CognitiveLoopService {
             metadata.voice_phi_adjustment = self.language_comm.voice_coherence.voice.compute_phi_adjustment();
         }
 
+        // ── Perception Manager telemetry ──
+        metadata.perception_attention_sensitivity = self.perception_manager.attention_sensitivity();
+        metadata.perception_budget_utilization = self.perception_manager.budget_utilization();
+        metadata.perception_vigilant = self.perception_manager.is_vigilant();
+        metadata.perception_mean_coherence = self.perception_manager.mean_coherence_score();
+
+        // ── Drive Manager telemetry ──
+        metadata.drive_boredom = self.drive_manager.boredom();
+        metadata.drive_flow_intensity = self.drive_manager.flow_intensity();
+        metadata.drive_in_flow = self.drive_manager.in_flow();
+        metadata.drive_exploration_threshold = self.drive_manager.exploration_threshold();
+
+        // ── Learning Manager telemetry ──
+        metadata.learning_plasticity = self.learning_manager.plasticity();
+        metadata.learning_in_dream_phase = self.learning_manager.in_dream_phase();
+        metadata.learning_error_trend = self.learning_manager.error_trend();
+
+        // ── Causal explanation narrative (every 47 cycles, amortized) ──
+        if self.stats.total_cycles % 47 == 0 && self.stats.total_cycles > 0 {
+            if let Some(ref explainer) = self.primitive_tier.causal_explainer {
+                let summary = explainer.summarize_understanding();
+                if summary.total_causal_relations > 0 {
+                    metadata.consciousness_causal_narrative = format!(
+                        "{} causal relations ({} high-confidence), avg confidence {:.0}%, {} explanations generated",
+                        summary.total_causal_relations,
+                        summary.high_confidence_relations,
+                        summary.average_confidence * 100.0,
+                        summary.explanations_generated,
+                    );
+                }
+            }
+        }
+
         // ── Substrate & convergence telemetry ──
         metadata.substrate = self.substrate_manager.telemetry(&self.config);
         // Populate flat substrate fields for backward-compatible access
@@ -1007,6 +1053,18 @@ impl CognitiveLoopService {
                 metadata.attachment_style = Some(format!("{:?}", nurture.style()));
                 metadata.attachment_security = Some(nurture.security_score());
             }
+        }
+
+        // ── Knowledge Engine telemetry ──
+        if let Some(ref km) = self.knowledge_manager {
+            let telem = km.telemetry();
+            let sigs = km.signals();
+            metadata.knowledge_graph_size = telem.graph_size;
+            metadata.knowledge_best_similarity = telem.best_search_similarity;
+            metadata.knowledge_causal_edges = telem.causal_edge_count;
+            metadata.knowledge_epistemic_surprise = sigs.epistemic_surprise;
+            metadata.knowledge_calibration_ece = telem.calibration_ece;
+            metadata.knowledge_contradictions = telem.contradictions_detected;
         }
 
         // ── Glyph Codex telemetry ──
