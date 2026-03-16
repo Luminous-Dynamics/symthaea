@@ -319,10 +319,13 @@ mod tests {
             Box::new(InterventionEffectBenchmark),
             // Speech
             Box::new(PhonemeDiscriminationBenchmark),
+            Box::new(VotContinuumBenchmark),
             // Consciousness
             Box::new(BlindSightBenchmark),
+            Box::new(BinocularRivalryBenchmark),
             // Substrate
             Box::new(SubstrateTransferBenchmark),
+            Box::new(SubstrateDegradationBenchmark),
             // Institutional Reasoning
             Box::new(institutional_reasoning::InstitutionalReasoningBenchmark),
             Box::new(institutional_reasoning::AnalogicalReasoningBenchmark),

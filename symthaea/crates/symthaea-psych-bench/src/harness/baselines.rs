@@ -3395,6 +3395,34 @@ pub fn consciousness_baselines() -> BaselineMap {
             population: "human adults",
         },
     );
+    // Binocular Rivalry (Levelt, 1965; Blake & Logothetis, 2002)
+    m.insert(
+        "rivalry_alternation_rate",
+        Baseline {
+            value: 0.40,
+            sd: Some(0.12),
+            source: "Blake & Logothetis (2002), alternation rate in Hz",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "rivalry_dominance_ratio",
+        Baseline {
+            value: 0.55,
+            sd: Some(0.08),
+            source: "Levelt (1965), proportion of time dominant percept wins",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "rivalry_cv",
+        Baseline {
+            value: 0.45,
+            sd: Some(0.10),
+            source: "Levelt (1965), coefficient of variation of dominance durations",
+            population: "human adults",
+        },
+    );
     m
 }
 
@@ -3507,6 +3535,34 @@ pub fn speech_baselines() -> BaselineMap {
             population: "human adults",
         },
     );
+    // VOT Continuum (Lisker & Abramson, 1964)
+    m.insert(
+        "vot_identification_accuracy",
+        Baseline {
+            value: 0.92,
+            sd: Some(0.06),
+            source: "Lisker & Abramson (1964), endpoint identification accuracy",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "vot_boundary_width",
+        Baseline {
+            value: 2.0,
+            sd: Some(0.80),
+            source: "Lisker & Abramson (1964), VOT category boundary width in steps",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "vot_slope_at_boundary",
+        Baseline {
+            value: 0.35,
+            sd: Some(0.10),
+            source: "Lisker & Abramson (1964), logistic slope at 50% crossover",
+            population: "human adults",
+        },
+    );
     m
 }
 
@@ -3546,6 +3602,34 @@ pub fn substrate_baselines() -> BaselineMap {
             value: 0.10,
             sd: Some(0.05),
             source: "Theoretical: fidelity loss per substrate hop",
+            population: "theoretical model",
+        },
+    );
+    // Substrate Degradation (Tononi 2004; Koch et al. 2016)
+    m.insert(
+        "substrate_degradation_slope",
+        Baseline {
+            value: 0.05,
+            sd: Some(0.04),
+            source: "Theoretical: accuracy loss per degradation step for bundled representations",
+            population: "theoretical model",
+        },
+    );
+    m.insert(
+        "substrate_critical_threshold",
+        Baseline {
+            value: 0.30,
+            sd: Some(0.15),
+            source: "Theoretical: quality level where bundled retrieval collapses",
+            population: "theoretical model",
+        },
+    );
+    m.insert(
+        "substrate_graceful_ratio",
+        Baseline {
+            value: 0.10,
+            sd: Some(0.08),
+            source: "Theoretical: R² of linear fit to degradation curve (low = catastrophic transition)",
             population: "theoretical model",
         },
     );

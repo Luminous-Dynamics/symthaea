@@ -580,6 +580,22 @@ impl BenchmarkReport {
                 "cross_modal_set_size_slope",
                 &bl.binding,
             ),
+            // Binocular Rivalry (Consciousness)
+            (
+                "alternation_rate",
+                "rivalry_alternation_rate",
+                &bl.consciousness,
+            ),
+            (
+                "dominance_ratio",
+                "rivalry_dominance_ratio",
+                &bl.consciousness,
+            ),
+            (
+                "coefficient_of_variation",
+                "rivalry_cv",
+                &bl.consciousness,
+            ),
             // Phoneme Discrimination (Speech)
             (
                 "cross_boundary_accuracy",
@@ -591,9 +607,41 @@ impl BenchmarkReport {
                 "categorical_perception_index",
                 &bl.speech,
             ),
+            // VOT Continuum (Speech)
+            (
+                "identification_accuracy",
+                "vot_identification_accuracy",
+                &bl.speech,
+            ),
+            (
+                "boundary_width",
+                "vot_boundary_width",
+                &bl.speech,
+            ),
+            (
+                "slope_at_boundary",
+                "vot_slope_at_boundary",
+                &bl.speech,
+            ),
             // Substrate Transfer
             ("transfer_fidelity", "transfer_fidelity", &bl.substrate),
             ("phi_preservation", "phi_preservation", &bl.substrate),
+            // Substrate Degradation
+            (
+                "degradation_slope",
+                "substrate_degradation_slope",
+                &bl.substrate,
+            ),
+            (
+                "critical_threshold",
+                "substrate_critical_threshold",
+                &bl.substrate,
+            ),
+            (
+                "graceful_ratio",
+                "substrate_graceful_ratio",
+                &bl.substrate,
+            ),
             // Mathematics domain
             ("accuracy", "arithmetic_accuracy", &bl.mathematics),
             (
@@ -1744,6 +1792,9 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("ChangeBlindness") => "detection_with_disruption",
         b if b.contains("ProprioceptiveDrift") => "drift_difference",
         b if b.contains("PhonemeDiscrimination") => "categorical_perception_index",
+        b if b.contains("VotContinuum") => "identification_accuracy",
+        b if b.contains("BinocularRivalry") => "dominance_ratio",
+        b if b.contains("Substrate") && b.contains("Degradation") => "graceful_ratio",
         b if b.contains("Substrate") && b.contains("Transfer") => "transfer_fidelity",
         // Mathematics domain
         b if b.contains("ArithmeticWordProblem") => "accuracy",
@@ -1819,6 +1870,9 @@ pub fn is_lower_better(metric_key: &str) -> bool {
             | "false_alarm_rate"
             | "simultaneity_window"
             | "degradation_gradient"
+            | "emotional_interference"
+            | "swap_error_rate"
+            | "pm_cost"
     )
 }
 
@@ -2688,10 +2742,13 @@ mod tests {
             Box::new(causal_reasoning::InterventionEffectBenchmark),
             // Speech
             Box::new(PhonemeDiscriminationBenchmark),
+            Box::new(VotContinuumBenchmark),
             // Consciousness
             Box::new(BlindSightBenchmark),
+            Box::new(BinocularRivalryBenchmark),
             // Substrate
             Box::new(SubstrateTransferBenchmark),
+            Box::new(SubstrateDegradationBenchmark),
             // Clinical/Therapeutic
             Box::new(EmpathicAccuracyBenchmark),
             Box::new(TherapeuticResponseBenchmark),
