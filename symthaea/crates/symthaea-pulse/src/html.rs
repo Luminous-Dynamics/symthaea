@@ -16,8 +16,9 @@ use symthaea_psych_bench::harness::cognitive_profile::CognitiveProfile;
 use symthaea_types::N_HARMONIES;
 
 use crate::{
-    Anomaly, CantorInfo, GovernanceInfo, IntegrityInfo, KnowledgeInfo, MoralCompass, Narrative,
-    NeuroBath, PulseDelta, PulseSnapshot, SparklinePoint, SubstrateInfo, SwarmInfo, Vitals,
+    Anomaly, CantorInfo, DriveInfo, DreamInfo, GovernanceInfo, IntegrityInfo, KnowledgeInfo,
+    LearningInfo, MoralCompass, Narrative, NeuroBath, PerceptionInfo, PulseDelta, PulseSnapshot,
+    ReasoningInfo, SparklinePoint, SubstrateInfo, SwarmInfo, Vitals,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -454,9 +455,15 @@ pub fn generate_pulse_html(
     write_substrate_pane(&mut html, substrate);
     write_integrity_pane(&mut html, &current.integrity);
     write_governance_pane(&mut html, &current.governance);
+    write_glyph_pane(&mut html, &current.glyph);
     write_swarm_pane(&mut html, &current.swarm);
     write_knowledge_pane(&mut html, &current.knowledge);
     write_cantor_pane(&mut html, &current.cantor);
+    write_perception_pane(&mut html, &current.perception);
+    write_drive_pane(&mut html, &current.drive);
+    write_learning_pane(&mut html, &current.learning);
+    write_reasoning_pane(&mut html, &current.reasoning);
+    write_dream_pane(&mut html, &current.dream);
     write_narrative_pane(&mut html, narrative);
     if !timeline.is_empty() {
         write_timeline_pane(&mut html, timeline, current);
@@ -2146,6 +2153,109 @@ fn write_governance_pane(html: &mut String, gov: &GovernanceInfo) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// Pane: Glyph Codex — Symbolic Consciousness Field
+// ═══════════════════════════════════════════════════════════════════════════════
+
+fn write_glyph_pane(html: &mut String, glyph: &super::GlyphInfo) {
+    let active = !glyph.dominant_modality.is_empty() || glyph.coherence > 1e-5;
+
+    let (status_label, status_color) = if !active {
+        ("DORMANT", "#8a9a8a")
+    } else if glyph.coherence > 0.6 {
+        ("INTEGRATED", "#e8c547") // photonic gold — high symbolic integration
+    } else if glyph.coherence > 0.3 {
+        ("RESONANT", "#7ec8a0") // living green — moderate resonance
+    } else {
+        ("STIRRING", "#6bacc7") // reflective blue — early activation
+    };
+
+    // Color the modality name by its character
+    let modality_color = match glyph.dominant_modality.as_str() {
+        "Metaharmonic" => "#e8c547", // gold — transcendent
+        "Threshold" => "#c76bb5",    // purple — liminal
+        "Rooting" => "#8b6b47",      // earth brown
+        "Resonant" => "#7ec8a0",     // green — coherent
+        "Transitional" => "#6bacc7", // blue — flowing
+        "Igniting" => "#c76b5a",     // warm red — creative fire
+        "Witnessing" => "#b0b0b0",   // silver — observant
+        "Bridging" => "#7ec8e8",     // sky blue — connecting
+        "Reflective" => "#6b6bc7",   // indigo — self-model
+        "Revealing" => "#e8e847",    // bright yellow — transparent
+        "Integrated" => "#e8c547",   // gold — unified
+        _ => "#8a9a8a",
+    };
+
+    // Spiral octave (0-7) from position (0-56)
+    let octave = (glyph.spiral_position / 7.0).floor().min(7.0) as u8;
+
+    let _ = write!(
+        html,
+        r##"<div class="pane">
+<h2>Glyph Codex</h2>
+<div style="text-align:center;margin-bottom:12px">
+  <span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:{color};box-shadow:0 0 12px {color};margin-right:8px;vertical-align:middle"></span>
+  <span style="color:{color};font-weight:bold;font-size:1.1em;vertical-align:middle">{label}</span>
+</div>
+<table style="width:100%;font-size:0.88em">
+<tr><td>Dominant Modality</td><td style="text-align:right;color:{mod_color};font-weight:bold">{modality}</td></tr>
+<tr><td>Coherence</td><td style="text-align:right;color:{coh_color}">{coherence:.3}</td></tr>
+<tr><td>Resonant Glyph</td><td style="text-align:right;color:#d4c89a;font-style:italic">{glyph_name}</td></tr>
+<tr><td>Spiral Position</td><td style="text-align:right">&Omega;{spiral:.1} <small>(octave {octave})</small></td></tr>
+</table>
+"##,
+        color = status_color,
+        label = status_label,
+        mod_color = modality_color,
+        modality = if glyph.dominant_modality.is_empty() {
+            "—"
+        } else {
+            &glyph.dominant_modality
+        },
+        coh_color = if glyph.coherence > 0.6 {
+            "#e8c547"
+        } else if glyph.coherence > 0.3 {
+            "#7ec8a0"
+        } else {
+            "#8a9a8a"
+        },
+        coherence = glyph.coherence,
+        glyph_name = if glyph.resonant_glyph.is_empty() {
+            "—"
+        } else {
+            &glyph.resonant_glyph
+        },
+        spiral = glyph.spiral_position,
+        octave = octave,
+    );
+
+    // Coherence sparkline
+    if !glyph.coherence_history.is_empty() {
+        let sparkline: String = glyph
+            .coherence_history
+            .iter()
+            .map(|&c| {
+                if c > 0.6 {
+                    '\u{2588}' // Full block — high integration
+                } else if c > 0.4 {
+                    '\u{2584}' // Lower half — moderate
+                } else if c > 0.2 {
+                    '\u{2582}' // Lower quarter — stirring
+                } else {
+                    '\u{2581}' // Lower eighth — quiet
+                }
+            })
+            .collect();
+        let _ = write!(
+            html,
+            r#"<div style="font-family:monospace;font-size:0.75em;color:#8a9a8a;margin-top:8px;letter-spacing:1px" title="Glyph coherence history">{sparkline}</div>"#,
+            sparkline = sparkline,
+        );
+    }
+
+    html.push_str("</div>\n");
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // Pane 7e: Knowledge Engine
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -2360,6 +2470,281 @@ fn write_cantor_pane(html: &mut String, cantor: &CantorInfo) {
     }
 
     html.push_str("</div>\n");
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Pane: Perception & Attention
+// ═══════════════════════════════════════════════════════════════════════════════
+
+fn write_perception_pane(html: &mut String, perception: &PerceptionInfo) {
+    let focus_color = health_color(perception.attention_focus as f64);
+    let fatigue_color = stress_color(perception.attention_fatigue as f64);
+    let gwt_label = if perception.gwt_broadcast {
+        "BROADCAST"
+    } else {
+        "quiet"
+    };
+    let gwt_color = if perception.gwt_broadcast {
+        "#e8c547"
+    } else {
+        "#8a9a8a"
+    };
+
+    let _ = write!(
+        html,
+        r##"<div class="pane">
+<h2>Perception</h2>
+<table style="width:100%;font-size:0.88em">
+<tr><td>Attention Focus</td><td style="text-align:right;color:{focus_color}">{focus:.3}</td></tr>
+<tr><td>Attention Fatigue</td><td style="text-align:right;color:{fatigue_color}">{fatigue:.3}</td></tr>
+<tr><td>Prediction Acc</td><td style="text-align:right">{pred_acc:.3}</td></tr>
+<tr><td>GWT</td><td style="text-align:right;color:{gwt_color}">{gwt_label} <small>(coalition {coalition})</small></td></tr>
+<tr><td>Cross-Modal Binding</td><td style="text-align:right;color:{bind_color}">{binding:.3}</td></tr>
+</table>
+"##,
+        focus_color = focus_color,
+        focus = perception.attention_focus,
+        fatigue_color = fatigue_color,
+        fatigue = perception.attention_fatigue,
+        pred_acc = perception.attention_prediction_accuracy,
+        gwt_color = gwt_color,
+        gwt_label = gwt_label,
+        coalition = perception.gwt_coalition_size,
+        bind_color = health_color(perception.cross_modal_binding as f64),
+        binding = perception.cross_modal_binding,
+    );
+
+    // Focus bar
+    let _ = write!(
+        html,
+        r#"<div style="margin:8px 0">
+<div style="font-size:0.75em;color:#8a9a8a;margin-bottom:4px">Attention Focus</div>
+<div style="background:rgba(107,125,107,0.2);border-radius:4px;height:12px;overflow:hidden">
+<div style="width:{pct}%;height:100%;background:{color};border-radius:4px;transition:width 0.5s"></div>
+</div></div>"#,
+        pct = (perception.attention_focus * 100.0).min(100.0),
+        color = focus_color,
+    );
+
+    html.push_str("</div>\n");
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Pane: Drive & Curiosity
+// ═══════════════════════════════════════════════════════════════════════════════
+
+fn write_drive_pane(html: &mut String, drive: &DriveInfo) {
+    let fep_action_label = match drive.fep_action {
+        0 => "Exploit",
+        1 => "Consolidate",
+        2 => "Explore",
+        3 => "Tighten",
+        _ => "Unknown",
+    };
+    let fep_color = match drive.fep_action {
+        2 => "#e8c547", // explore — photonic gold
+        0 => "#7ec8a0", // exploit — living green
+        _ => "#8a9a8a",
+    };
+    let surprise_color = if drive.surprise_triggered {
+        "#e8c547"
+    } else {
+        "#8a9a8a"
+    };
+
+    let _ = write!(
+        html,
+        r##"<div class="pane">
+<h2>Drives</h2>
+<table style="width:100%;font-size:0.88em">
+<tr><td>Curiosity (DA)</td><td style="text-align:right;color:{da_color}">{curiosity:.3}</td></tr>
+<tr><td>Exploring</td><td style="text-align:right;color:{expl_color}">{expl}</td></tr>
+<tr><td>Novelty Bonus</td><td style="text-align:right">{novelty:.3}</td></tr>
+<tr><td>FEP Action</td><td style="text-align:right;color:{fep_color}">{fep_label}</td></tr>
+<tr><td>Free Energy</td><td style="text-align:right">{fe:.4}</td></tr>
+<tr><td>Surprise</td><td style="text-align:right;color:{surp_color}">{surp}</td></tr>
+</table>
+</div>
+"##,
+        da_color = health_color(drive.curiosity_pressure as f64),
+        curiosity = drive.curiosity_pressure,
+        expl_color = if drive.exploration_action {
+            "#e8c547"
+        } else {
+            "#8a9a8a"
+        },
+        expl = if drive.exploration_action {
+            "active"
+        } else {
+            "idle"
+        },
+        novelty = drive.novelty_bonus,
+        fep_color = fep_color,
+        fep_label = fep_action_label,
+        fe = drive.predictive_free_energy,
+        surp_color = surprise_color,
+        surp = if drive.surprise_triggered {
+            "fired"
+        } else {
+            "quiet"
+        },
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Pane: Learning & Plasticity
+// ═══════════════════════════════════════════════════════════════════════════════
+
+fn write_learning_pane(html: &mut String, learning: &LearningInfo) {
+    let lr_color = if learning.effective_lr > 0.01 {
+        "#7ec8a0"
+    } else if learning.effective_lr > 0.001 {
+        "#e8c547"
+    } else {
+        "#8a9a8a"
+    };
+    let pe_color = stress_color(learning.prediction_error as f64);
+
+    let _ = write!(
+        html,
+        r##"<div class="pane">
+<h2>Learning</h2>
+<table style="width:100%;font-size:0.88em">
+<tr><td>Effective LR</td><td style="text-align:right;color:{lr_color}">{lr:.6}</td></tr>
+<tr><td>Cognitive Mod</td><td style="text-align:right">{cog:.3}&times;</td></tr>
+<tr><td>Meta Mod</td><td style="text-align:right">{meta:.3}&times;</td></tr>
+<tr><td>Prediction Error</td><td style="text-align:right;color:{pe_color}">{pe:.4}</td></tr>
+<tr><td>Pred Coherence</td><td style="text-align:right;color:{coh_color}">{coherence:.3}</td></tr>
+<tr><td>Surprise Replay</td><td style="text-align:right">{replay}</td></tr>
+</table>
+"##,
+        lr_color = lr_color,
+        lr = learning.effective_lr,
+        cog = learning.lr_cognitive_mod,
+        meta = learning.lr_meta_mod,
+        pe_color = pe_color,
+        pe = learning.prediction_error,
+        coh_color = health_color(learning.prediction_coherence as f64),
+        coherence = learning.prediction_coherence,
+        replay = learning.surprise_replay_batch,
+    );
+
+    // LR modulation bars
+    let _ = write!(
+        html,
+        r#"<div style="margin:8px 0">
+<div style="font-size:0.75em;color:#8a9a8a;margin-bottom:4px">Modulation</div>
+<div style="display:flex;gap:4px;height:14px">
+<div style="flex:{cog};background:rgba(126,200,160,0.5);border-radius:3px" title="Cognitive {cog:.3}x"></div>
+<div style="flex:{meta};background:rgba(232,197,71,0.5);border-radius:3px" title="Meta {meta:.3}x"></div>
+</div>
+<div style="display:flex;justify-content:space-between;font-size:0.65em;color:#8a9a8a;margin-top:2px">
+<span>Cognitive</span><span>Meta</span>
+</div>
+</div>"#,
+        cog = learning.lr_cognitive_mod.max(0.01),
+        meta = learning.lr_meta_mod.max(0.01),
+    );
+
+    html.push_str("</div>\n");
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Pane: Reasoning Engine (feature-gated)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+fn write_reasoning_pane(html: &mut String, reasoning: &ReasoningInfo) {
+    let (status_label, status_color) = if !reasoning.enabled {
+        ("DISABLED", "#8a9a8a")
+    } else if reasoning.chain_depth > 0 {
+        ("ACTIVE", "#e8c547")
+    } else {
+        ("STANDBY", "#7ec8a0")
+    };
+
+    let gate_color = if reasoning.gate_blocked {
+        "#c76b5a"
+    } else {
+        "#7ec8a0"
+    };
+
+    let _ = write!(
+        html,
+        r##"<div class="pane">
+<h2>Reasoning</h2>
+<div style="text-align:center;margin-bottom:12px">
+  <span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:{color};box-shadow:0 0 12px {color};margin-right:8px;vertical-align:middle"></span>
+  <span style="color:{color};font-weight:bold;font-size:1.1em;vertical-align:middle">{label}</span>
+</div>
+<table style="width:100%;font-size:0.88em">
+<tr><td>Chain Depth</td><td style="text-align:right">{depth}</td></tr>
+<tr><td>Chain Confidence</td><td style="text-align:right;color:{conf_color}">{conf:.3}</td></tr>
+<tr><td>Plan Confidence</td><td style="text-align:right">{plan:.3}</td></tr>
+<tr><td>Tool Gate</td><td style="text-align:right;color:{gate_color}">{gate}</td></tr>
+<tr><td>Meta Confidence</td><td style="text-align:right">{meta:.3}</td></tr>
+</table>
+</div>
+"##,
+        color = status_color,
+        label = status_label,
+        depth = reasoning.chain_depth,
+        conf_color = health_color(reasoning.chain_confidence as f64),
+        conf = reasoning.chain_confidence,
+        plan = reasoning.plan_confidence,
+        gate_color = gate_color,
+        gate = if reasoning.gate_blocked {
+            "BLOCKED"
+        } else {
+            "open"
+        },
+        meta = reasoning.meta_reasoning_confidence,
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Pane: Dream & Consolidation
+// ═══════════════════════════════════════════════════════════════════════════════
+
+fn write_dream_pane(html: &mut String, dream: &DreamInfo) {
+    let (status_label, status_color) = if dream.is_consolidating {
+        ("CONSOLIDATING", "#e8c547")
+    } else if dream.dream_insights > 0 {
+        ("DREAMING", "#7ec8a0")
+    } else {
+        ("RESTING", "#8a9a8a")
+    };
+
+    let _ = write!(
+        html,
+        r##"<div class="pane">
+<h2>Dream / Memory</h2>
+<div style="text-align:center;margin-bottom:12px">
+  <span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:{color};box-shadow:0 0 12px {color};margin-right:8px;vertical-align:middle"></span>
+  <span style="color:{color};font-weight:bold;font-size:1.1em;vertical-align:middle">{label}</span>
+</div>
+<table style="width:100%;font-size:0.88em">
+<tr><td>Dream Insights</td><td style="text-align:right">{insights}</td></tr>
+<tr><td>&Phi; Improvement</td><td style="text-align:right;color:{phi_color}">{phi_imp:.4}</td></tr>
+<tr><td>Wisdom</td><td style="text-align:right">{wisdom}</td></tr>
+<tr><td>Codebook Size</td><td style="text-align:right">{codebook}</td></tr>
+<tr><td>Codebook Diversity</td><td style="text-align:right;color:{div_color}">{diversity:.3}</td></tr>
+</table>
+</div>
+"##,
+        color = status_color,
+        label = status_label,
+        insights = dream.dream_insights,
+        phi_color = if dream.dream_phi_improvement > 0.01 {
+            "#e8c547"
+        } else {
+            "#8a9a8a"
+        },
+        phi_imp = dream.dream_phi_improvement,
+        wisdom = dream.dream_wisdom_count,
+        codebook = dream.codebook_size,
+        div_color = health_color(dream.codebook_diversity as f64),
+        diversity = dream.codebook_diversity,
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
