@@ -983,14 +983,14 @@ fn test_coherence_field_wired_when_enabled() {
     })
     .unwrap();
 
-    assert!(service.coherence_field.is_some(), "CoherenceField should be Some");
+    assert!(service.vision_sensory.coherence_field.is_some(), "CoherenceField should be Some");
 
     // Run a cycle — should not panic, coherence field gets hormone modulation
     let r = service.cycle("coherence test input");
     assert!(r.prediction_error.is_finite());
 
     // Coherence should remain bounded
-    let cf = service.coherence_field.as_ref().unwrap();
+    let cf = service.vision_sensory.coherence_field.as_ref().unwrap();
     assert!(cf.coherence >= 0.0 && cf.coherence <= 1.0);
 }
 
@@ -1002,7 +1002,7 @@ fn test_coherence_field_none_when_disabled() {
     })
     .unwrap();
 
-    assert!(service.coherence_field.is_none());
+    assert!(service.vision_sensory.coherence_field.is_none());
 }
 
 #[test]
@@ -1054,7 +1054,7 @@ fn test_coherence_field_modulates_consciousness() {
         );
     }
     // Verify the coherence field has a valid value
-    let cf = service.coherence_field.as_ref().unwrap();
+    let cf = service.vision_sensory.coherence_field.as_ref().unwrap();
     assert!(cf.coherence >= 0.0 && cf.coherence <= 1.0);
 }
 
@@ -1537,6 +1537,7 @@ fn helper_adjust_exploration_applies_delta_and_records_proposal() {
     let mut svc = make_helper_service();
     svc.curiosity_drive.exploration_urge = 0.5;
     svc.feedback_state.begin_cycle();
+    svc.feedback_state.snapshot_cycle_start(svc.prediction_confidence, svc.fep.lr_boost, 0.5, svc.carryover.learning.adaptive_threshold_scale);
     let delta: f32 = 0.2;
     svc.adjust_exploration("test_source", delta);
     assert!(
@@ -1552,6 +1553,7 @@ fn helper_scale_exploration_applies_factor() {
     let mut svc = make_helper_service();
     svc.curiosity_drive.exploration_urge = 0.8;
     svc.feedback_state.begin_cycle();
+    svc.feedback_state.snapshot_cycle_start(svc.prediction_confidence, svc.fep.lr_boost, 0.8, svc.carryover.learning.adaptive_threshold_scale);
     let factor: f32 = 0.5;
     svc.scale_exploration("test_source", factor);
     assert!(
@@ -1636,6 +1638,7 @@ fn helper_threshold_clamps_to_bounds() {
 fn helper_multiple_proposals_accumulate_within_cycle() {
     let mut svc = make_helper_service();
     svc.feedback_state.begin_cycle();
+    svc.feedback_state.snapshot_cycle_start(svc.prediction_confidence, svc.fep.lr_boost, svc.curiosity_drive.exploration_urge, svc.carryover.learning.adaptive_threshold_scale);
     let d1: f32 = 0.05;
     let d2: f32 = -0.03;
     let f1: f32 = 0.98;
@@ -1647,11 +1650,13 @@ fn helper_multiple_proposals_accumulate_within_cycle() {
         3,
         "3 proposals should accumulate"
     );
-    // Field should reflect all 3 mutations applied sequentially (using f32→f64 path)
-    let expected = ((0.5 + d1 as f64) + d2 as f64) * f1 as f64;
+    // Field reflects consensus: avg(adds) applied to base, then geo_mean(scales)
+    let base = 0.5_f64;
+    let avg_add = (d1 as f64 + d2 as f64) / 2.0;
+    let expected = (base + avg_add) * f1 as f64;
     assert!(
         (svc.prediction_confidence - expected).abs() < 1e-10,
-        "sequential mutations: got {} expected {}",
+        "consensus integration: got {} expected {}",
         svc.prediction_confidence,
         expected
     );
