@@ -617,7 +617,7 @@ impl CognitiveLoopService {
 
                     // ── Neuromod coupling from knowledge signals ──────────
                     // High uncertainty → NE vigilance (Yu & Dayan 2005)
-                    if sigs_uncertainty > 0.5 {
+                    if sigs_uncertainty.is_finite() && sigs_uncertainty > 0.5 {
                         let ne_base = self.neuromod.bath.noradrenaline.baseline_val();
                         let ne_nudge =
                             KNOWLEDGE_UNCERTAINTY_NE_SCALE * (sigs_uncertainty as f32 - 0.5);
@@ -628,7 +628,9 @@ impl CognitiveLoopService {
                     }
 
                     // High causal depth → DA reward for deep reasoning (Schultz 1997)
-                    if sigs_causal_depth > KNOWLEDGE_CAUSAL_DEPTH_EXPLOIT_THRESHOLD {
+                    if sigs_causal_depth.is_finite()
+                        && sigs_causal_depth > KNOWLEDGE_CAUSAL_DEPTH_EXPLOIT_THRESHOLD
+                    {
                         let da_base = self.neuromod.bath.dopamine.baseline_val();
                         self.neuromod.bath.dopamine.set_baseline(
                             (da_base + KNOWLEDGE_CAUSAL_DEPTH_DA_NUDGE).clamp(0.0, 1.0),
@@ -636,7 +638,11 @@ impl CognitiveLoopService {
                     }
 
                     // High relevance → 5-HT grounding confidence (Cools et al. 2008)
-                    if sigs_relevance > 0.5 && sigs_uncertainty < 0.5 {
+                    if sigs_relevance.is_finite()
+                        && sigs_uncertainty.is_finite()
+                        && sigs_relevance > 0.5
+                        && sigs_uncertainty < 0.5
+                    {
                         let sht_base = self.neuromod.bath.serotonin.baseline_val();
                         self.neuromod.bath.serotonin.set_baseline(
                             (sht_base + KNOWLEDGE_GROUNDING_SHT_NUDGE).clamp(0.0, 1.0),
@@ -644,7 +650,7 @@ impl CognitiveLoopService {
                     }
 
                     // Contradiction → NE + 5-HT (cognitive dissonance, Festinger 1957)
-                    if sigs_contradiction > 0.0 {
+                    if sigs_contradiction.is_finite() && sigs_contradiction > 0.0 {
                         let ne_base = self.neuromod.bath.noradrenaline.baseline_val();
                         self.neuromod.bath.noradrenaline.set_baseline(
                             (ne_base + KNOWLEDGE_CONTRADICTION_NE_BOOST).clamp(0.0, 1.0),
@@ -677,7 +683,9 @@ impl CognitiveLoopService {
                     // to allocate more cognitive resources toward examining the conflict.
                     // Science: Clark (2013) — predictive processing allocates attention
                     // to prediction error sources; contradictions are high-PE events.
-                    if sigs_contradiction > KNOWLEDGE_ATTENTION_CONTRADICTION_THRESHOLD {
+                    if sigs_contradiction.is_finite()
+                        && sigs_contradiction > KNOWLEDGE_ATTENTION_CONTRADICTION_THRESHOLD
+                    {
                         let intensity = (sigs_contradiction
                             - KNOWLEDGE_ATTENTION_CONTRADICTION_THRESHOLD)
                             .min(1.0);
@@ -2897,8 +2905,22 @@ impl CognitiveLoopService {
         #[cfg(not(feature = "physics-bridge"))]
         let compressed_for_cfc: &[f32] = &perception.encoding.compressed_state;
 
-        // 3. Convert to ndarray for CfC
-        let input_array: Array1<f32> = compressed_for_cfc.iter().copied().collect();
+        // 3. Copy into pre-allocated ndarray buffer for CfC (avoids per-cycle heap alloc).
+        // We take() the buffer, fill it, and put it back after use to satisfy the
+        // borrow checker (get_multi_scale_prediction takes &mut self).
+        let mut input_array = std::mem::replace(
+            &mut self.cfc_input_buffer,
+            ndarray::Array1::zeros(0),
+        );
+        {
+            let buf = input_array.as_slice_mut().unwrap();
+            let len = compressed_for_cfc.len().min(buf.len());
+            buf[..len].copy_from_slice(&compressed_for_cfc[..len]);
+            // Zero any trailing elements if buffer is larger
+            for v in &mut buf[len..] {
+                *v = 0.0;
+            }
+        }
 
         // 4. Step CfC forward with current input
         let resonance_tau_factor = if self.carryover.history.resonance_frequency > 0.0 {
@@ -3039,6 +3061,8 @@ impl CognitiveLoopService {
         // 5. Get multi-scale predictions
         let _t_core = Instant::now();
         let (prediction, raw_predictions) = self.get_multi_scale_prediction(&input_array);
+        // Return the buffer to CLS for reuse next cycle (zero-alloc swap)
+        self.cfc_input_buffer = input_array;
 
         let prediction_coherence = if self.stats.total_cycles % 11 == 0 {
             let coh = Self::compute_prediction_coherence_from_cache(&raw_predictions);

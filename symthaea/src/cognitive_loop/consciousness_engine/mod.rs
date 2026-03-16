@@ -56,6 +56,10 @@ pub(crate) struct ConsciousnessEngine {
 
     // ── Cached values (for non-firing cycles) ──────────────────────────
     cache: ConsciousnessEngineCache,
+
+    /// Pre-allocated buffer for Layer 4 sensory input (64 f64 values).
+    /// Reused each cycle to avoid per-cycle Vec<f64> heap allocation.
+    sensory_buffer: Vec<f64>,
 }
 
 impl ConsciousnessEngine {
@@ -73,6 +77,7 @@ impl ConsciousnessEngine {
             unified_consciousness_pipeline,
             moral_coupling: MoralConsciousnessCoupling::default(),
             cache: ConsciousnessEngineCache::default(),
+            sensory_buffer: vec![0.0f64; 64],
         }
     }
 }

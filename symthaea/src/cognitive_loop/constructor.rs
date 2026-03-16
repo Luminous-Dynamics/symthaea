@@ -489,6 +489,7 @@ impl CognitiveLoopService {
         // Create swarm event channel eagerly so the sender is always available.
         let (swarm_event_tx, swarm_event_rx) = std::sync::mpsc::channel();
 
+        let cfc_input_dim = config.cfc_config.input_dim;
         let mut service = Self {
             config,
             encoder,
@@ -1029,6 +1030,7 @@ impl CognitiveLoopService {
                 im
             },
             motor_rendering: super::motor_rendering_manager::MotorRenderingManager::new(),
+            cfc_input_buffer: ndarray::Array1::zeros(cfc_input_dim),
             math_service: super::math_service::MathService::new(),
             #[cfg(feature = "epistemic_auditor")]
             epistemic_auditor: None, // initialized below after struct construction

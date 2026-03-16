@@ -32,7 +32,11 @@ impl ConsciousnessEngine {
         // Push every cycle, compute every 97, adapt+hierarchical every 194
         // ═══════════════════════════════════════════════════════════════════
         let t = Instant::now();
-        self.spectral_mip_finder.push(input.hdv); // ContinuousHV
+        // Push every 2 cycles — halves per-cycle overhead while maintaining ~49 samples
+        // in the window (window_size=50, compute interval=97).
+        if input.cycle % 2 == 0 {
+            self.spectral_mip_finder.push(input.hdv); // ContinuousHV
+        }
 
         let spectral_mip_phi = if input.cycle % 97 == 0 {
             let result = self.spectral_mip_finder.compute();
@@ -168,7 +172,7 @@ impl ConsciousnessEngine {
         let equation_v2_consciousness = if let Some(ref mut eq) = self.consciousness_equation_v2 {
             if input.cycle % 23 == 0 && input.cycle > 0 {
                 use std::collections::HashMap;
-                let mut core_values = HashMap::new();
+                let mut core_values = HashMap::with_capacity(7);
                 core_values.insert(
                     CoreComponent::Integration,
                     input.unified_psi.clamp(0.0, 1.0),
@@ -190,18 +194,28 @@ impl ConsciousnessEngine {
                 core_values.insert(CoreComponent::Recursion, input.hot_depth);
                 core_values.insert(CoreComponent::Efficacy, 1.0 - input.prediction_error as f64);
 
-                // Approach C: Drift-driven epistemic humility
+                // Approach C: Drift-driven epistemic humility + knowledge grounding
                 // High moral drift → attenuate Knowledge component in EquationV2.
+                // Knowledge grounding blends in verified factual content as epistemic anchor.
                 // Science: Epistemic humility during value shifts — if your moral
                 // stance is changing rapidly, "knowledge" claims carry less weight.
+                // Science: Mercier & Sperber (2017) — grounded knowledge strengthens
+                // epistemic claims by anchoring them in verified factual content.
+                let blend = super::super::thresholds::KNOWLEDGE_GROUNDING_EPISTEMIC_BLEND;
+                let safe_grounding = if input.knowledge_grounding.is_finite() {
+                    input.knowledge_grounding
+                } else {
+                    0.5
+                };
                 let effective_epistemic = if self.moral_coupling.enabled {
                     let drift_ratio =
                         (input.moral_drift / self.moral_coupling.drift_saturation).min(1.0);
                     let attenuation =
                         1.0 - drift_ratio * self.moral_coupling.drift_epistemic_attenuation;
-                    input.epistemic_quality * attenuation
+                    let drift_attenuated = input.epistemic_quality * attenuation;
+                    drift_attenuated * (1.0 - blend) + safe_grounding * blend
                 } else {
-                    input.epistemic_quality
+                    input.epistemic_quality * (1.0 - blend) + safe_grounding * blend
                 };
                 core_values.insert(CoreComponent::Knowledge, effective_epistemic);
 
@@ -240,20 +254,22 @@ impl ConsciousnessEngine {
         // advance() every cycle (builds state), process() every 97 (with binding)
         // ═══════════════════════════════════════════════════════════════════
         let t = Instant::now();
+        // Fill sensory buffer (reused across cycles to avoid per-cycle Vec<f64> alloc).
+        // Take ownership temporarily to satisfy borrow checker (pipeline needs &mut self field).
+        let mut sensory_buf = std::mem::take(&mut self.sensory_buffer);
+        sensory_buf.resize(64, 0.0);
+        for i in 0..64 {
+            sensory_buf[i] = if input.hv16.get_bit(i) != 0 {
+                1.0
+            } else {
+                -1.0
+            };
+        }
         let pipeline_consciousness =
             if let Some(ref mut pipeline) = self.unified_consciousness_pipeline {
-                let sensory: Vec<f64> = (0..64)
-                    .map(|i| {
-                        if input.hv16.get_bit(i) != 0 {
-                            1.0
-                        } else {
-                            -1.0
-                        }
-                    })
-                    .collect();
                 if input.cycle % 97 == 0 && input.cycle > 0 {
                     // Full process with oscillatory binding
-                    match pipeline.process(&sensory) {
+                    match pipeline.process(&sensory_buf) {
                         Ok(moment) => {
                             self.cache.last_pipeline_consciousness = moment.consciousness;
                             moment.consciousness
@@ -262,7 +278,7 @@ impl ConsciousnessEngine {
                     }
                 } else {
                     // Lightweight advance: HDC + LTC + state (no binding)
-                    if let Ok(c) = pipeline.advance(&sensory) {
+                    if let Ok(c) = pipeline.advance(&sensory_buf) {
                         self.cache.last_pipeline_consciousness = c;
                     }
                     self.cache.last_pipeline_consciousness
@@ -270,6 +286,7 @@ impl ConsciousnessEngine {
             } else {
                 0.0
             };
+        self.sensory_buffer = sensory_buf;
         let pipeline_us = t.elapsed().as_micros() as u64;
 
         // Pipeline feedback: high consciousness → learning coherence
@@ -330,8 +347,7 @@ impl ConsciousnessEngine {
         // Neutral at 0.0 (no glyph data). Only active with feature `glyph_codex`.
         // Science: Jung (1959) — archetypal integration deepens conscious awareness.
         let glyph_coherence_factor = if input.glyph_coherence > 0.01 {
-            (input.glyph_coherence - 0.5)
-                * super::super::thresholds::GLYPH_CONSCIOUSNESS_MODULATION
+            (input.glyph_coherence - 0.5) * super::super::thresholds::GLYPH_CONSCIOUSNESS_MODULATION
         } else {
             0.0
         };

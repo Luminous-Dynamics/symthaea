@@ -68,14 +68,15 @@ impl CognitiveLoopService {
                     "{failure}"
                 );
                 self.integrity_manager.status.attestation_passed = false;
-                self.integrity_manager.status.anomalies.push(
-                    crate::integrity::IntegrityAnomaly {
+                self.integrity_manager
+                    .status
+                    .anomalies
+                    .push(crate::integrity::IntegrityAnomaly {
                         source: "live_attestation",
                         description: failure,
                         detected_at: std::time::Instant::now(),
                         severity: crate::integrity::AnomalySeverity::Critical,
-                    },
-                );
+                    });
             }
             // Escalate critical integrity anomalies to safety telemetry
             if self.integrity_manager.has_critical_anomaly() {
@@ -94,7 +95,7 @@ impl CognitiveLoopService {
 
         // User state inference: process input to update context, frustration, cognitive load
         // Science: adaptive UI via inferred cognitive state (Ritter et al. 2019)
-        if let Some(ref mut usi) = self.user_state {
+        if let Some(ref mut usi) = self.language_comm.user_state {
             usi.process(input, false);
             let state = usi.state();
             // Frustration → dampen exploration (noisy signals, don't overfit to errors)
@@ -117,7 +118,10 @@ impl CognitiveLoopService {
             if frustration > 0.4 {
                 let ne_base = self.neuromod.bath.noradrenaline.baseline_val();
                 let ne_nudge = 0.03 * (frustration - 0.4);
-                self.neuromod.bath.noradrenaline.set_baseline(ne_base + ne_nudge);
+                self.neuromod
+                    .bath
+                    .noradrenaline
+                    .set_baseline(ne_base + ne_nudge);
             }
             if state.is_in_flow() {
                 let da_base = self.neuromod.bath.dopamine.baseline_val();
@@ -127,6 +131,48 @@ impl CognitiveLoopService {
                 let da_base = self.neuromod.bath.dopamine.baseline_val();
                 self.neuromod.bath.dopamine.set_baseline(da_base - 0.01);
             }
+        }
+
+        // Spectrum → neuromodulator coupling (Aston-Jones & Cohen 2005; Schultz 1997)
+        // Sustained jamming activates threat axis (NE up, locus coeruleus)
+        // Network recovery triggers reward relief (DA nudge)
+        #[cfg(feature = "mesh")]
+        {
+            use super::thresholds::{
+                RADIO_JAMMING_NE_NUDGE, RADIO_NEUROMOD_JAMMING_MIN_STREAK, RADIO_RECOVERY_DA_NUDGE,
+            };
+            let telem = self.spectrum_manager.telemetry();
+            // Sustained jamming → NE arousal spike
+            if telem.jamming_streak >= RADIO_NEUROMOD_JAMMING_MIN_STREAK {
+                let ne_base = self.neuromod.bath.noradrenaline.baseline_val();
+                self.neuromod
+                    .bath
+                    .noradrenaline
+                    .set_baseline(ne_base + RADIO_JAMMING_NE_NUDGE);
+            }
+            // Recovery from blackout → DA relief
+            if telem.network_health == 0 && self.stats.total_cycles > 1 {
+                if telem.degradation_streak == 0 && telem.jamming_streak == 0 {
+                    let had_recent_loss = telem.tier_loss_ema.iter().any(|&l| l > 0.01);
+                    if had_recent_loss {
+                        let da_base = self.neuromod.bath.dopamine.baseline_val();
+                        self.neuromod
+                            .bath
+                            .dopamine
+                            .set_baseline(da_base + RADIO_RECOVERY_DA_NUDGE);
+                    }
+                }
+            }
+        }
+
+        // ── Pre-phase: Text-based crisis detection (safety-critical) ─────
+        // Runs BEFORE perception so crisis state is available for safety precheck.
+        // Science: C-SSRS screening protocol — catch indirect expressions early.
+        #[cfg(feature = "therapeutic")]
+        if self.config.enable_therapeutic {
+            self.therapeutic_manager.detect_crisis_from_text(input);
+            // Apply dream feedback to strategy selection (accuracy-gated exploration)
+            self.therapeutic_manager.apply_dream_feedback();
         }
 
         // ═══════════════════════════════════════════════════════════════════
@@ -147,7 +193,7 @@ impl CognitiveLoopService {
 
         // Coherence field: apply hormone modulation from neuromod bath
         // Science: McEwen (2007) — allostatic load shapes integration capacity
-        if let Some(ref mut cf) = self.coherence_field {
+        if let Some(ref mut cf) = self.vision_sensory.coherence_field {
             use super::neuromodulators::NeuromodulatorBathExt;
             let hormones = self.neuromod.bath.to_hormone_state();
             cf.apply_hormone_modulation(&hormones);
@@ -169,7 +215,7 @@ impl CognitiveLoopService {
             &perception,
             &dynamics,
             &feedback,
-            &mut module_timings,
+            module_timings,
         )
     }
 
@@ -799,7 +845,7 @@ mod tests {
         let mut s = CognitiveLoopService::new(config).unwrap();
         let r = s.cycle("resonance and flourishing");
         assert!(r.metadata.ethics.soul_alignment.is_finite());
-        assert!(s.soul.is_some());
+        assert!(s.ethics_values.soul.is_some());
     }
 
     #[test]
@@ -807,7 +853,7 @@ mod tests {
         let mut s = make_service();
         let r = s.cycle("test without soul");
         assert_eq!(r.metadata.ethics.soul_alignment, 0.0);
-        assert!(s.soul.is_none());
+        assert!(s.ethics_values.soul.is_none());
     }
 
     #[test]

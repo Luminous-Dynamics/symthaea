@@ -17,7 +17,7 @@ impl CognitiveLoopService {
         perception: &PerceptionPhaseResult,
         dynamics: &DynamicsPhaseResult,
         feedback: &FeedbackPhaseResult,
-        module_timings: &mut super::ModuleTimings,
+        mut module_timings: super::ModuleTimings,
     ) -> CycleResult {
         let thalamic_depth_score = match self.cognitive_depth {
             super::CognitiveDepth::DeepThought => 1.0f32,
@@ -31,6 +31,9 @@ impl CognitiveLoopService {
 
         let _t = Instant::now();
         let moral_anomaly_report = self.ethics_engine.last_anomaly_report().clone();
+        // Cache topology summary once — avoids 10+ repeated moral_topology().last_summary() chains
+        let topo_summary = self.ethics_engine.moral_topology().last_summary();
+        let topology_fresh = self.ethics_engine.last_topology_fresh();
         let mut metadata = super::CycleMetadata {
             surprise_triggered: perception.exploration.surprise_triggered,
             prefrontal_veto: feedback.self_model.prefrontal_veto,
@@ -219,67 +222,39 @@ impl CognitiveLoopService {
                 empathic_compassion: feedback.ethics.empathic_compassion,
                 empathic_tone_adj: feedback.ethics.empathic_tone_adj,
                 empathic_speech_rate_mod: feedback.ethics.empathic_speech_rate_mod,
-                moral_topo_beta_0: self.ethics_engine.moral_topology().last_summary().beta_0,
-                moral_topo_beta_1: self.ethics_engine.moral_topology().last_summary().beta_1,
-                moral_topo_beta_2: self.ethics_engine.moral_topology().last_summary().beta_2,
-                moral_topo_unity: self.ethics_engine.moral_topology().last_summary().unity,
-                moral_topo_completeness: self
-                    .ethics_engine
-                    .moral_topology()
-                    .last_summary()
-                    .completeness,
-                moral_topo_circularity: self
-                    .ethics_engine
-                    .moral_topology()
-                    .last_summary()
-                    .circularity,
-                moral_topo_free_energy: self
-                    .ethics_engine
-                    .moral_topology()
-                    .last_summary()
-                    .moral_free_energy,
-                moral_topo_dominant_harmony: self
-                    .ethics_engine
-                    .moral_topology()
-                    .last_summary()
-                    .dominant_harmony,
-                moral_topo_scenario_count: self
-                    .ethics_engine
-                    .moral_topology()
-                    .last_summary()
-                    .scenario_count,
+                moral_topo_beta_0: topo_summary.beta_0,
+                moral_topo_beta_1: topo_summary.beta_1,
+                moral_topo_beta_2: topo_summary.beta_2,
+                moral_topo_unity: topo_summary.unity,
+                moral_topo_completeness: topo_summary.completeness,
+                moral_topo_circularity: topo_summary.circularity,
+                moral_topo_free_energy: topo_summary.moral_free_energy,
+                moral_topo_dominant_harmony: topo_summary.dominant_harmony,
+                moral_topo_scenario_count: topo_summary.scenario_count,
                 // Gate anomaly flags on topology_fresh: between evaluations
                 // (cadence 30–120 cycles), report stale=false so dashboard/API
                 // consumers see clean transitions rather than sticky flags.
-                moral_anomaly_score: if self.ethics_engine.last_topology_fresh() {
+                moral_anomaly_score: if topology_fresh {
                     moral_anomaly_report.anomaly_score
                 } else {
                     0.0
                 },
-                moral_value_inversion: self.ethics_engine.last_topology_fresh()
+                moral_value_inversion: topology_fresh
                     && moral_anomaly_report.value_inversion,
-                moral_free_energy_spike: self.ethics_engine.last_topology_fresh()
+                moral_free_energy_spike: topology_fresh
                     && moral_anomaly_report.free_energy_spike,
-                moral_drift_alert: self.ethics_engine.last_topology_fresh()
+                moral_drift_alert: topology_fresh
                     && moral_anomaly_report.drift_alert,
-                moral_fragmentation_increase: self.ethics_engine.last_topology_fresh()
+                moral_fragmentation_increase: topology_fresh
                     && moral_anomaly_report.fragmentation_increase,
                 moral_trajectory_convergence: moral_anomaly_report.trajectory_convergence,
                 moral_convergence_severity: moral_anomaly_report.convergence_severity,
                 moral_matched_hazard: moral_anomaly_report.matched_hazard.clone(),
                 moral_anomaly_response_applied: self.config.enable_moral_anomaly_response
-                    && self.ethics_engine.last_topology_fresh()
+                    && topology_fresh
                     && moral_anomaly_report.anomaly_score > 0.0,
-                harmony_entropy: self
-                    .ethics_engine
-                    .moral_topology()
-                    .last_summary()
-                    .harmony_entropy,
-                moral_attractor_detected: self
-                    .ethics_engine
-                    .moral_topology()
-                    .last_summary()
-                    .attractor_detected,
+                harmony_entropy: topo_summary.harmony_entropy,
+                moral_attractor_detected: topo_summary.attractor_detected,
                 in_active_rest: self.stats.in_active_rest,
                 stillness_dominance_streak: self.stats.stillness_dominance_streak,
             },
@@ -357,7 +332,7 @@ impl CognitiveLoopService {
             },
             module_timings_us: {
                 module_timings.metadata_assembly = _t.elapsed().as_micros() as u64;
-                module_timings.clone()
+                module_timings
             },
             circadian_phase: circadian_phase_str.into(),
             circadian_plasticity: self.biorhythm_mgr.rhythm.plasticity_mod as f32,
@@ -982,19 +957,17 @@ impl CognitiveLoopService {
         metadata.consciousness.convergence_cycle = self.convergence_cycle;
 
         // ── Fragmentation warning ──
-        {
-            let topo = self.ethics_engine.moral_topology().last_summary();
-            if topo.beta_0 > 1 {
-                tracing::warn!(
-                    target: "cognitive_loop::moral_topology",
-                    beta_0 = topo.beta_0,
-                    unity = %format!("{:.3}", topo.unity),
-                    scenario_count = topo.scenario_count,
-                    cycle = self.stats.total_cycles,
-                    "Moral fragmentation: {} disjoint clusters",
-                    topo.beta_0
-                );
-            }
+        // Re-use topo_summary cached at top of phase_output
+        if topo_summary.beta_0 > 1 {
+            tracing::warn!(
+                target: "cognitive_loop::moral_topology",
+                beta_0 = topo_summary.beta_0,
+                unity = %format!("{:.3}", topo_summary.unity),
+                scenario_count = topo_summary.scenario_count,
+                cycle = self.stats.total_cycles,
+                "Moral fragmentation: {} disjoint clusters",
+                topo_summary.beta_0
+            );
         }
 
         // ── Therapeutic telemetry ──

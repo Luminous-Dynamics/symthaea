@@ -202,19 +202,9 @@ impl SpectralMIPFinder {
         self.full_dim = dim;
         let n = self.config.num_components.min(dim);
 
-        let snapshot: Vec<f64> = if let Some(ref indices) = self.active_dims {
-            indices
-                .iter()
-                .take(n)
-                .map(|&i| state.values[i.min(dim - 1)] as f64)
-                .collect()
-        } else {
-            let stride = if n > 1 { dim / n } else { 1 };
-            (0..n).map(|i| state.values[i * stride] as f64).collect()
-        };
-
-        // If window full, subtract outgoing snapshot from running sums
-        if self.window.len() >= self.config.window_size {
+        // If window full, subtract outgoing snapshot from running sums.
+        // Reuse its allocation for the incoming snapshot to avoid a heap alloc.
+        let mut snapshot: Vec<f64> = if self.window.len() >= self.config.window_size {
             if let Some(old) = self.window.pop_front() {
                 for i in 0..n.min(old.len()) {
                     self.sum[i] -= old[i];
@@ -222,7 +212,26 @@ impl SpectralMIPFinder {
                         self.cross_sum[i * n + j] -= old[i] * old[j];
                     }
                 }
+                old // reuse allocation
+            } else {
+                Vec::with_capacity(n)
             }
+        } else {
+            Vec::with_capacity(n)
+        };
+
+        // Fill snapshot, reusing the buffer
+        snapshot.clear();
+        if let Some(ref indices) = self.active_dims {
+            snapshot.extend(
+                indices
+                    .iter()
+                    .take(n)
+                    .map(|&i| state.values[i.min(dim - 1)] as f64),
+            );
+        } else {
+            let stride = if n > 1 { dim / n } else { 1 };
+            snapshot.extend((0..n).map(|i| state.values[i * stride] as f64));
         }
 
         // Add incoming snapshot to running sums
