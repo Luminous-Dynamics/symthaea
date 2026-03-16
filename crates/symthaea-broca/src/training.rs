@@ -736,6 +736,12 @@ pub fn train_with_adam(
         || config.enable_anomaly_response;
 
     for epoch in 0..config.epochs {
+        // Reset CfC momentum between epochs to prevent accumulated directional
+        // bias from 67K+ gradient steps (momentum 0.9 × 67K steps → runaway).
+        if epoch > 0 && config.train_network {
+            generator.controller_mut().reset_network_momentum();
+        }
+
         let mut total_loss = 0.0f32;
         let mut total_tokens = 0usize;
         let mut coherence_sum = 0.0f32;

@@ -20,8 +20,8 @@ use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::trial_analysis::TrialOutcome;
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use std::collections::BTreeMap;
+use symthaea_core::hdc::binary_grid_encoder::BinaryGridEncoder;
 use symthaea_core::hdc::grid_encoder::GridEncoder;
-use symthaea_core::hdc::ContinuousHV;
 
 /// ARC-style analogical reasoning benchmark.
 pub struct ArcAnalogyBenchmark;
@@ -111,7 +111,6 @@ struct AnalogyTrialResult {
 
 impl ArcAnalogyBenchmark {
     fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> AnalogyTrialResult {
-        let dim = config.dimension;
         let seed = config.trial_seed("reasoning", "arc_analogy", trial_idx);
         let mut rng = seed ^ 0x9E3779B97F4A7C15;
         let grid_size = 5;
@@ -122,7 +121,7 @@ impl ArcAnalogyBenchmark {
         let mut total_ticks: f64 = 0.0;
         let mut total_tasks: u32 = 0;
 
-        let encoder = GridEncoder::new(dim, grid_size, grid_size, num_colors as usize, seed);
+        let encoder = BinaryGridEncoder::new(grid_size, grid_size, num_colors as usize, seed);
 
         // ── Part 1: Single-Transform Analogy (A:B :: C:?) ──
         // For each transform type: generate A→B pair, infer rule, apply to novel C
@@ -144,11 +143,7 @@ impl ArcAnalogyBenchmark {
 
                 if noise_weight > 0.0 {
                     xor_shift(&mut rng);
-                    let noise = ContinuousHV::random(dim, rng);
-                    rule = ContinuousHV::weighted_bundle(
-                        &[&rule, &noise],
-                        &[1.0 - noise_weight as f32, noise_weight as f32],
-                    );
+                    rule = rule.add_noise(noise_weight as f32, rng);
                 }
 
                 // Target: C → ? (predict D)
@@ -205,11 +200,7 @@ impl ArcAnalogyBenchmark {
 
             if noise_weight > 0.0 {
                 xor_shift(&mut rng);
-                let noise = ContinuousHV::random(dim, rng);
-                rule = ContinuousHV::weighted_bundle(
-                    &[&rule, &noise],
-                    &[1.0 - noise_weight as f32, noise_weight as f32],
-                );
+                rule = rule.add_noise(noise_weight as f32, rng);
             }
 
             // Target with palette B (colors 3-5) — shift grid colors
@@ -280,11 +271,7 @@ impl ArcAnalogyBenchmark {
                 let mut rule = encoder.encode_rule(&src_hv, &dst_hv);
                 if noise_weight > 0.0 {
                     xor_shift(&mut rng);
-                    let noise = ContinuousHV::random(dim, rng);
-                    rule = ContinuousHV::weighted_bundle(
-                        &[&rule, &noise],
-                        &[1.0 - noise_weight as f32, noise_weight as f32],
-                    );
+                    rule = rule.add_noise(noise_weight as f32, rng);
                 }
                 rules.push(rule);
                 xor_shift(&mut rng);

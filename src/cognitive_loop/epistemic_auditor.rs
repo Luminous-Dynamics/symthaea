@@ -226,11 +226,11 @@ impl AuditRecord {
 
             // Phi / Consciousness
             phi: m.quality.equation_v2_consciousness,
-            consciousness_level: m.consciousness_level,
-            micro_phi: m.structural_micro_phi,
-            meso_phi: m.structural_meso_phi,
-            macro_phi: m.structural_macro_phi,
-            emergence_ratio: m.structural_emergence_ratio,
+            consciousness_level: m.consciousness.consciousness_level,
+            micro_phi: m.structural.structural_micro_phi,
+            meso_phi: m.structural.structural_meso_phi,
+            macro_phi: m.structural.structural_macro_phi,
+            emergence_ratio: m.structural.structural_emergence_ratio,
             limiting_component: m.eq_v2_limiting_component.clone(),
 
             // Graduation

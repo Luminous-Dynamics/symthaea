@@ -22,8 +22,9 @@ use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::trial_analysis::TrialOutcome;
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use std::collections::BTreeMap;
+use symthaea_core::hdc::binary_grid_encoder::BinaryGridEncoder;
 use symthaea_core::hdc::grid_encoder::GridEncoder;
-use symthaea_core::hdc::ContinuousHV;
+use symthaea_core::hdc::BinaryHV;
 
 /// ARC noise robustness benchmark.
 pub struct ArcNoiseBenchmark;
@@ -133,7 +134,7 @@ struct TrialResult {
 
 impl ArcNoiseBenchmark {
     fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> TrialResult {
-        let dim = config.dimension;
+        let _dim = config.dimension;
         let seed = config.trial_seed("reasoning", "arc_noise", trial_idx);
         let mut rng = seed ^ 0x9E3779B97F4A7C15;
 
@@ -145,7 +146,7 @@ impl ArcNoiseBenchmark {
         let noise_weight = 0.05 + pressure * 0.15;
         let tick_scale = 1.0 - pressure * 0.4;
 
-        let encoder = GridEncoder::new(dim, grid_size, grid_size, num_colors as usize, seed);
+        let encoder = BinaryGridEncoder::new(grid_size, grid_size, num_colors as usize, seed);
 
         let mut hits_per_level = [0u32; 5];
         let mut total_per_level = [0u32; 5];
@@ -171,11 +172,7 @@ impl ArcNoiseBenchmark {
 
                     if noise_weight > 0.0 {
                         xor_shift(&mut rng);
-                        let noise = ContinuousHV::random(dim, rng);
-                        rule = ContinuousHV::weighted_bundle(
-                            &[&rule, &noise],
-                            &[1.0 - noise_weight as f32, noise_weight as f32],
-                        );
+                        rule = rule.add_noise(noise_weight as f32, rng);
                     }
                     train_rules.push(rule);
                 }
@@ -205,7 +202,7 @@ impl ArcNoiseBenchmark {
 
                     // 2-AFC vs random distractor
                     xor_shift(&mut rng);
-                    let distractor = ContinuousHV::random(dim, rng);
+                    let distractor = BinaryHV::random(rng);
                     let dist_sim = predicted.similarity(&distractor) as f64;
 
                     total_per_level[level_idx] += 1;

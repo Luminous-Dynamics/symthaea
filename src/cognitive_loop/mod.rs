@@ -709,6 +709,11 @@ pub struct CognitiveLoopService {
     /// Motor rendering: output bridge, pending request, last result, phi, canvas.
     pub(crate) motor_rendering: motor_rendering_manager::MotorRenderingManager,
 
+    /// Pre-allocated input buffer for CfC temporal network step.
+    /// Sized to `config.cfc_config.input_dim` at construction, reused each cycle
+    /// to avoid per-cycle `Array1<f32>` heap allocation in `phase_dynamics`.
+    cfc_input_buffer: ndarray::Array1<f32>,
+
     /// Math Service: unified math dispatcher routing queries to Phase 1-3 solvers
     /// (linear algebra, root finding, quadrature, statistics, optimization, FFT,
     /// logic engine, constraint solver, geometry, graphs, differential equations).

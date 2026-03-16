@@ -155,6 +155,21 @@ pub const CANTOR_HARMONY_STILLNESS_SCALE: f64 = 0.08;
 /// Fractal choir (multiple coherent CRHVs) = collective resonance.
 pub const CANTOR_HARMONY_INTERCONNECT_SCALE: f64 = 0.06;
 
+// ── Dream frequency modulation ───────────────────────────────────────────────
+
+/// Base dream consolidation interval in cycles.
+/// Hobson & Friston (2012): consolidation timing follows metabolic constraints.
+pub const DREAM_BASE_INTERVAL: u64 = 100;
+
+/// Minimum dream interval (high learning rate floor).
+/// Diekelmann & Born (2010): minimum consolidation period for memory stability.
+pub const DREAM_MIN_INTERVAL: u64 = 30;
+
+/// Learning rate scaling factor for dream interval.
+/// Higher LR → shorter interval. interval = base / (1 + lr_scale * lr_boost)
+/// Walker (2017): learning intensity correlates with consolidation need.
+pub const DREAM_LR_INTERVAL_SCALE: f64 = 2.0;
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // FEP / ACTIVE INFERENCE
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1929,6 +1944,14 @@ pub const REST_MODULATION_COHERENCE_FRAC: f32 = 0.6;
 /// Fraction of rest modulation attributed to binding component.
 pub const REST_MODULATION_BINDING_FRAC: f32 = 0.4;
 
+/// Dream consolidation reliability threshold for LR boost.
+/// Diekelmann & Born (2010): effective consolidation enhances subsequent encoding.
+pub const DREAM_CONSOLIDATION_LR_THRESHOLD: f64 = 0.6;
+
+/// Maximum LR boost from high dream consolidation reliability.
+/// Walker (2017): post-sleep learning enhancement factor.
+pub const DREAM_CONSOLIDATION_LR_BOOST: f64 = 0.05;
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // EMPATHIC SPEECH MODULATION
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -3042,6 +3065,14 @@ pub const DREAM_KNOWLEDGE_CAUSAL_DEPTH_BOOST: f64 = 0.1;
 /// Chains shorter than this are too shallow to warrant preferential consolidation.
 /// Science: Hobson & Friston (2012) — only multi-step causal chains benefit from dream replay.
 pub const DREAM_KNOWLEDGE_CAUSAL_DEPTH_THRESHOLD: f64 = 3.0;
+
+/// Dream→Knowledge consolidation weight for strengthening replayed edges.
+/// Rasch & Born (2013): sleep replay strengthens memory traces proportional to replay intensity.
+pub const DREAM_KNOWLEDGE_REPLAY_WEIGHT: f64 = 0.1;
+
+/// Minimum dream consolidation quality to trigger knowledge update.
+/// Tononi & Cirelli (2006): only effective consolidation modifies synaptic weights.
+pub const DREAM_KNOWLEDGE_MIN_QUALITY: f64 = 0.4;
 
 /// Attention boost when knowledge contradictions exceed salience threshold.
 /// Contradictions signal prediction errors requiring focused examination.
@@ -4989,6 +5020,12 @@ mod tests {
         );
         // Contradiction boost < contradiction boost (dreams more aggressive than attention)
         assert!(DREAM_KNOWLEDGE_CAUSAL_DEPTH_BOOST < DREAM_KNOWLEDGE_CONTRADICTION_BOOST);
+        // Dream→Knowledge feedback constants
+        assert!(
+            DREAM_KNOWLEDGE_REPLAY_WEIGHT > 0.0
+                && DREAM_KNOWLEDGE_REPLAY_WEIGHT <= DREAM_KNOWLEDGE_CONTRADICTION_BOOST
+        );
+        assert!(DREAM_KNOWLEDGE_MIN_QUALITY > 0.0 && DREAM_KNOWLEDGE_MIN_QUALITY < 1.0);
         // Knowledge attention contradiction
         assert!(
             KNOWLEDGE_ATTENTION_CONTRADICTION_BOOST > 0.0

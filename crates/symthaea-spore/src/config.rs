@@ -39,3 +39,57 @@ impl Default for SporeConfig {
         }
     }
 }
+
+/// How the Spore shares consciousness state with the desktop Holon.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum HolonSyncMode {
+    /// No bridge activity.
+    Off,
+    /// Heartbeats + consciousness vector only (no task delegation).
+    PresenceOnly,
+    /// Full sync: task delegation, knowledge shares, resuscitation.
+    FullSync,
+}
+
+impl Default for HolonSyncMode {
+    fn default() -> Self {
+        Self::Off
+    }
+}
+
+/// BLE mesh sharing mode.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum BleMeshMode {
+    /// No mesh activity.
+    Off,
+    /// Receive peer CVs, don't advertise own.
+    PassiveDiscover,
+    /// Receive + advertise own CV.
+    ActiveShare,
+}
+
+impl Default for BleMeshMode {
+    fn default() -> Self {
+        Self::Off
+    }
+}
+
+/// Controls all outbound sharing. Sovereign privacy by default.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SharingConfig {
+    pub holon_mode: HolonSyncMode,
+    pub ble_mode: BleMeshMode,
+    pub haptic_enabled: bool,
+    pub telemetry_export: bool,
+}
+
+impl Default for SharingConfig {
+    fn default() -> Self {
+        Self {
+            holon_mode: HolonSyncMode::Off,
+            ble_mode: BleMeshMode::Off,
+            haptic_enabled: true,
+            telemetry_export: false,
+        }
+    }
+}

@@ -17,8 +17,9 @@ use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::trial_analysis::TrialOutcome;
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use std::collections::BTreeMap;
+use symthaea_core::hdc::binary_grid_encoder::BinaryGridEncoder;
 use symthaea_core::hdc::grid_encoder::GridEncoder;
-use symthaea_core::hdc::ContinuousHV;
+use symthaea_core::hdc::BinaryHV;
 
 /// ARC-style compositional reasoning benchmark (chained transforms + size variation + symmetry).
 pub struct ArcCompositionalBenchmark;
@@ -174,7 +175,6 @@ struct CompositionalTrialResult {
 
 impl ArcCompositionalBenchmark {
     fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> CompositionalTrialResult {
-        let dim = config.dimension;
         let seed = config.trial_seed("reasoning", "arc_compositional", trial_idx);
         let mut rng = seed ^ 0x9E3779B97F4A7C15;
         let num_colors: u8 = 6;
@@ -184,7 +184,7 @@ impl ArcCompositionalBenchmark {
 
         // ── Part 1: Chained Transforms (5×5 grids) ──
         let grid_size = 5;
-        let encoder = GridEncoder::new(dim, grid_size, grid_size, num_colors as usize, seed);
+        let encoder = BinaryGridEncoder::new(grid_size, grid_size, num_colors as usize, seed);
         let tasks_per_chain = 3;
         let mut chain_hits: u32 = 0;
         let mut chain_total: u32 = 0;
@@ -207,11 +207,7 @@ impl ArcCompositionalBenchmark {
                     let mut rule = encoder.encode_rule(&in_hv, &out_hv);
                     if noise_weight > 0.0 {
                         xor_shift(&mut rng);
-                        let noise = ContinuousHV::random(dim, rng);
-                        rule = ContinuousHV::weighted_bundle(
-                            &[&rule, &noise],
-                            &[1.0 - noise_weight as f32, noise_weight as f32],
-                        );
+                        rule = rule.add_noise(noise_weight as f32, rng);
                     }
                     train_rules.push(rule);
                     xor_shift(&mut rng);
@@ -268,8 +264,7 @@ impl ArcCompositionalBenchmark {
         // Train on 5×5, test on 3×3 and 7×7
         let sizes = [3, 5, 7];
         let max_size = 7;
-        let size_encoder = GridEncoder::new(
-            dim,
+        let size_encoder = BinaryGridEncoder::new(
             max_size,
             max_size,
             num_colors as usize,
@@ -296,11 +291,7 @@ impl ArcCompositionalBenchmark {
                 let mut rule = size_encoder.encode_rule(&in_hv, &out_hv);
                 if noise_weight > 0.0 {
                     xor_shift(&mut rng);
-                    let noise = ContinuousHV::random(dim, rng);
-                    rule = ContinuousHV::weighted_bundle(
-                        &[&rule, &noise],
-                        &[1.0 - noise_weight as f32, noise_weight as f32],
-                    );
+                    rule = rule.add_noise(noise_weight as f32, rng);
                 }
                 train_rules.push(rule);
                 xor_shift(&mut rng);
@@ -345,8 +336,7 @@ impl ArcCompositionalBenchmark {
         // ── Part 3: Symmetry Detection ──
         // Encode 4 types: h_sym only, v_sym only, both, neither — classify via cosine
         let sym_size = 5;
-        let sym_encoder = GridEncoder::new(
-            dim,
+        let sym_encoder = BinaryGridEncoder::new(
             sym_size,
             sym_size,
             num_colors as usize,
@@ -389,15 +379,10 @@ impl ArcCompositionalBenchmark {
             no_sym_hvs.push(sym_encoder.encode_grid(&g));
         }
 
-        let h_refs: Vec<&ContinuousHV> = h_sym_hvs.iter().collect();
-        let v_refs: Vec<&ContinuousHV> = v_sym_hvs.iter().collect();
-        let both_refs: Vec<&ContinuousHV> = both_sym_hvs.iter().collect();
-        let no_refs: Vec<&ContinuousHV> = no_sym_hvs.iter().collect();
-
-        let h_proto = ContinuousHV::bundle(&h_refs);
-        let v_proto = ContinuousHV::bundle(&v_refs);
-        let both_proto = ContinuousHV::bundle(&both_refs);
-        let no_proto = ContinuousHV::bundle(&no_refs);
+        let h_proto = BinaryHV::bundle(&h_sym_hvs);
+        let v_proto = BinaryHV::bundle(&v_sym_hvs);
+        let both_proto = BinaryHV::bundle(&both_sym_hvs);
+        let no_proto = BinaryHV::bundle(&no_sym_hvs);
 
         let prototypes = [&h_proto, &v_proto, &both_proto, &no_proto];
 
@@ -406,7 +391,7 @@ impl ArcCompositionalBenchmark {
         let mut sym_correct: u32 = 0;
         let mut sym_total: u32 = 0;
 
-        let classify = |hv: &ContinuousHV| -> usize {
+        let classify = |hv: &BinaryHV| -> usize {
             let mut best_idx = 0;
             let mut best_sim = f32::NEG_INFINITY;
             for (i, proto) in prototypes.iter().enumerate() {

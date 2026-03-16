@@ -524,6 +524,7 @@ impl CognitiveLoopService {
             let crhvs: Vec<_> = self.cantor_dream.broadcast_buffer.drain(..).collect();
             let mut dream_surprise_sum = 0.0f32;
             let mut dream_count = 0u32;
+            let mut high_quality_count = 0u32;
 
             // DEPTH-STRATIFIED EVICTION: Before adding new entries, if the codebook
             // is near capacity, evict from the most crowded depth stratum.
@@ -571,6 +572,7 @@ impl CognitiveLoopService {
                 if result.quality
                     > crate::cognitive_loop::thresholds::CANTOR_DREAM_QUALITY_THRESHOLD
                 {
+                    high_quality_count += 1;
                     // Depth-stratified label: "d{depth}_dream_consolidated_{N}"
                     let label = format!(
                         "d{}_dream_consolidated_{}",
@@ -595,6 +597,16 @@ impl CognitiveLoopService {
             if self.cantor_dream.dream_surprise > 0.01 {
                 self.fep.learning_signal += self.cantor_dream.dream_surprise * 0.2;
                 self.fep.learning_signal = self.fep.learning_signal.clamp(-1.0, 1.0);
+            }
+            // Dream→Learning reliability coupling: fraction of high-quality cleanups
+            // (those exceeding CANTOR_DREAM_QUALITY_THRESHOLD) measures consolidation
+            // reliability. High reliability boosts waking plasticity for enhanced encoding.
+            // Science: Diekelmann & Born (2010) — effective consolidation enhances
+            // subsequent encoding; Walker (2017) — post-sleep learning enhancement.
+            if dream_count > 0 {
+                let consolidation_reliability = high_quality_count as f32 / dream_count as f32;
+                self.learning_manager
+                    .apply_dream_consolidation_boost(consolidation_reliability);
             }
             tracing::debug!(
                 cleanups = self.cantor_dream.cleanup_engine.cleanups_performed,

@@ -763,6 +763,59 @@ impl KnowledgeManager {
         }
     }
 
+    /// Apply dream consolidation feedback to the knowledge graph.
+    ///
+    /// When the dream engine completes a consolidation cycle with sufficient quality,
+    /// this method strengthens knowledge graph edges whose source text contains any
+    /// of the consolidated topic keywords.  The boost magnitude is
+    /// `DREAM_KNOWLEDGE_REPLAY_WEIGHT * quality` — proportional to how effective the
+    /// dream replay was, matching Rasch & Born (2013) targeted-reactivation findings.
+    ///
+    /// # Arguments
+    /// - `consolidated_topics`: keywords inferred from recently consolidated memories.
+    ///   If empty, falls back to strengthening all causal facts (non-targeted replay).
+    /// - `quality`: 0.0–1.0 score representing dream consolidation effectiveness
+    ///   (typically `best_phi_improvement` from `DreamResult`).
+    ///
+    /// Returns the number of facts strengthened.
+    ///
+    /// Science:
+    /// - Rasch & Born (2013) — targeted reactivation during NREM strengthens cued traces.
+    /// - Tononi & Cirelli (2006) — synaptic homeostasis: only effective consolidation
+    ///   modifies weights.
+    pub fn apply_dream_consolidation(
+        &mut self,
+        consolidated_topics: &[String],
+        quality: f64,
+    ) -> usize {
+        let min_quality = crate::cognitive_loop::thresholds::DREAM_KNOWLEDGE_MIN_QUALITY;
+        if quality < min_quality {
+            return 0;
+        }
+        let replay_weight = crate::cognitive_loop::thresholds::DREAM_KNOWLEDGE_REPLAY_WEIGHT;
+        let boost = (replay_weight * quality) as f32;
+
+        let strengthened = if consolidated_topics.is_empty() {
+            // Non-targeted replay: fall back to strengthening all causal facts
+            self.graph.strengthen_causal_facts(boost)
+        } else {
+            // Targeted replay: boost only facts relevant to consolidated topics
+            self.graph
+                .strengthen_facts_by_topic(consolidated_topics, boost)
+        };
+
+        if strengthened > 0 {
+            tracing::debug!(
+                strengthened,
+                quality,
+                boost,
+                topics = consolidated_topics.len(),
+                "Dream→Knowledge: strengthened facts after dream consolidation"
+            );
+        }
+        strengthened
+    }
+
     /// Consolidate knowledge during dream/rest: prune weak facts, strengthen causal ones.
     ///
     /// Science: Stickgold & Walker (2013) — sleep-dependent memory consolidation

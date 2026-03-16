@@ -616,58 +616,114 @@ fn build_task_suite() -> Vec<BenchTask> {
     ]
 }
 
-/// Strip markdown code fences from LLM output.
+/// Clean LLM output into compilable Rust code.
 ///
-/// LLMs often wrap code in ```rust ... ``` blocks. Extract just the code.
-fn strip_markdown_fences(source: &str) -> String {
+/// Handles: markdown fences, leading/trailing prose, unclosed delimiters,
+/// Python-style syntax at top level, and truncated output.
+fn clean_llm_output(source: &str) -> String {
     let trimmed = source.trim();
+    if trimmed.is_empty() {
+        return trimmed.to_string();
+    }
 
+    // Step 1: Strip markdown fences (```rust ... ```)
+    let defenced = strip_markdown_fences(trimmed);
+
+    // Step 2: Strip leading prose (lines before first Rust construct)
+    let lines: Vec<&str> = defenced.lines().collect();
+    let code_start = lines
+        .iter()
+        .position(|l| {
+            let t = l.trim();
+            t.starts_with("use ")
+                || t.starts_with("pub ")
+                || t.starts_with("fn ")
+                || t.starts_with("struct ")
+                || t.starts_with("enum ")
+                || t.starts_with("impl ")
+                || t.starts_with("#[")
+                || t.starts_with("///")
+                || t.starts_with("mod ")
+                || t.starts_with("type ")
+                || t.starts_with("const ")
+                || t.starts_with("static ")
+                || t.starts_with("trait ")
+        })
+        .unwrap_or(0);
+
+    // Step 3: Strip trailing prose (lines after last closing brace)
+    let code_lines = &lines[code_start..];
+    let mut last_code_line = code_lines.len();
+    for (i, line) in code_lines.iter().enumerate().rev() {
+        let t = line.trim();
+        if t == "}"
+            || t.ends_with('}')
+            || t.ends_with(';')
+            || t.ends_with("*/")
+            || t.starts_with("//")
+            || t.starts_with("///")
+            || t.is_empty()
+        {
+            last_code_line = i + 1;
+            break;
+        }
+    }
+
+    let mut code: String = code_lines[..last_code_line].join("\n");
+
+    // Step 4: Balance braces — add missing closing braces for unclosed delimiters
+    let open_braces = code.chars().filter(|&c| c == '{').count();
+    let close_braces = code.chars().filter(|&c| c == '}').count();
+    if open_braces > close_braces {
+        let missing = open_braces - close_braces;
+        for _ in 0..missing {
+            code.push_str("\n}");
+        }
+    }
+
+    // Step 5: Remove lines that are clearly not Rust (common LLM artifacts)
+    let cleaned_lines: Vec<&str> = code
+        .lines()
+        .filter(|l| {
+            let t = l.trim();
+            // Remove explanation lines that start with natural language
+            !(t.starts_with("Here") && t.contains(':'))
+                && !(t.starts_with("This") && t.contains("function"))
+                && !(t.starts_with("The ") && t.contains("above"))
+                && !(t.starts_with("Note:"))
+                && !(t.starts_with("Example"))
+                && !t.starts_with("Output:")
+        })
+        .collect();
+
+    cleaned_lines.join("\n")
+}
+
+/// Strip markdown code fences from text.
+fn strip_markdown_fences(source: &str) -> String {
     // Check for opening fence
-    if let Some(start) = trimmed.find("```") {
-        // Find end of opening fence line
-        let after_fence = &trimmed[start + 3..];
+    if let Some(start) = source.find("```") {
+        let after_fence = &source[start + 3..];
         let code_start = after_fence
             .find('\n')
             .map(|i| start + 3 + i + 1)
             .unwrap_or(start + 3);
 
-        // Find closing fence
-        let code_region = &trimmed[code_start..];
+        let code_region = &source[code_start..];
         let code_end = code_region.rfind("```").unwrap_or(code_region.len());
 
         return code_region[..code_end].trim().to_string();
     }
 
-    // No fences — check for common LLM prefixes like "Here's the code:" or "```rust"
-    // Also strip leading prose before first `use ` or `pub ` or `fn ` or `struct `
-    let lines: Vec<&str> = trimmed.lines().collect();
-    let code_start = lines.iter().position(|l| {
-        let t = l.trim();
-        t.starts_with("use ")
-            || t.starts_with("pub ")
-            || t.starts_with("fn ")
-            || t.starts_with("struct ")
-            || t.starts_with("enum ")
-            || t.starts_with("impl ")
-            || t.starts_with("#[")
-            || t.starts_with("///")
-    });
-
-    if let Some(start) = code_start {
-        if start > 0 {
-            return lines[start..].join("\n");
-        }
-    }
-
-    trimmed.to_string()
+    source.to_string()
 }
 
 /// Validate generated code by compiling and running test assertions.
 fn validate_code(source: &str, test_source: &str) -> (bool, Vec<String>, usize, usize, bool, bool) {
     let mut executor = CodeExecutor::with_real_execution();
 
-    // Strip markdown fences and LLM prose from output
-    let clean_source = strip_markdown_fences(source);
+    // Clean LLM output: strip fences, prose, balance braces
+    let clean_source = clean_llm_output(source);
 
     // First attempt: compile with tests
     let test_src = if test_source.is_empty() {

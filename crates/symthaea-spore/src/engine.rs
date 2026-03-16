@@ -1,10 +1,17 @@
 //! SporeEngine: the core consciousness loop for WASM targets.
 
+use crate::ble_mesh::BleMesh;
 use crate::broca::BrocaLite;
-use crate::config::SporeConfig;
+use crate::compass::CompassSnapshot;
+use crate::config::{SharingConfig, SporeConfig};
 use crate::dream::DreamEngine;
+use crate::dream_journal::DreamJournal;
 use crate::fep::{ActiveInferenceAgent, FepCycleResult};
+use crate::haptic::HapticManager;
+use crate::holon_bridge::HolonBridge;
 use crate::memory::MemoryCoordinator;
+use crate::metabolism::{Metabolism, WakeSignal, WakeState};
+use crate::sensor_bridge::SensorBridge;
 use crate::topology::TopologyAnalyzer;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -190,6 +197,15 @@ pub struct SporeEngine {
     pub battery_percent: u8,
     /// Whether the device is currently charging.
     pub battery_charging: bool,
+
+    // Mobile embodiment subsystems
+    metabolism: Metabolism,
+    sensor_bridge: SensorBridge,
+    haptic: HapticManager,
+    dream_journal: DreamJournal,
+    holon_bridge: HolonBridge,
+    ble_mesh: BleMesh,
+    sharing: SharingConfig,
 }
 
 impl SporeEngine {
@@ -250,6 +266,13 @@ impl SporeEngine {
             thermal_level: 0,
             battery_percent: 100,
             battery_charging: false,
+            metabolism: Metabolism::new(),
+            sensor_bridge: SensorBridge::new(),
+            haptic: HapticManager::new(),
+            dream_journal: DreamJournal::new(),
+            holon_bridge: HolonBridge::new(crate::config::HolonSyncMode::Off),
+            ble_mesh: BleMesh::new(crate::config::BleMeshMode::Off),
+            sharing: SharingConfig::default(),
         }
     }
 
@@ -281,9 +304,18 @@ impl SporeEngine {
 
     /// Inner cycle: evolve network, compute consciousness, update neuromodulators,
     /// evaluate harmony alignment, attach epistemic status.
+    ///
+    /// Embodiment subsystems wired after core pipeline:
+    /// - Sensor nudges → neuromodulators
+    /// - Metabolism tick → wake state gating
+    /// - Haptic checks → event queue
+    /// - Holon bridge tick → outbound queue
+    /// - BLE mesh tick → peer eviction
+    /// - Auto-dream consolidation in Sleep+Charging+Night
     fn cycle_inner(&mut self, input_hv: ContinuousHV) -> CycleResult {
         self.cycle_count += 1;
-        let dt = 1.0 / self.config.target_hz;
+        let wake = self.metabolism.state();
+        let dt = 1.0 / wake.target_hz();
 
         // Evolve CfC network (O(1) closed-form temporal step)
         self.network.evolve_closed_form(dt, &input_hv);
@@ -304,6 +336,22 @@ impl SporeEngine {
             (self.bath.noradrenaline.level + prediction_error * 0.15 - 0.03).clamp(0.0, 1.0);
         self.bath.serotonin.level =
             (self.bath.serotonin.level + (1.0 - prediction_error) * 0.05 - 0.01).clamp(0.0, 1.0);
+
+        // Sensor bridge → neuromodulator nudges
+        if !self.sensor_bridge.privacy_mode() {
+            let nudges = self.sensor_bridge.compute_nudges();
+            self.bath.dopamine.level =
+                (self.bath.dopamine.level + nudges.dopamine_delta).clamp(0.0, 1.0);
+            self.bath.noradrenaline.level =
+                (self.bath.noradrenaline.level + nudges.norepinephrine_delta).clamp(0.0, 1.0);
+            self.bath.serotonin.level =
+                (self.bath.serotonin.level + nudges.serotonin_delta).clamp(0.0, 1.0);
+        }
+
+        // BLE mesh → neuromodulator nudges (social buffering, affective contagion)
+        let mesh_nudges = self.ble_mesh.compute_nudges();
+        self.bath.oxytocin.level =
+            (self.bath.oxytocin.level + mesh_nudges.oxytocin_delta).clamp(0.0, 1.0);
 
         // Compute consciousness (every N cycles or every cycle)
         let consciousness_level = if self.cycle_count % self.config.phi_every_n_cycles as u64 == 0 {
@@ -349,29 +397,35 @@ impl SporeEngine {
             }
         }
 
-        // FEP: active inference cycle
-        let fep_result = self.fep.cycle(
-            consciousness_level,
-            harmony_alignment,
-            1.0 - prediction_error,
-            neuromods[1], // norepinephrine as attention proxy
-        );
+        // FEP: active inference cycle (skipped in Sleep)
+        let fep_result = if !wake.skip_fep() {
+            self.fep.cycle(
+                consciousness_level,
+                harmony_alignment,
+                1.0 - prediction_error,
+                neuromods[1],
+            )
+        } else {
+            self.fep
+                .cycle(consciousness_level, harmony_alignment, 0.5, 0.3)
+        };
 
-        // Topology: observe consciousness dimensions
-        // Knowledge dimension modulated by dream wisdom
-        let wisdom_knowledge = (0.5 + self.dream.wisdom().len() as f64 * 0.02).min(0.8);
-        self.topology.observe(
-            [
-                consciousness_level as f64,
-                harmony_alignment as f64,
-                0.6,                 // workspace (constant for now)
-                neuromods[1] as f64, // attention
-                0.7,                 // recurrence
-                self.substrate_feasibility,
-                wisdom_knowledge,
-            ],
-            self.cycle_count,
-        );
+        // Topology: observe consciousness dimensions (skipped in Sleep/Drowsy)
+        if !wake.skip_topology() {
+            let wisdom_knowledge = (0.5 + self.dream.wisdom().len() as f64 * 0.02).min(0.8);
+            self.topology.observe(
+                [
+                    consciousness_level as f64,
+                    harmony_alignment as f64,
+                    0.6,
+                    neuromods[1] as f64,
+                    0.7,
+                    self.substrate_feasibility,
+                    wisdom_knowledge,
+                ],
+                self.cycle_count,
+            );
+        }
 
         // Apply FEP motor command effects to neuromodulators
         let intensity = fep_result.motor_command.intensity;
@@ -400,6 +454,68 @@ impl SporeEngine {
                     (self.bath.noradrenaline.level + 0.02 * intensity).clamp(0.0, 1.0);
             }
             _ => {}
+        }
+
+        // ── Embodiment subsystems ──────────────────────────────────────
+
+        // Metabolism: tick with consciousness metrics (focus detection, dream triggers)
+        self.metabolism.tick(prediction_error, consciousness_level);
+
+        // Haptic: check for significant consciousness shifts and surprise
+        self.haptic.check_consciousness(consciousness_level);
+        self.haptic.check_surprise(prediction_error);
+
+        // Holon bridge: tick for heartbeats/CV (privacy-gated)
+        if !self.sensor_bridge.privacy_mode() {
+            let da = self.bath.dopamine.effective();
+            let ot = self.bath.oxytocin.effective();
+            let ne = self.bath.noradrenaline.effective();
+            let valence = ((da - 0.5) + (ot - 0.5)).clamp(-1.0, 1.0);
+            let arousal = ne.clamp(0.0, 1.0);
+            let attention_slice = if let Some(ref out) = self.last_output {
+                &out.values[..64.min(out.values.len())]
+            } else {
+                &[]
+            };
+            self.holon_bridge.tick(
+                consciousness_level,
+                wake.as_u8(),
+                self.cycle_count,
+                attention_slice,
+                consciousness_level, // phi proxy
+                valence,
+                arousal,
+            );
+        }
+
+        // BLE mesh: tick for stale peer eviction
+        self.ble_mesh.tick(self.cycle_count);
+
+        // Auto-dream consolidation: Sleep + Charging + Night
+        if self.metabolism.dream_consolidation_due {
+            self.metabolism.dream_consolidation_due = false;
+            // Run dream cycle first to generate wisdom
+            self.dream.dream();
+            // Then journal the wisdom
+            let wisdoms = self.dream.wisdom();
+            if !wisdoms.is_empty() {
+                let nm = [
+                    self.bath.dopamine.effective(),
+                    self.bath.noradrenaline.effective(),
+                    self.bath.serotonin.effective(),
+                    self.bath.oxytocin.effective(),
+                ];
+                let had_wisdom = self.dream_journal.consolidate(
+                    wisdoms,
+                    &mut self.broca,
+                    consciousness_level,
+                    nm,
+                    self.cycle_count,
+                );
+                if had_wisdom {
+                    self.haptic.notify_dream_wisdom();
+                }
+            }
         }
 
         CycleResult {
@@ -526,6 +642,175 @@ impl SporeEngine {
     /// Query semantic memory for similar patterns.
     pub fn memory_query(&self, query: &[f32], top_k: usize) -> Vec<(usize, f32)> {
         self.memory.query_semantic(query, top_k)
+    }
+
+    // ======================================================================
+    // Mobile embodiment accessors
+    // ======================================================================
+
+    /// Send a wake signal to the metabolism state machine.
+    pub fn wake_signal(&mut self, signal: WakeSignal) {
+        self.metabolism.signal(signal);
+    }
+
+    /// Get current wake state.
+    pub fn wake_state(&self) -> WakeState {
+        self.metabolism.state()
+    }
+
+    /// Set sensor snapshot from platform.
+    pub fn set_sensors(
+        &mut self,
+        accel: f32,
+        light: f32,
+        proximity: bool,
+        barometer: f32,
+        gps_novelty: f32,
+    ) {
+        self.sensor_bridge
+            .set_sensors(accel, light, proximity, barometer, gps_novelty);
+    }
+
+    /// Get current motion state.
+    pub fn motion_state(&self) -> crate::sensor_bridge::MotionState {
+        self.sensor_bridge.motion_state()
+    }
+
+    /// Whether privacy mode is active (face-down proximity).
+    pub fn privacy_mode(&self) -> bool {
+        self.sensor_bridge.privacy_mode()
+    }
+
+    /// Get a consciousness compass snapshot as JSON.
+    pub fn compass_json(&self) -> String {
+        let neuromods = [
+            self.bath.dopamine.effective(),
+            self.bath.noradrenaline.effective(),
+            self.bath.serotonin.effective(),
+            self.bath.oxytocin.effective(),
+        ];
+        let snap = CompassSnapshot::build(
+            self.last_consciousness,
+            "Harmony", // TODO: dominant harmony from EightHarmonies
+            neuromods,
+            self.metabolism.state().as_u8(),
+            self.sensor_bridge.motion_state().as_u8(),
+            self.sensor_bridge.privacy_mode(),
+            self.dream.stats().dream_cycles as u32,
+            self.dream.wisdom().len() as u32,
+            self.cycle_count,
+        );
+        snap.to_json()
+    }
+
+    /// Set sharing configuration.
+    pub fn set_sharing_config(&mut self, config: SharingConfig) {
+        self.sharing = config.clone();
+        self.holon_bridge.set_mode(config.holon_mode);
+        self.ble_mesh.set_mode(config.ble_mode);
+        self.haptic.set_enabled(config.haptic_enabled);
+    }
+
+    /// Drain haptic events as JSON.
+    pub fn haptic_drain_json(&mut self) -> String {
+        self.haptic.drain_json()
+    }
+
+    /// Number of pending haptic events.
+    pub fn haptic_pending(&self) -> u32 {
+        self.haptic.pending_count()
+    }
+
+    /// Set haptic enabled/disabled.
+    pub fn haptic_set_enabled(&mut self, enabled: bool) {
+        self.haptic.set_enabled(enabled);
+    }
+
+    /// Drain holon outbound messages as JSON.
+    pub fn holon_drain_outbound_json(&mut self) -> String {
+        self.holon_bridge.drain_outbound_json()
+    }
+
+    /// Receive inbound holon message from JSON.
+    pub fn holon_receive_json(&mut self, json: &str) {
+        if let Ok(msg) = serde_json::from_str::<crate::holon_bridge::HolonInbound>(json) {
+            self.holon_bridge.receive(msg);
+        }
+    }
+
+    /// Set holon connection state.
+    pub fn holon_set_connected(&mut self, connected: bool) {
+        self.holon_bridge.set_connected(connected);
+    }
+
+    /// Receive a BLE peer consciousness vector.
+    pub fn ble_receive_peer(&mut self, peer_id: u64, data: &[u8]) -> bool {
+        let result = self.ble_mesh.receive_peer_raw(peer_id, data);
+        if result {
+            self.haptic.notify_peer_discovered();
+        }
+        result
+    }
+
+    /// Get BLE advertise payload.
+    pub fn ble_advertise_payload(&mut self) -> Vec<u8> {
+        let da = self.bath.dopamine.effective();
+        let ne = self.bath.noradrenaline.effective();
+        let ot = self.bath.oxytocin.effective();
+        let valence = ((da - 0.5) + (ot - 0.5)).clamp(-1.0, 1.0);
+        let arousal = ne.clamp(0.0, 1.0);
+        self.ble_mesh
+            .update_advertise(self.last_consciousness, valence, arousal);
+        self.ble_mesh.advertise_payload().to_vec()
+    }
+
+    /// Number of connected BLE peers.
+    pub fn ble_peer_count(&self) -> u32 {
+        self.ble_mesh.peer_count()
+    }
+
+    /// Collective Phi from BLE mesh peers.
+    pub fn ble_collective_phi(&self) -> f32 {
+        self.ble_mesh.collective_phi()
+    }
+
+    /// Get dream journal latest as JSON.
+    pub fn dream_journal_latest_json(&self) -> String {
+        self.dream_journal.latest_json()
+    }
+
+    /// Get all dream journal entries as JSON.
+    pub fn dream_journal_all_json(&self) -> String {
+        self.dream_journal.all_json()
+    }
+
+    /// Number of dream journal fragments.
+    pub fn dream_journal_count(&self) -> u32 {
+        self.dream_journal.count()
+    }
+
+    /// Explicitly trigger dream consolidation.
+    pub fn dream_consolidate(&mut self) {
+        self.dream.dream();
+        let wisdoms = self.dream.wisdom();
+        if !wisdoms.is_empty() {
+            let nm = [
+                self.bath.dopamine.effective(),
+                self.bath.noradrenaline.effective(),
+                self.bath.serotonin.effective(),
+                self.bath.oxytocin.effective(),
+            ];
+            let had_wisdom = self.dream_journal.consolidate(
+                wisdoms,
+                &mut self.broca,
+                self.last_consciousness,
+                nm,
+                self.cycle_count,
+            );
+            if had_wisdom {
+                self.haptic.notify_dream_wisdom();
+            }
+        }
     }
 
     // ======================================================================

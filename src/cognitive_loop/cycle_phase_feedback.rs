@@ -545,13 +545,13 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         #[cfg(feature = "support")]
         let (support_triage_count, support_alert_fired, support_federation_graduated, support_efe) = {
-            self.support_cycle_counter += 1;
+            self.support.cycle_counter += 1;
 
             let mut triage_count: u32 = 0;
-            if let Some(ref engine) = self.support_triage_engine {
+            if let Some(ref engine) = self.support.triage_engine {
                 let result = engine.triage(input, "");
                 triage_count = 1;
-                if let Some(ref manager) = self.support_knowledge_manager {
+                if let Some(ref manager) = self.support.knowledge_manager {
                     let category_str = format!("{:?}", result.suggested_category);
                     let articles = manager.search(&category_str, 3);
                     if !articles.is_empty() {
@@ -566,8 +566,8 @@ impl CognitiveLoopService {
 
             let mut alert_fired = false;
             let mut efe = 0.0_f64;
-            if self.support_cycle_counter % 47 == 0 {
-                if let Some(ref engine) = self.support_predictive_engine {
+            if self.support.cycle_counter % 47 == 0 {
+                if let Some(ref engine) = self.support.predictive_engine {
                     let telemetry = symthaea_support::telemetry::collect_telemetry();
                     let prediction = engine.assess_system_state(&telemetry);
                     efe = prediction.expected_free_energy;
@@ -583,15 +583,16 @@ impl CognitiveLoopService {
             }
 
             let mut graduated: usize = 0;
-            if self.support_cycle_counter % 97 == 0 {
+            if self.support.cycle_counter % 97 == 0 {
                 let can_share = self
-                    .support_privacy_manager
+                    .support
+                    .privacy_manager
                     .as_ref()
                     .map(|pm| pm.can_share_cognitive())
                     .unwrap_or(true);
 
                 if can_share {
-                    if let Some(ref manager) = self.support_knowledge_manager {
+                    if let Some(ref manager) = self.support.knowledge_manager {
                         let pending = Vec::new();
                         let result =
                             symthaea_support::federation::check_graduations(manager, &pending);
@@ -802,10 +803,16 @@ impl CognitiveLoopService {
                 // Science: Barsalou (2008), Clark (2013) — grounded cognition modulates consciousness
                 knowledge_grounding: if let Some(ref km) = self.knowledge_manager {
                     let s = km.signals();
-                    (s.relevance * super::thresholds::KNOWLEDGE_GROUNDING_RELEVANCE_WEIGHT
+                    let grounding = (s.relevance
+                        * super::thresholds::KNOWLEDGE_GROUNDING_RELEVANCE_WEIGHT
                         + (1.0 - s.uncertainty)
                             * super::thresholds::KNOWLEDGE_GROUNDING_CERTAINTY_WEIGHT)
-                        .clamp(0.0, 1.0)
+                        .clamp(0.0, 1.0);
+                    if grounding.is_finite() {
+                        grounding
+                    } else {
+                        0.5
+                    }
                 } else {
                     0.5
                 },
@@ -1079,7 +1086,7 @@ impl CognitiveLoopService {
                 };
                 let r = last_event.reliability;
                 // High reliability → nudge confidence up
-                if r > REASONING_RELIABILITY_THRESHOLD {
+                if r.is_finite() && r > REASONING_RELIABILITY_THRESHOLD {
                     let boost = ((r - 0.5) * REASONING_RELIABILITY_CONFIDENCE_SCALE) as f32;
                     self.adjust_confidence("reasoning_reliability", boost);
                 }

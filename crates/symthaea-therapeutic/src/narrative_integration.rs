@@ -55,6 +55,29 @@ impl NarrativeFragment {
     }
 }
 
+// ── Reauthored Fragment ──────────────────────────────────────────────────
+
+/// A reauthored narrative fragment — the original traumatic fragment paired
+/// with a positive reframe discovered via HDC similarity search.
+///
+/// Science: White & Epston (1990) — re-authoring conversations, finding
+/// "unique outcomes" that contradict the dominant problem-saturated story.
+#[derive(Debug, Clone)]
+pub struct ReauthoredFragment {
+    /// Index of the original traumatic fragment.
+    pub original_index: usize,
+    /// The original traumatic text.
+    pub original_text: String,
+    /// Index of the most similar positive fragment (the "unique outcome").
+    pub positive_index: usize,
+    /// The positive fragment text used as reframe anchor.
+    pub positive_text: String,
+    /// HDC similarity between original and positive fragment.
+    pub similarity: f32,
+    /// Suggested reframe: a blend of the original content with positive valence.
+    pub reframe_suggestion: String,
+}
+
 // ── Therapeutic Narrative ──────────────────────────────────────────────────
 
 /// Collection of narrative fragments with coherence tracking.
@@ -203,6 +226,93 @@ impl TherapeuticNarrative {
     /// Whether narrative is empty.
     pub fn is_empty(&self) -> bool {
         self.fragments.is_empty()
+    }
+
+    /// Construct alternative narratives by pairing traumatic fragments with
+    /// the most similar positive fragment, producing reauthoring suggestions.
+    ///
+    /// For each reauthoring candidate (traumatic, low integration), we search
+    /// for the non-traumatic fragment with the highest HDC similarity that
+    /// also has positive emotional valence (≥ 0.1). If the similarity exceeds
+    /// 0.2 (above random noise for `BinaryHV`), a `ReauthoredFragment` is
+    /// produced with a suggested reframe.
+    ///
+    /// Science: White & Epston (1990) — re-authoring conversations.
+    pub fn construct_alternative_narrative(&self) -> Vec<ReauthoredFragment> {
+        let candidates = self.candidates_for_reauthoring();
+        let mut reauthored = Vec::new();
+
+        for &orig_idx in &candidates {
+            let orig = &self.fragments[orig_idx];
+            let mut best_sim = f32::NEG_INFINITY;
+            let mut best_idx: Option<usize> = None;
+
+            for (j, frag) in self.fragments.iter().enumerate() {
+                if frag.is_traumatic || frag.emotional_valence < 0.1 {
+                    continue;
+                }
+                let sim = orig.similarity(frag);
+                if sim > best_sim {
+                    best_sim = sim;
+                    best_idx = Some(j);
+                }
+            }
+
+            if let Some(pos_idx) = best_idx {
+                if best_sim > 0.2 {
+                    let pos = &self.fragments[pos_idx];
+                    reauthored.push(ReauthoredFragment {
+                        original_index: orig_idx,
+                        original_text: orig.text.clone(),
+                        positive_index: pos_idx,
+                        positive_text: pos.text.clone(),
+                        similarity: best_sim,
+                        reframe_suggestion: format!(
+                            "Drawing from the experience of '{}', consider how '{}' might be understood differently",
+                            pos.text, orig.text
+                        ),
+                    });
+                }
+            }
+        }
+
+        reauthored
+    }
+
+    /// Measure the overall narrative arc quality.
+    ///
+    /// Combines three factors:
+    /// - **Redemption score** (0.4): fraction of fragments where valence improves
+    ///   from the prior fragment. Redemption sequences predict well-being.
+    /// - **Agency score** (0.3): fraction of non-traumatic fragments, reflecting
+    ///   narrative agency (authorship over one's own story).
+    /// - **Coherence** (0.3): the existing `self.coherence` value.
+    ///
+    /// Returns a score in [0.0, 1.0].
+    ///
+    /// Science: McAdams (2001) — redemption sequences predict well-being.
+    pub fn narrative_arc_score(&self) -> f32 {
+        if self.fragments.is_empty() {
+            return 0.0;
+        }
+
+        // Redemption: fraction of adjacent pairs where valence improves
+        let redemption = if self.fragments.len() < 2 {
+            0.5 // neutral when no pairs
+        } else {
+            let improving = self
+                .fragments
+                .windows(2)
+                .filter(|w| w[1].emotional_valence > w[0].emotional_valence)
+                .count();
+            improving as f32 / (self.fragments.len() - 1) as f32
+        };
+
+        // Agency: fraction of non-traumatic fragments
+        let agency = 1.0 - self.trauma_proportion();
+
+        // Weighted combination
+        (redemption * 0.4 + agency * 0.3 + self.coherence * 0.3).clamp(0.0, 1.0)
     }
 
     /// Recompute narrative coherence from fragment integration levels
@@ -372,6 +482,102 @@ mod tests {
         assert!(
             (0.0..=1.0).contains(&tc),
             "temporal coherence must be in [0,1], got {tc}"
+        );
+    }
+
+    // ── Reauthoring & narrative arc tests ────────────────────────────────
+
+    #[test]
+    fn test_construct_alternative_narrative_empty() {
+        let narrative = TherapeuticNarrative::new();
+        assert!(narrative.construct_alternative_narrative().is_empty());
+    }
+
+    #[test]
+    fn test_construct_alternative_narrative_no_traumatic() {
+        let mut narrative = TherapeuticNarrative::new();
+        narrative.integrate_fragment(NarrativeFragment::new("sunny day", 1, 0.6, false));
+        narrative.integrate_fragment(NarrativeFragment::new("nice walk", 2, 0.4, false));
+        assert!(narrative.construct_alternative_narrative().is_empty());
+    }
+
+    #[test]
+    fn test_construct_alternative_narrative_with_candidates() {
+        let mut narrative = TherapeuticNarrative::new();
+        narrative.integrate_fragment(NarrativeFragment::new("flashback to crash", 1, -0.8, true));
+        narrative.integrate_fragment(NarrativeFragment::new(
+            "felt safe driving today",
+            2,
+            0.5,
+            false,
+        ));
+        narrative.integrate_fragment(NarrativeFragment::new(
+            "enjoyed the sunshine",
+            3,
+            0.7,
+            false,
+        ));
+        let reauthored = narrative.construct_alternative_narrative();
+        // We have one traumatic candidate. Whether a reauthored fragment is
+        // produced depends on HDC similarity > 0.2 (deterministic from blake3
+        // seeds, so the result is stable). Regardless of match, the return
+        // type is correct and non-panicking.
+        for r in &reauthored {
+            assert!(r.similarity > 0.2);
+            assert!(r
+                .reframe_suggestion
+                .contains("Drawing from the experience of"));
+            assert_eq!(r.original_index, 0);
+        }
+    }
+
+    #[test]
+    fn test_narrative_arc_score_bounded() {
+        let mut narrative = TherapeuticNarrative::new();
+        for i in 0..10 {
+            narrative.integrate_fragment(NarrativeFragment::new(
+                &format!("frag {i}"),
+                i as u64,
+                if i % 2 == 0 { 1.0 } else { -1.0 },
+                i % 3 == 0,
+            ));
+        }
+        let score = narrative.narrative_arc_score();
+        assert!(
+            (0.0..=1.0).contains(&score),
+            "narrative arc score must be in [0,1], got {score}"
+        );
+    }
+
+    #[test]
+    fn test_narrative_arc_improving() {
+        // Improving narrative: valence rises, no trauma
+        let mut improving = TherapeuticNarrative::new();
+        for i in 0..6 {
+            improving.integrate_fragment(NarrativeFragment::new(
+                &format!("up {i}"),
+                i as u64,
+                -0.5 + (i as f32 * 0.2),
+                false,
+            ));
+        }
+
+        // Declining narrative: valence falls, all traumatic
+        let mut declining = TherapeuticNarrative::new();
+        for i in 0..6 {
+            declining.integrate_fragment(NarrativeFragment::new(
+                &format!("down {i}"),
+                i as u64,
+                0.5 - (i as f32 * 0.2),
+                true,
+            ));
+        }
+
+        assert!(
+            improving.narrative_arc_score() > declining.narrative_arc_score(),
+            "improving arc ({}) should score higher than declining ({})",
+            improving.narrative_arc_score(),
+            declining.narrative_arc_score()
         );
     }
 

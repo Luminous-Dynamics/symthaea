@@ -30,8 +30,9 @@ use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::trial_analysis::TrialOutcome;
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use std::collections::BTreeMap;
+use symthaea_core::hdc::binary_grid_encoder::BinaryGridEncoder;
 use symthaea_core::hdc::grid_encoder::GridEncoder;
-use symthaea_core::hdc::ContinuousHV;
+use symthaea_core::hdc::BinaryHV;
 
 /// Rule algebra probes for HDC grid encoding.
 pub struct ArcAlgebraBenchmark;
@@ -69,7 +70,7 @@ struct TrialResult {
 
 impl ArcAlgebraBenchmark {
     fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> TrialResult {
-        let dim = config.dimension;
+        let _dim = config.dimension;
         let seed = config.trial_seed("reasoning", "arc_algebra", trial_idx);
         let mut rng = seed ^ 0x9E3779B97F4A7C15;
 
@@ -80,7 +81,7 @@ impl ArcAlgebraBenchmark {
         let pressure = config.time_pressure;
         let tick_scale = 1.0 - pressure * 0.4;
 
-        let encoder = GridEncoder::new(dim, grid_size, grid_size, num_colors as usize, seed);
+        let encoder = BinaryGridEncoder::new(grid_size, grid_size, num_colors as usize, seed);
 
         let mut consistency_vals = Vec::new();
         let mut associativity_vals = Vec::new();
@@ -137,7 +138,7 @@ impl ArcAlgebraBenchmark {
             associativity_vals.push(rule_abc_direct.similarity(&rule_abc_alt) as f64);
 
             // ── Inverse existence: unbind(output, rule) ≈ input ──
-            let predicted_input = out_a_hv.bind(&rule_a).normalize();
+            let predicted_input = out_a_hv.bind(&rule_a);
             let inv_sim = predicted_input.similarity(&in_a_hv) as f64;
             inverse_vals.push(inv_sim);
 
@@ -167,15 +168,14 @@ impl ArcAlgebraBenchmark {
             let rule_d2 = encoder.encode_rule(&hv_d2, &out_hv_d2);
 
             // bundle(A, B) then apply_rule
-            let bundle_input = ContinuousHV::weighted_bundle(&[&hv_d1, &hv_d2], &[0.5, 0.5]);
+            let bundle_input = BinaryHV::bundle(&[hv_d1.clone(), hv_d2.clone()]);
             let consensus_rule = encoder.bundle_rules(&[rule_d1.clone(), rule_d2.clone()]);
             let result_left = encoder.apply_rule(&bundle_input, &consensus_rule);
 
             // apply_rule(A) + apply_rule(B)
             let result_d1 = encoder.apply_rule(&hv_d1, &rule_d1);
             let result_d2 = encoder.apply_rule(&hv_d2, &rule_d2);
-            let result_right =
-                ContinuousHV::weighted_bundle(&[&result_d1, &result_d2], &[0.5, 0.5]);
+            let result_right = BinaryHV::bundle(&[result_d1, result_d2]);
 
             distributivity_vals.push(result_left.similarity(&result_right) as f64);
         }

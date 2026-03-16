@@ -520,7 +520,7 @@ impl FeedbackState {
             threshold: ProposalCollector::new(),
             cycle_start_confidence: 0.5,
             cycle_start_lr: 1.0,
-            cycle_start_exploration: 0.3,
+            cycle_start_exploration: 0.0, // matches CuriosityDrive::default()
             cycle_start_threshold: 1.0,
             last_confidence_integration: None,
             last_lr_integration: None,

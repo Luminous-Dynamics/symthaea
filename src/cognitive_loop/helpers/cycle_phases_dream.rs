@@ -61,13 +61,14 @@ impl CognitiveLoopService {
             if let Some(ref km) = self.knowledge_manager {
                 let sigs = km.signals();
                 // Active contradictions boost consolidation by 20%
-                if sigs.contradiction_signal > 0.0 {
+                if sigs.contradiction_signal.is_finite() && sigs.contradiction_signal > 0.0 {
                     phi_weighted_surprise *=
                         1.0 + super::super::thresholds::DREAM_KNOWLEDGE_CONTRADICTION_BOOST as f32;
                 }
                 // Deep causal chains boost consolidation by 10%
-                if sigs.causal_depth
-                    > super::super::thresholds::DREAM_KNOWLEDGE_CAUSAL_DEPTH_THRESHOLD
+                if sigs.causal_depth.is_finite()
+                    && sigs.causal_depth
+                        > super::super::thresholds::DREAM_KNOWLEDGE_CAUSAL_DEPTH_THRESHOLD
                 {
                     phi_weighted_surprise *=
                         1.0 + super::super::thresholds::DREAM_KNOWLEDGE_CAUSAL_DEPTH_BOOST as f32;
@@ -139,6 +140,14 @@ impl CognitiveLoopService {
             } else {
                 20 // base rate
             };
+            // Adaptive LR-driven interval: high learning rate → consolidate more often.
+            // When the system is actively encoding new experience, dream consolidation
+            // should keep pace. Take the minimum with the pressure-based interval so
+            // either signal (memory pressure OR high LR) can accelerate dreaming.
+            // Science: Diekelmann & Born (2010) — sleep consolidation scales with learning load.
+            let lr_driven_interval =
+                self.cantor_dream.adaptive_interval(self.fep.lr_boost) as usize;
+            let dynamic_normal_interval = dynamic_normal_interval.min(lr_driven_interval);
             // Sacred Stillness modulates dream depth: high SS activation = deeper consolidation
             // Science: Walker & Stickgold (2006) — rest quality enhances memory consolidation
             let stillness_depth_factor = if self.stats.circadian_stillness_boost > 0.1 {
@@ -195,6 +204,21 @@ impl CognitiveLoopService {
                     }
                     Err(e) => {
                         tracing::debug!(error = %e, cycle = self.stats.total_cycles, "Dream replay failed");
+                    }
+                }
+
+                // Dream→Knowledge feedback: after a dream cycle, strengthen knowledge
+                // graph edges whose topics were recently relevant to the cognitive loop.
+                // This closes the loop: knowledge feeds dream salience (above), and
+                // dream consolidation quality flows back to reinforce the knowledge graph.
+                // Science: Rasch & Born (2013) — targeted memory reactivation during
+                // NREM sleep selectively strengthens task-relevant memory traces.
+                if dream_phi_improvement > 0.0 {
+                    if let Some(ref mut km) = self.knowledge_manager {
+                        let topics = km.top_grounded_facts(
+                            super::super::thresholds::KNOWLEDGE_EPISODIC_MAX_PER_DREAM,
+                        );
+                        km.apply_dream_consolidation(&topics, dream_phi_improvement as f64);
                     }
                 }
             }

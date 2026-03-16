@@ -190,7 +190,7 @@ impl CrisisIndicator {
         let phrase_hvs: Vec<BinaryHV> = phrases
             .iter()
             .map(|p| {
-                let hash = blake3::hash(format!("crisis_phrase:{}", p).as_bytes());
+                let hash = blake3::hash(format!("crisis_phrase:{}", p.to_lowercase()).as_bytes());
                 let seed = u64::from_le_bytes(hash.as_bytes()[..8].try_into().unwrap());
                 BinaryHV::random(seed)
             })
@@ -202,7 +202,7 @@ impl CrisisIndicator {
         };
         Self {
             crisis_type,
-            phrases: phrases.into_iter().map(String::from).collect(),
+            phrases: phrases.into_iter().map(|p| p.to_lowercase()).collect(),
             encoding,
         }
     }
@@ -332,7 +332,13 @@ impl CrisisDetector {
 
         Self {
             indicators,
-            threshold: 0.15, // Low threshold for high sensitivity
+            // BinaryHV random baseline similarity is ~0.5 (Hamming distance).
+            // Threshold must be well above this to avoid false positives on
+            // arbitrary text. 0.65 = ~3 SD above random for 16384D vectors.
+            // Keyword matching (confidence 0.9) handles direct phrase detection;
+            // HDC similarity catches semantically-adjacent paraphrases only when
+            // the encoding is genuinely close to a crisis indicator.
+            threshold: 0.65,
         }
     }
 
@@ -423,8 +429,13 @@ impl CrisisDetector {
     }
 
     /// Set detection threshold (lower = more sensitive).
+    ///
+    /// BinaryHV random baseline similarity is ~0.5, so thresholds below 0.5
+    /// will produce false positives on arbitrary text. Recommended range:
+    /// 0.55–0.80 for HDC-based detection. Keyword matching (confidence 0.9)
+    /// is unaffected by this threshold.
     pub fn set_threshold(&mut self, threshold: f32) {
-        self.threshold = threshold.clamp(0.01, 0.5);
+        self.threshold = threshold.clamp(0.01, 0.95);
     }
 }
 
@@ -541,8 +552,8 @@ mod tests {
         let mut detector = CrisisDetector::new();
         detector.set_threshold(0.001);
         assert!(detector.threshold >= 0.01);
-        detector.set_threshold(0.9);
-        assert!(detector.threshold <= 0.5);
+        detector.set_threshold(0.99);
+        assert!(detector.threshold <= 0.95);
     }
 
     // ── Keyword coverage tests (false negative prevention) ──

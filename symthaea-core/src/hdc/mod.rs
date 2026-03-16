@@ -298,6 +298,7 @@ pub mod projection;
 pub mod unified_hv; // Unified hypervector types (ContinuousHV) // Learned projection layers for dimension conversion
 
 // Grid encoding for 2D spatial reasoning (ARC-style puzzles)
+pub mod binary_grid_encoder;
 pub mod grid_encoder;
 
 // Global Workspace Theory (conscious access, competition, broadcasting)
@@ -323,7 +324,7 @@ pub mod simd_ops; // SIMD intrinsics for BinaryHV (AVX-512/AVX2/SSE4.1/NEON)
 pub mod spectral_connectivity; // Algebraic connectivity (λ₂) calculator - NOT IIT Φ!
 pub mod tiered_phi; // Multi-tier Φ (integrated information) approximation
 pub mod transposed_bundle; // Transposed bit-plane accumulator for fast majority-vote bundle // Unified HyperdimensionalVector trait interface
-                                                                                             // Performance optimization modules:
+                           // Performance optimization modules:
 pub mod algebraic_structures;
 pub mod arithmetic; // Modular arithmetic (re-exports arithmetic_engine)
 pub mod arithmetic_engine; // Revolutionary: True mathematical cognition via HDC

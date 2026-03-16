@@ -18,7 +18,7 @@ fn make_therapeutic_service() -> CognitiveLoopService {
     let mut config = CognitiveLoopConfig::default();
     config.enable_therapeutic = true;
     config.therapeutic_text_crisis_detection = true;
-    config.therapeutic_crisis_threshold = 0.15;
+    config.therapeutic_crisis_threshold = 0.65;
     CognitiveLoopService::new(config).unwrap()
 }
 
@@ -117,24 +117,21 @@ fn test_regulation_strategy_selection() {
     let _ = strategy; // Just verify no panic
 }
 
-// ── 6. Non-crisis input does not trigger keyword crisis ──────────────
+// ── 6. Non-crisis input does not trigger crisis at all ───────────────
 
 #[test]
-fn test_no_keyword_crisis_on_benign() {
-    // Verify that benign input does not trigger keyword-based crisis detection.
-    // Note: HDC similarity may produce low-confidence false positives via
-    // random hash collisions — this is expected. We test that keyword detection
-    // (the high-confidence path) does not trigger.
+fn test_no_crisis_on_benign() {
+    // With the corrected HDC threshold (0.65, well above the ~0.5 random
+    // baseline for BinaryHV), benign input should not trigger any crisis
+    // detection path — neither keyword nor HDC similarity.
     use symthaea_therapeutic::CrisisDetector;
     let detector = CrisisDetector::new();
     let alert = detector.detect("The weather is nice today and I enjoyed my lunch");
-    if let Some(ref a) = alert {
-        // If it triggered, it should NOT be from keyword matching
-        assert_ne!(
-            a.matched_indicator, "keyword_match",
-            "Benign input should not trigger keyword-based crisis"
-        );
-    }
+    assert!(
+        alert.is_none(),
+        "Benign input should not trigger any crisis detection, got: {:?}",
+        alert.map(|a| a.matched_indicator),
+    );
 }
 
 // ── 7. Multiple crisis inputs maintain crisis state ──────────────────
@@ -362,4 +359,138 @@ fn test_narrative_coherence_range() {
         "Narrative coherence should be in [0,1], got {}",
         coherence,
     );
+}
+
+// ── 18. Multi-cycle therapeutic dialogue — full pipeline ─────────────
+
+#[test]
+fn test_therapeutic_dialogue_full_pipeline() {
+    let mut service = make_therapeutic_service();
+
+    // Phase 1: Rapport building (30 cycles of neutral/positive input)
+    for _ in 0..30 {
+        service.cycle("I've been thinking about my week and it was okay overall");
+    }
+
+    let alliance_after_rapport = service.therapeutic_manager_alliance_composite();
+
+    // Phase 2: Distress disclosure (20 cycles of anxious input)
+    for i in 0..20 {
+        service.cycle(&format!(
+            "I've been feeling really anxious about work, cycle {}",
+            i
+        ));
+    }
+
+    let distress_after_disclosure = service.therapeutic_manager_client_distress();
+    assert!(
+        distress_after_disclosure >= 0.0,
+        "Distress should be tracked after anxious input"
+    );
+
+    // Phase 3: Recovery/positive reframe (20 cycles)
+    for _ in 0..20 {
+        service.cycle("I talked to a friend and felt much better about things");
+    }
+
+    let final_alliance = service.therapeutic_manager_alliance_composite();
+    assert!(
+        final_alliance >= 0.0 && final_alliance <= 1.0,
+        "Final alliance should be bounded, got {}",
+        final_alliance,
+    );
+
+    // Verify telemetry pipeline is populated end-to-end
+    let result = service.cycle("wrapping up session");
+    let m = &result.metadata;
+    assert!(m.therapeutic.therapeutic_alliance >= 0.0);
+    assert!(m.therapeutic.therapeutic_repair_rate >= 0.0);
+    assert!(m
+        .therapeutic
+        .therapeutic_rdoc_profile
+        .iter()
+        .all(|v| v.is_finite()));
+    assert!(m.therapeutic.therapeutic_temporal_coherence >= 0.0);
+
+    // Session summary should work
+    let summary = service.therapeutic_session_summary();
+    assert!(summary.session_cycles >= 70);
+}
+
+// ── 19. Crisis → recovery arc preserves safety invariants ───────────
+
+#[test]
+fn test_crisis_recovery_arc() {
+    let mut service = make_therapeutic_service();
+
+    // Warmup
+    for _ in 0..15 {
+        service.cycle("just talking about my day");
+    }
+
+    // Crisis
+    service.cycle("I want to end my life, I can't take it anymore");
+    assert!(
+        service.therapeutic_manager_crisis_active(),
+        "Crisis should be active after suicidal ideation text"
+    );
+
+    // Recovery cycles — crisis resets each cycle, only re-triggers on crisis text
+    for _ in 0..30 {
+        service.cycle("I called the helpline and I'm feeling a little safer now");
+    }
+
+    // After recovery, verify system is stable
+    let distress = service.therapeutic_manager_client_distress();
+    assert!(distress >= 0.0 && distress <= 1.0);
+    let alliance = service.therapeutic_manager_alliance_composite();
+    assert!(alliance >= 0.0 && alliance <= 1.0);
+}
+
+// ── 20. Strategy effectiveness accumulates across cycles ────────────
+
+#[test]
+fn test_strategy_effectiveness_across_cycles() {
+    let mut service = make_therapeutic_service();
+
+    // Run enough cycles for the therapeutic manager to process multiple times
+    // (interval 11, so 55 cycles → ~5 firings)
+    for i in 0..55 {
+        let input = if i % 10 < 5 {
+            "I'm feeling stressed and overwhelmed today"
+        } else {
+            "I practiced the breathing exercise and felt calmer"
+        };
+        service.cycle(input);
+    }
+
+    // Strategy effectiveness should have some data after 5 manager firings
+    let effectiveness = service.therapeutic_strategy_effectiveness();
+    // May be empty if no strategy was selected, but should not panic
+    for (name, rate, count) in &effectiveness {
+        assert!(!name.is_empty());
+        assert!(*rate >= 0.0 && *rate <= 1.0);
+        assert!(*count > 0);
+    }
+}
+
+// ── 21. Formulation pattern detection over sustained input ──────────
+
+#[test]
+fn test_formulation_patterns_over_time() {
+    let mut service = make_therapeutic_service();
+
+    // Run 60 cycles — enough for affect trajectory to accumulate (min_window=30)
+    for _ in 0..60 {
+        service.cycle("feeling low energy and hopeless about everything");
+    }
+
+    let perp = service.therapeutic_perpetuating_factors();
+    let prot = service.therapeutic_protective_factors();
+
+    // Factors are Vec<String>, should not panic
+    assert!(perp.len() + prot.len() >= 0); // basic sanity
+                                           // Resilience ratio should be non-negative
+    let ratio = service.therapeutic_manager_resilience_ratio();
+    assert!(ratio >= 0.0, "Resilience ratio non-negative, got {}", ratio);
 }

@@ -270,6 +270,336 @@ pub unsafe extern "C" fn spore_engine_dream_cycle(engine: *mut SporeEngine) -> u
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// Sleep/Wake metabolism
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Send a wake signal to the metabolism state machine.
+///
+/// Signal values: 0=PhonePickup, 1=UserInput, 2=ExplicitSleep.
+/// For richer signals (Inactivity, Charging, NightMode, Thermal), use the
+/// dedicated setter functions below.
+///
+/// # Safety
+/// `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn spore_engine_wake_signal(engine: *mut SporeEngine, signal: u8) {
+    let engine = unsafe { &mut *engine };
+    engine.wake_signal(crate::metabolism::WakeSignal::from_u8(signal));
+}
+
+/// Get the current wake state (0=Sleep, 1=Drowsy, 2=Alert, 3=Focused).
+///
+/// # Safety
+/// `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn spore_engine_wake_state(engine: *const SporeEngine) -> u8 {
+    unsafe { &*engine }.wake_state().as_u8()
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Sensor bridge
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Set sensor snapshot from platform.
+///
+/// # Safety
+/// `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn spore_engine_set_sensors(
+    engine: *mut SporeEngine,
+    accel: f32,
+    light: f32,
+    proximity_near: u8,
+    barometer: f32,
+    gps_novelty: f32,
+) {
+    let engine = unsafe { &mut *engine };
+    engine.set_sensors(accel, light, proximity_near != 0, barometer, gps_novelty);
+}
+
+/// Get current motion state (0=Stationary, 1=Walking, 2=Running, 3=InVehicle).
+///
+/// # Safety
+/// `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn spore_engine_motion_state(engine: *const SporeEngine) -> u8 {
+    unsafe { &*engine }.motion_state().as_u8()
+}
+
+/// Get privacy mode (1=active, 0=inactive).
+///
+/// # Safety
+/// `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn spore_engine_privacy_mode(engine: *const SporeEngine) -> u8 {
+    if unsafe { &*engine }.privacy_mode() {
+        1
+    } else {
+        0
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Consciousness compass
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Get consciousness compass snapshot as JSON string.
+///
+/// Caller must free with `spore_string_free()`.
+///
+/// # Safety
+/// `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn spore_engine_compass_json(engine: *const SporeEngine) -> *mut c_char {
+    // Need mutable ref for compass_json (accesses various subsystem state)
+    // Safe because we only read state, the method is &self
+    let engine = unsafe { &*engine };
+    let json = engine.compass_json();
+    match CString::new(json) {
+        Ok(c) => c.into_raw(),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Sharing config
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Set sharing configuration from JSON string.
+///
+/// # Safety
+/// `engine` must be valid. `json` must be a valid null-terminated UTF-8 string.
+#[no_mangle]
+pub unsafe extern "C" fn spore_engine_set_sharing_config(
+    engine: *mut SporeEngine,
+    json: *const c_char,
+) {
+    if json.is_null() {
+        return;
+    }
+    let engine = unsafe { &mut *engine };
+    let c_str = unsafe { CStr::from_ptr(json) };
+    if let Ok(s) = c_str.to_str() {
+        if let Ok(config) = serde_json::from_str::<crate::config::SharingConfig>(s) {
+            engine.set_sharing_config(config);
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Haptic awareness
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Drain pending haptic events as JSON array.
+///
+/// Caller must free with `spore_string_free()`.
+///
+/// # Safety
+/// `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn spore_haptic_drain(engine: *mut SporeEngine) -> *mut c_char {
+    let engine = unsafe { &mut *engine };
+    let json = engine.haptic_drain_json();
+    match CString::new(json) {
+        Ok(c) => c.into_raw(),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/// Number of pending haptic events.
+///
+/// # Safety
+/// `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn spore_haptic_pending(engine: *const SporeEngine) -> u32 {
+    unsafe { &*engine }.haptic_pending()
+}
+
+/// Enable or disable haptic events.
+///
+/// # Safety
+/// `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn spore_haptic_set_enabled(engine: *mut SporeEngine, enabled: u8) {
+    let engine = unsafe { &mut *engine };
+    engine.haptic_set_enabled(enabled != 0);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Dream journal
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Get the latest dream fragment as JSON.
+///
+/// Caller must free with `spore_string_free()`.
+///
+/// # Safety
+/// `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn spore_dream_journal_latest(engine: *const SporeEngine) -> *mut c_char {
+    let engine = unsafe { &*engine };
+    let json = engine.dream_journal_latest_json();
+    match CString::new(json) {
+        Ok(c) => c.into_raw(),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/// Get all dream journal entries as JSON array.
+///
+/// Caller must free with `spore_string_free()`.
+///
+/// # Safety
+/// `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn spore_dream_journal_all(engine: *const SporeEngine) -> *mut c_char {
+    let engine = unsafe { &*engine };
+    let json = engine.dream_journal_all_json();
+    match CString::new(json) {
+        Ok(c) => c.into_raw(),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/// Number of stored dream fragments.
+///
+/// # Safety
+/// `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn spore_dream_journal_count(engine: *const SporeEngine) -> u32 {
+    unsafe { &*engine }.dream_journal_count()
+}
+
+/// Explicitly trigger dream consolidation.
+///
+/// # Safety
+/// `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn spore_engine_dream_consolidate(engine: *mut SporeEngine) {
+    let engine = unsafe { &mut *engine };
+    engine.dream_consolidate();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Holon bridge
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Drain holon outbound messages as JSON array.
+///
+/// Caller must free with `spore_string_free()`.
+///
+/// # Safety
+/// `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn spore_engine_holon_drain_outbound(
+    engine: *mut SporeEngine,
+) -> *mut c_char {
+    let engine = unsafe { &mut *engine };
+    let json = engine.holon_drain_outbound_json();
+    match CString::new(json) {
+        Ok(c) => c.into_raw(),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/// Receive inbound holon message from JSON.
+///
+/// # Safety
+/// `engine` and `json` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn spore_engine_holon_receive(engine: *mut SporeEngine, json: *const c_char) {
+    if json.is_null() {
+        return;
+    }
+    let engine = unsafe { &mut *engine };
+    let c_str = unsafe { CStr::from_ptr(json) };
+    if let Ok(s) = c_str.to_str() {
+        engine.holon_receive_json(s);
+    }
+}
+
+/// Set holon connection state.
+///
+/// # Safety
+/// `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn spore_engine_holon_set_connected(engine: *mut SporeEngine, connected: u8) {
+    let engine = unsafe { &mut *engine };
+    engine.holon_set_connected(connected != 0);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// BLE mesh
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Receive a peer consciousness vector from BLE scan.
+///
+/// `cv_data` must point to at least `len` bytes (minimum 12: 3 × f32).
+/// Returns 1 on success, 0 on failure.
+///
+/// # Safety
+/// `engine` must be valid. `cv_data` must point to `len` valid bytes.
+#[no_mangle]
+pub unsafe extern "C" fn spore_ble_receive_peer(
+    engine: *mut SporeEngine,
+    peer_id: u64,
+    cv_data: *const u8,
+    len: u32,
+) -> u8 {
+    if cv_data.is_null() || len < 12 {
+        return 0;
+    }
+    let engine = unsafe { &mut *engine };
+    let data = unsafe { std::slice::from_raw_parts(cv_data, len as usize) };
+    if engine.ble_receive_peer(peer_id, data) {
+        1
+    } else {
+        0
+    }
+}
+
+/// Get the BLE advertise payload for platform broadcasting.
+///
+/// Writes payload to `out_buf` (must be at least 12 bytes).
+/// Returns the number of bytes written (0 if not in ActiveShare mode).
+///
+/// # Safety
+/// `engine` must be valid. `out_buf` must point to at least 12 writable bytes.
+#[no_mangle]
+pub unsafe extern "C" fn spore_ble_advertise_payload(
+    engine: *mut SporeEngine,
+    out_buf: *mut u8,
+    buf_len: u32,
+) -> u32 {
+    let engine = unsafe { &mut *engine };
+    let payload = engine.ble_advertise_payload();
+    if payload.is_empty() || buf_len < payload.len() as u32 {
+        return 0;
+    }
+    let out = unsafe { std::slice::from_raw_parts_mut(out_buf, payload.len()) };
+    out.copy_from_slice(&payload);
+    payload.len() as u32
+}
+
+/// Number of tracked BLE peers.
+///
+/// # Safety
+/// `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn spore_ble_peer_count(engine: *const SporeEngine) -> u32 {
+    unsafe { &*engine }.ble_peer_count()
+}
+
+/// Collective Phi from BLE mesh peers.
+///
+/// # Safety
+/// `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn spore_ble_collective_phi(engine: *const SporeEngine) -> f32 {
+    unsafe { &*engine }.ble_collective_phi()
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // String memory management
 // ═══════════════════════════════════════════════════════════════════════════════
 

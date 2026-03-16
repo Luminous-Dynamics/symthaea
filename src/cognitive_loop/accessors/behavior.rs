@@ -466,12 +466,12 @@ impl CognitiveLoopService {
     ) -> (f64, f64, f64, f64, f64, f64) {
         let lr = metadata.actual_effective_lr as f64;
         (
-            metadata.consciousness_level,
-            lr,                                 // meta-awareness proxy
-            metadata.consciousness_level * 0.8, // coherence proxy
-            metadata.consciousness_level * 0.6, // care activation proxy
-            metadata.consciousness_level * 0.9, // quality proxy
-            lr.min(1.0),                        // epistemic confidence proxy
+            metadata.consciousness.consciousness_level,
+            lr,                                               // meta-awareness proxy
+            metadata.consciousness.consciousness_level * 0.8, // coherence proxy
+            metadata.consciousness.consciousness_level * 0.6, // care activation proxy
+            metadata.consciousness.consciousness_level * 0.9, // quality proxy
+            lr.min(1.0),                                      // epistemic confidence proxy
         )
     }
 

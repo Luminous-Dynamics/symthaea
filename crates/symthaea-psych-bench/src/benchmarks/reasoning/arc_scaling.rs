@@ -27,8 +27,9 @@ use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::trial_analysis::TrialOutcome;
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use std::collections::BTreeMap;
+use symthaea_core::hdc::binary_grid_encoder::BinaryGridEncoder;
 use symthaea_core::hdc::grid_encoder::GridEncoder;
-use symthaea_core::hdc::ContinuousHV;
+use symthaea_core::hdc::BinaryHV;
 
 /// ARC scaling benchmark: grid size × HDC dimension.
 pub struct ArcScalingBenchmark;
@@ -58,17 +59,18 @@ fn transform(grid: &[Vec<u8>]) -> Vec<Vec<u8>> {
     GridEncoder::reflect_x(grid)
 }
 
-/// Run a scaling study for a single (grid_size, dim) pair.
+/// Run a scaling study for a single grid_size.
+/// The `_dim` parameter is kept for API compatibility but BinaryHV uses fixed 16384D.
 fn scaling_probe(
     grid_size: usize,
-    dim: usize,
+    _dim: usize,
     num_tasks: usize,
     seed: u64,
     noise_weight: f64,
 ) -> (f64, f64) {
     let mut rng = seed ^ 0x9E3779B97F4A7C15;
     let num_colors: u8 = 6;
-    let encoder = GridEncoder::new(dim, grid_size, grid_size, num_colors as usize, seed);
+    let encoder = BinaryGridEncoder::new(grid_size, grid_size, num_colors as usize, seed);
 
     let mut hits = 0u32;
     let mut total = 0u32;
@@ -87,11 +89,7 @@ fn scaling_probe(
 
             if noise_weight > 0.0 {
                 xor_shift(&mut rng);
-                let noise = ContinuousHV::random(dim, rng);
-                rule = ContinuousHV::weighted_bundle(
-                    &[&rule, &noise],
-                    &[1.0 - noise_weight as f32, noise_weight as f32],
-                );
+                rule = rule.add_noise(noise_weight as f32, rng);
             }
             train_rules.push(rule);
         }
@@ -109,9 +107,9 @@ fn scaling_probe(
         let pred_sim = predicted.similarity(&test_out_hv) as f64;
         sim_sum += pred_sim;
 
-        // 2-AFC vs random
+        // 2-AFC vs random BinaryHV
         xor_shift(&mut rng);
-        let distractor = ContinuousHV::random(dim, rng);
+        let distractor = BinaryHV::random(rng);
         let dist_sim = predicted.similarity(&distractor) as f64;
 
         total += 1;

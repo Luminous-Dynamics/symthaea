@@ -28,6 +28,7 @@
 //!      └──────────────┴───────────┘            └─────────┘
 //! ```
 
+use crate::action::primitives::{Atom, Molecule, PlanProfile, PrimitiveValue};
 use crate::action::{ActionOutcome, PolicyBundle, SandboxRoot};
 use crate::coding_experience::{CodingExperience, CodingExperienceStore};
 use crate::cognitive_loop::motor_output_bridge::{
@@ -328,6 +329,11 @@ pub struct CodingAgent {
     /// Cached file sources for source-level context extraction (path → source text).
     #[cfg(feature = "code_generation")]
     source_cache: std::collections::HashMap<PathBuf, String>,
+    /// Current execution plan profile (computed during Planning phase).
+    /// Used for energy budgeting and Phi gating before committing to actions.
+    current_plan: Option<PlanProfile>,
+    /// Remaining energy budget for this run.
+    energy_budget: f32,
 }
 
 impl CodingAgent {
@@ -404,6 +410,8 @@ impl CodingAgent {
             code_memory: None,
             #[cfg(feature = "code_generation")]
             source_cache: std::collections::HashMap::new(),
+            current_plan: None,
+            energy_budget: 100.0, // default energy budget per run
         }
     }
 
@@ -454,6 +462,8 @@ impl CodingAgent {
         self.prediction_error_history.clear();
         self.confidence_velocity_history.clear();
         self.retry_state = RetryState::default();
+        self.current_plan = None;
+        self.energy_budget = 100.0;
 
         // If we have indexed codebase memory, query for source-level context
         #[cfg(feature = "code_generation")]
@@ -540,17 +550,48 @@ impl CodingAgent {
             return;
         }
 
-        // 1. Phase-specific pre-cycle action (code generation, etc.)
+        // 1. Build and evaluate typed execution plan for this phase.
+        //    If the plan fails evaluation (Phi too low, budget exhausted,
+        //    destructive action), the step is skipped.
+        if let Some(plan) = self.build_execution_plan() {
+            let current_phi = self.phi_trace.last().copied().unwrap_or(0.0);
+            let profile = plan.profile();
+            let (approved, reason) = self.evaluate_plan(&plan, current_phi);
+
+            if !approved {
+                tracing::warn!(
+                    target: "symthaea::coding_agent",
+                    phase = %self.phase,
+                    reason = %reason,
+                    "Plan rejected — skipping step"
+                );
+                self.observations.push(format!("Plan rejected: {reason}"));
+                // Don't abort — let consciousness accumulate Phi via cycling
+                // but don't execute the plan this iteration
+            } else {
+                tracing::debug!(
+                    target: "symthaea::coding_agent",
+                    phase = %self.phase,
+                    steps = profile.step_count,
+                    energy = profile.total_energy,
+                    "Plan approved"
+                );
+                self.current_plan = Some(profile.clone());
+                self.deduct_energy(&profile);
+            }
+        }
+
+        // 2. Phase-specific pre-cycle action (code generation, etc.)
         self.pre_cycle_action();
 
-        // 2. Build observation with updated context
+        // 3. Build observation with updated context
         let observation = self.build_observation();
 
-        // 3. Set up the motor request based on current phase
+        // 4. Set up the motor request based on current phase
         let motor_request = self.build_motor_request();
         self.cognitive_loop.set_motor_request(motor_request);
 
-        // 4. Run one cognitive cycle
+        // 5. Run one cognitive cycle
         let cycle_result = self.cognitive_loop.cycle(&observation);
 
         // Extract consciousness signals for decision-making
@@ -573,10 +614,10 @@ impl CodingAgent {
             confidence_velocity: signals.confidence_velocity,
         });
 
-        // 5. Check for motor output result
+        // 6. Check for motor output result
         let motor_result = self.cognitive_loop.take_motor_result();
 
-        // 6. Process the cycle result and motor output
+        // 7. Process the cycle result and motor output
         let phase_before = self.phase.clone();
         self.process_step_result(&cycle_result, motor_result, phi);
         if self.phase != phase_before {
@@ -812,7 +853,7 @@ impl CodingAgent {
                 // LLM-generated code — write to disk
                 let target = self.resolve_target_file();
                 self.write_code_to_disk(&target, &result.output);
-                self.generated_code = Some(result.output.clone());
+                self.generated_code = Some(Self::strip_code_fences(&result.output));
                 // LLM succeeded — clear native_exhausted (task was handled)
                 self.native_exhausted = false;
 
@@ -828,7 +869,7 @@ impl CodingAgent {
                 if let Some(code) = self.native_code_template() {
                     let target = self.resolve_target_file();
                     self.write_code_to_disk(&target, &code);
-                    self.generated_code = Some(code);
+                    self.generated_code = Some(Self::strip_code_fences(&code));
                 } else {
                     // Native can't handle this — immediately escalate to LLM
                     // within the SAME iteration (don't wait for next cycle).
@@ -864,7 +905,7 @@ impl CodingAgent {
                         if llm_result.success && llm_result.tier != BackendTier::Native {
                             let target = self.resolve_target_file();
                             self.write_code_to_disk(&target, &llm_result.output);
-                            self.generated_code = Some(llm_result.output.clone());
+                            self.generated_code = Some(Self::strip_code_fences(&llm_result.output));
                             self.native_exhausted = false;
                         } else {
                             self.observations
@@ -915,7 +956,7 @@ impl CodingAgent {
         {
             let target = self.resolve_target_file();
             self.write_code_to_disk(&target, &fixed);
-            self.generated_code = Some(fixed);
+            self.generated_code = Some(Self::strip_code_fences(&fixed));
             self.observations.push(format!(
                 "Structured auto-fix applied ({} errors analyzed, line-targeted)",
                 structured.len()
@@ -933,7 +974,7 @@ impl CodingAgent {
         if let Some(fixed) = crate::language::code_executor::try_auto_fix(&code, &flat_errors) {
             let target = self.resolve_target_file();
             self.write_code_to_disk(&target, &fixed);
-            self.generated_code = Some(fixed);
+            self.generated_code = Some(Self::strip_code_fences(&fixed));
             self.observations.push("Basic auto-fix applied".into());
             tracing::info!(
                 target: "symthaea::coding_agent",
@@ -1348,7 +1389,7 @@ impl CodingAgent {
         }
         if task.contains("pascal") && task.contains("triangle") {
             return Some(
-                "/// Generate Pascal's triangle with n rows.\npub fn pascal_triangle(n: usize) -> Vec<Vec<u64>> {\n    let mut tri = Vec::with_capacity(n);\n    for i in 0..n {\n        let mut row = vec![1u64; i + 1];\n        for j in 1..i {\n            row[j] = tri[i - 1][j - 1] + tri[i - 1][j];\n        }\n        tri.push(row);\n    }\n    tri\n}\n"
+                "/// Generate Pascal's triangle with n rows.\npub fn pascal_triangle(n: usize) -> Vec<Vec<u64>> {\n    let mut tri: Vec<Vec<u64>> = Vec::with_capacity(n);\n    for i in 0..n {\n        let mut row = vec![1u64; i + 1];\n        for j in 1..i {\n            row[j] = tri[i - 1][j - 1] + tri[i - 1][j];\n        }\n        tri.push(row);\n    }\n    tri\n}\n"
                     .to_string(),
             );
         }
@@ -1650,6 +1691,111 @@ impl CodingAgent {
     }
 
     /// Build the motor action request based on current phase.
+    // ── Plan Evaluation (Typed Primitives) ──────────────────────────────
+
+    /// Build a typed execution plan for the current phase.
+    /// Returns a `Molecule` whose `PlanProfile` can be evaluated before committing.
+    fn build_execution_plan(&self) -> Option<Molecule> {
+        let target = self.resolve_target_file();
+        let working_dir = self.config.working_dir.clone();
+
+        match self.phase {
+            TaskPhase::Understanding => {
+                // Gather context: read target file + list directory
+                let mut plan = Molecule::atom(Atom::list(working_dir.clone()));
+                if target.exists() {
+                    plan = plan.then(Molecule::atom(Atom::read(target)));
+                }
+                Some(plan)
+            }
+            TaskPhase::Planning => None, // pure reasoning, no I/O plan
+            TaskPhase::Generating => {
+                if let Some(ref code) = self.generated_code {
+                    // Code ready: write → check
+                    Some(crate::action::primitives::recipes::write_and_check(
+                        target, code,
+                    ))
+                } else {
+                    None // generation happens via dispatcher, not primitives
+                }
+            }
+            TaskPhase::Testing => {
+                // cargo check in the working directory
+                Some(Molecule::atom(Atom::cargo_check(working_dir)))
+            }
+            TaskPhase::Fixing => {
+                if let Some(ref code) = self.generated_code {
+                    // Fix written: write → check, with recovery
+                    let write_check =
+                        crate::action::primitives::recipes::write_and_check(target, code);
+                    Some(write_check.recover(|_| {
+                        // On failure, the agent will re-enter Fixing with new errors
+                        Molecule::atom(Atom::Noop)
+                    }))
+                } else {
+                    None
+                }
+            }
+            TaskPhase::Done => None,
+        }
+    }
+
+    /// Evaluate whether the current plan is safe and affordable.
+    /// Returns (approved, reason) — if not approved, the reason explains why.
+    fn evaluate_plan(&self, plan: &Molecule, current_phi: f32) -> (bool, String) {
+        let profile = plan.profile();
+
+        // 1. Phi gating: is consciousness level sufficient?
+        if !profile.phi_sufficient(current_phi) {
+            return (
+                false,
+                format!(
+                    "Phi too low: {:.3} < {:.3} required",
+                    current_phi, profile.min_phi
+                ),
+            );
+        }
+
+        // 2. Energy budget: can we afford this plan?
+        if !profile.within_budget(self.energy_budget) {
+            return (
+                false,
+                format!(
+                    "Energy budget exceeded: plan costs {:.1}, budget remaining {:.1}",
+                    profile.total_energy, self.energy_budget
+                ),
+            );
+        }
+
+        // 3. Destructiveness: does this need confirmation we can't give autonomously?
+        if profile.max_destructiveness == crate::action::DestructivenessLevel::Destructive {
+            return (
+                false,
+                format!(
+                    "Plan contains destructive action ({}) — requires confirmation",
+                    profile.atom_names.join(" → ")
+                ),
+            );
+        }
+
+        (
+            true,
+            format!(
+                "Plan approved: {} steps, energy {:.1}/{:.1}, phi {:.3}/{:.3}",
+                profile.step_count,
+                profile.total_energy,
+                self.energy_budget,
+                current_phi,
+                profile.min_phi,
+            ),
+        )
+    }
+
+    /// Deduct energy cost from the budget after execution.
+    fn deduct_energy(&mut self, profile: &PlanProfile) {
+        self.energy_budget = (self.energy_budget - profile.total_energy).max(0.0);
+    }
+
     fn build_motor_request(&self) -> MotorActionRequest {
         match self.phase {
             TaskPhase::Understanding => {
@@ -2941,6 +3087,25 @@ impl CodingAgent {
             .as_ref()
             .map(|s| s.cached_error_hints().to_vec())
             .unwrap_or_default()
+    }
+
+    /// Get the current execution plan profile (if any).
+    pub fn current_plan_profile(&self) -> Option<&PlanProfile> {
+        self.current_plan.as_ref()
+    }
+
+    /// Get remaining energy budget.
+    pub fn remaining_energy(&self) -> f32 {
+        self.energy_budget
+    }
+
+    /// Build a plan for a hypothetical action and evaluate it.
+    /// Useful for FEP to reason about candidate actions before choosing.
+    pub fn evaluate_hypothetical_plan(&self, plan: &Molecule) -> (bool, String, PlanProfile) {
+        let current_phi = self.phi_trace.last().copied().unwrap_or(0.0);
+        let profile = plan.profile();
+        let (approved, reason) = self.evaluate_plan(plan, current_phi);
+        (approved, reason, profile)
     }
 }
 
@@ -4628,5 +4793,200 @@ assertion `left == right` failed
             CodingAgent::strip_code_fences("  ```rust\n  fn main() {}\n  ```  "),
             "fn main() {}"
         );
+    }
+
+    // ── Plan Evaluation Tests ────────────────────────────────────────
+
+    #[test]
+    fn test_build_execution_plan_understanding() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = CodingAgentConfig {
+            max_iterations: 1,
+            working_dir: dir.path().to_path_buf(),
+            target_file: Some(PathBuf::from("lib.rs")),
+            ..Default::default()
+        };
+        let mut agent = CodingAgent::new(config).unwrap();
+        agent.phase = TaskPhase::Understanding;
+
+        let plan = agent.build_execution_plan();
+        assert!(plan.is_some(), "Understanding phase should produce a plan");
+        let profile = plan.unwrap().profile();
+        assert!(
+            profile.fully_reversible,
+            "Understanding should be read-only"
+        );
+        assert_eq!(
+            profile.max_destructiveness,
+            crate::action::DestructivenessLevel::ReadOnly
+        );
+    }
+
+    #[test]
+    fn test_build_execution_plan_testing() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = CodingAgentConfig {
+            max_iterations: 1,
+            working_dir: dir.path().to_path_buf(),
+            ..Default::default()
+        };
+        let mut agent = CodingAgent::new(config).unwrap();
+        agent.phase = TaskPhase::Testing;
+
+        let plan = agent.build_execution_plan();
+        assert!(plan.is_some(), "Testing phase should produce a plan");
+        let profile = plan.unwrap().profile();
+        assert_eq!(profile.step_count, 1); // just cargo check
+        assert!(profile.fully_reversible);
+    }
+
+    #[test]
+    fn test_build_execution_plan_planning_is_none() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = CodingAgentConfig {
+            max_iterations: 1,
+            working_dir: dir.path().to_path_buf(),
+            ..Default::default()
+        };
+        let mut agent = CodingAgent::new(config).unwrap();
+        agent.phase = TaskPhase::Planning;
+
+        assert!(
+            agent.build_execution_plan().is_none(),
+            "Planning is pure reasoning — no I/O plan"
+        );
+    }
+
+    #[test]
+    fn test_evaluate_plan_phi_gating() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = CodingAgentConfig {
+            max_iterations: 1,
+            working_dir: dir.path().to_path_buf(),
+            ..Default::default()
+        };
+        let agent = CodingAgent::new(config).unwrap();
+
+        // Plan that requires phi > 0.3 (e.g., git push)
+        let dangerous = Molecule::atom(Atom::Exec {
+            program: "git".into(),
+            args: vec!["push".into()],
+            working_dir: None,
+            env: std::collections::BTreeMap::new(),
+        });
+
+        // With no phi history (defaults to 0.0), should reject
+        let (approved, reason) = agent.evaluate_plan(&dangerous, 0.0);
+        assert!(!approved, "Should reject: {}", reason);
+        assert!(reason.contains("Phi too low"));
+    }
+
+    #[test]
+    fn test_evaluate_plan_energy_budget() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = CodingAgentConfig {
+            max_iterations: 1,
+            working_dir: dir.path().to_path_buf(),
+            ..Default::default()
+        };
+        let mut agent = CodingAgent::new(config).unwrap();
+        agent.energy_budget = 1.0; // very tight budget
+
+        // Compile-fix loop costs ~12+ energy
+        let expensive = crate::action::primitives::recipes::compile_fix_loop(
+            PathBuf::from("/tmp/test/src/lib.rs"),
+            "fn main() {}".into(),
+            3,
+        );
+
+        let (approved, reason) = agent.evaluate_plan(&expensive, 1.0);
+        assert!(!approved, "Should reject expensive plan: {}", reason);
+        assert!(reason.contains("Energy budget exceeded"));
+    }
+
+    #[test]
+    fn test_evaluate_plan_destructive_rejected() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = CodingAgentConfig {
+            max_iterations: 1,
+            working_dir: dir.path().to_path_buf(),
+            ..Default::default()
+        };
+        let agent = CodingAgent::new(config).unwrap();
+
+        let dangerous = Molecule::atom(Atom::Exec {
+            program: "git".into(),
+            args: vec!["push".into()],
+            working_dir: None,
+            env: std::collections::BTreeMap::new(),
+        });
+
+        // Even with high phi and budget, destructive actions are blocked
+        let (approved, reason) = agent.evaluate_plan(&dangerous, 1.0);
+        assert!(!approved);
+        assert!(reason.contains("destructive"));
+    }
+
+    #[test]
+    fn test_evaluate_plan_safe_approved() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = CodingAgentConfig {
+            max_iterations: 1,
+            working_dir: dir.path().to_path_buf(),
+            ..Default::default()
+        };
+        let agent = CodingAgent::new(config).unwrap();
+
+        let safe = Molecule::atom(Atom::read("/tmp/test.rs"))
+            .then(Molecule::atom(Atom::cargo_check(PathBuf::from("/tmp"))));
+
+        let (approved, reason) = agent.evaluate_plan(&safe, 0.1);
+        assert!(approved, "Safe plan should be approved: {}", reason);
+        assert!(reason.contains("Plan approved"));
+    }
+
+    #[test]
+    fn test_energy_deduction() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = CodingAgentConfig {
+            max_iterations: 1,
+            working_dir: dir.path().to_path_buf(),
+            ..Default::default()
+        };
+        let mut agent = CodingAgent::new(config).unwrap();
+        assert!((agent.remaining_energy() - 100.0).abs() < 0.01);
+
+        let plan = Molecule::atom(Atom::cargo_check(PathBuf::from("/tmp")));
+        let profile = plan.profile();
+        agent.deduct_energy(&profile);
+
+        assert!(agent.remaining_energy() < 100.0);
+        assert!((agent.remaining_energy() - (100.0 - profile.total_energy)).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_evaluate_hypothetical_plan() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = CodingAgentConfig {
+            max_iterations: 1,
+            working_dir: dir.path().to_path_buf(),
+            ..Default::default()
+        };
+        let agent = CodingAgent::new(config).unwrap();
+
+        // Compare two candidate plans
+        let plan_a = Molecule::atom(Atom::cargo_check(PathBuf::from("/tmp")));
+        let plan_b = crate::action::primitives::recipes::compile_fix_loop(
+            PathBuf::from("/tmp/src/lib.rs"),
+            "code".into(),
+            5,
+        );
+
+        let (_, _, profile_a) = agent.evaluate_hypothetical_plan(&plan_a);
+        let (_, _, profile_b) = agent.evaluate_hypothetical_plan(&plan_b);
+
+        // Plan B should be more expensive (5 iterations of write+check)
+        assert!(profile_b.total_energy > profile_a.total_energy);
+        assert!(profile_b.step_count > profile_a.step_count);
     }
 }

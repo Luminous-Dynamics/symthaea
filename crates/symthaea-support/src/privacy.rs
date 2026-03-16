@@ -1,6 +1,7 @@
 //! Privacy — Sharing tier management and data filtering
 
 /// Privacy manager for controlling what data can be shared.
+#[derive(Debug)]
 pub struct PrivacyManager {
     sharing_tier: SharingTier,
 }

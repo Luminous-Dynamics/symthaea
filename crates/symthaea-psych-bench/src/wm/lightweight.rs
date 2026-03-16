@@ -110,6 +110,18 @@ impl WorkingMemory {
             .fold(0.0f32, f32::max)
     }
 
+    /// Boost activation of the item at `index` by a multiplicative factor.
+    ///
+    /// Models covert rehearsal: items rehearsed more frequently maintain
+    /// higher activation (Rundus, 1971). Factor > 1.0 boosts, < 1.0 attenuates.
+    /// Activation is floored at 0.0 but not upper-clamped, allowing rehearsal
+    /// to build supra-threshold traces that survive subsequent decay.
+    pub fn boost_activation(&mut self, index: usize, factor: f32) {
+        if let Some(act) = self.activations.get_mut(index) {
+            *act = (*act * factor).max(0.0);
+        }
+    }
+
     /// Current tick count.
     pub fn current_tick(&self) -> u64 {
         self.tick

@@ -3,6 +3,7 @@
 use crate::types::*;
 
 /// Triage engine for classifying and prioritizing support tickets.
+#[derive(Debug)]
 pub struct TriageEngine {
     category_keywords: Vec<(SupportCategory, Vec<&'static str>)>,
 }

@@ -593,6 +593,38 @@ impl EnhancedKnowledgeGraph {
         count
     }
 
+    /// Strengthen facts whose source text contains any of the given topic keywords.
+    ///
+    /// Used by the Dream→Knowledge feedback loop: when dream replay consolidates
+    /// memories around certain topics, the corresponding knowledge graph edges are
+    /// strengthened proportional to the replay quality.
+    ///
+    /// - `topics`: keywords extracted from consolidated dream content.
+    /// - `boost`: confidence increment per matched fact (capped at `initial_confidence`).
+    ///
+    /// Returns the number of facts strengthened.
+    ///
+    /// Science: Rasch & Born (2013) — targeted memory reactivation selectively
+    /// strengthens cued memory traces during sleep consolidation.
+    pub fn strengthen_facts_by_topic(&mut self, topics: &[String], boost: f32) -> usize {
+        if topics.is_empty() || boost <= 0.0 {
+            return 0;
+        }
+        let lower_topics: Vec<String> = topics.iter().map(|t| t.to_lowercase()).collect();
+        let mut count = 0;
+        for fact in self.facts.values_mut() {
+            let src = fact.encoding.source_text.to_lowercase();
+            let matches = lower_topics
+                .iter()
+                .any(|t| !t.is_empty() && src.contains(t.as_str()));
+            if matches && fact.confidence < fact.initial_confidence {
+                fact.confidence = (fact.confidence + boost).min(fact.initial_confidence);
+                count += 1;
+            }
+        }
+        count
+    }
+
     // ── Internal ────────────────────────────────────────────────────────
 
     fn detect_contradictions(

@@ -133,7 +133,11 @@ impl CognitiveLoopService {
         }
         // E/I seizure protection: freeze exploration during recovery (Turrigiano 2012)
         if self.neuromod.bath.exploration_frozen() {
-            self.scale_exploration("seizure_protection", 0.1);
+            self.scale_exploration_pri(
+                "seizure_protection",
+                0.1,
+                crate::cognitive_loop::feedback_state::Priority::Safety,
+            );
         }
 
         // Thalamic depth → tonic neuromodulator bias

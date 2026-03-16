@@ -531,10 +531,11 @@ pub struct CognitiveLoopConfig {
     #[cfg(feature = "therapeutic")]
     pub enable_therapeutic: bool,
 
-    /// Crisis detection sensitivity threshold (lower = more sensitive).
-    /// Range: 0.01 to 0.5. Default: 0.15.
-    /// Lower values catch more crisis indicators but may produce
-    /// false positives. Safety-critical: err toward sensitivity.
+    /// Crisis detection sensitivity threshold for HDC similarity path.
+    /// Range: 0.01–0.95. Default: 0.65.
+    /// BinaryHV random baseline is ~0.5, so values below 0.5 produce
+    /// false positives on arbitrary text. Keyword matching (confidence 0.9)
+    /// is unaffected. Safety-critical: keyword path catches explicit phrases.
     #[cfg(feature = "therapeutic")]
     pub therapeutic_crisis_threshold: f32,
 
@@ -772,7 +773,7 @@ impl Default for CognitiveLoopConfig {
             #[cfg(feature = "therapeutic")]
             enable_therapeutic: true, // On by default when feature is compiled in
             #[cfg(feature = "therapeutic")]
-            therapeutic_crisis_threshold: 0.15,
+            therapeutic_crisis_threshold: 0.65,
             #[cfg(feature = "therapeutic")]
             therapeutic_text_crisis_detection: true, // Safety-critical: on by default
             #[cfg(feature = "ssm_language")]

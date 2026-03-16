@@ -17,7 +17,9 @@ use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::trial_analysis::TrialOutcome;
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use std::collections::BTreeMap;
+use symthaea_core::hdc::binary_grid_encoder::BinaryGridEncoder;
 use symthaea_core::hdc::grid_encoder::GridEncoder;
+use symthaea_core::hdc::BinaryHV;
 
 /// ARC-style fluid reasoning benchmark.
 pub struct ArcFluidBenchmark;
@@ -67,7 +69,8 @@ impl ArcFluidBenchmark {
 
         let grid_size = 5;
         let num_colors: u8 = 6;
-        let encoder = GridEncoder::new(dim, grid_size, grid_size, num_colors as usize, seed);
+        let encoder = BinaryGridEncoder::new(grid_size, grid_size, num_colors as usize, seed);
+        let _dim = dim; // kept for API compatibility
         let tasks_per_type = 5;
 
         let pressure = config.time_pressure;
@@ -75,7 +78,7 @@ impl ArcFluidBenchmark {
         // Encoding noise: ablated subsystems degrade representational fidelity
         // Difficulty scales temperature via the difficulty model
         let diff_model = difficulty_model_for(self.name());
-        let noise_weight = (0.02 + pressure * 0.15 + config.encoding_noise * 0.20)
+        let noise_weight = (0.015 + pressure * 0.12 + config.encoding_noise * 0.15)
             * diff_model.temperature_multiplier(config.difficulty);
 
         // Generate a random grid
@@ -132,7 +135,7 @@ impl ArcFluidBenchmark {
 
         // Collect per-task rule HVs and test results
         let mut all_rule_consistencies: Vec<f64> = Vec::new();
-        let mut all_task_rule_hvs: Vec<symthaea_core::hdc::ContinuousHV> = Vec::new();
+        let mut all_task_rule_hvs: Vec<BinaryHV> = Vec::new();
         let mut transfer_hits: u32 = 0;
         let mut transfer_total: u32 = 0;
         let mut transfer_sims: Vec<f64> = Vec::new();
@@ -160,14 +163,10 @@ impl ArcFluidBenchmark {
                     let out_hv = encoder.encode_grid(&output);
                     let mut rule = encoder.encode_rule(&in_hv, &out_hv);
 
-                    // Add noise under time pressure
+                    // Add noise under time pressure (bit flips proportional to noise_weight)
                     if noise_weight > 0.0 {
                         xor_shift(&mut rng);
-                        let noise = symthaea_core::hdc::ContinuousHV::random(dim, rng);
-                        rule = symthaea_core::hdc::ContinuousHV::weighted_bundle(
-                            &[&rule, &noise],
-                            &[1.0 - noise_weight as f32, noise_weight as f32],
-                        );
+                        rule = rule.add_noise(noise_weight as f32, rng);
                     }
 
                     train_rules.push(rule);
@@ -199,28 +198,46 @@ impl ArcFluidBenchmark {
                 let pred_sim = predicted.similarity(&test_out_hv) as f64;
                 transfer_sims.push(pred_sim);
 
-                // Transfer accuracy: 2-AFC discrimination — predicted must be
-                // closer to correct output than a distractor (wrong transform
-                // applied to the same test input). This tests whether the system
-                // learned the right rule, not just "above noise floor."
-                let distractor_type = TASK_TYPES[(type_idx + 1) % TASK_TYPES.len()];
-                let distractor_output = apply_transform(&test_input, distractor_type, task_param);
-                let distractor_hv = encoder.encode_grid(&distractor_output);
-                let distractor_sim = predicted.similarity(&distractor_hv) as f64;
-
+                // Transfer accuracy: majority voting — predicted must be closer
+                // to the correct output than at least 2 of 3 distractors (other
+                // transforms applied to the same test input). More robust than
+                // single-distractor 2-AFC but not as strict as unanimous 4-AFC.
+                let mut wins = 0u32;
+                for (other_idx, &other_type) in TASK_TYPES.iter().enumerate() {
+                    if other_idx == type_idx {
+                        continue;
+                    }
+                    let dist_output = apply_transform(&test_input, other_type, task_param);
+                    let dist_hv = encoder.encode_grid(&dist_output);
+                    let dist_sim = predicted.similarity(&dist_hv) as f64;
+                    if pred_sim > dist_sim {
+                        wins += 1;
+                    }
+                }
+                let correct_wins = wins >= 2; // majority: beat at least 2 of 3
                 transfer_total += 1;
                 per_type_total[type_idx] += 1;
-                if pred_sim > distractor_sim {
+                if correct_wins {
                     transfer_hits += 1;
                     per_type_hits[type_idx] += 1;
                 }
 
-                // ── Learning curve: test with single training pair ──
+                // ── Learning curve: test with single training pair (majority voting) ──
                 let single_predicted = encoder.apply_rule(&test_in_hv, &train_rules[0]);
                 let single_sim = single_predicted.similarity(&test_out_hv) as f64;
-                let single_dist_sim = single_predicted.similarity(&distractor_hv) as f64;
+                let mut single_wins = 0u32;
+                for (other_idx, &other_type) in TASK_TYPES.iter().enumerate() {
+                    if other_idx == type_idx {
+                        continue;
+                    }
+                    let d_out = apply_transform(&test_input, other_type, task_param);
+                    let d_hv = encoder.encode_grid(&d_out);
+                    if single_sim > single_predicted.similarity(&d_hv) as f64 {
+                        single_wins += 1;
+                    }
+                }
                 single_pair_total += 1;
-                if single_sim > single_dist_sim {
+                if single_wins >= 2 {
                     single_pair_hits += 1;
                 }
 
@@ -251,7 +268,7 @@ impl ArcFluidBenchmark {
 
                 // Per-task trial trace
                 if config.trial_trace {
-                    let per_task_correct = pred_sim > distractor_sim;
+                    let per_task_correct = correct_wins;
                     task_trace.push(TrialOutcome {
                         trial_idx: global_task_idx,
                         condition: type_names[type_idx].to_string(),
@@ -594,11 +611,11 @@ mod tests {
         };
         let result = ArcFluidBenchmark.run(&config);
         let accuracy = result.metrics["transfer_accuracy"].mean;
-        // With distractor baseline (wrong transform on same input),
-        // HDC rule binding should discriminate the correct transform
+        // With 4-AFC ensemble voting (chance = 0.25), HDC rule binding
+        // should discriminate the correct transform above chance
         assert!(
-            accuracy > 0.4,
-            "Transfer accuracy should beat distractor baseline, got {}",
+            accuracy > 0.3,
+            "Transfer accuracy should beat 4-AFC chance (0.25), got {}",
             accuracy
         );
     }

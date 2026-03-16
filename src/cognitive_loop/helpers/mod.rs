@@ -715,7 +715,10 @@ impl CognitiveLoopService {
         self.start_time = Instant::now();
         self.language_comm.reset();
         self.adaptive_behavior = AdaptiveBehavior::default();
-        self.set_confidence("inference_mode_reset", 0.5);
+        self.prediction_confidence = 0.5;
+        self.feedback_state = super::feedback_state::FeedbackState::new();
+        self.feedback_state.begin_cycle();
+        self.feedback_state.snapshot_cycle_start(0.5, 1.0, 0.0, 1.0);
         self.flow_state.reset();
         self.emotion_contagion.reset();
         self.curiosity_drive.reset();

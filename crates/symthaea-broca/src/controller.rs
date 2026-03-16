@@ -265,6 +265,12 @@ impl LanguageController {
         self.current_pos = 0;
     }
 
+    /// Reset momentum on all CfC neurons. Call between BPTT training epochs
+    /// to prevent accumulated directional bias from 67K+ gradient steps.
+    pub fn reset_network_momentum(&mut self) {
+        self.network.reset_momentum();
+    }
+
     /// Append a new token embedding (for swarm vocabulary extension).
     /// The embedding is algebraically composed from context if `context_hvs` is provided.
     pub fn append_token(

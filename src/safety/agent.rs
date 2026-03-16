@@ -790,6 +790,7 @@ mod tests {
             empathic_compassion: 0.5,
             sigma: None,
             integrity_critical: false,
+            network_critical: false,
             avg_cycle_time_us: 100.0,
             cycles_per_second: 50.0,
         };
@@ -865,6 +866,7 @@ mod tests {
             empathic_compassion: 0.5,
             sigma: None,
             integrity_critical: false,
+            network_critical: false,
             avg_cycle_time_us: 100.0,
             cycles_per_second: 50.0,
         };

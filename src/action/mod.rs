@@ -9,6 +9,7 @@
 
 pub mod bindings;
 pub mod nixos_patterns;
+pub mod primitives;
 
 pub use nixos_patterns::{
     ChannelOperation, ExecutionRecord as NixOSExecutionRecord,

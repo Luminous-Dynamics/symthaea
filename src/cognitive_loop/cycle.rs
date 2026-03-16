@@ -215,7 +215,7 @@ impl CognitiveLoopService {
             &perception,
             &dynamics,
             &feedback,
-            &mut module_timings,
+            module_timings,
         )
     }
 
