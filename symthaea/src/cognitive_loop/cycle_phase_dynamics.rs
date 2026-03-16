@@ -116,6 +116,7 @@ use super::thresholds::{
     VISION_TRAINING_IMPORTANCE_SCALE,
 };
 use super::training::TrainingSample;
+use super::feedback_state::Priority;
 use super::{
     ActionHint, AdaptiveBehavior, CognitiveLoopService, CycleLearningResult, TrainingMethod,
 };
@@ -318,9 +319,15 @@ impl CognitiveLoopService {
 
                 // ── CPG Manager (interval 59, co-prime) ───────────────
                 #[cfg(feature = "cpg")]
-                if self.cpg_manager.should_run(cycle_num, urgency_u8) {
-                    let cpg_output = self.cpg_manager.process(snapshot);
-                    self.subsystem_collector.record("cpg_manager", cpg_output);
+                {
+                    // Cross-coupling: Substrate → CPG frequency scaling
+                    self.cpg_manager
+                        .set_tau_factor(self.substrate_manager.tau_factor as f64);
+
+                    if self.cpg_manager.should_run(cycle_num, urgency_u8) {
+                        let cpg_output = self.cpg_manager.process(snapshot);
+                        self.subsystem_collector.record("cpg_manager", cpg_output);
+                    }
                 }
 
                 // ── Spectral Twin Manager (interval 67, co-prime) ────────
@@ -614,7 +621,7 @@ impl CognitiveLoopService {
                     CONFIDENCE_CRASH_FREEZE_CYCLES // Full freeze
                 };
                 self.carryover.quality.crash_freeze_remaining = freeze_duration;
-                self.adjust_exploration_pri("confidence_crash", CONFIDENCE_CRASH_EXPLORATION_BOOST, crate::cognitive_loop::feedback_state::Priority::Safety);
+                self.adjust_exploration_pri("confidence_crash", CONFIDENCE_CRASH_EXPLORATION_BOOST, Priority::Safety);
                 tracing::debug!(
                     "Confidence crash detected: {prev_conf:.3} → {current_conf:.3} (drop={drop:.3}), \
                      freezing LR for {freeze_duration} cycles"
@@ -647,7 +654,7 @@ impl CognitiveLoopService {
             let variance_dampen = 1.0
                 - (pe_variance - PE_VARIANCE_THRESHOLD).min(PE_VARIANCE_MAX_EFFECT)
                     * PE_VARIANCE_DAMPEN_SCALE; // 0.90–1.0
-            self.scale_confidence("pe_variance", variance_dampen);
+            self.scale_confidence_pri("pe_variance", variance_dampen, Priority::Homeostatic);
         }
 
         // FEEDBACK: Quantum coherence boosts exploration (prev cycle)
@@ -655,7 +662,7 @@ impl CognitiveLoopService {
             let coherence_boost = (self.carryover.consciousness.quantum_coherence
                 - QUANTUM_COHERENCE_THRESHOLD) as f32
                 * QUANTUM_COHERENCE_BOOST_SCALE;
-            self.adjust_exploration("quantum_coherence", coherence_boost);
+            self.adjust_exploration_pri("quantum_coherence", coherence_boost, Priority::Homeostatic);
         }
 
         // ── Foveation → dynamics coupling ────────────────────────────────
@@ -675,11 +682,11 @@ impl CognitiveLoopService {
                 && fov_conf > FOVEATION_HIGH_CONFIDENCE_THRESHOLD
             {
                 // Familiar scene: dampen exploration, boost confidence
-                self.scale_exploration("foveation_familiar", FOVEATION_FAMILIAR_EXPLORATION_DAMPEN);
-                self.scale_confidence("foveation_familiar", FOVEATION_CONFIDENCE_BOOST);
+                self.scale_exploration_pri("foveation_familiar", FOVEATION_FAMILIAR_EXPLORATION_DAMPEN, Priority::Homeostatic);
+                self.scale_confidence_pri("foveation_familiar", FOVEATION_CONFIDENCE_BOOST, Priority::Homeostatic);
             } else if fov_count > 0 && fov_conf < FOVEATION_HIGH_CONFIDENCE_THRESHOLD {
                 // Novel objects: boost learning rate
-                self.scale_lr("foveation_novel", FOVEATION_NOVEL_LR_BOOST);
+                self.scale_lr_pri("foveation_novel", FOVEATION_NOVEL_LR_BOOST, Priority::Homeostatic);
             }
         }
 
@@ -694,7 +701,7 @@ impl CognitiveLoopService {
             if mean_surp > VISION_SURPRISE_EXPLORATION_THRESHOLD {
                 let boost = (mean_surp - VISION_SURPRISE_EXPLORATION_THRESHOLD)
                     * VISION_SURPRISE_EXPLORATION_SCALE;
-                self.adjust_exploration("vision_surprise", boost);
+                self.adjust_exploration_pri("vision_surprise", boost, Priority::Homeostatic);
             }
         }
 
@@ -769,10 +776,10 @@ impl CognitiveLoopService {
         // Sustained undershoot (<0.85) → system is sluggish → boost LR.
         // Science: Turrigiano (2008) — homeostatic failure triggers synaptic recalibration.
         if eff > HOMEOSTASIS_RECALIBRATE_HIGH && self.stats.total_cycles > DYNAMICS_POST_BOOT_CYCLES {
-            self.scale_lr_pri("homeostasis_overcorrect", 1.0 - HOMEOSTASIS_NEUROMOD_STEP, crate::cognitive_loop::feedback_state::Priority::Homeostatic);
-            self.scale_exploration_pri("homeostasis_overcorrect", 1.0 + HOMEOSTASIS_NEUROMOD_STEP, crate::cognitive_loop::feedback_state::Priority::Homeostatic);
+            self.scale_lr_pri("homeostasis_overcorrect", 1.0 - HOMEOSTASIS_NEUROMOD_STEP, Priority::Homeostatic);
+            self.scale_exploration_pri("homeostasis_overcorrect", 1.0 + HOMEOSTASIS_NEUROMOD_STEP, Priority::Homeostatic);
         } else if eff < HOMEOSTASIS_RECALIBRATE_LOW && eff > 0.0 && self.stats.total_cycles > DYNAMICS_POST_BOOT_CYCLES {
-            self.scale_lr_pri("homeostasis_sluggish", 1.0 + HOMEOSTASIS_NEUROMOD_STEP, crate::cognitive_loop::feedback_state::Priority::Homeostatic);
+            self.scale_lr_pri("homeostasis_sluggish", 1.0 + HOMEOSTASIS_NEUROMOD_STEP, Priority::Homeostatic);
         }
 
         // Session 10 Item 3: Coherence velocity → CfC tau modulation.
@@ -901,8 +908,8 @@ impl CognitiveLoopService {
             // Sensory-abstract mismatch → slow consolidation + dampen confidence.
             // Hierarchical decomposition is breaking → protect abstract representations.
             // Science: Friston (2010) — hierarchical level misalignment = high free energy.
-            self.scale_lr("wm_sensory_mismatch", WM_MISMATCH_LR_SCALE);
-            self.scale_confidence("wm_sensory_mismatch", WM_MISMATCH_CONFIDENCE_SCALE);
+            self.scale_lr_pri("wm_sensory_mismatch", WM_MISMATCH_LR_SCALE, Priority::Homeostatic);
+            self.scale_confidence_pri("wm_sensory_mismatch", WM_MISMATCH_CONFIDENCE_SCALE, Priority::Homeostatic);
         }
 
         // 10d. Update prediction confidence
@@ -939,12 +946,13 @@ impl CognitiveLoopService {
             let cm_error = perception.cross_manifold_prediction_error;
             if cm_error > CROSS_MANIFOLD_ERROR_THRESHOLD {
                 let excess = cm_error - CROSS_MANIFOLD_ERROR_THRESHOLD;
-                self.adjust_exploration(
+                self.adjust_exploration_pri(
                     "cross_manifold_error",
                     excess * CROSS_MANIFOLD_EXPLORATION_SCALE,
+                    Priority::Homeostatic,
                 );
-                self.scale_confidence("cross_manifold_error", CROSS_MANIFOLD_CONFIDENCE_DAMPEN);
-                self.scale_lr("cross_manifold_error", CROSS_MANIFOLD_LR_BOOST);
+                self.scale_confidence_pri("cross_manifold_error", CROSS_MANIFOLD_CONFIDENCE_DAMPEN, Priority::Homeostatic);
+                self.scale_lr_pri("cross_manifold_error", CROSS_MANIFOLD_LR_BOOST, Priority::Homeostatic);
             }
         }
 
@@ -963,13 +971,13 @@ impl CognitiveLoopService {
             if short_err > VISION_SHORT_HORIZON_ERROR_THRESHOLD {
                 let boost = (short_err - VISION_SHORT_HORIZON_ERROR_THRESHOLD)
                     * VISION_HORIZON_EXPLORATION_SCALE;
-                self.adjust_exploration("vision_horizon_short", boost);
+                self.adjust_exploration_pri("vision_horizon_short", boost, Priority::Homeostatic);
             }
 
             // Long-term error (500ms+, index 2) → planning uncertainty
             if let Some(&long_err) = perception.vision_horizon_errors.get(2) {
                 if long_err > VISION_LONG_HORIZON_CONFIDENCE_THRESHOLD {
-                    self.scale_confidence("vision_horizon_long", VISION_HORIZON_CONFIDENCE_DAMPEN);
+                    self.scale_confidence_pri("vision_horizon_long", VISION_HORIZON_CONFIDENCE_DAMPEN, Priority::Homeostatic);
                 }
             }
         }
@@ -2510,13 +2518,13 @@ impl CognitiveLoopService {
                 + (resonator_best_sim - RESONATOR_CONSOLIDATION_THRESHOLD) as f64 * super::thresholds::RESONATOR_CONSOLIDATION_PRECISION_SCALE)
                 .min(super::thresholds::RESONATOR_CONSOLIDATION_PRECISION_MAX);
             if self.stats.total_cycles > DYNAMICS_STARTUP_WARMUP_CYCLES {
-                self.scale_lr("resonator_familiar", RESONATOR_FAMILIAR_LR_SCALE);
+                self.scale_lr_pri("resonator_familiar", RESONATOR_FAMILIAR_LR_SCALE, Priority::Aesthetic);
             }
         } else if resonator_best_sim < RESONATOR_NOVEL_THRESHOLD
             && resonator_best_sim > 0.0
             && self.stats.total_cycles > DYNAMICS_STARTUP_WARMUP_CYCLES
         {
-            self.scale_lr("resonator_novel", RESONATOR_NOVEL_LR_SCALE);
+            self.scale_lr_pri("resonator_novel", RESONATOR_NOVEL_LR_SCALE, Priority::Aesthetic);
         }
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -2884,11 +2892,11 @@ impl CognitiveLoopService {
             if wm_stiffness > WORLD_MODEL_STIFFNESS_THRESHOLD {
                 let stiffness_nudge = (wm_stiffness - WORLD_MODEL_STIFFNESS_THRESHOLD)
                     * WORLD_MODEL_STIFFNESS_LR_SCALE;
-                self.adjust_lr("wm_stiff", stiffness_nudge);
+                self.adjust_lr_pri("wm_stiff", stiffness_nudge, Priority::Homeostatic);
             } else if wm_stiffness < WORLD_MODEL_SPONGINESS_THRESHOLD {
                 let spongy_dampen =
                     (WORLD_MODEL_SPONGINESS_THRESHOLD - wm_stiffness) * WORLD_MODEL_SPONGY_LR_SCALE;
-                self.scale_lr("wm_spongy", 1.0 - spongy_dampen);
+                self.scale_lr_pri("wm_spongy", 1.0 - spongy_dampen, Priority::Homeostatic);
             }
         }
 
@@ -2898,9 +2906,10 @@ impl CognitiveLoopService {
             let sensory_error = level_errors[0];
             let abstract_error = level_errors[level_errors.len() - 1];
             if abstract_error > sensory_error * super::thresholds::WORLD_MODEL_CONFUSION_RATIO && abstract_error > super::thresholds::WORLD_MODEL_ERROR_FLOOR {
-                self.adjust_exploration(
+                self.adjust_exploration_pri(
                     "conceptual_confusion",
                     super::thresholds::CONCEPTUAL_CONFUSION_EXPLORATION,
+                    Priority::Homeostatic,
                 );
             }
             wm_sensory_mismatch = sensory_error > abstract_error * super::thresholds::WORLD_MODEL_MISMATCH_RATIO && sensory_error > super::thresholds::WORLD_MODEL_ERROR_FLOOR;
@@ -3089,7 +3098,7 @@ impl CognitiveLoopService {
                 .report_learning(effective_lr, prediction_error, is_night);
             let fatigue = self.neuromod.bath.learning_fatigue_factor();
             if fatigue < 1.0 {
-                self.scale_lr_pri("glutamate_fatigue", fatigue, crate::cognitive_loop::feedback_state::Priority::Homeostatic);
+                self.scale_lr_pri("glutamate_fatigue", fatigue, Priority::Homeostatic);
             }
         }
 
@@ -3242,10 +3251,20 @@ impl CognitiveLoopService {
                 };
                 depth_boost + surprise_boost
             };
+            // Glyph modality → Broca cadence spacing: Threshold/Metaharmonic = +2 cycles.
+            // Science: Schooler (2002) — metacognitive shifts require processing pauses.
+            #[cfg(feature = "glyph_codex")]
+            let glyph_spacing_boost: usize = match self.glyph_manager.dominant_modality() {
+                crate::hdc::glyph_basis::FieldModality::Threshold
+                | crate::hdc::glyph_basis::FieldModality::Metaharmonic => 2,
+                _ => 0,
+            };
+            #[cfg(not(feature = "glyph_codex"))]
+            let glyph_spacing_boost: usize = 0;
             let broca_min_spacing = if self.stats.tom_prediction_mismatch_ema > 0.5 {
-                5 + fatigue_spacing_boost + governance_spacing_boost + cantor_spacing_boost
+                5 + fatigue_spacing_boost + governance_spacing_boost + cantor_spacing_boost + glyph_spacing_boost
             } else {
-                7 + fatigue_spacing_boost + governance_spacing_boost + cantor_spacing_boost
+                7 + fatigue_spacing_boost + governance_spacing_boost + cantor_spacing_boost + glyph_spacing_boost
             };
             let broca_should_generate = broca_psi > 0.4
                 && broca_novelty
@@ -3434,15 +3453,17 @@ impl CognitiveLoopService {
                 {
                     // Coherence feedback: high Broca coherence → confidence boost
                     if final_coherence > super::thresholds::BROCA_COHERENT_THRESHOLD {
-                        self.adjust_confidence(
+                        self.adjust_confidence_pri(
                             "broca_coherent",
                             (final_coherence - super::thresholds::BROCA_COHERENT_THRESHOLD)
                                 * super::thresholds::BROCA_COHERENT_CONFIDENCE_SCALE,
+                            Priority::Aesthetic,
                         );
                     } else if final_coherence < 0.3 {
-                        self.scale_confidence(
+                        self.scale_confidence_pri(
                             "broca_incoherent",
                             1.0 - (0.3 - final_coherence) * 0.05,
+                            Priority::Aesthetic,
                         );
                     }
 
@@ -3450,14 +3471,15 @@ impl CognitiveLoopService {
                     // Science: successful articulation reinforces associated representations
                     if broca_quality > 0.6 {
                         let lr_boost = 1.0 + (broca_quality - 0.6) * 0.1; // [1.0, 1.04]
-                        self.scale_lr("broca_quality", lr_boost);
+                        self.scale_lr_pri("broca_quality", lr_boost, Priority::Aesthetic);
                     }
 
                     // Veto feedback: triggered veto → dampen exploration
                     if veto_triggered {
-                        self.scale_exploration(
+                        self.scale_exploration_pri(
                             "broca_veto",
                             super::thresholds::BROCA_VETO_EXPLORATION_SCALE,
+                            Priority::Aesthetic,
                         );
                     }
 
@@ -3480,7 +3502,7 @@ impl CognitiveLoopService {
                 // reduces sensory search need (Levelt 1989 — monitoring loop).
                 if self.stats.broca_quality_ema > 0.7 {
                     let contraction = 1.0 - (self.stats.broca_quality_ema - 0.7) * 0.15; // [0.955, 1.0]
-                    self.scale_confidence("broca_attention_contract", contraction);
+                    self.scale_confidence_pri("broca_attention_contract", contraction, Priority::Aesthetic);
                 }
             }
         }

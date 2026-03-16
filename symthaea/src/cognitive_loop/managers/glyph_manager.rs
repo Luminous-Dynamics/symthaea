@@ -167,6 +167,16 @@ impl GlyphManager {
         self.resonant_glyph_name.as_deref()
     }
 
+    /// Echo phrase of the nearest resonant glyph (for Broca tone modulation).
+    ///
+    /// When a glyph is strongly resonant, its echo phrase carries the
+    /// emotional/philosophical tone that should influence speech generation.
+    /// Returns None when below quiet threshold or no match.
+    pub fn resonant_echo_phrase(&self) -> Option<&str> {
+        let id = self.resonant_glyph.as_deref()?;
+        self.registry.get(id).map(|e| e.echo_phrase.as_str())
+    }
+
     /// Current spiral position (0.0–56.0).
     pub fn spiral_position(&self) -> f32 {
         self.spiral_position
