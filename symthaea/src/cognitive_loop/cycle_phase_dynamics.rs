@@ -103,7 +103,12 @@ use super::thresholds::{
     AROUSAL_TRAP_RECOVERY_MIN_CYCLES, AROUSAL_TRAP_RECOVERY_RAMP_CYCLES,
     ATTENTION_SENSITIVITY_BOOST_FACTOR, CONFIDENCE_CRASH_FLOW_MULTIPLIER,
     DYNAMICS_POST_BOOT_CYCLES, DYNAMICS_STARTUP_WARMUP_CYCLES,
-    FEP_EFFICIENT_EXPLORATION_DAMPEN, NEUROMOD_DELTA_THRESHOLD, RESONATOR_STARTUP_CYCLES,
+    FEP_EFFICIENT_EXPLORATION_DAMPEN, KNOWLEDGE_CAUSAL_DEPTH_DA_NUDGE,
+    KNOWLEDGE_CAUSAL_DEPTH_EXPLOIT_THRESHOLD, KNOWLEDGE_CONTRADICTION_NE_BOOST,
+    KNOWLEDGE_CONTRADICTION_SHT_BOOST, KNOWLEDGE_GROUNDING_CERTAINTY_WEIGHT,
+    KNOWLEDGE_GROUNDING_RELEVANCE_WEIGHT, KNOWLEDGE_GROUNDING_SHT_NUDGE,
+    KNOWLEDGE_NOVELTY_EXPLORE_SCALE, KNOWLEDGE_UNCERTAINTY_NE_SCALE, NEUROMOD_DELTA_THRESHOLD,
+    RESONATOR_STARTUP_CYCLES,
 };
 #[cfg(feature = "vision-manifold")]
 use super::thresholds::{
@@ -224,6 +229,13 @@ impl CognitiveLoopService {
         // ── Phase B: COMPUTE — Run managers via CognitiveSubsystem trait ──
         {
             use super::subsystem_trait::CognitiveSubsystem;
+
+            // Pre-encode input text for glyph projection (before snapshot borrow).
+            // Uses 3-channel TextHdcEncoder for semantically meaningful modality coordinates
+            // instead of the coarse BinaryHV→±1 conversion from the snapshot.
+            #[cfg(feature = "glyph_codex")]
+            self.glyph_manager.encode_input(input);
+
             if let Some(ref snapshot) = self.last_snapshot {
                 let urgency_u8 = snapshot.urgency;
                 let cycle_num = snapshot.cycle_number;
@@ -301,6 +313,27 @@ impl CognitiveLoopService {
                             super::managers::radio_dispatcher::NetworkHealth::Blackout => 0.0,
                         };
                         self.swarm_manager.set_connectivity_modifier(connectivity_penalty);
+                    }
+                }
+
+                // ── CPG Manager (interval 59, co-prime) ───────────────
+                #[cfg(feature = "cpg")]
+                if self.cpg_manager.should_run(cycle_num, urgency_u8) {
+                    let cpg_output = self.cpg_manager.process(snapshot);
+                    self.subsystem_collector.record("cpg_manager", cpg_output);
+                }
+
+                // ── Spectral Twin Manager (interval 67, co-prime) ────────
+                // Records state every tick for history continuity, but only
+                // runs full spectral analysis at its interval.
+                #[cfg(feature = "spectral_state")]
+                {
+                    self.spectral_manager
+                        .record_state(&snapshot.compressed_state);
+                    if self.spectral_manager.should_run(cycle_num, urgency_u8) {
+                        let spectral_output = self.spectral_manager.process(snapshot);
+                        self.subsystem_collector
+                            .record("spectral_twin", spectral_output);
                     }
                 }
 
@@ -427,6 +460,75 @@ impl CognitiveLoopService {
                     self.subsystem_collector
                         .record("glyph_manager", glyph_output);
                 }
+
+                // ── Knowledge Manager: per-cycle extraction + neuromod coupling ──
+                // Not a CognitiveSubsystem — called directly with (input, cycle).
+                // Science: Kanerva (2009) HDC, Pearl (2009) Causality.
+                if let Some(ref mut km) = self.knowledge_manager {
+                    let (_telem, sigs) = km.process(input, cycle_num);
+                    let sigs = sigs.clone(); // release borrow
+
+                    // ── Neuromod coupling from knowledge signals ──────────
+                    // High uncertainty → NE vigilance (Yu & Dayan 2005)
+                    if sigs.uncertainty > 0.5 {
+                        let ne_base = self.neuromod.bath.noradrenaline.baseline_val();
+                        let ne_nudge = KNOWLEDGE_UNCERTAINTY_NE_SCALE
+                            * (sigs.uncertainty as f32 - 0.5);
+                        self.neuromod
+                            .bath
+                            .noradrenaline
+                            .set_baseline((ne_base + ne_nudge).clamp(0.0, 1.0));
+                    }
+
+                    // High causal depth → DA reward for deep reasoning (Schultz 1997)
+                    if sigs.causal_depth > KNOWLEDGE_CAUSAL_DEPTH_EXPLOIT_THRESHOLD {
+                        let da_base = self.neuromod.bath.dopamine.baseline_val();
+                        self.neuromod
+                            .bath
+                            .dopamine
+                            .set_baseline((da_base + KNOWLEDGE_CAUSAL_DEPTH_DA_NUDGE).clamp(0.0, 1.0));
+                    }
+
+                    // High relevance → 5-HT grounding confidence (Cools et al. 2008)
+                    if sigs.relevance > 0.5 && sigs.uncertainty < 0.5 {
+                        let sht_base = self.neuromod.bath.serotonin.baseline_val();
+                        self.neuromod
+                            .bath
+                            .serotonin
+                            .set_baseline((sht_base + KNOWLEDGE_GROUNDING_SHT_NUDGE).clamp(0.0, 1.0));
+                    }
+
+                    // Contradiction → NE + 5-HT (cognitive dissonance, Festinger 1957)
+                    if sigs.contradiction_signal > 0.0 {
+                        let ne_base = self.neuromod.bath.noradrenaline.baseline_val();
+                        self.neuromod
+                            .bath
+                            .noradrenaline
+                            .set_baseline((ne_base + KNOWLEDGE_CONTRADICTION_NE_BOOST).clamp(0.0, 1.0));
+                        let sht_base = self.neuromod.bath.serotonin.baseline_val();
+                        self.neuromod
+                            .bath
+                            .serotonin
+                            .set_baseline((sht_base + KNOWLEDGE_CONTRADICTION_SHT_BOOST).clamp(0.0, 1.0));
+                    }
+
+                    // ── Write carryover fields for working memory integration ──
+                    let grounding = (sigs.relevance * KNOWLEDGE_GROUNDING_RELEVANCE_WEIGHT
+                        + (1.0 - sigs.uncertainty) * KNOWLEDGE_GROUNDING_CERTAINTY_WEIGHT)
+                        .clamp(0.0, 1.0);
+                    self.carryover.quality.wm_knowledge_grounding = grounding;
+                    self.carryover.quality.wm_knowledge_injection_count =
+                        km.telemetry().facts_inserted.min(255) as u8;
+
+                    // ── Drain contradiction alerts → exploration boost ─────
+                    let alerts = km.drain_alerts();
+                    if !alerts.is_empty() {
+                        let boost = (alerts.len() as f32 * KNOWLEDGE_NOVELTY_EXPLORE_SCALE)
+                            .min(0.2);
+                        self.adjust_exploration("knowledge_contradictions", boost);
+                    }
+                }
+
             }
         }
 

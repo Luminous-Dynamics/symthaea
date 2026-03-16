@@ -26,6 +26,7 @@ use crate::hdc::glyph_basis::{
     FieldModality, GlyphBasis, GlyphCoherence, GlyphFreeEnergy, GlyphInteractionMatrix,
     GlyphRegistry, N_FIELD_MODALITIES,
 };
+use crate::hdc::moral_text_encoder::TextHdcEncoder;
 use symthaea_core::hdc::ContinuousHV;
 
 /// Glyph Manager — symbolic consciousness field tracking.
@@ -56,6 +57,12 @@ pub struct GlyphManager {
     resonant_glyph_name: Option<String>,
     /// Spiral position tracking (0.0–56.0).
     spiral_position: f32,
+    /// Cached semantic embedding from EthicsEngine or text encoder.
+    /// When present, used instead of coarse BinaryHV conversion.
+    semantic_hv_cache: Option<ContinuousHV>,
+    /// Text encoder for encoding raw input text into HDC space.
+    /// Same 3-channel encoder (trigram + word + sentiment) used by HarmonyBasis.
+    encoder: TextHdcEncoder,
 }
 
 impl GlyphManager {
@@ -82,6 +89,7 @@ impl GlyphManager {
     /// Create a new GlyphManager with shared basis and registry.
     pub fn new(basis: Arc<GlyphBasis>, registry: Arc<GlyphRegistry>) -> Self {
         let interaction_matrix = GlyphInteractionMatrix::from_basis(&basis);
+        let dim = basis.dim;
         Self {
             basis,
             registry,
@@ -95,6 +103,8 @@ impl GlyphManager {
             resonant_glyph: None,
             resonant_glyph_name: None,
             spiral_position: 0.0,
+            semantic_hv_cache: None,
+            encoder: TextHdcEncoder::with_sentiment(dim, 3, 0.5, 0.2),
         }
     }
 
@@ -152,6 +162,27 @@ impl GlyphManager {
         &self.registry
     }
 
+    /// Cache a high-quality semantic embedding from the EthicsEngine.
+    ///
+    /// Called from the ethics pipeline (Stage 3) with the same ContinuousHV
+    /// used for harmony projection. The GlyphManager's next `process()` call
+    /// will use this instead of the coarse BinaryHV→±1 conversion, giving
+    /// semantically meaningful modality coordinates.
+    pub fn set_semantic_hv(&mut self, hv: ContinuousHV) {
+        self.semantic_hv_cache = Some(hv);
+    }
+
+    /// Encode input text and cache it for the next `process()` call.
+    ///
+    /// Uses the same 3-channel TextHdcEncoder (trigram + word + sentiment)
+    /// as the HarmonyBasis, giving semantically meaningful glyph modality
+    /// coordinates instead of the coarse BinaryHV conversion.
+    pub fn encode_input(&mut self, input: &str) {
+        if !input.is_empty() {
+            self.semantic_hv_cache = Some(self.encoder.encode(input));
+        }
+    }
+
     // ── Internal processing ──────────────────────────────────────────────
 
     /// Encode the snapshot's input_hv as a ContinuousHV for projection.
@@ -187,8 +218,12 @@ impl CognitiveSubsystem for GlyphManager {
     fn process(&mut self, snapshot: &CycleSnapshot) -> SubsystemOutput {
         let mut output = SubsystemOutput::NEUTRAL;
 
-        // 1. Encode snapshot state as ContinuousHV
-        let hv = self.snapshot_to_hv(snapshot);
+        // 1. Use cached semantic embedding (from EthicsEngine Stage 3) when available.
+        //    Falls back to coarse BinaryHV→±1 conversion from snapshot.
+        let hv = self
+            .semantic_hv_cache
+            .take()
+            .unwrap_or_else(|| self.snapshot_to_hv(snapshot));
 
         // 2. Project onto 11 modality axes
         let raw_coords = self.basis.project(&hv);
