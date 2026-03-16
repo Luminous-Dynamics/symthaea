@@ -13,6 +13,8 @@
         overlays = [ (import rust-overlay) ];
         pkgs = import nixpkgs {
           inherit system overlays;
+          config.android_sdk.accept_license = true;
+          config.allowUnfree = true;
         };
 
         # Rust toolchain - stable with extensions
@@ -152,6 +154,22 @@
         # MuJoCo library path (3.3.7 for mujoco-rs compatibility)
         mujocoPath = "${mujoco337}/lib";
 
+        # Android NDK for mobile cross-compilation (Pixel 8 Pro target)
+        androidComposition = pkgs.androidenv.composeAndroidPackages {
+          platformVersions = [ "34" ];       # Android 14
+          includeNDK = true;
+          ndkVersions = [ "27.0.12077973" ]; # NDK r27
+        };
+        androidSdk = androidComposition.androidsdk;
+        ndkRoot = "${androidSdk}/libexec/android-sdk/ndk/27.0.12077973";
+        ndkToolchain = "${ndkRoot}/toolchains/llvm/prebuilt/linux-x86_64";
+
+        # Rust toolchain with mobile targets
+        rustToolchainMobile = pkgs.rust-bin.stable.latest.default.override {
+          extensions = [ "rust-src" "rust-analyzer" "clippy" "rustfmt" ];
+          targets = [ "aarch64-linux-android" "aarch64-apple-ios" ];
+        };
+
       in {
         devShells.default = pkgs.mkShell {
           inherit buildInputs nativeBuildInputs;
@@ -218,6 +236,49 @@
           OPENSSL_DIR = "${pkgs.openssl.dev}";
           OPENSSL_LIB_DIR = "${pkgs.openssl.out}/lib";
           OPENSSL_INCLUDE_DIR = "${pkgs.openssl.dev}/include";
+        };
+
+        # Mobile development shell — Android NDK + aarch64 targets
+        # Usage: nix develop .#mobile
+        devShells.mobile = pkgs.mkShell {
+          buildInputs = [
+            rustToolchainMobile
+            androidSdk
+            pkgs.pkg-config
+            pkgs.openssl
+            pkgs.openssl.dev
+            pkgs.cacert
+            pkgs.jq
+          ];
+
+          ANDROID_NDK_HOME = ndkRoot;
+          ANDROID_HOME = "${androidSdk}/libexec/android-sdk";
+          CC_aarch64_linux_android = "${ndkToolchain}/bin/aarch64-linux-android24-clang";
+          AR_aarch64_linux_android = "${ndkToolchain}/bin/llvm-ar";
+          CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER = "${ndkToolchain}/bin/aarch64-linux-android24-clang";
+          OPENSSL_DIR = "${pkgs.openssl.dev}";
+          OPENSSL_LIB_DIR = "${pkgs.openssl.out}/lib";
+          OPENSSL_INCLUDE_DIR = "${pkgs.openssl.dev}/include";
+
+          shellHook = ''
+            echo ""
+            echo "╔═══════════════════════════════════════════════════════════════╗"
+            echo "║     SYMTHAEA MOBILE - ARM64 Cross-Compilation                ║"
+            echo "║     Target: Pixel 8 Pro (Tensor G3, aarch64-linux-android)   ║"
+            echo "╚═══════════════════════════════════════════════════════════════╝"
+            echo ""
+            echo "  Rust: $(rustc --version)"
+            echo "  NDK:  ${ndkRoot}"
+            echo "  CC:   ${ndkToolchain}/bin/aarch64-linux-android24-clang"
+            echo ""
+            echo "  Build commands:"
+            echo "    cargo build --target aarch64-linux-android --release -p symthaea-spore --features native-ffi"
+            echo "    ./crates/symthaea-spore/build-android.sh"
+            echo ""
+            echo "  Deploy to Pixel:"
+            echo "    adb push target/aarch64-linux-android/release/libsymthaea_spore.so /data/local/tmp/"
+            echo ""
+          '';
         };
 
         # Package definition
