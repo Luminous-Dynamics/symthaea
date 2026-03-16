@@ -1,8 +1,29 @@
 # Mycelix Resilience Kit — Pre-Deployment Checklist
 
 **Version**: v0.1.0-resilience
-**Target**: Roodepoort community, South Africa
 **Date**: March 2026
+
+---
+
+## 0. Community Customization
+
+Before deploying for a new community, edit **one file**:
+
+**`observatory/src/lib/community-config.json`**
+
+| Field | What to change | Example |
+|-------|---------------|---------|
+| `community_name` | Your community's name | `"Soweto Mutual Aid Collective"` |
+| `basket_name` | Name for the price basket | `"Soweto Resilience Basket"` |
+| `dao_did` | Unique DAO identifier | `"soweto-mutual-aid"` |
+| `currency_code` | ISO 4217 code | `"ZAR"`, `"KES"`, `"GBP"` |
+| `currency_symbol` | Display symbol | `"R"`, `"KSh"`, `"£"` |
+| `labor_hour_value` | 1 hour of labor in local fiat | `27.58` (SA minimum wage) |
+| `basket_items` | Local goods + TEND prices + weights | See existing entries as template |
+
+Everything else adapts automatically: dashboard titles, DAO references, price basket, tax exports.
+
+After editing, also configure the **Community Config** panel at `/admin` (operator name, location, phone).
 
 ---
 

@@ -41,17 +41,26 @@ cd "$OBS_DIR"
 npx vite build 2>&1 | tail -3
 echo ""
 
-# Start preview server
+# Start preview server and wait for it to be ready
 echo -e "${YELLOW}[2/3]${NC} Starting preview server on port $PORT..."
 npx vite preview --port "$PORT" &>/dev/null &
 PREVIEW_PID=$!
-sleep 3
 
-# Verify the server started
-if ! kill -0 "$PREVIEW_PID" 2>/dev/null; then
-    echo -e "${RED}FAIL${NC}: Preview server failed to start"
+# Poll until the server responds (up to 15 seconds)
+READY=false
+for i in $(seq 1 30); do
+    if curl -sf -o /dev/null --connect-timeout 1 "http://localhost:${PORT}/" 2>/dev/null; then
+        READY=true
+        break
+    fi
+    sleep 0.5
+done
+
+if ! $READY; then
+    echo -e "${RED}FAIL${NC}: Preview server did not become ready within 15 seconds"
     exit 1
 fi
+echo "  Server ready."
 
 # Check routes
 echo -e "${YELLOW}[3/3]${NC} Checking routes..."
