@@ -71,7 +71,9 @@ struct TaskResult {
 impl TaskResult {
     /// Success = compiled AND all tests passed (or no tests but compiled)
     fn is_correct(&self) -> bool {
-        self.compiled && self.tests_failed == 0 && (self.tests_passed > 0 || self.test_source_empty())
+        self.compiled
+            && self.tests_failed == 0
+            && (self.tests_passed > 0 || self.test_source_empty())
     }
     fn test_source_empty(&self) -> bool {
         // Tasks with no test assertions count as "correct" if they compile
@@ -304,7 +306,6 @@ fn build_task_suite() -> Vec<BenchTask> {
     #[test] fn test_flatten() { assert_eq!(flatten(&[vec![1,2], vec![3,4]]), vec![1,2,3,4]); assert_eq!(flatten::<i32>(&[]), vec![]); }
 "#,
         },
-
         // ── Medium: 15 tasks ─────────────────────────────────────────
         BenchTask {
             description: "implement a linked list",
@@ -484,7 +485,6 @@ fn build_task_suite() -> Vec<BenchTask> {
     }
 "#,
         },
-
         // ── Hard: 15 tasks ───────────────────────────────────────────
         // Hard tasks get looser test assertions since LLM output varies
         BenchTask {
@@ -616,57 +616,121 @@ fn build_task_suite() -> Vec<BenchTask> {
     ]
 }
 
-/// Strip markdown code fences from LLM output.
+/// Clean LLM output into compilable Rust code.
 ///
-/// LLMs often wrap code in ```rust ... ``` blocks. Extract just the code.
-fn strip_markdown_fences(source: &str) -> String {
+/// Handles: markdown fences, leading/trailing prose, unclosed delimiters,
+/// Python-style syntax at top level, and truncated output.
+fn clean_llm_output(source: &str) -> String {
     let trimmed = source.trim();
+    if trimmed.is_empty() {
+        return trimmed.to_string();
+    }
 
+    // Step 1: Strip markdown fences (```rust ... ```)
+    let defenced = strip_markdown_fences(trimmed);
+
+    // Step 2: Strip leading prose (lines before first Rust construct)
+    let lines: Vec<&str> = defenced.lines().collect();
+    let code_start = lines.iter().position(|l| {
+        let t = l.trim();
+        t.starts_with("use ")
+            || t.starts_with("pub ")
+            || t.starts_with("fn ")
+            || t.starts_with("struct ")
+            || t.starts_with("enum ")
+            || t.starts_with("impl ")
+            || t.starts_with("#[")
+            || t.starts_with("///")
+            || t.starts_with("mod ")
+            || t.starts_with("type ")
+            || t.starts_with("const ")
+            || t.starts_with("static ")
+            || t.starts_with("trait ")
+    }).unwrap_or(0);
+
+    // Step 3: Strip trailing prose (lines after last closing brace)
+    let code_lines = &lines[code_start..];
+    let mut last_code_line = code_lines.len();
+    for (i, line) in code_lines.iter().enumerate().rev() {
+        let t = line.trim();
+        if t == "}" || t.ends_with('}') || t.ends_with(';') || t.ends_with("*/")
+            || t.starts_with("//") || t.starts_with("///") || t.is_empty()
+        {
+            last_code_line = i + 1;
+            break;
+        }
+    }
+
+    let mut code: String = code_lines[..last_code_line].join("\n");
+
+    // Step 4: Balance braces — add missing closing braces for unclosed delimiters
+    let open_braces = code.chars().filter(|&c| c == '{').count();
+    let close_braces = code.chars().filter(|&c| c == '}').count();
+    if open_braces > close_braces {
+        let missing = open_braces - close_braces;
+        for _ in 0..missing {
+            code.push_str("\n}");
+        }
+    }
+
+    // Step 5: Remove lines that are clearly not Rust (common LLM artifacts)
+    let cleaned_lines: Vec<&str> = code.lines().filter(|l| {
+        let t = l.trim();
+        // Remove explanation lines that start with natural language
+        !(t.starts_with("Here") && t.contains(':'))
+            && !(t.starts_with("This") && t.contains("function"))
+            && !(t.starts_with("The ") && t.contains("above"))
+            && !(t.starts_with("Note:"))
+            && !(t.starts_with("Example"))
+            && !t.starts_with("Output:")
+    }).collect();
+
+    cleaned_lines.join("\n")
+}
+
+/// Strip markdown code fences from text.
+fn strip_markdown_fences(source: &str) -> String {
     // Check for opening fence
-    if let Some(start) = trimmed.find("```") {
-        // Find end of opening fence line
-        let after_fence = &trimmed[start + 3..];
-        let code_start = after_fence.find('\n').map(|i| start + 3 + i + 1).unwrap_or(start + 3);
+    if let Some(start) = source.find("```") {
+        let after_fence = &source[start + 3..];
+        let code_start = after_fence
+            .find('\n')
+            .map(|i| start + 3 + i + 1)
+            .unwrap_or(start + 3);
 
-        // Find closing fence
-        let code_region = &trimmed[code_start..];
+        let code_region = &source[code_start..];
         let code_end = code_region.rfind("```").unwrap_or(code_region.len());
 
         return code_region[..code_end].trim().to_string();
     }
 
-    // No fences — check for common LLM prefixes like "Here's the code:" or "```rust"
-    // Also strip leading prose before first `use ` or `pub ` or `fn ` or `struct `
-    let lines: Vec<&str> = trimmed.lines().collect();
-    let code_start = lines.iter().position(|l| {
-        let t = l.trim();
-        t.starts_with("use ") || t.starts_with("pub ") || t.starts_with("fn ")
-            || t.starts_with("struct ") || t.starts_with("enum ")
-            || t.starts_with("impl ") || t.starts_with("#[") || t.starts_with("///")
-    });
-
-    if let Some(start) = code_start {
-        if start > 0 {
-            return lines[start..].join("\n");
-        }
-    }
-
-    trimmed.to_string()
+    source.to_string()
 }
 
 /// Validate generated code by compiling and running test assertions.
 fn validate_code(source: &str, test_source: &str) -> (bool, Vec<String>, usize, usize, bool, bool) {
     let mut executor = CodeExecutor::with_real_execution();
 
-    // Strip markdown fences and LLM prose from output
-    let clean_source = strip_markdown_fences(source);
+    // Clean LLM output: strip fences, prose, balance braces
+    let clean_source = clean_llm_output(source);
 
     // First attempt: compile with tests
-    let test_src = if test_source.is_empty() { None } else { Some(test_source) };
+    let test_src = if test_source.is_empty() {
+        None
+    } else {
+        Some(test_source)
+    };
     let result = executor.execute_rust(&clean_source, test_src);
 
     if result.compiled {
-        return (true, vec![], result.tests_passed, result.tests_failed, false, false);
+        return (
+            true,
+            vec![],
+            result.tests_passed,
+            result.tests_failed,
+            false,
+            false,
+        );
     }
 
     // Compilation failed — try auto-fix
@@ -674,7 +738,14 @@ fn validate_code(source: &str, test_source: &str) -> (bool, Vec<String>, usize, 
     if let Some(ref fixed_source) = fixed {
         let retry = executor.execute_rust(fixed_source, test_src);
         if retry.compiled {
-            return (true, vec![], retry.tests_passed, retry.tests_failed, true, true);
+            return (
+                true,
+                vec![],
+                retry.tests_passed,
+                retry.tests_failed,
+                true,
+                true,
+            );
         }
         return (false, retry.compile_errors, 0, 0, true, false);
     }
@@ -707,7 +778,8 @@ fn run_task(task: &BenchTask, task_idx: usize, use_llm: bool) -> TaskResult {
 
     let code_written = !content.is_empty();
     let contains_expected = content.contains(task.expected_fn);
-    let contains_todo = content.contains("TODO") || content.contains("todo!") || content.contains("unimplemented!");
+    let contains_todo =
+        content.contains("TODO") || content.contains("todo!") || content.contains("unimplemented!");
 
     // Level 2+3: Real compilation and test execution
     let (compiled, compile_errors, tests_passed, tests_failed, fix_attempted, fix_succeeded) =
@@ -717,7 +789,9 @@ fn run_task(task: &BenchTask, task_idx: usize, use_llm: bool) -> TaskResult {
             (false, vec!["No code generated".into()], 0, 0, false, false)
         };
 
-    let quality_rejections = result.observations.iter()
+    let quality_rejections = result
+        .observations
+        .iter()
         .filter(|o| o.contains("Quality gate rejected"))
         .count();
 
@@ -727,17 +801,34 @@ fn run_task(task: &BenchTask, task_idx: usize, use_llm: bool) -> TaskResult {
         result.phi_trace.iter().sum::<f32>() / result.phi_trace.len() as f32
     };
 
-    let tier_strings: Vec<String> = result.generation_tiers.iter().map(|t| t.to_string()).collect();
+    let tier_strings: Vec<String> = result
+        .generation_tiers
+        .iter()
+        .map(|t| t.to_string())
+        .collect();
 
     // Status symbols: ✓ = correct (compiles + tests pass), ◐ = compiles but tests fail, ✗ = doesn't compile
-    let status = if compiled && tests_failed == 0 { "✓" }
-        else if compiled { "◐" }
-        else { "✗" };
+    let status = if compiled && tests_failed == 0 {
+        "✓"
+    } else if compiled {
+        "◐"
+    } else {
+        "✗"
+    };
 
-    eprint!("\r  [{:>2}/50] {} {} {} ",
-        task_idx + 1, task.difficulty, status, task.description);
+    eprint!(
+        "\r  [{:>2}/50] {} {} {} ",
+        task_idx + 1,
+        task.difficulty,
+        status,
+        task.description
+    );
     if compiled {
-        eprint!("[compiled, {}/{} tests]", tests_passed, tests_passed + tests_failed);
+        eprint!(
+            "[compiled, {}/{} tests]",
+            tests_passed,
+            tests_passed + tests_failed
+        );
     } else if !compile_errors.is_empty() {
         let first_err: String = compile_errors[0].chars().take(50).collect();
         eprint!("[FAIL: {}]", first_err);
@@ -771,12 +862,24 @@ fn compute_stats(results: &[TaskResult]) -> BenchStats {
     let mut stats = BenchStats::default();
     for r in results {
         stats.total += 1;
-        if r.code_written { stats.code_written += 1; }
-        if r.contains_expected_fn { stats.name_match += 1; }
-        if r.compiled { stats.compiled += 1; }
-        if r.is_correct() { stats.correct += 1; }
-        if r.auto_fix_attempted { stats.auto_fix_attempts += 1; }
-        if r.auto_fix_succeeded { stats.auto_fix_successes += 1; }
+        if r.code_written {
+            stats.code_written += 1;
+        }
+        if r.contains_expected_fn {
+            stats.name_match += 1;
+        }
+        if r.compiled {
+            stats.compiled += 1;
+        }
+        if r.is_correct() {
+            stats.correct += 1;
+        }
+        if r.auto_fix_attempted {
+            stats.auto_fix_attempts += 1;
+        }
+        if r.auto_fix_succeeded {
+            stats.auto_fix_successes += 1;
+        }
         stats.total_tests_passed += r.tests_passed;
         stats.total_tests_failed += r.tests_failed;
         stats.total_energy += r.energy;
@@ -790,18 +893,30 @@ fn compute_stats(results: &[TaskResult]) -> BenchStats {
         match r.difficulty {
             Difficulty::Native => {
                 stats.native_total += 1;
-                if r.compiled { stats.native_compiled += 1; }
-                if r.is_correct() { stats.native_correct += 1; }
+                if r.compiled {
+                    stats.native_compiled += 1;
+                }
+                if r.is_correct() {
+                    stats.native_correct += 1;
+                }
             }
             Difficulty::Medium => {
                 stats.medium_total += 1;
-                if r.compiled { stats.medium_compiled += 1; }
-                if r.is_correct() { stats.medium_correct += 1; }
+                if r.compiled {
+                    stats.medium_compiled += 1;
+                }
+                if r.is_correct() {
+                    stats.medium_correct += 1;
+                }
             }
             Difficulty::Hard => {
                 stats.hard_total += 1;
-                if r.compiled { stats.hard_compiled += 1; }
-                if r.is_correct() { stats.hard_correct += 1; }
+                if r.compiled {
+                    stats.hard_compiled += 1;
+                }
+                if r.is_correct() {
+                    stats.hard_correct += 1;
+                }
             }
         }
     }
@@ -814,22 +929,43 @@ fn print_report(results: &[TaskResult], stats: &BenchStats) {
     println!("╚══════════════════════════════════════════════════════════════════╝\n");
 
     println!("── Validation Levels ──────────────────────────────────────");
-    println!("  L1 Name match:   {}/{} ({:.0}%)", stats.name_match, stats.total,
-        100.0 * stats.name_match as f64 / stats.total as f64);
-    println!("  L2 Compiles:     {}/{} ({:.0}%)", stats.compiled, stats.total,
-        100.0 * stats.compiled as f64 / stats.total as f64);
-    println!("  L3 Correct:      {}/{} ({:.0}%)", stats.correct, stats.total,
-        100.0 * stats.correct as f64 / stats.total as f64);
-    println!("  Tests: {} passed, {} failed", stats.total_tests_passed, stats.total_tests_failed);
+    println!(
+        "  L1 Name match:   {}/{} ({:.0}%)",
+        stats.name_match,
+        stats.total,
+        100.0 * stats.name_match as f64 / stats.total as f64
+    );
+    println!(
+        "  L2 Compiles:     {}/{} ({:.0}%)",
+        stats.compiled,
+        stats.total,
+        100.0 * stats.compiled as f64 / stats.total as f64
+    );
+    println!(
+        "  L3 Correct:      {}/{} ({:.0}%)",
+        stats.correct,
+        stats.total,
+        100.0 * stats.correct as f64 / stats.total as f64
+    );
+    println!(
+        "  Tests: {} passed, {} failed",
+        stats.total_tests_passed, stats.total_tests_failed
+    );
     println!();
 
     println!("── By Difficulty (L2 Compiled / L3 Correct) ─────────────");
-    println!("  Native: {}/{} compiled, {}/{} correct",
-        stats.native_compiled, stats.native_total, stats.native_correct, stats.native_total);
-    println!("  Medium: {}/{} compiled, {}/{} correct",
-        stats.medium_compiled, stats.medium_total, stats.medium_correct, stats.medium_total);
-    println!("  Hard:   {}/{} compiled, {}/{} correct",
-        stats.hard_compiled, stats.hard_total, stats.hard_correct, stats.hard_total);
+    println!(
+        "  Native: {}/{} compiled, {}/{} correct",
+        stats.native_compiled, stats.native_total, stats.native_correct, stats.native_total
+    );
+    println!(
+        "  Medium: {}/{} compiled, {}/{} correct",
+        stats.medium_compiled, stats.medium_total, stats.medium_correct, stats.medium_total
+    );
+    println!(
+        "  Hard:   {}/{} compiled, {}/{} correct",
+        stats.hard_compiled, stats.hard_total, stats.hard_correct, stats.hard_total
+    );
     println!();
 
     println!("── Auto-Fix ────────────────────────────────────────────");
@@ -843,17 +979,26 @@ fn print_report(results: &[TaskResult], stats: &BenchStats) {
         println!("  {}: {} calls", tier, count);
     }
     println!("  Total energy: {:.1}", stats.total_energy);
-    println!("  Total time: {:.1}s", stats.total_elapsed_ms as f64 / 1000.0);
+    println!(
+        "  Total time: {:.1}s",
+        stats.total_elapsed_ms as f64 / 1000.0
+    );
     println!();
 
     // Compilation failures
-    let compile_fails: Vec<&TaskResult> = results.iter()
+    let compile_fails: Vec<&TaskResult> = results
+        .iter()
         .filter(|r| r.code_written && !r.compiled)
         .collect();
     if !compile_fails.is_empty() {
-        println!("── Compilation Failures ({}) ────────────────────────────", compile_fails.len());
+        println!(
+            "── Compilation Failures ({}) ────────────────────────────",
+            compile_fails.len()
+        );
         for f in compile_fails.iter().take(10) {
-            let err: String = f.compile_errors.first()
+            let err: String = f
+                .compile_errors
+                .first()
                 .map(|e| e.chars().take(70).collect())
                 .unwrap_or_default();
             println!("  [{}] {} — {}", f.difficulty, f.description, err);
@@ -862,26 +1007,39 @@ fn print_report(results: &[TaskResult], stats: &BenchStats) {
     }
 
     // Test failures
-    let test_fails: Vec<&TaskResult> = results.iter()
+    let test_fails: Vec<&TaskResult> = results
+        .iter()
         .filter(|r| r.compiled && r.tests_failed > 0)
         .collect();
     if !test_fails.is_empty() {
-        println!("── Test Failures ({}) ───────────────────────────────────", test_fails.len());
+        println!(
+            "── Test Failures ({}) ───────────────────────────────────",
+            test_fails.len()
+        );
         for f in test_fails.iter().take(10) {
-            println!("  [{}] {} — {}/{} tests passed",
-                f.difficulty, f.description, f.tests_passed, f.tests_passed + f.tests_failed);
+            println!(
+                "  [{}] {} — {}/{} tests passed",
+                f.difficulty,
+                f.description,
+                f.tests_passed,
+                f.tests_passed + f.tests_failed
+            );
         }
         println!();
     }
 
     // No code generated
-    let no_code: Vec<&TaskResult> = results.iter()
-        .filter(|r| !r.code_written)
-        .collect();
+    let no_code: Vec<&TaskResult> = results.iter().filter(|r| !r.code_written).collect();
     if !no_code.is_empty() {
-        println!("── No Code Generated ({}) ──────────────────────────────", no_code.len());
+        println!(
+            "── No Code Generated ({}) ──────────────────────────────",
+            no_code.len()
+        );
         for f in no_code.iter().take(10) {
-            println!("  [{}] {} — phase: {}", f.difficulty, f.description, f.final_phase);
+            println!(
+                "  [{}] {} — phase: {}",
+                f.difficulty, f.description, f.final_phase
+            );
         }
     }
 }
@@ -890,14 +1048,19 @@ fn main() {
     let use_llm = std::env::args().any(|a| a == "--llm");
     let tasks = build_task_suite();
 
-    eprintln!("Symthaea Coding Agent — Hardened Benchmark ({} tasks)", tasks.len());
+    eprintln!(
+        "Symthaea Coding Agent — Hardened Benchmark ({} tasks)",
+        tasks.len()
+    );
     if use_llm {
         eprintln!("Mode: LLM (Ollama qwen2.5-coder:7b)\n");
     } else {
         eprintln!("Mode: Native-only\n");
     }
 
-    let results: Vec<TaskResult> = tasks.iter().enumerate()
+    let results: Vec<TaskResult> = tasks
+        .iter()
+        .enumerate()
         .map(|(i, task)| run_task(task, i, use_llm))
         .collect();
 
@@ -905,25 +1068,28 @@ fn main() {
     print_report(&results, &stats);
 
     // JSON report
-    let json_results: Vec<serde_json::Value> = results.iter().map(|r| {
-        serde_json::json!({
-            "description": r.description,
-            "difficulty": format!("{}", r.difficulty),
-            "code_written": r.code_written,
-            "name_match": r.contains_expected_fn,
-            "compiled": r.compiled,
-            "tests_passed": r.tests_passed,
-            "tests_failed": r.tests_failed,
-            "correct": r.is_correct(),
-            "auto_fix_attempted": r.auto_fix_attempted,
-            "auto_fix_succeeded": r.auto_fix_succeeded,
-            "compile_errors": r.compile_errors.iter().take(3).collect::<Vec<_>>(),
-            "tiers": r.tiers_used,
-            "energy": r.energy,
-            "phi_mean": r.phi_mean,
-            "elapsed_ms": r.elapsed_ms,
+    let json_results: Vec<serde_json::Value> = results
+        .iter()
+        .map(|r| {
+            serde_json::json!({
+                "description": r.description,
+                "difficulty": format!("{}", r.difficulty),
+                "code_written": r.code_written,
+                "name_match": r.contains_expected_fn,
+                "compiled": r.compiled,
+                "tests_passed": r.tests_passed,
+                "tests_failed": r.tests_failed,
+                "correct": r.is_correct(),
+                "auto_fix_attempted": r.auto_fix_attempted,
+                "auto_fix_succeeded": r.auto_fix_succeeded,
+                "compile_errors": r.compile_errors.iter().take(3).collect::<Vec<_>>(),
+                "tiers": r.tiers_used,
+                "energy": r.energy,
+                "phi_mean": r.phi_mean,
+                "elapsed_ms": r.elapsed_ms,
+            })
         })
-    }).collect();
+        .collect();
 
     let json_report = serde_json::json!({
         "benchmark": "symthaea_coding_agent_hardened",
@@ -948,7 +1114,10 @@ fn main() {
     });
 
     let report_path = std::env::temp_dir().join("symthaea_coding_benchmark_hardened.json");
-    if let Ok(()) = std::fs::write(&report_path, serde_json::to_string_pretty(&json_report).unwrap()) {
+    if let Ok(()) = std::fs::write(
+        &report_path,
+        serde_json::to_string_pretty(&json_report).unwrap(),
+    ) {
         eprintln!("\nJSON report: {}", report_path.display());
     }
 }
