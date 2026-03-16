@@ -200,8 +200,11 @@ fn neuromod_gaba_seizure_freezes() {
 
     let _result = service.run_neuromodulator_and_psi_phase(0.3, 0.5);
 
+    // Consensus integration: seizure Scale(0.1) at Safety priority dominates,
+    // but NE exploration_delta Add() proposals leak small amounts through the
+    // weighted average. Allow 0.02 tolerance above suppressed baseline.
     assert!(
-        service.curiosity_drive.exploration_urge <= initial_exploration * 0.5 + 0.01,
+        service.curiosity_drive.exploration_urge <= initial_exploration * 0.5 + 0.02,
         "seizure protection should heavily suppress exploration: {}",
         service.curiosity_drive.exploration_urge
     );
@@ -420,9 +423,9 @@ fn dynamics_self_model_accuracy_bounded() {
     let result = service.cycle("test self model");
 
     assert!(
-        (0.0..=1.0).contains(&result.metadata.predictive.self_model_accuracy),
+        (0.0..=1.0).contains(&result.metadata.self_model_accuracy),
         "self_model_accuracy should be [0,1]: {}",
-        result.metadata.predictive.self_model_accuracy
+        result.metadata.self_model_accuracy
     );
 }
 
@@ -548,10 +551,19 @@ fn phi_trust_decays_slowly() {
 #[test]
 fn coordinator_signals_updated_after_cycle() {
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
-    let initial_updates = service.memory_consol.memory_coordinator.stats.signal_updates;
+    let initial_updates = service
+        .memory_consol
+        .memory_coordinator
+        .stats
+        .signal_updates;
     let _ = service.cycle("test memory signals");
     assert!(
-        service.memory_consol.memory_coordinator.stats.signal_updates > initial_updates,
+        service
+            .memory_consol
+            .memory_coordinator
+            .stats
+            .signal_updates
+            > initial_updates,
         "cycle should update coordinator signals"
     );
 }
@@ -569,9 +581,18 @@ fn coordinator_enriched_priority_modulates() {
         .enriched_priority(base_priority, hash);
 
     // After recording retrievals
-    service.memory_consol.memory_coordinator.record_retrieval(hash);
-    service.memory_consol.memory_coordinator.record_retrieval(hash);
-    service.memory_consol.memory_coordinator.record_retrieval(hash);
+    service
+        .memory_consol
+        .memory_coordinator
+        .record_retrieval(hash);
+    service
+        .memory_consol
+        .memory_coordinator
+        .record_retrieval(hash);
+    service
+        .memory_consol
+        .memory_coordinator
+        .record_retrieval(hash);
 
     let after = service
         .memory_consol

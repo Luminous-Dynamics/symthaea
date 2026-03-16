@@ -71,10 +71,10 @@ impl CognitiveLoopService {
     pub fn process_text_input(&mut self, embedding: &[f32]) -> Result<CycleResult> {
         use symthaea_core::hdc::ContinuousHV;
 
-        let bridge = self
-            .feature_integ.neural_bridge
-            .as_ref()
-            .ok_or_else(|| anyhow::anyhow!("Neural bridge not loaded (no probe weights found)"))?;
+        let bridge =
+            self.feature_integ.neural_bridge.as_ref().ok_or_else(|| {
+                anyhow::anyhow!("Neural bridge not loaded (no probe weights found)")
+            })?;
 
         let cycle_start = Instant::now();
         self.stats.total_cycles += 1;
@@ -168,10 +168,14 @@ impl CognitiveLoopService {
 
         // Pre-compute identity fields before moving output
         #[cfg(feature = "identity")]
-        let signed_output = self.mfdi_bridge.sign_output(&output).map_err(|e| {
-            tracing::debug!(error = %e, "MFDI output signing failed");
-            e
-        }).ok();
+        let signed_output = self
+            .mfdi_bridge
+            .sign_output(&output)
+            .map_err(|e| {
+                tracing::debug!(error = %e, "MFDI output signing failed");
+                e
+            })
+            .ok();
         #[cfg(feature = "identity")]
         let assurance_level = self.mfdi_bridge.assurance_level();
 
@@ -273,7 +277,11 @@ impl CognitiveLoopService {
         let tau_owned: Vec<ndarray::Array1<f32>> = self.temporal_network.all_tau_owned();
         let tau_refs: Vec<&ndarray::Array1<f32>> = tau_owned.iter().collect();
         self.language_comm.voice_coherence.bridge.update(&tau_refs);
-        let coherence = self.language_comm.voice_coherence.bridge.smoothed_coherence();
+        let coherence = self
+            .language_comm
+            .voice_coherence
+            .bridge
+            .smoothed_coherence();
 
         // Effective threshold matches cycle() behavior (adaptive scaling)
         let effective_threshold = self.config.learning_threshold
@@ -707,7 +715,10 @@ impl CognitiveLoopService {
         self.start_time = Instant::now();
         self.language_comm.reset();
         self.adaptive_behavior = AdaptiveBehavior::default();
-        self.set_confidence("inference_mode_reset", 0.5);
+        self.prediction_confidence = 0.5;
+        self.feedback_state = super::feedback_state::FeedbackState::new();
+        self.feedback_state.begin_cycle();
+        self.feedback_state.snapshot_cycle_start(0.5, 1.0, 0.0, 1.0);
         self.flow_state.reset();
         self.emotion_contagion.reset();
         self.curiosity_drive.reset();
