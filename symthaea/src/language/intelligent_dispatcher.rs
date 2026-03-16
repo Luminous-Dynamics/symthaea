@@ -98,6 +98,8 @@ pub struct IntelligentDispatcher {
     total_energy: f64,
     /// Maximum energy budget (0.0 = unlimited).
     energy_budget: f64,
+    /// If set, forces the next `select_tier` call to return this tier.
+    forced_tier: Option<BackendTier>,
 }
 
 impl IntelligentDispatcher {
@@ -111,6 +113,7 @@ impl IntelligentDispatcher {
             cloud_stats: BackendStats::default(),
             total_energy: 0.0,
             energy_budget: 0.0,
+            forced_tier: None,
         }
     }
 
@@ -142,12 +145,23 @@ impl IntelligentDispatcher {
     /// 2. **Probable** + medium error → Local LLM (moderate cost)
     /// 3. **Uncertain/Unknown** → Cloud LLM (expensive but capable)
     /// 4. Budget exceeded → fall back to cheaper tier
+    /// Force the next `select_tier` call to return the given tier.
+    /// Consumed on first call (one-shot override).
+    pub fn force_next_tier(&mut self, tier: BackendTier) {
+        self.forced_tier = Some(tier);
+    }
+
     pub fn select_tier(
-        &self,
+        &mut self,
         epistemic: EpistemicStatus,
         prediction_error: f64,
         consciousness_level: f64,
     ) -> BackendTier {
+        // Check for forced tier (one-shot override)
+        if let Some(tier) = self.forced_tier.take() {
+            return tier;
+        }
+
         // Budget check: if we'd exceed budget, force cheaper tier
         let remaining = if self.energy_budget > 0.0 {
             self.energy_budget - self.total_energy
@@ -349,21 +363,21 @@ mod tests {
 
     #[test]
     fn test_select_tier_certain_low_error() {
-        let dispatcher = IntelligentDispatcher::simulated();
+        let mut dispatcher = IntelligentDispatcher::simulated();
         let tier = dispatcher.select_tier(EpistemicStatus::Certain, 0.1, 0.8);
         assert_eq!(tier, BackendTier::Native);
     }
 
     #[test]
     fn test_select_tier_probable_medium_error() {
-        let dispatcher = IntelligentDispatcher::simulated();
+        let mut dispatcher = IntelligentDispatcher::simulated();
         let tier = dispatcher.select_tier(EpistemicStatus::Probable, 0.4, 0.8);
         assert_eq!(tier, BackendTier::LocalLlm);
     }
 
     #[test]
     fn test_select_tier_uncertain_uses_local_when_no_cloud() {
-        let dispatcher = IntelligentDispatcher::simulated();
+        let mut dispatcher = IntelligentDispatcher::simulated();
         // No cloud backend → falls back to LocalLlm
         let tier = dispatcher.select_tier(EpistemicStatus::Uncertain, 0.8, 0.8);
         assert_eq!(tier, BackendTier::LocalLlm);
@@ -371,7 +385,7 @@ mod tests {
 
     #[test]
     fn test_select_tier_uncertain_uses_cloud_when_available() {
-        let dispatcher = IntelligentDispatcher::new(
+        let mut dispatcher = IntelligentDispatcher::new(
             Arc::new(SimulatedBackend),
             Some(Arc::new(SimulatedBackend)),
         );
@@ -381,7 +395,7 @@ mod tests {
 
     #[test]
     fn test_low_consciousness_forces_native() {
-        let dispatcher = IntelligentDispatcher::new(
+        let mut dispatcher = IntelligentDispatcher::new(
             Arc::new(SimulatedBackend),
             Some(Arc::new(SimulatedBackend)),
         );
@@ -392,7 +406,7 @@ mod tests {
 
     #[test]
     fn test_budget_forces_downgrade() {
-        let dispatcher = IntelligentDispatcher::new(
+        let mut dispatcher = IntelligentDispatcher::new(
             Arc::new(SimulatedBackend),
             Some(Arc::new(SimulatedBackend)),
         )
