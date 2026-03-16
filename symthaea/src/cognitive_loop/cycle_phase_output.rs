@@ -1081,6 +1081,11 @@ impl CognitiveLoopService {
             metadata.glyph_spiral_position = self.glyph_manager.spiral_position();
         }
 
+        // ── Feature availability flags ──
+        metadata.reasoning_engine_enabled = cfg!(feature = "reasoning_engine");
+        metadata.mesh_enabled = cfg!(feature = "mesh");
+        metadata.ssm_language_enabled = cfg!(feature = "ssm_language");
+
         // ── End-of-cycle stats ──
         self.run_end_of_cycle_stats(
             &mut metadata,

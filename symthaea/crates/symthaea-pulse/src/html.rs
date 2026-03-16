@@ -2646,6 +2646,44 @@ fn write_learning_pane(html: &mut String, learning: &LearningInfo) {
         meta = learning.lr_meta_mod.max(0.01),
     );
 
+    // Feedback priority distribution bar
+    let total = learning.feedback_proposal_count.max(1) as f32;
+    let [ae, co, ho, sa] = learning.feedback_priority_counts;
+    let conflict_color = if learning.feedback_conflict_ratio > 0.3 {
+        "#e86347" // high conflict = red
+    } else if learning.feedback_conflict_ratio > 0.15 {
+        "#e8c547" // moderate = yellow
+    } else {
+        "#7ec8a0" // low = green
+    };
+    let _ = write!(
+        html,
+        r#"<div style="margin:8px 0">
+<div style="font-size:0.75em;color:#8a9a8a;margin-bottom:4px">Feedback Proposals ({total}) &middot; conflict <span style="color:{conf_color}">{conflict:.2}</span> &middot; diversity {div:.2}</div>
+<div style="display:flex;gap:1px;height:12px;border-radius:3px;overflow:hidden">
+<div style="flex:{sa};background:#e86347" title="Safety {sa_n}"></div>
+<div style="flex:{ho};background:#e8c547" title="Homeostatic {ho_n}"></div>
+<div style="flex:{co};background:#7ec8a0" title="Cognitive {co_n}"></div>
+<div style="flex:{ae};background:#9a7ec8" title="Aesthetic {ae_n}"></div>
+</div>
+<div style="display:flex;justify-content:space-between;font-size:0.6em;color:#8a9a8a;margin-top:2px">
+<span style="color:#e86347">S</span><span style="color:#e8c547">H</span><span style="color:#7ec8a0">C</span><span style="color:#9a7ec8">A</span>
+</div>
+</div>"#,
+        total = learning.feedback_proposal_count,
+        conf_color = conflict_color,
+        conflict = learning.feedback_conflict_ratio,
+        div = learning.feedback_diversity,
+        sa = sa as f32 / total,
+        ho = ho as f32 / total,
+        co = co as f32 / total,
+        ae = ae as f32 / total,
+        sa_n = sa,
+        ho_n = ho,
+        co_n = co,
+        ae_n = ae,
+    );
+
     html.push_str("</div>\n");
 }
 

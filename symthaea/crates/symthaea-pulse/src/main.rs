@@ -382,6 +382,18 @@ pub struct LearningInfo {
     pub prediction_coherence: f32,
     #[serde(default)]
     pub surprise_replay_batch: usize,
+    /// Total feedback proposals this cycle.
+    #[serde(default)]
+    pub feedback_proposal_count: u32,
+    /// Average conflict ratio across feedback channels (0.0–0.5).
+    #[serde(default)]
+    pub feedback_conflict_ratio: f32,
+    /// Feedback proposals per priority: [Aesthetic, Cognitive, Homeostatic, Safety].
+    #[serde(default)]
+    pub feedback_priority_counts: [u32; 4],
+    /// Feedback signal diversity (0.0–1.0).
+    #[serde(default)]
+    pub feedback_diversity: f32,
 }
 
 /// Reasoning engine snapshot (meaningful only when reasoning_engine feature is enabled).
@@ -1286,6 +1298,10 @@ fn main() -> Result<()> {
             prediction_error: result.prediction_error,
             prediction_coherence: m.prediction_coherence,
             surprise_replay_batch: m.memory.surprise_replay_batch_size,
+            feedback_proposal_count: m.feedback_proposal_count,
+            feedback_conflict_ratio: m.feedback_conflict_ratio,
+            feedback_priority_counts: m.feedback_priority_counts,
+            feedback_diversity: m.feedback_diversity,
         },
         reasoning: ReasoningInfo {
             enabled: m.reasoning_engine_enabled,
@@ -1583,6 +1599,10 @@ fn main() -> Result<()> {
                     prediction_error: result.prediction_error,
                     prediction_coherence: wm.prediction_coherence,
                     surprise_replay_batch: wm.memory.surprise_replay_batch_size,
+                    feedback_proposal_count: wm.feedback_proposal_count,
+                    feedback_conflict_ratio: wm.feedback_conflict_ratio,
+                    feedback_priority_counts: wm.feedback_priority_counts,
+                    feedback_diversity: wm.feedback_diversity,
                 },
                 reasoning: ReasoningInfo {
                     enabled: wm.reasoning_engine_enabled,
