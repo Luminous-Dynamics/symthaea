@@ -232,17 +232,17 @@
         <form on:submit|preventDefault={handleExchange} class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label for="receiver" class="text-xs text-gray-400">Receiver DID</label>
-            <input id="receiver" bind:value={receiverDid} placeholder="member.did"
+            <input id="receiver" bind:value={receiverDid} placeholder="member.did" required
               class="w-full mt-1 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500" />
           </div>
           <div>
             <label for="hours" class="text-xs text-gray-400">Hours</label>
-            <input id="hours" type="number" bind:value={hours} min="0.25" step="0.25" max="12"
+            <input id="hours" type="number" bind:value={hours} min="0.25" step="0.25" max="12" required
               class="w-full mt-1 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500" />
           </div>
           <div>
             <label for="desc" class="text-xs text-gray-400">Service Description</label>
-            <input id="desc" bind:value={serviceDesc} placeholder="What was done?"
+            <input id="desc" bind:value={serviceDesc} placeholder="What was done?" required
               class="w-full mt-1 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500" />
           </div>
           <div>
@@ -267,6 +267,7 @@
     <!-- Search & Category Filter -->
     <div class="mb-6 space-y-3">
       <input type="text" bind:value={searchQuery} placeholder="Search listings & requests..."
+        aria-label="Search TEND listings and requests"
         class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500" />
       <div class="flex flex-wrap gap-2">
         <button on:click={() => filterCategory = ''}

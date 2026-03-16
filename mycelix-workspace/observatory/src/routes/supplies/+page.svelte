@@ -147,6 +147,7 @@
       <button
         class="px-4 py-2 rounded-lg text-sm font-semibold transition-colors bg-amber-700 hover:bg-amber-600 text-white"
         on:click={() => { showAddForm = !showAddForm; addError = ''; }}
+        aria-label={showAddForm ? 'Cancel adding new item' : 'Add new inventory item'}
       >
         {showAddForm ? 'Cancel' : '+ Add Item'}
       </button>
@@ -249,6 +250,7 @@
                 type="submit"
                 disabled={addSubmitting}
                 class="px-6 py-2 rounded-lg text-sm font-semibold transition-colors bg-amber-700 hover:bg-amber-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                aria-label="Submit new inventory item"
               >
                 {addSubmitting ? 'Adding...' : 'Add Item'}
               </button>
@@ -298,11 +300,13 @@
         <button
           class="px-3 py-1 rounded-full text-sm transition-colors {!filterCategory ? 'bg-amber-700 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}"
           on:click={() => filterCategory = ''}
+          aria-label="Show all categories"
         >All</button>
         {#each categories as cat}
           <button
             class="px-3 py-1 rounded-full text-sm transition-colors {filterCategory === cat ? 'bg-amber-700 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}"
             on:click={() => filterCategory = cat}
+            aria-label="Filter by {cat}"
           >{cat}</button>
         {/each}
       </div>
@@ -327,6 +331,7 @@
                 <button
                   class="px-3 py-1 rounded text-xs font-medium transition-colors bg-amber-800/60 hover:bg-amber-700 text-amber-200"
                   on:click={() => toggleStockForm(item.id)}
+                  aria-label={stockFormOpen[item.id] ? `Cancel stock update for ${item.name}` : `Update stock for ${item.name}`}
                 >
                   {stockFormOpen[item.id] ? 'Cancel' : 'Update Stock'}
                 </button>
@@ -372,6 +377,7 @@
                     type="submit"
                     disabled={stockSubmitting[item.id]}
                     class="px-4 py-1 rounded text-sm font-semibold transition-colors bg-amber-700 hover:bg-amber-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                    aria-label="Save stock update for {item.name}"
                   >
                     {stockSubmitting[item.id] ? 'Saving...' : 'Save'}
                   </button>
@@ -390,7 +396,8 @@
 
       <div class="mt-6 flex justify-end">
         <button on:click={() => exportInventoryCsv(items)}
-          class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded text-xs text-gray-300 transition-colors">
+          class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded text-xs text-gray-300 transition-colors"
+          aria-label="Export inventory data as CSV file">
           Export Inventory CSV
         </button>
       </div>

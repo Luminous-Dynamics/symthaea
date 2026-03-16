@@ -16,9 +16,10 @@
     type LowStockItem,
   } from '$lib/resilience-client';
   import { connectionHealth, connectionQuality, connectionLabel, qualityColor } from '$lib/connection-health';
-  import { queueCount } from '$lib/offline-queue';
+  import { queueCount, getQueue, removeItem, clearQueue, type QueuedSubmission } from '$lib/offline-queue';
   import { createFreshness } from '$lib/freshness';
   import FreshnessBar from '$lib/components/FreshnessBar.svelte';
+  import { browser } from '$app/environment';
 
   // ============================================================================
   // Dashboard data
@@ -37,6 +38,9 @@
   let waterAlerts = 0;
   let lowStockItems: LowStockItem[] = [];
   let oracle: OracleState = { vitality: 0, tier: 'Normal', updated_at: 0 };
+
+  // Offline queue
+  let queueItems: QueuedSubmission[] = [];
 
   // Activity log
   type LogEntry = { time: number; domain: string; message: string };
@@ -83,6 +87,8 @@
     if (results[8].status === 'fulfilled') lowStockItems = results[8].value;
     if (results[9].status === 'fulfilled') oracle = results[9].value;
 
+    queueItems = await getQueue();
+
     // Log changes
     if (tendListings !== prev.tendListings) log('tend', `TEND listings: ${prev.tendListings} → ${tendListings}`);
     if (aidOffers !== prev.aidOffers) log('mutual-aid', `Aid offers: ${prev.aidOffers} → ${aidOffers}`);
@@ -127,6 +133,50 @@
   function formatLogTime(ts: number): string {
     return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   }
+
+  // ============================================================================
+  // Community Config (localStorage-backed)
+  // ============================================================================
+
+  const CONFIG_KEY = 'mycelix-community-config';
+
+  interface CommunityConfig {
+    name: string;
+    location: string;
+    contactName: string;
+    contactPhone: string;
+    contactEmail: string;
+  }
+
+  const defaultConfig: CommunityConfig = {
+    name: 'Roodepoort Community',
+    location: 'Roodepoort, Gauteng, South Africa',
+    contactName: '',
+    contactPhone: '',
+    contactEmail: '',
+  };
+
+  let communityConfig: CommunityConfig = loadConfig();
+  let showConfigForm = false;
+  let configSaved = false;
+
+  function loadConfig(): CommunityConfig {
+    if (!browser) return { ...defaultConfig };
+    try {
+      const raw = localStorage.getItem(CONFIG_KEY);
+      if (!raw) return { ...defaultConfig };
+      return { ...defaultConfig, ...JSON.parse(raw) };
+    } catch {
+      return { ...defaultConfig };
+    }
+  }
+
+  function saveConfig() {
+    if (!browser) return;
+    localStorage.setItem(CONFIG_KEY, JSON.stringify(communityConfig));
+    configSaved = true;
+    setTimeout(() => { configSaved = false; }, 2000);
+  }
 </script>
 
 <svelte:head>
@@ -145,7 +195,7 @@
       </div>
       <div class="flex items-center gap-3">
         <div class="flex items-center gap-1.5 text-sm">
-          <span class="relative flex h-2.5 w-2.5">
+          <span class="relative flex h-2.5 w-2.5" aria-label="Connection quality: {$connectionQuality}">
             <span class="relative inline-flex rounded-full h-2.5 w-2.5 {$qualityColor}"></span>
           </span>
           <span class="text-gray-300">{$connectionLabel}</span>
@@ -159,13 +209,13 @@
 
     <!-- System Health -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-      <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
+      <div class="bg-gray-800 rounded-lg p-4 border border-gray-700" role="status">
         <h3 class="text-gray-400 text-xs uppercase">Connection</h3>
         <p class="text-xl font-bold mt-1 {$connectionQuality === 'excellent' ? 'text-green-400' : $connectionQuality === 'degraded' ? 'text-yellow-400' : 'text-red-400'}">
           {$connectionQuality === 'excellent' ? 'Healthy' : $connectionQuality === 'degraded' ? 'Degraded' : 'Down'}
         </p>
       </div>
-      <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
+      <div class="bg-gray-800 rounded-lg p-4 border border-gray-700" role="status">
         <h3 class="text-gray-400 text-xs uppercase">Oracle Tier</h3>
         <p class="text-xl font-bold mt-1 {tierColor(oracle.tier)}">{oracle.tier}</p>
         <p class="text-xs text-gray-500 mt-1">Vitality: {oracle.vitality}</p>
@@ -182,27 +232,27 @@
 
     <!-- Domain Counts -->
     <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 mb-6">
-      <a href="/tend" class="bg-gray-800 rounded-lg p-3 border border-gray-700 hover:border-blue-500/50 transition-colors">
+      <a href="/tend" aria-label="View TEND listings ({tendListings})" class="bg-gray-800 rounded-lg p-3 border border-gray-700 hover:border-blue-500/50 transition-colors">
         <p class="text-xs text-gray-400">TEND Listings</p>
         <p class="text-2xl font-bold text-blue-400">{tendListings}</p>
       </a>
-      <a href="/tend" class="bg-gray-800 rounded-lg p-3 border border-gray-700 hover:border-blue-500/50 transition-colors">
+      <a href="/tend" aria-label="View TEND requests ({tendRequests})" class="bg-gray-800 rounded-lg p-3 border border-gray-700 hover:border-blue-500/50 transition-colors">
         <p class="text-xs text-gray-400">TEND Requests</p>
         <p class="text-2xl font-bold text-blue-300">{tendRequests}</p>
       </a>
-      <a href="/mutual-aid" class="bg-gray-800 rounded-lg p-3 border border-gray-700 hover:border-green-500/50 transition-colors">
+      <a href="/mutual-aid" aria-label="View mutual aid offers ({aidOffers})" class="bg-gray-800 rounded-lg p-3 border border-gray-700 hover:border-green-500/50 transition-colors">
         <p class="text-xs text-gray-400">Aid Offers</p>
         <p class="text-2xl font-bold text-green-400">{aidOffers}</p>
       </a>
-      <a href="/mutual-aid" class="bg-gray-800 rounded-lg p-3 border border-gray-700 hover:border-green-500/50 transition-colors">
+      <a href="/mutual-aid" aria-label="View mutual aid requests ({aidRequests})" class="bg-gray-800 rounded-lg p-3 border border-gray-700 hover:border-green-500/50 transition-colors">
         <p class="text-xs text-gray-400">Aid Requests</p>
         <p class="text-2xl font-bold text-orange-400">{aidRequests}</p>
       </a>
-      <a href="/emergency" class="bg-gray-800 rounded-lg p-3 border border-gray-700 hover:border-red-500/50 transition-colors">
+      <a href="/emergency" aria-label="View emergency channels ({emergencyChannels})" class="bg-gray-800 rounded-lg p-3 border border-gray-700 hover:border-red-500/50 transition-colors">
         <p class="text-xs text-gray-400">Emerg. Channels</p>
         <p class="text-2xl font-bold text-red-400">{emergencyChannels}</p>
       </a>
-      <a href="/food" class="bg-gray-800 rounded-lg p-3 border border-gray-700 hover:border-emerald-500/50 transition-colors">
+      <a href="/food" aria-label="View food plots ({foodPlots})" class="bg-gray-800 rounded-lg p-3 border border-gray-700 hover:border-emerald-500/50 transition-colors">
         <p class="text-xs text-gray-400">Food Plots</p>
         <p class="text-2xl font-bold text-emerald-400">{foodPlots}</p>
       </a>
@@ -213,7 +263,7 @@
       <div class="bg-gray-800 rounded-lg border border-gray-700">
         <div class="p-4 border-b border-gray-700 flex justify-between items-center">
           <h2 class="text-sm font-semibold">Low Stock Alerts</h2>
-          <a href="/supplies" class="text-xs text-blue-400 hover:text-blue-300">View all</a>
+          <a href="/supplies" aria-label="View all supply items" class="text-xs text-blue-400 hover:text-blue-300">View all</a>
         </div>
         <div class="p-4 space-y-2 max-h-64 overflow-y-auto">
           {#each lowStockItems as ls}
@@ -238,7 +288,7 @@
         <div class="p-4 border-b border-gray-700">
           <h2 class="text-sm font-semibold">Activity Log</h2>
         </div>
-        <div class="p-4 space-y-1 max-h-64 overflow-y-auto">
+        <div class="p-4 space-y-1 max-h-64 overflow-y-auto" aria-live="polite">
           {#each activityLog as entry}
             <div class="flex items-start gap-2 text-xs py-1">
               <span class="text-gray-500 font-mono whitespace-nowrap">{formatLogTime(entry.time)}</span>
@@ -250,23 +300,138 @@
           {/each}
         </div>
       </div>
+
+      <!-- Offline Queue Inspector -->
+      <div class="bg-gray-800 rounded-lg border border-gray-700 lg:col-span-2">
+        <div class="p-4 border-b border-gray-700 flex justify-between items-center">
+          <h2 class="text-sm font-semibold">Offline Queue <span class="text-gray-400 font-normal">({queueItems.length} item{queueItems.length !== 1 ? 's' : ''})</span></h2>
+          {#if queueItems.length > 0}
+            <button
+              class="text-xs text-red-400 hover:text-red-300 transition-colors"
+              on:click={async () => {
+                if (confirm('Clear all queued submissions? This cannot be undone.')) {
+                  await clearQueue();
+                  queueItems = await getQueue();
+                }
+              }}
+            >Clear All</button>
+          {/if}
+        </div>
+        <div class="p-4 space-y-2 max-h-72 overflow-y-auto">
+          {#each queueItems as item (item.id)}
+            <div class="flex items-center justify-between p-2 bg-gray-700/40 border border-gray-600/50 rounded">
+              <div class="flex items-center gap-3 min-w-0">
+                <div class="min-w-0">
+                  <p class="text-sm font-medium truncate">{item.domain} <span class="text-gray-400 font-normal">/ {item.action}</span></p>
+                  <p class="text-xs text-gray-500">{formatLogTime(item.created_at)} &middot; {item.attempts} attempt{item.attempts !== 1 ? 's' : ''}</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-2 shrink-0">
+                <span class="text-xs px-1.5 py-0.5 rounded {item.status === 'queued' ? 'bg-yellow-900/40 text-yellow-400' : item.status === 'sending' ? 'bg-blue-900/40 text-blue-400' : 'bg-red-900/40 text-red-400'}">{item.status}</span>
+                <button
+                  class="text-xs text-gray-400 hover:text-red-400 transition-colors"
+                  on:click={async () => {
+                    await removeItem(item.id);
+                    queueItems = await getQueue();
+                  }}
+                >Remove</button>
+              </div>
+            </div>
+          {:else}
+            <p class="text-gray-500 text-center py-4 text-sm">Queue empty — all submissions synced</p>
+          {/each}
+        </div>
+      </div>
+    </div>
+
+    <!-- Community Config -->
+    <div class="mt-6 bg-gray-800 rounded-lg border border-gray-700">
+      <div class="p-4 border-b border-gray-700 flex justify-between items-center">
+        <h2 class="text-sm font-semibold">Community Identity</h2>
+        <button
+          on:click={() => showConfigForm = !showConfigForm}
+          class="text-xs px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+          aria-label={showConfigForm ? 'Close community settings' : 'Edit community settings'}
+        >
+          {showConfigForm ? 'Close' : 'Edit'}
+        </button>
+      </div>
+      {#if showConfigForm}
+        <div class="p-4">
+          <form on:submit|preventDefault={saveConfig} class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label for="cfg-name" class="text-xs text-gray-400">Community Name</label>
+              <input id="cfg-name" bind:value={communityConfig.name}
+                class="w-full mt-1 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500" />
+            </div>
+            <div>
+              <label for="cfg-location" class="text-xs text-gray-400">Location</label>
+              <input id="cfg-location" bind:value={communityConfig.location}
+                class="w-full mt-1 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500" />
+            </div>
+            <div>
+              <label for="cfg-contact" class="text-xs text-gray-400">Operator Name</label>
+              <input id="cfg-contact" bind:value={communityConfig.contactName}
+                class="w-full mt-1 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500" />
+            </div>
+            <div>
+              <label for="cfg-phone" class="text-xs text-gray-400">Operator Phone</label>
+              <input id="cfg-phone" type="tel" bind:value={communityConfig.contactPhone} placeholder="+27 82 000 0000"
+                class="w-full mt-1 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500" />
+            </div>
+            <div class="sm:col-span-2">
+              <label for="cfg-email" class="text-xs text-gray-400">Operator Email</label>
+              <input id="cfg-email" type="email" bind:value={communityConfig.contactEmail}
+                class="w-full mt-1 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500" />
+            </div>
+            <div class="sm:col-span-2 flex items-center gap-3">
+              <button type="submit"
+                class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded text-sm font-medium transition-colors">
+                Save
+              </button>
+              {#if configSaved}
+                <span class="text-xs text-green-400">Saved</span>
+              {/if}
+            </div>
+          </form>
+        </div>
+      {:else}
+        <div class="p-4 grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+          <div>
+            <p class="text-xs text-gray-400">Community</p>
+            <p class="text-gray-200">{communityConfig.name}</p>
+          </div>
+          <div>
+            <p class="text-xs text-gray-400">Location</p>
+            <p class="text-gray-200">{communityConfig.location}</p>
+          </div>
+          <div>
+            <p class="text-xs text-gray-400">Operator</p>
+            <p class="text-gray-200">{communityConfig.contactName || 'Not set'}</p>
+          </div>
+          <div>
+            <p class="text-xs text-gray-400">Contact</p>
+            <p class="text-gray-200">{communityConfig.contactPhone || communityConfig.contactEmail || 'Not set'}</p>
+          </div>
+        </div>
+      {/if}
     </div>
 
     <!-- Quick Links -->
     <div class="mt-6 grid grid-cols-2 md:grid-cols-4 gap-3">
-      <a href="/print" class="bg-gray-800 rounded-lg p-3 border border-gray-700 hover:border-gray-500 transition-colors text-center">
+      <a href="/print" aria-label="Print summary — printable community report" class="bg-gray-800 rounded-lg p-3 border border-gray-700 hover:border-gray-500 transition-colors text-center">
         <p class="text-sm font-medium text-gray-300">Print Summary</p>
         <p class="text-xs text-gray-500 mt-1">Printable community report</p>
       </a>
-      <a href="/value-anchor" class="bg-gray-800 rounded-lg p-3 border border-gray-700 hover:border-gray-500 transition-colors text-center">
+      <a href="/value-anchor" aria-label="Price oracle — update local prices" class="bg-gray-800 rounded-lg p-3 border border-gray-700 hover:border-gray-500 transition-colors text-center">
         <p class="text-sm font-medium text-gray-300">Price Oracle</p>
         <p class="text-xs text-gray-500 mt-1">Update local prices</p>
       </a>
-      <a href="/water" class="bg-gray-800 rounded-lg p-3 border border-gray-700 hover:border-gray-500 transition-colors text-center">
+      <a href="/water" aria-label="Water safety — {waterSystems} systems, {waterAlerts} alerts" class="bg-gray-800 rounded-lg p-3 border border-gray-700 hover:border-gray-500 transition-colors text-center">
         <p class="text-sm font-medium text-gray-300">Water Safety</p>
         <p class="text-xs text-gray-500 mt-1">{waterSystems} systems, {waterAlerts} alerts</p>
       </a>
-      <a href="/household" class="bg-gray-800 rounded-lg p-3 border border-gray-700 hover:border-gray-500 transition-colors text-center">
+      <a href="/household" aria-label="Households — emergency plans" class="bg-gray-800 rounded-lg p-3 border border-gray-700 hover:border-gray-500 transition-colors text-center">
         <p class="text-sm font-medium text-gray-300">Households</p>
         <p class="text-xs text-gray-500 mt-1">Emergency plans</p>
       </a>

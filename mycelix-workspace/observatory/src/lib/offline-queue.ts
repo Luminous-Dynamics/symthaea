@@ -21,6 +21,7 @@ export interface QueuedSubmission {
   status: 'queued' | 'sending' | 'failed';
   attempts: number;
   last_error?: string;
+  last_attempt_at?: number;  // For exponential backoff between retries
 }
 
 /** Reactive count of pending items in the offline queue. */
@@ -207,9 +208,20 @@ export async function flush(
       continue;
     }
 
+    // Exponential backoff: skip items that were retried recently
+    if (item.attempts > 0) {
+      const backoffMs = Math.min(1000 * Math.pow(2, item.attempts - 1), 30_000);
+      const lastAttemptAge = Date.now() - (item.last_attempt_at ?? 0);
+      if (lastAttemptAge < backoffMs) {
+        results.skipped++;
+        continue;
+      }
+    }
+
     // Mark as sending
     item.status = 'sending';
     item.attempts++;
+    item.last_attempt_at = Date.now();
     await idbPut(item);
 
     try {

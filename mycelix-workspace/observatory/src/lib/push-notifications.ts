@@ -86,8 +86,14 @@ export function notifyEmergency(message: EmergencyPayload): Notification | null 
   const title =
     message.priority === 'Flash' ? '[FLASH] Emergency' : '[IMMEDIATE] Alert';
 
-  return showNotification(title, message.content, {
+  const notification = showNotification(title, message.content, {
     tag: 'emergency-' + Date.now(),
     requireInteraction: true,
   });
+
+  if ('vibrate' in navigator) {
+    navigator.vibrate(message.priority === 'Flash' ? [200, 100, 200, 100, 400] : [200, 100, 200]);
+  }
+
+  return notification;
 }

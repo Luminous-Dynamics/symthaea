@@ -1,5 +1,7 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
+  import { createFreshness } from '$lib/freshness';
+  import FreshnessBar from '$lib/components/FreshnessBar.svelte';
   import { conductorStatus } from '$lib/stores';
   import {
     getBalance,
@@ -44,14 +46,12 @@
     { domain: 'Supplies', metric: '--', color: 'bg-amber-500', borderColor: 'border-amber-700', textColor: 'text-amber-400', link: '/supplies', status: 'loading' },
   ];
 
-  let lastUpdated: string | null = null;
-
   function updateCard(index: number, metric: string, status: CardStatus) {
     cards[index] = { ...cards[index], metric, status };
     cards = cards;
   }
 
-  onMount(async () => {
+  async function fetchData(): Promise<void> {
     const fetchers: Array<() => Promise<void>> = [
       // 0: TEND — Balance
       async () => {
@@ -137,8 +137,17 @@
     ];
 
     await Promise.all(fetchers.map((fn) => fn()));
-    lastUpdated = new Date().toLocaleTimeString();
+  }
+
+  const { lastUpdated, loadError, refreshing, startPolling, stopPolling, refresh } =
+    createFreshness(fetchData, 120_000);
+
+  onMount(async () => {
+    await refresh();
+    startPolling();
   });
+
+  onDestroy(() => stopPolling());
 
   function statusDotColor(status: CardStatus): string {
     switch (status) {
@@ -159,6 +168,8 @@
     <h1 class="text-3xl font-bold text-white">Mycelix Resilience Kit</h1>
     <p class="text-gray-400 mt-1">Roodepoort Community</p>
   </div>
+
+  <FreshnessBar {lastUpdated} {loadError} {refreshing} {refresh} />
 
   <!-- Domain Grid -->
   <div class="max-w-6xl mx-auto grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-10">
@@ -200,7 +211,7 @@
       </div>
       <div class="flex items-center gap-2">
         <span class="text-gray-400">Last Updated:</span>
-        <span class="text-gray-200">{lastUpdated ?? 'Fetching...'}</span>
+        <span class="text-gray-200">{$lastUpdated ? new Date($lastUpdated).toLocaleTimeString() : 'Fetching...'}</span>
       </div>
     </div>
   </div>

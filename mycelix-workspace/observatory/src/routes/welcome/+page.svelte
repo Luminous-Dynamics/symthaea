@@ -108,7 +108,14 @@
   <div class="max-w-2xl w-full">
 
     <!-- Progress indicator -->
-    <div class="flex items-center justify-center gap-2 mb-8">
+    <div
+      class="flex items-center justify-center gap-2 mb-8"
+      role="progressbar"
+      aria-label="Onboarding progress"
+      aria-valuenow={step}
+      aria-valuemin={1}
+      aria-valuemax={3}
+    >
       {#each [1, 2, 3] as s}
         <div
           class="h-2 rounded-full transition-all duration-300 {s === step
@@ -144,6 +151,7 @@
       <div class="flex justify-center">
         <button
           on:click={next}
+          aria-label="Go to next step"
           class="px-8 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg transition-colors"
         >
           Next &rarr;
@@ -203,12 +211,14 @@
       <div class="flex items-center justify-center gap-4">
         <button
           on:click={prev}
+          aria-label="Go to previous step"
           class="px-6 py-3 text-gray-400 hover:text-white transition-colors"
         >
           &larr; Back
         </button>
         <button
           on:click={next}
+          aria-label="Go to next step"
           class="px-8 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg transition-colors"
         >
           Next &rarr;
@@ -243,6 +253,7 @@
           <input
             type="checkbox"
             bind:checked={dontShowAgain}
+            aria-label="Don't show this welcome screen again"
             class="rounded bg-gray-800 border-gray-600 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-0"
           />
           Don't show this again
@@ -251,12 +262,14 @@
         <div class="flex items-center gap-4">
           <button
             on:click={prev}
+            aria-label="Go to previous step"
             class="px-6 py-3 text-gray-400 hover:text-white transition-colors"
           >
             &larr; Back
           </button>
           <button
             on:click={finish}
+            aria-label="Enter the resilience kit"
             class="px-8 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg transition-colors"
           >
             Enter the Kit

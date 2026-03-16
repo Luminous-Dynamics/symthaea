@@ -201,6 +201,7 @@
     <!-- Search & Category Filter -->
     <div class="mb-6 space-y-3">
       <input type="text" bind:value={searchQuery} placeholder="Search offers & requests..."
+        aria-label="Search mutual aid offers and requests"
         class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500" />
       <div class="flex flex-wrap gap-2">
         <button on:click={() => filterCategory = ''}
@@ -223,7 +224,7 @@
         <form on:submit|preventDefault={handleCreateOffer} class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label for="otitle" class="text-xs text-gray-400">What can you help with?</label>
-            <input id="otitle" bind:value={offerTitle} placeholder="e.g. Plumbing repair"
+            <input id="otitle" bind:value={offerTitle} placeholder="e.g. Plumbing repair" required
               class="w-full mt-1 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-green-500" />
           </div>
           <div>
@@ -262,7 +263,7 @@
         <form on:submit|preventDefault={handleCreateRequest} class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label for="rtitle" class="text-xs text-gray-400">What do you need?</label>
-            <input id="rtitle" bind:value={reqTitle} placeholder="e.g. Help installing gas stove"
+            <input id="rtitle" bind:value={reqTitle} placeholder="e.g. Help installing gas stove" required
               class="w-full mt-1 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-orange-500" />
           </div>
           <div>

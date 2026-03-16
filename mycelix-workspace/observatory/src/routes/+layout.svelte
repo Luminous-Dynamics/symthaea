@@ -2,10 +2,12 @@
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
   import { conductorStatus } from '$lib/stores';
+  import { connectToConductor, flushOfflineQueue } from '$lib/conductor';
   import { queueCount, initQueueCount } from '$lib/offline-queue';
-  import { flushOfflineQueue } from '$lib/conductor';
   import { connectionQuality, connectionLabel, qualityColor, setInternet } from '$lib/connection-health';
+  import { refreshConsensus } from '$lib/value-basket';
   import Toast from '$lib/components/Toast.svelte';
+  import LocaleSelector from '$lib/components/LocaleSelector.svelte';
 
   let syncing = false;
 
@@ -21,6 +23,7 @@
 
   let isOnline = true;
   let mobileMenuOpen = false;
+  let consensusTimer: ReturnType<typeof setInterval> | null = null;
 
   onMount(() => {
     isOnline = navigator.onLine;
@@ -30,9 +33,27 @@
     window.addEventListener('online', goOnline);
     window.addEventListener('offline', goOffline);
     initQueueCount();
+
+    // Proactive conductor connection on app startup
+    connectToConductor();
+
+    // Register service worker for offline PWA support
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/service-worker.js').catch((err) =>
+        console.warn('[Observatory] Service worker registration failed:', err),
+      );
+    }
+
+    // Global consensus refresh every 5 minutes
+    refreshConsensus().catch(() => {});
+    consensusTimer = setInterval(() => {
+      refreshConsensus().catch(() => {});
+    }, 300_000);
+
     return () => {
       window.removeEventListener('online', goOnline);
       window.removeEventListener('offline', goOffline);
+      if (consensusTimer) clearInterval(consensusTimer);
     };
   });
 
@@ -166,6 +187,9 @@
           <span class="relative inline-flex rounded-full h-2 w-2 {$qualityColor}"></span>
         </span>
         {$connectionLabel}
+      </span>
+      <span class="pl-2 border-l border-gray-700">
+        <LocaleSelector />
       </span>
     </div>
 

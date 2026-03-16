@@ -102,11 +102,13 @@
         <button
           class="px-3 py-1 rounded-full text-sm transition-colors {!filterType ? 'bg-pink-700 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}"
           on:click={() => filterType = ''}
+          aria-label="Show all circle types"
         >All</button>
         {#each CIRCLE_TYPES as ct}
           <button
             class="px-3 py-1 rounded-full text-sm transition-colors {filterType === ct ? 'bg-pink-700 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}"
             on:click={() => filterType = ct}
+            aria-label="Filter by {ct}"
           >{ct}</button>
         {/each}
       </div>
@@ -118,6 +120,7 @@
             <button
               class="w-full text-left bg-gray-900 rounded-lg border p-4 transition-colors {selectedCircle?.id === circle.id ? 'border-pink-500' : 'border-gray-800 hover:border-gray-700'}"
               on:click={() => selectCircle(circle)}
+              aria-label="View members of {circle.name}"
             >
               <div class="flex items-start justify-between">
                 <div>
@@ -134,6 +137,7 @@
                     disabled={submitting}
                     class="ml-auto px-3 py-1 rounded-full bg-pink-600 hover:bg-pink-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-xs font-medium transition-colors"
                     on:click|stopPropagation|preventDefault={() => handleJoin(circle)}
+                    aria-label="Join {circle.name}"
                   >
                     {submitting ? 'Joining...' : 'Join Circle'}
                   </button>
