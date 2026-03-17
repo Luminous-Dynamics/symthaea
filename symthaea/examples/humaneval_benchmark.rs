@@ -97,19 +97,64 @@ fn generate_solution(problem: &HumanEvalProblem, use_llm: bool) -> (String, bool
         .iter()
         .any(|t| t.to_string() == "LocalLLM");
 
-    // If the agent generated code, use it. Otherwise fall back to the prompt itself
-    // (which contains the function signature — test will fail but we can measure).
-    let solution = if code.contains(&problem.entry_point) {
-        code
-    } else if code.contains("def ") {
+    // Clean LLM output: strip markdown fences, language tags, prose
+    let clean = clean_python_output(&code);
+
+    // If the agent generated code, use it. Otherwise fall back to the prompt + pass.
+    let solution = if clean.contains(&problem.entry_point) {
+        clean
+    } else if clean.contains("def ") {
         // Code has a function but maybe wrong name — try it anyway
-        code
+        clean
     } else {
         // No useful code generated — use prompt + pass (will fail tests)
         format!("{}\n    pass\n", problem.prompt)
     };
 
     (solution, used_native, used_llm)
+}
+
+/// Clean LLM-generated Python output for HumanEval.
+///
+/// Strips markdown fences, bare language tags, leading prose, and ensures
+/// the output starts with valid Python (import, def, class, etc.).
+fn clean_python_output(source: &str) -> String {
+    let trimmed = source.trim();
+    if trimmed.is_empty() {
+        return trimmed.to_string();
+    }
+
+    // Strip markdown fences
+    let mut code = if let Some(start) = trimmed.find("```") {
+        let after_fence = &trimmed[start + 3..];
+        let code_start = after_fence.find('\n').map(|i| start + 3 + i + 1).unwrap_or(start + 3);
+        let code_region = &trimmed[code_start..];
+        let code_end = code_region.rfind("```").unwrap_or(code_region.len());
+        code_region[..code_end].trim().to_string()
+    } else {
+        trimmed.to_string()
+    };
+
+    // Strip leading lines that aren't Python code
+    let lines: Vec<&str> = code.lines().collect();
+    let code_start = lines.iter().position(|l| {
+        let t = l.trim();
+        t.starts_with("def ")
+            || t.starts_with("class ")
+            || t.starts_with("import ")
+            || t.starts_with("from ")
+            || t.starts_with("#")
+            || t.starts_with("@")
+            || t.starts_with("\"\"\"")
+            || t.is_empty()
+            || t.starts_with("    ") // indented code (function body)
+    }).unwrap_or(0);
+
+    if code_start > 0 {
+        code = lines[code_start..].join("\n");
+    }
+
+    code
 }
 
 /// Run a HumanEval problem's test suite against generated code.
