@@ -166,7 +166,9 @@ pub fn forward_affective_state(
     sync: &AffectiveSync,
 ) {
     let event = convert_affective_sync(peer_id, sync);
-    let _ = tx.send(event);
+    if tx.send(event).is_err() {
+        tracing::debug!("forward_affective_state: swarm channel closed");
+    }
 }
 
 /// Convenience function to forward a FederatedAggregator round result.
@@ -185,6 +187,23 @@ pub fn forward_federated_round(
         n_contributors,
         avg_quality: avg_quality.clamp(0.0, 1.0),
         trust_confidence: trust_confidence.clamp(0.0, 1.0),
+    };
+    if tx.send(event).is_err() {
+        tracing::debug!("forward_federated_round: swarm channel closed");
+    }
+}
+
+/// Forward a trust verification event through the swarm channel.
+pub fn forward_trust_verified(
+    tx: &mpsc::Sender<SwarmEvent>,
+    peer_id: &str,
+    trust_level: f64,
+    agent_pubkey: &str,
+) {
+    let event = SwarmEvent::TrustVerified {
+        peer_id: peer_id.to_string(),
+        trust_level: trust_level.clamp(0.0, 1.0),
+        agent_pubkey: agent_pubkey.to_string(),
     };
     let _ = tx.send(event);
 }

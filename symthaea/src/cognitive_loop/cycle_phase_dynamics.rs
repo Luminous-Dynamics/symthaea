@@ -1343,7 +1343,8 @@ impl CognitiveLoopService {
         if fep_td_error.abs() > FEP_TD_ERROR_DISCOVERY_THRESHOLD {
             if let Some(ref mut enhancer) = self.causal_enhancer {
                 if enhancer.should_discover() {
-                    let _ = enhancer.run_discovery();
+                    let graph = enhancer.run_discovery();
+                    tracing::trace!(edges = graph.edges.len(), "causal discovery completed");
                 }
             }
             self.carryover.quality.consecutive_low_td_error = 0;
@@ -1837,7 +1838,8 @@ impl CognitiveLoopService {
                 }
                 MotorCommandType::MotorOutput => {
                     // Ethics gate: Blocked verdict prevents motor execution
-                    if self.last_ethics_verdict
+                    let effective_verdict = self.ethics_verdict_override.as_ref().unwrap_or(&self.last_ethics_verdict);
+                    if *effective_verdict
                         == super::ethics_engine::EthicalVerdict::Blocked
                     {
                         let result = super::motor_output_bridge::MotorOutputResult {
@@ -1869,7 +1871,7 @@ impl CognitiveLoopService {
                             coherence as f64
                         };
                         // Caution verdict: cap motor confidence at 0.3
-                        let effective_confidence = if self.last_ethics_verdict
+                        let effective_confidence = if *effective_verdict
                             == super::ethics_engine::EthicalVerdict::Caution
                         {
                             enhanced_result.motor_command.confidence.min(0.3)
@@ -3722,7 +3724,7 @@ impl CognitiveLoopService {
                             .unwrap_or(0.0),
                         // Ethics gate: prevent generation when EthicalVerdict::Blocked.
                         // Science: APA Ethics Code (2017) principle 3.04 — avoid harm.
-                        ethics_blocked: self.last_ethics_verdict
+                        ethics_blocked: *self.ethics_verdict_override.as_ref().unwrap_or(&self.last_ethics_verdict)
                             == super::ethics_engine::EthicalVerdict::Blocked,
                     };
                     if let Some(mut result) = broca.generate(signals) {

@@ -547,8 +547,8 @@ impl CognitiveLoopService {
                 let result = engine.triage(input, "");
                 triage_count = 1;
                 if let Some(ref manager) = self.support.knowledge_manager {
-                    let category_str = format!("{:?}", result.suggested_category);
-                    let articles = manager.search(&category_str, 3);
+                    let category_str = result.suggested_category.as_str();
+                    let articles = manager.search(category_str, 3);
                     if !articles.is_empty() {
                         tracing::trace!(
                             category = %category_str,

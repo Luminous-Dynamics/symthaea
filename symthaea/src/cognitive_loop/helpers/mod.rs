@@ -97,9 +97,11 @@ impl CognitiveLoopService {
             .compress_for_ltc(&hdv, self.config.cfc_config.input_dim);
 
         // 4. Convert to ndarray and step the temporal network
-        let input_array = Array1::from_vec(compressed_state.clone());
+        let input_array = Array1::from_iter(compressed_state.iter().copied());
         let delta_t = self.config.cfc_config.delta_t;
-        let _ = self.temporal_network.step(&input_array, delta_t);
+        if let Err(e) = self.temporal_network.step(&input_array, delta_t) {
+            tracing::warn!(err = %e, "temporal_network.step failed in cycle_with_embedding");
+        }
 
         // 5. Multi-scale prediction
         let (prediction, raw_predictions) = self.get_multi_scale_prediction(&input_array);
@@ -230,9 +232,11 @@ impl CognitiveLoopService {
             .compress_for_ltc(hdv, self.config.cfc_config.input_dim);
 
         // 2. Convert to ndarray and step the temporal network
-        let input_array = Array1::from_vec(compressed_state.clone());
+        let input_array = Array1::from_iter(compressed_state.iter().copied());
         let delta_t = self.config.cfc_config.delta_t;
-        let _ = self.temporal_network.step(&input_array, delta_t);
+        if let Err(e) = self.temporal_network.step(&input_array, delta_t) {
+            tracing::warn!(err = %e, "temporal_network.step failed in cycle_no_embedding");
+        }
 
         // 3. Multi-scale prediction
         let (prediction, raw_predictions) = self.get_multi_scale_prediction(&input_array);
