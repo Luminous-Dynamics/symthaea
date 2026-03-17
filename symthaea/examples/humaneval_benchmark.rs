@@ -65,6 +65,34 @@ fn load_humaneval(path: &std::path::Path) -> Vec<HumanEvalProblem> {
     problems
 }
 
+/// Few-shot examples for HumanEval — teach the LLM the exact format expected.
+/// These are canonical solutions from easy problems.
+const FEW_SHOT_EXAMPLES: &str = r#"Example 1:
+```python
+from typing import List
+
+def max_element(l: List[int]) -> int:
+    """Return maximum element in the list.
+    >>> max_element([1, 2, 3])
+    3
+    """
+    return max(l)
+```
+
+Example 2:
+```python
+def strlen(string: str) -> int:
+    """Return length of given string
+    >>> strlen('')
+    0
+    >>> strlen('abc')
+    3
+    """
+    return len(string)
+```
+
+"#;
+
 /// Generate a Python solution for a HumanEval problem using the coding agent.
 fn generate_solution(problem: &HumanEvalProblem, use_llm: bool) -> (String, bool, bool) {
     let temp_dir = tempfile::tempdir().expect("tempdir");
@@ -76,9 +104,14 @@ fn generate_solution(problem: &HumanEvalProblem, use_llm: bool) -> (String, bool
         ..Default::default()
     };
 
+    // Provide few-shot examples + the raw HumanEval prompt.
+    // The prompt already contains function signature, docstring, and examples —
+    // don't wrap it in meta-instructions that confuse the LLM.
     let task = format!(
-        "Complete this Python function. Output ONLY the function body, no explanation:\n\n{}",
-        problem.prompt
+        "Complete the Python function below. Output ONLY the complete function (signature + body), nothing else.\n\n\
+         {}\n\n\
+         Now complete this function:\n\n{}",
+        FEW_SHOT_EXAMPLES, problem.prompt
     );
 
     let mut agent = CodingAgent::new(config).expect("agent");
