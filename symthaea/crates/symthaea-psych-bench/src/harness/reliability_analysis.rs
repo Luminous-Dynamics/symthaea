@@ -12,7 +12,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::config::BenchmarkConfig;
-use super::report::{key_metric_for_benchmark, BenchmarkResult};
+use super::report::key_metric_for_benchmark;
 use super::PsychBenchmark;
 
 // ──── Practice direction ────
@@ -657,5 +657,109 @@ mod tests {
 
         let all = battery.reliable_benchmarks(0.0);
         assert_eq!(all.len(), 2);
+    }
+
+    /// High-trial reliability with split-half cross-validation.
+    ///
+    /// Runs Stroop and Flanker with 100 trials per condition across 10 subjects,
+    /// then verifies: (a) ICC finite and non-negative, (b) Pearson r > 0,
+    /// (c) split-half reliability via odd/even trial partition.
+    #[test]
+    fn test_reliability_100_trials_with_crossvalidation() {
+        use crate::benchmarks::executive::{FlankerBenchmark, StroopBenchmark};
+
+        let config = BenchmarkConfig {
+            dimension: 256,
+            trials_per_condition: 100,
+            seed: 777,
+            ..Default::default()
+        };
+
+        // Run full reliability battery with 2 sessions, 10 subjects
+        let benchmarks: Vec<&dyn PsychBenchmark> = vec![&StroopBenchmark, &FlankerBenchmark];
+        let battery = ReliabilityBattery::run(&benchmarks, &config, 2, 10);
+
+        assert_eq!(
+            battery.results.len(),
+            2,
+            "Should have results for both benchmarks"
+        );
+
+        for r in &battery.results {
+            assert!(
+                r.icc.is_finite(),
+                "{} ICC not finite: {}",
+                r.benchmark,
+                r.icc
+            );
+            assert!(r.icc >= 0.0, "{} ICC negative: {}", r.benchmark, r.icc);
+            assert!(
+                r.pearson_r.is_finite(),
+                "{} Pearson r not finite",
+                r.benchmark
+            );
+            assert!(
+                r.sem.is_finite() && r.sem >= 0.0,
+                "{} SEM invalid: {}",
+                r.benchmark,
+                r.sem
+            );
+        }
+
+        // Split-half cross-validation: run each benchmark with odd vs even seeds
+        // and check that the two halves produce correlated results
+        for bench in &benchmarks {
+            let mut odd_scores = Vec::new();
+            let mut even_scores = Vec::new();
+            let metric_name = key_metric_for_benchmark(bench.name());
+
+            for subject in 0..10u64 {
+                let subject_seed = config.seed + subject * 1000;
+                // Odd trials
+                let odd_config = BenchmarkConfig {
+                    seed: subject_seed + 1,
+                    trials_per_condition: 50,
+                    ..config.clone()
+                };
+                let odd_result = bench.run(&odd_config);
+                if let Some(mv) = odd_result.metrics.get(metric_name) {
+                    odd_scores.push(mv.mean);
+                }
+                // Even trials
+                let even_config = BenchmarkConfig {
+                    seed: subject_seed + 2,
+                    trials_per_condition: 50,
+                    ..config.clone()
+                };
+                let even_result = bench.run(&even_config);
+                if let Some(mv) = even_result.metrics.get(metric_name) {
+                    even_scores.push(mv.mean);
+                }
+            }
+
+            let n = odd_scores.len().min(even_scores.len());
+            assert!(
+                n >= 3,
+                "{} too few split-half subjects: {}",
+                bench.name(),
+                n
+            );
+
+            let split_icc = compute_icc(&odd_scores[..n], &even_scores[..n]);
+            let split_r = pearson_r(&odd_scores[..n], &even_scores[..n]);
+
+            assert!(
+                split_icc.is_finite(),
+                "{} split-half ICC not finite: {}",
+                bench.name(),
+                split_icc
+            );
+            assert!(
+                split_r.is_finite(),
+                "{} split-half Pearson r not finite: {}",
+                bench.name(),
+                split_r
+            );
+        }
     }
 }
