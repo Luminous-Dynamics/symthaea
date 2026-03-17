@@ -1227,23 +1227,18 @@ pub const SUBSYSTEM_LR_FACTOR_MAX: f32 = 1.3;
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Cross-module agreement above this signals high convergence → confidence boost.
-#[allow(dead_code)]
 pub const CROSS_MODULE_AGREEMENT_HIGH: f32 = 0.8;
 
 /// Cross-module agreement below this signals divergence → exploration boost.
-#[allow(dead_code)]
 pub const CROSS_MODULE_AGREEMENT_LOW: f32 = 0.3;
 
 /// Unified quality score composition: prediction accuracy weight.
-#[allow(dead_code)]
 pub const UNIFIED_QUALITY_PREDICTION_WEIGHT: f32 = 0.5;
 
 /// Unified quality score composition: cross-module agreement weight.
-#[allow(dead_code)]
 pub const UNIFIED_QUALITY_AGREEMENT_WEIGHT: f32 = 0.3;
 
 /// Unified quality score composition: anomaly (inverse) weight.
-#[allow(dead_code)]
 pub const UNIFIED_QUALITY_ANOMALY_WEIGHT: f32 = 0.2;
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1252,29 +1247,23 @@ pub const UNIFIED_QUALITY_ANOMALY_WEIGHT: f32 = 0.2;
 
 /// FEP accuracy above this triggers confidence boost.
 /// Basis: Friston (2010) — accurate prediction reduces free energy.
-#[allow(dead_code)]
 pub const FEP_ACCURACY_CONFIDENCE_THRESHOLD: f64 = 0.5;
 
 /// FEP complexity above this dampens learning rate.
 /// Basis: Bayesian model complexity penalty (BIC/MDL principle).
-#[allow(dead_code)]
 pub const FEP_COMPLEXITY_THRESHOLD: f64 = 1.0;
 
 /// FEP pragmatic value above this triggers exploitation strategy.
 /// Basis: Friston et al. (2015) — expected free energy pragmatic term.
-#[allow(dead_code)]
 pub const FEP_PRAGMATIC_EXPLOIT_THRESHOLD: f64 = 0.7;
 
 /// FEP pragmatic value below this triggers exploration.
-#[allow(dead_code)]
 pub const FEP_PRAGMATIC_EXPLORE_THRESHOLD: f64 = 0.3;
 
 /// FEP temporal difference error above this triggers causal discovery.
-#[allow(dead_code)]
 pub const FEP_TD_ERROR_DISCOVERY_THRESHOLD: f64 = 0.5;
 
 /// FEP learning signal above this enables world model plasticity increase.
-#[allow(dead_code)]
 pub const FEP_LEARNING_PLASTICITY_THRESHOLD: f32 = 0.5;
 
 /// FEP complexity LR dampen factor: multiplier applied to learning rate when

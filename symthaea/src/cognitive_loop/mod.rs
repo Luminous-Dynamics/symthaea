@@ -169,7 +169,6 @@ pub(crate) mod support_manager;
 pub(crate) mod vision_sensory_manager;
 pub use substrate_manager::SubstrateTransitionRecord;
 pub(crate) mod subsystem_trait;
-#[allow(dead_code)] // Registry of tuning constants — many reserved for future wiring
 pub(crate) mod thresholds;
 
 #[cfg(feature = "epistemic_auditor")]
