@@ -46,6 +46,9 @@ services:
       - LORA_FREQ_MHZ=${LORA_FREQ_MHZ:-868.0}
       - POLL_INTERVAL_SECS=${POLL_INTERVAL_SECS:-30}
       - RUST_LOG=info
+      # Uncomment and set to enable PSK mesh encryption (64 hex chars = 32 bytes):
+      # Generate key: openssl rand -hex 32
+      # - MESH_ENCRYPTION_KEY=your-64-char-hex-key-here
     depends_on:
       conductor:
         condition: service_started

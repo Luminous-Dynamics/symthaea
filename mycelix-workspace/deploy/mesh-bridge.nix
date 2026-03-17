@@ -63,6 +63,12 @@ in {
       description = "Path to file containing the MESH_APP_TOKEN for conductor auth.";
     };
 
+    encryptionKeyFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.path;
+      default = null;
+      description = "Path to file containing the 64-char hex MESH_ENCRYPTION_KEY for PSK mesh encryption.";
+    };
+
     user = lib.mkOption {
       type = lib.types.str;
       default = "mycelix";
@@ -117,8 +123,10 @@ in {
         User = cfg.user;
         Group = cfg.group;
 
-        # Read token from file if provided
-        EnvironmentFile = lib.mkIf (cfg.appTokenFile != null) cfg.appTokenFile;
+        # Read secrets from file(s) if provided
+        EnvironmentFile =
+          lib.optional (cfg.appTokenFile != null) cfg.appTokenFile
+          ++ lib.optional (cfg.encryptionKeyFile != null) cfg.encryptionKeyFile;
 
         # Hardening
         NoNewPrivileges = true;

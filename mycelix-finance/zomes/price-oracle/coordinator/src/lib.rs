@@ -16,8 +16,7 @@
 use hdk::prelude::*;
 use mycelix_finance_shared::{
     anchor_hash, follow_update_chain, rate_limit_anchor_key,
-    verify_governance_or_bootstrap_from_links,
-    GOVERNANCE_AGENTS_ANCHOR,
+    verify_governance_or_bootstrap_from_links, GOVERNANCE_AGENTS_ANCHOR,
 };
 
 pub use price_oracle_integrity::*;
@@ -31,6 +30,13 @@ const BASKETS_ANCHOR: &str = "oracle:baskets";
 const ALERTS_ANCHOR: &str = "oracle:alerts";
 const REPORTER_ANCHOR_PREFIX: &str = "oracle:reporter:";
 const ACCURACY_ANCHOR_PREFIX: &str = "oracle:accuracy:";
+const ALL_REPORTS_ANCHOR: &str = "oracle:all_reports";
+
+/// Default limit for get_recent_reports queries
+const DEFAULT_RECENT_REPORTS_LIMIT: u32 = 20;
+
+/// Maximum allowed limit for get_recent_reports
+const MAX_RECENT_REPORTS_LIMIT: u32 = 100;
 
 /// Minimum reporters for a valid consensus
 const MIN_REPORTERS_FOR_CONSENSUS: usize = 2;
@@ -75,6 +81,16 @@ pub struct BasketItemInput {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GetBasketIndexInput {
     pub basket_name: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GetRecentReportsInput {
+    #[serde(default = "default_recent_limit")]
+    pub limit: u32,
+}
+
+fn default_recent_limit() -> u32 {
+    DEFAULT_RECENT_REPORTS_LIMIT
 }
 
 // =============================================================================
@@ -127,6 +143,16 @@ pub struct ReporterAccuracyResult {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct RecentReportResult {
+    pub id: String,
+    pub item_name: String,
+    pub price_tend: f64,
+    pub evidence: String,
+    pub reporter_did: String,
+    pub timestamp: i64,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct GetTopReportersInput {
     pub item: String,
     pub limit: u32,
@@ -138,7 +164,9 @@ pub struct GetTopReportersInput {
 
 /// Fetch the current accuracy entry for a reporter, or return a default.
 /// Returns (Some(original_action_hash), accuracy) if found, (None, default) if new.
-fn get_or_create_accuracy(reporter_did: &str) -> ExternResult<(Option<ActionHash>, ReporterAccuracy)> {
+fn get_or_create_accuracy(
+    reporter_did: &str,
+) -> ExternResult<(Option<ActionHash>, ReporterAccuracy)> {
     let acc_anchor = anchor_hash(&format!("{ACCURACY_ANCHOR_PREFIX}{reporter_did}"))?;
     let links = get_links(
         LinkQuery::try_new(acc_anchor, LinkTypes::ReporterToAccuracy)?,
@@ -161,12 +189,15 @@ fn get_or_create_accuracy(reporter_did: &str) -> ExternResult<(Option<ActionHash
     }
 
     // New reporter — return default
-    Ok((None, ReporterAccuracy {
-        reporter_did: reporter_did.to_string(),
-        accuracy_score: ACCURACY_INITIAL_SCORE,
-        report_count: 0,
-        updated_at: sys_time()?,
-    }))
+    Ok((
+        None,
+        ReporterAccuracy {
+            reporter_did: reporter_did.to_string(),
+            accuracy_score: ACCURACY_INITIAL_SCORE,
+            report_count: 0,
+            updated_at: sys_time()?,
+        },
+    ))
 }
 
 /// Update a reporter's accuracy score after consensus.
@@ -180,8 +211,8 @@ fn update_reporter_accuracy(
     // Compute accuracy delta: how far was this report from consensus?
     let delta = (report_price - consensus_median).abs() / consensus_median;
     let accuracy_signal = 1.0 - delta.min(1.0);
-    let new_score = (1.0 - ACCURACY_EMA_ALPHA) * acc.accuracy_score
-        + ACCURACY_EMA_ALPHA * accuracy_signal;
+    let new_score =
+        (1.0 - ACCURACY_EMA_ALPHA) * acc.accuracy_score + ACCURACY_EMA_ALPHA * accuracy_signal;
 
     acc.accuracy_score = new_score.clamp(0.0, 1.0);
     acc.report_count += 1;
@@ -292,7 +323,11 @@ pub fn report_price(input: ReportPriceInput) -> ExternResult<Record> {
     // Rate limit
     let my_info = agent_info()?;
     let now = sys_time()?;
-    let rate_key = rate_limit_anchor_key("oracle_report", &my_info.agent_initial_pubkey, now.as_micros());
+    let rate_key = rate_limit_anchor_key(
+        "oracle_report",
+        &my_info.agent_initial_pubkey,
+        now.as_micros(),
+    );
     let rate_links = get_links(
         LinkQuery::try_new(anchor_hash(&rate_key)?, LinkTypes::AnchorLinks)?,
         GetStrategy::default(),
@@ -331,7 +366,12 @@ pub fn report_price(input: ReportPriceInput) -> ExternResult<Record> {
 
     // Link from item anchor
     let item_anchor = anchor_hash(&format!("{ITEM_REPORTS_ANCHOR_PREFIX}{item}"))?;
-    create_link(item_anchor, action_hash.clone(), LinkTypes::ItemToReports, ())?;
+    create_link(
+        item_anchor,
+        action_hash.clone(),
+        LinkTypes::ItemToReports,
+        (),
+    )?;
 
     // Link from reporter
     let reporter_anchor = anchor_hash(&format!("{REPORTER_ANCHOR_PREFIX}{my_did}"))?;
@@ -350,8 +390,17 @@ pub fn report_price(input: ReportPriceInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get created record".into())))
+    // Global reports anchor (for get_recent_reports)
+    create_link(
+        anchor_hash(ALL_REPORTS_ANCHOR)?,
+        action_hash.clone(),
+        LinkTypes::AnchorLinks,
+        (),
+    )?;
+
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Failed to get created record".into()
+    )))
 }
 
 // =============================================================================
@@ -389,12 +438,7 @@ pub fn get_consensus_price(input: GetConsensusInput) -> ExternResult<ConsensusRe
     for link in &links {
         if let Some(hash) = link.target.clone().into_action_hash() {
             if let Some(record) = get(hash, GetOptions::default())? {
-                if let Some(report) = record
-                    .entry()
-                    .to_app_option::<PriceReport>()
-                    .ok()
-                    .flatten()
-                {
+                if let Some(report) = record.entry().to_app_option::<PriceReport>().ok().flatten() {
                     if report.reported_at.as_micros() >= window_start_us {
                         reporters.insert(report.reporter_did.clone());
                         reports.push(ReportData {
@@ -415,7 +459,11 @@ pub fn get_consensus_price(input: GetConsensusInput) -> ExternResult<ConsensusRe
     }
 
     // Sort by price for trimming
-    reports.sort_by(|a, b| a.price.partial_cmp(&b.price).unwrap_or(std::cmp::Ordering::Equal));
+    reports.sort_by(|a, b| {
+        a.price
+            .partial_cmp(&b.price)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 
     // Trim top/bottom 10% by count
     let trim_count = (reports.len() as f64 * TRIM_PERCENT).floor() as usize;
@@ -445,14 +493,15 @@ pub fn get_consensus_price(input: GetConsensusInput) -> ExternResult<ConsensusRe
     }
 
     // Compute accuracy-weighted median
-    let median = weighted_median(&mut weighted_entries).ok_or(
-        wasm_error!(WasmErrorInner::Guest("Failed to compute weighted median".into()))
-    )?;
+    let median = weighted_median(&mut weighted_entries).ok_or(wasm_error!(
+        WasmErrorInner::Guest("Failed to compute weighted median".into())
+    ))?;
 
     // Standard deviation (unweighted, on trimmed prices — for spread indication)
     let prices: Vec<f64> = trimmed.iter().map(|r| r.price).collect();
     let mean: f64 = prices.iter().sum::<f64>() / prices.len() as f64;
-    let variance: f64 = prices.iter().map(|p| (p - mean).powi(2)).sum::<f64>() / prices.len() as f64;
+    let variance: f64 =
+        prices.iter().map(|p| (p - mean).powi(2)).sum::<f64>() / prices.len() as f64;
     let std_dev = variance.sqrt();
 
     // Signal integrity: average accuracy of contributing reporters
@@ -547,8 +596,9 @@ pub fn define_basket(input: DefineBasketInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get basket record".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Failed to get basket record".into()
+    )))
 }
 
 /// Compute the composite index for a basket.
@@ -753,6 +803,57 @@ pub fn compute_volatility(input: GetBasketIndexInput) -> ExternResult<Volatility
 // QUERY HELPERS
 // =============================================================================
 
+/// Get the N most recent price reports across all items, sorted by timestamp descending.
+///
+/// Used by the mesh bridge poller to relay price data to the mesh network.
+/// Queries the global reports anchor and returns deserialized report data
+/// with action hash IDs for deduplication.
+#[hdk_extern]
+pub fn get_recent_reports(input: GetRecentReportsInput) -> ExternResult<Vec<RecentReportResult>> {
+    let limit = if input.limit == 0 {
+        DEFAULT_RECENT_REPORTS_LIMIT
+    } else {
+        input.limit.min(MAX_RECENT_REPORTS_LIMIT)
+    } as usize;
+
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(ALL_REPORTS_ANCHOR)?, LinkTypes::AnchorLinks)?,
+        GetStrategy::default(),
+    )?;
+
+    let mut results: Vec<RecentReportResult> = Vec::new();
+
+    for link in &links {
+        if let Some(hash) = link.target.clone().into_action_hash() {
+            if let Some(record) = get(hash.clone(), GetOptions::default())? {
+                if let Some(report) = record
+                    .entry()
+                    .to_app_option::<PriceReport>()
+                    .ok()
+                    .flatten()
+                {
+                    results.push(RecentReportResult {
+                        id: hash.to_string(),
+                        item_name: report.item,
+                        price_tend: report.price_tend,
+                        evidence: report.evidence,
+                        reporter_did: report.reporter_did,
+                        timestamp: report.reported_at.as_micros(),
+                    });
+                }
+            }
+        }
+    }
+
+    // Sort by timestamp descending (most recent first)
+    results.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+
+    // Truncate to requested limit
+    results.truncate(limit);
+
+    Ok(results)
+}
+
 /// Get all price reports for an item (within consensus window).
 #[hdk_extern]
 pub fn get_item_reports(item: String) -> ExternResult<Vec<Record>> {
@@ -771,12 +872,7 @@ pub fn get_item_reports(item: String) -> ExternResult<Vec<Record>> {
     for link in &links {
         if let Some(hash) = link.target.clone().into_action_hash() {
             if let Some(record) = get(hash, GetOptions::default())? {
-                if let Some(report) = record
-                    .entry()
-                    .to_app_option::<PriceReport>()
-                    .ok()
-                    .flatten()
-                {
+                if let Some(report) = record.entry().to_app_option::<PriceReport>().ok().flatten() {
                     if report.reported_at.as_micros() >= window_start_us {
                         records.push(record);
                     }
@@ -815,12 +911,7 @@ pub fn get_top_reporters(input: GetTopReportersInput) -> ExternResult<Vec<Report
     for link in &links {
         if let Some(hash) = link.target.clone().into_action_hash() {
             if let Some(record) = get(hash, GetOptions::default())? {
-                if let Some(report) = record
-                    .entry()
-                    .to_app_option::<PriceReport>()
-                    .ok()
-                    .flatten()
-                {
+                if let Some(report) = record.entry().to_app_option::<PriceReport>().ok().flatten() {
                     reporter_dids.insert(report.reporter_did);
                 }
             }
@@ -839,7 +930,11 @@ pub fn get_top_reporters(input: GetTopReportersInput) -> ExternResult<Vec<Report
     }
 
     // Sort by accuracy descending
-    results.sort_by(|a, b| b.accuracy_score.partial_cmp(&a.accuracy_score).unwrap_or(std::cmp::Ordering::Equal));
+    results.sort_by(|a, b| {
+        b.accuracy_score
+            .partial_cmp(&a.accuracy_score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 
     // Limit
     let limit = input.limit.min(100) as usize;
@@ -923,9 +1018,18 @@ mod tests {
     #[test]
     fn test_basket_weight_validation() {
         let items = vec![
-            BasketItemDef { item: "bread".into(), weight: 0.3 },
-            BasketItemDef { item: "diesel".into(), weight: 0.3 },
-            BasketItemDef { item: "eggs".into(), weight: 0.4 },
+            BasketItemDef {
+                item: "bread".into(),
+                weight: 0.3,
+            },
+            BasketItemDef {
+                item: "diesel".into(),
+                weight: 0.3,
+            },
+            BasketItemDef {
+                item: "eggs".into(),
+                weight: 0.4,
+            },
         ];
         let total: f64 = items.iter().map(|i| i.weight).sum();
         assert!((total - 1.0).abs() < 0.05);
@@ -938,11 +1042,12 @@ mod tests {
     #[test]
     fn test_weighted_median_uniform_weights() {
         // Equal weights should produce same result as simple median
-        let mut entries = vec![
-            (1.0, 1.0), (3.0, 1.0), (5.0, 1.0), (7.0, 1.0), (9.0, 1.0),
-        ];
+        let mut entries = vec![(1.0, 1.0), (3.0, 1.0), (5.0, 1.0), (7.0, 1.0), (9.0, 1.0)];
         let result = weighted_median(&mut entries).unwrap();
-        assert!((result - 5.0).abs() < f64::EPSILON, "uniform weights: got {result}");
+        assert!(
+            (result - 5.0).abs() < f64::EPSILON,
+            "uniform weights: got {result}"
+        );
     }
 
     #[test]
@@ -955,7 +1060,10 @@ mod tests {
         ];
         // total = 12, half = 6. Cumulative: 10 >= 6 at first entry
         let result = weighted_median(&mut entries).unwrap();
-        assert!((result - 1.0).abs() < f64::EPSILON, "skewed low: got {result}");
+        assert!(
+            (result - 1.0).abs() < f64::EPSILON,
+            "skewed low: got {result}"
+        );
 
         // Heavy weight on high price should pull median up
         let mut entries2 = vec![
@@ -964,7 +1072,10 @@ mod tests {
             (9.0, 10.0), // very heavy
         ];
         let result2 = weighted_median(&mut entries2).unwrap();
-        assert!((result2 - 9.0).abs() < f64::EPSILON, "skewed high: got {result2}");
+        assert!(
+            (result2 - 9.0).abs() < f64::EPSILON,
+            "skewed high: got {result2}"
+        );
     }
 
     #[test]
@@ -988,7 +1099,10 @@ mod tests {
         // total = 2, half = 1. Cumulative at first: 1.0 >= 1.0 → exact midpoint
         // Since cumulative == half and there's a next element, average: (2+8)/2 = 5
         let result = weighted_median(&mut entries).unwrap();
-        assert!((result - 5.0).abs() < f64::EPSILON, "two equal: got {result}");
+        assert!(
+            (result - 5.0).abs() < f64::EPSILON,
+            "two equal: got {result}"
+        );
     }
 
     // =========================================================================
@@ -1054,9 +1168,9 @@ mod tests {
     }
 
     /// Simulate the full trimmed + accuracy-weighted consensus from raw reports.
-    fn sim_consensus(
-        reports: &[(f64, f64)], // (price, accuracy_score)
-    ) -> (f64, f64) { // (weighted_median, signal_integrity)
+    fn sim_consensus(reports: &[(f64, f64)], // (price, accuracy_score)
+    ) -> (f64, f64) {
+        // (weighted_median, signal_integrity)
         // Sort by price for trimming
         let mut sorted: Vec<(f64, f64)> = reports.to_vec();
         sorted.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
@@ -1110,24 +1224,22 @@ mod tests {
         let bob_new = sim_accuracy_update(1.0, 5.00, median);
 
         // Both lose accuracy equally on round 1
-        assert!((alice_new - bob_new).abs() < 0.01,
-            "round 1 is symmetric: alice={alice_new}, bob={bob_new}");
+        assert!(
+            (alice_new - bob_new).abs() < 0.01,
+            "round 1 is symmetric: alice={alice_new}, bob={bob_new}"
+        );
         assert!(alice_new < 1.0, "both should lose some accuracy");
     }
 
     #[test]
     fn test_sim_accuracy_diverges_with_majority() {
         // With 3 reporters where 2 agree, the system differentiates immediately
-        let mut alice_acc = ACCURACY_INITIAL_SCORE;  // reports 0.50
-        let mut carol_acc = ACCURACY_INITIAL_SCORE;  // reports 0.52 (agrees with Alice)
-        let mut bob_acc = ACCURACY_INITIAL_SCORE;    // reports 5.00 (outlier)
+        let mut alice_acc = ACCURACY_INITIAL_SCORE; // reports 0.50
+        let mut carol_acc = ACCURACY_INITIAL_SCORE; // reports 0.52 (agrees with Alice)
+        let mut bob_acc = ACCURACY_INITIAL_SCORE; // reports 5.00 (outlier)
 
         for _ in 0..5 {
-            let reports = vec![
-                (0.50, alice_acc),
-                (0.52, carol_acc),
-                (5.00, bob_acc),
-            ];
+            let reports = vec![(0.50, alice_acc), (0.52, carol_acc), (5.00, bob_acc)];
             let (median, _) = sim_consensus(&reports);
 
             alice_acc = sim_accuracy_update(alice_acc, 0.50, median);
@@ -1138,22 +1250,35 @@ mod tests {
         // After 5 rounds, Alice and Carol should be much more accurate than Bob
         assert!(alice_acc > 0.9, "alice after 5 rounds: {alice_acc}");
         assert!(carol_acc > 0.9, "carol after 5 rounds: {carol_acc}");
-        assert!(bob_acc < alice_acc, "bob ({bob_acc}) should be less accurate than alice ({alice_acc})");
+        assert!(
+            bob_acc < alice_acc,
+            "bob ({bob_acc}) should be less accurate than alice ({alice_acc})"
+        );
         assert!(bob_acc < 0.7, "bob after 5 rounds: {bob_acc}");
 
         // In round 6, the weighted median should be pulled toward Alice/Carol
         let reports = vec![(0.50, alice_acc), (0.52, carol_acc), (5.00, bob_acc)];
         let (median, _) = sim_consensus(&reports);
-        assert!(median < 1.0, "accuracy-weighted median ({median}) should favor honest reporters");
+        assert!(
+            median < 1.0,
+            "accuracy-weighted median ({median}) should favor honest reporters"
+        );
     }
 
     #[test]
     fn test_sim_trimming_removes_outliers() {
         // 10 reporters: 8 report ~0.50, 2 report 100.0 (manipulation)
         let reports = vec![
-            (0.48, 1.0), (0.49, 1.0), (0.50, 1.0), (0.50, 1.0),
-            (0.51, 1.0), (0.51, 1.0), (0.52, 1.0), (0.53, 1.0),
-            (100.0, 1.0), (100.0, 1.0), // manipulators
+            (0.48, 1.0),
+            (0.49, 1.0),
+            (0.50, 1.0),
+            (0.50, 1.0),
+            (0.51, 1.0),
+            (0.51, 1.0),
+            (0.52, 1.0),
+            (0.53, 1.0),
+            (100.0, 1.0),
+            (100.0, 1.0), // manipulators
         ];
         let (median, _) = sim_consensus(&reports);
 
@@ -1161,7 +1286,10 @@ mod tests {
         // Remaining: [0.49, 0.50, 0.50, 0.51, 0.51, 0.52, 0.53, 100.0]
         // Even with one remaining outlier, the median of 8 elements should be reasonable
         // Median of [0.49, 0.50, 0.50, 0.51, 0.51, 0.52, 0.53, 100.0] = (0.51+0.51)/2 = 0.51
-        assert!(median < 1.0, "trimmed median ({median}) should resist manipulation");
+        assert!(
+            median < 1.0,
+            "trimmed median ({median}) should resist manipulation"
+        );
     }
 
     #[test]
@@ -1169,16 +1297,28 @@ mod tests {
         // 3 honest reporters (high accuracy) at 0.50
         // 5 sybil reporters (low accuracy from prior bad reports) at 10.0
         let reports = vec![
-            (0.50, 0.95), (0.50, 0.92), (0.50, 0.90), // honest
-            (10.0, 0.15), (10.0, 0.12), (10.0, 0.10), (10.0, 0.08), (10.0, 0.05), // sybil
+            (0.50, 0.95),
+            (0.50, 0.92),
+            (0.50, 0.90), // honest
+            (10.0, 0.15),
+            (10.0, 0.12),
+            (10.0, 0.10),
+            (10.0, 0.08),
+            (10.0, 0.05), // sybil
         ];
         let (median, si) = sim_consensus(&reports);
 
         // Trimming removes 1 from each end (0.05 and 0.95 weight entries)
         // Remaining 6: honest reporters have much higher weight
         // Median should be pulled toward honest reporters
-        assert!(median < 5.0, "accuracy-weighted ({median}) should resist sybil attack");
-        assert!(si < 0.6, "signal integrity ({si}) should reflect low-quality reporters");
+        assert!(
+            median < 5.0,
+            "accuracy-weighted ({median}) should resist sybil attack"
+        );
+        assert!(
+            si < 0.6,
+            "signal integrity ({si}) should reflect low-quality reporters"
+        );
     }
 
     #[test]
@@ -1206,36 +1346,138 @@ mod tests {
         let mut last_median = 0.0;
         for round in 0..10 {
             let reports: Vec<(f64, f64)> = vec![
-                (true_price, accuracies[0]),          // accurate
-                (true_price * 1.02, accuracies[1]),   // slightly off
-                (true_price * 0.98, accuracies[2]),   // slightly off other way
-                (true_price * 1.01, accuracies[3]),   // very close
-                (true_price * 2.00, accuracies[4]),   // 100% off consistently
+                (true_price, accuracies[0]),        // accurate
+                (true_price * 1.02, accuracies[1]), // slightly off
+                (true_price * 0.98, accuracies[2]), // slightly off other way
+                (true_price * 1.01, accuracies[3]), // very close
+                (true_price * 2.00, accuracies[4]), // 100% off consistently
             ];
 
             let (median, _) = sim_consensus(&reports);
             last_median = median;
 
             // Update all accuracies
-            let prices = [true_price, true_price * 1.02, true_price * 0.98,
-                          true_price * 1.01, true_price * 2.00];
+            let prices = [
+                true_price,
+                true_price * 1.02,
+                true_price * 0.98,
+                true_price * 1.01,
+                true_price * 2.00,
+            ];
             for i in 0..5 {
                 accuracies[i] = sim_accuracy_update(accuracies[i], prices[i], median);
             }
 
             if round == 9 {
                 // After 10 rounds, the bad reporter should have noticeably lower accuracy
-                assert!(accuracies[4] < accuracies[0],
+                assert!(
+                    accuracies[4] < accuracies[0],
                     "bad reporter ({}) should be less accurate than honest ({})",
-                    accuracies[4], accuracies[0]);
+                    accuracies[4],
+                    accuracies[0]
+                );
                 // Accurate reporters should remain high
-                assert!(accuracies[0] > 0.9,
-                    "accurate reporter after 10 rounds: {}", accuracies[0]);
+                assert!(
+                    accuracies[0] > 0.9,
+                    "accurate reporter after 10 rounds: {}",
+                    accuracies[0]
+                );
             }
         }
 
         // Final median should be close to true price
-        assert!((last_median - true_price).abs() < 0.15,
-            "final median ({last_median}) should be near true price ({true_price})");
+        assert!(
+            (last_median - true_price).abs() < 0.15,
+            "final median ({last_median}) should be near true price ({true_price})"
+        );
+    }
+
+    // =========================================================================
+    // get_recent_reports input/output tests
+    // =========================================================================
+
+    #[test]
+    fn test_recent_reports_input_default_limit() {
+        let input: GetRecentReportsInput =
+            serde_json::from_str("{}").expect("empty object should use default limit");
+        assert_eq!(input.limit, DEFAULT_RECENT_REPORTS_LIMIT);
+    }
+
+    #[test]
+    fn test_recent_reports_input_custom_limit() {
+        let input: GetRecentReportsInput =
+            serde_json::from_str(r#"{"limit": 5}"#).expect("should parse custom limit");
+        assert_eq!(input.limit, 5);
+    }
+
+    #[test]
+    fn test_recent_reports_limit_clamping() {
+        // Verify the clamping logic used in get_recent_reports
+        let over_limit = 200u32;
+        let clamped = over_limit.min(MAX_RECENT_REPORTS_LIMIT) as usize;
+        assert_eq!(clamped, MAX_RECENT_REPORTS_LIMIT as usize);
+
+        let zero_limit = 0u32;
+        let resolved = if zero_limit == 0 {
+            DEFAULT_RECENT_REPORTS_LIMIT
+        } else {
+            zero_limit.min(MAX_RECENT_REPORTS_LIMIT)
+        } as usize;
+        assert_eq!(resolved, DEFAULT_RECENT_REPORTS_LIMIT as usize);
+    }
+
+    #[test]
+    fn test_recent_report_result_serialization() {
+        let result = RecentReportResult {
+            id: "uhCkk_abc123".to_string(),
+            item_name: "bread_750g".to_string(),
+            price_tend: 0.15,
+            evidence: "Pick n Pay Roodepoort".to_string(),
+            reporter_did: "did:holo:abc123".to_string(),
+            timestamp: 1710000000000000,
+        };
+
+        let json = serde_json::to_value(&result).expect("should serialize");
+        assert_eq!(json["id"], "uhCkk_abc123");
+        assert_eq!(json["item_name"], "bread_750g");
+        assert_eq!(json["price_tend"], 0.15);
+        assert_eq!(json["evidence"], "Pick n Pay Roodepoort");
+        assert_eq!(json["reporter_did"], "did:holo:abc123");
+        assert_eq!(json["timestamp"], 1710000000000000i64);
+    }
+
+    #[test]
+    fn test_recent_reports_sorting() {
+        // Verify that sorting by timestamp descending works correctly
+        let mut results = vec![
+            RecentReportResult {
+                id: "a".into(),
+                item_name: "bread".into(),
+                price_tend: 0.1,
+                evidence: "".into(),
+                reporter_did: "".into(),
+                timestamp: 100,
+            },
+            RecentReportResult {
+                id: "b".into(),
+                item_name: "eggs".into(),
+                price_tend: 0.2,
+                evidence: "".into(),
+                reporter_did: "".into(),
+                timestamp: 300,
+            },
+            RecentReportResult {
+                id: "c".into(),
+                item_name: "diesel".into(),
+                price_tend: 0.3,
+                evidence: "".into(),
+                reporter_did: "".into(),
+                timestamp: 200,
+            },
+        ];
+        results.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+        assert_eq!(results[0].id, "b"); // 300 — most recent
+        assert_eq!(results[1].id, "c"); // 200
+        assert_eq!(results[2].id, "a"); // 100 — oldest
     }
 }
