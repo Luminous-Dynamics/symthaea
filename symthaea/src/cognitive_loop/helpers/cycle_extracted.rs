@@ -746,7 +746,9 @@ impl CognitiveLoopService {
         let mut total_phi = 0.0;
         for ep in episodes {
             let input_array = ndarray::Array1::from_vec(ep.input.values.clone());
-            let _ = self.temporal_network.step(&input_array, 0.02); // Standard dt
+            if let Err(e) = self.temporal_network.step(&input_array, 0.02) {
+                tracing::warn!(err = %e, "temporal_network.step failed in episode replay");
+            }
 
             // Measure integration (Layer 1 proxy)
             let phi = match &self.temporal_network {

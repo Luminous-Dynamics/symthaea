@@ -646,7 +646,7 @@ impl CognitiveLoopService {
                 self.carryover.quality.last_dissipative_health = health;
                 (
                     health,
-                    format!("{:?}", dc.current_regime()),
+                    dc.current_regime().as_str().into(),
                     dc.entropy_production_rate,
                 )
             } else {
