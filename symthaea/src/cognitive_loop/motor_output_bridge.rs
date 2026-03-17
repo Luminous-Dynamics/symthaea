@@ -150,6 +150,9 @@ pub struct MotorOutputBridge {
     executor: SimpleExecutor,
     /// Minimum Phi required for any motor output (overrides policy if higher).
     min_phi_override: Option<f64>,
+    /// Current safety level — gates motor output.
+    /// Red = halt all motor, Orange = readonly only.
+    safety_override: crate::safety::SafetyLevel,
 }
 
 impl MotorOutputBridge {
