@@ -13,6 +13,7 @@ use crate::transport::MeshTransport;
 use crate::BridgeMetrics;
 use anyhow::Result;
 use holochain_client::{AgentSigner, AppWebsocket, ClientAgentSigner, ExternIO, ZomeCallTarget};
+use crate::dedup_cache::LruBinaryCache;
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
@@ -51,7 +52,15 @@ pub async fn run(
 ) -> Result<()> {
     tracing::info!("Relay starting, conductor={conductor_url}");
 
-    let mut dedup: HashSet<[u8; 32]> = crate::dedup_cache::load_binary_cache("relay-dedup.cache");
+    let cipher = crate::encryption::load_psk();
+    if cipher.is_some() {
+        tracing::info!("PSK encryption enabled (relay)");
+    }
+
+    let mut dedup = LruBinaryCache::from_hash_set(
+        crate::dedup_cache::load_binary_cache("relay-dedup.cache"),
+        10_000,
+    );
     let mut reassembly: HashMap<[u8; 4], ReassemblyBuffer> = HashMap::new();
     let mut ws_cached: Option<AppWebsocket> = None;
     let mut known_peers: HashSet<[u8; 8]> = HashSet::new();
@@ -83,13 +92,30 @@ pub async fn run(
                 if let Some(payload_bytes) = buffer.try_reassemble() {
                     reassembly.remove(&hash_prefix);
 
-                    match RelayPayload::from_bytes(&payload_bytes) {
+                    // --- Decrypt if PSK is configured ---
+                    let decrypted_bytes = if let Some(ref c) = cipher {
+                        match crate::encryption::decrypt(c, &payload_bytes) {
+                            Ok(plain) => plain,
+                            Err(e) => {
+                                tracing::warn!("Decryption failed (wrong key or plaintext?): {e}");
+                                metrics.fragments_dropped.fetch_add(1, Ordering::Relaxed);
+                                continue;
+                            }
+                        }
+                    } else {
+                        payload_bytes
+                    };
+
+                    match RelayPayload::from_bytes(&decrypted_bytes) {
                         Ok(payload) => {
                             // --- Security: validate payload size ---
                             if payload.data.len() > MAX_PAYLOAD_DATA_SIZE {
                                 tracing::warn!(
-                                    "Payload data too large ({} bytes), dropping",
-                                    payload.data.len()
+                                    reason = "oversized",
+                                    size_bytes = payload.data.len(),
+                                    relay_type = ?payload.relay_type,
+                                    origin = ?&payload.origin[..4],
+                                    "REJECTED: payload data too large"
                                 );
                                 metrics.fragments_dropped.fetch_add(1, Ordering::Relaxed);
                                 continue;
@@ -102,17 +128,22 @@ pub async fn run(
                                 .as_secs();
                             if payload.timestamp > now + MAX_FUTURE_TOLERANCE_SECS {
                                 tracing::warn!(
-                                    "Payload timestamp {} is in the future (now={}), dropping",
-                                    payload.timestamp, now
+                                    reason = "future_timestamp",
+                                    payload_ts = payload.timestamp,
+                                    now_ts = now,
+                                    origin = ?&payload.origin[..4],
+                                    "REJECTED: payload timestamp in the future"
                                 );
                                 metrics.fragments_dropped.fetch_add(1, Ordering::Relaxed);
                                 continue;
                             }
                             if now.saturating_sub(payload.timestamp) > MAX_PAYLOAD_AGE_SECS {
                                 tracing::warn!(
-                                    "Payload timestamp {} is too old (age={}s), dropping",
-                                    payload.timestamp,
-                                    now.saturating_sub(payload.timestamp)
+                                    reason = "expired",
+                                    payload_ts = payload.timestamp,
+                                    age_secs = now.saturating_sub(payload.timestamp),
+                                    origin = ?&payload.origin[..4],
+                                    "REJECTED: payload timestamp too old"
                                 );
                                 metrics.fragments_dropped.fetch_add(1, Ordering::Relaxed);
                                 continue;
@@ -124,8 +155,9 @@ pub async fn run(
                                 .or_insert_with(PeerRateTracker::new);
                             if !tracker.allow() {
                                 tracing::warn!(
-                                    "Peer {:?} exceeds rate limit, dropping",
-                                    &payload.origin[..4]
+                                    reason = "rate_limited",
+                                    origin = ?&payload.origin[..4],
+                                    "REJECTED: peer exceeds rate limit"
                                 );
                                 metrics.fragments_dropped.fetch_add(1, Ordering::Relaxed);
                                 continue;
@@ -197,14 +229,11 @@ pub async fn run(
             }
         }
 
-        // Trim dedup
-        if dedup.len() > 10_000 {
-            dedup.clear();
-        }
+        // LRU eviction handled automatically by LruBinaryCache
     }
 
     // Persist dedup cache for restart resilience
-    if let Err(e) = crate::dedup_cache::save_binary_cache(&dedup, "relay-dedup.cache") {
+    if let Err(e) = crate::dedup_cache::save_lru_cache(&dedup, "relay-dedup.cache") {
         tracing::warn!("Failed to save relay dedup cache: {e}");
     }
 
@@ -536,21 +565,21 @@ mod tests {
 
     #[test]
     fn test_content_hash_dedup() {
-        let mut dedup: HashSet<[u8; 32]> = HashSet::new();
+        let mut dedup = LruBinaryCache::new(10_000);
 
-        let hash1 = blake3::hash(b"payload-1").into();
-        let hash2 = blake3::hash(b"payload-2").into();
+        let hash1: [u8; 32] = blake3::hash(b"payload-1").into();
+        let hash2: [u8; 32] = blake3::hash(b"payload-2").into();
 
         assert!(!dedup.contains(&hash1));
-        dedup.insert(hash1);
+        assert!(dedup.insert(hash1));
         assert!(dedup.contains(&hash1));
         assert!(!dedup.contains(&hash2));
 
-        // Duplicate insert doesn't grow set
-        dedup.insert(hash1);
+        // Duplicate insert returns false and doesn't grow
+        assert!(!dedup.insert(hash1));
         assert_eq!(dedup.len(), 1);
 
-        dedup.insert(hash2);
+        assert!(dedup.insert(hash2));
         assert_eq!(dedup.len(), 2);
     }
 
@@ -591,17 +620,16 @@ mod tests {
     }
 
     #[test]
-    fn test_dedup_overflow_clear() {
-        let mut dedup: HashSet<[u8; 32]> = HashSet::new();
-        for i in 0..10_001u32 {
+    fn test_dedup_lru_eviction_at_cap() {
+        let mut dedup = LruBinaryCache::new(100);
+        for i in 0..200u32 {
             dedup.insert(blake3::hash(&i.to_le_bytes()).into());
         }
-        assert!(dedup.len() > 10_000);
-
-        // Simulates the relay loop overflow logic
-        if dedup.len() > 10_000 {
-            dedup.clear();
-        }
-        assert_eq!(dedup.len(), 0);
+        // LRU keeps exactly capacity entries
+        assert_eq!(dedup.len(), 100);
+        // Oldest entries (0..100) should be evicted
+        assert!(!dedup.contains(&blake3::hash(&0u32.to_le_bytes()).into()));
+        // Newest entries should be present
+        assert!(dedup.contains(&blake3::hash(&199u32.to_le_bytes()).into()));
     }
 }

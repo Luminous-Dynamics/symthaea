@@ -4,7 +4,8 @@
   import { conductorStatus } from '$lib/stores';
   import { connectToConductor, flushOfflineQueue } from '$lib/conductor';
   import { queueCount, initQueueCount } from '$lib/offline-queue';
-  import { connectionQuality, connectionLabel, qualityColor, setInternet } from '$lib/connection-health';
+  import { connectionQuality, connectionLabel, qualityColor, setInternet, setMeshBridgeDetected } from '$lib/connection-health';
+  import { isMeshBridgeAvailable } from '$lib/offline-queue';
   import { refreshConsensus } from '$lib/value-basket';
   import Toast from '$lib/components/Toast.svelte';
   import LocaleSelector from '$lib/components/LocaleSelector.svelte';
@@ -37,6 +38,13 @@
     // Proactive conductor connection on app startup
     connectToConductor();
 
+    // Detect mesh bridge availability (non-blocking)
+    isMeshBridgeAvailable().then(setMeshBridgeDetected).catch(() => {});
+    // Re-check mesh bridge every 60 seconds
+    const meshCheckTimer = setInterval(() => {
+      isMeshBridgeAvailable().then(setMeshBridgeDetected).catch(() => {});
+    }, 60_000);
+
     // Register service worker for offline PWA support
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/service-worker.js').catch((err) =>
@@ -54,6 +62,7 @@
       window.removeEventListener('online', goOnline);
       window.removeEventListener('offline', goOffline);
       if (consensusTimer) clearInterval(consensusTimer);
+      clearInterval(meshCheckTimer);
     };
   });
 

@@ -135,7 +135,11 @@ Only if deploying LoRa or WiFi-direct mesh for internet outage resilience:
 - [ ] Review `docs/MESH_SECURITY_AUDIT.md` for threat model and mitigations
 - [ ] Verify MESH_APP_TOKEN is set (conductor auth)
 - [ ] Verify dedup cache directory is writable: `MESH_CACHE_DIR`
-- [ ] (Optional) Configure PSK encryption when deploying near untrusted radio neighbors
+- [ ] (Optional) Configure PSK encryption when deploying near untrusted radio neighbors:
+  - Generate key: `openssl rand -hex 32` → 64 hex chars
+  - Set `MESH_ENCRYPTION_KEY=<hex>` on ALL nodes (same key per community)
+  - Verify bridge logs: "PSK encryption enabled"
+  - WARNING: Nodes with mismatched keys cannot communicate
 - [ ] Verify consciousness gating on price oracle (Citizen+ tier required for reporting)
 
 ## 11. Post-Deployment Monitoring
@@ -150,6 +154,7 @@ Only if deploying LoRa or WiFi-direct mesh for internet outage resilience:
   - Peer count
   - Fragment drop rate (should be <5%)
   - Connection failures
+- [ ] (Optional) Prometheus scraping: `curl http://localhost:9100/metrics` for standard exposition format
 - [ ] Update value basket weekly (or when prices change significantly)
 - [ ] Print updated community summary monthly
 - [ ] Export community config from `/admin` for backup
@@ -162,7 +167,7 @@ Only if deploying LoRa or WiFi-direct mesh for internet outage resilience:
 - **hc CLI**: Must be in PATH for `hc dna pack` (use `nix develop` environment).
 - **Push notifications**: Only work when the browser tab is open (not true push via service worker subscription). Sufficient for 30s polling. Haptic feedback requires device vibration API.
 - **Mesh bridge**: LoRa SX1276 TX/RX is stubbed (needs hardware for implementation). B.A.T.M.A.N. UDP transport is fully functional. Loopback transport available for testing.
-- **Mesh encryption**: Plaintext over radio. Acceptable for trusted community mesh. PSK encryption planned for v0.2.
+- **Mesh encryption**: XChaCha20-Poly1305 PSK encryption available via `MESH_ENCRYPTION_KEY` env var. Plaintext by default if not set. All nodes must share the same key.
 - **Single operator**: No multi-operator role system yet. Any user can access `/admin`.
 - **Community config**: Stored in localStorage — not synced across devices. Operator should configure on the primary device. Export/import available on `/admin`.
 

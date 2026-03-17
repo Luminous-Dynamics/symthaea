@@ -120,16 +120,25 @@ resilience-up: resilience-build
 
 # Run all resilience-related tests (mesh-bridge + price oracle + Observatory vitest + type-check)
 resilience-test:
-    @echo "Running mesh-bridge tests..."
-    @cd mesh-bridge && cargo test
+    @echo "=== Mesh-bridge lib + integration tests ==="
+    @cd mesh-bridge && cargo test --lib
     @echo ""
-    @echo "Running price oracle unit tests..."
+    @echo "=== Mesh-bridge stress proptests ==="
+    @cd mesh-bridge && cargo test --test stress_proptests
+    @echo ""
+    @echo "=== Mesh-bridge manifest validation ==="
+    @cd mesh-bridge && cargo test --test manifest_validation
+    @echo ""
+    @echo "=== Mesh-bridge pipeline integration ==="
+    @cd mesh-bridge && cargo test --test pipeline_integration
+    @echo ""
+    @echo "=== Price oracle unit tests ==="
     @cd ../mycelix-finance && cargo test --lib -p price_oracle -p price_oracle_integrity
     @echo ""
-    @echo "Running Observatory vitest (75 tests)..."
+    @echo "=== Observatory vitest ==="
     @cd observatory && npx vitest run
     @echo ""
-    @echo "Running Observatory type-check (resilience routes)..."
+    @echo "=== Observatory type-check (resilience routes) ==="
     @cd observatory && npx svelte-check 2>&1 | tee /tmp/svelte-check.log | tail -1; \
       if grep "routes/tend\|routes/food\|routes/mutual-aid\|routes/emergency\|routes/value-anchor\|routes/water\|routes/household\|routes/knowledge\|routes/care-circles\|routes/shelter\|routes/supplies\|lib/resilience-client\|lib/value-basket\|lib/community\|lib/tax-export" /tmp/svelte-check.log | grep -q "ERROR"; then \
         echo "  FAIL: Errors in resilience code"; exit 1; \
@@ -138,6 +147,10 @@ resilience-test:
       fi
     @echo ""
     @echo "All resilience tests passed!"
+
+# Quick test: mesh-bridge lib tests only (fastest feedback loop)
+resilience-test-quick:
+    @cd mesh-bridge && cargo test --lib
 
 # Smoke test: build Observatory, check all routes return 200
 resilience-smoke:

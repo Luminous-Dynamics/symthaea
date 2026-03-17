@@ -42,15 +42,18 @@ The mesh bridge operates in a hostile environment: LoRa and WiFi-direct mesh net
 
 **Residual risk**: An attacker could spoof different origin IDs to bypass per-peer rate limiting. Each spoofed origin consumes rate tracker memory (~200 bytes). At 1000 unique origins, this is ~200 KB — acceptable.
 
-### 3. Transport Encryption — NOT IMPLEMENTED
+### 3. Transport Encryption — IMPLEMENTED
 
 **Risk**: All relay payloads are sent in plaintext over LoRa/WiFi-direct. Anyone in radio range can read TEND exchange amounts, emergency messages, food harvest quantities.
 
-**Recommendation**: Add authenticated encryption before serialization. Options:
-- **Short-term**: Pre-shared key (PSK) per community, configured via `MESH_ENCRYPTION_KEY` env var. XChaCha20-Poly1305 (32-byte key, 24-byte nonce). Adds ~40 bytes overhead per payload — fits in LoRa frame budget.
-- **Long-term**: Per-agent keypairs derived from Holochain agent keys. Requires conductor API extension.
+**Mitigation** (encryption.rs):
+- XChaCha20-Poly1305 PSK encryption via `MESH_ENCRYPTION_KEY` env var (64 hex chars = 32 bytes)
+- 24-byte random nonce per payload + 16-byte auth tag = 40 bytes overhead (fits LoRa frame budget)
+- Encrypt before fragmentation, decrypt after reassembly
+- Plaintext fallback when env var is not set (backward compatible)
+- All nodes in a community must share the same PSK
 
-**Priority**: Medium. In a community deployment where all nodes are trusted, the risk is low. Becomes high if nodes are operated by different trust groups.
+**Residual risk**: Key distribution is manual (env var). Long-term: derive per-agent keypairs from Holochain agent keys.
 
 ### 4. Message Authentication — PARTIAL
 

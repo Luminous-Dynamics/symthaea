@@ -8,6 +8,7 @@ pub mod serializer;
 pub mod transport;
 
 pub mod dedup_cache;
+pub mod encryption;
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -50,6 +51,45 @@ impl BridgeMetrics {
         }
     }
 
+    /// Return metrics in Prometheus text exposition format (version 0.0.4).
+    pub fn to_prometheus(&self) -> String {
+        let sent = self.messages_sent.load(Ordering::Relaxed);
+        let recv = self.messages_received.load(Ordering::Relaxed);
+        let dropped = self.fragments_dropped.load(Ordering::Relaxed);
+        let peers = self.peers_seen.load(Ordering::Relaxed);
+        let cycles = self.poll_cycles.load(Ordering::Relaxed);
+        let failures = self.connection_failures.load(Ordering::Relaxed);
+        let last_send = self.last_send_at.load(Ordering::Relaxed);
+        let last_recv = self.last_recv_at.load(Ordering::Relaxed);
+
+        format!(
+            "# HELP mesh_bridge_messages_sent Total messages relayed outbound\n\
+             # TYPE mesh_bridge_messages_sent counter\n\
+             mesh_bridge_messages_sent {sent}\n\
+             # HELP mesh_bridge_messages_received Total messages relayed inbound\n\
+             # TYPE mesh_bridge_messages_received counter\n\
+             mesh_bridge_messages_received {recv}\n\
+             # HELP mesh_bridge_fragments_dropped Total fragments dropped\n\
+             # TYPE mesh_bridge_fragments_dropped counter\n\
+             mesh_bridge_fragments_dropped {dropped}\n\
+             # HELP mesh_bridge_peers_seen Distinct peers seen\n\
+             # TYPE mesh_bridge_peers_seen gauge\n\
+             mesh_bridge_peers_seen {peers}\n\
+             # HELP mesh_bridge_poll_cycles Total poll cycles completed\n\
+             # TYPE mesh_bridge_poll_cycles counter\n\
+             mesh_bridge_poll_cycles {cycles}\n\
+             # HELP mesh_bridge_connection_failures Total conductor connection failures\n\
+             # TYPE mesh_bridge_connection_failures counter\n\
+             mesh_bridge_connection_failures {failures}\n\
+             # HELP mesh_bridge_last_send_at Epoch ms of last outbound relay\n\
+             # TYPE mesh_bridge_last_send_at gauge\n\
+             mesh_bridge_last_send_at {last_send}\n\
+             # HELP mesh_bridge_last_recv_at Epoch ms of last inbound relay\n\
+             # TYPE mesh_bridge_last_recv_at gauge\n\
+             mesh_bridge_last_recv_at {last_recv}\n"
+        )
+    }
+
     pub fn to_json(&self) -> serde_json::Value {
         serde_json::json!({
             "messages_sent": self.messages_sent.load(Ordering::Relaxed),
@@ -90,6 +130,30 @@ mod tests {
         assert_eq!(json["messages_sent"], 42);
         assert_eq!(json["peers_seen"], 3);
         assert_eq!(json["fragments_dropped"], 0);
+    }
+
+    #[test]
+    fn test_metrics_to_prometheus() {
+        let m = BridgeMetrics::new();
+        m.messages_sent.store(10, Ordering::Relaxed);
+        m.messages_received.store(5, Ordering::Relaxed);
+        m.fragments_dropped.store(2, Ordering::Relaxed);
+        m.peers_seen.store(3, Ordering::Relaxed);
+        m.poll_cycles.store(100, Ordering::Relaxed);
+        m.connection_failures.store(1, Ordering::Relaxed);
+        m.last_send_at.store(1700000000000, Ordering::Relaxed);
+        m.last_recv_at.store(1700000001000, Ordering::Relaxed);
+        let prom = m.to_prometheus();
+        assert!(prom.contains("mesh_bridge_messages_sent 10"));
+        assert!(prom.contains("mesh_bridge_messages_received 5"));
+        assert!(prom.contains("mesh_bridge_fragments_dropped 2"));
+        assert!(prom.contains("mesh_bridge_peers_seen 3"));
+        assert!(prom.contains("mesh_bridge_poll_cycles 100"));
+        assert!(prom.contains("mesh_bridge_connection_failures 1"));
+        assert!(prom.contains("mesh_bridge_last_send_at 1700000000000"));
+        assert!(prom.contains("mesh_bridge_last_recv_at 1700000001000"));
+        assert!(prom.contains("# TYPE mesh_bridge_messages_sent counter"));
+        assert!(prom.contains("# TYPE mesh_bridge_peers_seen gauge"));
     }
 
     #[test]

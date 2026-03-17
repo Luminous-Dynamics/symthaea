@@ -13,6 +13,7 @@ use crate::serializer::{
 use crate::transport::MeshTransport;
 use crate::BridgeMetrics;
 use anyhow::Result;
+use chacha20poly1305::XChaCha20Poly1305;
 use holochain_client::{AgentSigner, AppWebsocket, ClientAgentSigner, ExternIO, ZomeCallTarget};
 use std::collections::HashSet;
 use std::sync::atomic::Ordering;
@@ -53,9 +54,26 @@ pub async fn run(
 
     let mut dedup: HashSet<String> = crate::dedup_cache::load_string_cache("poller-dedup.cache");
     let origin = get_origin_id();
+    let cipher = crate::encryption::load_psk();
+    if cipher.is_some() {
+        tracing::info!("PSK encryption enabled");
+    }
     let mut poll_count: u64 = 0;
     let mut consecutive_failures: u32 = 0;
     let mut ws_cached: Option<AppWebsocket> = None;
+
+    // Startup diagnostic: verify conductor is reachable before entering poll loop
+    match startup_check(conductor_url).await {
+        Ok(()) => tracing::info!("Conductor reachable at {conductor_url}"),
+        Err(e) => tracing::warn!(
+            "Conductor startup check failed: {e}\n\
+             The poller will retry on each poll cycle with exponential backoff.\n\
+             Common fixes:\n\
+             - Is the conductor running? (just up / docker compose up)\n\
+             - Is CONDUCTOR_URL correct? (current: {conductor_url})\n\
+             - Is the resilience hApp installed? (hc app install ...)"
+        ),
+    }
 
     loop {
         if cancel.is_cancelled() {
@@ -70,7 +88,18 @@ pub async fn run(
         if poll_count % HEARTBEAT_EVERY_N_POLLS == 0 {
             let heartbeat = RelayPayload::new(RelayType::Heartbeat, origin, Vec::new());
             let bytes = heartbeat.to_bytes();
-            let frames = serializer::fragment(&bytes, LORA_MAX_FRAME);
+            let wire_bytes = if let Some(ref c) = cipher {
+                match crate::encryption::encrypt(c, &bytes) {
+                    Ok(enc) => enc,
+                    Err(e) => {
+                        tracing::error!("Failed to encrypt heartbeat: {e}");
+                        bytes
+                    }
+                }
+            } else {
+                bytes
+            };
+            let frames = serializer::fragment(&wire_bytes, LORA_MAX_FRAME);
             for frame in &frames {
                 let _ = transport.send(frame).await;
             }
@@ -85,6 +114,7 @@ pub async fn run(
             &*transport,
             &mut ws_cached,
             poll_count,
+            cipher.as_ref(),
         )
         .await
         {
@@ -169,10 +199,17 @@ async fn relay_payload(
     origin: &[u8; 8],
     data: Vec<u8>,
     transport: &dyn MeshTransport,
+    cipher: Option<&XChaCha20Poly1305>,
 ) -> Result<()> {
     let payload = RelayPayload::new(relay_type, *origin, data);
     let bytes = payload.to_bytes();
-    let frames = serializer::fragment(&bytes, LORA_MAX_FRAME);
+    let wire_bytes = if let Some(c) = cipher {
+        crate::encryption::encrypt(c, &bytes)
+            .map_err(|e| anyhow::anyhow!("{e}"))?
+    } else {
+        bytes
+    };
+    let frames = serializer::fragment(&wire_bytes, LORA_MAX_FRAME);
     for frame in &frames {
         transport.send(frame).await?;
     }
@@ -211,6 +248,7 @@ async fn poll_once(
     transport: &dyn MeshTransport,
     ws_cached: &mut Option<AppWebsocket>,
     poll_count: u64,
+    cipher: Option<&XChaCha20Poly1305>,
 ) -> Result<usize> {
     // Reuse cached connection or establish a new one
     let ws = match ws_cached.take() {
@@ -231,28 +269,28 @@ async fn poll_once(
     // === SAFETY-CRITICAL: every cycle ===
 
     // --- Poll TEND exchanges ---
-    relayed += poll_tend(&ws, dedup, origin, transport).await;
+    relayed += poll_tend(&ws, dedup, origin, transport, cipher).await;
 
     // --- Poll emergency messages ---
-    relayed += poll_emergency(&ws, dedup, origin, transport).await;
+    relayed += poll_emergency(&ws, dedup, origin, transport, cipher).await;
 
     // --- Poll water alerts ---
-    relayed += poll_water(&ws, dedup, origin, transport).await;
+    relayed += poll_water(&ws, dedup, origin, transport, cipher).await;
 
     // --- Poll hearth alerts ---
-    relayed += poll_hearth(&ws, dedup, origin, transport).await;
+    relayed += poll_hearth(&ws, dedup, origin, transport, cipher).await;
 
     // --- Poll food harvests ---
-    relayed += poll_food(&ws, dedup, origin, transport).await;
+    relayed += poll_food(&ws, dedup, origin, transport, cipher).await;
 
     // === LOWER-PRIORITY: every other cycle ===
     if poll_count % 2 == 0 {
-        relayed += poll_knowledge(&ws, dedup, origin, transport).await;
-        relayed += poll_care_circles(&ws, dedup, origin, transport).await;
-        relayed += poll_shelter(&ws, dedup, origin, transport).await;
-        relayed += poll_supplies(&ws, dedup, origin, transport).await;
-        relayed += poll_mutual_aid(&ws, dedup, origin, transport).await;
-        relayed += poll_price_reports(&ws, dedup, origin, transport).await;
+        relayed += poll_knowledge(&ws, dedup, origin, transport, cipher).await;
+        relayed += poll_care_circles(&ws, dedup, origin, transport, cipher).await;
+        relayed += poll_shelter(&ws, dedup, origin, transport, cipher).await;
+        relayed += poll_supplies(&ws, dedup, origin, transport, cipher).await;
+        relayed += poll_mutual_aid(&ws, dedup, origin, transport, cipher).await;
+        relayed += poll_price_reports(&ws, dedup, origin, transport, cipher).await;
     }
 
     // Cache connection for reuse on next poll cycle
@@ -270,6 +308,7 @@ async fn poll_tend(
     dedup: &mut HashSet<String>,
     origin: &[u8; 8],
     transport: &dyn MeshTransport,
+    cipher: Option<&XChaCha20Poly1305>,
 ) -> usize {
     let input = match ExternIO::encode(serde_json::json!({
         "dao_did": "roodepoort-resilience",
@@ -306,7 +345,7 @@ async fn poll_tend(
                 };
 
                 if let Ok(data) = bincode::serialize(&tend) {
-                    if relay_payload(RelayType::TendExchange, origin, data, transport)
+                    if relay_payload(RelayType::TendExchange, origin, data, transport, cipher)
                         .await
                         .is_ok()
                     {
@@ -325,6 +364,7 @@ async fn poll_emergency(
     dedup: &mut HashSet<String>,
     origin: &[u8; 8],
     transport: &dyn MeshTransport,
+    cipher: Option<&XChaCha20Poly1305>,
 ) -> usize {
     let input = match ExternIO::encode(()) {
         Ok(i) => i,
@@ -356,7 +396,7 @@ async fn poll_emergency(
                 };
 
                 if let Ok(data) = bincode::serialize(&emergency) {
-                    if relay_payload(RelayType::EmergencyMessage, origin, data, transport)
+                    if relay_payload(RelayType::EmergencyMessage, origin, data, transport, cipher)
                         .await
                         .is_ok()
                     {
@@ -375,6 +415,7 @@ async fn poll_food(
     dedup: &mut HashSet<String>,
     origin: &[u8; 8],
     transport: &dyn MeshTransport,
+    cipher: Option<&XChaCha20Poly1305>,
 ) -> usize {
     let input = match ExternIO::encode(serde_json::json!({ "limit": MAX_ENTRIES_PER_DOMAIN })) {
         Ok(i) => i,
@@ -407,7 +448,7 @@ async fn poll_food(
                 };
 
                 if let Ok(data) = bincode::serialize(&food) {
-                    if relay_payload(RelayType::FoodHarvest, origin, data, transport)
+                    if relay_payload(RelayType::FoodHarvest, origin, data, transport, cipher)
                         .await
                         .is_ok()
                     {
@@ -426,6 +467,7 @@ async fn poll_water(
     dedup: &mut HashSet<String>,
     origin: &[u8; 8],
     transport: &dyn MeshTransport,
+    cipher: Option<&XChaCha20Poly1305>,
 ) -> usize {
     let input = match ExternIO::encode(()) {
         Ok(i) => i,
@@ -458,7 +500,7 @@ async fn poll_water(
                 };
 
                 if let Ok(data) = bincode::serialize(&water) {
-                    if relay_payload(RelayType::WaterAlert, origin, data, transport)
+                    if relay_payload(RelayType::WaterAlert, origin, data, transport, cipher)
                         .await
                         .is_ok()
                     {
@@ -477,6 +519,7 @@ async fn poll_hearth(
     dedup: &mut HashSet<String>,
     origin: &[u8; 8],
     transport: &dyn MeshTransport,
+    cipher: Option<&XChaCha20Poly1305>,
 ) -> usize {
     let input = match ExternIO::encode(()) {
         Ok(i) => i,
@@ -508,7 +551,7 @@ async fn poll_hearth(
                 };
 
                 if let Ok(data) = bincode::serialize(&hearth) {
-                    if relay_payload(RelayType::HearthAlert, origin, data, transport)
+                    if relay_payload(RelayType::HearthAlert, origin, data, transport, cipher)
                         .await
                         .is_ok()
                     {
@@ -527,6 +570,7 @@ async fn poll_knowledge(
     dedup: &mut HashSet<String>,
     origin: &[u8; 8],
     transport: &dyn MeshTransport,
+    cipher: Option<&XChaCha20Poly1305>,
 ) -> usize {
     let input = match ExternIO::encode(serde_json::json!({ "limit": MAX_ENTRIES_PER_DOMAIN })) {
         Ok(i) => i,
@@ -569,7 +613,7 @@ async fn poll_knowledge(
                 };
 
                 if let Ok(data) = bincode::serialize(&claim) {
-                    if relay_payload(RelayType::KnowledgeClaim, origin, data, transport)
+                    if relay_payload(RelayType::KnowledgeClaim, origin, data, transport, cipher)
                         .await
                         .is_ok()
                     {
@@ -588,6 +632,7 @@ async fn poll_care_circles(
     dedup: &mut HashSet<String>,
     origin: &[u8; 8],
     transport: &dyn MeshTransport,
+    cipher: Option<&XChaCha20Poly1305>,
 ) -> usize {
     let input = match ExternIO::encode(()) {
         Ok(i) => i,
@@ -619,7 +664,7 @@ async fn poll_care_circles(
                 };
 
                 if let Ok(data) = bincode::serialize(&care) {
-                    if relay_payload(RelayType::CareCircleUpdate, origin, data, transport)
+                    if relay_payload(RelayType::CareCircleUpdate, origin, data, transport, cipher)
                         .await
                         .is_ok()
                     {
@@ -638,6 +683,7 @@ async fn poll_shelter(
     dedup: &mut HashSet<String>,
     origin: &[u8; 8],
     transport: &dyn MeshTransport,
+    cipher: Option<&XChaCha20Poly1305>,
 ) -> usize {
     let input = match ExternIO::encode(()) {
         Ok(i) => i,
@@ -669,7 +715,7 @@ async fn poll_shelter(
                 };
 
                 if let Ok(data) = bincode::serialize(&shelter) {
-                    if relay_payload(RelayType::ShelterUpdate, origin, data, transport)
+                    if relay_payload(RelayType::ShelterUpdate, origin, data, transport, cipher)
                         .await
                         .is_ok()
                     {
@@ -688,6 +734,7 @@ async fn poll_supplies(
     dedup: &mut HashSet<String>,
     origin: &[u8; 8],
     transport: &dyn MeshTransport,
+    cipher: Option<&XChaCha20Poly1305>,
 ) -> usize {
     let input = match ExternIO::encode(()) {
         Ok(i) => i,
@@ -720,7 +767,7 @@ async fn poll_supplies(
                 };
 
                 if let Ok(data) = bincode::serialize(&supply) {
-                    if relay_payload(RelayType::SupplyUpdate, origin, data, transport)
+                    if relay_payload(RelayType::SupplyUpdate, origin, data, transport, cipher)
                         .await
                         .is_ok()
                     {
@@ -739,6 +786,7 @@ async fn poll_mutual_aid(
     dedup: &mut HashSet<String>,
     origin: &[u8; 8],
     transport: &dyn MeshTransport,
+    cipher: Option<&XChaCha20Poly1305>,
 ) -> usize {
     let input = match ExternIO::encode(serde_json::json!({ "limit": MAX_ENTRIES_PER_DOMAIN })) {
         Ok(i) => i,
@@ -771,7 +819,7 @@ async fn poll_mutual_aid(
                 };
 
                 if let Ok(data) = bincode::serialize(&aid) {
-                    if relay_payload(RelayType::MutualAidOffer, origin, data, transport)
+                    if relay_payload(RelayType::MutualAidOffer, origin, data, transport, cipher)
                         .await
                         .is_ok()
                     {
@@ -790,6 +838,7 @@ async fn poll_price_reports(
     dedup: &mut HashSet<String>,
     origin: &[u8; 8],
     transport: &dyn MeshTransport,
+    cipher: Option<&XChaCha20Poly1305>,
 ) -> usize {
     let input = match ExternIO::encode(serde_json::json!({ "limit": MAX_ENTRIES_PER_DOMAIN })) {
         Ok(i) => i,
@@ -821,7 +870,7 @@ async fn poll_price_reports(
                 };
 
                 if let Ok(data) = bincode::serialize(&price) {
-                    if relay_payload(RelayType::PriceReport, origin, data, transport)
+                    if relay_payload(RelayType::PriceReport, origin, data, transport, cipher)
                         .await
                         .is_ok()
                     {
@@ -844,6 +893,17 @@ fn get_origin_id() -> [u8; 8] {
     let mut id = [0u8; 8];
     id.copy_from_slice(&hash.as_bytes()[..8]);
     id
+}
+
+/// One-shot conductor connectivity check at startup.
+/// Attempts to connect and list installed apps. Returns Ok if reachable.
+async fn startup_check(conductor_url: &str) -> Result<()> {
+    let token: Vec<u8> = std::env::var("MESH_APP_TOKEN")
+        .unwrap_or_default()
+        .into_bytes();
+    let signer: Arc<dyn AgentSigner + Send + Sync> = Arc::new(ClientAgentSigner::default());
+    let _ws = AppWebsocket::connect(conductor_url, token, signer).await?;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -998,7 +1058,7 @@ mod tests {
             notes: "First harvest".into(),
         };
         let data = bincode::serialize(&food).unwrap();
-        relay_payload(RelayType::FoodHarvest, &origin, data, &transport)
+        relay_payload(RelayType::FoodHarvest, &origin, data, &transport, None)
             .await
             .unwrap();
 

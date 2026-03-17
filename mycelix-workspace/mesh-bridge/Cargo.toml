@@ -35,6 +35,11 @@ thiserror = "1"
 # Hashing for dedup
 blake3 = "1"
 
+# PSK encryption (XChaCha20-Poly1305)
+chacha20poly1305 = "0.10"
+rand = "0.8"
+hex = "0.4"
+
 # Time
 chrono = "0.4"
 
