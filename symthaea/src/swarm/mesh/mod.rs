@@ -1019,14 +1019,19 @@ pub fn build_nonce(source_id: &[u8; 8], payload_type: u8, epoch: u8, sequence: u
 /// Returns `[nonce (12 bytes) | ciphertext+tag]`.
 /// The nonce includes payload_type and epoch to prevent cross-type
 /// and restart nonce reuse. See [`build_nonce`].
+///
+/// **`epoch`** must be a random byte generated once at node startup
+/// (via `rand::thread_rng().gen::<u8>()`). This prevents nonce reuse
+/// across node restarts when using the same key material.
 #[cfg(feature = "mesh-encryption")]
 pub fn encrypt_packet(
     envelope: &[u8],
     key: &[u8; 32],
     source_id: &[u8; 8],
+    epoch: u8,
     sequence: u32,
 ) -> Vec<u8> {
-    encrypt_packet_typed(envelope, key, source_id, 0, 0, sequence)
+    encrypt_packet_typed(envelope, key, source_id, 0, epoch, sequence)
 }
 
 /// Encrypt with explicit payload_type and epoch (nonce-safe variant).
@@ -1171,11 +1176,17 @@ pub struct RotatingKeyPair {
     /// Version of the previous key (for versioned decrypt hints).
     #[zeroize(skip)]
     previous_version: u8,
+    /// Random epoch byte generated once at construction. Prevents nonce reuse
+    /// across node restarts under the same key material (P0 security fix).
+    #[zeroize(skip)]
+    epoch: u8,
 }
 
 #[cfg(feature = "mesh-encryption")]
 impl RotatingKeyPair {
     /// Create a new key pair with a single key (no rotation in progress).
+    ///
+    /// Generates a random epoch byte to prevent nonce reuse across restarts.
     pub fn new(key: [u8; 32]) -> Self {
         Self {
             current: key,
@@ -1183,6 +1194,7 @@ impl RotatingKeyPair {
             grace_expires_at: 0,
             key_version: 0,
             previous_version: 0,
+            epoch: rand::Rng::gen(&mut rand::thread_rng()),
         }
     }
 
@@ -1223,9 +1235,14 @@ impl RotatingKeyPair {
         self.previous.is_some()
     }
 
-    /// Encrypt with the current key (legacy — uses type=0, epoch=0).
+    /// Encrypt with the current key using the stored random epoch.
     pub fn encrypt(&self, envelope: &[u8], source_id: &[u8; 8], sequence: u32) -> Vec<u8> {
-        encrypt_packet(envelope, &self.current, source_id, sequence)
+        encrypt_packet(envelope, &self.current, source_id, self.epoch, sequence)
+    }
+
+    /// Get the epoch byte (useful for logging/telemetry).
+    pub fn epoch(&self) -> u8 {
+        self.epoch
     }
 
     /// Encrypt with the current key, using typed nonce for cross-type safety.
@@ -2775,7 +2792,7 @@ mod tests {
         let sequence = 12345u32;
         let plaintext = b"Hello mesh encryption!";
 
-        let ciphertext = encrypt_packet(plaintext, &key, &source_id, sequence);
+        let ciphertext = encrypt_packet(plaintext, &key, &source_id, 0xAB, sequence);
         assert_ne!(&ciphertext[AEAD_NONCE_SIZE..], plaintext);
 
         let decrypted = decrypt_packet(&ciphertext, &key).expect("decryption should succeed");
@@ -2790,7 +2807,7 @@ mod tests {
         let source_id = [0x01u8; 8];
         let plaintext = b"secret data";
 
-        let ciphertext = encrypt_packet(plaintext, &key_a, &source_id, 1);
+        let ciphertext = encrypt_packet(plaintext, &key_a, &source_id, 0xAB, 1);
         assert!(decrypt_packet(&ciphertext, &key_b).is_none());
     }
 
@@ -2801,7 +2818,7 @@ mod tests {
         let source_id = [0x01u8; 8];
         let plaintext = b"tamper test";
 
-        let mut ciphertext = encrypt_packet(plaintext, &key, &source_id, 1);
+        let mut ciphertext = encrypt_packet(plaintext, &key, &source_id, 0xAB, 1);
         // Flip a byte in the ciphertext portion (after the nonce)
         if ciphertext.len() > AEAD_NONCE_SIZE + 1 {
             ciphertext[AEAD_NONCE_SIZE + 1] ^= 0xFF;
@@ -2946,6 +2963,41 @@ mod tests {
 
     #[cfg(feature = "mesh-encryption")]
     #[test]
+    fn test_rotating_key_pair_epoch_initialized() {
+        // Two RotatingKeyPairs with the same key should have different epochs
+        // (random initialization) — verifying nonce uniqueness across restarts.
+        let key = [0x11u8; 32];
+        let pair_a = RotatingKeyPair::new(key);
+        let pair_b = RotatingKeyPair::new(key);
+        // With 256 possible epochs, collision probability is 1/256.
+        // We don't assert inequality (could collide), but verify epoch is accessible.
+        let _ = pair_a.epoch();
+        let _ = pair_b.epoch();
+    }
+
+    #[cfg(feature = "mesh-encryption")]
+    #[test]
+    fn test_rotating_key_pair_epoch_in_ciphertext() {
+        // Encrypt the same data with the same key but different epochs
+        // (via two RotatingKeyPair instances) — ciphertexts should differ
+        // because the epoch byte enters the nonce.
+        let key = [0x42u8; 32];
+        let source = [0xAA; 8];
+        let plaintext = b"epoch nonce safety test";
+
+        // Force different epochs by using encrypt_packet directly
+        let ct_a = encrypt_packet(plaintext, &key, &source, 0x11, 1);
+        let ct_b = encrypt_packet(plaintext, &key, &source, 0x22, 1);
+
+        assert_ne!(ct_a, ct_b, "Different epochs must produce different ciphertexts");
+
+        // Both must decrypt successfully
+        assert_eq!(decrypt_packet(&ct_a, &key).unwrap(), plaintext);
+        assert_eq!(decrypt_packet(&ct_b, &key).unwrap(), plaintext);
+    }
+
+    #[cfg(feature = "mesh-encryption")]
+    #[test]
     fn test_rotating_key_pair_rotation() {
         let old_key = [0x11u8; 32];
         let new_key = [0x22u8; 32];
@@ -3046,7 +3098,7 @@ mod tests {
 
         let key_a = store_a.peer_key(&source_b).unwrap();
         let plaintext = b"wisdom vector payload";
-        let ct = encrypt_packet(plaintext, key_a, &source_a, 1);
+        let ct = encrypt_packet(plaintext, key_a, &source_a, 0xAB, 1);
 
         let key_b = store_b.peer_key(&source_a).unwrap();
         let pt = decrypt_packet(&ct, key_b).expect("peer key should decrypt");
@@ -3073,7 +3125,7 @@ mod tests {
         store_b.agree([0x0A; 8], &pub_a);
 
         let key_a_for_b = store_a.peer_key(&source_b).unwrap();
-        let ct = encrypt_packet(b"secret", key_a_for_b, &[0x0A; 8], 1);
+        let ct = encrypt_packet(b"secret", key_a_for_b, &[0x0A; 8], 0xAB, 1);
 
         // C's public key is different — derive a different shared secret
         let mut store_a2 = PeerKeyStore::new([0x11; 32]);
