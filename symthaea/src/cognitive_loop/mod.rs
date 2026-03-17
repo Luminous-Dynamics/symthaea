@@ -196,6 +196,7 @@ pub use managers::network_service_bridge::{
     NetworkServiceBridge, NetworkServiceBridgeHandle,
 };
 pub use managers::swarm_manager::{SwarmEvent, SwarmTelemetry};
+pub use ethics_engine::EthicalVerdict;
 
 #[cfg(feature = "mesh")]
 pub use managers::{
@@ -211,6 +212,18 @@ pub mod nurture_bridge;
 
 #[cfg(feature = "humanoid")]
 pub mod motor_bridge;
+
+#[cfg(feature = "safety-agents")]
+pub mod safety_enforcement;
+#[cfg(feature = "safety-agents")]
+pub mod civic_crisis_detector;
+pub mod defense;
+#[cfg(feature = "safety-agents")]
+pub mod guardian;
+#[cfg(feature = "sentinel")]
+pub mod threat_memory;
+#[cfg(feature = "sentinel")]
+pub mod collective_immunity;
 
 // ── Imports (only what the struct definitions below require) ─────────────────
 // AffectiveBridge now owned by ConsciousnessStateManager
@@ -635,6 +648,12 @@ pub struct CognitiveLoopService {
     /// Checked before motor execution: `Blocked` prevents action, `Caution` caps confidence.
     pub(crate) last_ethics_verdict: ethics_engine::EthicalVerdict,
 
+    /// External override for the ethical verdict. When `Some`, takes precedence
+    /// over the ethics engine's output each cycle. Used by safety systems and
+    /// integration tests to force a specific verdict for deterministic testing.
+    /// Cleared only by an explicit `clear_ethics_override()` call.
+    pub(crate) ethics_verdict_override: Option<ethics_engine::EthicalVerdict>,
+
     /// KosmicSong: Unified identity synthesizing Phi + Eight Harmonies + Epistemic Humility.
     /// Computed every cycle after consciousness_engine + ethics_engine settle.
     /// Outputs coherence_score (0.0-1.0) that gates FEP learning rate and exploration.
@@ -730,6 +749,19 @@ pub struct CognitiveLoopService {
     /// Epistemic Auditor: DuckDB-backed consciousness telemetry audit trail.
     #[cfg(feature = "epistemic_auditor")]
     pub(crate) epistemic_auditor: Option<epistemic_auditor::EpistemicAuditor>,
+
+    /// NRC-style safety agent for consciousness monitoring and operational gating.
+    #[cfg(feature = "safety-agents")]
+    pub(crate) safety_agent: crate::safety::SafetyAgent,
+    /// Physical guardian posture state machine.
+    #[cfg(feature = "safety-agents")]
+    pub(crate) guardian_state: guardian::GuardianState,
+    #[cfg(feature = "sentinel")]
+    pub(crate) sentinel_manager: managers::SentinelManager,
+    #[cfg(feature = "sentinel")]
+    pub(crate) threat_memory: threat_memory::ThreatMemory,
+    #[cfg(feature = "sentinel")]
+    pub(crate) collective_immune_state: collective_immunity::CollectiveImmuneState,
 }
 
 // MetricsProvider impl is in metrics_provider.rs
