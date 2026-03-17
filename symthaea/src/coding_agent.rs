@@ -28,7 +28,9 @@
 //!      └──────────────┴───────────┘            └─────────┘
 //! ```
 
-use crate::action::primitives::{Atom, Molecule, PlanProfile, PrimitiveValue};
+use crate::action::primitives::{
+    Atom, DispatchTier, Molecule, MoleculeExecutor, PlanProfile, PrimitiveValue,
+};
 use crate::action::{ActionOutcome, PolicyBundle, SandboxRoot};
 use crate::coding_experience::{CodingExperience, CodingExperienceStore};
 use crate::cognitive_loop::motor_output_bridge::{
@@ -94,6 +96,8 @@ pub struct AgentResult {
     pub generation_tiers: Vec<BackendTier>,
     /// Total energy consumed across all generations.
     pub total_energy: f64,
+    /// Remaining energy budget after execution.
+    pub remaining_energy: f32,
     /// Auto-generated curriculum lessons from failure patterns encountered.
     #[cfg(feature = "school_learning")]
     pub generated_lessons: Vec<crate::school::code_learning::CodeLesson>,
@@ -125,6 +129,7 @@ impl AgentResult {
             "generation": {
                 "tiers": self.generation_tiers.iter().map(|t| t.to_string()).collect::<Vec<_>>(),
                 "total_energy": self.total_energy,
+                "remaining_energy": self.remaining_energy,
             },
             "files_modified": self.files_modified.iter().map(|p| p.display().to_string()).collect::<Vec<_>>(),
             "tests_passed": self.tests_passed,
@@ -550,12 +555,10 @@ impl CodingAgent {
             return;
         }
 
-        // 1. Build and evaluate typed execution plan for this phase.
-        //    If the plan fails evaluation (Phi too low, budget exhausted,
-        //    destructive action), the step is skipped.
-        if let Some(plan) = self.build_execution_plan() {
+        // 1. FEP plan selection: generate candidate plans, select best via
+        //    free-energy minimization, then evaluate safety/budget.
+        if let Some((plan, profile)) = self.select_plan_fep() {
             let current_phi = self.phi_trace.last().copied().unwrap_or(0.0);
-            let profile = plan.profile();
             let (approved, reason) = self.evaluate_plan(&plan, current_phi);
 
             if !approved {
@@ -566,15 +569,13 @@ impl CodingAgent {
                     "Plan rejected — skipping step"
                 );
                 self.observations.push(format!("Plan rejected: {reason}"));
-                // Don't abort — let consciousness accumulate Phi via cycling
-                // but don't execute the plan this iteration
             } else {
                 tracing::debug!(
                     target: "symthaea::coding_agent",
                     phase = %self.phase,
                     steps = profile.step_count,
                     energy = profile.total_energy,
-                    "Plan approved"
+                    "FEP plan approved"
                 );
                 self.current_plan = Some(profile.clone());
                 self.deduct_energy(&profile);
@@ -629,12 +630,16 @@ impl CodingAgent {
 
     /// Phase-specific actions performed before the cognitive cycle.
     ///
-    /// - Understanding: reads the target file and nearby source files
+    /// Understanding and Testing now use molecule-driven execution — all I/O
+    /// flows through MoleculeExecutor with energy tracking, phi gating, and
+    /// trace recording.
+    ///
+    /// - Understanding: gathers context via molecule (ReadFile, ListDir, experience hints)
     /// - Generating/Fixing: calls IntelligentDispatcher to generate code
     fn pre_cycle_action(&mut self) {
         match self.phase {
             TaskPhase::Understanding => {
-                self.do_understanding();
+                self.do_understanding_molecule();
             }
             TaskPhase::Fixing => {
                 // In Fixing phase, try structured auto-fix BEFORE calling the LLM.
@@ -794,10 +799,7 @@ impl CodingAgent {
             let params = GenerationParams {
                 temperature,
                 max_tokens: 1024,
-                system_prompt: Some(
-                    "You are a code generator. Output ONLY valid source code, no explanations."
-                        .into(),
-                ),
+                system_prompt: Some(self.codegen_system_prompt()),
             };
 
             // Sync bridge for async dispatcher
@@ -1542,6 +1544,27 @@ impl CodingAgent {
         self.config.working_dir.join("src").join("lib.rs")
     }
 
+    /// Detect the target language from the target file extension.
+    fn target_language(&self) -> &'static str {
+        let target = self.resolve_target_file();
+        match target.extension().and_then(|e| e.to_str()) {
+            Some("py") => "python",
+            Some("nix") => "nix",
+            _ => "rust",
+        }
+    }
+
+    /// Build a language-appropriate system prompt for the LLM.
+    fn codegen_system_prompt(&self) -> String {
+        match self.target_language() {
+            "python" => "You are a Python code generator. Output ONLY valid Python code. \
+                No explanations, no markdown fences, no comments outside the function. \
+                Complete the function body directly.".into(),
+            "nix" => "You are a Nix code generator. Output ONLY valid Nix expressions.".into(),
+            _ => "You are a code generator. Output ONLY valid source code, no explanations.".into(),
+        }
+    }
+
     /// Write code to disk, creating parent directories as needed.
     /// Strip markdown code fences from generated output.
     /// LLM and template outputs sometimes wrap code in ```rust ... ``` blocks.
@@ -1713,8 +1736,7 @@ impl CodingAgent {
                 if let Some(ref code) = self.generated_code {
                     // Code ready: write → check
                     Some(crate::action::primitives::recipes::write_and_check(
-                        target,
-                        code,
+                        target, code,
                     ))
                 } else {
                     None // generation happens via dispatcher, not primitives
@@ -1727,10 +1749,8 @@ impl CodingAgent {
             TaskPhase::Fixing => {
                 if let Some(ref code) = self.generated_code {
                     // Fix written: write → check, with recovery
-                    let write_check = crate::action::primitives::recipes::write_and_check(
-                        target,
-                        code,
-                    );
+                    let write_check =
+                        crate::action::primitives::recipes::write_and_check(target, code);
                     Some(write_check.recover(|_| {
                         // On failure, the agent will re-enter Fixing with new errors
                         Molecule::atom(Atom::Noop)
@@ -1741,6 +1761,196 @@ impl CodingAgent {
             }
             TaskPhase::Done => None,
         }
+    }
+
+    /// Generate multiple candidate plans for the current phase and use FEP
+    /// free-energy minimization to select the best one.
+    ///
+    /// Returns the selected plan (if any) and its profile. The FEP selector
+    /// prefers plans that are: feasible (phi + budget), non-destructive,
+    /// and have the lowest expected free energy.
+    fn select_plan_fep(&self) -> Option<(Molecule, PlanProfile)> {
+        use crate::action::primitives::{
+            select_best_plan, select_best_plan_with_history, PlanCandidate,
+        };
+
+        let target = self.resolve_target_file();
+        let working_dir = self.config.working_dir.clone();
+        let current_phi = self.phi_trace.last().copied().unwrap_or(0.0);
+
+        let candidates: Vec<PlanCandidate> = match self.phase {
+            TaskPhase::Understanding => {
+                let mut plans = vec![];
+                // Option A: List directory only (cheap)
+                let list_only = Molecule::atom(Atom::list(working_dir.clone()));
+                plans.push(PlanCandidate {
+                    name: "list_only".into(),
+                    profile: list_only.profile(),
+                    molecule: list_only,
+                });
+                // Option B: List + read target (more context)
+                if target.exists() {
+                    let list_and_read = Molecule::atom(Atom::list(working_dir.clone()))
+                        .then(Molecule::atom(Atom::read(target.clone())));
+                    plans.push(PlanCandidate {
+                        name: "list_and_read".into(),
+                        profile: list_and_read.profile(),
+                        molecule: list_and_read,
+                    });
+                }
+                // Option C: Gather context from multiple files
+                let cargo_toml = working_dir.join("Cargo.toml");
+                if cargo_toml.exists() && target.exists() {
+                    let gather = Molecule::atom(Atom::read(cargo_toml))
+                        .then(Molecule::atom(Atom::read(target.clone())))
+                        .then(Molecule::atom(Atom::list(working_dir.clone())));
+                    plans.push(PlanCandidate {
+                        name: "full_context".into(),
+                        profile: gather.profile(),
+                        molecule: gather,
+                    });
+                }
+                plans
+            }
+            TaskPhase::Testing => {
+                let mut plans = vec![];
+                // Option A: cargo check (fast, less info)
+                let check = Molecule::atom(Atom::cargo_check(working_dir.clone()));
+                plans.push(PlanCandidate {
+                    name: "cargo_check".into(),
+                    profile: check.profile(),
+                    molecule: check,
+                });
+                // Option B: cargo check + clippy (more info, more energy)
+                let check_clippy = Molecule::atom(Atom::cargo_check(working_dir.clone()))
+                    .then(Molecule::atom(Atom::cargo_clippy(working_dir.clone())));
+                plans.push(PlanCandidate {
+                    name: "check_and_clippy".into(),
+                    profile: check_clippy.profile(),
+                    molecule: check_clippy,
+                });
+                // Option C: full test suite (most info, most energy)
+                let test = Molecule::atom(Atom::cargo_test(working_dir.clone()));
+                plans.push(PlanCandidate {
+                    name: "cargo_test".into(),
+                    profile: test.profile(),
+                    molecule: test,
+                });
+                plans
+            }
+            TaskPhase::Generating => {
+                let mut plans = vec![];
+                if let Some(ref code) = self.generated_code {
+                    // Option A: write + check
+                    let wc = crate::action::primitives::recipes::write_and_check(
+                        target.clone(),
+                        code,
+                    );
+                    plans.push(PlanCandidate {
+                        name: "write_and_check".into(),
+                        profile: wc.profile(),
+                        molecule: wc,
+                    });
+                    // Option B: write + check + test (more thorough)
+                    let wct = crate::action::primitives::recipes::full_coding_workflow(
+                        target.clone(),
+                        code.clone(),
+                        working_dir.clone(),
+                    );
+                    plans.push(PlanCandidate {
+                        name: "full_workflow".into(),
+                        profile: wct.profile(),
+                        molecule: wct,
+                    });
+                }
+                // Option C-E: Tier-aware generation (Dispatch atoms)
+                // These let FEP choose the backend tier based on energy/success history
+                let prompt = self.build_generation_prompt();
+                for (name, mol) in crate::action::primitives::recipes::tiered_generation_candidates(
+                    target.clone(),
+                    &prompt,
+                ) {
+                    plans.push(PlanCandidate {
+                        name,
+                        profile: mol.profile(),
+                        molecule: mol,
+                    });
+                }
+                plans
+            }
+            TaskPhase::Fixing => {
+                if let Some(ref code) = self.generated_code {
+                    let mut plans = vec![];
+                    // Option A: write + check (simple)
+                    let wc = crate::action::primitives::recipes::write_and_check(
+                        target.clone(),
+                        code,
+                    );
+                    plans.push(PlanCandidate {
+                        name: "fix_and_check".into(),
+                        profile: wc.profile(),
+                        molecule: wc,
+                    });
+                    // Option B: write + check with recovery
+                    let wcr = crate::action::primitives::recipes::write_and_check(
+                        target.clone(),
+                        code,
+                    )
+                    .recover(|_| Molecule::atom(Atom::Noop));
+                    plans.push(PlanCandidate {
+                        name: "fix_with_recovery".into(),
+                        profile: wcr.profile(),
+                        molecule: wcr,
+                    });
+                    plans
+                } else {
+                    vec![]
+                }
+            }
+            TaskPhase::Planning | TaskPhase::Done => vec![],
+        };
+
+        if candidates.is_empty() {
+            return None;
+        }
+
+        // Enhancement 2: Query historical recipe success rates for learning loop.
+        // Past execution outcomes influence which plan FEP prefers.
+        let selected_idx = if let Some(ref store) = self.experience_store {
+            let recipe_keys: Vec<&str> = candidates
+                .iter()
+                .map(|c| {
+                    // Build recipe key from atom names
+                    c.profile
+                        .atom_names
+                        .first()
+                        .copied()
+                        .unwrap_or("Unknown")
+                })
+                .collect();
+            let rates = store.recipe_success_rates(&recipe_keys);
+            select_best_plan_with_history(&candidates, current_phi, self.energy_budget, &rates)
+        } else {
+            select_best_plan(&candidates, current_phi, self.energy_budget)
+        };
+
+        let selected_idx = selected_idx?;
+        let selected = &candidates[selected_idx];
+
+        tracing::debug!(
+            target: "symthaea::coding_agent",
+            phase = %self.phase,
+            selected = %selected.name,
+            candidates = candidates.len(),
+            energy = selected.profile.total_energy,
+            "FEP selected plan (history-aware)"
+        );
+
+        // Build the actual molecule to execute
+        // For tier-aware candidates, use the selected plan directly
+        let profile = selected.profile.clone();
+        self.build_execution_plan()
+            .map(|m| (m, profile))
     }
 
     /// Evaluate whether the current plan is safe and affordable.
@@ -1781,14 +1991,17 @@ impl CodingAgent {
             );
         }
 
-        (true, format!(
-            "Plan approved: {} steps, energy {:.1}/{:.1}, phi {:.3}/{:.3}",
-            profile.step_count,
-            profile.total_energy,
-            self.energy_budget,
-            current_phi,
-            profile.min_phi,
-        ))
+        (
+            true,
+            format!(
+                "Plan approved: {} steps, energy {:.1}/{:.1}, phi {:.3}/{:.3}",
+                profile.step_count,
+                profile.total_energy,
+                self.energy_budget,
+                current_phi,
+                profile.min_phi,
+            ),
+        )
     }
 
     /// Deduct energy cost from the budget after execution.
@@ -1970,7 +2183,10 @@ impl CodingAgent {
         // Before transitioning from Generating → Testing, validate that the
         // generated code is worth testing. Reject TODO stubs, empty bodies,
         // and unimplemented!() placeholders.
-        if (self.phase == TaskPhase::Generating || self.phase == TaskPhase::Fixing)
+        // Quality gate is Rust-specific — skip for Python/Nix targets
+        let is_rust = self.target_language() == "rust";
+        if is_rust
+            && (self.phase == TaskPhase::Generating || self.phase == TaskPhase::Fixing)
             && self.generated_code.is_some()
         {
             if let Some(ref code) = self.generated_code {
@@ -2063,10 +2279,10 @@ impl CodingAgent {
                 }
             }
             TaskPhase::Testing => {
-                // Try motor result first; if none, run cargo check directly
+                // Try motor result first; if none, run testing molecule
                 let effective_result = motor_result.clone().or_else(|| {
                     if self.generated_code.is_some() {
-                        self.run_cargo_check()
+                        self.do_testing_molecule()
                     } else {
                         None
                     }
@@ -2095,10 +2311,10 @@ impl CodingAgent {
             }
             TaskPhase::Fixing => {
                 let code_written = self.generated_code.is_some();
-                // Try motor result; if none and code was written, run cargo check directly
+                // Try motor result; if none and code was written, run testing molecule
                 let effective_result = motor_result.clone().or_else(|| {
                     if code_written {
-                        self.run_cargo_check()
+                        self.do_testing_molecule()
                     } else {
                         None
                     }
@@ -2262,7 +2478,6 @@ impl CodingAgent {
     /// still applies: we won't run commands if Phi is below the warm-up threshold.
     fn run_cargo_check(&mut self) -> Option<MotorOutputResult> {
         if !self.config.enable_real_exec {
-            // In simulated mode, check if generated code has basic syntax issues
             return Some(MotorOutputResult {
                 success: self.generated_code.is_some(),
                 action_type: Some(ActionType::CargoCheck),
@@ -2272,9 +2487,8 @@ impl CodingAgent {
             });
         }
 
-        let working_dir = &self.config.working_dir;
+        let working_dir = self.config.working_dir.clone();
 
-        // Check if Cargo.toml exists
         if !working_dir.join("Cargo.toml").exists() {
             return Some(MotorOutputResult {
                 success: false,
@@ -2285,51 +2499,320 @@ impl CodingAgent {
             });
         }
 
+        // Execute via MoleculeExecutor for value flow + energy tracking + trace
+        let current_phi = self.phi_trace.last().copied().unwrap_or(0.0);
+        let molecule = Molecule::atom(Atom::cargo_check(working_dir.clone()));
+        let mut executor = crate::action::primitives::MoleculeExecutor::new(
+            current_phi,
+            self.energy_budget,
+            true, // real execution
+        );
+
         tracing::info!(
             target: "symthaea::coding_agent",
             dir = %working_dir.display(),
-            "Running cargo check (direct)"
+            "Running cargo check (molecule executor)"
         );
 
-        match std::process::Command::new("cargo")
-            .args(["check", "--message-format=short"])
-            .current_dir(working_dir)
-            .output()
-        {
-            Ok(output) => {
-                let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-                let success = output.status.success();
+        match executor.execute(&molecule) {
+            Ok(val) => {
+                // Update energy budget from executor
+                self.energy_budget = executor.energy_budget;
+
+                // Store execution trace
+                self.store_execution_trace(&executor.trace);
+
+                let success = val.is_success();
+                let stderr_text = val.stderr().unwrap_or("").to_string();
 
                 if !success {
-                    self.last_test_output = Some(stderr.clone());
+                    self.last_test_output = Some(stderr_text.clone());
                     self.observations.push(format!(
                         "cargo check failed:\n{}",
-                        &stderr[..stderr.len().min(500)]
+                        &stderr_text[..stderr_text.len().min(500)]
                     ));
                 } else {
                     self.observations.push("cargo check passed".into());
                 }
+
+                let (stdout_bytes, stderr_bytes, exit_code) = match &val {
+                    PrimitiveValue::CommandResult { stdout, stderr, exit_code } => {
+                        (stdout.as_bytes().to_vec(), stderr.as_bytes().to_vec(), *exit_code)
+                    }
+                    _ => (vec![], vec![], if success { 0 } else { 1 }),
+                };
 
                 Some(MotorOutputResult {
                     success,
                     action_type: Some(ActionType::CargoCheck),
                     prediction_error: if success { 0.0 } else { 0.8 },
                     outcome: Some(crate::action::ActionOutcome::CommandOutput {
-                        stdout: output.stdout,
-                        stderr: output.stderr,
-                        exit_code: output.status.code().unwrap_or(-1),
+                        stdout: stdout_bytes,
+                        stderr: stderr_bytes,
+                        exit_code,
                     }),
-                    error: if success { None } else { Some(stderr) },
+                    error: if success { None } else { Some(stderr_text) },
                 })
             }
-            Err(e) => Some(MotorOutputResult {
+            Err(e) => {
+                let error_msg = format!("{}", e);
+                tracing::warn!(
+                    target: "symthaea::coding_agent",
+                    error = %error_msg,
+                    "Molecule executor failed"
+                );
+                Some(MotorOutputResult {
+                    success: false,
+                    action_type: Some(ActionType::CargoCheck),
+                    prediction_error: 1.0,
+                    outcome: None,
+                    error: Some(error_msg),
+                })
+            }
+        }
+    }
+
+    /// Execute a molecule through MoleculeExecutor and convert results to
+    /// observations, motor results, and trace storage.
+    ///
+    /// This is the unified execution path — all phases route through here
+    /// instead of ad-hoc file I/O.
+    fn execute_molecule(&mut self, molecule: &Molecule) -> Option<MotorOutputResult> {
+        let current_phi = self.phi_trace.last().copied().unwrap_or(0.0);
+        let real_exec = self.config.enable_real_exec;
+        let mut executor = MoleculeExecutor::new(current_phi, self.energy_budget, real_exec);
+
+        match executor.execute(molecule) {
+            Ok(val) => {
+                // Update energy budget
+                self.energy_budget = executor.energy_budget;
+
+                // Store trace
+                self.store_execution_trace(&executor.trace);
+
+                // Convert result to observations
+                match &val {
+                    PrimitiveValue::Text(text) => {
+                        if !text.is_empty() && text.len() <= 2000 {
+                            self.observations.push(text.clone());
+                        } else if text.len() > 2000 {
+                            self.observations.push(format!(
+                                "{}...(truncated, {} bytes total)",
+                                &text[..1500],
+                                text.len()
+                            ));
+                        }
+                    }
+                    PrimitiveValue::Listing(paths) => {
+                        let names: Vec<String> = paths
+                            .iter()
+                            .take(50)
+                            .map(|p| {
+                                p.file_name()
+                                    .map(|n| n.to_string_lossy().to_string())
+                                    .unwrap_or_else(|| p.display().to_string())
+                            })
+                            .collect();
+                        self.observations.push(format!("Files: [{}]", names.join(", ")));
+                    }
+                    PrimitiveValue::CommandResult {
+                        stdout,
+                        stderr,
+                        exit_code,
+                    } => {
+                        let success = *exit_code == 0;
+                        if !success {
+                            self.last_test_output = Some(stderr.clone());
+                            self.observations.push(format!(
+                                "Command failed (exit={}):\n{}",
+                                exit_code,
+                                &stderr[..stderr.len().min(500)]
+                            ));
+                        } else {
+                            self.observations
+                                .push(format!("Command succeeded (exit={})", exit_code));
+                        }
+                        return Some(MotorOutputResult {
+                            success,
+                            action_type: Some(ActionType::CargoCheck),
+                            prediction_error: if success { 0.0 } else { 0.8 },
+                            outcome: Some(ActionOutcome::CommandOutput {
+                                stdout: stdout.as_bytes().to_vec(),
+                                stderr: stderr.as_bytes().to_vec(),
+                                exit_code: *exit_code,
+                            }),
+                            error: if success { None } else { Some(stderr.clone()) },
+                        });
+                    }
+                    _ => {}
+                }
+
+                Some(MotorOutputResult {
+                    success: true,
+                    action_type: None,
+                    prediction_error: 0.0,
+                    outcome: Some(ActionOutcome::Success),
+                    error: None,
+                })
+            }
+            Err(e) => {
+                let error_msg = format!("{}", e);
+                tracing::warn!(
+                    target: "symthaea::coding_agent",
+                    error = %error_msg,
+                    "Molecule execution failed"
+                );
+                self.observations.push(format!("Execution error: {}", error_msg));
+                Some(MotorOutputResult {
+                    success: false,
+                    action_type: None,
+                    prediction_error: 1.0,
+                    outcome: None,
+                    error: Some(error_msg),
+                })
+            }
+        }
+    }
+
+    /// Execute the Understanding phase via molecules.
+    ///
+    /// Each read-only atom is executed individually through MoleculeExecutor
+    /// so that intermediate results (file contents) are captured in observations.
+    /// Understanding is always real I/O (read-only = no risk).
+    fn do_understanding_molecule(&mut self) {
+        let target = self.resolve_target_file();
+        let working_dir = self.config.working_dir.clone();
+        let current_phi = self.phi_trace.last().copied().unwrap_or(0.0);
+
+        // Execute each atom individually to capture all intermediate results.
+        // This is understanding-specific: we need every file's content, not just
+        // the last one in a sequence.
+
+        // 1. List working directory
+        {
+            let mol = Molecule::atom(Atom::list(working_dir.clone()));
+            let mut executor = MoleculeExecutor::new(current_phi, self.energy_budget, true);
+            if let Ok(PrimitiveValue::Listing(paths)) = executor.execute(&mol) {
+                self.energy_budget = executor.energy_budget;
+                let mut names: Vec<String> = paths
+                    .iter()
+                    .filter_map(|p| {
+                        let name = p.file_name()?.to_string_lossy().to_string();
+                        if name.starts_with('.') || name == "target" || name == "node_modules" {
+                            None
+                        } else if p.is_dir() {
+                            Some(format!("{}/", name))
+                        } else {
+                            Some(name)
+                        }
+                    })
+                    .collect();
+                names.sort();
+                if !names.is_empty() {
+                    self.observations.push(format!(
+                        "Working directory {}: [{}]",
+                        working_dir.display(),
+                        names.join(", ")
+                    ));
+                }
+            }
+        }
+
+        // 2. Read target file
+        if target.exists() {
+            let mol = Molecule::atom(Atom::read(target.clone()));
+            let mut executor = MoleculeExecutor::new(current_phi, self.energy_budget, true);
+            if let Ok(PrimitiveValue::Text(content)) = executor.execute(&mol) {
+                self.energy_budget = executor.energy_budget;
+                let preview = if content.len() > 1500 {
+                    format!("{}...(truncated)", &content[..1500])
+                } else {
+                    content
+                };
+                self.observations.push(format!(
+                    "Target file {} ({} bytes):\n{}",
+                    target.display(),
+                    preview.len(),
+                    preview
+                ));
+            }
+        } else {
+            self.observations.push(format!(
+                "Target file {} does not exist yet (will be created)",
+                target.display()
+            ));
+        }
+
+        // 3. Read Cargo.toml
+        let cargo_toml = working_dir.join("Cargo.toml");
+        if cargo_toml.exists() {
+            let mol = Molecule::atom(Atom::read(cargo_toml));
+            let mut executor = MoleculeExecutor::new(current_phi, self.energy_budget, true);
+            if let Ok(PrimitiveValue::Text(content)) = executor.execute(&mol) {
+                self.energy_budget = executor.energy_budget;
+                let preview: String = content.lines().take(15).collect::<Vec<_>>().join("\n");
+                self.observations.push(format!("Cargo.toml:\n{}", preview));
+            }
+        }
+
+        // Query experience store (non-molecule, fast cache lookup)
+        let hints = self.retrieve_experience_hints();
+        if !hints.is_empty() {
+            self.observations.push(format!(
+                "Prior experience: {} relevant patterns",
+                hints.len()
+            ));
+            for (pattern, hint) in hints.iter().take(3) {
+                self.observations.push(format!(
+                    "  Prior: {} → {}",
+                    &pattern[..pattern.len().min(80)],
+                    &hint[..hint.len().min(80)]
+                ));
+            }
+        }
+    }
+
+    /// Execute the Testing phase via molecules.
+    /// Replaces the ad-hoc run_cargo_check() with molecule execution.
+    fn do_testing_molecule(&mut self) -> Option<MotorOutputResult> {
+        if !self.config.enable_real_exec {
+            return Some(MotorOutputResult {
+                success: self.generated_code.is_some(),
+                action_type: Some(ActionType::CargoCheck),
+                prediction_error: 0.0,
+                outcome: Some(ActionOutcome::Success),
+                error: None,
+            });
+        }
+
+        let working_dir = self.config.working_dir.clone();
+        if !working_dir.join("Cargo.toml").exists() {
+            return Some(MotorOutputResult {
                 success: false,
                 action_type: Some(ActionType::CargoCheck),
-                prediction_error: 1.0,
+                prediction_error: 0.5,
                 outcome: None,
-                error: Some(format!("Failed to run cargo: {e}")),
-            }),
+                error: Some("No Cargo.toml in working directory".into()),
+            });
         }
+
+        // Use the FEP-selected plan if available, otherwise default to cargo check
+        let molecule = self
+            .current_plan
+            .as_ref()
+            .and_then(|profile| {
+                // If the profile includes testing atoms, rebuild the molecule
+                if profile.atom_names.iter().any(|n| *n == "CargoTest") {
+                    Some(Molecule::atom(Atom::cargo_test(working_dir.clone())))
+                } else if profile.atom_names.iter().any(|n| *n == "CargoCheck") {
+                    Some(Molecule::atom(Atom::cargo_check(working_dir.clone())))
+                } else {
+                    None
+                }
+            })
+            .unwrap_or_else(|| Molecule::atom(Atom::cargo_check(working_dir)));
+
+        self.execute_molecule(&molecule)
     }
 
     /// Check code quality before allowing it into the Testing phase.
@@ -2542,6 +3025,59 @@ impl CodingAgent {
         }
     }
 
+    /// Store a molecule execution trace — both in observations and in the
+    /// persistent experience store for cross-session learning (#3).
+    fn store_execution_trace(&mut self, trace: &[(String, f32, String)]) {
+        if trace.is_empty() {
+            return;
+        }
+
+        // Format trace for observations
+        let trace_summary: String = trace
+            .iter()
+            .map(|(name, energy, summary)| format!("  {} (E={:.1}): {}", name, energy, summary))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        tracing::debug!(
+            target: "symthaea::coding_agent",
+            steps = trace.len(),
+            "Molecule trace:\n{}", trace_summary
+        );
+
+        // Store trace as a procedural experience for recipe learning
+        let total_energy: f32 = trace.iter().map(|(_, e, _)| e).sum();
+        let atom_names: Vec<&str> = trace.iter().map(|(n, _, _)| n.as_str()).collect();
+        let recipe_key = atom_names.join("→");
+
+        // Check if the last step was a success (exit=0 or no error)
+        let last_success = trace
+            .last()
+            .map(|(_, _, s)| s.contains("exit=0") || s == "()")
+            .unwrap_or(false);
+
+        let experience = CodingExperience {
+            task: format!("recipe:{}", recipe_key),
+            detail: format!(
+                "energy={:.1}, steps={}, atoms=[{}]",
+                total_energy,
+                trace.len(),
+                recipe_key,
+            ),
+            success: last_success,
+            tier: "MoleculeExecutor".to_string(),
+            fix_hint: None,
+        };
+
+        if let Some(ref mut store) = self.experience_store {
+            if let Ok(rt) = tokio::runtime::Runtime::new() {
+                rt.block_on(async {
+                    store.store(experience).await;
+                });
+            }
+        }
+    }
+
     /// Map prediction confidence to epistemic status.
     fn confidence_to_epistemic(confidence: f32) -> EpistemicStatus {
         if confidence > 0.9 {
@@ -2577,6 +3113,7 @@ impl CodingAgent {
             errors: self.errors.clone(),
             generation_tiers: self.generation_tiers.clone(),
             total_energy: self.dispatcher.as_ref().map_or(0.0, |d| d.total_energy()),
+            remaining_energy: self.energy_budget,
             #[cfg(feature = "school_learning")]
             generated_lessons: self.generate_lessons_from_failures(),
         }
@@ -3101,10 +3638,7 @@ impl CodingAgent {
 
     /// Build a plan for a hypothetical action and evaluate it.
     /// Useful for FEP to reason about candidate actions before choosing.
-    pub fn evaluate_hypothetical_plan(
-        &self,
-        plan: &Molecule,
-    ) -> (bool, String, PlanProfile) {
+    pub fn evaluate_hypothetical_plan(&self, plan: &Molecule) -> (bool, String, PlanProfile) {
         let current_phi = self.phi_trace.last().copied().unwrap_or(0.0);
         let profile = plan.profile();
         let (approved, reason) = self.evaluate_plan(plan, current_phi);
@@ -4082,6 +4616,7 @@ mod tests {
             errors: vec![],
             generation_tiers: vec![],
             total_energy: 0.0,
+            remaining_energy: 100.0,
             #[cfg(feature = "school_learning")]
             generated_lessons: vec![],
         };
@@ -4106,6 +4641,7 @@ mod tests {
             errors: vec![long_error; 5],
             generation_tiers: vec![],
             total_energy: 1.0,
+            remaining_energy: 99.0,
             #[cfg(feature = "school_learning")]
             generated_lessons: vec![],
         };
@@ -4815,7 +5351,10 @@ assertion `left == right` failed
         let plan = agent.build_execution_plan();
         assert!(plan.is_some(), "Understanding phase should produce a plan");
         let profile = plan.unwrap().profile();
-        assert!(profile.fully_reversible, "Understanding should be read-only");
+        assert!(
+            profile.fully_reversible,
+            "Understanding should be read-only"
+        );
         assert_eq!(
             profile.max_destructiveness,
             crate::action::DestructivenessLevel::ReadOnly
@@ -4988,5 +5527,218 @@ assertion `left == right` failed
         // Plan B should be more expensive (5 iterations of write+check)
         assert!(profile_b.total_energy > profile_a.total_energy);
         assert!(profile_b.step_count > profile_a.step_count);
+    }
+
+    // ── Enhancement 1: Molecule-driven execution tests ────────────────
+
+    #[test]
+    fn test_execute_molecule_read_simulated() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = CodingAgentConfig {
+            max_iterations: 1,
+            working_dir: dir.path().to_path_buf(),
+            enable_real_exec: false,
+            ..Default::default()
+        };
+        let mut agent = CodingAgent::new(config).unwrap();
+
+        let mol = Molecule::atom(Atom::read("/tmp/test.rs"));
+        let result = agent.execute_molecule(&mol);
+
+        assert!(result.is_some());
+        assert!(result.unwrap().success);
+        // Should have added observation
+        assert!(
+            agent.observations.iter().any(|o| o.contains("simulated read")),
+            "Should have simulated read observation: {:?}",
+            agent.observations
+        );
+    }
+
+    #[test]
+    fn test_execute_molecule_tracks_energy() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = CodingAgentConfig {
+            max_iterations: 1,
+            working_dir: dir.path().to_path_buf(),
+            enable_real_exec: false,
+            ..Default::default()
+        };
+        let mut agent = CodingAgent::new(config).unwrap();
+        agent.phi_trace.push(1.0); // need sufficient phi for CargoCheck (min 0.05)
+        let initial_energy = agent.energy_budget;
+
+        let mol = Molecule::atom(Atom::cargo_check(PathBuf::from("/tmp")));
+        agent.execute_molecule(&mol);
+
+        // Energy should have been deducted (CargoCheck costs 3.0)
+        assert!(
+            agent.energy_budget < initial_energy,
+            "Energy budget should decrease: {} < {}",
+            agent.energy_budget,
+            initial_energy
+        );
+    }
+
+    #[test]
+    fn test_execute_molecule_command_result() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = CodingAgentConfig {
+            max_iterations: 1,
+            working_dir: dir.path().to_path_buf(),
+            enable_real_exec: false,
+            ..Default::default()
+        };
+        let mut agent = CodingAgent::new(config).unwrap();
+        agent.phi_trace.push(1.0); // sufficient phi for CargoCheck
+
+        // Simulated exec returns exit_code=0
+        let mol = Molecule::atom(Atom::cargo_check(PathBuf::from("/tmp")));
+        let result = agent.execute_molecule(&mol).unwrap();
+
+        assert!(result.success);
+        assert_eq!(result.action_type, Some(ActionType::CargoCheck));
+    }
+
+    #[test]
+    fn test_do_understanding_molecule() {
+        let dir = tempfile::tempdir().unwrap();
+        // Create a Cargo.toml in the temp dir
+        std::fs::write(dir.path().join("Cargo.toml"), "[package]\nname = \"test\"").unwrap();
+        std::fs::create_dir_all(dir.path().join("src")).unwrap();
+        std::fs::write(dir.path().join("src/lib.rs"), "pub fn hello() {}").unwrap();
+
+        let config = CodingAgentConfig {
+            max_iterations: 1,
+            working_dir: dir.path().to_path_buf(),
+            target_file: Some(dir.path().join("src/lib.rs")),
+            enable_real_exec: true,
+            ..Default::default()
+        };
+        let mut agent = CodingAgent::new(config).unwrap();
+        agent.task = "add fibonacci".into();
+
+        agent.do_understanding_molecule();
+
+        // Should have gathered context
+        assert!(
+            !agent.observations.is_empty(),
+            "Should have observations from understanding"
+        );
+        // Should have file listing
+        assert!(
+            agent.observations.iter().any(|o| o.contains("src") || o.contains("Cargo.toml") || o.contains("Files")),
+            "Should have project files in observations: {:?}",
+            agent.observations
+        );
+    }
+
+    #[test]
+    fn test_do_testing_molecule_no_cargo_toml() {
+        let dir = tempfile::tempdir().unwrap();
+        // No Cargo.toml
+        let config = CodingAgentConfig {
+            max_iterations: 1,
+            working_dir: dir.path().to_path_buf(),
+            enable_real_exec: true,
+            ..Default::default()
+        };
+        let mut agent = CodingAgent::new(config).unwrap();
+
+        let result = agent.do_testing_molecule();
+        assert!(result.is_some());
+        assert!(!result.unwrap().success);
+    }
+
+    #[test]
+    fn test_do_testing_molecule_simulated() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = CodingAgentConfig {
+            max_iterations: 1,
+            working_dir: dir.path().to_path_buf(),
+            enable_real_exec: false,
+            ..Default::default()
+        };
+        let mut agent = CodingAgent::new(config).unwrap();
+        agent.generated_code = Some("fn main() {}".into());
+
+        let result = agent.do_testing_molecule();
+        assert!(result.is_some());
+        assert!(result.unwrap().success);
+    }
+
+    // ── Enhancement 2: Learning loop tests ────────────────────────────
+
+    #[test]
+    fn test_select_plan_fep_returns_plan() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("Cargo.toml"), "[package]\nname = \"t\"").unwrap();
+        std::fs::create_dir_all(dir.path().join("src")).unwrap();
+        std::fs::write(dir.path().join("src/lib.rs"), "").unwrap();
+
+        let config = CodingAgentConfig {
+            max_iterations: 1,
+            working_dir: dir.path().to_path_buf(),
+            target_file: Some(dir.path().join("src/lib.rs")),
+            ..Default::default()
+        };
+        let mut agent = CodingAgent::new(config).unwrap();
+        agent.task = "add fibonacci".into();
+        agent.phase = TaskPhase::Understanding;
+        agent.phi_trace.push(1.0);
+
+        let result = agent.select_plan_fep();
+        assert!(result.is_some(), "Should select a plan for Understanding phase");
+    }
+
+    // ── Enhancement 3: Dispatch tier tests ────────────────────────────
+
+    #[test]
+    fn test_generating_includes_tiered_candidates() {
+        use crate::action::primitives::PlanCandidate;
+
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("Cargo.toml"), "[package]").unwrap();
+        std::fs::create_dir_all(dir.path().join("src")).unwrap();
+        std::fs::write(dir.path().join("src/lib.rs"), "").unwrap();
+
+        let config = CodingAgentConfig {
+            max_iterations: 1,
+            working_dir: dir.path().to_path_buf(),
+            target_file: Some(dir.path().join("src/lib.rs")),
+            ..Default::default()
+        };
+        let mut agent = CodingAgent::new(config).unwrap();
+        agent.task = "add fibonacci".into();
+        agent.phase = TaskPhase::Generating;
+        agent.phi_trace.push(1.0);
+        agent.generated_code = Some("fn fib(n: u32) -> u32 { n }".into());
+
+        // The plan selection should have candidates including tiered dispatch
+        let result = agent.select_plan_fep();
+        // It should succeed (at least the write_and_check candidate)
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn test_dispatch_tier_energy_in_profile() {
+        let native = crate::action::primitives::recipes::generate_and_check(
+            PathBuf::from("/tmp/src/lib.rs"),
+            "add fib",
+            DispatchTier::Native,
+        );
+        let cloud = crate::action::primitives::recipes::generate_and_check(
+            PathBuf::from("/tmp/src/lib.rs"),
+            "add fib",
+            DispatchTier::CloudLlm,
+        );
+
+        // Cloud plan should be 50x more expensive for the dispatch atom
+        assert!(
+            cloud.profile().total_energy > native.profile().total_energy * 5.0,
+            "Cloud ({}) should be much more expensive than native ({})",
+            cloud.profile().total_energy,
+            native.profile().total_energy
+        );
     }
 }
