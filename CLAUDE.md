@@ -22,8 +22,8 @@ Full allocation: @.claude/rules/PORTS.md
 2. **No workarounds** - Fix the flake, don't hack
 3. **Test what exists** - No aspirational tests
 4. **Edit, don't duplicate** - One implementation per feature
-5. **No custom CARGO_TARGET_DIR** - Use the project's default `target/` directory. Do NOT create unique target dirs in `/tmp`. sccache handles caching; cargo's built-in locking handles concurrency. Multiple sessions waiting on the same lock is fine — the second build is incremental and fast.
-6. **One session per workspace** - Do NOT run multiple Claude Code sessions editing the same workspace simultaneously. Concurrent sessions cause: (a) cargo lock contention (60+ rustc processes), (b) edits in one session overwritten by another, (c) build times 10-50x slower. Use git worktrees (`isolation: "worktree"`) for parallel work.
+5. **No custom CARGO_TARGET_DIR** - Use the project's default `target/` directory. Do NOT create unique target dirs in `/tmp`. sccache handles caching via `~/.cargo/config.toml` (`rustc-wrapper = "sccache"`). Each worktree gets its own `target/`; sccache shares compiled artifacts across all of them.
+6. **Use session worktrees for parallel work** - Do NOT run multiple sessions building in the same `target/` directory. Instead, create an isolated worktree: `./scripts/session-worktree.sh create <name>`, then `cd` into the printed path. This gives you your own `target/` (no cargo lock contention) while sccache ensures shared compilation cache. Run `./scripts/session-worktree.sh cleanup` periodically to remove stale worktrees. Run `./scripts/session-worktree.sh status` to check system health.
 7. **No monorepo CI** - Do NOT add GitHub Actions workflows to this private monorepo. CI runs on the public standalone repos only (symthaea, mycelix). Use `symthaea/scripts/sync-to-standalone.sh` to push changes to the standalone repo for CI.
 
 Full rules: @.claude/rules/DEVELOPMENT.md

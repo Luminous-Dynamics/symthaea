@@ -18,12 +18,14 @@ pub use consciousness_thresholds::{ConsciousnessThresholds, PhiThresholds};
 
 pub mod consciousness_profile;
 pub use consciousness_profile::{
-    bootstrap_credential, evaluate_bootstrap_governance, evaluate_governance, gate_consciousness,
-    is_bootstrap_eligible, needs_refresh, requirement_for_basic, requirement_for_constitutional,
-    requirement_for_guardian, requirement_for_proposal, requirement_for_voting, should_audit,
-    ConsciousnessCredential, ConsciousnessProfile, ConsciousnessTier, GateAuditInput,
-    GovernanceAuditFilter, GovernanceAuditResult, GovernanceEligibility, GovernanceRequirement,
-    GRACE_PERIOD_US, REFRESH_WINDOW_US,
+    bootstrap_credential, decay_reputation, evaluate_bootstrap_governance, evaluate_governance,
+    evaluate_governance_with_reputation, gate_consciousness, is_bootstrap_eligible, needs_refresh,
+    requirement_for_basic, requirement_for_constitutional, requirement_for_guardian,
+    requirement_for_proposal, requirement_for_voting, should_audit, ConsciousnessCredential,
+    ConsciousnessProfile, ConsciousnessTier, GateAuditInput, GovernanceAuditFilter,
+    GovernanceAuditResult, GovernanceEligibility, GovernanceRequirement, ReputationState,
+    GRACE_PERIOD_US, REFRESH_WINDOW_US, REPUTATION_BLACKLIST_THRESHOLD, REPUTATION_DECAY_PER_DAY,
+    REPUTATION_MAX_SLASHES, REPUTATION_RESTORATION_INTERACTIONS, REPUTATION_SLASH_FACTOR,
 };
 
 pub mod collective_phi;

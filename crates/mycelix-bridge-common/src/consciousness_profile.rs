@@ -310,6 +310,14 @@ pub struct GovernanceEligibility {
     pub profile: ConsciousnessProfile,
     /// Why ineligible (empty if eligible).
     pub reasons: Vec<String>,
+    /// Restoration progress (0.0–1.0). 1.0 for non-blacklisted agents.
+    /// Only meaningful when used with `evaluate_governance_with_reputation`.
+    #[serde(default = "default_restoration_progress")]
+    pub restoration_progress: f64,
+}
+
+fn default_restoration_progress() -> f64 {
+    1.0
 }
 
 // ============================================================================
@@ -433,6 +441,7 @@ pub fn evaluate_bootstrap_governance(
             tier: ConsciousnessTier::Observer,
             profile: credential.profile.clone(),
             reasons: vec!["Bootstrap credential expired".into()],
+            restoration_progress: 1.0,
         };
     }
     if requirement.min_tier > ConsciousnessTier::Participant {
@@ -445,6 +454,7 @@ pub fn evaluate_bootstrap_governance(
                 "Bootstrap credentials are capped at Participant; {:?} required",
                 requirement.min_tier,
             )],
+            restoration_progress: 1.0,
         };
     }
     if let Some(min_id) = requirement.min_identity {
@@ -458,6 +468,7 @@ pub fn evaluate_bootstrap_governance(
                     "Identity {:.2} below required {:.2}",
                     credential.profile.identity, min_id,
                 )],
+                restoration_progress: 1.0,
             };
         }
     }
@@ -467,6 +478,7 @@ pub fn evaluate_bootstrap_governance(
         tier: ConsciousnessTier::Participant,
         profile: credential.profile.clone(),
         reasons: vec!["Bootstrap credential: temporary Participant access".into()],
+        restoration_progress: 1.0,
     }
 }
 
@@ -529,6 +541,7 @@ pub fn evaluate_governance(
                 tier,
                 profile: clamped,
                 reasons,
+                restoration_progress: 1.0,
             };
         }
 
@@ -541,6 +554,7 @@ pub fn evaluate_governance(
                 "Credential expired at {} (now {})",
                 credential.expires_at, now_us
             )],
+            restoration_progress: 1.0,
         };
     }
     let clamped = credential.profile.clamped();
@@ -587,6 +601,7 @@ pub fn evaluate_governance(
         tier,
         profile: clamped,
         reasons,
+        restoration_progress: 1.0,
     }
 }
 
@@ -802,6 +817,254 @@ pub struct GovernanceAuditResult {
     pub entries: Vec<GateAuditInput>,
     /// Number of entries that matched the filter.
     pub total_matched: u32,
+}
+
+// ============================================================================
+// Reputation Decay, Slashing, and Restoration
+// ============================================================================
+
+/// Reputation decay rate per day (multiplicative).
+/// Half-life ~347 days: `0.998^347 ~ 0.500`.
+///
+/// Basis: Dunbar (2010) — social relationships require maintenance;
+/// trust fades without sustained positive interaction.
+pub const REPUTATION_DECAY_PER_DAY: f64 = 0.998;
+
+/// Slashing factor for detected Byzantine behavior.
+/// Applied as: `reputation *= (1.0 - SLASH_FACTOR)`.
+///
+/// Basis: Ostrom (1990) — graduated sanctions in commons governance.
+/// First offense halves reputation; recovery is possible but slow.
+pub const REPUTATION_SLASH_FACTOR: f64 = 0.5;
+
+/// Reputation floor below which an agent is considered blacklisted.
+/// At this level, the agent cannot participate in governance.
+///
+/// Basis: Axelrod (1984) — sustained defection warrants exclusion,
+/// but the threshold must be low enough to allow recovery.
+pub const REPUTATION_BLACKLIST_THRESHOLD: f64 = 0.05;
+
+/// Minimum consecutive good interactions to lift a blacklist.
+///
+/// Basis: Ubuntu restorative justice — redemption through demonstrated
+/// commitment to community norms. 100 interactions ~ weeks of good behavior.
+pub const REPUTATION_RESTORATION_INTERACTIONS: u32 = 100;
+
+/// Maximum slash events before permanent reputation cap at 0.5.
+/// Prevents repeated gaming of slash/recovery cycles.
+///
+/// Basis: Three-strikes principle with proportional response.
+pub const REPUTATION_MAX_SLASHES: u32 = 5;
+
+/// Reputation state for an agent, tracking decay and sanctions.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ReputationState {
+    /// Current reputation score (0.0-1.0).
+    pub score: f64,
+    /// Last update timestamp (microseconds since epoch).
+    pub last_updated_us: u64,
+    /// Number of consecutive good interactions since last slash.
+    pub consecutive_good: u32,
+    /// Total slash events in this agent's history.
+    pub total_slashes: u32,
+    /// Whether the agent is currently blacklisted.
+    pub blacklisted: bool,
+    /// Timestamp at which blacklist was applied (for duration tracking).
+    pub blacklisted_since_us: Option<u64>,
+}
+
+impl Default for ReputationState {
+    fn default() -> Self {
+        Self {
+            score: 0.0,
+            last_updated_us: 0,
+            consecutive_good: 0,
+            total_slashes: 0,
+            blacklisted: false,
+            blacklisted_since_us: None,
+        }
+    }
+}
+
+impl ReputationState {
+    /// Create a new reputation state with the given initial score and timestamp.
+    pub fn new(initial_score: f64, now_us: u64) -> Self {
+        Self {
+            score: initial_score.clamp(0.0, 1.0),
+            last_updated_us: now_us,
+            ..Default::default()
+        }
+    }
+
+    /// Apply temporal decay based on elapsed time.
+    ///
+    /// `reputation *= DECAY^days_elapsed`
+    ///
+    /// Uses microsecond timestamps. Safe for NaN/Inf inputs (clamps to 0).
+    pub fn apply_decay(&mut self, now_us: u64) {
+        if now_us <= self.last_updated_us {
+            return; // No time elapsed or clock skew
+        }
+        let elapsed_us = now_us - self.last_updated_us;
+        let elapsed_days = elapsed_us as f64 / 86_400_000_000.0;
+
+        if !elapsed_days.is_finite() || elapsed_days <= 0.0 {
+            return;
+        }
+
+        let decay_factor = REPUTATION_DECAY_PER_DAY.powf(elapsed_days);
+        if decay_factor.is_finite() {
+            self.score = (self.score * decay_factor).clamp(0.0, 1.0);
+        } else {
+            self.score = 0.0; // Extreme elapsed time -> full decay
+        }
+        self.last_updated_us = now_us;
+
+        // Check blacklist threshold after decay
+        self.check_blacklist(now_us);
+    }
+
+    /// Record a positive interaction, incrementing the consecutive good count.
+    ///
+    /// If the agent is blacklisted and reaches RESTORATION_INTERACTIONS,
+    /// the blacklist is lifted (Ubuntu restorative justice model).
+    pub fn record_good_interaction(&mut self, reputation_boost: f64, now_us: u64) {
+        self.apply_decay(now_us);
+        self.consecutive_good = self.consecutive_good.saturating_add(1);
+
+        // Apply reputation boost (clamped to prevent abuse)
+        let effective_boost = reputation_boost.clamp(0.0, 0.1);
+        let cap = if self.total_slashes >= REPUTATION_MAX_SLASHES {
+            0.5 // Permanent cap after max slashes
+        } else {
+            1.0
+        };
+        self.score = (self.score + effective_boost).clamp(0.0, cap);
+
+        // Check restoration
+        if self.blacklisted && self.consecutive_good >= REPUTATION_RESTORATION_INTERACTIONS {
+            self.blacklisted = false;
+            self.blacklisted_since_us = None;
+            // Restore to minimum Participant threshold
+            self.score = self.score.max(0.1);
+        }
+    }
+
+    /// Apply a reputation slash for detected Byzantine behavior.
+    ///
+    /// Resets consecutive good interactions. Checks blacklist after slashing.
+    ///
+    /// Returns the new reputation score.
+    pub fn slash(&mut self, now_us: u64) -> f64 {
+        self.apply_decay(now_us);
+        self.score *= 1.0 - REPUTATION_SLASH_FACTOR;
+        self.score = self.score.clamp(0.0, 1.0);
+        self.consecutive_good = 0;
+        self.total_slashes = self.total_slashes.saturating_add(1);
+        self.check_blacklist(now_us);
+        self.score
+    }
+
+    /// Apply a proportional slash with a custom factor.
+    ///
+    /// `factor` is clamped to [0.0, 1.0]. Applied as: `score *= (1.0 - factor)`.
+    pub fn slash_proportional(&mut self, factor: f64, now_us: u64) -> f64 {
+        self.apply_decay(now_us);
+        let clamped_factor = factor.clamp(0.0, 1.0);
+        self.score *= 1.0 - clamped_factor;
+        self.score = self.score.clamp(0.0, 1.0);
+        self.consecutive_good = 0;
+        self.total_slashes = self.total_slashes.saturating_add(1);
+        self.check_blacklist(now_us);
+        self.score
+    }
+
+    /// Check and update blacklist status.
+    fn check_blacklist(&mut self, now_us: u64) {
+        if self.score < REPUTATION_BLACKLIST_THRESHOLD && !self.blacklisted {
+            self.blacklisted = true;
+            self.blacklisted_since_us = Some(now_us);
+        }
+    }
+
+    /// Whether this agent can participate in governance.
+    ///
+    /// Blacklisted agents are excluded from all governance actions
+    /// until they complete the restoration path.
+    pub fn can_participate(&self) -> bool {
+        !self.blacklisted
+    }
+
+    /// Restoration progress (0.0-1.0).
+    ///
+    /// Returns 1.0 for non-blacklisted agents.
+    /// For blacklisted agents, tracks progress toward RESTORATION_INTERACTIONS.
+    pub fn restoration_progress(&self) -> f64 {
+        if !self.blacklisted {
+            return 1.0;
+        }
+        (self.consecutive_good as f64 / REPUTATION_RESTORATION_INTERACTIONS as f64).clamp(0.0, 1.0)
+    }
+}
+
+/// Apply reputation decay to a ConsciousnessProfile's reputation dimension.
+///
+/// Convenience function for use in credential issuance pipelines.
+pub fn decay_reputation(profile: &ConsciousnessProfile, elapsed_days: f64) -> ConsciousnessProfile {
+    if !elapsed_days.is_finite() || elapsed_days <= 0.0 {
+        return profile.clone();
+    }
+    let decay_factor = REPUTATION_DECAY_PER_DAY.powf(elapsed_days);
+    let decayed_rep = if decay_factor.is_finite() {
+        (profile.reputation * decay_factor).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    ConsciousnessProfile {
+        identity: profile.identity,
+        reputation: decayed_rep,
+        community: profile.community,
+        engagement: profile.engagement,
+    }
+}
+
+/// Evaluate governance with reputation state integration.
+///
+/// Wraps `evaluate_governance` but also checks blacklist status
+/// and applies restoration progress to vote weight.
+pub fn evaluate_governance_with_reputation(
+    credential: &ConsciousnessCredential,
+    requirement: &GovernanceRequirement,
+    reputation_state: &ReputationState,
+    now_us: u64,
+) -> GovernanceEligibility {
+    // Blacklisted agents cannot participate
+    if reputation_state.blacklisted {
+        return GovernanceEligibility {
+            eligible: false,
+            weight_bp: 0,
+            tier: ConsciousnessTier::Observer,
+            profile: credential.profile.clone(),
+            reasons: vec![format!(
+                "Blacklisted: reputation {:.3} below threshold {:.3}. Restoration progress: {:.0}%",
+                reputation_state.score,
+                REPUTATION_BLACKLIST_THRESHOLD,
+                reputation_state.restoration_progress() * 100.0,
+            )],
+            restoration_progress: reputation_state.restoration_progress(),
+        };
+    }
+
+    // Evaluate normally
+    let mut result = evaluate_governance(credential, requirement, now_us);
+
+    // Scale vote weight by slash penalty if agent has been slashed before
+    if reputation_state.total_slashes > 0 {
+        let slash_penalty = 1.0 - (reputation_state.total_slashes as f64 * 0.05).min(0.25);
+        result.weight_bp = (result.weight_bp as f64 * slash_penalty) as u32;
+    }
+
+    result
 }
 
 // ============================================================================
@@ -2513,5 +2776,261 @@ mod tests {
             // Tier is always valid (no panic)
             let _tier = clamped.tier();
         }
+    }
+
+    // ========================================================================
+    // Reputation decay, slashing, and restoration tests
+    // ========================================================================
+
+    #[test]
+    fn test_reputation_decay_one_day() {
+        let mut state = ReputationState::new(1.0, 0);
+        let one_day_us = 86_400_000_000u64;
+        state.apply_decay(one_day_us);
+        assert!(
+            (state.score - REPUTATION_DECAY_PER_DAY).abs() < 1e-6,
+            "After 1 day, score should be {}, got {}",
+            REPUTATION_DECAY_PER_DAY,
+            state.score
+        );
+    }
+
+    #[test]
+    fn test_reputation_decay_half_life() {
+        let mut state = ReputationState::new(1.0, 0);
+        let days_347_us = 347 * 86_400_000_000u64;
+        state.apply_decay(days_347_us);
+        assert!(
+            state.score > 0.49 && state.score < 0.51,
+            "After ~347 days, score should be ~0.5, got {}",
+            state.score
+        );
+    }
+
+    #[test]
+    fn test_reputation_no_decay_on_zero_elapsed() {
+        let mut state = ReputationState::new(0.8, 1000);
+        state.apply_decay(1000); // same timestamp
+        assert!((state.score - 0.8).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_reputation_slash() {
+        let mut state = ReputationState::new(1.0, 0);
+        let new_score = state.slash(1000);
+        assert!(
+            (new_score - 0.5).abs() < 1e-6,
+            "After slash, score should be 0.5, got {}",
+            new_score
+        );
+        assert_eq!(state.total_slashes, 1);
+        assert_eq!(state.consecutive_good, 0);
+    }
+
+    #[test]
+    fn test_reputation_slash_below_blacklist() {
+        let mut state = ReputationState::new(0.08, 0);
+        state.slash(1000);
+        // 0.08 * 0.5 = 0.04 < 0.05 threshold
+        assert!(state.blacklisted);
+        assert!(!state.can_participate());
+    }
+
+    #[test]
+    fn test_reputation_restoration_path() {
+        let mut state = ReputationState::new(0.03, 0);
+        state.blacklisted = true;
+        state.blacklisted_since_us = Some(0);
+
+        // Progress through restoration
+        for i in 0..REPUTATION_RESTORATION_INTERACTIONS {
+            assert!(
+                state.blacklisted,
+                "Should still be blacklisted at interaction {}",
+                i
+            );
+            state.record_good_interaction(0.001, 1000 + i as u64 * 1000);
+        }
+
+        assert!(
+            !state.blacklisted,
+            "Should be restored after {} good interactions",
+            REPUTATION_RESTORATION_INTERACTIONS
+        );
+        assert!(
+            state.score >= 0.1,
+            "Score should be at least 0.1 after restoration"
+        );
+    }
+
+    #[test]
+    fn test_reputation_max_slashes_cap() {
+        let mut state = ReputationState::new(1.0, 0);
+
+        // Slash more than MAX_SLASHES times
+        for i in 0..(REPUTATION_MAX_SLASHES + 2) {
+            state.score = 0.8; // Reset score to test cap
+            state.slash(i as u64 * 1000);
+        }
+
+        // Now good interactions should be capped at 0.5
+        state.score = 0.3;
+        state.blacklisted = false;
+        for i in 0..200 {
+            state.record_good_interaction(0.01, 1_000_000 + i as u64 * 1000);
+        }
+        assert!(
+            state.score <= 0.5 + 1e-6,
+            "Score should be capped at 0.5 after {} slashes, got {}",
+            REPUTATION_MAX_SLASHES,
+            state.score
+        );
+    }
+
+    #[test]
+    fn test_reputation_proportional_slash() {
+        let mut state = ReputationState::new(1.0, 0);
+        state.slash_proportional(0.3, 1000);
+        assert!((state.score - 0.7).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_reputation_restoration_progress() {
+        let mut state = ReputationState::new(0.01, 0);
+        state.blacklisted = true;
+        state.blacklisted_since_us = Some(0);
+        state.consecutive_good = 50;
+
+        let progress = state.restoration_progress();
+        assert!(
+            (progress - 0.5).abs() < 1e-6,
+            "50/{} should be 50% progress, got {}",
+            REPUTATION_RESTORATION_INTERACTIONS,
+            progress
+        );
+    }
+
+    #[test]
+    fn test_reputation_non_blacklisted_full_progress() {
+        let state = ReputationState::new(0.8, 0);
+        assert!((state.restoration_progress() - 1.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_decay_reputation_profile() {
+        let profile = ConsciousnessProfile {
+            identity: 0.9,
+            reputation: 1.0,
+            community: 0.7,
+            engagement: 0.5,
+        };
+        let decayed = decay_reputation(&profile, 30.0);
+        assert!(
+            (decayed.identity - 0.9).abs() < 1e-10,
+            "Identity should not decay"
+        );
+        assert!(decayed.reputation < 1.0, "Reputation should decay");
+        assert!(
+            (decayed.community - 0.7).abs() < 1e-10,
+            "Community should not decay"
+        );
+    }
+
+    #[test]
+    fn test_evaluate_governance_blacklisted() {
+        let credential = ConsciousnessCredential {
+            did: "did:mycelix:test".to_string(),
+            profile: ConsciousnessProfile {
+                identity: 0.9,
+                reputation: 0.01,
+                community: 0.8,
+                engagement: 0.7,
+            },
+            tier: ConsciousnessTier::Citizen,
+            issued_at: 0,
+            expires_at: 100_000_000_000,
+            issuer: "did:mycelix:bridge".to_string(),
+        };
+        let rep_state = ReputationState {
+            score: 0.01,
+            blacklisted: true,
+            blacklisted_since_us: Some(0),
+            consecutive_good: 20,
+            total_slashes: 2,
+            last_updated_us: 0,
+        };
+        let requirement = GovernanceRequirement {
+            min_tier: ConsciousnessTier::Participant,
+            min_identity: None,
+            min_community: None,
+        };
+
+        let result = evaluate_governance_with_reputation(
+            &credential,
+            &requirement,
+            &rep_state,
+            50_000_000_000,
+        );
+        assert!(!result.eligible, "Blacklisted agent should not be eligible");
+        assert_eq!(result.weight_bp, 0);
+    }
+
+    #[test]
+    fn test_evaluate_governance_slash_penalty() {
+        let credential = ConsciousnessCredential {
+            did: "did:mycelix:test".to_string(),
+            profile: ConsciousnessProfile {
+                identity: 0.9,
+                reputation: 0.8,
+                community: 0.8,
+                engagement: 0.7,
+            },
+            tier: ConsciousnessTier::Steward,
+            issued_at: 0,
+            expires_at: 100_000_000_000,
+            issuer: "did:mycelix:bridge".to_string(),
+        };
+        let rep_state = ReputationState {
+            score: 0.8,
+            blacklisted: false,
+            blacklisted_since_us: None,
+            consecutive_good: 50,
+            total_slashes: 2, // 2 slashes -> 10% weight reduction
+            last_updated_us: 0,
+        };
+        let requirement = GovernanceRequirement {
+            min_tier: ConsciousnessTier::Participant,
+            min_identity: None,
+            min_community: None,
+        };
+
+        let result = evaluate_governance_with_reputation(
+            &credential,
+            &requirement,
+            &rep_state,
+            50_000_000_000,
+        );
+        assert!(result.eligible);
+        // Weight should be reduced by slash penalty
+        let base_weight = credential.profile.clamped().tier().vote_weight_bp();
+        assert!(
+            result.weight_bp < base_weight,
+            "Weight {} should be less than base {} due to slash penalty",
+            result.weight_bp,
+            base_weight
+        );
+    }
+
+    #[test]
+    fn test_reputation_nan_safety() {
+        let state = ReputationState::new(f64::NAN, 0);
+        assert!(
+            (state.score - 0.0).abs() < 1e-10,
+            "NaN should clamp to 0"
+        );
+
+        let mut state2 = ReputationState::new(0.5, 0);
+        state2.apply_decay(u64::MAX); // extreme elapsed time
+        assert!(state2.score.is_finite());
     }
 }

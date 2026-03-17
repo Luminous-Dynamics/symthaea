@@ -17,15 +17,15 @@
             "id": "test",
             "version": "1.0.0"
           },
-          "storedAt": 1771516453815,
+          "storedAt": 1773671293865,
           "version": 1,
           "createdBy": "stats-agent",
           "tombstone": false,
-          "expiresAt": 1772121253815,
+          "expiresAt": 1774276093865,
           "cid": "cid:3227ed0614bb57255f2bde87551b9c1518eb4c8a4374cb40557d5bac62e7129f",
           "sizeBytes": 7
         },
-        "expiresAt": 1772121253815
+        "expiresAt": 1774276093865
       }
     ],
     [
@@ -44,14 +44,14 @@
             "id": "profile",
             "version": "1.0.0"
           },
-          "storedAt": 1771516518141,
+          "storedAt": 1773671304640,
           "version": 1,
           "createdBy": "test-agent",
           "tombstone": false,
           "cid": "cid:3cba1e3cf23c8ce24b7e08171d823fbd9a4929aafd9f27516e30699d3a42026a",
           "sizeBytes": 16
         },
-        "expiresAt": 1772121318144
+        "expiresAt": 1774276104649
       }
     ],
     [
@@ -68,15 +68,15 @@
             "id": "test",
             "version": "1"
           },
-          "storedAt": 1771516520676,
+          "storedAt": 1773671307535,
           "version": 1,
           "createdBy": "test-agent",
           "tombstone": false,
-          "expiresAt": 1772121320676,
+          "expiresAt": 1774276107535,
           "cid": "cid:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
           "sizeBytes": 2
         },
-        "expiresAt": 1772121320676
+        "expiresAt": 1774276107535
       }
     ],
     [
@@ -93,14 +93,14 @@
             "id": "test",
             "version": "1"
           },
-          "storedAt": 1771516518199,
+          "storedAt": 1773671304668,
           "version": 1,
           "createdBy": "test-agent",
           "tombstone": false,
           "cid": "cid:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
           "sizeBytes": 2
         },
-        "expiresAt": 1772121318203
+        "expiresAt": 1774276104668
       }
     ],
     [
@@ -120,15 +120,585 @@
             "id": "preferences",
             "version": "1.0.0"
           },
-          "storedAt": 1771516520651,
+          "storedAt": 1773671307476,
           "version": 1,
           "createdBy": "test-agent",
           "tombstone": false,
-          "expiresAt": 1772121320651,
+          "expiresAt": 1774276107476,
           "cid": "cid:d000c3a62ce70f5ea240220649437c2c4852b6965200e6ff080b7b55d329ce25",
           "sizeBytes": 32
         },
-        "expiresAt": 1772121320651
+        "expiresAt": 1774276107476
+      }
+    ],
+    [
+      "uess:pref:theme",
+      {
+        "data": {
+          "preference": "dark-mode"
+        },
+        "metadata": {
+          "classification": {
+            "empirical": 0,
+            "normative": 0,
+            "materiality": 1
+          },
+          "schema": {
+            "id": "test",
+            "version": "1.0.0"
+          },
+          "storedAt": 1773671276117,
+          "version": 1,
+          "createdBy": "agent:test-user",
+          "tombstone": false,
+          "expiresAt": 1774276076117,
+          "cid": "cid:9f05ac29d0a9b0741c09454acb52550cc3a5623f3fb91ce2cdbd6967b7ff7b5d",
+          "sizeBytes": 26
+        },
+        "expiresAt": 1774276076117
+      }
+    ],
+    [
+      "uess:game:alice",
+      {
+        "data": {
+          "name": "Alice",
+          "score": 100
+        },
+        "metadata": {
+          "classification": {
+            "empirical": 0,
+            "normative": 2,
+            "materiality": 1
+          },
+          "schema": {
+            "id": "test",
+            "version": "1.0.0"
+          },
+          "storedAt": 1773671276161,
+          "version": 1,
+          "createdBy": "agent:test-user",
+          "tombstone": false,
+          "expiresAt": 1774276076161,
+          "cid": "cid:c83e0766d4824f250cb5e9933d3bc4e2dee695016a3023f5ecfa9c4b6459260c",
+          "sizeBytes": 28
+        },
+        "expiresAt": 1774276076161
+      }
+    ],
+    [
+      "uess:private:data",
+      {
+        "data": {
+          "secret": true
+        },
+        "metadata": {
+          "classification": {
+            "empirical": 0,
+            "normative": 0,
+            "materiality": 1
+          },
+          "schema": {
+            "id": "test",
+            "version": "1.0.0"
+          },
+          "storedAt": 1773671276172,
+          "version": 1,
+          "createdBy": "agent:test-user",
+          "tombstone": false,
+          "expiresAt": 1774276076172,
+          "cid": "cid:dc6f8af4a6f1de8a098d4240a234897a99168d02b0a32ae798fe7a3f01d1d49b",
+          "sizeBytes": 15
+        },
+        "expiresAt": 1774276076172
+      }
+    ],
+    [
+      "uess:public:data",
+      {
+        "data": {
+          "public": true
+        },
+        "metadata": {
+          "classification": {
+            "empirical": 2,
+            "normative": 2,
+            "materiality": 2
+          },
+          "schema": {
+            "id": "test",
+            "version": "1.0.0"
+          },
+          "storedAt": 1773671276178,
+          "version": 1,
+          "createdBy": "agent:test-user",
+          "tombstone": false,
+          "cid": "cid:fd18c84a41f878174ace9e13e21be5569b5ee223cd473b090f7c4ec62fc9e064",
+          "sizeBytes": 15
+        },
+        "expiresAt": 1774276076181
+      }
+    ],
+    [
+      "uess:cid:test",
+      {
+        "data": {
+          "content": "addressed"
+        },
+        "metadata": {
+          "classification": {
+            "empirical": 3,
+            "normative": 2,
+            "materiality": 2
+          },
+          "schema": {
+            "id": "test",
+            "version": "1.0.0"
+          },
+          "storedAt": 1773671276188,
+          "version": 1,
+          "createdBy": "agent:test-user",
+          "tombstone": false,
+          "cid": "cid:3c0452382ffa243d9270c2e97387458d048ce78bb805980f9ef8c7967a404d5c",
+          "sizeBytes": 23
+        },
+        "expiresAt": 1774276076192
+      }
+    ],
+    [
+      "uess:mutable:data",
+      {
+        "data": {
+          "count": 2
+        },
+        "metadata": {
+          "classification": {
+            "empirical": 0,
+            "normative": 2,
+            "materiality": 1
+          },
+          "schema": {
+            "id": "test",
+            "version": "1.0.0"
+          },
+          "storedAt": 1773671276196,
+          "modifiedAt": 1773671276198,
+          "version": 2,
+          "createdBy": "agent:test-user",
+          "tombstone": false,
+          "cid": "cid:57413ce83ee1d989e384dfd3a82c6e2d9052a23c4204706bd2d7df11aa4c2d7c",
+          "sizeBytes": 11
+        },
+        "expiresAt": 1774276076199
+      }
+    ],
+    [
+      "uess:append:data",
+      {
+        "data": {
+          "v": 2
+        },
+        "metadata": {
+          "classification": {
+            "empirical": 2,
+            "normative": 2,
+            "materiality": 2
+          },
+          "schema": {
+            "id": "test",
+            "version": "1.0.0"
+          },
+          "storedAt": 1773671276200,
+          "modifiedAt": 1773671276204,
+          "version": 2,
+          "createdBy": "agent:test-user",
+          "tombstone": false,
+          "cid": "cid:2b5442799fccc3af2e7e790017697373913b7afcac933d72fb5876de994f659a",
+          "sizeBytes": 7
+        },
+        "expiresAt": 1774276076204
+      }
+    ],
+    [
+      "uess:immutable:data",
+      {
+        "data": {
+          "fixed": true
+        },
+        "metadata": {
+          "classification": {
+            "empirical": 3,
+            "normative": 2,
+            "materiality": 2
+          },
+          "schema": {
+            "id": "test",
+            "version": "1.0.0"
+          },
+          "storedAt": 1773671276206,
+          "version": 1,
+          "createdBy": "agent:test-user",
+          "tombstone": false,
+          "cid": "cid:a9674b522fa327b337d828c0eff524432166321a1ff876e3e0c6fddab2bab84c",
+          "sizeBytes": 14
+        },
+        "expiresAt": 1774276076207
+      }
+    ],
+    [
+      "uess:immutable:delete",
+      {
+        "data": {
+          "fixed": true
+        },
+        "metadata": {
+          "classification": {
+            "empirical": 3,
+            "normative": 2,
+            "materiality": 2
+          },
+          "schema": {
+            "id": "test",
+            "version": "1.0.0"
+          },
+          "storedAt": 1773671276214,
+          "version": 1,
+          "createdBy": "agent:test-user",
+          "tombstone": false,
+          "cid": "cid:a9674b522fa327b337d828c0eff524432166321a1ff876e3e0c6fddab2bab84c",
+          "sizeBytes": 14
+        },
+        "expiresAt": 1774276076215
+      }
+    ],
+    [
+      "uess:downgrade:test",
+      {
+        "data": {
+          "data": true
+        },
+        "metadata": {
+          "classification": {
+            "empirical": 3,
+            "normative": 2,
+            "materiality": 2
+          },
+          "schema": {
+            "id": "test",
+            "version": "1.0.0"
+          },
+          "storedAt": 1773671276221,
+          "version": 1,
+          "createdBy": "agent:test-user",
+          "tombstone": false,
+          "cid": "cid:075d659c869f8fd2ee0df010fe8e5e9514b8b3370575786d555f731419c145c6",
+          "sizeBytes": 13
+        },
+        "expiresAt": 1774276076222
+      }
+    ],
+    [
+      "uess:info:test",
+      {
+        "data": {
+          "data": true
+        },
+        "metadata": {
+          "classification": {
+            "empirical": 2,
+            "normative": 2,
+            "materiality": 2
+          },
+          "schema": {
+            "id": "test",
+            "version": "1.0.0"
+          },
+          "storedAt": 1773671276226,
+          "version": 1,
+          "createdBy": "agent:test-user",
+          "tombstone": false,
+          "cid": "cid:075d659c869f8fd2ee0df010fe8e5e9514b8b3370575786d555f731419c145c6",
+          "sizeBytes": 13
+        },
+        "expiresAt": 1774276076227
+      }
+    ],
+    [
+      "uess:query:e0",
+      {
+        "data": {
+          "level": "e0"
+        },
+        "metadata": {
+          "classification": {
+            "empirical": 0,
+            "normative": 2,
+            "materiality": 1
+          },
+          "schema": {
+            "id": "test",
+            "version": "1.0.0"
+          },
+          "storedAt": 1773671276245,
+          "version": 1,
+          "createdBy": "agent:test-user",
+          "tombstone": false,
+          "expiresAt": 1774276076245,
+          "cid": "cid:d7eb61c6b81fccb75df4ea8c9a6bf5bad47ad03c70ccd72b0ccb951b0b09d8d3",
+          "sizeBytes": 14
+        },
+        "expiresAt": 1774276076245
+      }
+    ],
+    [
+      "uess:query:e2",
+      {
+        "data": {
+          "level": "e2"
+        },
+        "metadata": {
+          "classification": {
+            "empirical": 2,
+            "normative": 2,
+            "materiality": 2
+          },
+          "schema": {
+            "id": "test",
+            "version": "1.0.0"
+          },
+          "storedAt": 1773671276247,
+          "version": 1,
+          "createdBy": "agent:test-user",
+          "tombstone": false,
+          "cid": "cid:47bd055c8f19f0552cf3f98fd411a5b9f2e2f2cc2f9aa8d00eb79f8fdd503959",
+          "sizeBytes": 14
+        },
+        "expiresAt": 1774276076248
+      }
+    ],
+    [
+      "uess:query:e3",
+      {
+        "data": {
+          "level": "e3"
+        },
+        "metadata": {
+          "classification": {
+            "empirical": 3,
+            "normative": 2,
+            "materiality": 2
+          },
+          "schema": {
+            "id": "test",
+            "version": "1.0.0"
+          },
+          "storedAt": 1773671276248,
+          "version": 1,
+          "createdBy": "agent:test-user",
+          "tombstone": false,
+          "cid": "cid:bea683da9f8955b0288fdfcfbc79d665dc15b08de52be8d013468dcb05e46da0",
+          "sizeBytes": 14
+        },
+        "expiresAt": 1774276076249
+      }
+    ],
+    [
+      "uess:query:other",
+      {
+        "data": {
+          "level": "other"
+        },
+        "metadata": {
+          "classification": {
+            "empirical": 0,
+            "normative": 2,
+            "materiality": 1
+          },
+          "schema": {
+            "id": "other",
+            "version": "2.0.0"
+          },
+          "storedAt": 1773671276240,
+          "version": 1,
+          "createdBy": "agent:test-user",
+          "tombstone": false,
+          "expiresAt": 1774276076240,
+          "cid": "cid:b8feea4b846ce0f9fb1bc42a1f686b4fdc793527f3d95582f0ddf0b1857b579d",
+          "sizeBytes": 17
+        },
+        "expiresAt": 1774276076240
+      }
+    ],
+    [
+      "uess:verify:test",
+      {
+        "data": {
+          "important": true
+        },
+        "metadata": {
+          "classification": {
+            "empirical": 0,
+            "normative": 0,
+            "materiality": 1
+          },
+          "schema": {
+            "id": "test",
+            "version": "1.0.0"
+          },
+          "storedAt": 1773671293843,
+          "version": 1,
+          "createdBy": "verify-agent",
+          "tombstone": false,
+          "expiresAt": 1774276093843,
+          "cid": "cid:8638f5ff5c6743087c0cc70531ff9b67ef147d7e5a81a5e3ce19ea1aa8fd3049",
+          "sizeBytes": 18
+        },
+        "expiresAt": 1774276093843
+      }
+    ],
+    [
+      "uess:stats:2",
+      {
+        "data": {
+          "b": 2
+        },
+        "metadata": {
+          "classification": {
+            "empirical": 2,
+            "normative": 2,
+            "materiality": 1
+          },
+          "schema": {
+            "id": "test",
+            "version": "1.0.0"
+          },
+          "storedAt": 1773671276260,
+          "version": 1,
+          "createdBy": "agent:test-user",
+          "tombstone": false,
+          "expiresAt": 1774276076260,
+          "cid": "cid:0ab1a6d394cd30195f0642b67ae1180c375ffadf5dd7f39c390668b5fdb6da93",
+          "sizeBytes": 7
+        },
+        "expiresAt": 1774276076260
+      }
+    ],
+    [
+      "uess:e2e:m1",
+      {
+        "data": {
+          "level": "temporal"
+        },
+        "metadata": {
+          "classification": {
+            "empirical": 1,
+            "normative": 0,
+            "materiality": 1
+          },
+          "schema": {
+            "id": "test",
+            "version": "1.0.0"
+          },
+          "storedAt": 1773671293693,
+          "version": 1,
+          "createdBy": "e2e-agent",
+          "tombstone": false,
+          "expiresAt": 1774276093693,
+          "cid": "cid:79821c7a2ef21db8039254d2023c88814b973581f4104f00f013f1906f15b83c",
+          "sizeBytes": 20
+        },
+        "expiresAt": 1774276093693
+      }
+    ],
+    [
+      "uess:e2e:m2",
+      {
+        "data": {
+          "level": "persistent"
+        },
+        "metadata": {
+          "classification": {
+            "empirical": 2,
+            "normative": 2,
+            "materiality": 2
+          },
+          "schema": {
+            "id": "test",
+            "version": "1.0.0"
+          },
+          "storedAt": 1773671293699,
+          "version": 1,
+          "createdBy": "e2e-agent",
+          "tombstone": false,
+          "cid": "cid:e2fc2f804e36ae3e526a8008840ca46110928ccca6697e04b2a6dce97bf5db61",
+          "sizeBytes": 22
+        },
+        "expiresAt": 1774276093700
+      }
+    ],
+    [
+      "uess:integrity:test",
+      {
+        "data": {
+          "name": "Alice",
+          "scores": [
+            0.95,
+            0.88,
+            0.72
+          ],
+          "nested": {
+            "trust": {
+              "level": 3,
+              "verified": true
+            }
+          }
+        },
+        "metadata": {
+          "classification": {
+            "empirical": 0,
+            "normative": 0,
+            "materiality": 1
+          },
+          "schema": {
+            "id": "profile",
+            "version": "2.0.0"
+          },
+          "storedAt": 1773671293794,
+          "version": 1,
+          "createdBy": "e2e-agent",
+          "tombstone": false,
+          "expiresAt": 1774276093794,
+          "cid": "cid:714d74e39f74e36a29f61e921b3e00465bad0e001d3ac1a8a6254d9eb6ab6317",
+          "sizeBytes": 89
+        },
+        "expiresAt": 1774276093794
+      }
+    ],
+    [
+      "uess:obs:2",
+      {
+        "data": {
+          "x": 2
+        },
+        "metadata": {
+          "classification": {
+            "empirical": 1,
+            "normative": 0,
+            "materiality": 1
+          },
+          "schema": {
+            "id": "test",
+            "version": "1.0.0"
+          },
+          "storedAt": 1773671293818,
+          "version": 1,
+          "createdBy": "metrics-agent",
+          "tombstone": false,
+          "expiresAt": 1774276093818,
+          "cid": "cid:5e2b030a4a0f1582d78c0fd9924511cd6b1f2df9879e574f5ea1406c94052418",
+          "sizeBytes": 7
+        },
+        "expiresAt": 1774276093818
       }
     ]
   ]

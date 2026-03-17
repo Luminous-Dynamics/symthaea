@@ -32,6 +32,16 @@
             # Nix tooling
             nixfmt
             nil  # Nix LSP
+
+            # LaTeX (papers — HAI, psych-bench, stewardship)
+            (texlive.combine {
+              inherit (texlive)
+                scheme-medium
+                changepage
+                marvosym
+                cm-super
+                ;
+            })
           ];
 
           shellHook = ''

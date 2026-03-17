@@ -599,6 +599,12 @@ pub struct CognitiveLoopConfig {
     /// Default: false (desktop). Set true for mobile profiles.
     pub enable_thermal_adaptation: bool,
 
+    // ── Federation ──────────────────────────────────────────────────────
+    /// Enable federated learning coordinator (requires async runtime).
+    pub federation_enabled: bool,
+    /// Federated sync round interval in milliseconds (default: 30000 = 30s).
+    pub federation_round_interval_ms: u64,
+
     // ── Vision Manifold Integration ─────────────────────────────────────
     /// Enable the internal VisionBridge in the cognitive loop (default false).
     /// When true, the cognitive loop creates a VisionBridge and processes
@@ -792,6 +798,8 @@ impl Default for CognitiveLoopConfig {
             energy_budget_joules_per_sec: None,
             substrate_transition_alpha: super::thresholds::SUBSTRATE_TRANSITION_ALPHA_DEFAULT,
             enable_thermal_adaptation: false,
+            federation_enabled: false,
+            federation_round_interval_ms: 30_000,
             #[cfg(feature = "vision-manifold")]
             enable_vision_manifold: false,
             #[cfg(feature = "vision-manifold")]
