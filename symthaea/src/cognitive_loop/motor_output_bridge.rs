@@ -164,6 +164,7 @@ impl MotorOutputBridge {
             registry: Self::coding_registry(),
             executor: SimpleExecutor::from_env(),
             min_phi_override: None,
+            safety_override: crate::safety::SafetyLevel::Green,
         }
     }
 
@@ -176,6 +177,7 @@ impl MotorOutputBridge {
             registry: Self::coding_registry(),
             executor: SimpleExecutor::from_env(),
             min_phi_override: None,
+            safety_override: crate::safety::SafetyLevel::Green,
         })
     }
 
@@ -183,6 +185,12 @@ impl MotorOutputBridge {
     pub fn with_min_phi(mut self, min_phi: f64) -> Self {
         self.min_phi_override = Some(min_phi);
         self
+    }
+
+    /// Update the safety level from SafetyAgent assessment.
+    /// Red = halt all motor, Orange = readonly only.
+    pub fn set_safety_level(&mut self, level: crate::safety::SafetyLevel) {
+        self.safety_override = level;
     }
 
     /// Switch the executor to real command execution mode.
