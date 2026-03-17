@@ -2,8 +2,8 @@
 
 use currency_mint_integrity::*;
 use hdk::prelude::*;
-use mycelix_finance_shared::anchor_hash;
-use mycelix_finance_types::CurrencyStatus;
+use mycelix_finance_shared::{anchor_hash, verify_citizen_tier};
+use mycelix_finance_types::{compute_minted_demurrage, CurrencyStatus};
 
 use crate::helpers::*;
 use crate::{ActivateCurrencyInput, AmendCurrencyParamsInput, CreateCurrencyInput};
@@ -15,6 +15,7 @@ use crate::{ActivateCurrencyInput, AmendCurrencyParamsInput, CreateCurrencyInput
 /// Small communities (hearth-scale, ≤10) can create currencies without governance.
 #[hdk_extern]
 pub fn create_currency(input: CreateCurrencyInput) -> ExternResult<CurrencyDefinition> {
+    verify_citizen_tier()?;
     if !input.dao_did.starts_with("did:") {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "DAO must be a valid DID".into()
@@ -249,6 +250,65 @@ pub fn retire_currency(currency_id: String) -> ExternResult<CurrencyDefinition> 
         }
     }
 
+    // Apply final demurrage before retirement so no member evades demurrage
+    // by timing the retirement. We apply directly (bypassing the Active-only
+    // guard in apply_minted_demurrage) since we've already verified the
+    // currency is Active or Suspended.
+    if def.params.demurrage_rate > 0.0 {
+        let member_dids = collect_currency_members(&currency_id)?;
+        let now = sys_time()?;
+        let compost_did = format!("did:mycelix:__compost__:{}", currency_id);
+        let _ = get_or_create_minted_balance(compost_did.clone(), currency_id.clone())?;
+
+        for did in &member_dids {
+            let bal =
+                get_or_create_minted_balance(did.clone(), currency_id.clone())?;
+            let elapsed = now
+                .as_micros()
+                .saturating_sub(bal.last_activity.as_micros()) as u64
+                / 1_000_000;
+            let deduction = compute_minted_demurrage(
+                bal.balance,
+                def.params.demurrage_rate,
+                elapsed,
+            );
+            if deduction > 0 {
+                mutate_balance(did, &currency_id, |b| {
+                    b.balance -= deduction;
+                    b.last_activity = now;
+                })?;
+                mutate_balance(&compost_did, &currency_id, |b| {
+                    b.balance += deduction;
+                    b.last_activity = now;
+                })?;
+            }
+        }
+    }
+
+    // Enforce zero-sum invariant: all member balances (including compost)
+    // must sum to zero before retirement. This prevents permanently broken
+    // accounting in a frozen currency.
+    {
+        let member_dids = collect_currency_members(&currency_id)?;
+        let compost_did = format!("did:mycelix:__compost__:{}", currency_id);
+        let mut sum: i64 = 0;
+        for did in &member_dids {
+            let bal = get_or_create_minted_balance(did.clone(), currency_id.clone())?;
+            sum += bal.balance as i64;
+        }
+        // Include compost balance in the sum
+        let compost_bal =
+            get_or_create_minted_balance(compost_did, currency_id.clone())?;
+        sum += compost_bal.balance as i64;
+
+        if sum != 0 {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Cannot retire currency: zero-sum invariant violated (net balance: {})",
+                sum
+            ))));
+        }
+    }
+
     let updated = CurrencyDefinition {
         status: CurrencyStatus::Retired,
         ..def
@@ -336,6 +396,7 @@ pub fn search_currencies(query: String) -> ExternResult<Vec<CurrencyDefinition>>
 /// authorization (proposal ID).
 #[hdk_extern]
 pub fn amend_currency_params(input: AmendCurrencyParamsInput) -> ExternResult<CurrencyDefinition> {
+    verify_citizen_tier()?;
     let (record, def) = get_currency_inner(&input.currency_id)?;
 
     match def.status {

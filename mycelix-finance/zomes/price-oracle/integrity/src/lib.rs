@@ -42,6 +42,14 @@ pub const ACCURACY_INITIAL_SCORE: f64 = 1.0;
 /// Minimum weight floor — prevents zero-influence reporters
 pub const ACCURACY_MIN_WEIGHT: f64 = 0.05;
 
+/// Minimum reports before a reporter gets full accuracy-based weight.
+/// Prevents sybil attacks where new accounts flood consensus.
+pub const MIN_REPORTS_FOR_FULL_WEIGHT: u32 = 5;
+
+/// Weight cap for reporters below MIN_REPORTS_FOR_FULL_WEIGHT.
+/// Limits newcomer influence until they build history.
+pub const NEWCOMER_WEIGHT_CAP: f64 = 0.5;
+
 /// String length limits
 const MAX_ITEM_NAME_LEN: usize = 128;
 const MAX_EVIDENCE_LEN: usize = 512;
@@ -268,9 +276,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
 
 fn validate_price_report(report: &PriceReport) -> ExternResult<ValidateCallbackResult> {
     if report.item.is_empty() || report.item.len() > MAX_ITEM_NAME_LEN {
-        return Ok(ValidateCallbackResult::Invalid(
-            format!("Item name must be 1-{MAX_ITEM_NAME_LEN} characters"),
-        ));
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Item name must be 1-{MAX_ITEM_NAME_LEN} characters"
+        )));
     }
     if !report.price_tend.is_finite() || report.price_tend <= 0.0 {
         return Ok(ValidateCallbackResult::Invalid(
@@ -278,9 +286,9 @@ fn validate_price_report(report: &PriceReport) -> ExternResult<ValidateCallbackR
         ));
     }
     if report.evidence.len() > MAX_EVIDENCE_LEN {
-        return Ok(ValidateCallbackResult::Invalid(
-            format!("Evidence must be <= {MAX_EVIDENCE_LEN} characters"),
-        ));
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Evidence must be <= {MAX_EVIDENCE_LEN} characters"
+        )));
     }
     if report.reporter_did.is_empty() || report.reporter_did.len() > MAX_DID_LEN {
         return Ok(ValidateCallbackResult::Invalid(
@@ -311,14 +319,14 @@ fn validate_consensus(consensus: &PriceConsensus) -> ExternResult<ValidateCallba
 
 fn validate_basket(basket: &BasketDefinition) -> ExternResult<ValidateCallbackResult> {
     if basket.name.is_empty() || basket.name.len() > MAX_BASKET_NAME_LEN {
-        return Ok(ValidateCallbackResult::Invalid(
-            format!("Basket name must be 1-{MAX_BASKET_NAME_LEN} characters"),
-        ));
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Basket name must be 1-{MAX_BASKET_NAME_LEN} characters"
+        )));
     }
     if basket.items.is_empty() || basket.items.len() > MAX_BASKET_ITEMS {
-        return Ok(ValidateCallbackResult::Invalid(
-            format!("Basket must have 1-{MAX_BASKET_ITEMS} items"),
-        ));
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Basket must have 1-{MAX_BASKET_ITEMS} items"
+        )));
     }
     let total_weight: f64 = basket.items.iter().map(|i| i.weight).sum();
     if !total_weight.is_finite() || (total_weight - 1.0).abs() > 0.05 {

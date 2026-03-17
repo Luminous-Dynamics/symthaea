@@ -107,6 +107,10 @@ pub struct ConsensusResult {
     /// Average accuracy of reporters contributing to this consensus (0.0-1.0).
     /// High signal_integrity means reporters have been historically accurate.
     pub signal_integrity: f64,
+    /// Whether TEND limit escalation was triggered due to price volatility
+    /// exceeding VOLATILITY_ESCALATION_THRESHOLD (20% weekly change).
+    #[serde(default)]
+    pub tend_escalated: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -209,7 +213,13 @@ fn update_reporter_accuracy(
     let (existing_hash, mut acc) = get_or_create_accuracy(reporter_did)?;
 
     // Compute accuracy delta: how far was this report from consensus?
-    let delta = (report_price - consensus_median).abs() / consensus_median;
+    // Guard against division by zero: if consensus_median is near zero,
+    // use a small floor to avoid panic.
+    let delta = if consensus_median.abs() < 0.0001 {
+        (report_price - consensus_median).abs() / 0.0001
+    } else {
+        (report_price - consensus_median).abs() / consensus_median
+    };
     let accuracy_signal = 1.0 - delta.min(1.0);
     let new_score =
         (1.0 - ACCURACY_EMA_ALPHA) * acc.accuracy_score + ACCURACY_EMA_ALPHA * accuracy_signal;
@@ -249,8 +259,10 @@ fn weighted_median(entries: &mut [(f64, f64)]) -> Option<f64> {
     for (i, &(price, weight)) in entries.iter().enumerate() {
         cumulative += weight;
         if cumulative >= half {
-            // If we land exactly on the midpoint and there's a next entry, average
-            if (cumulative - half).abs() < f64::EPSILON && i + 1 < entries.len() {
+            // If we land exactly on the midpoint and there's a next entry, average.
+            // Scale epsilon by total_weight so the comparison is meaningful for
+            // large cumulative sums (bare f64::EPSILON is ~1e-16, easily lost).
+            if (cumulative - half).abs() < f64::EPSILON * total_weight && i + 1 < entries.len() {
                 return Some((price + entries[i + 1].0) / 2.0);
             }
             return Some(price);
@@ -407,6 +419,35 @@ pub fn report_price(input: ReportPriceInput) -> ExternResult<Record> {
 // CONSENSUS COMPUTATION
 // =============================================================================
 
+/// Fetch the most recent stored consensus price for an item.
+///
+/// Returns `Ok(Some(median_price))` if a prior consensus exists, `Ok(None)` otherwise.
+/// Used by `get_consensus_price` to detect volatility and trigger TEND escalation.
+fn get_previous_consensus_price(item: &str) -> ExternResult<Option<f64>> {
+    let consensus_anchor = anchor_hash(&format!("{ITEM_REPORTS_ANCHOR_PREFIX}{item}:consensus"))?;
+    let links = get_links(
+        LinkQuery::try_new(consensus_anchor, LinkTypes::ItemToConsensus)?,
+        GetStrategy::default(),
+    )?;
+
+    if let Some(link) = links.last() {
+        if let Some(hash) = link.target.clone().into_action_hash() {
+            if let Some(record) = get(hash, GetOptions::default())? {
+                if let Some(prev) = record
+                    .entry()
+                    .to_app_option::<PriceConsensus>()
+                    .ok()
+                    .flatten()
+                {
+                    return Ok(Some(prev.median_price));
+                }
+            }
+        }
+    }
+
+    Ok(None)
+}
+
 /// Get the accuracy-weighted consensus price for an item.
 ///
 /// 1. Collects all reports within the consensus window (1 week)
@@ -414,6 +455,9 @@ pub fn report_price(input: ReportPriceInput) -> ExternResult<Record> {
 /// 3. Fetches each reporter's accuracy EMA score
 /// 4. Computes a weighted median where weight = max(accuracy, 0.05)
 /// 5. Updates each reporter's accuracy score based on this consensus
+/// 6. Checks weekly price change vs prior consensus — if above
+///    VOLATILITY_ESCALATION_THRESHOLD (20%), auto-escalates TEND limits
+///    via cross-zome call to `tend/update_oracle_state`
 ///
 /// Requires at least 2 unique reporters for a valid consensus.
 #[hdk_extern]
@@ -486,7 +530,11 @@ pub fn get_consensus_price(input: GetConsensusInput) -> ExternResult<ConsensusRe
 
     for report in trimmed {
         let (_, acc) = get_or_create_accuracy(&report.reporter_did)?;
-        let weight = acc.accuracy_score.max(ACCURACY_MIN_WEIGHT);
+        let mut weight = acc.accuracy_score.max(ACCURACY_MIN_WEIGHT);
+        // Sybil resistance: cap newcomer weight until they build history
+        if acc.report_count < MIN_REPORTS_FOR_FULL_WEIGHT {
+            weight = weight.min(NEWCOMER_WEIGHT_CAP);
+        }
         weighted_entries.push((report.price, weight));
         accuracy_sum += acc.accuracy_score;
         accuracy_count += 1;
@@ -523,6 +571,10 @@ pub fn get_consensus_price(input: GetConsensusInput) -> ExternResult<ConsensusRe
 
     let consensus_hash = create_entry(&EntryTypes::PriceConsensus(consensus))?;
 
+    // Fetch the previous consensus price BEFORE replacing the link, so we
+    // compare against the prior value (not the one we just stored).
+    let previous_median = get_previous_consensus_price(&item)?;
+
     // Update latest consensus link (replace old if exists)
     let consensus_anchor = anchor_hash(&format!("{ITEM_REPORTS_ANCHOR_PREFIX}{item}:consensus"))?;
     let old_links = get_links(
@@ -545,6 +597,54 @@ pub fn get_consensus_price(input: GetConsensusInput) -> ExternResult<ConsensusRe
         let _ = update_reporter_accuracy(&report.reporter_did, report.price, median);
     }
 
+    // -------------------------------------------------------------------------
+    // Volatility check: compare new consensus to previous consensus for this
+    // item. If the weekly price change exceeds VOLATILITY_ESCALATION_THRESHOLD
+    // (20%), auto-escalate TEND limits via cross-zome call.
+    // -------------------------------------------------------------------------
+    let mut tend_escalated = false;
+
+    if let Some(previous_median) = previous_median {
+        if previous_median > 0.0 {
+            let weekly_change = ((median - previous_median) / previous_median).abs();
+            if weekly_change > VOLATILITY_ESCALATION_THRESHOLD {
+                let vitality = if weekly_change > 0.40 {
+                    10u32 // Emergency
+                } else if weekly_change > 0.30 {
+                    30 // High
+                } else {
+                    50 // Elevated
+                };
+
+                // Cross-zome call to TEND oracle — same DNA, local call.
+                // Failure is non-fatal: log warning but don't fail consensus.
+                match call(
+                    CallTargetCell::Local,
+                    ZomeName::from("tend"),
+                    FunctionName::from("update_oracle_state"),
+                    None,
+                    vitality,
+                ) {
+                    Ok(ZomeCallResponse::Ok(_)) => {
+                        tend_escalated = true;
+                    }
+                    Ok(other) => {
+                        debug!(
+                            "price-oracle: TEND escalation returned non-Ok response: {:?}",
+                            other
+                        );
+                    }
+                    Err(e) => {
+                        debug!(
+                            "price-oracle: TEND escalation cross-zome call failed (non-fatal): {:?}",
+                            e
+                        );
+                    }
+                }
+            }
+        }
+    }
+
     Ok(ConsensusResult {
         item,
         median_price: median,
@@ -552,6 +652,7 @@ pub fn get_consensus_price(input: GetConsensusInput) -> ExternResult<ConsensusRe
         std_dev,
         window_start,
         signal_integrity,
+        tend_escalated,
     })
 }
 
@@ -1161,18 +1262,34 @@ mod tests {
 
     /// Simulate the accuracy EMA update for a reporter given their price and the consensus.
     fn sim_accuracy_update(old_score: f64, report_price: f64, consensus: f64) -> f64 {
-        let delta = (report_price - consensus).abs() / consensus;
+        let delta = if consensus.abs() < 0.0001 {
+            (report_price - consensus).abs() / 0.0001
+        } else {
+            (report_price - consensus).abs() / consensus
+        };
         let signal = 1.0 - delta.min(1.0);
         let new = (1.0 - ACCURACY_EMA_ALPHA) * old_score + ACCURACY_EMA_ALPHA * signal;
         new.clamp(0.0, 1.0)
     }
 
     /// Simulate the full trimmed + accuracy-weighted consensus from raw reports.
+    /// Assumes all reporters are established (report_count >= MIN_REPORTS_FOR_FULL_WEIGHT).
     fn sim_consensus(reports: &[(f64, f64)], // (price, accuracy_score)
     ) -> (f64, f64) {
+        // Treat all as established reporters
+        let with_counts: Vec<(f64, f64, u32)> = reports
+            .iter()
+            .map(|(p, a)| (*p, *a, MIN_REPORTS_FOR_FULL_WEIGHT))
+            .collect();
+        sim_consensus_with_counts(&with_counts)
+    }
+
+    /// Simulate consensus with explicit report counts per reporter.
+    /// (price, accuracy_score, report_count)
+    fn sim_consensus_with_counts(reports: &[(f64, f64, u32)]) -> (f64, f64) {
         // (weighted_median, signal_integrity)
         // Sort by price for trimming
-        let mut sorted: Vec<(f64, f64)> = reports.to_vec();
+        let mut sorted: Vec<(f64, f64, u32)> = reports.to_vec();
         sorted.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
 
         // Trim 10%
@@ -1183,14 +1300,20 @@ mod tests {
             &sorted[..]
         };
 
-        // Build weighted entries
+        // Build weighted entries with newcomer cap
         let mut entries: Vec<(f64, f64)> = trimmed
             .iter()
-            .map(|(price, acc)| (*price, acc.max(ACCURACY_MIN_WEIGHT)))
+            .map(|(price, acc, count)| {
+                let mut weight = acc.max(ACCURACY_MIN_WEIGHT);
+                if *count < MIN_REPORTS_FOR_FULL_WEIGHT {
+                    weight = weight.min(NEWCOMER_WEIGHT_CAP);
+                }
+                (*price, weight)
+            })
             .collect();
 
         let median = weighted_median(&mut entries).unwrap();
-        let si = trimmed.iter().map(|(_, a)| a).sum::<f64>() / trimmed.len() as f64;
+        let si = trimmed.iter().map(|(_, a, _)| a).sum::<f64>() / trimmed.len() as f64;
 
         (median, si)
     }
@@ -1334,6 +1457,45 @@ mod tests {
         // All close together → median near 0.51
         assert!((median - 0.51).abs() < 0.02, "median: {median}");
         assert!(si > 0.95, "signal integrity: {si}");
+    }
+
+    #[test]
+    fn test_sim_newcomer_weight_cap_resists_sybil_flood() {
+        // 3 established honest reporters at ~0.50
+        // 3 new sybil accounts (report_count=0, accuracy=1.0) reporting 10.0
+        // Without the newcomer cap, sybils have 3×1.0 = 3.0 weight.
+        // With the cap, each sybil gets at most 0.5 → 3×0.5 = 1.5 total.
+        // Honest total: 0.95 + 0.92 + 0.90 = 2.77 → honest dominate.
+        let reports = vec![
+            (0.50, 0.95, MIN_REPORTS_FOR_FULL_WEIGHT),     // established honest
+            (0.51, 0.92, MIN_REPORTS_FOR_FULL_WEIGHT + 3), // established honest
+            (0.52, 0.90, MIN_REPORTS_FOR_FULL_WEIGHT + 1), // established honest
+            (10.0, ACCURACY_INITIAL_SCORE, 0),              // sybil newcomer
+            (10.0, ACCURACY_INITIAL_SCORE, 1),              // sybil newcomer
+            (10.0, ACCURACY_INITIAL_SCORE, 2),              // sybil newcomer
+        ];
+        let (median, _si) = sim_consensus_with_counts(&reports);
+
+        // Sorted by price: 0.50(0.95), 0.51(0.92), 0.52(0.90), 10.0(0.5), 10.0(0.5), 10.0(0.5)
+        // Total weight: 2.77 + 1.5 = 4.27. Half = 2.135.
+        // Cumulative: 0.95, 1.87, 2.77 >= 2.135 at price 0.52
+        // Median should be near the honest price.
+        assert!(
+            median < 1.0,
+            "newcomer-capped median ({median}) should resist sybil flood"
+        );
+
+        // Compare: without newcomer cap (all treated as established), sybils would
+        // have full weight and pull the median higher.
+        let uncapped_reports: Vec<(f64, f64)> = reports
+            .iter()
+            .map(|(p, a, _)| (*p, *a))
+            .collect();
+        let (uncapped_median, _) = sim_consensus(&uncapped_reports);
+        assert!(
+            median <= uncapped_median,
+            "capped median ({median}) should be <= uncapped ({uncapped_median})"
+        );
     }
 
     #[test]

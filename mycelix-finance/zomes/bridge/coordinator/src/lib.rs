@@ -6,7 +6,9 @@
 
 use finance_bridge_integrity::*;
 use hdk::prelude::*;
-use mycelix_finance_shared::{anchor_hash, follow_update_chain, verify_caller_is_did};
+use mycelix_finance_shared::{
+    anchor_hash, follow_update_chain, verify_caller_is_did, verify_participant_tier,
+};
 use mycelix_finance_types::{FeeTier, TendLimitTier};
 
 const FINANCE_HAPP_ID: &str = "mycelix-finance";
@@ -26,15 +28,13 @@ const FINANCE_HAPP_ID: &str = "mycelix-finance";
 /// is guaranteed and any gap in oversight is unacceptable.
 const STRICT_GOVERNANCE_MODE: bool = false;
 
-/// Maximum percentage of vault that any single member can deposit/redeem per day
-const DAILY_RATE_LIMIT_PCT: f64 = 0.05; // 5%
-
 /// 24 hours in microseconds
 const DAY_MICROS: i64 = 24 * 60 * 60 * 1_000_000;
 
 /// Process a cross-hApp payment
 #[hdk_extern]
 pub fn process_payment(input: ProcessPaymentInput) -> ExternResult<Record> {
+    verify_participant_tier()?;
     verify_caller_is_did(&input.from_did)?;
     if input.currency != "SAP" {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -106,6 +106,7 @@ pub struct ProcessPaymentInput {
 /// Register collateral from another hApp
 #[hdk_extern]
 pub fn register_collateral(input: RegisterCollateralInput) -> ExternResult<Record> {
+    verify_participant_tier()?;
     verify_caller_is_did(&input.owner_did)?;
     let now = sys_time()?;
 
@@ -223,6 +224,7 @@ pub fn get_payment_history(input: GetPaymentHistoryInput) -> ExternResult<Vec<Re
 /// Rate-limited: max 5% of total vault value per day per member.
 #[hdk_extern]
 pub fn deposit_collateral(input: DepositCollateralInput) -> ExternResult<Record> {
+    verify_participant_tier()?;
     verify_caller_is_did(&input.depositor_did)?;
     let now = sys_time()?;
 
@@ -244,8 +246,17 @@ pub fn deposit_collateral(input: DepositCollateralInput) -> ExternResult<Record>
 
     let sap_minted = (input.collateral_amount as f64 * input.oracle_rate) as u64;
 
-    // Enforce rate limit: max 5% of vault per day per member
-    enforce_rate_limit(&input.depositor_did, sap_minted, now)?;
+    // Tier-scaled daily rate limit: higher consciousness tiers get larger limits
+    let mycel_score = fetch_mycel_score(&input.depositor_did);
+    let tier = FeeTier::from_mycel(mycel_score);
+    let daily_limit_pct = match tier {
+        FeeTier::Newcomer => 1,   // 1% for newcomers (shouldn't reach here due to tier gate, but defense in depth)
+        FeeTier::Member => 5,     // 5% for members
+        FeeTier::Steward => 10,   // 10% for stewards
+    };
+
+    // Enforce rate limit: max daily_limit_pct% of vault per day per member
+    enforce_rate_limit(&input.depositor_did, sap_minted, now, daily_limit_pct)?;
 
     let deposit_id = format!(
         "deposit:{}:{}:{}",
@@ -405,6 +416,7 @@ pub fn confirm_deposit(deposit_id: String) -> ExternResult<Record> {
 /// Uses link-based indexing for O(1) lookup instead of chain scan.
 #[hdk_extern]
 pub fn redeem_collateral(deposit_id: String) -> ExternResult<Record> {
+    verify_participant_tier()?;
     let links = get_links(
         LinkQuery::try_new(anchor_hash(&deposit_id)?, LinkTypes::DepositIdToDeposit)?,
         GetStrategy::default(),
@@ -436,9 +448,16 @@ pub fn redeem_collateral(deposit_id: String) -> ExternResult<Record> {
         )));
     }
 
-    // Enforce rate limit on redemption
+    // Enforce tier-scaled rate limit on redemption
     let now = sys_time()?;
-    enforce_rate_limit(&deposit.depositor_did, deposit.sap_minted, now)?;
+    let mycel_score = fetch_mycel_score(&deposit.depositor_did);
+    let redeem_tier = FeeTier::from_mycel(mycel_score);
+    let redeem_daily_limit_pct = match redeem_tier {
+        FeeTier::Newcomer => 1,
+        FeeTier::Member => 5,
+        FeeTier::Steward => 10,
+    };
+    enforce_rate_limit(&deposit.depositor_did, deposit.sap_minted, now, redeem_daily_limit_pct)?;
 
     let redeemed = CollateralBridgeDeposit {
         status: BridgeDepositStatus::Redeemed,
@@ -950,12 +969,15 @@ pub struct FinanceBridgeHealth {
 // ---------------------------------------------------------------------------
 
 /// Enforce the daily rate limit: no member may deposit/redeem more than
-/// 5% of total vault value in any rolling 24-hour period.
+/// `daily_limit_pct`% of total vault value in any rolling 24-hour period.
+///
+/// The limit percentage is tier-scaled based on MYCEL score:
+/// - Newcomer: 1%, Member: 5%, Steward: 10%
 ///
 /// Vault value = sum of `sap_minted` for all Confirmed deposits.
 /// Daily activity = sum of `sap_minted` for this member's deposits/redemptions
 /// created within the last 24 hours.
-fn enforce_rate_limit(member_did: &str, new_amount: u64, now: Timestamp) -> ExternResult<()> {
+fn enforce_rate_limit(member_did: &str, new_amount: u64, now: Timestamp, daily_limit_pct: u32) -> ExternResult<()> {
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(
             UnitEntryTypes::CollateralBridgeDeposit,
@@ -987,7 +1009,7 @@ fn enforce_rate_limit(member_did: &str, new_amount: u64, now: Timestamp) -> Exte
         return Ok(());
     }
 
-    let daily_limit = (vault_total as f64 * DAILY_RATE_LIMIT_PCT) as u64;
+    let daily_limit = (vault_total as f64 * (daily_limit_pct as f64 / 100.0)) as u64;
 
     // Sum this member's activity in the last 24 hours
     let cutoff = now.as_micros() - DAY_MICROS;
@@ -999,8 +1021,8 @@ fn enforce_rate_limit(member_did: &str, new_amount: u64, now: Timestamp) -> Exte
 
     if daily_activity.saturating_add(new_amount) > daily_limit {
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "Rate limit exceeded: max {} SAP/day (5% of vault {}). Already used {} today, requesting {}.",
-            daily_limit, vault_total, daily_activity, new_amount
+            "Rate limit exceeded: max {} SAP/day ({}% of vault {}). Already used {} today, requesting {}.",
+            daily_limit, daily_limit_pct, vault_total, daily_activity, new_amount
         ))));
     }
 

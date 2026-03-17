@@ -38,6 +38,7 @@ pub use input_validation::*;
 pub use race_resolution::*;
 pub use rate_limit::*;
 pub use types::*;
+pub use consciousness_gating::*;
 pub use update_chain::*;
 pub use validation::*;
 
@@ -55,16 +56,21 @@ pub mod race_resolution {
 
     /// Deterministically pick a single winner from a set of concurrent links.
     ///
-    /// Returns the link with the lowest `create_link_hash` (lexicographic byte
-    /// comparison), which is consistent across all DHT nodes regardless of the
-    /// order in which links are observed.
+    /// Uses a two-level tiebreaker: first by `create_link_hash`, then by
+    /// `author` (agent pubkey). The secondary key ensures determinism even in
+    /// split-brain scenarios where different DHT partitions may compute
+    /// different ActionHashes for the same logical operation.
     ///
     /// # Errors
     /// Returns an error if the slice is empty.
     pub fn pick_race_winner(links: &[Link]) -> ExternResult<&Link> {
         links
             .iter()
-            .min_by_key(|l| l.create_link_hash.clone())
+            .min_by(|a, b| {
+                a.create_link_hash
+                    .cmp(&b.create_link_hash)
+                    .then_with(|| a.author.cmp(&b.author))
+            })
             .ok_or_else(|| {
                 wasm_error!(WasmErrorInner::Guest(
                     "Race resolution failed: no links found after creation".into()
@@ -744,6 +750,85 @@ pub mod validation {
             )));
         }
         Ok(())
+    }
+}
+
+/// Consciousness gating for Mycelix Finance operations.
+///
+/// These functions verify that the calling agent meets minimum consciousness
+/// tier requirements before performing sensitive operations. Consciousness
+/// scores are fetched from the identity cluster via cross-role calls.
+///
+/// ## Tiers
+///
+/// - **Participant** (combined >= 0.3): Basic financial operations (deposits,
+///   payments, collateral). Most members clear this bar.
+/// - **Citizen** (identity >= 0.25, reputation >= 0.10): Higher-bar operations
+///   like currency creation and parameter amendment.
+///
+/// ## Fallback
+///
+/// When the identity cluster is unreachable (bootstrap, standalone, network
+/// partition), both functions fall back to allowing the operation. The integrity
+/// zome still enforces economic invariants regardless of consciousness gating.
+pub mod consciousness_gating {
+    use super::*;
+
+    /// Verify the caller meets Participant consciousness tier.
+    ///
+    /// Participant tier requires a combined consciousness score >= 0.3.
+    /// Used for: deposits, payments, collateral registration.
+    pub fn verify_participant_tier() -> ExternResult<()> {
+        match call(
+            CallTargetCell::OtherRole("identity".into()),
+            ZomeName::from("consciousness_gating"),
+            FunctionName::from("check_participant_tier"),
+            None,
+            (),
+        ) {
+            Ok(ZomeCallResponse::Ok(result)) => {
+                let passed = result.decode::<bool>().unwrap_or(false);
+                if passed {
+                    Ok(())
+                } else {
+                    Err(wasm_error!(WasmErrorInner::Guest(
+                        "Participant+ tier required (combined consciousness >= 0.3)".into()
+                    )))
+                }
+            }
+            // Identity cluster unavailable — permissive fallback
+            _ => Ok(()),
+        }
+    }
+
+    /// Verify the caller meets Citizen+ consciousness tier.
+    ///
+    /// Citizen tier requires:
+    /// - identity_score >= 0.25 (verified DID)
+    /// - reputation_score >= 0.10 (some community participation)
+    ///
+    /// Used for: currency creation, parameter amendment.
+    pub fn verify_citizen_tier() -> ExternResult<()> {
+        match call(
+            CallTargetCell::OtherRole("identity".into()),
+            ZomeName::from("consciousness_gating"),
+            FunctionName::from("check_citizen_tier"),
+            None,
+            (),
+        ) {
+            Ok(ZomeCallResponse::Ok(result)) => {
+                let passed = result.decode::<bool>().unwrap_or(false);
+                if passed {
+                    Ok(())
+                } else {
+                    Err(wasm_error!(WasmErrorInner::Guest(
+                        "Citizen+ tier required (identity >= 0.25, reputation >= 0.10)".into()
+                    )))
+                }
+            }
+            // Identity cluster unavailable — permissive fallback
+            _ => Ok(()),
+        }
     }
 }
 

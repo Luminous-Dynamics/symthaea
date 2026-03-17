@@ -3,7 +3,8 @@
 use hdk::prelude::*;
 use mycelix_finance_shared::{
     anchor_hash, follow_update_chain, links_to_records, rate_limit_anchor_key, validate_did_format,
-    validate_id, verify_caller_is_did, DEFAULT_RATE_LIMIT_PER_MINUTE,
+    validate_id, verify_caller_is_did, verify_citizen_tier, verify_participant_tier,
+    DEFAULT_RATE_LIMIT_PER_MINUTE,
 };
 use mycelix_finance_types::{
     compute_demurrage_deduction, FeeTier, SapMintSource, SuccessionPreference, COMPOST_LOCAL_PCT,
@@ -200,6 +201,12 @@ pub struct DemurrageResult {
 /// Maximum retries for optimistic-locking SAP balance mutations.
 const MAX_SAP_RETRIES: usize = 3;
 
+/// Minimum elapsed seconds before recomputing demurrage on retry.
+/// If a concurrent writer already applied demurrage and updated `last_demurrage_at`,
+/// the retry will see a very small elapsed time. Recomputing demurrage in that case
+/// risks double-application against a stale balance. Skip if < 60s elapsed.
+const DEMURRAGE_MIN_ELAPSED_SECONDS: u64 = 60;
+
 /// Credit SAP to a member's balance (used by bridge deposits and community issuance).
 /// Auto-initializes the SapBalance entry if the member has none yet.
 ///
@@ -236,15 +243,22 @@ pub fn credit_sap(input: CreditSapInput) -> ExternResult<Record> {
         let (record, bal) = get_sap_balance_inner(&input.member_did)?;
         let now = sys_time()?;
 
-        // Apply pending demurrage first, then credit
+        // Apply pending demurrage first, then credit.
+        // If elapsed time is very small (< 60s), a concurrent writer likely already
+        // applied demurrage and updated last_demurrage_at. Skip recomputation to
+        // avoid double-application against a stale balance.
         let elapsed = elapsed_seconds(bal.last_demurrage_at, now);
-        let deduction = compute_demurrage_deduction(
-            bal.balance,
-            DEMURRAGE_EXEMPT_FLOOR,
-            DEMURRAGE_RATE,
-            elapsed,
-        );
-        let post_demurrage = bal.balance.saturating_sub(deduction);
+        let post_demurrage = if elapsed >= DEMURRAGE_MIN_ELAPSED_SECONDS {
+            let deduction = compute_demurrage_deduction(
+                bal.balance,
+                DEMURRAGE_EXEMPT_FLOOR,
+                DEMURRAGE_RATE,
+                elapsed,
+            );
+            bal.balance.saturating_sub(deduction)
+        } else {
+            bal.balance
+        };
 
         let expected_balance = post_demurrage + input.amount;
         let updated = SapBalance {
@@ -307,15 +321,21 @@ pub fn debit_sap(input: DebitSapInput) -> ExternResult<Record> {
         let (record, bal) = get_sap_balance_inner(&input.member_did)?;
         let now = sys_time()?;
 
-        // Apply pending demurrage first
+        // Apply pending demurrage first.
+        // Skip if elapsed < 60s — a concurrent writer likely already applied demurrage
+        // and updated last_demurrage_at (avoids double-application on retry).
         let elapsed = elapsed_seconds(bal.last_demurrage_at, now);
-        let deduction = compute_demurrage_deduction(
-            bal.balance,
-            DEMURRAGE_EXEMPT_FLOOR,
-            DEMURRAGE_RATE,
-            elapsed,
-        );
-        let effective = bal.balance.saturating_sub(deduction);
+        let effective = if elapsed >= DEMURRAGE_MIN_ELAPSED_SECONDS {
+            let deduction = compute_demurrage_deduction(
+                bal.balance,
+                DEMURRAGE_EXEMPT_FLOOR,
+                DEMURRAGE_RATE,
+                elapsed,
+            );
+            bal.balance.saturating_sub(deduction)
+        } else {
+            bal.balance
+        };
 
         if input.amount > effective {
             return Err(wasm_error!(WasmErrorInner::Guest(format!(
@@ -409,34 +429,11 @@ pub fn mint_sap_from_governance(input: MintSapFromGovernanceInput) -> ExternResu
         }
     }
 
-    // Consciousness gate: SAP minting requires Steward tier (consciousness >= 0.6)
-    // This implements the Φ Gate — high-impact economic actions require demonstrated
-    // community consciousness (identity + reputation + community + engagement).
-    if let Ok(ZomeCallResponse::Ok(result)) = call(
-        CallTargetCell::Local,
-        ZomeName::from("finance_bridge"),
-        FunctionName::from("get_member_fee_tier"),
-        None,
-        input.recipient_did.clone(),
-    ) {
-        #[derive(Debug, Deserialize)]
-        struct TierResp {
-            tier_name: String,
-        }
-        if let Ok(resp) = result.decode::<TierResp>() {
-            if resp.tier_name == "Newcomer" {
-                return Err(wasm_error!(WasmErrorInner::Guest(
-                    "SAP minting recipient must be at least Member tier (MYCEL >= 0.3). \
-                     Newcomers cannot receive governance-minted SAP to prevent bootstrap attacks."
-                        .into()
-                )));
-            }
-        }
-    }
-    // SECURITY NOTE: If bridge is unreachable, we allow the mint (bootstrap/standalone mode).
-    // This is PERMISSIVE — the consciousness gate is bypassed. Governance authorization
-    // (checked above) is still required, so this only weakens the tier check, not
-    // the authorization check. Per-proposal and annual caps still apply.
+    // Consciousness gate: SAP minting requires Citizen+ tier (identity >= 0.25,
+    // reputation >= 0.10). Uses shared consciousness gating via identity cluster.
+    // If identity cluster is unreachable, falls back to permissive (bootstrap mode) —
+    // governance authorization (checked above) is still required.
+    verify_citizen_tier()?;
 
     // Constitutional cap: per-proposal maximum
     if input.amount > SAP_MINT_PER_PROPOSAL_MAX {
@@ -745,6 +742,7 @@ fn elapsed_seconds(from: Timestamp, to: Timestamp) -> u64 {
 
 #[hdk_extern]
 pub fn send_payment(input: SendPaymentInput) -> ExternResult<Record> {
+    verify_participant_tier()?;
     // Verify caller is the sender (prevents DID spoofing)
     verify_caller_is_did(&input.from_did)?;
 
@@ -912,6 +910,7 @@ pub struct SendPaymentInput {
 
 #[hdk_extern]
 pub fn open_payment_channel(input: OpenChannelInput) -> ExternResult<Record> {
+    verify_participant_tier()?;
     verify_caller_is_did(&input.party_a)?;
 
     let now = sys_time()?;
@@ -1573,6 +1572,9 @@ pub struct HearthSapPoolResponse {
 ///
 /// Deducts from caller's SapBalance and credits the hearth pool.
 /// Requires hearth membership (verified via cross-zome call).
+///
+/// Uses optimistic locking with retry on the hearth pool update to prevent
+/// concurrent contributions from overwriting each other.
 #[hdk_extern]
 pub fn contribute_to_hearth_pool(input: ContributeToHearthInput) -> ExternResult<HearthSapPool> {
     if input.amount == 0 {
@@ -1587,7 +1589,7 @@ pub fn contribute_to_hearth_pool(input: ContributeToHearthInput) -> ExternResult
     // Verify hearth membership
     verify_hearth_membership(&caller_did, &input.hearth_did)?;
 
-    // Deduct from personal SAP balance
+    // Deduct from personal SAP balance (uses credit_sap/debit_sap style retry internally)
     let (record, mut personal_bal) = find_sap_balance_record(&caller_did)?.ok_or(wasm_error!(
         WasmErrorInner::Guest("No SAP balance found".into())
     ))?;
@@ -1603,24 +1605,59 @@ pub fn contribute_to_hearth_pool(input: ContributeToHearthInput) -> ExternResult
     personal_bal.balance -= input.amount;
     update_entry(record.action_address().clone(), &personal_bal)?;
 
-    // Credit hearth pool (apply demurrage first)
-    let mut pool = get_or_create_hearth_pool(&input.hearth_did)?;
-    let now_ts = sys_time()?;
-    let elapsed = elapsed_seconds(pool.last_demurrage_at, now_ts);
-    let deduction = compute_demurrage_deduction(
-        pool.balance,
-        DEMURRAGE_EXEMPT_FLOOR,
-        DEMURRAGE_RATE,
-        elapsed,
-    );
-    pool.balance = pool.balance.saturating_sub(deduction);
-    pool.last_demurrage_at = now_ts;
+    // Credit hearth pool with optimistic-locking retry
+    for attempt in 0..MAX_SAP_RETRIES {
+        let (pool_record, pool) = get_hearth_pool_record(&input.hearth_did)?;
+        let now_ts = sys_time()?;
 
-    pool.balance += input.amount;
-    pool.total_contributed += input.amount;
-    update_hearth_pool(&input.hearth_did, &pool)?;
+        // Apply demurrage (skip if < 60s to avoid double-application on retry)
+        let elapsed = elapsed_seconds(pool.last_demurrage_at, now_ts);
+        let post_demurrage = if elapsed >= DEMURRAGE_MIN_ELAPSED_SECONDS {
+            let deduction = compute_demurrage_deduction(
+                pool.balance,
+                DEMURRAGE_EXEMPT_FLOOR,
+                DEMURRAGE_RATE,
+                elapsed,
+            );
+            pool.balance.saturating_sub(deduction)
+        } else {
+            pool.balance
+        };
 
-    Ok(pool)
+        let expected_balance = post_demurrage + input.amount;
+        let expected_contributed = pool.total_contributed + input.amount;
+        let updated = HearthSapPool {
+            balance: expected_balance,
+            last_demurrage_at: now_ts,
+            total_contributed: expected_contributed,
+            ..pool
+        };
+        update_entry(pool_record.action_address().clone(), &updated)?;
+
+        // Verify our update won: re-read from the anchor
+        let (_, actual) = get_hearth_pool_record(&input.hearth_did)?;
+        if actual.balance == expected_balance && actual.total_contributed == expected_contributed {
+            return Ok(updated);
+        }
+
+        // Concurrent update detected
+        if attempt == MAX_SAP_RETRIES - 1 {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "contribute_to_hearth_pool for hearth {} failed after {} retries due to concurrent modifications",
+                input.hearth_did, MAX_SAP_RETRIES
+            ))));
+        }
+        debug!(
+            "contribute_to_hearth_pool: concurrent update detected for hearth {}, retry {}/{}",
+            input.hearth_did,
+            attempt + 1,
+            MAX_SAP_RETRIES
+        );
+    }
+
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "contribute_to_hearth_pool: retry loop exited unexpectedly".into()
+    )))
 }
 
 /// Withdraw SAP from hearth pool to personal balance.
@@ -1821,6 +1858,57 @@ fn get_or_create_hearth_pool(hearth_did: &str) -> ExternResult<HearthSapPool> {
         (),
     )?;
     Ok(pool)
+}
+
+/// Like `get_or_create_hearth_pool` but also returns the Record for optimistic locking.
+fn get_hearth_pool_record(hearth_did: &str) -> ExternResult<(Record, HearthSapPool)> {
+    let anchor_key = format!("hearth-sap:{}", hearth_did);
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(&anchor_key)?, LinkTypes::HearthDidToSapPool)?,
+        GetStrategy::default(),
+    )?;
+
+    if let Some(link) = links.first() {
+        if let Some(action_hash) = link.target.clone().into_action_hash() {
+            let record = follow_update_chain(action_hash)?;
+            if let Some(pool) = record
+                .entry()
+                .to_app_option::<HearthSapPool>()
+                .map_err(|e| {
+                    wasm_error!(WasmErrorInner::Guest(format!(
+                        "HearthSapPool deserialization error: {:?}",
+                        e
+                    )))
+                })?
+            {
+                return Ok((record, pool));
+            }
+        }
+    }
+
+    // Create if not found
+    let now = sys_time()?;
+    let pool = HearthSapPool {
+        hearth_did: hearth_did.to_string(),
+        balance: 0,
+        last_demurrage_at: now,
+        member_count: 0,
+        total_contributed: 0,
+        total_withdrawn: 0,
+    };
+
+    let hash = create_entry(&EntryTypes::HearthSapPool(pool.clone()))?;
+    create_link(
+        anchor_hash(&anchor_key)?,
+        hash.clone(),
+        LinkTypes::HearthDidToSapPool,
+        (),
+    )?;
+
+    let record = get(hash, GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("HearthSapPool not found after creation".into())
+    ))?;
+    Ok((record, pool))
 }
 
 fn update_hearth_pool(hearth_did: &str, pool: &HearthSapPool) -> ExternResult<()> {

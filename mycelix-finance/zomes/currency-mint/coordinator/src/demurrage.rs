@@ -20,6 +20,8 @@ pub fn apply_minted_demurrage(input: ApplyDemurrageInput) -> ExternResult<Demurr
     validate_id(&input.currency_id, "currency_id")?;
     let (_, def) = get_currency_inner(&input.currency_id)?;
 
+    // Retired currencies have zero-sum enforced at retirement time and
+    // final demurrage applied, so exemption here is correct.
     if def.status != CurrencyStatus::Active {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Demurrage can only be applied to Active currencies".into()
@@ -85,6 +87,8 @@ pub fn apply_demurrage_all(currency_id: String) -> ExternResult<Vec<DemurrageRes
     validate_id(&currency_id, "currency_id")?;
     let (_, def) = get_currency_inner(&currency_id)?;
 
+    // Retired currencies have zero-sum enforced at retirement time and
+    // final demurrage applied, so exemption here is correct.
     if def.status != CurrencyStatus::Active {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Demurrage can only be applied to Active currencies".into()
@@ -156,23 +160,47 @@ pub fn redistribute_compost(currency_id: String) -> ExternResult<RedistributeCom
     // (lowest ActionHash) proceeds. Losers delete their link and return 0.
     // This uses AnchorLinks because no dedicated link type exists for
     // redistribution guards.
+
+    /// Guard links older than this are considered stale (winner crashed before
+    /// finishing). 5 minutes in microseconds.
+    const COMPOST_GUARD_STALE_US: i64 = 300_000_000;
+
     let redist_anchor = format!("compost-redistribute:{}", currency_id);
     let redist_anchor_hash = anchor_hash(&redist_anchor)?;
 
     // Quick pre-check: if a redistribution guard already exists, return
-    // idempotently (redistribution already happened or is in progress).
+    // idempotently — UNLESS the guard is stale (older than threshold),
+    // which indicates the winner crashed mid-redistribution.
     let pre_existing = get_links(
         LinkQuery::try_new(redist_anchor_hash.clone(), LinkTypes::AnchorLinks)?,
         GetStrategy::default(),
     )?;
     if !pre_existing.is_empty() {
-        return Ok(RedistributeCompostResult {
-            currency_id,
-            total_redistributed: 0,
-            recipients: 0,
-            per_member_amount: 0,
-            remainder_kept: 0,
-        });
+        let now_us = sys_time()?.as_micros();
+        let mut all_stale = true;
+        for link in &pre_existing {
+            let link_age = now_us.saturating_sub(link.timestamp.as_micros()) as i64;
+            if link_age < COMPOST_GUARD_STALE_US {
+                all_stale = false;
+                break;
+            }
+        }
+        if all_stale {
+            // Stale guard(s) from a crashed previous attempt — clean up and
+            // allow a fresh redistribution to proceed.
+            for link in &pre_existing {
+                let _ = delete_link(link.create_link_hash.clone(), GetOptions::default());
+            }
+        } else {
+            // Fresh guard exists — redistribution is in progress or completed.
+            return Ok(RedistributeCompostResult {
+                currency_id,
+                total_redistributed: 0,
+                recipients: 0,
+                per_member_amount: 0,
+                remainder_kept: 0,
+            });
+        }
     }
 
     // Create our idempotency guard link (target is our agent key as a
@@ -268,6 +296,10 @@ pub fn redistribute_compost(currency_id: String) -> ExternResult<RedistributeCom
         b.balance -= total_distributed;
         b.last_activity = now;
     })?;
+
+    // Best-effort cleanup: delete our guard link so future redistributions
+    // aren't blocked. If this fails the staleness check will recover.
+    let _ = delete_link(our_link_hash, GetOptions::default());
 
     Ok(RedistributeCompostResult {
         currency_id,

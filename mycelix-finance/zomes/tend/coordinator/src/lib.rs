@@ -17,8 +17,8 @@
 use hdk::prelude::*;
 use mycelix_finance_shared::{
     anchor_hash, follow_update_chain, pick_race_winner, rate_limit_anchor_key,
-    verify_governance_or_bootstrap_from_links, DEFAULT_RATE_LIMIT_PER_MINUTE,
-    GOVERNANCE_AGENTS_ANCHOR,
+    verify_governance_or_bootstrap_from_links, verify_participant_tier,
+    DEFAULT_RATE_LIMIT_PER_MINUTE, GOVERNANCE_AGENTS_ANCHOR,
 };
 
 // Re-export integrity types for external use
@@ -475,7 +475,7 @@ fn get_or_create_hearth_balance(
     };
     let hash = create_entry(&EntryTypes::HearthTendBalance(bal.clone()))?;
     let anchor = anchor_hash(&anchor_key)?;
-    create_link(
+    let our_link_hash = create_link(
         anchor.clone(),
         hash.clone(),
         LinkTypes::HearthToBalances,
@@ -500,7 +500,9 @@ fn get_or_create_hearth_balance(
             .min()
         {
             if winner_hash != hash {
-                // We lost the race — return the winner's entry instead
+                // We lost the race — delete our orphaned link to prevent drift
+                let _ = delete_link(our_link_hash, GetOptions::default());
+                // Return the winner's entry instead
                 let record = follow_update_chain(winner_hash)?;
                 let winner_bal = record
                     .entry()
@@ -607,6 +609,7 @@ fn update_hearth_balance(
             )))?;
 
         let now = sys_time()?;
+        // See ZERO-SUM INVARIANT comment in update_balance_after_exchange.
         if is_provider {
             bal.balance += hours.round() as i32;
             bal.total_provided += hours;
@@ -748,6 +751,7 @@ pub fn get_currency_alias(dao_did: String) -> ExternResult<Option<CurrencyAliasE
 /// against BALANCE_LIMIT; apprentice enforcement uses APPRENTICE_BALANCE_LIMIT.
 #[hdk_extern]
 pub fn record_exchange(input: RecordExchangeInput) -> ExternResult<ExchangeRecord> {
+    verify_participant_tier()?;
     if input.receiver_did.is_empty() || input.receiver_did.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Receiver DID must be 1-256 characters".into()
@@ -914,6 +918,7 @@ pub fn record_exchange(input: RecordExchangeInput) -> ExternResult<ExchangeRecor
 /// Enforces apprentice balance limits before confirming.
 #[hdk_extern]
 pub fn confirm_exchange(exchange_id: String) -> ExternResult<ExchangeRecord> {
+    verify_participant_tier()?;
     if exchange_id.is_empty() || exchange_id.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Exchange ID must be 1-256 characters".into()
@@ -1754,7 +1759,7 @@ fn get_or_create_balance(member_did: String, dao_did: String) -> ExternResult<Ba
     let action_hash = create_entry(&EntryTypes::TendBalance(balance.clone()))?;
 
     let anchor = anchor_hash(&format!("balance:{}:{}", dao_did, member_did))?;
-    create_link(
+    let our_link_hash = create_link(
         anchor.clone(),
         action_hash.clone(),
         LinkTypes::MemberToBalance,
@@ -1763,7 +1768,8 @@ fn get_or_create_balance(member_did: String, dao_did: String) -> ExternResult<Ba
 
     // RC-13: Race condition guard — re-read links to detect concurrent creators.
     // If multiple links exist, deterministically pick the one with the lowest
-    // target ActionHash. If we're not the winner, return the winner's entry.
+    // target ActionHash. If we're not the winner, delete our orphaned link and
+    // return the winner's entry.
     let recheck_links = get_links(
         LinkQuery::try_new(anchor, LinkTypes::MemberToBalance)?,
         GetStrategy::default(),
@@ -1775,7 +1781,9 @@ fn get_or_create_balance(member_did: String, dao_did: String) -> ExternResult<Ba
             .min()
         {
             if winner_hash != action_hash {
-                // We lost the race — return the winner's entry instead
+                // We lost the race — delete our orphaned link to prevent drift
+                let _ = delete_link(our_link_hash, GetOptions::default());
+                // Return the winner's entry instead
                 let record = follow_update_chain(winner_hash)?;
                 let winner_bal = record
                     .entry()
@@ -1904,6 +1912,7 @@ pub fn get_my_exchanges(input: PaginatedDaoInput) -> ExternResult<Vec<ExchangeRe
 /// Create a service listing (offer to help)
 #[hdk_extern]
 pub fn create_listing(input: CreateListingInput) -> ExternResult<ServiceListing> {
+    verify_participant_tier()?;
     if input.title.is_empty() || input.title.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Title must be 1-256 characters".into()
@@ -2036,6 +2045,7 @@ pub fn get_dao_listings(input: PaginatedDaoInput) -> ExternResult<Vec<ServiceLis
 /// Create a service request (ask for help)
 #[hdk_extern]
 pub fn create_request(input: CreateRequestInput) -> ExternResult<ServiceRequest> {
+    verify_participant_tier()?;
     if input.title.is_empty() || input.title.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Title must be 1-256 characters".into()
@@ -2277,6 +2287,14 @@ fn update_balance_after_exchange(
         })? {
             let now = sys_time()?;
 
+            // ZERO-SUM INVARIANT: Both provider (+) and receiver (-) apply
+            // the same `hours.round() as i32`, so the pair always nets to zero.
+            // However, f32 has ~7 decimal digits of precision. A client sending
+            // e.g. 2.5000001 would round to 3 instead of the intended 2 or 3,
+            // and `total_provided`/`total_received` (f32 accumulators) will
+            // drift from the integer `balance` over many exchanges. If this
+            // becomes problematic, migrate hours to fixed-point (e.g. i32
+            // quarter-hours) to eliminate rounding entirely.
             if is_provider {
                 balance.balance += hours.round() as i32;
                 balance.total_provided += hours;
