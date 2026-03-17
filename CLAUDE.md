@@ -18,7 +18,7 @@ Full details: @.claude/rules/CREDENTIALS.md
 Full allocation: @.claude/rules/PORTS.md
 
 ### Development
-1. **Flakes first** - `nix develop` before anything
+1. **Flakes first** - `nix develop` before anything. The flake provides `mold` (linker), `sccache`, and other build tools. Without it, `cargo build` will fail with `cannot find 'ld'` because `.cargo/config.toml` requires `mold` via `-fuse-ld=mold`.
 2. **No workarounds** - Fix the flake, don't hack
 3. **Test what exists** - No aspirational tests
 4. **Edit, don't duplicate** - One implementation per feature
