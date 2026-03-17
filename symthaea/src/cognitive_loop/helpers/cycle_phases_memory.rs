@@ -105,7 +105,8 @@ impl CognitiveLoopService {
         let mut codebook_evictions: usize = 0;
         if self.stats.total_cycles % 97 == 0 && self.stats.total_cycles > 0 {
             let top_eps = self
-                .episodic_persistence.replay
+                .episodic_persistence
+                .replay
                 .as_ref()
                 .map(|replay| replay.get_top_episodes(3))
                 .unwrap_or_default();
@@ -523,6 +524,7 @@ impl CognitiveLoopService {
             let crhvs: Vec<_> = self.cantor_dream.broadcast_buffer.drain(..).collect();
             let mut dream_surprise_sum = 0.0f32;
             let mut dream_count = 0u32;
+            let mut high_quality_count = 0u32;
 
             // DEPTH-STRATIFIED EVICTION: Before adding new entries, if the codebook
             // is near capacity, evict from the most crowded depth stratum.
@@ -535,7 +537,8 @@ impl CognitiveLoopService {
                 let mut depth_counts = [0usize; 8]; // depths 0-7
                 for d in 0..8 {
                     depth_counts[d] = self
-                        .cantor_dream.cleanup_engine
+                        .cantor_dream
+                        .cleanup_engine
                         .codebook
                         .count_by_prefix(&format!("d{d}_"));
                 }
@@ -549,7 +552,10 @@ impl CognitiveLoopService {
                 // Evict oldest entry from that stratum (FIFO — first match removed)
                 if depth_counts[max_stratum] > 2 {
                     let prefix = format!("d{max_stratum}_");
-                    self.cantor_dream.cleanup_engine.codebook.evict_by_prefix(&prefix);
+                    self.cantor_dream
+                        .cleanup_engine
+                        .codebook
+                        .evict_by_prefix(&prefix);
                 }
             }
 
@@ -566,6 +572,7 @@ impl CognitiveLoopService {
                 if result.quality
                     > crate::cognitive_loop::thresholds::CANTOR_DREAM_QUALITY_THRESHOLD
                 {
+                    high_quality_count += 1;
                     // Depth-stratified label: "d{depth}_dream_consolidated_{N}"
                     let label = format!(
                         "d{}_dream_consolidated_{}",
@@ -590,6 +597,16 @@ impl CognitiveLoopService {
             if self.cantor_dream.dream_surprise > 0.01 {
                 self.fep.learning_signal += self.cantor_dream.dream_surprise * 0.2;
                 self.fep.learning_signal = self.fep.learning_signal.clamp(-1.0, 1.0);
+            }
+            // Dream→Learning reliability coupling: fraction of high-quality cleanups
+            // (those exceeding CANTOR_DREAM_QUALITY_THRESHOLD) measures consolidation
+            // reliability. High reliability boosts waking plasticity for enhanced encoding.
+            // Science: Diekelmann & Born (2010) — effective consolidation enhances
+            // subsequent encoding; Walker (2017) — post-sleep learning enhancement.
+            if dream_count > 0 {
+                let consolidation_reliability = high_quality_count as f32 / dream_count as f32;
+                self.learning_manager
+                    .apply_dream_consolidation_boost(consolidation_reliability);
             }
             tracing::debug!(
                 cleanups = self.cantor_dream.cleanup_engine.cleanups_performed,
@@ -618,16 +635,25 @@ impl CognitiveLoopService {
 
         // Memory coordinator: broadcast signals and process graduations
         {
-            let coord_phi = self.language_comm.voice_coherence.bridge.smoothed_coherence() as f64;
+            let coord_phi = self
+                .language_comm
+                .voice_coherence
+                .bridge
+                .smoothed_coherence() as f64;
             let coord_coherence = coherence as f64;
-            self.memory_consol.memory_coordinator.update_signals_with_sigma(
-                coord_phi,
-                coord_coherence,
-                self.carryover.consciousness.last_sigma,
-            );
+            self.memory_consol
+                .memory_coordinator
+                .update_signals_with_sigma(
+                    coord_phi,
+                    coord_coherence,
+                    self.carryover.consciousness.last_sigma,
+                );
 
             if let Some(ref mut replay) = self.episodic_persistence.replay {
-                let graduated = self.memory_consol.memory_coordinator.process_graduations(replay);
+                let graduated = self
+                    .memory_consol
+                    .memory_coordinator
+                    .process_graduations(replay);
                 if graduated > 0 {
                     tracing::debug!(
                         graduated,
@@ -649,13 +675,20 @@ impl CognitiveLoopService {
             use std::sync::atomic::Ordering;
 
             if !self
-                .episodic_persistence.flush_in_progress
+                .episodic_persistence
+                .flush_in_progress
                 .load(Ordering::Relaxed)
             {
                 if let Some(ref replay) = self.episodic_persistence.replay {
                     let top_episodes = replay.get_top_episodes(16);
                     if !top_episodes.is_empty() {
-                        let db = self.episodic_persistence.db.as_ref().unwrap().clone();
+                        let Some(db) = self.episodic_persistence.db.clone() else {
+                            return EpisodicReplayResult {
+                                surprise_replay_batch_size: 0,
+                                phasic_da_replay_boost: 0,
+                                memory_db_flushed: false,
+                            };
+                        };
                         let flush_guard = self.episodic_persistence.flush_in_progress.clone();
                         flush_guard.store(true, Ordering::Relaxed);
 
@@ -692,7 +725,10 @@ impl CognitiveLoopService {
                         std::thread::spawn(move || {
                             match db.store_batch_sync(&records) {
                                 Ok(n) => {
-                                    tracing::debug!(stored = n, "Memory flush: episodes persisted to SQLite");
+                                    tracing::debug!(
+                                        stored = n,
+                                        "Memory flush: episodes persisted to SQLite"
+                                    );
                                 }
                                 Err(e) => {
                                     tracing::warn!(error = %e, "Memory flush failed");

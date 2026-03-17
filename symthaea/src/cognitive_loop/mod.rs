@@ -192,8 +192,8 @@ pub use physics_integration::ParetoContext;
 pub use managers::governance_manager::{GovernanceEvent, GovernanceEventKind, GovernanceOutcome};
 
 pub use managers::network_service_bridge::{
-    forward_affective_state, forward_federated_round, NetworkServiceBridge,
-    NetworkServiceBridgeHandle,
+    forward_affective_state, forward_federated_round, FederatedCoordinatorHandle,
+    NetworkServiceBridge, NetworkServiceBridgeHandle,
 };
 pub use managers::swarm_manager::{SwarmEvent, SwarmTelemetry};
 
@@ -631,6 +631,10 @@ pub struct CognitiveLoopService {
     /// Runs **alongside** existing inline code (additive wiring — old code not removed yet).
     ethics_engine: ethics_engine::EthicsEngine,
 
+    /// Last unified ethical verdict from `ethics_engine.evaluate()`.
+    /// Checked before motor execution: `Blocked` prevents action, `Caution` caps confidence.
+    pub(crate) last_ethics_verdict: ethics_engine::EthicalVerdict,
+
     /// KosmicSong: Unified identity synthesizing Phi + Eight Harmonies + Epistemic Humility.
     /// Computed every cycle after consciousness_engine + ethics_engine settle.
     /// Outputs coherence_score (0.0-1.0) that gates FEP learning rate and exploration.
@@ -670,6 +674,9 @@ pub struct CognitiveLoopService {
     /// Sender half of the swarm event channel. Clone via `swarm_event_sender()` to
     /// inject events from async components (NetworkService, Hyperfeel, mesh layer).
     swarm_event_tx: std::sync::mpsc::Sender<managers::swarm_manager::SwarmEvent>,
+
+    /// Handle for the federated coordinator task (if enabled).
+    federation_handle: Option<crate::cognitive_loop::managers::network_service_bridge::FederatedCoordinatorHandle>,
 
     /// Spectrum Manager: Multi-band radio dispatch, AIMD congestion, delta compression.
     /// Implements CognitiveSubsystem at interval 53. Feature-gated behind `mesh`.
