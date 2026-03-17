@@ -250,7 +250,7 @@ fn build_vignettes() -> Vec<Vignette> {
 
 impl PsychBenchmark for CognitiveDistortionBenchmark {
     fn name(&self) -> &str {
-        "CognitiveDistortion"
+        "Clinical::CognitiveDistortion"
     }
 
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {

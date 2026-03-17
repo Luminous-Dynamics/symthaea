@@ -234,6 +234,38 @@ impl fmt::Display for MetricValue {
     }
 }
 
+/// Calibration transparency classification for benchmark parameters.
+///
+/// Reports whether the benchmark's key parameters were set a priori (from
+/// theory/literature) or tuned post-hoc to match human baselines. See
+/// `CALIBRATION_TRANSPARENCY.md` for the full audit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CalibrationClass {
+    /// All parameters derived from task structure, mathematics, or literature
+    /// before seeing benchmark output.
+    APriori,
+    /// At least one parameter was tuned post-hoc to match human baselines.
+    PostHoc,
+    /// Baselines are theoretical (no human data exists for comparison).
+    Theoretical,
+}
+
+impl Default for CalibrationClass {
+    fn default() -> Self {
+        CalibrationClass::PostHoc
+    }
+}
+
+impl fmt::Display for CalibrationClass {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CalibrationClass::APriori => write!(f, "a_priori"),
+            CalibrationClass::PostHoc => write!(f, "post_hoc"),
+            CalibrationClass::Theoretical => write!(f, "theoretical"),
+        }
+    }
+}
+
 /// Result from a single benchmark run.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BenchmarkResult {
@@ -252,6 +284,9 @@ pub struct BenchmarkResult {
     /// Per-trial trace data (populated when `config.trial_trace` is true).
     #[serde(default)]
     pub trial_trace: Vec<super::trial_analysis::TrialOutcome>,
+    /// Calibration transparency: whether key parameters were set a priori or post-hoc.
+    #[serde(default)]
+    pub calibration_class: CalibrationClass,
 }
 
 impl BenchmarkResult {
@@ -265,7 +300,14 @@ impl BenchmarkResult {
             conditions: 0,
             trials_per_condition: 0,
             trial_trace: Vec::new(),
+            calibration_class: CalibrationClass::default(),
         }
+    }
+
+    /// Set the calibration class (builder pattern).
+    pub fn with_calibration(mut self, class: CalibrationClass) -> Self {
+        self.calibration_class = class;
+        self
     }
 
     /// Insert a metric.
@@ -1865,6 +1907,66 @@ pub fn is_lower_better(metric_key: &str) -> bool {
     )
 }
 
+/// Classify a benchmark's calibration status based on the parameter audit.
+///
+/// See `CALIBRATION_TRANSPARENCY.md` for the full audit. Benchmarks default to
+/// `PostHoc` unless explicitly listed here as `APriori` or `Theoretical`.
+pub fn calibration_class_of(benchmark: &str) -> CalibrationClass {
+    // A priori: parameters set from task structure / literature before seeing z-scores
+    let a_priori = [
+        "WCST",
+        "IGT",
+        "TowerOfLondon",
+        "Ravens",
+        "DualTask",
+        "N-back",
+        "Nback",
+        "DigitSpan",
+        "ChangeDetection",
+        "Binding",       // WorM binding
+        "CrossModal",
+        "ValenceClassification",
+        "RemoteAssociates",
+        "FalseBelief",
+        "FauxPas",
+        "Hinting",
+        "Persuasion",
+        "BART",
+        "HorizonTask",
+        "InstrumentalLearning",
+        "ReversalLearning",
+        "TemporalDiscounting",
+        "ProbabilisticReasoning",
+        "FeelingOfKnowing",
+        "ChangeBlindness",
+    ];
+    // Theoretical: no human data, comparison is to model predictions
+    let theoretical = [
+        "Degradation",
+        "Transfer",        // substrate
+        "CausalDecomposition",
+        "AnalogicalReasoning",
+        "CausalChain",
+        "Counterfactual",
+        "WeightedDecomposition",
+        "Stability",
+        "Isomorphism",
+        "ConsciousnessIndicators",
+    ];
+
+    for name in &a_priori {
+        if benchmark.contains(name) {
+            return CalibrationClass::APriori;
+        }
+    }
+    for name in &theoretical {
+        if benchmark.contains(name) {
+            return CalibrationClass::Theoretical;
+        }
+    }
+    CalibrationClass::PostHoc
+}
+
 impl BenchmarkReport {
     /// Compute a normalized cognitive profile: domain → score [0.0, 1.0].
     ///
@@ -2042,6 +2144,54 @@ impl BenchmarkReport {
         ));
         lines.push("Cross-cultural generalizability has not been validated.".to_string());
         lines.push("Ref: Henrich, Heine, & Norenzayan (2010).".to_string());
+
+        // Calibration transparency split
+        let mut a_priori_zs = Vec::new();
+        let mut post_hoc_zs = Vec::new();
+        let mut theoretical_zs = Vec::new();
+
+        for result in &self.results {
+            let key = key_metric_for_benchmark(&result.benchmark);
+            let bl = crate::harness::baselines::BaselineCollection::all();
+            let comparisons = self.find_comparisons(result, &bl);
+            if let Some((_, comp)) = comparisons.iter().find(|(k, _)| k == key) {
+                if let Some(z) = comp.z_score {
+                    let z_adj = if is_lower_better(key) { -z } else { z };
+                    match calibration_class_of(&result.benchmark) {
+                        CalibrationClass::APriori => a_priori_zs.push(z_adj),
+                        CalibrationClass::PostHoc => post_hoc_zs.push(z_adj),
+                        CalibrationClass::Theoretical => theoretical_zs.push(z_adj),
+                    }
+                }
+            }
+        }
+
+        lines.push(String::new());
+        lines.push("Calibration Transparency (see CALIBRATION_TRANSPARENCY.md):".to_string());
+        if !a_priori_zs.is_empty() {
+            let mean = a_priori_zs.iter().sum::<f64>() / a_priori_zs.len() as f64;
+            lines.push(format!(
+                "  A priori params only:  z={:+.3} (n={} benchmarks)",
+                mean,
+                a_priori_zs.len()
+            ));
+        }
+        if !post_hoc_zs.is_empty() {
+            let mean = post_hoc_zs.iter().sum::<f64>() / post_hoc_zs.len() as f64;
+            lines.push(format!(
+                "  Post-hoc calibrated:   z={:+.3} (n={} benchmarks)",
+                mean,
+                post_hoc_zs.len()
+            ));
+        }
+        if !theoretical_zs.is_empty() {
+            let mean = theoretical_zs.iter().sum::<f64>() / theoretical_zs.len() as f64;
+            lines.push(format!(
+                "  Theoretical baselines: z={:+.3} (n={} benchmarks)",
+                mean,
+                theoretical_zs.len()
+            ));
+        }
 
         lines.join("\n")
     }

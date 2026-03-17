@@ -49,7 +49,7 @@ impl RestlessBanditBenchmark {
 
         // Higher alpha EMA tracks drift faster
         let mut arm_ema: Vec<f64> = vec![0.5; num_arms];
-        let ema_alpha = 0.6; // High alpha = fast drift tracking
+        let ema_alpha = 0.6; // Moderate alpha = balanced drift tracking
                              // Track last-pull time per arm (recency-aware exploration)
         let mut arm_pulls: Vec<u64> = vec![0; num_arms];
         let mut arm_last_pull: Vec<usize> = vec![0; num_arms];

@@ -239,7 +239,7 @@ pub struct AllianceMaintenanceBenchmark;
 
 impl PsychBenchmark for AllianceMaintenanceBenchmark {
     fn name(&self) -> &str {
-        "AllianceMaintenance"
+        "Clinical::AllianceMaintenance"
     }
 
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {

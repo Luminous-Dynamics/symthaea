@@ -61,7 +61,7 @@ impl TemporalOrderBenchmark {
         // temporal position templates. With binary XOR binding the unbind is
         // exact, but probabilistic blending of temporal positions still has
         // sampling noise, so ensemble averaging smooths the gradient.
-        const N_ENSEMBLES: usize = 5;
+        const N_ENSEMBLES: usize = 8;
         let mut first_templates = Vec::with_capacity(N_ENSEMBLES);
         let mut second_templates = Vec::with_capacity(N_ENSEMBLES);
         for ens in 0..N_ENSEMBLES {
