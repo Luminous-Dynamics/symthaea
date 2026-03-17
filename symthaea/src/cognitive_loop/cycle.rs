@@ -206,15 +206,103 @@ impl CognitiveLoopService {
         let feedback = self.phase_feedback(input, &perception, &mut dynamics, &mut module_timings);
 
         // ═══════════════════════════════════════════════════════════════════
+        // PHASE 3.5: SAFETY ENFORCEMENT
+        // NRC defense-in-depth: assess consciousness → gate LR/exploration/motor
+        // Science: Arnsten (2009), Yerkes-Dodson (1908), Aston-Jones & Cohen (2005)
+        // ═══════════════════════════════════════════════════════════════════
+        #[cfg(feature = "safety-agents")]
+        {
+            let safety_result = super::safety_enforcement::compute_enforcement(
+                &mut self.safety_agent,
+                feedback.consciousness.consciousness_level as f32,
+                dynamics.core.prediction_error,
+                feedback.self_model.temporal_coherence_score as f32,
+                {
+                    #[cfg(feature = "integrity")]
+                    { self.integrity_manager.has_critical_anomaly() }
+                    #[cfg(not(feature = "integrity"))]
+                    { false }
+                },
+                self.stats.total_cycles as usize,
+                {
+                    #[cfg(feature = "sentinel")]
+                    { Some(&self.collective_immune_state) }
+                    #[cfg(not(feature = "sentinel"))]
+                    { None }
+                },
+            );
+
+            // Gate 1: Learning rate — Arnsten (2009)
+            if safety_result.lr_multiplier < 1.0 {
+                self.stats.effective_learning_rate *= safety_result.lr_multiplier;
+            }
+
+            // Gate 2: Exploration — Yerkes-Dodson (1908)
+            if safety_result.exploration_multiplier < 1.0 {
+                self.carryover.quality.last_exploration_bonus *= safety_result.exploration_multiplier;
+            }
+
+            // Gate 3: Neuromodulators — Aston-Jones & Cohen (2005), Sapolsky (2004)
+            if safety_result.ne_nudge > 0.0 {
+                let ne_base = self.neuromod.bath.noradrenaline.baseline_val();
+                self.neuromod.bath.noradrenaline.set_baseline(ne_base + safety_result.ne_nudge);
+            }
+            if safety_result.allostatic_load > 0.0 {
+                self.neuromod.bath.accumulate_allostatic_load(safety_result.allostatic_load, false);
+            }
+
+            // Gate 4: Consciousness penalty — Dehaene (2014)
+            // Applied via allostatic load accumulation above, which naturally
+            // degrades consciousness through the neuromodulator→Phi pathway.
+
+            // Guardian posture update
+            self.guardian_state.update(
+                safety_result.level,
+                feedback.consciousness.consciousness_level,
+                self.stats.total_cycles as usize,
+            );
+        }
+
+        // Sentinel threat processing: detect → store → share
+        #[cfg(feature = "sentinel")]
+        {
+            // Store locally-detected threats in immune memory
+            for threat in self.sentinel_manager.active_threats() {
+                self.threat_memory.store_threat(
+                    super::threat_memory::ThreatSignalKind::from_sentinel_kind(threat.kind),
+                    threat.severity,
+                    threat.confidence,
+                    self.stats.total_cycles as usize,
+                    &threat.evidence,
+                );
+            }
+
+            // Update collective immune state from swarm data
+            let local_threat_level = self.sentinel_manager.threat_level();
+            let local_kinds: Vec<String> = self.sentinel_manager.active_threats()
+                .iter()
+                .map(|t| format!("{:?}", t.kind))
+                .collect();
+            self.collective_immune_state.update(
+                local_threat_level,
+                &[], // peer threat reports wired when swarm drain is available
+                feedback.consciousness.consciousness_level,
+                self.swarm_manager.connected_peers(),
+                &local_kinds,
+                &local_kinds, // bootstrap: local = swarm until peer sharing wired
+            );
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
         // PHASE 4: OUTPUT
         // Metadata assembly, telemetry, CycleResult construction
         // ═══════════════════════════════════════════════════════════════════
         self.phase_output(
             input,
             cycle_start,
-            &perception,
-            &dynamics,
-            &feedback,
+            &mut perception,
+            &mut dynamics,
+            &mut feedback,
             module_timings,
         )
     }

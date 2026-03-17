@@ -3,6 +3,7 @@
 //! Extracts the final metadata assembly and CycleResult construction from
 //! the original `cycle()` method.
 
+use std::mem;
 use std::time::Instant;
 
 use super::phase_results::{DynamicsPhaseResult, FeedbackPhaseResult, PerceptionPhaseResult};
@@ -14,9 +15,9 @@ impl CognitiveLoopService {
         &mut self,
         _input: &str,
         cycle_start: Instant,
-        perception: &PerceptionPhaseResult,
-        dynamics: &DynamicsPhaseResult,
-        feedback: &FeedbackPhaseResult,
+        perception: &mut PerceptionPhaseResult,
+        dynamics: &mut DynamicsPhaseResult,
+        feedback: &mut FeedbackPhaseResult,
         mut module_timings: super::ModuleTimings,
     ) -> CycleResult {
         let thalamic_depth_score = match self.cognitive_depth {
@@ -30,7 +31,7 @@ impl CognitiveLoopService {
         let selected_strategy_str = perception.strategy.selected_strategy.as_str();
 
         let _t = Instant::now();
-        let moral_anomaly_report = self.ethics_engine.last_anomaly_report().clone();
+        let moral_anomaly_report = self.ethics_engine.last_anomaly_report();
         // Cache topology summary once — avoids 10+ repeated moral_topology().last_summary() chains
         let topo_summary = self.ethics_engine.moral_topology().last_summary();
         let topology_fresh = self.ethics_engine.last_topology_fresh();
@@ -38,17 +39,17 @@ impl CognitiveLoopService {
             surprise_triggered: perception.exploration.surprise_triggered,
             prefrontal_veto: feedback.self_model.prefrontal_veto,
             reasoning_confidence: dynamics.reasoning.reasoning_confidence,
-            exploration_action: perception.exploration.exploration_action.clone(),
+            exploration_action: mem::take(&mut perception.exploration.exploration_action),
             reasoning_gate_blocked: dynamics.reasoning.reasoning_gate_blocked,
-            reasoning_fallback: dynamics.reasoning.reasoning_fallback.clone(),
+            reasoning_fallback: mem::take(&mut dynamics.reasoning.reasoning_fallback),
             reasoning_plan_action: dynamics.reasoning.reasoning_plan_action,
             reasoning_plan_confidence: dynamics.reasoning.reasoning_plan_confidence,
-            reasoning_narrative: dynamics.reasoning.reasoning_narrative.clone(),
+            reasoning_narrative: mem::take(&mut dynamics.reasoning.reasoning_narrative),
             quality: super::QualityDiagnostics {
                 meta_cognitive_accuracy: feedback.self_model.meta_cognitive_accuracy,
                 meta_cognitive_depth: feedback.self_model.meta_cognitive_depth,
                 dissipative_health: feedback.quality.dissipative_health,
-                dissipative_regime: feedback.quality.dissipative_regime.clone(),
+                dissipative_regime: mem::take(&mut feedback.quality.dissipative_regime),
                 dissipative_entropy_rate: feedback.quality.dissipative_entropy_rate,
                 epistemic_phi_eff: feedback.reasoning.epistemic_phi_eff,
                 equation_v2_consciousness: feedback.consciousness.equation_v2_consciousness,
@@ -73,17 +74,14 @@ impl CognitiveLoopService {
                     .consciousness_profile_composite,
                 synergy_enhanced_composite: feedback.consciousness.synergy_enhanced_composite,
                 emergent_properties_count: feedback.consciousness.emergent_properties_count,
-                consciousness_state_label: feedback.consciousness.consciousness_state_label.clone(),
+                consciousness_state_label: mem::take(&mut feedback.consciousness.consciousness_state_label),
                 consciousness_state_level: feedback.consciousness.consciousness_state_level,
                 consciousness_weights: feedback.consciousness.consciousness_weights,
                 consciousness_weight_variance: feedback.consciousness.consciousness_weight_variance,
                 consciousness_gradient_magnitude: feedback
                     .consciousness
                     .consciousness_gradient_magnitude,
-                consciousness_limiting_component: feedback
-                    .consciousness
-                    .consciousness_limiting_component
-                    .clone(),
+                consciousness_limiting_component: mem::take(&mut feedback.consciousness.consciousness_limiting_component),
                 ..Default::default()
             },
             embodied: super::EmbodiedAffectMetrics {
@@ -186,14 +184,10 @@ impl CognitiveLoopService {
             primitive_psi: feedback.consciousness.primitive_psi,
             lattice_height: feedback.consciousness.lattice_height,
             lattice_width: feedback.consciousness.lattice_width,
-            lattice_join_concept: feedback
-                .consciousness
-                .lattice_join_concept
-                .clone()
-                .unwrap_or_default(),
+            lattice_join_concept: mem::take(&mut feedback.consciousness.lattice_join_concept).unwrap_or_default(),
             causal_codebook_entries: feedback.consciousness.causal_codebook_entries_len,
             compositionality_total: feedback.consciousness.compositionality_total,
-            composition_rule_applied: feedback.ethics.composition_rule_applied.clone(),
+            composition_rule_applied: mem::take(&mut feedback.ethics.composition_rule_applied),
             harmonics: super::HarmonicMetrics {
                 harmonies_alignment: feedback.ethics.harmonies_alignment,
                 harmonies_approved: feedback.ethics.harmonies_approved,
@@ -212,15 +206,15 @@ impl CognitiveLoopService {
                 moral_kl_divergence: self.ethics_engine.last_moral_free_energy().kl_divergence,
                 moral_entropy: self.ethics_engine.last_moral_free_energy().entropy,
                 moral_surprise: self.ethics_engine.last_moral_free_energy().surprise,
-                dominant_harmonic: dynamics.guidance.dominant_harmonic.clone(),
-                guiding_question: dynamics.guidance.guiding_question.clone(),
-                guiding_priority_category: dynamics.guidance.guiding_priority_category.clone(),
+                dominant_harmonic: mem::take(&mut dynamics.guidance.dominant_harmonic),
+                guiding_question: mem::take(&mut dynamics.guidance.guiding_question),
+                guiding_priority_category: mem::take(&mut dynamics.guidance.guiding_priority_category),
             },
             ethics: super::EthicalTelemetry {
                 moral_score: perception.moral.moral_score,
-                moral_steering_category: dynamics.guidance.moral_steering_category.clone(),
+                moral_steering_category: mem::take(&mut dynamics.guidance.moral_steering_category),
                 value_evaluator_score: feedback.ethics.value_evaluator_score,
-                value_evaluator_decision: feedback.ethics.value_evaluator_decision.clone(),
+                value_evaluator_decision: mem::take(&mut feedback.ethics.value_evaluator_decision),
                 value_feedback_trend: value_trend,
                 value_gate_factor: feedback.ethics.value_gate_factor,
                 soul_alignment: perception.moral.soul_alignment,
@@ -259,10 +253,10 @@ impl CognitiveLoopService {
                 moral_attractor_detected: topo_summary.attractor_detected,
                 in_active_rest: self.stats.in_active_rest,
                 stillness_dominance_streak: self.stats.stillness_dominance_streak,
-                unified_verdict: format!("{:?}", self.last_ethics_verdict),
+                unified_verdict: self.ethics_verdict_override.as_ref().unwrap_or(&self.last_ethics_verdict).as_str().to_string(),
             },
             multi_obj_frontier_size: feedback.multi_obj_frontier_size,
-            reasoning_context: feedback.reasoning.reasoning_context.clone(),
+            reasoning_context: mem::take(&mut feedback.reasoning.reasoning_context),
             context_phi_weight: feedback.reasoning.context_phi_weight,
             reasoning_chain_confidence: feedback.reasoning.reasoning_chain_confidence,
             reasoning_chain_depth: feedback.reasoning.reasoning_chain_depth,
@@ -276,7 +270,7 @@ impl CognitiveLoopService {
             epistemic_quality: feedback.reasoning.epistemic_quality,
             phi_validation_correlation: feedback.reasoning.phi_validation_correlation,
             epistemic_conflict_count: feedback.reasoning.epistemic_conflict_count,
-            eq_v2_limiting_component: feedback.consciousness.eq_v2_limiting_component.clone(),
+            eq_v2_limiting_component: mem::take(&mut feedback.consciousness.eq_v2_limiting_component),
             pipeline_consciousness: feedback.consciousness.pipeline_consciousness,
             multimodal_integrated_phi: feedback.consciousness.multimodal_integrated_phi,
             epistemic_gate_confidence: feedback.reasoning.epistemic_gate_confidence,
@@ -365,7 +359,7 @@ impl CognitiveLoopService {
             evolution_confidence_delta: feedback.evolution.evolution_confidence_delta,
             homeostasis_pull_strength: dynamics.homeostasis.homeostasis_pull_strength,
             prediction_coherence_urgency_bias: perception.urgency.prediction_coherence_urgency_bias,
-            limiting_component_boosted: feedback.loops.limiting_component_boosted.clone(),
+            limiting_component_boosted: mem::take(&mut feedback.loops.limiting_component_boosted),
             love_resonance_boost: feedback.loops.love_resonance_boost,
             reasoning_chain_boosted: feedback.loops.reasoning_chain_boosted,
             harmonic_interference_lr_mod: feedback.loops.harmonic_interference_lr_mod,
@@ -983,7 +977,7 @@ impl CognitiveLoopService {
                 encode_time_us: tel.encode_time_us,
                 evolve_time_us: tel.evolve_time_us,
                 vision_mean_surprise: perception.vision_mean_surprise,
-                vision_horizon_errors: perception.vision_horizon_errors.clone(),
+                vision_horizon_errors: mem::take(&mut perception.vision_horizon_errors),
                 scene_recognized: perception.scene_recognized,
             });
         }
@@ -1025,8 +1019,8 @@ impl CognitiveLoopService {
         }
 
         metadata.consciousness.weight_convergence_state =
-            feedback.consciousness.convergence_state.clone();
-        if feedback.consciousness.convergence_state == "Converged" && self.convergence_cycle == 0 {
+            mem::take(&mut feedback.consciousness.convergence_state);
+        if metadata.consciousness.weight_convergence_state == "Converged" && self.convergence_cycle == 0 {
             self.convergence_cycle = self.stats.total_cycles;
         }
         metadata.consciousness.convergence_cycle = self.convergence_cycle;
@@ -1206,6 +1200,27 @@ impl CognitiveLoopService {
         metadata.reasoning_engine_enabled = cfg!(feature = "reasoning_engine");
         metadata.mesh_enabled = cfg!(feature = "mesh");
         metadata.ssm_language_enabled = cfg!(feature = "ssm_language");
+
+        // ── Immune system telemetry ──
+        #[cfg(feature = "safety-agents")]
+        {
+            let level = self.safety_agent.current_level();
+            metadata.immune_safety_level = format!("{:?}", level).to_uppercase();
+            let telem = self.guardian_state.telemetry(self.stats.total_cycles as usize);
+            metadata.immune_guardian_posture = telem.posture;
+            metadata.immune_patrol_active = telem.patrol_active;
+            metadata.immune_emergency_cycles = telem.emergency_cycles;
+        }
+        #[cfg(feature = "sentinel")]
+        {
+            let st = self.sentinel_manager.telemetry();
+            metadata.immune_active_threats = st.active_threats as u32;
+            metadata.immune_max_severity = st.max_severity;
+            metadata.immune_threat_level = st.threat_level;
+            metadata.immune_quarantined_peers = st.quarantined_peers as u32;
+            metadata.immune_threat_patterns = self.threat_memory.pattern_count() as u32;
+            metadata.immune_response_active = self.collective_immune_state.immune_response_active;
+        }
 
         // ── End-of-cycle stats ──
         self.run_end_of_cycle_stats(
@@ -1476,14 +1491,10 @@ impl CognitiveLoopService {
         self.curiosity_drive.boredom = self.curiosity_drive.boredom.clamp(0.0, 1.5);
 
         CycleResult {
-            output: dynamics.core.output.clone(),
+            output: mem::take(&mut dynamics.core.output),
             prediction_error: dynamics.core.prediction_error,
             peak_attention: perception.encoding.encoding_result.peak_attention,
-            detected_primitives: perception
-                .encoding
-                .encoding_result
-                .detected_primitives
-                .clone(),
+            detected_primitives: mem::take(&mut perception.encoding.encoding_result.detected_primitives),
             learning_occurred: dynamics.core.learning_occurred,
             training_loss: dynamics.core.training_loss,
             cycle_time_us: u64::try_from(cycle_start.elapsed().as_micros()).unwrap_or(u64::MAX),

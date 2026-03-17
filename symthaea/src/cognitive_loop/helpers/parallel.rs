@@ -150,7 +150,7 @@ pub(in crate::cognitive_loop) fn parallel_episodic_learning(
                 .codebooks
                 .get(1)
                 .and_then(|cb| cb.symbols.iter().find(|(l, _)| l == val_label))
-                .map(|(_, hv)| hv.clone());
+                .map(|(_, hv)| hv);
 
             // Quantize phi -> nearest band
             let phi_label = if ctx.phi > super::super::thresholds::PHI_QUANTIZATION_HIGH {
@@ -165,7 +165,7 @@ pub(in crate::cognitive_loop) fn parallel_episodic_learning(
                 .codebooks
                 .get(2)
                 .and_then(|cb| cb.symbols.iter().find(|(l, _)| l == phi_label))
-                .map(|(_, hv)| hv.clone());
+                .map(|(_, hv)| hv);
 
             if let (Some(v_hv), Some(p_hv)) = (val_hv, phi_hv) {
                 // Pre-sized String avoids reallocation (ep_ + up to 20 digits)
