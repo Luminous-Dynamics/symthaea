@@ -212,7 +212,8 @@ impl CognitiveLoopService {
 
     /// Update listener prediction feedback
     pub fn update_listener_prediction(&mut self, success: f32) {
-        self.language_comm.voice_coherence
+        self.language_comm
+            .voice_coherence
             .voice
             .update_listener_prediction(success);
     }
@@ -227,7 +228,10 @@ impl CognitiveLoopService {
         let consciousness_level =
             super::super::snapshot::ConsciousnessSnapshot::compute_consciousness_level(
                 self.prediction_confidence as f32,
-                self.language_comm.voice_coherence.bridge.smoothed_coherence(),
+                self.language_comm
+                    .voice_coherence
+                    .bridge
+                    .smoothed_coherence(),
                 self.flow_state.intensity,
                 pattern_confidence,
             );
@@ -267,7 +271,11 @@ impl CognitiveLoopService {
             coherence_velocity: signals.coherence_velocity,
             cross_agreement: signals.cross_module_agreement,
             consciousness_level: signals.consciousness_level as f32,
-            articulation_quality: self.language_comm.voice_coherence.voice.smoothed_articulation(),
+            articulation_quality: self
+                .language_comm
+                .voice_coherence
+                .voice
+                .smoothed_articulation(),
             rate_stability: self.language_comm.voice_coherence.voice.rate_stability(),
             integrated_phi: self
                 .carryover
@@ -287,7 +295,11 @@ impl CognitiveLoopService {
     /// Get combined phi contribution from all feedback sources
     pub fn combined_phi_contribution(&self) -> f32 {
         self.language_comm.voice_coherence.bridge.phi_contribution()
-            + self.language_comm.voice_coherence.voice.compute_phi_adjustment()
+            + self
+                .language_comm
+                .voice_coherence
+                .voice
+                .compute_phi_adjustment()
     }
 
     /// Get the prediction-outcome coupling Modulation Index
@@ -314,8 +326,16 @@ impl CognitiveLoopService {
 
     /// Get combined learning rate modifier
     pub fn combined_learning_rate(&self) -> f32 {
-        let coherence_lr = self.language_comm.voice_coherence.bridge.effective_learning_rate();
-        let voice_modifier = self.language_comm.voice_coherence.voice.learning_rate_modifier();
+        let coherence_lr = self
+            .language_comm
+            .voice_coherence
+            .bridge
+            .effective_learning_rate();
+        let voice_modifier = self
+            .language_comm
+            .voice_coherence
+            .voice
+            .learning_rate_modifier();
         coherence_lr * voice_modifier
     }
 
@@ -446,12 +466,12 @@ impl CognitiveLoopService {
     ) -> (f64, f64, f64, f64, f64, f64) {
         let lr = metadata.actual_effective_lr as f64;
         (
-            metadata.consciousness_level,
-            lr,                                // meta-awareness proxy
-            metadata.consciousness_level * 0.8, // coherence proxy
-            metadata.consciousness_level * 0.6, // care activation proxy
-            metadata.consciousness_level * 0.9, // quality proxy
-            lr.min(1.0),                       // epistemic confidence proxy
+            metadata.consciousness.consciousness_level,
+            lr,                                               // meta-awareness proxy
+            metadata.consciousness.consciousness_level * 0.8, // coherence proxy
+            metadata.consciousness.consciousness_level * 0.6, // care activation proxy
+            metadata.consciousness.consciousness_level * 0.9, // quality proxy
+            lr.min(1.0),                                      // epistemic confidence proxy
         )
     }
 
@@ -706,17 +726,12 @@ impl CognitiveLoopService {
     /// Inject a swarm event into the SwarmManager for processing.
     ///
     /// Events are queued and drained during the next `process()` call (interval 41).
-    pub fn inject_swarm_event(
-        &mut self,
-        event: super::super::managers::swarm_manager::SwarmEvent,
-    ) {
+    pub fn inject_swarm_event(&mut self, event: super::super::managers::swarm_manager::SwarmEvent) {
         self.swarm_manager.inject_event(event);
     }
 
     /// Get the current swarm telemetry snapshot.
-    pub fn swarm_telemetry(
-        &self,
-    ) -> &super::super::managers::swarm_manager::SwarmTelemetry {
+    pub fn swarm_telemetry(&self) -> &super::super::managers::swarm_manager::SwarmTelemetry {
         self.swarm_manager.telemetry()
     }
 
@@ -750,8 +765,7 @@ impl CognitiveLoopService {
         use super::super::thresholds::{
             SWARM_ANOMALY_NE_CAP, SWARM_ANOMALY_NE_MULT, SWARM_CONTAGION_DA_CAP,
             SWARM_CONTAGION_DA_GAIN, SWARM_CONTAGION_DA_THRESHOLD, SWARM_OXY_CAP,
-            SWARM_OXY_HALFLIFE, SWARM_OXY_PER_SQRT_PEER, SWARM_PHI_SHT_CAP,
-            SWARM_PHI_SHT_GAIN,
+            SWARM_OXY_HALFLIFE, SWARM_OXY_PER_SQRT_PEER, SWARM_PHI_SHT_CAP, SWARM_PHI_SHT_GAIN,
         };
         let telem = self.swarm_manager.telemetry().clone();
 
@@ -760,14 +774,16 @@ impl CognitiveLoopService {
             let oxy_dose = ((telem.connected_peers as f32).sqrt() * SWARM_OXY_PER_SQRT_PEER)
                 .min(SWARM_OXY_CAP);
             if oxy_dose > super::super::thresholds::GOV_NEUROMOD_FLOOR {
-                self.neuromod.bath.inject("oxytocin", oxy_dose, SWARM_OXY_HALFLIFE);
+                self.neuromod
+                    .bath
+                    .inject("oxytocin", oxy_dose, SWARM_OXY_HALFLIFE);
             }
         }
 
         // Anomaly vigilance: sudden peer loss → NE (Arnsten 2009)
         if telem.anomaly_count > 0 {
-            let ne_nudge =
-                (SWARM_ANOMALY_NE_MULT * telem.anomaly_count.min(3) as f32).min(SWARM_ANOMALY_NE_CAP);
+            let ne_nudge = (SWARM_ANOMALY_NE_MULT * telem.anomaly_count.min(3) as f32)
+                .min(SWARM_ANOMALY_NE_CAP);
             self.neuromod
                 .bath
                 .noradrenaline
@@ -827,6 +843,57 @@ impl CognitiveLoopService {
         }
     }
 
+    /// Cross-couple drive state → learning plasticity.
+    ///
+    /// - Boredom > 0.5 → boost plasticity by 10% (Berlyne 1960: boredom drives exploratory learning)
+    /// - In flow → dampen LR modulation to 0.9 (Csikszentmihalyi 1990: don't disturb flow)
+    pub(crate) fn cross_couple_drive_learning(&mut self) {
+        let boredom = self.drive_manager.boredom();
+        let in_flow = self.drive_manager.in_flow();
+
+        // Boredom → plasticity boost: system is under-stimulated, open up to new learning
+        if boredom > super::super::thresholds::DRIVE_BOREDOM_PLASTICITY_THRESHOLD {
+            let boost = (boredom - super::super::thresholds::DRIVE_BOREDOM_PLASTICITY_THRESHOLD)
+                * super::super::thresholds::DRIVE_BOREDOM_PLASTICITY_GAIN;
+            // Direct plasticity nudge (within LearningManager's clamp range)
+            let current = self.learning_manager.plasticity();
+            let nudged = (current + boost).min(0.95);
+            if nudged > current {
+                // LearningManager doesn't expose set_plasticity — use the LR modulation
+                // channel instead: boost carryover LR factor
+                self.carryover.learning.subsystem_lr_factor *= 1.0 + boost;
+            }
+        }
+
+        // Flow → LR dampening: stable parameters benefit flow state maintenance
+        if in_flow {
+            self.carryover.learning.subsystem_lr_factor *= 0.9;
+        }
+    }
+
+    /// Cross-couple knowledge causal depth → moral reasoning confidence.
+    ///
+    /// Deep causal understanding (normalized depth > 0.6) → nudge prediction confidence
+    /// by +0.01 per excess depth unit. This flows into the ethics engine evaluation,
+    /// producing more confident moral verdicts when grounded in causal reasoning.
+    ///
+    /// Science: Pearl (2009) — deeper causal understanding → more confident moral reasoning.
+    pub(crate) fn cross_couple_knowledge_ethics(&mut self) {
+        if let Some(ref km) = self.knowledge_manager {
+            let depth = km.signals().causal_depth;
+            if depth.is_finite()
+                && depth > super::super::thresholds::KNOWLEDGE_ETHICS_CAUSAL_DEPTH_THRESHOLD
+            {
+                let nudge = (depth
+                    - super::super::thresholds::KNOWLEDGE_ETHICS_CAUSAL_DEPTH_THRESHOLD)
+                    * super::super::thresholds::KNOWLEDGE_ETHICS_CONFIDENCE_GAIN;
+                let nudge = nudge.min(0.03); // cap to prevent runaway
+                self.prediction_confidence =
+                    (self.prediction_confidence + nudge).clamp(0.0, 1.0);
+            }
+        }
+    }
+
     /// Access the resonant speech module (read-only).
     pub fn resonant_speech(&self) -> &crate::resonant_speech::ResonantSpeech {
         &self.resonant_speech
@@ -845,9 +912,7 @@ impl CognitiveLoopService {
     }
 
     /// Access the ethics and values manager.
-    pub fn ethics_values(
-        &self,
-    ) -> &super::super::ethics_values_manager::EthicsAndValuesManager {
+    pub fn ethics_values(&self) -> &super::super::ethics_values_manager::EthicsAndValuesManager {
         &self.ethics_values
     }
 
@@ -864,9 +929,7 @@ impl CognitiveLoopService {
     }
 
     /// Access the vision and sensory manager.
-    pub fn vision_sensory(
-        &self,
-    ) -> &super::super::vision_sensory_manager::VisionAndSensoryManager {
+    pub fn vision_sensory(&self) -> &super::super::vision_sensory_manager::VisionAndSensoryManager {
         &self.vision_sensory
     }
 }

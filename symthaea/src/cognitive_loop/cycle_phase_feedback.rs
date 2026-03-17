@@ -7,6 +7,7 @@
 
 use std::time::Instant;
 
+use super::feedback_state::Priority;
 use super::helpers::{DreamPhaseResult, EpisodicReplayResult, ResonatorCodebookResult};
 use super::phase_results::{
     DynamicsPhaseResult, FbConsciousness, FbEthics, FbEvolution, FbLoops, FbMemory, FbQuality,
@@ -39,14 +40,12 @@ use super::thresholds::{
     SOCIAL_LR_BASE, SOCIAL_LR_RANGE, SPEECH_RATE_CLAMP_MAX, SPEECH_RATE_CLAMP_MIN,
     STRUCTURAL_BOTTLENECK_LR_SCALE, STRUCTURAL_BOTTLENECK_THRESHOLD,
     STRUCTURAL_EMERGENCE_CONFIDENCE_BOOST, STRUCTURAL_EMERGENCE_CONFIDENCE_THRESHOLD,
-    TEMPORAL_CHAIN_DEEP_LR_SCALE, TEMPORAL_CHAIN_DEEP_THRESHOLD,
-    TEMPORAL_CHAIN_SHALLOW_LR_SCALE, TEMPORAL_CHAIN_SHALLOW_THRESHOLD,
-    SUBSYSTEM_LR_FACTOR_MAX, SUBSYSTEM_LR_FACTOR_MIN, TOM_ACCURACY_HIGH, TOM_ACCURACY_LOW,
-    TOM_ACCURACY_SCALE, TRUST_DECAY_FACTOR, TRUST_SIGNAL_MIDPOINT, TRUST_SIGNAL_RATE,
-    UNIFIED_QUALITY_AGREEMENT_WEIGHT, UNIFIED_QUALITY_ANOMALY_WEIGHT,
-    UNIFIED_QUALITY_PREDICTION_WEIGHT,
+    SUBSYSTEM_LR_FACTOR_MAX, SUBSYSTEM_LR_FACTOR_MIN, TEMPORAL_CHAIN_DEEP_LR_SCALE,
+    TEMPORAL_CHAIN_DEEP_THRESHOLD, TEMPORAL_CHAIN_SHALLOW_LR_SCALE,
+    TEMPORAL_CHAIN_SHALLOW_THRESHOLD, TOM_ACCURACY_HIGH, TOM_ACCURACY_LOW, TOM_ACCURACY_SCALE,
+    TRUST_DECAY_FACTOR, TRUST_SIGNAL_MIDPOINT, TRUST_SIGNAL_RATE, UNIFIED_QUALITY_AGREEMENT_WEIGHT,
+    UNIFIED_QUALITY_ANOMALY_WEIGHT, UNIFIED_QUALITY_PREDICTION_WEIGHT,
 };
-use super::feedback_state::Priority;
 use super::{CognitiveLoopService, CycleState};
 
 impl CognitiveLoopService {
@@ -82,7 +81,7 @@ impl CognitiveLoopService {
             #[cfg(feature = "vision-manifold")]
             scene_recognized: perception.scene_recognized,
             #[cfg(feature = "semantic-encoder")]
-            semantic_embedding: None, // TODO: wire to semantic_embedding_channel
+            semantic_embedding: self.feature_integ.last_semantic_continuous.clone(),
         };
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -97,7 +96,7 @@ impl CognitiveLoopService {
         let temporal_causal_chains = consciousness_metrics.temporal_causal_chains;
         let temporal_continuity = consciousness_metrics.temporal_continuity;
         let temporal_max_chain_length = consciousness_metrics.temporal_max_chain_length;
-        let _chain_cycle_numbers = consciousness_metrics.chain_cycle_numbers;
+        // chain_cycle_numbers: computed upstream but not consumed in feedback phase
         let causal_codebook_entries = consciousness_metrics.causal_codebook_entries;
         let continuity_replay_needed = consciousness_metrics.continuity_replay_needed;
         let lattice_height = consciousness_metrics.lattice_height;
@@ -131,18 +130,12 @@ impl CognitiveLoopService {
         if temporal_max_chain_length >= TEMPORAL_CHAIN_DEEP_THRESHOLD
             && self.stats.total_cycles > 15
         {
-            self.scale_lr(
-                "deep_causal_chain",
-                TEMPORAL_CHAIN_DEEP_LR_SCALE,
-            );
+            self.scale_lr("deep_causal_chain", TEMPORAL_CHAIN_DEEP_LR_SCALE);
         } else if temporal_max_chain_length > 0
             && temporal_max_chain_length <= TEMPORAL_CHAIN_SHALLOW_THRESHOLD
             && self.stats.total_cycles > 15
         {
-            self.scale_lr(
-                "shallow_causal_chain",
-                TEMPORAL_CHAIN_SHALLOW_LR_SCALE,
-            );
+            self.scale_lr("shallow_causal_chain", TEMPORAL_CHAIN_SHALLOW_LR_SCALE);
         }
 
         let value_embeddings_created = consciousness_metrics.value_embeddings_created;
@@ -488,20 +481,14 @@ impl CognitiveLoopService {
         // Low pipeline consciousness → tighten caution (subsystems aren't coherent).
         // Science: Dehaene (2014) — global workspace ignition requires integrated processing.
         self.carryover.quality.last_pipeline_consciousness = pipeline_consciousness;
-        let _pipeline_consciousness_gated = if pipeline_consciousness > 0.7
-            && self.stats.total_cycles > 15
-        {
+        if pipeline_consciousness > 0.7 && self.stats.total_cycles > 15 {
             self.scale_threshold("pipeline_conscious_relax", 0.97);
-            true
         } else if pipeline_consciousness < 0.3
             && pipeline_consciousness > 0.0
             && self.stats.total_cycles > 15
         {
             self.scale_threshold("pipeline_conscious_caution", 1.03);
-            true
-        } else {
-            false
-        };
+        }
 
         // ═══════════════════════════════════════════════════════════════════════
         // RESONATOR CODEBOOK GROWTH
@@ -553,13 +540,13 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         #[cfg(feature = "support")]
         let (support_triage_count, support_alert_fired, support_federation_graduated, support_efe) = {
-            self.support_cycle_counter += 1;
+            self.support.cycle_counter += 1;
 
             let mut triage_count: u32 = 0;
-            if let Some(ref engine) = self.support_triage_engine {
+            if let Some(ref engine) = self.support.triage_engine {
                 let result = engine.triage(input, "");
                 triage_count = 1;
-                if let Some(ref manager) = self.support_knowledge_manager {
+                if let Some(ref manager) = self.support.knowledge_manager {
                     let category_str = format!("{:?}", result.suggested_category);
                     let articles = manager.search(&category_str, 3);
                     if !articles.is_empty() {
@@ -574,8 +561,8 @@ impl CognitiveLoopService {
 
             let mut alert_fired = false;
             let mut efe = 0.0_f64;
-            if self.support_cycle_counter % 47 == 0 {
-                if let Some(ref engine) = self.support_predictive_engine {
+            if self.support.cycle_counter % 47 == 0 {
+                if let Some(ref engine) = self.support.predictive_engine {
                     let telemetry = symthaea_support::telemetry::collect_telemetry();
                     let prediction = engine.assess_system_state(&telemetry);
                     efe = prediction.expected_free_energy;
@@ -591,15 +578,16 @@ impl CognitiveLoopService {
             }
 
             let mut graduated: usize = 0;
-            if self.support_cycle_counter % 97 == 0 {
+            if self.support.cycle_counter % 97 == 0 {
                 let can_share = self
-                    .support_privacy_manager
+                    .support
+                    .privacy_manager
                     .as_ref()
                     .map(|pm| pm.can_share_cognitive())
                     .unwrap_or(true);
 
                 if can_share {
-                    if let Some(ref manager) = self.support_knowledge_manager {
+                    if let Some(ref manager) = self.support.knowledge_manager {
                         let pending = Vec::new();
                         let result =
                             symthaea_support::federation::check_graduations(manager, &pending);
@@ -701,6 +689,10 @@ impl CognitiveLoopService {
         let attention_fatigue = late_result.attention_fatigue;
         let attention_prediction_accuracy = late_result.attention_prediction_accuracy;
         let psi_attention_avg = late_result.psi_attention_avg;
+        let hierarchical_free_energy_lr_boost = late_result.hierarchical_free_energy_lr_boost;
+        let predictive_phi_lr_delta = late_result.predictive_phi_lr_delta;
+        let body_valence_confidence_delta = late_result.body_valence_confidence_delta;
+        let narrative_self_confidence_factor = late_result.narrative_self_confidence_factor;
 
         let gwt_broadcast = integration_result.gwt_broadcast;
         let gwt_coalition_size = integration_result.gwt_coalition_size;
@@ -780,12 +772,11 @@ impl CognitiveLoopService {
                         .as_ref()
                         .map(|mc| {
                             let normalized_depth = mc.depth() as f64 / 3.0;
-                            normalized_depth
-                                * self.substrate_manager.hot_capability(&self.config)
+                            normalized_depth * self.substrate_manager.hot_capability(&self.config)
                         })
                         .unwrap_or(0.5); // preserve backward compat when disabled
-                    // Hubris attenuates HOT: can't claim deep self-knowledge while
-                    // morally overconfident. 0.7× during hubris, 1.0× otherwise.
+                                         // Hubris attenuates HOT: can't claim deep self-knowledge while
+                                         // morally overconfident. 0.7× during hubris, 1.0× otherwise.
                     if self.ethics_engine.last_anomaly_report().moral_hubris {
                         raw_hot * 0.7
                     } else {
@@ -794,31 +785,69 @@ impl CognitiveLoopService {
                 },
                 // Cantor metacognitive depth: derived from dream surprise EMA
                 // Higher surprise = richer fractal structure = deeper self-reference
-                cantor_metacognitive_depth: (self.cantor_dream.dream_surprise as f64).clamp(0.0, 1.0),
+                cantor_metacognitive_depth: (self.cantor_dream.dream_surprise as f64)
+                    .clamp(0.0, 1.0),
                 // Governance collective Phi: inter-agent consciousness integration
                 governance_collective_phi: {
                     #[cfg(feature = "mycelix")]
-                    { self.governance_mgr.last_collective_phi() }
+                    {
+                        self.governance_mgr.last_collective_phi()
+                    }
                     #[cfg(not(feature = "mycelix"))]
-                    { 0.0 }
+                    {
+                        0.0
+                    }
                 },
                 // Knowledge grounding: dynamic from KnowledgeManager signals
                 // Science: Barsalou (2008), Clark (2013) — grounded cognition modulates consciousness
                 knowledge_grounding: if let Some(ref km) = self.knowledge_manager {
                     let s = km.signals();
-                    (s.relevance * super::thresholds::KNOWLEDGE_GROUNDING_RELEVANCE_WEIGHT
-                        + (1.0 - s.uncertainty) * super::thresholds::KNOWLEDGE_GROUNDING_CERTAINTY_WEIGHT)
-                        .clamp(0.0, 1.0)
+                    let grounding = (s.relevance
+                        * super::thresholds::KNOWLEDGE_GROUNDING_RELEVANCE_WEIGHT
+                        + (1.0 - s.uncertainty)
+                            * super::thresholds::KNOWLEDGE_GROUNDING_CERTAINTY_WEIGHT)
+                        .clamp(0.0, 1.0);
+                    if grounding.is_finite() {
+                        grounding
+                    } else {
+                        0.5
+                    }
                 } else {
                     0.5
+                },
+                // Knowledge coherence: composite quality from graph size, calibration, contradictions.
+                // Formula: (log2(graph_size+1)/10) × (1-ece) × (1/(1 + contradictions×0.1))
+                // Science: Stanovich (2009) — epistemic rationality; Guo et al. (2017) — calibration.
+                knowledge_coherence: if let Some(ref km) = self.knowledge_manager {
+                    let t = km.telemetry();
+                    let log_scale = super::thresholds::KNOWLEDGE_COHERENCE_LOG_SCALE;
+                    let size_factor =
+                        ((t.graph_size as f64 + 1.0).log2() / log_scale).clamp(0.0, 1.0);
+                    let ece_factor = (1.0 - t.calibration_ece).clamp(0.0, 1.0);
+                    let contradiction_factor = 1.0
+                        / (1.0 + t.contradictions_detected as f64 * 0.1);
+                    let coherence = size_factor * ece_factor * contradiction_factor;
+                    if coherence.is_finite() {
+                        coherence
+                    } else {
+                        0.0
+                    }
+                } else {
+                    0.0
                 },
                 // Glyph coherence: symbolic consciousness field integration
                 glyph_coherence: {
                     #[cfg(feature = "glyph_codex")]
-                    { self.glyph_manager.last_coherence().value }
+                    {
+                        self.glyph_manager.last_coherence().value
+                    }
                     #[cfg(not(feature = "glyph_codex"))]
-                    { 0.0 }
+                    {
+                        0.0
+                    }
                 },
+                // CfC temporal coherence → consciousness (Clark 2013)
+                temporal_coherence_phi: self.language_comm.voice_coherence.bridge.phi_contribution(),
             },
         );
         self.consciousness_engine
@@ -951,8 +980,7 @@ impl CognitiveLoopService {
                 AFFECT_VALENCE_NEGATIVE_EXPLORE_BOOST, AFFECT_VALENCE_NEGATIVE_THRESHOLD,
                 AFFECT_VALENCE_POSITIVE_CONFIDENCE_BOOST, AFFECT_VALENCE_POSITIVE_THRESHOLD,
             };
-            if affect_cons_arousal > AFFECT_AROUSAL_HIGH_THRESHOLD && self.stats.total_cycles > 10
-            {
+            if affect_cons_arousal > AFFECT_AROUSAL_HIGH_THRESHOLD && self.stats.total_cycles > 10 {
                 self.scale_lr("affect_high_arousal", AFFECT_AROUSAL_HIGH_LR_SCALE);
             } else if affect_cons_arousal < AFFECT_AROUSAL_LOW_THRESHOLD
                 && affect_cons_arousal > 0.0
@@ -991,7 +1019,8 @@ impl CognitiveLoopService {
                 && self.stats.total_cycles > 15
             {
                 let boost = ((narrative_gwt_self_psi - NARRATIVE_SELF_PHI_CONFIDENCE_THRESHOLD)
-                    * NARRATIVE_SELF_PHI_CONFIDENCE_SCALE as f64) as f32;
+                    * NARRATIVE_SELF_PHI_CONFIDENCE_SCALE as f64)
+                    as f32;
                 self.adjust_confidence("narrative_self_coherent", boost);
             } else if narrative_gwt_self_psi > 0.0
                 && narrative_gwt_self_psi < NARRATIVE_SELF_PHI_LOW_THRESHOLD
@@ -1064,6 +1093,33 @@ impl CognitiveLoopService {
             }
         }
 
+        // ── Reasoning engine reliability → confidence + LR feedback ───────
+        // When the reasoning engine produces high-reliability assessments,
+        // nudge prediction confidence upward. If the gate was passed AND
+        // the outcome was good, boost learning rate to reinforce the pathway.
+        // Science: Stanovich & West (2000) — dual-process theory: System 2
+        // reliability calibrates metacognitive confidence.
+        #[cfg(feature = "reasoning_engine")]
+        if let Some(ref reasoning_engine) = self.reasoning_engine {
+            if let Some(last_event) = reasoning_engine.last_event() {
+                use crate::cognitive_loop::thresholds::{
+                    REASONING_RELIABILITY_CONFIDENCE_SCALE, REASONING_RELIABILITY_THRESHOLD,
+                };
+                let r = last_event.reliability;
+                // High reliability → nudge confidence up
+                if r.is_finite() && r > REASONING_RELIABILITY_THRESHOLD {
+                    let boost = ((r - 0.5) * REASONING_RELIABILITY_CONFIDENCE_SCALE) as f32;
+                    self.adjust_confidence("reasoning_reliability", boost);
+                }
+                // Gate passed + good outcome → boost LR to reinforce
+                if let Some(ref posthoc) = last_event.posthoc_outcome {
+                    if posthoc.gate_passed && posthoc.outcome_good {
+                        self.scale_lr("reasoning_gate_success", 1.02);
+                    }
+                }
+            }
+        }
+
         // Soul experience integration
         let _t = Instant::now();
         {
@@ -1128,7 +1184,11 @@ impl CognitiveLoopService {
                 if phi_divergence > PHI_DIVERGENCE_THRESHOLD {
                     let boost = (phi_divergence - PHI_DIVERGENCE_THRESHOLD).min(PHI_DIVERGENCE_MAX)
                         * PHI_DIVERGENCE_SCALE;
-                    self.adjust_exploration_pri("phi_divergence", boost as f32, Priority::Aesthetic);
+                    self.adjust_exploration_pri(
+                        "phi_divergence",
+                        boost as f32,
+                        Priority::Aesthetic,
+                    );
                 }
 
                 // Phi relational → oxytocin (prosocial bonding)
@@ -1176,8 +1236,9 @@ impl CognitiveLoopService {
             .map(|s| (s - mean_signal).powi(2))
             .sum::<f32>()
             / signals.len() as f32;
-        let cross_module_agreement: f32 =
-            (1.0_f32 - (variance * CROSS_MODULE_VARIANCE_AMPLIFICATION as f32).sqrt()).clamp(0.0, 1.0);
+        let cross_module_agreement: f32 = (1.0_f32
+            - (variance * CROSS_MODULE_VARIANCE_AMPLIFICATION as f32).sqrt())
+        .clamp(0.0, 1.0);
         if cross_module_agreement > CROSS_MODULE_AGREEMENT_HIGH {
             self.adjust_confidence(
                 "cross_mod_agree",
@@ -1362,7 +1423,8 @@ impl CognitiveLoopService {
             };
             let tb = perception.encoding.temporal_binding_strength;
             if tb < TEMPORAL_BINDING_EXPLORE_THRESHOLD && self.stats.total_cycles > 15 {
-                let boost = (TEMPORAL_BINDING_EXPLORE_THRESHOLD - tb) * TEMPORAL_BINDING_EXPLORE_SCALE;
+                let boost =
+                    (TEMPORAL_BINDING_EXPLORE_THRESHOLD - tb) * TEMPORAL_BINDING_EXPLORE_SCALE;
                 self.adjust_exploration("temporal_binding_low", boost);
                 self.scale_lr("temporal_binding_low", TEMPORAL_BINDING_LOW_LR_SCALE);
             } else if tb > TEMPORAL_BINDING_DAMPEN_THRESHOLD && self.stats.total_cycles > 15 {
@@ -1471,6 +1533,10 @@ impl CognitiveLoopService {
                 narrative_gwt_self_psi,
                 living_mind_vitality,
                 living_mind_coherence,
+                hierarchical_free_energy_lr_boost,
+                predictive_phi_lr_delta,
+                body_valence_confidence_delta,
+                narrative_self_confidence_factor,
             },
             reasoning: FbReasoning {
                 reasoning_context,
