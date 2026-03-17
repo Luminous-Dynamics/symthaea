@@ -122,6 +122,7 @@ qdrant = ["dep:qdrant-client", "dep:tokio"]  # Sensory Cortex: vector similarity
 datalog = []                                 # Prefrontal Cortex: recursive reasoning (cozo dep pending fix)
 lance = ["dep:tokio"]                         # Long-Term Memory: multimodal storage (lancedb dep pending upgrade)
 duck = ["dep:duckdb"]                        # Epistemic Auditor: analytics/Phi stats
+complex_cfc = []                             # Complex-valued CfC neuron with native oscillation
 _scaling_study = []                          # Gate for scaling_study_demo example
 
 # full-databases removed: aggregate never referenced (enable individual features: qdrant, datalog, lance, duck)

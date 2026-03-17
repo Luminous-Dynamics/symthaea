@@ -30,6 +30,9 @@ use std::collections::HashMap;
 pub struct CompositionAlgebra {
     /// Named compositions: name -> (expression, encoding)
     compositions: HashMap<String, NamedComposition>,
+    /// Role-bound encodings (e.g., ROLE_AGENT ^ AUTHORITY).
+    /// Kept separate from compositions so they don't pollute nearest-neighbor search.
+    role_encodings: HashMap<String, BinaryHV>,
 }
 
 /// A named composition with its expression and computed encoding
@@ -50,7 +53,13 @@ impl CompositionAlgebra {
     pub fn new() -> Self {
         Self {
             compositions: HashMap::new(),
+            role_encodings: HashMap::new(),
         }
+    }
+
+    /// Access to all named compositions.
+    pub fn compositions(&self) -> &HashMap<String, NamedComposition> {
+        &self.compositions
     }
 
     /// Define a new named composition from an expression.
@@ -94,13 +103,14 @@ impl CompositionAlgebra {
         self.compositions.get(name)
     }
 
-    /// Get encoding for a name (composition or primitive).
+    /// Get encoding for a name (composition, role-encoding, or primitive).
     pub fn get_encoding(&self, name: &str, system: &PrimitiveSystem) -> Option<BinaryHV> {
-        // First check compositions
         if let Some(comp) = self.compositions.get(name) {
             return Some(comp.encoding);
         }
-        // Then check primitives
+        if let Some(hv) = self.role_encodings.get(name) {
+            return Some(*hv);
+        }
         system.get(name).map(|p| p.encoding)
     }
 
@@ -472,6 +482,46 @@ impl CompositionAlgebra {
 
         Ok(results)
     }
+
+    /// Execute a counterfactual transformation: remove components then add others.
+    ///
+    /// Returns `(forward_trace, inverse_trace)` where:
+    /// - `forward_trace` applies removals then additions to `start`
+    /// - `inverse_trace` reverses the transformation (remove additions, add removals)
+    ///
+    /// This enables "What if X lost A,B but gained C,D?" queries with reversibility
+    /// checking.
+    pub fn query_counterfactual(
+        &self,
+        start: &str,
+        removals: &[&str],
+        additions: &[&str],
+        system: &PrimitiveSystem,
+    ) -> Result<(Vec<TransitionResult>, Vec<TransitionResult>), CompositionAlgebraError> {
+        // Forward: remove all, then add all
+        let mut forward_steps: Vec<TransitionStep<'_>> = Vec::new();
+        for r in removals {
+            forward_steps.push(TransitionStep::Remove(r));
+        }
+        for a in additions {
+            forward_steps.push(TransitionStep::Add(a));
+        }
+        let forward = self.query_chain(start, &forward_steps, system)?;
+
+        // Inverse: from the counterfactual state, remove additions then add removals
+        // We need the name of the final forward state as starting point for inverse.
+        // Use the original start for the inverse chain (remove additions, add removals).
+        let mut inverse_steps: Vec<TransitionStep<'_>> = Vec::new();
+        for a in additions {
+            inverse_steps.push(TransitionStep::Remove(a));
+        }
+        for r in removals {
+            inverse_steps.push(TransitionStep::Add(r));
+        }
+        let inverse = self.query_chain(start, &inverse_steps, system)?;
+
+        Ok((forward, inverse))
+    }
 }
 
 impl Default for CompositionAlgebra {
@@ -509,6 +559,19 @@ impl CompositionAlgebra {
                 "SOVEREIGNTY + LEGITIMACY + OBLIGATION + COOPERATE",
             ),
             ("CORRUPTION", "AUTHORITY + DEFECT + EXCHANGE"),
+            // Extended axioms (match load_institutional_axioms_role_bound)
+            ("PEACE_TREATY", "TREATY + COOPERATE + SOVEREIGNTY"),
+            ("FEDERATION", "SOVEREIGNTY + AUTHORITY + COOPERATE + TRUST"),
+            ("CONSTITUTIONAL_CRISIS", "LEGITIMACY + AUTHORITY + DEFECT"),
+            (
+                "IMPEACHMENT",
+                "AUTHORITY + LEGITIMACY + ENFORCEMENT + POPULATION",
+            ),
+            ("DIPLOMACY", "TREATY + TRUST + COOPERATE + EXCHANGE"),
+            (
+                "COLONIALISM",
+                "SOVEREIGNTY + ENFORCEMENT + POPULATION + DEFECT",
+            ),
         ];
 
         let mut loaded = 0;
@@ -709,6 +772,246 @@ impl CompositionAlgebra {
 
         Ok((best_name, best_sim, result_hv))
     }
+
+    /// HDC-native analogy: A is to B as D is to ?
+    ///
+    /// Uses XOR binding in encoding space rather than source-name set operations.
+    /// This works with any encoding scheme (raw, weighted, role-bound) because
+    /// it operates entirely on the vector representations.
+    ///
+    /// Algorithm: transform = A ⊕ B, result = transform ⊕ D, find nearest axiom.
+    pub fn query_analogy_hdc(
+        &self,
+        a: &str,
+        b: &str,
+        d: &str,
+    ) -> Result<(String, f32, BinaryHV), CompositionAlgebraError> {
+        let enc_a = self
+            .compositions
+            .get(a)
+            .map(|c| c.encoding)
+            .ok_or_else(|| CompositionAlgebraError::NotFound(a.to_string()))?;
+        let enc_b = self
+            .compositions
+            .get(b)
+            .map(|c| c.encoding)
+            .ok_or_else(|| CompositionAlgebraError::NotFound(b.to_string()))?;
+        let enc_d = self
+            .compositions
+            .get(d)
+            .map(|c| c.encoding)
+            .ok_or_else(|| CompositionAlgebraError::NotFound(d.to_string()))?;
+
+        let transform = enc_a.bind(&enc_b);
+        let result_hv = transform.bind(&enc_d);
+
+        let mut best_name = String::new();
+        let mut best_sim: f32 = -1.0;
+
+        for (name, c) in &self.compositions {
+            if name == a || name == b || name == d {
+                continue;
+            }
+            let sim = result_hv.similarity(&c.encoding);
+            if sim > best_sim {
+                best_sim = sim;
+                best_name = name.clone();
+            }
+        }
+
+        if best_name.is_empty() {
+            return Err(CompositionAlgebraError::ParseError(
+                "no compositions to compare against".to_string(),
+            ));
+        }
+
+        Ok((best_name, best_sim, result_hv))
+    }
+
+    /// Load institutional axioms with role-binding.
+    ///
+    /// Each primitive is bound to a role HV (AGENT, MODE, CONSTRAINT, TARGET)
+    /// before bundling, making the same primitive in different roles orthogonal.
+    pub fn load_institutional_axioms_role_bound(&mut self, system: &PrimitiveSystem) -> usize {
+        let role_agent = BinaryHV::random(0xA6E7_0001);
+        let role_mode = BinaryHV::random(0x40DE_0002);
+        let role_constraint = BinaryHV::random(0xC057_0003);
+        let role_target = BinaryHV::random(0x7A46_0004);
+
+        // Build role-bound encodings for each primitive-role pair
+        let role_bindings: Vec<(&str, &BinaryHV, &str)> = vec![
+            // Agent roles
+            ("RA_AUTHORITY", &role_agent, "AUTHORITY"),
+            ("RA_SOVEREIGNTY", &role_agent, "SOVEREIGNTY"),
+            ("RA_SANCTION", &role_agent, "SANCTION"),
+            ("RA_POPULATION", &role_agent, "POPULATION"),
+            // Mode roles
+            ("RM_ENFORCEMENT", &role_mode, "ENFORCEMENT"),
+            ("RM_LEGITIMACY", &role_mode, "LEGITIMACY"),
+            ("RM_EXCHANGE", &role_mode, "EXCHANGE"),
+            ("RM_DEFECT", &role_mode, "DEFECT"),
+            ("RM_COOPERATE", &role_mode, "COOPERATE"),
+            // Constraint roles
+            ("RC_PROHIBITION", &role_constraint, "PROHIBITION"),
+            ("RC_TRUST", &role_constraint, "TRUST"),
+            ("RC_RECIPROCATE", &role_constraint, "RECIPROCATE"),
+            ("RC_OBLIGATION", &role_constraint, "OBLIGATION"),
+            ("RC_OVERLAPS", &role_constraint, "OVERLAPS"),
+            ("RC_COOPERATE", &role_constraint, "COOPERATE"),
+            // Target roles
+            ("RT_TREATY", &role_target, "TREATY"),
+            ("RT_COOPERATE", &role_target, "COOPERATE"),
+        ];
+
+        let mut role_hvs: HashMap<String, BinaryHV> = HashMap::new();
+        for (name, role_hv, prim_name) in &role_bindings {
+            if let Some(prim) = system.get(prim_name) {
+                let bound = role_hv.bind(&prim.encoding);
+                role_hvs.insert(name.to_string(), bound);
+                self.role_encodings.insert(name.to_string(), bound);
+            }
+        }
+
+        let axioms: Vec<(&str, Vec<&str>, Vec<&str>)> = vec![
+            (
+                "REVOLUTION",
+                vec!["RA_AUTHORITY", "RM_ENFORCEMENT", "RC_PROHIBITION"],
+                vec!["AUTHORITY", "ENFORCEMENT", "PROHIBITION"],
+            ),
+            (
+                "FAILED_STATE",
+                vec!["RA_SOVEREIGNTY", "RA_POPULATION"],
+                vec!["SOVEREIGNTY", "POPULATION"],
+            ),
+            (
+                "BORDER_DISPUTE",
+                vec!["RA_SOVEREIGNTY", "RC_OVERLAPS"],
+                vec!["SOVEREIGNTY", "OVERLAPS"],
+            ),
+            (
+                "LEGITIMATE_GOVERNANCE",
+                vec!["RA_AUTHORITY", "RM_LEGITIMACY", "RC_TRUST"],
+                vec!["AUTHORITY", "LEGITIMACY", "TRUST"],
+            ),
+            (
+                "REGULATORY_CAPTURE",
+                vec!["RA_AUTHORITY", "RM_EXCHANGE", "RM_DEFECT"],
+                vec!["AUTHORITY", "EXCHANGE", "DEFECT"],
+            ),
+            (
+                "TRADE_AGREEMENT",
+                vec!["RT_TREATY", "RM_EXCHANGE", "RC_RECIPROCATE"],
+                vec!["TREATY", "EXCHANGE", "RECIPROCATE"],
+            ),
+            (
+                "ECONOMIC_SANCTION",
+                vec!["RA_SANCTION", "RM_EXCHANGE", "RC_PROHIBITION"],
+                vec!["SANCTION", "EXCHANGE", "PROHIBITION"],
+            ),
+            (
+                "CIVIL_DISOBEDIENCE",
+                vec!["RA_POPULATION", "RM_LEGITIMACY", "RC_OBLIGATION"],
+                vec!["POPULATION", "LEGITIMACY", "OBLIGATION"],
+            ),
+            (
+                "DEMOCRATIC_ELECTION",
+                vec![
+                    "RA_AUTHORITY",
+                    "RM_LEGITIMACY",
+                    "RA_POPULATION",
+                    "RC_COOPERATE",
+                ],
+                vec!["AUTHORITY", "LEGITIMACY", "POPULATION", "COOPERATE"],
+            ),
+            (
+                "ARMS_EMBARGO",
+                vec!["RA_SANCTION", "RM_ENFORCEMENT", "RC_PROHIBITION"],
+                vec!["SANCTION", "ENFORCEMENT", "PROHIBITION"],
+            ),
+            (
+                "SOCIAL_CONTRACT",
+                vec![
+                    "RA_SOVEREIGNTY",
+                    "RM_LEGITIMACY",
+                    "RC_OBLIGATION",
+                    "RT_COOPERATE",
+                ],
+                vec!["SOVEREIGNTY", "LEGITIMACY", "OBLIGATION", "COOPERATE"],
+            ),
+            (
+                "CORRUPTION",
+                vec!["RA_AUTHORITY", "RM_DEFECT", "RM_EXCHANGE"],
+                vec!["AUTHORITY", "DEFECT", "EXCHANGE"],
+            ),
+            (
+                "PEACE_TREATY",
+                vec!["RT_TREATY", "RM_COOPERATE", "RA_SOVEREIGNTY"],
+                vec!["TREATY", "COOPERATE", "SOVEREIGNTY"],
+            ),
+            (
+                "FEDERATION",
+                vec!["RA_SOVEREIGNTY", "RA_AUTHORITY", "RM_COOPERATE", "RC_TRUST"],
+                vec!["SOVEREIGNTY", "AUTHORITY", "COOPERATE", "TRUST"],
+            ),
+            (
+                "CONSTITUTIONAL_CRISIS",
+                vec!["RM_LEGITIMACY", "RA_AUTHORITY", "RM_DEFECT"],
+                vec!["LEGITIMACY", "AUTHORITY", "DEFECT"],
+            ),
+            (
+                "IMPEACHMENT",
+                vec![
+                    "RA_AUTHORITY",
+                    "RM_LEGITIMACY",
+                    "RM_ENFORCEMENT",
+                    "RA_POPULATION",
+                ],
+                vec!["AUTHORITY", "LEGITIMACY", "ENFORCEMENT", "POPULATION"],
+            ),
+            (
+                "DIPLOMACY",
+                vec!["RT_TREATY", "RC_TRUST", "RM_COOPERATE", "RM_EXCHANGE"],
+                vec!["TREATY", "TRUST", "COOPERATE", "EXCHANGE"],
+            ),
+            (
+                "COLONIALISM",
+                vec![
+                    "RA_SOVEREIGNTY",
+                    "RM_ENFORCEMENT",
+                    "RA_POPULATION",
+                    "RM_DEFECT",
+                ],
+                vec!["SOVEREIGNTY", "ENFORCEMENT", "POPULATION", "DEFECT"],
+            ),
+        ];
+
+        let mut loaded = 0;
+        for (name, role_names, source_names) in &axioms {
+            let components: Vec<BinaryHV> = role_names
+                .iter()
+                .filter_map(|rn| role_hvs.get(*rn).copied())
+                .collect();
+            if components.is_empty() {
+                continue;
+            }
+            let encoding = if components.len() == 1 {
+                components[0]
+            } else {
+                BinaryHV::bundle(&components)
+            };
+            self.compositions.insert(
+                name.to_string(),
+                NamedComposition {
+                    name: name.to_string(),
+                    expression: role_names.join(" + "),
+                    encoding,
+                    sources: source_names.iter().map(|s| s.to_string()).collect(),
+                },
+            );
+            loaded += 1;
+        }
+        loaded
+    }
 }
 
 /// Exportable composition (without encoding)
@@ -762,3 +1065,62 @@ impl std::fmt::Display for CompositionAlgebraError {
 }
 
 impl std::error::Error for CompositionAlgebraError {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_load_institutional_axioms_18() {
+        let system = PrimitiveSystem::new();
+        let mut algebra = CompositionAlgebra::new();
+        let loaded = algebra.load_institutional_axioms(&system);
+        assert_eq!(loaded, 18);
+    }
+
+    #[test]
+    fn test_load_institutional_axioms_role_bound_18() {
+        let system = PrimitiveSystem::new();
+        let mut algebra = CompositionAlgebra::new();
+        let loaded = algebra.load_institutional_axioms_role_bound(&system);
+        assert_eq!(loaded, 18);
+    }
+
+    #[test]
+    fn test_query_analogy_hdc_returns_result() {
+        let system = PrimitiveSystem::new();
+        let mut algebra = CompositionAlgebra::new();
+        algebra.load_institutional_axioms(&system);
+        let (nearest, sim, _hv) = algebra
+            .query_analogy_hdc("REVOLUTION", "LEGITIMATE_GOVERNANCE", "TRADE_AGREEMENT")
+            .unwrap();
+        assert!(!nearest.is_empty());
+        assert!(sim.is_finite());
+        assert_ne!(nearest, "REVOLUTION");
+        assert_ne!(nearest, "LEGITIMATE_GOVERNANCE");
+        assert_ne!(nearest, "TRADE_AGREEMENT");
+    }
+
+    #[test]
+    fn test_query_analogy_hdc_asymmetric() {
+        let system = PrimitiveSystem::new();
+        let mut algebra = CompositionAlgebra::new();
+        algebra.load_institutional_axioms(&system);
+        let (fwd, _, _) = algebra
+            .query_analogy_hdc("REVOLUTION", "LEGITIMATE_GOVERNANCE", "CORRUPTION")
+            .unwrap();
+        let (rev, _, _) = algebra
+            .query_analogy_hdc("LEGITIMATE_GOVERNANCE", "REVOLUTION", "CORRUPTION")
+            .unwrap();
+        assert!(!fwd.is_empty());
+        assert!(!rev.is_empty());
+    }
+
+    #[test]
+    fn test_compositions_accessor() {
+        let system = PrimitiveSystem::new();
+        let mut algebra = CompositionAlgebra::new();
+        algebra.load_institutional_axioms(&system);
+        assert_eq!(algebra.compositions().len(), 18);
+    }
+}

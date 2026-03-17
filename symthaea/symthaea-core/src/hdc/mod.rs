@@ -298,16 +298,21 @@ pub mod projection;
 pub mod unified_hv; // Unified hypervector types (ContinuousHV) // Learned projection layers for dimension conversion
 
 // Grid encoding for 2D spatial reasoning (ARC-style puzzles)
+pub mod binary_grid_encoder;
 pub mod grid_encoder;
 
 // Global Workspace Theory (conscious access, competition, broadcasting)
 pub mod global_workspace; // GWT implementation with competitive dynamics
 pub mod higher_order_thought; // Higher-Order Thought (HOT) theory — meta-representational consciousness
 
+// HDC-native cryptographic primitives (MAC, threshold sharing, context keys, commitments)
+pub mod hdc_crypto;
+
 // Consciousness topology and Φ measurement modules
 pub mod binary_hv;
 pub mod consciousness_topology; // Consciousness topology structures
 pub mod consciousness_topology_generators; // 8 topology generators (Random, Star, Ring, Line, Tree, Dense, Modular, Lattice)
+pub mod hdc_trait;
 pub mod phi_orchestrator; // Adaptive Φ calculator orchestrator (Phase 5E)
 #[allow(deprecated)]
 pub mod phi_real; // ContinuousHV Φ calculator (no binarization) using cosine similarity
@@ -316,14 +321,13 @@ pub mod phi_resonant; // Resonator-based Φ calculator (O(n log N) dynamics)
 mod phi_tier_tests; // Unit tests for Φ tier implementations
 pub mod phi_topology_validation; // ContinuousHV-TieredPhi integration for topology validation
 pub mod real_hv; // Real-valued hypervectors for consciousness topologies
-pub mod spectral_connectivity; // Algebraic connectivity (λ₂) calculator - NOT IIT Φ!
-pub mod tiered_phi; // Multi-tier Φ (integrated information) approximation
 pub mod simd_continuous; // SIMD intrinsics for ContinuousHV (AVX2/FMA/SSE4.1)
 pub mod simd_detect; // Unified SIMD feature detection (single source of truth for all modules)
 pub mod simd_ops; // SIMD intrinsics for BinaryHV (AVX-512/AVX2/SSE4.1/NEON)
-pub mod transposed_bundle; // Transposed bit-plane accumulator for fast majority-vote bundle
-pub mod hdc_trait; // Unified HyperdimensionalVector trait interface
-                   // Performance optimization modules:
+pub mod spectral_connectivity; // Algebraic connectivity (λ₂) calculator - NOT IIT Φ!
+pub mod tiered_phi; // Multi-tier Φ (integrated information) approximation
+pub mod transposed_bundle; // Transposed bit-plane accumulator for fast majority-vote bundle // Unified HyperdimensionalVector trait interface
+                           // Performance optimization modules:
 pub mod algebraic_structures;
 pub mod arithmetic; // Modular arithmetic (re-exports arithmetic_engine)
 pub mod arithmetic_engine; // Revolutionary: True mathematical cognition via HDC
