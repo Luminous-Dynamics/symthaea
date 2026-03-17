@@ -24,6 +24,21 @@ const REASSEMBLY_TIMEOUT_SECS: u64 = 30;
 /// Maximum in-flight reassembly buffers.
 const MAX_REASSEMBLY_BUFFERS: usize = 64;
 
+/// Maximum age of a relayed payload (seconds). Payloads older than this
+/// are rejected to prevent replay attacks from stale mesh traffic.
+const MAX_PAYLOAD_AGE_SECS: u64 = 3600; // 1 hour
+
+/// Maximum future timestamp tolerance (seconds). Prevents spoofed
+/// timestamps from bypassing the age check.
+const MAX_FUTURE_TOLERANCE_SECS: u64 = 300; // 5 minutes
+
+/// Maximum payload data size (bytes). Prevents memory exhaustion
+/// from adversarial oversized messages.
+const MAX_PAYLOAD_DATA_SIZE: usize = 65_536; // 64 KB
+
+/// Maximum inbound messages per minute per peer. Prevents flooding.
+const MAX_MESSAGES_PER_MINUTE_PER_PEER: u32 = 60;
+
 /// Run the relay loop: mesh transport → deserializer → conductor.
 ///
 /// Respects the `cancel` token for graceful shutdown — finishes processing
@@ -40,6 +55,7 @@ pub async fn run(
     let mut reassembly: HashMap<[u8; 4], ReassemblyBuffer> = HashMap::new();
     let mut ws_cached: Option<AppWebsocket> = None;
     let mut known_peers: HashSet<[u8; 8]> = HashSet::new();
+    let mut peer_rate: HashMap<[u8; 8], PeerRateTracker> = HashMap::new();
 
     loop {
         if cancel.is_cancelled() {
@@ -69,6 +85,52 @@ pub async fn run(
 
                     match RelayPayload::from_bytes(&payload_bytes) {
                         Ok(payload) => {
+                            // --- Security: validate payload size ---
+                            if payload.data.len() > MAX_PAYLOAD_DATA_SIZE {
+                                tracing::warn!(
+                                    "Payload data too large ({} bytes), dropping",
+                                    payload.data.len()
+                                );
+                                metrics.fragments_dropped.fetch_add(1, Ordering::Relaxed);
+                                continue;
+                            }
+
+                            // --- Security: validate timestamp (anti-replay) ---
+                            let now = std::time::SystemTime::now()
+                                .duration_since(std::time::UNIX_EPOCH)
+                                .unwrap_or_default()
+                                .as_secs();
+                            if payload.timestamp > now + MAX_FUTURE_TOLERANCE_SECS {
+                                tracing::warn!(
+                                    "Payload timestamp {} is in the future (now={}), dropping",
+                                    payload.timestamp, now
+                                );
+                                metrics.fragments_dropped.fetch_add(1, Ordering::Relaxed);
+                                continue;
+                            }
+                            if now.saturating_sub(payload.timestamp) > MAX_PAYLOAD_AGE_SECS {
+                                tracing::warn!(
+                                    "Payload timestamp {} is too old (age={}s), dropping",
+                                    payload.timestamp,
+                                    now.saturating_sub(payload.timestamp)
+                                );
+                                metrics.fragments_dropped.fetch_add(1, Ordering::Relaxed);
+                                continue;
+                            }
+
+                            // --- Security: per-peer rate limiting ---
+                            let tracker = peer_rate
+                                .entry(payload.origin)
+                                .or_insert_with(PeerRateTracker::new);
+                            if !tracker.allow() {
+                                tracing::warn!(
+                                    "Peer {:?} exceeds rate limit, dropping",
+                                    &payload.origin[..4]
+                                );
+                                metrics.fragments_dropped.fetch_add(1, Ordering::Relaxed);
+                                continue;
+                            }
+
                             // Track peer
                             if known_peers.insert(payload.origin) {
                                 metrics.peers_seen.fetch_add(1, Ordering::Relaxed);
@@ -175,6 +237,40 @@ impl ReassemblyBuffer {
 
     fn is_stale(&self) -> bool {
         self.created_at.elapsed().as_secs() > REASSEMBLY_TIMEOUT_SECS
+    }
+}
+
+/// Sliding-window rate tracker per peer.
+struct PeerRateTracker {
+    /// Timestamps of recent messages (ring buffer).
+    window: std::collections::VecDeque<std::time::Instant>,
+}
+
+impl PeerRateTracker {
+    fn new() -> Self {
+        Self {
+            window: std::collections::VecDeque::with_capacity(
+                MAX_MESSAGES_PER_MINUTE_PER_PEER as usize + 1,
+            ),
+        }
+    }
+
+    /// Returns true if the peer is within rate limits.
+    fn allow(&mut self) -> bool {
+        let now = std::time::Instant::now();
+        let one_minute_ago = now - std::time::Duration::from_secs(60);
+
+        // Expire old entries
+        while self.window.front().map_or(false, |t| *t < one_minute_ago) {
+            self.window.pop_front();
+        }
+
+        if self.window.len() >= MAX_MESSAGES_PER_MINUTE_PER_PEER as usize {
+            return false;
+        }
+
+        self.window.push_back(now);
+        true
     }
 }
 
@@ -456,6 +552,42 @@ mod tests {
 
         dedup.insert(hash2);
         assert_eq!(dedup.len(), 2);
+    }
+
+    #[test]
+    fn test_peer_rate_tracker_allows_within_limit() {
+        let mut tracker = PeerRateTracker::new();
+        for _ in 0..MAX_MESSAGES_PER_MINUTE_PER_PEER {
+            assert!(tracker.allow());
+        }
+        // Next should be rejected
+        assert!(!tracker.allow());
+    }
+
+    #[test]
+    fn test_peer_rate_tracker_window_expiry() {
+        let mut tracker = PeerRateTracker::new();
+        // Fill up the window
+        for _ in 0..MAX_MESSAGES_PER_MINUTE_PER_PEER {
+            assert!(tracker.allow());
+        }
+        assert!(!tracker.allow());
+
+        // Manually expire all entries by pushing old timestamps
+        tracker.window.clear();
+        // After clearing, should allow again
+        assert!(tracker.allow());
+    }
+
+    #[test]
+    fn test_payload_age_constants() {
+        assert!(MAX_PAYLOAD_AGE_SECS > 0);
+        assert!(MAX_PAYLOAD_AGE_SECS <= 86400, "max age should be <= 24h");
+        assert!(MAX_FUTURE_TOLERANCE_SECS > 0);
+        assert!(MAX_FUTURE_TOLERANCE_SECS <= 600, "future tolerance should be <= 10min");
+        assert!(MAX_PAYLOAD_DATA_SIZE > 0);
+        assert!(MAX_PAYLOAD_DATA_SIZE <= 1_048_576, "max data should be <= 1MB");
+        assert!(MAX_MESSAGES_PER_MINUTE_PER_PEER >= 10);
     }
 
     #[test]

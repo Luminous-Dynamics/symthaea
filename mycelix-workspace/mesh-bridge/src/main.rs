@@ -59,7 +59,8 @@ async fn main() -> Result<()> {
 
     // Select transport
     let transport = transport::create_transport()?;
-    tracing::info!("Transport: {}", transport.name());
+    let transport_name = transport.name().to_string();
+    tracing::info!("Transport: {}", transport_name);
 
     // Start poller (conductor → mesh)
     let poller_transport = transport.clone_box();
@@ -99,8 +100,9 @@ async fn main() -> Result<()> {
         .parse()
         .unwrap_or(9100);
     let health_metrics = metrics;
+    let health_transport_name = transport_name;
     let health_handle = tokio::spawn(async move {
-        if let Err(e) = serve_health(health_port, health_metrics).await {
+        if let Err(e) = serve_health(health_port, health_metrics, &health_transport_name).await {
             tracing::warn!("Health endpoint failed to start: {e}");
         }
     });
@@ -124,7 +126,7 @@ async fn main() -> Result<()> {
 
 /// Minimal HTTP health endpoint — responds to GET /health with JSON status + metrics.
 /// Also sends systemd watchdog pings every 30 seconds if running under systemd.
-async fn serve_health(port: u16, metrics: BridgeMetrics) -> Result<()> {
+async fn serve_health(port: u16, metrics: BridgeMetrics, transport_name: &str) -> Result<()> {
     use tokio::io::AsyncWriteExt;
     use tokio::net::TcpListener;
 
@@ -152,6 +154,7 @@ async fn serve_health(port: u16, metrics: BridgeMetrics) -> Result<()> {
             "status": "running",
             "service": "mycelix-mesh-bridge",
             "version": env!("CARGO_PKG_VERSION"),
+            "transport": transport_name,
             "uptime_check": uptime_secs,
             "metrics": metrics.to_json(),
         });

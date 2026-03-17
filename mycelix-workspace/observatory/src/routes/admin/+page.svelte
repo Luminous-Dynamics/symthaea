@@ -179,6 +179,69 @@
     configSaved = true;
     setTimeout(() => { configSaved = false; }, 2000);
   }
+
+  // ============================================================================
+  // Config Export/Import
+  // ============================================================================
+
+  let configImportError = '';
+  let configImportSuccess = false;
+
+  function exportConfig() {
+    const config = {
+      community_name: communityConfig.name,
+      operator: {
+        name: communityConfig.contactName,
+        phone: communityConfig.contactPhone,
+        email: communityConfig.contactEmail,
+        location: communityConfig.location,
+      },
+      community_config: communityDefaults,
+    };
+    const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `mycelix-config-${communityConfig.name.toLowerCase().replace(/\s+/g, '-')}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function importConfig(event: Event) {
+    configImportError = '';
+    configImportSuccess = false;
+    const input = event.target as HTMLInputElement;
+    const file = input?.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result as string);
+        if (!data.community_name && !data.community_config?.community_name) {
+          configImportError = 'Invalid config: missing community_name';
+          return;
+        }
+        // Apply operator config
+        if (data.operator) {
+          communityConfig.contactName = data.operator.name || '';
+          communityConfig.contactPhone = data.operator.phone || '';
+          communityConfig.contactEmail = data.operator.email || '';
+          communityConfig.location = data.operator.location || '';
+        }
+        if (data.community_name) {
+          communityConfig.name = data.community_name;
+        }
+        saveConfig();
+        configImportSuccess = true;
+      } catch {
+        configImportError = 'Failed to parse JSON file';
+      }
+    };
+    reader.readAsText(file);
+    // Reset input so same file can be re-imported
+    input.value = '';
+  }
 </script>
 
 <svelte:head>
@@ -419,6 +482,29 @@
       {/if}
     </div>
 
+    <!-- Config Export/Import -->
+    <div class="mt-6 bg-gray-800 rounded-lg border border-gray-700">
+      <div class="p-4 border-b border-gray-700 flex justify-between items-center">
+        <h2 class="text-sm font-semibold">Community Config (JSON)</h2>
+        <div class="flex gap-2">
+          <button
+            on:click={exportConfig}
+            class="text-xs px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+          >Export</button>
+          <label class="text-xs px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded transition-colors cursor-pointer">
+            Import
+            <input type="file" accept=".json" class="hidden" on:change={importConfig} />
+          </label>
+        </div>
+      </div>
+      {#if configImportError}
+        <div class="p-3 bg-red-900/30 border-b border-red-500/50 text-sm text-red-300">{configImportError}</div>
+      {/if}
+      {#if configImportSuccess}
+        <div class="p-3 bg-green-900/30 border-b border-green-500/50 text-sm text-green-300">Config imported. Reload the page for changes to take effect.</div>
+      {/if}
+    </div>
+
     <!-- Quick Links -->
     <div class="mt-6 grid grid-cols-2 md:grid-cols-4 gap-3">
       <a href="/print" aria-label="Print summary — printable community report" class="bg-gray-800 rounded-lg p-3 border border-gray-700 hover:border-gray-500 transition-colors text-center">
@@ -433,9 +519,9 @@
         <p class="text-sm font-medium text-gray-300">Water Safety</p>
         <p class="text-xs text-gray-500 mt-1">{waterSystems} systems, {waterAlerts} alerts</p>
       </a>
-      <a href="/household" aria-label="Households — emergency plans" class="bg-gray-800 rounded-lg p-3 border border-gray-700 hover:border-gray-500 transition-colors text-center">
-        <p class="text-sm font-medium text-gray-300">Households</p>
-        <p class="text-xs text-gray-500 mt-1">Emergency plans</p>
+      <a href="/network" aria-label="Network health — mesh bridge status" class="bg-gray-800 rounded-lg p-3 border border-gray-700 hover:border-gray-500 transition-colors text-center">
+        <p class="text-sm font-medium text-gray-300">Network / Mesh</p>
+        <p class="text-xs text-gray-500 mt-1">DHT + mesh bridge status</p>
       </a>
     </div>
 

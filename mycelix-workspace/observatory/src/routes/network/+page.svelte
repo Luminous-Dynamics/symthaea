@@ -87,14 +87,85 @@
   // Helpers
   // ============================================================================
 
+  // ============================================================================
+  // Mesh Bridge Health
+  // ============================================================================
+
+  interface MeshBridgeHealth {
+    status: 'running' | 'offline' | 'unknown';
+    service: string;
+    version: string;
+    metrics: {
+      messages_sent: number;
+      messages_received: number;
+      fragments_dropped: number;
+      peers_seen: number;
+      last_send_at: number;
+      last_recv_at: number;
+      poll_cycles: number;
+      connection_failures: number;
+    };
+  }
+
+  const meshHealth = writable<MeshBridgeHealth>({
+    status: 'unknown',
+    service: 'mycelix-mesh-bridge',
+    version: '0.1.0',
+    metrics: {
+      messages_sent: 0,
+      messages_received: 0,
+      fragments_dropped: 0,
+      peers_seen: 0,
+      last_send_at: 0,
+      last_recv_at: 0,
+      poll_cycles: 0,
+      connection_failures: 0,
+    },
+  });
+
+  let meshTransport = 'unknown';
+
+  async function fetchMeshHealth() {
+    const meshUrl = (typeof window !== 'undefined' && window.location)
+      ? `${window.location.protocol}//${window.location.hostname}:9100/health`
+      : 'http://localhost:9100/health';
+    try {
+      const resp = await fetch(meshUrl, { signal: AbortSignal.timeout(3000) });
+      if (resp.ok) {
+        const data = await resp.json();
+        meshHealth.set({
+          status: data.status === 'running' ? 'running' : 'offline',
+          service: data.service || 'mycelix-mesh-bridge',
+          version: data.version || '0.1.0',
+          metrics: data.metrics || {},
+        });
+        meshTransport = data.transport || 'unknown';
+      } else {
+        meshHealth.update(h => ({ ...h, status: 'offline' }));
+      }
+    } catch {
+      meshHealth.update(h => ({ ...h, status: 'offline' }));
+    }
+  }
+
+  function formatMeshTime(epochMs: number): string {
+    if (!epochMs) return 'never';
+    const seconds = Math.floor((Date.now() - epochMs) / 1000);
+    if (seconds < 60) return `${seconds}s ago`;
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+    return `${Math.floor(seconds / 3600)}h ago`;
+  }
+
   let currentTime = new Date().toLocaleTimeString();
   let interval: ReturnType<typeof setInterval>;
 
   onMount(() => {
+    fetchMeshHealth();
     interval = setInterval(() => {
       currentTime = new Date().toLocaleTimeString();
       simulateNetwork();
-    }, 2000);
+      fetchMeshHealth();
+    }, 5000);
   });
 
   onDestroy(() => {
@@ -391,6 +462,70 @@
           </div>
         </div>
       </div>
+    </div>
+
+    <!-- Mesh Bridge Status -->
+    <div class="mt-6 bg-gray-800 rounded-lg border border-gray-700">
+      <div class="p-4 border-b border-gray-700 flex justify-between items-center">
+        <h2 class="text-lg font-semibold">Mesh Bridge (Offline Relay)</h2>
+        <span class="text-xs px-2 py-1 rounded-full {$meshHealth.status === 'running' ? 'bg-green-500/20 text-green-400' : $meshHealth.status === 'offline' ? 'bg-red-500/20 text-red-400' : 'bg-gray-500/20 text-gray-400'}">
+          {$meshHealth.status}
+        </span>
+      </div>
+      {#if $meshHealth.status === 'running'}
+        <div class="p-4">
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+            <div class="bg-gray-700/50 rounded p-3">
+              <p class="text-xs text-gray-400 uppercase">Sent</p>
+              <p class="text-xl font-bold text-blue-400">{$meshHealth.metrics.messages_sent}</p>
+            </div>
+            <div class="bg-gray-700/50 rounded p-3">
+              <p class="text-xs text-gray-400 uppercase">Received</p>
+              <p class="text-xl font-bold text-green-400">{$meshHealth.metrics.messages_received}</p>
+            </div>
+            <div class="bg-gray-700/50 rounded p-3">
+              <p class="text-xs text-gray-400 uppercase">Peers Seen</p>
+              <p class="text-xl font-bold text-purple-400">{$meshHealth.metrics.peers_seen}</p>
+            </div>
+            <div class="bg-gray-700/50 rounded p-3">
+              <p class="text-xs text-gray-400 uppercase">Dropped</p>
+              <p class="text-xl font-bold {$meshHealth.metrics.fragments_dropped > 0 ? 'text-yellow-400' : 'text-gray-400'}">
+                {$meshHealth.metrics.fragments_dropped}
+              </p>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+            <div>
+              <p class="text-xs text-gray-400">Transport</p>
+              <p class="text-gray-200">{meshTransport}</p>
+            </div>
+            <div>
+              <p class="text-xs text-gray-400">Poll Cycles</p>
+              <p class="text-gray-200">{$meshHealth.metrics.poll_cycles}</p>
+            </div>
+            <div>
+              <p class="text-xs text-gray-400">Last Send</p>
+              <p class="text-gray-200">{formatMeshTime($meshHealth.metrics.last_send_at)}</p>
+            </div>
+            <div>
+              <p class="text-xs text-gray-400">Last Receive</p>
+              <p class="text-gray-200">{formatMeshTime($meshHealth.metrics.last_recv_at)}</p>
+            </div>
+          </div>
+          {#if $meshHealth.metrics.connection_failures > 0}
+            <div class="mt-3 p-2 bg-yellow-900/20 border border-yellow-800/50 rounded text-sm text-yellow-300">
+              {$meshHealth.metrics.connection_failures} conductor connection failure{$meshHealth.metrics.connection_failures !== 1 ? 's' : ''}
+            </div>
+          {/if}
+        </div>
+      {:else if $meshHealth.status === 'offline'}
+        <div class="p-4 text-sm text-gray-400">
+          <p>Mesh bridge is not running. This is normal if you haven't deployed mesh hardware.</p>
+          <p class="mt-2">To enable: set <code class="bg-gray-700 px-1 rounded">MESH_TRANSPORT=lora</code> or <code class="bg-gray-700 px-1 rounded">MESH_TRANSPORT=batman</code> in your deployment config.</p>
+        </div>
+      {:else}
+        <div class="p-4 text-sm text-gray-400">Checking mesh bridge status...</div>
+      {/if}
     </div>
 
     <!-- Footer -->

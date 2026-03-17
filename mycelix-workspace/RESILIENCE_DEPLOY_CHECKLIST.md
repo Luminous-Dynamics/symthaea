@@ -115,23 +115,44 @@ With conductor running:
 
 ## 9. Mesh Bridge (Optional)
 
-Only if deploying LoRa mesh for internet outage resilience:
+Only if deploying LoRa or WiFi-direct mesh for internet outage resilience:
 
-- [ ] Raspberry Pi 4/5 with SX1276 LoRa HAT connected
-- [ ] `MESH_TRANSPORT=lora` in Docker compose or NixOS config
-- [ ] Mesh bridge service starts without errors
-- [ ] Two nodes within LoRa range can exchange TEND credits
-- [ ] Emergency messages relay over mesh
+- [ ] Hardware ready (Raspberry Pi 4/5 + SX1276 LoRa HAT, or WiFi-direct capable device)
+- [ ] See `docs/MESH_HARDWARE_GUIDE.md` for bill of materials and assembly
+- [ ] `MESH_TRANSPORT=lora` or `MESH_TRANSPORT=batman` in Docker compose or NixOS config
+- [ ] Mesh bridge service starts without errors: `docker logs mycelix-mesh-bridge`
+- [ ] Health endpoint responds: `curl http://localhost:9100/health`
+- [ ] `/network` page shows "Mesh Bridge: running" with transport type
+- [ ] Two nodes within range can exchange TEND credits over mesh
+- [ ] Emergency messages relay over mesh (Flash priority)
+- [ ] Verify rate limiting: >60 messages/min from one peer are dropped
+- [ ] Verify timestamp validation: stale replays (>1h old) are rejected
+- [ ] For LoRa: verify SPI device accessible (`ls /dev/spidev0.0`)
+- [ ] For B.A.T.M.A.N.: verify bat0 interface up (`ip link show bat0`)
 
-## 10. Post-Deployment Monitoring
+## 10. Security Verification
+
+- [ ] Review `docs/MESH_SECURITY_AUDIT.md` for threat model and mitigations
+- [ ] Verify MESH_APP_TOKEN is set (conductor auth)
+- [ ] Verify dedup cache directory is writable: `MESH_CACHE_DIR`
+- [ ] (Optional) Configure PSK encryption when deploying near untrusted radio neighbors
+- [ ] Verify consciousness gating on price oracle (Citizen+ tier required for reporting)
+
+## 11. Post-Deployment Monitoring
 
 - [ ] Check `/admin` daily for:
   - Connection status
   - Water alerts
   - Low-stock items
   - Queue depth (should be 0 if internet is stable)
+- [ ] Check `/network` for mesh bridge health (if deployed):
+  - Messages sent/received
+  - Peer count
+  - Fragment drop rate (should be <5%)
+  - Connection failures
 - [ ] Update value basket weekly (or when prices change significantly)
 - [ ] Print updated community summary monthly
+- [ ] Export community config from `/admin` for backup
 
 ---
 
@@ -140,9 +161,10 @@ Only if deploying LoRa mesh for internet outage resilience:
 - **Language**: English only. i18n scaffolding in place (70+ string keys). Afrikaans/Zulu/Sotho translations planned for v0.2.
 - **hc CLI**: Must be in PATH for `hc dna pack` (use `nix develop` environment).
 - **Push notifications**: Only work when the browser tab is open (not true push via service worker subscription). Sufficient for 30s polling. Haptic feedback requires device vibration API.
-- **Mesh bridge**: Requires physical LoRa hardware for real mesh. Loopback transport available for testing.
+- **Mesh bridge**: LoRa SX1276 TX/RX is stubbed (needs hardware for implementation). B.A.T.M.A.N. UDP transport is fully functional. Loopback transport available for testing.
+- **Mesh encryption**: Plaintext over radio. Acceptable for trusted community mesh. PSK encryption planned for v0.2.
 - **Single operator**: No multi-operator role system yet. Any user can access `/admin`.
-- **Community config**: Stored in localStorage — not synced across devices. Operator should configure on the primary device.
+- **Community config**: Stored in localStorage — not synced across devices. Operator should configure on the primary device. Export/import available on `/admin`.
 
 ---
 

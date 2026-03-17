@@ -113,7 +113,7 @@ roles:
       strategy: create
       deferred: false
     dna:
-      path: ./supplychain/dna/mycelix_supplychain.dna
+      path: ./supplychain/dna/supplychain.dna
       modifiers:
         network_seed: ~
         properties: ~

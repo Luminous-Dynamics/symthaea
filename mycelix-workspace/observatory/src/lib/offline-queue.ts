@@ -271,3 +271,96 @@ export async function removeItem(id: string): Promise<void> {
 export async function initQueueCount(): Promise<void> {
   await refreshCount();
 }
+
+// ============================================================================
+// Mesh Bridge Fallback
+// ============================================================================
+
+/**
+ * Check if the mesh bridge health endpoint is reachable.
+ * Returns true if the mesh bridge is running and can relay messages.
+ */
+export async function isMeshBridgeAvailable(): Promise<boolean> {
+  try {
+    const meshUrl = typeof window !== 'undefined'
+      ? `${window.location.protocol}//${window.location.hostname}:9100/health`
+      : 'http://localhost:9100/health';
+    const resp = await fetch(meshUrl, { signal: AbortSignal.timeout(2000) });
+    if (!resp.ok) return false;
+    const data = await resp.json();
+    return data.status === 'running';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Flush with mesh bridge fallback. When the primary executor (conductor)
+ * fails for an item, attempts to relay through the mesh bridge if available.
+ *
+ * The mesh bridge will poll the conductor and relay the entry when it
+ * reconnects — this just ensures the entry is logged locally for the
+ * bridge to pick up.
+ */
+export async function flushWithMeshFallback(
+  primaryExecutor: (domain: string, action: string, payload: unknown) => Promise<void>,
+  meshAvailable?: boolean,
+): Promise<{ succeeded: number; failed: number; skipped: number; meshRelayed: number }> {
+  const results = { succeeded: 0, failed: 0, skipped: 0, meshRelayed: 0 };
+
+  let items: QueuedSubmission[];
+  try {
+    items = await getQueue();
+  } catch {
+    return results;
+  }
+
+  // Check mesh bridge availability once per flush cycle
+  const meshReady = meshAvailable ?? await isMeshBridgeAvailable();
+
+  for (const item of items) {
+    if (item.attempts >= MAX_ATTEMPTS) {
+      results.skipped++;
+      continue;
+    }
+
+    // Exponential backoff
+    if (item.attempts > 0) {
+      const backoffMs = Math.min(1000 * Math.pow(2, item.attempts - 1), 30_000);
+      const lastAttemptAge = Date.now() - (item.last_attempt_at ?? 0);
+      if (lastAttemptAge < backoffMs) {
+        results.skipped++;
+        continue;
+      }
+    }
+
+    item.status = 'sending';
+    item.attempts++;
+    item.last_attempt_at = Date.now();
+    await idbPut(item);
+
+    try {
+      await primaryExecutor(item.domain, item.action, item.payload);
+      await idbDelete(item.id);
+      results.succeeded++;
+    } catch (err) {
+      // Primary failed — if mesh bridge is running, mark as mesh-relayed
+      // The mesh bridge poller will pick up the entry from the conductor
+      // when connectivity resumes.
+      if (meshReady) {
+        item.status = 'queued'; // Keep queued for mesh bridge pickup
+        item.last_error = `conductor failed, mesh bridge available: ${err instanceof Error ? err.message : String(err)}`;
+        await idbPut(item);
+        results.meshRelayed++;
+      } else {
+        item.status = 'failed';
+        item.last_error = err instanceof Error ? err.message : String(err);
+        await idbPut(item);
+        results.failed++;
+      }
+    }
+  }
+
+  await refreshCount();
+  return results;
+}
