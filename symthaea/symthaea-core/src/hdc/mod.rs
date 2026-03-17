@@ -307,6 +307,8 @@ pub mod higher_order_thought; // Higher-Order Thought (HOT) theory — meta-repr
 
 // HDC-native cryptographic primitives (MAC, threshold sharing, context keys, commitments)
 pub mod hdc_crypto;
+// HDC homomorphic computation (encrypted HVs, collective wisdom pool, privacy-preserving aggregation)
+pub mod hdc_fhe;
 
 // Consciousness topology and Φ measurement modules
 pub mod binary_hv;
