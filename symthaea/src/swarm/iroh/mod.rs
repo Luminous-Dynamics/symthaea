@@ -77,6 +77,9 @@ pub struct IrohNode {
     /// Whether this is a real or stub implementation
     is_stub: bool,
 
+    /// Optional handshake reference for clearing trust on disconnect.
+    handshake: Option<Arc<RwLock<crate::swarm::handshake::HybridHandshake>>>,
+
     /// Inner Iroh endpoint (only with feature)
     #[cfg(feature = "swarm")]
     endpoint: Option<iroh::Endpoint>,
@@ -104,6 +107,7 @@ impl IrohNode {
             ticket_manager: TicketManager::new(),
             config,
             is_stub: true,
+            handshake: None,
         })
     }
 
@@ -124,6 +128,7 @@ impl IrohNode {
             ticket_manager: TicketManager::new(),
             config,
             is_stub: true,
+            handshake: None,
         })
     }
 
@@ -158,6 +163,7 @@ impl IrohNode {
             ticket_manager: TicketManager::new(),
             config,
             is_stub: false,
+            handshake: None,
             endpoint: Some(endpoint),
         })
     }
@@ -212,10 +218,26 @@ impl IrohNode {
         self.ticket_manager.ticket_count()
     }
 
-    /// Disconnect from a peer
+    /// Set the handshake reference for trust clearing on disconnect.
+    pub fn set_handshake(
+        &mut self,
+        handshake: Arc<RwLock<crate::swarm::handshake::HybridHandshake>>,
+    ) {
+        self.handshake = Some(handshake);
+    }
+
+    /// Disconnect from a peer and clear their trust entry.
+    ///
+    /// Trust is cleared on disconnect to prevent stale trust from persisting
+    /// across reconnection — peers must re-handshake after reconnecting.
     pub fn disconnect(&self, peer_id: &str) {
         if let Some(channel) = self.connections.write().remove(peer_id) {
             channel.close();
+            // Clear trust on disconnect to prevent zombie trust
+            if let Some(ref hs) = self.handshake {
+                hs.write().remove_peer(peer_id);
+                tracing::debug!(peer = peer_id, "Cleared trust on disconnect");
+            }
             tracing::info!("Disconnected from peer: {}", peer_id);
         }
     }
@@ -401,6 +423,20 @@ impl IrohChannel {
     /// Check if the channel is still alive
     pub fn is_alive(&self) -> bool {
         self.alive.load(std::sync::atomic::Ordering::SeqCst)
+    }
+
+    /// Get a reference to the underlying QUIC connection (for handshake protocol).
+    ///
+    /// Returns `None` in stub mode or if the connection was not established.
+    #[cfg(feature = "swarm")]
+    pub fn connection_ref(&self) -> Option<&iroh::endpoint::Connection> {
+        self.connection.as_ref()
+    }
+
+    /// Stub for non-swarm builds — always returns `None`.
+    #[cfg(not(feature = "swarm"))]
+    pub fn connection_ref(&self) -> Option<&()> {
+        None
     }
 
     /// Send a consciousness vector over the channel (stub without feature)

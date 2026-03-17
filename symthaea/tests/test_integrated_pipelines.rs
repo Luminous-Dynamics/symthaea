@@ -575,7 +575,7 @@ mod swarm_consciousness_broadcasting {
         let mut handshake = HybridHandshake::new(config);
 
         // Create challenge for peer
-        let challenge = handshake.create_challenge("peer-123");
+        let challenge = handshake.create_challenge("peer-123").unwrap();
 
         match challenge {
             SwarmMessage::TrustChallenge { nonce } => {

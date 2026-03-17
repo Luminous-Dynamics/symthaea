@@ -287,9 +287,16 @@ impl PeerInfo {
         }
     }
 
-    /// Check if peer is trusted enough for tensor streaming
+    /// Check if peer is trusted enough for tensor streaming.
+    ///
+    /// Returns true for `LocalTrust` (whitelisted peers always stream)
+    /// and `Verified(level)` when level meets the minimum threshold.
     pub fn is_streamable(&self, min_trust: f64) -> bool {
-        matches!(self.trust_level, TrustLevel::Verified(level) if level >= min_trust)
+        match self.trust_level {
+            TrustLevel::Verified(level) => level >= min_trust,
+            TrustLevel::LocalTrust => true,
+            _ => false,
+        }
     }
 }
 
@@ -415,6 +422,30 @@ mod tests {
     fn test_connection_ticket() {
         let ticket = ConnectionTicket::new("ticket-string", "node-123");
         assert!(!ticket.is_expired());
+    }
+
+    #[test]
+    fn test_local_trust_is_streamable() {
+        let mut peer = PeerInfo::new("local-node");
+        peer.trust_level = TrustLevel::LocalTrust;
+        assert!(peer.is_streamable(0.5));
+        assert!(peer.is_streamable(0.9));
+        assert!(peer.is_streamable(1.0));
+    }
+
+    #[test]
+    fn test_streamable_thresholds() {
+        let mut peer = PeerInfo::new("test-node");
+        peer.trust_level = TrustLevel::Verified(0.7);
+        assert!(peer.is_streamable(0.5));
+        assert!(peer.is_streamable(0.7));
+        assert!(!peer.is_streamable(0.8));
+
+        peer.trust_level = TrustLevel::Unknown;
+        assert!(!peer.is_streamable(0.0));
+
+        peer.trust_level = TrustLevel::Untrusted;
+        assert!(!peer.is_streamable(0.0));
     }
 
     #[test]

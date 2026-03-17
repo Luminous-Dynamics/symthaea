@@ -33,6 +33,18 @@ pub struct SwarmConfig {
 
     /// Path to persist node identity
     pub identity_path: Option<String>,
+
+    /// Require completed handshake for all peer communication (default: true).
+    /// Set to false ONLY for local testing with `SwarmConfig::local_only()`.
+    pub require_handshake: bool,
+
+    /// Initial trust score assigned to peers that pass Ed25519 handshake verification.
+    /// Range: 0.0-1.0 (default: 0.7). Full trust requires reputation history.
+    pub initial_trust_score: f64,
+
+    /// Challenge timeout in seconds for the trust handshake protocol.
+    /// Range: 1-120 (default: 30). Increase for high-latency mesh networks.
+    pub challenge_timeout_secs: u64,
 }
 
 impl Default for SwarmConfig {
@@ -47,16 +59,21 @@ impl Default for SwarmConfig {
             heartbeat_interval_ms: 30000,
             bootstrap_peers: vec![],
             identity_path: None,
+            require_handshake: true,
+            initial_trust_score: crate::cognitive_loop::thresholds::HANDSHAKE_INITIAL_TRUST_SCORE,
+            challenge_timeout_secs: crate::cognitive_loop::thresholds::HANDSHAKE_CHALLENGE_TIMEOUT_SECS,
         }
     }
 }
 
 impl SwarmConfig {
-    /// Create config for local testing (no external connections)
+    /// Create config for local testing (no external connections).
+    /// Disables handshake requirement for easier local development.
     pub fn local_only() -> Self {
         Self {
             enable_derp: false,
             bootstrap_peers: vec![],
+            require_handshake: false,
             ..Default::default()
         }
     }
