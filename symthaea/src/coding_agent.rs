@@ -779,8 +779,9 @@ impl CodingAgent {
             )
         };
 
-        // Build the generation prompt
+        // Build the generation prompt and system prompt before borrowing dispatcher
         let prompt = self.build_generation_prompt();
+        let sys_prompt = self.codegen_system_prompt();
 
         // Call the dispatcher (async → sync bridge)
         let dispatch_result = if let Some(ref mut dispatcher) = self.dispatcher {
@@ -799,7 +800,7 @@ impl CodingAgent {
             let params = GenerationParams {
                 temperature,
                 max_tokens: 1024,
-                system_prompt: Some(self.codegen_system_prompt()),
+                system_prompt: Some(sys_prompt.clone()),
             };
 
             // Sync bridge for async dispatcher
@@ -883,10 +884,7 @@ impl CodingAgent {
                         let params = GenerationParams {
                             temperature: 0.4,
                             max_tokens: 1024,
-                            system_prompt: Some(
-                                "You are a code generator. Output ONLY valid source code, no explanations."
-                                    .into(),
-                            ),
+                            system_prompt: Some(sys_prompt.clone()),
                         };
                         let llm_result = Self::block_on_dispatch(
                             dispatcher,
