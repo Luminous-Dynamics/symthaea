@@ -211,6 +211,116 @@ pub fn drain_swarm_channel(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// FEDERATED COORDINATOR BRIDGE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Handle for managing a spawned federated coordinator task.
+///
+/// The coordinator runs periodic sync rounds, forwarding results as
+/// `SwarmEvent::FederatedRound` through the CLS swarm channel.
+pub struct FederatedCoordinatorHandle {
+    /// Total rounds successfully completed.
+    pub(crate) total_rounds: std::sync::Arc<std::sync::atomic::AtomicU64>,
+    /// Total rounds that failed.
+    pub(crate) total_failures: std::sync::Arc<std::sync::atomic::AtomicU64>,
+    /// Shutdown signal.
+    shutdown_tx: Option<tokio::sync::oneshot::Sender<()>>,
+}
+
+impl FederatedCoordinatorHandle {
+    /// Total sync rounds completed.
+    pub fn total_rounds(&self) -> u64 {
+        self.total_rounds
+            .load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// Total sync rounds that failed.
+    pub fn total_failures(&self) -> u64 {
+        self.total_failures
+            .load(std::sync::atomic::Ordering::Relaxed)
+    }
+}
+
+impl Drop for FederatedCoordinatorHandle {
+    fn drop(&mut self) {
+        if let Some(tx) = self.shutdown_tx.take() {
+            let _ = tx.send(());
+        }
+    }
+}
+
+/// Spawn a federated coordinator that runs periodic sync rounds.
+///
+/// The coordinator calls `run_sync_round()` at the configured interval,
+/// forwarding results through the CLS swarm channel as `SwarmEvent::FederatedRound`.
+pub fn spawn_federated_coordinator(
+    config: crate::swarm::FederatedNetworkConfig,
+    initial_weights: Vec<f32>,
+    round_interval: std::time::Duration,
+    tx: mpsc::Sender<SwarmEvent>,
+) -> FederatedCoordinatorHandle {
+    let total_rounds = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
+    let total_failures = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
+    let (shutdown_tx, mut shutdown_rx) = tokio::sync::oneshot::channel::<()>();
+
+    let rounds = total_rounds.clone();
+    let failures = total_failures.clone();
+
+    tokio::spawn(async move {
+        let coordinator =
+            crate::swarm::FederatedCoordinator::new(config, initial_weights).await;
+
+        let mut interval = tokio::time::interval(round_interval);
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+
+        tracing::info!(
+            interval_ms = round_interval.as_millis() as u64,
+            "FederatedCoordinatorBridge: started"
+        );
+
+        loop {
+            tokio::select! {
+                _ = interval.tick() => {
+                    match coordinator.run_sync_round().await {
+                        Ok(Some(_weights)) => {
+                            rounds.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                            let peer_count = coordinator.peer_count();
+                            let trust_confidence = if peer_count > 0 { 0.8 } else { 0.0 };
+                            forward_federated_round(
+                                &tx,
+                                peer_count,
+                                0.7, // placeholder quality
+                                trust_confidence,
+                            );
+                        }
+                        Ok(None) => {
+                            // No aggregation this round (insufficient peers)
+                        }
+                        Err(e) => {
+                            failures.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                            tracing::warn!(
+                                error = %e,
+                                "FederatedCoordinatorBridge: sync round failed"
+                            );
+                        }
+                    }
+                }
+                _ = &mut shutdown_rx => {
+                    tracing::info!("FederatedCoordinatorBridge: shutdown signal received");
+                    break;
+                }
+            }
+        }
+    });
+
+    FederatedCoordinatorHandle {
+        total_rounds,
+        total_failures,
+        shutdown_tx: Some(shutdown_tx),
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // TESTS
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -422,5 +532,49 @@ mod tests {
             forwarded.load(std::sync::atomic::Ordering::Relaxed),
             2
         );
+    }
+
+    #[test]
+    fn test_forward_trust_verified() {
+        let (tx, rx) = mpsc::channel();
+        forward_trust_verified(&tx, "peer-X", 0.85, "abcdef1234");
+
+        let event = rx.try_recv().unwrap();
+        match event {
+            SwarmEvent::TrustVerified {
+                peer_id,
+                trust_level,
+                agent_pubkey,
+            } => {
+                assert_eq!(peer_id, "peer-X");
+                assert!((trust_level - 0.85).abs() < 0.01);
+                assert_eq!(agent_pubkey, "abcdef1234");
+            }
+            _ => panic!("Expected TrustVerified"),
+        }
+    }
+
+    #[test]
+    fn test_trust_verified_clamps() {
+        let (tx, rx) = mpsc::channel();
+        forward_trust_verified(&tx, "p", 2.0, "key");
+        let event = rx.try_recv().unwrap();
+        match event {
+            SwarmEvent::TrustVerified { trust_level, .. } => {
+                assert!((trust_level - 1.0).abs() < 0.01, "Should clamp to 1.0");
+            }
+            _ => panic!("Expected TrustVerified"),
+        }
+    }
+
+    #[test]
+    fn test_federated_coordinator_handle_counters() {
+        let handle = FederatedCoordinatorHandle {
+            total_rounds: std::sync::Arc::new(std::sync::atomic::AtomicU64::new(5)),
+            total_failures: std::sync::Arc::new(std::sync::atomic::AtomicU64::new(1)),
+            shutdown_tx: None,
+        };
+        assert_eq!(handle.total_rounds(), 5);
+        assert_eq!(handle.total_failures(), 1);
     }
 }

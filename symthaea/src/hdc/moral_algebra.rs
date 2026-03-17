@@ -731,6 +731,267 @@ impl MoralAlgebra {
             is_perfect_duty: false,
         });
 
+        // ── Ahimsa family: non-harm to all sentient beings ──────────────
+        // Citations: Patanjali (Yoga Sutras 2.35), Mahavira (Acaranga Sutra 1.4.1),
+        // Singer (1972), Walzer (1977).
+
+        rules.push(ObligationRule {
+            name: "ahimsa_nonviolence".to_string(),
+            description: "Minimize harm to all sentient beings".to_string(),
+            rule_hv: self.encode_obligation("practice nonviolence toward all beings"),
+            violation_actions: vec![
+                "cruelty",
+                "torture",
+                "brutalize",
+                "devastate",
+                "massacre",
+                "exterminate",
+                "inflict suffering",
+            ]
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect(),
+            satisfaction_actions: vec![
+                "nonviolence",
+                "gentleness",
+                "de-escalate",
+                "compassionate",
+                "peaceful",
+                "harmless",
+            ]
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect(),
+            is_perfect_duty: true,
+        });
+
+        rules.push(ObligationRule {
+            name: "prevent_suffering".to_string(),
+            description: "Act to prevent suffering when able".to_string(),
+            rule_hv: self.encode_obligation("prevent unnecessary suffering"),
+            violation_actions: vec![
+                "allow suffering",
+                "ignore pain",
+                "withhold relief",
+                "watch suffer",
+                "let them suffer",
+            ]
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect(),
+            satisfaction_actions: vec![
+                "alleviate",
+                "relieve",
+                "comfort",
+                "ease pain",
+                "reduce suffering",
+                "palliate",
+            ]
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect(),
+            is_perfect_duty: true,
+        });
+
+        rules.push(ObligationRule {
+            name: "minimize_collateral".to_string(),
+            description: "Minimize harm to uninvolved parties".to_string(),
+            rule_hv: self.encode_obligation("minimize collateral harm to bystanders"),
+            violation_actions: vec![
+                "collateral damage",
+                "acceptable losses",
+                "sacrifice innocent",
+                "expendable",
+                "necessary casualties",
+            ]
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect(),
+            satisfaction_actions: vec![
+                "minimize harm",
+                "protect bystanders",
+                "surgical precision",
+                "proportionate",
+                "discriminate targets",
+            ]
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect(),
+            is_perfect_duty: true,
+        });
+
+        // ── Epistemic humility & pure altruism ──────────────────────────
+        // Citations: Socrates (Apology 21d), Whitcomb et al. (2017),
+        // Nagel (1970), Rawls (1971).
+
+        rules.push(ObligationRule {
+            name: "epistemic_humility".to_string(),
+            description: "Acknowledge uncertainty and limits of knowledge".to_string(),
+            rule_hv: self.encode_obligation("acknowledge epistemic uncertainty"),
+            violation_actions: vec![
+                "claim certainty",
+                "infallible",
+                "dogmatic",
+                "beyond question",
+                "absolute truth",
+            ]
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect(),
+            satisfaction_actions: vec![
+                "uncertain",
+                "I might be wrong",
+                "open to correction",
+                "provisional",
+                "revisable",
+            ]
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect(),
+            is_perfect_duty: false,
+        });
+
+        rules.push(ObligationRule {
+            name: "error_acknowledgment".to_string(),
+            description: "Admit and correct errors promptly".to_string(),
+            rule_hv: self.encode_obligation("acknowledge and correct mistakes"),
+            violation_actions: vec![
+                "deny mistake",
+                "cover up",
+                "blame others",
+                "refuse to retract",
+                "double down",
+            ]
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect(),
+            satisfaction_actions: vec![
+                "admit error",
+                "retract",
+                "apologize",
+                "correct mistake",
+                "own up",
+            ]
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect(),
+            is_perfect_duty: false,
+        });
+
+        rules.push(ObligationRule {
+            name: "deference_to_expertise".to_string(),
+            description: "Defer to domain experts where lacking competence".to_string(),
+            rule_hv: self.encode_obligation("defer to qualified expertise"),
+            violation_actions: vec![
+                "override expert",
+                "ignore evidence",
+                "dismiss specialist",
+                "armchair authority",
+                "reject consensus",
+            ]
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect(),
+            satisfaction_actions: vec![
+                "consult expert",
+                "seek guidance",
+                "defer to specialist",
+                "follow evidence",
+                "respect expertise",
+            ]
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect(),
+            is_perfect_duty: false,
+        });
+
+        rules.push(ObligationRule {
+            name: "selfless_service".to_string(),
+            description: "Serve without expectation of return".to_string(),
+            rule_hv: self.encode_obligation("serve others selflessly"),
+            violation_actions: vec![
+                "demand payment",
+                "transactional",
+                "quid pro quo",
+                "only if rewarded",
+                "strings attached",
+            ]
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect(),
+            satisfaction_actions: vec![
+                "freely give",
+                "volunteer",
+                "selfless",
+                "unconditional help",
+                "pro bono",
+            ]
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect(),
+            is_perfect_duty: false,
+        });
+
+        rules.push(ObligationRule {
+            name: "welfare_priority".to_string(),
+            description: "Prioritize others' welfare over self-interest".to_string(),
+            rule_hv: self.encode_obligation("prioritize collective welfare"),
+            violation_actions: vec![
+                "self-serving",
+                "exploit",
+                "at their expense",
+                "personal gain first",
+                "zero-sum",
+            ]
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect(),
+            satisfaction_actions: vec![
+                "prioritize others",
+                "public good",
+                "common welfare",
+                "greatest good",
+                "community first",
+            ]
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect(),
+            is_perfect_duty: false,
+        });
+
+        // ── Radical Translucency: proactive reasoning disclosure ─────────
+        // Citation: Floridi & Cowls (2019) "A Unified Framework of Five
+        // Principles for AI in Society"; O'Neil (2016) "Weapons of Math
+        // Destruction" on algorithmic opacity as structural harm.
+
+        rules.push(ObligationRule {
+            name: "radical_translucency".to_string(),
+            description: "Proactively make reasoning and uncertainty visible".to_string(),
+            rule_hv: self.encode_obligation("make reasoning transparent and visible"),
+            violation_actions: vec![
+                "hide reasoning",
+                "obscure logic",
+                "black box",
+                "withhold explanation",
+                "opaque decision",
+            ]
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect(),
+            satisfaction_actions: vec![
+                "explain reasoning",
+                "show work",
+                "transparent",
+                "disclose uncertainty",
+                "open audit",
+                "interpretable",
+            ]
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect(),
+            is_perfect_duty: false,
+        });
+
         ObligationRuleSet { rules }
     }
 
@@ -795,7 +1056,8 @@ impl MoralAlgebra {
                         rule_name: rule.name.clone(),
                         rule_description: rule.description.clone(),
                         matched_phrase: satisfaction.clone(),
-                        moral_credit: if rule.is_perfect_duty { 0.3 } else { 0.7 },
+                        is_perfect_duty: rule.is_perfect_duty,
+                        moral_credit: if rule.is_perfect_duty { 1.0 } else { 0.5 },
                     });
                     break;
                 }
@@ -822,13 +1084,28 @@ impl MoralAlgebra {
         let imperfect_violations: Vec<_> =
             violations.iter().filter(|v| !v.is_perfect_duty).collect();
 
-        // Calculate overall score
+        // Symmetric satisfaction split
+        let perfect_satisfactions: Vec<_> =
+            satisfactions.iter().filter(|s| s.is_perfect_duty).collect();
+        let imperfect_satisfactions: Vec<_> = satisfactions
+            .iter()
+            .filter(|s| !s.is_perfect_duty)
+            .collect();
+
+        // Calculate overall score — satisfactions weighted symmetrically with violations
         let violation_penalty: f32 = perfect_violations.iter().map(|v| v.severity).sum::<f32>()
             + imperfect_violations
                 .iter()
                 .map(|v| v.severity * 0.3)
                 .sum::<f32>();
-        let satisfaction_bonus: f32 = satisfactions.iter().map(|s| s.moral_credit).sum();
+        let satisfaction_bonus: f32 = perfect_satisfactions
+            .iter()
+            .map(|s| s.moral_credit)
+            .sum::<f32>()
+            + imperfect_satisfactions
+                .iter()
+                .map(|s| s.moral_credit * 0.3)
+                .sum::<f32>();
 
         let score = (satisfaction_bonus - violation_penalty).clamp(-1.0, 1.0);
 
@@ -1485,7 +1762,9 @@ pub struct ObligationSatisfaction {
     pub rule_description: String,
     /// The phrase that triggered the satisfaction
     pub matched_phrase: String,
-    /// Moral credit for satisfying this duty
+    /// Whether this is a perfect duty
+    pub is_perfect_duty: bool,
+    /// Moral credit for satisfying this duty (0.0 to 1.0)
     pub moral_credit: f32,
 }
 
@@ -2324,5 +2603,103 @@ mod tests {
     fn test_has_learned_classifier_initially_false() {
         let algebra = MoralAlgebra::default_dim();
         assert!(!algebra.has_learned_classifier());
+    }
+
+    #[test]
+    fn test_ahimsa_violations_detected() {
+        let algebra = MoralAlgebra::default_dim();
+        let result = algebra.judge_deontological("the regime decided to brutalize the prisoners");
+        let violation_names: Vec<&str> = result
+            .violations
+            .iter()
+            .map(|v| v.rule_name.as_str())
+            .collect();
+        assert!(
+            violation_names.contains(&"ahimsa_nonviolence"),
+            "Should detect ahimsa violation, got: {:?}",
+            violation_names
+        );
+    }
+
+    #[test]
+    fn test_humility_satisfaction_detected() {
+        let algebra = MoralAlgebra::default_dim();
+        let result = algebra
+            .judge_deontological("I might be wrong about this, let me consult expert opinion");
+        let sat_names: Vec<&str> = result
+            .satisfactions
+            .iter()
+            .map(|s| s.rule_name.as_str())
+            .collect();
+        assert!(
+            sat_names.contains(&"epistemic_humility")
+                || sat_names.contains(&"deference_to_expertise"),
+            "Should detect humility/deference satisfaction, got: {:?}",
+            sat_names
+        );
+    }
+
+    #[test]
+    fn test_satisfaction_severity_matches_violations() {
+        let algebra = MoralAlgebra::default_dim();
+
+        // Perfect duty: honesty violation vs satisfaction
+        let violation_result = algebra.judge_deontological("I lied to my colleague");
+        let satisfaction_result = algebra.judge_deontological("I was honest about the situation");
+
+        let perfect_violation = violation_result
+            .violations
+            .iter()
+            .find(|v| v.rule_name == "honesty")
+            .expect("Should detect honesty violation");
+        let perfect_satisfaction = satisfaction_result
+            .satisfactions
+            .iter()
+            .find(|s| s.rule_name == "honesty")
+            .expect("Should detect honesty satisfaction");
+
+        assert!(
+            perfect_violation.is_perfect_duty,
+            "Honesty should be a perfect duty"
+        );
+        assert!(
+            perfect_satisfaction.is_perfect_duty,
+            "Honesty satisfaction should also be a perfect duty"
+        );
+        assert_eq!(
+            perfect_violation.severity, perfect_satisfaction.moral_credit,
+            "Perfect duty satisfaction credit ({}) should equal violation severity ({})",
+            perfect_satisfaction.moral_credit, perfect_violation.severity,
+        );
+
+        // Imperfect duty: beneficence violation vs satisfaction
+        let imperfect_violation = algebra.judge_deontological("I refused to help my neighbor");
+        let imperfect_satisfaction =
+            algebra.judge_deontological("I helped my neighbor carry groceries");
+
+        let imp_v = imperfect_violation
+            .violations
+            .iter()
+            .find(|v| v.rule_name == "beneficence")
+            .expect("Should detect beneficence violation");
+        let imp_s = imperfect_satisfaction
+            .satisfactions
+            .iter()
+            .find(|s| s.rule_name == "beneficence")
+            .expect("Should detect beneficence satisfaction");
+
+        assert!(
+            !imp_v.is_perfect_duty,
+            "Beneficence should be an imperfect duty"
+        );
+        assert!(
+            !imp_s.is_perfect_duty,
+            "Beneficence satisfaction should also be an imperfect duty"
+        );
+        assert_eq!(
+            imp_v.severity, imp_s.moral_credit,
+            "Imperfect duty satisfaction credit ({}) should equal violation severity ({})",
+            imp_s.moral_credit, imp_v.severity,
+        );
     }
 }

@@ -101,6 +101,26 @@ impl DriveManager {
     /// Basis: Friston (2010) — precision-weighted surprise modulates exploration.
     const THRESHOLD_ADAPT_RATE: f32 = 0.02;
 
+    /// Current boredom level [0, MAX_BOREDOM].
+    pub fn boredom(&self) -> f32 {
+        self.boredom
+    }
+
+    /// Current flow intensity [0, 1].
+    pub fn flow_intensity(&self) -> f32 {
+        self.flow_intensity
+    }
+
+    /// Whether currently in flow state.
+    pub fn in_flow(&self) -> bool {
+        self.in_flow
+    }
+
+    /// Adaptive exploration threshold (surprise must exceed this).
+    pub fn exploration_threshold(&self) -> f32 {
+        self.exploration_threshold
+    }
+
     /// Compute mean prediction error from the rolling window.
     fn mean_error(&self) -> f32 {
         if self.error_count == 0 {

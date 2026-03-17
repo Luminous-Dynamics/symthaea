@@ -577,6 +577,7 @@ impl UnifiedValueEvaluator {
                 recommended: false,
                 summary: "Veto: insufficient consciousness or value violation".to_string(),
                 processing_time_ms: 0.0,
+                ahimsa_violation: false,
             },
             authenticity: 0.0,
             consciousness_adequacy,

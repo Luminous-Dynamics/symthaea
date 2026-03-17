@@ -402,6 +402,10 @@ pub struct CycleMetadata {
     /// 0.0 when predictive self is not enabled.
     pub predictive_self_safety: f32,
 
+    /// Behavioral prediction error (average across moral_score, exploration_urge,
+    /// behavioral_coherence). 0.0 when predictive self is not enabled.
+    pub predictive_behavioral_error: f32,
+
     /// Attention subsystem telemetry (schema, GWT, budget, memoization).
     #[serde(flatten)]
     pub attention: AttentionMetrics,
@@ -1279,6 +1283,113 @@ pub struct CycleMetadata {
     #[serde(default)]
     pub learning_error_trend: f32,
 
+    // ── Memory Manager Telemetry ──────────────────────────────────────────
+    /// Memory consolidation pressure [0, 1]. High = memory overload, needs dreaming.
+    /// Science: Frankland & Bontempi (2005) — systems consolidation under pressure.
+    #[serde(default)]
+    pub memory_consolidation_pressure: f32,
+    /// Mean retrieval quality [0, 1]. Signal reliability of memory recall.
+    /// Science: Tulving (2002) — episodic retrieval quality.
+    #[serde(default = "default_half_f32")]
+    pub memory_recall_quality: f32,
+
+    // ── Swarm Manager Telemetry ───────────────────────────────────────────
+    /// Number of connected swarm peers.
+    #[serde(default)]
+    pub swarm_connected_peers: usize,
+    /// Connectivity EMA [0, 1] — ratio of connected/expected peers.
+    #[serde(default)]
+    pub swarm_connectivity_ema: f32,
+    /// Mean peer Φ across connected peers.
+    #[serde(default)]
+    pub swarm_mean_peer_phi: f32,
+    /// Affective contagion strength this cycle.
+    /// Science: Hatfield et al. (1993) — emotional contagion.
+    #[serde(default)]
+    pub swarm_affective_contagion: f32,
+    /// Federated learning trust confidence.
+    #[serde(default)]
+    pub swarm_federated_confidence: f32,
+    /// Number of network anomaly events (mass disconnects).
+    #[serde(default)]
+    pub swarm_anomaly_count: u32,
+
+    // ── Governance Manager Telemetry ──────────────────────────────────────
+    /// Governance reward EMA from outcome alignment (-1.0 to 1.0).
+    /// Science: Woolley et al. (2010) — collective intelligence reward signal.
+    #[serde(default)]
+    pub governance_reward_ema: f32,
+    /// Number of pending governance events queued for processing.
+    #[serde(default)]
+    pub governance_pending_events: usize,
+    /// Number of pending governance outcomes awaiting learning.
+    #[serde(default)]
+    pub governance_pending_outcomes: usize,
+    /// Collective Phi from latest governance tally.
+    #[serde(default)]
+    pub governance_collective_phi: f32,
+    /// Accumulated governance confidence nudge this cycle.
+    #[serde(default)]
+    pub governance_confidence_delta: f32,
+    /// Community mode from collective identity (e.g., "Deliberative").
+    #[serde(default)]
+    pub governance_community_mode: String,
+    /// Number of epistemic blind spots detected.
+    #[serde(default)]
+    pub governance_blind_spot_count: usize,
+    /// Severity of worst blind spot [0, 1].
+    #[serde(default)]
+    pub governance_max_blind_spot_severity: f32,
+    /// Number of epistemic agents tracked.
+    #[serde(default)]
+    pub governance_epistemic_agents: usize,
+    /// Maximum absolute harmonic delta from governance feedback.
+    #[serde(default)]
+    pub governance_harmonic_delta_max: f32,
+    /// Learning rate boost from governance prediction error.
+    #[serde(default)]
+    pub governance_lr_boost: f32,
+
+    // ── CPG Manager Telemetry ─────────────────────────────────────────────
+    /// Kuramoto synchronization index [0, 1]. 0 = incoherent, 1 = perfect sync.
+    #[serde(default)]
+    pub cpg_sync_index: f32,
+    /// Mean oscillator frequency (Hz).
+    #[serde(default)]
+    pub cpg_mean_freq: f32,
+    /// Whether motor output is active.
+    #[serde(default)]
+    pub cpg_motor_active: bool,
+    /// Whether desynchronization alert was triggered.
+    #[serde(default)]
+    pub cpg_desync_alert: bool,
+
+    // ── Radio/Spectrum Manager Telemetry ───────────────────────────────────
+    /// Network health: 0=AllUp, 1=LocalDown, 2=MetroOnly, 3=Blackout.
+    #[serde(default)]
+    pub spectrum_network_health: u8,
+    /// Per-tier availability [Local, Metro, Regional] as bitmask.
+    #[serde(default)]
+    pub spectrum_tier_available: u8,
+    /// Consecutive jamming cycles.
+    #[serde(default)]
+    pub spectrum_jamming_streak: u32,
+    /// Spectrum prediction error [0, 1].
+    #[serde(default)]
+    pub spectrum_prediction_error: f32,
+    /// Epistemic discount from network degradation.
+    #[serde(default)]
+    pub spectrum_epistemic_discount: f32,
+    /// Number of degradation streak cycles.
+    #[serde(default)]
+    pub spectrum_degradation_streak: u32,
+    /// Known mesh route table size.
+    #[serde(default)]
+    pub spectrum_known_peers: usize,
+    /// Active encryption sessions.
+    #[serde(default)]
+    pub spectrum_encryption_sessions: usize,
+
     // ── Causal Explanation Narrative Telemetry ─────────────────────────────
     /// Causal self-explanation narrative summary (generated every 47 cycles).
     /// Science: Wierzbicka (1996) — NSM-grounded causal transparency.
@@ -1423,6 +1534,39 @@ pub struct TherapeuticTelemetry {
     /// Narrative temporal coherence (Adler 2012) [0.0–1.0].
     #[serde(default)]
     pub therapeutic_temporal_coherence: f32,
+
+    // ── Shadow work telemetry (Observability Mode — Jung → Friston) ──
+
+    /// Total shadow pressure across all fragments (cumulative PE × recurrence × valence).
+    #[serde(default)]
+    pub shadow_total_pressure: f32,
+    /// Number of active shadow fragments.
+    #[serde(default)]
+    pub shadow_fragment_count: u32,
+    /// Highest individual fragment pressure (the "loudest" shadow).
+    #[serde(default)]
+    pub shadow_peak_pressure: f32,
+    /// Mean prediction error for shadow-related content.
+    #[serde(default)]
+    pub shadow_mean_prediction_error: f32,
+    /// Number of possible projection events detected this cycle.
+    #[serde(default)]
+    pub shadow_projection_detections: u32,
+    /// Whether shadow pressure exceeds the surfacing threshold (diagnostic only).
+    #[serde(default)]
+    pub shadow_surfacing_indicated: bool,
+    /// Number of shadow fragments queued for dream processing.
+    #[serde(default)]
+    pub shadow_dream_queue_depth: u32,
+    /// Best Phi improvement from dream-processed shadow content.
+    #[serde(default)]
+    pub shadow_best_dream_phi: f32,
+    /// Shadow pressure trend: positive = accumulating, negative = integrating/decaying.
+    #[serde(default)]
+    pub shadow_pressure_trend: f32,
+    /// Ratio of shadow content to total narrative content.
+    #[serde(default)]
+    pub shadow_to_narrative_ratio: f32,
 }
 
 fn default_response_profile() -> String {
@@ -1545,6 +1689,9 @@ pub struct BrocaGenerationTelemetry {
     pub generation_time_us: u64,
     /// Whether generation was skipped due to low consciousness.
     pub consciousness_gated: bool,
+    /// Whether generation was skipped due to `EthicalVerdict::Blocked`.
+    #[serde(default)]
+    pub ethics_gated: bool,
     /// Composite generation quality (0.0–1.0).
     #[serde(default)]
     pub quality: f32,
@@ -1639,6 +1786,22 @@ pub struct QualityDiagnostics {
     pub anomaly_recovery_progress: f32,
     /// Whether anomaly recovery is actively in progress.
     pub anomaly_recovering: bool,
+    /// HFE learning rate boost applied when hierarchical free energy exceeds threshold (1.0 = no boost).
+    /// Friston (2008) — poor model → learn harder, capped at +10%.
+    #[serde(default = "default_one_f32")]
+    pub hierarchical_free_energy_lr_boost: f32,
+    /// Predictive phi modulation learning rate delta (±1.5% max, coherence-weighted).
+    /// Friston (2010) — precision-weighted plasticity gating.
+    #[serde(default)]
+    pub predictive_phi_lr_delta: f32,
+    /// Confidence delta from body valence somatic marker feedback.
+    /// Damasio (1999) — positive somatic state boosts coherence, negative dampens.
+    #[serde(default)]
+    pub body_valence_confidence_delta: f32,
+    /// Confidence scale factor from narrative self-Phi (1.02 strong, 0.95 weak, 1.0 neutral).
+    /// Gallagher (2000) — strong narrative identity stabilizes learning.
+    #[serde(default = "default_one_f32")]
+    pub narrative_self_confidence_factor: f32,
 }
 
 /// Attention subsystem telemetry: schema focus, GWT, budget, memoization.
@@ -1793,6 +1956,9 @@ pub struct EthicalTelemetry {
     /// Consecutive cycles of Sacred Stillness dominance.
     #[serde(default)]
     pub stillness_dominance_streak: u16,
+    /// Unified ethical verdict for this cycle ("Safe", "Caution", or "Blocked").
+    #[serde(default)]
+    pub unified_verdict: String,
 }
 
 /// Free energy principle (FEP) and predictive processing telemetry.

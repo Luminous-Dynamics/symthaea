@@ -17,6 +17,19 @@ pub(crate) enum WeightConvergenceState {
     Oscillating,
 }
 
+impl WeightConvergenceState {
+    /// Static string matching Debug output — avoids `format!("{:?}")` on hot path.
+    #[inline]
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::Initializing => "Initializing",
+            Self::Converging => "Converging",
+            Self::Converged => "Converged",
+            Self::Oscillating => "Oscillating",
+        }
+    }
+}
+
 /// Unified output from the consciousness engine.
 ///
 /// Contains all measurement results plus proposed feedback deltas.
@@ -163,6 +176,15 @@ pub(crate) struct ConsciousnessEngineInput<'a> {
     /// Science: Baddeley (2000) — working memory benefits from grounded semantic content.
     pub knowledge_grounding: f64,
 
+    /// Knowledge coherence score [0.0, 1.0] from the knowledge engine.
+    /// Composite of graph size (log-scaled), calibration quality (1 - ECE), and
+    /// contradiction pressure (penalised by contradiction_count). A large, well-calibrated,
+    /// contradiction-free graph scores near 1.0; empty or inconsistent graphs near 0.0.
+    /// Neutral at 0.0 when knowledge engine is disabled (weight keeps impact minimal).
+    /// Formula: (log2(graph_size+1)/10) × (1-ece) × (1/(1 + contradictions×0.1))
+    /// Science: Stanovich (2009) — epistemic rationality; Guo et al. (2017) — calibration.
+    pub knowledge_coherence: f64,
+
     // ── Glyph coherence → symbolic consciousness coupling ─────────────
     /// Glyph field coherence [0.0, 0.95] from the GlyphManager.
     /// Measures integration across all 11 Field Modalities (symbolic consciousness depth).
@@ -170,6 +192,14 @@ pub(crate) struct ConsciousnessEngineInput<'a> {
     /// Neutral at 0.0 when glyph_codex feature is disabled.
     /// Science: Jung (1959) — archetypal integration; Grof (1985) — consciousness cartography.
     pub glyph_coherence: f64,
+
+    // ── CfC temporal coherence → consciousness coupling ──────────────
+    /// CfC temporal coherence phi contribution [0.0, 1.0] from the VoiceCoherenceBridge.
+    /// Measures how well the CfC temporal dynamics contribute to integrated information.
+    /// Additive nudge to Knowledge component in EquationV2: max +5% at perfect coherence.
+    /// Neutral at 0.0 when voice coherence bridge is inactive.
+    /// Science: Clark (2013) — temporal integration supports unified conscious experience.
+    pub temporal_coherence_phi: f32,
 }
 
 /// Dynamic weights for the unified consciousness computation.

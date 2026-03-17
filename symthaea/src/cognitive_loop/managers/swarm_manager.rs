@@ -74,6 +74,15 @@ pub enum SwarmEvent {
         /// Number of peers who corroborated these facts.
         corroboration_count: u32,
     },
+    /// A peer completed the trust handshake (Ed25519 or BLAKE3 verification).
+    TrustVerified {
+        /// Peer's node ID.
+        peer_id: String,
+        /// Trust level after verification [0, 1].
+        trust_level: f64,
+        /// Peer's agent public key (hex-encoded).
+        agent_pubkey: String,
+    },
 }
 
 /// Swarm telemetry snapshot for CycleMetadata.
@@ -145,6 +154,10 @@ pub struct SwarmManager {
     /// Pending knowledge facts received from peers (drained by cognitive loop).
     pending_knowledge_shares: Vec<(String, f32)>,
 
+    // ── Trust tracking ──────────────────────────────────────────────────
+    /// Number of peers that completed the trust handshake.
+    verified_peers: usize,
+
     // ── Telemetry snapshot ──────────────────────────────────────────────
     /// Last computed telemetry (readable between process calls).
     last_telemetry: SwarmTelemetry,
@@ -167,6 +180,7 @@ impl Default for SwarmManager {
             connectivity_history: VecDeque::with_capacity(8),
             connectivity_modifier: 1.0,
             pending_knowledge_shares: Vec::new(),
+            verified_peers: 0,
             last_telemetry: SwarmTelemetry::default(),
         }
     }
@@ -354,6 +368,14 @@ impl SwarmManager {
                     // Cap pending shares to prevent unbounded growth
                     if self.pending_knowledge_shares.len() > 64 {
                         self.pending_knowledge_shares.truncate(64);
+                    }
+                }
+                SwarmEvent::TrustVerified {
+                    trust_level, ..
+                } => {
+                    // Track verified peer count for telemetry
+                    if trust_level > 0.0 {
+                        self.verified_peers = self.verified_peers.saturating_add(1);
                     }
                 }
             }
@@ -555,7 +577,16 @@ pub fn convert_peer_event(event: &crate::swarm::PeerEvent) -> Option<SwarmEvent>
                 arousal: 0.0,
             })
         }
-        // Discovered and TrustChanged don't map to cognitive-level signals
+        crate::swarm::PeerEvent::TrustChanged {
+            peer_id,
+            new: trust,
+            ..
+        } => Some(SwarmEvent::TrustVerified {
+            peer_id: peer_id.clone(),
+            trust_level: trust.value(),
+            agent_pubkey: String::new(),
+        }),
+        // Discovered doesn't map to cognitive-level signals
         _ => None,
     }
 }

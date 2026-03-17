@@ -682,6 +682,14 @@ pub struct CognitiveLoopConfig {
     /// Default: false (inference engine not spawned).
     #[serde(default)]
     pub enable_streaming_inference: bool,
+
+    /// Enable federated learning coordinator (requires async runtime).
+    #[serde(default)]
+    pub federation_enabled: bool,
+
+    /// Federated sync round interval in milliseconds (default: 30000 = 30s).
+    #[serde(default = "default_federation_round_interval_ms")]
+    pub federation_round_interval_ms: u64,
 }
 
 impl Default for CognitiveLoopConfig {
@@ -773,7 +781,7 @@ impl Default for CognitiveLoopConfig {
             #[cfg(feature = "therapeutic")]
             enable_therapeutic: true, // On by default when feature is compiled in
             #[cfg(feature = "therapeutic")]
-            therapeutic_crisis_threshold: 0.65,
+            therapeutic_crisis_threshold: 0.62,
             #[cfg(feature = "therapeutic")]
             therapeutic_text_crisis_detection: true, // Safety-critical: on by default
             #[cfg(feature = "ssm_language")]
@@ -812,10 +820,15 @@ impl Default for CognitiveLoopConfig {
             knowledge_ontology_max: 500,
             knowledge_db_path: None,
             enable_streaming_inference: false,
+            federation_enabled: false,
+            federation_round_interval_ms: 30_000,
         }
     }
 }
 
+fn default_federation_round_interval_ms() -> u64 {
+    30_000
+}
 fn default_knowledge_graph_capacity() -> usize {
     10_000
 }

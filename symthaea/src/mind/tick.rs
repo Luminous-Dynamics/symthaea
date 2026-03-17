@@ -615,9 +615,7 @@ impl ContinuousMind {
                 if let Some(ref tx) = self.swarm_event_tx {
                     for id in &expired_ids {
                         let peer_id = crate::swarm::mesh::hex_short(id);
-                        let _ = tx.send(crate::cognitive_loop::SwarmEvent::PeerLeft {
-                            peer_id,
-                        });
+                        let _ = tx.send(crate::cognitive_loop::SwarmEvent::PeerLeft { peer_id });
                     }
                 }
 
@@ -1189,9 +1187,12 @@ impl ContinuousMind {
                 // Quality and trust estimated from contributor count (more peers → higher confidence).
                 if let Some(ref tx) = self.swarm_event_tx {
                     let quality = (n_contributors as f64 / 10.0).min(1.0); // saturates at 10 contributors
-                    let trust = (n_contributors as f64 / 5.0).min(1.0);    // saturates at 5
+                    let trust = (n_contributors as f64 / 5.0).min(1.0); // saturates at 5
                     crate::cognitive_loop::forward_federated_round(
-                        tx, n_contributors, quality, trust,
+                        tx,
+                        n_contributors,
+                        quality,
+                        trust,
                     );
                 }
             }

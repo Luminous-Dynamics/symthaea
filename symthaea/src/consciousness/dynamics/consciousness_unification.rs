@@ -217,6 +217,32 @@ pub enum UnifiedEmotion {
 }
 
 impl UnifiedEmotion {
+    /// Static string matching Debug output — avoids `format!("{:?}")` on hot path.
+    #[inline]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Joy => "Joy",
+            Self::Sadness => "Sadness",
+            Self::Anger => "Anger",
+            Self::Fear => "Fear",
+            Self::Surprise => "Surprise",
+            Self::Disgust => "Disgust",
+            Self::Trust => "Trust",
+            Self::Anticipation => "Anticipation",
+            Self::Love => "Love",
+            Self::Peace => "Peace",
+            Self::Curiosity => "Curiosity",
+            Self::Gratitude => "Gratitude",
+            Self::Seeking => "Seeking",
+            Self::Rage => "Rage",
+            Self::Lust => "Lust",
+            Self::Care => "Care",
+            Self::Panic => "Panic",
+            Self::Play => "Play",
+            Self::Neutral => "Neutral",
+        }
+    }
+
     /// Convert to valence-arousal-dominance
     pub fn to_vad(&self) -> (f64, f64, f64) {
         match self {
@@ -600,6 +626,19 @@ pub enum EmotionalPattern {
     Escalating,
     Calming,
     Volatile,
+}
+
+impl EmotionalPattern {
+    /// Static string matching Debug output — avoids `format!("{:?}")` on hot path.
+    #[inline]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Stable => "Stable",
+            Self::Escalating => "Escalating",
+            Self::Calming => "Calming",
+            Self::Volatile => "Volatile",
+        }
+    }
 }
 
 // ============================================================================

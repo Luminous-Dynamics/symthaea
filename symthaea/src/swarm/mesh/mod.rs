@@ -709,6 +709,38 @@ impl WisdomPacket {
     pub fn assembler(thought_id: u16, total_fragments: u8) -> FragmentAssembler {
         FragmentAssembler::new(thought_id, total_fragments, WISDOM_PACKET_SIZE)
     }
+
+    // ── HDC-Native Authentication ────────────────────────────────────────
+
+    /// Compute an HDC-MAC over the wisdom BinaryHV using a BinaryHV key.
+    ///
+    /// This is a zero-serialization authentication: the MAC is computed
+    /// directly on the 16,384-bit wisdom vector via a single XOR+permute
+    /// (~10 ns release, ~6 µs debug). Compare: BLAKE3 MAC over 2KB ≈ 100 ns.
+    ///
+    /// The returned BinaryHV can be sent alongside the packet or stored
+    /// for later verification. It is NOT embedded in the packet wire format
+    /// (use `auth_mac` field for the existing 8-bit BLAKE3 MAC).
+    pub fn compute_hdc_mac(&self, key: &BinaryHV) -> BinaryHV {
+        symthaea_core::hdc::hdc_crypto::HdcMac::compute(&self.wisdom, key)
+    }
+
+    /// Verify an HDC-MAC on the wisdom BinaryHV (exact match).
+    pub fn verify_hdc_mac(&self, key: &BinaryHV, mac: &BinaryHV) -> bool {
+        symthaea_core::hdc::hdc_crypto::HdcMac::verify(&self.wisdom, key, mac)
+    }
+
+    /// Verify an HDC-MAC with noise tolerance (for lossy channels like LoRa/BLE).
+    ///
+    /// Recommended threshold: 0.95 (false positive rate ≈ 2^{-4700}).
+    pub fn verify_hdc_mac_noisy(
+        &self,
+        key: &BinaryHV,
+        mac: &BinaryHV,
+        threshold: f32,
+    ) -> bool {
+        symthaea_core::hdc::hdc_crypto::HdcMac::verify_noisy(&self.wisdom, key, mac, threshold)
+    }
 }
 
 impl std::fmt::Debug for WisdomPacket {
@@ -2318,6 +2350,90 @@ mod tests {
         let recovered = WisdomPacket::from_assembler(&assembler).unwrap();
         let recovered_bytes = recovered.to_bytes();
         assert!(verify_packet_mac(&recovered_bytes, &key));
+    }
+
+    // ====================================================================
+    // HDC-MAC on WisdomPacket (Phase 4 wiring)
+    // ====================================================================
+
+    #[test]
+    fn test_wisdom_packet_hdc_mac_roundtrip() {
+        let packet = WisdomPacket {
+            source_id: [0xDE; 8],
+            sequence: 42,
+            phi: 0.7,
+            urgency: MeshUrgency::Normal,
+            timestamp_s: 1_700_000,
+            payload_type: PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 3,
+            wisdom: BinaryHV::random(42),
+        };
+        let key = BinaryHV::random(99);
+        let mac = packet.compute_hdc_mac(&key);
+        assert!(packet.verify_hdc_mac(&key, &mac));
+    }
+
+    #[test]
+    fn test_wisdom_packet_hdc_mac_wrong_key_fails() {
+        let packet = WisdomPacket {
+            source_id: [0xDE; 8],
+            sequence: 42,
+            phi: 0.7,
+            urgency: MeshUrgency::Normal,
+            timestamp_s: 1_700_000,
+            payload_type: PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 3,
+            wisdom: BinaryHV::random(42),
+        };
+        let key_a = BinaryHV::random(99);
+        let key_b = BinaryHV::random(100);
+        let mac = packet.compute_hdc_mac(&key_a);
+        assert!(!packet.verify_hdc_mac(&key_b, &mac));
+    }
+
+    #[test]
+    fn test_wisdom_packet_hdc_mac_tampered_wisdom_fails() {
+        let key = BinaryHV::random(99);
+        let packet = WisdomPacket {
+            source_id: [0xDE; 8],
+            sequence: 42,
+            phi: 0.7,
+            urgency: MeshUrgency::Normal,
+            timestamp_s: 1_700_000,
+            payload_type: PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 3,
+            wisdom: BinaryHV::random(42),
+        };
+        let mac = packet.compute_hdc_mac(&key);
+
+        // Tamper: change wisdom
+        let mut tampered = packet;
+        tampered.wisdom = BinaryHV::random(43);
+        assert!(!tampered.verify_hdc_mac(&key, &mac));
+    }
+
+    #[test]
+    fn test_wisdom_packet_hdc_mac_noisy_verify() {
+        let packet = WisdomPacket {
+            source_id: [0xDE; 8],
+            sequence: 42,
+            phi: 0.7,
+            urgency: MeshUrgency::Normal,
+            timestamp_s: 1_700_000,
+            payload_type: PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 3,
+            wisdom: BinaryHV::random(42),
+        };
+        let key = BinaryHV::random(99);
+        let mac = packet.compute_hdc_mac(&key);
+        assert!(packet.verify_hdc_mac_noisy(&key, &mac, 0.95));
+
+        let wrong_key = BinaryHV::random(100);
+        assert!(!packet.verify_hdc_mac_noisy(&wrong_key, &mac, 0.95));
     }
 
     // ====================================================================

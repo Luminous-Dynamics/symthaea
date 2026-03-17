@@ -563,7 +563,11 @@ fn test_predictive_affective_crossmodal_synergy() {
             "Predictive phi modulation must be finite at cycle {i}"
         );
         assert!(
-            result.metadata.temporal.cross_modal_binding_strength.is_finite(),
+            result
+                .metadata
+                .temporal
+                .cross_modal_binding_strength
+                .is_finite(),
             "Cross-modal binding strength must be finite at cycle {i}"
         );
         assert!(
@@ -573,12 +577,14 @@ fn test_predictive_affective_crossmodal_synergy() {
 
         // Bounds checks
         assert!(
-            result.metadata.embodied.affective_valence >= -1.0 && result.metadata.embodied.affective_valence <= 1.0,
+            result.metadata.embodied.affective_valence >= -1.0
+                && result.metadata.embodied.affective_valence <= 1.0,
             "Valence out of bounds at cycle {i}: {}",
             result.metadata.embodied.affective_valence
         );
         assert!(
-            result.metadata.embodied.affective_arousal >= 0.0 && result.metadata.embodied.affective_arousal <= 1.0,
+            result.metadata.embodied.affective_arousal >= 0.0
+                && result.metadata.embodied.affective_arousal <= 1.0,
             "Arousal out of bounds at cycle {i}: {}",
             result.metadata.embodied.affective_arousal
         );
@@ -883,7 +889,8 @@ fn test_embodied_cognition_telemetry() {
             "Embodied phi modulation should be finite"
         );
         assert!(
-            result.metadata.embodied.embodied_agency >= 0.0 && result.metadata.embodied.embodied_agency <= 1.0,
+            result.metadata.embodied.embodied_agency >= 0.0
+                && result.metadata.embodied.embodied_agency <= 1.0,
             "Embodied agency should be in [0, 1], got: {}",
             result.metadata.embodied.embodied_agency,
         );
@@ -1014,7 +1021,7 @@ fn test_harmonics_and_consciousness_profile_wired() {
     assert!(
         last_result
             .metadata
-            .consciousness_profile_composite
+            .consciousness.consciousness_profile_composite
             .is_finite(),
         "Consciousness profile composite should be finite"
     );
@@ -1086,7 +1093,11 @@ fn test_temporal_consciousness_telemetry() {
     for _ in 0..20 {
         let result = service.cycle("temporal coherence test");
         assert!(
-            result.metadata.temporal.temporal_coherence_score.is_finite(),
+            result
+                .metadata
+                .temporal
+                .temporal_coherence_score
+                .is_finite(),
             "Temporal coherence score should be finite"
         );
         // Temporal coherence should be non-negative
@@ -1130,9 +1141,9 @@ fn test_causal_chain_boosts_episodic_consolidation() {
     // After 60 cycles the cached causal chain count should be populated
     // (may be 0 if no genuine chains found, but the analysis ran without panic)
     assert!(
-        meta.temporal_causal_chains < 1000,
+        meta.temporal.temporal_causal_chains < 1000,
         "Causal chain count should be bounded, got {}",
-        meta.temporal_causal_chains,
+        meta.temporal.temporal_causal_chains,
     );
     // causal_codebook_entries should be a finite count
     assert!(
@@ -1319,7 +1330,7 @@ fn test_holographic_and_affective_wired() {
     assert!(
         last_result
             .metadata
-            .affect_consciousness_valence
+            .embodied.affect_consciousness_valence
             .is_finite(),
         "Affective consciousness valence should be finite, got: {}",
         last_result.metadata.embodied.affect_consciousness_valence,
@@ -1346,9 +1357,16 @@ fn test_differentiable_and_pipeline_wired() {
     }
 
     assert!(
-        last_result.metadata.consciousness.consciousness_gradient_magnitude >= 0.0,
+        last_result
+            .metadata
+            .consciousness
+            .consciousness_gradient_magnitude
+            >= 0.0,
         "Gradient magnitude should be non-negative, got: {}",
-        last_result.metadata.consciousness.consciousness_gradient_magnitude,
+        last_result
+            .metadata
+            .consciousness
+            .consciousness_gradient_magnitude,
     );
     assert!(
         last_result.metadata.pipeline_consciousness >= 0.0,
@@ -2179,7 +2197,11 @@ fn test_sustained_high_throughput() {
             i
         );
         assert!(
-            result.metadata.consciousness.consciousness_level.is_finite(),
+            result
+                .metadata
+                .consciousness
+                .consciousness_level
+                .is_finite(),
             "Cycle {} consciousness level is not finite",
             i
         );
@@ -2361,7 +2383,11 @@ fn test_consciousness_metrics_bounded() {
             result.prediction_error
         );
         assert!(
-            result.metadata.consciousness.consciousness_level.is_finite(),
+            result
+                .metadata
+                .consciousness
+                .consciousness_level
+                .is_finite(),
             "Cycle {i}: consciousness_level not finite"
         );
 
@@ -2371,11 +2397,19 @@ fn test_consciousness_metrics_bounded() {
             "Cycle {i}: holographic_unity not finite"
         );
         assert!(
-            result.metadata.consciousness.consciousness_gradient_magnitude.is_finite(),
+            result
+                .metadata
+                .consciousness
+                .consciousness_gradient_magnitude
+                .is_finite(),
             "Cycle {i}: gradient_magnitude not finite"
         );
         assert!(
-            result.metadata.embodied.affect_consciousness_valence.is_finite(),
+            result
+                .metadata
+                .embodied
+                .affect_consciousness_valence
+                .is_finite(),
             "Cycle {i}: affective_valence not finite"
         );
     }
@@ -4909,7 +4943,11 @@ fn test_consciousness_limiting_component_boost() {
         let result = service.cycle("test limiting component boost");
         // limiting_component_boosted is a String, always valid
         assert!(
-            result.metadata.consciousness.consciousness_gradient_magnitude.is_finite(),
+            result
+                .metadata
+                .consciousness
+                .consciousness_gradient_magnitude
+                .is_finite(),
             "gradient not finite at cycle {i}"
         );
     }
@@ -6939,7 +6977,11 @@ fn test_circadian_stillness_oscillation() {
         }
 
         // Consciousness should always be finite and non-negative
-        if !result.metadata.consciousness.consciousness_level.is_finite()
+        if !result
+            .metadata
+            .consciousness
+            .consciousness_level
+            .is_finite()
             || result.metadata.consciousness.consciousness_level < 0.0
         {
             all_consciousness_finite = false;
@@ -7308,14 +7350,14 @@ fn test_cross_coupling_no_nan_500_cycles() {
 
         // Consciousness level: finite, bounded [0, 1]
         assert!(
-            m.consciousness_level.is_finite(),
+            m.consciousness.consciousness_level.is_finite(),
             "consciousness_level not finite at cycle {i}: {}",
-            m.consciousness_level
+            m.consciousness.consciousness_level
         );
         assert!(
-            m.consciousness_level >= 0.0 && m.consciousness_level <= 1.0,
+            m.consciousness.consciousness_level >= 0.0 && m.consciousness.consciousness_level <= 1.0,
             "consciousness_level out of [0,1] at cycle {i}: {}",
-            m.consciousness_level
+            m.consciousness.consciousness_level
         );
 
         // Prediction error: finite, bounded [0, 1]

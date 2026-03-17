@@ -631,30 +631,38 @@ fn clean_llm_output(source: &str) -> String {
 
     // Step 2: Strip leading prose (lines before first Rust construct)
     let lines: Vec<&str> = defenced.lines().collect();
-    let code_start = lines.iter().position(|l| {
-        let t = l.trim();
-        t.starts_with("use ")
-            || t.starts_with("pub ")
-            || t.starts_with("fn ")
-            || t.starts_with("struct ")
-            || t.starts_with("enum ")
-            || t.starts_with("impl ")
-            || t.starts_with("#[")
-            || t.starts_with("///")
-            || t.starts_with("mod ")
-            || t.starts_with("type ")
-            || t.starts_with("const ")
-            || t.starts_with("static ")
-            || t.starts_with("trait ")
-    }).unwrap_or(0);
+    let code_start = lines
+        .iter()
+        .position(|l| {
+            let t = l.trim();
+            t.starts_with("use ")
+                || t.starts_with("pub ")
+                || t.starts_with("fn ")
+                || t.starts_with("struct ")
+                || t.starts_with("enum ")
+                || t.starts_with("impl ")
+                || t.starts_with("#[")
+                || t.starts_with("///")
+                || t.starts_with("mod ")
+                || t.starts_with("type ")
+                || t.starts_with("const ")
+                || t.starts_with("static ")
+                || t.starts_with("trait ")
+        })
+        .unwrap_or(0);
 
     // Step 3: Strip trailing prose (lines after last closing brace)
     let code_lines = &lines[code_start..];
     let mut last_code_line = code_lines.len();
     for (i, line) in code_lines.iter().enumerate().rev() {
         let t = line.trim();
-        if t == "}" || t.ends_with('}') || t.ends_with(';') || t.ends_with("*/")
-            || t.starts_with("//") || t.starts_with("///") || t.is_empty()
+        if t == "}"
+            || t.ends_with('}')
+            || t.ends_with(';')
+            || t.ends_with("*/")
+            || t.starts_with("//")
+            || t.starts_with("///")
+            || t.is_empty()
         {
             last_code_line = i + 1;
             break;
@@ -674,16 +682,19 @@ fn clean_llm_output(source: &str) -> String {
     }
 
     // Step 5: Remove lines that are clearly not Rust (common LLM artifacts)
-    let cleaned_lines: Vec<&str> = code.lines().filter(|l| {
-        let t = l.trim();
-        // Remove explanation lines that start with natural language
-        !(t.starts_with("Here") && t.contains(':'))
-            && !(t.starts_with("This") && t.contains("function"))
-            && !(t.starts_with("The ") && t.contains("above"))
-            && !(t.starts_with("Note:"))
-            && !(t.starts_with("Example"))
-            && !t.starts_with("Output:")
-    }).collect();
+    let cleaned_lines: Vec<&str> = code
+        .lines()
+        .filter(|l| {
+            let t = l.trim();
+            // Remove explanation lines that start with natural language
+            !(t.starts_with("Here") && t.contains(':'))
+                && !(t.starts_with("This") && t.contains("function"))
+                && !(t.starts_with("The ") && t.contains("above"))
+                && !(t.starts_with("Note:"))
+                && !(t.starts_with("Example"))
+                && !t.starts_with("Output:")
+        })
+        .collect();
 
     cleaned_lines.join("\n")
 }

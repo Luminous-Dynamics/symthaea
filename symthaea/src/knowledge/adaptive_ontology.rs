@@ -34,6 +34,9 @@ pub struct PrimitiveUsage {
     pub last_used_cycle: u64,
     /// Whether this primitive was composed from existing ones
     pub parent_names: Vec<String>,
+    /// IS-A parent concept name (e.g., "dog" is_a "animal").
+    /// Science: Quillian (1967) — semantic networks; Collins & Loftus (1975).
+    pub is_a_parent: Option<String>,
 }
 
 /// Configuration for the adaptive ontology
@@ -209,11 +212,22 @@ impl AdaptiveOntology {
             created_at_cycle: current_cycle,
             last_used_cycle: current_cycle,
             parent_names,
+            is_a_parent: None,
         };
 
         self.primitives.insert(name.to_string(), usage);
         self.total_created += 1;
         true
+    }
+
+    /// Set the IS-A parent for a primitive (taxonomic relation).
+    ///
+    /// Example: `set_is_a("dog", "animal")` means "dog IS-A animal".
+    /// Science: Quillian (1967) — semantic networks; Collins & Loftus (1975).
+    pub fn set_is_a(&mut self, child: &str, parent: &str) {
+        if let Some(usage) = self.primitives.get_mut(child) {
+            usage.is_a_parent = Some(parent.to_string());
+        }
     }
 
     /// Record utility feedback for a primitive.
@@ -251,6 +265,27 @@ impl AdaptiveOntology {
         let pruned = before - self.primitives.len();
         self.total_pruned += pruned as u64;
         pruned
+    }
+
+    /// Walk the IS-A parent chain starting from `concept`, up to `max_depth` steps.
+    ///
+    /// Returns a vector of ancestors, e.g. `["animal", "living_thing"]` for `"dog"`.
+    /// Returns an empty vector if the concept is not found or has no IS-A parent.
+    ///
+    /// Science: Collins & Quillian (1969) — hierarchical semantic memory retrieval.
+    pub fn is_a_chain(&self, concept: &str, max_depth: usize) -> Vec<String> {
+        let mut chain = Vec::new();
+        let mut current = concept.to_string();
+        for _ in 0..max_depth {
+            match self.primitives.get(&current).and_then(|u| u.is_a_parent.as_ref()) {
+                Some(parent) => {
+                    chain.push(parent.clone());
+                    current = parent.clone();
+                }
+                None => break,
+            }
+        }
+        chain
     }
 
     /// Get all learned primitives (for inspection/telemetry)
@@ -298,6 +333,7 @@ impl AdaptiveOntology {
                 utility: u.utility,
                 created_at_cycle: u.created_at_cycle,
                 last_used_cycle: u.last_used_cycle,
+                is_a_parent: u.is_a_parent.clone(),
             })
             .collect()
     }
@@ -320,6 +356,9 @@ impl AdaptiveOntology {
             u.usage_count = u.usage_count.max(record.usage_count);
             u.utility = record.utility;
             u.last_used_cycle = record.last_used_cycle;
+            if record.is_a_parent.is_some() {
+                u.is_a_parent = record.is_a_parent.clone();
+            }
         }
     }
 }

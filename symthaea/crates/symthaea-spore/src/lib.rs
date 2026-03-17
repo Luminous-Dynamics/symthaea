@@ -37,12 +37,20 @@
 
 #![cfg_attr(not(feature = "native-ffi"), deny(unsafe_code))]
 
+pub mod ble_mesh;
 pub mod broca;
+pub mod compass;
 pub mod config;
 pub mod dream;
+pub mod dream_journal;
 pub mod engine;
 pub mod fep;
+pub mod haptic;
+pub mod holon_bridge;
 pub mod memory;
+pub mod metabolism;
+pub mod pairing;
+pub mod sensor_bridge;
 pub mod topology;
 
 #[cfg(feature = "wasm")]
@@ -51,5 +59,5 @@ pub mod wasm_bindings;
 #[cfg(feature = "native-ffi")]
 pub mod native_ffi;
 
-pub use config::SporeConfig;
+pub use config::{SharingConfig, SporeConfig};
 pub use engine::SporeEngine;

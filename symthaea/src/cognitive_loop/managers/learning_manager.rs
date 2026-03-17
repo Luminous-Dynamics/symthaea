@@ -69,6 +69,42 @@ impl LearningManager {
     /// Minimum plasticity (always retain some learning capacity).
     const MIN_PLASTICITY: f32 = 0.1;
 
+    /// Current plasticity level [0.1, 0.95].
+    pub fn plasticity(&self) -> f32 {
+        self.plasticity
+    }
+
+    /// Whether in dream consolidation phase (low arousal sustained).
+    pub fn in_dream_phase(&self) -> bool {
+        self.in_dream_phase
+    }
+
+    /// Error trend direction: positive = errors increasing.
+    pub fn error_trend(&self) -> f32 {
+        self.error_trend
+    }
+
+    /// Apply a plasticity boost from dream consolidation quality.
+    ///
+    /// High consolidation reliability signals that offline replay was effective,
+    /// priming waking plasticity for enhanced encoding of new experiences.
+    ///
+    /// Science: Diekelmann & Born (2010) — effective consolidation enhances subsequent
+    /// encoding; Walker (2017) — post-sleep learning enhancement.
+    pub fn apply_dream_consolidation_boost(&mut self, consolidation_reliability: f32) {
+        use super::super::thresholds::{
+            DREAM_CONSOLIDATION_LR_BOOST, DREAM_CONSOLIDATION_LR_THRESHOLD,
+        };
+        if consolidation_reliability.is_finite()
+            && consolidation_reliability > DREAM_CONSOLIDATION_LR_THRESHOLD as f32
+        {
+            let boost = (consolidation_reliability - DREAM_CONSOLIDATION_LR_THRESHOLD as f32)
+                * DREAM_CONSOLIDATION_LR_BOOST as f32;
+            self.plasticity =
+                (self.plasticity + boost).clamp(Self::MIN_PLASTICITY, Self::MAX_PLASTICITY);
+        }
+    }
+
     fn mean_surprise(&self) -> f32 {
         if self.surprise_count == 0 {
             return 0.0;

@@ -23,9 +23,10 @@ fn test_prefrontal_veto_suppresses_exploration() {
     let result = service.cycle("one more overload input");
     if result.metadata.prefrontal_veto {
         // If veto triggered, exploration_urge should be near-zero.
-        // Not exactly 0.0 because end-of-cycle homeostatic drift nudges it slightly toward 0.3.
+        // Not exactly 0.0 because end-of-cycle homeostatic drift nudges it slightly toward 0.3,
+        // and knowledge engine contradiction→exploration coupling adds a small boost (~0.02).
         assert!(
-            service.curiosity_drive().exploration_urge < 0.05,
+            service.curiosity_drive().exploration_urge < 0.10,
             "Prefrontal veto should suppress exploration_urge to near-zero, got: {}",
             service.curiosity_drive().exploration_urge,
         );
@@ -225,7 +226,11 @@ fn test_embodied_phi_modulation_affects_unified_psi() {
     // Both should produce valid results
     assert!(baseline_result.prediction_error.is_finite());
     assert!(embodied_result.prediction_error.is_finite());
-    assert!(embodied_result.metadata.embodied.embodied_phi_modulation.is_finite());
+    assert!(embodied_result
+        .metadata
+        .embodied
+        .embodied_phi_modulation
+        .is_finite());
     // The embodied phi modulation should be non-trivial (not exactly 1.0 after 20 cycles)
     // (lenient — we just verify the feedback path exists and doesn't break)
 }
@@ -437,13 +442,15 @@ fn test_cycle_with_affective_bridge() {
     let result = service.cycle("affective check");
     // Affective valence should be in valid range
     assert!(
-        result.metadata.embodied.affective_valence >= -1.0 && result.metadata.embodied.affective_valence <= 1.0,
+        result.metadata.embodied.affective_valence >= -1.0
+            && result.metadata.embodied.affective_valence <= 1.0,
         "Affective valence out of range: {}",
         result.metadata.embodied.affective_valence
     );
     // Affective arousal should be in valid range
     assert!(
-        result.metadata.embodied.affective_arousal >= 0.0 && result.metadata.embodied.affective_arousal <= 1.0,
+        result.metadata.embodied.affective_arousal >= 0.0
+            && result.metadata.embodied.affective_arousal <= 1.0,
         "Affective arousal out of range: {}",
         result.metadata.embodied.affective_arousal
     );
@@ -493,12 +500,17 @@ fn test_cycle_with_cross_modal_binding() {
     let result = service.cycle("binding check");
     // Cross-modal binding strength should be finite
     assert!(
-        result.metadata.temporal.cross_modal_binding_strength.is_finite(),
+        result
+            .metadata
+            .temporal
+            .cross_modal_binding_strength
+            .is_finite(),
         "Cross-modal binding strength should be finite"
     );
     // Cross-modal Phi should be finite and non-negative
     assert!(
-        result.metadata.temporal.cross_modal_psi.is_finite() && result.metadata.temporal.cross_modal_psi >= 0.0,
+        result.metadata.temporal.cross_modal_psi.is_finite()
+            && result.metadata.temporal.cross_modal_psi >= 0.0,
         "Cross-modal Phi should be finite and >= 0: {}",
         result.metadata.temporal.cross_modal_psi
     );
@@ -526,10 +538,20 @@ fn test_predictive_affective_crossmodal_synergy() {
     // All 6 new metadata fields should be populated with valid values
     assert!(result.metadata.fep.predictive_free_energy.is_finite());
     assert!(result.metadata.fep.predictive_phi_modulation.is_finite());
-    assert!(result.metadata.temporal.cross_modal_binding_strength.is_finite());
+    assert!(result
+        .metadata
+        .temporal
+        .cross_modal_binding_strength
+        .is_finite());
     assert!(result.metadata.temporal.cross_modal_psi.is_finite());
-    assert!(result.metadata.embodied.affective_valence >= -1.0 && result.metadata.embodied.affective_valence <= 1.0);
-    assert!(result.metadata.embodied.affective_arousal >= 0.0 && result.metadata.embodied.affective_arousal <= 1.0);
+    assert!(
+        result.metadata.embodied.affective_valence >= -1.0
+            && result.metadata.embodied.affective_valence <= 1.0
+    );
+    assert!(
+        result.metadata.embodied.affective_arousal >= 0.0
+            && result.metadata.embodied.affective_arousal <= 1.0
+    );
 }
 
 #[test]
@@ -983,7 +1005,10 @@ fn test_coherence_field_wired_when_enabled() {
     })
     .unwrap();
 
-    assert!(service.vision_sensory.coherence_field.is_some(), "CoherenceField should be Some");
+    assert!(
+        service.vision_sensory.coherence_field.is_some(),
+        "CoherenceField should be Some"
+    );
 
     // Run a cycle — should not panic, coherence field gets hormone modulation
     let r = service.cycle("coherence test input");
@@ -1048,7 +1073,8 @@ fn test_coherence_field_modulates_consciousness() {
     for i in 0..5 {
         let r = service.cycle(&format!("coherence consciousness test {i}"));
         assert!(
-            r.metadata.consciousness.consciousness_level >= 0.0 && r.metadata.consciousness.consciousness_level <= 1.0,
+            r.metadata.consciousness.consciousness_level >= 0.0
+                && r.metadata.consciousness.consciousness_level <= 1.0,
             "consciousness_level out of bounds: {}",
             r.metadata.consciousness.consciousness_level
         );
@@ -1537,7 +1563,12 @@ fn helper_adjust_exploration_applies_delta_and_records_proposal() {
     let mut svc = make_helper_service();
     svc.curiosity_drive.exploration_urge = 0.5;
     svc.feedback_state.begin_cycle();
-    svc.feedback_state.snapshot_cycle_start(svc.prediction_confidence, svc.fep.lr_boost, 0.5, svc.carryover.learning.adaptive_threshold_scale);
+    svc.feedback_state.snapshot_cycle_start(
+        svc.prediction_confidence,
+        svc.fep.lr_boost,
+        0.5,
+        svc.carryover.learning.adaptive_threshold_scale,
+    );
     let delta: f32 = 0.2;
     svc.adjust_exploration("test_source", delta);
     assert!(
@@ -1553,7 +1584,12 @@ fn helper_scale_exploration_applies_factor() {
     let mut svc = make_helper_service();
     svc.curiosity_drive.exploration_urge = 0.8;
     svc.feedback_state.begin_cycle();
-    svc.feedback_state.snapshot_cycle_start(svc.prediction_confidence, svc.fep.lr_boost, 0.8, svc.carryover.learning.adaptive_threshold_scale);
+    svc.feedback_state.snapshot_cycle_start(
+        svc.prediction_confidence,
+        svc.fep.lr_boost,
+        0.8,
+        svc.carryover.learning.adaptive_threshold_scale,
+    );
     let factor: f32 = 0.5;
     svc.scale_exploration("test_source", factor);
     assert!(
@@ -1638,7 +1674,12 @@ fn helper_threshold_clamps_to_bounds() {
 fn helper_multiple_proposals_accumulate_within_cycle() {
     let mut svc = make_helper_service();
     svc.feedback_state.begin_cycle();
-    svc.feedback_state.snapshot_cycle_start(svc.prediction_confidence, svc.fep.lr_boost, svc.curiosity_drive.exploration_urge, svc.carryover.learning.adaptive_threshold_scale);
+    svc.feedback_state.snapshot_cycle_start(
+        svc.prediction_confidence,
+        svc.fep.lr_boost,
+        svc.curiosity_drive.exploration_urge,
+        svc.carryover.learning.adaptive_threshold_scale,
+    );
     let d1: f32 = 0.05;
     let d2: f32 = -0.03;
     let f1: f32 = 0.98;

@@ -249,6 +249,19 @@ pub unsafe extern "C" fn spore_engine_set_battery_state(
     engine.battery_charging = is_charging != 0;
 }
 
+/// Report platform night mode state.
+///
+/// `is_night`: 1 if night/dark mode active, 0 if not.
+/// Combined with charging state, triggers auto-sleep in the metabolism.
+///
+/// # Safety
+/// `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn spore_engine_set_night_mode(engine: *mut SporeEngine, is_night: u8) {
+    let engine = unsafe { &mut *engine };
+    engine.night_mode = is_night != 0;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // Dream engine
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -267,6 +280,439 @@ pub unsafe extern "C" fn spore_engine_dream_cycle(engine: *mut SporeEngine) -> u
     } else {
         0
     }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Sleep/Wake metabolism
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Send a wake signal to the metabolism state machine.
+///
+/// Signal values: 0=PhonePickup, 1=UserInput, 2=ExplicitSleep.
+/// For richer signals (Inactivity, Charging, NightMode, Thermal), use the
+/// dedicated setter functions below.
+///
+/// # Safety
+/// `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn spore_engine_wake_signal(engine: *mut SporeEngine, signal: u8) {
+    let engine = unsafe { &mut *engine };
+    engine.wake_signal(crate::metabolism::WakeSignal::from_u8(signal));
+}
+
+/// Get the current wake state (0=Sleep, 1=Drowsy, 2=Alert, 3=Focused).
+///
+/// # Safety
+/// `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn spore_engine_wake_state(engine: *const SporeEngine) -> u8 {
+    unsafe { &*engine }.wake_state().as_u8()
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Sensor bridge
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Set sensor snapshot from platform.
+///
+/// # Safety
+/// `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn spore_engine_set_sensors(
+    engine: *mut SporeEngine,
+    accel: f32,
+    light: f32,
+    proximity_near: u8,
+    barometer: f32,
+    gps_novelty: f32,
+) {
+    let engine = unsafe { &mut *engine };
+    engine.set_sensors(accel, light, proximity_near != 0, barometer, gps_novelty);
+}
+
+/// Get current motion state (0=Stationary, 1=Walking, 2=Running, 3=InVehicle).
+///
+/// # Safety
+/// `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn spore_engine_motion_state(engine: *const SporeEngine) -> u8 {
+    unsafe { &*engine }.motion_state().as_u8()
+}
+
+/// Get privacy mode (1=active, 0=inactive).
+///
+/// # Safety
+/// `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn spore_engine_privacy_mode(engine: *const SporeEngine) -> u8 {
+    if unsafe { &*engine }.privacy_mode() {
+        1
+    } else {
+        0
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Consciousness compass
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Get consciousness compass snapshot as JSON string.
+///
+/// Caller must free with `spore_string_free()`.
+///
+/// # Safety
+/// `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn spore_engine_compass_json(engine: *const SporeEngine) -> *mut c_char {
+    // Need mutable ref for compass_json (accesses various subsystem state)
+    // Safe because we only read state, the method is &self
+    let engine = unsafe { &*engine };
+    let json = engine.compass_json();
+    match CString::new(json) {
+        Ok(c) => c.into_raw(),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Sharing config
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Set sharing configuration from JSON string.
+///
+/// # Safety
+/// `engine` must be valid. `json` must be a valid null-terminated UTF-8 string.
+#[no_mangle]
+pub unsafe extern "C" fn spore_engine_set_sharing_config(
+    engine: *mut SporeEngine,
+    json: *const c_char,
+) {
+    if json.is_null() {
+        return;
+    }
+    let engine = unsafe { &mut *engine };
+    let c_str = unsafe { CStr::from_ptr(json) };
+    if let Ok(s) = c_str.to_str() {
+        if let Ok(config) = serde_json::from_str::<crate::config::SharingConfig>(s) {
+            engine.set_sharing_config(config);
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Haptic awareness
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Drain pending haptic events as JSON array.
+///
+/// Caller must free with `spore_string_free()`.
+///
+/// # Safety
+/// `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn spore_haptic_drain(engine: *mut SporeEngine) -> *mut c_char {
+    let engine = unsafe { &mut *engine };
+    let json = engine.haptic_drain_json();
+    match CString::new(json) {
+        Ok(c) => c.into_raw(),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/// Number of pending haptic events.
+///
+/// # Safety
+/// `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn spore_haptic_pending(engine: *const SporeEngine) -> u32 {
+    unsafe { &*engine }.haptic_pending()
+}
+
+/// Enable or disable haptic events.
+///
+/// # Safety
+/// `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn spore_haptic_set_enabled(engine: *mut SporeEngine, enabled: u8) {
+    let engine = unsafe { &mut *engine };
+    engine.haptic_set_enabled(enabled != 0);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Dream journal
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Get the latest dream fragment as JSON.
+///
+/// Caller must free with `spore_string_free()`.
+///
+/// # Safety
+/// `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn spore_dream_journal_latest(engine: *const SporeEngine) -> *mut c_char {
+    let engine = unsafe { &*engine };
+    let json = engine.dream_journal_latest_json();
+    match CString::new(json) {
+        Ok(c) => c.into_raw(),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/// Get all dream journal entries as JSON array.
+///
+/// Caller must free with `spore_string_free()`.
+///
+/// # Safety
+/// `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn spore_dream_journal_all(engine: *const SporeEngine) -> *mut c_char {
+    let engine = unsafe { &*engine };
+    let json = engine.dream_journal_all_json();
+    match CString::new(json) {
+        Ok(c) => c.into_raw(),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/// Number of stored dream fragments.
+///
+/// # Safety
+/// `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn spore_dream_journal_count(engine: *const SporeEngine) -> u32 {
+    unsafe { &*engine }.dream_journal_count()
+}
+
+/// Explicitly trigger dream consolidation.
+///
+/// # Safety
+/// `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn spore_engine_dream_consolidate(engine: *mut SporeEngine) {
+    let engine = unsafe { &mut *engine };
+    engine.dream_consolidate();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Holon bridge
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Drain holon outbound messages as JSON array.
+///
+/// Caller must free with `spore_string_free()`.
+///
+/// # Safety
+/// `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn spore_engine_holon_drain_outbound(
+    engine: *mut SporeEngine,
+) -> *mut c_char {
+    let engine = unsafe { &mut *engine };
+    let json = engine.holon_drain_outbound_json();
+    match CString::new(json) {
+        Ok(c) => c.into_raw(),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/// Receive inbound holon message from JSON.
+///
+/// # Safety
+/// `engine` and `json` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn spore_engine_holon_receive(engine: *mut SporeEngine, json: *const c_char) {
+    if json.is_null() {
+        return;
+    }
+    let engine = unsafe { &mut *engine };
+    let c_str = unsafe { CStr::from_ptr(json) };
+    if let Ok(s) = c_str.to_str() {
+        engine.holon_receive_json(s);
+    }
+}
+
+/// Set holon connection state.
+///
+/// # Safety
+/// `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn spore_engine_holon_set_connected(engine: *mut SporeEngine, connected: u8) {
+    let engine = unsafe { &mut *engine };
+    engine.holon_set_connected(connected != 0);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// BLE mesh
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Receive a peer consciousness vector from BLE scan.
+///
+/// `cv_data` must point to at least `len` bytes (minimum 12: 3 × f32).
+/// Returns 1 on success, 0 on failure.
+///
+/// # Safety
+/// `engine` must be valid. `cv_data` must point to `len` valid bytes.
+#[no_mangle]
+pub unsafe extern "C" fn spore_ble_receive_peer(
+    engine: *mut SporeEngine,
+    peer_id: u64,
+    cv_data: *const u8,
+    len: u32,
+) -> u8 {
+    if cv_data.is_null() || len < 12 {
+        return 0;
+    }
+    let engine = unsafe { &mut *engine };
+    let data = unsafe { std::slice::from_raw_parts(cv_data, len as usize) };
+    if engine.ble_receive_peer(peer_id, data) {
+        1
+    } else {
+        0
+    }
+}
+
+/// Get the BLE advertise payload for platform broadcasting.
+///
+/// Writes payload to `out_buf` (must be at least 12 bytes).
+/// Returns the number of bytes written (0 if not in ActiveShare mode).
+///
+/// # Safety
+/// `engine` must be valid. `out_buf` must point to at least 12 writable bytes.
+#[no_mangle]
+pub unsafe extern "C" fn spore_ble_advertise_payload(
+    engine: *mut SporeEngine,
+    out_buf: *mut u8,
+    buf_len: u32,
+) -> u32 {
+    let engine = unsafe { &mut *engine };
+    let payload = engine.ble_advertise_payload();
+    if payload.is_empty() || buf_len < payload.len() as u32 {
+        return 0;
+    }
+    let out = unsafe { std::slice::from_raw_parts_mut(out_buf, payload.len()) };
+    out.copy_from_slice(&payload);
+    payload.len() as u32
+}
+
+/// Number of tracked BLE peers.
+///
+/// # Safety
+/// `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn spore_ble_peer_count(engine: *const SporeEngine) -> u32 {
+    unsafe { &*engine }.ble_peer_count()
+}
+
+/// Collective Phi from BLE mesh peers.
+///
+/// # Safety
+/// `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn spore_ble_collective_phi(engine: *const SporeEngine) -> f32 {
+    unsafe { &*engine }.ble_collective_phi()
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Pairing
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Set pairing mode (0=Off, 1=Discoverable, 2=Paired).
+///
+/// # Safety
+/// `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn spore_pairing_set_mode(engine: *mut SporeEngine, mode: u8) {
+    let engine = unsafe { &mut *engine };
+    let pairing_mode = match mode {
+        1 => crate::config::PairingMode::Discoverable,
+        2 => crate::config::PairingMode::Paired,
+        _ => crate::config::PairingMode::Off,
+    };
+    engine.pairing.set_mode(pairing_mode);
+}
+
+/// Generate a new pairing keypair.
+///
+/// # Safety
+/// `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn spore_pairing_generate_keypair(engine: *mut SporeEngine) {
+    let engine = unsafe { &mut *engine };
+    engine.pairing.generate_keypair();
+}
+
+/// Initiate pairing with a peer. Returns 1 on success, 0 on failure.
+///
+/// # Safety
+/// `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn spore_pairing_initiate(engine: *mut SporeEngine, peer_id: u64) -> u8 {
+    let engine = unsafe { &mut *engine };
+    if engine.pairing.initiate_pairing(peer_id) {
+        1
+    } else {
+        0
+    }
+}
+
+/// Receive an inbound pairing message from JSON.
+///
+/// # Safety
+/// `engine` must be valid. `json` must be a valid null-terminated UTF-8 string.
+#[no_mangle]
+pub unsafe extern "C" fn spore_pairing_receive(engine: *mut SporeEngine, json: *const c_char) {
+    if json.is_null() {
+        return;
+    }
+    let engine = unsafe { &mut *engine };
+    let c_str = unsafe { CStr::from_ptr(json) };
+    if let Ok(s) = c_str.to_str() {
+        if let Ok(msg) = serde_json::from_str::<crate::pairing::PairingInbound>(s) {
+            engine.pairing.receive_inbound(msg);
+        }
+    }
+}
+
+/// Drain pairing outbound messages as JSON array.
+///
+/// Caller must free with `spore_string_free()`.
+///
+/// # Safety
+/// `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn spore_pairing_drain_outbound(engine: *mut SporeEngine) -> *mut c_char {
+    let engine = unsafe { &mut *engine };
+    let msgs = engine.pairing.drain_outbound();
+    match serde_json::to_string(&msgs) {
+        Ok(json) => match CString::new(json) {
+            Ok(c) => c.into_raw(),
+            Err(_) => std::ptr::null_mut(),
+        },
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/// Check if a peer is paired. Returns 1 if paired, 0 otherwise.
+///
+/// # Safety
+/// `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn spore_pairing_is_paired(engine: *const SporeEngine, peer_id: u64) -> u8 {
+    let engine = unsafe { &*engine };
+    if engine.pairing.is_paired(peer_id) {
+        1
+    } else {
+        0
+    }
+}
+
+/// Get the number of paired devices.
+///
+/// # Safety
+/// `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn spore_pairing_paired_count(engine: *const SporeEngine) -> u32 {
+    unsafe { &*engine }.pairing.paired_count() as u32
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -410,6 +856,264 @@ mod tests {
         unsafe {
             spore_engine_free(std::ptr::null_mut());
             spore_string_free(std::ptr::null_mut());
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Embodiment FFI tests
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_wake_signal_and_state() {
+        let engine = spore_engine_new();
+        unsafe {
+            // Default is Alert (2)
+            assert_eq!(spore_engine_wake_state(engine), 2);
+            // ExplicitSleep = signal 2
+            spore_engine_wake_signal(engine, 2);
+            assert_eq!(spore_engine_wake_state(engine), 0); // Sleep
+            // PhonePickup = signal 0
+            spore_engine_wake_signal(engine, 0);
+            assert_eq!(spore_engine_wake_state(engine), 1); // Drowsy
+            spore_engine_free(engine);
+        }
+    }
+
+    #[test]
+    fn test_set_sensors_and_motion() {
+        let engine = spore_engine_new();
+        unsafe {
+            // Default is Stationary
+            assert_eq!(spore_engine_motion_state(engine), 0);
+            assert_eq!(spore_engine_privacy_mode(engine), 0);
+            // Set proximity near → privacy mode
+            spore_engine_set_sensors(engine, 0.0, 300.0, 1, 1013.0, 0.0);
+            assert_eq!(spore_engine_privacy_mode(engine), 1);
+            spore_engine_free(engine);
+        }
+    }
+
+    #[test]
+    fn test_compass_json() {
+        let engine = spore_engine_new();
+        unsafe {
+            spore_engine_cycle(engine, std::ptr::null());
+            let json = spore_engine_compass_json(engine);
+            assert!(!json.is_null());
+            let s = CStr::from_ptr(json).to_str().unwrap();
+            assert!(s.contains("consciousness_level"));
+            assert!(s.contains("dominant_harmony"));
+            assert!(s.contains("wake_state"));
+            spore_string_free(json);
+            spore_engine_free(engine);
+        }
+    }
+
+    #[test]
+    fn test_sharing_config_json() {
+        let engine = spore_engine_new();
+        unsafe {
+            let config = CString::new(
+                r#"{"holon_mode":"FullSync","ble_mode":"ActiveShare","haptic_enabled":true,"telemetry_export":false}"#
+            ).unwrap();
+            spore_engine_set_sharing_config(engine, config.as_ptr());
+            // Verify holon is now active by running cycles and draining
+            for _ in 0..60 {
+                spore_engine_cycle(engine, std::ptr::null());
+            }
+            let outbound = spore_engine_holon_drain_outbound(engine);
+            assert!(!outbound.is_null());
+            let s = CStr::from_ptr(outbound).to_str().unwrap();
+            assert!(s.starts_with('['));
+            spore_string_free(outbound);
+            spore_engine_free(engine);
+        }
+    }
+
+    #[test]
+    fn test_sharing_config_null_is_noop() {
+        let engine = spore_engine_new();
+        unsafe {
+            spore_engine_set_sharing_config(engine, std::ptr::null());
+            // Should not crash
+            spore_engine_free(engine);
+        }
+    }
+
+    #[test]
+    fn test_haptic_drain_and_pending() {
+        let engine = spore_engine_new();
+        unsafe {
+            assert_eq!(spore_haptic_pending(engine), 0);
+            // Run cycles to potentially generate haptic events
+            for _ in 0..20 {
+                spore_engine_cycle(engine, std::ptr::null());
+            }
+            let json = spore_haptic_drain(engine);
+            assert!(!json.is_null());
+            let s = CStr::from_ptr(json).to_str().unwrap();
+            assert!(s.starts_with('['));
+            spore_string_free(json);
+            spore_engine_free(engine);
+        }
+    }
+
+    #[test]
+    fn test_haptic_set_enabled() {
+        let engine = spore_engine_new();
+        unsafe {
+            spore_haptic_set_enabled(engine, 0); // disable
+            for _ in 0..20 {
+                spore_engine_cycle(engine, std::ptr::null());
+            }
+            assert_eq!(spore_haptic_pending(engine), 0);
+            spore_engine_free(engine);
+        }
+    }
+
+    #[test]
+    fn test_dream_journal_ffi() {
+        let engine = spore_engine_new();
+        unsafe {
+            assert_eq!(spore_dream_journal_count(engine), 0);
+            let latest = spore_dream_journal_latest(engine);
+            assert!(!latest.is_null());
+            let s = CStr::from_ptr(latest).to_str().unwrap();
+            assert_eq!(s, "null");
+            spore_string_free(latest);
+
+            let all = spore_dream_journal_all(engine);
+            assert!(!all.is_null());
+            let s = CStr::from_ptr(all).to_str().unwrap();
+            assert_eq!(s, "[]");
+            spore_string_free(all);
+
+            // Trigger consolidation
+            spore_engine_dream_consolidate(engine);
+            spore_engine_free(engine);
+        }
+    }
+
+    #[test]
+    fn test_holon_bridge_ffi() {
+        let engine = spore_engine_new();
+        unsafe {
+            // Set connected
+            spore_engine_holon_set_connected(engine, 1);
+            // Drain outbound (empty since mode is Off by default)
+            let outbound = spore_engine_holon_drain_outbound(engine);
+            assert!(!outbound.is_null());
+            let s = CStr::from_ptr(outbound).to_str().unwrap();
+            assert_eq!(s, "[]");
+            spore_string_free(outbound);
+
+            // Receive null is noop
+            spore_engine_holon_receive(engine, std::ptr::null());
+
+            // Receive valid JSON
+            let msg = CString::new(r#"{"LanguageOutput":"hello from holon"}"#).unwrap();
+            spore_engine_holon_receive(engine, msg.as_ptr());
+            spore_engine_free(engine);
+        }
+    }
+
+    #[test]
+    fn test_ble_peer_ffi() {
+        let engine = spore_engine_new();
+        unsafe {
+            assert_eq!(spore_ble_peer_count(engine), 0);
+            assert_eq!(spore_ble_collective_phi(engine), 0.0);
+
+            // Receive peer with valid CV data (3 x f32 = 12 bytes)
+            let mut cv_data = Vec::new();
+            cv_data.extend_from_slice(&0.7f32.to_le_bytes());
+            cv_data.extend_from_slice(&0.3f32.to_le_bytes());
+            cv_data.extend_from_slice(&0.5f32.to_le_bytes());
+
+            // Need to enable BLE mode first
+            let config = CString::new(
+                r#"{"holon_mode":"Off","ble_mode":"ActiveShare","haptic_enabled":true,"telemetry_export":false}"#
+            ).unwrap();
+            spore_engine_set_sharing_config(engine, config.as_ptr());
+
+            let result = spore_ble_receive_peer(engine, 42, cv_data.as_ptr(), 12);
+            assert_eq!(result, 1);
+            assert_eq!(spore_ble_peer_count(engine), 1);
+            assert!(spore_ble_collective_phi(engine) > 0.0);
+
+            spore_engine_free(engine);
+        }
+    }
+
+    #[test]
+    fn test_ble_receive_null_data() {
+        let engine = spore_engine_new();
+        unsafe {
+            let result = spore_ble_receive_peer(engine, 1, std::ptr::null(), 0);
+            assert_eq!(result, 0);
+            spore_engine_free(engine);
+        }
+    }
+
+    #[test]
+    fn test_ble_receive_short_data() {
+        let engine = spore_engine_new();
+        unsafe {
+            let data = [1u8, 2, 3];
+            let result = spore_ble_receive_peer(engine, 1, data.as_ptr(), 3);
+            assert_eq!(result, 0);
+            spore_engine_free(engine);
+        }
+    }
+
+    #[test]
+    fn test_ble_advertise_payload_ffi() {
+        let engine = spore_engine_new();
+        unsafe {
+            let config = CString::new(
+                r#"{"holon_mode":"Off","ble_mode":"ActiveShare","haptic_enabled":true,"telemetry_export":false}"#
+            ).unwrap();
+            spore_engine_set_sharing_config(engine, config.as_ptr());
+
+            spore_engine_cycle(engine, std::ptr::null());
+
+            let mut buf = [0u8; 16];
+            let written = spore_ble_advertise_payload(engine, buf.as_mut_ptr(), 16);
+            assert_eq!(written, 12); // 3 × f32
+
+            spore_engine_free(engine);
+        }
+    }
+
+    #[test]
+    fn test_ble_advertise_buf_too_small() {
+        let engine = spore_engine_new();
+        unsafe {
+            let config = CString::new(
+                r#"{"holon_mode":"Off","ble_mode":"ActiveShare","haptic_enabled":true,"telemetry_export":false}"#
+            ).unwrap();
+            spore_engine_set_sharing_config(engine, config.as_ptr());
+            spore_engine_cycle(engine, std::ptr::null());
+
+            let mut buf = [0u8; 4]; // too small
+            let written = spore_ble_advertise_payload(engine, buf.as_mut_ptr(), 4);
+            assert_eq!(written, 0);
+
+            spore_engine_free(engine);
+        }
+    }
+
+    #[test]
+    fn test_night_mode_with_charging_triggers_sleep() {
+        let engine = spore_engine_new();
+        unsafe {
+            assert_eq!(spore_engine_wake_state(engine), 2); // Alert
+            spore_engine_set_night_mode(engine, 1);
+            spore_engine_set_battery_state(engine, 80, 1); // charging
+            // Run a cycle to trigger edge-detected forwarding
+            spore_engine_cycle(engine, std::ptr::null());
+            assert_eq!(spore_engine_wake_state(engine), 0); // Sleep
+            spore_engine_free(engine);
         }
     }
 }

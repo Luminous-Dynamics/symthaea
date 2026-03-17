@@ -207,8 +207,7 @@ impl CodingExperienceStore {
             let hint = experience
                 .fix_hint
                 .unwrap_or_else(|| experience.detail.clone());
-            self.error_hints_cache
-                .push((experience.detail, hint));
+            self.error_hints_cache.push((experience.detail, hint));
             if self.error_hints_cache.len() > self.max_cache_size {
                 self.error_hints_cache.remove(0);
             }
@@ -275,6 +274,53 @@ impl CodingExperienceStore {
     /// Get the in-memory success cache.
     pub fn cached_successes(&self) -> &[(String, String)] {
         &self.success_cache
+    }
+
+    /// Get the success rate for a recipe pattern (e.g., "CargoCheck" or "WriteFile→CargoCheck").
+    ///
+    /// Searches caches for experiences matching the recipe pattern.
+    /// For successes: task field starts with "recipe:<pattern>".
+    /// For failures: detail field contains the atoms pattern (since error cache stores detail, not task).
+    /// Returns `(successes, total)` — caller can compute rate. Returns (0, 0) if no data.
+    pub fn recipe_success_rate(&self, recipe_key: &str) -> (usize, usize) {
+        let prefix = format!("recipe:{}", recipe_key);
+
+        let mut successes = 0usize;
+        let mut total = 0usize;
+
+        // Success cache: (task, detail) — task starts with "recipe:..."
+        for (task, _) in &self.success_cache {
+            if task.starts_with(&prefix) {
+                successes += 1;
+                total += 1;
+            }
+        }
+
+        // Error cache: (detail, hint) — detail contains "atoms=[...]" with the recipe key
+        for (detail, _) in &self.error_hints_cache {
+            if detail.contains(recipe_key) {
+                total += 1;
+            }
+        }
+
+        (successes, total)
+    }
+
+    /// Get success rates for multiple recipe patterns at once.
+    /// Returns a map from recipe_key to success_rate (0.0-1.0, with 0.5 prior for unseen recipes).
+    pub fn recipe_success_rates(&self, recipe_keys: &[&str]) -> Vec<f32> {
+        recipe_keys
+            .iter()
+            .map(|key| {
+                let (successes, total) = self.recipe_success_rate(key);
+                if total == 0 {
+                    0.5 // uninformative prior
+                } else {
+                    // Bayesian: (successes + 1) / (total + 2) — Laplace smoothing
+                    (successes as f32 + 1.0) / (total as f32 + 2.0)
+                }
+            })
+            .collect()
     }
 
     /// Total number of stored experiences.
@@ -432,5 +478,71 @@ mod tests {
         assert_eq!(store.cached_successes().len(), 1);
         assert_eq!(store.cached_error_hints().len(), 1);
         assert_eq!(store.count().await, 2);
+    }
+
+    #[tokio::test]
+    async fn test_recipe_success_rate_no_data() {
+        let store = CodingExperienceStore::new().await.unwrap();
+        let (successes, total) = store.recipe_success_rate("CargoCheck");
+        assert_eq!(successes, 0);
+        assert_eq!(total, 0);
+    }
+
+    #[tokio::test]
+    async fn test_recipe_success_rate_with_data() {
+        let mut store = CodingExperienceStore::new().await.unwrap();
+
+        // Store a successful recipe trace (task=recipe:..., detail=summary)
+        store
+            .store(CodingExperience {
+                task: "recipe:CargoCheck".to_string(),
+                detail: "energy=3.0, steps=1, atoms=[CargoCheck]".to_string(),
+                success: true,
+                tier: "MoleculeExecutor".to_string(),
+                fix_hint: None,
+            })
+            .await;
+
+        // Store a failed recipe trace
+        // For failures, error_hints_cache stores (detail, hint), so detail
+        // must contain the recipe key for matching.
+        store
+            .store(CodingExperience {
+                task: "recipe:CargoCheck".to_string(),
+                detail: "energy=3.0, steps=1, atoms=[CargoCheck]".to_string(),
+                success: false,
+                tier: "MoleculeExecutor".to_string(),
+                fix_hint: None,
+            })
+            .await;
+
+        let (successes, total) = store.recipe_success_rate("CargoCheck");
+        assert_eq!(successes, 1);
+        assert_eq!(total, 2);
+    }
+
+    #[tokio::test]
+    async fn test_recipe_success_rates_bayesian() {
+        let mut store = CodingExperienceStore::new().await.unwrap();
+
+        // Two successes for WriteFile→CargoCheck
+        for _ in 0..2 {
+            store
+                .store(CodingExperience {
+                    task: "recipe:WriteFile→CargoCheck".to_string(),
+                    detail: "energy=4.0".to_string(),
+                    success: true,
+                    tier: "MoleculeExecutor".to_string(),
+                    fix_hint: None,
+                })
+                .await;
+        }
+
+        let rates = store.recipe_success_rates(&["WriteFile→CargoCheck", "UnseenRecipe"]);
+        assert_eq!(rates.len(), 2);
+        // WriteFile→CargoCheck: (2+1)/(2+2) = 0.75
+        assert!((rates[0] - 0.75).abs() < 0.01);
+        // UnseenRecipe: 0.5 (uninformative prior)
+        assert!((rates[1] - 0.5).abs() < f32::EPSILON);
     }
 }

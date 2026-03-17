@@ -288,7 +288,9 @@ fn test_semantic_evictions_route_to_graduation() {
     let mut eviction_count = 0usize;
 
     for i in 0..10u64 {
-        let v: Vec<f32> = (0..dim).map(|j| ((i * 7 + j as u64) as f32 * 0.01).sin()).collect();
+        let v: Vec<f32> = (0..dim)
+            .map(|j| ((i * 7 + j as u64) as f32 * 0.01).sin())
+            .collect();
         let evicted = semantic.store_with_timestamp(v, 0.1, None, i);
 
         if let Some(entry) = evicted {
@@ -307,11 +309,20 @@ fn test_semantic_evictions_route_to_graduation() {
         }
     }
 
-    assert_eq!(eviction_count, 7, "Should have 7 evictions from capacity-3 buffer with 10 stores");
+    assert_eq!(
+        eviction_count, 7,
+        "Should have 7 evictions from capacity-3 buffer with 10 stores"
+    );
 
     let graduated = coordinator.process_graduations(&mut episodic);
-    assert!(graduated > 0, "Evicted semantic entries should graduate to episodic memory");
-    assert!(episodic.stats().total_stored > 0, "Episodic memory should contain graduated semantic entries");
+    assert!(
+        graduated > 0,
+        "Evicted semantic entries should graduate to episodic memory"
+    );
+    assert!(
+        episodic.stats().total_stored > 0,
+        "Episodic memory should contain graduated semantic entries"
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

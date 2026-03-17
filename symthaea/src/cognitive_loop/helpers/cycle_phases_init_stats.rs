@@ -37,7 +37,8 @@ impl CognitiveLoopService {
         if startup_suppressed {
             self.stats.startup_suppressed_cycles += 1;
             // Ramp learning rate from 20% → 100% over warmup period
-            let lr_scale = 0.2 + 0.8 * startup_warmup_progress;
+            let lr_scale = super::super::thresholds::STARTUP_LR_INITIAL_SCALE
+                + super::super::thresholds::STARTUP_LR_RAMP_RANGE * startup_warmup_progress;
             self.stats.adaptive_learning_rate *= lr_scale;
             // Session 16 Item 3: Startup exploration ramp.
             // Instead of flat suppression, ramp from STARTUP_EXPLORATION_INITIAL to 1.0.
@@ -64,8 +65,10 @@ impl CognitiveLoopService {
             } else if ema < CONSCIOUSNESS_EMA_LOW_THRESHOLD && ema > 0.0 {
                 self.stats.adaptive_learning_rate *= CONSCIOUSNESS_EMA_LR_DAMPEN;
             }
-            self.stats.adaptive_learning_rate =
-                self.stats.adaptive_learning_rate.clamp(0.0001, 0.1);
+            self.stats.adaptive_learning_rate = self
+                .stats
+                .adaptive_learning_rate
+                .clamp(super::super::thresholds::ADAPTIVE_LR_MIN, super::super::thresholds::ADAPTIVE_LR_MAX);
         }
 
         // Snapshot exploration_urge for end-of-cycle budget clamping (Task B)
@@ -141,7 +144,9 @@ impl CognitiveLoopService {
                 self.biorhythm_mgr.rhythm.phase == crate::chronobiology::CircadianPhase::Night;
             if self.neuromod.was_sleeping && !is_sleep_now {
                 let quality =
-                    (self.neuromod.bath.allostatic_recovery_cycles as f32 / 100.0).clamp(0.0, 1.0);
+                    (self.neuromod.bath.allostatic_recovery_cycles as f32
+                        / super::super::thresholds::SLEEP_RECOVERY_QUALITY_SCALE)
+                    .clamp(0.0, 1.0);
                 self.neuromod.bath.apply_sleep_recovery(quality);
 
                 // ── Psych-bench calibration: receptor sensitivity tuning ──
@@ -231,17 +236,26 @@ impl CognitiveLoopService {
 
         // Apply circadian plasticity to learning rate (Night=high plasticity, Day=low)
         // Halved: bath circadian baselines (Phase 2) provide the other 50%
-        let plasticity_half = 1.0 + (self.biorhythm_mgr.rhythm.plasticity_mod as f32 - 1.0) * 0.5;
+        let plasticity_half = 1.0
+            + (self.biorhythm_mgr.rhythm.plasticity_mod as f32 - 1.0)
+                * super::super::thresholds::CIRCADIAN_PLASTICITY_SCALE;
         let circadian_lr = self.stats.adaptive_learning_rate * plasticity_half;
-        self.stats.adaptive_learning_rate = circadian_lr.clamp(0.0001, 0.1);
+        self.stats.adaptive_learning_rate = circadian_lr
+            .clamp(super::super::thresholds::ADAPTIVE_LR_MIN, super::super::thresholds::ADAPTIVE_LR_MAX);
 
         // Circadian stillness: Night phase naturally elevates Sacred Stillness
         // Science: Tononi & Cirelli (2006) — synaptic homeostasis hypothesis;
         // rest is not absence of function but active consolidation.
         self.stats.circadian_stillness_boost = match self.biorhythm_mgr.rhythm.phase {
-            crate::chronobiology::CircadianPhase::Night => 0.2,
-            crate::chronobiology::CircadianPhase::Dusk => 0.1,
-            crate::chronobiology::CircadianPhase::Dawn => 0.05,
+            crate::chronobiology::CircadianPhase::Night => {
+                super::super::thresholds::CIRCADIAN_STILLNESS_NIGHT
+            }
+            crate::chronobiology::CircadianPhase::Dusk => {
+                super::super::thresholds::CIRCADIAN_STILLNESS_DUSK
+            }
+            crate::chronobiology::CircadianPhase::Dawn => {
+                super::super::thresholds::CIRCADIAN_STILLNESS_DAWN
+            }
             _ => 0.0,
         };
 
@@ -276,9 +290,15 @@ impl CognitiveLoopService {
         {
             let neuromod_inputs = super::super::neuromodulators::NeuromodulatorInputs {
                 prediction_error: self.stats.avg_prediction_error,
-                surprise: self.stats.avg_prediction_error > self.config.learning_threshold * 3.0,
+                surprise: self.stats.avg_prediction_error
+                    > self.config.learning_threshold
+                        * super::super::thresholds::SURPRISE_PE_MULTIPLIER,
                 reward_signal: self.carryover.quality.last_value_score as f32,
-                coherence: self.carryover.history.cached_coherence.unwrap_or(0.5),
+                coherence: self
+                    .carryover
+                    .history
+                    .cached_coherence
+                    .unwrap_or(super::super::thresholds::COHERENCE_DEFAULT),
                 arousal: self.emotion_contagion.arousal,
                 binding_strength: self.carryover.quality.last_phenomenal_binding as f32,
                 epistemic_confidence: self.carryover.quality.last_epistemic_confidence,
@@ -352,7 +372,11 @@ impl CognitiveLoopService {
             };
             let sa_input = super::super::calibration::SelfAssessmentInput {
                 prediction_error: self.stats.avg_prediction_error,
-                coherence: self.carryover.history.cached_coherence.unwrap_or(0.5),
+                coherence: self
+                    .carryover
+                    .history
+                    .cached_coherence
+                    .unwrap_or(super::super::thresholds::COHERENCE_DEFAULT),
                 confidence_calibration_error: (self.prediction_confidence as f32
                     - (1.0 - self.stats.avg_prediction_error.min(1.0)))
                 .abs(),
@@ -361,7 +385,9 @@ impl CognitiveLoopService {
                 inhibition_error_rate,
                 drift_anomalous,
                 // Phase 1F: 5 new proxy signals for expanded 9-transmitter calibration
-                social_coherence: self.neuromod.bath.oxytocin.effective() * 0.5 + 0.5,
+                social_coherence: self.neuromod.bath.oxytocin.effective()
+                    * super::super::thresholds::SOCIAL_COHERENCE_OXY_WEIGHT
+                    + super::super::thresholds::SOCIAL_COHERENCE_OFFSET,
                 ei_ratio: self.neuromod.bath.ei_ratio(),
                 excitotoxicity_risk: self.neuromod.bath.excitotoxicity_risk(),
                 sleep_pressure: self.neuromod.bath.adenosine.effective(),
@@ -463,7 +489,8 @@ impl CognitiveLoopService {
                 let pe = self.stats.avg_prediction_error;
                 let fe_ema = self.ethics_engine.moral_fe_ema() as f32;
                 // Normalize: baseline PE ~0.3 for typical FE-driven exploration cycles
-                let baseline_pe = 0.3_f32 + fe_ema * 0.1;
+                let baseline_pe = super::super::thresholds::FEP_BASELINE_PE_BASE
+                    + fe_ema * super::super::thresholds::FEP_BASELINE_PE_EMA_FACTOR;
                 self.ethics_engine
                     .feedback_exploration_outcome(pe, baseline_pe);
             }
@@ -472,16 +499,24 @@ impl CognitiveLoopService {
             // F > 0.5 → novel moral territory → explore (scaled by adaptive gain)
             // F < 0.5 → familiar moral ground → no exploration boost
             // Gain adapts via feedback_exploration_outcome() [0.05, 0.25].
-            if free_energy > 0.5 {
-                let fe_boost = ((free_energy - 0.5) * gain as f64).min(0.2) as f32;
+            if free_energy > super::super::thresholds::MORAL_FE_EXPLORATION_THRESHOLD {
+                let fe_boost = ((free_energy
+                    - super::super::thresholds::MORAL_FE_EXPLORATION_THRESHOLD)
+                    * gain as f64)
+                    .min(super::super::thresholds::MORAL_FE_BOOST_CAP)
+                    as f32;
                 self.adjust_exploration("moral_free_energy", fe_boost);
             }
 
             // Topology completeness still provides structural signal:
             // When fewer than 3 of 8 harmonies explored, boost regardless of F.
             // This catches cold-start (prior is zero, F is undefined/zero).
-            if scenario_count >= 3 && completeness < 0.3 {
-                let structural_boost = (0.3 - completeness) * 0.3; // up to +0.09
+            if scenario_count >= super::super::thresholds::MORAL_TOPOLOGY_MIN_SCENARIOS
+                && completeness < super::super::thresholds::MORAL_TOPOLOGY_COMPLETENESS_THRESHOLD
+            {
+                let structural_boost = (super::super::thresholds::MORAL_TOPOLOGY_COMPLETENESS_THRESHOLD
+                    - completeness)
+                    * super::super::thresholds::MORAL_TOPOLOGY_STRUCTURAL_BOOST_SCALE; // up to +0.09
                 self.adjust_exploration("moral_topology_gap", structural_boost as f32);
             }
         }
@@ -558,7 +593,7 @@ impl CognitiveLoopService {
 
         // Neuromodulator EMA stats (alpha=0.05)
         {
-            let alpha = 0.05_f32;
+            let alpha = super::super::thresholds::NEUROMOD_EMA_ALPHA;
             let da = self.neuromod.bath.dopamine.effective();
             let ne = self.neuromod.bath.noradrenaline.effective();
             let sht = self.neuromod.bath.serotonin.effective();

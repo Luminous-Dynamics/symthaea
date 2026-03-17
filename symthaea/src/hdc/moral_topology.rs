@@ -214,6 +214,20 @@ pub struct MoralAnomalyConfig {
     /// - 0.05: gentle decay, ~60% weight at age 10
     /// - 0.1: moderate decay, ~37% weight at age 10
     pub baseline_decay_rate: f64,
+
+    // ── Moral hubris (overconfidence) detection ─────────────────────────
+    /// Enable moral hubris detection (default: true).
+    pub hubris_enabled: bool,
+    /// Love coherence threshold above which hubris tracking activates (default: 0.9).
+    pub hubris_coherence_threshold: f64,
+    /// Minimum consecutive cycles above threshold to flag hubris (default: 5).
+    pub hubris_min_streak: usize,
+    /// Maximum harmony entropy (normalized) below which hubris is suspicious (default: 0.02).
+    pub hubris_max_variance: f64,
+    /// Weight of moral_hubris in composite anomaly_score (default: 0.15).
+    pub weight_hubris: f64,
+    /// Confidence delta for hubris response (default: -0.15).
+    pub response_confidence_hubris: f64,
 }
 
 impl Default for MoralAnomalyConfig {
@@ -250,6 +264,12 @@ impl Default for MoralAnomalyConfig {
             convergence_decay_lambda: 1.0,
             convergence_baseline_window: 100,
             baseline_decay_rate: 0.0,
+            hubris_enabled: true,
+            hubris_coherence_threshold: 0.9,
+            hubris_min_streak: 5,
+            hubris_max_variance: 0.02,
+            weight_hubris: 0.15,
+            response_confidence_hubris: -0.15,
         }
     }
 }
@@ -275,6 +295,7 @@ impl MoralAnomalyConfig {
             ("weight_fe_spike", self.weight_fe_spike),
             ("weight_fragmentation", self.weight_fragmentation),
             ("weight_drift", self.weight_drift),
+            ("weight_hubris", self.weight_hubris),
         ] {
             if val < 0.0 || !val.is_finite() {
                 return Err(format!(
@@ -321,6 +342,10 @@ impl MoralAnomalyConfig {
             ("response_confidence_frag", self.response_confidence_frag),
             ("response_lr_drift", self.response_lr_drift),
             ("response_lr_convergence", self.response_lr_convergence),
+            (
+                "response_confidence_hubris",
+                self.response_confidence_hubris,
+            ),
         ] {
             if !val.is_finite() {
                 return Err(format!(
@@ -962,6 +987,8 @@ pub struct MoralTopology {
     detection_cycle: u64,
     /// Scenario IDs currently in the window (parallel to `self.window`).
     window_scenario_ids: VecDeque<u64>,
+    /// Consecutive cycles of suspected moral hubris.
+    hubris_streak: usize,
 }
 
 /// A single point on the moral manifold trajectory.
@@ -1069,6 +1096,9 @@ pub struct MoralAnomalyReport {
     pub convergence_severity: f64,
     /// Name of matched hazard signature template (e.g. "weaponization"), if any.
     pub matched_hazard: Option<String>,
+    /// Sustained moral overconfidence detected.
+    #[serde(default)]
+    pub moral_hubris: bool,
     /// Composite anomaly score in \[0.0, 1.0\].
     pub anomaly_score: f64,
 }
@@ -1302,6 +1332,7 @@ impl MoralTopology {
             scenario_counter: 0,
             detection_cycle: 0,
             window_scenario_ids: VecDeque::new(),
+            hubris_streak: 0,
         }
     }
 
@@ -1343,6 +1374,7 @@ impl MoralTopology {
             scenario_counter: 0,
             detection_cycle: 0,
             window_scenario_ids: VecDeque::new(),
+            hubris_streak: 0,
         }
     }
 
@@ -2250,12 +2282,39 @@ impl MoralTopology {
         let trajectory_convergence = convergence_report.convergence_detected;
         let convergence_severity = convergence_report.severity;
 
+        // Moral hubris: sustained high-coherence low-variance state
+        let moral_hubris = if ac.hubris_enabled {
+            let max_entropy = (N_HARMONIES as f64).ln();
+            let normalized_entropy =
+                if max_entropy > 0.0 && current_summary.harmony_entropy.is_finite() {
+                    current_summary.harmony_entropy / max_entropy
+                } else {
+                    1.0
+                };
+            let coherence_proxy = if current_summary.moral_free_energy.is_finite() {
+                (1.0 - current_summary.moral_free_energy.min(2.0) / 2.0).clamp(0.0, 1.0)
+            } else {
+                0.0
+            };
+            if coherence_proxy > ac.hubris_coherence_threshold
+                && normalized_entropy < ac.hubris_max_variance
+            {
+                self.hubris_streak += 1;
+            } else {
+                self.hubris_streak = 0;
+            }
+            self.hubris_streak >= ac.hubris_min_streak
+        } else {
+            false
+        };
+
         // Composite score: weighted sum clamped to [0, 1]
         let raw = (value_inversion as u8 as f64) * ac.weight_value_inversion
             + (fe_spike as u8 as f64) * ac.weight_fe_spike
             + (fragmentation_increase as u8 as f64) * ac.weight_fragmentation
             + (drift_alert as u8 as f64) * ac.weight_drift
-            + (trajectory_convergence as u8 as f64) * ac.weight_convergence;
+            + (trajectory_convergence as u8 as f64) * ac.weight_convergence
+            + (moral_hubris as u8 as f64) * ac.weight_hubris;
         let anomaly_score = raw.clamp(0.0, 1.0);
 
         // Feed observation to adaptive state if enabled
@@ -2272,6 +2331,7 @@ impl MoralTopology {
             trajectory_convergence,
             convergence_severity,
             matched_hazard: convergence_report.matched_hazard.clone(),
+            moral_hubris,
             anomaly_score,
         }
     }
@@ -5316,6 +5376,122 @@ mod tests {
         assert!(
             config.baseline_decay_rate == 0.0,
             "Default decay rate must be 0.0 for backward compatibility"
+        );
+    }
+
+    #[test]
+    fn test_hubris_detection_sustained() {
+        use super::*;
+        let config = MoralTopologyConfig {
+            dim: 256,
+            ..Default::default()
+        };
+        let mut anomaly_config = MoralAnomalyConfig::default();
+        anomaly_config.hubris_min_streak = 3;
+        anomaly_config.hubris_coherence_threshold = 0.7;
+        anomaly_config.hubris_max_variance = 0.05;
+        let basis = std::sync::Arc::new(HarmonyBasis::new(256));
+        let mut topo = MoralTopology::with_anomaly_config(config, basis.clone(), anomaly_config);
+        let mut summary = MoralTopologySummary::default();
+        summary.moral_free_energy = 0.1;
+        summary.harmony_entropy = 0.05;
+        summary.scenario_count = 10;
+        for i in 0..5 {
+            let report = topo.detect_anomalies(&summary);
+            if i >= 2 {
+                assert!(
+                    report.moral_hubris,
+                    "Hubris should trigger after {} cycles",
+                    i + 1
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_hubris_resets_on_variance() {
+        use super::*;
+        let config = MoralTopologyConfig {
+            dim: 256,
+            ..Default::default()
+        };
+        let mut anomaly_config = MoralAnomalyConfig::default();
+        anomaly_config.hubris_min_streak = 3;
+        anomaly_config.hubris_coherence_threshold = 0.7;
+        anomaly_config.hubris_max_variance = 0.05;
+        let basis = std::sync::Arc::new(HarmonyBasis::new(256));
+        let mut topo = MoralTopology::with_anomaly_config(config, basis.clone(), anomaly_config);
+        let mut summary = MoralTopologySummary::default();
+        summary.moral_free_energy = 0.1;
+        summary.harmony_entropy = 0.05;
+        summary.scenario_count = 10;
+        topo.detect_anomalies(&summary);
+        topo.detect_anomalies(&summary);
+        summary.harmony_entropy = 1.5;
+        let report = topo.detect_anomalies(&summary);
+        assert!(
+            !report.moral_hubris,
+            "Hubris should reset when entropy increases"
+        );
+        summary.harmony_entropy = 0.05;
+        let report = topo.detect_anomalies(&summary);
+        assert!(
+            !report.moral_hubris,
+            "Hubris should not trigger immediately after reset"
+        );
+    }
+
+    #[test]
+    fn test_hubris_below_threshold() {
+        use super::*;
+        let config = MoralTopologyConfig {
+            dim: 256,
+            ..Default::default()
+        };
+        let mut anomaly_config = MoralAnomalyConfig::default();
+        anomaly_config.hubris_min_streak = 3;
+        anomaly_config.hubris_coherence_threshold = 0.9;
+        anomaly_config.hubris_max_variance = 0.02;
+        let basis = std::sync::Arc::new(HarmonyBasis::new(256));
+        let mut topo = MoralTopology::with_anomaly_config(config, basis.clone(), anomaly_config);
+        let mut summary = MoralTopologySummary::default();
+        summary.moral_free_energy = 1.0;
+        summary.harmony_entropy = 0.05;
+        summary.scenario_count = 10;
+        for _ in 0..10 {
+            let report = topo.detect_anomalies(&summary);
+            assert!(
+                !report.moral_hubris,
+                "Coherence below threshold should never trigger hubris"
+            );
+        }
+    }
+
+    #[test]
+    fn test_hubris_composite_score() {
+        use super::*;
+        let config = MoralTopologyConfig {
+            dim: 256,
+            ..Default::default()
+        };
+        let mut anomaly_config = MoralAnomalyConfig::default();
+        anomaly_config.hubris_min_streak = 2;
+        anomaly_config.hubris_coherence_threshold = 0.7;
+        anomaly_config.hubris_max_variance = 0.05;
+        anomaly_config.weight_hubris = 0.15;
+        let basis = std::sync::Arc::new(HarmonyBasis::new(256));
+        let mut topo = MoralTopology::with_anomaly_config(config, basis.clone(), anomaly_config);
+        let mut summary = MoralTopologySummary::default();
+        summary.moral_free_energy = 0.1;
+        summary.harmony_entropy = 0.05;
+        summary.scenario_count = 10;
+        topo.detect_anomalies(&summary);
+        let report = topo.detect_anomalies(&summary);
+        assert!(report.moral_hubris, "Hubris should be detected");
+        assert!(
+            report.anomaly_score >= 0.15 - 0.001,
+            "Anomaly score should include hubris weight, got {}",
+            report.anomaly_score
         );
     }
 }

@@ -16,7 +16,7 @@ use symthaea_psych_bench::harness::cognitive_profile::CognitiveProfile;
 use symthaea_types::N_HARMONIES;
 
 use crate::{
-    Anomaly, CantorInfo, DriveInfo, DreamInfo, GovernanceInfo, IntegrityInfo, KnowledgeInfo,
+    Anomaly, CantorInfo, DreamInfo, DriveInfo, GovernanceInfo, IntegrityInfo, KnowledgeInfo,
     LearningInfo, MoralCompass, Narrative, NeuroBath, PerceptionInfo, PulseDelta, PulseSnapshot,
     ReasoningInfo, SparklinePoint, SubstrateInfo, SwarmInfo, Vitals,
 };
@@ -1389,10 +1389,52 @@ fn write_neurobath_pane(html: &mut String, bath: &NeuroBath) {
         );
     }
 
+    // ── Bath dynamics diagnostics ──────────────────────────────────────────
+    let attractor_label = if bath.attractor_detected {
+        r#"<span style="color:#e8c547;font-weight:bold;" title="Phase-space attractor detected — bath dynamics have settled into a stable cycle">⊙ Attractor</span>"#
+    } else {
+        r#"<span style="color:#6b7d6b;" title="No attractor detected — bath exploring phase space">○ Exploring</span>"#
+    };
+
+    let entropy_color = if bath.bath_entropy > 1.5 {
+        "#c76b5a" // high chaos
+    } else if bath.bath_entropy > 0.8 {
+        "#e8c547" // moderate
+    } else {
+        "#7ec8a0" // low/stable
+    };
+
+    let excitotox_color = stress_color(bath.excitotoxicity_risk as f64);
+    let pe_color = stress_color(bath.self_assessment_pe_ema as f64);
+    let coherence_color = health_color(bath.self_assessment_coherence_ema as f64);
+
+    let calibration_badge = if bath.self_assessment_calibration_fired {
+        r#" <span style="color:#7ec8a0;font-size:0.75em;" title="Auto-calibration ran this cycle">⟳ calibrated</span>"#
+    } else {
+        ""
+    };
+
+    let seizure_warning = if bath.ei_seizure_events > 0 {
+        format!(
+            r#" <span style="color:#c76b5a;font-weight:bold;" title="Cumulative E/I imbalance events — sustained glutamate excess">⚡ {} seizure-like event{}</span>"#,
+            bath.ei_seizure_events,
+            if bath.ei_seizure_events == 1 { "" } else { "s" }
+        )
+    } else {
+        String::new()
+    };
+
     let _ = write!(
         html,
         r#"<div class="status-bar">
   {} · E/I: {:.2} · Allostatic: {:.0}% · Sleep: {:.2}{}
+</div>
+<div class="status-bar" style="margin-top:0.4em;font-size:0.82em;gap:0.8em;flex-wrap:wrap;">
+  {} · Entropy: <span style="color:{};">{:.2}</span>{}
+</div>
+<div class="status-bar" style="margin-top:0.4em;font-size:0.82em;gap:0.8em;flex-wrap:wrap;" title="Self-assessment monitor tracks internal prediction quality">
+  Self-Assess · PE: <span style="color:{};">{:.2}</span> · Coherence: <span style="color:{};">{:.2}</span>{}
+  · Excitotox: <span style="color:{};">{:.2}</span>
 </div>
 </div>
 "#,
@@ -1405,6 +1447,17 @@ fn write_neurobath_pane(html: &mut String, bath: &NeuroBath) {
         } else {
             format!(" · {}", bath.personality)
         },
+        attractor_label,
+        entropy_color,
+        bath.bath_entropy,
+        seizure_warning,
+        pe_color,
+        bath.self_assessment_pe_ema,
+        coherence_color,
+        bath.self_assessment_coherence_ema,
+        calibration_badge,
+        excitotox_color,
+        bath.excitotoxicity_risk,
     );
 }
 
@@ -3238,7 +3291,7 @@ fn write_broca_quality_sparkline(html: &mut String, sparkline: &[SparklinePoint]
 
     let data: Vec<f64> = sparkline.iter().map(|s| s.broca_quality as f64).collect();
     let min = 0.0_f64;
-    let max = 1.0_f64;
+    let _max = 1.0_f64;
     let range = 1.0;
     let last = *data.last().unwrap_or(&0.0);
 
@@ -3300,7 +3353,7 @@ fn write_tom_mismatch_sparkline(html: &mut String, sparkline: &[SparklinePoint])
 
     let data: Vec<f64> = sparkline.iter().map(|s| s.tom_mismatch as f64).collect();
     let min = 0.0_f64;
-    let max = 1.0_f64;
+    let _max = 1.0_f64;
     let range = 1.0;
     let last = *data.last().unwrap_or(&0.0);
 
@@ -3844,8 +3897,10 @@ fn escape_html(s: &str) -> String {
 mod tests {
     use super::*;
     use crate::{
-        Anomaly, IntegrityInfo, MoralCompass, Narrative, NeuroBath, PulseSnapshot, SparklinePoint,
-        SubstrateInfo, Vitals,
+        Anomaly, CantorInfo, DreamInfo, DriveInfo, GlyphInfo, GovernanceInfo, IntegrityInfo,
+        KnowledgeInfo, LearningInfo, MoralCompass, Narrative, NeuroBath, PerceptionInfo,
+        PulseSnapshot, ReasoningInfo, SpectrumInfo, SparklinePoint, SubstrateInfo, SwarmInfo,
+        Vitals,
     };
     use symthaea_types::N_HARMONIES;
 
@@ -3890,6 +3945,13 @@ mod tests {
             circadian_phase: "Day".into(),
             sleep_pressure: 0.15,
             ei_ratio: 1.05,
+            bath_entropy: 0.5,
+            attractor_detected: false,
+            ei_seizure_events: 0,
+            excitotoxicity_risk: 0.0,
+            self_assessment_pe_ema: 0.0,
+            self_assessment_coherence_ema: 0.0,
+            self_assessment_calibration_fired: false,
         }
     }
 
@@ -3960,6 +4022,17 @@ mod tests {
             narrative: test_narrative(),
             sparkline: vec![test_sparkline_point(0.50), test_sparkline_point(0.55)],
             integrity: IntegrityInfo::default(),
+            swarm: SwarmInfo::default(),
+            governance: GovernanceInfo::default(),
+            knowledge: KnowledgeInfo::default(),
+            cantor: CantorInfo::default(),
+            glyph: GlyphInfo::default(),
+            spectrum: SpectrumInfo::default(),
+            perception: PerceptionInfo::default(),
+            drive: DriveInfo::default(),
+            learning: LearningInfo::default(),
+            reasoning: ReasoningInfo::default(),
+            dream: DreamInfo::default(),
         }
     }
 
@@ -4090,6 +4163,13 @@ mod tests {
             circadian_phase: "Day".into(),
             sleep_pressure: 0.1,
             ei_ratio: 1.0,
+            bath_entropy: 0.5,
+            attractor_detected: false,
+            ei_seizure_events: 0,
+            excitotoxicity_risk: 0.0,
+            self_assessment_pe_ema: 0.0,
+            self_assessment_coherence_ema: 0.0,
+            self_assessment_calibration_fired: false,
         };
         assert_eq!(interpret_neuro_state(&bath), "Baseline Equilibrium");
     }

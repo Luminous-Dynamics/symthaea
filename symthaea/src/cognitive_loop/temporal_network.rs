@@ -159,7 +159,8 @@ impl TemporalNetwork {
         }
     }
 
-    /// Get all tau values (owned version for HdcLtc compatibility)
+    /// Get all tau values (owned version for HdcLtc compatibility).
+    /// Use [`with_tau_refs`] or [`flattened_tau`] instead when owned copies aren't needed.
     pub fn all_tau_owned(&self) -> Vec<Array1<f32>> {
         match self {
             Self::CfC(cfc) => cfc.all_tau().into_iter().cloned().collect(),
@@ -171,6 +172,47 @@ impl TemporalNetwork {
                     .map(|&tau| Array1::from_vec(vec![tau]))
                     .collect()
             }
+        }
+    }
+
+    /// Call `f` with tau references, avoiding owned clones on the CfC hot path.
+    pub fn with_tau_refs<R>(&self, f: impl FnOnce(&[&Array1<f32>]) -> R) -> R {
+        match self {
+            Self::CfC(cfc) => {
+                let refs = cfc.all_tau();
+                f(&refs)
+            }
+            Self::HdcLtc(bridge) => {
+                let owned = bridge.all_tau();
+                let refs: Vec<&Array1<f32>> = owned.iter().collect();
+                f(&refs)
+            }
+            Self::HierarchicalCfC(hcfc) => {
+                let owned: Vec<Array1<f32>> = hcfc
+                    .time_constants()
+                    .iter()
+                    .map(|&tau| Array1::from_vec(vec![tau]))
+                    .collect();
+                let refs: Vec<&Array1<f32>> = owned.iter().collect();
+                f(&refs)
+            }
+        }
+    }
+
+    /// Flatten all tau values into a single Vec<f32>, skipping intermediate owned copies on CfC.
+    pub fn flattened_tau(&self) -> Vec<f32> {
+        match self {
+            Self::CfC(cfc) => cfc
+                .all_tau()
+                .into_iter()
+                .flat_map(|a| a.iter().copied())
+                .collect(),
+            Self::HdcLtc(bridge) => bridge
+                .all_tau()
+                .into_iter()
+                .flat_map(|a| a.into_iter())
+                .collect(),
+            Self::HierarchicalCfC(hcfc) => hcfc.time_constants().to_vec(),
         }
     }
 

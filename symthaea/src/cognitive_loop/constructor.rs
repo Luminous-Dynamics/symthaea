@@ -489,6 +489,18 @@ impl CognitiveLoopService {
         // Create swarm event channel eagerly so the sender is always available.
         let (swarm_event_tx, swarm_event_rx) = std::sync::mpsc::channel();
 
+        // Spawn federated coordinator if enabled.
+        let federation_handle = if config.federation_enabled {
+            Some(super::managers::network_service_bridge::spawn_federated_coordinator(
+                crate::swarm::FederatedNetworkConfig::default(),
+                vec![0.0; 64], // initial weights placeholder
+                std::time::Duration::from_millis(config.federation_round_interval_ms),
+                swarm_event_tx.clone(),
+            ))
+        } else {
+            None
+        };
+
         let cfc_input_dim = config.cfc_config.input_dim;
         let mut service = Self {
             config,
@@ -937,6 +949,7 @@ impl CognitiveLoopService {
                     dense_basis,
                 )
             },
+            last_ethics_verdict: super::ethics_engine::EthicalVerdict::Safe,
             kosmic_song: crate::mycelix::KosmicSong::default(),
             drive_manager: super::managers::DriveManager::default(),
             memory_manager: super::managers::MemoryManager::default(),
@@ -947,6 +960,7 @@ impl CognitiveLoopService {
             swarm_manager: super::managers::SwarmManager::default(),
             swarm_event_rx: std::sync::Mutex::new(Some(swarm_event_rx)),
             swarm_event_tx,
+            federation_handle,
             #[cfg(feature = "mesh")]
             spectrum_manager: super::managers::SpectrumManager::default(),
             #[cfg(feature = "cpg")]
@@ -1022,7 +1036,6 @@ impl CognitiveLoopService {
                 // Register governance thresholds for integrity monitoring
                 #[cfg(feature = "mycelix")]
                 im.register_governance_thresholds();
-                im.register_knowledge_thresholds();
                 // Apply substrate tau factor for temporal consistency scaling (#3)
                 im.set_substrate_tau_factor(substrate_tau_for_integrity);
                 // Install panic hook for crash forensics — dumps integrity snapshot to disk

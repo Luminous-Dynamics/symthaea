@@ -49,7 +49,9 @@ fn load_humaneval(path: &std::path::Path) -> Vec<HumanEvalProblem> {
     let mut problems = Vec::new();
 
     for line in content.lines() {
-        if line.trim().is_empty() { continue; }
+        if line.trim().is_empty() {
+            continue;
+        }
         let v: serde_json::Value = serde_json::from_str(line)
             .unwrap_or_else(|e| panic!("Failed to parse JSONL line: {e}"));
         problems.push(HumanEvalProblem {
@@ -86,8 +88,14 @@ fn generate_solution(problem: &HumanEvalProblem, use_llm: bool) -> (String, bool
     let target = temp_dir.path().join("solution.py");
     let code = std::fs::read_to_string(&target).unwrap_or_default();
 
-    let used_native = result.generation_tiers.iter().any(|t| t.to_string() == "Native");
-    let used_llm = result.generation_tiers.iter().any(|t| t.to_string() == "LocalLLM");
+    let used_native = result
+        .generation_tiers
+        .iter()
+        .any(|t| t.to_string() == "Native");
+    let used_llm = result
+        .generation_tiers
+        .iter()
+        .any(|t| t.to_string() == "LocalLLM");
 
     // If the agent generated code, use it. Otherwise fall back to the prompt itself
     // (which contains the function signature — test will fail but we can measure).
@@ -123,7 +131,9 @@ fn run_test(problem: &HumanEvalProblem, solution: &str) -> (bool, bool, Option<S
         (true, true, None)
     } else if result.compiled {
         let err = result.runtime_error.or_else(|| {
-            if result.test_output.contains("AssertionError") || result.test_output.contains("assert") {
+            if result.test_output.contains("AssertionError")
+                || result.test_output.contains("assert")
+            {
                 Some("Assertion failed".into())
             } else if !result.test_output.is_empty() {
                 Some(result.test_output.chars().take(200).collect())
@@ -133,7 +143,11 @@ fn run_test(problem: &HumanEvalProblem, solution: &str) -> (bool, bool, Option<S
         });
         (false, true, err)
     } else {
-        (false, false, Some(result.compile_errors.first().cloned().unwrap_or_default()))
+        (
+            false,
+            false,
+            Some(result.compile_errors.first().cloned().unwrap_or_default()),
+        )
     }
 }
 
@@ -151,14 +165,18 @@ fn verify_canonical(problem: &HumanEvalProblem) -> bool {
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let use_llm = args.iter().any(|a| a == "--llm");
-    let limit = args.iter().position(|a| a == "--limit")
+    let limit = args
+        .iter()
+        .position(|a| a == "--limit")
         .and_then(|i| args.get(i + 1))
         .and_then(|s| s.parse::<usize>().ok())
         .unwrap_or(164);
     let verify = args.iter().any(|a| a == "--verify-canonical");
 
     // Find the dataset
-    let data_path = PathBuf::from("benchmarks/ai_benchmarks/data/humaneval/human-eval-master/data/HumanEval.jsonl.gz");
+    let data_path = PathBuf::from(
+        "benchmarks/ai_benchmarks/data/humaneval/human-eval-master/data/HumanEval.jsonl.gz",
+    );
     if !data_path.exists() {
         eprintln!("HumanEval dataset not found at: {}", data_path.display());
         eprintln!("Run: python3 benchmarks/ai_benchmarks/scripts/download_benchmarks.py");
@@ -198,9 +216,20 @@ fn main() {
         let (passed, compiled, error) = run_test(problem, &solution);
         let elapsed = start.elapsed().as_millis();
 
-        let status = if passed { "✓" } else if compiled { "◐" } else { "✗" };
-        eprint!("\r  [{:>3}/{}] {} {} ",
-            i + 1, problems.len(), status, problem.task_id);
+        let status = if passed {
+            "✓"
+        } else if compiled {
+            "◐"
+        } else {
+            "✗"
+        };
+        eprint!(
+            "\r  [{:>3}/{}] {} {} ",
+            i + 1,
+            problems.len(),
+            status,
+            problem.task_id
+        );
         if let Some(ref e) = error {
             let short: String = e.chars().take(50).collect();
             eprint!("— {}", short);
@@ -234,41 +263,64 @@ fn main() {
     println!("╚══════════════════════════════════════════════════════════╝\n");
 
     println!("── Pass@1 ─────────────────────────────────────────────");
-    println!("  Passed:   {}/{} ({:.1}%)", passed, total, 100.0 * passed as f64 / total as f64);
-    println!("  Compiled: {}/{} ({:.1}%)", compiled, total, 100.0 * compiled as f64 / total as f64);
+    println!(
+        "  Passed:   {}/{} ({:.1}%)",
+        passed,
+        total,
+        100.0 * passed as f64 / total as f64
+    );
+    println!(
+        "  Compiled: {}/{} ({:.1}%)",
+        compiled,
+        total,
+        100.0 * compiled as f64 / total as f64
+    );
     println!();
 
     println!("── Tier Usage ──────────────────────────────────────────");
     println!("  Native generation: {}", used_native_count);
     println!("  LLM generation:    {}", used_llm_count);
     println!("  Total time: {:.1}s", total_time as f64 / 1000.0);
-    println!("  Avg time:   {:.0}ms/problem", total_time as f64 / total as f64);
+    println!(
+        "  Avg time:   {:.0}ms/problem",
+        total_time as f64 / total as f64
+    );
     println!();
 
     // Show failures
     let failures: Vec<&EvalResult> = results.iter().filter(|r| !r.passed).collect();
     if !failures.is_empty() && failures.len() <= 30 {
-        println!("── Failures ({}) ───────────────────────────────────────", failures.len());
+        println!(
+            "── Failures ({}) ───────────────────────────────────────",
+            failures.len()
+        );
         for f in failures.iter().take(20) {
-            let err: String = f.error.as_ref().map(|e| e.chars().take(60).collect()).unwrap_or_default();
+            let err: String = f
+                .error
+                .as_ref()
+                .map(|e| e.chars().take(60).collect())
+                .unwrap_or_default();
             println!("  {} ({}) — {}", f.task_id, f.entry_point, err);
         }
     }
 
     // JSON report
-    let json_results: Vec<serde_json::Value> = results.iter().map(|r| {
-        serde_json::json!({
-            "task_id": r.task_id,
-            "entry_point": r.entry_point,
-            "passed": r.passed,
-            "compiled": r.compiled,
-            "error": r.error,
-            "used_native": r.used_native,
-            "used_llm": r.used_llm,
-            "elapsed_ms": r.elapsed_ms,
-            "code_len": r.code_len,
+    let json_results: Vec<serde_json::Value> = results
+        .iter()
+        .map(|r| {
+            serde_json::json!({
+                "task_id": r.task_id,
+                "entry_point": r.entry_point,
+                "passed": r.passed,
+                "compiled": r.compiled,
+                "error": r.error,
+                "used_native": r.used_native,
+                "used_llm": r.used_llm,
+                "elapsed_ms": r.elapsed_ms,
+                "code_len": r.code_len,
+            })
         })
-    }).collect();
+        .collect();
 
     let json_report = serde_json::json!({
         "benchmark": "humaneval",
@@ -282,7 +334,10 @@ fn main() {
     });
 
     let report_path = std::env::temp_dir().join("symthaea_humaneval.json");
-    if let Ok(()) = std::fs::write(&report_path, serde_json::to_string_pretty(&json_report).unwrap()) {
+    if let Ok(()) = std::fs::write(
+        &report_path,
+        serde_json::to_string_pretty(&json_report).unwrap(),
+    ) {
         eprintln!("\nJSON report: {}", report_path.display());
     }
 }

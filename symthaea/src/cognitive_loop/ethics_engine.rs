@@ -79,6 +79,7 @@ pub struct RestorationTracker {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // violation_cycle recorded for future audit/diagnostics
 struct RestorationEntry {
     /// Cycle when the violation occurred.
     violation_cycle: u64,
@@ -485,6 +486,12 @@ pub(crate) enum EthicalVerdict {
     Blocked,
 }
 
+impl Default for EthicalVerdict {
+    fn default() -> Self {
+        EthicalVerdict::Safe
+    }
+}
+
 /// Input snapshot for the ethics engine.
 #[allow(dead_code)] // compressed_state reserved for Stage 2+3 harmony integration
 pub(crate) struct EthicsEngineInput<'a> {
@@ -803,9 +810,13 @@ impl EthicsEngine {
                 .collect();
 
             let ahimsa_violated = viols.iter().any(|name| {
-                name.starts_with("ahimsa_")
+                let is_ahimsa = name.starts_with("ahimsa_")
                     || name == "prevent_suffering"
-                    || name == "minimize_collateral"
+                    || name == "minimize_collateral";
+                // Restorative justice: if this specific violation has been
+                // sufficiently corrected, don't re-trigger the ahimsa gate.
+                // The system has demonstrated corrective behavior.
+                is_ahimsa && !self.restoration_tracker.is_restored(name)
             });
             self.cache.last_ahimsa_violated = ahimsa_violated;
 
@@ -1314,6 +1325,16 @@ impl EthicsEngine {
     /// Current adaptive gain for moral FE → exploration coupling.
     pub fn moral_exploration_gain(&self) -> f32 {
         self.cache.moral_exploration_gain
+    }
+
+    /// Access the restorative justice tracker.
+    pub fn restoration_tracker(&self) -> &RestorationTracker {
+        &self.restoration_tracker
+    }
+
+    /// Access the restorative justice tracker (mutable).
+    pub fn restoration_tracker_mut(&mut self) -> &mut RestorationTracker {
+        &mut self.restoration_tracker
     }
 
     /// Cached anomaly report from the last `evaluate()` call.
@@ -2205,5 +2226,40 @@ mod tests {
         assert!(tracker.is_restored("anything"));
         assert_eq!(tracker.active_violations(), 0);
         assert!((tracker.restoration_progress() - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_restoration_softens_ahimsa_gate() {
+        // Integration: ahimsa violation → courage blocked → corrections → courage restored
+        let mut tracker = RestorationTracker::default();
+
+        // Phase 1: Initial violation — not yet restored
+        tracker.record_violation("ahimsa_nonviolence", 100);
+        assert!(!tracker.is_restored("ahimsa_nonviolence"));
+
+        // Phase 2: Accumulate corrective behavior (10 cycles)
+        for _ in 0..10 {
+            tracker.record_correction("ahimsa_nonviolence");
+        }
+
+        // Phase 3: Violation is now restored
+        assert!(tracker.is_restored("ahimsa_nonviolence"));
+
+        // Phase 4: The ahimsa gate check in evaluate() uses:
+        //   is_ahimsa && !self.restoration_tracker.is_restored(name)
+        // So a restored violation no longer blocks courage override.
+        let would_block = !tracker.is_restored("ahimsa_nonviolence");
+        assert!(
+            !would_block,
+            "Restored ahimsa violation should not block courage"
+        );
+
+        // Phase 5: But an unrestored different violation still blocks
+        tracker.record_violation("prevent_suffering", 200);
+        let suffering_blocks = !tracker.is_restored("prevent_suffering");
+        assert!(
+            suffering_blocks,
+            "Unrestored suffering violation should still block"
+        );
     }
 }

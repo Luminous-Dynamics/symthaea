@@ -70,6 +70,12 @@ impl MemoryManager {
         self.consolidation_pressure
     }
 
+    /// Mean retrieval quality [0.0, 1.0].
+    /// High values indicate reliable memory recall; low values suggest retrieval failures.
+    pub fn recall_quality(&self) -> f32 {
+        self.mean_retrieval_quality()
+    }
+
     fn mean_retrieval_quality(&self) -> f32 {
         if self.retrieval_count == 0 {
             return 0.5;

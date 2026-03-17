@@ -379,6 +379,19 @@ pub enum CouplingQuality {
 }
 
 impl CouplingQuality {
+    /// Static string matching Debug output — avoids `format!("{:?}")` on hot path.
+    #[inline]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::NotTracking => "NotTracking",
+            Self::InsufficientData => "InsufficientData",
+            Self::NoCoupling => "NoCoupling",
+            Self::WeakCoupling => "WeakCoupling",
+            Self::ModerateCoupling => "ModerateCoupling",
+            Self::StrongCoupling => "StrongCoupling",
+        }
+    }
+
     /// Is coupling meaningful?
     pub fn is_meaningful(&self) -> bool {
         matches!(

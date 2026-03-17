@@ -54,7 +54,13 @@ pub(super) fn cosine_f32(a: &[f32], b: &[f32]) -> f32 {
     if a.is_empty() {
         return 0.0;
     }
-    symthaea_core::hdc::simd_continuous::similarity_simd(a, b)
+    let sim = symthaea_core::hdc::simd_continuous::similarity_simd(a, b);
+    // Guard: SIMD path may overflow to NaN/Inf for very large magnitudes
+    if sim.is_finite() {
+        sim.clamp(-1.0, 1.0)
+    } else {
+        0.0
+    }
 }
 
 impl CognitiveLoopService {
@@ -273,10 +279,10 @@ impl CognitiveLoopService {
         // 5 (deferred). Move prediction to encoder (no clone needed)
         self.encoder.set_prediction(prediction);
 
-        // 8. Update coherence bridge with current tau values
-        let tau_owned: Vec<ndarray::Array1<f32>> = self.temporal_network.all_tau_owned();
-        let tau_refs: Vec<&ndarray::Array1<f32>> = tau_owned.iter().collect();
-        self.language_comm.voice_coherence.bridge.update(&tau_refs);
+        // 8. Update coherence bridge with current tau values (zero-clone on CfC hot path)
+        self.temporal_network.with_tau_refs(|refs| {
+            self.language_comm.voice_coherence.bridge.update(refs);
+        });
         let coherence = self
             .language_comm
             .voice_coherence
@@ -337,11 +343,7 @@ impl CognitiveLoopService {
                 prediction_error,
                 urgency,
             };
-            // Capacity bound: attestation_buffer_capacity (max 256) — evict before push
-            while self.psi_attestation_buffer.len() >= self.config.attestation_buffer_capacity {
-                let _ = self.psi_attestation_buffer.pop_front();
-            }
-            self.psi_attestation_buffer.push_back(record);
+            self.push_psi_attestation(record);
         }
 
         super::CycleResult {
@@ -372,6 +374,14 @@ impl CognitiveLoopService {
             #[cfg(feature = "identity")]
             assurance_level: self.mfdi_bridge.assurance_level(),
         }
+    }
+
+    /// Push a PsiAttestationRecord into the bounded buffer, evicting oldest if at capacity.
+    pub(super) fn push_psi_attestation(&mut self, record: super::PsiAttestationRecord) {
+        while self.psi_attestation_buffer.len() >= self.config.attestation_buffer_capacity {
+            let _ = self.psi_attestation_buffer.pop_front();
+        }
+        self.psi_attestation_buffer.push_back(record);
     }
 
     /// Update prediction confidence based on consciousness state and prediction accuracy
@@ -508,14 +518,20 @@ impl CognitiveLoopService {
 
         // Consciousness pattern from temporal signatures
         let temporal_summary = self.language_comm.voice_coherence.temporal.summary();
-        self.stats.consciousness_pattern = format!("{:?}", temporal_summary.pattern);
+        let pat_str = temporal_summary.pattern.as_str();
+        if self.stats.consciousness_pattern != pat_str {
+            self.stats.consciousness_pattern = pat_str.to_string();
+        }
         self.stats.pattern_confidence = temporal_summary.confidence;
         self.stats.tau_mean = temporal_summary.features.mean;
         self.stats.tau_trend = temporal_summary.features.trend;
 
         // Adaptive behavior stats
         self.stats.adaptive_confidence = self.adaptive_behavior.confidence;
-        self.stats.action_hint = format!("{:?}", self.adaptive_behavior.action_hint);
+        let hint_str = self.adaptive_behavior.action_hint.as_str();
+        if self.stats.action_hint != hint_str {
+            self.stats.action_hint = hint_str.to_string();
+        }
         self.stats.learning_paused = self.adaptive_behavior.pause_learning;
         self.stats.adaptive_learning_rate = self
             .adaptive_behavior
@@ -541,9 +557,10 @@ impl CognitiveLoopService {
         self.stats.emotional_valence = self.emotion_contagion.smoothed_valence();
         self.stats.emotional_arousal = self.emotion_contagion.smoothed_arousal();
         let (nudge_pattern, nudge_strength) = self.emotion_contagion.pattern_nudge();
-        self.stats.emotion_nudge_pattern = nudge_pattern
-            .map(|p| format!("{p:?}"))
-            .unwrap_or_else(|| "None".to_string());
+        let nudge_str = nudge_pattern.map(|p| p.as_str()).unwrap_or("None");
+        if self.stats.emotion_nudge_pattern != nudge_str {
+            self.stats.emotion_nudge_pattern = nudge_str.to_string();
+        }
         self.stats.emotion_nudge_strength = nudge_strength;
 
         // Curiosity drive stats
@@ -554,8 +571,10 @@ impl CognitiveLoopService {
         self.stats.novelty_bonus = self.curiosity_drive.novelty_bonus;
 
         // Self-reflection stats
-        self.stats.self_assessment =
-            format!("{:?}", self.self_model_tier.self_reflection.self_assessment);
+        let assess_str = self.self_model_tier.self_reflection.self_assessment.as_str();
+        if self.stats.self_assessment != assess_str {
+            self.stats.self_assessment = assess_str.to_string();
+        }
         self.stats.reflection_count = self.self_model_tier.self_reflection.reflection_count;
         self.stats.adjustments_made = self.self_model_tier.self_reflection.adjustments_made;
         self.stats.learning_effectiveness = self
@@ -574,7 +593,10 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
 
         // Cognitive depth from thalamic routing
-        self.stats.cognitive_depth = format!("{:?}", self.cognitive_depth);
+        let depth_str = self.cognitive_depth.as_str();
+        if self.stats.cognitive_depth != depth_str {
+            self.stats.cognitive_depth = depth_str.to_string();
+        }
 
         // Unified Phi from the unification engine
         self.stats.unified_psi = self.unification_engine.psi as f32;
@@ -584,14 +606,19 @@ impl CognitiveLoopService {
         self.stats.unified_emotional_valence = unified_state.valence as f32;
         self.stats.unified_emotional_arousal = unified_state.arousal as f32;
         self.stats.unified_emotional_dominance = unified_state.dominance as f32;
-        self.stats.unified_emotion = unified_state
+        let emo_str = unified_state
             .discrete_emotion
-            .map(|e| format!("{e:?}"))
-            .unwrap_or_else(|| "Neutral".to_string());
+            .map(|e| e.as_str())
+            .unwrap_or("Neutral");
+        if self.stats.unified_emotion != emo_str {
+            self.stats.unified_emotion = emo_str.to_string();
+        }
 
         // Emotional pattern from the bridge
-        self.stats.emotional_pattern =
-            format!("{:?}", self.unification_engine.emotional.detect_pattern());
+        let emo_pat_str = self.unification_engine.emotional.detect_pattern().as_str();
+        if self.stats.emotional_pattern != emo_pat_str {
+            self.stats.emotional_pattern = emo_pat_str.to_string();
+        }
 
         // Thalamic routing statistics
         let (reflex_rate, cortical_rate, deep_rate) = self.thalamic_router.routing_stats();
@@ -603,7 +630,10 @@ impl CognitiveLoopService {
         let ai_stats = self.fep.active_inference_bridge.statistics();
         self.stats.active_inference_modulation_index =
             ai_stats.modulation_index.map(|mi| mi as f32).unwrap_or(0.0);
-        self.stats.active_inference_coupling_quality = format!("{:?}", ai_stats.coupling_quality);
+        let coupling_str = ai_stats.coupling_quality.as_str();
+        if self.stats.active_inference_coupling_quality != coupling_str {
+            self.stats.active_inference_coupling_quality = coupling_str.to_string();
+        }
         self.stats.active_inference_avg_error = ai_stats
             .average_prediction_error
             .map(|e| e as f32)
@@ -615,9 +645,14 @@ impl CognitiveLoopService {
         // fep_action_outcome_coupling is updated during cycle processing by enhanced FEP bridge
 
         // Closed Learning Loop statistics
-        self.stats.current_strategy =
-            format!("{:?}", self.fep.closed_learning_loop.current_strategy);
-        self.stats.best_strategy = format!("{:?}", self.fep.closed_learning_loop.best_strategy());
+        let cur_strat_str = self.fep.closed_learning_loop.current_strategy.as_str();
+        if self.stats.current_strategy != cur_strat_str {
+            self.stats.current_strategy = cur_strat_str.to_string();
+        }
+        let best_strat_str = self.fep.closed_learning_loop.best_strategy().as_str();
+        if self.stats.best_strategy != best_strat_str {
+            self.stats.best_strategy = best_strat_str.to_string();
+        }
         self.stats.average_reward = self.fep.closed_learning_loop.average_reward();
         self.stats.exploration_rate = self.fep.closed_learning_loop.exploration_rate();
         self.stats.learning_loop_interactions = self.fep.closed_learning_loop.total_interactions();

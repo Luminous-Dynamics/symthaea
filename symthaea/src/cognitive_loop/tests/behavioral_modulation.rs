@@ -106,11 +106,14 @@ fn consciousness_state_level_telemetry_consistent() {
 
     for (i, r) in results.iter().enumerate() {
         let m = &r.metadata;
-        assert!(m.consciousness_state_level.is_finite(), "NaN at cycle {i}");
+        assert!(
+            m.consciousness.consciousness_state_level.is_finite(),
+            "NaN at cycle {i}"
+        );
 
         // After warmup, bool should match threshold logic
         if i > 15 {
-            let csl = m.consciousness_state_level;
+            let csl = m.consciousness.consciousness_state_level;
             let expected = csl > 0.7 || (csl > 0.0 && csl < 0.2);
             assert_eq!(
                 m.consciousness_state_modulated, expected,
@@ -166,12 +169,12 @@ fn mcts_effectiveness_telemetry_consistent() {
     for (i, r) in results.iter().enumerate() {
         let m = &r.metadata;
         assert!(
-            m.adaptive.mcts_plan_effectiveness.is_finite(),
+            m.mcts_plan_effectiveness.is_finite(),
             "NaN mcts_plan_effectiveness at cycle {i}"
         );
 
         if i > 15 {
-            let mpe = m.adaptive.mcts_plan_effectiveness;
+            let mpe = m.mcts_plan_effectiveness;
             let expected = mpe > 0.6 || (mpe > 0.0 && mpe < 0.2);
             assert_eq!(
                 m.mcts_effectiveness_modulated, expected,
@@ -191,11 +194,11 @@ fn affect_consciousness_telemetry_populated() {
     // Raw affect fields should be finite
     for (i, r) in results.iter().enumerate() {
         assert!(
-            r.metadata.affect_consciousness_valence.is_finite(),
+            r.metadata.embodied.affect_consciousness_valence.is_finite(),
             "NaN affect_cons_valence at cycle {i}"
         );
         assert!(
-            r.metadata.affect_consciousness_arousal.is_finite(),
+            r.metadata.embodied.affect_consciousness_arousal.is_finite(),
             "NaN affect_cons_arousal at cycle {i}"
         );
     }
@@ -239,7 +242,7 @@ fn phenomenal_binding_modulation_signal_finite() {
     let results = run_cycles(&mut svc, 50, "phenomenal binding check");
     for (i, r) in results.iter().enumerate() {
         assert!(
-            r.metadata.phenomenal_binding_strength.is_finite(),
+            r.metadata.temporal.phenomenal_binding_strength.is_finite(),
             "NaN phenomenal_binding_strength at cycle {i}"
         );
     }
@@ -251,7 +254,7 @@ fn temporal_coherence_modulation_signal_finite() {
     let results = run_cycles(&mut svc, 50, "temporal coherence check");
     for (i, r) in results.iter().enumerate() {
         assert!(
-            r.metadata.temporal_coherence_score.is_finite(),
+            r.metadata.temporal.temporal_coherence_score.is_finite(),
             "NaN temporal_coherence_score at cycle {i}"
         );
     }
@@ -263,7 +266,7 @@ fn holographic_unity_modulation_signal_finite() {
     let results = run_cycles(&mut svc, 50, "holographic unity check");
     for (i, r) in results.iter().enumerate() {
         assert!(
-            r.metadata.holographic_unity.is_finite(),
+            r.metadata.temporal.holographic_unity.is_finite(),
             "NaN holographic_unity at cycle {i}"
         );
     }
@@ -321,15 +324,15 @@ fn no_nan_in_consciousness_metrics_across_cycles() {
             "NaN in actual_effective_lr at cycle {i}"
         );
         assert!(
-            m.consciousness_level.is_finite(),
+            m.consciousness.consciousness_level.is_finite(),
             "NaN in consciousness_level at cycle {i}"
         );
         assert!(
-            m.holographic_unity.is_finite(),
+            m.temporal.holographic_unity.is_finite(),
             "NaN in holographic_unity at cycle {i}"
         );
         assert!(
-            m.holographic_binding.is_finite(),
+            m.temporal.holographic_binding.is_finite(),
             "NaN in holographic_binding at cycle {i}"
         );
     }

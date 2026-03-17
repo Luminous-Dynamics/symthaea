@@ -32,6 +32,7 @@ pub(super) struct AsyncTrainerHandle {
     pub sample_tx: mpsc::SyncSender<TrainingSample>,
     pub weights_rx: std::sync::Mutex<mpsc::Receiver<Vec<f32>>>,
     pub updates_applied: u64,
+    pub samples_dropped: u64,
 }
 
 impl AsyncTrainerHandle {
@@ -97,6 +98,7 @@ impl AsyncTrainerHandle {
             sample_tx,
             weights_rx: std::sync::Mutex::new(weights_rx),
             updates_applied: 0,
+            samples_dropped: 0,
         }
     }
 
@@ -118,7 +120,9 @@ impl AsyncTrainerHandle {
         }
     }
 
-    pub fn send(&self, sample: TrainingSample) {
-        let _ = self.sample_tx.try_send(sample);
+    pub fn send(&mut self, sample: TrainingSample) {
+        if self.sample_tx.try_send(sample).is_err() {
+            self.samples_dropped += 1;
+        }
     }
 }

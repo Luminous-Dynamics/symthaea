@@ -95,6 +95,22 @@ pub enum SelfAssessment {
     NeedsCalibration,
 }
 
+impl SelfAssessment {
+    /// Static string matching Debug output — avoids `format!("{:?}")` on hot path.
+    #[inline]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Optimal => "Optimal",
+            Self::Learning => "Learning",
+            Self::Stagnating => "Stagnating",
+            Self::Struggling => "Struggling",
+            Self::Overconfident => "Overconfident",
+            Self::Exploring => "Exploring",
+            Self::NeedsCalibration => "NeedsCalibration",
+        }
+    }
+}
+
 /// Recommendation from self-reflection
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Recommendation {

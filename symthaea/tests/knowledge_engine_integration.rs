@@ -336,7 +336,10 @@ fn test_knowledge_engine_feedback_loop() {
 
     // Phase 2: Verify do(X) intervention propagation
     let effects = mgr.do_intervention("sanctions", 4);
-    assert!(!effects.is_empty(), "do(sanctions) should propagate effects");
+    assert!(
+        !effects.is_empty(),
+        "do(sanctions) should propagate effects"
+    );
 
     // Phase 3: Verify confounder detection (separate chains — may find none)
     let _confounders = mgr.detect_confounders("inflation", "oil shortage");
@@ -382,11 +385,18 @@ fn test_knowledge_engine_feedback_loop() {
     // Phase 10: Ontology IS-A (nonexistent concept → chain is just [concept])
     let ontology = mgr.ontology();
     let chain = ontology.is_a_chain("nonexistent", 5);
-    assert_eq!(chain.len(), 1, "IS-A chain for unknown concept should contain only the concept itself");
+    assert_eq!(
+        chain.len(),
+        1,
+        "IS-A chain for unknown concept should contain only the concept itself"
+    );
 
     // Phase 11: Temporal search
     let temporal_results = mgr.search_temporal_window(1, 5, 10);
-    assert!(!temporal_results.is_empty(), "Should find facts in cycle range 1-5");
+    assert!(
+        !temporal_results.is_empty(),
+        "Should find facts in cycle range 1-5"
+    );
 
     // Phase 12: RAG-style grounded facts (may be empty if no HDC search was done, but should not panic)
     let _grounded = mgr.top_grounded_facts(5);
@@ -410,7 +420,11 @@ fn test_spreading_activation_in_search() {
     // Insert a cluster of related facts
     for i in 0..10 {
         mgr.process(
-            &format!("Sanctions round {} increased inflation by {}%.", i + 1, i * 5 + 10),
+            &format!(
+                "Sanctions round {} increased inflation by {}%.",
+                i + 1,
+                i * 5 + 10
+            ),
             i as u64 + 1,
         );
     }
@@ -426,7 +440,10 @@ fn test_spreading_activation_in_search() {
     // Search should find sanctions-related facts via HDC similarity
     mgr.process("sanctions inflation", 30);
     let results = mgr.last_search_results();
-    assert!(!results.is_empty(), "Search should return at least one result");
+    assert!(
+        !results.is_empty(),
+        "Search should return at least one result"
+    );
 }
 
 // ── Test 17: IS-A auto-detection from natural text ──
@@ -543,7 +560,9 @@ fn test_calibration_convergence() {
 
     for i in 0..1000 {
         // Simple LCG pseudo-random
-        rng_state = rng_state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        rng_state = rng_state
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         let rand_val = (rng_state >> 33) as f32 / (u32::MAX >> 1) as f32;
 
         if i % 2 == 0 {
@@ -562,7 +581,11 @@ fn test_calibration_convergence() {
 
     // With 1000 samples from a well-calibrated source, ECE should be low
     // (not necessarily very low due to pseudo-random variance, but < 0.2)
-    assert!(ece < 0.25, "Well-calibrated system should have low ECE: {}", ece);
+    assert!(
+        ece < 0.25,
+        "Well-calibrated system should have low ECE: {}",
+        ece
+    );
 
     assert_eq!(audit.total_samples(), 1000);
 
@@ -573,5 +596,9 @@ fn test_calibration_convergence() {
     // Check MCE is reasonable
     let mce = audit.mce();
     assert!(mce >= ece, "MCE >= ECE");
-    assert!(mce < 0.5, "Well-calibrated system should have MCE < 0.5: {}", mce);
+    assert!(
+        mce < 0.5,
+        "Well-calibrated system should have MCE < 0.5: {}",
+        mce
+    );
 }

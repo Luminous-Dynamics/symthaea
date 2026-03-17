@@ -156,7 +156,7 @@ pub fn extract_snapshot(
     cycle_count: u64,
 ) -> CognitiveSnapshot {
     CognitiveSnapshot {
-        consciousness_level: metadata.consciousness_level,
+        consciousness_level: metadata.consciousness.consciousness_level,
         prediction_error: metadata.fep.fep_surprise,
         living_mind_vitality: metadata.living_mind_vitality,
         living_mind_coherence: metadata.living_mind_coherence,

@@ -138,7 +138,7 @@ fn memory_pipeline_no_nan_100_cycles() {
             "NaN prediction_error at {i}"
         );
         assert!(
-            m.consciousness_level.is_finite(),
+            m.consciousness.consciousness_level.is_finite(),
             "NaN consciousness at {i}"
         );
 

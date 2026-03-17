@@ -3340,7 +3340,7 @@ impl Symthaea {
     /// let cls = CognitiveLoopService::new(config)?;
     /// symthaea.wire_swarm_channel(&cls);
     /// ```
-    pub fn wire_swarm_channel(&mut self, cls: &cognitive_loop::CognitiveLoopService) {
+    pub fn wire_swarm_channel(&mut self, cls: &crate::cognitive_loop::CognitiveLoopService) {
         self.mind.set_swarm_channel(cls.swarm_event_sender());
     }
 

@@ -607,9 +607,15 @@ impl KnowledgeExtractor {
                     if entity.entity_type == EntityType::Symptom
                         || entity.entity_type == EntityType::ClinicalConcept
                     {
-                        if lower.contains("protective") || lower.contains("resilience") || lower.contains("strength") {
+                        if lower.contains("protective")
+                            || lower.contains("resilience")
+                            || lower.contains("strength")
+                        {
                             SemanticRole::ProtectiveFactor
-                        } else if lower.contains("risk") || lower.contains("vulnerability") || lower.contains("predispos") {
+                        } else if lower.contains("risk")
+                            || lower.contains("vulnerability")
+                            || lower.contains("predispos")
+                        {
                             SemanticRole::RiskFactor
                         } else {
                             SemanticRole::TherapeuticTarget

@@ -82,6 +82,7 @@ mod service;
 mod types;
 
 // Iroh and handshake modules compile always (with stub implementations when feature disabled)
+mod attestation;
 mod handshake;
 mod iroh;
 
@@ -112,6 +113,9 @@ pub use iroh::{
 
 // Handshake types
 pub use handshake::{HandshakeError, HandshakeResult, HybridHandshake, SwarmMessageExt};
+
+// Consciousness attestation — signed ConsciousnessVector proofs
+pub use attestation::{AttestedConsciousnessVector, AttestationManager};
 
 // Network Service - high-level swarm integration
 pub use service::{CollectiveConsciousness, NetworkService, PeerEvent, ServiceStats, SwarmBridge};

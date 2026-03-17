@@ -16,6 +16,9 @@ symthaea-types = { path = "../symthaea-types" }
 symthaea-harmonies = { path = "../symthaea-harmonies" }
 serde = { workspace = true }
 serde_json = { workspace = true }
+blake3 = { workspace = true }
+ed25519-dalek = { version = "2", optional = true, default-features = false, features = ["rand_core"] }
+hex = { version = "0.4", optional = true }
 
 # WASM bindings (optional — rlib builds skip this)
 wasm-bindgen = { version = "0.2", optional = true }
@@ -36,3 +39,6 @@ wasm = ["dep:wasm-bindgen", "dep:serde-wasm-bindgen", "dep:console_error_panic_h
 # Native mobile FFI: C-compatible extern functions for iOS (staticlib) and Android (cdylib/JNI).
 # Produces symthaea_spore.h via cbindgen for Swift/Kotlin consumption.
 native-ffi = []
+# Ed25519 mobile pairing for Spore-to-Spore trust establishment.
+# Without this feature, BLAKE3 keyed MAC is used as symmetric fallback.
+pairing = ["dep:ed25519-dalek", "dep:hex"]

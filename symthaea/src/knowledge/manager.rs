@@ -83,7 +83,9 @@ impl CalibrationAudit {
 
     /// Maximum Calibration Error: worst bin's |accuracy - confidence|.
     pub fn mce(&self) -> f64 {
-        self.bins.iter().enumerate()
+        self.bins
+            .iter()
+            .enumerate()
             .filter(|(_, &(total, _))| total > 0)
             .map(|(i, &(total, correct))| {
                 let bin_confidence = (i as f64 + 0.5) / 10.0;
@@ -95,11 +97,17 @@ impl CalibrationAudit {
 
     /// Per-bin summary: (bin_midpoint, total_count, accuracy).
     pub fn bin_summary(&self) -> Vec<(f32, u64, f32)> {
-        self.bins.iter().enumerate()
+        self.bins
+            .iter()
+            .enumerate()
             .filter(|(_, &(total, _))| total > 0)
             .map(|(i, &(total, correct))| {
                 let midpoint = (i as f32 + 0.5) / 10.0;
-                let accuracy = if total > 0 { correct as f32 / total as f32 } else { 0.0 };
+                let accuracy = if total > 0 {
+                    correct as f32 / total as f32
+                } else {
+                    0.0
+                };
                 (midpoint, total, accuracy)
             })
             .collect()
@@ -280,10 +288,17 @@ impl KnowledgeManager {
             if let Ok(edges) = p.load_causal_edges() {
                 let edge_count = edges.len();
                 for record in &edges {
-                    causal_bridge.import_edge(record.cause.clone(), record.effect.clone(), record.strength);
+                    causal_bridge.import_edge(
+                        record.cause.clone(),
+                        record.effect.clone(),
+                        record.strength,
+                    );
                 }
                 if edge_count > 0 {
-                    tracing::info!(count = edge_count, "Knowledge: loaded causal edges from SQLite");
+                    tracing::info!(
+                        count = edge_count,
+                        "Knowledge: loaded causal edges from SQLite"
+                    );
                 }
             }
             // Load existing ontology primitives
@@ -293,7 +308,10 @@ impl KnowledgeManager {
                     ontology.import_ontology_record(record);
                 }
                 if onto_count > 0 {
-                    tracing::info!(count = onto_count, "Knowledge: loaded ontology primitives from SQLite");
+                    tracing::info!(
+                        count = onto_count,
+                        "Knowledge: loaded ontology primitives from SQLite"
+                    );
                 }
             }
             p
@@ -567,12 +585,17 @@ impl KnowledgeManager {
                     let child = relation.subject.to_lowercase();
                     let parent = relation.object.to_lowercase();
                     // First ensure both exist in ontology
-                    if self.ontology.lookup(&self.encoder.encode_token(&child), current_cycle).is_some() {
+                    if self
+                        .ontology
+                        .lookup(&self.encoder.encode_token(&child), current_cycle)
+                        .is_some()
+                    {
                         self.ontology.set_is_a(&child, &parent);
                     } else {
                         // Learn child, then set IS-A
                         let child_hv = self.encoder.encode_token(&child);
-                        self.ontology.learn(&child, child_hv, vec![parent.clone()], current_cycle);
+                        self.ontology
+                            .learn(&child, child_hv, vec![parent.clone()], current_cycle);
                         self.ontology.set_is_a(&child, &parent);
                     }
                 }
@@ -740,6 +763,59 @@ impl KnowledgeManager {
         }
     }
 
+    /// Apply dream consolidation feedback to the knowledge graph.
+    ///
+    /// When the dream engine completes a consolidation cycle with sufficient quality,
+    /// this method strengthens knowledge graph edges whose source text contains any
+    /// of the consolidated topic keywords.  The boost magnitude is
+    /// `DREAM_KNOWLEDGE_REPLAY_WEIGHT * quality` — proportional to how effective the
+    /// dream replay was, matching Rasch & Born (2013) targeted-reactivation findings.
+    ///
+    /// # Arguments
+    /// - `consolidated_topics`: keywords inferred from recently consolidated memories.
+    ///   If empty, falls back to strengthening all causal facts (non-targeted replay).
+    /// - `quality`: 0.0–1.0 score representing dream consolidation effectiveness
+    ///   (typically `best_phi_improvement` from `DreamResult`).
+    ///
+    /// Returns the number of facts strengthened.
+    ///
+    /// Science:
+    /// - Rasch & Born (2013) — targeted reactivation during NREM strengthens cued traces.
+    /// - Tononi & Cirelli (2006) — synaptic homeostasis: only effective consolidation
+    ///   modifies weights.
+    pub fn apply_dream_consolidation(
+        &mut self,
+        consolidated_topics: &[String],
+        quality: f64,
+    ) -> usize {
+        let min_quality = crate::cognitive_loop::thresholds::DREAM_KNOWLEDGE_MIN_QUALITY;
+        if quality < min_quality {
+            return 0;
+        }
+        let replay_weight = crate::cognitive_loop::thresholds::DREAM_KNOWLEDGE_REPLAY_WEIGHT;
+        let boost = (replay_weight * quality) as f32;
+
+        let strengthened = if consolidated_topics.is_empty() {
+            // Non-targeted replay: fall back to strengthening all causal facts
+            self.graph.strengthen_causal_facts(boost)
+        } else {
+            // Targeted replay: boost only facts relevant to consolidated topics
+            self.graph
+                .strengthen_facts_by_topic(consolidated_topics, boost)
+        };
+
+        if strengthened > 0 {
+            tracing::debug!(
+                strengthened,
+                quality,
+                boost,
+                topics = consolidated_topics.len(),
+                "Dream→Knowledge: strengthened facts after dream consolidation"
+            );
+        }
+        strengthened
+    }
+
     /// Consolidate knowledge during dream/rest: prune weak facts, strengthen causal ones.
     ///
     /// Science: Stickgold & Walker (2013) — sleep-dependent memory consolidation
@@ -835,7 +911,9 @@ impl KnowledgeManager {
             return self.top_facts(k);
         }
 
-        let mut scored: Vec<(u64, f32)> = self.last_search_results.iter()
+        let mut scored: Vec<(u64, f32)> = self
+            .last_search_results
+            .iter()
             .map(|r| {
                 let combined = r.confidence * 0.6 + r.similarity * 0.4;
                 (r.fact_id, combined)
@@ -843,10 +921,12 @@ impl KnowledgeManager {
             .collect();
         scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
-        scored.iter()
+        scored
+            .iter()
             .take(k)
             .filter_map(|(id, _)| {
-                self.graph.all_facts()
+                self.graph
+                    .all_facts()
                     .find(|f| f.id == *id)
                     .map(|f| f.encoding.source_text.clone())
             })
@@ -862,7 +942,8 @@ impl KnowledgeManager {
         end_cycle: u64,
         k: usize,
     ) -> Vec<FactSearchResult> {
-        self.graph.all_facts()
+        self.graph
+            .all_facts()
             .filter(|f| f.inserted_at_cycle >= start_cycle && f.inserted_at_cycle <= end_cycle)
             .map(|f| FactSearchResult {
                 fact_id: f.id,
@@ -897,7 +978,11 @@ impl KnowledgeManager {
             }
         }
 
-        results.sort_by(|a, b| b.similarity.partial_cmp(&a.similarity).unwrap_or(std::cmp::Ordering::Equal));
+        results.sort_by(|a, b| {
+            b.similarity
+                .partial_cmp(&a.similarity)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         results.truncate(k);
         results
     }
@@ -933,16 +1018,18 @@ impl KnowledgeManager {
 
         // Phase 1: collect causal-eligible fact first words from graph (immutable borrow).
         // Gather fact_ids first to avoid holding &self.last_search_results across the graph borrow.
-        let search_fact_ids: Vec<u64> = self.last_search_results.iter()
-            .map(|r| r.fact_id)
-            .collect();
-        let causal_fact_words: Vec<String> = search_fact_ids.iter()
+        let search_fact_ids: Vec<u64> =
+            self.last_search_results.iter().map(|r| r.fact_id).collect();
+        let causal_fact_words: Vec<String> = search_fact_ids
+            .iter()
             .filter_map(|&fact_id| {
-                self.graph.all_facts()
+                self.graph
+                    .all_facts()
                     .find(|f| f.id == fact_id)
                     .filter(|f| f.has_causal_relations)
                     .map(|f| {
-                        f.encoding.source_text
+                        f.encoding
+                            .source_text
                             .split_whitespace()
                             .next()
                             .unwrap_or("")
@@ -953,7 +1040,8 @@ impl KnowledgeManager {
             .collect();
 
         // Phase 2: look up edges and collect (cause, effect) pairs (immutable borrow of bridge).
-        let causal_updates: Vec<(String, String)> = causal_fact_words.iter()
+        let causal_updates: Vec<(String, String)> = causal_fact_words
+            .iter()
             .filter_map(|first_word| {
                 let effects = self.causal_bridge.effects_of(first_word);
                 effects.first().map(|e| (e.cause.clone(), e.effect.clone()))
@@ -962,7 +1050,8 @@ impl KnowledgeManager {
 
         // Phase 3: apply updates (mutable borrow of bridge only).
         for (cause, effect) in &causal_updates {
-            self.causal_bridge.update_strength_from_outcome(cause, effect, outcome_good, causal_lr);
+            self.causal_bridge
+                .update_strength_from_outcome(cause, effect, outcome_good, causal_lr);
         }
     }
 
@@ -987,7 +1076,8 @@ impl KnowledgeManager {
     /// Counterfactual query: find causes for an effect with necessity scores.
     /// Science: Pearl (2000) — do-calculus.
     pub fn counterfactual(&self, effect: &str, max_results: usize) -> Vec<(String, f32)> {
-        self.causal_bridge.counterfactual_necessity(effect, max_results)
+        self.causal_bridge
+            .counterfactual_necessity(effect, max_results)
     }
 
     /// Simulate an intervention: do(X) → propagated effects.
@@ -1010,12 +1100,22 @@ impl KnowledgeManager {
         outcome_occurred: bool,
         learning_rate: f32,
     ) {
-        self.causal_bridge.update_strength_from_outcome(cause, effect, outcome_occurred, learning_rate);
+        self.causal_bridge.update_strength_from_outcome(
+            cause,
+            effect,
+            outcome_occurred,
+            learning_rate,
+        );
     }
 
     /// Find analogous facts in a target domain using HDC similarity.
     /// Science: Gentner (1983) — structure mapping theory.
-    pub fn find_analogous(&self, source_id: u64, target_domain: &str, top_k: usize) -> Vec<(String, f32)> {
+    pub fn find_analogous(
+        &self,
+        source_id: u64,
+        target_domain: &str,
+        top_k: usize,
+    ) -> Vec<(String, f32)> {
         // Find the source fact's vector (clone to release borrow)
         let source_vector = match self.graph.all_facts().find(|f| f.id == source_id) {
             Some(f) => f.encoding.vector.clone(),
@@ -1023,8 +1123,11 @@ impl KnowledgeManager {
         };
 
         // Search for similar facts in the target domain
-        let results = self.graph.search_domain(target_domain, &source_vector, top_k * 3);
-        results.iter()
+        let results = self
+            .graph
+            .search_domain(target_domain, &source_vector, top_k * 3);
+        results
+            .iter()
             .take(top_k)
             .map(|r| (format!("fact:{}", r.fact_id), r.similarity))
             .collect()
@@ -1032,7 +1135,8 @@ impl KnowledgeManager {
 
     /// Get per-domain distribution: (domain_name, fact_count, avg_confidence).
     pub fn domain_distribution(&self) -> Vec<(String, usize, f32)> {
-        self.graph.domain_distribution()
+        self.graph
+            .domain_distribution()
             .into_iter()
             .map(|(name, avg_conf, count)| (name, count, avg_conf))
             .collect()
@@ -1078,15 +1182,19 @@ impl KnowledgeManager {
             let seeds = self.last_search_results.clone();
             let spread_results = self.graph.spreading_activation_search(
                 &seeds,
-                2,    // 2 hops
-                0.5,  // 50% decay per hop
+                2,   // 2 hops
+                0.5, // 50% decay per hop
                 self.config.search_top_k * 2,
                 self.current_cycle,
             );
 
             // Merge: keep original results but add novel spread activations
             for spread in &spread_results {
-                if !self.last_search_results.iter().any(|r| r.fact_id == spread.fact_id) {
+                if !self
+                    .last_search_results
+                    .iter()
+                    .any(|r| r.fact_id == spread.fact_id)
+                {
                     self.last_search_results.push(spread.clone());
                 }
             }
@@ -1095,9 +1203,12 @@ impl KnowledgeManager {
             self.last_search_results.sort_by(|a, b| {
                 let score_a = a.similarity * 0.6 + a.confidence * 0.4;
                 let score_b = b.similarity * 0.6 + b.confidence * 0.4;
-                score_b.partial_cmp(&score_a).unwrap_or(std::cmp::Ordering::Equal)
+                score_b
+                    .partial_cmp(&score_a)
+                    .unwrap_or(std::cmp::Ordering::Equal)
             });
-            self.last_search_results.truncate(self.config.search_top_k * 2);
+            self.last_search_results
+                .truncate(self.config.search_top_k * 2);
         }
 
         // Trace causal chains for extracted entities and update causal_depth
@@ -1150,8 +1261,10 @@ impl KnowledgeManager {
             // Causal depth: normalized by max reasonable chain length (5 = deep chain)
             causal_depth: (self.last_causal_depth as f64 / 5.0).clamp(0.0, 1.0),
             // Epistemic surprise: contradictions + novelty
-            epistemic_surprise: ((self.last_telemetry.contradictions_detected as f64 * 0.3).min(0.6)
-                + (1.0 - avg_sim) * 0.4).clamp(0.0, 1.0),
+            epistemic_surprise: ((self.last_telemetry.contradictions_detected as f64 * 0.3)
+                .min(0.6)
+                + (1.0 - avg_sim) * 0.4)
+                .clamp(0.0, 1.0),
         };
     }
 }
@@ -1482,26 +1595,50 @@ mod tests {
             let (telem, signals) = mgr.process(input, cycle as u64);
 
             // All telemetry fields should be finite
-            assert!(telem.avg_confidence.is_finite(), "cycle {cycle}: avg_confidence not finite");
-            assert!(telem.best_search_similarity.is_finite(), "cycle {cycle}: best_search_similarity not finite");
+            assert!(
+                telem.avg_confidence.is_finite(),
+                "cycle {cycle}: avg_confidence not finite"
+            );
+            assert!(
+                telem.best_search_similarity.is_finite(),
+                "cycle {cycle}: best_search_similarity not finite"
+            );
 
             // All signals bounded
-            assert!(signals.uncertainty >= 0.0 && signals.uncertainty <= 1.0,
-                "cycle {cycle}: uncertainty out of bounds: {}", signals.uncertainty);
-            assert!(signals.relevance >= 0.0 && signals.relevance <= 1.0,
-                "cycle {cycle}: relevance out of bounds: {}", signals.relevance);
-            assert!(signals.novelty >= 0.0 && signals.novelty <= 1.0,
-                "cycle {cycle}: novelty out of bounds: {}", signals.novelty);
-            assert!(signals.contradiction_signal.is_finite(),
-                "cycle {cycle}: contradiction_signal not finite");
-            assert!(signals.causal_depth.is_finite(),
-                "cycle {cycle}: causal_depth not finite");
-            assert!(signals.epistemic_surprise.is_finite(),
-                "cycle {cycle}: epistemic_surprise not finite");
+            assert!(
+                signals.uncertainty >= 0.0 && signals.uncertainty <= 1.0,
+                "cycle {cycle}: uncertainty out of bounds: {}",
+                signals.uncertainty
+            );
+            assert!(
+                signals.relevance >= 0.0 && signals.relevance <= 1.0,
+                "cycle {cycle}: relevance out of bounds: {}",
+                signals.relevance
+            );
+            assert!(
+                signals.novelty >= 0.0 && signals.novelty <= 1.0,
+                "cycle {cycle}: novelty out of bounds: {}",
+                signals.novelty
+            );
+            assert!(
+                signals.contradiction_signal.is_finite(),
+                "cycle {cycle}: contradiction_signal not finite"
+            );
+            assert!(
+                signals.causal_depth.is_finite(),
+                "cycle {cycle}: causal_depth not finite"
+            );
+            assert!(
+                signals.epistemic_surprise.is_finite(),
+                "cycle {cycle}: epistemic_surprise not finite"
+            );
         }
 
         // Graph should have accumulated facts
-        assert!(mgr.graph().len() > 0, "Graph should have facts after 100 cycles");
+        assert!(
+            mgr.graph().len() > 0,
+            "Graph should have facts after 100 cycles"
+        );
 
         // Telemetry graph_size should match
         let telem = mgr.telemetry();
@@ -1618,10 +1755,10 @@ mod tests {
     fn test_calibration_audit_bin_boundaries() {
         let mut audit = CalibrationAudit::default();
 
-        audit.record(0.0, false);   // Bin 0
-        audit.record(0.15, true);   // Bin 1
-        audit.record(0.55, true);   // Bin 5
-        audit.record(0.99, true);   // Bin 9
+        audit.record(0.0, false); // Bin 0
+        audit.record(0.15, true); // Bin 1
+        audit.record(0.55, true); // Bin 5
+        audit.record(0.99, true); // Bin 9
 
         let summary = audit.bin_summary();
         assert_eq!(summary.len(), 4); // 4 non-empty bins
@@ -1693,6 +1830,9 @@ mod tests {
         assert!(after_0 > 0, "Should extract on cycle 0");
         // Off-interval shouldn't add new facts
         assert_eq!(after_1, after_0, "Should not extract on off-interval cycle");
-        assert!(after_3 >= after_0, "Should extract on cycle 3 (on interval)");
+        assert!(
+            after_3 >= after_0,
+            "Should extract on cycle 3 (on interval)"
+        );
     }
 }

@@ -685,6 +685,7 @@ impl CognitiveLoopService {
         let predictive_psi_modulation = late_result.predictive_psi_modulation;
         let hierarchical_total_free_energy = late_result.hierarchical_total_free_energy;
         let predictive_self_safety = late_result.predictive_self_safety;
+        let predictive_behavioral_error = late_result.predictive_behavioral_error;
         let attention_schema_focus = late_result.attention_schema_focus;
         let attention_fatigue = late_result.attention_fatigue;
         let attention_prediction_accuracy = late_result.attention_prediction_accuracy;
@@ -903,7 +904,7 @@ impl CognitiveLoopService {
         let sigma = consciousness_output.sigma;
         let eq_v2_limiting_component = consciousness_output
             .limiting_component
-            .map(|c| format!("{c:?}"))
+            .map(|c| c.as_str().to_string())
             .unwrap_or_default();
         self.carryover.quality.last_pipeline_consciousness =
             consciousness_output.pipeline_consciousness;
@@ -1035,7 +1036,7 @@ impl CognitiveLoopService {
 
         let consciousness_weights = consciousness_output.current_weights;
         let consciousness_weight_variance = consciousness_output.weight_variance;
-        let convergence_state = format!("{:?}", consciousness_output.convergence_state);
+        let convergence_state = consciousness_output.convergence_state.as_str().to_string();
 
         // Phi-Harmony coupling: during Sacred Stillness, weight Phi by integration
         // quality rather than raw intensity. Rest-state Phi should reflect how
@@ -1511,6 +1512,7 @@ impl CognitiveLoopService {
                 predictive_psi_modulation,
                 hierarchical_total_free_energy,
                 predictive_self_safety,
+                predictive_behavioral_error,
                 attention_schema_focus,
                 attention_fatigue,
                 attention_prediction_accuracy,

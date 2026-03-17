@@ -60,6 +60,10 @@ impl CognitiveLoopService {
                 coherence_velocity_gated: feedback.quality.coherence_velocity_gated,
                 anomaly_recovery_progress: dynamics.homeostasis.anomaly_recovery_progress,
                 anomaly_recovering: dynamics.homeostasis.anomaly_recovering,
+                hierarchical_free_energy_lr_boost: feedback.self_model.hierarchical_free_energy_lr_boost,
+                predictive_phi_lr_delta: feedback.self_model.predictive_phi_lr_delta,
+                body_valence_confidence_delta: feedback.self_model.body_valence_confidence_delta,
+                narrative_self_confidence_factor: feedback.self_model.narrative_self_confidence_factor,
             },
             narrative_self_psi: feedback.self_model.narrative_self_psi,
             consciousness: super::ConsciousnessLevelMetrics {
@@ -95,6 +99,7 @@ impl CognitiveLoopService {
                 ..Default::default()
             },
             predictive_self_safety: feedback.self_model.predictive_self_safety,
+            predictive_behavioral_error: feedback.self_model.predictive_behavioral_error,
             attention: super::AttentionMetrics {
                 attention_schema_focus: feedback.self_model.attention_schema_focus,
                 gwt_broadcast: feedback.self_model.gwt_broadcast,
@@ -239,12 +244,9 @@ impl CognitiveLoopService {
                 } else {
                     0.0
                 },
-                moral_value_inversion: topology_fresh
-                    && moral_anomaly_report.value_inversion,
-                moral_free_energy_spike: topology_fresh
-                    && moral_anomaly_report.free_energy_spike,
-                moral_drift_alert: topology_fresh
-                    && moral_anomaly_report.drift_alert,
+                moral_value_inversion: topology_fresh && moral_anomaly_report.value_inversion,
+                moral_free_energy_spike: topology_fresh && moral_anomaly_report.free_energy_spike,
+                moral_drift_alert: topology_fresh && moral_anomaly_report.drift_alert,
                 moral_fragmentation_increase: topology_fresh
                     && moral_anomaly_report.fragmentation_increase,
                 moral_trajectory_convergence: moral_anomaly_report.trajectory_convergence,
@@ -257,6 +259,7 @@ impl CognitiveLoopService {
                 moral_attractor_detected: topo_summary.attractor_detected,
                 in_active_rest: self.stats.in_active_rest,
                 stillness_dominance_streak: self.stats.stillness_dominance_streak,
+                unified_verdict: format!("{:?}", self.last_ethics_verdict),
             },
             multi_obj_frontier_size: feedback.multi_obj_frontier_size,
             reasoning_context: feedback.reasoning.reasoning_context.clone(),
@@ -787,6 +790,78 @@ impl CognitiveLoopService {
         metadata.learning_in_dream_phase = self.learning_manager.in_dream_phase();
         metadata.learning_error_trend = self.learning_manager.error_trend();
 
+        // ── Memory Manager telemetry ──
+        metadata.memory_consolidation_pressure = self.memory_manager.consolidation_pressure();
+        metadata.memory_recall_quality = self.memory_manager.recall_quality();
+
+        // ── Swarm Manager telemetry ──
+        {
+            let st = self.swarm_manager.telemetry();
+            metadata.swarm_connected_peers = st.connected_peers;
+            metadata.swarm_connectivity_ema = st.connectivity_ema as f32;
+            metadata.swarm_mean_peer_phi = st.mean_peer_phi as f32;
+            metadata.swarm_affective_contagion = st.affective_contagion as f32;
+            metadata.swarm_federated_confidence = st.federated_confidence as f32;
+            metadata.swarm_anomaly_count = st.anomaly_count;
+        }
+
+        // ── Governance Manager telemetry ──
+        #[cfg(feature = "mycelix")]
+        {
+            metadata.governance_reward_ema = self.governance_mgr.reward_ema() as f32;
+            metadata.governance_pending_events = self.governance_mgr.pending_event_count();
+            metadata.governance_pending_outcomes = self.governance_mgr.pending_outcome_count();
+            metadata.governance_collective_phi = self.governance_mgr.last_collective_phi() as f32;
+            metadata.governance_community_mode = self
+                .governance_mgr
+                .community_mode()
+                .map(|m| format!("{:?}", m))
+                .unwrap_or_default();
+            metadata.governance_blind_spot_count = self.governance_mgr.blind_spot_count();
+            metadata.governance_max_blind_spot_severity =
+                self.governance_mgr.max_blind_spot_severity() as f32;
+            metadata.governance_epistemic_agents = self.governance_mgr.epistemic_agent_count();
+            metadata.governance_harmonic_delta_max =
+                self.governance_mgr.last_harmonic_delta_max() as f32;
+            metadata.governance_lr_boost = self.governance_mgr.last_lr_boost() as f32;
+        }
+
+        // ── CPG Manager telemetry ──
+        #[cfg(feature = "cpg")]
+        {
+            let ct = self.cpg_manager.telemetry();
+            metadata.cpg_sync_index = ct.sync_index as f32;
+            metadata.cpg_mean_freq = ct.mean_freq as f32;
+            metadata.cpg_motor_active = ct.motor_active;
+            metadata.cpg_desync_alert = ct.desync_alert;
+        }
+
+        // ── Spectrum Manager telemetry ──
+        #[cfg(feature = "mesh")]
+        {
+            let rt = self.spectrum_manager.telemetry();
+            metadata.spectrum_network_health = rt.network_health;
+            metadata.spectrum_tier_available = {
+                let mut bits: u8 = 0;
+                if rt.tier_available[0] {
+                    bits |= 1;
+                }
+                if rt.tier_available[1] {
+                    bits |= 2;
+                }
+                if rt.tier_available[2] {
+                    bits |= 4;
+                }
+                bits
+            };
+            metadata.spectrum_jamming_streak = rt.jamming_streak;
+            metadata.spectrum_prediction_error = rt.spectrum_prediction_error as f32;
+            metadata.spectrum_epistemic_discount = rt.epistemic_discount as f32;
+            metadata.spectrum_degradation_streak = rt.degradation_streak;
+            metadata.spectrum_known_peers = rt.known_peers;
+            metadata.spectrum_encryption_sessions = rt.encryption_sessions;
+        }
+
         // ── Causal explanation narrative (every 47 cycles, amortized) ──
         if self.stats.total_cycles % 47 == 0 && self.stats.total_cycles > 0 {
             if let Some(ref explainer) = self.primitive_tier.causal_explainer {
@@ -916,7 +991,7 @@ impl CognitiveLoopService {
         // Foveation bridge telemetry
         #[cfg(feature = "foveation")]
         {
-            if let Some(ref fov_mutex) = self.foveation_manager {
+            if let Some(ref fov_mutex) = self.vision_sensory.foveation_manager {
                 if let Ok(fov) = fov_mutex.lock() {
                     let ft = fov.telemetry();
                     metadata.foveation = Some(super::FoveationBridgeTelemetry {
@@ -1077,6 +1152,19 @@ impl CognitiveLoopService {
                     .collect();
             metadata.therapeutic.therapeutic_temporal_coherence =
                 self.therapeutic_manager.narrative.temporal_coherence();
+
+            // ── Shadow work telemetry (Observability Mode) ──
+            let st = &self.therapeutic_manager.last_shadow_telemetry;
+            metadata.therapeutic.shadow_total_pressure = st.total_shadow_pressure;
+            metadata.therapeutic.shadow_fragment_count = st.shadow_fragment_count;
+            metadata.therapeutic.shadow_peak_pressure = st.peak_fragment_pressure;
+            metadata.therapeutic.shadow_mean_prediction_error = st.shadow_mean_prediction_error;
+            metadata.therapeutic.shadow_projection_detections = st.projection_detections;
+            metadata.therapeutic.shadow_surfacing_indicated = st.surfacing_indicated;
+            metadata.therapeutic.shadow_dream_queue_depth = st.dream_queue_depth;
+            metadata.therapeutic.shadow_best_dream_phi = st.best_dream_phi_improvement;
+            metadata.therapeutic.shadow_pressure_trend = st.pressure_trend;
+            metadata.therapeutic.shadow_to_narrative_ratio = st.shadow_to_narrative_ratio;
         }
 
         // ── Nurture/attachment telemetry ──
@@ -1142,7 +1230,7 @@ impl CognitiveLoopService {
 
         // Cross-manifold predictor: observe actual cognitive state for Hebbian learning
         #[cfg(feature = "vision-manifold")]
-        if let Some(ref mut pred) = self.cross_manifold_predictor {
+        if let Some(ref mut pred) = self.vision_sensory.cross_manifold_predictor {
             pred.observe_cognitive(&perception.encoding.encoding_result.hdv);
         }
 
@@ -1340,14 +1428,21 @@ impl CognitiveLoopService {
         // Visualization: record attention/saliency/binding snapshot
         // ═══════════════════════════════════════════════════════════════════════
         if let Some(ref mut viz) = self.attention_visualizer {
+            static ATTENTION_LABELS: std::sync::OnceLock<Vec<String>> =
+                std::sync::OnceLock::new();
+            let labels = ATTENTION_LABELS
+                .get_or_init(|| {
+                    vec![
+                        "phi_attention".into(),
+                        "prediction_error".into(),
+                        "coherence".into(),
+                        "binding_strength".into(),
+                        "consciousness".into(),
+                    ]
+                })
+                .clone();
             let snapshot = crate::visualization::AttentionSnapshot::new(
-                vec![
-                    "phi_attention".into(),
-                    "prediction_error".into(),
-                    "coherence".into(),
-                    "binding_strength".into(),
-                    "consciousness".into(),
-                ],
+                labels,
                 vec![
                     perception.encoding.phi_attention_weight as f64,
                     dynamics.core.prediction_error as f64,

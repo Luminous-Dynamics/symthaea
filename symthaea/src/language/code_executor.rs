@@ -835,7 +835,9 @@ pub fn try_auto_fix_structured(source: &str, errors: &[CompileError]) -> Option<
     let mut line_offset: i64 = 0;
 
     for error in errors {
-        let target_line = error.line.map(|l| ((l as i64 + line_offset) as usize).saturating_sub(1));
+        let target_line = error
+            .line
+            .map(|l| ((l as i64 + line_offset) as usize).saturating_sub(1));
 
         match error.category {
             ErrorCategory::TypeMismatch => {
@@ -843,7 +845,8 @@ pub fn try_auto_fix_structured(source: &str, errors: &[CompileError]) -> Option<
                     if idx < lines.len() {
                         let line = lines[idx].clone();
                         // "expected String, found &str" → add .to_string()
-                        if error.message.contains("expected") && error.message.contains("String")
+                        if error.message.contains("expected")
+                            && error.message.contains("String")
                             && error.message.contains("&str")
                         {
                             if let Some(col) = error.column {
@@ -855,9 +858,17 @@ pub fn try_auto_fix_structured(source: &str, errors: &[CompileError]) -> Option<
                                     let trimmed = line.trim_end();
                                     if !trimmed.ends_with(".to_string()") {
                                         let new_line = if let Some(pos) = trimmed.rfind(';') {
-                                            format!("{}.to_string(){}", &trimmed[..pos], &trimmed[pos..])
+                                            format!(
+                                                "{}.to_string(){}",
+                                                &trimmed[..pos],
+                                                &trimmed[pos..]
+                                            )
                                         } else if let Some(pos) = trimmed.rfind(',') {
-                                            format!("{}.to_string(){}", &trimmed[..pos], &trimmed[pos..])
+                                            format!(
+                                                "{}.to_string(){}",
+                                                &trimmed[..pos],
+                                                &trimmed[pos..]
+                                            )
                                         } else {
                                             format!("{}.to_string()", trimmed)
                                         };
@@ -868,14 +879,17 @@ pub fn try_auto_fix_structured(source: &str, errors: &[CompileError]) -> Option<
                             }
                         }
                         // "expected &str, found String" → add .as_str() or &
-                        if error.message.contains("expected") && error.message.contains("&str")
-                            && error.message.contains("found") && error.message.contains("String")
+                        if error.message.contains("expected")
+                            && error.message.contains("&str")
+                            && error.message.contains("found")
+                            && error.message.contains("String")
                             && !error.message.contains("expected `String`")
                         {
                             let trimmed = line.trim_end();
                             if !trimmed.ends_with(".as_str()") {
                                 if let Some(pos) = trimmed.rfind(';') {
-                                    lines[idx] = format!("{}.as_str(){}", &trimmed[..pos], &trimmed[pos..]);
+                                    lines[idx] =
+                                        format!("{}.as_str(){}", &trimmed[..pos], &trimmed[pos..]);
                                     any_fix = true;
                                 }
                             }
@@ -1289,7 +1303,8 @@ mod tests {
 
     #[test]
     fn test_structured_auto_fix_clone_insertion() {
-        let source = "fn main() {\n    let s = String::from(\"hello\");\n    let a = s;\n    let b = s;\n}";
+        let source =
+            "fn main() {\n    let s = String::from(\"hello\");\n    let a = s;\n    let b = s;\n}";
         let errors = vec![CompileError {
             message: "cannot move out of `s` because it is borrowed".into(),
             code: Some("E0382".into()),
@@ -1318,8 +1333,14 @@ mod tests {
         let fixed = try_auto_fix_structured(source, &errors);
         assert!(fixed.is_some());
         let fixed = fixed.unwrap();
-        assert!(fixed.contains("<'a>"), "Should add lifetime parameter: {fixed}");
-        assert!(fixed.contains("-> &'a"), "Should annotate return type: {fixed}");
+        assert!(
+            fixed.contains("<'a>"),
+            "Should add lifetime parameter: {fixed}"
+        );
+        assert!(
+            fixed.contains("-> &'a"),
+            "Should annotate return type: {fixed}"
+        );
     }
 
     #[test]
@@ -1336,7 +1357,10 @@ mod tests {
         let fixed = try_auto_fix_structured(source, &errors);
         assert!(fixed.is_some());
         let fixed = fixed.unwrap();
-        assert!(fixed.contains("#[derive(Clone)]"), "Should add derive(Clone): {fixed}");
+        assert!(
+            fixed.contains("#[derive(Clone)]"),
+            "Should add derive(Clone): {fixed}"
+        );
     }
 
     #[test]

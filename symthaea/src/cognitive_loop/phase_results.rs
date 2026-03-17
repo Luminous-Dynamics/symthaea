@@ -343,6 +343,7 @@ pub(super) struct FbSelfModel {
     pub(super) predictive_psi_modulation: f64,
     pub(super) hierarchical_total_free_energy: f64,
     pub(super) predictive_self_safety: f32,
+    pub(super) predictive_behavioral_error: f32,
     pub(super) attention_schema_focus: f32,
     pub(super) attention_fatigue: f32,
     pub(super) attention_prediction_accuracy: f32,
@@ -365,6 +366,10 @@ pub(super) struct FbSelfModel {
     pub(super) narrative_gwt_self_psi: f64,
     pub(super) living_mind_vitality: f64,
     pub(super) living_mind_coherence: f64,
+    pub(super) hierarchical_free_energy_lr_boost: f32,
+    pub(super) predictive_phi_lr_delta: f32,
+    pub(super) body_valence_confidence_delta: f32,
+    pub(super) narrative_self_confidence_factor: f32,
 }
 
 /// Reasoning, epistemic, and causal metrics.

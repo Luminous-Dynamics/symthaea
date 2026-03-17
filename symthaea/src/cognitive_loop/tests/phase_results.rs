@@ -312,6 +312,7 @@ fn dyn_reasoning_field_count_10() {
         mcts_plan_effectiveness: _,
         causal_attention_edges: _,
         school_predicted_phi_gain: _,
+        ..
     } = d;
 }
 

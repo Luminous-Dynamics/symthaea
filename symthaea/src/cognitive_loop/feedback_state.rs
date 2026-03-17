@@ -755,55 +755,54 @@ impl FeedbackState {
             + self.threshold.len()
     }
 
+    /// Return (dominant_source_name, concentration) in a single pass.
+    /// Avoids the double Vec allocation from calling both methods separately.
+    /// Concentration = fraction of total proposals from the dominant source (0.0 if none).
+    fn dominant_source_info(&self) -> (&'static str, f32) {
+        // Use a small inline buffer — typical subsystem count is <16 distinct sources
+        let mut counts: [(&'static str, usize); 16] = [("", 0); 16];
+        let mut n_sources = 0usize;
+        let mut total = 0usize;
+        for collector in [
+            &self.confidence,
+            &self.learning_rate,
+            &self.exploration,
+            &self.threshold,
+        ] {
+            for ap in collector.proposals() {
+                total += 1;
+                if let Some(entry) = counts[..n_sources]
+                    .iter_mut()
+                    .find(|(s, _)| *s == ap.source)
+                {
+                    entry.1 += 1;
+                } else if n_sources < 16 {
+                    counts[n_sources] = (ap.source, 1);
+                    n_sources += 1;
+                }
+            }
+        }
+        if total == 0 {
+            return ("", 0.0);
+        }
+        let (name, max_count) = counts[..n_sources]
+            .iter()
+            .max_by_key(|(_, c)| *c)
+            .copied()
+            .unwrap_or(("", 0));
+        (name, max_count as f32 / total as f32)
+    }
+
     /// Return the source name that contributed the most proposals this cycle.
     /// Ties broken arbitrarily. Returns "" if no proposals.
     pub fn dominant_source(&self) -> &'static str {
-        let mut counts: Vec<(&'static str, usize)> = Vec::new();
-        for collector in [
-            &self.confidence,
-            &self.learning_rate,
-            &self.exploration,
-            &self.threshold,
-        ] {
-            for ap in collector.proposals() {
-                if let Some(entry) = counts.iter_mut().find(|(s, _)| *s == ap.source) {
-                    entry.1 += 1;
-                } else {
-                    counts.push((ap.source, 1));
-                }
-            }
-        }
-        counts
-            .iter()
-            .max_by_key(|(_, c)| *c)
-            .map(|(s, _)| *s)
-            .unwrap_or("")
+        self.dominant_source_info().0
     }
 
     /// Fraction of total proposals contributed by the dominant source.
-    /// Returns (concentration, source_name). 0.0 if no proposals.
+    /// 0.0 if no proposals.
     pub fn dominant_source_concentration(&self) -> f32 {
-        let total = self.total_proposals();
-        if total == 0 {
-            return 0.0;
-        }
-        let mut counts: Vec<(&'static str, usize)> = Vec::new();
-        for collector in [
-            &self.confidence,
-            &self.learning_rate,
-            &self.exploration,
-            &self.threshold,
-        ] {
-            for ap in collector.proposals() {
-                if let Some(entry) = counts.iter_mut().find(|(s, _)| *s == ap.source) {
-                    entry.1 += 1;
-                } else {
-                    counts.push((ap.source, 1));
-                }
-            }
-        }
-        let max_count = counts.iter().map(|(_, c)| *c).max().unwrap_or(0);
-        max_count as f32 / total as f32
+        self.dominant_source_info().1
     }
 
     /// Average conflict ratio across all 4 channels.

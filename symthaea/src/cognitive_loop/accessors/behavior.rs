@@ -894,6 +894,63 @@ impl CognitiveLoopService {
         }
     }
 
+    /// Cross-couple memory consolidation state → learning plasticity.
+    ///
+    /// - High consolidation pressure (> 0.6) → boost LR factor (Born & Wilhelm 2012)
+    /// - Low recall quality (< 0.3) → dampen LR factor (Tulving 2002)
+    pub(crate) fn cross_couple_memory_learning(&mut self) {
+        let pressure = self.memory_manager.consolidation_pressure();
+        let recall = self.memory_manager.recall_quality();
+
+        // High consolidation pressure → boost learning (primed for encoding)
+        if pressure > super::super::thresholds::MEMORY_CONSOLIDATION_PLASTICITY_THRESHOLD {
+            let boost = (pressure
+                - super::super::thresholds::MEMORY_CONSOLIDATION_PLASTICITY_THRESHOLD)
+                * super::super::thresholds::MEMORY_CONSOLIDATION_PLASTICITY_GAIN;
+            self.carryover.learning.subsystem_lr_factor *= 1.0 + boost;
+        }
+
+        // Low recall quality → dampen learning (encoding unreliable)
+        if recall < super::super::thresholds::MEMORY_RECALL_QUALITY_DAMPEN_THRESHOLD {
+            let deficit =
+                super::super::thresholds::MEMORY_RECALL_QUALITY_DAMPEN_THRESHOLD - recall;
+            let dampening =
+                deficit * super::super::thresholds::MEMORY_RECALL_QUALITY_DAMPEN_SCALE;
+            self.carryover.learning.subsystem_lr_factor *= (1.0 - dampening).max(0.8);
+        }
+    }
+
+    /// Cross-couple perception state → drive exploration.
+    ///
+    /// - Low perceptual coherence → boost exploration (Damasio 1994: orienting response)
+    /// - High perceptual load → suppress exploration (Lavie 2005: load theory)
+    pub(crate) fn cross_couple_perception_drive(&mut self) {
+        let coherence = self.perception_manager.mean_coherence_score();
+        let utilization = self.perception_manager.budget_utilization();
+
+        // Low coherence → exploration boost (orienting reflex)
+        if coherence < super::super::thresholds::PERCEPTION_LOW_COHERENCE_THRESHOLD {
+            let deficit =
+                super::super::thresholds::PERCEPTION_LOW_COHERENCE_THRESHOLD - coherence;
+            let boost =
+                deficit * super::super::thresholds::PERCEPTION_LOW_COHERENCE_EXPLORE_GAIN;
+            // Nudge confidence down slightly to encourage exploration
+            self.prediction_confidence =
+                (self.prediction_confidence - boost as f64).clamp(0.0, 1.0);
+        }
+
+        // High perceptual load → suppress exploration (conserve resources)
+        if utilization > super::super::thresholds::PERCEPTION_HIGH_LOAD_SUPPRESS_THRESHOLD {
+            let excess =
+                utilization - super::super::thresholds::PERCEPTION_HIGH_LOAD_SUPPRESS_THRESHOLD;
+            let suppression =
+                excess * super::super::thresholds::PERCEPTION_HIGH_LOAD_SUPPRESS_FACTOR;
+            // Boost confidence slightly to discourage exploration
+            self.prediction_confidence =
+                (self.prediction_confidence + suppression as f64).clamp(0.0, 1.0);
+        }
+    }
+
     /// Access the resonant speech module (read-only).
     pub fn resonant_speech(&self) -> &crate::resonant_speech::ResonantSpeech {
         &self.resonant_speech

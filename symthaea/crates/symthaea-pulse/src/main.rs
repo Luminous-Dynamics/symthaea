@@ -120,6 +120,27 @@ pub struct NeuroBath {
     pub circadian_phase: String,
     pub sleep_pressure: f32,
     pub ei_ratio: f32,
+    /// Shannon entropy of bath phase space (0.0 = rigid attractor, high = chaotic).
+    #[serde(default)]
+    pub bath_entropy: f32,
+    /// Whether a phase-space attractor has been detected in the bath dynamics.
+    #[serde(default)]
+    pub attractor_detected: bool,
+    /// Cumulative seizure-like E/I imbalance events (sustained glutamate/GABA imbalance).
+    #[serde(default)]
+    pub ei_seizure_events: u32,
+    /// Excitotoxicity risk from sustained high glutamate (0.0 = safe, 1.0 = critical).
+    #[serde(default)]
+    pub excitotoxicity_risk: f32,
+    /// Self-assessment prediction error EMA (0.0–1.0). High = model is miscalibrated.
+    #[serde(default)]
+    pub self_assessment_pe_ema: f32,
+    /// Self-assessment coherence EMA (0.0–1.0). High = stable internal predictions.
+    #[serde(default)]
+    pub self_assessment_coherence_ema: f32,
+    /// Whether self-assessment triggered auto-calibration this cycle.
+    #[serde(default)]
+    pub self_assessment_calibration_fired: bool,
 }
 
 /// Snapshot of moral/ethical state.
@@ -1161,6 +1182,13 @@ fn main() -> Result<()> {
         circadian_phase: m.circadian_phase.clone(),
         sleep_pressure: m.neuromod.neuromod_sleep_pressure,
         ei_ratio: m.neuromod.neuromod_ei_ratio,
+        bath_entropy: m.neuromod.neuromod_bath_entropy,
+        attractor_detected: m.neuromod.neuromod_attractor_detected,
+        ei_seizure_events: m.neuromod.neuromod_ei_seizure_events,
+        excitotoxicity_risk: m.neuromod.neuromod_excitotoxicity_risk,
+        self_assessment_pe_ema: m.neuromod.self_assessment_pe_ema,
+        self_assessment_coherence_ema: m.neuromod.self_assessment_coherence_ema,
+        self_assessment_calibration_fired: m.neuromod.self_assessment_calibration_fired,
     };
 
     let compass = MoralCompass {
@@ -1271,10 +1299,40 @@ fn main() -> Result<()> {
             global_failure_streak: m.integrity.global_failure_streak,
             confidence_history: m.integrity.confidence_history.clone(),
         },
-        swarm: SwarmInfo::default(),
-        governance: GovernanceInfo::default(),
-        knowledge: KnowledgeInfo::default(),
-        cantor: CantorInfo::default(),
+        swarm: SwarmInfo {
+            connected_peers: m.swarm_connected_peers,
+            connectivity_ema: m.swarm_connectivity_ema,
+            mean_peer_phi: m.swarm_mean_peer_phi,
+            affective_contagion: m.swarm_affective_contagion,
+            federated_confidence: m.swarm_federated_confidence,
+            anomaly_count: m.swarm_anomaly_count as usize,
+        },
+        governance: GovernanceInfo {
+            reward_ema: m.governance_reward_ema,
+            pending_events: m.governance_pending_events,
+            pending_outcomes: m.governance_pending_outcomes,
+            collective_phi: m.governance_collective_phi,
+            confidence_delta: m.governance_confidence_delta,
+            community_mode: m.governance_community_mode.clone(),
+            blind_spot_count: m.governance_blind_spot_count,
+            max_blind_spot_severity: m.governance_max_blind_spot_severity,
+            epistemic_agents: m.governance_epistemic_agents,
+            harmonic_delta_max: m.governance_harmonic_delta_max,
+            lr_boost: m.governance_lr_boost,
+            reward_history: Vec::new(), // no per-cycle history in metadata
+        },
+        knowledge: KnowledgeInfo {
+            graph_size: m.knowledge_graph_size as usize,
+            causal_edges: m.knowledge_causal_edges as usize,
+            calibration_ece: m.knowledge_calibration_ece as f32,
+            contradictions: m.knowledge_contradictions as usize,
+            ..KnowledgeInfo::default()
+        },
+        cantor: CantorInfo {
+            codebook_size: m.memory.resonator_codebook_size,
+            codebook_capacity: m.memory.resonator_episodes,
+            ..CantorInfo::default()
+        },
         glyph: GlyphInfo {
             dominant_modality: m.glyph_dominant_modality.clone(),
             coherence: m.glyph_coherence,
@@ -1282,7 +1340,23 @@ fn main() -> Result<()> {
             spiral_position: m.glyph_spiral_position,
             coherence_history: glyph_coherence_init,
         },
-        spectrum: SpectrumInfo::default(),
+        spectrum: SpectrumInfo {
+            network_health: match m.spectrum_network_health {
+                0 => "AllTiersUp".into(),
+                1 => "LocalDown".into(),
+                2 => "MetroOnly".into(),
+                3 => "Blackout".into(),
+                _ => "Unknown".into(),
+            },
+            tier_available: m.spectrum_tier_available,
+            jamming_streak: m.spectrum_jamming_streak,
+            prediction_error: m.spectrum_prediction_error as f64,
+            epistemic_discount: m.spectrum_epistemic_discount as f64,
+            degradation_streak: m.spectrum_degradation_streak,
+            known_peers: m.spectrum_known_peers,
+            encryption_sessions: m.spectrum_encryption_sessions,
+            ..SpectrumInfo::default()
+        },
         perception: PerceptionInfo {
             attention_focus: m.attention.attention_schema_focus,
             attention_fatigue: m.attention.attention_fatigue,
@@ -1531,6 +1605,13 @@ fn main() -> Result<()> {
                     circadian_phase: wm.circadian_phase.clone(),
                     sleep_pressure: wm.neuromod.neuromod_sleep_pressure,
                     ei_ratio: wm.neuromod.neuromod_ei_ratio,
+                    bath_entropy: wm.neuromod.neuromod_bath_entropy,
+                    attractor_detected: wm.neuromod.neuromod_attractor_detected,
+                    ei_seizure_events: wm.neuromod.neuromod_ei_seizure_events,
+                    excitotoxicity_risk: wm.neuromod.neuromod_excitotoxicity_risk,
+                    self_assessment_pe_ema: wm.neuromod.self_assessment_pe_ema,
+                    self_assessment_coherence_ema: wm.neuromod.self_assessment_coherence_ema,
+                    self_assessment_calibration_fired: wm.neuromod.self_assessment_calibration_fired,
                 },
                 compass: MoralCompass {
                     moral_score: wm.ethics.moral_score,
@@ -1574,10 +1655,40 @@ fn main() -> Result<()> {
                     global_failure_streak: wm.integrity.global_failure_streak,
                     confidence_history: wm.integrity.confidence_history.clone(),
                 },
-                swarm: SwarmInfo::default(),
-                governance: GovernanceInfo::default(),
-                knowledge: KnowledgeInfo::default(),
-                cantor: CantorInfo::default(),
+                swarm: SwarmInfo {
+                    connected_peers: wm.swarm_connected_peers,
+                    connectivity_ema: wm.swarm_connectivity_ema,
+                    mean_peer_phi: wm.swarm_mean_peer_phi,
+                    affective_contagion: wm.swarm_affective_contagion,
+                    federated_confidence: wm.swarm_federated_confidence,
+                    anomaly_count: wm.swarm_anomaly_count as usize,
+                },
+                governance: GovernanceInfo {
+                    reward_ema: wm.governance_reward_ema,
+                    pending_events: wm.governance_pending_events,
+                    pending_outcomes: wm.governance_pending_outcomes,
+                    collective_phi: wm.governance_collective_phi,
+                    confidence_delta: wm.governance_confidence_delta,
+                    community_mode: wm.governance_community_mode.clone(),
+                    blind_spot_count: wm.governance_blind_spot_count,
+                    max_blind_spot_severity: wm.governance_max_blind_spot_severity,
+                    epistemic_agents: wm.governance_epistemic_agents,
+                    harmonic_delta_max: wm.governance_harmonic_delta_max,
+                    lr_boost: wm.governance_lr_boost,
+                    reward_history: Vec::new(),
+                },
+                knowledge: KnowledgeInfo {
+                    graph_size: wm.knowledge_graph_size as usize,
+                    causal_edges: wm.knowledge_causal_edges as usize,
+                    calibration_ece: wm.knowledge_calibration_ece as f32,
+                    contradictions: wm.knowledge_contradictions as usize,
+                    ..KnowledgeInfo::default()
+                },
+                cantor: CantorInfo {
+                    codebook_size: wm.memory.resonator_codebook_size,
+                    codebook_capacity: wm.memory.resonator_episodes,
+                    ..CantorInfo::default()
+                },
                 glyph: GlyphInfo {
                     dominant_modality: wm.glyph_dominant_modality.clone(),
                     coherence: wm.glyph_coherence,
@@ -1585,7 +1696,23 @@ fn main() -> Result<()> {
                     spiral_position: wm.glyph_spiral_position,
                     coherence_history: glyph_coherence_history.clone(),
                 },
-                spectrum: SpectrumInfo::default(),
+                spectrum: SpectrumInfo {
+                    network_health: match wm.spectrum_network_health {
+                        0 => "AllTiersUp".into(),
+                        1 => "LocalDown".into(),
+                        2 => "MetroOnly".into(),
+                        3 => "Blackout".into(),
+                        _ => "Unknown".into(),
+                    },
+                    tier_available: wm.spectrum_tier_available,
+                    jamming_streak: wm.spectrum_jamming_streak,
+                    prediction_error: wm.spectrum_prediction_error as f64,
+                    epistemic_discount: wm.spectrum_epistemic_discount as f64,
+                    degradation_streak: wm.spectrum_degradation_streak,
+                    known_peers: wm.spectrum_known_peers,
+                    encryption_sessions: wm.spectrum_encryption_sessions,
+                    ..SpectrumInfo::default()
+                },
                 perception: PerceptionInfo {
                     attention_focus: wm.attention.attention_schema_focus,
                     attention_fatigue: wm.attention.attention_fatigue,
@@ -1723,6 +1850,13 @@ mod tests {
             circadian_phase: "Day".into(),
             sleep_pressure: 0.2,
             ei_ratio: 1.1,
+            bath_entropy: 0.55,
+            attractor_detected: false,
+            ei_seizure_events: 0,
+            excitotoxicity_risk: 0.05,
+            self_assessment_pe_ema: 0.2,
+            self_assessment_coherence_ema: 0.8,
+            self_assessment_calibration_fired: false,
         }
     }
 
@@ -1930,7 +2064,11 @@ mod tests {
             .map(|_| make_sparkline_point(0.5, 0.3, 1.0))
             .collect();
         let result = detect_anomalies(&points);
-        assert!(result.is_empty(), "constant data should have no anomalies, got {}", result.len());
+        assert!(
+            result.is_empty(),
+            "constant data should have no anomalies, got {}",
+            result.len()
+        );
     }
 
     #[test]
@@ -1982,7 +2120,11 @@ mod tests {
             points.push(make_sparkline_point(c, 0.9, 0.0));
         }
         let result = detect_anomalies(&points);
-        assert!(result.len() <= 8, "anomalies should be truncated to 8, got {}", result.len());
+        assert!(
+            result.len() <= 8,
+            "anomalies should be truncated to 8, got {}",
+            result.len()
+        );
     }
 
     // ── PulseDelta tests ─────────────────────────────────────────────────
@@ -2073,6 +2215,9 @@ mod tests {
             color: "#e8c547",
         }];
         let report = generate_session_report(&v, &b, &c, &sparkline, &anomalies, None, &[]);
-        assert!(report.contains("C(t) Surge"), "report should list anomaly kinds");
+        assert!(
+            report.contains("C(t) Surge"),
+            "report should list anomaly kinds"
+        );
     }
 }

@@ -447,6 +447,9 @@ cpg = []                                    # Central Pattern Generator (Kuramot
 complex_cfc = ["symthaea-core/complex_cfc"] # Complex-valued CfC neuron with native oscillation
 spectral_state = []                         # Spectral twin: frequency-domain CfC state analysis
 
+# ── Defense / Immune System ────────────────────────────────────────
+sentinel = []                                # Distributed immune system: governance anomaly detection, threat memory, collective immunity
+
 # ── Distributed / Network ──────────────────────────────────────────
 mesh = []                                   # Physical mesh radio (LoRa + B.A.T.M.A.N. + Yggdrasil)
 lz4_compression = ["mesh", "dep:lz4_flex"]  # LZ4 packet compression for mesh radio

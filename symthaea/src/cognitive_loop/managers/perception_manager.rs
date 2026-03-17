@@ -66,6 +66,26 @@ impl PerceptionManager {
     /// Width of optimal arousal zone (±).
     const AROUSAL_ZONE_WIDTH: f32 = 0.2;
 
+    /// Current attention sensitivity level [0.5, 2.0].
+    pub fn attention_sensitivity(&self) -> f32 {
+        self.attention_sensitivity
+    }
+
+    /// Rolling attention budget utilization (EMA) [0, 1].
+    pub fn budget_utilization(&self) -> f32 {
+        self.budget_utilization
+    }
+
+    /// Whether currently in vigilant mode (high attention).
+    pub fn is_vigilant(&self) -> bool {
+        self.vigilant
+    }
+
+    /// Mean perceptual coherence from rolling history.
+    pub fn mean_coherence_score(&self) -> f32 {
+        self.mean_coherence()
+    }
+
     fn mean_coherence(&self) -> f32 {
         if self.coherence_count == 0 {
             return 0.5;

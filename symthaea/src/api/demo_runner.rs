@@ -270,6 +270,35 @@ impl DemoRunner {
             }
         }
 
+        // Populate therapeutic telemetry from CycleMetadata
+        #[cfg(feature = "therapeutic")]
+        {
+            data.therapeutic_distress = m.therapeutic.therapeutic_client_distress;
+            data.therapeutic_alliance = m.therapeutic.therapeutic_alliance;
+            data.therapeutic_crisis_active = m.therapeutic.therapeutic_crisis_active;
+            data.therapeutic_strategy = m.therapeutic.therapeutic_strategy.clone();
+            data.therapeutic_narrative_coherence = m.therapeutic.therapeutic_narrative_coherence;
+            data.therapeutic_clinical_severity = m.therapeutic.therapeutic_clinical_severity;
+            data.therapeutic_serotonin_debt = m.therapeutic.therapeutic_serotonin_debt;
+            data.therapeutic_dopamine_debt = m.therapeutic.therapeutic_dopamine_debt;
+            data.therapeutic_dream_accuracy = m.therapeutic.therapeutic_dream_accuracy;
+            data.therapeutic_resilience_ratio = m.therapeutic.therapeutic_resilience_ratio;
+            data.therapeutic_rupture_count = m.therapeutic.therapeutic_rupture_count;
+            data.therapeutic_last_rupture_type =
+                m.therapeutic.therapeutic_last_rupture_type.clone();
+            data.therapeutic_repair_rate = m.therapeutic.therapeutic_repair_rate;
+            data.therapeutic_withdrawal_count = m.therapeutic.therapeutic_withdrawal_count;
+            data.therapeutic_confrontation_count = m.therapeutic.therapeutic_confrontation_count;
+            data.therapeutic_rdoc_profile = m.therapeutic.therapeutic_rdoc_profile;
+            data.therapeutic_perpetuating_factors =
+                m.therapeutic.therapeutic_perpetuating_factors.clone();
+            data.therapeutic_protective_factors =
+                m.therapeutic.therapeutic_protective_factors.clone();
+            data.therapeutic_strategy_effectiveness =
+                m.therapeutic.therapeutic_strategy_effectiveness.clone();
+            data.therapeutic_temporal_coherence = m.therapeutic.therapeutic_temporal_coherence;
+        }
+
         // Redact sensitive vector fields if requested (Item 3: telemetry protection).
         // Keeps scalar aggregates (consciousness_level, mesh_health_score, etc.) intact.
         if self.redact_telemetry {

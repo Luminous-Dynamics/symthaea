@@ -269,16 +269,17 @@ impl CognitiveSubsystem for GlyphManager {
         self.last_coords = coords;
 
         // 5. Compute glyph free energy against prior
-        let fe = self
-            .basis
-            .glyph_free_energy(&coords, &self.modality_prior, Self::RESONANCE_TEMPERATURE);
+        let fe = self.basis.glyph_free_energy(
+            &coords,
+            &self.modality_prior,
+            Self::RESONANCE_TEMPERATURE,
+        );
         self.last_free_energy = fe;
 
         // 6. Update prior (EMA)
         let alpha = Self::PRIOR_EMA_ALPHA;
         for i in 0..N_FIELD_MODALITIES {
-            self.modality_prior[i] =
-                self.modality_prior[i] * (1.0 - alpha) + coords[i] * alpha;
+            self.modality_prior[i] = self.modality_prior[i] * (1.0 - alpha) + coords[i] * alpha;
         }
         self.prior_count += 1;
 

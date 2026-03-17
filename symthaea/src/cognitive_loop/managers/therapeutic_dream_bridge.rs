@@ -7,8 +7,8 @@
 //! Feature gate: `therapeutic`
 
 use serde::{Deserialize, Serialize};
-use symthaea_clinical::therapeutic_modalities::{TherapeuticIntervention, TherapeuticModality};
 use symthaea_clinical::rdoc::RDocDomain;
+use symthaea_clinical::therapeutic_modalities::{TherapeuticIntervention, TherapeuticModality};
 use symthaea_dream::DreamableAction;
 
 /// A dreamable wrapper around a therapeutic intervention.
@@ -256,11 +256,11 @@ impl DreamableAction for DreamableTherapeuticAction {
             let idx = domain_idx as usize;
             if idx < outcome.len() {
                 match idx {
-                    0 => outcome[idx] -= effect * 0.3, // Reduce negative valence
-                    1 => outcome[idx] += effect * 0.2, // Increase positive valence
+                    0 => outcome[idx] -= effect * 0.3,  // Reduce negative valence
+                    1 => outcome[idx] += effect * 0.2,  // Increase positive valence
                     2 => outcome[idx] += effect * 0.15, // Improve cognitive function
-                    3 => outcome[idx] += effect * 0.1, // Improve social processing
-                    4 => outcome[idx] -= effect * 0.2, // Reduce arousal dysregulation
+                    3 => outcome[idx] += effect * 0.1,  // Improve social processing
+                    4 => outcome[idx] -= effect * 0.2,  // Reduce arousal dysregulation
                     5 => outcome[idx] += effect * 0.05, // Minor sensorimotor improvement
                     _ => {}
                 }

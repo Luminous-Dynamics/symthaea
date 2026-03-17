@@ -37,7 +37,8 @@ impl CognitiveLoopService {
 
     /// Check if the last input had moral concerns
     pub fn has_moral_concerns(&self) -> bool {
-        self.ethics_values.last_moral_judgment
+        self.ethics_values
+            .last_moral_judgment
             .as_ref()
             .map(|j| j.moral_score < -0.3 || j.consent_violation || !j.violations.is_empty())
             .unwrap_or(false)

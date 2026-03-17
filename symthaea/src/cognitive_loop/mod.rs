@@ -212,6 +212,13 @@ pub mod nurture_bridge;
 #[cfg(feature = "humanoid")]
 pub mod motor_bridge;
 
+pub mod defense;
+pub mod guardian;
+#[cfg(feature = "sentinel")]
+pub mod threat_memory;
+#[cfg(feature = "sentinel")]
+pub mod collective_immunity;
+
 // ── Imports (only what the struct definitions below require) ─────────────────
 // AffectiveBridge now owned by ConsciousnessStateManager
 use crate::brain::prefrontal::PrefrontalCortex;

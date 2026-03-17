@@ -278,6 +278,15 @@ impl EnhancedKnowledgeGraph {
                 // Floor at 50% of initial
             }
 
+            // Clinical domain facts decay slower (established clinical knowledge
+            // persists longer than episodic observations).
+            // Science: clinical ontologies are stable over DSM revision cycles (~15 years).
+            #[cfg(feature = "therapeutic")]
+            if fact.domain.as_deref() == Some("clinical") {
+                fact.confidence = fact.confidence.max(fact.initial_confidence * 0.8);
+                // Floor at 80% of initial — clinical facts resist forgetting
+            }
+
             if fact.confidence < self.eviction_threshold {
                 to_evict.push(fact.id);
             }
@@ -348,6 +357,129 @@ impl EnhancedKnowledgeGraph {
     /// Iterate over all stored facts.
     pub fn all_facts(&self) -> impl Iterator<Item = &TemporalFact> {
         self.facts.values()
+    }
+
+    /// Get per-domain distribution: (domain_name, avg_confidence, fact_count).
+    ///
+    /// Sorted by average confidence ascending (most uncertain first).
+    pub fn domain_distribution(&self) -> Vec<(String, f32, usize)> {
+        let mut distribution: Vec<(String, f32, usize)> = self
+            .domain_index
+            .iter()
+            .map(|(domain, ids)| {
+                let valid_facts: Vec<f32> = ids
+                    .iter()
+                    .filter_map(|id| self.facts.get(id))
+                    .map(|f| f.confidence)
+                    .collect();
+                let count = valid_facts.len();
+                let avg_conf = if count > 0 {
+                    valid_facts.iter().sum::<f32>() / count as f32
+                } else {
+                    0.0
+                };
+                (domain.clone(), avg_conf, count)
+            })
+            .collect();
+
+        distribution.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+        distribution
+    }
+
+    /// Adjust confidence of a specific fact by a delta.
+    ///
+    /// Clamps result to [0.0, 1.0]. Used by calibration feedback.
+    /// Science: Jaynes (2003) — probability as extended logic.
+    pub fn adjust_confidence(&mut self, fact_id: FactId, delta: f32) {
+        if let Some(fact) = self.facts.get_mut(&fact_id) {
+            fact.confidence = (fact.confidence + delta).clamp(0.0, 1.0);
+        }
+    }
+
+    /// Spreading activation search: expand from seed results through HDC similarity.
+    ///
+    /// Starting from `seeds`, finds facts similar to each seed (within `hops` rounds),
+    /// decaying activation by `decay_factor` per hop. Returns up to `max_results`.
+    /// Science: Anderson (1983) — ACT-R spreading activation.
+    pub fn spreading_activation_search(
+        &mut self,
+        seeds: &[FactSearchResult],
+        hops: usize,
+        decay_factor: f32,
+        max_results: usize,
+        current_cycle: u64,
+    ) -> Vec<FactSearchResult> {
+        let mut activated: HashMap<FactId, f32> = HashMap::new();
+        let mut frontier_ids: Vec<FactId> = seeds.iter().map(|s| s.fact_id).collect();
+
+        // Seed activation
+        for seed in seeds {
+            activated.insert(seed.fact_id, seed.similarity);
+        }
+
+        for hop in 0..hops {
+            let hop_decay = decay_factor.powi(hop as i32 + 1);
+            let mut next_frontier = Vec::new();
+
+            for &fid in &frontier_ids {
+                let query_vec = match self.facts.get(&fid) {
+                    Some(f) => f.encoding.vector.clone(),
+                    None => continue,
+                };
+
+                // Find similar facts
+                for fact in self.facts.values() {
+                    if activated.contains_key(&fact.id) {
+                        continue;
+                    }
+                    let sim = fact.encoding.vector.similarity(&query_vec);
+                    if sim > 0.1 {
+                        let decayed_sim = sim * hop_decay;
+                        activated.insert(fact.id, decayed_sim);
+                        next_frontier.push(fact.id);
+                    }
+                }
+            }
+
+            frontier_ids = next_frontier;
+            if frontier_ids.is_empty() {
+                break;
+            }
+        }
+
+        // Remove seeds from results (caller already has them)
+        let seed_ids: std::collections::HashSet<FactId> = seeds.iter().map(|s| s.fact_id).collect();
+
+        let mut results: Vec<FactSearchResult> = activated
+            .into_iter()
+            .filter(|(id, _)| !seed_ids.contains(id))
+            .map(|(id, activation)| {
+                let confidence = self.facts.get(&id).map(|f| f.confidence).unwrap_or(0.0);
+                FactSearchResult {
+                    fact_id: id,
+                    similarity: activation,
+                    confidence,
+                }
+            })
+            .collect();
+
+        results.sort_by(|a, b| {
+            let score_a = a.similarity * a.confidence;
+            let score_b = b.similarity * b.confidence;
+            score_b
+                .partial_cmp(&score_a)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        results.truncate(max_results);
+
+        // Mark accessed
+        for result in &results {
+            if let Some(fact) = self.facts.get_mut(&result.fact_id) {
+                fact.last_accessed_cycle = current_cycle;
+            }
+        }
+
+        results
     }
 
     // ── Contradiction Resolution ────────────────────────────────────────
@@ -454,6 +586,38 @@ impl EnhancedKnowledgeGraph {
         let mut count = 0;
         for fact in self.facts.values_mut() {
             if fact.has_causal_relations && fact.confidence < fact.initial_confidence {
+                fact.confidence = (fact.confidence + boost).min(fact.initial_confidence);
+                count += 1;
+            }
+        }
+        count
+    }
+
+    /// Strengthen facts whose source text contains any of the given topic keywords.
+    ///
+    /// Used by the Dream→Knowledge feedback loop: when dream replay consolidates
+    /// memories around certain topics, the corresponding knowledge graph edges are
+    /// strengthened proportional to the replay quality.
+    ///
+    /// - `topics`: keywords extracted from consolidated dream content.
+    /// - `boost`: confidence increment per matched fact (capped at `initial_confidence`).
+    ///
+    /// Returns the number of facts strengthened.
+    ///
+    /// Science: Rasch & Born (2013) — targeted memory reactivation selectively
+    /// strengthens cued memory traces during sleep consolidation.
+    pub fn strengthen_facts_by_topic(&mut self, topics: &[String], boost: f32) -> usize {
+        if topics.is_empty() || boost <= 0.0 {
+            return 0;
+        }
+        let lower_topics: Vec<String> = topics.iter().map(|t| t.to_lowercase()).collect();
+        let mut count = 0;
+        for fact in self.facts.values_mut() {
+            let src = fact.encoding.source_text.to_lowercase();
+            let matches = lower_topics
+                .iter()
+                .any(|t| !t.is_empty() && src.contains(t.as_str()));
+            if matches && fact.confidence < fact.initial_confidence {
                 fact.confidence = (fact.confidence + boost).min(fact.initial_confidence);
                 count += 1;
             }

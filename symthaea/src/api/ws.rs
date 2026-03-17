@@ -262,6 +262,48 @@ pub struct DemoCycleData {
     /// RDoC clinical severity composite (0.0–1.0).
     #[serde(default)]
     pub therapeutic_clinical_severity: f32,
+    /// Serotonin debt from sustained negative valence (0.0–1.0).
+    #[serde(default)]
+    pub therapeutic_serotonin_debt: f32,
+    /// Dopamine debt from sustained low positive valence (0.0–1.0).
+    #[serde(default)]
+    pub therapeutic_dopamine_debt: f32,
+    /// Dream prediction accuracy (lower = better, 1.0 = no data).
+    #[serde(default)]
+    pub therapeutic_dream_accuracy: f32,
+    /// Case formulation resilience ratio (protective / total, 0.0–1.0).
+    #[serde(default)]
+    pub therapeutic_resilience_ratio: f32,
+    /// Alliance rupture count (cumulative).
+    #[serde(default)]
+    pub therapeutic_rupture_count: u32,
+    /// Last rupture type ("Withdrawal", "Confrontation", or empty).
+    #[serde(default)]
+    pub therapeutic_last_rupture_type: String,
+    /// Repair success rate (0.0–1.0).
+    #[serde(default)]
+    pub therapeutic_repair_rate: f32,
+    /// Withdrawal rupture count.
+    #[serde(default)]
+    pub therapeutic_withdrawal_count: u32,
+    /// Confrontation rupture count.
+    #[serde(default)]
+    pub therapeutic_confrontation_count: u32,
+    /// RDoC 6-domain profile [NegVal, PosVal, Cognitive, Social, Arousal, Sensorimotor].
+    #[serde(default)]
+    pub therapeutic_rdoc_profile: [f32; 6],
+    /// Perpetuating factor descriptions from case formulation.
+    #[serde(default)]
+    pub therapeutic_perpetuating_factors: Vec<String>,
+    /// Protective factor descriptions from case formulation.
+    #[serde(default)]
+    pub therapeutic_protective_factors: Vec<String>,
+    /// Strategy effectiveness: (name, mean_effectiveness, use_count).
+    #[serde(default)]
+    pub therapeutic_strategy_effectiveness: Vec<(String, f32, u32)>,
+    /// Narrative temporal coherence (Adler 2012) [0.0–1.0].
+    #[serde(default)]
+    pub therapeutic_temporal_coherence: f32,
 }
 
 impl DemoCycleData {
@@ -325,6 +367,15 @@ impl DemoCycleData {
         sf32(&mut self.therapeutic_alliance);
         sf32(&mut self.therapeutic_narrative_coherence);
         sf32(&mut self.therapeutic_clinical_severity);
+        sf32(&mut self.therapeutic_serotonin_debt);
+        sf32(&mut self.therapeutic_dopamine_debt);
+        sf32(&mut self.therapeutic_dream_accuracy);
+        sf32(&mut self.therapeutic_resilience_ratio);
+        sf32(&mut self.therapeutic_repair_rate);
+        sf32(&mut self.therapeutic_temporal_coherence);
+        for v in &mut self.therapeutic_rdoc_profile {
+            sf32(v);
+        }
 
         // Array f64 fields
         for v in &mut self.harmony_coordinates {

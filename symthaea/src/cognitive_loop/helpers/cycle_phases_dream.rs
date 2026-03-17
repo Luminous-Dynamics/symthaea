@@ -51,8 +51,45 @@ impl CognitiveLoopService {
                     },
                 ) // 1.0 to 1.5x boost
                 .unwrap_or(1.0);
-            let phi_weighted_surprise =
+            let mut phi_weighted_surprise =
                 prediction_error * (1.0 + unified_psi as f32).clamp(1.0, 2.0) * narrative_salience;
+
+            // Knowledge-aware dream consolidation: contradictions and deep causal
+            // chains boost consolidation priority for offline integration.
+            // Science: Festinger (1957) — cognitive dissonance drives consolidation;
+            //          Hobson & Friston (2012) — active inference in dreams consolidates causal models.
+            if let Some(ref km) = self.knowledge_manager {
+                let sigs = km.signals();
+                // Active contradictions boost consolidation by 20%
+                if sigs.contradiction_signal.is_finite() && sigs.contradiction_signal > 0.0 {
+                    phi_weighted_surprise *=
+                        1.0 + super::super::thresholds::DREAM_KNOWLEDGE_CONTRADICTION_BOOST as f32;
+                }
+                // Deep causal chains boost consolidation by 10%
+                if sigs.causal_depth.is_finite()
+                    && sigs.causal_depth
+                        > super::super::thresholds::DREAM_KNOWLEDGE_CAUSAL_DEPTH_THRESHOLD
+                {
+                    phi_weighted_surprise *=
+                        1.0 + super::super::thresholds::DREAM_KNOWLEDGE_CAUSAL_DEPTH_BOOST as f32;
+                }
+            }
+            // Reasoning reliability → dream consolidation boost: surprising events
+            // that contradicted high-confidence reasoning get more dream time.
+            // Science: Hobson & Friston (2012) — predictive processing theory of
+            // dreaming; high-confidence prediction errors are preferentially consolidated.
+            #[cfg(feature = "reasoning_engine")]
+            if let Some(ref reasoning_engine) = self.reasoning_engine {
+                if let Some(last_event) = reasoning_engine.last_event() {
+                    let r = last_event.reliability;
+                    if r > super::super::thresholds::REASONING_RELIABILITY_THRESHOLD {
+                        // High reliability + surprise → boost consolidation weight
+                        let boost =
+                            (r - 0.5) * super::super::thresholds::DREAM_REASONING_RELIABILITY_SCALE;
+                        phi_weighted_surprise *= 1.0 + boost as f32;
+                    }
+                }
+            }
             // Scene recognition boost: recognized visual contexts encode preferentially.
             // Conway (2005) — self-relevant and context-rich memories encode preferentially.
             #[cfg(feature = "vision-manifold")]
@@ -103,6 +140,14 @@ impl CognitiveLoopService {
             } else {
                 20 // base rate
             };
+            // Adaptive LR-driven interval: high learning rate → consolidate more often.
+            // When the system is actively encoding new experience, dream consolidation
+            // should keep pace. Take the minimum with the pressure-based interval so
+            // either signal (memory pressure OR high LR) can accelerate dreaming.
+            // Science: Diekelmann & Born (2010) — sleep consolidation scales with learning load.
+            let lr_driven_interval =
+                self.cantor_dream.adaptive_interval(self.fep.lr_boost) as usize;
+            let dynamic_normal_interval = dynamic_normal_interval.min(lr_driven_interval);
             // Sacred Stillness modulates dream depth: high SS activation = deeper consolidation
             // Science: Walker & Stickgold (2006) — rest quality enhances memory consolidation
             let stillness_depth_factor = if self.stats.circadian_stillness_boost > 0.1 {
@@ -159,6 +204,21 @@ impl CognitiveLoopService {
                     }
                     Err(e) => {
                         tracing::debug!(error = %e, cycle = self.stats.total_cycles, "Dream replay failed");
+                    }
+                }
+
+                // Dream→Knowledge feedback: after a dream cycle, strengthen knowledge
+                // graph edges whose topics were recently relevant to the cognitive loop.
+                // This closes the loop: knowledge feeds dream salience (above), and
+                // dream consolidation quality flows back to reinforce the knowledge graph.
+                // Science: Rasch & Born (2013) — targeted memory reactivation during
+                // NREM sleep selectively strengthens task-relevant memory traces.
+                if dream_phi_improvement > 0.0 {
+                    if let Some(ref mut km) = self.knowledge_manager {
+                        let topics = km.top_grounded_facts(
+                            super::super::thresholds::KNOWLEDGE_EPISODIC_MAX_PER_DREAM,
+                        );
+                        km.apply_dream_consolidation(&topics, dream_phi_improvement as f64);
                     }
                 }
             }
@@ -260,9 +320,8 @@ impl CognitiveLoopService {
             if let Some(ref mut bus) = self.experience_bus {
                 let signals = km.signals();
                 if signals.relevance > 0.3 {
-                    let top_facts = km.top_facts(
-                        super::super::thresholds::KNOWLEDGE_EPISODIC_MAX_PER_DREAM,
-                    );
+                    let top_facts =
+                        km.top_facts(super::super::thresholds::KNOWLEDGE_EPISODIC_MAX_PER_DREAM);
                     for fact_text in &top_facts {
                         let mut memory = crate::experience::EpisodicMemory::new(
                             &format!("knowledge_fact_{}", self.stats.total_cycles),
@@ -283,10 +342,7 @@ impl CognitiveLoopService {
         // Science: Stickgold & Walker (2013) — sleep-dependent memory consolidation;
         //          McClelland et al. (1995) — complementary learning systems theory.
         if let Some(ref mut km) = self.knowledge_manager {
-            let top = self
-                .memory_consol
-                .memory_coordinator
-                .most_replayed(5);
+            let top = self.memory_consol.memory_coordinator.most_replayed(5);
             for (content_hash, replay_count) in &top {
                 if *replay_count >= 3 {
                     let label = format!("episode_0x{:016x}", content_hash);

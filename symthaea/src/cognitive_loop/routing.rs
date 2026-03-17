@@ -94,22 +94,22 @@ impl CodeTaskDetector {
 
         for &kw in &self.code_keywords {
             if lower.contains(kw) {
-                score += 0.3;
+                score += super::thresholds::CODE_TASK_KEYWORD_WEIGHT;
             }
         }
         for &kw in &self.debug_keywords {
             if lower.contains(kw) {
-                score += 0.25;
+                score += super::thresholds::CODE_TASK_DEBUG_WEIGHT;
             }
         }
         for &kw in &self.refactor_keywords {
             if lower.contains(kw) {
-                score += 0.25;
+                score += super::thresholds::CODE_TASK_REFACTOR_WEIGHT;
             }
         }
 
         let confidence = score.min(1.0);
-        (confidence >= 0.3, confidence)
+        (confidence >= super::thresholds::CODE_TASK_CONFIDENCE_THRESHOLD, confidence)
     }
 
     /// Detect the specific type of code task
@@ -172,6 +172,18 @@ pub enum CognitiveDepth {
     DeepThought,
 }
 
+impl CognitiveDepth {
+    /// Static string matching Debug output — avoids `format!("{:?}")` on hot path.
+    #[inline]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Reflex => "Reflex",
+            Self::Cortical => "Cortical",
+            Self::DeepThought => "DeepThought",
+        }
+    }
+}
+
 /// Thalamic router - determines cognitive depth before processing
 ///
 /// Implements the 3-path routing from Architecture V2:
@@ -230,12 +242,12 @@ impl ThalamicRouter {
     ) -> CognitiveDepth {
         let depth = if novelty > self.novelty_threshold
             || urgency > self.urgency_threshold
-            || complexity > 0.8
-            || emotional_intensity > 0.7
+            || complexity > super::thresholds::THALAMIC_COMPLEXITY_DEEP_THRESHOLD
+            || emotional_intensity > super::thresholds::THALAMIC_EMOTIONAL_DEEP_THRESHOLD
         {
             // High stakes - use deep thought
             CognitiveDepth::DeepThought
-        } else if novelty < self.familiarity_threshold && complexity < 0.3 && urgency < 0.5 {
+        } else if novelty < self.familiarity_threshold && complexity < super::thresholds::THALAMIC_COMPLEXITY_REFLEX_THRESHOLD && urgency < super::thresholds::THALAMIC_URGENCY_REFLEX_THRESHOLD {
             // Familiar, simple, not urgent - use reflex
             CognitiveDepth::Reflex
         } else {
@@ -455,6 +467,17 @@ impl CouplingQuality {
             Self::WeakCoupling | Self::ModerateCoupling | Self::StrongCoupling
         )
     }
+
+    /// Human-readable label for telemetry/dashboard display.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::InsufficientData => "InsufficientData",
+            Self::NoCoupling => "NoCoupling",
+            Self::WeakCoupling => "WeakCoupling",
+            Self::ModerateCoupling => "ModerateCoupling",
+            Self::StrongCoupling => "StrongCoupling",
+        }
+    }
 }
 
 /// Simplified Active Inference Bridge for prediction-outcome coupling
@@ -565,9 +588,9 @@ impl ActiveInferenceBridge {
     pub fn coupling_quality(&self) -> CouplingQuality {
         match self.modulation_index() {
             None => CouplingQuality::InsufficientData,
-            Some(mi) if mi < 0.1 => CouplingQuality::NoCoupling,
-            Some(mi) if mi < 0.3 => CouplingQuality::WeakCoupling,
-            Some(mi) if mi < 0.6 => CouplingQuality::ModerateCoupling,
+            Some(mi) if mi < super::thresholds::COUPLING_NO_COUPLING_THRESHOLD as f64 => CouplingQuality::NoCoupling,
+            Some(mi) if mi < super::thresholds::COUPLING_WEAK_THRESHOLD as f64 => CouplingQuality::WeakCoupling,
+            Some(mi) if mi < super::thresholds::COUPLING_MODERATE_THRESHOLD as f64 => CouplingQuality::ModerateCoupling,
             Some(_) => CouplingQuality::StrongCoupling,
         }
     }
