@@ -575,11 +575,7 @@ impl BenchmarkReport {
                 "cross_modal_swap_error_rate",
                 &bl.binding,
             ),
-            (
-                "set_size_slope",
-                "cross_modal_set_size_slope",
-                &bl.binding,
-            ),
+            ("set_size_slope", "cross_modal_set_size_slope", &bl.binding),
             // Binocular Rivalry (Consciousness)
             (
                 "alternation_rate",
@@ -591,11 +587,7 @@ impl BenchmarkReport {
                 "rivalry_dominance_ratio",
                 &bl.consciousness,
             ),
-            (
-                "coefficient_of_variation",
-                "rivalry_cv",
-                &bl.consciousness,
-            ),
+            ("coefficient_of_variation", "rivalry_cv", &bl.consciousness),
             // Phoneme Discrimination (Speech)
             (
                 "cross_boundary_accuracy",
@@ -613,16 +605,8 @@ impl BenchmarkReport {
                 "vot_identification_accuracy",
                 &bl.speech,
             ),
-            (
-                "boundary_width",
-                "vot_boundary_width",
-                &bl.speech,
-            ),
-            (
-                "slope_at_boundary",
-                "vot_slope_at_boundary",
-                &bl.speech,
-            ),
+            ("boundary_width", "vot_boundary_width", &bl.speech),
+            ("slope_at_boundary", "vot_slope_at_boundary", &bl.speech),
             // Substrate Transfer
             ("transfer_fidelity", "transfer_fidelity", &bl.substrate),
             ("phi_preservation", "phi_preservation", &bl.substrate),
@@ -637,11 +621,7 @@ impl BenchmarkReport {
                 "substrate_critical_threshold",
                 &bl.substrate,
             ),
-            (
-                "graceful_ratio",
-                "substrate_graceful_ratio",
-                &bl.substrate,
-            ),
+            ("graceful_ratio", "substrate_graceful_ratio", &bl.substrate),
             // Mathematics domain
             ("accuracy", "arithmetic_accuracy", &bl.mathematics),
             (
@@ -845,11 +825,19 @@ impl BenchmarkReport {
             ),
             // Clinical/Therapeutic
             ("empathic_accuracy", "empathic_accuracy", &bl.clinical),
-            ("response_appropriateness", "response_appropriateness", &bl.clinical),
+            (
+                "response_appropriateness",
+                "response_appropriateness",
+                &bl.clinical,
+            ),
             ("repair_success_rate", "repair_success_rate", &bl.clinical),
             ("crisis_sensitivity", "crisis_sensitivity", &bl.clinical),
             ("crisis_specificity", "crisis_specificity", &bl.clinical),
-            ("distortion_identification", "distortion_identification", &bl.clinical),
+            (
+                "distortion_identification",
+                "distortion_identification",
+                &bl.clinical,
+            ),
             ("mi_spirit_score", "mi_spirit_score", &bl.clinical),
         ];
 
@@ -1873,6 +1861,7 @@ pub fn is_lower_better(metric_key: &str) -> bool {
             | "emotional_interference"
             | "swap_error_rate"
             | "pm_cost"
+            | "capacity_ratio"
     )
 }
 
@@ -2042,7 +2031,10 @@ impl BenchmarkReport {
         // Cross-cultural baseline disclosure
         let cultural = super::baselines::BaselineCollection::cultural_metadata();
         let total_domains = cultural.len();
-        let weird_domains = cultural.values().filter(|m| m.sample_region == "WEIRD").count();
+        let weird_domains = cultural
+            .values()
+            .filter(|m| m.sample_region == "WEIRD")
+            .count();
         lines.push(String::new());
         lines.push(format!(
             "NOTE: {}/{} domain baselines derive from WEIRD populations.",
@@ -2803,7 +2795,10 @@ mod tests {
     fn test_report_contains_bias_disclosure() {
         let mut report = BenchmarkReport::new();
         let mut stroop = BenchmarkResult::new("Executive::Stroop", None);
-        stroop.insert("stroop_effect", MetricValue::from_samples(&[0.10, 0.08, 0.12]));
+        stroop.insert(
+            "stroop_effect",
+            MetricValue::from_samples(&[0.10, 0.08, 0.12]),
+        );
         report.add(stroop);
         let output = report.format_composites();
         assert!(output.contains("WEIRD"), "Should contain WEIRD disclosure");

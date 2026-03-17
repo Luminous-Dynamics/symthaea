@@ -21,7 +21,9 @@ use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::trial_analysis::TrialOutcome;
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use std::collections::BTreeMap;
+use symthaea_core::hdc::binary_grid_encoder::BinaryGridEncoder;
 use symthaea_core::hdc::grid_encoder::GridEncoder;
+use symthaea_core::hdc::BinaryHV;
 
 /// Representational Similarity Analysis benchmark for HDC grid encodings.
 pub struct ArcRsaBenchmark;
@@ -175,7 +177,7 @@ struct TrialResult {
 
 impl ArcRsaBenchmark {
     fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> TrialResult {
-        let dim = config.dimension;
+        let _dim = config.dimension;
         let seed = config.trial_seed("reasoning", "arc_rsa", trial_idx);
         let mut rng = seed ^ 0x9E3779B97F4A7C15;
 
@@ -186,12 +188,12 @@ impl ArcRsaBenchmark {
         let pressure = config.time_pressure;
         let tick_scale = 1.0 - pressure * 0.4;
 
-        let encoder = GridEncoder::new(dim, grid_size, grid_size, num_colors as usize, seed);
+        let encoder = BinaryGridEncoder::new(grid_size, grid_size, num_colors as usize, seed);
 
         // Generate grids: for each transform type, apply to random inputs
         // Collect (grid, encoding, type_index) tuples
         let mut grids: Vec<Vec<Vec<u8>>> = Vec::new();
-        let mut encodings: Vec<symthaea_core::hdc::ContinuousHV> = Vec::new();
+        let mut encodings: Vec<BinaryHV> = Vec::new();
         let mut type_labels: Vec<usize> = Vec::new();
 
         for (type_idx, &tt) in TRANSFORMS.iter().enumerate() {

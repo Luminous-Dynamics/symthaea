@@ -38,6 +38,12 @@ pub struct LanguageControllerConfig {
     pub dt_per_token: f32,
     /// Temperature scaling for logits before softmax/sampling.
     pub logit_temperature: f32,
+    /// Multiplicative scale for cosine-similarity logits (CLIP-style).
+    /// Cosine similarities are in [-1, 1]; this scales them to [-scale, scale]
+    /// so softmax can discriminate between tokens in high-dimensional space.
+    /// Default 20.0 (like CLIP's learned temperature).
+    #[serde(default = "default_logit_scale")]
+    pub logit_scale: f32,
     /// CfC backbone time constant — controls state dependency for sequence coherence.
     #[serde(default = "default_backbone_tau")]
     pub backbone_tau: f32,
@@ -47,6 +53,10 @@ pub struct LanguageControllerConfig {
     /// Vocab size threshold above which logit computation is parallelized.
     #[serde(default = "default_parallel_threshold")]
     pub parallel_threshold: usize,
+}
+
+fn default_logit_scale() -> f32 {
+    20.0
 }
 
 fn default_backbone_tau() -> f32 {
@@ -71,6 +81,7 @@ impl Default for LanguageControllerConfig {
             max_seq_len: 512,
             dt_per_token: 0.02, // 20ms per token step
             logit_temperature: 1.0,
+            logit_scale: default_logit_scale(),
             backbone_tau: default_backbone_tau(),
             gradient_attenuation: default_gradient_attenuation(),
             parallel_threshold: default_parallel_threshold(),
@@ -147,21 +158,24 @@ impl LanguageController {
 
     /// Compute logits for all tokens via weight-tied similarity.
     ///
-    /// `logits[i] = cosine_similarity(output_hv, token_embeddings[i])`
+    /// `logits[i] = logit_scale * cosine_similarity(output_hv, token_embeddings[i])`
+    /// The scale factor (default 20.0, CLIP-style) spreads cosine similarities from
+    /// [-1, 1] to a range where softmax can discriminate between tokens.
     /// Parallelized with rayon for large vocabularies.
     pub fn compute_logits(&self, output_hv: &ContinuousHV) -> Vec<f32> {
+        let scale = self.config.logit_scale;
         #[cfg(feature = "parallel")]
         if self.token_embeddings.len() > self.config.parallel_threshold {
             // Parallel for large vocabularies
             return self
                 .token_embeddings
                 .par_iter()
-                .map(|emb| output_hv.similarity(emb))
+                .map(|emb| scale * output_hv.similarity(emb))
                 .collect();
         }
         self.token_embeddings
             .iter()
-            .map(|emb| output_hv.similarity(emb))
+            .map(|emb| scale * output_hv.similarity(emb))
             .collect()
     }
 
@@ -232,6 +246,11 @@ impl LanguageController {
         self.network.output().normalize()
     }
 
+    /// Get the controller configuration.
+    pub fn config(&self) -> &LanguageControllerConfig {
+        &self.config
+    }
+
     /// Get token embedding, returning a zero vector for out-of-range IDs.
     fn get_token_embedding(&self, token_id: u32) -> ContinuousHV {
         self.token_embeddings
@@ -244,6 +263,12 @@ impl LanguageController {
     pub fn reset(&mut self) {
         self.network.reset();
         self.current_pos = 0;
+    }
+
+    /// Reset momentum on all CfC neurons. Call between BPTT training epochs
+    /// to prevent accumulated directional bias from 67K+ gradient steps.
+    pub fn reset_network_momentum(&mut self) {
+        self.network.reset_momentum();
     }
 
     /// Append a new token embedding (for swarm vocabulary extension).
@@ -311,9 +336,10 @@ impl LanguageController {
         let mut logits = vec![f32::NEG_INFINITY; self.token_embeddings.len()];
         let inv_temp = 1.0 / self.config.logit_temperature.max(1e-6);
 
+        let scale = self.config.logit_scale;
         for &i in active_indices {
             if i < self.token_embeddings.len() {
-                let mut s = output_hv.similarity(&self.token_embeddings[i]) * inv_temp;
+                let mut s = scale * output_hv.similarity(&self.token_embeddings[i]) * inv_temp;
                 if !s.is_finite() {
                     s = 0.0;
                 }
@@ -394,12 +420,10 @@ impl LanguageController {
 
     /// Backpropagate a loss gradient through the CfC network.
     ///
-    /// Given the gradient of the loss w.r.t. the network output HV (`d_output`),
-    /// this constructs a synthetic target for each neuron's backward() method and
-    /// applies gradients to the CfC weights (weight_hv, input_mask, tau_modulator).
-    ///
-    /// The `input_hv` should be the composed input that was fed during the forward
-    /// step: `thought_hv ⊗ token_emb[prev] ⊗ pos_emb[pos]`.
+    /// Given the gradient of the loss w.r.t. the **normalized** network output HV (`d_output`),
+    /// this projects the gradient onto the tangent plane of the unit sphere (to account for
+    /// the normalize() in the forward pass), constructs a synthetic target for each neuron's
+    /// backward() method, and applies gradients to CfC weights.
     pub fn backward_step(
         &mut self,
         d_output: &ContinuousHV,
@@ -420,11 +444,32 @@ impl LanguageController {
             self.config.dt_per_token
         };
 
-        // Backprop through the last layer: construct target = output - d_output
-        // This makes MSE-based backward() produce gradients aligned with d_output
+        // --- Backprop through normalize() ---
+        // Forward: output_hat = output_raw / ||output_raw||
+        // Jacobian: d_hat/d_raw = (I - hat * hat^T) / ||raw||
+        // So: d_raw = (d_output - dot(d_output, hat) * hat) / ||raw||
+        let raw_output = self.network.output();
+        let raw_norm = raw_output.norm().max(1e-8);
+        let output_hat = raw_output.normalize();
+
+        // Project d_output onto tangent plane of unit sphere
+        let dot_d_hat: f32 = d_output
+            .as_slice()
+            .iter()
+            .zip(output_hat.as_slice().iter())
+            .map(|(d, h)| d * h)
+            .sum();
+        let d_raw_values: Vec<f32> = d_output
+            .as_slice()
+            .iter()
+            .zip(output_hat.as_slice().iter())
+            .map(|(d, h)| (d - dot_d_hat * h) / raw_norm)
+            .collect();
+        let d_raw = ContinuousHV::from_slice(&d_raw_values);
+
+        // Backprop through the last layer: construct target = state - d_raw
         let last_layer_idx = self.network.n_layers() - 1;
 
-        // For last layer: target = neuron_state - scale * d_output
         // Each neuron gets the same gradient signal (since output = avg(states))
         let inv_n = 1.0
             / self
@@ -433,8 +478,8 @@ impl LanguageController {
                 .map(|l| l.len())
                 .unwrap_or(1) as f32;
 
-        // Scale d_output by 1/n (since output = mean of neuron states)
-        let d_per_neuron = d_output.scale(inv_n);
+        // Scale d_raw by 1/n (since output = mean of neuron states)
+        let d_per_neuron = d_raw.scale(inv_n);
 
         // Get the input that was fed to each layer
         let layer_input = self.network.layer_input(last_layer_idx, &input_hv);
@@ -445,7 +490,9 @@ impl LanguageController {
                 // Target = state - d_output (gradient descent direction)
                 let target = neuron.state().subtract(&d_per_neuron);
                 let grads = neuron.backward(&layer_input, &target, dt);
-                neuron.apply_gradients(&grads, network_lr);
+                // Use no_decay variant: per-step weight decay of 0.0001 applied
+                // 67K times/epoch decays weights to ~0.1%, destroying the network.
+                neuron.apply_gradients_no_decay(&grads, network_lr);
             }
         }
 
@@ -482,7 +529,10 @@ impl LanguageController {
                 for neuron in layer.iter_mut() {
                     let target = neuron.state().subtract(&d_per_n0);
                     let grads = neuron.backward(&layer0_input, &target, dt);
-                    neuron.apply_gradients(&grads, network_lr * self.config.gradient_attenuation);
+                    neuron.apply_gradients_no_decay(
+                        &grads,
+                        network_lr * self.config.gradient_attenuation,
+                    );
                 }
             }
         }

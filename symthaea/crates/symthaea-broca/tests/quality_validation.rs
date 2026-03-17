@@ -280,7 +280,8 @@ fn test_checkpoint_training_resume() {
     };
 
     // Phase 1: train 10 epochs
-    let (metrics_phase1, adam_state, _, _, _) = train_with_adam(&mut gen, &dataset, &train_cfg, None);
+    let (metrics_phase1, adam_state, _, _, _) =
+        train_with_adam(&mut gen, &dataset, &train_cfg, None);
     assert_eq!(metrics_phase1.len(), 10);
     let loss_at_10 = metrics_phase1.last().unwrap().avg_loss;
 

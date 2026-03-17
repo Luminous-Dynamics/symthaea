@@ -31,6 +31,9 @@ pub struct NormativeScore {
     pub interpretation: String,
     /// Source citation for the baseline.
     pub source: String,
+    /// Sample population region (e.g., "WEIRD") for cross-cultural awareness.
+    #[serde(default)]
+    pub sample_region: Option<String>,
 }
 
 /// Convert a z-score to a percentile rank (0.0–100.0).
@@ -298,7 +301,22 @@ impl NormativeReport {
                 percentile,
                 interpretation,
                 source: baseline.source.to_string(),
+                sample_region: None,
             });
+        }
+
+        // Enrich with cross-cultural metadata
+        let cultural = super::baselines::BaselineCollection::cultural_metadata();
+        for score in &mut scores {
+            let domain = score
+                .benchmark
+                .split("::")
+                .next()
+                .unwrap_or("")
+                .to_lowercase();
+            if let Some(meta) = cultural.get(domain.as_str()) {
+                score.sample_region = Some(meta.sample_region.to_string());
+            }
         }
 
         // Compute summary statistics
@@ -482,6 +500,7 @@ mod tests {
             percentile: z_to_percentile(0.5),
             interpretation: interpret_z(0.5).to_string(),
             source: "MacLeod (1991)".to_string(),
+            sample_region: None,
         };
 
         assert_eq!(score.benchmark, "Executive::Stroop");
@@ -630,6 +649,7 @@ mod tests {
                     percentile: z_to_percentile(2.5),
                     interpretation: interpret_z(2.5).to_string(),
                     source: "Test".to_string(),
+                    sample_region: None,
                 },
                 NormativeScore {
                     benchmark: "Test::Weak".to_string(),
@@ -641,6 +661,7 @@ mod tests {
                     percentile: z_to_percentile(-3.0),
                     interpretation: interpret_z(-3.0).to_string(),
                     source: "Test".to_string(),
+                    sample_region: None,
                 },
                 NormativeScore {
                     benchmark: "Test::Average".to_string(),
@@ -652,6 +673,7 @@ mod tests {
                     percentile: z_to_percentile(0.2),
                     interpretation: interpret_z(0.2).to_string(),
                     source: "Test".to_string(),
+                    sample_region: None,
                 },
             ],
             overall_mean_z: (2.5 + -3.0 + 0.2) / 3.0,

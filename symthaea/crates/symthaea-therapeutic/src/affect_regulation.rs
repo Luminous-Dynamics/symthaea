@@ -55,13 +55,13 @@ impl RegulationStrategy {
     /// Minimum alliance required to use this strategy.
     pub fn min_alliance(&self) -> f32 {
         match self {
-            Self::Grounding => 0.1,         // safe at any alliance level
-            Self::Validation => 0.1,        // always appropriate
-            Self::DistressTolerance => 0.2, // basic coping
-            Self::Defusion => 0.3,          // requires some trust
+            Self::Grounding => 0.1,            // safe at any alliance level
+            Self::Validation => 0.1,           // always appropriate
+            Self::DistressTolerance => 0.2,    // basic coping
+            Self::Defusion => 0.3,             // requires some trust
             Self::CognitiveReappraisal => 0.4, // requires cognitive engagement
-            Self::Containment => 0.5,       // requires strong therapeutic space
-            Self::ExposurePrep => 0.6,      // requires strong alliance
+            Self::Containment => 0.5,          // requires strong therapeutic space
+            Self::ExposurePrep => 0.6,         // requires strong alliance
         }
     }
 
@@ -124,6 +124,51 @@ impl NeuromodDelta {
 
 // ── Regulation Engine ──────────────────────────────────────────────────────
 
+/// Per-strategy effectiveness record tracking outcomes.
+///
+/// Records how often a strategy was applied and the mean affect-delta
+/// (improvement in client distress) it produced. Negative delta = improvement.
+///
+/// Science: Lambert (2013) — outcome-informed treatment adjusts based on client progress.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StrategyEffectiveness {
+    /// Number of times this strategy was applied.
+    pub applications: u32,
+    /// Number of times affect improved after application.
+    pub successes: u32,
+    /// Mean affect-delta (EMA-smoothed). Negative = improvement.
+    pub mean_affect_delta: f32,
+}
+
+impl StrategyEffectiveness {
+    fn new() -> Self {
+        Self {
+            applications: 0,
+            successes: 0,
+            mean_affect_delta: 0.0,
+        }
+    }
+
+    /// Success rate (0-1). Returns 0.5 if no applications (neutral prior).
+    pub fn success_rate(&self) -> f32 {
+        if self.applications == 0 {
+            0.5 // neutral prior (Bayesian: no data → uniform)
+        } else {
+            self.successes as f32 / self.applications as f32
+        }
+    }
+
+    /// Record an application outcome.
+    fn record(&mut self, affect_delta: f32) {
+        self.applications += 1;
+        if affect_delta < 0.0 {
+            self.successes += 1; // negative delta = distress decreased = success
+        }
+        // EMA for mean delta (alpha=0.2 for moderate responsiveness)
+        self.mean_affect_delta = self.mean_affect_delta * 0.8 + affect_delta * 0.2;
+    }
+}
+
 /// Context-aware regulation strategy selection and neuromod mapping.
 #[derive(Debug, Clone)]
 pub struct RegulationEngine {
@@ -131,6 +176,11 @@ pub struct RegulationEngine {
     pub active_strategy: Option<RegulationStrategy>,
     /// Strategy effectiveness history (strategy → success count).
     strategy_successes: Vec<(RegulationStrategy, u32)>,
+    /// Per-strategy effectiveness tracking with affect-delta outcomes.
+    /// Science: Lambert (2013) — outcome-informed treatment.
+    strategy_effectiveness: std::collections::HashMap<RegulationStrategy, StrategyEffectiveness>,
+    /// Distress at time of last strategy application (for delta computation).
+    distress_at_application: Option<f32>,
     /// Dream-discovered strategy preferences (strategy → cumulative Phi improvement).
     dream_strategy_bias: Vec<(RegulationStrategy, f32)>,
     /// Accumulated serotonin debt from sustained negative valence.
@@ -147,6 +197,8 @@ impl RegulationEngine {
         Self {
             active_strategy: None,
             strategy_successes: Vec::new(),
+            strategy_effectiveness: std::collections::HashMap::new(),
+            distress_at_application: None,
             dream_strategy_bias: Vec::new(),
             serotonin_debt: 0.0,
             dopamine_debt: 0.0,
@@ -203,15 +255,29 @@ impl RegulationEngine {
     /// - Low acetylcholine → CognitiveSystems ↓
     /// - Low oxytocin → SocialProcesses ↓
     pub fn update_rdoc_from_neuromod(rdoc: &mut RDocProfile, bath: &[f32; 8]) {
-        let alpha = 0.03_f32; // Moderate EMA blending
         let [da, ne, sht, ach, gaba, oxy, _glu, _aden] = *bath;
 
-        // Low serotonin → increase NegativeValence
+        // Per-transmitter EMA time constants (Science: Stahl 2013, Cooper et al. 2003)
+        // Serotonin: slow dynamics (~weeks for tonic changes) → alpha 0.01
+        // Dopamine: fast phasic dynamics (~seconds) → alpha 0.08
+        // Noradrenaline: moderate (~minutes) → alpha 0.05
+        // Acetylcholine: fast cholinergic (~seconds) → alpha 0.06
+        // Oxytocin: slow peptide dynamics (~hours) → alpha 0.02
+        // GABA: moderate inhibitory → alpha 0.04
+        let alpha_sht: f32 = 0.01;
+        let alpha_da: f32 = 0.08;
+        let alpha_ne: f32 = 0.05;
+        let alpha_ach: f32 = 0.06;
+        let alpha_oxy: f32 = 0.02;
+        let alpha_gaba: f32 = 0.04;
+
+        // Low serotonin + low GABA → increase NegativeValence
         let neg_val_signal = (1.0 - sht).max(0.0) * 0.5 + (1.0 - gaba).max(0.0) * 0.3;
+        let alpha_neg = alpha_sht * 0.7 + alpha_gaba * 0.3; // weighted blend
         let cur_neg = rdoc.score(RDocDomain::NegativeValence);
         rdoc.set_score(
             RDocDomain::NegativeValence,
-            cur_neg * (1.0 - alpha) + neg_val_signal * alpha,
+            cur_neg * (1.0 - alpha_neg) + neg_val_signal * alpha_neg,
         );
 
         // Low dopamine → decrease PositiveValence
@@ -219,7 +285,7 @@ impl RegulationEngine {
         let cur_pos = rdoc.score(RDocDomain::PositiveValence);
         rdoc.set_score(
             RDocDomain::PositiveValence,
-            cur_pos * (1.0 - alpha) + pos_val_signal * alpha,
+            cur_pos * (1.0 - alpha_da) + pos_val_signal * alpha_da,
         );
 
         // High noradrenaline deviation → increase ArousalRegulatory
@@ -227,7 +293,7 @@ impl RegulationEngine {
         let cur_arousal = rdoc.score(RDocDomain::ArousalRegulatory);
         rdoc.set_score(
             RDocDomain::ArousalRegulatory,
-            cur_arousal * (1.0 - alpha) + arousal_signal * alpha,
+            cur_arousal * (1.0 - alpha_ne) + arousal_signal * alpha_ne,
         );
 
         // Acetylcholine → CognitiveSystems
@@ -235,7 +301,7 @@ impl RegulationEngine {
         let cur_cog = rdoc.score(RDocDomain::CognitiveSystems);
         rdoc.set_score(
             RDocDomain::CognitiveSystems,
-            cur_cog * (1.0 - alpha) + cog_signal * alpha,
+            cur_cog * (1.0 - alpha_ach) + cog_signal * alpha_ach,
         );
 
         // Oxytocin → SocialProcesses
@@ -243,13 +309,18 @@ impl RegulationEngine {
         let cur_social = rdoc.score(RDocDomain::SocialProcesses);
         rdoc.set_score(
             RDocDomain::SocialProcesses,
-            cur_social * (1.0 - alpha) + social_signal * alpha,
+            cur_social * (1.0 - alpha_oxy) + social_signal * alpha_oxy,
         );
     }
 
     /// Select the most appropriate regulation strategy given context.
     ///
-    /// Priority: safety first, then alliance-appropriate, then best evidence.
+    /// Priority: safety first, then effectiveness-biased, then alliance-appropriate,
+    /// then dream wisdom, then default evidence-based selection.
+    ///
+    /// Science: Lambert (2013) outcome-informed treatment — adjust based on
+    /// tracked client progress. Strategies with <30% success rate (≥3 applications)
+    /// are deprioritized.
     pub fn select_strategy(
         &self,
         client: &ClientModel,
@@ -267,6 +338,21 @@ impl RegulationEngine {
             return RegulationStrategy::Validation;
         }
 
+        // Effectiveness-biased selection: if we have enough data on a strategy
+        // that works well for this client, prefer it (outcome-informed treatment).
+        // Only active in non-crisis, with sufficient data (≥3 applications).
+        if let Some(best) = self.most_effective_strategy() {
+            if alliance_level >= best.min_alliance() {
+                // Check it's not the least effective too (edge case with only 1 tracked)
+                let dominated = self
+                    .least_effective_strategy()
+                    .map_or(false, |worst| worst == best);
+                if !dominated {
+                    return best;
+                }
+            }
+        }
+
         // Dream wisdom tie-breaker: if the dream engine discovered a strategy
         // that produces better consciousness quality (Phi), prefer it when
         // alliance permits and the strategy is appropriate for distress level.
@@ -274,7 +360,11 @@ impl RegulationEngine {
         if let Some(dream_pref) = self.dream_preferred_strategy() {
             let pref_safe = !is_crisis || dream_pref.crisis_safe();
             let pref_alliance_ok = alliance_level >= dream_pref.min_alliance();
-            if pref_safe && pref_alliance_ok {
+            // Also check effectiveness: don't use dream-preferred if historically poor
+            let not_poor = self.effectiveness(&dream_pref).map_or(true, |eff| {
+                eff.applications < 3 || eff.success_rate() >= 0.3
+            });
+            if pref_safe && pref_alliance_ok && not_poor {
                 return dream_pref;
             }
         }
@@ -309,11 +399,7 @@ impl RegulationEngine {
     /// Apply a regulation strategy → neuromodulator delta.
     ///
     /// Intensity scales with client distress (higher distress = stronger intervention).
-    pub fn apply_strategy(
-        &mut self,
-        strategy: RegulationStrategy,
-        distress: f32,
-    ) -> NeuromodDelta {
+    pub fn apply_strategy(&mut self, strategy: RegulationStrategy, distress: f32) -> NeuromodDelta {
         self.active_strategy = Some(strategy);
         let intensity = distress.clamp(0.1, 1.0) * 0.15; // max 0.15 delta per cycle
 
@@ -458,6 +544,11 @@ impl RegulationEngine {
             .map(|(s, _)| *s)
     }
 
+    /// Clear dream strategy preference (used when prediction accuracy is low).
+    pub fn clear_dream_preference(&mut self) {
+        self.dream_strategy_bias.clear();
+    }
+
     /// Record that a strategy was effective (client distress decreased).
     pub fn record_success(&mut self, strategy: RegulationStrategy) {
         if let Some((_, count)) = self
@@ -469,6 +560,69 @@ impl RegulationEngine {
         } else {
             self.strategy_successes.push((strategy, 1));
         }
+    }
+
+    /// Record the distress level at time of strategy application.
+    ///
+    /// Must be called before `record_outcome()` to compute affect-delta.
+    pub fn record_application_distress(&mut self, distress: f32) {
+        self.distress_at_application = Some(distress);
+    }
+
+    /// Record the outcome of the last applied strategy.
+    ///
+    /// Computes affect-delta from distress at application vs current distress.
+    /// Negative delta = improvement. Also records into legacy `record_success`.
+    pub fn record_outcome(&mut self, current_distress: f32) {
+        if let (Some(strategy), Some(prior_distress)) =
+            (self.active_strategy, self.distress_at_application)
+        {
+            let delta = current_distress - prior_distress; // negative = improvement
+            self.strategy_effectiveness
+                .entry(strategy)
+                .or_insert_with(StrategyEffectiveness::new)
+                .record(delta);
+            if delta < 0.0 {
+                self.record_success(strategy);
+            }
+            self.distress_at_application = None;
+        }
+    }
+
+    /// Get effectiveness record for a strategy.
+    pub fn effectiveness(&self, strategy: &RegulationStrategy) -> Option<&StrategyEffectiveness> {
+        self.strategy_effectiveness.get(strategy)
+    }
+
+    /// Get the most effective strategy based on historical outcomes.
+    ///
+    /// Returns the strategy with the highest success rate (minimum 3 applications).
+    pub fn most_effective_strategy(&self) -> Option<RegulationStrategy> {
+        self.strategy_effectiveness
+            .iter()
+            .filter(|(_, eff)| eff.applications >= 3)
+            .max_by(|a, b| {
+                a.1.success_rate()
+                    .partial_cmp(&b.1.success_rate())
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
+            .map(|(s, _)| *s)
+    }
+
+    /// Get the least effective strategy (to avoid in selection).
+    ///
+    /// Returns the strategy with the lowest success rate (minimum 3 applications).
+    pub fn least_effective_strategy(&self) -> Option<RegulationStrategy> {
+        self.strategy_effectiveness
+            .iter()
+            .filter(|(_, eff)| eff.applications >= 3)
+            .min_by(|a, b| {
+                a.1.success_rate()
+                    .partial_cmp(&b.1.success_rate())
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
+            .filter(|(_, eff)| eff.success_rate() < 0.3) // only flag truly poor strategies
+            .map(|(s, _)| *s)
     }
 }
 
@@ -587,17 +741,16 @@ mod tests {
         rdoc_high_neg.set_score(RDocDomain::NegativeValence, 0.9);
         let rdoc_default = RDocProfile::default();
 
-        let delta_high = engine.apply_strategy_rdoc(
-            RegulationStrategy::Validation, 0.5, &rdoc_high_neg,
-        );
-        let delta_default = engine.apply_strategy_rdoc(
-            RegulationStrategy::Validation, 0.5, &rdoc_default,
-        );
+        let delta_high =
+            engine.apply_strategy_rdoc(RegulationStrategy::Validation, 0.5, &rdoc_high_neg);
+        let delta_default =
+            engine.apply_strategy_rdoc(RegulationStrategy::Validation, 0.5, &rdoc_default);
         // High NegativeValence should produce stronger serotonin delta
         assert!(
             delta_high.serotonin.abs() > delta_default.serotonin.abs(),
             "serotonin should be amplified: {} vs {}",
-            delta_high.serotonin, delta_default.serotonin,
+            delta_high.serotonin,
+            delta_default.serotonin,
         );
     }
 
@@ -609,10 +762,14 @@ mod tests {
         let rdoc_default = RDocProfile::default();
 
         let delta_low = engine.apply_strategy_rdoc(
-            RegulationStrategy::CognitiveReappraisal, 0.5, &rdoc_low_pos,
+            RegulationStrategy::CognitiveReappraisal,
+            0.5,
+            &rdoc_low_pos,
         );
         let delta_default = engine.apply_strategy_rdoc(
-            RegulationStrategy::CognitiveReappraisal, 0.5, &rdoc_default,
+            RegulationStrategy::CognitiveReappraisal,
+            0.5,
+            &rdoc_default,
         );
         assert!(
             delta_low.dopamine.abs() > delta_default.dopamine.abs(),
@@ -626,12 +783,8 @@ mod tests {
         // as non-RDoC apply_strategy (within amplification factor).
         let mut engine = RegulationEngine::new();
         let rdoc = RDocProfile::default();
-        let delta_rdoc = engine.apply_strategy_rdoc(
-            RegulationStrategy::Grounding, 0.5, &rdoc,
-        );
-        let delta_plain = engine.apply_strategy(
-            RegulationStrategy::Grounding, 0.5,
-        );
+        let delta_rdoc = engine.apply_strategy_rdoc(RegulationStrategy::Grounding, 0.5, &rdoc);
+        let delta_plain = engine.apply_strategy(RegulationStrategy::Grounding, 0.5);
         // With default RDoC (moderate scores), amplification should be modest
         // GABA should still be positive and in the same ballpark
         assert!(delta_rdoc.gaba > 0.0);
@@ -653,7 +806,7 @@ mod tests {
         let mut engine = RegulationEngine::new();
         engine.incorporate_dream_wisdom(4, 0.5); // Validation
         engine.incorporate_dream_wisdom(4, 0.0); // Low improvement
-        // EMA should decay: 0.5*0.9 + 0.0*0.1 = 0.45
+                                                 // EMA should decay: 0.5*0.9 + 0.0*0.1 = 0.45
         let pref = engine.dream_preferred_strategy();
         assert_eq!(pref, Some(RegulationStrategy::Validation));
     }
@@ -750,9 +903,7 @@ mod tests {
         let rdoc = RDocProfile::default();
 
         // Without debt
-        let delta_no_debt = engine.apply_strategy_rdoc(
-            RegulationStrategy::Validation, 0.5, &rdoc,
-        );
+        let delta_no_debt = engine.apply_strategy_rdoc(RegulationStrategy::Validation, 0.5, &rdoc);
 
         // Accumulate serotonin debt
         let mut neg_rdoc = RDocProfile::default();
@@ -761,13 +912,13 @@ mod tests {
             engine.tick_debt(&neg_rdoc);
         }
 
-        let delta_with_debt = engine.apply_strategy_rdoc(
-            RegulationStrategy::Validation, 0.5, &rdoc,
-        );
+        let delta_with_debt =
+            engine.apply_strategy_rdoc(RegulationStrategy::Validation, 0.5, &rdoc);
         assert!(
             delta_with_debt.serotonin > delta_no_debt.serotonin,
             "Accumulated serotonin debt should amplify serotonin delta: {} vs {}",
-            delta_with_debt.serotonin, delta_no_debt.serotonin,
+            delta_with_debt.serotonin,
+            delta_no_debt.serotonin,
         );
     }
 
@@ -811,6 +962,124 @@ mod tests {
         assert!(
             rdoc.score(RDocDomain::SocialProcesses) < pre_social,
             "Low oxytocin should decrease SocialProcesses",
+        );
+    }
+
+    #[test]
+    fn test_strategy_effectiveness_tracking() {
+        let mut engine = RegulationEngine::new();
+        // Apply Validation and record improvement
+        engine.apply_strategy(RegulationStrategy::Validation, 0.5);
+        engine.record_application_distress(0.6);
+        engine.record_outcome(0.4); // delta = -0.2 (improvement)
+
+        let eff = engine
+            .effectiveness(&RegulationStrategy::Validation)
+            .unwrap();
+        assert_eq!(eff.applications, 1);
+        assert_eq!(eff.successes, 1);
+        assert!(
+            eff.mean_affect_delta < 0.0,
+            "mean delta should be negative (improvement)"
+        );
+    }
+
+    #[test]
+    fn test_strategy_effectiveness_success_rate() {
+        let mut engine = RegulationEngine::new();
+        // 3 successes, 1 failure
+        for delta in [-0.2, -0.1, -0.3, 0.1] {
+            engine.apply_strategy(RegulationStrategy::Grounding, 0.5);
+            engine.record_application_distress(0.5);
+            engine.record_outcome(0.5 + delta);
+        }
+        let eff = engine
+            .effectiveness(&RegulationStrategy::Grounding)
+            .unwrap();
+        assert_eq!(eff.applications, 4);
+        assert_eq!(eff.successes, 3);
+        assert!((eff.success_rate() - 0.75).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_strategy_effectiveness_neutral_prior() {
+        let eff = StrategyEffectiveness::new();
+        assert_eq!(eff.success_rate(), 0.5, "no data → 0.5 neutral prior");
+    }
+
+    #[test]
+    fn test_most_effective_strategy() {
+        let mut engine = RegulationEngine::new();
+        // Validation: 4/4 success
+        for _ in 0..4 {
+            engine.apply_strategy(RegulationStrategy::Validation, 0.5);
+            engine.record_application_distress(0.5);
+            engine.record_outcome(0.3); // improvement
+        }
+        // Grounding: 1/4 success
+        for delta in [0.1, 0.2, 0.1, -0.1] {
+            engine.apply_strategy(RegulationStrategy::Grounding, 0.5);
+            engine.record_application_distress(0.5);
+            engine.record_outcome(0.5 + delta);
+        }
+        assert_eq!(
+            engine.most_effective_strategy(),
+            Some(RegulationStrategy::Validation)
+        );
+        assert_eq!(
+            engine.least_effective_strategy(),
+            Some(RegulationStrategy::Grounding)
+        );
+    }
+
+    #[test]
+    fn test_effectiveness_biased_selection() {
+        let mut engine = RegulationEngine::new();
+        // Build strong effectiveness record for Defusion (4/4 success)
+        for _ in 0..4 {
+            engine.apply_strategy(RegulationStrategy::Defusion, 0.5);
+            engine.record_application_distress(0.5);
+            engine.record_outcome(0.3); // improvement
+        }
+        let client = make_calm_client();
+        let mut alliance = TherapeuticAlliance::new();
+        alliance.bond = 0.5;
+        alliance.goal_agreement = 0.5;
+        alliance.task_agreement = 0.5;
+        // Without effectiveness data: would select ExposurePrep or Validation
+        // With effectiveness data: should prefer Defusion (100% success rate)
+        let strategy = engine.select_strategy(&client, &alliance, false);
+        assert_eq!(
+            strategy,
+            RegulationStrategy::Defusion,
+            "should prefer historically effective strategy"
+        );
+    }
+
+    #[test]
+    fn test_effectiveness_bias_skips_poor_strategies() {
+        let mut engine = RegulationEngine::new();
+        // Defusion: 0/4 success (poor)
+        for _ in 0..4 {
+            engine.apply_strategy(RegulationStrategy::Defusion, 0.5);
+            engine.record_application_distress(0.3);
+            engine.record_outcome(0.6); // worsening
+        }
+        // Also add dream wisdom for Defusion
+        engine.incorporate_dream_wisdom(3, 0.5); // ordinal 3 = Defusion
+
+        let client = make_calm_client();
+        let mut alliance = TherapeuticAlliance::new();
+        alliance.bond = 0.5;
+        alliance.goal_agreement = 0.5;
+        alliance.task_agreement = 0.5;
+
+        let strategy = engine.select_strategy(&client, &alliance, false);
+        // Should NOT select Defusion despite dream preference (poor effectiveness)
+        assert_ne!(
+            strategy,
+            RegulationStrategy::Defusion,
+            "should not prefer historically poor strategy even with dream bias"
         );
     }
 

@@ -2,6 +2,7 @@
 
 use crate::types::*;
 
+#[derive(Debug)]
 pub struct PredictiveEngine {
     /// Free energy threshold above which alerts are generated.
     alert_threshold: f64,

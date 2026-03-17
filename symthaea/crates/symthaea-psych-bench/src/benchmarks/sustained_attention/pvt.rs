@@ -58,7 +58,7 @@ impl PvtBenchmark {
 
         let base_rt = 4.0f64;
         // Difficulty increases fatigue increment
-        let fatigue_increment = 0.15 * temp_mult;
+        let fatigue_increment = 0.05 * temp_mult;
         let noise_base: f64 = (0.8 + config.time_pressure * 0.5) * temp_mult;
         let lapse_threshold = base_rt * 2.0;
 

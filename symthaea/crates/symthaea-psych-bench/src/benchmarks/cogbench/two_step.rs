@@ -20,7 +20,7 @@ impl TwoStepBenchmark {
     fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> (f64, f64, Vec<f64>) {
         let seed = config.trial_seed("cogbench", "two_step", trial_idx);
         let mut rng_state = seed ^ 0x9E3779B97F4A7C15;
-        let num_episodes = 40;
+        let num_episodes = 60;
 
         let agent_config = ActiveInferenceAgentConfig {
             state_dim: 4,
@@ -84,10 +84,10 @@ impl TwoStepBenchmark {
             let mb_sum: f64 = mb_exp.iter().sum();
             let mb_probs: Vec<f64> = mb_exp.iter().map(|e| e / mb_sum).collect();
 
-            // Blend: ramp model-based weight rapidly, saturating by episode 20.
-            // After ~20 episodes, the transition model has enough data (70+ observations).
-            let progress = (ep as f64 / 20.0).min(1.0);
-            let mb_weight = 0.2 + 0.7 * progress;
+            // Blend: ramp model-based weight rapidly, saturating by episode 15.
+            // After ~15 episodes, the transition model has enough data (50+ observations).
+            let progress = (ep as f64 / 15.0).min(1.0);
+            let mb_weight = 0.3 + 0.65 * progress;
             let blended_probs: Vec<f64> = (0..2)
                 .map(|a| (1.0 - mb_weight) * fep_probs[a] + mb_weight * mb_probs[a])
                 .collect();

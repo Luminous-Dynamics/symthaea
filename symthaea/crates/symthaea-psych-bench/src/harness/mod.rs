@@ -193,24 +193,24 @@ mod tests {
         use crate::benchmarks::attention::*;
         use crate::benchmarks::binding::*;
         use crate::benchmarks::butlin::*;
+        use crate::benchmarks::causal_reasoning::*;
+        use crate::benchmarks::clinical::*;
         use crate::benchmarks::cogbench::*;
         use crate::benchmarks::consciousness::*;
         use crate::benchmarks::creativity::*;
         use crate::benchmarks::executive::*;
         use crate::benchmarks::inhibition::*;
+        use crate::benchmarks::institutional_reasoning;
         use crate::benchmarks::language::*;
         use crate::benchmarks::memory_agent::*;
         use crate::benchmarks::metacognition::*;
         use crate::benchmarks::motor::*;
         use crate::benchmarks::reasoning::*;
-        use crate::benchmarks::causal_reasoning::*;
         use crate::benchmarks::social::*;
         use crate::benchmarks::spatial::*;
         use crate::benchmarks::speech::*;
         use crate::benchmarks::substrate::*;
         use crate::benchmarks::sustained_attention::*;
-        use crate::benchmarks::clinical::*;
-        use crate::benchmarks::institutional_reasoning;
         use crate::benchmarks::tombench::*;
         use crate::benchmarks::worm::*;
 

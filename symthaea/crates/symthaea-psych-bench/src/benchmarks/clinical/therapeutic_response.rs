@@ -105,9 +105,18 @@ impl PsychBenchmark for TherapeuticResponseBenchmark {
             context_sensitive_scores.iter().sum::<f64>() / n_trials as f64;
 
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
-        result.insert("response_appropriateness", MetricValue::from_samples(&[appropriateness]));
-        result.insert("exact_match_accuracy", MetricValue::from_samples(&[accuracy]));
-        result.insert("context_sensitivity", MetricValue::from_samples(&context_sensitive_scores));
+        result.insert(
+            "response_appropriateness",
+            MetricValue::from_samples(&[appropriateness]),
+        );
+        result.insert(
+            "exact_match_accuracy",
+            MetricValue::from_samples(&[accuracy]),
+        );
+        result.insert(
+            "context_sensitivity",
+            MetricValue::from_samples(&context_sensitive_scores),
+        );
 
         result.conditions = 1;
         result.trials_per_condition = n_trials;
@@ -118,7 +127,8 @@ impl PsychBenchmark for TherapeuticResponseBenchmark {
     fn provenance(&self) -> Option<BenchmarkProvenance> {
         Some(BenchmarkProvenance {
             paradigm: "Therapeutic response selection — match helping skill to client presentation",
-            citation: "Hill, C. E. (2009). Helping Skills (3rd ed.). American Psychological Association.",
+            citation:
+                "Hill, C. E. (2009). Helping Skills (3rd ed.). American Psychological Association.",
             year: 2009,
             doi: None,
         })

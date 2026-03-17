@@ -2,6 +2,7 @@
 
 use crate::types::*;
 
+#[derive(Debug)]
 pub struct KnowledgeManager {
     articles: Vec<StoredArticle>,
 }

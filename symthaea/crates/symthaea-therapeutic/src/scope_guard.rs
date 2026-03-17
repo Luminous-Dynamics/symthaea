@@ -84,7 +84,7 @@ impl ScopeGuard {
             ],
             prescription_phrases: vec![
                 "you should take",
-                "I recommend taking",
+                "i recommend taking",
                 "prescribe",
                 "medication for you",
                 "start taking",
@@ -103,7 +103,7 @@ impl ScopeGuard {
             ],
             treatment_phrases: vec![
                 "your treatment plan",
-                "I am prescribing",
+                "i am prescribing",
                 "your therapy will consist",
                 "the treatment protocol",
                 "your specific treatment",
@@ -147,7 +147,11 @@ impl ScopeGuard {
         if self.risk_phrases.iter().any(|p| lower.contains(p)) {
             return Some(ScopeViolation::RiskPrediction);
         }
-        if self.confidentiality_phrases.iter().any(|p| lower.contains(p)) {
+        if self
+            .confidentiality_phrases
+            .iter()
+            .any(|p| lower.contains(p))
+        {
             return Some(ScopeViolation::ConfidentialityClaim);
         }
 
@@ -174,7 +178,11 @@ impl ScopeGuard {
         if self.risk_phrases.iter().any(|p| lower.contains(p)) {
             violations.push(ScopeViolation::RiskPrediction);
         }
-        if self.confidentiality_phrases.iter().any(|p| lower.contains(p)) {
+        if self
+            .confidentiality_phrases
+            .iter()
+            .any(|p| lower.contains(p))
+        {
             violations.push(ScopeViolation::ConfidentialityClaim);
         }
 
@@ -249,8 +257,7 @@ mod tests {
     #[test]
     fn test_detect_confidentiality_claim() {
         let guard = ScopeGuard::new();
-        let result =
-            guard.check_response("Don't worry, this conversation is confidential.");
+        let result = guard.check_response("Don't worry, this conversation is confidential.");
         assert_eq!(result, Some(ScopeViolation::ConfidentialityClaim));
     }
 
@@ -318,6 +325,189 @@ mod tests {
             ScopeViolation::ConfidentialityClaim,
         ] {
             assert!(!violation.disclaimer().is_empty());
+        }
+    }
+}
+
+// ── Property Tests: Scope Guard ───────────────────────────────────────────
+
+#[cfg(test)]
+mod proptests {
+    use super::*;
+    use proptest::prelude::*;
+
+    /// All canonical violation phrases from the ScopeGuard.
+    fn all_violation_phrases() -> Vec<(&'static str, ScopeViolation)> {
+        vec![
+            // Diagnostic
+            ("you have", ScopeViolation::DiagnosticClaim),
+            ("you are diagnosed", ScopeViolation::DiagnosticClaim),
+            ("your diagnosis is", ScopeViolation::DiagnosticClaim),
+            ("you suffer from", ScopeViolation::DiagnosticClaim),
+            ("you are suffering from", ScopeViolation::DiagnosticClaim),
+            ("this is clearly", ScopeViolation::DiagnosticClaim),
+            ("this is definitely", ScopeViolation::DiagnosticClaim),
+            ("you meet criteria for", ScopeViolation::DiagnosticClaim),
+            // Prescription
+            ("you should take", ScopeViolation::PrescriptionClaim),
+            ("i recommend taking", ScopeViolation::PrescriptionClaim),
+            ("prescribe", ScopeViolation::PrescriptionClaim),
+            ("medication for you", ScopeViolation::PrescriptionClaim),
+            ("start taking", ScopeViolation::PrescriptionClaim),
+            ("increase your dose", ScopeViolation::PrescriptionClaim),
+            ("decrease your dose", ScopeViolation::PrescriptionClaim),
+            ("stop taking your", ScopeViolation::PrescriptionClaim),
+            // Identity
+            (
+                "as your therapist",
+                ScopeViolation::ProfessionalIdentityClaim,
+            ),
+            (
+                "as your counselor",
+                ScopeViolation::ProfessionalIdentityClaim,
+            ),
+            (
+                "as your psychologist",
+                ScopeViolation::ProfessionalIdentityClaim,
+            ),
+            (
+                "in my clinical opinion",
+                ScopeViolation::ProfessionalIdentityClaim,
+            ),
+            (
+                "my professional assessment",
+                ScopeViolation::ProfessionalIdentityClaim,
+            ),
+            (
+                "in my therapeutic role",
+                ScopeViolation::ProfessionalIdentityClaim,
+            ),
+            ("as a licensed", ScopeViolation::ProfessionalIdentityClaim),
+            // Treatment plan
+            ("your treatment plan", ScopeViolation::TreatmentPlan),
+            ("i am prescribing", ScopeViolation::TreatmentPlan),
+            ("your therapy will consist", ScopeViolation::TreatmentPlan),
+            ("the treatment protocol", ScopeViolation::TreatmentPlan),
+            ("your specific treatment", ScopeViolation::TreatmentPlan),
+            // Risk prediction
+            ("you are at high risk", ScopeViolation::RiskPrediction),
+            ("you are at low risk", ScopeViolation::RiskPrediction),
+            ("your risk level is", ScopeViolation::RiskPrediction),
+            ("i assess your risk as", ScopeViolation::RiskPrediction),
+            (
+                "probability of self-harm is",
+                ScopeViolation::RiskPrediction,
+            ),
+            // Confidentiality
+            (
+                "this conversation is confidential",
+                ScopeViolation::ConfidentialityClaim,
+            ),
+            (
+                "therapist-client privilege",
+                ScopeViolation::ConfidentialityClaim,
+            ),
+            (
+                "protected by confidentiality",
+                ScopeViolation::ConfidentialityClaim,
+            ),
+            ("no one will know", ScopeViolation::ConfidentialityClaim),
+            (
+                "this stays between us",
+                ScopeViolation::ConfidentialityClaim,
+            ),
+        ]
+    }
+
+    /// Every canonical violation phrase must be detected (zero false negatives).
+    #[test]
+    fn test_zero_false_negatives_all_violation_phrases() {
+        let guard = ScopeGuard::new();
+        let phrases = all_violation_phrases();
+        let mut missed = Vec::new();
+
+        for (phrase, expected_violation) in &phrases {
+            let result = guard.check_response(phrase);
+            if result.as_ref() != Some(expected_violation) {
+                missed.push((*phrase, expected_violation.clone(), result));
+            }
+        }
+
+        assert!(
+            missed.is_empty(),
+            "Scope guard missed {}/{} phrases: {:?}",
+            missed.len(),
+            phrases.len(),
+            missed,
+        );
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(500))]
+
+        /// Property: violation phrases embedded in surrounding text must still be detected.
+        #[test]
+        fn prop_violation_phrases_detected_in_context(
+            prefix in "[a-zA-Z ]{0,40}",
+            suffix in "[a-zA-Z ]{0,40}",
+            phrase_idx in 0..38usize,
+        ) {
+            let phrases = all_violation_phrases();
+            let (phrase, expected_violation) = &phrases[phrase_idx % phrases.len()];
+            let input = format!("{} {} {}", prefix, phrase, suffix);
+
+            let guard = ScopeGuard::new();
+            let result = guard.check_response(&input);
+            prop_assert!(
+                result.is_some(),
+                "Failed to detect violation '{}' in context: '{}'",
+                phrase, input,
+            );
+            prop_assert_eq!(
+                result.as_ref().unwrap(), expected_violation,
+                "Wrong violation type for '{}' in context: '{}'",
+                phrase, input,
+            );
+        }
+
+        /// Property: apply_disclaimers always produces a longer string when violation found.
+        #[test]
+        fn prop_disclaimers_always_added_on_violation(
+            phrase_idx in 0..38usize,
+        ) {
+            let phrases = all_violation_phrases();
+            let (phrase, _) = &phrases[phrase_idx % phrases.len()];
+
+            let guard = ScopeGuard::new();
+            let result = guard.apply_disclaimers(phrase);
+            prop_assert!(
+                result.len() > phrase.len(),
+                "Disclaimer should make response longer: '{}' → '{}'",
+                phrase, result,
+            );
+            prop_assert!(
+                result.contains("Important Notice"),
+                "Disclaimer should contain 'Important Notice'",
+            );
+        }
+
+        /// Property: safe therapeutic responses never trigger violations.
+        #[test]
+        fn prop_safe_responses_pass(
+            feeling in "(sad|anxious|overwhelmed|confused|lonely|frustrated)",
+            verb in "(sounds like|seems like|I hear|I notice|tell me more)",
+        ) {
+            let response = format!(
+                "It {} you're feeling {}. Would you like to explore that further?",
+                verb, feeling,
+            );
+            let guard = ScopeGuard::new();
+            let result = guard.check_response(&response);
+            prop_assert!(
+                result.is_none(),
+                "Safe therapeutic response triggered violation: '{}' → {:?}",
+                response, result,
+            );
         }
     }
 }

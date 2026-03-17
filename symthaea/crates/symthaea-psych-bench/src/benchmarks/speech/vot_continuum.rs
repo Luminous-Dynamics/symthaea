@@ -66,7 +66,8 @@ impl VotContinuumBenchmark {
             let mut pa_count = 0u32;
             for trial in 0..trials_per_step {
                 xor_shift(&mut rng);
-                let noise_hv = ContinuousHV::random(dim, rng.wrapping_add(step as u64 * 100 + trial as u64));
+                let noise_hv =
+                    ContinuousHV::random(dim, rng.wrapping_add(step as u64 * 100 + trial as u64));
                 let stimulus = ContinuousHV::weighted_bundle(
                     &[&continuum[step], &noise_hv],
                     &[1.0 - noise_frac, noise_frac],
@@ -84,7 +85,8 @@ impl VotContinuumBenchmark {
 
         // Identification accuracy: mean of endpoint clarity
         // Steps 0-1 should be ~0% "pa", steps 8-9 should be ~100% "pa"
-        let endpoint_acc = ((1.0 - identifications[0]) + (1.0 - identifications[1])
+        let endpoint_acc = ((1.0 - identifications[0])
+            + (1.0 - identifications[1])
             + identifications[n_steps - 2]
             + identifications[n_steps - 1])
             / 4.0;

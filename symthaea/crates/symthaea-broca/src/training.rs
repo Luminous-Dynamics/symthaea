@@ -250,7 +250,7 @@ impl Default for TrainingConfig {
             epochs: 10,
             learning_rate: 0.001,
             bptt_window: 16,
-            grad_clip: 1.0,
+            grad_clip: 20.0,
             report_interval: 100,
             use_adam: true,
             warmup_fraction: 0.1,
@@ -430,8 +430,12 @@ impl GradientDiagnostics {
 
         // Oscillating: high coefficient of variation (std/mean > 2.0)
         if mean > 1e-8 {
-            let variance =
-                self.grad_norms.iter().map(|&g| (g - mean).powi(2)).sum::<f32>() / n as f32;
+            let variance = self
+                .grad_norms
+                .iter()
+                .map(|&g| (g - mean).powi(2))
+                .sum::<f32>()
+                / n as f32;
             let cv = variance.sqrt() / mean;
             if cv > 2.0 {
                 anomalies.push(GradientAnomaly::Oscillating {
@@ -442,7 +446,10 @@ impl GradientDiagnostics {
 
         // Plateau: all norms within 1% of mean (no learning signal diversity)
         if n >= 10 && mean > 1e-8 {
-            let all_flat = self.grad_norms.iter().all(|&g| (g - mean).abs() < mean * 0.01);
+            let all_flat = self
+                .grad_norms
+                .iter()
+                .all(|&g| (g - mean).abs() < mean * 0.01);
             if all_flat {
                 anomalies.push(GradientAnomaly::Plateau { mean_norm: mean });
             }
@@ -729,6 +736,12 @@ pub fn train_with_adam(
         || config.enable_anomaly_response;
 
     for epoch in 0..config.epochs {
+        // Reset CfC momentum between epochs to prevent accumulated directional
+        // bias from 67K+ gradient steps (momentum 0.9 × 67K steps → runaway).
+        if epoch > 0 && config.train_network {
+            generator.controller_mut().reset_network_momentum();
+        }
+
         let mut total_loss = 0.0f32;
         let mut total_tokens = 0usize;
         let mut coherence_sum = 0.0f32;
@@ -822,9 +835,8 @@ pub fn train_with_adam(
                     coherence_count += 1;
                     if effective_coherence_weight > 0.0 {
                         // weight = 1.0 when coherence=1.0, lower when coherence drops
-                        let weight = (1.0
-                            - effective_coherence_weight * (1.0 - coherence))
-                            .max(0.05);
+                        let weight =
+                            (1.0 - effective_coherence_weight * (1.0 - coherence)).max(0.05);
                         raw_loss * weight
                     } else {
                         raw_loss
@@ -838,9 +850,9 @@ pub fn train_with_adam(
 
                 // Phased training: only enable CfC BPTT after network_warmup_epochs
                 // (force_train_network overrides when plateau anomaly detected)
-                let train_network_this_epoch =
-                    (config.train_network && epoch >= config.network_warmup_epochs)
-                        || force_train_network;
+                let train_network_this_epoch = (config.train_network
+                    && epoch >= config.network_warmup_epochs)
+                    || force_train_network;
 
                 // Compute gradient of CE loss w.r.t. output HV (for CfC BPTT)
                 let d_output = if train_network_this_epoch {
@@ -980,7 +992,8 @@ pub fn train_with_adam(
                             GradientAnomaly::Exploding { .. } => {
                                 lr_multiplier = (lr_multiplier * 0.5).max(0.01);
                                 tracing::warn!(
-                                    epoch, lr_multiplier,
+                                    epoch,
+                                    lr_multiplier,
                                     "Anomaly response: halved LR (exploding gradients)"
                                 );
                             }
@@ -988,14 +1001,16 @@ pub fn train_with_adam(
                                 let max_mult = 10.0 * initial_lr;
                                 lr_multiplier = (lr_multiplier * 2.0).min(max_mult / initial_lr);
                                 tracing::warn!(
-                                    epoch, lr_multiplier,
+                                    epoch,
+                                    lr_multiplier,
                                     "Anomaly response: doubled LR (vanishing gradients)"
                                 );
                             }
                             GradientAnomaly::Oscillating { .. } => {
                                 effective_grad_clip *= 0.5;
                                 tracing::warn!(
-                                    epoch, effective_grad_clip,
+                                    epoch,
+                                    effective_grad_clip,
                                     "Anomaly response: tightened grad clip (oscillating)"
                                 );
                             }
@@ -1017,7 +1032,9 @@ pub fn train_with_adam(
                                     report.coherence_collapse_detected = true;
                                 }
                                 tracing::warn!(
-                                    epoch, mean_coherence, lr_multiplier,
+                                    epoch,
+                                    mean_coherence,
+                                    lr_multiplier,
                                     "Anomaly response: halved LR (coherence collapse)"
                                 );
                             }
@@ -1033,7 +1050,8 @@ pub fn train_with_adam(
                             report.anomaly_early_stopped = true;
                         }
                         tracing::warn!(
-                            epoch, consecutive_anomaly_epochs,
+                            epoch,
+                            consecutive_anomaly_epochs,
                             "Anomaly response: early stopping (3 consecutive anomalous epochs)"
                         );
                         break;
@@ -1092,8 +1110,7 @@ pub fn train_with_adam(
         let mean_coherence = if intent_coherences.is_empty() {
             0.0
         } else {
-            intent_coherences.iter().map(|(_, c)| c).sum::<f32>()
-                / intent_coherences.len() as f32
+            intent_coherences.iter().map(|(_, c)| c).sum::<f32>() / intent_coherences.len() as f32
         };
         let passed = mean_coherence >= config.smoke_test_coherence_threshold;
         if !passed {
@@ -1133,8 +1150,15 @@ fn cross_entropy_loss(logits: &[f32], target: usize) -> f32 {
 
 /// Compute the gradient of cross-entropy loss w.r.t. the network output HV.
 ///
-/// For weight-tied output: logits[i] = cosine_similarity(output_hv, emb[i])
-/// ∂L/∂output_hv = Σ_i (softmax[i] - one_hot[target]) × emb[i]
+/// For weight-tied output: logits[i] = scale * cosine_similarity(output_hv, emb[i])
+///
+/// The derivative of cosine_similarity(o, e) w.r.t. o is:
+///   (e - cos(o,e) * o) / (||o|| * ||e||)
+///
+/// Since output_hv is normalized (||o|| = 1), this simplifies to:
+///   (e / ||e|| - cos(o,e) * o)
+///
+/// Full chain: ∂L/∂o = scale × Σ_i (softmax[i] - 1_{i=target}) × (e_i/||e_i|| - cos_i × o)
 ///
 /// This gradient is used to backpropagate through the CfC network.
 fn compute_ce_gradient_wrt_output(
@@ -1158,9 +1182,13 @@ fn compute_ce_gradient_wrt_output(
     }
 
     let embeddings = controller.token_embeddings();
+    let output_hv = controller.output_hv();
+    let output_slice = output_hv.as_slice();
+    let scale = controller.config().logit_scale;
     let n = embeddings.len().min(logits.len());
 
-    // Accumulate: d_output = Σ_i (softmax[i] - 1_{i=target}) × emb[i]
+    // Accumulate: d_output = scale × Σ_i error_i × (e_hat_i - cos_i × o)
+    // where e_hat_i = e_i / ||e_i||, cos_i = similarity(o, e_i)
     let mut d_output = vec![0.0f32; HDC_DIMENSION];
     for i in 0..n {
         let prob = exps[i] / sum_exp;
@@ -1171,9 +1199,20 @@ fn compute_ce_gradient_wrt_output(
         }
 
         let emb_vals = embeddings[i].as_slice();
+        // Compute ||e_i|| for normalization
+        let emb_norm: f32 = emb_vals.iter().map(|v| v * v).sum::<f32>().sqrt().max(1e-8);
+        // cos_i = similarity(output, emb[i]) — recover from scaled logit
+        let cos_i = if scale.abs() > 1e-6 {
+            logits[i] / scale
+        } else {
+            0.0
+        };
+
+        let scaled_error = scale * error;
         for (j, &ev) in emb_vals.iter().enumerate() {
             if j < d_output.len() {
-                d_output[j] += error * ev;
+                // d cos(o,e)/do = (e/||e|| - cos*o) / ||o|| — but ||o||=1 (normalized)
+                d_output[j] += scaled_error * (ev / emb_norm - cos_i * output_slice[j]);
             }
         }
     }
@@ -1183,9 +1222,9 @@ fn compute_ce_gradient_wrt_output(
 
 /// Apply gradient through weight-tied output (SGD).
 ///
-/// For weight-tied output: logits[i] = similarity(output_hv, emb[i])
-/// Gradient of CE loss w.r.t. output_hv is: sum_i (softmax[i] - one_hot[target]) * emb[i]
-/// We use this to shift the relevant token embeddings toward/away from the output.
+/// For weight-tied output: logits[i] = scale * cosine_similarity(output_hv, emb[i])
+/// ∂L/∂e_i = scale × (softmax[i] - 1_{target}) × output_hv
+/// (simplified: we use output_hv as gradient direction to shift embeddings)
 ///
 /// Returns (grad_l2_norm, was_clipped).
 fn apply_weight_tied_gradient(
@@ -1210,6 +1249,7 @@ fn apply_weight_tied_gradient(
 
     let output_hv = controller.output_hv();
     let output_slice = output_hv.as_slice();
+    let scale = controller.config().logit_scale;
 
     // Update token embeddings: shift target toward output, others away
     let embeddings = controller.token_embeddings_mut();
@@ -1229,8 +1269,8 @@ fn apply_weight_tied_gradient(
 
         sum_sq += error * error;
 
-        // Gradient: error * output_hv (projected onto embedding dimension)
-        let raw = -lr * error;
+        // Gradient includes the logit_scale factor
+        let raw = -lr * scale * error;
         let grad_scale = raw.clamp(-grad_clip, grad_clip);
         if (grad_scale - raw).abs() > 1e-10 {
             was_clipped = true;
@@ -1273,6 +1313,7 @@ fn apply_weight_tied_gradient_adam(
 
     let output_hv = controller.output_hv();
     let output_slice = output_hv.as_slice();
+    let scale = controller.config().logit_scale;
 
     let embeddings = controller.token_embeddings_mut();
     let n = embeddings.len().min(logits.len());
@@ -1290,23 +1331,19 @@ fn apply_weight_tied_gradient_adam(
 
         sum_sq += error * error;
 
-        // Compute per-dimension gradient: error * output_hv
+        // Compute per-dimension gradient: scale * error * output_hv
         let dim = embeddings[i].values.len().min(output_slice.len());
         let grad: Vec<f32> = (0..dim)
             .map(|j| {
-                let raw = error * output_slice[j];
+                let raw = scale * error * output_slice[j];
                 let clamped = raw.clamp(-grad_clip, grad_clip);
-                if (clamped - raw).abs() > 1e-10 {
-                    // Note: can't mutate was_clipped in closure directly,
-                    // but we'll check post-hoc
-                }
                 clamped
             })
             .collect();
 
         // Check if any gradient was actually clipped
         for &val in output_slice {
-            let raw = error * val;
+            let raw = scale * error * val;
             if raw.abs() > grad_clip {
                 was_clipped = true;
                 break;
@@ -1470,13 +1507,32 @@ pub fn generate_curriculum(tokenizer: &BpeTokenizer) -> TrainingDataset {
 ///
 /// Uses teacher-forced forward pass through the CfC network, computing loss
 /// at each position. Returns the average per-token loss.
+///
+/// Uses negative sampling (same as training) to avoid the 8x cost of computing
+/// all 4096 cosine similarities per token. The loss estimate is slightly biased
+/// (softmax denominator covers fewer terms) but the relative ranking between
+/// epochs is preserved, which is all early stopping needs.
 pub fn compute_validation_loss(
     generator: &mut BrocaGenerator,
     dataset: &TrainingDataset,
     bptt_window: usize,
 ) -> f32 {
+    compute_validation_loss_sampled(generator, dataset, bptt_window, 60)
+}
+
+/// Validation loss with configurable negative sampling.
+/// `negative_samples = 0` uses full softmax (expensive but exact).
+pub fn compute_validation_loss_sampled(
+    generator: &mut BrocaGenerator,
+    dataset: &TrainingDataset,
+    bptt_window: usize,
+    negative_samples: usize,
+) -> f32 {
     let mut total_loss = 0.0f32;
     let mut total_tokens = 0usize;
+    let vocab_size = generator.controller().vocab_size();
+    let use_sampled = negative_samples > 0 && vocab_size > negative_samples + 1;
+    let mut neg_seed: u64 = 0xDEAD_BEEF_CAFE;
 
     for pair in &dataset.pairs {
         if pair.target_ids.is_empty() {
@@ -1491,9 +1547,21 @@ pub fn compute_validation_loss(
         let window_end = pair.target_ids.len().min(bptt_window);
 
         for (pos, &target_id) in pair.target_ids[..window_end].iter().enumerate() {
-            let logits = generator
-                .controller_mut()
-                .forward_step(&thought_hv, prev_token, pos);
+            let logits = if use_sampled {
+                neg_seed = neg_seed.wrapping_add(1);
+                let active =
+                    sample_negatives(target_id as usize, vocab_size, negative_samples, neg_seed);
+                generator.controller_mut().forward_step_sampled(
+                    &thought_hv,
+                    prev_token,
+                    pos,
+                    &active,
+                )
+            } else {
+                generator
+                    .controller_mut()
+                    .forward_step(&thought_hv, prev_token, pos)
+            };
             let loss = cross_entropy_loss(&logits, target_id as usize);
             total_loss += loss;
             total_tokens += 1;
@@ -2321,7 +2389,10 @@ mod tests {
         // Should early-stop (3 consecutive anomalous epochs) or complete with reduced LR
         // Either way, all losses should be finite (anomaly response prevents divergence)
         for m in &metrics {
-            assert!(m.avg_loss.is_finite(), "Loss should remain finite with anomaly response");
+            assert!(
+                m.avg_loss.is_finite(),
+                "Loss should remain finite with anomaly response"
+            );
         }
     }
 
@@ -2445,7 +2516,10 @@ mod tests {
         let metrics = train(&mut gen, &dataset, &train_config);
         // Should complete without error and produce finite loss
         for m in &metrics {
-            assert!(m.avg_loss.is_finite(), "Loss should be finite with frozen embeddings");
+            assert!(
+                m.avg_loss.is_finite(),
+                "Loss should be finite with frozen embeddings"
+            );
         }
     }
 
@@ -2571,7 +2645,10 @@ mod tests {
             assert!(m.avg_loss.is_finite(), "No-coherence loss should be finite");
         }
         for m in &metrics_yes {
-            assert!(m.avg_loss.is_finite(), "Coherence-gated loss should be finite");
+            assert!(
+                m.avg_loss.is_finite(),
+                "Coherence-gated loss should be finite"
+            );
         }
 
         // Coherence-weighted loss should be lower (scaled down by weight)
@@ -2723,8 +2800,7 @@ mod tests {
             ..Default::default()
         };
 
-        let (_, _, _, _, validation) =
-            train_with_adam(&mut gen, &dataset, &train_config, None);
+        let (_, _, _, _, validation) = train_with_adam(&mut gen, &dataset, &train_config, None);
         let val = validation.expect("TrainingValidation should be Some when smoke test enabled");
         assert_eq!(val.intent_coherences.len(), 8, "Should test all 8 intents");
         assert!(val.mean_coherence.is_finite());
@@ -2830,7 +2906,11 @@ pub fn generate_therapeutic_training_data(tokenizer: &BpeTokenizer) -> TrainingD
         // Set base consciousness channels to reasonable defaults
         channels.set_consciousness(0.6, 0.5, 0.7);
         channels.set_emotion(
-            if distress > 0.5 { -(distress - 0.5) } else { 0.3 },
+            if distress > 0.5 {
+                -(distress - 0.5)
+            } else {
+                0.3
+            },
             distress.clamp(0.3, 0.8),
             0.7, // warmth
         );

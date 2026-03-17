@@ -34,7 +34,6 @@ use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::trial_analysis::TrialOutcome;
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use std::collections::BTreeMap;
-use symthaea_core::hdc::binary_hv::BinaryHV;
 use symthaea_core::hdc::primitive_system::CompositionAlgebra;
 use symthaea_core::hdc::primitive_system::PrimitiveSystem;
 
@@ -124,17 +123,25 @@ impl InstitutionalReasoningBenchmark {
 
         // Also define NATION_STATE and REGULATION in the algebra so we can
         // use them as composites/targets in decomposition tests.
-        // NATION_STATE = SOVEREIGNTY ^ INSTITUTION ^ ENFORCEMENT ^ POPULATION
-        // REGULATION = LAW ^ COMPLIANCE (already a derived primitive, but we
-        // need it in the algebra's composition map for similarity ranking).
+        // Use bundle (+) to match the axiom definitions — XOR (^) binding
+        // creates a fundamentally different representation that can't be
+        // compared via similarity with bundle-based axioms.
         let _ = algebra.define(
             "NATION_STATE",
-            "SOVEREIGNTY ^ INSTITUTION ^ ENFORCEMENT ^ POPULATION",
+            "SOVEREIGNTY + INSTITUTION + ENFORCEMENT + POPULATION",
             &system,
         );
-        let _ = algebra.define("REGULATION", "LAW ^ COMPLIANCE", &system);
+        let _ = algebra.define("REGULATION", "LAW + COMPLIANCE", &system);
 
         // ── 1. Decomposition accuracy ──
+        // Institutional axioms are created via bundling (majority vote), not XOR
+        // binding. XOR unbinding is NOT the inverse of bundling. Instead, use
+        // a similarity-residual approach: after factoring out the removed
+        // component's contribution, which target does the composite align with?
+        //
+        // residual_sim = sim(composite, target) - sim(removed, target)
+        // This measures: "the composite is similar to the target for reasons
+        // beyond just the removed component."
         let cases = Self::decomposition_cases();
         let mut correct = 0usize;
         let total = cases.len();
@@ -157,12 +164,18 @@ impl InstitutionalReasoningBenchmark {
                 None => continue,
             };
 
-            // Unbind: residual = composite XOR removed
-            let residual = composite_hv.bind(&removed_hv);
-            let sim_near = residual.similarity(&near_hv);
-            let sim_far = residual.similarity(&far_hv);
+            // Similarity-residual decomposition: factor out the removed
+            // component's contribution to see which target the composite
+            // aligns with for structural (non-removed) reasons.
+            let sim_comp_near = composite_hv.similarity(&near_hv);
+            let sim_comp_far = composite_hv.similarity(&far_hv);
+            let sim_rem_near = removed_hv.similarity(&near_hv);
+            let sim_rem_far = removed_hv.similarity(&far_hv);
 
-            if sim_near > sim_far {
+            let residual_near = sim_comp_near - sim_rem_near;
+            let residual_far = sim_comp_far - sim_rem_far;
+
+            if residual_near > residual_far {
                 correct += 1;
             }
         }

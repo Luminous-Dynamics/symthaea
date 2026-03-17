@@ -78,6 +78,17 @@ struct ArgumentEncoding {
     distractor_hv: ContinuousHV,
 }
 
+/// Negate a ContinuousHV by flipping all component signs.
+/// Cannot use weighted_bundle([v], [-1.0]) — it normalizes by weight_sum,
+/// turning (-1*v)/(-1) = v (a no-op).
+fn negate_hv(hv: &ContinuousHV) -> ContinuousHV {
+    let mut result = hv.clone();
+    for v in result.values.iter_mut() {
+        *v = -*v;
+    }
+    result
+}
+
 fn encode_argument(arg_type: ArgumentType, dim: usize, seed: u64) -> ArgumentEncoding {
     let p = ContinuousHV::random(dim, seed.wrapping_add(1));
     let q = ContinuousHV::random(dim, seed.wrapping_add(2));
@@ -88,8 +99,8 @@ fn encode_argument(arg_type: ArgumentType, dim: usize, seed: u64) -> ArgumentEnc
     let q_implies_r = q.bind(&r);
 
     // Negation: negate each component (multiply by -1 in continuous HDC)
-    let neg_p = ContinuousHV::weighted_bundle(&[&p], &[-1.0]);
-    let neg_q = ContinuousHV::weighted_bundle(&[&q], &[-1.0]);
+    let neg_p = negate_hv(&p);
+    let neg_q = negate_hv(&q);
 
     // Distractor: a random HV unrelated to any argument component
     let distractor = ContinuousHV::random(dim, seed.wrapping_add(100));

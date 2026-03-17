@@ -105,9 +105,10 @@ pub fn evaluate_arc_tasks(
     dimension: usize,
     seed: u64,
 ) -> ArcDatasetResult {
-    use symthaea_core::hdc::grid_encoder::GridEncoder;
-    use symthaea_core::hdc::ContinuousHV;
+    use symthaea_core::hdc::binary_grid_encoder::BinaryGridEncoder;
+    use symthaea_core::hdc::BinaryHV;
 
+    let _dimension = dimension;
     let mut tasks_correct: usize = 0;
     let mut similarity_sum: f64 = 0.0;
     let mut consistency_sum: f64 = 0.0;
@@ -141,8 +142,7 @@ pub fn evaluate_arc_tasks(
             .unwrap_or(30);
         let num_colors = 10; // ARC uses colors 0-9
 
-        let encoder = GridEncoder::new(
-            dimension,
+        let encoder = BinaryGridEncoder::new(
             max_rows.max(1),
             max_cols.max(1),
             num_colors,
@@ -184,7 +184,7 @@ pub fn evaluate_arc_tasks(
         similarity_sum += pred_sim;
 
         // 2-AFC: predicted vs random distractor
-        let distractor = ContinuousHV::random(dimension, seed ^ (task_count as u64) ^ 0xDEAD);
+        let distractor = BinaryHV::random(seed ^ (task_count as u64) ^ 0xDEAD);
         let dist_sim = predicted.similarity(&distractor) as f64;
         let correct = pred_sim > dist_sim;
         if correct {

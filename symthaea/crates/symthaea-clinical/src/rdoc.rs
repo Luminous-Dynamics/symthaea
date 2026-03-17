@@ -249,7 +249,11 @@ mod tests {
         severe.set_score(RDocDomain::CognitiveSystems, 0.0);
         severe.set_score(RDocDomain::SocialProcesses, 0.0);
         let sim = healthy.similarity(&severe);
-        assert!(sim < 0.8, "dissimilar profiles sim {:.3} should be < 0.8", sim);
+        assert!(
+            sim < 0.8,
+            "dissimilar profiles sim {:.3} should be < 0.8",
+            sim
+        );
     }
 
     #[test]

@@ -24,8 +24,9 @@ use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::trial_analysis::TrialOutcome;
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use std::collections::BTreeMap;
+use symthaea_core::hdc::binary_grid_encoder::BinaryGridEncoder;
 use symthaea_core::hdc::grid_encoder::GridEncoder;
-use symthaea_core::hdc::ContinuousHV;
+use symthaea_core::hdc::BinaryHV;
 
 /// Adaptive staircase benchmark for grid complexity capacity.
 pub struct ArcStaircaseBenchmark;
@@ -50,14 +51,14 @@ fn gen_grid(rng: &mut u64, size: usize, num_colors: u8) -> Vec<Vec<u8>> {
 /// Test accuracy at a given grid size. Returns (accuracy, mean_similarity).
 fn probe_accuracy(
     grid_size: usize,
-    dim: usize,
+    _dim: usize,
     num_tasks: usize,
     seed: u64,
     noise_weight: f64,
 ) -> (f64, f64) {
     let mut rng = seed ^ 0x9E3779B97F4A7C15;
     let num_colors: u8 = 6;
-    let encoder = GridEncoder::new(dim, grid_size, grid_size, num_colors as usize, seed);
+    let encoder = BinaryGridEncoder::new(grid_size, grid_size, num_colors as usize, seed);
 
     let mut hits = 0u32;
     let mut total = 0u32;
@@ -75,11 +76,7 @@ fn probe_accuracy(
             let mut rule = encoder.encode_rule(&in_hv, &out_hv);
             if noise_weight > 0.0 {
                 xor_shift(&mut rng);
-                let noise = ContinuousHV::random(dim, rng);
-                rule = ContinuousHV::weighted_bundle(
-                    &[&rule, &noise],
-                    &[1.0 - noise_weight as f32, noise_weight as f32],
-                );
+                rule = rule.add_noise(noise_weight as f32, rng);
             }
             train_rules.push(rule);
         }
@@ -96,7 +93,7 @@ fn probe_accuracy(
         sim_sum += pred_sim;
 
         xor_shift(&mut rng);
-        let distractor = ContinuousHV::random(dim, rng);
+        let distractor = BinaryHV::random(rng);
         let dist_sim = predicted.similarity(&distractor) as f64;
 
         total += 1;

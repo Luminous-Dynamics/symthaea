@@ -50,8 +50,9 @@ impl RestlessBanditBenchmark {
         // Higher alpha EMA tracks drift faster
         let mut arm_ema: Vec<f64> = vec![0.5; num_arms];
         let ema_alpha = 0.6; // High alpha = fast drift tracking
-                             // Track pull count per arm (UCB-style exploration bonus)
+                             // Track last-pull time per arm (recency-aware exploration)
         let mut arm_pulls: Vec<u64> = vec![0; num_arms];
+        let mut arm_last_pull: Vec<usize> = vec![0; num_arms];
         let mut rt_ticks = Vec::new();
 
         for trial in 0..num_trials {
@@ -64,29 +65,33 @@ impl RestlessBanditBenchmark {
                 *val = (*val + drift).clamp(0.0, 1.0);
             }
 
-            // Action selection: UCB1 with forced initial sampling.
-            // UCB adds sqrt(2 * ln(t) / n_i) bonus to under-sampled arms,
-            // providing principled exploration without wasting trials on
-            // random epsilon exploration.
+            // Action selection: recency-aware UCB for non-stationary bandits.
+            // Standard UCB1 uses total pulls; for restless bandits, arms not
+            // pulled recently have drifted → their estimates are stale.
+            // Add recency bonus proportional to time since last pull.
             let chosen_arm = if trial < num_arms {
                 // Phase 1: sample each arm once
                 trial
             } else {
-                // Phase 2: UCB1 — pick arm maximizing EMA + exploration bonus
+                // Phase 2: UCB with recency bonus
                 let total_pulls: u64 = arm_pulls.iter().sum();
                 let ln_total = (total_pulls as f64).ln();
                 arm_ema
                     .iter()
                     .enumerate()
                     .map(|(i, &ema)| {
-                        let bonus = if arm_pulls[i] > 0 {
+                        let count_bonus = if arm_pulls[i] > 0 {
                             (2.0 * ln_total / arm_pulls[i] as f64).sqrt()
                         } else {
                             f64::MAX
                         };
+                        // Recency: arms not pulled recently get extra bonus (stale estimates)
+                        let staleness = (trial - arm_last_pull[i]) as f64;
+                        let recency_bonus = (staleness / 10.0).min(0.5);
                         // Time pressure: base UCB scale 0.15; +0.10/unit inflates exploration bonus,
                         // modeling noisier value estimation under deadline (Daw et al., 2006 restless bandit).
-                        (i, ema + bonus * (0.15 + config.time_pressure * 0.10))
+                        let ucb_scale = 0.15 + config.time_pressure * 0.10;
+                        (i, ema + count_bonus * ucb_scale + recency_bonus * 0.1)
                     })
                     .max_by(|(_, a), (_, b)| a.total_cmp(b))
                     .map(|(i, _)| i)
@@ -94,6 +99,7 @@ impl RestlessBanditBenchmark {
             };
 
             arm_pulls[chosen_arm] += 1;
+            arm_last_pull[chosen_arm] = trial;
 
             // RT proxy: decision difficulty from EMA margin between best and
             // second-best arm — smaller margin = harder deliberation (Daw et al., 2006).

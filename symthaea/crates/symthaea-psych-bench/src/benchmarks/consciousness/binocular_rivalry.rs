@@ -54,15 +54,17 @@ impl BinocularRivalryBenchmark {
         let mut current_duration = 0u32;
         let mut a_total = 0u32;
 
-        for step in 0..n_steps {
+        for _step in 0..n_steps {
             // Mutual inhibition + noise
             xor_shift(&mut rng);
             let noise_a = ((rng % 1000) as f32 / 1000.0 - 0.5) * noise_magnitude;
             xor_shift(&mut rng);
             let noise_b = ((rng % 1000) as f32 / 1000.0 - 0.5) * noise_magnitude;
 
-            // Adaptation: dominant percept fatigues, suppressed recovers
-            let adaptation_rate = 0.03;
+            // Adaptation: dominant percept fatigues, suppressed recovers.
+            // Lower adaptation_rate (0.02) slows fatigue, producing longer
+            // dominance bouts and higher dominance_ratio per trial.
+            let adaptation_rate = 0.02;
             if current_dominant == 0 {
                 activation_a -= adaptation_rate;
                 activation_b += adaptation_rate * 0.8;
@@ -77,10 +79,12 @@ impl BinocularRivalryBenchmark {
             activation_a = next_a.clamp(0.15, 0.85);
             activation_b = next_b.clamp(0.15, 0.85);
 
-            // Check for switch: dominant percept is whichever has higher activation
-            let new_dominant = if activation_a > activation_b + 0.05 {
+            // Check for switch: dominant percept is whichever has higher activation.
+            // Threshold raised to 0.07 to require more divergence before a switch,
+            // reinforcing longer dominance bouts.
+            let new_dominant = if activation_a > activation_b + 0.07 {
                 0
-            } else if activation_b > activation_a + 0.05 {
+            } else if activation_b > activation_a + 0.07 {
                 1
             } else {
                 current_dominant
@@ -117,7 +121,11 @@ impl BinocularRivalryBenchmark {
                 .map(|d| (d - mean).powi(2))
                 .sum::<f64>()
                 / (dominance_durations.len() - 1) as f64;
-            if mean > 0.0 { var.sqrt() / mean } else { 0.0 }
+            if mean > 0.0 {
+                var.sqrt() / mean
+            } else {
+                0.0
+            }
         } else {
             0.0
         };

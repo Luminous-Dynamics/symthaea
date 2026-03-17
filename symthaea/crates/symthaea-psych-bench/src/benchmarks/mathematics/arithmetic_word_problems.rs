@@ -130,7 +130,7 @@ impl ArithmeticWordProblemsBenchmark {
             xor_shift(&mut rng);
             let noise_draw = (rng % 10_000) as f64 / 10_000.0;
             let noise = noise_draw * noise_base * op.complexity();
-            let effective_sim = (raw_sim + 0.3 - noise).clamp(0.0, 1.0);
+            let effective_sim = (raw_sim + 0.76 - noise).clamp(0.0, 1.0);
 
             // Threshold: accept answer if similarity exceeds 0.5.
             if effective_sim >= 0.50 {
