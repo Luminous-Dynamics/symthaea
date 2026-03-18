@@ -130,7 +130,11 @@ impl CognitiveLoopService {
             // Science: Jung (1951) — shadow integration through active imagination;
             // Hartmann (1998) — dreams as "safe space" for processing threatening content.
             #[cfg(feature = "therapeutic")]
-            if let Some(shadow_input) = self.therapeutic_manager.shadow_detector.next_dream_fragment() {
+            if let Some(shadow_input) = self
+                .therapeutic_manager
+                .shadow_detector
+                .next_dream_fragment()
+            {
                 dream.record(
                     &shadow_input.state_vector,
                     shadow_input.action_vector,
@@ -258,7 +262,8 @@ impl CognitiveLoopService {
                 // consolidated during sleep for survival-relevant pattern retention.
                 #[cfg(feature = "sentinel")]
                 {
-                    self.threat_memory.decay_old_patterns(self.stats.total_cycles as usize);
+                    self.threat_memory
+                        .decay_old_patterns(self.stats.total_cycles as usize);
                 }
             }
 

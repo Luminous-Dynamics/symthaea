@@ -68,10 +68,10 @@ pub fn compute_enforcement(
     temporal_coherence: f32,
     integrity_critical: bool,
     cycle: usize,
-    #[cfg(feature = "sentinel")]
-    collective_immune: Option<&super::collective_immunity::CollectiveImmuneState>,
-    #[cfg(not(feature = "sentinel"))]
-    _collective_immune: Option<&()>,
+    #[cfg(feature = "sentinel")] collective_immune: Option<
+        &super::collective_immunity::CollectiveImmuneState,
+    >,
+    #[cfg(not(feature = "sentinel"))] _collective_immune: Option<&()>,
 ) -> SafetyEnforcementResult {
     let metrics = SafetyMetrics {
         cycle,
@@ -97,8 +97,14 @@ pub fn compute_enforcement(
 
     let (lr_mult, explore_mult) = match level {
         SafetyLevel::Red => (SAFETY_RED_LR_MULTIPLIER, 0.0),
-        SafetyLevel::Orange => (SAFETY_ORANGE_LR_MULTIPLIER, SAFETY_ORANGE_EXPLORATION_DAMPEN),
-        SafetyLevel::Yellow => (SAFETY_YELLOW_LR_MULTIPLIER, SAFETY_YELLOW_EXPLORATION_DAMPEN),
+        SafetyLevel::Orange => (
+            SAFETY_ORANGE_LR_MULTIPLIER,
+            SAFETY_ORANGE_EXPLORATION_DAMPEN,
+        ),
+        SafetyLevel::Yellow => (
+            SAFETY_YELLOW_LR_MULTIPLIER,
+            SAFETY_YELLOW_EXPLORATION_DAMPEN,
+        ),
         SafetyLevel::Green => (1.0, 1.0),
     };
 

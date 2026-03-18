@@ -61,10 +61,14 @@ impl CognitiveLoopService {
                 coherence_velocity_gated: feedback.quality.coherence_velocity_gated,
                 anomaly_recovery_progress: dynamics.homeostasis.anomaly_recovery_progress,
                 anomaly_recovering: dynamics.homeostasis.anomaly_recovering,
-                hierarchical_free_energy_lr_boost: feedback.self_model.hierarchical_free_energy_lr_boost,
+                hierarchical_free_energy_lr_boost: feedback
+                    .self_model
+                    .hierarchical_free_energy_lr_boost,
                 predictive_phi_lr_delta: feedback.self_model.predictive_phi_lr_delta,
                 body_valence_confidence_delta: feedback.self_model.body_valence_confidence_delta,
-                narrative_self_confidence_factor: feedback.self_model.narrative_self_confidence_factor,
+                narrative_self_confidence_factor: feedback
+                    .self_model
+                    .narrative_self_confidence_factor,
             },
             narrative_self_psi: feedback.self_model.narrative_self_psi,
             consciousness: super::ConsciousnessLevelMetrics {
@@ -74,14 +78,18 @@ impl CognitiveLoopService {
                     .consciousness_profile_composite,
                 synergy_enhanced_composite: feedback.consciousness.synergy_enhanced_composite,
                 emergent_properties_count: feedback.consciousness.emergent_properties_count,
-                consciousness_state_label: mem::take(&mut feedback.consciousness.consciousness_state_label),
+                consciousness_state_label: mem::take(
+                    &mut feedback.consciousness.consciousness_state_label,
+                ),
                 consciousness_state_level: feedback.consciousness.consciousness_state_level,
                 consciousness_weights: feedback.consciousness.consciousness_weights,
                 consciousness_weight_variance: feedback.consciousness.consciousness_weight_variance,
                 consciousness_gradient_magnitude: feedback
                     .consciousness
                     .consciousness_gradient_magnitude,
-                consciousness_limiting_component: mem::take(&mut feedback.consciousness.consciousness_limiting_component),
+                consciousness_limiting_component: mem::take(
+                    &mut feedback.consciousness.consciousness_limiting_component,
+                ),
                 ..Default::default()
             },
             embodied: super::EmbodiedAffectMetrics {
@@ -184,7 +192,8 @@ impl CognitiveLoopService {
             primitive_psi: feedback.consciousness.primitive_psi,
             lattice_height: feedback.consciousness.lattice_height,
             lattice_width: feedback.consciousness.lattice_width,
-            lattice_join_concept: mem::take(&mut feedback.consciousness.lattice_join_concept).unwrap_or_default(),
+            lattice_join_concept: mem::take(&mut feedback.consciousness.lattice_join_concept)
+                .unwrap_or_default(),
             causal_codebook_entries: feedback.consciousness.causal_codebook_entries_len,
             compositionality_total: feedback.consciousness.compositionality_total,
             composition_rule_applied: mem::take(&mut feedback.ethics.composition_rule_applied),
@@ -208,7 +217,9 @@ impl CognitiveLoopService {
                 moral_surprise: self.ethics_engine.last_moral_free_energy().surprise,
                 dominant_harmonic: mem::take(&mut dynamics.guidance.dominant_harmonic),
                 guiding_question: mem::take(&mut dynamics.guidance.guiding_question),
-                guiding_priority_category: mem::take(&mut dynamics.guidance.guiding_priority_category),
+                guiding_priority_category: mem::take(
+                    &mut dynamics.guidance.guiding_priority_category,
+                ),
             },
             ethics: super::EthicalTelemetry {
                 moral_score: perception.moral.moral_score,
@@ -253,7 +264,12 @@ impl CognitiveLoopService {
                 moral_attractor_detected: topo_summary.attractor_detected,
                 in_active_rest: self.stats.in_active_rest,
                 stillness_dominance_streak: self.stats.stillness_dominance_streak,
-                unified_verdict: self.ethics_verdict_override.as_ref().unwrap_or(&self.last_ethics_verdict).as_str().to_string(),
+                unified_verdict: self
+                    .ethics_verdict_override
+                    .as_ref()
+                    .unwrap_or(&self.last_ethics_verdict)
+                    .as_str()
+                    .to_string(),
             },
             multi_obj_frontier_size: feedback.multi_obj_frontier_size,
             reasoning_context: mem::take(&mut feedback.reasoning.reasoning_context),
@@ -270,7 +286,9 @@ impl CognitiveLoopService {
             epistemic_quality: feedback.reasoning.epistemic_quality,
             phi_validation_correlation: feedback.reasoning.phi_validation_correlation,
             epistemic_conflict_count: feedback.reasoning.epistemic_conflict_count,
-            eq_v2_limiting_component: mem::take(&mut feedback.consciousness.eq_v2_limiting_component),
+            eq_v2_limiting_component: mem::take(
+                &mut feedback.consciousness.eq_v2_limiting_component,
+            ),
             pipeline_consciousness: feedback.consciousness.pipeline_consciousness,
             multimodal_integrated_phi: feedback.consciousness.multimodal_integrated_phi,
             epistemic_gate_confidence: feedback.reasoning.epistemic_gate_confidence,
@@ -1028,7 +1046,9 @@ impl CognitiveLoopService {
 
         metadata.consciousness.weight_convergence_state =
             mem::take(&mut feedback.consciousness.convergence_state);
-        if metadata.consciousness.weight_convergence_state == "Converged" && self.convergence_cycle == 0 {
+        if metadata.consciousness.weight_convergence_state == "Converged"
+            && self.convergence_cycle == 0
+        {
             self.convergence_cycle = self.stats.total_cycles;
         }
         metadata.consciousness.convergence_cycle = self.convergence_cycle;
@@ -1214,7 +1234,9 @@ impl CognitiveLoopService {
         {
             let level = self.safety_agent.current_level();
             metadata.immune_safety_level = format!("{:?}", level).to_uppercase();
-            let telem = self.guardian_state.telemetry(self.stats.total_cycles as usize);
+            let telem = self
+                .guardian_state
+                .telemetry(self.stats.total_cycles as usize);
             metadata.immune_guardian_posture = telem.posture;
             metadata.immune_patrol_active = telem.patrol_active;
             metadata.immune_emergency_cycles = telem.emergency_cycles;
@@ -1456,8 +1478,7 @@ impl CognitiveLoopService {
         // Visualization: record attention/saliency/binding snapshot
         // ═══════════════════════════════════════════════════════════════════════
         if let Some(ref mut viz) = self.attention_visualizer {
-            static ATTENTION_LABELS: std::sync::OnceLock<Vec<String>> =
-                std::sync::OnceLock::new();
+            static ATTENTION_LABELS: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
             let labels = ATTENTION_LABELS
                 .get_or_init(|| {
                     vec![
@@ -1507,7 +1528,9 @@ impl CognitiveLoopService {
             output: mem::take(&mut dynamics.core.output),
             prediction_error: dynamics.core.prediction_error,
             peak_attention: perception.encoding.encoding_result.peak_attention,
-            detected_primitives: mem::take(&mut perception.encoding.encoding_result.detected_primitives),
+            detected_primitives: mem::take(
+                &mut perception.encoding.encoding_result.detected_primitives,
+            ),
             learning_occurred: dynamics.core.learning_occurred,
             training_loss: dynamics.core.training_loss,
             cycle_time_us: u64::try_from(cycle_start.elapsed().as_micros()).unwrap_or(u64::MAX),

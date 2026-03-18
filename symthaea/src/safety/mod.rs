@@ -50,8 +50,7 @@ pub use level::SafetyLevel;
 
 #[cfg(feature = "safety-agents")]
 pub use agent::{
-    SafetyAgent, SafetyAgentConfig, SafetyAssessment, SafetyMetrics,
-    SafetyOverrideEntry,
+    SafetyAgent, SafetyAgentConfig, SafetyAssessment, SafetyMetrics, SafetyOverrideEntry,
 };
 #[cfg(feature = "safety-agents")]
 pub use audit::SafetyAuditReport;

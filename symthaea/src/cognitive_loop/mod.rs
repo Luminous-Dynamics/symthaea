@@ -190,12 +190,12 @@ pub use physics_integration::ParetoContext;
 #[cfg(feature = "mycelix")]
 pub use managers::governance_manager::{GovernanceEvent, GovernanceEventKind, GovernanceOutcome};
 
+pub use ethics_engine::EthicalVerdict;
 pub use managers::network_service_bridge::{
     forward_affective_state, forward_federated_round, FederatedCoordinatorHandle,
     NetworkServiceBridge, NetworkServiceBridgeHandle,
 };
 pub use managers::swarm_manager::{SwarmEvent, SwarmTelemetry};
-pub use ethics_engine::EthicalVerdict;
 
 #[cfg(feature = "mesh")]
 pub use managers::{
@@ -213,16 +213,16 @@ pub mod nurture_bridge;
 pub mod motor_bridge;
 
 #[cfg(feature = "safety-agents")]
-pub mod safety_enforcement;
-#[cfg(feature = "safety-agents")]
 pub mod civic_crisis_detector;
+#[cfg(feature = "sentinel")]
+pub mod collective_immunity;
 pub mod defense;
 #[cfg(feature = "safety-agents")]
 pub mod guardian;
+#[cfg(feature = "safety-agents")]
+pub mod safety_enforcement;
 #[cfg(feature = "sentinel")]
 pub mod threat_memory;
-#[cfg(feature = "sentinel")]
-pub mod collective_immunity;
 
 // ── Imports (only what the struct definitions below require) ─────────────────
 // AffectiveBridge now owned by ConsciousnessStateManager
@@ -694,7 +694,8 @@ pub struct CognitiveLoopService {
     swarm_event_tx: std::sync::mpsc::Sender<managers::swarm_manager::SwarmEvent>,
 
     /// Handle for the federated coordinator task (if enabled).
-    federation_handle: Option<crate::cognitive_loop::managers::network_service_bridge::FederatedCoordinatorHandle>,
+    federation_handle:
+        Option<crate::cognitive_loop::managers::network_service_bridge::FederatedCoordinatorHandle>,
 
     /// Spectrum Manager: Multi-band radio dispatch, AIMD congestion, delta compression.
     /// Implements CognitiveSubsystem at interval 53. Feature-gated behind `mesh`.
@@ -737,7 +738,8 @@ pub struct CognitiveLoopService {
     /// Hierarchical bundler for per-region BinaryHV aggregation.
     /// Accumulates HDC encodings per cortical region, enabling structured
     /// role-bound aggregation and per-region recovery via XOR unbinding.
-    pub(crate) hierarchical_bundler: Option<symthaea_core::hdc::hierarchical_bundle::HierarchicalBundler>,
+    pub(crate) hierarchical_bundler:
+        Option<symthaea_core::hdc::hierarchical_bundle::HierarchicalBundler>,
 
     /// Pre-allocated input buffer for CfC temporal network step.
     /// Sized to `config.cfc_config.input_dim` at construction, reused each cycle

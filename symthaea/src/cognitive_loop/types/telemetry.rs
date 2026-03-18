@@ -1585,7 +1585,6 @@ pub struct TherapeuticTelemetry {
     pub therapeutic_temporal_coherence: f32,
 
     // ── Shadow work telemetry (Observability Mode — Jung → Friston) ──
-
     /// Total shadow pressure across all fragments (cumulative PE × recurrence × valence).
     #[serde(default)]
     pub shadow_total_pressure: f32,

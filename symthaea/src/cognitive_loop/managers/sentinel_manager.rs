@@ -277,12 +277,7 @@ impl SentinelManager {
     }
 
     /// Quarantine a peer for a given number of cycles.
-    pub fn quarantine_peer(
-        &mut self,
-        peer_id: String,
-        duration_cycles: u64,
-        current_cycle: u64,
-    ) {
+    pub fn quarantine_peer(&mut self, peer_id: String, duration_cycles: u64, current_cycle: u64) {
         self.quarantined_peers
             .insert(peer_id, current_cycle + duration_cycles);
     }
@@ -335,8 +330,7 @@ impl SentinelManager {
                     // Check rate limit
                     let count = activity.proposal_times.len();
                     if count > rate_limit as usize {
-                        let confidence =
-                            (count as f32 / rate_limit as f32 - 1.0).min(1.0);
+                        let confidence = (count as f32 / rate_limit as f32 - 1.0).min(1.0);
                         // Bump anomaly score before dropping the borrow
                         activity.anomaly_score =
                             activity.anomaly_score * (1.0 - ema_alpha) + ema_alpha;
@@ -389,10 +383,8 @@ impl SentinelManager {
 
                     let count = activity.tier_changes.len();
                     if count > Self::MAX_TIER_CHANGES {
-                        let confidence = (count as f32
-                            / Self::MAX_TIER_CHANGES as f32
-                            - 1.0)
-                            .min(1.0);
+                        let confidence =
+                            (count as f32 / Self::MAX_TIER_CHANGES as f32 - 1.0).min(1.0);
                         activity.anomaly_score =
                             activity.anomaly_score * (1.0 - ema_alpha) + ema_alpha * 0.8;
                         self.emit_threat(ThreatSignal {
@@ -436,10 +428,7 @@ impl SentinelManager {
                             kind: ThreatSignalKind::DispatchLoop,
                             confidence,
                             severity: ThreatSignalKind::DispatchLoop.base_severity() * confidence,
-                            subject: Some(format!(
-                                "{}->{}",
-                                source_cluster, target_cluster
-                            )),
+                            subject: Some(format!("{}->{}", source_cluster, target_cluster)),
                             detected_at: cycle,
                             evidence: format!(
                                 "Dispatch loop: {}->{} occurred {} times in recent history",
@@ -554,8 +543,7 @@ impl SentinelManager {
                     let agreement_rate =
                         shared.iter().filter(|&&x| x).count() as f64 / shared.len() as f64;
                     if agreement_rate > Self::VOTE_CORRELATION_THRESHOLD {
-                        let confidence = ((agreement_rate
-                            - Self::VOTE_CORRELATION_THRESHOLD)
+                        let confidence = ((agreement_rate - Self::VOTE_CORRELATION_THRESHOLD)
                             * 10.0)
                             .min(1.0) as f32;
                         self.emit_threat(ThreatSignal {
@@ -592,10 +580,8 @@ impl SentinelManager {
                 if a.magnitudes.len() >= 5 && b.magnitudes.len() >= 5 {
                     // Compare recent magnitude sequences using cosine similarity
                     let len = a.magnitudes.len().min(b.magnitudes.len()).min(20);
-                    let a_slice: Vec<f64> =
-                        a.magnitudes.iter().rev().take(len).copied().collect();
-                    let b_slice: Vec<f64> =
-                        b.magnitudes.iter().rev().take(len).copied().collect();
+                    let a_slice: Vec<f64> = a.magnitudes.iter().rev().take(len).copied().collect();
+                    let b_slice: Vec<f64> = b.magnitudes.iter().rev().take(len).copied().collect();
 
                     let dot: f64 = a_slice.iter().zip(&b_slice).map(|(x, y)| x * y).sum();
                     let norm_a: f64 = a_slice.iter().map(|x| x * x).sum::<f64>().sqrt();
@@ -604,11 +590,9 @@ impl SentinelManager {
                     if norm_a > 1e-10 && norm_b > 1e-10 {
                         let similarity = dot / (norm_a * norm_b);
                         if similarity > Self::GRADIENT_SIMILARITY_THRESHOLD {
-                            let confidence = ((similarity
-                                - Self::GRADIENT_SIMILARITY_THRESHOLD)
+                            let confidence = ((similarity - Self::GRADIENT_SIMILARITY_THRESHOLD)
                                 * 20.0)
-                                .min(1.0)
-                                as f32;
+                                .min(1.0) as f32;
                             self.emit_threat(ThreatSignal {
                                 kind: ThreatSignalKind::GradientFingerprint,
                                 confidence,

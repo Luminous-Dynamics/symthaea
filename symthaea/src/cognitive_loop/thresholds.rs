@@ -5653,9 +5653,7 @@ mod tests {
             KNOWLEDGE_ETHICS_CAUSAL_DEPTH_THRESHOLD > 0.0
                 && KNOWLEDGE_ETHICS_CAUSAL_DEPTH_THRESHOLD < 1.0
         );
-        assert!(
-            KNOWLEDGE_ETHICS_CONFIDENCE_GAIN > 0.0 && KNOWLEDGE_ETHICS_CONFIDENCE_GAIN < 0.1
-        );
+        assert!(KNOWLEDGE_ETHICS_CONFIDENCE_GAIN > 0.0 && KNOWLEDGE_ETHICS_CONFIDENCE_GAIN < 0.1);
         // Cross-coupling: Memory → Learning
         assert!(
             MEMORY_CONSOLIDATION_PLASTICITY_THRESHOLD > 0.0
@@ -5670,13 +5668,11 @@ mod tests {
                 && MEMORY_RECALL_QUALITY_DAMPEN_THRESHOLD < 0.5
         );
         assert!(
-            MEMORY_RECALL_QUALITY_DAMPEN_SCALE > 0.0
-                && MEMORY_RECALL_QUALITY_DAMPEN_SCALE < 1.0
+            MEMORY_RECALL_QUALITY_DAMPEN_SCALE > 0.0 && MEMORY_RECALL_QUALITY_DAMPEN_SCALE < 1.0
         );
         // Cross-coupling: Perception → Drive
         assert!(
-            PERCEPTION_LOW_COHERENCE_THRESHOLD > 0.0
-                && PERCEPTION_LOW_COHERENCE_THRESHOLD < 0.5
+            PERCEPTION_LOW_COHERENCE_THRESHOLD > 0.0 && PERCEPTION_LOW_COHERENCE_THRESHOLD < 0.5
         );
         assert!(
             PERCEPTION_LOW_COHERENCE_EXPLORE_GAIN > 0.0

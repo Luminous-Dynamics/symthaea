@@ -2936,20 +2936,48 @@ fn write_immune_pane(html: &mut String, immune: &super::ImmuneInfo) {
         shield = shield,
         color = status_color,
         label = status_label,
-        safety = if immune.safety_level.is_empty() { "GREEN" } else { &immune.safety_level },
-        posture = if immune.guardian_posture.is_empty() { "Hold" } else { &immune.guardian_posture },
+        safety = if immune.safety_level.is_empty() {
+            "GREEN"
+        } else {
+            &immune.safety_level
+        },
+        posture = if immune.guardian_posture.is_empty() {
+            "Hold"
+        } else {
+            &immune.guardian_posture
+        },
         patrol = if immune.patrol_active { "Yes" } else { "No" },
-        threat_color = if immune.active_threats > 0 { "#c76b5a" } else { "#8a9a8a" },
+        threat_color = if immune.active_threats > 0 {
+            "#c76b5a"
+        } else {
+            "#8a9a8a"
+        },
         threats = immune.active_threats,
         threat_level = immune.threat_level,
         quarantined = immune.quarantined_peers,
         patterns = immune.threat_patterns,
-        lr_color = if immune.lr_multiplier < 1.0 { "#e8c547" } else { "#8a9a8a" },
+        lr_color = if immune.lr_multiplier < 1.0 {
+            "#e8c547"
+        } else {
+            "#8a9a8a"
+        },
         lr = immune.lr_multiplier,
         explore = immune.exploration_multiplier,
-        halt_color = if immune.motor_halt { "#e05555" } else { "#8a9a8a" },
-        halt = if immune.motor_halt { "HALTED" } else { "Active" },
-        immune_active = if immune.immune_response_active { "ACTIVE" } else { "Standby" },
+        halt_color = if immune.motor_halt {
+            "#e05555"
+        } else {
+            "#8a9a8a"
+        },
+        halt = if immune.motor_halt {
+            "HALTED"
+        } else {
+            "Active"
+        },
+        immune_active = if immune.immune_response_active {
+            "ACTIVE"
+        } else {
+            "Standby"
+        },
         emergency = immune.emergency_cycles,
     );
 }
@@ -3972,7 +4000,7 @@ mod tests {
     use crate::{
         Anomaly, CantorInfo, DreamInfo, DriveInfo, GlyphInfo, GovernanceInfo, IntegrityInfo,
         KnowledgeInfo, LearningInfo, MoralCompass, Narrative, NeuroBath, PerceptionInfo,
-        PulseSnapshot, ReasoningInfo, SpectrumInfo, SparklinePoint, SubstrateInfo, SwarmInfo,
+        PulseSnapshot, ReasoningInfo, SparklinePoint, SpectrumInfo, SubstrateInfo, SwarmInfo,
         Vitals,
     };
     use symthaea_types::N_HARMONIES;

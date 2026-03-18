@@ -409,8 +409,11 @@ impl ThreatMemory {
     /// Returns up to `limit` patterns, sorted by confidence (descending).
     /// Only patterns with confidence > 0.5 are shared.
     pub fn shareable_patterns(&self, limit: usize) -> Vec<&ThreatPattern> {
-        let mut candidates: Vec<&ThreatPattern> =
-            self.patterns.iter().filter(|p| p.confidence > 0.5).collect();
+        let mut candidates: Vec<&ThreatPattern> = self
+            .patterns
+            .iter()
+            .filter(|p| p.confidence > 0.5)
+            .collect();
         candidates.sort_by(|a, b| {
             b.confidence
                 .partial_cmp(&a.confidence)
@@ -431,8 +434,13 @@ mod tests {
 
     #[test]
     fn test_encode_threat_dimensionality() {
-        let features =
-            ThreatMemory::encode_threat(ThreatSignalKind::ProposalFlood, 0.5, 0.8, 100, "test flood");
+        let features = ThreatMemory::encode_threat(
+            ThreatSignalKind::ProposalFlood,
+            0.5,
+            0.8,
+            100,
+            "test flood",
+        );
         assert_eq!(features.len(), 32);
     }
 
@@ -447,7 +455,13 @@ mod tests {
     #[test]
     fn test_store_and_retrieve() {
         let mut memory = ThreatMemory::default();
-        let id = memory.store_threat(ThreatSignalKind::ProposalFlood, 0.5, 0.8, 100, "flood attack");
+        let id = memory.store_threat(
+            ThreatSignalKind::ProposalFlood,
+            0.5,
+            0.8,
+            100,
+            "flood attack",
+        );
         assert_eq!(memory.pattern_count(), 1);
         assert_eq!(id, 0);
     }
@@ -455,10 +469,20 @@ mod tests {
     #[test]
     fn test_deduplication() {
         let mut memory = ThreatMemory::default();
-        let id1 =
-            memory.store_threat(ThreatSignalKind::ProposalFlood, 0.5, 0.8, 100, "flood attack");
-        let id2 =
-            memory.store_threat(ThreatSignalKind::ProposalFlood, 0.6, 0.9, 110, "flood attack");
+        let id1 = memory.store_threat(
+            ThreatSignalKind::ProposalFlood,
+            0.5,
+            0.8,
+            100,
+            "flood attack",
+        );
+        let id2 = memory.store_threat(
+            ThreatSignalKind::ProposalFlood,
+            0.6,
+            0.9,
+            110,
+            "flood attack",
+        );
         // Same kind + similar description -> should deduplicate
         assert_eq!(id1, id2);
         assert_eq!(memory.pattern_count(), 1);
@@ -492,8 +516,13 @@ mod tests {
     #[test]
     fn test_peer_threat_reduced_confidence() {
         let mut memory = ThreatMemory::default();
-        let features =
-            ThreatMemory::encode_threat(ThreatSignalKind::ProposalFlood, 0.5, 0.8, 100, "peer threat");
+        let features = ThreatMemory::encode_threat(
+            ThreatSignalKind::ProposalFlood,
+            0.5,
+            0.8,
+            100,
+            "peer threat",
+        );
         memory.store_peer_threat(
             ThreatSignalKind::ProposalFlood,
             0.5,
@@ -526,11 +555,22 @@ mod tests {
     #[test]
     fn test_match_against_finds_similar() {
         let mut memory = ThreatMemory::default();
-        memory.store_threat(ThreatSignalKind::ProposalFlood, 0.5, 0.8, 100, "flood attack");
+        memory.store_threat(
+            ThreatSignalKind::ProposalFlood,
+            0.5,
+            0.8,
+            100,
+            "flood attack",
+        );
 
         // Use same cycle to ensure temporal encoding similarity (different cycles have different sin/cos)
-        let matches =
-            memory.match_against(ThreatSignalKind::ProposalFlood, 0.6, 0.9, 100, "flood attack");
+        let matches = memory.match_against(
+            ThreatSignalKind::ProposalFlood,
+            0.6,
+            0.9,
+            100,
+            "flood attack",
+        );
         assert!(!matches.is_empty());
         assert!(matches[0].1 > ThreatMemory::MATCH_THRESHOLD);
     }

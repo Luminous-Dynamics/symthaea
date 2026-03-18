@@ -491,17 +491,21 @@ impl CognitiveLoopService {
 
         // Spawn federated coordinator if enabled.
         let federation_handle = if config.federation_enabled {
-            Some(super::managers::network_service_bridge::spawn_federated_coordinator(
-                crate::swarm::FederatedNetworkConfig::default(),
-                vec![0.0; 64], // initial weights placeholder
-                std::time::Duration::from_millis(config.federation_round_interval_ms),
-                swarm_event_tx.clone(),
-            ))
+            Some(
+                super::managers::network_service_bridge::spawn_federated_coordinator(
+                    crate::swarm::FederatedNetworkConfig::default(),
+                    vec![0.0; 64], // initial weights placeholder
+                    std::time::Duration::from_millis(config.federation_round_interval_ms),
+                    swarm_event_tx.clone(),
+                ),
+            )
         } else {
             None
         };
 
         let cfc_input_dim = config.cfc_config.input_dim;
+        let enable_hierarchical_bundling = config.enable_hierarchical_bundling;
+        let genesis_phrase_for_bundler = config.genesis_phrase.clone();
         let mut service = Self {
             config,
             encoder,
@@ -1044,15 +1048,17 @@ impl CognitiveLoopService {
                 im
             },
             motor_rendering: super::motor_rendering_manager::MotorRenderingManager::new(),
-            hierarchical_bundler: if config.enable_hierarchical_bundling {
-                Some(symthaea_core::hdc::hierarchical_bundle::HierarchicalBundler::new(
-                    config.genesis_phrase.as_ref().map_or(42, |p| {
-                        use std::hash::{Hash, Hasher};
-                        let mut h = std::collections::hash_map::DefaultHasher::new();
-                        p.hash(&mut h);
-                        h.finish()
-                    }),
-                ))
+            hierarchical_bundler: if enable_hierarchical_bundling {
+                Some(
+                    symthaea_core::hdc::hierarchical_bundle::HierarchicalBundler::new(
+                        genesis_phrase_for_bundler.as_ref().map_or(42, |p| {
+                            use std::hash::{Hash, Hasher};
+                            let mut h = std::collections::hash_map::DefaultHasher::new();
+                            p.hash(&mut h);
+                            h.finish()
+                        }),
+                    ),
+                )
             } else {
                 None
             },

@@ -248,6 +248,27 @@ impl CognitiveLoopService {
             coherence_velocity: self.carryover.quality.coherence_velocity,
             cross_module_agreement: self.stats.avg_cross_module_agreement,
             consciousness_level: consciousness_level as f64,
+            #[cfg(feature = "therapeutic")]
+            client_distress: self.therapeutic_manager.client_distress(),
+            #[cfg(feature = "therapeutic")]
+            alliance_quality: self.therapeutic_manager.alliance_composite(),
+            #[cfg(feature = "therapeutic")]
+            therapeutic_intent: if self.therapeutic_manager.crisis_active {
+                7.0
+            } else {
+                self.therapeutic_manager
+                    .active_strategy()
+                    .map(|s| match s {
+                        symthaea_therapeutic::RegulationStrategy::Validation => 0.0,
+                        symthaea_therapeutic::RegulationStrategy::Defusion => 2.0,
+                        symthaea_therapeutic::RegulationStrategy::CognitiveReappraisal => 2.0,
+                        symthaea_therapeutic::RegulationStrategy::Grounding => 4.0,
+                        symthaea_therapeutic::RegulationStrategy::DistressTolerance => 4.0,
+                        symthaea_therapeutic::RegulationStrategy::ExposurePrep => 5.0,
+                        symthaea_therapeutic::RegulationStrategy::Containment => 6.0,
+                    })
+                    .unwrap_or(0.0)
+            },
         }
     }
 
@@ -902,8 +923,7 @@ impl CognitiveLoopService {
                     - super::super::thresholds::KNOWLEDGE_ETHICS_CAUSAL_DEPTH_THRESHOLD)
                     * super::super::thresholds::KNOWLEDGE_ETHICS_CONFIDENCE_GAIN;
                 let nudge = nudge.min(0.03); // cap to prevent runaway
-                self.prediction_confidence =
-                    (self.prediction_confidence + nudge).clamp(0.0, 1.0);
+                self.prediction_confidence = (self.prediction_confidence + nudge).clamp(0.0, 1.0);
             }
         }
     }
@@ -926,10 +946,8 @@ impl CognitiveLoopService {
 
         // Low recall quality → dampen learning (encoding unreliable)
         if recall < super::super::thresholds::MEMORY_RECALL_QUALITY_DAMPEN_THRESHOLD {
-            let deficit =
-                super::super::thresholds::MEMORY_RECALL_QUALITY_DAMPEN_THRESHOLD - recall;
-            let dampening =
-                deficit * super::super::thresholds::MEMORY_RECALL_QUALITY_DAMPEN_SCALE;
+            let deficit = super::super::thresholds::MEMORY_RECALL_QUALITY_DAMPEN_THRESHOLD - recall;
+            let dampening = deficit * super::super::thresholds::MEMORY_RECALL_QUALITY_DAMPEN_SCALE;
             self.carryover.learning.subsystem_lr_factor *= (1.0 - dampening).max(0.8);
         }
     }
@@ -944,10 +962,8 @@ impl CognitiveLoopService {
 
         // Low coherence → exploration boost (orienting reflex)
         if coherence < super::super::thresholds::PERCEPTION_LOW_COHERENCE_THRESHOLD {
-            let deficit =
-                super::super::thresholds::PERCEPTION_LOW_COHERENCE_THRESHOLD - coherence;
-            let boost =
-                deficit * super::super::thresholds::PERCEPTION_LOW_COHERENCE_EXPLORE_GAIN;
+            let deficit = super::super::thresholds::PERCEPTION_LOW_COHERENCE_THRESHOLD - coherence;
+            let boost = deficit * super::super::thresholds::PERCEPTION_LOW_COHERENCE_EXPLORE_GAIN;
             // Nudge confidence down slightly to encourage exploration
             self.prediction_confidence =
                 (self.prediction_confidence - boost as f64).clamp(0.0, 1.0);
@@ -1008,7 +1024,9 @@ impl CognitiveLoopService {
     ///
     /// Returns the override if set, otherwise the last verdict from the ethics engine.
     pub fn last_ethics_verdict(&self) -> &super::super::ethics_engine::EthicalVerdict {
-        self.ethics_verdict_override.as_ref().unwrap_or(&self.last_ethics_verdict)
+        self.ethics_verdict_override
+            .as_ref()
+            .unwrap_or(&self.last_ethics_verdict)
     }
 
     /// Override the unified ethical verdict.

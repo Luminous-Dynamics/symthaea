@@ -36,6 +36,7 @@ members = [
     "crates/symthaea-hal",
     "crates/symthaea-ssm",
     "crates/symthaea-zkproof",
+    "crates/symthaea-zkproof/core",
     "crates/symthaea-broca",
     "crates/symthaea-consciousness-equation",
     "crates/symthaea-neuromodulators",
@@ -58,6 +59,13 @@ members = [
     "crates/symthaea-clinical",
     "crates/symthaea-therapeutic",
     "crates/symthaea-hdc-store",
+    # DRM/KMS boot animation — needs Linux DRM headers; not in default-members.
+    "crates/symthaea-quicken-fb",
+]
+# Only build core crates by default; platform-specific crates (quicken-fb) require explicit -p flag.
+default-members = [
+    ".",
+    "symthaea-core",
 ]
 
 # Workspace-wide lint configuration. Members opt in via [lints] workspace = true.
@@ -636,6 +644,10 @@ required-features = ["code_generation"]
 # They won't be built by default until the required modules are fixed
 
 # Integration tests needing cfg-gated modules
+[[test]]
+name = "defense_cascade_integration"
+required-features = ["safety-agents", "sentinel"]
+
 [[test]]
 name = "flight_integration"
 required-features = ["flight"]

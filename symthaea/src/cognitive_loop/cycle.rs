@@ -203,7 +203,8 @@ impl CognitiveLoopService {
         // PHASE 3: FEEDBACK
         // Consciousness metrics, quality gating, homeostasis, dream engine
         // ═══════════════════════════════════════════════════════════════════
-        let mut feedback = self.phase_feedback(input, &perception, &mut dynamics, &mut module_timings);
+        let mut feedback =
+            self.phase_feedback(input, &perception, &mut dynamics, &mut module_timings);
 
         // ═══════════════════════════════════════════════════════════════════
         // PHASE 3.5: SAFETY ENFORCEMENT
@@ -219,16 +220,24 @@ impl CognitiveLoopService {
                 feedback.self_model.temporal_coherence_score as f32,
                 {
                     #[cfg(feature = "integrity")]
-                    { self.integrity_manager.has_critical_anomaly() }
+                    {
+                        self.integrity_manager.has_critical_anomaly()
+                    }
                     #[cfg(not(feature = "integrity"))]
-                    { false }
+                    {
+                        false
+                    }
                 },
                 self.stats.total_cycles as usize,
                 {
                     #[cfg(feature = "sentinel")]
-                    { Some(&self.collective_immune_state) }
+                    {
+                        Some(&self.collective_immune_state)
+                    }
                     #[cfg(not(feature = "sentinel"))]
-                    { None }
+                    {
+                        None
+                    }
                 },
             );
 
@@ -239,16 +248,22 @@ impl CognitiveLoopService {
 
             // Gate 2: Exploration — Yerkes-Dodson (1908)
             if safety_result.exploration_multiplier < 1.0 {
-                self.carryover.quality.last_exploration_bonus *= safety_result.exploration_multiplier;
+                self.carryover.quality.last_exploration_bonus *=
+                    safety_result.exploration_multiplier;
             }
 
             // Gate 3: Neuromodulators — Aston-Jones & Cohen (2005), Sapolsky (2004)
             if safety_result.ne_nudge > 0.0 {
                 let ne_base = self.neuromod.bath.noradrenaline.baseline_val();
-                self.neuromod.bath.noradrenaline.set_baseline(ne_base + safety_result.ne_nudge);
+                self.neuromod
+                    .bath
+                    .noradrenaline
+                    .set_baseline(ne_base + safety_result.ne_nudge);
             }
             if safety_result.allostatic_load > 0.0 {
-                self.neuromod.bath.accumulate_allostatic_load(safety_result.allostatic_load, false);
+                self.neuromod
+                    .bath
+                    .accumulate_allostatic_load(safety_result.allostatic_load, false);
             }
 
             // Gate 4: Consciousness penalty — Dehaene (2014)
@@ -337,7 +352,9 @@ impl CognitiveLoopService {
 
             // Update collective immune state from swarm data
             let local_threat_level = self.sentinel_manager.threat_level();
-            let local_kinds: Vec<String> = self.sentinel_manager.active_threats()
+            let local_kinds: Vec<String> = self
+                .sentinel_manager
+                .active_threats()
                 .iter()
                 .map(|t| format!("{:?}", t.kind))
                 .collect();
