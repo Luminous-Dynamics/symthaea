@@ -133,6 +133,9 @@
             microtype
           ]))
 
+          # Linker — mold uses 3-5x less memory than lld for large binaries
+          mold
+
           # Development tools
           cmake
           gnuplot

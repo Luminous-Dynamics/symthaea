@@ -1302,6 +1302,7 @@ harness = false
 [profile.test]
 inherits = "dev"
 opt-level = 1  # HV16 array ops are 10-100x slower at opt-level=0
+codegen-units = 256  # More CUs = smaller object files = less linker memory (critical for 1.1M line crate)
 
 [profile.release]
 opt-level = 3
