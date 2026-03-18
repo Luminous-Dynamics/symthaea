@@ -52,13 +52,9 @@ const GOV_CONSTITUTIONAL: f64 = 0.6;
 
 // Reputation thresholds — intentionally higher than consciousness thresholds
 // because they combine consciousness (60%) + hApp reputation (40%).
-#[allow(dead_code)] // Used by EnhancedMycelixBridge (currently unwired)
 const REP_BASIC: f64 = 0.3;
-#[allow(dead_code)]
 const REP_GOVERNANCE: f64 = 0.5;
-#[allow(dead_code)]
 const REP_VOTING: f64 = 0.6;
-#[allow(dead_code)]
 const REP_CONSTITUTIONAL: f64 = 0.8;
 
 use super::affective_consciousness::CoreAffect;
@@ -377,7 +373,7 @@ pub struct MycelixBridge {
     /// runs separately to avoid serde version conflicts.
     /// Set via `set_governance_dispatch_tx()`.
     #[cfg(feature = "mycelix")]
-    governance_dispatch_tx: Option<std::sync::mpsc::Sender<GovernanceDispatchCommand>>,
+    governance_dispatch_tx: Option<std::sync::mpsc::SyncSender<GovernanceDispatchCommand>>,
 }
 
 /// Commands dispatched to an external Holochain conductor process.
@@ -455,7 +451,7 @@ impl MycelixBridge {
     /// # Example
     ///
     /// ```ignore
-    /// let (tx, rx) = std::sync::mpsc::channel();
+    /// let (tx, rx) = MycelixBridge::create_governance_channel();
     /// bridge.set_governance_dispatch_tx(tx);
     /// // In a separate async task:
     /// // conductor_bridge::run_dispatch_loop(rx, conductor).await;
@@ -463,22 +459,23 @@ impl MycelixBridge {
     #[cfg(feature = "mycelix")]
     pub fn set_governance_dispatch_tx(
         &mut self,
-        tx: std::sync::mpsc::Sender<GovernanceDispatchCommand>,
+        tx: std::sync::mpsc::SyncSender<GovernanceDispatchCommand>,
     ) {
         self.governance_dispatch_tx = Some(tx);
     }
 
-    /// Create the dispatch channel pair for Holochain governance connectivity.
+    /// Create the bounded dispatch channel pair for Holochain governance connectivity.
     ///
-    /// Returns `(Sender, Receiver)` — caller gives the sender to this bridge
+    /// Returns `(SyncSender, Receiver)` — caller gives the sender to this bridge
     /// via `set_governance_dispatch_tx()` and passes the receiver to the
-    /// conductor bridge process.
+    /// conductor bridge process. Bounded to 64 commands to provide backpressure
+    /// and prevent unbounded memory growth under load.
     #[cfg(feature = "mycelix")]
     pub fn create_governance_channel() -> (
-        std::sync::mpsc::Sender<GovernanceDispatchCommand>,
+        std::sync::mpsc::SyncSender<GovernanceDispatchCommand>,
         std::sync::mpsc::Receiver<GovernanceDispatchCommand>,
     ) {
-        std::sync::mpsc::channel()
+        std::sync::mpsc::sync_channel(64)
     }
 
     // ========================================================================
@@ -534,13 +531,32 @@ impl MycelixBridge {
 
         // 6. Dispatch to Holochain conductor if channel is connected
         #[cfg(feature = "mycelix")]
-        if let Some(ref tx) = self.governance_dispatch_tx {
-            let _ = tx.send(GovernanceDispatchCommand::SubmitProposal {
-                description: proposal.description.clone(),
-                proposer_did: self.agent_id.clone(),
-                consciousness_phi: consciousness.phi,
-                alignment_score: alignment.overall_score,
-            });
+        {
+            let mut disconnected = false;
+            if let Some(ref tx) = self.governance_dispatch_tx {
+                match tx.try_send(GovernanceDispatchCommand::SubmitProposal {
+                    description: proposal.description.clone(),
+                    proposer_did: self.agent_id.clone(),
+                    consciousness_phi: consciousness.phi,
+                    alignment_score: alignment.overall_score,
+                }) {
+                    Ok(()) => {}
+                    Err(std::sync::mpsc::TrySendError::Full(_)) => {
+                        tracing::warn!(
+                            "Governance dispatch channel full (64) — proposal queued locally only"
+                        );
+                    }
+                    Err(std::sync::mpsc::TrySendError::Disconnected(_)) => {
+                        tracing::warn!(
+                            "Governance dispatch channel disconnected — proposal queued locally only"
+                        );
+                        disconnected = true;
+                    }
+                }
+            }
+            if disconnected {
+                self.governance_dispatch_tx = None;
+            }
         }
 
         Ok(SubmissionResult {
@@ -623,14 +639,36 @@ impl MycelixBridge {
 
         // Dispatch to Holochain conductor if channel is connected
         #[cfg(feature = "mycelix")]
-        if let Some(ref tx) = self.governance_dispatch_tx {
-            let approve = matches!(value, VoteValue::Yes | VoteValue::StrongYes);
-            let _ = tx.send(GovernanceDispatchCommand::CastVote {
-                proposal_id: proposal.id.clone(),
-                voter_did: self.agent_id.clone(),
-                approve,
-                rationale: format!("{:?}: score {:.2}", alignment.recommendation, alignment.overall_score),
-            });
+        {
+            let mut disconnected = false;
+            if let Some(ref tx) = self.governance_dispatch_tx {
+                let approve = matches!(value, VoteValue::Yes | VoteValue::StrongYes);
+                match tx.try_send(GovernanceDispatchCommand::CastVote {
+                    proposal_id: proposal.id.clone(),
+                    voter_did: self.agent_id.clone(),
+                    approve,
+                    rationale: format!(
+                        "{:?}: score {:.2}",
+                        alignment.recommendation, alignment.overall_score
+                    ),
+                }) {
+                    Ok(()) => {}
+                    Err(std::sync::mpsc::TrySendError::Full(_)) => {
+                        tracing::warn!(
+                            "Governance dispatch channel full (64) — vote queued locally only"
+                        );
+                    }
+                    Err(std::sync::mpsc::TrySendError::Disconnected(_)) => {
+                        tracing::warn!(
+                            "Governance dispatch channel disconnected — vote queued locally only"
+                        );
+                        disconnected = true;
+                    }
+                }
+            }
+            if disconnected {
+                self.governance_dispatch_tx = None;
+            }
         }
 
         Ok(Vote {

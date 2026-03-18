@@ -167,6 +167,9 @@ impl Default for GovernanceManager {
 }
 
 impl GovernanceManager {
+    /// Co-prime scheduling interval (cycles).
+    pub const INTERVAL: u32 = 37;
+
     /// Maximum stored outcomes.
     const MAX_OUTCOMES: usize = 64;
 
@@ -551,7 +554,7 @@ impl CognitiveSubsystem for GovernanceManager {
     }
 
     fn interval(&self) -> u32 {
-        37 // co-prime with 7, 11, 13, 19, 23, 29
+        Self::INTERVAL
     }
 
     fn process(&mut self, snapshot: &CycleSnapshot) -> SubsystemOutput {

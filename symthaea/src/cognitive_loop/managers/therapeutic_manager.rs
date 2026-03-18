@@ -127,6 +127,9 @@ impl Default for TherapeuticManager {
 }
 
 impl TherapeuticManager {
+    /// Co-prime scheduling interval (cycles).
+    pub const INTERVAL: u32 = 11;
+
     /// Create a new therapeutic manager with default configuration.
     pub fn new() -> Self {
         Self::default()
@@ -546,7 +549,7 @@ impl CognitiveSubsystem for TherapeuticManager {
     }
 
     fn interval(&self) -> u32 {
-        11 // co-prime with 7, 13, 19, 37, 41
+        Self::INTERVAL
     }
 
     fn process(&mut self, snapshot: &CycleSnapshot) -> SubsystemOutput {

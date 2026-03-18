@@ -50,6 +50,9 @@ impl Default for MemoryManager {
 }
 
 impl MemoryManager {
+    /// Co-prime scheduling interval (cycles).
+    pub const INTERVAL: u32 = 11;
+
     /// Consolidation pressure threshold before requesting consolidation.
     /// Basis: Frankland & Bontempi (2005) — systems consolidation occurs under pressure.
     const CONSOLIDATION_THRESHOLD: f32 = 0.7;
@@ -99,7 +102,7 @@ impl CognitiveSubsystem for MemoryManager {
     }
 
     fn interval(&self) -> u32 {
-        11 // co-prime
+        Self::INTERVAL
     }
 
     fn process(&mut self, snapshot: &CycleSnapshot) -> SubsystemOutput {

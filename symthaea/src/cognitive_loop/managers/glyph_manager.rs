@@ -66,6 +66,9 @@ pub struct GlyphManager {
 }
 
 impl GlyphManager {
+    /// Co-prime scheduling interval (cycles).
+    pub const INTERVAL: u32 = 43;
+
     /// Glyph prior EMA alpha (slow tracking of symbolic drift).
     /// Basis: Holt (1957) — exponential smoothing.
     const PRIOR_EMA_ALPHA: f64 = 0.05;
@@ -242,7 +245,7 @@ impl CognitiveSubsystem for GlyphManager {
     }
 
     fn interval(&self) -> u32 {
-        43 // co-prime with 7, 11, 13, 19, 29, 37, 41, 53
+        Self::INTERVAL
     }
 
     fn process(&mut self, snapshot: &CycleSnapshot) -> SubsystemOutput {

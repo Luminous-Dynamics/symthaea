@@ -52,6 +52,9 @@ impl Default for PerceptionManager {
 }
 
 impl PerceptionManager {
+    /// Co-prime scheduling interval (cycles).
+    pub const INTERVAL: u32 = 19;
+
     /// Budget utilization threshold for pre-emptive gating.
     /// Basis: Lavie (2005) — perceptual load theory.
     const BUDGET_WARNING_THRESHOLD: f32 = 0.8;
@@ -109,7 +112,7 @@ impl CognitiveSubsystem for PerceptionManager {
     }
 
     fn interval(&self) -> u32 {
-        19 // co-prime
+        Self::INTERVAL
     }
 
     fn process(&mut self, snapshot: &CycleSnapshot) -> SubsystemOutput {

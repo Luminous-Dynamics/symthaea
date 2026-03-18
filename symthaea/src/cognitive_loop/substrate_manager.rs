@@ -452,7 +452,7 @@ impl SubstrateManager {
         let per_region = self
             .per_region_feasibility
             .iter()
-            .map(|(region, &feas)| (format!("{:?}", region), feas))
+            .map(|(region, &feas)| (region.as_str().to_string(), feas))
             .collect();
         let encoding_noise = if config.enable_substrate_encoding_noise && self.scale_pressure < 0.0
         {

@@ -102,6 +102,20 @@ pub enum SwarmEvent {
         /// Human-readable description.
         description: String,
     },
+
+    /// A time beacon received from a mesh peer (Sovereign Clock).
+    TimeBeaconReceived {
+        /// Source peer ID (8-byte prefix).
+        source_id: [u8; 8],
+        /// Beacon timestamp (µs since epoch).
+        timestamp_us: u64,
+        /// Peer's stratum level.
+        stratum: u8,
+        /// Peer's Phi at beacon time.
+        phi: f32,
+        /// Beacon drift estimate (ppm).
+        drift_ppm: f32,
+    },
 }
 
 /// A threat pattern report from a peer, ready for SentinelManager consumption.
@@ -243,6 +257,9 @@ impl Default for SwarmManager {
 }
 
 impl SwarmManager {
+    /// Co-prime scheduling interval (cycles).
+    pub const INTERVAL: u32 = 41;
+
     /// Maximum tracked peers for Φ averaging (prevents unbounded growth).
     const MAX_TRACKED_PEERS: usize = 256;
 
@@ -503,6 +520,9 @@ impl SwarmManager {
                         });
                     }
                 }
+                // Sovereign Inoculation events — handled by their dedicated managers,
+                // passed through here for uniform channel draining.
+                SwarmEvent::TimeBeaconReceived { .. } => {}
             }
         }
     }
@@ -564,7 +584,7 @@ impl CognitiveSubsystem for SwarmManager {
     }
 
     fn interval(&self) -> u32 {
-        41 // co-prime with 7, 11, 13, 19, 29, 37
+        Self::INTERVAL
     }
 
     fn process(&mut self, _snapshot: &CycleSnapshot) -> SubsystemOutput {

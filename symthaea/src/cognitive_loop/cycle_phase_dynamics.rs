@@ -4116,7 +4116,8 @@ mod tests {
     use crate::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService, CycleResult};
 
     fn make_service() -> CognitiveLoopService {
-        CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap()
+        CognitiveLoopService::new(CognitiveLoopConfig::default())
+            .expect("default config must initialize")
     }
 
     fn run_cycles(svc: &mut CognitiveLoopService, n: usize, input: &str) -> Vec<CycleResult> {
@@ -4178,7 +4179,8 @@ mod tests {
         let mut cfg = CognitiveLoopConfig::default();
         // Max valid threshold (1.0) — PE rarely exceeds this on first cycle
         cfg.learning_threshold = 1.0;
-        let mut svc = CognitiveLoopService::new(cfg).unwrap();
+        let mut svc = CognitiveLoopService::new(cfg)
+            .expect("test config must initialize");
         let result = svc.cycle("no learning");
         if !result.learning_occurred {
             assert_eq!(result.metadata.actual_effective_lr, 0.0);

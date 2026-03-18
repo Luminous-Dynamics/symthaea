@@ -229,6 +229,9 @@ impl Default for SentinelManager {
 }
 
 impl SentinelManager {
+    /// Co-prime scheduling interval (cycles).
+    pub const INTERVAL: u32 = 67;
+
     /// Maximum dispatch history entries.
     const MAX_DISPATCH_HISTORY: usize = 256;
 
@@ -662,7 +665,7 @@ impl CognitiveSubsystem for SentinelManager {
     }
 
     fn interval(&self) -> u32 {
-        67
+        Self::INTERVAL
     }
 
     fn process(&mut self, snapshot: &CycleSnapshot) -> SubsystemOutput {

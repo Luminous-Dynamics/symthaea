@@ -128,6 +128,24 @@ pub enum CorticalRegion {
 }
 
 impl CorticalRegion {
+    /// Human-readable name for this cortical region.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            CorticalRegion::Prefrontal => "Prefrontal",
+            CorticalRegion::Motor => "Motor",
+            CorticalRegion::Sensory => "Sensory",
+            CorticalRegion::Visual => "Visual",
+            CorticalRegion::Auditory => "Auditory",
+            CorticalRegion::Language => "Language",
+            CorticalRegion::Memory => "Memory",
+            CorticalRegion::Emotional => "Emotional",
+            CorticalRegion::Social => "Social",
+            CorticalRegion::Creative => "Creative",
+            CorticalRegion::Executive => "Executive",
+            CorticalRegion::Integration => "Integration",
+        }
+    }
+
     /// All 12 cortical regions.
     pub const ALL: [CorticalRegion; 12] = [
         CorticalRegion::Prefrontal,

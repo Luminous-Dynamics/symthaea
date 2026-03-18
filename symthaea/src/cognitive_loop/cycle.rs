@@ -545,7 +545,8 @@ mod tests {
     // ── Helper ────────────────────────────────────────────────────────
 
     fn make_service() -> CognitiveLoopService {
-        CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap()
+        CognitiveLoopService::new(CognitiveLoopConfig::default())
+            .expect("default config must initialize")
     }
 
     // ── cycle() basic execution ───────────────────────────────────────
@@ -689,11 +690,13 @@ mod tests {
         // Use genesis phrase for determinism
         let mut cfg = CognitiveLoopConfig::default();
         cfg.genesis_phrase = Some("determinism test".to_string());
-        let mut s1 = CognitiveLoopService::new(cfg.clone()).unwrap();
-        let mut s2 = CognitiveLoopService::new(cfg).unwrap();
+        let mut s1 = CognitiveLoopService::new(cfg.clone())
+            .expect("test config must initialize");
+        let mut s2 =
+            CognitiveLoopService::new(cfg).expect("test config must initialize");
 
         let r1 = s1.cycle("hello");
-        let r2 = s2.try_cycle("hello").unwrap();
+        let r2 = s2.try_cycle("hello").expect("try_cycle should succeed");
 
         // Both should produce same output with deterministic genesis
         assert_eq!(r1.output.len(), r2.output.len());
@@ -705,7 +708,8 @@ mod tests {
     #[test]
     fn cycle_with_hdc_ltc_unified_backend() {
         let config = CognitiveLoopConfig::with_hdc_ltc_unified();
-        let mut s = CognitiveLoopService::new(config).unwrap();
+        let mut s = CognitiveLoopService::new(config)
+            .expect("unified backend config must initialize");
         let result = s.cycle("HdcLtc backend test");
         assert!(!result.output.is_empty());
         assert!(result.prediction_error.is_finite());
@@ -714,7 +718,8 @@ mod tests {
     #[test]
     fn cycle_with_hdc_ltc_fast_backend() {
         let config = CognitiveLoopConfig::with_hdc_ltc_fast();
-        let mut s = CognitiveLoopService::new(config).unwrap();
+        let mut s = CognitiveLoopService::new(config)
+            .expect("fast backend config must initialize");
         let result = s.cycle("fast backend test");
         assert!(!result.output.is_empty());
         assert!(result.prediction_error.is_finite());
@@ -748,11 +753,13 @@ mod tests {
 
         let mut cfg_a = CognitiveLoopConfig::default();
         cfg_a.genesis_phrase = Some(phrase.clone());
-        let mut sa = CognitiveLoopService::new(cfg_a).unwrap();
+        let mut sa = CognitiveLoopService::new(cfg_a)
+            .expect("determinism config must initialize");
 
         let mut cfg_b = CognitiveLoopConfig::default();
         cfg_b.genesis_phrase = Some(phrase);
-        let mut sb = CognitiveLoopService::new(cfg_b).unwrap();
+        let mut sb = CognitiveLoopService::new(cfg_b)
+            .expect("determinism config must initialize");
 
         let ra = sa.cycle("determinism check");
         let rb = sb.cycle("determinism check");
@@ -1040,7 +1047,8 @@ mod tests {
     fn soul_alignment_computed_when_enabled() {
         let mut config = CognitiveLoopConfig::default();
         config.enable_soul_alignment = true;
-        let mut s = CognitiveLoopService::new(config).unwrap();
+        let mut s = CognitiveLoopService::new(config)
+            .expect("soul alignment config must initialize");
         let r = s.cycle("resonance and flourishing");
         assert!(r.metadata.ethics.soul_alignment.is_finite());
         assert!(s.ethics_values.soul.is_some());

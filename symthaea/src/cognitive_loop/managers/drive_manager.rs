@@ -68,6 +68,9 @@ impl Default for DriveManager {
 }
 
 impl DriveManager {
+    /// Co-prime scheduling interval (cycles).
+    pub const INTERVAL: u32 = 7;
+
     /// Threshold below which prediction error is "low" (boredom territory).
     /// Basis: Eastwood et al. (2012) — boredom as failed engagement with environment.
     const LOW_ERROR_THRESHOLD: f32 = 0.05;
@@ -146,7 +149,7 @@ impl CognitiveSubsystem for DriveManager {
     }
 
     fn interval(&self) -> u32 {
-        7 // co-prime
+        Self::INTERVAL
     }
 
     fn process(&mut self, snapshot: &CycleSnapshot) -> SubsystemOutput {
