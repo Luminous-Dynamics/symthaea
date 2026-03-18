@@ -42,7 +42,10 @@ pub enum HolonOutbound {
         embedding: Vec<f32>,
     },
     /// Pairing verified notification for desktop.
-    PairingVerified { peer_id: u64, pubkey_hex: String },
+    PairingVerified {
+        peer_id: u64,
+        pubkey_hex: String,
+    },
 }
 
 /// Inbound message types from the Holon.

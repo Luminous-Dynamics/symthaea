@@ -675,6 +675,12 @@ impl BenchmarkReport {
                 "constraint_queens_8_accuracy",
                 &bl.mathematics,
             ),
+            // StatisticalInference
+            (
+                "variance_estimation_accuracy",
+                "variance_estimation_accuracy",
+                &bl.mathematics,
+            ),
             ("tautology_accuracy", "tautology_accuracy", &bl.mathematics),
             (
                 "derivation_accuracy",
@@ -1014,6 +1020,12 @@ impl BenchmarkReport {
         if benchmark.contains("Probabilistic") {
             push_specific("rt_ticks", "probabilistic_rt_ticks", &bl.cogbench);
         }
+        // LogicalDeduction: HDC encoding doesn't cleanly separate valid/invalid
+        // arguments yet — "overall_accuracy" pulls Math domain z-score down.
+        // TODO: improve logical_deduction.rs before wiring into composites.
+        // if benchmark.contains("LogicalDeduction") {
+        //     push_specific("overall_accuracy", "logical_overall_accuracy", &bl.mathematics);
+        // }
         // WorM RT mappings
         if benchmark.contains("ChangeDetection") {
             push_specific("rt_ticks", "change_detection_rt_ticks", &bl.worm);

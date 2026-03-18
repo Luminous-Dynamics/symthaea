@@ -85,7 +85,8 @@ impl Default for CryptoConfig {
     fn default() -> Self {
         Self {
             key_rotation_interval: crate::cognitive_loop::thresholds::KEY_ROTATION_INTERVAL_DEFAULT,
-            key_rotation_grace_period: crate::cognitive_loop::thresholds::KEY_ROTATION_GRACE_PERIOD_DEFAULT,
+            key_rotation_grace_period:
+                crate::cognitive_loop::thresholds::KEY_ROTATION_GRACE_PERIOD_DEFAULT,
             aead_algorithm: AeadAlgorithm::ChaCha20Poly1305,
             enable_versioned_encrypt: true,
         }
@@ -106,7 +107,8 @@ impl Default for SwarmConfig {
             identity_path: None,
             require_handshake: true,
             initial_trust_score: crate::cognitive_loop::thresholds::HANDSHAKE_INITIAL_TRUST_SCORE,
-            challenge_timeout_secs: crate::cognitive_loop::thresholds::HANDSHAKE_CHALLENGE_TIMEOUT_SECS,
+            challenge_timeout_secs:
+                crate::cognitive_loop::thresholds::HANDSHAKE_CHALLENGE_TIMEOUT_SECS,
             crypto: CryptoConfig::default(),
         }
     }

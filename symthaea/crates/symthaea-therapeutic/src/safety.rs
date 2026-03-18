@@ -222,19 +222,15 @@ impl CrisisIndicator {
 /// Stopwords filtered from crisis encoding — these contribute noise
 /// without semantic signal for crisis detection.
 const CRISIS_STOPWORDS: &[&str] = &[
-    "a", "an", "the", "is", "am", "are", "was", "were", "be", "been", "being",
-    "i", "me", "my", "we", "our", "you", "your", "he", "she", "it", "its",
-    "they", "them", "their", "this", "that", "these", "those",
-    "in", "on", "at", "to", "for", "of", "with", "by", "from", "as",
-    "and", "or", "but", "so", "if", "then", "than", "when", "while",
-    "do", "did", "does", "have", "has", "had", "will", "would", "could",
-    "should", "can", "may", "might", "shall", "must",
-    "just", "very", "really", "also", "too", "even", "still", "already",
-    "about", "into", "over", "after", "before", "between", "through",
-    "up", "down", "out", "off", "all", "each", "every", "both",
-    "here", "there", "where", "how", "what", "which", "who", "whom",
-    "some", "any", "no", "not", "only", "own", "same", "much", "many",
-    "more", "most", "other", "such",
+    "a", "an", "the", "is", "am", "are", "was", "were", "be", "been", "being", "i", "me", "my",
+    "we", "our", "you", "your", "he", "she", "it", "its", "they", "them", "their", "this", "that",
+    "these", "those", "in", "on", "at", "to", "for", "of", "with", "by", "from", "as", "and", "or",
+    "but", "so", "if", "then", "than", "when", "while", "do", "did", "does", "have", "has", "had",
+    "will", "would", "could", "should", "can", "may", "might", "shall", "must", "just", "very",
+    "really", "also", "too", "even", "still", "already", "about", "into", "over", "after",
+    "before", "between", "through", "up", "down", "out", "off", "all", "each", "every", "both",
+    "here", "there", "where", "how", "what", "which", "who", "whom", "some", "any", "no", "not",
+    "only", "own", "same", "much", "many", "more", "most", "other", "such",
 ];
 
 fn encode_text_compositional(text: &str) -> BinaryHV {
@@ -984,9 +980,9 @@ mod proptests {
         // These paraphrases share crisis-relevant words but don't match
         // any exact keyword substring.
         let paraphrases = [
-            "life is not worth it anymore",       // shares "not", "worth" with "not worth living"
-            "die peacefully in my sleep tonight",  // shares "die" with "want to die"
-            "dead would be better than this",      // shares "dead", "better" with "better off dead"
+            "life is not worth it anymore", // shares "not", "worth" with "not worth living"
+            "die peacefully in my sleep tonight", // shares "die" with "want to die"
+            "dead would be better than this", // shares "dead", "better" with "better off dead"
         ];
 
         let mut detected = 0;

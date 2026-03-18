@@ -251,8 +251,7 @@ impl SporeEngine {
             TextEncoder::new(TextEncoderConfig::default()).expect("TextEncoder init");
 
         let substrate_type = parse_substrate(&config.substrate);
-        let raw_feasibility =
-            substrate_requirements(&substrate_type).consciousness_feasibility();
+        let raw_feasibility = substrate_requirements(&substrate_type).consciousness_feasibility();
         // Apply validation overlay: raw_feasibility × honest_confidence
         // This is the epistemically honest value shown in telemetry/reports.
         let (evidence_level, honest_confidence) = honest_confidence_for(&substrate_type);
@@ -344,15 +343,18 @@ impl SporeEngine {
         // Edge-detect platform state changes → metabolism signals (avoid per-cycle spam)
         if self.thermal_level != self.last_forwarded_thermal {
             self.last_forwarded_thermal = self.thermal_level;
-            self.metabolism.signal(WakeSignal::ThermalLevel(self.thermal_level));
+            self.metabolism
+                .signal(WakeSignal::ThermalLevel(self.thermal_level));
         }
         if self.battery_charging != self.last_forwarded_charging {
             self.last_forwarded_charging = self.battery_charging;
-            self.metabolism.signal(WakeSignal::ChargingChanged(self.battery_charging));
+            self.metabolism
+                .signal(WakeSignal::ChargingChanged(self.battery_charging));
         }
         if self.night_mode != self.last_forwarded_night {
             self.last_forwarded_night = self.night_mode;
-            self.metabolism.signal(WakeSignal::NightMode(self.night_mode));
+            self.metabolism
+                .signal(WakeSignal::NightMode(self.night_mode));
         }
 
         let dt = 1.0 / wake.target_hz();
@@ -369,13 +371,22 @@ impl SporeEngine {
         };
         self.last_output = Some(output_hv);
 
-        // Update neuromodulators based on prediction error
-        self.bath.dopamine.level =
-            (self.bath.dopamine.level + prediction_error * 0.1 - 0.02).clamp(0.0, 1.0);
-        self.bath.noradrenaline.level =
-            (self.bath.noradrenaline.level + prediction_error * 0.15 - 0.03).clamp(0.0, 1.0);
-        self.bath.serotonin.level =
-            (self.bath.serotonin.level + (1.0 - prediction_error) * 0.05 - 0.01).clamp(0.0, 1.0);
+        // Reuptake FIRST: exponential decay toward baseline (0.5) each cycle.
+        // Rate 0.1 at 10Hz → ~1s convergence. This is the primary regulatory mechanism.
+        self.bath.dopamine.reuptake();
+        self.bath.noradrenaline.reuptake();
+        self.bath.serotonin.reuptake();
+        self.bath.oxytocin.reuptake();
+
+        // PE-driven production (no manual decay — reuptake handles that).
+        // DA: reward prediction error (Schultz 1997)
+        self.bath.dopamine.produce(prediction_error * 0.08);
+        // NE: arousal/alertness from surprise (Aston-Jones & Cohen 2005)
+        self.bath.noradrenaline.produce(prediction_error * 0.10);
+        // 5-HT: contentment from low surprise (Dayan & Huys 2009)
+        self.bath.serotonin.produce((1.0 - prediction_error) * 0.04);
+        // OT: baseline social presence — doesn't require BLE peers
+        self.bath.oxytocin.produce(0.003);
 
         // Sensor bridge → neuromodulator nudges
         if !self.sensor_bridge.privacy_mode() {
@@ -505,7 +516,8 @@ impl SporeEngine {
         // Metabolism: tick with consciousness metrics (focus detection, dream triggers)
         self.metabolism.tick(prediction_error, consciousness_level);
 
-        // Haptic: check for significant consciousness shifts and surprise
+        // Haptic: advance cooldown, then check for significant shifts
+        self.haptic.tick();
         self.haptic.check_consciousness(consciousness_level);
         self.haptic.check_surprise(prediction_error);
 
@@ -539,8 +551,17 @@ impl SporeEngine {
         self.pairing.tick(self.cycle_count);
         for msg in self.pairing.drain_outbound() {
             if let crate::pairing::PairingOutbound::Ack { peer_id } = &msg {
-                if let Some(dev) = self.pairing.paired_devices().iter().find(|d| d.peer_id == *peer_id) {
-                    let pubkey_hex = dev.pubkey.iter().map(|b| format!("{b:02x}")).collect::<String>();
+                if let Some(dev) = self
+                    .pairing
+                    .paired_devices()
+                    .iter()
+                    .find(|d| d.peer_id == *peer_id)
+                {
+                    let pubkey_hex = dev
+                        .pubkey
+                        .iter()
+                        .map(|b| format!("{b:02x}"))
+                        .collect::<String>();
                     self.holon_bridge.enqueue_outbound(
                         crate::holon_bridge::HolonOutbound::PairingVerified {
                             peer_id: *peer_id,
@@ -619,7 +640,70 @@ impl SporeEngine {
     }
 
     /// Create a checkpoint of the current engine state.
+    ///
+    /// Serializes semantic and episodic memory into the checkpoint so that
+    /// consciousness continuity is preserved across restarts.
+    ///
+    /// **Semantic entry format** per entry:
+    /// - Key: `"{slot_index}"` (ring buffer position)
+    /// - Value: `[hdc_vector (dim×4 bytes f32 LE) | cycle (8 bytes u64 LE) | prediction_error (4 bytes f32 LE)]`
+    ///
+    /// **Episodic entry format** per entry:
+    /// - `[input_len (4 bytes u32 LE) | input (len×4 bytes f32 LE) | output_len (4) | output (len×4) | phi (4) | cycle (8) | prediction_error (4) | valence (4) | replay_count (4 u32 LE) | consolidation_strength (4)]`
     pub fn checkpoint(&self) -> crate::persistence::SporeCheckpoint {
+        // Serialize semantic memory entries
+        let semantic_entries: Vec<(String, Vec<u8>)> = self
+            .memory
+            .semantic
+            .iter_entries()
+            .map(|(idx, entry)| {
+                let mut buf = Vec::with_capacity(entry.hdc_vector.len() * 4 + 12);
+                for &v in &entry.hdc_vector {
+                    buf.extend_from_slice(&v.to_le_bytes());
+                }
+                buf.extend_from_slice(&entry.cycle.to_le_bytes());
+                buf.extend_from_slice(&entry.prediction_error.to_le_bytes());
+                (idx.to_string(), buf)
+            })
+            .collect();
+
+        // Serialize episodic memory entries
+        let episodic_entries: Vec<Vec<u8>> = self
+            .memory
+            .episodic
+            .iter_episodes()
+            .map(|ep| {
+                let input_len = ep.input.len() as u32;
+                let output_len = ep.output.len() as u32;
+                let capacity = 4
+                    + (input_len as usize) * 4
+                    + 4
+                    + (output_len as usize) * 4
+                    + 4
+                    + 8
+                    + 4
+                    + 4
+                    + 4
+                    + 4;
+                let mut buf = Vec::with_capacity(capacity);
+                buf.extend_from_slice(&input_len.to_le_bytes());
+                for &v in &ep.input {
+                    buf.extend_from_slice(&v.to_le_bytes());
+                }
+                buf.extend_from_slice(&output_len.to_le_bytes());
+                for &v in &ep.output {
+                    buf.extend_from_slice(&v.to_le_bytes());
+                }
+                buf.extend_from_slice(&ep.phi.to_le_bytes());
+                buf.extend_from_slice(&ep.cycle.to_le_bytes());
+                buf.extend_from_slice(&ep.prediction_error.to_le_bytes());
+                buf.extend_from_slice(&ep.valence.to_le_bytes());
+                buf.extend_from_slice(&ep.replay_count.to_le_bytes());
+                buf.extend_from_slice(&ep.consolidation_strength.to_le_bytes());
+                buf
+            })
+            .collect();
+
         crate::persistence::SporeCheckpoint {
             cycle: self.cycle_count,
             consciousness_level: self.last_consciousness,
@@ -629,13 +713,16 @@ impl SporeEngine {
                 self.bath.serotonin.level,
                 self.bath.oxytocin.level,
             ],
-            semantic_entries: vec![], // Semantic memory serialization can be extended later
-            episodic_entries: vec![], // Episodic memory serialization can be extended later
+            semantic_entries,
+            episodic_entries,
             format_version: crate::persistence::SporeCheckpoint::FORMAT_VERSION,
         }
     }
 
     /// Restore engine state from a checkpoint.
+    ///
+    /// Deserializes semantic and episodic memory entries from the checkpoint
+    /// binary format back into the live memory subsystems.
     pub fn restore(&mut self, checkpoint: &crate::persistence::SporeCheckpoint) {
         self.cycle_count = checkpoint.cycle;
         self.last_consciousness = checkpoint.consciousness_level;
@@ -643,6 +730,137 @@ impl SporeEngine {
         self.bath.noradrenaline.level = checkpoint.neuromodulators[1];
         self.bath.serotonin.level = checkpoint.neuromodulators[2];
         self.bath.oxytocin.level = checkpoint.neuromodulators[3];
+
+        // Restore semantic memory
+        let mut sem_entries = Vec::new();
+        for (key, data) in &checkpoint.semantic_entries {
+            let slot_idx: usize = match key.parse() {
+                Ok(v) => v,
+                Err(_) => continue,
+            };
+            // Minimum size: cycle (8) + prediction_error (4) = 12 bytes beyond the HV
+            if data.len() < 12 {
+                continue;
+            }
+            // hdc_vector is everything except the last 12 bytes, in f32 LE chunks
+            let hv_byte_len = data.len() - 12;
+            if hv_byte_len % 4 != 0 {
+                continue;
+            }
+            let dim = hv_byte_len / 4;
+            let mut hdc_vector = Vec::with_capacity(dim);
+            for i in 0..dim {
+                let off = i * 4;
+                let v =
+                    f32::from_le_bytes([data[off], data[off + 1], data[off + 2], data[off + 3]]);
+                hdc_vector.push(v);
+            }
+            let tail_off = hv_byte_len;
+            let cycle = u64::from_le_bytes([
+                data[tail_off],
+                data[tail_off + 1],
+                data[tail_off + 2],
+                data[tail_off + 3],
+                data[tail_off + 4],
+                data[tail_off + 5],
+                data[tail_off + 6],
+                data[tail_off + 7],
+            ]);
+            let prediction_error = f32::from_le_bytes([
+                data[tail_off + 8],
+                data[tail_off + 9],
+                data[tail_off + 10],
+                data[tail_off + 11],
+            ]);
+            sem_entries.push((
+                slot_idx,
+                crate::memory::SemanticEntry {
+                    hdc_vector,
+                    cycle,
+                    prediction_error,
+                },
+            ));
+        }
+        self.memory.semantic.restore_entries(sem_entries);
+
+        // Restore episodic memory
+        let mut episodes = Vec::new();
+        for data in &checkpoint.episodic_entries {
+            if let Some(ep) = Self::deserialize_episode(data) {
+                episodes.push(ep);
+            }
+        }
+        self.memory.episodic.restore_episodes(episodes);
+
+        // Sync coordinator step
+        self.memory.step = checkpoint.cycle;
+    }
+
+    /// Deserialize a single episodic entry from its binary representation.
+    fn deserialize_episode(data: &[u8]) -> Option<crate::memory::Episode> {
+        let mut pos = 0;
+
+        // input_len
+        if pos + 4 > data.len() {
+            return None;
+        }
+        let input_len = u32::from_le_bytes(data[pos..pos + 4].try_into().ok()?) as usize;
+        pos += 4;
+
+        // input
+        if pos + input_len * 4 > data.len() {
+            return None;
+        }
+        let mut input = Vec::with_capacity(input_len);
+        for _ in 0..input_len {
+            input.push(f32::from_le_bytes(data[pos..pos + 4].try_into().ok()?));
+            pos += 4;
+        }
+
+        // output_len
+        if pos + 4 > data.len() {
+            return None;
+        }
+        let output_len = u32::from_le_bytes(data[pos..pos + 4].try_into().ok()?) as usize;
+        pos += 4;
+
+        // output
+        if pos + output_len * 4 > data.len() {
+            return None;
+        }
+        let mut output = Vec::with_capacity(output_len);
+        for _ in 0..output_len {
+            output.push(f32::from_le_bytes(data[pos..pos + 4].try_into().ok()?));
+            pos += 4;
+        }
+
+        // phi + cycle + prediction_error + valence + replay_count + consolidation_strength
+        // = 4 + 8 + 4 + 4 + 4 + 4 = 28 bytes
+        if pos + 28 > data.len() {
+            return None;
+        }
+        let phi = f32::from_le_bytes(data[pos..pos + 4].try_into().ok()?);
+        pos += 4;
+        let cycle = u64::from_le_bytes(data[pos..pos + 8].try_into().ok()?);
+        pos += 8;
+        let prediction_error = f32::from_le_bytes(data[pos..pos + 4].try_into().ok()?);
+        pos += 4;
+        let valence = f32::from_le_bytes(data[pos..pos + 4].try_into().ok()?);
+        pos += 4;
+        let replay_count = u32::from_le_bytes(data[pos..pos + 4].try_into().ok()?);
+        pos += 4;
+        let consolidation_strength = f32::from_le_bytes(data[pos..pos + 4].try_into().ok()?);
+
+        Some(crate::memory::Episode {
+            input,
+            output,
+            phi,
+            cycle,
+            prediction_error,
+            valence,
+            replay_count,
+            consolidation_strength,
+        })
     }
 
     /// Save current state to storage. Returns true on success.
@@ -1516,8 +1734,7 @@ impl SporeEngine {
     fn build_epistemic_status(&self) -> EpistemicStatus {
         // Gap between hypothetical feasibility and evidence confidence.
         // Uses raw_feasibility (not validation-overlaid) to show the divergence.
-        let feasibility_gap =
-            (self.raw_feasibility as f32 - self.honest_confidence as f32).abs();
+        let feasibility_gap = (self.raw_feasibility as f32 - self.honest_confidence as f32).abs();
 
         let disclaimer = format!(
             "SIMULATED consciousness on {} substrate. \
@@ -2333,12 +2550,21 @@ mod integration_tests {
         let json = engine.compass_json();
         // Should contain one of the real harmony names
         let real_names = [
-            "Resonant Coherence", "Pan-Sentient Flourishing", "Integral Wisdom",
-            "Infinite Play", "Universal Interconnectedness", "Sacred Reciprocity",
-            "Evolutionary Progression", "Sacred Stillness",
+            "Resonant Coherence",
+            "Pan-Sentient Flourishing",
+            "Integral Wisdom",
+            "Infinite Play",
+            "Universal Interconnectedness",
+            "Sacred Reciprocity",
+            "Evolutionary Progression",
+            "Sacred Stillness",
         ];
         let has_real_name = real_names.iter().any(|name| json.contains(name));
-        assert!(has_real_name, "Compass should have a real harmony name, got: {}", json);
+        assert!(
+            has_real_name,
+            "Compass should have a real harmony name, got: {}",
+            json
+        );
     }
 
     #[test]
@@ -2366,5 +2592,151 @@ mod integration_tests {
         // Should have at least one ConsciousnessShift event
         // (depends on whether the drop exceeds 0.15 threshold)
         assert!(haptics.starts_with('['));
+    }
+
+    #[test]
+    fn checkpoint_preserves_semantic_memory() {
+        let mut engine = SporeEngine::new(SporeConfig::default());
+
+        // Run cycles to populate memory
+        for i in 0..10 {
+            engine.cycle(&format!("concept {i}"));
+        }
+
+        let cp = engine.checkpoint();
+        assert_eq!(cp.cycle, 10);
+
+        // Semantic memory is always stored, so we should have entries
+        assert!(
+            !cp.semantic_entries.is_empty(),
+            "checkpoint should contain semantic entries after 10 cycles"
+        );
+
+        // Each semantic entry should have valid data (HDC floats + cycle + pred_error)
+        for (key, data) in &cp.semantic_entries {
+            assert!(key.parse::<usize>().is_ok(), "key should be a slot index");
+            // Minimum: at least the trailing 12 bytes (cycle + prediction_error)
+            assert!(
+                data.len() >= 12,
+                "entry data too small: {} bytes",
+                data.len()
+            );
+            // Data length minus 12 should be divisible by 4 (f32 elements)
+            assert_eq!(
+                (data.len() - 12) % 4,
+                0,
+                "HDC vector bytes not aligned to f32"
+            );
+        }
+
+        // Restore into a fresh engine
+        let mut engine2 = SporeEngine::new(SporeConfig::default());
+        engine2.restore(&cp);
+
+        assert_eq!(engine2.cycle_count(), 10);
+        assert_eq!(
+            engine2.memory.semantic.len(),
+            engine.memory.semantic.len(),
+            "semantic memory count should match after restore"
+        );
+
+        // Verify an entry round-trips correctly by extracting data before drop
+        let original_first: Option<(u64, usize, f32)> = engine
+            .memory
+            .semantic
+            .iter_entries()
+            .next()
+            .map(|(_, e)| (e.cycle, e.hdc_vector.len(), e.prediction_error));
+        if let Some((orig_cycle, orig_dim, orig_pe)) = original_first {
+            let restored = engine2
+                .memory
+                .semantic
+                .iter_entries()
+                .find(|(_, e)| e.cycle == orig_cycle)
+                .map(|(_, e)| (e.hdc_vector.len(), e.prediction_error));
+            assert!(
+                restored.is_some(),
+                "restored engine should have matching entry"
+            );
+            let (rest_dim, rest_pe) = restored.unwrap();
+            assert_eq!(orig_dim, rest_dim, "HDC vector dimension should match");
+            assert!(
+                (orig_pe - rest_pe).abs() < 1e-6,
+                "prediction_error should round-trip"
+            );
+        }
+    }
+
+    #[test]
+    fn checkpoint_preserves_episodic_memory() {
+        let mut engine = SporeEngine::new(SporeConfig::default());
+
+        // Run enough cycles with varied input to trigger episodic storage
+        // (episodic requires phi > threshold)
+        for i in 0..50 {
+            engine.cycle(&format!("experience {i} with varied content"));
+        }
+
+        let cp = engine.checkpoint();
+        let original_epi_count = engine.memory.episodic.len();
+
+        // Restore into a fresh engine
+        let mut engine2 = SporeEngine::new(SporeConfig::default());
+        engine2.restore(&cp);
+
+        assert_eq!(
+            engine2.memory.episodic.len(),
+            original_epi_count,
+            "episodic memory count should match after restore"
+        );
+
+        // If there are episodic entries, verify one round-trips
+        if !cp.episodic_entries.is_empty() {
+            let original_top = engine.memory.episodic.iter_episodes().next().unwrap();
+            let restored_top = engine2.memory.episodic.iter_episodes().next().unwrap();
+            assert_eq!(original_top.cycle, restored_top.cycle);
+            assert!((original_top.phi - restored_top.phi).abs() < 1e-6);
+            assert_eq!(original_top.input.len(), restored_top.input.len());
+            assert_eq!(original_top.output.len(), restored_top.output.len());
+            assert_eq!(original_top.replay_count, restored_top.replay_count);
+        }
+    }
+
+    #[test]
+    fn checkpoint_memory_binary_roundtrip() {
+        // Test that checkpoint → to_bytes → from_bytes → restore preserves memory
+        let mut engine = SporeEngine::new(SporeConfig::default());
+        for i in 0..15 {
+            engine.cycle(&format!("roundtrip test {i}"));
+        }
+
+        let cp = engine.checkpoint();
+        let bytes = cp.to_bytes();
+        let cp2 = crate::persistence::SporeCheckpoint::from_bytes(&bytes)
+            .expect("from_bytes should succeed");
+
+        assert_eq!(cp.semantic_entries.len(), cp2.semantic_entries.len());
+        assert_eq!(cp.episodic_entries.len(), cp2.episodic_entries.len());
+
+        // Verify semantic data matches byte-for-byte
+        for (i, ((k1, d1), (k2, d2))) in cp
+            .semantic_entries
+            .iter()
+            .zip(cp2.semantic_entries.iter())
+            .enumerate()
+        {
+            assert_eq!(k1, k2, "semantic key mismatch at {i}");
+            assert_eq!(d1, d2, "semantic data mismatch at {i}");
+        }
+
+        // Verify episodic data matches byte-for-byte
+        for (i, (d1, d2)) in cp
+            .episodic_entries
+            .iter()
+            .zip(cp2.episodic_entries.iter())
+            .enumerate()
+        {
+            assert_eq!(d1, d2, "episodic data mismatch at {i}");
+        }
     }
 }

@@ -26,6 +26,7 @@
 pub mod affect_regulation;
 pub mod alliance;
 pub mod client_model;
+pub mod dream_integration;
 pub mod ethical_constraints;
 pub mod formulation;
 pub mod narrative_integration;
@@ -35,10 +36,11 @@ pub mod shadow;
 
 pub use affect_regulation::{RegulationEngine, RegulationStrategy};
 pub use alliance::{RuptureType, TherapeuticAlliance};
-pub use client_model::ClientModel;
+pub use client_model::{ClientModel, OutcomeSummary};
 pub use ethical_constraints::{EthicalConstraint, EthicalEvaluation};
 pub use formulation::CaseFormulation;
 pub use narrative_integration::{NarrativeFragment, TherapeuticNarrative};
 pub use safety::{CrisisAlert, CrisisDetector, CrisisType, EscalationAction, SafetyPlan};
 pub use scope_guard::{ScopeGuard, ScopeViolation};
+pub use dream_integration::TherapeuticAction;
 pub use shadow::{ShadowDetector, ShadowSnapshot, ShadowTelemetry};

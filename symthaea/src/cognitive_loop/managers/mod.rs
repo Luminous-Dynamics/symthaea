@@ -90,3 +90,24 @@ pub mod sentinel_manager;
 pub use sentinel_manager::{
     SentinelEvent, SentinelManager, SentinelTelemetry, ThreatSignal, ThreatSignalKind,
 };
+
+// Sovereign Inoculation managers
+#[cfg(feature = "mesh")]
+pub mod time_manager;
+#[cfg(feature = "mesh")]
+pub use time_manager::TimeManager;
+
+#[cfg(feature = "mesh-trust")]
+pub mod trust_manager;
+#[cfg(feature = "mesh-trust")]
+pub use trust_manager::TrustManager;
+
+#[cfg(feature = "social-fabric")]
+pub mod social_fabric_manager;
+#[cfg(feature = "social-fabric")]
+pub use social_fabric_manager::SocialFabricManager;
+
+#[cfg(feature = "survival")]
+pub mod survival_manager;
+#[cfg(feature = "survival")]
+pub use survival_manager::SurvivalManager;

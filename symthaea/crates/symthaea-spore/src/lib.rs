@@ -38,6 +38,7 @@
 #![cfg_attr(not(feature = "native-ffi"), deny(unsafe_code))]
 
 pub mod ble_mesh;
+pub mod boot_consciousness;
 pub mod broca;
 pub mod compass;
 pub mod config;
@@ -51,8 +52,15 @@ pub mod memory;
 pub mod metabolism;
 pub mod pairing;
 pub mod persistence;
+pub mod secure_boot;
 pub mod sensor_bridge;
+pub mod sovereign;
 pub mod topology;
+
+pub mod hardware_probe;
+
+#[cfg(feature = "wasm")]
+pub mod quickening;
 
 #[cfg(feature = "wasm")]
 pub mod wasm_bindings;

@@ -129,11 +129,10 @@ impl AttestationManager {
         }
 
         // Deserialize public key
-        let pubkey_bytes = hex::decode(&attested.signer_key).map_err(|e| {
-            SwarmError::TrustVerificationError {
+        let pubkey_bytes =
+            hex::decode(&attested.signer_key).map_err(|e| SwarmError::TrustVerificationError {
                 reason: format!("Invalid signer key hex: {e}"),
-            }
-        })?;
+            })?;
 
         if pubkey_bytes.len() != 32 {
             return Err(SwarmError::TrustVerificationError {
@@ -151,12 +150,11 @@ impl AttestationManager {
                     reason: "Failed to convert signer key bytes".to_string(),
                 })?;
 
-        let verifying_key =
-            VerifyingKey::from_bytes(&pubkey_array).map_err(|e| {
-                SwarmError::TrustVerificationError {
-                    reason: format!("Invalid Ed25519 public key: {e}"),
-                }
-            })?;
+        let verifying_key = VerifyingKey::from_bytes(&pubkey_array).map_err(|e| {
+            SwarmError::TrustVerificationError {
+                reason: format!("Invalid Ed25519 public key: {e}"),
+            }
+        })?;
 
         // Deserialize signature
         if attested.signature.len() != 64 {
@@ -168,14 +166,11 @@ impl AttestationManager {
             });
         }
 
-        let sig_bytes: [u8; 64] =
-            attested
-                .signature
-                .clone()
-                .try_into()
-                .map_err(|_| SwarmError::TrustVerificationError {
-                    reason: "Failed to convert signature bytes".to_string(),
-                })?;
+        let sig_bytes: [u8; 64] = attested.signature.clone().try_into().map_err(|_| {
+            SwarmError::TrustVerificationError {
+                reason: "Failed to convert signature bytes".to_string(),
+            }
+        })?;
         let signature = Signature::from_bytes(&sig_bytes);
 
         // Serialize CV for verification
@@ -183,11 +178,11 @@ impl AttestationManager {
             .map_err(|e| SwarmError::SerializationError(e.to_string()))?;
 
         // Verify signature
-        verifying_key
-            .verify(&cv_bytes, &signature)
-            .map_err(|_| SwarmError::TrustVerificationError {
+        verifying_key.verify(&cv_bytes, &signature).map_err(|_| {
+            SwarmError::TrustVerificationError {
                 reason: "Ed25519 signature verification failed on ConsciousnessVector".to_string(),
-            })?;
+            }
+        })?;
 
         Ok(true)
     }
@@ -360,7 +355,10 @@ mod tests {
         attested.vector.phi = 0.99;
 
         let result = manager.verify(&attested);
-        assert!(result.is_err(), "Tampered CV should fail signature verification");
+        assert!(
+            result.is_err(),
+            "Tampered CV should fail signature verification"
+        );
     }
 
     #[test]
@@ -406,6 +404,9 @@ mod tests {
         let attested = manager_a.attest(&cv).unwrap();
 
         let result = manager_b.verify_and_extract(&attested);
-        assert!(result.is_err(), "verify_and_extract should error for untrusted signer");
+        assert!(
+            result.is_err(),
+            "verify_and_extract should error for untrusted signer"
+        );
     }
 }

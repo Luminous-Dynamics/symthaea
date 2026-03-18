@@ -88,6 +88,16 @@ mod iroh;
 #[cfg(feature = "pqc-handshake")]
 pub mod pqc_handshake;
 
+// Sovereign Inoculation: Trust + Name + Social
+#[cfg(feature = "mesh")]
+pub mod web_of_trust;
+#[cfg(feature = "mesh")]
+pub mod consciousness_certificate;
+#[cfg(feature = "mesh")]
+pub mod name_resolver;
+#[cfg(feature = "mesh")]
+pub mod resonance_graph;
+
 // Re-exports
 pub use config::{
     AeadAlgorithm, BootstrapConfig, CryptoConfig, PeerConfig, SwarmConfig, MYCELIX_BOOTSTRAP_NODES,

@@ -549,6 +549,86 @@ pub unsafe extern "C" fn spore_engine_dream_consolidate(engine: *mut SporeEngine
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// Broca language generation
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Generate text from the current consciousness state using BrocaLite.
+///
+/// Returns a JSON string: `{"text":"...","num_tokens":N,"eos_terminated":bool}`
+/// Caller must free with `spore_string_free()`.
+///
+/// # Safety
+/// `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn spore_engine_generate_text(
+    engine: *mut SporeEngine,
+    max_tokens: u32,
+) -> *mut c_char {
+    let engine = unsafe { &mut *engine };
+    let result = engine.generate_text(max_tokens as usize);
+    let json = serde_json::json!({
+        "text": result.text,
+        "num_tokens": result.num_tokens,
+        "eos_terminated": result.eos_terminated,
+    });
+    match CString::new(json.to_string()) {
+        Ok(c) => c.into_raw(),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Persistence
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Save a checkpoint to storage. Returns 1 on success, 0 on failure.
+///
+/// # Safety
+/// `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn spore_engine_save_checkpoint(engine: *mut SporeEngine) -> u8 {
+    let engine = unsafe { &mut *engine };
+    if engine.save_checkpoint() {
+        1
+    } else {
+        0
+    }
+}
+
+/// Load a checkpoint from storage. Returns 1 on success, 0 on failure.
+///
+/// # Safety
+/// `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn spore_engine_load_checkpoint(engine: *mut SporeEngine) -> u8 {
+    let engine = unsafe { &mut *engine };
+    if engine.load_checkpoint() {
+        1
+    } else {
+        0
+    }
+}
+
+/// Set the storage backend to a file at the given path.
+///
+/// # Safety
+/// `engine` must be valid. `path` must be a valid null-terminated UTF-8 string.
+#[no_mangle]
+pub unsafe extern "C" fn spore_engine_set_storage_path(
+    engine: *mut SporeEngine,
+    path: *const c_char,
+) {
+    if path.is_null() {
+        return;
+    }
+    let engine = unsafe { &mut *engine };
+    let c_str = unsafe { CStr::from_ptr(path) };
+    if let Ok(s) = c_str.to_str() {
+        engine.set_storage(Box::new(crate::persistence::FileStorage::new(s)));
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // Holon bridge
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -927,7 +1007,7 @@ mod tests {
             // ExplicitSleep = signal 2
             spore_engine_wake_signal(engine, 2);
             assert_eq!(spore_engine_wake_state(engine), 0); // Sleep
-            // PhonePickup = signal 0
+                                                            // PhonePickup = signal 0
             spore_engine_wake_signal(engine, 0);
             assert_eq!(spore_engine_wake_state(engine), 1); // Drowsy
             spore_engine_free(engine);
@@ -1165,7 +1245,7 @@ mod tests {
             assert_eq!(spore_engine_wake_state(engine), 2); // Alert
             spore_engine_set_night_mode(engine, 1);
             spore_engine_set_battery_state(engine, 80, 1); // charging
-            // Run a cycle to trigger edge-detected forwarding
+                                                           // Run a cycle to trigger edge-detected forwarding
             spore_engine_cycle(engine, std::ptr::null());
             assert_eq!(spore_engine_wake_state(engine), 0); // Sleep
             spore_engine_free(engine);

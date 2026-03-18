@@ -33,7 +33,11 @@ pub enum PairingOutbound {
     /// Challenge nonce sent to a peer requesting pairing.
     Challenge { peer_id: u64, nonce: Vec<u8> },
     /// Signed response to a received challenge.
-    Response { peer_id: u64, signature: Vec<u8>, pubkey: Vec<u8> },
+    Response {
+        peer_id: u64,
+        signature: Vec<u8>,
+        pubkey: Vec<u8>,
+    },
     /// Pairing accepted.
     Ack { peer_id: u64 },
     /// Pairing rejected.
@@ -46,7 +50,11 @@ pub enum PairingInbound {
     /// Peer requests pairing — contains their nonce for us to sign.
     Challenge { peer_id: u64, nonce: Vec<u8> },
     /// Peer's signed response to our challenge.
-    Response { peer_id: u64, signature: Vec<u8>, pubkey: Vec<u8> },
+    Response {
+        peer_id: u64,
+        signature: Vec<u8>,
+        pubkey: Vec<u8>,
+    },
     /// Peer acknowledged our pairing.
     Ack { peer_id: u64 },
     /// Peer rejected pairing.
@@ -322,7 +330,11 @@ impl PairingManager {
             }
             PairingInbound::Ack { peer_id } => {
                 // Update last_seen for the peer
-                if let Some(dev) = self.paired_devices.iter_mut().find(|d| d.peer_id == peer_id) {
+                if let Some(dev) = self
+                    .paired_devices
+                    .iter_mut()
+                    .find(|d| d.peer_id == peer_id)
+                {
                     dev.last_seen = self.cycle;
                 }
             }

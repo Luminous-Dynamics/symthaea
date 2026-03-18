@@ -467,9 +467,7 @@ impl SwarmManager {
                         self.pending_knowledge_shares.truncate(64);
                     }
                 }
-                SwarmEvent::TrustVerified {
-                    trust_level, ..
-                } => {
+                SwarmEvent::TrustVerified { trust_level, .. } => {
                     // Track verified peer count for telemetry
                     if trust_level > 0.0 {
                         self.verified_peers = self.verified_peers.saturating_add(1);
@@ -484,8 +482,16 @@ impl SwarmManager {
                     description,
                 } => {
                     // Clamp NaN/Inf and store for SentinelManager drain
-                    let sev = if severity.is_finite() { severity.clamp(0.0, 1.0) } else { 0.0 };
-                    let conf = if confidence.is_finite() { confidence.clamp(0.0, 1.0) } else { 0.0 };
+                    let sev = if severity.is_finite() {
+                        severity.clamp(0.0, 1.0)
+                    } else {
+                        0.0
+                    };
+                    let conf = if confidence.is_finite() {
+                        confidence.clamp(0.0, 1.0)
+                    } else {
+                        0.0
+                    };
                     if self.pending_threat_patterns.len() < 32 {
                         self.pending_threat_patterns.push(PeerThreatReport {
                             peer_id,

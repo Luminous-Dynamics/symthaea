@@ -21,7 +21,7 @@ ed25519-dalek = { version = "2", optional = true, default-features = false, feat
 hex = { version = "0.4", optional = true }
 
 # WASM bindings (optional — rlib builds skip this)
-wasm-bindgen = { version = "0.2", optional = true }
+wasm-bindgen = { version = "=0.2.108", optional = true }
 serde-wasm-bindgen = { version = "0.6", optional = true }
 console_error_panic_hook = { version = "0.1", optional = true }
 

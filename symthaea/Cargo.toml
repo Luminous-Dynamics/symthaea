@@ -482,6 +482,13 @@ pqc-handshake = ["identity", "mesh-key-exchange", "dep:mycelix-crypto"]  # Hybri
 mycelix = ["mycelix-fl-core", "sha3"]       # Mycelix FL algorithms + hashing
 mycelix_sdk = ["mycelix", "dep:mycelix-sdk"]                  # Enabled Mycelix SDK integration
 
+# ── Sovereign Inoculation ──────────────────────────────────────────
+mesh-trust = ["mesh", "identity"]              # Post-quantum web-of-trust over mesh
+mesh-naming = ["mesh"]                         # Decentralized name resolution (sovereign DNS)
+social-fabric = ["mesh"]                       # Resonance-based content routing (sovereign social)
+survival = ["mesh"]                            # Infrastructure monitoring + demand forecasting
+survival-mqtt = ["survival"]                   # MQTT sensor bridge (requires external rumqttc)
+
 # ── Desktop & System Integration ────────────────────────────────────
 notifications = ["zbus"]                    # D-Bus desktop notifications
 nix-mind = ["symthaea-nix"]                 # Conscious NixOS mind with HDC world model + active inference

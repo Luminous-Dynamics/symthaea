@@ -390,11 +390,7 @@ impl ShadowDetector {
     }
 
     /// Record dream results back to the shadow fragment.
-    pub fn record_dream_result(
-        &mut self,
-        fragment_index: usize,
-        phi_improvement: f32,
-    ) {
+    pub fn record_dream_result(&mut self, fragment_index: usize, phi_improvement: f32) {
         if let Some(frag) = self.fragments.get_mut(fragment_index) {
             frag.record_dream_result(phi_improvement);
         }
@@ -547,10 +543,9 @@ impl ShadowDetector {
         // Compute trend: slope of pressure over recent history
         let pressure_trend = if self.pressure_history.len() >= 3 {
             let n = self.pressure_history.len();
-            let recent = self.pressure_history.iter().rev().take(5).sum::<f32>()
-                / 5.0_f32.min(n as f32);
-            let older = self.pressure_history.iter().take(5).sum::<f32>()
-                / 5.0_f32.min(n as f32);
+            let recent =
+                self.pressure_history.iter().rev().take(5).sum::<f32>() / 5.0_f32.min(n as f32);
+            let older = self.pressure_history.iter().take(5).sum::<f32>() / 5.0_f32.min(n as f32);
             recent - older
         } else {
             0.0
@@ -758,14 +753,7 @@ mod tests {
 
         // Build up significant shadow pressure
         for i in 0..20 {
-            detector.process(
-                i * 11,
-                0.5,
-                -0.9,
-                0.8,
-                "I hate myself for what I did",
-                0.1,
-            );
+            detector.process(i * 11, 0.5, -0.9, 0.8, "I hate myself for what I did", 0.1);
         }
 
         let telemetry = detector.process(221, 0.5, -0.9, 0.8, "I hate myself for what I did", 0.1);
@@ -817,9 +805,7 @@ mod tests {
         }
 
         detector.record_dream_result(0, 0.15);
-        assert!(
-            (detector.fragments()[0].dream_phi_improvement - 0.15).abs() < 0.001,
-        );
+        assert!((detector.fragments()[0].dream_phi_improvement - 0.15).abs() < 0.001,);
         assert_eq!(detector.fragments()[0].dream_processing_count, 1);
     }
 
@@ -863,7 +849,11 @@ mod tests {
             );
         }
 
-        let final_pressure = detector.fragments().first().map(|f| f.pressure()).unwrap_or(0.0);
+        let final_pressure = detector
+            .fragments()
+            .first()
+            .map(|f| f.pressure())
+            .unwrap_or(0.0);
         assert!(
             final_pressure < initial_pressure,
             "dormant shadow should decay: {} < {}",
@@ -925,7 +915,11 @@ mod tests {
     fn test_empty_input_no_shadow() {
         let mut detector = ShadowDetector::new();
         detector.process(1, 0.5, -0.9, 0.8, "", 0.1);
-        assert_eq!(detector.fragment_count(), 0, "empty input should not create shadow");
+        assert_eq!(
+            detector.fragment_count(),
+            0,
+            "empty input should not create shadow"
+        );
     }
 
     #[test]
