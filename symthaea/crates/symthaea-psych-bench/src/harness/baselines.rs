@@ -3952,6 +3952,15 @@ pub fn mathematics_baselines() -> BaselineMap {
             population: "human adults",
         },
     );
+    m.insert(
+        "logical_overall_accuracy",
+        Baseline {
+            value: 0.78,
+            sd: Some(0.10),
+            source: "Johnson-Laird (1983), weighted avg of valid (0.85) + invalid (0.70)",
+            population: "human adults",
+        },
+    );
     // Constraint puzzles
     m.insert(
         "constraint_queens_4_accuracy",

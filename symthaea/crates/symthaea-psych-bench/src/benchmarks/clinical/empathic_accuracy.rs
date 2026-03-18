@@ -359,16 +359,14 @@ impl EmpathicAccuracyBenchmark {
                     .wrapping_add(2000 + b as u64 * 47);
                 // Lower intensity → more noise on behavioral cues
                 let intensity_factor = scenario.intensity;
-                let behav_flip =
-                    (base_flip + (1.0 - intensity_factor) * 0.15).clamp(0.0, 0.5);
+                let behav_flip = (base_flip + (1.0 - intensity_factor) * 0.15).clamp(0.0, 0.5);
                 let cue = target_emotion.add_noise(behav_flip, cue_seed);
                 cue_hvs.push(cue);
             }
 
             // Add distractor emotion traces for mixed/masked scenarios
             for d in 0..scenario.distractor_count {
-                let dist_idx =
-                    ((scenario.seed_offset as usize) + d + 3) % NUM_EMOTION_PROTOTYPES;
+                let dist_idx = ((scenario.seed_offset as usize) + d + 3) % NUM_EMOTION_PROTOTYPES;
                 let dist_seed = seed
                     .wrapping_add(scenario.seed_offset)
                     .wrapping_add(3000 + d as u64 * 61);

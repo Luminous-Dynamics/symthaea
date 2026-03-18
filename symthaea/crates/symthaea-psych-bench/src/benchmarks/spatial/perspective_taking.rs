@@ -108,7 +108,13 @@ impl PerspectiveTakingBenchmark {
             // Rotated location HVs (for comparison targets).
             let rotated_locs: Vec<BinaryHV> = loc_hvs
                 .iter()
-                .map(|l| if shift == 0 { l.clone() } else { l.permute(shift) })
+                .map(|l| {
+                    if shift == 0 {
+                        l.clone()
+                    } else {
+                        l.permute(shift)
+                    }
+                })
                 .collect();
 
             let n_queries = 25;

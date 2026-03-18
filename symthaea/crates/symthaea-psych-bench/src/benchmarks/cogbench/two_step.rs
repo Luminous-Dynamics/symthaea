@@ -54,8 +54,8 @@ impl TwoStepBenchmark {
         let mut transition_counts = [[1.0f64; 2]; 2]; // Laplace prior
                                                       // Reward model: EMA of rewards in each state
         let mut state_reward = [0.5f64; 2]; // prior: 0.5
-        // Lower LR (0.35 vs 0.50) smooths reward estimates, reducing noise in the
-        // transition×reward interaction statistic (Daw et al., 2011 two-step task).
+                                            // Lower LR (0.35 vs 0.50) smooths reward estimates, reducing noise in the
+                                            // transition×reward interaction statistic (Daw et al., 2011 two-step task).
         let reward_lr = 0.35;
         let mut rt_ticks = Vec::new();
 

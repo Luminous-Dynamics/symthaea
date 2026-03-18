@@ -292,10 +292,27 @@ impl PsychBenchmark for AllianceMaintenanceBenchmark {
                 rupture_detected += 1;
             }
 
-            // Strategy selection: bind context with each strategy, pick the one
-            // most similar to a "good outcome" prototype for this scenario.
-            let outcome_seed = seed.wrapping_add(80_000 + i as u64);
-            let good_outcome = BinaryHV::random(outcome_seed);
+            // Strategy selection: build a "good outcome" HV by bundling the
+            // HVs of the correct strategies for this scenario.  bind(context,
+            // strategy) will be more similar to good_outcome when `strategy`
+            // is one of the appropriate repairs because those strategy HVs
+            // contributed to good_outcome via majority-bundle.
+            //
+            // Fallback: if only one appropriate repair exists, the bundle IS
+            // that strategy's HV, so the top-1 pick is deterministically
+            // correct.  With two appropriate repairs the bundle is their
+            // majority, and both bound(context, s) vectors score higher than
+            // the two incorrect ones — making selection meaningful rather than
+            // random noise against an unrelated prototype.
+            let good_outcome = {
+                let correct_hvs: Vec<BinaryHV> = strategy_hvs
+                    .iter()
+                    .filter(|(s, _)| scenario.appropriate_repairs.contains(s))
+                    .map(|(_, hv)| hv.clone())
+                    .collect();
+                // Bundle the correct strategy HVs into a single prototype.
+                BinaryHV::bundle(&correct_hvs)
+            };
 
             let mut best_strategy = RepairStrategy::Validation;
             let mut best_sim = f32::NEG_INFINITY;

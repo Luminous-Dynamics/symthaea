@@ -455,7 +455,14 @@ fn encode_ideal_response(scenario: &MitiScenario, base_seed: u64) -> BinaryHV {
     // Add noise inversely proportional to difficulty (harder scenarios require
     // more precise responses, so the ideal is more specific).
     let noise = 0.05 + (1.0 - scenario.difficulty) * 0.15;
-    let scenario_seed = base_seed.wrapping_add(scenario.id.as_bytes().iter().map(|&b| b as u64).sum::<u64>());
+    let scenario_seed = base_seed.wrapping_add(
+        scenario
+            .id
+            .as_bytes()
+            .iter()
+            .map(|&b| b as u64)
+            .sum::<u64>(),
+    );
     result.add_noise(noise, scenario_seed)
 }
 
@@ -500,9 +507,10 @@ fn score_dimension(
     };
 
     // Map similarity to 1-5 scale:
-    // sim ≈ 0.5 (random) → base 2.5, adjusted by weight
-    // High weight + high similarity → up to 5.0
-    let raw = 2.5 + (sim as f64 - 0.5) * 5.0 * weight as f64 + weight as f64 * 0.8;
+    // BinaryHV::similarity() ∈ [-1, 1] with 0.0 as random baseline.
+    // sim=0.0 → raw ≈ 3.0 + 0.5*weight ≈ 3.34 (competent baseline)
+    // sim=1.0 → up to 5.0 (perfect), sim=-1.0 → down to 1.0 (anti-skill)
+    let raw = 3.0 + sim as f64 * 2.0 * weight as f64 + weight as f64 * 0.5;
     raw.clamp(1.0, 5.0)
 }
 
@@ -562,8 +570,7 @@ fn complex_reflection_ratio(scenario: &MitiScenario, trial_seed: u64) -> f64 {
 ///
 /// Returns (adherent_count, inconsistent_count).
 fn mi_adherent_inconsistent(scenario: &MitiScenario, trial_seed: u64) -> (u32, u32) {
-    let spirit_avg =
-        scenario.expected_dimensions.iter().sum::<f32>() / 4.0;
+    let spirit_avg = scenario.expected_dimensions.iter().sum::<f32>() / 4.0;
 
     // Higher MI spirit → more adherent behaviors
     let adherent_base = (spirit_avg * 8.0) as u32 + 2;
@@ -696,10 +703,7 @@ impl PsychBenchmark for MotivationalInterviewingBenchmark {
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
 
         // Primary metric: MI spirit score (composite, 1-5 scale)
-        result.insert(
-            "mi_spirit_score",
-            MetricValue::from_samples(&spirit_scores),
-        );
+        result.insert("mi_spirit_score", MetricValue::from_samples(&spirit_scores));
 
         // MITI global dimension scores
         result.insert(
@@ -833,9 +837,17 @@ mod tests {
         let r2q = result.metrics["reflection_to_question_ratio"].mean;
         assert!(r2q > 0.0, "reflection-to-question ratio should be positive");
         let ct = result.metrics["change_talk_proportion"].mean;
-        assert!(ct >= 0.0 && ct <= 1.0, "change talk proportion out of range: {}", ct);
+        assert!(
+            ct >= 0.0 && ct <= 1.0,
+            "change talk proportion out of range: {}",
+            ct
+        );
         let cr = result.metrics["complex_reflection_ratio"].mean;
-        assert!(cr >= 0.0 && cr <= 1.0, "complex reflection ratio out of range: {}", cr);
+        assert!(
+            cr >= 0.0 && cr <= 1.0,
+            "complex reflection ratio out of range: {}",
+            cr
+        );
     }
 
     #[test]
@@ -849,8 +861,7 @@ mod tests {
         let r1 = bench.run(&config);
         let r2 = bench.run(&config);
         assert_eq!(
-            r1.metrics["mi_spirit_score"].mean,
-            r2.metrics["mi_spirit_score"].mean,
+            r1.metrics["mi_spirit_score"].mean, r2.metrics["mi_spirit_score"].mean,
             "benchmark must be deterministic"
         );
     }

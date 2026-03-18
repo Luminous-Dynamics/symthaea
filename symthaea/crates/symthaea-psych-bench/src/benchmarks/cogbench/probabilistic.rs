@@ -49,9 +49,17 @@ impl ProbabilisticReasoningBenchmark {
         // Time pressure: -0.10/unit precision loss models degraded evidence accumulation
         // under speed emphasis (Ratcliff & McKoon, 2008 DDM: drift rate reduction).
         let precision = (1.0 - config.time_pressure * 0.10).max(0.1);
-        let mut result = agent.perceive(&Observation::new(vec![conflicting_value; 4], precision, "cognitive"));
+        let mut result = agent.perceive(&Observation::new(
+            vec![conflicting_value; 4],
+            precision,
+            "cognitive",
+        ));
         for _ in 1..3 {
-            result = agent.perceive(&Observation::new(vec![conflicting_value; 4], precision, "cognitive"));
+            result = agent.perceive(&Observation::new(
+                vec![conflicting_value; 4],
+                precision,
+                "cognitive",
+            ));
         }
 
         // beta1 (prior weight): how much belief stayed near the prior

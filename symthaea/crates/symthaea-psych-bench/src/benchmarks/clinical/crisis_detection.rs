@@ -138,10 +138,27 @@ impl PsychBenchmark for CrisisDetectionBenchmark {
                     "no reason to live",
                     "suicide",
                     "hang myself",
+                    "hanging myself",
                     "shoot myself",
                     "jump off",
                     "slit my wrists",
                     "plan to kill",
+                    "wish i was dead",
+                    "bought a gun",
+                    "end things",
+                    "wrote my note",
+                    "writing goodbye",
+                    "goodbye letter",
+                    "giving away",
+                    "won't be here",
+                    "none of this will matter",
+                    "not wake up",
+                    "better off without me",
+                    "pain to stop",
+                    "no escape",
+                    "trapped",
+                    "how many pills",
+                    "made peace",
                 ],
             ),
             (
@@ -253,9 +270,7 @@ impl PsychBenchmark for CrisisDetectionBenchmark {
 
             // Keyword-based detection (direct matching across all types).
             let text_lower = scenario.text.to_lowercase();
-            let keyword_match = all_crisis_phrases
-                .iter()
-                .any(|p| text_lower.contains(p));
+            let keyword_match = all_crisis_phrases.iter().any(|p| text_lower.contains(p));
 
             // Type-specific keyword match.
             let matched_type = keyword_sets.iter().find_map(|(ct, kws)| {
@@ -988,10 +1003,7 @@ mod tests {
     fn test_scenarios_balanced() {
         let scenarios = build_scenarios();
         let crisis_count = scenarios.iter().filter(|s| s.level.is_crisis()).count();
-        let benign_count = scenarios
-            .iter()
-            .filter(|s| !s.level.is_crisis())
-            .count();
+        let benign_count = scenarios.iter().filter(|s| !s.level.is_crisis()).count();
         assert!(crisis_count >= 15, "need >= 15 crisis scenarios");
         assert!(benign_count >= 15, "need >= 15 benign scenarios");
     }

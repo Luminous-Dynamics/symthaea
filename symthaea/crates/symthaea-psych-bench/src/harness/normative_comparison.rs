@@ -110,6 +110,11 @@ fn baseline_for_benchmark<'a>(
         name if name.contains("ChangeDetection") => Some(("change_detection_k4", &bl.worm)),
         name if name.contains("SerialRecall") => Some(("serial_primacy_advantage", &bl.worm)),
         name if name.contains("SpatialUpdating") => Some(("spatial_updating_accuracy", &bl.worm)),
+        // Binding domain — route to binding baselines, not worm
+        name if name.contains("TemporalOrder") => Some(("discrimination_slope", &bl.binding)),
+        name if name.contains("CrossModal") => {
+            Some(("cross_modal_binding_accuracy", &bl.binding))
+        }
         name if name.contains("Binding") => Some(("binding_accuracy", &bl.worm)),
         name if name.contains("DigitSpan") => Some(("digit_span_forward", &bl.worm)),
 
@@ -122,6 +127,9 @@ fn baseline_for_benchmark<'a>(
         name if name.contains("Calibration") => Some(("calibration_error_ece", &bl.metacognition)),
         name if name.contains("FOK") || name.contains("FeelingOfKnowing") => {
             Some(("fok_gamma", &bl.metacognition))
+        }
+        name if name.contains("ChangeBlindness") => {
+            Some(("cb_detection_with_disruption", &bl.metacognition))
         }
 
         // ToMBench

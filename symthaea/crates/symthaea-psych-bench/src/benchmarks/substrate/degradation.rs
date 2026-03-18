@@ -59,14 +59,9 @@ impl SubstrateDegradationBenchmark {
             for trial in 0..trials_per_level {
                 // Create a target vector and a role binder
                 xor_shift(&mut rng);
-                let target = ContinuousHV::random(
-                    dim,
-                    seed.wrapping_add(1000 + trial as u64 * 100),
-                );
-                let role = ContinuousHV::random(
-                    dim,
-                    seed.wrapping_add(2000 + trial as u64),
-                );
+                let target =
+                    ContinuousHV::random(dim, seed.wrapping_add(1000 + trial as u64 * 100));
+                let role = ContinuousHV::random(dim, seed.wrapping_add(2000 + trial as u64));
 
                 // Bundle target with distractor features to form a composite memory
                 let distractors: Vec<ContinuousHV> = (0..n_features)
