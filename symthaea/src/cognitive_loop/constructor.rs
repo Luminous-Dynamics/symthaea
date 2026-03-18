@@ -1081,6 +1081,8 @@ impl CognitiveLoopService {
             defense_actions_proposed: 0,
             #[cfg(feature = "safety-agents")]
             defense_actions_approved: 0,
+            civic_crisis_detector: super::civic_crisis_detector::CivicCrisisDetector::new(),
+            security_telemetry: crate::swarm::SecurityTelemetry::default(),
             resonant_speech: crate::resonant_speech::ResonantSpeech::new(),
             streaming_inference: if enable_streaming_inference {
                 // Cycle-aligned config: batch=1, max_latency=32ms (~31Hz loop)

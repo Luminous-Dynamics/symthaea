@@ -334,6 +334,41 @@ impl CognitiveLoopService {
                 approved = self.defense_actions_approved,
                 "Defense cascade"
             );
+
+            // ── Civic Crisis Detection ───────────────────────────────────
+            // Monitor prediction error, safety level, Phi, and arousal for
+            // sustained anomalies that indicate community-level emergencies.
+            // Produces CivicCrisisEvent for the Mycelix emergency-incidents zome.
+            let crisis_input = super::civic_crisis_detector::CrisisDetectorInput {
+                prediction_error: dynamics.core.prediction_error as f64,
+                safety_level_ordinal: match safety_result.level {
+                    crate::safety::SafetyLevel::Green => 0,
+                    crate::safety::SafetyLevel::Yellow => 1,
+                    crate::safety::SafetyLevel::Orange => 2,
+                    crate::safety::SafetyLevel::Red => 3,
+                },
+                consciousness_level: feedback.consciousness.consciousness_level,
+                collective_phi: self.swarm_manager.mean_peer_phi(),
+                arousal: self.neuromod.bath.norepinephrine.baseline_val() as f64,
+                has_peers: self.swarm_manager.connected_peers() > 0,
+            };
+
+            if let Some(crisis_event) = self.civic_crisis_detector.tick(
+                &crisis_input,
+                self.stats.total_cycles,
+            ) {
+                self.security_telemetry.crisis_events_emitted += 1;
+                tracing::warn!(
+                    severity = crisis_event.severity,
+                    crisis_type = ?crisis_event.crisis_type,
+                    confidence = crisis_event.confidence,
+                    signals = crisis_event.trigger_signals.len(),
+                    "Civic crisis detected — forwarding to Mycelix emergency-incidents"
+                );
+                // TODO: Forward crisis_event to Mycelix civic bridge when holochain
+                // conductor is connected. For now, the event is logged + counted
+                // in security_telemetry.crisis_events_emitted.
+            }
         }
 
         // Sentinel threat processing: detect → store → share

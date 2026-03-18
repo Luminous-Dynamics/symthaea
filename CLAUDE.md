@@ -151,7 +151,7 @@ Quick guide: @.claude/guides/SERVICES.md
 ## Collaborator
 
 **Tristan (tstoltz)** - Richardson, TX (Central)
-- NixOS 25.11 | Neovim | Alacritty | Zellij
+- NixOS 26.05 (Yarara) | Neovim | Alacritty | Zellij
 - Email: tristan.stoltz@evolvingresonantcocreationism.com
 
 ---

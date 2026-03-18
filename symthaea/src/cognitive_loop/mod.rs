@@ -775,6 +775,13 @@ pub struct CognitiveLoopService {
     /// Defense actions that passed moral filter this cycle.
     #[cfg(feature = "safety-agents")]
     pub(crate) defense_actions_approved: u32,
+
+    /// Civic crisis detector: monitors PE, safety level, Phi, arousal for
+    /// community-level emergencies. Produces CivicCrisisEvent for Mycelix.
+    pub(crate) civic_crisis_detector: civic_crisis_detector::CivicCrisisDetector,
+
+    /// Aggregate security telemetry for the crypto/swarm stack.
+    pub(crate) security_telemetry: crate::swarm::SecurityTelemetry,
 }
 
 // MetricsProvider impl is in metrics_provider.rs
