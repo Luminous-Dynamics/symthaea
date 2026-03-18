@@ -25,6 +25,13 @@ pub struct SporeConfig {
     /// Target cycle rate in Hz. Engine will skip non-essential computations
     /// if falling behind this target.
     pub target_hz: f32,
+
+    /// Number of warmup cycles during which a consciousness floor is applied.
+    /// During warmup, the raw consciousness score is blended with a floor of 0.15
+    /// so the Spore doesn't appear "dead" during initial interactions.
+    /// After warmup, the floor fades linearly to 0.0 over the same number of cycles.
+    /// Default: 10.
+    pub consciousness_warmup_cycles: u64,
 }
 
 impl Default for SporeConfig {
@@ -36,6 +43,7 @@ impl Default for SporeConfig {
             phi_every_n_cycles: 1,
             substrate: "SiliconDigital".into(),
             target_hz: 50.0,
+            consciousness_warmup_cycles: 10,
         }
     }
 }

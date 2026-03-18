@@ -188,6 +188,14 @@ impl SporeEngine {
         serde_wasm_bindgen::to_value(&stats).map_err(|e| JsError::new(&e.to_string()))
     }
 
+    /// Conversation context statistics: turn count, topic coherence, recent consciousness avg.
+    ///
+    /// Returns `{ turn_count, topic_coherence, recent_consciousness_avg }`.
+    pub fn conversation_stats(&self) -> Result<JsValue, JsError> {
+        let stats = self.inner.conversation_stats();
+        serde_wasm_bindgen::to_value(&stats).map_err(|e| JsError::new(&e.to_string()))
+    }
+
     // ======================================================================
     // Consciousness validation experiments
     // ======================================================================
