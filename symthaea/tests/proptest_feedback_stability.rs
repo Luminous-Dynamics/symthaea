@@ -1316,7 +1316,7 @@ proptest! {
             let m = &result.metadata;
 
             // Track LR during freeze windows to verify it's stable
-            if m.lr_frozen {
+            if m.modulation.lr_frozen {
                 lr_during_freeze.push(m.actual_effective_lr);
             } else {
                 // If we had frozen LR values, verify they were similar
@@ -1395,11 +1395,11 @@ proptest! {
 
             // New telemetry fields must be finite booleans (no panic/crash)
             // (booleans can't be NaN, but verifying the fields exist and are populated)
-            let _ = m.epistemic_conflict_exploration;
-            let _ = m.phenomenal_fragmentation_recovery;
-            let _ = m.temporal_discontinuity_recovery;
-            let _ = m.binding_attention_modulated;
-            let _ = m.resonator_semantic_lr_mod;
+            let _ = m.modulation.epistemic_conflict_exploration;
+            let _ = m.modulation.phenomenal_fragmentation_recovery;
+            let _ = m.modulation.temporal_discontinuity_recovery;
+            let _ = m.modulation.binding_attention_modulated;
+            let _ = m.modulation.resonator_semantic_lr_mod;
         }
     }
 }
@@ -1444,12 +1444,12 @@ proptest! {
                 "LR out of bounds after Session 13 mods: {lr} at cycle {i}");
 
             // Verify new telemetry fields exist and are populated
-            let _ = m.fep_td_converged;
-            let _ = m.confidence_rising_dampen;
-            let _ = m.flow_lr_boost;
-            let _ = m.fep_efficiency_boost;
-            let _ = m.attention_overload_threshold;
-            let _ = m.quality_exploration_floor;
+            let _ = m.modulation.fep_td_converged;
+            let _ = m.modulation.confidence_rising_dampen;
+            let _ = m.modulation.flow_lr_boost;
+            let _ = m.modulation.fep_efficiency_boost;
+            let _ = m.modulation.attention_overload_threshold;
+            let _ = m.modulation.quality_exploration_floor;
         }
     }
 }
@@ -1491,10 +1491,10 @@ proptest! {
             let lr = m.actual_effective_lr;
             assert_finite_f32(lr, &format!("lr@cycle{i}"))?;
 
-            let _ = m.living_mind_vitality_feedback;
-            let _ = m.metacog_low_accuracy_dampen;
-            let _ = m.self_safety_lr_boost;
-            let _ = m.embodied_agency_stable;
+            let _ = m.modulation.living_mind_vitality_feedback;
+            let _ = m.modulation.metacog_low_accuracy_dampen;
+            let _ = m.modulation.self_safety_lr_boost;
+            let _ = m.modulation.embodied_agency_stable;
         }
     }
 }
@@ -1538,13 +1538,13 @@ proptest! {
                 "LR out of bounds after S15 mods: {lr} at cycle {i}");
 
             // New telemetry fields exist and are populated
-            let _ = m.pipeline_consciousness_gated;
-            let _ = m.low_coherence_early_warning;
-            let _ = m.mode_stable_exploration_dampen;
-            let _ = m.crash_binding_relaxed;
-            let _ = m.attention_fatigue_broca_gated;
-            let _ = m.resonator_sustained_low_boost;
-            let _ = m.anomaly_recovery_phi_accelerated;
+            let _ = m.modulation.pipeline_consciousness_gated;
+            let _ = m.modulation.low_coherence_early_warning;
+            let _ = m.modulation.mode_stable_exploration_dampen;
+            let _ = m.modulation.crash_binding_relaxed;
+            let _ = m.modulation.attention_fatigue_broca_gated;
+            let _ = m.modulation.resonator_sustained_low_boost;
+            let _ = m.modulation.anomaly_recovery_phi_accelerated;
         }
     }
 }
@@ -1592,14 +1592,14 @@ proptest! {
             // (no assertion on exact value — just verify cycle doesn't panic)
 
             // All 8 new telemetry fields exist and are accessible
-            let _ = m.temporal_binding_feedback;
-            let _ = m.consciousness_gradient_active;
-            let _ = m.startup_exploration_ramped;
-            let _ = m.epistemic_rejection_streak_recal;
-            let _ = m.full_dampen_threshold_freeze;
-            let _ = m.consciousness_ema_lr_bias;
-            let _ = m.multi_obj_frontier_gated;
-            let _ = m.error_bifurcation_response;
+            let _ = m.modulation.temporal_binding_feedback;
+            let _ = m.modulation.consciousness_gradient_active;
+            let _ = m.modulation.startup_exploration_ramped;
+            let _ = m.modulation.epistemic_rejection_streak_recal;
+            let _ = m.modulation.full_dampen_threshold_freeze;
+            let _ = m.modulation.consciousness_ema_lr_bias;
+            let _ = m.modulation.multi_obj_frontier_gated;
+            let _ = m.modulation.error_bifurcation_response;
         }
     }
 }

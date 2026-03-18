@@ -1958,7 +1958,7 @@ mod tests {
         let result = VetoResult::allow();
         assert!(!result.vetoed);
         assert!(result.reason.is_none());
-        assert_eq!(result.confidence, 1.0);
+        assert!((result.confidence - 1.0).abs() < f64::EPSILON);
         assert!(result.alternative.is_none());
         assert_eq!(result.phi_impact, 0.0);
     }
@@ -2084,7 +2084,7 @@ mod tests {
         let integration = NarrativeGWTIntegration::default_config();
 
         // Before any processing, accuracy should be 0
-        assert_eq!(integration.prediction_accuracy(), 0.0);
+        assert!((integration.prediction_accuracy() - 0.0).abs() < f64::EPSILON);
     }
 
     #[test]

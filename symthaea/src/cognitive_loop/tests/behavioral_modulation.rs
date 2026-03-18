@@ -32,20 +32,20 @@ fn count_true(results: &[CycleResult], field: impl Fn(&CycleMetadata) -> bool) -
 /// Count how many modulation bools are true in total across all 13 tracked modulations.
 fn total_modulations_fired(m: &CycleMetadata) -> usize {
     [
-        m.affect_consciousness_modulated,
-        m.narrative_self_phi_modulated,
-        m.epistemic_phi_modulated,
-        m.phenomenal_binding_modulated,
-        m.temporal_coherence_modulated,
-        m.holographic_unity_modulated,
-        m.harmonies_alignment_modulated,
-        m.consciousness_gradient_lr_modulated,
-        m.value_cache_confidence_modulated,
-        m.binding_attention_modulated,
-        m.consciousness_state_modulated,
-        m.living_mind_vitality_modulated,
-        m.living_mind_coherence_modulated,
-        m.mcts_effectiveness_modulated,
+        m.modulation.affect_consciousness_modulated,
+        m.modulation.narrative_self_phi_modulated,
+        m.modulation.epistemic_phi_modulated,
+        m.modulation.phenomenal_binding_modulated,
+        m.modulation.temporal_coherence_modulated,
+        m.modulation.holographic_unity_modulated,
+        m.modulation.harmonies_alignment_modulated,
+        m.modulation.consciousness_gradient_lr_modulated,
+        m.modulation.value_cache_confidence_modulated,
+        m.modulation.binding_attention_modulated,
+        m.modulation.consciousness_state_modulated,
+        m.modulation.living_mind_vitality_modulated,
+        m.modulation.living_mind_coherence_modulated,
+        m.modulation.mcts_effectiveness_modulated,
     ]
     .iter()
     .filter(|&&b| b)
@@ -116,9 +116,9 @@ fn consciousness_state_level_telemetry_consistent() {
             let csl = m.consciousness.consciousness_state_level;
             let expected = csl > 0.7 || (csl > 0.0 && csl < 0.2);
             assert_eq!(
-                m.consciousness_state_modulated, expected,
+                m.modulation.consciousness_state_modulated, expected,
                 "Cycle {i}: consciousness_state_modulated={} but level={csl} (expected={expected})",
-                m.consciousness_state_modulated
+                m.modulation.consciousness_state_modulated
             );
         }
     }
@@ -146,13 +146,13 @@ fn living_mind_signals_zero_without_feature() {
         // When signal is 0.0, the > 0.0 guard prevents modulation from firing
         if m.living_mind_vitality == 0.0 {
             assert!(
-                !m.living_mind_vitality_modulated,
+                !m.modulation.living_mind_vitality_modulated,
                 "Cycle {i}: vitality_modulated should be false when vitality is 0.0"
             );
         }
         if m.living_mind_coherence == 0.0 {
             assert!(
-                !m.living_mind_coherence_modulated,
+                !m.modulation.living_mind_coherence_modulated,
                 "Cycle {i}: coherence_modulated should be false when coherence is 0.0"
             );
         }
@@ -177,9 +177,9 @@ fn mcts_effectiveness_telemetry_consistent() {
             let mpe = m.mcts_plan_effectiveness;
             let expected = mpe > 0.6 || (mpe > 0.0 && mpe < 0.2);
             assert_eq!(
-                m.mcts_effectiveness_modulated, expected,
+                m.modulation.mcts_effectiveness_modulated, expected,
                 "Cycle {i}: mcts_effectiveness_modulated={} but effectiveness={mpe} (expected={expected})",
-                m.mcts_effectiveness_modulated
+                m.modulation.mcts_effectiveness_modulated
             );
         }
     }
@@ -204,7 +204,7 @@ fn affect_consciousness_telemetry_populated() {
     }
 
     // The modulation bool should match threshold logic
-    let fires = count_true(&results, |m| m.affect_consciousness_modulated);
+    let fires = count_true(&results, |m| m.modulation.affect_consciousness_modulated);
     // fires can be 0 (neutral affect) — that's valid. But count must be bounded.
     assert!(fires <= results.len());
 }
@@ -214,7 +214,7 @@ fn binding_attention_modulation_fires() {
     // binding_attention is one of the most reliably-firing modulations.
     let mut svc = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
     let results = run_cycles(&mut svc, 50, "binding attention");
-    let fires = count_true(&results, |m| m.binding_attention_modulated);
+    let fires = count_true(&results, |m| m.modulation.binding_attention_modulated);
     // binding_attention_modulated fires when binding > threshold after warmup.
     // It may or may not fire depending on binding dynamics, but field must be populated.
     assert!(fires <= results.len());

@@ -1577,4 +1577,98 @@ mod tests {
         assert_eq!(summary.priority_counts[Priority::Cognitive as usize], 1);
         assert_eq!(summary.priority_counts[Priority::Aesthetic as usize], 1);
     }
+
+    mod proptests {
+        use super::*;
+        use proptest::prelude::*;
+
+        /// Generate random FeedbackProposal
+        fn arb_proposal() -> impl Strategy<Value = FeedbackProposal> {
+            prop_oneof![
+                (-5.0..5.0f64).prop_map(FeedbackProposal::Add),
+                (0.01..10.0f64).prop_map(FeedbackProposal::Scale),
+                (-5.0..5.0f64).prop_map(FeedbackProposal::Set),
+            ]
+        }
+
+        proptest! {
+            /// LR integration always stays within [1.0, 3.0] regardless of proposals.
+            #[test]
+            fn prop_lr_integration_bounded(
+                proposals in proptest::collection::vec(arb_proposal(), 0..50),
+            ) {
+                let mut collector = ProposalCollector::new();
+                for p in proposals {
+                    collector.propose("test", p);
+                }
+                let result = collector.integrate(1.0, 1.0, 3.0);
+                prop_assert!(result.effective >= 1.0, "LR below min: {}", result.effective);
+                prop_assert!(result.effective <= 3.0, "LR above max: {}", result.effective);
+                prop_assert!(result.effective.is_finite(), "LR not finite: {}", result.effective);
+            }
+
+            /// Confidence integration always stays within [0.01, 0.99].
+            #[test]
+            fn prop_confidence_integration_bounded(
+                proposals in proptest::collection::vec(arb_proposal(), 0..50),
+            ) {
+                let mut collector = ProposalCollector::new();
+                for p in proposals {
+                    collector.propose("test", p);
+                }
+                let result = collector.integrate(0.5, 0.01, 0.99);
+                prop_assert!(result.effective >= 0.01, "Confidence below min: {}", result.effective);
+                prop_assert!(result.effective <= 0.99, "Confidence above max: {}", result.effective);
+                prop_assert!(result.effective.is_finite());
+            }
+
+            /// Exploration integration always stays within [0.0, 1.0].
+            #[test]
+            fn prop_exploration_integration_bounded(
+                proposals in proptest::collection::vec(arb_proposal(), 0..50),
+            ) {
+                let mut collector = ProposalCollector::new();
+                for p in proposals {
+                    collector.propose("test", p);
+                }
+                let result = collector.integrate(0.3, 0.0, 1.0);
+                prop_assert!(result.effective >= 0.0, "Exploration below min: {}", result.effective);
+                prop_assert!(result.effective <= 1.0, "Exploration above max: {}", result.effective);
+                prop_assert!(result.effective.is_finite());
+            }
+
+            /// Integrate is deterministic: same proposals -> same result.
+            #[test]
+            fn prop_integration_deterministic(
+                proposals in proptest::collection::vec(arb_proposal(), 1..20),
+                base in -10.0..10.0f64,
+                min_val in -5.0..0.0f64,
+                max_val in 1.0..10.0f64,
+            ) {
+                let mut c1 = ProposalCollector::new();
+                let mut c2 = ProposalCollector::new();
+                for p in &proposals {
+                    c1.propose("test", *p);
+                    c2.propose("test", *p);
+                }
+                let r1 = c1.integrate(base, min_val, max_val);
+                let r2 = c2.integrate(base, min_val, max_val);
+                prop_assert!((r1.effective - r2.effective).abs() < 1e-12,
+                    "Non-deterministic: {} vs {}", r1.effective, r2.effective);
+            }
+
+            /// Conflict ratio is always in [0.0, 0.5].
+            #[test]
+            fn prop_conflict_ratio_bounded(
+                proposals in proptest::collection::vec(arb_proposal(), 0..50),
+            ) {
+                let mut collector = ProposalCollector::new();
+                for p in proposals {
+                    collector.propose("test", p);
+                }
+                let ratio = collector.conflict_ratio();
+                prop_assert!(ratio >= 0.0 && ratio <= 0.5, "Conflict ratio out of bounds: {}", ratio);
+            }
+        }
+    }
 }

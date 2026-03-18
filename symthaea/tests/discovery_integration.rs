@@ -235,9 +235,9 @@ fn test_substrate_telemetry_in_cycle_metadata() {
     // Substrate telemetry should be populated via #[serde(flatten)]
     let meta = &result.metadata;
     assert!(
-        meta.substrate_feasibility >= 0.0 && meta.substrate_feasibility <= 1.0,
-        "Substrate feasibility should be in [0,1]: {}",
-        meta.substrate_feasibility
+        meta.substrate_effective_feasibility >= 0.0 && meta.substrate_effective_feasibility <= 1.0,
+        "Substrate effective feasibility should be in [0,1]: {}",
+        meta.substrate_effective_feasibility
     );
     assert!(
         meta.substrate_effective_feasibility >= 0.0,
