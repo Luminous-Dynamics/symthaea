@@ -310,6 +310,19 @@ pub enum FallbackStrategy {
     NoFallback { reason: String },
 }
 
+impl FallbackStrategy {
+    /// Variant label without inner data (avoids Debug formatting allocation).
+    pub fn label(&self) -> &'static str {
+        match self {
+            FallbackStrategy::DowngradeToReadOnly { .. } => "DowngradeToReadOnly",
+            FallbackStrategy::DeferUntilHigherPhi { .. } => "DeferUntilHigherPhi",
+            FallbackStrategy::RequestHumanConfirmation { .. } => "RequestHumanConfirmation",
+            FallbackStrategy::EpistemicAction { .. } => "EpistemicAction",
+            FallbackStrategy::NoFallback { .. } => "NoFallback",
+        }
+    }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Tool Calibration
 // ─────────────────────────────────────────────────────────────────────────────

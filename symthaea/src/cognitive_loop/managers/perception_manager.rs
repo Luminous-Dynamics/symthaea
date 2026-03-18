@@ -18,6 +18,11 @@
 use super::super::subsystem_trait::{
     output_flags, CognitiveSubsystem, CycleSnapshot, SubsystemOutput,
 };
+use super::super::thresholds::{
+    PERCEPTION_BINDING_HIGH, PERCEPTION_BINDING_LOW, PERCEPTION_COHERENCE_HIGH,
+    PERCEPTION_COHERENCE_LOW, PERCEPTION_SENSITIVITY_MAX, PERCEPTION_SENSITIVITY_MIN,
+    PERCEPTION_VIGILANCE_COHERENCE, PERCEPTION_VIGILANCE_PE,
+};
 
 /// Perception Manager — attention gating and perceptual quality assessment.
 ///
@@ -151,13 +156,13 @@ impl CognitiveSubsystem for PerceptionManager {
         let mean_coh = self.mean_coherence();
 
         // High coherence → perceptual confidence boost
-        if mean_coh > 0.7 {
-            output.confidence_delta += (mean_coh - 0.7) as f64 * 0.015;
+        if mean_coh > PERCEPTION_COHERENCE_HIGH {
+            output.confidence_delta += f64::from(mean_coh - PERCEPTION_COHERENCE_HIGH) * 0.015;
         }
 
         // Low coherence → signal exploration (might need different perspective)
-        if mean_coh < 0.3 {
-            output.exploration_delta += (0.3 - mean_coh) as f64 * 0.02;
+        if mean_coh < PERCEPTION_COHERENCE_LOW {
+            output.exploration_delta += f64::from(PERCEPTION_COHERENCE_LOW - mean_coh) * 0.02;
             output.flags |= output_flags::REQUEST_EXPLORATION;
         }
 
@@ -172,21 +177,26 @@ impl CognitiveSubsystem for PerceptionManager {
 
         // ── 4. Vigilance mode ─────────────────────────────────────────────
         // Enter vigilant mode on low coherence + high prediction error
-        let should_be_vigilant = coherence < 0.4 && snapshot.prediction_error > 0.4;
+        let should_be_vigilant = coherence < PERCEPTION_VIGILANCE_COHERENCE
+            && snapshot.prediction_error > PERCEPTION_VIGILANCE_PE;
         if should_be_vigilant && !self.vigilant {
             self.vigilant = true;
-            self.attention_sensitivity = (self.attention_sensitivity * 1.2).min(2.0);
+            self.attention_sensitivity =
+                (self.attention_sensitivity * 1.2).min(PERCEPTION_SENSITIVITY_MAX);
         } else if !should_be_vigilant && self.vigilant {
             self.vigilant = false;
-            self.attention_sensitivity = (self.attention_sensitivity * 0.9).max(0.5);
+            self.attention_sensitivity =
+                (self.attention_sensitivity * 0.9).max(PERCEPTION_SENSITIVITY_MIN);
         }
 
         // ── 5. Phenomenal binding → confidence modulation ─────────────────
         let binding = snapshot.phenomenal_binding;
-        if binding > 0.7 {
-            output.confidence_delta += (binding - 0.7) * 0.01;
-        } else if binding < 0.3 {
-            output.confidence_delta -= (0.3 - binding) * 0.01;
+        let high = f64::from(PERCEPTION_BINDING_HIGH);
+        let low = f64::from(PERCEPTION_BINDING_LOW);
+        if binding > high {
+            output.confidence_delta += (binding - high) * 0.01;
+        } else if binding < low {
+            output.confidence_delta -= (low - binding) * 0.01;
         }
 
         output

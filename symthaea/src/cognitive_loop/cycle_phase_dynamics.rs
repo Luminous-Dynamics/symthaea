@@ -2318,7 +2318,7 @@ impl CognitiveLoopService {
                 if let Some(ref gate) = reasoning_result.gate {
                     if !gate.is_allowed() {
                         reasoning_gate_blocked = true;
-                        reasoning_fallback = gate.fallback.as_ref().map(|f| format!("{:?}", f));
+                        reasoning_fallback = gate.fallback.as_ref().map(|f| f.label().to_string());
                         reasoning_lr_factor = 0.0;
                         tracing::info!(
                             risk = ?gate.risk_level,

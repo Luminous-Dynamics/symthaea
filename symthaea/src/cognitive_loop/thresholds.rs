@@ -277,6 +277,40 @@ pub const MEMORY_RECALL_SIM_THRESHOLD: f32 = 0.3;
 /// Basis: Tulving & Schacter (1990) — repetition priming allows processing shortcuts.
 pub const INPUT_MEMO_THRESHOLD: f32 = 0.95;
 
+// ── Perception Manager ──────────────────────────────────────────────────────
+
+/// Perceptual coherence above which confidence is boosted.
+/// Basis: Dehaene & Changeux (2011) — high coherence indicates global workspace access.
+pub const PERCEPTION_COHERENCE_HIGH: f32 = 0.7;
+
+/// Perceptual coherence below which exploration is encouraged.
+/// Basis: Friston (2010) — low coherence signals high free-energy, triggering exploration.
+pub const PERCEPTION_COHERENCE_LOW: f32 = 0.3;
+
+/// Coherence threshold for entering vigilant mode.
+/// Basis: Posner & Petersen (1990) — alerting network activates on degraded percepts.
+pub const PERCEPTION_VIGILANCE_COHERENCE: f32 = 0.4;
+
+/// Prediction error threshold for entering vigilant mode.
+/// Basis: Rao & Ballard (1999) — high PE signals model-world mismatch.
+pub const PERCEPTION_VIGILANCE_PE: f32 = 0.4;
+
+/// Phenomenal binding above which confidence is boosted.
+/// Basis: Treisman & Gelade (1980) — feature integration theory, bound percepts are reliable.
+pub const PERCEPTION_BINDING_HIGH: f32 = 0.7;
+
+/// Phenomenal binding below which confidence is penalized.
+/// Basis: Treisman & Gelade (1980) — unbound features are perceptually unreliable.
+pub const PERCEPTION_BINDING_LOW: f32 = 0.3;
+
+/// Minimum attention sensitivity floor.
+/// Basis: Broadbent (1958) — filter theory, sensitivity cannot drop below baseline.
+pub const PERCEPTION_SENSITIVITY_MIN: f32 = 0.5;
+
+/// Maximum attention sensitivity ceiling.
+/// Basis: Kahneman (1973) — attention as limited resource, upper bound on allocation.
+pub const PERCEPTION_SENSITIVITY_MAX: f32 = 2.0;
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // PSI SYNTHESIS WEIGHTS
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -2528,6 +2562,20 @@ pub const GOV_COLLECTIVE_PHI_ECB: f32 = 0.01;
 /// High collective Phi boosts unified consciousness via social integration.
 /// Basis: Woolley et al. (2010) — collective intelligence factor.
 pub const GOV_CONSCIOUSNESS_MODULATION: f64 = 0.04; // ±2% at extremes (0.04 × 0.5 = 0.02)
+
+/// Number of lagged consciousness values for governance decorrelation.
+/// At 20Hz, 50 cycles ≈ 2.5s — enough temporal separation to break the
+/// consciousness → governance → neuromod → consciousness feedback loop.
+/// Basis: Granger (1969) — temporal decorrelation breaks circular causation.
+pub const GOVERNANCE_CONSCIOUSNESS_LAG_SIZE: usize = 50;
+
+/// Maximum age (in cycles) before stale ethics consequence predictions are expired.
+/// Basis: Cushman (2013) — dual-process moral cognition outcome observation windows.
+pub const CONSEQUENCE_TRACKER_MAX_AGE_CYCLES: u64 = 2000;
+
+/// EMA alpha for consequence tracker prediction accuracy.
+/// Basis: Friston (2010) — precision-weighted prediction error learning.
+pub const CONSEQUENCE_TRACKER_ACCURACY_ALPHA: f64 = 0.05;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // GLYPH CODEX — SYMBOLIC CONSCIOUSNESS COUPLING
