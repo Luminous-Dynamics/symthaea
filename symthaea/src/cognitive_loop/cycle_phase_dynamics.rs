@@ -382,10 +382,49 @@ impl CognitiveLoopService {
                 // we drain them here before processing.
                 if let Ok(rx_guard) = self.swarm_event_rx.lock() {
                     if let Some(ref rx) = *rx_guard {
-                        super::managers::network_service_bridge::drain_swarm_channel(
-                            rx,
-                            &mut self.swarm_manager,
-                        );
+                        use super::managers::swarm_manager::SwarmEvent;
+                        for _ in 0..256 {
+                            match rx.try_recv() {
+                                Ok(event) => {
+                                    // Sovereign Clock: forward TimeBeacons to TimeManager.
+                                    #[cfg(feature = "mesh")]
+                                    if let SwarmEvent::TimeBeaconReceived {
+                                        source_id, timestamp_us, stratum, phi, drift_ppm,
+                                    } = &event
+                                    {
+                                        let beacon = crate::swarm::mesh::time_beacon::TimeBeacon {
+                                            timestamp_us: *timestamp_us,
+                                            stratum: *stratum,
+                                            counter: 0,
+                                            phi: *phi,
+                                            drift_ppm: *drift_ppm,
+                                        };
+                                        self.time_manager.inject_beacon(beacon, *source_id);
+                                    }
+
+                                    // Sovereign Trust: forward TrustVerified to TrustManager.
+                                    #[cfg(feature = "mesh-trust")]
+                                    if let SwarmEvent::TrustVerified {
+                                        peer_id,
+                                        trust_level,
+                                        ..
+                                    } = &event
+                                    {
+                                        self.trust_manager.inject_event(
+                                            super::managers::trust_manager::TrustEvent::PeerVerified {
+                                                peer_id: peer_id.clone(),
+                                                trust_level: *trust_level,
+                                                pq_verified: false,
+                                            },
+                                        );
+                                    }
+
+                                    // All events still go to SwarmManager for normal processing.
+                                    self.swarm_manager.inject_event(event);
+                                }
+                                Err(_) => break,
+                            }
+                        }
                     }
                 }
 
@@ -592,6 +631,38 @@ impl CognitiveLoopService {
                     let glyph_output = self.glyph_manager.process(snapshot);
                     self.subsystem_collector
                         .record("glyph_manager", glyph_output);
+                }
+
+                // ── Sovereign Inoculation Managers ──────────────────────────
+                // Mesh infrastructure subsystems — time consensus, trust graph,
+                // social fabric resonance, survival/resource monitoring.
+
+                #[cfg(feature = "mesh")]
+                if self.time_manager.should_run(cycle_num, urgency_u8) {
+                    let time_output = self.time_manager.process(snapshot);
+                    self.subsystem_collector
+                        .record("time_manager", time_output);
+                }
+
+                #[cfg(feature = "mesh-trust")]
+                if self.trust_manager.should_run(cycle_num, urgency_u8) {
+                    let trust_output = self.trust_manager.process(snapshot);
+                    self.subsystem_collector
+                        .record("trust_manager", trust_output);
+                }
+
+                #[cfg(feature = "social-fabric")]
+                if self.social_fabric_manager.should_run(cycle_num, urgency_u8) {
+                    let fabric_output = self.social_fabric_manager.process(snapshot);
+                    self.subsystem_collector
+                        .record("social_fabric_manager", fabric_output);
+                }
+
+                #[cfg(feature = "survival")]
+                if self.survival_manager.should_run(cycle_num, urgency_u8) {
+                    let survival_output = self.survival_manager.process(snapshot);
+                    self.subsystem_collector
+                        .record("survival_manager", survival_output);
                 }
 
                 // ── Knowledge Manager: per-cycle extraction + neuromod coupling ──

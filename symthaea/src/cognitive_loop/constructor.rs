@@ -903,6 +903,9 @@ impl CognitiveLoopService {
             substrate_manager,
             // physics_integration moved to feature_integ manager
             convergence_cycle: 0,
+            governance_consciousness_lag: std::collections::VecDeque::with_capacity(
+                super::thresholds::GOVERNANCE_CONSCIOUSNESS_LAG_SIZE,
+            ),
             ethics_engine: {
                 let engine_mp = MoralParser::new();
                 let engine_ma = MoralAlgebra::default_dim();
@@ -990,6 +993,14 @@ impl CognitiveLoopService {
             glyph_manager: super::managers::GlyphManager::with_dim(
                 crate::hdc::moral_algebra::MORAL_DIM,
             ),
+            #[cfg(feature = "mesh")]
+            time_manager: super::managers::TimeManager::new(true),
+            #[cfg(feature = "mesh-trust")]
+            trust_manager: super::managers::TrustManager::new(String::new(), true),
+            #[cfg(feature = "social-fabric")]
+            social_fabric_manager: super::managers::SocialFabricManager::new(true),
+            #[cfg(feature = "survival")]
+            survival_manager: super::managers::SurvivalManager::new(true),
             #[cfg(feature = "integrity")]
             integrity_manager: {
                 let mut im = crate::integrity::IntegrityManager::new();

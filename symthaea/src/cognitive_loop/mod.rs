@@ -638,6 +638,13 @@ pub struct CognitiveLoopService {
     /// Cycle at which consciousness weights first converged (0 = not yet).
     convergence_cycle: usize,
 
+    /// Lagged consciousness for governance gating — excludes recent governance feedback.
+    /// Ring buffer of last `GOVERNANCE_CONSCIOUSNESS_LAG_SIZE` consciousness values;
+    /// governance gates use the oldest to decorrelate the feedback loop:
+    /// consciousness → governance → neuromod → consciousness.
+    /// Science: Granger (1969) — temporal decorrelation breaks circular causation.
+    governance_consciousness_lag: VecDeque<f64>,
+
     /// Unified Ethics Engine: wraps MoralParser + MoralAlgebra + ValueEvaluator + Harmonies
     /// into a single `evaluate()` call per cycle with co-prime interval scheduling.
     /// Runs **alongside** existing inline code (additive wiring — old code not removed yet).
@@ -723,6 +730,26 @@ pub struct CognitiveLoopService {
     /// Implements CognitiveSubsystem at interval 43. Feature-gated behind `glyph_codex`.
     #[cfg(feature = "glyph_codex")]
     glyph_manager: managers::GlyphManager,
+
+    /// Time Manager: Mesh-wide time consensus from peer beacons.
+    /// Implements CognitiveSubsystem at interval 23. Feature-gated behind `mesh`.
+    #[cfg(feature = "mesh")]
+    time_manager: managers::TimeManager,
+
+    /// Trust Manager: Web-of-trust graph with decay and violation detection.
+    /// Implements CognitiveSubsystem at interval 29. Feature-gated behind `mesh-trust`.
+    #[cfg(feature = "mesh-trust")]
+    trust_manager: managers::TrustManager,
+
+    /// Social Fabric Manager: Resonance graph for content diversity and echo-chamber detection.
+    /// Implements CognitiveSubsystem at interval 31. Feature-gated behind `social-fabric`.
+    #[cfg(feature = "social-fabric")]
+    social_fabric_manager: managers::SocialFabricManager,
+
+    /// Survival Manager: IoT sensor monitoring, demand forecasting, emergency detection.
+    /// Implements CognitiveSubsystem at interval 47. Feature-gated behind `survival`.
+    #[cfg(feature = "survival")]
+    survival_manager: managers::SurvivalManager,
 
     /// Integrity Manager: BLAKE3 attestation, temporal consistency, behavioral canaries.
     /// Runs tamper detection at co-prime intervals. Feature-gated behind `integrity`.
