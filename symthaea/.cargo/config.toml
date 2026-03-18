@@ -2,7 +2,7 @@
 rustflags = ["-C", "link-arg=-fuse-ld=mold"]
 
 [env]
-RUST_TEST_THREADS = "8"
+RUST_TEST_THREADS = "2"  # 4+ OOMs with concurrent sessions; raise when running solo
 # Disable incremental — incompatible with sccache (causes 98% cache misses).
 # sccache's cross-worktree caching is far more valuable than incremental's
 # within-session speedup for our multi-session workflow.
