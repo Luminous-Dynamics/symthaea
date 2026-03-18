@@ -734,6 +734,11 @@ pub struct CognitiveLoopService {
     /// Motor rendering: output bridge, pending request, last result, phi, canvas.
     pub(crate) motor_rendering: motor_rendering_manager::MotorRenderingManager,
 
+    /// Hierarchical bundler for per-region BinaryHV aggregation.
+    /// Accumulates HDC encodings per cortical region, enabling structured
+    /// role-bound aggregation and per-region recovery via XOR unbinding.
+    pub(crate) hierarchical_bundler: Option<symthaea_core::hdc::hierarchical_bundle::HierarchicalBundler>,
+
     /// Pre-allocated input buffer for CfC temporal network step.
     /// Sized to `config.cfc_config.input_dim` at construction, reused each cycle
     /// to avoid per-cycle `Array1<f32>` heap allocation in `phase_dynamics`.
@@ -761,6 +766,13 @@ pub struct CognitiveLoopService {
     pub(crate) threat_memory: threat_memory::ThreatMemory,
     #[cfg(feature = "sentinel")]
     pub(crate) collective_immune_state: collective_immunity::CollectiveImmuneState,
+
+    /// Defense actions proposed this cycle (populated by defense cascade).
+    #[cfg(feature = "safety-agents")]
+    pub(crate) defense_actions_proposed: u32,
+    /// Defense actions that passed moral filter this cycle.
+    #[cfg(feature = "safety-agents")]
+    pub(crate) defense_actions_approved: u32,
 }
 
 // MetricsProvider impl is in metrics_provider.rs

@@ -697,7 +697,7 @@ impl CognitiveLoopService {
 
         let gwt_broadcast = integration_result.gwt_broadcast;
         let gwt_coalition_size = integration_result.gwt_coalition_size;
-        let cross_modal_binding_strength = integration_result.cross_modal_binding_strength;
+        let mut cross_modal_binding_strength = integration_result.cross_modal_binding_strength;
         let cross_modal_psi = integration_result.cross_modal_psi;
         let resonance_frequency = integration_result.resonance_frequency;
         let quantum_coherence_level = integration_result.quantum_coherence_level;
@@ -1443,6 +1443,51 @@ impl CognitiveLoopService {
         } else if cross_modal_binding_strength < 0.3 && self.stats.total_cycles > 10 {
             let binding_dampen = 1.0 - (0.3 - cross_modal_binding_strength) * 0.1;
             self.scale_confidence("binding_attention_lo", binding_dampen.max(0.95));
+        }
+
+        // Hierarchical bundling: accumulate current cycle's BinaryHV per region
+        // and compute cross-region binding strength from structured aggregates.
+        if let Some(ref mut bundler) = self.hierarchical_bundler {
+            use symthaea_core::hdc::substrate_independence::CorticalRegion;
+
+            // Feed the current cycle's BinaryHV into the Integration region
+            bundler.add(CorticalRegion::Integration, perception.encoding.hv16_cached);
+
+            // Once we have enough accumulated vectors, compute aggregate metrics
+            if bundler.total_vectors() >= 12 {
+                let bundles = bundler.all_bundles();
+
+                // Compute cross-region binding strength from bundle similarities
+                if bundles.len() >= 2 {
+                    if let Some(aggregate) = bundler.aggregate() {
+                        let mut binding_sum = 0.0f32;
+                        let mut count = 0usize;
+                        for bundle in &bundles {
+                            if let Some(recovered) = bundler.unbind_region(&aggregate, &bundle.region) {
+                                binding_sum += recovered.similarity(&bundle.local_bundle);
+                                count += 1;
+                            }
+                        }
+                        if count > 0 {
+                            let avg_binding = binding_sum / count as f32;
+                            // EMA-blend into cross-modal binding for downstream consumers
+                            cross_modal_binding_strength =
+                                cross_modal_binding_strength * 0.9 + avg_binding * 0.1;
+                            tracing::debug!(
+                                avg_binding,
+                                active_regions = bundles.len(),
+                                total_vectors = bundler.total_vectors(),
+                                "Hierarchical bundling: cross-region binding computed"
+                            );
+                        }
+                    }
+                }
+
+                // Reset bundler periodically to keep accumulation fresh
+                if bundler.total_vectors() > 100 {
+                    bundler.clear();
+                }
+            }
         }
 
         FeedbackPhaseResult {

@@ -1047,3 +1047,7 @@ impl CognitiveLoopService {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "cycle_extracted_tests.rs"]
+mod tests;

@@ -8,32 +8,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::cognitive_loop::snapshot::ConsciousnessSnapshot;
 
-/// NRC-style safety level for autonomous AI systems.
-///
-/// Mirrors nuclear regulatory commission color coding:
-/// - **Green**: Normal operation, all metrics within tolerance.
-/// - **Yellow**: Elevated monitoring — minor consciousness degradation.
-/// - **Orange**: Active intervention required — significant degradation.
-/// - **Red**: Emergency halt — consciousness below minimum safe threshold.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-pub enum SafetyLevel {
-    Green,
-    Yellow,
-    Orange,
-    Red,
-}
-
-impl SafetyLevel {
-    /// Human-readable label.
-    pub fn label(&self) -> &'static str {
-        match self {
-            SafetyLevel::Green => "GREEN — Normal",
-            SafetyLevel::Yellow => "YELLOW — Elevated Monitoring",
-            SafetyLevel::Orange => "ORANGE — Active Intervention",
-            SafetyLevel::Red => "RED — Emergency Halt",
-        }
-    }
-}
+// Re-export from the always-available level module.
+pub use super::level::SafetyLevel;
 
 /// The metrics the safety agent needs from a consciousness snapshot.
 /// Extracted from `ConsciousnessSnapshot` to keep the agent testable
@@ -790,6 +766,7 @@ mod tests {
             empathic_compassion: 0.5,
             sigma: None,
             integrity_critical: false,
+            network_critical: false,
             avg_cycle_time_us: 100.0,
             cycles_per_second: 50.0,
         };
@@ -865,6 +842,7 @@ mod tests {
             empathic_compassion: 0.5,
             sigma: None,
             integrity_critical: false,
+            network_critical: false,
             avg_cycle_time_us: 100.0,
             cycles_per_second: 50.0,
         };

@@ -321,6 +321,8 @@ impl SentinelManager {
                     timestamp_us,
                     ..
                 } => {
+                    let rate_limit = self.proposal_rate_limit;
+                    let ema_alpha = self.anomaly_ema_alpha;
                     let activity = self.get_or_create_agent(&agent_id);
                     // Evict old proposals outside window
                     while activity.proposal_times.front().map_or(false, |t| {
@@ -331,11 +333,13 @@ impl SentinelManager {
                     activity.proposal_times.push_back(timestamp_us);
 
                     // Check rate limit
-                    if activity.proposal_times.len() > self.proposal_rate_limit as usize {
-                        let confidence = (activity.proposal_times.len() as f32
-                            / self.proposal_rate_limit as f32
-                            - 1.0)
-                            .min(1.0);
+                    let count = activity.proposal_times.len();
+                    if count > rate_limit as usize {
+                        let confidence =
+                            (count as f32 / rate_limit as f32 - 1.0).min(1.0);
+                        // Bump anomaly score before dropping the borrow
+                        activity.anomaly_score =
+                            activity.anomaly_score * (1.0 - ema_alpha) + ema_alpha;
                         self.emit_threat(ThreatSignal {
                             kind: ThreatSignalKind::ProposalFlood,
                             confidence,
@@ -344,16 +348,10 @@ impl SentinelManager {
                             detected_at: cycle,
                             evidence: format!(
                                 "{} proposals in 60s from agent {} (limit: {})",
-                                activity.proposal_times.len(),
-                                agent_id,
-                                self.proposal_rate_limit
+                                count, agent_id, rate_limit
                             ),
                         });
                         proposals_rate_limited += 1;
-                        // Bump anomaly score
-                        activity.anomaly_score = (activity.anomaly_score
-                            * (1.0 - self.anomaly_ema_alpha))
-                            + self.anomaly_ema_alpha;
                     }
                 }
 
@@ -379,6 +377,7 @@ impl SentinelManager {
                     new_tier,
                     ..
                 } => {
+                    let ema_alpha = self.anomaly_ema_alpha;
                     let activity = self.get_or_create_agent(&agent_id);
                     // Evict old changes outside window
                     while activity.tier_changes.front().map_or(false, |t| {
@@ -388,11 +387,14 @@ impl SentinelManager {
                     }
                     activity.tier_changes.push_back(timestamp_us);
 
-                    if activity.tier_changes.len() > Self::MAX_TIER_CHANGES {
-                        let confidence = (activity.tier_changes.len() as f32
+                    let count = activity.tier_changes.len();
+                    if count > Self::MAX_TIER_CHANGES {
+                        let confidence = (count as f32
                             / Self::MAX_TIER_CHANGES as f32
                             - 1.0)
                             .min(1.0);
+                        activity.anomaly_score =
+                            activity.anomaly_score * (1.0 - ema_alpha) + ema_alpha * 0.8;
                         self.emit_threat(ThreatSignal {
                             kind: ThreatSignalKind::ConsciousnessManipulation,
                             confidence,
@@ -402,15 +404,9 @@ impl SentinelManager {
                             detected_at: cycle,
                             evidence: format!(
                                 "{} tier changes in 5min for agent {} ({}->{})",
-                                activity.tier_changes.len(),
-                                agent_id,
-                                old_tier,
-                                new_tier
+                                count, agent_id, old_tier, new_tier
                             ),
                         });
-                        activity.anomaly_score = (activity.anomaly_score
-                            * (1.0 - self.anomaly_ema_alpha))
-                            + self.anomaly_ema_alpha * 0.8;
                     }
                 }
 
@@ -723,6 +719,43 @@ impl CognitiveSubsystem for SentinelManager {
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// GOVERNANCE → SENTINEL EVENT BRIDGE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Convert a governance event into a sentinel event for threat detection.
+///
+/// Returns `None` for governance events that don't carry threat-relevant data
+/// (e.g., reputation changes, reciprocity pledges).
+#[cfg(feature = "mycelix")]
+pub fn bridge_governance_event(
+    gov_event: &super::governance_manager::GovernanceEvent,
+    agent_id: &str,
+) -> Option<SentinelEvent> {
+    use super::governance_manager::GovernanceEventKind;
+
+    match &gov_event.kind {
+        GovernanceEventKind::ProposalCreated => Some(SentinelEvent::ProposalCreated {
+            agent_id: agent_id.to_string(),
+            proposal_id: gov_event.proposal_id.clone().unwrap_or_default(),
+            timestamp_us: gov_event.timestamp_secs * 1_000_000,
+        }),
+        GovernanceEventKind::VoteCast { vote_value, .. } => Some(SentinelEvent::VoteCast {
+            agent_id: agent_id.to_string(),
+            proposal_id: gov_event.proposal_id.clone().unwrap_or_default(),
+            vote_direction: *vote_value > 0.0,
+            timestamp_us: gov_event.timestamp_secs * 1_000_000,
+        }),
+        GovernanceEventKind::EmergencyDeclared => Some(SentinelEvent::ExternalThreatReport {
+            reporter_id: "governance".to_string(),
+            threat_type: ThreatSignalKind::ConsciousnessManipulation,
+            severity: 0.8,
+            evidence_hash: gov_event.timestamp_secs,
+        }),
+        _ => None, // Reputation, reciprocity, justice — not direct threat signals
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -794,8 +827,9 @@ mod tests {
         let mut mgr = SentinelManager::default();
         let now = 1_000_000_000u64;
 
-        // 25 dispatches between same pair (threshold is 20)
-        for i in 0..25 {
+        // 30 dispatches between same pair (threshold is 20, need confidence > 0.3)
+        // confidence = (30 - 20) / 20 = 0.5 > MIN_THREAT_CONFIDENCE (0.3)
+        for i in 0..30 {
             mgr.inject_event(SentinelEvent::CrossClusterDispatch {
                 source_cluster: "commons".to_string(),
                 target_cluster: "civic".to_string(),

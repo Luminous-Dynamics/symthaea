@@ -304,6 +304,29 @@ pub struct DemoCycleData {
     /// Narrative temporal coherence (Adler 2012) [0.0–1.0].
     #[serde(default)]
     pub therapeutic_temporal_coherence: f32,
+
+    // ── Shadow Work Telemetry (Observability Mode) ──
+    /// Total shadow pressure across all fragments.
+    #[serde(default)]
+    pub shadow_total_pressure: f32,
+    /// Number of active shadow fragments.
+    #[serde(default)]
+    pub shadow_fragment_count: u32,
+    /// Highest individual fragment pressure.
+    #[serde(default)]
+    pub shadow_peak_pressure: f32,
+    /// Whether shadow surfacing is indicated (diagnostic only).
+    #[serde(default)]
+    pub shadow_surfacing_indicated: bool,
+    /// Shadow pressure trend (positive = accumulating).
+    #[serde(default)]
+    pub shadow_pressure_trend: f32,
+    /// Shadow-to-narrative ratio.
+    #[serde(default)]
+    pub shadow_to_narrative_ratio: f32,
+    /// Shadow dream queue depth.
+    #[serde(default)]
+    pub shadow_dream_queue_depth: u32,
 }
 
 impl DemoCycleData {
@@ -373,6 +396,10 @@ impl DemoCycleData {
         sf32(&mut self.therapeutic_resilience_ratio);
         sf32(&mut self.therapeutic_repair_rate);
         sf32(&mut self.therapeutic_temporal_coherence);
+        sf32(&mut self.shadow_total_pressure);
+        sf32(&mut self.shadow_peak_pressure);
+        sf32(&mut self.shadow_pressure_trend);
+        sf32(&mut self.shadow_to_narrative_ratio);
         for v in &mut self.therapeutic_rdoc_profile {
             sf32(v);
         }

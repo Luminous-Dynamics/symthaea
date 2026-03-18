@@ -21,7 +21,8 @@ use crate::action::bindings::{ActionContext, ActionRegistry};
 use crate::action::{
     ActionIR, ActionOutcome, ExecutionOutcome, PolicyBundle, SandboxRoot, SimpleExecutor,
 };
-use crate::cognitive_loop::guardian::{GuardianPosture, GuardianState, GuardianTelemetry};
+#[cfg(feature = "safety-agents")]
+use crate::cognitive_loop::guardian::{GuardianPosture, GuardianState};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
@@ -380,6 +381,7 @@ impl MotorOutputBridge {
 /// - `Emergency` / `Hold` → `e_stop = true` (all servos to safe position)
 /// - `Defensive` → no locomotion, sensor-only mode
 /// - `Cautious` / `Normal` → locomotion permitted with CPG timing
+#[cfg(feature = "safety-agents")]
 #[derive(Debug, Clone)]
 pub struct RobotActuatorCommand {
     /// Current guardian posture (from consciousness + safety level).
@@ -409,6 +411,7 @@ pub struct RobotActuatorCommand {
     pub cycle: usize,
 }
 
+#[cfg(feature = "safety-agents")]
 impl RobotActuatorCommand {
     /// Generate a robot actuator command from the current guardian state.
     ///
@@ -498,6 +501,7 @@ impl RobotActuatorCommand {
     }
 }
 
+#[cfg(feature = "safety-agents")]
 impl MotorOutputBridge {
     /// Generate a robot actuator command from the current guardian + CPG state.
     ///
@@ -681,6 +685,7 @@ mod tests {
 
     // ── Robot Actuator Command Tests ─────────────────────────────────────
 
+    #[cfg(feature = "safety-agents")]
     #[test]
     fn test_robot_command_from_guardian_normal() {
         use crate::safety::SafetyLevel;
@@ -689,7 +694,7 @@ mod tests {
         guardian.start_patrol(5);
 
         let phases = vec![0.0, 1.57, 3.14, 4.71, 0.5, 2.0, 3.5, 5.0];
-        let outputs: Vec<f64> = phases.iter().map(|p| p.sin()).collect();
+        let outputs: Vec<f64> = phases.iter().map(|p| (*p as f64).sin()).collect();
 
         let cmd = RobotActuatorCommand::from_guardian(&guardian, &phases, &outputs, 0.95, 0.8, 100);
 
@@ -704,6 +709,7 @@ mod tests {
         assert!(!cmd.is_safe_hold());
     }
 
+    #[cfg(feature = "safety-agents")]
     #[test]
     fn test_robot_command_emergency_stops_everything() {
         use crate::safety::SafetyLevel;
@@ -724,6 +730,7 @@ mod tests {
         assert!(cmd.is_safe_hold());
     }
 
+    #[cfg(feature = "safety-agents")]
     #[test]
     fn test_robot_command_hold_on_low_phi() {
         use crate::safety::SafetyLevel;
@@ -737,6 +744,7 @@ mod tests {
         assert!(cmd.is_safe_hold());
     }
 
+    #[cfg(feature = "safety-agents")]
     #[test]
     fn test_robot_command_defensive_no_locomotion() {
         use crate::safety::SafetyLevel;
@@ -754,6 +762,7 @@ mod tests {
         assert!(cmd.sensor_sweep_multiplier < 0.5, "Defensive = fast sensor sweep");
     }
 
+    #[cfg(feature = "safety-agents")]
     #[test]
     fn test_motor_bridge_robot_command() {
         use crate::safety::SafetyLevel;

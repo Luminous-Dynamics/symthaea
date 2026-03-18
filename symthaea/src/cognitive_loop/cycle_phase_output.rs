@@ -328,6 +328,14 @@ impl CognitiveLoopService {
                 structural_num_clusters: feedback.consciousness.structural_num_clusters,
             },
             module_timings_us: {
+                // Hierarchical bundling telemetry
+                if let Some(ref bundler) = self.hierarchical_bundler {
+                    tracing::trace!(
+                        active_regions = bundler.active_region_count(),
+                        total_vectors = bundler.total_vectors(),
+                        "Hierarchical bundling stats"
+                    );
+                }
                 module_timings.metadata_assembly = _t.elapsed().as_micros() as u64;
                 module_timings
             },
@@ -875,7 +883,7 @@ impl CognitiveLoopService {
         // ── Substrate & convergence telemetry ──
         metadata.substrate = self.substrate_manager.telemetry(&self.config);
         // Populate flat substrate fields for backward-compatible access
-        metadata.substrate_transition = metadata.substrate.substrate_transition.clone();
+        metadata.substrate_transition = mem::take(&mut metadata.substrate.substrate_transition);
         metadata.substrate_feasibility_raw = metadata.substrate.substrate_feasibility_raw;
         metadata.substrate_honest_confidence = metadata.substrate.substrate_honest_confidence;
         metadata.substrate_effective_feasibility =
@@ -1220,6 +1228,11 @@ impl CognitiveLoopService {
             metadata.immune_quarantined_peers = st.quarantined_peers as u32;
             metadata.immune_threat_patterns = self.threat_memory.pattern_count() as u32;
             metadata.immune_response_active = self.collective_immune_state.immune_response_active;
+        }
+        #[cfg(feature = "safety-agents")]
+        {
+            metadata.defense_actions_proposed = self.defense_actions_proposed;
+            metadata.defense_actions_approved = self.defense_actions_approved;
         }
 
         // ── End-of-cycle stats ──

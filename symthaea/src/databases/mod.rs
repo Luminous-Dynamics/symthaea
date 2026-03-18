@@ -76,6 +76,9 @@ pub mod sqlite_client;
 #[cfg(feature = "lancedb-backend")]
 pub mod lance_client;
 
+#[cfg(feature = "hdc-store")]
+pub mod hdc_store_client;
+
 // ============================================================================
 // Core Types
 // ============================================================================
@@ -477,6 +480,10 @@ pub enum DatabaseBackend {
     /// Requires the `lancedb-backend` feature flag.
     #[cfg(feature = "lancedb-backend")]
     Lance,
+    /// HdcStore — zero-copy mmap'd BinaryHV storage with LSH indexing.
+    /// Requires the `hdc-store` feature flag.
+    #[cfg(feature = "hdc-store")]
+    HdcStore,
 }
 
 /// Configuration for the consciousness database layer.
@@ -521,6 +528,16 @@ pub async fn create_database(config: &DatabaseConfig) -> DbResult<Box<dyn Consci
             };
             Ok(Box::new(db))
         }
+        #[cfg(feature = "hdc-store")]
+        DatabaseBackend::HdcStore => {
+            let path = config
+                .path
+                .clone()
+                .unwrap_or_else(|| "consciousness.hdc".to_string());
+            let db = hdc_store_client::HdcStoreDatabase::new(&path)
+                .map_err(|e| DatabaseError::ConnectionFailed(e.to_string()))?;
+            Ok(Box::new(db))
+        }
     }
 }
 
@@ -529,6 +546,9 @@ pub use sqlite_client::SqliteMemory;
 
 #[cfg(feature = "lancedb-backend")]
 pub use lance_client::LanceMemory;
+
+#[cfg(feature = "hdc-store")]
+pub use hdc_store_client::HdcStoreDatabase;
 
 #[cfg(test)]
 mod tests {

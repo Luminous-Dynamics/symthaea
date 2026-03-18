@@ -70,7 +70,6 @@ fn substrate_transfer_chain_all_eight() {
             assert!(
                 result
                     .metadata
-                    .adaptive
                     .valence_homeostasis_pull
                     .is_finite(),
                 "NaN on {:?} at cycle {i}",

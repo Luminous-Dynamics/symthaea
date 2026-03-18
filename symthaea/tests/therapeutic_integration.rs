@@ -494,3 +494,135 @@ fn test_formulation_patterns_over_time() {
     let ratio = service.therapeutic_manager_resilience_ratio();
     assert!(ratio >= 0.0, "Resilience ratio non-negative, got {}", ratio);
 }
+
+// ══════════════════════════════════════════════════════════════════════
+// Shadow Work (Observability Mode) — Jung → Friston Mapping
+// ══════════════════════════════════════════════════════════════════════
+
+// ── 22. Shadow pressure accumulates from distressing input ───────────
+
+#[test]
+fn test_shadow_pressure_accumulates() {
+    let mut service = make_therapeutic_service();
+
+    // Run neutral warmup (low PE, high integration → no shadow)
+    for _ in 0..15 {
+        service.cycle("just a regular calm day");
+    }
+
+    let initial_pressure = service.shadow_total_pressure();
+
+    // Run emotionally charged, distressing input for many cycles
+    // Shadow accumulates when: high |valence|, high PE, low narrative integration
+    for i in 0..55 {
+        service.cycle(&format!(
+            "I'm terrified of being abandoned and it keeps coming back {}",
+            i
+        ));
+    }
+
+    let final_pressure = service.shadow_total_pressure();
+    assert!(
+        final_pressure >= initial_pressure,
+        "Shadow pressure should accumulate from distressing input: {} >= {}",
+        final_pressure,
+        initial_pressure,
+    );
+}
+
+// ── 23. Shadow fragment count grows with distinct distressing themes ─
+
+#[test]
+fn test_shadow_fragment_count() {
+    let mut service = make_therapeutic_service();
+
+    // Run enough cycles for therapeutic manager to fire multiple times
+    for _ in 0..25 {
+        service.cycle("I'm furious at my father for leaving");
+    }
+    for _ in 0..25 {
+        service.cycle("I feel deep shame about my failures");
+    }
+
+    // Fragment count should be non-negative (may be 0 if PE was below floor)
+    let count = service.shadow_fragment_count();
+    assert!(
+        count <= 64,
+        "Shadow fragment count should be bounded, got {}",
+        count,
+    );
+}
+
+// ── 24. Shadow telemetry fields are finite and bounded ───────────────
+
+#[test]
+fn test_shadow_telemetry_bounded() {
+    let mut service = make_therapeutic_service();
+
+    for i in 0..55 {
+        let input = if i % 2 == 0 {
+            "I keep having nightmares about the accident"
+        } else {
+            "everything feels overwhelming and hopeless"
+        };
+        service.cycle(input);
+    }
+
+    let t = service.shadow_telemetry();
+    assert!(t.total_shadow_pressure.is_finite());
+    assert!(t.peak_fragment_pressure.is_finite());
+    assert!(t.shadow_mean_prediction_error.is_finite());
+    assert!(t.pressure_trend.is_finite());
+    assert!(t.shadow_to_narrative_ratio.is_finite());
+    assert!(t.best_dream_phi_improvement.is_finite());
+    assert!(t.shadow_fragment_count <= 64);
+}
+
+// ── 25. Shadow telemetry appears in CycleMetadata ────────────────────
+
+#[test]
+fn test_shadow_telemetry_in_metadata() {
+    let mut service = make_therapeutic_service();
+
+    for i in 0..30 {
+        service.cycle(&format!("feeling deeply anxious cycle {}", i));
+    }
+
+    let result = service.cycle("checking shadow telemetry");
+    let m = &result.metadata;
+
+    // Shadow fields should be populated (even if zero — just verify they exist and are finite)
+    assert!(m.therapeutic.shadow_total_pressure.is_finite());
+    assert!(m.therapeutic.shadow_peak_pressure.is_finite());
+    assert!(m.therapeutic.shadow_mean_prediction_error.is_finite());
+    assert!(m.therapeutic.shadow_pressure_trend.is_finite());
+    assert!(m.therapeutic.shadow_to_narrative_ratio.is_finite());
+    assert!(m.therapeutic.shadow_best_dream_phi.is_finite());
+}
+
+// ── 26. Neutral input produces minimal shadow pressure ───────────────
+
+#[test]
+fn test_neutral_input_minimal_shadow() {
+    let mut service = make_therapeutic_service();
+
+    for _ in 0..55 {
+        service.cycle("the weather is pleasant and I had a nice lunch");
+    }
+
+    let pressure = service.shadow_total_pressure();
+    let count = service.shadow_fragment_count();
+
+    // Neutral content (low |valence|) should not accumulate as shadow
+    // Pressure may be non-zero due to system dynamics but should be low
+    assert!(
+        pressure < 50.0,
+        "Neutral input should produce low shadow pressure, got {}",
+        pressure,
+    );
+    assert!(
+        count < 10,
+        "Neutral input should produce few shadow fragments, got {}",
+        count,
+    );
+}

@@ -371,6 +371,13 @@ pub struct CognitiveLoopConfig {
     /// Science: Friston (2008) — hierarchical predictive processing
     pub enable_hierarchical_free_energy: bool,
 
+    /// Enable hierarchical region-based bundling for structured aggregation.
+    /// When enabled, the cognitive loop accumulates BinaryHV vectors per cortical
+    /// region and produces structured aggregates for enhanced Phi measurement.
+    /// Role-bound XOR binding allows per-region recovery from the aggregate.
+    /// Science: Kanerva (2009) — hyperdimensional computing; Engel (2001) — binding
+    pub enable_hierarchical_bundling: bool,
+
     /// Enable contextual harmony weighting for domain-aware moral evaluation.
     pub enable_contextual_weights: bool,
 
@@ -689,13 +696,19 @@ pub struct CognitiveLoopConfig {
     #[serde(default)]
     pub enable_streaming_inference: bool,
 
-    /// Enable federated learning coordinator (requires async runtime).
-    #[serde(default)]
-    pub federation_enabled: bool,
+    /// Enable FHE collective wisdom pool for privacy-preserving peer learning.
+    /// Feature-gated behind `fhe-wisdom`.
+    #[cfg(feature = "fhe-wisdom")]
+    pub fhe_wisdom_enabled: bool,
 
-    /// Federated sync round interval in milliseconds (default: 30000 = 30s).
-    #[serde(default = "default_federation_round_interval_ms")]
-    pub federation_round_interval_ms: u64,
+    /// Minimum contributions before aggregation (threshold k).
+    #[cfg(feature = "fhe-wisdom")]
+    pub fhe_threshold_k: usize,
+
+    /// Aggregation interval in cycles.
+    #[cfg(feature = "fhe-wisdom")]
+    pub fhe_aggregation_interval: usize,
+
 }
 
 impl Default for CognitiveLoopConfig {
@@ -749,6 +762,7 @@ impl Default for CognitiveLoopConfig {
             enable_consciousness_thermodynamics: false,
             enable_phenomenal_binding: false,
             enable_hierarchical_free_energy: false,
+            enable_hierarchical_bundling: false,
             enable_contextual_weights: false,
             enable_phi_attention: false,
             enable_negation_detection: false,
@@ -828,8 +842,12 @@ impl Default for CognitiveLoopConfig {
             knowledge_ontology_max: 500,
             knowledge_db_path: None,
             enable_streaming_inference: false,
-            federation_enabled: false,
-            federation_round_interval_ms: 30_000,
+            #[cfg(feature = "fhe-wisdom")]
+            fhe_wisdom_enabled: false,
+            #[cfg(feature = "fhe-wisdom")]
+            fhe_threshold_k: 3,
+            #[cfg(feature = "fhe-wisdom")]
+            fhe_aggregation_interval: 100,
         }
     }
 }
@@ -964,6 +982,7 @@ impl ConsciousnessProfile {
         config.enable_consciousness_thermodynamics = false;
         config.enable_phenomenal_binding = false;
         config.enable_hierarchical_free_energy = false;
+        config.enable_hierarchical_bundling = false;
         config.enable_contextual_weights = false;
         config.enable_phi_attention = false;
         config.enable_negation_detection = false;
@@ -1025,6 +1044,7 @@ impl ConsciousnessProfile {
                 config.enable_consciousness_thermodynamics = true;
                 config.enable_phenomenal_binding = true;
                 config.enable_hierarchical_free_energy = true;
+                config.enable_hierarchical_bundling = true;
                 config.enable_contextual_weights = true;
                 config.enable_phi_attention = true;
                 config.enable_negation_detection = true;
@@ -1107,6 +1127,7 @@ impl CognitiveLoopConfig {
             self.enable_consciousness_thermodynamics,
             self.enable_phenomenal_binding,
             self.enable_hierarchical_free_energy,
+            self.enable_hierarchical_bundling,
             self.enable_contextual_weights,
             self.enable_phi_attention,
             self.enable_negation_detection,

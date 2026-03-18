@@ -402,6 +402,7 @@ pub mod consciousness; // Modular consciousness (re-exports consciousness_integr
 pub mod consciousness_dashboard;
 pub mod consciousness_evaluator; // Consciousness evaluation
 pub mod consciousness_integration; // Complete consciousness pipeline
+pub mod hierarchical_bundle; // Per-region bundling with role-based binding for scalable aggregation
 pub mod substrate_composition; // Weighted substrate mixtures for hybrid analysis
 pub mod substrate_independence; // Substrate type definitions // Real-time consciousness monitoring
 pub mod substrate_validation; // Validation framework with evidence levels and feasibility gaps

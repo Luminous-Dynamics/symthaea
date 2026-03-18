@@ -1449,6 +1449,55 @@ pub struct CycleMetadata {
     /// Whether the `ssm_language` (Broca) feature is compiled in and active.
     #[serde(default)]
     pub ssm_language_enabled: bool,
+
+    // ── Immune System / Defense ──────────────────────────────────────────
+    /// Current safety level label ("GREEN", "YELLOW", "ORANGE", "RED").
+    #[serde(default)]
+    pub immune_safety_level: String,
+    /// Guardian posture label ("Normal", "Cautious", "Defensive", "Emergency", "Hold").
+    #[serde(default)]
+    pub immune_guardian_posture: String,
+    /// Whether guardian patrol is active.
+    #[serde(default)]
+    pub immune_patrol_active: bool,
+    /// Number of active sentinel threat signals.
+    #[serde(default)]
+    pub immune_active_threats: u32,
+    /// Highest threat severity this cycle (0.0–1.0).
+    #[serde(default)]
+    pub immune_max_severity: f32,
+    /// Aggregate threat level (0.0–1.0).
+    #[serde(default)]
+    pub immune_threat_level: f32,
+    /// Number of quarantined peers.
+    #[serde(default)]
+    pub immune_quarantined_peers: u32,
+    /// Stored threat patterns in immune memory.
+    #[serde(default)]
+    pub immune_threat_patterns: u32,
+    /// LR multiplier from safety enforcement (1.0 = no gate).
+    #[serde(default = "default_one_f32")]
+    pub immune_lr_multiplier: f32,
+    /// Exploration multiplier from safety enforcement (1.0 = no gate).
+    #[serde(default = "default_one_f32")]
+    pub immune_exploration_multiplier: f32,
+    /// Whether motor output is halted by safety.
+    #[serde(default)]
+    pub immune_motor_halt: bool,
+    /// Whether collective immune response is active across swarm.
+    #[serde(default)]
+    pub immune_response_active: bool,
+    /// Cumulative emergency posture cycles.
+    #[serde(default)]
+    pub immune_emergency_cycles: u64,
+
+    // ── Defense Cascade ──────────────────────────────────────────────────
+    /// Number of defense actions proposed this cycle.
+    #[serde(default)]
+    pub defense_actions_proposed: u32,
+    /// Number of defense actions that passed the moral filter.
+    #[serde(default)]
+    pub defense_actions_approved: u32,
 }
 
 /// Therapeutic subsystem telemetry for CycleMetadata.

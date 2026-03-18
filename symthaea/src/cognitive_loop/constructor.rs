@@ -950,6 +950,7 @@ impl CognitiveLoopService {
                 )
             },
             last_ethics_verdict: super::ethics_engine::EthicalVerdict::Safe,
+            ethics_verdict_override: None,
             kosmic_song: crate::mycelix::KosmicSong::default(),
             drive_manager: super::managers::DriveManager::default(),
             memory_manager: super::managers::MemoryManager::default(),
@@ -1043,10 +1044,37 @@ impl CognitiveLoopService {
                 im
             },
             motor_rendering: super::motor_rendering_manager::MotorRenderingManager::new(),
+            hierarchical_bundler: if config.enable_hierarchical_bundling {
+                Some(symthaea_core::hdc::hierarchical_bundle::HierarchicalBundler::new(
+                    config.genesis_phrase.as_ref().map_or(42, |p| {
+                        use std::hash::{Hash, Hasher};
+                        let mut h = std::collections::hash_map::DefaultHasher::new();
+                        p.hash(&mut h);
+                        h.finish()
+                    }),
+                ))
+            } else {
+                None
+            },
             cfc_input_buffer: ndarray::Array1::zeros(cfc_input_dim),
             math_service: super::math_service::MathService::new(),
             #[cfg(feature = "epistemic_auditor")]
             epistemic_auditor: None, // initialized below after struct construction
+            // Defense / Immune System
+            #[cfg(feature = "safety-agents")]
+            safety_agent: crate::safety::SafetyAgent::new(),
+            #[cfg(feature = "safety-agents")]
+            guardian_state: super::guardian::GuardianState::default(),
+            #[cfg(feature = "sentinel")]
+            sentinel_manager: super::managers::SentinelManager::default(),
+            #[cfg(feature = "sentinel")]
+            threat_memory: super::threat_memory::ThreatMemory::default(),
+            #[cfg(feature = "sentinel")]
+            collective_immune_state: super::collective_immunity::CollectiveImmuneState::default(),
+            #[cfg(feature = "safety-agents")]
+            defense_actions_proposed: 0,
+            #[cfg(feature = "safety-agents")]
+            defense_actions_approved: 0,
             resonant_speech: crate::resonant_speech::ResonantSpeech::new(),
             streaming_inference: if enable_streaming_inference {
                 // Cycle-aligned config: batch=1, max_latency=32ms (~31Hz loop)

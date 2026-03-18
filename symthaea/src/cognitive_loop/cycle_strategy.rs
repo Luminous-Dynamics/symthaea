@@ -663,7 +663,11 @@ impl CognitiveLoopService {
         if ethics_output.lr_factor != 1.0 {
             self.scale_lr("ethics_engine", ethics_output.lr_factor);
         }
-        self.last_ethics_verdict = ethics_output.unified_verdict.clone();
+        self.last_ethics_verdict = if let Some(ref ov) = self.ethics_verdict_override {
+            ov.clone()
+        } else {
+            ethics_output.unified_verdict.clone()
+        };
         // Reset escalation block flag each cycle — re-applied below if still warranted.
         self.stats.escalation_blocked = false;
 

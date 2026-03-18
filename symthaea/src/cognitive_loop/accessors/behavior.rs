@@ -382,6 +382,13 @@ impl CognitiveLoopService {
         &mut self,
         event: super::super::managers::governance_manager::GovernanceEvent,
     ) {
+        // Bridge governance events to sentinel for threat detection
+        #[cfg(feature = "sentinel")]
+        if let Some(sentinel_event) =
+            super::super::managers::sentinel_manager::bridge_governance_event(&event, "local")
+        {
+            self.sentinel_manager.inject_event(sentinel_event);
+        }
         self.governance_mgr.inject_event(event);
     }
 
@@ -411,6 +418,13 @@ impl CognitiveLoopService {
     ) {
         let (events, outcomes) = bridge.drain_pending_governance();
         for event in events {
+            // Bridge governance events to sentinel for threat detection
+            #[cfg(feature = "sentinel")]
+            if let Some(sentinel_event) =
+                super::super::managers::sentinel_manager::bridge_governance_event(&event, "bridge")
+            {
+                self.sentinel_manager.inject_event(sentinel_event);
+            }
             self.governance_mgr.inject_event(event);
         }
         for outcome in outcomes {
@@ -988,5 +1002,28 @@ impl CognitiveLoopService {
     /// Access the vision and sensory manager.
     pub fn vision_sensory(&self) -> &super::super::vision_sensory_manager::VisionAndSensoryManager {
         &self.vision_sensory
+    }
+
+    /// Get the current unified ethical verdict.
+    ///
+    /// Returns the override if set, otherwise the last verdict from the ethics engine.
+    pub fn last_ethics_verdict(&self) -> &super::super::ethics_engine::EthicalVerdict {
+        self.ethics_verdict_override.as_ref().unwrap_or(&self.last_ethics_verdict)
+    }
+
+    /// Override the unified ethical verdict.
+    ///
+    /// When set, the override takes precedence over the ethics engine's output
+    /// each cycle. The override persists until cleared via `clear_ethics_override()`.
+    /// Used by external safety systems and integration tests to force a specific
+    /// verdict that gates motor output and Broca generation.
+    pub fn set_ethics_verdict(&mut self, verdict: super::super::ethics_engine::EthicalVerdict) {
+        self.ethics_verdict_override = Some(verdict);
+    }
+
+    /// Clear the ethics verdict override, allowing the ethics engine to
+    /// determine the verdict normally.
+    pub fn clear_ethics_override(&mut self) {
+        self.ethics_verdict_override = None;
     }
 }

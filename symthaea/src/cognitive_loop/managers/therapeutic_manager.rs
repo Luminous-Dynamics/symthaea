@@ -46,6 +46,7 @@ struct TherapeuticSessionSnapshot<'a> {
     crisis_active: bool,
     serotonin_debt: f32,
     dopamine_debt: f32,
+    shadow: symthaea_therapeutic::ShadowSnapshot,
 }
 
 /// Deserializable restore struct for session persistence.
@@ -59,6 +60,8 @@ struct TherapeuticSessionRestore {
     alliance_repairs: u32,
     narrative_coherence: f32,
     crisis_active: bool,
+    #[serde(default)]
+    shadow: Option<symthaea_therapeutic::ShadowSnapshot>,
 }
 
 /// Therapeutic Manager — integrates therapeutic psychology into the cognitive loop.
@@ -150,6 +153,7 @@ impl TherapeuticManager {
             crisis_active: self.crisis_active,
             serotonin_debt: self.regulation_engine.serotonin_debt(),
             dopamine_debt: self.regulation_engine.dopamine_debt(),
+            shadow: self.shadow_detector.snapshot(),
         };
         serde_json::to_string(&session)
     }
@@ -168,6 +172,9 @@ impl TherapeuticManager {
         self.alliance.repair_count = snapshot.alliance_repairs;
         self.narrative.coherence = snapshot.narrative_coherence;
         self.crisis_active = snapshot.crisis_active;
+        if let Some(shadow) = snapshot.shadow {
+            self.shadow_detector.restore(shadow);
+        }
         Ok(())
     }
 
@@ -844,6 +851,81 @@ mod tests {
             restored.client_model.cycle_count,
             manager.client_model.cycle_count
         );
+    }
+
+    #[test]
+    fn test_shadow_persistence_roundtrip() {
+        let mut manager = TherapeuticManager::new();
+        // Run cycles with distressing content to build shadow fragments
+        for i in 0..30 {
+            let mut snapshot = make_snapshot(-0.8, 0.7, i);
+            snapshot.prediction_error = 0.6;
+            manager.process(&snapshot);
+            // Also feed shadow detector directly with high-PE content
+            manager.shadow_detector.process(
+                i as u64,
+                0.6,
+                -0.8,
+                0.7,
+                "painful unresolved conflict",
+                0.1,
+            );
+        }
+
+        let pre_count = manager.shadow_detector.fragment_count();
+        let pre_pressure = manager.shadow_detector.total_pressure();
+        assert!(pre_count > 0, "should have shadow fragments");
+
+        // Serialize
+        let json = manager
+            .serialize_session()
+            .expect("serialize with shadow should succeed");
+        assert!(json.contains("shadow"));
+        assert!(json.contains("fragments"));
+
+        // Restore into fresh manager
+        let mut restored = TherapeuticManager::new();
+        restored
+            .restore_session(&json)
+            .expect("restore with shadow should succeed");
+
+        assert_eq!(
+            restored.shadow_detector.fragment_count(),
+            pre_count,
+            "fragment count should survive roundtrip"
+        );
+        // Pressure may differ slightly due to HDC encoding loss (serde skip),
+        // but fragment scalar fields (cumulative_PE, recurrence) are preserved.
+        let restored_pressure = restored.shadow_detector.total_pressure();
+        assert!(
+            (restored_pressure - pre_pressure).abs() < 0.01,
+            "pressure should survive roundtrip: {} vs {}",
+            restored_pressure,
+            pre_pressure,
+        );
+    }
+
+    #[test]
+    fn test_shadow_persistence_backward_compat() {
+        // Old snapshots without "shadow" field should restore cleanly (Option + serde(default))
+        let json = r#"{
+            "client_model": {"cycle_count": 5, "session_count": 1, "affect_trajectory": [], "rdoc_profile": {}, "presenting_concerns": [], "diagnostic_hypotheses": [], "automatic_thoughts": [], "core_beliefs": [], "behavioral_patterns": [], "risk_level": "None"},
+            "alliance_bond": 0.5,
+            "alliance_goal": 0.5,
+            "alliance_task": 0.5,
+            "alliance_ruptures": 0,
+            "alliance_repairs": 0,
+            "narrative_coherence": 0.3,
+            "crisis_active": false
+        }"#;
+
+        let mut manager = TherapeuticManager::new();
+        let result = manager.restore_session(json);
+        assert!(
+            result.is_ok(),
+            "restore from old snapshot without shadow should succeed"
+        );
+        assert_eq!(manager.shadow_detector.fragment_count(), 0);
     }
 
     #[test]

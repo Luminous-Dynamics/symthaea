@@ -15,8 +15,10 @@
 //! ## Usage
 //!
 //! ```rust,ignore
-//! // Spawn the actor on an existing tokio runtime
-//! let (handle, actor) = IrohBridgeHandle::new(64, 128);
+//! // Spawn the actor with trust-gated broadcasting
+//! let service = NetworkService::new(config).await?;
+//! let hs = service.handshake_arc();
+//! let (handle, actor) = IrohBridgeHandle::new_with_handshake(64, 128, Some(hs));
 //! let node = IrohNode::new(config).await?;
 //! tokio::spawn(actor.run(node));
 //!
