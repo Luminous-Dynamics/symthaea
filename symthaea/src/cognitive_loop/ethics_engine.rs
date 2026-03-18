@@ -570,6 +570,9 @@ pub(crate) struct EthicsEngine {
     // ── Restorative justice ─────────────────────────────────────────────
     restoration_tracker: RestorationTracker,
 
+    // ── Consequence tracking (active inference applied to ethics) ─────
+    consequence_tracker: ConsequenceTracker,
+
     // ── Cached values ──────────────────────────────────────────────────
     cache: EthicsEngineCache,
 }
@@ -725,6 +728,7 @@ impl EthicsEngine {
             interaction_matrix,
             compliance_checker,
             restoration_tracker: RestorationTracker::default(),
+            consequence_tracker: ConsequenceTracker::new(),
             cache: EthicsEngineCache {
                 last_harmonies_approved: true,
                 topology_cadence: initial_cadence,
@@ -1463,6 +1467,212 @@ impl EthicsEngine {
         let snap: crate::hdc::moral_topology::MoralTopologySnapshot = serde_json::from_str(&json)?;
         self.moral_topology.restore(&snap);
         Ok(())
+    }
+
+    // ── Consequence Tracker delegation ──────────────────────────────────
+
+    /// Record an ethical prediction for later outcome validation.
+    pub fn record_consequence_prediction(
+        &mut self,
+        action_id: String,
+        verdict: EthicalVerdict,
+        consciousness: f64,
+        cycle: u64,
+        community_phi: f64,
+        affect_valence: f64,
+    ) {
+        self.consequence_tracker.record_prediction(
+            action_id,
+            verdict,
+            consciousness,
+            cycle,
+            community_phi,
+            affect_valence,
+        );
+    }
+
+    /// Observe an outcome and resolve matching predictions.
+    /// Returns the prediction error if a matching prediction was found.
+    pub fn observe_consequence_outcome(
+        &mut self,
+        action_id: &str,
+        observed_phi: f64,
+        observed_valence: f64,
+        current_cycle: u64,
+    ) -> Option<f64> {
+        self.consequence_tracker
+            .observe_outcome(action_id, observed_phi, observed_valence, current_cycle)
+    }
+
+    /// Get current consequence prediction accuracy (EMA).
+    pub fn consequence_tracker_accuracy(&self) -> f64 {
+        self.consequence_tracker.accuracy()
+    }
+
+    /// Total consequence predictions made.
+    pub fn consequence_tracker_total(&self) -> u64 {
+        self.consequence_tracker.total_predictions()
+    }
+
+    /// Expire stale consequence predictions older than `max_age_cycles`.
+    pub fn expire_stale_predictions(&mut self, current_cycle: u64, max_age_cycles: u64) {
+        self.consequence_tracker
+            .expire_stale(current_cycle, max_age_cycles);
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CONSEQUENCE TRACKER — Active Inference Applied to Ethics
+//
+// Science: Friston (2010) active inference; Cushman (2013) dual-process moral cognition.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Tracks ethical predictions against actual outcomes.
+///
+/// After the ethics engine evaluates an action, the ConsequenceTracker
+/// records the prediction. When the outcome is observed (via governance
+/// events, consciousness changes, or community feedback), it computes
+/// prediction error and adjusts the ethics engine's confidence.
+///
+/// Science: Friston (2010) active inference; Cushman (2013) dual-process moral cognition.
+pub(crate) struct ConsequenceTracker {
+    /// Pending predictions awaiting outcome observation.
+    pending: Vec<ConsequencePrediction>,
+    /// Maximum pending predictions (prevents unbounded growth).
+    max_pending: usize,
+    /// Completed predictions with observed outcomes.
+    completed: Vec<ConsequenceOutcome>,
+    /// Maximum completed outcomes to retain (ring buffer).
+    max_completed: usize,
+    /// Running prediction accuracy (EMA, alpha=0.05).
+    accuracy_ema: f64,
+    /// Total predictions made.
+    total_predictions: u64,
+    /// Total correct predictions (verdict matched outcome).
+    total_correct: u64,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct ConsequencePrediction {
+    pub action_id: String,
+    pub predicted_verdict: EthicalVerdict,
+    pub consciousness_at_prediction: f64,
+    pub cycle: u64,
+    pub baseline_community_phi: f64,
+    pub baseline_affect_valence: f64,
+}
+
+#[derive(Debug, Clone)]
+#[allow(dead_code)]
+pub(crate) struct ConsequenceOutcome {
+    pub prediction: ConsequencePrediction,
+    pub observed_community_phi: f64,
+    pub observed_affect_valence: f64,
+    pub prediction_correct: bool,
+    pub prediction_error: f64,
+    pub observation_delay_cycles: u64,
+}
+
+impl ConsequenceTracker {
+    pub(crate) fn new() -> Self {
+        Self {
+            pending: Vec::new(),
+            max_pending: 100,
+            completed: Vec::new(),
+            max_completed: 500,
+            accuracy_ema: 0.5,
+            total_predictions: 0,
+            total_correct: 0,
+        }
+    }
+
+    pub(crate) fn resolved_count(&self) -> usize {
+        self.completed.len()
+    }
+
+    pub(crate) fn pending_count(&self) -> usize {
+        self.pending.len()
+    }
+
+    pub(crate) fn record_prediction(
+        &mut self,
+        action_id: String,
+        verdict: EthicalVerdict,
+        consciousness: f64,
+        cycle: u64,
+        community_phi: f64,
+        affect_valence: f64,
+    ) {
+        if self.pending.len() >= self.max_pending {
+            self.pending.remove(0);
+        }
+        self.pending.push(ConsequencePrediction {
+            action_id,
+            predicted_verdict: verdict,
+            consciousness_at_prediction: consciousness,
+            cycle,
+            baseline_community_phi: community_phi,
+            baseline_affect_valence: affect_valence,
+        });
+        self.total_predictions += 1;
+    }
+
+    pub(crate) fn observe_outcome(
+        &mut self,
+        action_id: &str,
+        observed_phi: f64,
+        observed_valence: f64,
+        current_cycle: u64,
+    ) -> Option<f64> {
+        let idx = self.pending.iter().position(|p| p.action_id == action_id)?;
+        let prediction = self.pending.remove(idx);
+
+        let phi_delta = observed_phi - prediction.baseline_community_phi;
+        let valence_delta = observed_valence - prediction.baseline_affect_valence;
+        let positive_outcome = phi_delta > -0.05 && valence_delta > -0.2;
+
+        let prediction_correct = match prediction.predicted_verdict {
+            EthicalVerdict::Safe => positive_outcome,
+            EthicalVerdict::Caution => true,
+            EthicalVerdict::Blocked => !positive_outcome,
+        };
+
+        let pe = if prediction_correct { 0.0 } else { 1.0 };
+        let alpha = super::thresholds::CONSEQUENCE_TRACKER_ACCURACY_ALPHA;
+        self.accuracy_ema = self.accuracy_ema * (1.0 - alpha)
+            + (if prediction_correct { 1.0 } else { 0.0 }) * alpha;
+        if prediction_correct {
+            self.total_correct += 1;
+        }
+
+        let delay = current_cycle.saturating_sub(prediction.cycle);
+        let outcome = ConsequenceOutcome {
+            prediction,
+            observed_community_phi: observed_phi,
+            observed_affect_valence: observed_valence,
+            prediction_correct,
+            prediction_error: pe,
+            observation_delay_cycles: delay,
+        };
+        if self.completed.len() >= self.max_completed {
+            self.completed.remove(0);
+        }
+        self.completed.push(outcome);
+
+        Some(pe)
+    }
+
+    pub(crate) fn accuracy(&self) -> f64 {
+        self.accuracy_ema
+    }
+
+    pub(crate) fn total_predictions(&self) -> u64 {
+        self.total_predictions
+    }
+
+    pub(crate) fn expire_stale(&mut self, current_cycle: u64, max_age_cycles: u64) {
+        self.pending
+            .retain(|p| current_cycle.saturating_sub(p.cycle) < max_age_cycles);
     }
 }
 
@@ -2271,5 +2481,64 @@ mod tests {
             suffering_blocks,
             "Unrestored suffering violation should still block"
         );
+    }
+
+    // ── Consequence Tracker tests ────────────────────────────────────────
+
+    #[test]
+    fn test_consequence_tracker_default_accuracy() {
+        let tracker = ConsequenceTracker::new();
+        assert!(
+            (tracker.accuracy() - 0.5).abs() < 1e-10,
+            "Default accuracy should be 0.5 (uninformative prior)"
+        );
+        assert_eq!(tracker.total_predictions(), 0);
+    }
+
+    #[test]
+    fn test_consequence_tracker_correct_safe_prediction() {
+        let mut tracker = ConsequenceTracker::new();
+        tracker.record_prediction("a1".into(), EthicalVerdict::Safe, 0.5, 100, 0.6, 0.3);
+        let pe = tracker.observe_outcome("a1", 0.6, 0.3, 110);
+        assert!(pe.is_some());
+        assert!((pe.unwrap() - 0.0).abs() < 1e-10, "Safe + stable = correct");
+        assert!(tracker.accuracy() > 0.5);
+    }
+
+    #[test]
+    fn test_consequence_tracker_wrong_safe_prediction() {
+        let mut tracker = ConsequenceTracker::new();
+        tracker.record_prediction("b1".into(), EthicalVerdict::Safe, 0.5, 100, 0.6, 0.3);
+        let pe = tracker.observe_outcome("b1", 0.4, -0.1, 120);
+        assert!((pe.unwrap() - 1.0).abs() < 1e-10, "Safe + crash = wrong");
+        assert!(tracker.accuracy() < 0.5);
+    }
+
+    #[test]
+    fn test_consequence_tracker_caution_always_correct() {
+        let mut tracker = ConsequenceTracker::new();
+        tracker.record_prediction("c1".into(), EthicalVerdict::Caution, 0.5, 100, 0.6, 0.3);
+        let pe = tracker.observe_outcome("c1", 0.4, -0.5, 120);
+        assert!((pe.unwrap() - 0.0).abs() < 1e-10, "Caution always correct");
+    }
+
+    #[test]
+    fn test_consequence_tracker_expire_stale() {
+        let mut tracker = ConsequenceTracker::new();
+        tracker.record_prediction("old".into(), EthicalVerdict::Safe, 0.5, 10, 0.5, 0.0);
+        tracker.record_prediction("new".into(), EthicalVerdict::Safe, 0.5, 90, 0.5, 0.0);
+        tracker.expire_stale(100, 50);
+        assert!(tracker.observe_outcome("old", 0.5, 0.0, 100).is_none());
+        assert!(tracker.observe_outcome("new", 0.5, 0.0, 100).is_some());
+    }
+
+    #[test]
+    fn test_consequence_tracker_on_ethics_engine() {
+        let mut engine = make_engine();
+        assert!((engine.consequence_tracker_accuracy() - 0.5).abs() < 1e-10);
+        engine.record_consequence_prediction("t1".into(), EthicalVerdict::Safe, 0.5, 100, 0.6, 0.3);
+        let pe = engine.observe_consequence_outcome("t1", 0.6, 0.3, 110);
+        assert!(pe.is_some());
+        assert!(engine.consequence_tracker_accuracy() > 0.5);
     }
 }
