@@ -1,0 +1,8 @@
+[build]
+rustc-wrapper = "sccache"
+
+# Each git worktree automatically gets its own target/ directory.
+# This prevents cargo lock contention between concurrent sessions.
+# sccache ensures compilation artifacts are shared across worktrees
+# via its global hash-based cache — so the first build in a new worktree
+# is nearly instant for unchanged crates.

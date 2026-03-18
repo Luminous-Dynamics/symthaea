@@ -338,9 +338,10 @@ pub fn debit_sap(input: DebitSapInput) -> ExternResult<Record> {
         };
 
         if input.amount > effective {
+            let demurrage_applied = bal.balance.saturating_sub(effective);
             return Err(wasm_error!(WasmErrorInner::Guest(format!(
                 "Insufficient SAP balance: effective {} (raw {} - demurrage {}), need {}",
-                effective, bal.balance, deduction, input.amount
+                effective, bal.balance, demurrage_applied, input.amount
             ))));
         }
 

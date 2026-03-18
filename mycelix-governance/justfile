@@ -1,0 +1,93 @@
+# Mycelix Governance — Build & Test Commands
+#
+# Usage: just <recipe>
+# Run `just` with no arguments to see all recipes.
+
+# Default recipe: list all recipes
+default:
+    @just --list
+
+# Environment setup
+export LIBCLANG_PATH := env("LIBCLANG_PATH", "/nix/store/xibf2ayyaljj1r7wgjf4n7n4vg5z8n2v-clang-21.1.8-lib/lib")
+hc_bin := env("HC_BIN", "/nix/store/k53j1w5ah0wi5x4cgk135csk5idl7b00-hc-0.6.1-rc.0/bin")
+
+# ============================================================================
+# BUILD
+# ============================================================================
+
+# Build all WASM zomes (release)
+build-wasm:
+    cargo build --release --target wasm32-unknown-unknown
+
+# Pack the governance DNA bundle
+pack-dna:
+    PATH={{hc_bin}}:$PATH hc dna pack dna/ -o dna/mycelix_governance_dna.dna
+
+# Build WASM + pack DNA (full pipeline)
+build: build-wasm pack-dna
+
+# ============================================================================
+# UNIT TESTS
+# ============================================================================
+
+# Run all workspace unit tests
+test-unit:
+    cargo test --workspace --exclude mycelix-identity-tests
+
+# ============================================================================
+# SWEETTEST — FULL SUITE
+# ============================================================================
+
+# Run all 47 sweettests in a single run (needs ~12GB RAM, ~60 min)
+test-sweettest:
+    cd tests && cargo test --release --test sweettest_integration -- --ignored --test-threads=1 --nocapture
+
+# ============================================================================
+# SWEETTEST — BATCHED (OOM-safe on 32GB systems)
+# ============================================================================
+# Each batch runs a subset of test modules, then holochain test envs are cleaned.
+# Total: 47 tests across 5 batches.
+
+# Batch 1: Proposals + Discussion + Voting (10 tests, ~15 min)
+test-batch-1:
+    cd tests && cargo test --release --test sweettest_integration proposal_tests -- --ignored --test-threads=1 --nocapture
+    cd tests && cargo test --release --test sweettest_integration discussion_tests -- --ignored --test-threads=1 --nocapture
+    cd tests && cargo test --release --test sweettest_integration voting_tests -- --ignored --test-threads=1 --nocapture
+
+# Batch 2: Constitution + Councils + Council Decisions (7 tests, ~12 min)
+test-batch-2:
+    cd tests && cargo test --release --test sweettest_integration constitution_tests -- --ignored --test-threads=1 --nocapture
+    cd tests && cargo test --release --test sweettest_integration council_tests -- --ignored --test-threads=1 --nocapture
+    cd tests && cargo test --release --test sweettest_integration council_decision_tests -- --ignored --test-threads=1 --nocapture
+
+# Batch 3: Execution + Veto/Fund + Quadratic (13 tests, ~20 min)
+test-batch-3:
+    cd tests && cargo test --release --test sweettest_integration execution_tests -- --ignored --test-threads=1 --nocapture
+    cd tests && cargo test --release --test sweettest_integration veto_fund_tests -- --ignored --test-threads=1 --nocapture
+    cd tests && cargo test --release --test sweettest_integration quadratic_voting_tests -- --ignored --test-threads=1 --nocapture
+
+# Batch 4: DKG + Governance Identity (16 tests, ~25 min)
+test-batch-4:
+    cd tests && cargo test --release --test sweettest_integration threshold_signing_dkg_tests -- --ignored --test-threads=1 --nocapture
+    cd tests && cargo test --release --test sweettest_integration governance_identity_tests -- --ignored --test-threads=1 --nocapture
+
+# Batch 5: Integration + Lifecycle E2E (2 tests, ~10 min)
+test-batch-5:
+    cd tests && cargo test --release --test sweettest_integration integration_tests -- --ignored --test-threads=1 --nocapture
+    cd tests && cargo test --release --test sweettest_integration lifecycle_e2e_tests -- --ignored --test-threads=1 --nocapture
+
+# Run all batches sequentially (OOM-safe alternative to test-sweettest)
+test-sweettest-batched: test-batch-1 test-batch-2 test-batch-3 test-batch-4 test-batch-5
+
+# ============================================================================
+# CLEANUP
+# ============================================================================
+
+# Clean holochain test environments from /tmp
+clean-test-envs:
+    rm -rf /tmp/holochain-test-environments* || true
+    @echo "Cleaned holochain test environments"
+
+# Clean cargo build artifacts
+clean:
+    cargo clean

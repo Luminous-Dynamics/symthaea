@@ -21,6 +21,9 @@
             rustc
             cargo
 
+            # Linker (required by symthaea/.cargo/config.toml: -fuse-ld=mold)
+            mold
+
             # Database (PostgreSQL already in your environment)
             postgresql_15
 
