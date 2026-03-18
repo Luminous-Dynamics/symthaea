@@ -778,6 +778,7 @@ pub struct CognitiveLoopService {
 
     /// Civic crisis detector: monitors PE, safety level, Phi, arousal for
     /// community-level emergencies. Produces CivicCrisisEvent for Mycelix.
+    #[cfg(feature = "safety-agents")]
     pub(crate) civic_crisis_detector: civic_crisis_detector::CivicCrisisDetector,
 
     /// Aggregate security telemetry for the crypto/swarm stack.

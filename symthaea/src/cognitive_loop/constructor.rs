@@ -1081,6 +1081,7 @@ impl CognitiveLoopService {
             defense_actions_proposed: 0,
             #[cfg(feature = "safety-agents")]
             defense_actions_approved: 0,
+            #[cfg(feature = "safety-agents")]
             civic_crisis_detector: super::civic_crisis_detector::CivicCrisisDetector::new(),
             security_telemetry: crate::swarm::SecurityTelemetry::default(),
             resonant_speech: crate::resonant_speech::ResonantSpeech::new(),
