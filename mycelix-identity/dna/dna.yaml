@@ -32,6 +32,12 @@ integrity:
     - name: mfa_integrity
       path: "../target/wasm32-unknown-unknown/release/mfa_integrity.wasm"
 
+    - name: name_registry_integrity
+      path: "../target/wasm32-unknown-unknown/release/name_registry_integrity.wasm"
+
+    - name: web_of_trust_integrity
+      path: "../target/wasm32-unknown-unknown/release/web_of_trust_integrity.wasm"
+
 coordinator:
   zomes:
     - name: did_registry
@@ -91,3 +97,13 @@ coordinator:
       dependencies:
         - name: mfa_integrity
         - name: did_registry_integrity
+
+    - name: name_registry
+      path: "../target/wasm32-unknown-unknown/release/name_registry_coordinator.wasm"
+      dependencies:
+        - name: name_registry_integrity
+
+    - name: web_of_trust
+      path: "../target/wasm32-unknown-unknown/release/web_of_trust_coordinator.wasm"
+      dependencies:
+        - name: web_of_trust_integrity

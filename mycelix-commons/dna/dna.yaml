@@ -1,7 +1,7 @@
 ---
 # Mycelix Commons DNA
-# Universal Resource Coordination: property + housing + care + mutualaid + water + food + transport
-# 4 property + 6 housing + 5 care + 7 mutualaid + 5 water + 4 food + 3 transport + 3 support + 1 space = 38 domain + 1 bridge = 39 coordinator zomes
+# Universal Resource Coordination: property + housing + care + mutualaid + water + food + transport + mesh-time + resource-mesh
+# 4 property + 6 housing + 5 care + 7 mutualaid + 5 water + 4 food + 3 transport + 3 support + 1 space + 1 mesh-time + 1 resource-mesh = 40 domain + 1 bridge = 41 coordinator zomes
 
 manifest_version: "0"
 name: mycelix_commons
@@ -106,6 +106,14 @@ integrity:
     # Space / membrane factory
     - name: space_integrity
       path: ../target/wasm32-unknown-unknown/release/space_integrity.wasm
+
+    # Mesh-Time domain
+    - name: mesh_time_integrity
+      path: ../target/wasm32-unknown-unknown/release/mesh_time_integrity.wasm
+
+    # Resource-Mesh domain
+    - name: resource_mesh_integrity
+      path: ../target/wasm32-unknown-unknown/release/resource_mesh_integrity.wasm
 
     # Unified bridge
     - name: commons_bridge_integrity
@@ -288,6 +296,18 @@ coordinator:
       path: ../target/wasm32-unknown-unknown/release/space.wasm
       dependencies:
         - name: space_integrity
+
+    # Mesh-Time domain
+    - name: mesh_time
+      path: ../target/wasm32-unknown-unknown/release/mesh_time.wasm
+      dependencies:
+        - name: mesh_time_integrity
+
+    # Resource-Mesh domain
+    - name: resource_mesh
+      path: ../target/wasm32-unknown-unknown/release/resource_mesh.wasm
+      dependencies:
+        - name: resource_mesh_integrity
 
     # Unified bridge
     - name: commons_bridge

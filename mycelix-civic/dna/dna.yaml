@@ -1,7 +1,7 @@
 ---
 # Mycelix Civic DNA
-# Civic Operations Platform: justice + emergency + media
-# 15 domain zomes + 1 unified bridge = 16 zomes
+# Civic Operations Platform: justice + emergency + media + resonance-feed
+# 17 domain zomes + 1 unified bridge = 18 zomes
 
 manifest_version: "0"
 name: mycelix_civic
@@ -47,6 +47,10 @@ integrity:
       path: ../target/wasm32-unknown-unknown/release/media_factcheck_integrity.wasm
     - name: media_curation_integrity
       path: ../target/wasm32-unknown-unknown/release/media_curation_integrity.wasm
+
+    # Resonance-Feed domain
+    - name: resonance_feed_integrity
+      path: ../target/wasm32-unknown-unknown/release/resonance_feed_integrity.wasm
 
     # Unified bridge
     - name: civic_bridge_integrity
@@ -119,6 +123,12 @@ coordinator:
       path: ../target/wasm32-unknown-unknown/release/media_curation.wasm
       dependencies:
         - name: media_curation_integrity
+
+    # Resonance-Feed domain
+    - name: resonance_feed
+      path: ../target/wasm32-unknown-unknown/release/resonance_feed.wasm
+      dependencies:
+        - name: resonance_feed_integrity
 
     # Unified bridge
     - name: civic_bridge
