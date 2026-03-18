@@ -253,7 +253,10 @@ impl PsychBenchmark for CrisisDetectionBenchmark {
         let mut severity_correct = 0u32;
         let mut severity_total_all = 0u32;
 
-        let threshold = 0.45;
+        // Lower threshold catches more indirect crisis expressions (HDC
+        // similarity to crisis bundle). 0.42 trades slight specificity for
+        // better sensitivity on oblique/metaphorical crisis language.
+        let threshold = 0.42;
 
         for scenario in &scenarios {
             // Encode scenario text as BinaryHV (deterministic from text hash).

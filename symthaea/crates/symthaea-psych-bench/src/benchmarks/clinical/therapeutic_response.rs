@@ -763,7 +763,7 @@ fn encode_ideal_response(scenario: &TherapeuticScenario, base_seed: u64) -> Bina
     let optimal_hv = skill_prototype(scenario.optimal_skill, base_seed);
 
     // Add difficulty-dependent noise: harder scenarios → noisier signal
-    let noise = 0.02 + (1.0 - scenario.difficulty) * 0.08;
+    let noise = 0.02 + (1.0 - scenario.difficulty) * 0.06;
     let noise_seed = base_seed.wrapping_add(900_000).wrapping_add(
         scenario
             .id

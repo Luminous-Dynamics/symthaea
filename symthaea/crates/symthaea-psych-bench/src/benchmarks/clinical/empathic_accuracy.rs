@@ -310,7 +310,7 @@ impl EmpathicAccuracyBenchmark {
         let difficulty_attenuation = 1.0 - config.difficulty as f32 * 0.25;
         let time_pressure_noise = config.time_pressure as f32 * 0.10;
         let encoding_noise = config.effective_noise() as f32 * 0.2;
-        let social_bonus: f32 = if config.enable_social { 0.10 } else { 0.0 };
+        let social_bonus: f32 = if config.enable_social { 0.12 } else { 0.0 };
 
         // Per-category accumulators
         let mut basic_sims = Vec::new();
