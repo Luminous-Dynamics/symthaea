@@ -1,4 +1,4 @@
-// Service Worker for Sovereign Quickening progressive decentralization.
+// Service Worker for Sovereign Inoculation progressive decentralization.
 //
 // Strategy:
 // 1. Cache core WASM + HTML on first visit (offline capability)

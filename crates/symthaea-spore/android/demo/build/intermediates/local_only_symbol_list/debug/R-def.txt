@@ -1,0 +1,36 @@
+R_DEF: Internal format may change without notice
+local
+drawable circle_indicator
+drawable consciousness_circle
+drawable ic_spore_background
+drawable ic_spore_foreground
+id brocaText
+id consciousnessCircle
+id consciousnessLabel
+id consciousnessValue
+id disclaimerText
+id dopamineBar
+id dopamineLabel
+id dopamineValue
+id dreamNarrative
+id dreamText
+id hapticIndicator
+id harmonyText
+id neBar
+id neLabel
+id neValue
+id neuromodLabel
+id oxytocinBar
+id oxytocinLabel
+id oxytocinValue
+id peText
+id serotoninBar
+id serotoninLabel
+id serotoninValue
+id statusText
+id titleText
+layout activity_main
+mipmap ic_launcher
+mipmap ic_launcher_round
+string app_name
+style Theme.SporeDemo

@@ -176,11 +176,7 @@ impl Default for GatingConfig {
             // CfC output is in a different representational space than thought input,
             // giving baseline coherence of ~0.006. A threshold of 0.003 fires only
             // when coherence drops to half its normal level (genuine drift).
-            // Disabled (0.0): after BPTT training, CfC output HV lives in a
-            // different representational space than input thought HV, so
-            // cosine similarity is always ~0.006. Needs re-calibration against
-            // the trained network's actual coherence distribution.
-            veto_threshold: 0.0,
+            veto_threshold: 0.003,
             min_veto_position: 2,
             max_vetoes: 1,
             veto_refractory: 8,
@@ -198,7 +194,7 @@ impl Default for GatingConfig {
 }
 
 fn default_veto_threshold() -> f32 {
-    0.0 // Disabled until coherence is calibrated against trained network
+    0.15
 }
 
 fn default_min_veto_position() -> usize {

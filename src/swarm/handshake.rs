@@ -238,10 +238,7 @@ impl HybridHandshake {
         // Rate limit: one challenge per peer (duplicates indicate replay)
         if self.pending_challenges.contains_key(peer_node_id) {
             return Err(HandshakeError::ProtocolViolation {
-                message: format!(
-                    "Challenge already pending for peer '{}'",
-                    peer_node_id,
-                ),
+                message: format!("Challenge already pending for peer '{}'", peer_node_id,),
             });
         }
 
@@ -354,12 +351,11 @@ impl HybridHandshake {
                     reason: "Failed to convert public key bytes".to_string(),
                 })?;
 
-        let verifying_key =
-            VerifyingKey::from_bytes(&pubkey_array).map_err(|e| {
-                SwarmError::TrustVerificationError {
-                    reason: format!("Invalid Ed25519 public key: {}", e),
-                }
-            })?;
+        let verifying_key = VerifyingKey::from_bytes(&pubkey_array).map_err(|e| {
+            SwarmError::TrustVerificationError {
+                reason: format!("Invalid Ed25519 public key: {}", e),
+            }
+        })?;
 
         // Parse signature
         let sig_bytes: [u8; 64] =
@@ -805,8 +801,7 @@ mod tests_ed25519 {
 
     #[test]
     fn test_handshake_result() {
-        let success =
-            HandshakeResult::success("peer-1", "agent-1", TrustLevel::Verified(0.8), 150);
+        let success = HandshakeResult::success("peer-1", "agent-1", TrustLevel::Verified(0.8), 150);
         assert!(success.streaming_allowed);
 
         let failed = HandshakeResult::failed("peer-2");
@@ -865,7 +860,10 @@ mod tests_ed25519 {
         let mut config = SwarmConfig::default();
         config.challenge_timeout_secs = 5;
         let handshake = HybridHandshake::new(config);
-        assert_eq!(handshake.challenge_timeout, std::time::Duration::from_secs(5));
+        assert_eq!(
+            handshake.challenge_timeout,
+            std::time::Duration::from_secs(5)
+        );
     }
 
     #[test]
@@ -896,7 +894,9 @@ mod tests_ed25519 {
         let (sig_a, key_a_hex) = response_ab.try_into_response().unwrap();
 
         // Step 5: B verifies A's response
-        let trust_a = hs_b.verify_mutual_response("peer-A", &sig_a, &key_a_hex).unwrap();
+        let trust_a = hs_b
+            .verify_mutual_response("peer-A", &sig_a, &key_a_hex)
+            .unwrap();
         assert!(matches!(trust_a, TrustLevel::Verified(_)));
 
         // Both sides are now mutually verified
@@ -1033,8 +1033,7 @@ mod tests_blake3 {
 
     #[test]
     fn test_handshake_result() {
-        let success =
-            HandshakeResult::success("peer-1", "agent-1", TrustLevel::Verified(0.8), 150);
+        let success = HandshakeResult::success("peer-1", "agent-1", TrustLevel::Verified(0.8), 150);
         assert!(success.streaming_allowed);
 
         let failed = HandshakeResult::failed("peer-2");

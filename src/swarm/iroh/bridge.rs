@@ -31,11 +31,11 @@
 //! ```
 
 use crate::mind::SocialMessage;
+#[allow(unused_imports)]
+use parking_lot::RwLock as ParkingRwLock;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use tokio::sync::mpsc;
-#[allow(unused_imports)]
-use parking_lot::RwLock as ParkingRwLock; // used via Arc<parking_lot::RwLock<...>>
+use tokio::sync::mpsc; // used via Arc<parking_lot::RwLock<...>>
 
 // ============================================================================
 // IrohBridgeHandle — Sync side (held by ContinuousMind)
@@ -89,6 +89,7 @@ impl IrohBridgeHandle {
             alive,
             handshake,
             require_handshake: true,
+            attestation: None,
         };
 
         (handle, actor)
@@ -167,6 +168,9 @@ pub struct IrohBridgeActor {
     /// When true (default), broadcasts are refused if no handshake is configured.
     /// Set to false only for local testing via `SwarmConfig::local_only()`.
     require_handshake: bool,
+    /// Optional attestation manager for signing outbound and verifying inbound CVs.
+    attestation:
+        Option<Arc<parking_lot::RwLock<crate::swarm::attestation::AttestationManager>>>,
 }
 
 impl IrohBridgeActor {
@@ -179,6 +183,26 @@ impl IrohBridgeActor {
         handshake: Arc<parking_lot::RwLock<crate::swarm::handshake::HybridHandshake>>,
     ) {
         self.handshake = Some(handshake);
+    }
+
+    /// Set the attestation manager for signing outbound CVs and verifying inbound CVs.
+    ///
+    /// When set:
+    /// - Outbound CVs are signed with Ed25519 before transmission
+    /// - Inbound CVs are verified against the trusted signer set
+    /// - Failed verifications increment `security_telemetry.inbound_rejected_untrusted`
+    pub fn set_attestation(
+        &mut self,
+        attestation: Arc<parking_lot::RwLock<crate::swarm::attestation::AttestationManager>>,
+    ) {
+        self.attestation = Some(attestation);
+    }
+
+    /// Get the attestation manager reference.
+    pub fn attestation(
+        &self,
+    ) -> &Option<Arc<parking_lot::RwLock<crate::swarm::attestation::AttestationManager>>> {
+        &self.attestation
     }
 
     /// Set whether handshake is required for broadcasting.
@@ -282,10 +306,7 @@ impl IrohBridgeActor {
             // Trust gating: skip peers that haven't completed the handshake
             if let Some(ref hs) = self.handshake {
                 if !hs.read().is_peer_trusted(peer_id) {
-                    tracing::trace!(
-                        peer = peer_id,
-                        "Skipping untrusted peer in broadcast"
-                    );
+                    tracing::trace!(peer = peer_id, "Skipping untrusted peer in broadcast");
                     continue;
                 }
             }

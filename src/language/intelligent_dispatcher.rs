@@ -185,6 +185,10 @@ impl IntelligentDispatcher {
             }
         };
 
+        // Bayesian override: if we have enough data (5+ attempts) and the selected
+        // tier's success rate is poor (<30%), try the next tier with better stats.
+        let base_tier = self.bayesian_adjust(base_tier);
+
         // Consciousness modulation: very low consciousness → don't trust expensive backends
         if consciousness_level < 0.2 {
             return BackendTier::Native;
@@ -338,6 +342,55 @@ impl IntelligentDispatcher {
             rate = self.success_rate(tier),
             "Recorded generation outcome"
         );
+    }
+
+    /// Bayesian tier adjustment: if the selected tier has poor success rate
+    /// (>= 5 attempts, < 30% success) and another tier has better stats, switch.
+    fn bayesian_adjust(&self, tier: BackendTier) -> BackendTier {
+        let stats = match tier {
+            BackendTier::Native => &self.native_stats,
+            BackendTier::LocalLlm => &self.local_stats,
+            BackendTier::CloudLlm => &self.cloud_stats,
+            BackendTier::Simulated => return tier,
+        };
+
+        if stats.attempts < 5 || stats.success_rate() >= 0.3 {
+            return tier;
+        }
+
+        let alternatives = match tier {
+            BackendTier::Native => vec![BackendTier::LocalLlm, BackendTier::CloudLlm],
+            BackendTier::LocalLlm => vec![BackendTier::CloudLlm, BackendTier::Native],
+            BackendTier::CloudLlm => vec![BackendTier::LocalLlm, BackendTier::Native],
+            BackendTier::Simulated => return tier,
+        };
+
+        for alt in alternatives {
+            let alt_rate = match alt {
+                BackendTier::Native => self.native_stats.success_rate(),
+                BackendTier::LocalLlm => self.local_stats.success_rate(),
+                BackendTier::CloudLlm => {
+                    if self.cloud_llm.is_none() {
+                        continue;
+                    }
+                    self.cloud_stats.success_rate()
+                }
+                BackendTier::Simulated => continue,
+            };
+            if alt_rate > stats.success_rate() {
+                tracing::info!(
+                    target: "symthaea::dispatcher",
+                    from = %tier,
+                    to = %alt,
+                    from_rate = stats.success_rate(),
+                    to_rate = alt_rate,
+                    "Bayesian override: switching to tier with better success rate"
+                );
+                return alt;
+            }
+        }
+
+        tier
     }
 
     /// Get remaining energy budget (f64::MAX if unlimited).
@@ -506,5 +559,41 @@ mod tests {
         // Should not panic
         dispatcher.record_outcome(BackendTier::Simulated, true);
         dispatcher.record_outcome(BackendTier::Simulated, false);
+    }
+
+    #[test]
+    fn test_bayesian_override_poor_tier() {
+        let mut dispatcher = IntelligentDispatcher::simulated();
+        for _ in 0..5 {
+            dispatcher.record_outcome(BackendTier::Native, false);
+        }
+        for _ in 0..3 {
+            dispatcher.record_outcome(BackendTier::LocalLlm, true);
+        }
+        let tier = dispatcher.select_tier(EpistemicStatus::Certain, 0.1, 0.8);
+        assert_eq!(tier, BackendTier::LocalLlm);
+    }
+
+    #[test]
+    fn test_bayesian_no_override_insufficient_data() {
+        let mut dispatcher = IntelligentDispatcher::simulated();
+        for _ in 0..3 {
+            dispatcher.record_outcome(BackendTier::Native, false);
+        }
+        let tier = dispatcher.select_tier(EpistemicStatus::Certain, 0.1, 0.8);
+        assert_eq!(tier, BackendTier::Native);
+    }
+
+    #[test]
+    fn test_bayesian_no_override_acceptable_rate() {
+        let mut dispatcher = IntelligentDispatcher::simulated();
+        for _ in 0..3 {
+            dispatcher.record_outcome(BackendTier::Native, false);
+        }
+        for _ in 0..2 {
+            dispatcher.record_outcome(BackendTier::Native, true);
+        }
+        let tier = dispatcher.select_tier(EpistemicStatus::Certain, 0.1, 0.8);
+        assert_eq!(tier, BackendTier::Native);
     }
 }

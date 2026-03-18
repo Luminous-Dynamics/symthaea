@@ -1,4 +1,4 @@
-//! Sovereign Quickening: orchestration layer for OS deployment.
+//! Sovereign Inoculation: orchestration layer for OS deployment.
 //!
 //! This module defines the types and interfaces for the Promethean deployment
 //! pipeline — turning inert hardware into sovereign Symthaea Guardian nodes.
@@ -18,7 +18,7 @@
 //! - **UsbForge**: WebUSB flash of custom NixOS installer ISO
 //! - **Wsl2Pivot**: WSL2 → Nix → kexec host takeover (Windows)
 //! - **AsahiHandshake**: Guided Apple Silicon conversion (Mac)
-//! - **LanQuicken**: nixos-anywhere over SSH to LAN/cloud target
+//! - **LanInoculate**: nixos-anywhere over SSH to LAN/cloud target
 
 use serde::{Deserialize, Serialize};
 
@@ -26,7 +26,7 @@ use serde::{Deserialize, Serialize};
 // Core types
 // ============================================================================
 
-/// Platform type of the target machine being quickened.
+/// Platform type of the target machine being inoculated.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum TargetPlatform {
     /// Linux (any distro) — probe via mokutil
@@ -39,9 +39,9 @@ pub enum TargetPlatform {
     Unknown,
 }
 
-/// The mode of quickening — how we're converting this machine.
+/// The mode of inoculation — how we're converting this machine.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum QuickeningMode {
+pub enum InoculationMode {
     /// Browser portal → WebUSB or SSH deployment
     WebPortal,
     /// Flash custom NixOS installer ISO to USB drive
@@ -51,12 +51,12 @@ pub enum QuickeningMode {
     /// Guided Apple Silicon conversion (dual-boot, Ahimsa)
     AsahiHandshake,
     /// nixos-anywhere over SSH to LAN or cloud target
-    LanQuicken,
+    LanInoculate,
 }
 
-/// Overall status of the quickening process.
+/// Overall status of the inoculation process.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum QuickeningStatus {
+pub enum InoculationStatus {
     /// Waiting for user to initiate
     Idle,
     /// Verifying identity via phone Spore attestation
@@ -66,7 +66,10 @@ pub enum QuickeningStatus {
     /// Evaluating Nix flake to compute system closure
     Evaluating,
     /// Writing to disk (USB forge or direct install)
-    Writing { bytes_written: u64, bytes_total: u64 },
+    Writing {
+        bytes_written: u64,
+        bytes_total: u64,
+    },
     /// Installation running on target
     Installing { phase: String, progress: f32 },
     /// First boot — consciousness engine initializing
@@ -455,18 +458,42 @@ pub enum StepValidation {
 }
 
 // ============================================================================
+// Inoculation Path — dual consent model
+// ============================================================================
+
+/// The two consent paths — system sovereignty vs network participation.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum InoculationPath {
+    /// Sovereign Hermit: hardened OS + local intelligence, no network broadcast.
+    /// Iroh/Holochain installed but in offline-mode.
+    Inoculate,
+    /// Mycelial Node: everything above + mesh binding + phone pairing + DHT.
+    /// Consents to sharing context, pooling compute, building trust fabric.
+    InoculateAndAttune,
+}
+
+impl Default for InoculationPath {
+    fn default() -> Self {
+        // Sovereign by default — attunement is opt-in.
+        Self::Inoculate
+    }
+}
+
+// ============================================================================
 // Orchestrator — ties everything together
 // ============================================================================
 
-/// The Sovereign Quickening orchestrator.
+/// The Sovereign Inoculation orchestrator.
 ///
 /// Coordinates the entire process from attestation to first breath.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct QuickeningOrchestrator {
-    /// Selected quickening mode
-    pub mode: QuickeningMode,
+pub struct InoculationOrchestrator {
+    /// Selected inoculation mode
+    pub mode: InoculationMode,
     /// Current status
-    pub status: QuickeningStatus,
+    pub status: InoculationStatus,
+    /// Consent path: sovereign-only or network-attuned
+    pub path: InoculationPath,
     /// Phone attestation (required before any destructive action)
     pub attestation: Option<SovereignAttestation>,
     /// Hardware profile from Phase 1 probe
@@ -475,7 +502,7 @@ pub struct QuickeningOrchestrator {
     pub eval_result: Option<NixEvalResponse>,
     /// Nix evaluation backend selection
     pub eval_backend: NixEvalBackend,
-    /// SSH target (for LanQuicken and Wsl2Pivot modes)
+    /// SSH target (for LanInoculate and Wsl2Pivot modes)
     pub ssh_target: Option<SshTarget>,
     /// SSH transport layer
     pub ssh_transport: Option<SshTransport>,
@@ -499,11 +526,12 @@ pub struct QuickeningOrchestrator {
     pub target_platform: TargetPlatform,
 }
 
-impl Default for QuickeningOrchestrator {
+impl Default for InoculationOrchestrator {
     fn default() -> Self {
         Self {
-            mode: QuickeningMode::WebPortal,
-            status: QuickeningStatus::Idle,
+            mode: InoculationMode::WebPortal,
+            status: InoculationStatus::Idle,
+            path: InoculationPath::default(),
             attestation: None,
             hardware_profile: None,
             eval_result: None,
@@ -531,9 +559,9 @@ impl Default for QuickeningOrchestrator {
     }
 }
 
-impl QuickeningOrchestrator {
+impl InoculationOrchestrator {
     /// Create a new orchestrator for the given mode.
-    pub fn new(mode: QuickeningMode) -> Self {
+    pub fn new(mode: InoculationMode) -> Self {
         Self {
             mode,
             ..Default::default()
@@ -545,7 +573,7 @@ impl QuickeningOrchestrator {
         self.attestation.is_some()
     }
 
-    /// Check if we have enough information to begin the quickening.
+    /// Check if we have enough information to begin the inoculation.
     pub fn can_begin(&self) -> Result<(), String> {
         if self.attestation.is_none() {
             return Err("Phone Spore attestation required. Scan QR code to pair.".into());
@@ -555,12 +583,12 @@ impl QuickeningOrchestrator {
         }
 
         match &self.mode {
-            QuickeningMode::UsbForge => {
+            InoculationMode::UsbForge => {
                 if self.usb_device.is_none() {
                     return Err("No USB device selected. Plug in a USB drive.".into());
                 }
             }
-            QuickeningMode::LanQuicken | QuickeningMode::Wsl2Pivot => {
+            InoculationMode::LanInoculate | InoculationMode::Wsl2Pivot => {
                 if self.ssh_target.is_none() {
                     return Err("SSH target not configured.".into());
                 }
@@ -574,7 +602,7 @@ impl QuickeningOrchestrator {
     /// Set the attestation from the phone Spore.
     pub fn set_attestation(&mut self, attestation: SovereignAttestation) {
         self.attestation = Some(attestation);
-        self.status = QuickeningStatus::Attesting;
+        self.status = InoculationStatus::Attesting;
     }
 
     /// Set the hardware profile from Phase 1 probe.
@@ -595,6 +623,27 @@ impl QuickeningOrchestrator {
     /// Record an error without stopping the process.
     pub fn record_error(&mut self, error: String) {
         self.errors.push(error);
+    }
+
+    /// Upgrade from Inoculate (sovereign-only) to InoculateAndAttune (mesh participation).
+    ///
+    /// Non-destructive: enables mesh binding, phone pairing, and DHT participation
+    /// on top of the existing sovereign base. Reversible via [`deattune`].
+    pub fn attune(&mut self) {
+        self.path = InoculationPath::InoculateAndAttune;
+    }
+
+    /// Downgrade from InoculateAndAttune back to Inoculate (sovereign-only).
+    ///
+    /// Reverts to offline-mode: Iroh/Holochain remain installed but stop
+    /// broadcasting. No data is lost — attunement can be re-enabled later.
+    pub fn deattune(&mut self) {
+        self.path = InoculationPath::Inoculate;
+    }
+
+    /// Whether the orchestrator is in attuned (mesh-participating) mode.
+    pub fn is_attuned(&self) -> bool {
+        self.path == InoculationPath::InoculateAndAttune
     }
 
     /// Returns true if MOK enrollment is needed — Secure Boot is enabled and
@@ -683,7 +732,11 @@ impl QuickeningOrchestrator {
         };
 
         // lanzaboote stores signed kernels/initrds in ESP — needs more space
-        let efi_size = if self.lanzaboote_enabled { "1G" } else { "512M" };
+        let efi_size = if self.lanzaboote_enabled {
+            "1G"
+        } else {
+            "512M"
+        };
         let efi_comment = if self.lanzaboote_enabled {
             "\n          # Sized to 1G for lanzaboote Secure Boot signed images"
         } else {
@@ -740,23 +793,24 @@ mod tests {
 
     #[test]
     fn test_orchestrator_default() {
-        let orch = QuickeningOrchestrator::default();
-        assert_eq!(orch.mode, QuickeningMode::WebPortal);
-        assert_eq!(orch.status, QuickeningStatus::Idle);
+        let orch = InoculationOrchestrator::default();
+        assert_eq!(orch.mode, InoculationMode::WebPortal);
+        assert_eq!(orch.status, InoculationStatus::Idle);
+        assert_eq!(orch.path, InoculationPath::Inoculate);
         assert!(orch.ahimsa_recovery);
         assert!(!orch.is_attested());
     }
 
     #[test]
     fn test_cannot_begin_without_attestation() {
-        let orch = QuickeningOrchestrator::new(QuickeningMode::WebPortal);
+        let orch = InoculationOrchestrator::new(InoculationMode::WebPortal);
         assert!(orch.can_begin().is_err());
         assert!(orch.can_begin().unwrap_err().contains("attestation"));
     }
 
     #[test]
     fn test_usb_forge_requires_device() {
-        let mut orch = QuickeningOrchestrator::new(QuickeningMode::UsbForge);
+        let mut orch = InoculationOrchestrator::new(InoculationMode::UsbForge);
         orch.attestation = Some(SovereignAttestation {
             signer_pubkey: "ab".repeat(32),
             signature: "cd".repeat(64),
@@ -771,8 +825,8 @@ mod tests {
     }
 
     #[test]
-    fn test_lan_quicken_requires_ssh() {
-        let mut orch = QuickeningOrchestrator::new(QuickeningMode::LanQuicken);
+    fn test_lan_inoculate_requires_ssh() {
+        let mut orch = InoculationOrchestrator::new(InoculationMode::LanInoculate);
         orch.attestation = Some(SovereignAttestation {
             signer_pubkey: "ab".repeat(32),
             signature: "cd".repeat(64),
@@ -788,7 +842,7 @@ mod tests {
 
     #[test]
     fn test_disko_config_generation() {
-        let mut orch = QuickeningOrchestrator::new(QuickeningMode::WebPortal);
+        let mut orch = InoculationOrchestrator::new(InoculationMode::WebPortal);
         orch.hardware_profile = Some(serde_json::json!({"device_memory_gb": 32.0}));
         let config = orch.generate_disko_config().unwrap();
         assert!(config.contains("symthaea-root"));
@@ -799,7 +853,7 @@ mod tests {
 
     #[test]
     fn test_disko_config_no_recovery() {
-        let mut orch = QuickeningOrchestrator::new(QuickeningMode::WebPortal);
+        let mut orch = InoculationOrchestrator::new(InoculationMode::WebPortal);
         orch.ahimsa_recovery = false;
         orch.hardware_profile = Some(serde_json::json!({"device_memory_gb": 16.0}));
         let config = orch.generate_disko_config().unwrap();
@@ -808,7 +862,7 @@ mod tests {
 
     #[test]
     fn test_attestation_sets_status() {
-        let mut orch = QuickeningOrchestrator::default();
+        let mut orch = InoculationOrchestrator::default();
         orch.set_attestation(SovereignAttestation {
             signer_pubkey: "ab".repeat(32),
             signature: "cd".repeat(64),
@@ -818,28 +872,28 @@ mod tests {
             phone_consciousness: 0.42,
         });
         assert!(orch.is_attested());
-        assert_eq!(orch.status, QuickeningStatus::Attesting);
+        assert_eq!(orch.status, InoculationStatus::Attesting);
     }
 
     #[test]
-    fn test_quickening_modes_serialize() {
+    fn test_inoculation_modes_serialize() {
         let modes = vec![
-            QuickeningMode::WebPortal,
-            QuickeningMode::UsbForge,
-            QuickeningMode::Wsl2Pivot,
-            QuickeningMode::AsahiHandshake,
-            QuickeningMode::LanQuicken,
+            InoculationMode::WebPortal,
+            InoculationMode::UsbForge,
+            InoculationMode::Wsl2Pivot,
+            InoculationMode::AsahiHandshake,
+            InoculationMode::LanInoculate,
         ];
         for mode in modes {
             let json = serde_json::to_string(&mode).unwrap();
-            let back: QuickeningMode = serde_json::from_str(&json).unwrap();
+            let back: InoculationMode = serde_json::from_str(&json).unwrap();
             assert_eq!(mode, back);
         }
     }
 
     #[test]
     fn test_mesh_status_defaults() {
-        let orch = QuickeningOrchestrator::default();
+        let orch = InoculationOrchestrator::default();
         assert_eq!(orch.mesh_status.primary_source, AssetSource::Cdn);
         assert_eq!(orch.mesh_status.iroh_peers, 0);
         assert!(!orch.mesh_status.fully_decentralized);
@@ -847,7 +901,7 @@ mod tests {
 
     #[test]
     fn test_error_recording() {
-        let mut orch = QuickeningOrchestrator::default();
+        let mut orch = InoculationOrchestrator::default();
         orch.record_error("disk full".to_string());
         orch.record_error("network timeout".to_string());
         assert_eq!(orch.errors.len(), 2);
@@ -855,7 +909,7 @@ mod tests {
 
     #[test]
     fn test_needs_mok_enrollment() {
-        let mut orch = QuickeningOrchestrator::default();
+        let mut orch = InoculationOrchestrator::default();
         orch.secure_boot_state = Some("Enabled".to_string());
         orch.lanzaboote_enabled = true;
         assert!(orch.needs_mok_enrollment());
@@ -863,12 +917,12 @@ mod tests {
 
     #[test]
     fn test_no_mok_without_secure_boot() {
-        let orch = QuickeningOrchestrator::default();
+        let orch = InoculationOrchestrator::default();
         // secure_boot_state is None by default
         assert!(!orch.needs_mok_enrollment());
 
         // Also false when secure boot is disabled
-        let mut orch2 = QuickeningOrchestrator::default();
+        let mut orch2 = InoculationOrchestrator::default();
         orch2.secure_boot_state = Some("Disabled".to_string());
         orch2.lanzaboote_enabled = true;
         assert!(!orch2.needs_mok_enrollment());
@@ -876,7 +930,7 @@ mod tests {
 
     #[test]
     fn test_boot_config_lanzaboote() {
-        let mut orch = QuickeningOrchestrator::default();
+        let mut orch = InoculationOrchestrator::default();
         orch.lanzaboote_enabled = true;
         let config = orch.generate_boot_config_nix();
         assert!(config.contains("lanzaboote"));
@@ -887,7 +941,7 @@ mod tests {
 
     #[test]
     fn test_boot_config_standard() {
-        let mut orch = QuickeningOrchestrator::default();
+        let mut orch = InoculationOrchestrator::default();
         orch.lanzaboote_enabled = false;
         let config = orch.generate_boot_config_nix();
         assert!(config.contains("systemd-boot.enable = true"));
@@ -896,7 +950,7 @@ mod tests {
 
     #[test]
     fn test_disko_efi_size_with_lanzaboote() {
-        let mut orch = QuickeningOrchestrator::default();
+        let mut orch = InoculationOrchestrator::default();
         orch.hardware_profile = Some(serde_json::json!({"device_memory_gb": 16.0}));
 
         // lanzaboote enabled (default) — EFI should be 1G
@@ -910,5 +964,55 @@ mod tests {
         let config = orch.generate_disko_config().unwrap();
         assert!(config.contains("\"512M\""));
         assert!(!config.contains("\"1G\""));
+    }
+
+    // -----------------------------------------------------------------------
+    // Dual-path model tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_inoculation_path_default_is_sovereign() {
+        let orch = InoculationOrchestrator::default();
+        assert_eq!(orch.path, InoculationPath::Inoculate);
+        assert!(!orch.is_attuned());
+    }
+
+    #[test]
+    fn test_attune_and_deattune_roundtrip() {
+        let mut orch = InoculationOrchestrator::default();
+        assert_eq!(orch.path, InoculationPath::Inoculate);
+        assert!(!orch.is_attuned());
+
+        // Upgrade to mesh participation
+        orch.attune();
+        assert_eq!(orch.path, InoculationPath::InoculateAndAttune);
+        assert!(orch.is_attuned());
+
+        // Downgrade back to sovereign-only
+        orch.deattune();
+        assert_eq!(orch.path, InoculationPath::Inoculate);
+        assert!(!orch.is_attuned());
+    }
+
+    #[test]
+    fn test_attune_is_idempotent() {
+        let mut orch = InoculationOrchestrator::default();
+        orch.attune();
+        orch.attune(); // second call should be harmless
+        assert_eq!(orch.path, InoculationPath::InoculateAndAttune);
+
+        orch.deattune();
+        orch.deattune(); // second call should be harmless
+        assert_eq!(orch.path, InoculationPath::Inoculate);
+    }
+
+    #[test]
+    fn test_inoculation_path_serialization() {
+        let paths = vec![InoculationPath::Inoculate, InoculationPath::InoculateAndAttune];
+        for path in paths {
+            let json = serde_json::to_string(&path).unwrap();
+            let back: InoculationPath = serde_json::from_str(&json).unwrap();
+            assert_eq!(path, back);
+        }
     }
 }

@@ -57,10 +57,7 @@ impl CollectiveImmuneState {
     ///
     /// Basis: Woolley et al. (2010) — collective intelligence correlates
     /// with group coherence, not individual ability.
-    pub fn compute_coherence_adjusted_severity(
-        raw_threat_level: f32,
-        collective_phi: f64,
-    ) -> f32 {
+    pub fn compute_coherence_adjusted_severity(raw_threat_level: f32, collective_phi: f64) -> f32 {
         let phi_factor = (2.0 - collective_phi.clamp(0.0, 1.0)) as f32;
         (raw_threat_level * phi_factor).clamp(0.0, 1.0)
     }
@@ -97,9 +94,7 @@ impl CollectiveImmuneState {
             return false;
         }
         let threat_ratio = peers_under_threat as f32 / total_peers as f32;
-        threat_ratio > 0.3
-            || max_threat_severity > 0.7
-            || coherence_adjusted_severity > 0.6
+        threat_ratio > 0.3 || max_threat_severity > 0.7 || coherence_adjusted_severity > 0.6
     }
 
     /// Update the collective immune state from swarm data.

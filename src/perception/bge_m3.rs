@@ -636,9 +636,7 @@ impl BgeM3 {
 
         // Load weights
         let vb = if is_safetensors {
-            // Verify model integrity before unsafe memory-mapped loading
-            super::model_integrity::verify_model_integrity(&weights_path, None)?;
-            unsafe { VarBuilder::from_mmaped_safetensors(&[weights_path], DType::F32, &device)? }
+            super::model_integrity::verified_mmap_safetensors(&[weights_path], DType::F32, &device, None)?
         } else {
             // PyTorch pickle format - try to load using candle's pickle support
             Self::load_pytorch_weights(weights_path, &device)?

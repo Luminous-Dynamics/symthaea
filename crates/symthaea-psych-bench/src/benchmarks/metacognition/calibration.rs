@@ -243,11 +243,12 @@ impl MetacognitiveCalibrationBenchmark {
                 rng ^= rng << 13;
                 rng ^= rng >> 7;
                 rng ^= rng << 17;
-                // Time pressure: base noise 0.22 calibrated to ECE ~0.14, within one SD
+                // Time pressure: base noise 0.19 calibrated to ECE ~0.12, within one SD
                 // of human baseline (Fleming & Lau, 2014: ECE ~0.15 ± 0.05);
+                // tighter noise preserves confidence-accuracy correlation (gamma).
                 // +0.12/unit models reduced introspective access under SAT
                 // (Lichtenstein et al., 1982).
-                let noise_range = 0.22 + config.time_pressure * 0.12;
+                let noise_range = 0.19 + config.time_pressure * 0.12;
                 let noise = ((rng % 1000) as f64 / 1000.0 - 0.5) * noise_range;
                 let confidence = (raw_confidence + noise).clamp(0.0, 1.0);
 

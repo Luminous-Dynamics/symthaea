@@ -1676,7 +1676,9 @@ fn main() -> Result<()> {
                     excitotoxicity_risk: wm.neuromod.neuromod_excitotoxicity_risk,
                     self_assessment_pe_ema: wm.neuromod.self_assessment_pe_ema,
                     self_assessment_coherence_ema: wm.neuromod.self_assessment_coherence_ema,
-                    self_assessment_calibration_fired: wm.neuromod.self_assessment_calibration_fired,
+                    self_assessment_calibration_fired: wm
+                        .neuromod
+                        .self_assessment_calibration_fired,
                 },
                 compass: MoralCompass {
                     moral_score: wm.ethics.moral_score,

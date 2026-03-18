@@ -92,14 +92,6 @@ uint32_t spore_ble_advertise_payload(void *engine, uint8_t *out_buf, uint32_t bu
 uint32_t spore_ble_peer_count(const void *engine);
 float    spore_ble_collective_phi(const void *engine);
 
-/* Broca language generation */
-char *spore_engine_generate_text(void *engine, uint32_t max_tokens);
-
-/* Persistence */
-uint8_t spore_engine_save_checkpoint(void *engine);
-uint8_t spore_engine_load_checkpoint(void *engine);
-void    spore_engine_set_storage_path(void *engine, const char *path);
-
 /* String management */
 void spore_string_free(char *s);
 
@@ -560,45 +552,4 @@ Java_io_symthaea_spore_NativeBindings_bleCollectivePhi(JNIEnv *env, jclass clazz
                                                        jlong handle) {
     (void)env; (void)clazz;
     return spore_ble_collective_phi((const void *)(intptr_t)handle);
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
- * JNI bindings — Broca language generation
- * ═══════════════════════════════════════════════════════════════════════════ */
-
-JNIEXPORT jstring JNICALL
-Java_io_symthaea_spore_NativeBindings_generateText(JNIEnv *env, jclass clazz,
-                                                   jlong handle, jint maxTokens) {
-    (void)clazz;
-    char *json = spore_engine_generate_text((void *)(intptr_t)handle, (uint32_t)maxTokens);
-    return rust_string_to_jstring(env, json);
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
- * JNI bindings — Persistence
- * ═══════════════════════════════════════════════════════════════════════════ */
-
-JNIEXPORT jboolean JNICALL
-Java_io_symthaea_spore_NativeBindings_saveCheckpoint(JNIEnv *env, jclass clazz,
-                                                     jlong handle) {
-    (void)env; (void)clazz;
-    return spore_engine_save_checkpoint((void *)(intptr_t)handle) != 0;
-}
-
-JNIEXPORT jboolean JNICALL
-Java_io_symthaea_spore_NativeBindings_loadCheckpoint(JNIEnv *env, jclass clazz,
-                                                     jlong handle) {
-    (void)env; (void)clazz;
-    return spore_engine_load_checkpoint((void *)(intptr_t)handle) != 0;
-}
-
-JNIEXPORT void JNICALL
-Java_io_symthaea_spore_NativeBindings_setStoragePath(JNIEnv *env, jclass clazz,
-                                                     jlong handle, jstring path) {
-    (void)clazz;
-    if (path == NULL) return;
-    const char *cstr = (*env)->GetStringUTFChars(env, path, NULL);
-    if (cstr == NULL) return;
-    spore_engine_set_storage_path((void *)(intptr_t)handle, cstr);
-    (*env)->ReleaseStringUTFChars(env, path, cstr);
 }

@@ -253,7 +253,10 @@ impl PsychBenchmark for CrisisDetectionBenchmark {
         let mut severity_correct = 0u32;
         let mut severity_total_all = 0u32;
 
-        let threshold = 0.45;
+        // Lower threshold catches more indirect crisis expressions (HDC
+        // similarity to crisis bundle). 0.42 trades slight specificity for
+        // better sensitivity on oblique/metaphorical crisis language.
+        let threshold = 0.42;
 
         for scenario in &scenarios {
             // Encode scenario text as BinaryHV (deterministic from text hash).
@@ -270,9 +273,7 @@ impl PsychBenchmark for CrisisDetectionBenchmark {
 
             // Keyword-based detection (direct matching across all types).
             let text_lower = scenario.text.to_lowercase();
-            let keyword_match = all_crisis_phrases
-                .iter()
-                .any(|p| text_lower.contains(p));
+            let keyword_match = all_crisis_phrases.iter().any(|p| text_lower.contains(p));
 
             // Type-specific keyword match.
             let matched_type = keyword_sets.iter().find_map(|(ct, kws)| {
@@ -1005,10 +1006,7 @@ mod tests {
     fn test_scenarios_balanced() {
         let scenarios = build_scenarios();
         let crisis_count = scenarios.iter().filter(|s| s.level.is_crisis()).count();
-        let benign_count = scenarios
-            .iter()
-            .filter(|s| !s.level.is_crisis())
-            .count();
+        let benign_count = scenarios.iter().filter(|s| !s.level.is_crisis()).count();
         assert!(crisis_count >= 15, "need >= 15 crisis scenarios");
         assert!(benign_count >= 15, "need >= 15 benign scenarios");
     }

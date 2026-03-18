@@ -491,12 +491,14 @@ impl CognitiveLoopService {
 
         // Spawn federated coordinator if enabled.
         let federation_handle = if config.federation_enabled {
-            Some(super::managers::network_service_bridge::spawn_federated_coordinator(
-                crate::swarm::FederatedNetworkConfig::default(),
-                vec![0.0; 64], // initial weights placeholder
-                std::time::Duration::from_millis(config.federation_round_interval_ms),
-                swarm_event_tx.clone(),
-            ))
+            Some(
+                super::managers::network_service_bridge::spawn_federated_coordinator(
+                    crate::swarm::FederatedNetworkConfig::default(),
+                    vec![0.0; 64], // initial weights placeholder
+                    std::time::Duration::from_millis(config.federation_round_interval_ms),
+                    swarm_event_tx.clone(),
+                ),
+            )
         } else {
             None
         };
@@ -901,6 +903,9 @@ impl CognitiveLoopService {
             substrate_manager,
             // physics_integration moved to feature_integ manager
             convergence_cycle: 0,
+            governance_consciousness_lag: std::collections::VecDeque::with_capacity(
+                super::thresholds::GOVERNANCE_CONSCIOUSNESS_LAG_SIZE,
+            ),
             ethics_engine: {
                 let engine_mp = MoralParser::new();
                 let engine_ma = MoralAlgebra::default_dim();
@@ -988,6 +993,14 @@ impl CognitiveLoopService {
             glyph_manager: super::managers::GlyphManager::with_dim(
                 crate::hdc::moral_algebra::MORAL_DIM,
             ),
+            #[cfg(feature = "mesh")]
+            time_manager: super::managers::TimeManager::new(true),
+            #[cfg(feature = "mesh-trust")]
+            trust_manager: super::managers::TrustManager::new(String::new(), true),
+            #[cfg(feature = "social-fabric")]
+            social_fabric_manager: super::managers::SocialFabricManager::new(true),
+            #[cfg(feature = "survival")]
+            survival_manager: super::managers::SurvivalManager::new(true),
             #[cfg(feature = "integrity")]
             integrity_manager: {
                 let mut im = crate::integrity::IntegrityManager::new();
@@ -1047,14 +1060,16 @@ impl CognitiveLoopService {
             },
             motor_rendering: super::motor_rendering_manager::MotorRenderingManager::new(),
             hierarchical_bundler: if enable_hierarchical_bundling {
-                Some(symthaea_core::hdc::hierarchical_bundle::HierarchicalBundler::new(
-                    genesis_phrase_for_bundler.as_ref().map_or(42, |p| {
-                        use std::hash::{Hash, Hasher};
-                        let mut h = std::collections::hash_map::DefaultHasher::new();
-                        p.hash(&mut h);
-                        h.finish()
-                    }),
-                ))
+                Some(
+                    symthaea_core::hdc::hierarchical_bundle::HierarchicalBundler::new(
+                        genesis_phrase_for_bundler.as_ref().map_or(42, |p| {
+                            use std::hash::{Hash, Hasher};
+                            let mut h = std::collections::hash_map::DefaultHasher::new();
+                            p.hash(&mut h);
+                            h.finish()
+                        }),
+                    ),
+                )
             } else {
                 None
             },
@@ -1077,6 +1092,9 @@ impl CognitiveLoopService {
             defense_actions_proposed: 0,
             #[cfg(feature = "safety-agents")]
             defense_actions_approved: 0,
+            #[cfg(feature = "safety-agents")]
+            civic_crisis_detector: super::civic_crisis_detector::CivicCrisisDetector::new(),
+            security_telemetry: crate::swarm::SecurityTelemetry::default(),
             resonant_speech: crate::resonant_speech::ResonantSpeech::new(),
             streaming_inference: if enable_streaming_inference {
                 // Cycle-aligned config: batch=1, max_latency=32ms (~31Hz loop)

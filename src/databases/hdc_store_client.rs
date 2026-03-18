@@ -12,7 +12,8 @@
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::RwLock;
 
 use symthaea_core::hdc::BinaryHV;
 use symthaea_hdc_store::{HdcStore, LshIndex, StoreConfig};
@@ -20,11 +21,13 @@ use symthaea_hdc_store::{HdcStore, LshIndex, StoreConfig};
 use super::{DatabaseError, DatabaseStats, DbResult, MemoryRecord, MemoryType, SearchResult};
 
 /// Hash a string ID to u64 for HdcStore keying.
+///
+/// Uses BLAKE3 (deterministic across Rust versions) truncated to u64.
+/// DefaultHasher uses SipHash which is NOT stable across Rust releases.
 fn id_to_u64(id: &str) -> u64 {
-    use std::hash::{Hash, Hasher};
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    id.hash(&mut hasher);
-    hasher.finish()
+    let hash = blake3::hash(id.as_bytes());
+    let bytes: [u8; 8] = hash.as_bytes()[..8].try_into().unwrap();
+    u64::from_le_bytes(bytes)
 }
 
 /// Metadata sidecar for a stored memory record (everything except the BinaryHV).
@@ -83,17 +86,17 @@ impl RecordMetadata {
 /// Uses mmap'd BinaryHV storage with LSH indexing for fast similarity search.
 pub struct HdcStoreDatabase {
     /// Vector storage (mmap'd, zero-copy reads).
-    store: Mutex<HdcStore>,
+    store: RwLock<HdcStore>,
     /// LSH index for approximate nearest neighbor.
-    lsh: Mutex<LshIndex>,
+    lsh: RwLock<LshIndex>,
     /// Metadata sidecar: id_hash -> metadata.
-    metadata: Mutex<HashMap<u64, RecordMetadata>>,
+    metadata: RwLock<HashMap<u64, RecordMetadata>>,
     /// Reverse map: string ID -> u64 hash.
-    id_map: Mutex<HashMap<String, u64>>,
+    id_map: RwLock<HashMap<String, u64>>,
     /// Store file path.
     path: PathBuf,
     /// Query counter for stats.
-    total_queries: Mutex<u64>,
+    total_queries: AtomicU64,
 }
 
 impl HdcStoreDatabase {
@@ -113,12 +116,12 @@ impl HdcStoreDatabase {
         let lsh = LshIndex::new(10, 32, 42);
 
         Ok(Self {
-            store: Mutex::new(store),
-            lsh: Mutex::new(lsh),
-            metadata: Mutex::new(HashMap::new()),
-            id_map: Mutex::new(HashMap::new()),
+            store: RwLock::new(store),
+            lsh: RwLock::new(lsh),
+            metadata: RwLock::new(HashMap::new()),
+            id_map: RwLock::new(HashMap::new()),
             path: store_path,
-            total_queries: Mutex::new(0),
+            total_queries: AtomicU64::new(0),
         })
     }
 
@@ -147,7 +150,7 @@ impl super::ConsciousnessDatabase for HdcStoreDatabase {
         {
             let mut store = self
                 .store
-                .lock()
+                .write()
                 .map_err(|e| DatabaseError::Other(e.to_string()))?;
             store
                 .append(id_hash, &hv)
@@ -156,21 +159,21 @@ impl super::ConsciousnessDatabase for HdcStoreDatabase {
         {
             let mut lsh = self
                 .lsh
-                .lock()
+                .write()
                 .map_err(|e| DatabaseError::Other(e.to_string()))?;
             lsh.insert(id_hash, &hv);
         }
         {
             let mut metadata = self
                 .metadata
-                .lock()
+                .write()
                 .map_err(|e| DatabaseError::Other(e.to_string()))?;
             metadata.insert(id_hash, meta);
         }
         {
             let mut id_map = self
                 .id_map
-                .lock()
+                .write()
                 .map_err(|e| DatabaseError::Other(e.to_string()))?;
             id_map.insert(id_string, id_hash);
         }
@@ -178,33 +181,23 @@ impl super::ConsciousnessDatabase for HdcStoreDatabase {
         Ok(())
     }
 
-    async fn search_similar(
-        &self,
-        query: &BinaryHV,
-        top_k: usize,
-    ) -> DbResult<Vec<SearchResult>> {
-        {
-            let mut q = self
-                .total_queries
-                .lock()
-                .map_err(|e| DatabaseError::Other(e.to_string()))?;
-            *q += 1;
-        }
+    async fn search_similar(&self, query: &BinaryHV, top_k: usize) -> DbResult<Vec<SearchResult>> {
+        self.total_queries.fetch_add(1, Ordering::Relaxed);
 
         let store = self
             .store
-            .lock()
+            .read()
             .map_err(|e| DatabaseError::Other(e.to_string()))?;
         let metadata = self
             .metadata
-            .lock()
+            .read()
             .map_err(|e| DatabaseError::Other(e.to_string()))?;
 
         // Use LSH candidates first, then verify with actual similarity
         let candidates = {
             let lsh = self
                 .lsh
-                .lock()
+                .read()
                 .map_err(|e| DatabaseError::Other(e.to_string()))?;
             lsh.query_candidates(query)
         };
@@ -255,11 +248,11 @@ impl super::ConsciousnessDatabase for HdcStoreDatabase {
         let id_hash = id_to_u64(id);
         let store = self
             .store
-            .lock()
+            .read()
             .map_err(|e| DatabaseError::Other(e.to_string()))?;
         let metadata = self
             .metadata
-            .lock()
+            .read()
             .map_err(|e| DatabaseError::Other(e.to_string()))?;
 
         match (store.get(id_hash), metadata.get(&id_hash)) {
@@ -275,7 +268,7 @@ impl super::ConsciousnessDatabase for HdcStoreDatabase {
         let hv_copy = {
             let store = self
                 .store
-                .lock()
+                .read()
                 .map_err(|e| DatabaseError::Other(e.to_string()))?;
             store.get(id_hash).copied()
         };
@@ -284,7 +277,7 @@ impl super::ConsciousnessDatabase for HdcStoreDatabase {
         if let Some(hv) = &hv_copy {
             let mut lsh = self
                 .lsh
-                .lock()
+                .write()
                 .map_err(|e| DatabaseError::Other(e.to_string()))?;
             lsh.remove(id_hash, hv);
         }
@@ -293,7 +286,7 @@ impl super::ConsciousnessDatabase for HdcStoreDatabase {
         let deleted = {
             let mut store = self
                 .store
-                .lock()
+                .write()
                 .map_err(|e| DatabaseError::Other(e.to_string()))?;
             store.delete(id_hash)
         };
@@ -301,14 +294,14 @@ impl super::ConsciousnessDatabase for HdcStoreDatabase {
         if deleted {
             let mut metadata = self
                 .metadata
-                .lock()
+                .write()
                 .map_err(|e| DatabaseError::Other(e.to_string()))?;
             metadata.remove(&id_hash);
             drop(metadata);
 
             let mut id_map = self
                 .id_map
-                .lock()
+                .write()
                 .map_err(|e| DatabaseError::Other(e.to_string()))?;
             id_map.remove(id);
         }
@@ -317,7 +310,7 @@ impl super::ConsciousnessDatabase for HdcStoreDatabase {
         {
             let mut store = self
                 .store
-                .lock()
+                .write()
                 .map_err(|e| DatabaseError::Other(e.to_string()))?;
             if store.needs_compaction() {
                 let _ = store.compact();
@@ -330,7 +323,7 @@ impl super::ConsciousnessDatabase for HdcStoreDatabase {
     async fn count(&self) -> DbResult<usize> {
         let store = self
             .store
-            .lock()
+            .read()
             .map_err(|e| DatabaseError::Other(e.to_string()))?;
         Ok(store.live_count() as usize)
     }
@@ -339,7 +332,7 @@ impl super::ConsciousnessDatabase for HdcStoreDatabase {
         // Healthy if we can acquire the lock and read the count
         let _store = self
             .store
-            .lock()
+            .read()
             .map_err(|e| DatabaseError::Other(e.to_string()))?;
         Ok(true)
     }
@@ -347,16 +340,13 @@ impl super::ConsciousnessDatabase for HdcStoreDatabase {
     async fn stats(&self) -> DbResult<DatabaseStats> {
         let store = self
             .store
-            .lock()
+            .read()
             .map_err(|e| DatabaseError::Other(e.to_string()))?;
         let metadata = self
             .metadata
-            .lock()
+            .read()
             .map_err(|e| DatabaseError::Other(e.to_string()))?;
-        let total_queries = *self
-            .total_queries
-            .lock()
-            .map_err(|e| DatabaseError::Other(e.to_string()))?;
+        let total_queries = self.total_queries.load(Ordering::Relaxed);
 
         // Count by memory type
         let mut type_counts: HashMap<String, usize> = HashMap::new();
@@ -373,9 +363,7 @@ impl super::ConsciousnessDatabase for HdcStoreDatabase {
         }
 
         let count = store.live_count() as usize;
-        let file_size = std::fs::metadata(&self.path)
-            .map(|m| m.len())
-            .unwrap_or(0);
+        let file_size = std::fs::metadata(&self.path).map(|m| m.len()).unwrap_or(0);
 
         Ok(DatabaseStats {
             total_records: count,
@@ -408,11 +396,11 @@ impl super::ConsciousnessDatabase for HdcStoreDatabase {
     async fn list_all(&self) -> DbResult<Vec<MemoryRecord>> {
         let store = self
             .store
-            .lock()
+            .read()
             .map_err(|e| DatabaseError::Other(e.to_string()))?;
         let metadata = self
             .metadata
-            .lock()
+            .read()
             .map_err(|e| DatabaseError::Other(e.to_string()))?;
 
         let records: Vec<MemoryRecord> = store
@@ -500,6 +488,25 @@ mod tests {
         let stats = db.stats().await.unwrap();
         assert_eq!(stats.total_records, 5);
         assert!(stats.backend_status.contains("5 live"));
+    }
+
+    #[test]
+    fn blake3_hash_deterministic() {
+        let h1 = id_to_u64("did:mycelix:alice");
+        let h2 = id_to_u64("did:mycelix:alice");
+        assert_eq!(h1, h2, "BLAKE3 hash must be deterministic");
+    }
+
+    #[test]
+    fn blake3_hash_collision_resistance() {
+        let h1 = id_to_u64("did:mycelix:alice");
+        let h2 = id_to_u64("did:mycelix:bob");
+        let h3 = id_to_u64("did:mycelix:alice2");
+        let h4 = id_to_u64("");
+        assert_ne!(h1, h2);
+        assert_ne!(h1, h3);
+        assert_ne!(h2, h3);
+        assert_ne!(h1, h4);
     }
 
     #[tokio::test]

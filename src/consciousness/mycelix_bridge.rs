@@ -377,34 +377,7 @@ pub struct MycelixBridge {
     /// runs separately to avoid serde version conflicts.
     /// Set via `set_governance_dispatch_tx()`.
     #[cfg(feature = "mycelix")]
-    governance_dispatch_tx: Option<std::sync::mpsc::Sender<GovernanceDispatchCommand>>,
-    /// Channel receiver for governance outcome events from the Holochain
-    /// conductor bridge (dispatch loop confirmations and poller tally results).
-    /// Set via `set_governance_outcome_rx()`.
-    #[cfg(feature = "mycelix")]
-    governance_outcome_rx: Option<std::sync::mpsc::Receiver<GovernanceDispatchOutcome>>,
-}
-
-/// Outcome events received from the Holochain conductor bridge.
-///
-/// The conductor's dispatch loop and governance poller produce these after
-/// successful zome calls or completed tallies. The `MycelixBridge` drains
-/// them and converts to `GovernanceEvent`/`GovernanceOutcome` for the
-/// `GovernanceManager`.
-#[cfg(feature = "mycelix")]
-#[derive(Debug, Clone)]
-pub enum GovernanceDispatchOutcome {
-    /// A proposal was successfully submitted on-chain.
-    ProposalSubmitted { proposal_id: String },
-    /// A vote was successfully recorded on-chain.
-    VoteRecorded { proposal_id: String },
-    /// A proposal tally completed (passed or failed).
-    TallyCompleted {
-        proposal_id: String,
-        passed: bool,
-        tally_yes: u32,
-        tally_no: u32,
-    },
+    governance_dispatch_tx: Option<std::sync::mpsc::SyncSender<GovernanceDispatchCommand>>,
 }
 
 /// Commands dispatched to an external Holochain conductor process.
@@ -450,8 +423,6 @@ impl MycelixBridge {
             pending_gov_outcomes: Vec::new(),
             #[cfg(feature = "mycelix")]
             governance_dispatch_tx: None,
-            #[cfg(feature = "mycelix")]
-            governance_outcome_rx: None,
         }
     }
 
@@ -471,8 +442,6 @@ impl MycelixBridge {
             pending_gov_outcomes: Vec::new(),
             #[cfg(feature = "mycelix")]
             governance_dispatch_tx: None,
-            #[cfg(feature = "mycelix")]
-            governance_outcome_rx: None,
         }
     }
 
@@ -486,7 +455,7 @@ impl MycelixBridge {
     /// # Example
     ///
     /// ```ignore
-    /// let (tx, rx) = std::sync::mpsc::channel();
+    /// let (tx, rx) = MycelixBridge::create_governance_channel();
     /// bridge.set_governance_dispatch_tx(tx);
     /// // In a separate async task:
     /// // conductor_bridge::run_dispatch_loop(rx, conductor).await;
@@ -494,48 +463,23 @@ impl MycelixBridge {
     #[cfg(feature = "mycelix")]
     pub fn set_governance_dispatch_tx(
         &mut self,
-        tx: std::sync::mpsc::Sender<GovernanceDispatchCommand>,
+        tx: std::sync::mpsc::SyncSender<GovernanceDispatchCommand>,
     ) {
         self.governance_dispatch_tx = Some(tx);
     }
 
-    /// Set the governance outcome channel receiver.
+    /// Create the bounded dispatch channel pair for Holochain governance connectivity.
     ///
-    /// The sender end should be shared between the dispatch loop (for
-    /// submission/vote confirmations) and the governance poller (for
-    /// completed tally results). Use `create_governance_outcome_channel()`
-    /// for convenience.
-    #[cfg(feature = "mycelix")]
-    pub fn set_governance_outcome_rx(
-        &mut self,
-        rx: std::sync::mpsc::Receiver<GovernanceDispatchOutcome>,
-    ) {
-        self.governance_outcome_rx = Some(rx);
-    }
-
-    /// Create a governance outcome channel pair.
-    ///
-    /// Returns `(Sender, Receiver)`. Pass the sender to the dispatch loop
-    /// and governance poller; pass the receiver to `set_governance_outcome_rx()`.
-    #[cfg(feature = "mycelix")]
-    pub fn create_governance_outcome_channel() -> (
-        std::sync::mpsc::Sender<GovernanceDispatchOutcome>,
-        std::sync::mpsc::Receiver<GovernanceDispatchOutcome>,
-    ) {
-        std::sync::mpsc::channel()
-    }
-
-    /// Create the dispatch channel pair for Holochain governance connectivity.
-    ///
-    /// Returns `(Sender, Receiver)` — caller gives the sender to this bridge
+    /// Returns `(SyncSender, Receiver)` — caller gives the sender to this bridge
     /// via `set_governance_dispatch_tx()` and passes the receiver to the
-    /// conductor bridge process.
+    /// conductor bridge process. Bounded to 64 commands to provide backpressure
+    /// and prevent unbounded memory growth under load.
     #[cfg(feature = "mycelix")]
     pub fn create_governance_channel() -> (
-        std::sync::mpsc::Sender<GovernanceDispatchCommand>,
+        std::sync::mpsc::SyncSender<GovernanceDispatchCommand>,
         std::sync::mpsc::Receiver<GovernanceDispatchCommand>,
     ) {
-        std::sync::mpsc::channel()
+        std::sync::mpsc::sync_channel(64)
     }
 
     // ========================================================================
@@ -591,13 +535,32 @@ impl MycelixBridge {
 
         // 6. Dispatch to Holochain conductor if channel is connected
         #[cfg(feature = "mycelix")]
-        if let Some(ref tx) = self.governance_dispatch_tx {
-            let _ = tx.send(GovernanceDispatchCommand::SubmitProposal {
-                description: proposal.description.clone(),
-                proposer_did: self.agent_id.clone(),
-                consciousness_phi: consciousness.phi,
-                alignment_score: alignment.overall_score,
-            });
+        {
+            let mut disconnected = false;
+            if let Some(ref tx) = self.governance_dispatch_tx {
+                match tx.try_send(GovernanceDispatchCommand::SubmitProposal {
+                    description: proposal.description.clone(),
+                    proposer_did: self.agent_id.clone(),
+                    consciousness_phi: consciousness.phi,
+                    alignment_score: alignment.overall_score,
+                }) {
+                    Ok(()) => {}
+                    Err(std::sync::mpsc::TrySendError::Full(_)) => {
+                        tracing::warn!(
+                            "Governance dispatch channel full (64) — proposal queued locally only"
+                        );
+                    }
+                    Err(std::sync::mpsc::TrySendError::Disconnected(_)) => {
+                        tracing::warn!(
+                            "Governance dispatch channel disconnected — proposal queued locally only"
+                        );
+                        disconnected = true;
+                    }
+                }
+            }
+            if disconnected {
+                self.governance_dispatch_tx = None;
+            }
         }
 
         Ok(SubmissionResult {
@@ -680,14 +643,36 @@ impl MycelixBridge {
 
         // Dispatch to Holochain conductor if channel is connected
         #[cfg(feature = "mycelix")]
-        if let Some(ref tx) = self.governance_dispatch_tx {
-            let approve = matches!(value, VoteValue::Yes | VoteValue::StrongYes);
-            let _ = tx.send(GovernanceDispatchCommand::CastVote {
-                proposal_id: proposal.id.clone(),
-                voter_did: self.agent_id.clone(),
-                approve,
-                rationale: format!("{:?}: score {:.2}", alignment.recommendation, alignment.overall_score),
-            });
+        {
+            let mut disconnected = false;
+            if let Some(ref tx) = self.governance_dispatch_tx {
+                let approve = matches!(value, VoteValue::Yes | VoteValue::StrongYes);
+                match tx.try_send(GovernanceDispatchCommand::CastVote {
+                    proposal_id: proposal.id.clone(),
+                    voter_did: self.agent_id.clone(),
+                    approve,
+                    rationale: format!(
+                        "{:?}: score {:.2}",
+                        alignment.recommendation, alignment.overall_score
+                    ),
+                }) {
+                    Ok(()) => {}
+                    Err(std::sync::mpsc::TrySendError::Full(_)) => {
+                        tracing::warn!(
+                            "Governance dispatch channel full (64) — vote queued locally only"
+                        );
+                    }
+                    Err(std::sync::mpsc::TrySendError::Disconnected(_)) => {
+                        tracing::warn!(
+                            "Governance dispatch channel disconnected — vote queued locally only"
+                        );
+                        disconnected = true;
+                    }
+                }
+            }
+            if disconnected {
+                self.governance_dispatch_tx = None;
+            }
         }
 
         Ok(Vote {
@@ -1017,11 +1002,6 @@ impl MycelixBridge {
     }
 
     /// Drain all pending governance events and outcomes.
-    ///
-    /// Also drains the outcome channel (if set) and converts
-    /// `GovernanceDispatchOutcome` into `GovernanceEvent`/`GovernanceOutcome`
-    /// for the `GovernanceManager`.
-    ///
     /// Returns `(events, outcomes)` — caller injects them into CLS.
     #[cfg(feature = "mycelix")]
     pub fn drain_pending_governance(
@@ -1030,71 +1010,6 @@ impl MycelixBridge {
         Vec<crate::cognitive_loop::managers::governance_manager::GovernanceEvent>,
         Vec<crate::cognitive_loop::managers::governance_manager::GovernanceOutcome>,
     ) {
-        // Drain the outcome channel into pending_gov_events / pending_gov_outcomes
-        if let Some(ref rx) = self.governance_outcome_rx {
-            while let Ok(outcome) = rx.try_recv() {
-                match outcome {
-                    GovernanceDispatchOutcome::ProposalSubmitted { ref proposal_id } => {
-                        self.pending_gov_events.push(
-                            crate::cognitive_loop::managers::governance_manager::GovernanceEvent {
-                                kind: crate::cognitive_loop::managers::governance_manager::GovernanceEventKind::ProposalCreated,
-                                proposal_id: Some(proposal_id.clone()),
-                                timestamp_secs: std::time::SystemTime::now()
-                                    .duration_since(std::time::UNIX_EPOCH)
-                                    .unwrap_or_default()
-                                    .as_secs(),
-                            },
-                        );
-                    }
-                    GovernanceDispatchOutcome::VoteRecorded { ref proposal_id } => {
-                        self.pending_gov_events.push(
-                            crate::cognitive_loop::managers::governance_manager::GovernanceEvent {
-                                kind: crate::cognitive_loop::managers::governance_manager::GovernanceEventKind::VoteCast {
-                                    voter_phi: 0.0,
-                                    vote_value: 0.0,
-                                },
-                                proposal_id: Some(proposal_id.clone()),
-                                timestamp_secs: std::time::SystemTime::now()
-                                    .duration_since(std::time::UNIX_EPOCH)
-                                    .unwrap_or_default()
-                                    .as_secs(),
-                            },
-                        );
-                    }
-                    GovernanceDispatchOutcome::TallyCompleted {
-                        ref proposal_id,
-                        passed,
-                        ..
-                    } => {
-                        // Emit as a GovernanceEvent (TallyCompleted)
-                        self.pending_gov_events.push(
-                            crate::cognitive_loop::managers::governance_manager::GovernanceEvent {
-                                kind: crate::cognitive_loop::managers::governance_manager::GovernanceEventKind::TallyCompleted {
-                                    passed,
-                                    collective_phi: 0.0,
-                                },
-                                proposal_id: Some(proposal_id.clone()),
-                                timestamp_secs: std::time::SystemTime::now()
-                                    .duration_since(std::time::UNIX_EPOCH)
-                                    .unwrap_or_default()
-                                    .as_secs(),
-                            },
-                        );
-                        // Also emit as a GovernanceOutcome for learning feedback
-                        self.pending_gov_outcomes.push(
-                            crate::cognitive_loop::managers::governance_manager::GovernanceOutcome {
-                                proposal_id: proposal_id.clone(),
-                                passed,
-                                my_vote_aligned: None,
-                                value_alignment_score: 0.0,
-                                harmonic_resonance: 0.0,
-                            },
-                        );
-                    }
-                }
-            }
-        }
-
         (
             std::mem::take(&mut self.pending_gov_events),
             std::mem::take(&mut self.pending_gov_outcomes),

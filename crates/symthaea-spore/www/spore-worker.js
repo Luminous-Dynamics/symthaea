@@ -1,10 +1,9 @@
 // Web Worker for Spore consciousness engine.
 // Keeps experiments and heavy cycles off the main thread.
 
-import init, { SporeEngine, QuickeningOrchestrator, probe_hardware } from './pkg/symthaea_spore.js';
+import init, { SporeEngine } from './pkg/symthaea_spore.js';
 
 let engine = null;
-let quickening = null;
 let running = false;
 let cycleInterval = null;
 let currentThought = 'awareness';
@@ -98,67 +97,6 @@ function runBattery() {
   return results;
 }
 
-// Collect hardware info from browser APIs and pass to WASM for Nix config generation
-async function probeHardware() {
-  const hw = {
-    cpuCores: navigator.hardwareConcurrency || 1,
-    deviceMemoryGb: navigator.deviceMemory || 0,
-    gpuVendor: '',
-    gpuArchitecture: '',
-    gpuDescription: '',
-    hasWebgpu: !!navigator.gpu,
-    hasWebusb: !!navigator.usb,
-    storageQuotaBytes: 0,
-    platform: '',
-    isMobile: false,
-    browserName: '',
-  };
-
-  // Platform and browser detection
-  if (navigator.userAgentData) {
-    hw.platform = navigator.userAgentData.platform || '';
-    hw.isMobile = navigator.userAgentData.mobile || false;
-    const brands = navigator.userAgentData.brands || [];
-    const brand = brands.find(b => !b.brand.includes('Not')) || brands[0];
-    if (brand) hw.browserName = brand.brand;
-  } else {
-    hw.platform = navigator.platform || '';
-    hw.isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
-    // Basic UA parsing fallback
-    if (/Firefox/i.test(navigator.userAgent)) hw.browserName = 'Firefox';
-    else if (/Chrome/i.test(navigator.userAgent)) hw.browserName = 'Chrome';
-    else if (/Safari/i.test(navigator.userAgent)) hw.browserName = 'Safari';
-    else hw.browserName = 'Unknown';
-  }
-
-  // Storage quota
-  if (navigator.storage && navigator.storage.estimate) {
-    try {
-      const est = await navigator.storage.estimate();
-      hw.storageQuotaBytes = est.quota || 0;
-    } catch (_) { /* not available */ }
-  }
-
-  // WebGPU adapter info
-  if (navigator.gpu) {
-    try {
-      const adapter = await navigator.gpu.requestAdapter();
-      if (adapter) {
-        // adapterInfo available in recent browsers
-        const info = adapter.info || (adapter.requestAdapterInfo ? await adapter.requestAdapterInfo() : null);
-        if (info) {
-          hw.gpuVendor = info.vendor || '';
-          hw.gpuArchitecture = info.architecture || '';
-          hw.gpuDescription = info.description || info.device || '';
-        }
-      }
-    } catch (_) { /* WebGPU available but adapter request failed */ }
-  }
-
-  // Pass collected data to WASM for processing
-  return probe_hardware(hw);
-}
-
 // Multi-substrate comparison: run N cycles on each substrate, return time series
 function multiSubstrateComparison(substrates, cycles) {
   const results = {};
@@ -240,13 +178,15 @@ self.onmessage = async function(e) {
       case 'report':
         if (engine) result = engine.consciousness_report();
         break;
-      // Sovereign Quickening: Hardware probe
-      case 'probeHardware':
-        result = await probeHardware();
-        break;
       // Phase 1: Language generation (Broca)
       case 'generateText':
         if (engine) result = engine.generate_text(params.maxTokens || 32);
+        break;
+      case 'generateTextWithInput':
+        if (engine) result = engine.generate_text_with_input(params.input || '', params.maxTokens || 64);
+        break;
+      case 'selectGlyph':
+        if (engine) result = engine.select_glyph(params.input || '');
         break;
       // Phase 2: Dream engine
       case 'dreamCycle':
@@ -278,19 +218,6 @@ self.onmessage = async function(e) {
         break;
       case 'fepCycle':
         if (engine) result = engine.fep_cycle();
-        break;
-      // Phase 6: Sovereign Quickening
-      case 'quickeningState':
-        if (!quickening) quickening = new QuickeningOrchestrator();
-        result = quickening.quickening_state();
-        break;
-      case 'quickeningAdvance':
-        if (!quickening) quickening = new QuickeningOrchestrator();
-        result = quickening.quickening_advance(params.phaseData || params);
-        break;
-      case 'quickeningNarrate':
-        if (!quickening) quickening = new QuickeningOrchestrator();
-        result = quickening.quickening_narrate(params.phase, params.context || null);
         break;
       default:
         throw new Error(`Unknown action: ${action}`);

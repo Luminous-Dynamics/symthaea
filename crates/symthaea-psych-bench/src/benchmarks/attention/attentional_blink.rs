@@ -65,9 +65,14 @@ impl AttentionalBlinkBenchmark {
         );
 
         // Attention depletion model parameters
-        let attention_capacity: f64 = 1.0;
+        // Working memory capacity modulates attention pool — higher WM capacity
+        // supports greater attentional resource availability (Vogel et al., 2005).
+        let wm_bonus = (config.working_memory_capacity as f64 - 4.0) * 0.04;
+        let attention_capacity: f64 = (1.0 + wm_bonus).clamp(0.7, 1.3);
         let t1_cost: f64 = 0.75; // T1 processing depletes attention
         let recovery_rate: f64 = 0.12; // Per-lag recovery
+        // Encoding noise degrades target discrimination
+        let enc_noise = config.effective_noise() as f32;
 
         // Time pressure: base 0.30 matches ~50% T2|T1 accuracy at lag-2 (Raymond et al., 1992 AB);
         // +0.15/unit degrades target discrimination, modeling attention-gate narrowing under SAT (Heitz, 2014).
@@ -102,8 +107,23 @@ impl AttentionalBlinkBenchmark {
                     ContinuousHV::weighted_bundle(&[&target_category, &t1_noise], &[0.80, 0.20]);
 
                 // Detect T1 (similarity to target category)
-                let t1_sim = t1.similarity(&target_category) as f64;
-                let t1_dsim = t1.similarity(&distractor_category) as f64;
+                // Encoding noise adds per-comparison noise (individual perceptual noise)
+                let t1_noise_a = {
+                    let ns = rng.wrapping_add(8000 + lag as u64 * 3);
+                    ((ns.wrapping_mul(0x9E3779B97F4A7C15) >> 33) as f32
+                        / (1u64 << 31) as f32)
+                        - 0.5
+                };
+                let t1_noise_b = {
+                    let ns = rng.wrapping_add(8001 + lag as u64 * 3);
+                    ((ns.wrapping_mul(0x9E3779B97F4A7C15) >> 33) as f32
+                        / (1u64 << 31) as f32)
+                        - 0.5
+                };
+                let t1_sim =
+                    (t1.similarity(&target_category) + t1_noise_a * enc_noise * 0.12) as f64;
+                let t1_dsim =
+                    (t1.similarity(&distractor_category) + t1_noise_b * enc_noise * 0.12) as f64;
 
                 let t1_ev = t1_sim / temperature;
                 let t1_dev = t1_dsim / temperature;
@@ -166,8 +186,22 @@ impl AttentionalBlinkBenchmark {
                     ],
                 );
 
-                let t2_sim = t2.similarity(&target_category) as f64;
-                let t2_dsim = t2.similarity(&distractor_category) as f64;
+                let t2_noise_a = {
+                    let ns = rng.wrapping_add(9000 + lag as u64 * 5);
+                    ((ns.wrapping_mul(0x9E3779B97F4A7C15) >> 33) as f32
+                        / (1u64 << 31) as f32)
+                        - 0.5
+                };
+                let t2_noise_b = {
+                    let ns = rng.wrapping_add(9001 + lag as u64 * 5);
+                    ((ns.wrapping_mul(0x9E3779B97F4A7C15) >> 33) as f32
+                        / (1u64 << 31) as f32)
+                        - 0.5
+                };
+                let t2_sim = (t2.similarity(&target_category)
+                    + t2_noise_a * enc_noise * 0.12) as f64;
+                let t2_dsim = (t2.similarity(&distractor_category)
+                    + t2_noise_b * enc_noise * 0.12) as f64;
 
                 let t2_ev = t2_sim / temperature;
                 let t2_dev = t2_dsim / temperature;

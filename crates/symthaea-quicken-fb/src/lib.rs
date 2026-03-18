@@ -9,7 +9,6 @@
 /// - `mycelium` — L-system branch growth, Bresenham rendering, node pulsing
 /// - `progress` — Named pipe reader for installer progress events
 /// - `color` — Solarpunk RGBA palette with interpolation and compositing
-
 pub mod color;
 pub mod framebuffer;
 pub mod mycelium;

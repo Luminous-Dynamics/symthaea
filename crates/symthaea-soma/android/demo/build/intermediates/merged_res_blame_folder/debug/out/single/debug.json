@@ -1,0 +1,62 @@
+[
+    {
+        "merged": "io.symthaea.spore.demo-merged_res-35:/mipmap-hdpi_ic_launcher_round.png.flat",
+        "source": "io.symthaea.spore.demo-main-37:/mipmap-hdpi/ic_launcher_round.png"
+    },
+    {
+        "merged": "io.symthaea.spore.demo-merged_res-35:/drawable_circle_indicator.xml.flat",
+        "source": "io.symthaea.spore.demo-main-37:/drawable/circle_indicator.xml"
+    },
+    {
+        "merged": "io.symthaea.spore.demo-merged_res-35:/mipmap-xxhdpi_ic_launcher.png.flat",
+        "source": "io.symthaea.spore.demo-main-37:/mipmap-xxhdpi/ic_launcher.png"
+    },
+    {
+        "merged": "io.symthaea.spore.demo-merged_res-35:/mipmap-xhdpi_ic_launcher.png.flat",
+        "source": "io.symthaea.spore.demo-main-37:/mipmap-xhdpi/ic_launcher.png"
+    },
+    {
+        "merged": "io.symthaea.spore.demo-merged_res-35:/mipmap-xxxhdpi_ic_launcher.png.flat",
+        "source": "io.symthaea.spore.demo-main-37:/mipmap-xxxhdpi/ic_launcher.png"
+    },
+    {
+        "merged": "io.symthaea.spore.demo-merged_res-35:/drawable_ic_spore_background.xml.flat",
+        "source": "io.symthaea.spore.demo-main-37:/drawable/ic_spore_background.xml"
+    },
+    {
+        "merged": "io.symthaea.spore.demo-merged_res-35:/layout_activity_main.xml.flat",
+        "source": "io.symthaea.spore.demo-main-37:/layout/activity_main.xml"
+    },
+    {
+        "merged": "io.symthaea.spore.demo-merged_res-35:/mipmap-mdpi_ic_launcher.png.flat",
+        "source": "io.symthaea.spore.demo-main-37:/mipmap-mdpi/ic_launcher.png"
+    },
+    {
+        "merged": "io.symthaea.spore.demo-merged_res-35:/mipmap-xhdpi_ic_launcher_round.png.flat",
+        "source": "io.symthaea.spore.demo-main-37:/mipmap-xhdpi/ic_launcher_round.png"
+    },
+    {
+        "merged": "io.symthaea.spore.demo-merged_res-35:/mipmap-xxhdpi_ic_launcher_round.png.flat",
+        "source": "io.symthaea.spore.demo-main-37:/mipmap-xxhdpi/ic_launcher_round.png"
+    },
+    {
+        "merged": "io.symthaea.spore.demo-merged_res-35:/mipmap-xxxhdpi_ic_launcher_round.png.flat",
+        "source": "io.symthaea.spore.demo-main-37:/mipmap-xxxhdpi/ic_launcher_round.png"
+    },
+    {
+        "merged": "io.symthaea.spore.demo-merged_res-35:/drawable_ic_spore_foreground.xml.flat",
+        "source": "io.symthaea.spore.demo-main-37:/drawable/ic_spore_foreground.xml"
+    },
+    {
+        "merged": "io.symthaea.spore.demo-merged_res-35:/mipmap-mdpi_ic_launcher_round.png.flat",
+        "source": "io.symthaea.spore.demo-main-37:/mipmap-mdpi/ic_launcher_round.png"
+    },
+    {
+        "merged": "io.symthaea.spore.demo-merged_res-35:/drawable_consciousness_circle.xml.flat",
+        "source": "io.symthaea.spore.demo-main-37:/drawable/consciousness_circle.xml"
+    },
+    {
+        "merged": "io.symthaea.spore.demo-merged_res-35:/mipmap-hdpi_ic_launcher.png.flat",
+        "source": "io.symthaea.spore.demo-main-37:/mipmap-hdpi/ic_launcher.png"
+    }
+]

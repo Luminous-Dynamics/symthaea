@@ -67,6 +67,14 @@ mod lora_fragment;
 mod mesh_receiver;
 pub mod sensor;
 
+// Sovereign Inoculation modules
+pub mod mesh_time;
+pub mod time_beacon;
+pub mod name_packet;
+pub mod content_packet;
+pub mod sensor_iot;
+pub mod sensor_forecast;
+
 pub use dual_layer::{
     BiLoopbackTransport, DualLayerMesh, LoopbackTransport, MeshRoute, MeshTransport,
 };
@@ -154,6 +162,22 @@ pub struct MeshStats {
     pub encrypted_packets_sent: u64,
     /// Packets received and successfully decrypted.
     pub encrypted_packets_received: u64,
+    /// Time beacon packets emitted (Sovereign Clock).
+    pub time_beacons_sent: u64,
+    /// Time beacon packets received (Sovereign Clock).
+    pub time_beacons_received: u64,
+    /// Name query packets emitted (Sovereign Name).
+    pub name_queries_sent: u64,
+    /// Name query packets received (Sovereign Name).
+    pub name_queries_received: u64,
+    /// Name response packets emitted (Sovereign Name).
+    pub name_responses_sent: u64,
+    /// Name response packets received (Sovereign Name).
+    pub name_responses_received: u64,
+    /// Content announcement packets emitted (Sovereign Social).
+    pub content_announces_sent: u64,
+    /// Content announcement packets received (Sovereign Social).
+    pub content_announces_received: u64,
 }
 
 impl MeshStats {
@@ -164,6 +188,10 @@ impl MeshStats {
             + self.affective_sent
             + self.gradients_sent
             + self.moral_topology_sent
+            + self.time_beacons_sent
+            + self.name_queries_sent
+            + self.name_responses_sent
+            + self.content_announces_sent
     }
 
     /// Total packets received across all types.
@@ -173,6 +201,10 @@ impl MeshStats {
             + self.affective_received
             + self.gradients_received
             + self.moral_topology_received
+            + self.time_beacons_received
+            + self.name_queries_received
+            + self.name_responses_received
+            + self.content_announces_received
     }
 
     /// Returns the compression ratio (0.0–1.0, lower is better).
@@ -295,6 +327,14 @@ pub enum PayloadType {
     Gradient = 3,
     /// Moral topology summary for cross-agent coherence.
     MoralTopology = 4,
+    /// Time beacon for mesh-time consensus (Sovereign Clock).
+    TimeBeacon = 5,
+    /// Name query for mesh name resolution (Sovereign Name).
+    NameQuery = 6,
+    /// Name response for mesh name resolution (Sovereign Name).
+    NameResponse = 7,
+    /// Content announcement for resonance-based discovery (Sovereign Social).
+    ContentAnnounce = 8,
 }
 
 impl PayloadType {
@@ -306,18 +346,26 @@ impl PayloadType {
             2 => Self::Heartbeat,
             3 => Self::Gradient,
             4 => Self::MoralTopology,
+            5 => Self::TimeBeacon,
+            6 => Self::NameQuery,
+            7 => Self::NameResponse,
+            8 => Self::ContentAnnounce,
             _ => Self::Heartbeat, // unknown types become heartbeats (safe no-op)
         }
     }
 
     /// Backpressure priority: higher values are retained first when inbox is full.
-    /// Heartbeat(3) > Wisdom(2) > MoralTopology/Affective(1) > Gradient(0).
+    /// Heartbeat(3) > Wisdom(2) > TimeBeacon(2) > MoralTopology/Affective/Name/Content(1) > Gradient(0).
     pub fn priority(&self) -> u8 {
         match self {
             Self::Heartbeat => 3,
             Self::WisdomVector => 2,
+            Self::TimeBeacon => 2,
             Self::Affective => 1,
             Self::MoralTopology => 1,
+            Self::NameQuery => 1,
+            Self::NameResponse => 1,
+            Self::ContentAnnounce => 1,
             Self::Gradient => 0,
         }
     }
@@ -733,12 +781,7 @@ impl WisdomPacket {
     /// Verify an HDC-MAC with noise tolerance (for lossy channels like LoRa/BLE).
     ///
     /// Recommended threshold: 0.95 (false positive rate ≈ 2^{-4700}).
-    pub fn verify_hdc_mac_noisy(
-        &self,
-        key: &BinaryHV,
-        mac: &BinaryHV,
-        threshold: f32,
-    ) -> bool {
+    pub fn verify_hdc_mac_noisy(&self, key: &BinaryHV, mac: &BinaryHV, threshold: f32) -> bool {
         symthaea_core::hdc::hdc_crypto::HdcMac::verify_noisy(&self.wisdom, key, mac, threshold)
     }
 }
@@ -1107,11 +1150,11 @@ pub fn try_encrypt_packet_typed(
     let cipher = ChaCha20Poly1305::new(key.into());
     let nonce_bytes = build_nonce(source_id, payload_type, epoch, sequence);
     let nonce = Nonce::from(nonce_bytes);
-    let ciphertext = cipher
-        .encrypt(&nonce, envelope)
-        .map_err(|e| crate::swarm::SwarmError::EncryptionFailed {
+    let ciphertext = cipher.encrypt(&nonce, envelope).map_err(|e| {
+        crate::swarm::SwarmError::EncryptionFailed {
             reason: format!("ChaCha20-Poly1305: {e}"),
-        })?;
+        }
+    })?;
     let mut out = Vec::with_capacity(12 + ciphertext.len());
     out.extend_from_slice(&nonce_bytes);
     out.extend_from_slice(&ciphertext);
@@ -1238,6 +1281,11 @@ pub struct RotatingKeyPair {
     /// across node restarts under the same key material (P0 security fix).
     #[zeroize(skip)]
     epoch: u8,
+    /// Optional sensor context key overlay. When set, the effective encryption
+    /// key is `current XOR context_overlay` — binding mesh encryption to the
+    /// physical environment (location, light, motion, altitude).
+    /// Both peers must independently derive the same context key.
+    context_overlay: Option<[u8; 32]>,
 }
 
 #[cfg(feature = "mesh-encryption")]
@@ -1253,6 +1301,7 @@ impl RotatingKeyPair {
             key_version: 0,
             previous_version: 0,
             epoch: rand::Rng::gen(&mut rand::thread_rng()),
+            context_overlay: None,
         }
     }
 
@@ -1294,13 +1343,47 @@ impl RotatingKeyPair {
     }
 
     /// Encrypt with the current key using the stored random epoch.
+    ///
+    /// If a sensor context overlay is set, the effective key is
+    /// `current XOR context_overlay` — physically binding the encryption.
     pub fn encrypt(&self, envelope: &[u8], source_id: &[u8; 8], sequence: u32) -> Vec<u8> {
-        encrypt_packet(envelope, &self.current, source_id, self.epoch, sequence)
+        let key = self.effective_key();
+        encrypt_packet(envelope, &key, source_id, self.epoch, sequence)
     }
 
     /// Get the epoch byte (useful for logging/telemetry).
     pub fn epoch(&self) -> u8 {
         self.epoch
+    }
+
+    /// Set the sensor context key overlay.
+    ///
+    /// When set, all encryption/decryption uses `base_key XOR context_overlay`
+    /// as the effective key. Both peers must independently derive the same
+    /// context key from their sensor readings (same location, similar conditions).
+    ///
+    /// Call with `None` to disable context binding.
+    pub fn set_context_overlay(&mut self, overlay: Option<[u8; 32]>) {
+        self.context_overlay = overlay;
+    }
+
+    /// Whether a sensor context overlay is active.
+    pub fn has_context_overlay(&self) -> bool {
+        self.context_overlay.is_some()
+    }
+
+    /// Compute the effective encryption key (base XOR context overlay).
+    fn effective_key(&self) -> [u8; 32] {
+        match &self.context_overlay {
+            Some(overlay) => {
+                let mut key = self.current;
+                for (k, o) in key.iter_mut().zip(overlay.iter()) {
+                    *k ^= o;
+                }
+                key
+            }
+            None => self.current,
+        }
     }
 
     /// Encrypt with the current key, using typed nonce for cross-type safety.
@@ -3135,11 +3218,71 @@ mod tests {
         let ct_a = encrypt_packet(plaintext, &key, &source, 0x11, 1);
         let ct_b = encrypt_packet(plaintext, &key, &source, 0x22, 1);
 
-        assert_ne!(ct_a, ct_b, "Different epochs must produce different ciphertexts");
+        assert_ne!(
+            ct_a, ct_b,
+            "Different epochs must produce different ciphertexts"
+        );
 
         // Both must decrypt successfully
         assert_eq!(decrypt_packet(&ct_a, &key).unwrap(), plaintext);
         assert_eq!(decrypt_packet(&ct_b, &key).unwrap(), plaintext);
+    }
+
+    #[cfg(feature = "mesh-encryption")]
+    #[test]
+    fn test_context_overlay_changes_ciphertext() {
+        let base_key = [0x42u8; 32];
+        let source = [0xAA; 8];
+        let plaintext = b"sensor-bound encryption test";
+
+        // Encrypt without overlay
+        let mut pair = RotatingKeyPair::new(base_key);
+        let ct_plain = pair.encrypt(plaintext, &source, 1);
+
+        // Encrypt with overlay
+        let overlay = [0xFFu8; 32];
+        pair.set_context_overlay(Some(overlay));
+        let ct_overlay = pair.encrypt(plaintext, &source, 1);
+
+        // Ciphertexts must differ (different effective keys)
+        assert_ne!(
+            ct_plain, ct_overlay,
+            "Context overlay must change the ciphertext"
+        );
+
+        // Both must decrypt with their respective effective keys
+        assert_eq!(decrypt_packet(&ct_plain, &base_key).unwrap(), plaintext);
+
+        // Overlay key: base XOR overlay
+        let mut effective = base_key;
+        for (k, o) in effective.iter_mut().zip(overlay.iter()) {
+            *k ^= o;
+        }
+        assert_eq!(decrypt_packet(&ct_overlay, &effective).unwrap(), plaintext);
+    }
+
+    #[cfg(feature = "mesh-encryption")]
+    #[test]
+    fn test_context_overlay_symmetric() {
+        // Two peers with same base key + same overlay derive same effective key
+        let base_key = [0x42u8; 32];
+        let overlay = [0xABu8; 32];
+        let source = [0xAA; 8];
+        let plaintext = b"peer-to-peer context binding";
+
+        let mut sender = RotatingKeyPair::new(base_key);
+        sender.set_context_overlay(Some(overlay));
+
+        let mut receiver = RotatingKeyPair::new(base_key);
+        receiver.set_context_overlay(Some(overlay));
+
+        // Sender encrypts
+        let ct = sender.encrypt(plaintext, &source, 1);
+
+        // Receiver decrypts with same effective key
+        let effective = receiver.effective_key();
+        let decrypted = decrypt_packet(&ct, &effective).expect("Same overlay should decrypt");
+        assert_eq!(decrypted, plaintext);
     }
 
     #[cfg(feature = "mesh-encryption")]

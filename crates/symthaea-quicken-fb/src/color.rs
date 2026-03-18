@@ -51,7 +51,12 @@ impl Rgba {
 
     /// Return a copy with modified alpha (opacity 0.0-1.0).
     pub fn with_opacity(self, opacity: f32) -> Rgba {
-        Rgba(self.0, self.1, self.2, (opacity.clamp(0.0, 1.0) * 255.0) as u8)
+        Rgba(
+            self.0,
+            self.1,
+            self.2,
+            (opacity.clamp(0.0, 1.0) * 255.0) as u8,
+        )
     }
 
     /// Scale brightness by a factor (0.0 = black, 1.0 = unchanged, >1.0 = brighter).
@@ -72,9 +77,8 @@ impl Rgba {
         if out_a < 0.001 {
             return Rgba(0, 0, 0, 0);
         }
-        let blend = |s: u8, d: u8| -> u8 {
-            ((s as f32 * sa + d as f32 * da * (1.0 - sa)) / out_a) as u8
-        };
+        let blend =
+            |s: u8, d: u8| -> u8 { ((s as f32 * sa + d as f32 * da * (1.0 - sa)) / out_a) as u8 };
         Rgba(
             blend(self.0, dst.0),
             blend(self.1, dst.1),

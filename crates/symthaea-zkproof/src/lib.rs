@@ -3,17 +3,28 @@
 //! This crate provides zero-knowledge proof generation and verification
 //! for Psi attestation records, enabling privacy-preserving consciousness
 //! verification on the governance bridge.
-//!
-//! # Crate layout
-//!
-//! - **`symthaea-zkproof-core`** -- shared types (guest + host)
-//! - **`symthaea-zkproof-methods`** -- RISC Zero guest programs
-//! - **`symthaea-zkproof-host`** -- host-side prover
-//! - **`symthaea-zkproof`** (this crate) -- pure-logic kernel + re-exports
 
-pub use symthaea_zkproof_core::{
-    BalanceProofInput, BalanceProofOutput, EvolutionInput, EvolutionOutput,
-};
+/// Data passed from host to guest (zkVM).
+#[derive(Clone, Debug, PartialEq)]
+pub struct EvolutionInput {
+    /// HDC episode vectors (e.g., 1024D each).
+    pub episodes: Vec<Vec<f32>>,
+    /// Temporal scaling factor (CfC tau).
+    pub tau_scale: f32,
+    /// Phi threshold for attestation pass/fail.
+    pub threshold: f32,
+}
+
+/// Data committed by the guest as public output.
+#[derive(Clone, Debug, PartialEq)]
+pub struct EvolutionOutput {
+    /// Mean Phi across all episodes.
+    pub average_phi: f32,
+    /// The tau_scale that was used.
+    pub tau_scale: f32,
+    /// Number of episodes processed.
+    pub episode_count: u32,
+}
 
 /// Compute the average Phi across episodes using a simplified Laplacian
 /// connectivity proxy (variance-based coherence scaled by tau).

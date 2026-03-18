@@ -41,6 +41,19 @@ pub enum RegulationStrategy {
 }
 
 impl RegulationStrategy {
+    /// Static string for telemetry (avoids `format!("{:?}")`).
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::CognitiveReappraisal => "CognitiveReappraisal",
+            Self::DistressTolerance => "DistressTolerance",
+            Self::Grounding => "Grounding",
+            Self::Defusion => "Defusion",
+            Self::Validation => "Validation",
+            Self::Containment => "Containment",
+            Self::ExposurePrep => "ExposurePrep",
+        }
+    }
+
     /// All strategies for iteration.
     pub const ALL: [Self; 7] = [
         Self::CognitiveReappraisal,
@@ -51,6 +64,20 @@ impl RegulationStrategy {
         Self::Containment,
         Self::ExposurePrep,
     ];
+
+    /// Broca therapeutic intent code for this strategy.
+    /// 0=validate, 1=reflect, 2=reframe, 3=explore, 4=psychoeducate, 6=contain.
+    pub fn intent_code(&self) -> f32 {
+        match self {
+            Self::Validation => 0.0,
+            Self::Defusion => 1.0,
+            Self::CognitiveReappraisal => 2.0,
+            Self::ExposurePrep => 3.0,
+            Self::DistressTolerance => 4.0,
+            Self::Grounding => 4.0,
+            Self::Containment => 6.0,
+        }
+    }
 
     /// Minimum alliance required to use this strategy.
     pub fn min_alliance(&self) -> f32 {

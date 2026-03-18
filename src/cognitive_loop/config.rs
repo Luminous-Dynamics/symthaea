@@ -651,6 +651,17 @@ pub struct CognitiveLoopConfig {
     #[cfg(feature = "foveation")]
     pub foveation_max_dispatches: u8,
 
+    // ── Sovereign Inoculation ──────────────────────────────────────────
+    /// Enable sovereign mesh-time consensus (requires `mesh` feature).
+    #[serde(default)]
+    pub enable_mesh_time: bool,
+    /// Enable sovereign name resolution (requires `mesh` feature).
+    #[serde(default)]
+    pub enable_name_resolution: bool,
+    /// Name cache size for mesh name resolver. Default: 256.
+    #[serde(default = "default_name_cache_size")]
+    pub name_cache_size: usize,
+
     // ── Chronobiology ──────────────────────────────────────────────────
     /// Timezone offset in hours from UTC (e.g., -5.0 for CDT, +9.0 for JST).
     /// Biorhythm stores time in UTC internally; this offset is applied via
@@ -708,7 +719,6 @@ pub struct CognitiveLoopConfig {
     /// Aggregation interval in cycles.
     #[cfg(feature = "fhe-wisdom")]
     pub fhe_aggregation_interval: usize,
-
 }
 
 impl Default for CognitiveLoopConfig {
@@ -835,6 +845,9 @@ impl Default for CognitiveLoopConfig {
             #[cfg(feature = "foveation")]
             foveation_max_dispatches: 3,
             timezone_offset_hours: 0.0,
+            enable_mesh_time: false,
+            enable_name_resolution: false,
+            name_cache_size: 256,
             enable_knowledge_engine: false,
             knowledge_graph_capacity: 10_000,
             knowledge_causal_capacity: 5_000,
@@ -866,6 +879,9 @@ fn default_knowledge_search_top_k() -> usize {
 }
 fn default_knowledge_ontology_max() -> usize {
     500
+}
+fn default_name_cache_size() -> usize {
+    256
 }
 
 impl CognitiveLoopConfig {

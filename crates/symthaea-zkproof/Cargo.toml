@@ -2,12 +2,7 @@
 name = "symthaea-zkproof"
 version = "0.1.0"
 edition = "2021"
-description = "Zero-knowledge proof framework for Symthaea consciousness attestation"
+license = "MIT"
+description = "ZK proof generation for Symthaea consciousness attestations"
 
 [dependencies]
-serde = { version = "1.0", features = ["derive"] }
-symthaea-zkproof-core = { path = "core" }
-
-[dev-dependencies]
-# Host-side proving (heavy dependency, test-only for now)
-# symthaea-zkproof-host = { path = "host" }

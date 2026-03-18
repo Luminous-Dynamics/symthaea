@@ -11,7 +11,6 @@
 /// Signal handling:
 ///   SIGTERM — clean exit (restore CRTC, unmap, fade to black)
 ///   SIGINT  — same as SIGTERM
-
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
@@ -241,7 +240,10 @@ fn print_usage() {
 fn install_signal_handlers() {
     // Use a simple atomic flag approach — safe for signal handlers
     unsafe {
-        nix::libc::signal(nix::libc::SIGTERM, signal_handler as nix::libc::sighandler_t);
+        nix::libc::signal(
+            nix::libc::SIGTERM,
+            signal_handler as nix::libc::sighandler_t,
+        );
         nix::libc::signal(nix::libc::SIGINT, signal_handler as nix::libc::sighandler_t);
     }
 }

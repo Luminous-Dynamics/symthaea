@@ -68,7 +68,7 @@ pub struct BrocaConfig {
 }
 
 fn default_repetition_penalty() -> f32 {
-    2.0
+    1.5
 }
 
 impl Default for BrocaConfig {
@@ -294,11 +294,10 @@ impl BrocaGenerator {
             self.controller.reset();
         }
 
-        // 4. Re-seed sampling RNG and reset coherence stats for this generation
+        // 4. Re-seed sampling RNG for reproducibility
         if let Some(seed) = self.config.sampling_seed {
             self.sampling_rng = Some(StdRng::seed_from_u64(seed));
         }
-        self.coherence_feedback.reset_stats();
 
         // 5. Autoregressive generation loop
         let mut tokens = Vec::new();
@@ -326,11 +325,6 @@ impl BrocaGenerator {
             // Apply frequency-scaled repetition penalty
             if rep_penalty > 1.0 + 1e-6 {
                 apply_repetition_penalty(&mut logits, &tokens, rep_penalty);
-            }
-
-            // No-repeat bigram: block any token that would complete a repeated 2-gram
-            if !tokens.is_empty() {
-                block_repeated_ngrams(&mut logits, &tokens, 2);
             }
 
             // Apply gating and compute audit trail values
@@ -478,21 +472,10 @@ impl BrocaGenerator {
             // Skip special tokens in output
             if !self.tokenizer.is_special(next_token) {
                 let token_str = self.tokenizer.token_str(next_token);
-                let is_byte_token = token_str.starts_with("<0x")
-                    && token_str.ends_with('>')
-                    && token_str.len() == 6;
-
-                // Insert space between word tokens when the vocab has no leading spaces.
-                // A "word token" is any non-byte, non-punctuation, non-affix token.
-                if !text_bytes.is_empty() && !is_byte_token && needs_space_before(token_str) {
-                    let last = *text_bytes.last().unwrap();
-                    if last != b' ' && last != b'\n' && last != b'-' {
-                        text_bytes.push(b' ');
-                    }
-                }
-
                 // Decode byte tokens (<0xHH>) to raw bytes for proper UTF-8
-                if is_byte_token {
+                if token_str.starts_with("<0x") && token_str.ends_with('>')
+                    && token_str.len() == 6
+                {
                     if let Ok(byte) = u8::from_str_radix(&token_str[3..5], 16) {
                         text_bytes.push(byte);
                     } else {
@@ -572,22 +555,6 @@ impl BrocaGenerator {
     pub fn config(&self) -> &BrocaConfig {
         &self.config
     }
-
-    /// Get mutable reference to the config.
-    pub fn config_mut(&mut self) -> &mut BrocaConfig {
-        &mut self.config
-    }
-
-    /// Rebuild gating subsystems from the current config.
-    /// Call after modifying config to apply changes.
-    pub fn rebuild_gating(&mut self) {
-        self.coherence_feedback = CoherenceFeedback::with_veto_threshold(
-            self.config.gating.coherence_drift_threshold,
-            self.config.gating.veto_threshold,
-        );
-        self.epistemic_gate = EpistemicGate::new(&self.tokenizer, &self.config.gating);
-        self.emotional_modulator = EmotionalModulator::new(&self.tokenizer, &self.config.gating);
-    }
 }
 
 /// Apply frequency-scaled repetition penalty to logits for tokens already generated.
@@ -614,47 +581,6 @@ fn apply_repetition_penalty(logits: &mut [f32], generated: &[u32], penalty: f32)
             }
         }
     }
-}
-
-/// Block tokens that would complete a repeated n-gram.
-/// For each n-gram of length `n` ending at the current position, if appending
-/// a candidate token would create an n-gram already seen, set its logit to -inf.
-fn block_repeated_ngrams(logits: &mut [f32], generated: &[u32], n: usize) {
-    if generated.len() < n - 1 {
-        return;
-    }
-    // Collect all (n-1)-gram → next-token pairs from history
-    let mut seen = std::collections::HashSet::new();
-    for window in generated.windows(n) {
-        let prefix = &window[..n - 1];
-        let next = window[n - 1];
-        seen.insert((prefix.to_vec(), next));
-    }
-    // Current (n-1)-gram suffix
-    let suffix = &generated[generated.len() - (n - 1)..];
-    for token_id in 0..logits.len() {
-        if seen.contains(&(suffix.to_vec(), token_id as u32)) {
-            logits[token_id] = f32::NEG_INFINITY;
-        }
-    }
-}
-
-/// Whether a token needs a space inserted before it during post-processing.
-/// Returns true for word tokens (alphabetic start, no leading punctuation/affix marker).
-fn needs_space_before(token_str: &str) -> bool {
-    let first = match token_str.bytes().next() {
-        Some(b) => b,
-        None => return false,
-    };
-    // Alphabetic tokens need a space before them (the vocab has no leading spaces)
-    if first.is_ascii_alphabetic() {
-        // But not suffix-affixes that start with a letter after a hyphen in the vocab
-        // (those are like "-ing" which already have the hyphen in the token)
-        return true;
-    }
-    // Tokens starting with "'" (contractions like "'re", "'m") don't need space
-    // Punctuation, digits, byte tokens — no space needed
-    false
 }
 
 /// Greedy sampling: return the argmax token.

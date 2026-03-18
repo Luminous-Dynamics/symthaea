@@ -83,13 +83,24 @@ mod types;
 
 // Iroh and handshake modules compile always (with stub implementations when feature disabled)
 mod attestation;
-mod handshake;
+pub(crate) mod handshake;
 mod iroh;
+#[cfg(feature = "pqc-handshake")]
+pub mod pqc_handshake;
+
+// Sovereign Inoculation: Trust + Name + Social
+#[cfg(feature = "mesh")]
+pub mod web_of_trust;
+#[cfg(feature = "mesh")]
+pub mod consciousness_certificate;
+#[cfg(feature = "mesh")]
+pub mod name_resolver;
+#[cfg(feature = "mesh")]
+pub mod resonance_graph;
 
 // Re-exports
 pub use config::{
-    AeadAlgorithm, BootstrapConfig, CryptoConfig, PeerConfig, SwarmConfig,
-    MYCELIX_BOOTSTRAP_NODES,
+    AeadAlgorithm, BootstrapConfig, CryptoConfig, PeerConfig, SwarmConfig, MYCELIX_BOOTSTRAP_NODES,
 };
 pub use error::{SwarmError, SwarmResult};
 pub use types::{
@@ -118,7 +129,7 @@ pub use iroh::{
 pub use handshake::{HandshakeError, HandshakeResult, HybridHandshake, SwarmMessageExt};
 
 // Consciousness attestation — signed ConsciousnessVector proofs
-pub use attestation::{AttestedConsciousnessVector, AttestationManager};
+pub use attestation::{AttestationManager, AttestedConsciousnessVector};
 
 // Network Service - high-level swarm integration
 pub use service::{CollectiveConsciousness, NetworkService, PeerEvent, ServiceStats, SwarmBridge};

@@ -7,33 +7,6 @@ use wasm_bindgen::prelude::*;
 
 use crate::config::SporeConfig;
 use crate::engine::SporeEngine as InnerEngine;
-use crate::hardware_probe;
-use crate::quickening::{self, InstallSubsystem, NarrationBank, QuickeningPhase, QuickeningState};
-
-/// Probe hardware capabilities and generate NixOS configuration.
-///
-/// Takes browser-collected hardware data as a JS object (camelCase fields matching
-/// `HardwareProfile`) and returns a `ProbeResult` containing the parsed profile
-/// plus NixOS hardware configuration recommendations.
-///
-/// # JS usage
-/// ```js
-/// const result = probe_hardware({
-///   cpuCores: navigator.hardwareConcurrency,
-///   deviceMemoryGb: navigator.deviceMemory || 0,
-///   hasWebgpu: !!navigator.gpu,
-///   // ... etc
-/// });
-/// console.log(result.nixConfig.nixHardwareConfig);
-/// ```
-#[wasm_bindgen]
-pub fn probe_hardware(js_data: JsValue) -> Result<JsValue, JsError> {
-    console_error_panic_hook::set_once();
-    let profile: hardware_probe::HardwareProfile = serde_wasm_bindgen::from_value(js_data)
-        .map_err(|e| JsError::new(&format!("Invalid hardware data: {e}")))?;
-    let result = hardware_probe::probe(profile);
-    serde_wasm_bindgen::to_value(&result).map_err(|e| JsError::new(&e.to_string()))
-}
 
 /// WASM-exported Spore consciousness engine.
 #[wasm_bindgen]
@@ -215,6 +188,14 @@ impl SporeEngine {
         serde_wasm_bindgen::to_value(&stats).map_err(|e| JsError::new(&e.to_string()))
     }
 
+    /// Conversation context statistics: turn count, topic coherence, recent consciousness avg.
+    ///
+    /// Returns `{ turn_count, topic_coherence, recent_consciousness_avg }`.
+    pub fn conversation_stats(&self) -> Result<JsValue, JsError> {
+        let stats = self.inner.conversation_stats();
+        serde_wasm_bindgen::to_value(&stats).map_err(|e| JsError::new(&e.to_string()))
+    }
+
     // ======================================================================
     // Consciousness validation experiments
     // ======================================================================
@@ -275,109 +256,5 @@ impl SporeEngine {
             .inner
             .collapse_threshold_experiment(steps, cycles_per_step);
         serde_wasm_bindgen::to_value(&result).map_err(|e| JsError::new(&e.to_string()))
-    }
-}
-
-// ======================================================================
-// Quickening: Sovereign Birth orchestration
-// ======================================================================
-
-/// Sovereign Birth ceremony state machine.
-///
-/// Tracks progress through the Quickening phases, accumulating narration
-/// and awakening Harmony tones as each subsystem installs.
-#[wasm_bindgen]
-pub struct QuickeningOrchestrator {
-    state: QuickeningState,
-}
-
-#[wasm_bindgen]
-impl QuickeningOrchestrator {
-    /// Create a new Quickening orchestrator at the start of the ceremony.
-    #[wasm_bindgen(constructor)]
-    pub fn new() -> Self {
-        console_error_panic_hook::set_once();
-        Self {
-            state: QuickeningState::new(),
-        }
-    }
-
-    /// Get the current QuickeningState as a JSON object.
-    ///
-    /// Returns: `{ current_phase, phases_completed, harmonies_awakened,
-    ///             consciousness_level, elapsed_seconds, narration_history }`
-    pub fn quickening_state(&self) -> Result<JsValue, JsError> {
-        serde_wasm_bindgen::to_value(&self.state).map_err(|e| JsError::new(&e.to_string()))
-    }
-
-    /// Advance to the next phase. Takes a JSON object with:
-    /// - `phase` (string): phase name (e.g. "TrustVerification", "StorePopulation")
-    /// - `subsystem` (string, optional): for StorePopulation, the subsystem name
-    /// - `elapsed` (number): elapsed seconds since ceremony start
-    /// - `context` (object, optional): template variables for narration
-    ///
-    /// Returns a `PhaseAdvanceResult` with narration, haptic, tone, and state.
-    pub fn quickening_advance(&mut self, phase_data: JsValue) -> Result<JsValue, JsError> {
-        #[derive(serde::Deserialize)]
-        struct AdvanceInput {
-            phase: String,
-            #[serde(default)]
-            subsystem: Option<String>,
-            #[serde(default)]
-            elapsed: f32,
-            #[serde(default)]
-            context: std::collections::HashMap<String, String>,
-        }
-
-        let input: AdvanceInput = serde_wasm_bindgen::from_value(phase_data)
-            .map_err(|e| JsError::new(&format!("Invalid phase data: {e}")))?;
-
-        let mut phase = QuickeningPhase::from_name(&input.phase)
-            .ok_or_else(|| JsError::new(&format!("Unknown phase: {}", input.phase)))?;
-
-        // For StorePopulation, apply the subsystem
-        if let Some(ref sub_name) = input.subsystem {
-            if let Some(sub) = InstallSubsystem::from_name(sub_name) {
-                phase = phase.with_subsystem(sub);
-            }
-        }
-
-        let result = self.state.advance(&phase, &input.context, input.elapsed);
-        serde_wasm_bindgen::to_value(&result).map_err(|e| JsError::new(&e.to_string()))
-    }
-
-    /// Get narration for a specific phase without advancing state.
-    ///
-    /// `phase` is the phase name string, `context` is a JSON object of template variables.
-    pub fn quickening_narrate(&self, phase: &str, context: JsValue) -> Result<String, JsError> {
-        let ctx: std::collections::HashMap<String, String> =
-            if context.is_null() || context.is_undefined() {
-                std::collections::HashMap::new()
-            } else {
-                serde_wasm_bindgen::from_value(context)
-                    .map_err(|e| JsError::new(&format!("Invalid context: {e}")))?
-            };
-
-        let qp = QuickeningPhase::from_name(phase)
-            .ok_or_else(|| JsError::new(&format!("Unknown phase: {phase}")))?;
-
-        let lines = NarrationBank::narrate(&qp, &ctx);
-        Ok(lines.join("\n"))
-    }
-
-    /// Get the Harmony tones array as JSON.
-    pub fn harmony_tones(&self) -> Result<JsValue, JsError> {
-        serde_wasm_bindgen::to_value(&quickening::HARMONY_TONES)
-            .map_err(|e| JsError::new(&e.to_string()))
-    }
-
-    /// Current progress fraction (0.0 to 1.0).
-    pub fn progress(&self) -> f32 {
-        self.state.progress()
-    }
-
-    /// Whether the ceremony is complete.
-    pub fn is_complete(&self) -> bool {
-        self.state.is_complete()
     }
 }

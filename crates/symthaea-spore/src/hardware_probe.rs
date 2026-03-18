@@ -96,8 +96,7 @@ impl HardwareProfile {
 
         let combined = format!("{vendor} {desc} {arch}");
 
-        if combined.contains("nvidia") || combined.contains("geforce") || combined.contains("rtx")
-        {
+        if combined.contains("nvidia") || combined.contains("geforce") || combined.contains("rtx") {
             GpuDriverClass::Nvidia
         } else if combined.contains("amd")
             || combined.contains("radeon")
@@ -109,8 +108,7 @@ impl HardwareProfile {
             || combined.contains("uhd")
         {
             GpuDriverClass::Intel
-        } else if combined.contains("apple") || combined.contains("m1") || combined.contains("m2")
-        {
+        } else if combined.contains("apple") || combined.contains("m1") || combined.contains("m2") {
             GpuDriverClass::Apple
         } else if combined.contains("qualcomm") || combined.contains("adreno") {
             GpuDriverClass::Qualcomm
@@ -254,10 +252,7 @@ impl NixHardwareConfig {
         let has_npu = gpu_class == GpuDriverClass::Apple
             || gpu_class == GpuDriverClass::Qualcomm
             || (gpu_class == GpuDriverClass::Intel
-                && profile
-                    .gpu_description
-                    .to_lowercase()
-                    .contains("meteor"));
+                && profile.gpu_description.to_lowercase().contains("meteor"));
 
         // --- Substrate recommendation ---
         let recommended_substrate = if has_npu {
@@ -294,8 +289,14 @@ impl NixHardwareConfig {
         };
 
         // --- Generate nix config ---
-        let nix_hardware_config =
-            generate_hardware_nix(profile, &gpu_driver, &filesystem, swap_size_gb, enable_cuda, enable_rocm);
+        let nix_hardware_config = generate_hardware_nix(
+            profile,
+            &gpu_driver,
+            &filesystem,
+            swap_size_gb,
+            enable_cuda,
+            enable_rocm,
+        );
 
         Self {
             filesystem,
@@ -365,9 +366,7 @@ fn generate_hardware_nix(
     ));
 
     if filesystem == "btrfs" {
-        nix.push_str(
-            "  fileSystems.\"/\".options = [ \"compress=zstd\" \"noatime\" ];\n\n",
-        );
+        nix.push_str("  fileSystems.\"/\".options = [ \"compress=zstd\" \"noatime\" ];\n\n");
     }
 
     // --- Swap ---

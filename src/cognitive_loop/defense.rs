@@ -34,13 +34,19 @@ pub enum DefenseActionKind {
     /// Increase peer behavior scoring frequency.
     IncreasePeerScoring { interval_reduction: f32 },
     /// Rate-limit governance proposals for a specific agent.
-    RateLimitProposals { agent_id: String, max_per_minute: u32 },
+    RateLimitProposals {
+        agent_id: String,
+        max_per_minute: u32,
+    },
     /// Boost neuromodulator vigilance (NE).
     BoostVigilance { ne_delta: f32 },
 
     // -- Orange (active intervention) --
     /// Temporarily quarantine a peer (reduce trust, limit interaction).
-    QuarantinePeer { peer_id: String, duration_cycles: u32 },
+    QuarantinePeer {
+        peer_id: String,
+        duration_cycles: u32,
+    },
     /// Suspend non-Guardian governance proposals.
     SuspendNonGuardianProposals,
     /// Reduce motor output to read-only.

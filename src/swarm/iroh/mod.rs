@@ -246,7 +246,9 @@ impl IrohNode {
     }
 
     /// Get the attestation manager reference (for passing to channels).
-    pub fn attestation(&self) -> &Option<Arc<RwLock<crate::swarm::attestation::AttestationManager>>> {
+    pub fn attestation(
+        &self,
+    ) -> &Option<Arc<RwLock<crate::swarm::attestation::AttestationManager>>> {
         &self.attestation
     }
 

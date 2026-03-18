@@ -189,9 +189,7 @@ impl LayerExtractor {
         let is_safetensors = Self::is_safetensors_file(&weights_path)?;
 
         let vb = if is_safetensors {
-            // Verify model integrity before unsafe memory-mapped loading
-            super::model_integrity::verify_model_integrity(&weights_path, None)?;
-            unsafe { VarBuilder::from_mmaped_safetensors(&[weights_path], DType::F32, &device)? }
+            super::model_integrity::verified_mmap_safetensors(&[weights_path], DType::F32, &device, None)?
         } else {
             VarBuilder::from_pth(&weights_path, DType::F32, &device)?
         };

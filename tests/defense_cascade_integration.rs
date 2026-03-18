@@ -4,9 +4,7 @@
 //! SafetyAgent → safety_enforcement → defense actions → moral filter
 //! Sentinel → threat memory → collective immunity → guardian posture
 
-use symthaea::cognitive_loop::defense::{
-    moral_filter, propose_defense_actions, DefenseActionKind,
-};
+use symthaea::cognitive_loop::defense::{moral_filter, propose_defense_actions, DefenseActionKind};
 use symthaea::cognitive_loop::guardian::{GuardianPosture, GuardianState};
 use symthaea::cognitive_loop::safety_enforcement::compute_enforcement;
 use symthaea::safety::{SafetyAgent, SafetyLevel};
@@ -64,10 +62,9 @@ fn test_defense_cascade_green_to_red() {
 
     let yellow = propose_defense_actions(SafetyLevel::Yellow, 100);
     assert!(!yellow.is_empty());
-    assert!(yellow
-        .iter()
-        .all(|a| !a.kind.affects_others() || a.kind == DefenseActionKind::BoostVigilance { ne_delta: 0.03 }
-            || matches!(a.kind, DefenseActionKind::IncreasePeerScoring { .. })));
+    assert!(yellow.iter().all(|a| !a.kind.affects_others()
+        || a.kind == DefenseActionKind::BoostVigilance { ne_delta: 0.03 }
+        || matches!(a.kind, DefenseActionKind::IncreasePeerScoring { .. })));
 
     let orange = propose_defense_actions(SafetyLevel::Orange, 200);
     assert!(orange
@@ -205,16 +202,13 @@ fn test_full_cascade_safety_to_guardian() {
     ];
 
     for (i, (consciousness, expected_level)) in degradation_steps.iter().enumerate() {
-        let enforcement = compute_enforcement(
-            &mut agent,
-            *consciousness,
-            0.3,
-            0.5,
-            false,
-            i + 1,
-            None,
+        let enforcement =
+            compute_enforcement(&mut agent, *consciousness, 0.3, 0.5, false, i + 1, None);
+        assert_eq!(
+            enforcement.level, *expected_level,
+            "Cycle {}: expected {:?}",
+            i, expected_level
         );
-        assert_eq!(enforcement.level, *expected_level, "Cycle {}: expected {:?}", i, expected_level);
 
         // Update guardian posture
         guardian.update(enforcement.level, *consciousness as f64, i + 1);
@@ -234,7 +228,9 @@ fn test_full_cascade_safety_to_guardian() {
                 assert!(guardian.posture.locomotion_permitted());
             }
             SafetyLevel::Orange => {
-                assert!(actions.iter().any(|a| matches!(a.kind, DefenseActionKind::SuspendNonGuardianProposals)));
+                assert!(actions
+                    .iter()
+                    .any(|a| matches!(a.kind, DefenseActionKind::SuspendNonGuardianProposals)));
                 assert!(!guardian.posture.locomotion_permitted());
             }
             SafetyLevel::Red => {
@@ -268,33 +264,40 @@ fn security_pipeline_threat_to_guardian_posture() {
     // Step 1: Simulate a collective immune threat
     let mut immune = CollectiveImmuneState::default();
     immune.update(
-        0.8,                                                          // local_threat_level: high
-        &[("peer1".into(), 0.7), ("peer2".into(), 0.6)],             // peer reports
-        0.4,                                                          // collective_phi: low (confused swarm)
-        5,                                                            // total_peers
-        &["ProposalFlood".into()],                                    // local threats
-        &["ProposalFlood".into(), "GradientFingerprint".into()],      // swarm threats
+        0.8,                                                     // local_threat_level: high
+        &[("peer1".into(), 0.7), ("peer2".into(), 0.6)],         // peer reports
+        0.4,                       // collective_phi: low (confused swarm)
+        5,                         // total_peers
+        &["ProposalFlood".into()], // local threats
+        &["ProposalFlood".into(), "GradientFingerprint".into()], // swarm threats
     );
 
     // Verify immune response activated
-    assert!(immune.immune_response_active, "Immune response should activate with high threats");
+    assert!(
+        immune.immune_response_active,
+        "Immune response should activate with high threats"
+    );
     assert!(
         immune.coherence_adjusted_severity > 0.5,
         "Severity should be amplified by low phi, got {}",
         immune.coherence_adjusted_severity
     );
-    assert_eq!(immune.blind_spots.len(), 1, "Should detect blind spot: GradientFingerprint");
+    assert_eq!(
+        immune.blind_spots.len(),
+        1,
+        "Should detect blind spot: GradientFingerprint"
+    );
     assert_eq!(immune.blind_spots[0], "GradientFingerprint");
 
     // Step 2: Safety enforcement with collective immunity
     let mut agent = SafetyAgent::new();
     let result = compute_enforcement(
         &mut agent,
-        0.8,    // consciousness_level: normal
-        0.2,    // prediction_error: low
-        0.9,    // temporal_coherence: high
-        false,  // integrity_critical: no
-        100,    // cycle
+        0.8,   // consciousness_level: normal
+        0.2,   // prediction_error: low
+        0.9,   // temporal_coherence: high
+        false, // integrity_critical: no
+        100,   // cycle
         Some(&immune),
     );
 
@@ -307,12 +310,19 @@ fn security_pipeline_threat_to_guardian_posture() {
 
     // Step 3: Propose defense actions based on escalated level
     let mut actions = propose_defense_actions(result.level, 100);
-    assert!(!actions.is_empty(), "Should propose defense actions at {:?}", result.level);
+    assert!(
+        !actions.is_empty(),
+        "Should propose defense actions at {:?}",
+        result.level
+    );
 
     // Step 4: Moral algebra filter
     moral_filter(&mut actions);
     let approved_count = actions.iter().filter(|a| a.morally_approved).count();
-    assert!(approved_count > 0, "At least some defense actions should be morally approved");
+    assert!(
+        approved_count > 0,
+        "At least some defense actions should be morally approved"
+    );
 
     // Step 5: Guardian posture should reflect the safety level
     let mut guardian = GuardianState::default();
@@ -334,8 +344,14 @@ fn security_pipeline_threat_to_guardian_posture() {
     // Verify neuromodulator coupling is active under immune response
     let (ne, cortisol, oxy) = immune.neuromod_deltas();
     assert!(ne > 0.0, "NE should increase under active immune response");
-    assert!(cortisol > 0.0, "Cortisol should increase under active immune response");
-    assert!(oxy > 0.0, "Oxytocin should increase for in-group solidarity");
+    assert!(
+        cortisol > 0.0,
+        "Cortisol should increase under active immune response"
+    );
+    assert!(
+        oxy > 0.0,
+        "Oxytocin should increase for in-group solidarity"
+    );
 }
 
 /// Test the full escalation ladder: Green → Yellow → Orange with collective immunity.
@@ -368,7 +384,8 @@ fn escalation_ladder_green_to_orange() {
     );
     guardian.update(result.level, 0.8, 2);
     assert!(
-        guardian.posture == GuardianPosture::Cautious || guardian.posture == GuardianPosture::Defensive,
+        guardian.posture == GuardianPosture::Cautious
+            || guardian.posture == GuardianPosture::Defensive,
         "Guardian should be at least Cautious, got {:?}",
         guardian.posture
     );
@@ -394,7 +411,11 @@ fn escalation_ladder_green_to_orange() {
     );
 
     // Verify guardian tracked transitions
-    assert!(guardian.transition_count >= 2, "Should have recorded at least 2 transitions, got {}", guardian.transition_count);
+    assert!(
+        guardian.transition_count >= 2,
+        "Should have recorded at least 2 transitions, got {}",
+        guardian.transition_count
+    );
 }
 
 /// Verify moral algebra blocks actions that affect others at extreme severity.
@@ -405,17 +426,32 @@ fn moral_algebra_blocks_excessive_defense() {
     moral_filter(&mut actions);
 
     // Self-protective actions should always be approved
-    let halt = actions.iter().find(|a| matches!(a.kind, DefenseActionKind::HaltMotor))
+    let halt = actions
+        .iter()
+        .find(|a| matches!(a.kind, DefenseActionKind::HaltMotor))
         .expect("Red should propose HaltMotor");
-    assert!(halt.morally_approved, "HaltMotor (self-protective) should always be approved");
+    assert!(
+        halt.morally_approved,
+        "HaltMotor (self-protective) should always be approved"
+    );
 
-    let safe_pos = actions.iter().find(|a| matches!(a.kind, DefenseActionKind::PhysicalSafePosition))
+    let safe_pos = actions
+        .iter()
+        .find(|a| matches!(a.kind, DefenseActionKind::PhysicalSafePosition))
         .expect("Red should propose PhysicalSafePosition");
-    assert!(safe_pos.morally_approved, "PhysicalSafePosition should always be approved");
+    assert!(
+        safe_pos.morally_approved,
+        "PhysicalSafePosition should always be approved"
+    );
 
-    let beacon = actions.iter().find(|a| matches!(a.kind, DefenseActionKind::EmergencyBeacon))
+    let beacon = actions
+        .iter()
+        .find(|a| matches!(a.kind, DefenseActionKind::EmergencyBeacon))
         .expect("Red should propose EmergencyBeacon");
-    assert!(beacon.morally_approved, "EmergencyBeacon (self-protective) should always be approved");
+    assert!(
+        beacon.morally_approved,
+        "EmergencyBeacon (self-protective) should always be approved"
+    );
 
     // All approved actions affecting others should have bounded severity
     for action in &actions {
@@ -430,7 +466,8 @@ fn moral_algebra_blocks_excessive_defense() {
     }
 
     // Verify at least one other-affecting action exists and is approved
-    let other_affecting_approved = actions.iter()
+    let other_affecting_approved = actions
+        .iter()
         .filter(|a| a.kind.affects_others() && a.morally_approved)
         .count();
     assert!(
@@ -447,26 +484,46 @@ fn collective_immunity_neuromod_coupling() {
     // Inactive state → no deltas
     let inactive = CollectiveImmuneState::default();
     let (ne, cortisol, oxy) = inactive.neuromod_deltas();
-    assert_eq!(ne, 0.0, "Inactive immune state should produce zero NE delta");
-    assert_eq!(cortisol, 0.0, "Inactive immune state should produce zero cortisol delta");
-    assert_eq!(oxy, 0.0, "Inactive immune state should produce zero oxytocin delta");
+    assert_eq!(
+        ne, 0.0,
+        "Inactive immune state should produce zero NE delta"
+    );
+    assert_eq!(
+        cortisol, 0.0,
+        "Inactive immune state should produce zero cortisol delta"
+    );
+    assert_eq!(
+        oxy, 0.0,
+        "Inactive immune state should produce zero oxytocin delta"
+    );
 
     // Active state with threat → positive deltas
     let mut active = CollectiveImmuneState::default();
     active.update(
-        0.8,                                     // high local threat
-        &[("p1".into(), 0.7)],                   // peer under threat
-        0.3,                                     // low collective phi (confused swarm)
-        3,                                       // total peers
-        &[],                                     // no local threat kinds
-        &["GradientFingerprint".into()],          // swarm-wide threats
+        0.8,                             // high local threat
+        &[("p1".into(), 0.7)],           // peer under threat
+        0.3,                             // low collective phi (confused swarm)
+        3,                               // total peers
+        &[],                             // no local threat kinds
+        &["GradientFingerprint".into()], // swarm-wide threats
     );
-    assert!(active.immune_response_active, "Should activate with high threat severity");
+    assert!(
+        active.immune_response_active,
+        "Should activate with high threat severity"
+    );
 
     let (ne, cortisol, oxy) = active.neuromod_deltas();
     assert!(ne > 0.0, "NE should increase under threat, got {}", ne);
-    assert!(cortisol > 0.0, "Cortisol should increase under threat, got {}", cortisol);
-    assert!(oxy > 0.0, "Oxytocin should increase for in-group solidarity, got {}", oxy);
+    assert!(
+        cortisol > 0.0,
+        "Cortisol should increase under threat, got {}",
+        cortisol
+    );
+    assert!(
+        oxy > 0.0,
+        "Oxytocin should increase for in-group solidarity, got {}",
+        oxy
+    );
 
     // Verify magnitudes scale with threat level
     // NE = swarm_threat_level * 0.04

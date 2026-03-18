@@ -7,24 +7,21 @@ use symthaea_zkproof_core::{
 
 risc0_zkvm::guest::entry!(main);
 
-/// Guest entry point.
-///
-/// The host selects the proof type by writing either an `EvolutionInput` or a
-/// `BalanceProofInput`.  We use a `u8` tag to dispatch:
-///   0 => consciousness attestation (EvolutionInput → EvolutionOutput)
-///   1 => balance sufficiency    (BalanceProofInput → BalanceProofOutput)
 fn main() {
+    // Tag-dispatched entry point:
+    //   tag 0 = consciousness attestation (EvolutionInput → EvolutionOutput)
+    //   tag 1 = balance proof            (BalanceProofInput → BalanceProofOutput)
     let tag: u8 = env::read();
 
     match tag {
-        0 => prove_evolution(),
-        1 => prove_balance(),
-        _ => panic!("unknown proof tag: {tag}"),
+        0 => run_consciousness_attestation(),
+        1 => run_balance_proof(),
+        _ => panic!("unknown guest program tag: {tag}"),
     }
 }
 
-/// Consciousness attestation proof.
-fn prove_evolution() {
+/// Tag 0: Consciousness attestation — simplified Laplacian connectivity proxy.
+fn run_consciousness_attestation() {
     let input: EvolutionInput = env::read();
 
     let mut total_phi = 0.0_f32;
@@ -42,22 +39,25 @@ fn prove_evolution() {
 
     let avg_phi = if n > 0.0 { total_phi / n } else { 0.0 };
 
-    env::commit(&EvolutionOutput {
+    let output = EvolutionOutput {
         average_phi: avg_phi,
         tau_scale: input.tau_scale,
         episode_count: input.episodes.len() as u32,
-    });
+    };
+
+    env::commit(&output);
 }
 
-/// Balance sufficiency proof.
-/// Proves: balance >= required_minimum WITHOUT revealing the actual balance.
-fn prove_balance() {
+/// Tag 1: Balance sufficiency proof — proves `balance >= required_minimum`
+/// without revealing the actual balance.
+fn run_balance_proof() {
     let input: BalanceProofInput = env::read();
-    let sufficient = input.balance >= input.required_minimum;
 
-    env::commit(&BalanceProofOutput {
-        sufficient,
+    let output = BalanceProofOutput {
+        sufficient: input.balance >= input.required_minimum,
         required_minimum: input.required_minimum,
         nonce: input.nonce,
-    });
+    };
+
+    env::commit(&output);
 }

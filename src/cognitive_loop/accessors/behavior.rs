@@ -510,6 +510,19 @@ impl CognitiveLoopService {
         )
     }
 
+    /// Get the lagged consciousness level for governance gating.
+    ///
+    /// Uses a 50-cycle lag (~2.5s at 20Hz) to decorrelate the circular
+    /// dependency: consciousness → governance → neuromod → consciousness.
+    /// Returns the oldest value in the ring buffer, or 0.0 if empty.
+    /// Science: Granger (1969) — temporal decorrelation breaks circular causation.
+    pub fn governance_lagged_consciousness(&self) -> f64 {
+        self.governance_consciousness_lag
+            .front()
+            .copied()
+            .unwrap_or(0.0)
+    }
+
     /// Record a predicted outcome alignment for a governance proposal.
     ///
     /// Call this when casting a vote to enable governance prediction error
@@ -923,8 +936,7 @@ impl CognitiveLoopService {
                     - super::super::thresholds::KNOWLEDGE_ETHICS_CAUSAL_DEPTH_THRESHOLD)
                     * super::super::thresholds::KNOWLEDGE_ETHICS_CONFIDENCE_GAIN;
                 let nudge = nudge.min(0.03); // cap to prevent runaway
-                self.prediction_confidence =
-                    (self.prediction_confidence + nudge).clamp(0.0, 1.0);
+                self.prediction_confidence = (self.prediction_confidence + nudge).clamp(0.0, 1.0);
             }
         }
     }
@@ -947,10 +959,8 @@ impl CognitiveLoopService {
 
         // Low recall quality → dampen learning (encoding unreliable)
         if recall < super::super::thresholds::MEMORY_RECALL_QUALITY_DAMPEN_THRESHOLD {
-            let deficit =
-                super::super::thresholds::MEMORY_RECALL_QUALITY_DAMPEN_THRESHOLD - recall;
-            let dampening =
-                deficit * super::super::thresholds::MEMORY_RECALL_QUALITY_DAMPEN_SCALE;
+            let deficit = super::super::thresholds::MEMORY_RECALL_QUALITY_DAMPEN_THRESHOLD - recall;
+            let dampening = deficit * super::super::thresholds::MEMORY_RECALL_QUALITY_DAMPEN_SCALE;
             self.carryover.learning.subsystem_lr_factor *= (1.0 - dampening).max(0.8);
         }
     }
@@ -965,10 +975,8 @@ impl CognitiveLoopService {
 
         // Low coherence → exploration boost (orienting reflex)
         if coherence < super::super::thresholds::PERCEPTION_LOW_COHERENCE_THRESHOLD {
-            let deficit =
-                super::super::thresholds::PERCEPTION_LOW_COHERENCE_THRESHOLD - coherence;
-            let boost =
-                deficit * super::super::thresholds::PERCEPTION_LOW_COHERENCE_EXPLORE_GAIN;
+            let deficit = super::super::thresholds::PERCEPTION_LOW_COHERENCE_THRESHOLD - coherence;
+            let boost = deficit * super::super::thresholds::PERCEPTION_LOW_COHERENCE_EXPLORE_GAIN;
             // Nudge confidence down slightly to encourage exploration
             self.prediction_confidence =
                 (self.prediction_confidence - boost as f64).clamp(0.0, 1.0);
@@ -1029,7 +1037,9 @@ impl CognitiveLoopService {
     ///
     /// Returns the override if set, otherwise the last verdict from the ethics engine.
     pub fn last_ethics_verdict(&self) -> &super::super::ethics_engine::EthicalVerdict {
-        self.ethics_verdict_override.as_ref().unwrap_or(&self.last_ethics_verdict)
+        self.ethics_verdict_override
+            .as_ref()
+            .unwrap_or(&self.last_ethics_verdict)
     }
 
     /// Override the unified ethical verdict.

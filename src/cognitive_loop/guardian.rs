@@ -83,9 +83,9 @@ impl GuardianPosture {
     /// Returns None if locomotion is not permitted.
     pub fn recommended_gait(&self) -> Option<&'static str> {
         match self {
-            Self::Normal => Some("walk"), // default patrol gait
+            Self::Normal => Some("walk"),   // default patrol gait
             Self::Cautious => Some("walk"), // cautious = walk only
-            _ => None, // no locomotion
+            _ => None,                      // no locomotion
         }
     }
 
@@ -366,9 +366,7 @@ mod tests {
 
     #[test]
     fn test_sensor_sweep_multiplier() {
-        assert!(
-            (GuardianPosture::Normal.sensor_sweep_multiplier() - 1.0).abs() < 1e-6
-        );
+        assert!((GuardianPosture::Normal.sensor_sweep_multiplier() - 1.0).abs() < 1e-6);
         assert!(GuardianPosture::Cautious.sensor_sweep_multiplier() < 1.0);
         assert!(
             GuardianPosture::Defensive.sensor_sweep_multiplier()

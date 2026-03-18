@@ -24,6 +24,7 @@
 
 pub mod accelerator;
 pub mod cmod_adapter;
+pub mod cmod_evaluation;
 pub mod datacenter;
 pub mod fission;
 pub mod fusion_twin;
@@ -102,6 +103,12 @@ pub use datacenter::{
     DatacenterFepAction, DatacenterFepAgent, DatacenterHdcEncoder, DatacenterOutput,
     DatacenterPredictor, DatacenterReading, DatacenterSafetyLevel, DatacenterTwin,
     DATACENTER_HORIZONS, DATACENTER_HORIZON_LABELS,
+};
+
+pub use cmod_evaluation::{
+    compute_auc, compute_roc_curve, evaluate_density_limit, load_density_limit_csv,
+    ConfusionMatrix, DensityLimitEncoder, DensityLimitSample, DensityLimitShot, EvaluationConfig,
+    EvaluationReport, LeadTimeStats, NormalizationRanges, RocPoint,
 };
 
 pub use cmod_adapter::{

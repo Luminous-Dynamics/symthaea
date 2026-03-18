@@ -102,6 +102,20 @@ pub enum SwarmEvent {
         /// Human-readable description.
         description: String,
     },
+
+    /// A time beacon received from a mesh peer (Sovereign Clock).
+    TimeBeaconReceived {
+        /// Source peer ID (8-byte prefix).
+        source_id: [u8; 8],
+        /// Beacon timestamp (µs since epoch).
+        timestamp_us: u64,
+        /// Peer's stratum level.
+        stratum: u8,
+        /// Peer's Phi at beacon time.
+        phi: f32,
+        /// Beacon drift estimate (ppm).
+        drift_ppm: f32,
+    },
 }
 
 /// A threat pattern report from a peer, ready for SentinelManager consumption.
@@ -467,9 +481,7 @@ impl SwarmManager {
                         self.pending_knowledge_shares.truncate(64);
                     }
                 }
-                SwarmEvent::TrustVerified {
-                    trust_level, ..
-                } => {
+                SwarmEvent::TrustVerified { trust_level, .. } => {
                     // Track verified peer count for telemetry
                     if trust_level > 0.0 {
                         self.verified_peers = self.verified_peers.saturating_add(1);
@@ -484,8 +496,16 @@ impl SwarmManager {
                     description,
                 } => {
                     // Clamp NaN/Inf and store for SentinelManager drain
-                    let sev = if severity.is_finite() { severity.clamp(0.0, 1.0) } else { 0.0 };
-                    let conf = if confidence.is_finite() { confidence.clamp(0.0, 1.0) } else { 0.0 };
+                    let sev = if severity.is_finite() {
+                        severity.clamp(0.0, 1.0)
+                    } else {
+                        0.0
+                    };
+                    let conf = if confidence.is_finite() {
+                        confidence.clamp(0.0, 1.0)
+                    } else {
+                        0.0
+                    };
                     if self.pending_threat_patterns.len() < 32 {
                         self.pending_threat_patterns.push(PeerThreatReport {
                             peer_id,
@@ -497,6 +517,9 @@ impl SwarmManager {
                         });
                     }
                 }
+                // Sovereign Inoculation events — handled by their dedicated managers,
+                // passed through here for uniform channel draining.
+                SwarmEvent::TimeBeaconReceived { .. } => {}
             }
         }
     }

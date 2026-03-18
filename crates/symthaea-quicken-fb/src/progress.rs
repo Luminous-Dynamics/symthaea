@@ -2,7 +2,6 @@
 ///
 /// Reads events from a named pipe (FIFO) written by the installer, or
 /// falls back to polling /proc/diskstats for disk I/O rate estimation.
-
 use std::fs::File;
 use std::io::{self, BufRead, BufReader};
 use std::os::unix::fs::FileTypeExt;
@@ -160,10 +159,7 @@ impl ProgressMonitor {
             if fields.len() >= 10 {
                 let name = fields[2];
                 // Only count whole-disk devices, skip partitions
-                if name.starts_with("sd")
-                    || name.starts_with("nvme")
-                    || name.starts_with("vd")
-                {
+                if name.starts_with("sd") || name.starts_with("nvme") || name.starts_with("vd") {
                     if let Ok(sectors) = fields[9].parse::<u64>() {
                         total += sectors * 512; // sectors are 512 bytes
                     }
@@ -181,7 +177,9 @@ mod tests {
     #[test]
     fn test_parse_derivation() {
         let ev = ProgressMonitor::parse_line("DRV:nixos-system-luminous-24.11");
-        assert!(matches!(ev, Some(ProgressEvent::DerivationComplete(ref s)) if s == "nixos-system-luminous-24.11"));
+        assert!(
+            matches!(ev, Some(ProgressEvent::DerivationComplete(ref s)) if s == "nixos-system-luminous-24.11")
+        );
     }
 
     #[test]

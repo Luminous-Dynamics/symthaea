@@ -288,7 +288,6 @@ pub mod sequence_encoder;
 pub mod statistical_retrieval;
 pub mod temporal_encoder;
 pub mod text_encoder; // Revolutionary Enhancement: Text → HDC encoding
-pub mod trajectory_accumulator; // Continuous behavioral identity via HDC temporal binding
 pub mod unified_network_phi; // Phi measurement and validation for HdcLtcUnifiedNetwork // HV → Primitive sequence (generative direction) - THE MOUTH
                              // DISABLED: depends on crate::learnable_ltc which doesn't exist in symthaea-core
                              // pub mod hd_ltc_codec;      // Bidirectional HDC ↔ LTC translation - THE THROAT

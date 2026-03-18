@@ -3,7 +3,6 @@
 /// Opens a DRM device, finds a connected display, creates a dumb buffer at
 /// native resolution, and maps it for direct pixel access on each frame.
 /// No display server required — this runs on bare metal during NixOS installation.
-
 use drm::buffer::Buffer;
 use drm::control::connector::{Info as ConnectorInfo, State as ConnectorState};
 use drm::control::crtc::Handle as CrtcHandle;
@@ -96,17 +95,13 @@ impl DrmFramebuffer {
         let card = Card::open(device_path)?;
 
         // Query resources
-        let res = card
-            .resource_handles()
-            .map_err(DrmError::ResourceQuery)?;
+        let res = card.resource_handles().map_err(DrmError::ResourceQuery)?;
 
         // Find first connected connector with a valid mode
         let (connector, mode) = Self::find_connected_display(&card, &res)?;
 
         // Find encoder + CRTC
-        let encoder_handle = connector
-            .current_encoder()
-            .ok_or(DrmError::NoEncoder)?;
+        let encoder_handle = connector.current_encoder().ok_or(DrmError::NoEncoder)?;
         let encoder = card
             .get_encoder(encoder_handle)
             .map_err(DrmError::ResourceQuery)?;
@@ -130,14 +125,8 @@ impl DrmFramebuffer {
             .map_err(DrmError::FramebufferAdd)?;
 
         // Set the CRTC to display our framebuffer
-        card.set_crtc(
-            crtc,
-            Some(fb),
-            (0, 0),
-            &[connector.handle()],
-            Some(mode),
-        )
-        .map_err(DrmError::ModeSetting)?;
+        card.set_crtc(crtc, Some(fb), (0, 0), &[connector.handle()], Some(mode))
+            .map_err(DrmError::ModeSetting)?;
 
         Ok(Self {
             card,
@@ -200,10 +189,7 @@ impl DrmFramebuffer {
         let dst_bytes: &mut [u8] = &mut mapping;
         // SAFETY: XRGB8888 is 4-byte aligned, DRM guarantees alignment.
         let dst: &mut [u32] = unsafe {
-            std::slice::from_raw_parts_mut(
-                dst_bytes.as_mut_ptr() as *mut u32,
-                dst_bytes.len() / 4,
-            )
+            std::slice::from_raw_parts_mut(dst_bytes.as_mut_ptr() as *mut u32, dst_bytes.len() / 4)
         };
 
         if stride_pixels == w {

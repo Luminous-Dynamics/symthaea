@@ -655,7 +655,11 @@ mod tests {
             client.update_affect(CoreAffectSnapshot::new(0.6, 0.5, i));
         }
         let phq9 = client.phq9_analogue();
-        assert!(phq9 < 5.0, "Positive affect should yield minimal PHQ-9: {}", phq9);
+        assert!(
+            phq9 < 5.0,
+            "Positive affect should yield minimal PHQ-9: {}",
+            phq9
+        );
     }
 
     #[test]
@@ -665,7 +669,11 @@ mod tests {
             client.update_affect(CoreAffectSnapshot::new(-0.8, 0.3, i));
         }
         let phq9 = client.phq9_analogue();
-        assert!(phq9 > 8.0, "Depressed affect should yield elevated PHQ-9: {}", phq9);
+        assert!(
+            phq9 > 8.0,
+            "Depressed affect should yield elevated PHQ-9: {}",
+            phq9
+        );
     }
 
     #[test]
@@ -676,7 +684,11 @@ mod tests {
         }
         client.risk_level = RiskLevel::High;
         let phq9 = client.phq9_analogue();
-        assert!(phq9 >= 0.0 && phq9 <= 27.0, "PHQ-9 must be in 0-27: {}", phq9);
+        assert!(
+            phq9 >= 0.0 && phq9 <= 27.0,
+            "PHQ-9 must be in 0-27: {}",
+            phq9
+        );
     }
 
     #[test]
@@ -695,7 +707,11 @@ mod tests {
             client.update_affect(CoreAffectSnapshot::new(0.3, 0.4, i));
         }
         let gad7 = client.gad7_analogue();
-        assert!(gad7 < 5.0, "Calm positive affect should yield minimal GAD-7: {}", gad7);
+        assert!(
+            gad7 < 5.0,
+            "Calm positive affect should yield minimal GAD-7: {}",
+            gad7
+        );
     }
 
     #[test]
@@ -706,7 +722,11 @@ mod tests {
         }
         client.update_rdoc(RDocDomain::NegativeValence, 0.8);
         let gad7 = client.gad7_analogue();
-        assert!(gad7 > 8.0, "Anxious affect should yield elevated GAD-7: {}", gad7);
+        assert!(
+            gad7 > 8.0,
+            "Anxious affect should yield elevated GAD-7: {}",
+            gad7
+        );
     }
 
     #[test]
@@ -718,7 +738,11 @@ mod tests {
         client.update_rdoc(RDocDomain::NegativeValence, 1.0);
         client.update_rdoc(RDocDomain::ArousalRegulatory, 1.0);
         let gad7 = client.gad7_analogue();
-        assert!(gad7 >= 0.0 && gad7 <= 21.0, "GAD-7 must be in 0-21: {}", gad7);
+        assert!(
+            gad7 >= 0.0 && gad7 <= 21.0,
+            "GAD-7 must be in 0-21: {}",
+            gad7
+        );
     }
 
     #[test]
@@ -730,7 +754,11 @@ mod tests {
         client.update_rdoc(RDocDomain::SocialProcesses, 0.8);
         client.update_rdoc(RDocDomain::PositiveValence, 0.7);
         let ors = client.ors_analogue();
-        assert!(ors > 25.0, "Good functioning should yield high ORS: {}", ors);
+        assert!(
+            ors > 25.0,
+            "Good functioning should yield high ORS: {}",
+            ors
+        );
     }
 
     #[test]
@@ -741,7 +769,11 @@ mod tests {
         }
         client.update_rdoc(RDocDomain::SocialProcesses, 0.1);
         let ors = client.ors_analogue();
-        assert!(ors < 20.0, "Impaired functioning should yield low ORS: {}", ors);
+        assert!(
+            ors < 20.0,
+            "Impaired functioning should yield low ORS: {}",
+            ors
+        );
     }
 
     #[test]

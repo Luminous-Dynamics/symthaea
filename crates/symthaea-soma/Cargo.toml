@@ -1,0 +1,33 @@
+[package]
+name = "symthaea-soma"
+version = "0.1.0"
+edition = "2021"
+description = "Symthaea Soma: mobile-embodied consciousness engine (Android/iOS) wrapping the Spore kernel"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[dependencies]
+symthaea-spore = { path = "../symthaea-spore", default-features = false }
+symthaea-core = { path = "../../symthaea-core", default-features = false }
+symthaea-consciousness-equation = { path = "../symthaea-consciousness-equation" }
+symthaea-neuromodulators = { path = "../symthaea-neuromodulators" }
+symthaea-types = { path = "../symthaea-types" }
+symthaea-harmonies = { path = "../symthaea-harmonies" }
+symthaea-vision-manifold = { path = "../symthaea-vision-manifold" }
+symthaea-foveation = { path = "../symthaea-foveation" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+blake3 = { workspace = true }
+ed25519-dalek = { version = "2", optional = true, default-features = false, features = ["rand_core"] }
+hex = { version = "0.4", optional = true }
+
+[features]
+default = []
+# Native mobile FFI: C-compatible extern functions for iOS (staticlib) and Android (cdylib/JNI).
+native-ffi = []
+# Ed25519 mobile pairing for Spore-to-Spore trust establishment.
+pairing = ["dep:ed25519-dalek", "dep:hex"]
+# Screen embodiment: Soma sees her own UI via vision-manifold + foveation.
+screen-vision = []

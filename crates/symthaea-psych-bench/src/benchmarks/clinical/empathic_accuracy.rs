@@ -310,7 +310,7 @@ impl EmpathicAccuracyBenchmark {
         let difficulty_attenuation = 1.0 - config.difficulty as f32 * 0.25;
         let time_pressure_noise = config.time_pressure as f32 * 0.10;
         let encoding_noise = config.effective_noise() as f32 * 0.2;
-        let social_bonus: f32 = if config.enable_social { 0.10 } else { 0.0 };
+        let social_bonus: f32 = if config.enable_social { 0.12 } else { 0.0 };
 
         // Per-category accumulators
         let mut basic_sims = Vec::new();
@@ -359,16 +359,14 @@ impl EmpathicAccuracyBenchmark {
                     .wrapping_add(2000 + b as u64 * 47);
                 // Lower intensity → more noise on behavioral cues
                 let intensity_factor = scenario.intensity;
-                let behav_flip =
-                    (base_flip + (1.0 - intensity_factor) * 0.15).clamp(0.0, 0.5);
+                let behav_flip = (base_flip + (1.0 - intensity_factor) * 0.15).clamp(0.0, 0.5);
                 let cue = target_emotion.add_noise(behav_flip, cue_seed);
                 cue_hvs.push(cue);
             }
 
             // Add distractor emotion traces for mixed/masked scenarios
             for d in 0..scenario.distractor_count {
-                let dist_idx =
-                    ((scenario.seed_offset as usize) + d + 3) % NUM_EMOTION_PROTOTYPES;
+                let dist_idx = ((scenario.seed_offset as usize) + d + 3) % NUM_EMOTION_PROTOTYPES;
                 let dist_seed = seed
                     .wrapping_add(scenario.seed_offset)
                     .wrapping_add(3000 + d as u64 * 61);

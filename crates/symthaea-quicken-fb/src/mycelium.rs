@@ -2,7 +2,6 @@
 ///
 /// Generates procedural mycelial network growth seeded by the genesis phrase.
 /// Renders to a raw pixel buffer using Bresenham's line algorithm — no GPU required.
-
 use crate::color::{Rgba, LEAF_GREEN, LICHEN_GREY, MOSS_DEEP, MYCELIAL_WHITE, SOLAR_GOLD};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
@@ -225,11 +224,7 @@ impl MycelialNetwork {
 
         // Clear to background (MOSS_DEEP or black depending on elapsed time)
         let bg = if self.elapsed < 1.0 {
-            Rgba::lerp(
-                crate::color::BLACK,
-                MOSS_DEEP,
-                self.elapsed,
-            )
+            Rgba::lerp(crate::color::BLACK, MOSS_DEEP, self.elapsed)
         } else {
             MOSS_DEEP
         };

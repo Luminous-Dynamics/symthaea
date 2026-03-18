@@ -7,7 +7,7 @@
 //! Science: APA DSM-5 (2013), WHO ICD-11 (2019), Kotov et al. (2017) HiTOP.
 
 use serde::{Deserialize, Serialize};
-use symthaea_core::hdc::{BinaryHV, HDC_DIMENSION};
+use symthaea_core::hdc::BinaryHV;
 
 /// Genesis seed phrase for clinical ontology vectors.
 const CLINICAL_GENESIS: &str = "consciousness-first clinical knowledge for healing";

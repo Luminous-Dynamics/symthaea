@@ -759,7 +759,10 @@ mod tests {
         assert_eq!(cmd.posture, GuardianPosture::Defensive);
         assert!(!cmd.locomotion_permitted);
         assert!(cmd.cpg_phases.is_empty(), "No CPG in defensive");
-        assert!(cmd.sensor_sweep_multiplier < 0.5, "Defensive = fast sensor sweep");
+        assert!(
+            cmd.sensor_sweep_multiplier < 0.5,
+            "Defensive = fast sensor sweep"
+        );
     }
 
     #[cfg(feature = "safety-agents")]

@@ -177,6 +177,26 @@ pub fn verify_model_integrity(path: &Path, expected_hash: Option<&str>) -> Resul
     }
 }
 
+/// Verify integrity and load safetensors via memory-mapped I/O.
+///
+/// Consolidates the `verify → unsafe mmap` pattern into a single safe
+/// wrapper. The `unsafe` is justified because `verify_model_integrity`
+/// has already confirmed file existence and (optionally) SHA-256 hash.
+#[cfg(feature = "neural-bridge")]
+pub fn verified_mmap_safetensors(
+    paths: &[impl AsRef<std::path::Path>],
+    dtype: candle_core::DType,
+    device: &candle_core::Device,
+    expected_hash: Option<&str>,
+) -> Result<candle_nn::VarBuilder<'static>> {
+    for p in paths {
+        verify_model_integrity(p.as_ref(), expected_hash)?;
+    }
+    let path_refs: Vec<&std::path::Path> = paths.iter().map(|p| p.as_ref()).collect();
+    // SAFETY: Files verified above (existence + optional SHA-256 integrity).
+    Ok(unsafe { candle_nn::VarBuilder::from_mmaped_safetensors(&path_refs, dtype, device)? })
+}
+
 /// Stub for non-neural-bridge builds. Always succeeds with a no-op.
 #[cfg(not(feature = "neural-bridge"))]
 pub fn verify_model_integrity(_path: &Path, _expected_hash: Option<&str>) -> Result<()> {

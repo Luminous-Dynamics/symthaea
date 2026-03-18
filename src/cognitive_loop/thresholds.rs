@@ -2529,6 +2529,20 @@ pub const GOV_COLLECTIVE_PHI_ECB: f32 = 0.01;
 /// Basis: Woolley et al. (2010) — collective intelligence factor.
 pub const GOV_CONSCIOUSNESS_MODULATION: f64 = 0.04; // ±2% at extremes (0.04 × 0.5 = 0.02)
 
+/// Number of lagged consciousness values for governance decorrelation.
+/// At 20Hz, 50 cycles ≈ 2.5s — enough temporal separation to break the
+/// consciousness → governance → neuromod → consciousness feedback loop.
+/// Basis: Granger (1969) — temporal decorrelation breaks circular causation.
+pub const GOVERNANCE_CONSCIOUSNESS_LAG_SIZE: usize = 50;
+
+/// Maximum age (in cycles) before stale ethics consequence predictions are expired.
+/// Basis: Cushman (2013) — dual-process moral cognition outcome observation windows.
+pub const CONSEQUENCE_TRACKER_MAX_AGE_CYCLES: u64 = 2000;
+
+/// EMA alpha for consequence tracker prediction accuracy.
+/// Basis: Friston (2010) — precision-weighted prediction error learning.
+pub const CONSEQUENCE_TRACKER_ACCURACY_ALPHA: f64 = 0.05;
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // GLYPH CODEX — SYMBOLIC CONSCIOUSNESS COUPLING
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -5653,9 +5667,7 @@ mod tests {
             KNOWLEDGE_ETHICS_CAUSAL_DEPTH_THRESHOLD > 0.0
                 && KNOWLEDGE_ETHICS_CAUSAL_DEPTH_THRESHOLD < 1.0
         );
-        assert!(
-            KNOWLEDGE_ETHICS_CONFIDENCE_GAIN > 0.0 && KNOWLEDGE_ETHICS_CONFIDENCE_GAIN < 0.1
-        );
+        assert!(KNOWLEDGE_ETHICS_CONFIDENCE_GAIN > 0.0 && KNOWLEDGE_ETHICS_CONFIDENCE_GAIN < 0.1);
         // Cross-coupling: Memory → Learning
         assert!(
             MEMORY_CONSOLIDATION_PLASTICITY_THRESHOLD > 0.0
@@ -5670,13 +5682,11 @@ mod tests {
                 && MEMORY_RECALL_QUALITY_DAMPEN_THRESHOLD < 0.5
         );
         assert!(
-            MEMORY_RECALL_QUALITY_DAMPEN_SCALE > 0.0
-                && MEMORY_RECALL_QUALITY_DAMPEN_SCALE < 1.0
+            MEMORY_RECALL_QUALITY_DAMPEN_SCALE > 0.0 && MEMORY_RECALL_QUALITY_DAMPEN_SCALE < 1.0
         );
         // Cross-coupling: Perception → Drive
         assert!(
-            PERCEPTION_LOW_COHERENCE_THRESHOLD > 0.0
-                && PERCEPTION_LOW_COHERENCE_THRESHOLD < 0.5
+            PERCEPTION_LOW_COHERENCE_THRESHOLD > 0.0 && PERCEPTION_LOW_COHERENCE_THRESHOLD < 0.5
         );
         assert!(
             PERCEPTION_LOW_COHERENCE_EXPLORE_GAIN > 0.0

@@ -19,7 +19,7 @@
 //! Ed25519 keys prove *who* you are. Trajectory vectors prove *that* you are a
 //! consistent behavioral agent. This is a second factor, not a primary identity.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 
 use super::binary_hv::BinaryHV;
 
@@ -29,6 +29,12 @@ const MAX_ACTIONS_PER_DOMAIN: usize = 1024;
 /// Default exponential decay rate for trajectory weighting.
 /// Higher values mean recent actions dominate more strongly.
 const DEFAULT_DECAY_RATE: f64 = 0.01;
+
+/// Default checkpoint interval (actions per checkpoint window).
+const DEFAULT_CHECKPOINT_INTERVAL: u64 = 50;
+
+/// Maximum checkpoints retained in the ring buffer.
+const MAX_CHECKPOINTS: usize = 8;
 
 /// Behavioral domains for trajectory separation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -56,6 +62,17 @@ struct TrajectoryEntry {
     timestamp: u64,
 }
 
+/// A windowed checkpoint: a bundle of actions over a fixed interval.
+#[derive(Debug, Clone)]
+pub struct TrajectoryCheckpoint {
+    /// Cycle/timestamp when this checkpoint was created.
+    pub cycle: u64,
+    /// Bundle of all action HVs in this window.
+    pub bundle: BinaryHV,
+    /// Number of actions in this checkpoint window.
+    pub action_count: u64,
+}
+
 /// Per-domain trajectory state.
 #[derive(Debug)]
 struct DomainTrajectory {
@@ -66,14 +83,27 @@ struct DomainTrajectory {
     accumulator: BinaryHV,
     /// Number of actions accumulated (including pruned).
     total_actions: u64,
+    /// Windowed checkpoints ring buffer (max MAX_CHECKPOINTS).
+    checkpoints: VecDeque<TrajectoryCheckpoint>,
+    /// Actions accumulated since last checkpoint.
+    window_entries: Vec<BinaryHV>,
+    /// Actions per checkpoint window.
+    checkpoint_interval: u64,
 }
 
 impl DomainTrajectory {
     fn with_seed(seed: u64) -> Self {
+        Self::with_seed_and_interval(seed, DEFAULT_CHECKPOINT_INTERVAL)
+    }
+
+    fn with_seed_and_interval(seed: u64, checkpoint_interval: u64) -> Self {
         Self {
             entries: Vec::new(),
             accumulator: BinaryHV::random(seed),
             total_actions: 0,
+            checkpoints: VecDeque::new(),
+            window_entries: Vec::new(),
+            checkpoint_interval,
         }
     }
 }
@@ -90,6 +120,8 @@ pub struct TrajectoryAccumulator {
     decay_rate: f64,
     /// Seed for deterministic initialization.
     seed: u64,
+    /// Checkpoint interval for new domains.
+    checkpoint_interval: u64,
 }
 
 impl TrajectoryAccumulator {
@@ -99,6 +131,7 @@ impl TrajectoryAccumulator {
             domains: HashMap::new(),
             decay_rate: DEFAULT_DECAY_RATE,
             seed,
+            checkpoint_interval: DEFAULT_CHECKPOINT_INTERVAL,
         }
     }
 
@@ -108,6 +141,17 @@ impl TrajectoryAccumulator {
             domains: HashMap::new(),
             decay_rate: decay_rate.clamp(0.0001, 1.0),
             seed,
+            checkpoint_interval: DEFAULT_CHECKPOINT_INTERVAL,
+        }
+    }
+
+    /// Create with a custom checkpoint interval.
+    pub fn with_checkpoint_interval(seed: u64, interval: u64) -> Self {
+        Self {
+            domains: HashMap::new(),
+            decay_rate: DEFAULT_DECAY_RATE,
+            seed,
+            checkpoint_interval: interval.max(1),
         }
     }
 
@@ -117,10 +161,11 @@ impl TrajectoryAccumulator {
     /// preserving the ordering of actions.
     pub fn record_action(&mut self, domain: TrajectoryDomain, action_hv: BinaryHV, timestamp: u64) {
         let domain_seed = self.seed.wrapping_add(domain as u64 * 7919);
+        let checkpoint_interval = self.checkpoint_interval;
         let traj = self
             .domains
             .entry(domain)
-            .or_insert_with(|| DomainTrajectory::with_seed(domain_seed));
+            .or_insert_with(|| DomainTrajectory::with_seed_and_interval(domain_seed, checkpoint_interval));
 
         // Temporal binding: order matters
         // accumulator = rho(accumulator) XOR action_hv
@@ -130,6 +175,22 @@ impl TrajectoryAccumulator {
             timestamp,
         });
         traj.total_actions += 1;
+
+        // Windowed checkpoint accumulation
+        traj.window_entries.push(action_hv);
+        if traj.window_entries.len() as u64 >= traj.checkpoint_interval {
+            let bundle = BinaryHV::bundle(&traj.window_entries);
+            let action_count = traj.window_entries.len() as u64;
+            traj.window_entries.clear();
+            traj.checkpoints.push_back(TrajectoryCheckpoint {
+                cycle: timestamp,
+                bundle,
+                action_count,
+            });
+            if traj.checkpoints.len() > MAX_CHECKPOINTS {
+                traj.checkpoints.pop_front();
+            }
+        }
 
         // Prune oldest entries if over limit
         if traj.entries.len() > MAX_ACTIONS_PER_DOMAIN {
@@ -248,14 +309,62 @@ impl TrajectoryAccumulator {
         self.domains.get(domain).map_or(0, |t| t.total_actions)
     }
 
-    /// BLAKE3 hash of the unified trajectory for compact commitment.
+    /// BLAKE3 hash of checkpointed trajectory for compact commitment.
     ///
-    /// This can be included in a TrustCredential's kvector_commitment field
-    /// to bind the credential to the agent's behavioral trajectory.
+    /// Uses concatenated checkpoint bundles (stable between issuances when no
+    /// checkpoint boundary is crossed) instead of the always-moving accumulator.
+    /// Falls back to unified trajectory hash if no checkpoints exist.
     pub fn trajectory_commitment(&self) -> Option<[u8; 32]> {
-        let unified = self.unified_trajectory()?;
-        let hash = blake3::hash(&unified.0);
-        Some(*hash.as_bytes())
+        // Collect all checkpoints across domains
+        let mut has_checkpoints = false;
+        let mut hasher = blake3::Hasher::new();
+
+        // Sort domains for deterministic ordering
+        let mut domain_keys: Vec<_> = self.domains.keys().collect();
+        domain_keys.sort_by_key(|d| *d as u8);
+
+        for domain in &domain_keys {
+            if let Some(traj) = self.domains.get(domain) {
+                for cp in &traj.checkpoints {
+                    hasher.update(&cp.bundle.0);
+                    has_checkpoints = true;
+                }
+            }
+        }
+
+        if has_checkpoints {
+            Some(*hasher.finalize().as_bytes())
+        } else {
+            // Fallback: hash unified trajectory (pre-checkpoint behavior)
+            let unified = self.unified_trajectory()?;
+            Some(*blake3::hash(&unified.0).as_bytes())
+        }
+    }
+
+    /// Compare trajectory checkpoints with another accumulator checkpoint-by-checkpoint.
+    ///
+    /// Returns per-checkpoint similarity values for divergence analysis.
+    pub fn divergence_from_checkpoints(
+        &self,
+        domain: &TrajectoryDomain,
+        other: &TrajectoryAccumulator,
+    ) -> Option<Vec<f32>> {
+        let self_traj = self.domains.get(domain)?;
+        let other_traj = other.domains.get(domain)?;
+
+        let len = self_traj.checkpoints.len().min(other_traj.checkpoints.len());
+        if len == 0 {
+            return None;
+        }
+
+        let sims: Vec<f32> = (0..len)
+            .map(|i| {
+                self_traj.checkpoints[i]
+                    .bundle
+                    .similarity(&other_traj.checkpoints[i].bundle)
+            })
+            .collect();
+        Some(sims)
     }
 
     /// Clear all recorded actions (useful for testing or privacy reset).
@@ -415,6 +524,77 @@ mod tests {
         assert!(acc.trajectory_commitment().is_none());
         assert_eq!(acc.total_actions(), 0);
         assert_eq!(acc.active_domains(), 0);
+    }
+
+    #[test]
+    fn checkpoint_created_at_interval() {
+        let mut acc = TrajectoryAccumulator::with_checkpoint_interval(42, 10);
+        for i in 0..10 {
+            acc.record_action(TrajectoryDomain::General, action(i), i as u64);
+        }
+        let traj = acc.domains.get(&TrajectoryDomain::General).unwrap();
+        assert_eq!(traj.checkpoints.len(), 1, "One checkpoint after 10 actions with interval 10");
+        assert_eq!(traj.checkpoints[0].action_count, 10);
+    }
+
+    #[test]
+    fn commitment_stable_within_window() {
+        let mut acc = TrajectoryAccumulator::with_checkpoint_interval(42, 10);
+        // Record 10 actions to create checkpoint
+        for i in 0..10 {
+            acc.record_action(TrajectoryDomain::General, action(i), i as u64);
+        }
+        let c1 = acc.trajectory_commitment().unwrap();
+        // Record 5 more (within next window, no new checkpoint)
+        for i in 10..15 {
+            acc.record_action(TrajectoryDomain::General, action(i), i as u64);
+        }
+        let c2 = acc.trajectory_commitment().unwrap();
+        assert_eq!(c1, c2, "Commitment should be stable within a checkpoint window");
+    }
+
+    #[test]
+    fn checkpoint_ring_buffer_bounded() {
+        let mut acc = TrajectoryAccumulator::with_checkpoint_interval(42, 5);
+        // Create 10 checkpoints (50 actions)
+        for i in 0..50 {
+            acc.record_action(TrajectoryDomain::General, action(i), i as u64);
+        }
+        let traj = acc.domains.get(&TrajectoryDomain::General).unwrap();
+        assert_eq!(traj.checkpoints.len(), 8, "Ring buffer should cap at MAX_CHECKPOINTS=8");
+    }
+
+    #[test]
+    fn commitment_differs_from_raw_accumulator() {
+        let mut acc = TrajectoryAccumulator::with_checkpoint_interval(42, 5);
+        for i in 0..10 {
+            acc.record_action(TrajectoryDomain::General, action(i), i as u64);
+        }
+        let checkpoint_commitment = acc.trajectory_commitment().unwrap();
+        // Raw accumulator hash
+        let raw_hash = *blake3::hash(&acc.trajectory(&TrajectoryDomain::General).unwrap().0).as_bytes();
+        assert_ne!(checkpoint_commitment, raw_hash, "Checkpoint commitment should differ from raw accumulator hash");
+    }
+
+    #[test]
+    fn checkpoint_divergence_comparison() {
+        let mut acc1 = TrajectoryAccumulator::with_checkpoint_interval(42, 5);
+        let mut acc2 = TrajectoryAccumulator::with_checkpoint_interval(42, 5);
+        // Same first 5 actions
+        for i in 0..5 {
+            let a = action(i);
+            acc1.record_action(TrajectoryDomain::General, a, i as u64);
+            acc2.record_action(TrajectoryDomain::General, a, i as u64);
+        }
+        // Different next 5 actions
+        for i in 5..10 {
+            acc1.record_action(TrajectoryDomain::General, action(i), i as u64);
+            acc2.record_action(TrajectoryDomain::General, action(i + 100), i as u64);
+        }
+        let sims = acc1.divergence_from_checkpoints(&TrajectoryDomain::General, &acc2).unwrap();
+        assert_eq!(sims.len(), 2);
+        assert_eq!(sims[0], 1.0, "First checkpoint should be identical");
+        assert!(sims[1] < 0.9, "Second checkpoint should diverge");
     }
 
     #[test]

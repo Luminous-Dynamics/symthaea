@@ -176,11 +176,7 @@ mod tests {
         // Verify HV data is 32-byte aligned for all entry indices
         for i in 0..100 {
             let hv_offset = h.entry_offset(i) + ENTRY_HV_OFFSET;
-            assert_eq!(
-                hv_offset % 32,
-                0,
-                "HV data at index {i} not 32-byte aligned"
-            );
+            assert_eq!(hv_offset % 32, 0, "HV data at index {i} not 32-byte aligned");
         }
     }
 }

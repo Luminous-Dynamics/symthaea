@@ -1498,6 +1498,69 @@ pub struct CycleMetadata {
     /// Number of defense actions that passed the moral filter.
     #[serde(default)]
     pub defense_actions_approved: u32,
+
+    // ── Sovereign Inoculation Telemetry ───────────────────────────────
+    // Clock
+    /// Mesh-time consensus offset from local clock (µs).
+    #[serde(default)]
+    pub sovereign_time_offset_us: i64,
+    /// Mesh-time stratum level (0=GPS, 15=unsync).
+    #[serde(default)]
+    pub sovereign_time_stratum: u8,
+    /// Mesh-time drift estimation (ppm).
+    #[serde(default)]
+    pub sovereign_time_drift_ppm: f32,
+    /// Mesh-time peer count contributing to consensus.
+    #[serde(default)]
+    pub sovereign_time_peer_count: usize,
+    /// Mesh-time quality (0=Authoritative, 1=Consensus, 2=Degraded, 3=FreeRunning).
+    #[serde(default)]
+    pub sovereign_time_quality: u8,
+
+    // Trust
+    /// Average trust across web-of-trust graph edges.
+    #[serde(default)]
+    pub sovereign_trust_avg: f32,
+    /// Trust graph density (edges / max possible).
+    #[serde(default)]
+    pub sovereign_trust_density: f32,
+    /// Sybil anomaly count detected.
+    #[serde(default)]
+    pub sovereign_trust_anomalies: u32,
+    /// Fraction of trust edges with post-quantum verification.
+    #[serde(default)]
+    pub sovereign_trust_pq_fraction: f32,
+
+    // Social Fabric
+    /// Mean resonance across tracked peers.
+    #[serde(default)]
+    pub sovereign_social_resonance_mean: f32,
+    /// Content diversity metric (0=echo chamber, 1=maximally diverse).
+    #[serde(default)]
+    pub sovereign_social_diversity: f32,
+    /// Echo chamber risk score (0–1, >0.85 = warning).
+    #[serde(default)]
+    pub sovereign_social_echo_risk: f32,
+    /// Number of unique content peers.
+    #[serde(default)]
+    pub sovereign_social_peer_reach: usize,
+
+    // Survival
+    /// Water availability fraction (0.0–1.0).
+    #[serde(default)]
+    pub sovereign_survival_water_pct: f32,
+    /// Current power consumption (kW).
+    #[serde(default)]
+    pub sovereign_survival_power_kw: f32,
+    /// Whether a survival emergency is active.
+    #[serde(default)]
+    pub sovereign_survival_emergency: bool,
+    /// Number of active IoT sensors.
+    #[serde(default)]
+    pub sovereign_survival_sensor_count: usize,
+    /// Number of active resource alerts.
+    #[serde(default)]
+    pub sovereign_survival_alert_count: usize,
 }
 
 /// Therapeutic subsystem telemetry for CycleMetadata.
@@ -1585,7 +1648,6 @@ pub struct TherapeuticTelemetry {
     pub therapeutic_temporal_coherence: f32,
 
     // ── Shadow work telemetry (Observability Mode — Jung → Friston) ──
-
     /// Total shadow pressure across all fragments (cumulative PE × recurrence × valence).
     #[serde(default)]
     pub shadow_total_pressure: f32,
@@ -2008,6 +2070,16 @@ pub struct EthicalTelemetry {
     /// Unified ethical verdict for this cycle ("Safe", "Caution", or "Blocked").
     #[serde(default)]
     pub unified_verdict: String,
+    /// Consequence tracker prediction accuracy (EMA, 0.0–1.0).
+    /// Tracks whether ethical verdicts (Safe/Caution/Blocked) correctly predicted outcomes.
+    /// 0.5 = uninformative prior, 1.0 = perfect calibration.
+    /// Science: Friston (2010) — active inference; Cushman (2013) — dual-process moral cognition.
+    #[serde(default = "default_consequence_accuracy")]
+    pub ethics_consequence_accuracy: f64,
+}
+
+fn default_consequence_accuracy() -> f64 {
+    0.5
 }
 
 /// Free energy principle (FEP) and predictive processing telemetry.

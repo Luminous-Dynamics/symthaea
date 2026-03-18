@@ -53,7 +53,7 @@ impl ChangeBlindnessBenchmark {
 
         // Detection temperature: higher = noisier decisions.
         // Time pressure makes detection harder (less careful comparison).
-        let temperature: f64 = (0.12 + config.time_pressure * 0.10)
+        let temperature: f64 = (0.10 + config.time_pressure * 0.10)
             * diff_model.temperature_multiplier(config.difficulty);
 
         // Scene parameters

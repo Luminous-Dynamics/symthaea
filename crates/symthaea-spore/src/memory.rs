@@ -129,10 +129,7 @@ impl SemanticMemory {
         &self.stats
     }
 
-    /// Iterate over all populated entries in the ring buffer.
-    ///
-    /// Returns `(slot_index, &SemanticEntry)` pairs. Used for checkpoint
-    /// serialization — the slot index preserves ring buffer position.
+    /// Iterate over all stored entries with their slot indices (for checkpoint serialization).
     pub fn iter_entries(&self) -> impl Iterator<Item = (usize, &SemanticEntry)> {
         self.entries
             .iter()
@@ -140,31 +137,16 @@ impl SemanticMemory {
             .filter_map(|(i, slot)| slot.as_ref().map(|e| (i, e)))
     }
 
-    /// Restore the ring buffer from a checkpoint snapshot.
-    ///
-    /// Clears existing entries and rebuilds from the provided list.
-    /// Each tuple is `(slot_index, entry)`. The write position and count
-    /// are recomputed from the restored data.
+    /// Restore entries from a checkpoint. Overwrites existing entries at the given slot indices.
     pub fn restore_entries(&mut self, entries: Vec<(usize, SemanticEntry)>) {
-        // Clear all slots
-        for slot in self.entries.iter_mut() {
-            *slot = None;
-        }
-        self.count = 0;
-        self.write_pos = 0;
-
-        let mut max_slot = 0usize;
         for (idx, entry) in entries {
-            if idx < self.max_entries {
+            if idx < self.entries.len() {
                 self.entries[idx] = Some(entry);
-                self.count += 1;
-                if idx >= max_slot {
-                    max_slot = idx + 1;
+                if idx >= self.count {
+                    self.count = idx + 1;
                 }
             }
         }
-        // Set write_pos to one past the highest populated slot (mod capacity)
-        self.write_pos = max_slot % self.max_entries;
     }
 }
 
@@ -284,21 +266,14 @@ impl EpisodicMemory {
         self.episodes.clear();
     }
 
-    /// Iterate over all stored episodes.
-    ///
-    /// Used for checkpoint serialization.
+    /// Iterate over all stored episodes (for checkpoint serialization).
     pub fn iter_episodes(&self) -> impl Iterator<Item = &Episode> {
         self.episodes.iter()
     }
 
-    /// Restore episodes from a checkpoint snapshot.
-    ///
-    /// Replaces the current episode buffer with the provided list.
-    /// No Phi threshold filtering is applied — these are pre-validated entries
-    /// from a previous checkpoint.
+    /// Restore episodes from a checkpoint, replacing all existing episodes.
     pub fn restore_episodes(&mut self, episodes: Vec<Episode>) {
         self.episodes = episodes;
-        // Truncate to capacity if the checkpoint had more entries than current config
         if self.episodes.len() > self.max_episodes {
             self.episodes.truncate(self.max_episodes);
         }

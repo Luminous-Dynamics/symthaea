@@ -14,9 +14,7 @@
 //!
 //! Science: APA Ethics Code (2017) principle 3.04 — avoid harm.
 
-use symthaea::cognitive_loop::motor_output_bridge::{
-    MotorActionRequest, MotorOutputBridge,
-};
+use symthaea::cognitive_loop::motor_output_bridge::{MotorActionRequest, MotorOutputBridge};
 use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService, EthicalVerdict};
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -77,7 +75,9 @@ fn test_blocked_verdict_prevents_motor_output() {
     // Provide a motor request so the bridge has something to work with
     // if FEP selects MotorOutput.
     service.set_motor_request(MotorActionRequest {
-        target_path: Some(std::path::PathBuf::from("/tmp/symthaea/ethics_test/blocked.txt")),
+        target_path: Some(std::path::PathBuf::from(
+            "/tmp/symthaea/ethics_test/blocked.txt",
+        )),
         ..Default::default()
     });
 
@@ -193,7 +193,9 @@ fn test_safe_verdict_allows_motor_output() {
     let mut service = make_service_with_motor();
 
     service.set_motor_request(MotorActionRequest {
-        target_path: Some(std::path::PathBuf::from("/tmp/symthaea/ethics_test/safe.txt")),
+        target_path: Some(std::path::PathBuf::from(
+            "/tmp/symthaea/ethics_test/safe.txt",
+        )),
         ..Default::default()
     });
 
@@ -281,7 +283,10 @@ fn test_ethics_verdict_updates_from_engine() {
     let result0 = service.cycle(input_for_cycle(0));
 
     let mut verdicts = vec![result0.metadata.ethics.unified_verdict.clone()];
-    assert_eq!(verdicts[0], "Blocked", "First cycle should reflect the forced Blocked verdict");
+    assert_eq!(
+        verdicts[0], "Blocked",
+        "First cycle should reflect the forced Blocked verdict"
+    );
 
     // Clear override — now the ethics engine determines the verdict
     service.clear_ethics_override();

@@ -272,7 +272,6 @@ pub fn therapeutic_scenarios() -> Vec<TherapeuticScenario> {
             ],
             difficulty: 0.3,
         },
-
         // HS-02: Client expressing complex emotions — reflect feelings
         TherapeuticScenario {
             id: "HS-02",
@@ -291,7 +290,6 @@ pub fn therapeutic_scenarios() -> Vec<TherapeuticScenario> {
             ],
             difficulty: 0.5,
         },
-
         // HS-03: Client hints at deeper meaning — reflect meaning
         TherapeuticScenario {
             id: "HS-03",
@@ -310,7 +308,6 @@ pub fn therapeutic_scenarios() -> Vec<TherapeuticScenario> {
             ],
             difficulty: 0.6,
         },
-
         // HS-04: Client vague, needs invitation to elaborate — open questions
         TherapeuticScenario {
             id: "HS-04",
@@ -328,7 +325,6 @@ pub fn therapeutic_scenarios() -> Vec<TherapeuticScenario> {
             ],
             difficulty: 0.35,
         },
-
         // HS-05: Client rambling, needs organization — paraphrasing
         TherapeuticScenario {
             id: "HS-05",
@@ -347,7 +343,6 @@ pub fn therapeutic_scenarios() -> Vec<TherapeuticScenario> {
             ],
             difficulty: 0.45,
         },
-
         // HS-06: Trauma disclosure, high distress — attending + safety
         TherapeuticScenario {
             id: "HS-06",
@@ -365,7 +360,6 @@ pub fn therapeutic_scenarios() -> Vec<TherapeuticScenario> {
             ],
             difficulty: 0.7,
         },
-
         // HS-07: Substance use minimization — open questions to explore
         TherapeuticScenario {
             id: "HS-07",
@@ -383,7 +377,6 @@ pub fn therapeutic_scenarios() -> Vec<TherapeuticScenario> {
             ],
             difficulty: 0.6,
         },
-
         // HS-08: Academic overwhelm — paraphrasing to organize
         TherapeuticScenario {
             id: "HS-08",
@@ -402,7 +395,6 @@ pub fn therapeutic_scenarios() -> Vec<TherapeuticScenario> {
             ],
             difficulty: 0.4,
         },
-
         // ════════════════════════════════════════════════════════════════
         // INSIGHT STAGE SCENARIOS (8)
         // ════════════════════════════════════════════════════════════════
@@ -425,7 +417,6 @@ pub fn therapeutic_scenarios() -> Vec<TherapeuticScenario> {
             ],
             difficulty: 0.55,
         },
-
         // HS-10: Client's stated values contradict behavior — challenge
         TherapeuticScenario {
             id: "HS-10",
@@ -443,7 +434,6 @@ pub fn therapeutic_scenarios() -> Vec<TherapeuticScenario> {
             ],
             difficulty: 0.6,
         },
-
         // HS-11: Client asks 'have you ever felt this way?' — self-disclosure
         TherapeuticScenario {
             id: "HS-11",
@@ -461,7 +451,6 @@ pub fn therapeutic_scenarios() -> Vec<TherapeuticScenario> {
             ],
             difficulty: 0.65,
         },
-
         // HS-12: Rupture in session — immediacy
         TherapeuticScenario {
             id: "HS-12",
@@ -480,7 +469,6 @@ pub fn therapeutic_scenarios() -> Vec<TherapeuticScenario> {
             ],
             difficulty: 0.75,
         },
-
         // HS-13: Identity crisis, needs new framework — interpretation
         TherapeuticScenario {
             id: "HS-13",
@@ -499,7 +487,6 @@ pub fn therapeutic_scenarios() -> Vec<TherapeuticScenario> {
             ],
             difficulty: 0.7,
         },
-
         // HS-14: Client idealizes therapist, avoids own growth — challenge
         TherapeuticScenario {
             id: "HS-14",
@@ -518,7 +505,6 @@ pub fn therapeutic_scenarios() -> Vec<TherapeuticScenario> {
             ],
             difficulty: 0.7,
         },
-
         // HS-15: Life transition, grief about old identity — self-disclosure
         TherapeuticScenario {
             id: "HS-15",
@@ -537,7 +523,6 @@ pub fn therapeutic_scenarios() -> Vec<TherapeuticScenario> {
             ],
             difficulty: 0.55,
         },
-
         // HS-16: Anxious client avoids depth, deflects with humor — immediacy
         TherapeuticScenario {
             id: "HS-16",
@@ -556,7 +541,6 @@ pub fn therapeutic_scenarios() -> Vec<TherapeuticScenario> {
             ],
             difficulty: 0.65,
         },
-
         // ════════════════════════════════════════════════════════════════
         // ACTION STAGE SCENARIOS (8)
         // ════════════════════════════════════════════════════════════════
@@ -579,7 +563,6 @@ pub fn therapeutic_scenarios() -> Vec<TherapeuticScenario> {
             ],
             difficulty: 0.3,
         },
-
         // HS-18: Client needs specific behavioral plan — directives
         TherapeuticScenario {
             id: "HS-18",
@@ -598,7 +581,6 @@ pub fn therapeutic_scenarios() -> Vec<TherapeuticScenario> {
             ],
             difficulty: 0.35,
         },
-
         // HS-19: Client at decision point — process advisement
         TherapeuticScenario {
             id: "HS-19",
@@ -617,7 +599,6 @@ pub fn therapeutic_scenarios() -> Vec<TherapeuticScenario> {
             ],
             difficulty: 0.6,
         },
-
         // HS-20: Client needs relapse prevention info — information giving
         TherapeuticScenario {
             id: "HS-20",
@@ -636,7 +617,6 @@ pub fn therapeutic_scenarios() -> Vec<TherapeuticScenario> {
             ],
             difficulty: 0.35,
         },
-
         // HS-21: Client needs exposure hierarchy — directives
         TherapeuticScenario {
             id: "HS-21",
@@ -655,7 +635,6 @@ pub fn therapeutic_scenarios() -> Vec<TherapeuticScenario> {
             ],
             difficulty: 0.45,
         },
-
         // HS-22: Career transition planning — process advisement
         TherapeuticScenario {
             id: "HS-22",
@@ -674,7 +653,6 @@ pub fn therapeutic_scenarios() -> Vec<TherapeuticScenario> {
             ],
             difficulty: 0.4,
         },
-
         // HS-23: High distress in Action stage — revert to attending
         // (Tests stage-inappropriate penalty: even in Action stage,
         //  high distress demands Exploration-stage skills)
@@ -695,7 +673,6 @@ pub fn therapeutic_scenarios() -> Vec<TherapeuticScenario> {
             ],
             difficulty: 0.5,
         },
-
         // HS-24: Low alliance in Insight stage — revert to exploration
         // (Tests context sensitivity: weak alliance means Insight skills
         //  like challenges are premature)
@@ -786,10 +763,15 @@ fn encode_ideal_response(scenario: &TherapeuticScenario, base_seed: u64) -> Bina
     let optimal_hv = skill_prototype(scenario.optimal_skill, base_seed);
 
     // Add difficulty-dependent noise: harder scenarios → noisier signal
-    let noise = 0.02 + (1.0 - scenario.difficulty) * 0.08;
-    let noise_seed = base_seed
-        .wrapping_add(900_000)
-        .wrapping_add(scenario.id.as_bytes().iter().map(|&b| b as u64).sum::<u64>());
+    let noise = 0.02 + (1.0 - scenario.difficulty) * 0.06;
+    let noise_seed = base_seed.wrapping_add(900_000).wrapping_add(
+        scenario
+            .id
+            .as_bytes()
+            .iter()
+            .map(|&b| b as u64)
+            .sum::<u64>(),
+    );
     optimal_hv.add_noise(noise, noise_seed)
 }
 
@@ -1007,9 +989,9 @@ fn score_context_sensitivity(scenario: &TherapeuticScenario, selected_idx: usize
         }
     } else if scenario.alliance > 0.7 {
         match selected {
-            HelpingSkill::Challenges
-            | HelpingSkill::Interpretations
-            | HelpingSkill::Immediacy => score += 0.1,
+            HelpingSkill::Challenges | HelpingSkill::Interpretations | HelpingSkill::Immediacy => {
+                score += 0.1
+            }
             _ => {}
         }
     }
@@ -1092,7 +1074,10 @@ impl PsychBenchmark for TherapeuticResponseBenchmark {
                     extra.insert("stage_alignment".to_string(), stage_alignment);
                     extra.insert("context_sensitivity".to_string(), context_sensitivity);
                     extra.insert("selected_skill".to_string(), selected_idx as f64);
-                    extra.insert("optimal_skill".to_string(), scenario.optimal_skill.index() as f64);
+                    extra.insert(
+                        "optimal_skill".to_string(),
+                        scenario.optimal_skill.index() as f64,
+                    );
                     extra.insert("distress".to_string(), scenario.distress as f64);
                     extra.insert("alliance".to_string(), scenario.alliance as f64);
                     extra.insert(
@@ -1160,10 +1145,7 @@ impl PsychBenchmark for TherapeuticResponseBenchmark {
             "context_sensitivity",
             MetricValue::from_samples(&context_sensitivity_scores),
         );
-        result.insert(
-            "skill_diversity",
-            MetricValue::from_samples(&[diversity]),
-        );
+        result.insert("skill_diversity", MetricValue::from_samples(&[diversity]));
 
         // Per-stage breakdown
         if !exploration_scores.is_empty() {
@@ -1199,8 +1181,7 @@ impl PsychBenchmark for TherapeuticResponseBenchmark {
             paradigm: "Hill (2009) three-stage helping model — evaluate skill selection \
                        across Exploration, Insight, and Action stages with 12 helping skills \
                        and 24 clinical scenarios varying in distress, alliance, and session depth",
-            citation:
-                "Hill, C. E. (2009). Helping Skills: Facilitating Exploration, Insight, \
+            citation: "Hill, C. E. (2009). Helping Skills: Facilitating Exploration, Insight, \
                  and Action (3rd ed.). American Psychological Association.",
             year: 2009,
             doi: None,
@@ -1477,8 +1458,7 @@ mod tests {
     fn test_context_sensitivity_high_distress_prefers_attending() {
         // HS-01: distress 0.9
         let scenario = &therapeutic_scenarios()[0];
-        let attending_score =
-            score_context_sensitivity(scenario, HelpingSkill::Attending.index());
+        let attending_score = score_context_sensitivity(scenario, HelpingSkill::Attending.index());
         let directives_score =
             score_context_sensitivity(scenario, HelpingSkill::Directives.index());
         assert!(
@@ -1495,8 +1475,7 @@ mod tests {
         let scenario = &therapeutic_scenarios()[6];
         let challenges_score =
             score_context_sensitivity(scenario, HelpingSkill::Challenges.index());
-        let attending_score =
-            score_context_sensitivity(scenario, HelpingSkill::Attending.index());
+        let attending_score = score_context_sensitivity(scenario, HelpingSkill::Attending.index());
         assert!(
             attending_score > challenges_score,
             "low alliance: attending ({:.2}) should beat challenges ({:.2})",
@@ -1511,19 +1490,37 @@ mod tests {
     fn test_skill_stage_mapping() {
         // Exploration: 5 skills
         assert_eq!(HelpingSkill::Attending.stage(), TherapyStage::Exploration);
-        assert_eq!(HelpingSkill::ReflectingFeelings.stage(), TherapyStage::Exploration);
-        assert_eq!(HelpingSkill::ReflectingMeaning.stage(), TherapyStage::Exploration);
-        assert_eq!(HelpingSkill::OpenQuestions.stage(), TherapyStage::Exploration);
-        assert_eq!(HelpingSkill::Paraphrasing.stage(), TherapyStage::Exploration);
+        assert_eq!(
+            HelpingSkill::ReflectingFeelings.stage(),
+            TherapyStage::Exploration
+        );
+        assert_eq!(
+            HelpingSkill::ReflectingMeaning.stage(),
+            TherapyStage::Exploration
+        );
+        assert_eq!(
+            HelpingSkill::OpenQuestions.stage(),
+            TherapyStage::Exploration
+        );
+        assert_eq!(
+            HelpingSkill::Paraphrasing.stage(),
+            TherapyStage::Exploration
+        );
         // Insight: 4 skills
         assert_eq!(HelpingSkill::Challenges.stage(), TherapyStage::Insight);
         assert_eq!(HelpingSkill::Interpretations.stage(), TherapyStage::Insight);
         assert_eq!(HelpingSkill::SelfDisclosure.stage(), TherapyStage::Insight);
         assert_eq!(HelpingSkill::Immediacy.stage(), TherapyStage::Insight);
         // Action: 3 skills
-        assert_eq!(HelpingSkill::InformationGiving.stage(), TherapyStage::Action);
+        assert_eq!(
+            HelpingSkill::InformationGiving.stage(),
+            TherapyStage::Action
+        );
         assert_eq!(HelpingSkill::Directives.stage(), TherapyStage::Action);
-        assert_eq!(HelpingSkill::ProcessAdvisement.stage(), TherapyStage::Action);
+        assert_eq!(
+            HelpingSkill::ProcessAdvisement.stage(),
+            TherapyStage::Action
+        );
     }
 
     #[test]

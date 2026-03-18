@@ -576,7 +576,7 @@ impl CognitivePacing {
                 pacing.sentence_pause *= pause_factor;
                 // Softer energy: reduce emphasis proportionally
                 pacing.emphasis *= 1.0 - (self.client_distress - 0.3) * 0.3; // 0.79–1.0
-                // More breath pauses when client is distressed (models attentive presence)
+                                                                             // More breath pauses when client is distressed (models attentive presence)
                 pacing.breath_probability += self.client_distress * 0.15;
                 pacing.breath_probability = pacing.breath_probability.min(0.5);
             }
@@ -1192,5 +1192,150 @@ mod tests {
         assert!((pacing.coherence_velocity).abs() < 0.01);
         assert!((pacing.cross_module_agreement - 1.0).abs() < 0.01);
         assert!((pacing.consciousness_level - 0.5).abs() < 0.01);
+    }
+
+    // ===== Therapeutic Voice Modulation Tests =====
+
+    #[cfg(feature = "therapeutic")]
+    fn make_therapeutic_pacing(distress: f32, alliance: f32, intent: f32) -> CognitivePacing {
+        let mut pacing = make_base_pacing();
+        pacing.client_distress = distress;
+        pacing.alliance_quality = alliance;
+        pacing.therapeutic_intent = intent;
+        pacing
+    }
+
+    #[cfg(feature = "therapeutic")]
+    #[test]
+    fn test_therapeutic_distress_slows_rate() {
+        let calm = make_therapeutic_pacing(0.0, 0.5, 1.0);
+        let distressed = make_therapeutic_pacing(0.8, 0.5, 1.0);
+        let rate_calm = calm.effective_pacing().rate;
+        let rate_distressed = distressed.effective_pacing().rate;
+        assert!(
+            rate_distressed < rate_calm,
+            "High distress should slow rate: distressed={rate_distressed} vs calm={rate_calm}"
+        );
+    }
+
+    #[cfg(feature = "therapeutic")]
+    #[test]
+    fn test_therapeutic_distress_increases_pauses() {
+        let calm = make_therapeutic_pacing(0.0, 0.5, 1.0);
+        let distressed = make_therapeutic_pacing(0.8, 0.5, 1.0);
+        let pause_calm = calm.effective_pacing().phrase_pause;
+        let pause_distressed = distressed.effective_pacing().phrase_pause;
+        assert!(
+            pause_distressed > pause_calm,
+            "High distress should increase pauses: distressed={pause_distressed} vs calm={pause_calm}"
+        );
+    }
+
+    #[cfg(feature = "therapeutic")]
+    #[test]
+    fn test_therapeutic_distress_softens_emphasis() {
+        let calm = make_therapeutic_pacing(0.0, 0.5, 1.0);
+        let distressed = make_therapeutic_pacing(0.8, 0.5, 1.0);
+        let emph_calm = calm.effective_pacing().emphasis;
+        let emph_distressed = distressed.effective_pacing().emphasis;
+        assert!(
+            emph_distressed < emph_calm,
+            "High distress should soften emphasis: distressed={emph_distressed} vs calm={emph_calm}"
+        );
+    }
+
+    #[cfg(feature = "therapeutic")]
+    #[test]
+    fn test_therapeutic_low_alliance_warms_tone() {
+        let low_alliance = make_therapeutic_pacing(0.0, 0.1, 1.0);
+        let high_alliance = make_therapeutic_pacing(0.0, 0.8, 1.0);
+        let valence_low = low_alliance.effective_pacing().emotional_valence;
+        let valence_high = high_alliance.effective_pacing().emotional_valence;
+        assert!(
+            valence_low > valence_high,
+            "Low alliance should boost warmth: low={valence_low} vs high={valence_high}"
+        );
+    }
+
+    #[cfg(feature = "therapeutic")]
+    #[test]
+    fn test_therapeutic_high_alliance_widens_range() {
+        let mid_alliance = make_therapeutic_pacing(0.0, 0.5, 1.0);
+        let high_alliance = make_therapeutic_pacing(0.0, 0.9, 1.0);
+        let emph_mid = mid_alliance.effective_pacing().emphasis;
+        let emph_high = high_alliance.effective_pacing().emphasis;
+        assert!(
+            emph_high > emph_mid,
+            "High alliance should widen emphasis: high={emph_high} vs mid={emph_mid}"
+        );
+    }
+
+    #[cfg(feature = "therapeutic")]
+    #[test]
+    fn test_therapeutic_intent_validate_warms() {
+        let validate = make_therapeutic_pacing(0.0, 0.5, 0.0); // intent 0
+        let neutral = make_therapeutic_pacing(0.0, 0.5, 1.0);  // intent 1 (no match)
+        let valence_val = validate.effective_pacing().emotional_valence;
+        let valence_neutral = neutral.effective_pacing().emotional_valence;
+        assert!(
+            valence_val > valence_neutral,
+            "Validate intent should warm tone: validate={valence_val} vs neutral={valence_neutral}"
+        );
+    }
+
+    #[cfg(feature = "therapeutic")]
+    #[test]
+    fn test_therapeutic_intent_crisis_grounding() {
+        let crisis = make_therapeutic_pacing(0.0, 0.5, 7.0);
+        let neutral = make_therapeutic_pacing(0.0, 0.5, 1.0);
+        let rate_crisis = crisis.effective_pacing().rate;
+        let rate_neutral = neutral.effective_pacing().rate;
+        assert!(
+            rate_crisis < rate_neutral * 0.8,
+            "Crisis intent should significantly slow rate: crisis={rate_crisis} vs neutral={rate_neutral}"
+        );
+        let breath_crisis = crisis.effective_pacing().breath_probability;
+        assert!(
+            breath_crisis >= 0.29,
+            "Crisis should set breath_probability ≈ 0.3: got {breath_crisis}"
+        );
+    }
+
+    #[cfg(feature = "therapeutic")]
+    #[test]
+    fn test_therapeutic_intent_challenge_firms() {
+        let challenge = make_therapeutic_pacing(0.0, 0.5, 5.0); // intent 5
+        let neutral = make_therapeutic_pacing(0.0, 0.5, 1.0);
+        let emph_challenge = challenge.effective_pacing().emphasis;
+        let emph_neutral = neutral.effective_pacing().emphasis;
+        assert!(
+            emph_challenge > emph_neutral,
+            "Challenge intent should firm emphasis: challenge={emph_challenge} vs neutral={emph_neutral}"
+        );
+    }
+
+    #[cfg(feature = "therapeutic")]
+    #[test]
+    fn test_therapeutic_distress_threshold() {
+        // At exactly 0.3, distress modulation should not activate
+        let at_threshold = make_therapeutic_pacing(0.3, 0.5, 1.0);
+        let below_threshold = make_therapeutic_pacing(0.29, 0.5, 1.0);
+        let rate_at = at_threshold.effective_pacing().rate;
+        let rate_below = below_threshold.effective_pacing().rate;
+        assert!(
+            (rate_at - rate_below).abs() < 0.01,
+            "At distress=0.3 should behave like below: at={rate_at} vs below={rate_below}"
+        );
+    }
+
+    #[cfg(feature = "therapeutic")]
+    #[test]
+    fn test_therapeutic_breath_probability_capped() {
+        let extreme = make_therapeutic_pacing(1.0, 0.5, 1.0);
+        let breath = extreme.effective_pacing().breath_probability;
+        assert!(
+            breath <= 0.5,
+            "Breath probability should cap at 0.5: got {breath}"
+        );
     }
 }

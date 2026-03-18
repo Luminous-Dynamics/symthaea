@@ -66,6 +66,19 @@ pub enum AttachmentStyle {
     Disorganized,
 }
 
+impl AttachmentStyle {
+    /// Static string for telemetry (avoids `format!("{:?}")`).
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            AttachmentStyle::Forming => "Forming",
+            AttachmentStyle::Secure => "Secure",
+            AttachmentStyle::Anxious => "Anxious",
+            AttachmentStyle::Avoidant => "Avoidant",
+            AttachmentStyle::Disorganized => "Disorganized",
+        }
+    }
+}
+
 /// Bowlby's 4-stage separation distress cascade.
 ///
 /// Progression: Calm -> Quiet -> Vocalization -> Protest -> Despair.

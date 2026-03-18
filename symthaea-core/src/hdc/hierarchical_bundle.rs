@@ -173,10 +173,7 @@ impl HierarchicalBundler {
 
     /// Number of regions with accumulated vectors.
     pub fn active_region_count(&self) -> usize {
-        self.accumulators
-            .values()
-            .filter(|v| !v.is_empty())
-            .count()
+        self.accumulators.values().filter(|v| !v.is_empty()).count()
     }
 
     /// Total vectors across all regions.
@@ -223,13 +220,22 @@ impl ProgressiveBundler {
     /// Create a new progressive bundler at the given level.
     pub fn new(level: HierarchyLevel, seed: u64) -> Self {
         let mut hierarchy_roles = HashMap::new();
-        hierarchy_roles.insert(HierarchyLevel::Node, BinaryHV::random(seed.wrapping_add(1000)));
+        hierarchy_roles.insert(
+            HierarchyLevel::Node,
+            BinaryHV::random(seed.wrapping_add(1000)),
+        );
         hierarchy_roles.insert(
             HierarchyLevel::Neighborhood,
             BinaryHV::random(seed.wrapping_add(2000)),
         );
-        hierarchy_roles.insert(HierarchyLevel::Ward, BinaryHV::random(seed.wrapping_add(3000)));
-        hierarchy_roles.insert(HierarchyLevel::Guild, BinaryHV::random(seed.wrapping_add(4000)));
+        hierarchy_roles.insert(
+            HierarchyLevel::Ward,
+            BinaryHV::random(seed.wrapping_add(3000)),
+        );
+        hierarchy_roles.insert(
+            HierarchyLevel::Guild,
+            BinaryHV::random(seed.wrapping_add(4000)),
+        );
 
         Self {
             level,

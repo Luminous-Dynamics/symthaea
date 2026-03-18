@@ -5,7 +5,6 @@
 //! are provided via feature-gated modules.
 
 use std::collections::HashMap;
-use std::path::PathBuf;
 
 /// Storage trait for Spore persistence.
 ///
@@ -49,65 +48,6 @@ impl SporeStorage for InMemoryStorage {
 
     fn keys(&self) -> Vec<String> {
         self.data.keys().cloned().collect()
-    }
-}
-
-/// File-based storage backend for Android/native persistence.
-///
-/// Stores each key as a separate file under the given directory.
-/// Thread-safe via filesystem atomicity (write to temp, rename).
-pub struct FileStorage {
-    dir: PathBuf,
-}
-
-impl FileStorage {
-    pub fn new(dir: &str) -> Self {
-        let path = PathBuf::from(dir);
-        // Ensure directory exists
-        let _ = std::fs::create_dir_all(&path);
-        Self { dir: path }
-    }
-
-    fn key_path(&self, key: &str) -> PathBuf {
-        // Sanitize key to prevent path traversal
-        let safe_key: String = key
-            .chars()
-            .map(|c| if c.is_alphanumeric() || c == '_' || c == '-' { c } else { '_' })
-            .collect();
-        self.dir.join(format!("{safe_key}.spore"))
-    }
-}
-
-impl SporeStorage for FileStorage {
-    fn load(&self, key: &str) -> Option<Vec<u8>> {
-        std::fs::read(self.key_path(key)).ok()
-    }
-
-    fn save(&mut self, key: &str, data: &[u8]) -> bool {
-        let path = self.key_path(key);
-        // Write to temp file, then rename for atomicity
-        let tmp = path.with_extension("tmp");
-        if std::fs::write(&tmp, data).is_ok() {
-            std::fs::rename(&tmp, &path).is_ok()
-        } else {
-            false
-        }
-    }
-
-    fn delete(&mut self, key: &str) {
-        let _ = std::fs::remove_file(self.key_path(key));
-    }
-
-    fn keys(&self) -> Vec<String> {
-        std::fs::read_dir(&self.dir)
-            .into_iter()
-            .flatten()
-            .filter_map(|e| e.ok())
-            .filter_map(|e| {
-                let name = e.file_name().to_string_lossy().to_string();
-                name.strip_suffix(".spore").map(|s| s.to_string())
-            })
-            .collect()
     }
 }
 
@@ -403,59 +343,5 @@ mod tests {
         let restored = SporeCheckpoint::from_bytes(&loaded).unwrap();
         assert_eq!(restored.cycle, 100);
         assert!((restored.consciousness_level - 0.85).abs() < 1e-6);
-    }
-
-    #[test]
-    fn file_storage_crud() {
-        let dir = std::env::temp_dir().join("spore_test_file_storage");
-        let _ = std::fs::remove_dir_all(&dir);
-
-        let mut storage = FileStorage::new(dir.to_str().unwrap());
-
-        // Save + load
-        assert!(storage.save("state", b"hello consciousness"));
-        assert_eq!(storage.load("state"), Some(b"hello consciousness".to_vec()));
-        assert_eq!(storage.load("missing"), None);
-
-        // Keys
-        storage.save("dreams", b"dream data");
-        let mut keys = storage.keys();
-        keys.sort();
-        assert_eq!(keys, vec!["dreams", "state"]);
-
-        // Delete
-        storage.delete("state");
-        assert_eq!(storage.load("state"), None);
-        assert_eq!(storage.keys().len(), 1);
-
-        // Cleanup
-        let _ = std::fs::remove_dir_all(&dir);
-    }
-
-    #[test]
-    fn file_storage_checkpoint_roundtrip() {
-        let dir = std::env::temp_dir().join("spore_test_file_checkpoint");
-        let _ = std::fs::remove_dir_all(&dir);
-
-        let mut storage = FileStorage::new(dir.to_str().unwrap());
-        let checkpoint = SporeCheckpoint {
-            cycle: 500,
-            consciousness_level: 0.42,
-            neuromodulators: [0.7, 0.3, 0.8, 0.5],
-            semantic_entries: vec![],
-            episodic_entries: vec![],
-            format_version: SporeCheckpoint::FORMAT_VERSION,
-        };
-
-        let bytes = checkpoint.to_bytes();
-        assert!(storage.save("spore_checkpoint", &bytes));
-
-        let loaded = storage.load("spore_checkpoint").unwrap();
-        let restored = SporeCheckpoint::from_bytes(&loaded).unwrap();
-        assert_eq!(restored.cycle, 500);
-        assert!((restored.consciousness_level - 0.42).abs() < 1e-6);
-        assert_eq!(restored.neuromodulators, [0.7, 0.3, 0.8, 0.5]);
-
-        let _ = std::fs::remove_dir_all(&dir);
     }
 }

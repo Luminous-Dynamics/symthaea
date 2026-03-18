@@ -1,0 +1,20 @@
+{
+    "logs": [
+        {
+            "outputFile": "io.symthaea.spore.demo-mergeDebugResources-33:/values-watch-v21/values-watch-v21.xml",
+            "map": [
+                {
+                    "source": "/home/tstoltz/.gradle/caches/transforms-3/849c9d0bd44968c4ea569c4ee28fcf9d/transformed/appcompat-1.6.1/res/values-watch-v21/values-watch-v21.xml",
+                    "from": {
+                        "startLines": "2,6,10",
+                        "startColumns": "4,4,4",
+                        "startOffsets": "55,271,499",
+                        "endLines": "5,9,13",
+                        "endColumns": "12,12,12",
+                        "endOffsets": "266,494,724"
+                    }
+                }
+            ]
+        }
+    ]
+}

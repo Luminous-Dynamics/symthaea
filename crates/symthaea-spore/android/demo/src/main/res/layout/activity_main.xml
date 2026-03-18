@@ -275,24 +275,6 @@
         app:layout_constraintTop_toTopOf="@id/oxytocinLabel"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <!-- Broca voice: generated text from consciousness state -->
-    <TextView
-        android:id="@+id/brocaText"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:text=""
-        android:textColor="#03DAC5"
-        android:textSize="14sp"
-        android:textStyle="italic"
-        android:alpha="0"
-        android:maxLines="2"
-        android:ellipsize="end"
-        android:gravity="center"
-        app:layout_constraintTop_toBottomOf="@id/oxytocinLabel"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="16dp" />
-
     <!-- Status row: wake state, motion, cycle count -->
     <TextView
         android:id="@+id/statusText"
@@ -302,7 +284,7 @@
         android:textColor="#AAAAAA"
         android:textSize="12sp"
         android:fontFamily="monospace"
-        app:layout_constraintTop_toBottomOf="@id/brocaText"
+        app:layout_constraintTop_toBottomOf="@id/oxytocinLabel"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         android:layout_marginTop="20dp" />

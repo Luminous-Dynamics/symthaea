@@ -190,12 +190,12 @@ pub use physics_integration::ParetoContext;
 #[cfg(feature = "mycelix")]
 pub use managers::governance_manager::{GovernanceEvent, GovernanceEventKind, GovernanceOutcome};
 
+pub use ethics_engine::EthicalVerdict;
 pub use managers::network_service_bridge::{
     forward_affective_state, forward_federated_round, FederatedCoordinatorHandle,
     NetworkServiceBridge, NetworkServiceBridgeHandle,
 };
 pub use managers::swarm_manager::{SwarmEvent, SwarmTelemetry};
-pub use ethics_engine::EthicalVerdict;
 
 #[cfg(feature = "mesh")]
 pub use managers::{
@@ -213,16 +213,16 @@ pub mod nurture_bridge;
 pub mod motor_bridge;
 
 #[cfg(feature = "safety-agents")]
-pub mod safety_enforcement;
-#[cfg(feature = "safety-agents")]
 pub mod civic_crisis_detector;
+#[cfg(feature = "sentinel")]
+pub mod collective_immunity;
 pub mod defense;
 #[cfg(feature = "safety-agents")]
 pub mod guardian;
+#[cfg(feature = "safety-agents")]
+pub mod safety_enforcement;
 #[cfg(feature = "sentinel")]
 pub mod threat_memory;
-#[cfg(feature = "sentinel")]
-pub mod collective_immunity;
 
 // ── Imports (only what the struct definitions below require) ─────────────────
 // AffectiveBridge now owned by ConsciousnessStateManager
@@ -638,6 +638,13 @@ pub struct CognitiveLoopService {
     /// Cycle at which consciousness weights first converged (0 = not yet).
     convergence_cycle: usize,
 
+    /// Lagged consciousness for governance gating — excludes recent governance feedback.
+    /// Ring buffer of last `GOVERNANCE_CONSCIOUSNESS_LAG_SIZE` consciousness values;
+    /// governance gates use the oldest to decorrelate the feedback loop:
+    /// consciousness → governance → neuromod → consciousness.
+    /// Science: Granger (1969) — temporal decorrelation breaks circular causation.
+    governance_consciousness_lag: VecDeque<f64>,
+
     /// Unified Ethics Engine: wraps MoralParser + MoralAlgebra + ValueEvaluator + Harmonies
     /// into a single `evaluate()` call per cycle with co-prime interval scheduling.
     /// Runs **alongside** existing inline code (additive wiring — old code not removed yet).
@@ -694,7 +701,8 @@ pub struct CognitiveLoopService {
     swarm_event_tx: std::sync::mpsc::Sender<managers::swarm_manager::SwarmEvent>,
 
     /// Handle for the federated coordinator task (if enabled).
-    federation_handle: Option<crate::cognitive_loop::managers::network_service_bridge::FederatedCoordinatorHandle>,
+    federation_handle:
+        Option<crate::cognitive_loop::managers::network_service_bridge::FederatedCoordinatorHandle>,
 
     /// Spectrum Manager: Multi-band radio dispatch, AIMD congestion, delta compression.
     /// Implements CognitiveSubsystem at interval 53. Feature-gated behind `mesh`.
@@ -723,6 +731,26 @@ pub struct CognitiveLoopService {
     #[cfg(feature = "glyph_codex")]
     glyph_manager: managers::GlyphManager,
 
+    /// Time Manager: Mesh-wide time consensus from peer beacons.
+    /// Implements CognitiveSubsystem at interval 23. Feature-gated behind `mesh`.
+    #[cfg(feature = "mesh")]
+    time_manager: managers::TimeManager,
+
+    /// Trust Manager: Web-of-trust graph with decay and violation detection.
+    /// Implements CognitiveSubsystem at interval 29. Feature-gated behind `mesh-trust`.
+    #[cfg(feature = "mesh-trust")]
+    trust_manager: managers::TrustManager,
+
+    /// Social Fabric Manager: Resonance graph for content diversity and echo-chamber detection.
+    /// Implements CognitiveSubsystem at interval 31. Feature-gated behind `social-fabric`.
+    #[cfg(feature = "social-fabric")]
+    social_fabric_manager: managers::SocialFabricManager,
+
+    /// Survival Manager: IoT sensor monitoring, demand forecasting, emergency detection.
+    /// Implements CognitiveSubsystem at interval 47. Feature-gated behind `survival`.
+    #[cfg(feature = "survival")]
+    survival_manager: managers::SurvivalManager,
+
     /// Integrity Manager: BLAKE3 attestation, temporal consistency, behavioral canaries.
     /// Runs tamper detection at co-prime intervals. Feature-gated behind `integrity`.
     #[cfg(feature = "integrity")]
@@ -737,7 +765,8 @@ pub struct CognitiveLoopService {
     /// Hierarchical bundler for per-region BinaryHV aggregation.
     /// Accumulates HDC encodings per cortical region, enabling structured
     /// role-bound aggregation and per-region recovery via XOR unbinding.
-    pub(crate) hierarchical_bundler: Option<symthaea_core::hdc::hierarchical_bundle::HierarchicalBundler>,
+    pub(crate) hierarchical_bundler:
+        Option<symthaea_core::hdc::hierarchical_bundle::HierarchicalBundler>,
 
     /// Pre-allocated input buffer for CfC temporal network step.
     /// Sized to `config.cfc_config.input_dim` at construction, reused each cycle
@@ -773,6 +802,14 @@ pub struct CognitiveLoopService {
     /// Defense actions that passed moral filter this cycle.
     #[cfg(feature = "safety-agents")]
     pub(crate) defense_actions_approved: u32,
+
+    /// Civic crisis detector: monitors PE, safety level, Phi, arousal for
+    /// community-level emergencies. Produces CivicCrisisEvent for Mycelix.
+    #[cfg(feature = "safety-agents")]
+    pub(crate) civic_crisis_detector: civic_crisis_detector::CivicCrisisDetector,
+
+    /// Aggregate security telemetry for the crypto/swarm stack.
+    pub(crate) security_telemetry: crate::swarm::SecurityTelemetry,
 }
 
 // MetricsProvider impl is in metrics_provider.rs

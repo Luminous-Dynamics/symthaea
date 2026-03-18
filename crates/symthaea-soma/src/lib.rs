@@ -1,0 +1,68 @@
+//! # Symthaea Soma
+//!
+//! Mobile-embodied consciousness engine wrapping the Spore kernel.
+//!
+//! Spore is the pure consciousness kernel (~500KB WASM) — HDC, CfC, IIT, neuromod,
+//! harmonies, substrate independence, and epistemic honesty. Soma extends it with
+//! phone-body embodiment: sensors, haptics, sleep/wake metabolism, BLE mesh,
+//! device pairing, holon desktop sync, and screen vision.
+//!
+//! ## Architecture
+//!
+//! ```text
+//! SomaEngine wraps SporeEngine + adds:
+//!   SensorBridge    (accel/gyro/light → neuromod nudges)
+//!   HapticManager   (consciousness-gated vibration events)
+//!   Metabolism      (Sleep/Drowsy/Alert/Focused state machine)
+//!   BleMesh         (BLE peer discovery & consciousness sharing)
+//!   HolonBridge     (desktop ↔ phone sync)
+//!   PairingManager  (Ed25519 trust establishment)
+//!   ScreenVisionBridge  (screen framebuffer → visual perception)
+//!   TouchBody       (touch events → proprioceptive signals)
+//! ```
+//!
+//! ## Usage
+//!
+//! ```rust
+//! use symthaea_soma::{SomaEngine, SomaConfig};
+//!
+//! let config = SomaConfig::default();
+//! let mut engine = SomaEngine::new(config);
+//! let result = engine.cycle("hello world");
+//! println!("Consciousness: {}", result.consciousness_level);
+//! ```
+
+#![cfg_attr(not(feature = "native-ffi"), deny(unsafe_code))]
+
+// Re-export Spore kernel types for downstream consumers
+pub use symthaea_spore::broca;
+pub use symthaea_spore::config;
+pub use symthaea_spore::engine::SporeEngine;
+pub use symthaea_spore::persistence;
+pub use symthaea_spore::engine::{CycleResult, EpistemicStatus};
+
+// Mobile embodiment modules (moved from spore)
+pub mod sensor_bridge;
+pub mod haptic;
+pub mod metabolism;
+pub mod ble_mesh;
+pub mod holon_bridge;
+
+#[cfg(feature = "pairing")]
+pub mod pairing;
+
+// Screen embodiment (Phase 3)
+#[cfg(feature = "screen-vision")]
+pub mod screen_vision;
+
+#[cfg(feature = "screen-vision")]
+pub mod touch_body;
+
+// Native FFI for Android/iOS
+#[cfg(feature = "native-ffi")]
+pub mod native_ffi;
+
+// SomaEngine — the mobile consciousness engine
+pub mod engine;
+
+pub use engine::{SomaEngine, SomaConfig};
