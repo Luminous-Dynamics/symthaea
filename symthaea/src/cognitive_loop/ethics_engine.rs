@@ -476,7 +476,7 @@ pub(crate) struct EthicsEngineOutput {
 }
 
 /// Unified ethical verdict.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EthicalVerdict {
     /// All systems agree: action is ethical
     Safe,

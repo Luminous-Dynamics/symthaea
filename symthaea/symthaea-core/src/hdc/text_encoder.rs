@@ -113,6 +113,9 @@ pub struct TextEncoder {
     /// Pre-allocated i32 accumulation buffer for bundle/majority-vote operations.
     /// Avoids allocating 64KB per bundle call on the hot path.
     bundle_accum: Vec<i32>,
+
+    /// Reusable buffer for word lowercasing (avoids String alloc per word).
+    lowercase_buf: String,
 }
 
 /// Encoder statistics
@@ -140,6 +143,7 @@ impl TextEncoder {
             special_tokens,
             stats: TextEncoderStats::default(),
             bundle_accum: vec![0i32; dim],
+            lowercase_buf: String::new(),
         })
     }
 
@@ -426,33 +430,43 @@ impl TextEncoder {
         text: &str,
         primitive_cache: &HashMap<String, Arc<Vec<i8>>>,
     ) -> Result<Vec<i8>> {
-        let words: Vec<&str> = text.split_whitespace().collect();
+        // Use iterator directly instead of collecting into Vec<&str>
+        let mut words = text.split_whitespace().peekable();
 
-        if words.is_empty() {
+        if words.peek().is_none() {
             return Ok(self.special_tokens["[PAD]"].clone());
         }
 
         let dim = self.config.dimension;
+        let max_len = self.config.max_length;
+        let use_positional = self.config.use_positional;
 
         // Zero the pre-allocated accumulation buffer (avoids 64KB alloc per call)
         self.bundle_accum[..dim].fill(0);
 
-        for (pos, word) in words.iter().enumerate().take(self.config.max_length) {
-            let normalized = word.to_lowercase();
+        for (pos, word) in words.enumerate().take(max_len) {
+            // Reuse lowercase buffer instead of allocating String per word
+            self.lowercase_buf.clear();
+            for c in word.chars() {
+                for lc in c.to_lowercase() {
+                    self.lowercase_buf.push(lc);
+                }
+            }
 
             // Both branches produce &[i8] — zero allocation on cache hit:
             // - Primitive path: borrow directly from pre-computed cache (no Arc::clone)
             // - Fallback path: Arc<Vec<i8>> from encode_word() (O(1) cache hit)
             let word_arc;
-            let word_slice: &[i8] = if let Some(cached) = primitive_cache.get(&normalized) {
-                cached.as_ref()
-            } else {
-                word_arc = self.encode_word(word)?;
-                &word_arc
-            };
+            let word_slice: &[i8] =
+                if let Some(cached) = primitive_cache.get(self.lowercase_buf.as_str()) {
+                    cached.as_ref()
+                } else {
+                    word_arc = self.encode_word(word)?;
+                    &word_arc
+                };
 
             // Fused bind + accumulate in single pass (better cache locality)
-            if self.config.use_positional && pos < self.position_vectors.len() {
+            if use_positional && pos < self.position_vectors.len() {
                 let pos_vec = &self.position_vectors[pos];
                 for i in 0..dim {
                     self.bundle_accum[i] += (word_slice[i] * pos_vec[i]) as i32;

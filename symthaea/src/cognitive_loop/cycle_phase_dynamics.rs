@@ -1838,10 +1838,11 @@ impl CognitiveLoopService {
                 }
                 MotorCommandType::MotorOutput => {
                     // Ethics gate: Blocked verdict prevents motor execution
-                    let effective_verdict = self.ethics_verdict_override.as_ref().unwrap_or(&self.last_ethics_verdict);
-                    if *effective_verdict
-                        == super::ethics_engine::EthicalVerdict::Blocked
-                    {
+                    let effective_verdict = self
+                        .ethics_verdict_override
+                        .as_ref()
+                        .unwrap_or(&self.last_ethics_verdict);
+                    if *effective_verdict == super::ethics_engine::EthicalVerdict::Blocked {
                         let result = super::motor_output_bridge::MotorOutputResult {
                             success: false,
                             action_type: None,
@@ -1854,8 +1855,7 @@ impl CognitiveLoopService {
                             ),
                         };
                         self.motor_rendering.last_result = Some(result);
-                    } else if let Some(ref mut bridge) = self.motor_rendering.output_bridge
-                    {
+                    } else if let Some(ref mut bridge) = self.motor_rendering.output_bridge {
                         let request = self
                             .motor_rendering
                             .pending_request
@@ -2196,16 +2196,14 @@ impl CognitiveLoopService {
                             },
                             PlannedAction {
                                 id: "code_verify".to_string(),
-                                description: "Verify generated code via compilation"
-                                    .to_string(),
+                                description: "Verify generated code via compilation".to_string(),
                                 embedding: vec![0.6, 0.4, 0.3, 0.7],
                                 prior: 0.2,
                                 is_epistemic: true,
                             },
                             PlannedAction {
                                 id: "code_refactor".to_string(),
-                                description: "Refactor code for clarity or performance"
-                                    .to_string(),
+                                description: "Refactor code for clarity or performance".to_string(),
                                 embedding: vec![0.5, 0.5, 0.6, 0.4],
                                 prior: 0.15,
                                 is_epistemic: false,
@@ -3534,347 +3532,14 @@ impl CognitiveLoopService {
         }
 
         // ── Broca SSM language generation + feedback ─────────────────────────
-        // Demand-driven: generate only when consciousness is sufficient AND there's
-        // novel content worth articulating. Minimum cadence 7 to prevent spam.
-        // Biologically: Broca's area activates for speech production when there's
-        // something meaningful to express (Hickok & Poeppel 2007).
         #[cfg(feature = "ssm_language")]
-        {
-            let broca_psi = self.unification_engine.psi as f32;
-            let broca_novelty =
-                prediction_error > self.config.learning_threshold || surprise_triggered;
-            // Adaptive cadence: poor user model → generate more (probe to refine)
-            // Session 15 Item 5: Attention fatigue → Broca cadence gating.
-            // High fatigue → widen spacing (don't generate when attention depleted).
-            // Science: Mackworth (1948) — vigilance decrement degrades production quality.
-            let fatigue_spacing_boost = if self
-                .self_model_tier
-                .attention_schema
-                .as_ref()
-                .map(|s| s.fatigue_level())
-                .unwrap_or(0.0)
-                > 0.6
-            {
-                3
-            } else {
-                0
-            };
-            // Governance urgency → Broca cadence modulation.
-            // High governance activity (pending events) → widen spacing (focus on deliberation).
-            // Low collective_phi → cautious generation (epistemic humility).
-            #[cfg(feature = "mycelix")]
-            let governance_spacing_boost = {
-                let pending = self.governance_mgr.pending_event_count();
-                let phi = self.governance_mgr.last_collective_phi();
-                let urgency_boost: usize = if pending > 3 { 2 } else { 0 };
-                let phi_boost: usize = if phi > 0.01 && phi < 0.3 { 2 } else { 0 };
-                urgency_boost + phi_boost
-            };
-            #[cfg(not(feature = "mycelix"))]
-            let governance_spacing_boost: usize = 0;
-            // Cantor fractal depth → Broca cadence: deep recursion = deliberate speech.
-            // Science: Goldman-Rakic (1996) — prefrontal recursion depth → utterance complexity.
-            let cantor_spacing_boost = {
-                use crate::cognitive_loop::thresholds::{
-                    CANTOR_DEPTH_BROCA_SPACING_BOOST, CANTOR_SURPRISE_BROCA_SPACING_BOOST,
-                    CANTOR_SURPRISE_BROCA_THRESHOLD,
-                };
-                let depth_boost = if self
-                    .cantor_dream
-                    .broadcast_buffer
-                    .last()
-                    .map(|crhv| crhv.depth > 5)
-                    .unwrap_or(false)
-                {
-                    CANTOR_DEPTH_BROCA_SPACING_BOOST
-                } else {
-                    0
-                };
-                let surprise_boost =
-                    if self.cantor_dream.dream_surprise > CANTOR_SURPRISE_BROCA_THRESHOLD {
-                        CANTOR_SURPRISE_BROCA_SPACING_BOOST
-                    } else {
-                        0
-                    };
-                depth_boost + surprise_boost
-            };
-            // Glyph modality → Broca cadence spacing: Threshold/Metaharmonic = +2 cycles.
-            // Science: Schooler (2002) — metacognitive shifts require processing pauses.
-            #[cfg(feature = "glyph_codex")]
-            let glyph_spacing_boost: usize = match self.glyph_manager.dominant_modality() {
-                crate::hdc::glyph_basis::FieldModality::Threshold
-                | crate::hdc::glyph_basis::FieldModality::Metaharmonic => 2,
-                _ => 0,
-            };
-            #[cfg(not(feature = "glyph_codex"))]
-            let glyph_spacing_boost: usize = 0;
-            let broca_min_spacing = if self.stats.tom_prediction_mismatch_ema > 0.5 {
-                5 + fatigue_spacing_boost
-                    + governance_spacing_boost
-                    + cantor_spacing_boost
-                    + glyph_spacing_boost
-            } else {
-                7 + fatigue_spacing_boost
-                    + governance_spacing_boost
-                    + cantor_spacing_boost
-                    + glyph_spacing_boost
-            };
-            let broca_should_generate = broca_psi > 0.4
-                && broca_novelty
-                && self.stats.total_cycles % broca_min_spacing != 0;
-            if broca_should_generate {
-                // Community mode → Broca tone modulation:
-                //   Exploratory = speculative (higher arousal, lower warmth)
-                //   Protective = cautious (lower arousal, higher warmth)
-                //   Creative = enthusiastic (higher valence, moderate arousal)
-                //   Reflective = measured (lower arousal, neutral warmth)
-                #[cfg(feature = "mycelix")]
-                let (mode_valence_nudge, mode_arousal_nudge, mode_warmth) = {
-                    match self.governance_mgr.community_mode() {
-                        Some(crate::mycelix::collective_identity::CommunityMode::Exploratory) => {
-                            (0.0, 0.05, 0.4)
-                        }
-                        Some(crate::mycelix::collective_identity::CommunityMode::Protective) => {
-                            (0.0, -0.05, 0.7)
-                        }
-                        Some(crate::mycelix::collective_identity::CommunityMode::Creative) => {
-                            (0.05, 0.03, 0.5)
-                        }
-                        Some(crate::mycelix::collective_identity::CommunityMode::Reflective) => {
-                            (0.0, -0.03, 0.5)
-                        }
-                        None => (0.0, 0.0, 0.5),
-                    }
-                };
-                #[cfg(not(feature = "mycelix"))]
-                let (mode_valence_nudge, mode_arousal_nudge, mode_warmth) =
-                    (0.0f32, 0.0f32, 0.5f32);
-
-                // Generate in a scoped borrow, then apply feedback outside
-                let broca_feedback = if let Some(ref mut broca) = self.language_comm.broca_manager {
-                    // Phase 7b: Math epistemic caveat → lower Broca's epistemic confidence.
-                    // When a solver reports uncertainty (error bounds, low R², non-convergence),
-                    // Broca's EpistemicGate suppresses factual assertions and boosts hedging.
-                    // Science: Kahneman (2011) — System 2 must express calibrated uncertainty.
-                    let math_epistemic_penalty = if math_result.epistemic_caveat.is_some() {
-                        0.3 // Push toward Uncertain (ordinal ~2)
-                    } else if math_result.solved && math_result.multipath_verified {
-                        -0.1 // Boost toward Certain for verified math
-                    } else {
-                        0.0
-                    };
-                    // Knowledge context for grounded generation — reserved for future use
-                    let signals = super::broca_bridge::BrocaConsciousnessSignals {
-                        epistemic_confidence: (self.carryover.quality.last_epistemic_confidence
-                            - math_epistemic_penalty)
-                            .clamp(0.0, 1.0),
-                        emotional_valence: self.emotion_contagion.prosody_valence()
-                            + mode_valence_nudge,
-                        emotional_arousal: self.emotion_contagion.prosody_arousal()
-                            + mode_arousal_nudge,
-                        emotional_warmth: mode_warmth,
-                        consciousness_level: broca_psi,
-                        meta_awareness: self.carryover.learning.self_model_accuracy as f32,
-                        coherence,
-                        knowledge_grounding: self
-                            .knowledge_manager
-                            .as_ref()
-                            .map(|km| {
-                                let s = km.signals();
-                                ((s.relevance * 0.6 + (1.0 - s.uncertainty) * 0.4) as f32)
-                                    .clamp(0.0, 1.0)
-                            })
-                            .unwrap_or(0.5),
-                        knowledge_context: self
-                            .knowledge_manager
-                            .as_ref()
-                            .map(|km| km.top_grounded_facts(5))
-                            .unwrap_or_default(),
-                        #[cfg(feature = "therapeutic")]
-                        therapeutic_intent: if self.therapeutic_manager.crisis_active {
-                            7.0 // Crisis mode
-                        } else {
-                            // Map regulation strategy to intent code:
-                            // 0=validate, 1=reflect, 2=reframe, 3=explore, 4=psychoeducate,
-                            // 5=challenge, 6=contain, 7=crisis
-                            match self.therapeutic_manager.active_strategy() {
-                                Some(symthaea_therapeutic::RegulationStrategy::Validation) => 0.0,
-                                Some(symthaea_therapeutic::RegulationStrategy::Defusion) => 1.0,
-                                Some(
-                                    symthaea_therapeutic::RegulationStrategy::CognitiveReappraisal,
-                                ) => 2.0,
-                                Some(symthaea_therapeutic::RegulationStrategy::ExposurePrep) => 3.0,
-                                Some(
-                                    symthaea_therapeutic::RegulationStrategy::DistressTolerance,
-                                ) => 4.0,
-                                Some(symthaea_therapeutic::RegulationStrategy::Containment) => 6.0,
-                                Some(symthaea_therapeutic::RegulationStrategy::Grounding) => 4.0,
-                                None => 0.0,
-                            }
-                        },
-                        #[cfg(feature = "therapeutic")]
-                        alliance_quality: self.therapeutic_manager.alliance_composite(),
-                        #[cfg(feature = "therapeutic")]
-                        client_distress_level: self.therapeutic_manager.client_distress(),
-                        #[cfg(feature = "therapeutic")]
-                        intervention_depth: self
-                            .therapeutic_manager
-                            .active_strategy()
-                            .map(|s| s.min_alliance()) // depth ≈ min_alliance required
-                            .unwrap_or(0.0),
-                        // Ethics gate: prevent generation when EthicalVerdict::Blocked.
-                        // Science: APA Ethics Code (2017) principle 3.04 — avoid harm.
-                        ethics_blocked: *self.ethics_verdict_override.as_ref().unwrap_or(&self.last_ethics_verdict)
-                            == super::ethics_engine::EthicalVerdict::Blocked,
-                    };
-                    if let Some(mut result) = broca.generate(signals) {
-                        // Surface the generated text for consumers
-                        if !result.text.is_empty() {
-                            // Scope guard: check generated text for scope violations
-                            // (diagnostic claims, prescriptive language, therapist impersonation).
-                            // Violations append disclaimers; the text is never silently suppressed.
-                            // Science: APA Ethics Code (2017) principle 2.01 — boundaries of competence
-                            #[cfg(feature = "therapeutic")]
-                            let text = if self.config.enable_therapeutic {
-                                self.therapeutic_manager
-                                    .scope_guard
-                                    .apply_disclaimers(&result.text)
-                            } else {
-                                result.text.clone()
-                            };
-                            // Move the owned String instead of cloning when no scope guard needed.
-                            #[cfg(not(feature = "therapeutic"))]
-                            let text = std::mem::take(&mut result.text);
-                            self.language_comm.last_broca_text = Some(text);
-                        }
-
-                        // ── Composite quality metric ──
-                        #[cfg(feature = "liquid-mamba")]
-                        let semantic_pe = result.semantic_pe;
-                        #[cfg(not(feature = "liquid-mamba"))]
-                        let semantic_pe = 0.0_f32;
-                        let broca_quality = result.final_coherence * 0.4
-                            + (1.0 - semantic_pe.min(1.0)) * 0.4
-                            + result.long_coherence * 0.2;
-                        let broca_quality = broca_quality.clamp(0.0, 1.0);
-
-                        // Update quality EMA (alpha = 0.15)
-                        self.stats.broca_quality_ema = if self.stats.broca_generation_count == 0 {
-                            broca_quality
-                        } else {
-                            self.stats.broca_quality_ema * 0.85 + broca_quality * 0.15
-                        };
-                        self.stats.broca_generation_count += 1;
-
-                        // Track low-quality streak for adaptive gating
-                        if broca_quality < 0.3 {
-                            self.stats.broca_low_quality_streak =
-                                self.stats.broca_low_quality_streak.saturating_add(1);
-                        } else {
-                            self.stats.broca_low_quality_streak = 0;
-                        }
-
-                        // Adaptive consciousness gating: raise threshold after
-                        // sustained low quality (3+ consecutive poor generations).
-                        // Science: Hickok & Poeppel (2007) — speech production
-                        // requires sufficient consciousness; poor output → raise bar.
-                        if self.stats.broca_low_quality_streak >= 3 {
-                            broca.consciousness_threshold =
-                                (broca.consciousness_threshold + 0.05).min(0.5);
-                        } else if self.stats.broca_quality_ema > 0.7
-                            && broca.consciousness_threshold > 0.1
-                        {
-                            broca.consciousness_threshold =
-                                (broca.consciousness_threshold - 0.02).max(0.1);
-                        }
-
-                        // Populate telemetry
-                        broca.last_telemetry.quality = broca_quality;
-                        broca.last_telemetry.long_coherence = result.long_coherence;
-                        broca.last_telemetry.semantic_pe = semantic_pe;
-
-                        // Return feedback values to apply after borrow ends
-                        #[cfg(feature = "liquid-mamba")]
-                        let deferred_semantic_pe = result.semantic_pe;
-                        #[cfg(not(feature = "liquid-mamba"))]
-                        let deferred_semantic_pe = 0.0_f32;
-
-                        Some((
-                            result.final_coherence,
-                            broca_quality,
-                            result.veto_triggered,
-                            deferred_semantic_pe,
-                        ))
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                };
-
-                // Apply deferred feedback outside the broca_manager borrow
-                if let Some((final_coherence, broca_quality, veto_triggered, deferred_sem_pe)) =
-                    broca_feedback
-                {
-                    // Coherence feedback: high Broca coherence → confidence boost
-                    if final_coherence > super::thresholds::BROCA_COHERENT_THRESHOLD {
-                        self.adjust_confidence_pri(
-                            "broca_coherent",
-                            (final_coherence - super::thresholds::BROCA_COHERENT_THRESHOLD)
-                                * super::thresholds::BROCA_COHERENT_CONFIDENCE_SCALE,
-                            Priority::Aesthetic,
-                        );
-                    } else if final_coherence < 0.3 {
-                        self.scale_confidence_pri(
-                            "broca_incoherent",
-                            1.0 - (0.3 - final_coherence) * 0.05,
-                            Priority::Aesthetic,
-                        );
-                    }
-
-                    // Quality-driven LR modulation: high quality → slight LR boost
-                    // Science: successful articulation reinforces associated representations
-                    if broca_quality > 0.6 {
-                        let lr_boost = 1.0 + (broca_quality - 0.6) * 0.1; // [1.0, 1.04]
-                        self.scale_lr_pri("broca_quality", lr_boost, Priority::Aesthetic);
-                    }
-
-                    // Veto feedback: triggered veto → dampen exploration
-                    if veto_triggered {
-                        self.scale_exploration_pri(
-                            "broca_veto",
-                            super::thresholds::BROCA_VETO_EXPLORATION_SCALE,
-                            Priority::Aesthetic,
-                        );
-                    }
-
-                    // Semantic PE → FEP: language reconstruction error as
-                    // additional surprise signal (closes language-perception loop).
-                    let _ = deferred_sem_pe; // suppress unused warning when liquid-mamba disabled
-                    #[cfg(feature = "liquid-mamba")]
-                    if deferred_sem_pe > 0.1 {
-                        let sem_obs = Observation::from_consciousness_state(
-                            deferred_sem_pe as f64,
-                            0.1,
-                            coherence as f64,
-                            effective_lr as f64,
-                        );
-                        self.fep.agent.perceive(&sem_obs);
-                    }
-                }
-
-                // Broca quality → attention budget: successful articulation
-                // reduces sensory search need (Levelt 1989 — monitoring loop).
-                if self.stats.broca_quality_ema > 0.7 {
-                    let contraction = 1.0 - (self.stats.broca_quality_ema - 0.7) * 0.15; // [0.955, 1.0]
-                    self.scale_confidence_pri(
-                        "broca_attention_contract",
-                        contraction,
-                        Priority::Aesthetic,
-                    );
-                }
-            }
-        }
+        self.run_broca_generation(
+            prediction_error,
+            surprise_triggered,
+            coherence,
+            effective_lr,
+            math_result,
+        );
 
         // ═══════════════════════════════════════════════════════════════════════
         // PARALLEL POST-PROCESSING
@@ -4019,6 +3684,312 @@ impl CognitiveLoopService {
             cycle_reward,
             had_semantic_eviction,
             school_predicted_phi_gain,
+        }
+    }
+
+    /// Broca SSM language generation + feedback.
+    ///
+    /// Demand-driven: generate only when consciousness is sufficient AND there's
+    /// novel content worth articulating. Minimum cadence 7 to prevent spam.
+    /// Biologically: Broca's area activates for speech production when there's
+    /// something meaningful to express (Hickok & Poeppel 2007).
+    #[cfg(feature = "ssm_language")]
+    fn run_broca_generation(
+        &mut self,
+        prediction_error: f32,
+        surprise_triggered: bool,
+        coherence: f32,
+        effective_lr: f32,
+        math_result: &DynMath,
+    ) {
+        let broca_psi = self.unification_engine.psi as f32;
+        let broca_novelty =
+            prediction_error > self.config.learning_threshold || surprise_triggered;
+        // Attention fatigue → Broca cadence gating.
+        // High fatigue → widen spacing (don't generate when attention depleted).
+        // Science: Mackworth (1948) — vigilance decrement degrades production quality.
+        let fatigue_spacing_boost = if self
+            .self_model_tier
+            .attention_schema
+            .as_ref()
+            .map(|s| s.fatigue_level())
+            .unwrap_or(0.0)
+            > 0.6
+        {
+            3
+        } else {
+            0
+        };
+        // Governance urgency → Broca cadence modulation.
+        #[cfg(feature = "mycelix")]
+        let governance_spacing_boost = {
+            let pending = self.governance_mgr.pending_event_count();
+            let phi = self.governance_mgr.last_collective_phi();
+            let urgency_boost: usize = if pending > 3 { 2 } else { 0 };
+            let phi_boost: usize = if phi > 0.01 && phi < 0.3 { 2 } else { 0 };
+            urgency_boost + phi_boost
+        };
+        #[cfg(not(feature = "mycelix"))]
+        let governance_spacing_boost: usize = 0;
+        // Cantor fractal depth → Broca cadence: deep recursion = deliberate speech.
+        // Science: Goldman-Rakic (1996) — prefrontal recursion depth → utterance complexity.
+        let cantor_spacing_boost = {
+            use crate::cognitive_loop::thresholds::{
+                CANTOR_DEPTH_BROCA_SPACING_BOOST, CANTOR_SURPRISE_BROCA_SPACING_BOOST,
+                CANTOR_SURPRISE_BROCA_THRESHOLD,
+            };
+            let depth_boost = if self
+                .cantor_dream
+                .broadcast_buffer
+                .last()
+                .map(|crhv| crhv.depth > 5)
+                .unwrap_or(false)
+            {
+                CANTOR_DEPTH_BROCA_SPACING_BOOST
+            } else {
+                0
+            };
+            let surprise_boost =
+                if self.cantor_dream.dream_surprise > CANTOR_SURPRISE_BROCA_THRESHOLD {
+                    CANTOR_SURPRISE_BROCA_SPACING_BOOST
+                } else {
+                    0
+                };
+            depth_boost + surprise_boost
+        };
+        // Glyph modality → Broca cadence spacing: Threshold/Metaharmonic = +2 cycles.
+        // Science: Schooler (2002) — metacognitive shifts require processing pauses.
+        #[cfg(feature = "glyph_codex")]
+        let glyph_spacing_boost: usize = match self.glyph_manager.dominant_modality() {
+            crate::hdc::glyph_basis::FieldModality::Threshold
+            | crate::hdc::glyph_basis::FieldModality::Metaharmonic => 2,
+            _ => 0,
+        };
+        #[cfg(not(feature = "glyph_codex"))]
+        let glyph_spacing_boost: usize = 0;
+        let broca_min_spacing = if self.stats.tom_prediction_mismatch_ema > 0.5 {
+            5 + fatigue_spacing_boost
+                + governance_spacing_boost
+                + cantor_spacing_boost
+                + glyph_spacing_boost
+        } else {
+            7 + fatigue_spacing_boost
+                + governance_spacing_boost
+                + cantor_spacing_boost
+                + glyph_spacing_boost
+        };
+        let broca_should_generate = broca_psi > 0.4
+            && broca_novelty
+            && self.stats.total_cycles % broca_min_spacing != 0;
+        if !broca_should_generate {
+            return;
+        }
+
+        // Community mode → Broca tone modulation
+        #[cfg(feature = "mycelix")]
+        let (mode_valence_nudge, mode_arousal_nudge, mode_warmth) = {
+            match self.governance_mgr.community_mode() {
+                Some(crate::mycelix::collective_identity::CommunityMode::Exploratory) => {
+                    (0.0, 0.05, 0.4)
+                }
+                Some(crate::mycelix::collective_identity::CommunityMode::Protective) => {
+                    (0.0, -0.05, 0.7)
+                }
+                Some(crate::mycelix::collective_identity::CommunityMode::Creative) => {
+                    (0.05, 0.03, 0.5)
+                }
+                Some(crate::mycelix::collective_identity::CommunityMode::Reflective) => {
+                    (0.0, -0.03, 0.5)
+                }
+                None => (0.0, 0.0, 0.5),
+            }
+        };
+        #[cfg(not(feature = "mycelix"))]
+        let (mode_valence_nudge, mode_arousal_nudge, mode_warmth) =
+            (0.0f32, 0.0f32, 0.5f32);
+
+        // Generate in a scoped borrow, then apply feedback outside
+        let broca_feedback = if let Some(ref mut broca) = self.language_comm.broca_manager {
+            let math_epistemic_penalty = if math_result.epistemic_caveat.is_some() {
+                0.3
+            } else if math_result.solved && math_result.multipath_verified {
+                -0.1
+            } else {
+                0.0
+            };
+            let signals = super::broca_bridge::BrocaConsciousnessSignals {
+                epistemic_confidence: (self.carryover.quality.last_epistemic_confidence
+                    - math_epistemic_penalty)
+                    .clamp(0.0, 1.0),
+                emotional_valence: self.emotion_contagion.prosody_valence()
+                    + mode_valence_nudge,
+                emotional_arousal: self.emotion_contagion.prosody_arousal()
+                    + mode_arousal_nudge,
+                emotional_warmth: mode_warmth,
+                consciousness_level: broca_psi,
+                meta_awareness: self.carryover.learning.self_model_accuracy as f32,
+                coherence,
+                knowledge_grounding: self
+                    .knowledge_manager
+                    .as_ref()
+                    .map(|km| {
+                        let s = km.signals();
+                        ((s.relevance * 0.6 + (1.0 - s.uncertainty) * 0.4) as f32)
+                            .clamp(0.0, 1.0)
+                    })
+                    .unwrap_or(0.5),
+                knowledge_context: self
+                    .knowledge_manager
+                    .as_ref()
+                    .map(|km| km.top_grounded_facts(5))
+                    .unwrap_or_default(),
+                #[cfg(feature = "therapeutic")]
+                therapeutic_intent: if self.therapeutic_manager.crisis_active {
+                    7.0
+                } else {
+                    self.therapeutic_manager
+                        .active_strategy()
+                        .map(|s| s.intent_code())
+                        .unwrap_or(0.0)
+                },
+                #[cfg(feature = "therapeutic")]
+                alliance_quality: self.therapeutic_manager.alliance_composite(),
+                #[cfg(feature = "therapeutic")]
+                client_distress_level: self.therapeutic_manager.client_distress(),
+                #[cfg(feature = "therapeutic")]
+                intervention_depth: self
+                    .therapeutic_manager
+                    .active_strategy()
+                    .map(|s| s.min_alliance())
+                    .unwrap_or(0.0),
+                ethics_blocked: self
+                    .ethics_verdict_override
+                    .unwrap_or(self.last_ethics_verdict)
+                    == super::ethics_engine::EthicalVerdict::Blocked,
+            };
+            if let Some(mut result) = broca.generate(signals) {
+                if !result.text.is_empty() {
+                    #[cfg(feature = "therapeutic")]
+                    let text = if self.config.enable_therapeutic {
+                        self.therapeutic_manager
+                            .scope_guard
+                            .apply_disclaimers(&result.text)
+                    } else {
+                        result.text.clone()
+                    };
+                    #[cfg(not(feature = "therapeutic"))]
+                    let text = std::mem::take(&mut result.text);
+                    self.language_comm.last_broca_text = Some(text);
+                }
+
+                #[cfg(feature = "liquid-mamba")]
+                let semantic_pe = result.semantic_pe;
+                #[cfg(not(feature = "liquid-mamba"))]
+                let semantic_pe = 0.0_f32;
+                let broca_quality = result.final_coherence * 0.4
+                    + (1.0 - semantic_pe.min(1.0)) * 0.4
+                    + result.long_coherence * 0.2;
+                let broca_quality = broca_quality.clamp(0.0, 1.0);
+
+                self.stats.broca_quality_ema = if self.stats.broca_generation_count == 0 {
+                    broca_quality
+                } else {
+                    self.stats.broca_quality_ema * 0.85 + broca_quality * 0.15
+                };
+                self.stats.broca_generation_count += 1;
+
+                if broca_quality < 0.3 {
+                    self.stats.broca_low_quality_streak =
+                        self.stats.broca_low_quality_streak.saturating_add(1);
+                } else {
+                    self.stats.broca_low_quality_streak = 0;
+                }
+
+                if self.stats.broca_low_quality_streak >= 3 {
+                    broca.consciousness_threshold =
+                        (broca.consciousness_threshold + 0.05).min(0.5);
+                } else if self.stats.broca_quality_ema > 0.7
+                    && broca.consciousness_threshold > 0.1
+                {
+                    broca.consciousness_threshold =
+                        (broca.consciousness_threshold - 0.02).max(0.1);
+                }
+
+                broca.last_telemetry.quality = broca_quality;
+                broca.last_telemetry.long_coherence = result.long_coherence;
+                broca.last_telemetry.semantic_pe = semantic_pe;
+
+                #[cfg(feature = "liquid-mamba")]
+                let deferred_semantic_pe = result.semantic_pe;
+                #[cfg(not(feature = "liquid-mamba"))]
+                let deferred_semantic_pe = 0.0_f32;
+
+                Some((
+                    result.final_coherence,
+                    broca_quality,
+                    result.veto_triggered,
+                    deferred_semantic_pe,
+                ))
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        // Apply deferred feedback outside the broca_manager borrow
+        if let Some((final_coherence, broca_quality, veto_triggered, deferred_sem_pe)) =
+            broca_feedback
+        {
+            if final_coherence > super::thresholds::BROCA_COHERENT_THRESHOLD {
+                self.adjust_confidence_pri(
+                    "broca_coherent",
+                    (final_coherence - super::thresholds::BROCA_COHERENT_THRESHOLD)
+                        * super::thresholds::BROCA_COHERENT_CONFIDENCE_SCALE,
+                    Priority::Aesthetic,
+                );
+            } else if final_coherence < 0.3 {
+                self.scale_confidence_pri(
+                    "broca_incoherent",
+                    1.0 - (0.3 - final_coherence) * 0.05,
+                    Priority::Aesthetic,
+                );
+            }
+
+            if broca_quality > 0.6 {
+                let lr_boost = 1.0 + (broca_quality - 0.6) * 0.1;
+                self.scale_lr_pri("broca_quality", lr_boost, Priority::Aesthetic);
+            }
+
+            if veto_triggered {
+                self.scale_exploration_pri(
+                    "broca_veto",
+                    super::thresholds::BROCA_VETO_EXPLORATION_SCALE,
+                    Priority::Aesthetic,
+                );
+            }
+
+            let _ = deferred_sem_pe;
+            #[cfg(feature = "liquid-mamba")]
+            if deferred_sem_pe > 0.1 {
+                let sem_obs = Observation::from_consciousness_state(
+                    deferred_sem_pe as f64,
+                    0.1,
+                    coherence as f64,
+                    effective_lr as f64,
+                );
+                self.fep.agent.perceive(&sem_obs);
+            }
+        }
+
+        // Broca quality → attention budget (Levelt 1989 — monitoring loop)
+        if self.stats.broca_quality_ema > 0.7 {
+            let contraction = 1.0 - (self.stats.broca_quality_ema - 0.7) * 0.15;
+            self.scale_confidence_pri(
+                "broca_attention_contract",
+                contraction,
+                Priority::Aesthetic,
+            );
         }
     }
 

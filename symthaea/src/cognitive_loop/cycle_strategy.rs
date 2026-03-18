@@ -352,8 +352,8 @@ impl CognitiveLoopService {
         if self.config.enable_substrate_encoding_noise
             && self.substrate_manager.scale_pressure < 0.0
         {
-            let noise_fraction =
-                (-self.substrate_manager.scale_pressure).min(7.0) / SUBSTRATE_NOISE_FRACTION_DIVISOR; // [0.0, 0.1]
+            let noise_fraction = (-self.substrate_manager.scale_pressure).min(7.0)
+                / SUBSTRATE_NOISE_FRACTION_DIVISOR; // [0.0, 0.1]
             let seed = self.stats.total_cycles as u64;
             hv16_cached = hv16_cached.add_noise(noise_fraction, seed);
         }
@@ -663,11 +663,9 @@ impl CognitiveLoopService {
         if ethics_output.lr_factor != 1.0 {
             self.scale_lr("ethics_engine", ethics_output.lr_factor);
         }
-        self.last_ethics_verdict = if let Some(ref ov) = self.ethics_verdict_override {
-            ov.clone()
-        } else {
-            ethics_output.unified_verdict.clone()
-        };
+        self.last_ethics_verdict = self
+            .ethics_verdict_override
+            .unwrap_or(ethics_output.unified_verdict);
         // Reset escalation block flag each cycle — re-applied below if still warranted.
         self.stats.escalation_blocked = false;
 
@@ -686,8 +684,8 @@ impl CognitiveLoopService {
                 .map(|crhv| crhv.self_similarity() as f64)
                 .unwrap_or(0.0);
             if meta_depth > CANTOR_META_DEPTH_STILLNESS_THRESHOLD {
-                let stillness_delta =
-                    (meta_depth - CANTOR_META_DEPTH_STILLNESS_THRESHOLD) * CANTOR_HARMONY_STILLNESS_SCALE;
+                let stillness_delta = (meta_depth - CANTOR_META_DEPTH_STILLNESS_THRESHOLD)
+                    * CANTOR_HARMONY_STILLNESS_SCALE;
                 self.ethics_engine
                     .nudge_harmony_coordinate(7, stillness_delta);
             }
