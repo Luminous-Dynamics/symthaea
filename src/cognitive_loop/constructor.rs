@@ -506,6 +506,7 @@ impl CognitiveLoopService {
         let cfc_input_dim = config.cfc_config.input_dim;
         let enable_hierarchical_bundling = config.enable_hierarchical_bundling;
         let genesis_phrase_for_bundler = config.genesis_phrase.clone();
+        let enable_mesh_time = config.enable_mesh_time;
         let mut service = Self {
             config,
             encoder,
@@ -994,7 +995,7 @@ impl CognitiveLoopService {
                 crate::hdc::moral_algebra::MORAL_DIM,
             ),
             #[cfg(feature = "mesh")]
-            time_manager: super::managers::TimeManager::new(config.enable_mesh_time),
+            time_manager: super::managers::TimeManager::new(enable_mesh_time),
             #[cfg(feature = "mesh-trust")]
             trust_manager: super::managers::TrustManager::new(
                 format!("node_{:016x}", {

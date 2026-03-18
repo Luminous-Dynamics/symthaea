@@ -50,8 +50,8 @@ use symthaea_core::hdc::hdc_fhe::{CollectiveWisdomPool, EncryptedHV};
 /// Number of peers contributing to the collective.
 const NUM_PEERS: usize = 7;
 
-/// Threshold for mask recovery (k-of-n).
-const THRESHOLD_K: usize = 4;
+/// Threshold for mask recovery (k-of-n). Must be odd for deterministic majority vote.
+const THRESHOLD_K: usize = 3;
 
 /// Number of classes for classification test.
 const NUM_CLASSES: usize = 8;
