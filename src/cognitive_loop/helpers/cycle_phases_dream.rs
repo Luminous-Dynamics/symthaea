@@ -124,6 +124,21 @@ impl CognitiveLoopService {
                 );
             }
 
+            // Shadow→Dream bridge: record high-pressure shadow fragments as dream events.
+            // The dream engine generates counterfactuals: "what if this shadow content
+            // were integrated rather than repressed?"
+            // Science: Jung (1951) — shadow integration through active imagination;
+            // Hartmann (1998) — dreams as "safe space" for processing threatening content.
+            #[cfg(feature = "therapeutic")]
+            if let Some(shadow_input) = self.therapeutic_manager.shadow_detector.next_dream_fragment() {
+                dream.record(
+                    &shadow_input.state_vector,
+                    shadow_input.action_vector,
+                    &dream_outcome,
+                    phi_weighted_surprise * 0.6, // Lower priority than primary/therapeutic
+                );
+            }
+
             // Dream during Cruise urgency (low-error steady state) or periodically.
             // Consolidation pressure modulates frequency: when GWT broadcasts pile up
             // faster than they're processed, dream more often to integrate them.
@@ -220,6 +235,30 @@ impl CognitiveLoopService {
                         );
                         km.apply_dream_consolidation(&topics, dream_phi_improvement as f64);
                     }
+                }
+
+                // Shadow→Dream feedback: record dream Phi improvement back to shadow fragments.
+                // Positive improvement = dream found integration path worth pursuing.
+                // Science: Hartmann (1998) — dreams create new connections (integration);
+                // Barrett (2001) — dream problem-solving correlates with waking insight.
+                #[cfg(feature = "therapeutic")]
+                if dream_phi_improvement > 0.0 {
+                    // Feed improvement to the highest-pressure fragment
+                    let frag_count = self.therapeutic_manager.shadow_detector.fragment_count();
+                    if frag_count > 0 {
+                        self.therapeutic_manager
+                            .shadow_detector
+                            .record_dream_result(0, dream_phi_improvement);
+                    }
+                }
+
+                // Threat memory consolidation: decay old patterns, boost recent ones.
+                // Threat patterns get +30% salience boost during dream consolidation.
+                // Science: Walker (2017) — threat-related memories preferentially
+                // consolidated during sleep for survival-relevant pattern retention.
+                #[cfg(feature = "sentinel")]
+                {
+                    self.threat_memory.decay_old_patterns(self.stats.total_cycles as usize);
                 }
             }
 

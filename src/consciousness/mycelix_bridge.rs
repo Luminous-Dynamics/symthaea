@@ -372,6 +372,65 @@ pub struct MycelixBridge {
     #[cfg(feature = "mycelix")]
     pending_gov_outcomes:
         Vec<crate::cognitive_loop::managers::governance_manager::GovernanceOutcome>,
+    /// Channel sender for dispatching governance actions to an external
+    /// Holochain conductor process. The conductor bridge (`symthaea-mycelix-holochain`)
+    /// runs separately to avoid serde version conflicts.
+    /// Set via `set_governance_dispatch_tx()`.
+    #[cfg(feature = "mycelix")]
+    governance_dispatch_tx: Option<std::sync::mpsc::Sender<GovernanceDispatchCommand>>,
+    /// Channel receiver for governance outcome events from the Holochain
+    /// conductor bridge (dispatch loop confirmations and poller tally results).
+    /// Set via `set_governance_outcome_rx()`.
+    #[cfg(feature = "mycelix")]
+    governance_outcome_rx: Option<std::sync::mpsc::Receiver<GovernanceDispatchOutcome>>,
+}
+
+/// Outcome events received from the Holochain conductor bridge.
+///
+/// The conductor's dispatch loop and governance poller produce these after
+/// successful zome calls or completed tallies. The `MycelixBridge` drains
+/// them and converts to `GovernanceEvent`/`GovernanceOutcome` for the
+/// `GovernanceManager`.
+#[cfg(feature = "mycelix")]
+#[derive(Debug, Clone)]
+pub enum GovernanceDispatchOutcome {
+    /// A proposal was successfully submitted on-chain.
+    ProposalSubmitted { proposal_id: String },
+    /// A vote was successfully recorded on-chain.
+    VoteRecorded { proposal_id: String },
+    /// A proposal tally completed (passed or failed).
+    TallyCompleted {
+        proposal_id: String,
+        passed: bool,
+        tally_yes: u32,
+        tally_no: u32,
+    },
+}
+
+/// Commands dispatched to an external Holochain conductor process.
+///
+/// The conductor bridge (`symthaea-mycelix-holochain` crate) receives these
+/// via `std::sync::mpsc::Receiver<GovernanceDispatchCommand>` and translates
+/// them into real zome calls via `AppWebsocket`.
+#[cfg(feature = "mycelix")]
+#[derive(Debug, Clone)]
+pub enum GovernanceDispatchCommand {
+    /// Submit a proposal to the governance cluster.
+    SubmitProposal {
+        description: String,
+        proposer_did: String,
+        consciousness_phi: f64,
+        alignment_score: f64,
+    },
+    /// Cast a vote on an existing proposal.
+    CastVote {
+        proposal_id: String,
+        voter_did: String,
+        approve: bool,
+        rationale: String,
+    },
+    /// Query active proposals (response arrives via governance event channel).
+    QueryActiveProposals,
 }
 
 impl MycelixBridge {
@@ -389,6 +448,10 @@ impl MycelixBridge {
             pending_gov_events: Vec::new(),
             #[cfg(feature = "mycelix")]
             pending_gov_outcomes: Vec::new(),
+            #[cfg(feature = "mycelix")]
+            governance_dispatch_tx: None,
+            #[cfg(feature = "mycelix")]
+            governance_outcome_rx: None,
         }
     }
 
@@ -406,7 +469,73 @@ impl MycelixBridge {
             pending_gov_events: Vec::new(),
             #[cfg(feature = "mycelix")]
             pending_gov_outcomes: Vec::new(),
+            #[cfg(feature = "mycelix")]
+            governance_dispatch_tx: None,
+            #[cfg(feature = "mycelix")]
+            governance_outcome_rx: None,
         }
+    }
+
+    /// Set the governance dispatch channel for real Holochain connectivity.
+    ///
+    /// The receiver end should be owned by the `symthaea-mycelix-holochain`
+    /// conductor bridge, which translates commands into real zome calls.
+    /// Without this channel, proposals and votes are evaluated locally
+    /// but not submitted on-chain.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let (tx, rx) = std::sync::mpsc::channel();
+    /// bridge.set_governance_dispatch_tx(tx);
+    /// // In a separate async task:
+    /// // conductor_bridge::run_dispatch_loop(rx, conductor).await;
+    /// ```
+    #[cfg(feature = "mycelix")]
+    pub fn set_governance_dispatch_tx(
+        &mut self,
+        tx: std::sync::mpsc::Sender<GovernanceDispatchCommand>,
+    ) {
+        self.governance_dispatch_tx = Some(tx);
+    }
+
+    /// Set the governance outcome channel receiver.
+    ///
+    /// The sender end should be shared between the dispatch loop (for
+    /// submission/vote confirmations) and the governance poller (for
+    /// completed tally results). Use `create_governance_outcome_channel()`
+    /// for convenience.
+    #[cfg(feature = "mycelix")]
+    pub fn set_governance_outcome_rx(
+        &mut self,
+        rx: std::sync::mpsc::Receiver<GovernanceDispatchOutcome>,
+    ) {
+        self.governance_outcome_rx = Some(rx);
+    }
+
+    /// Create a governance outcome channel pair.
+    ///
+    /// Returns `(Sender, Receiver)`. Pass the sender to the dispatch loop
+    /// and governance poller; pass the receiver to `set_governance_outcome_rx()`.
+    #[cfg(feature = "mycelix")]
+    pub fn create_governance_outcome_channel() -> (
+        std::sync::mpsc::Sender<GovernanceDispatchOutcome>,
+        std::sync::mpsc::Receiver<GovernanceDispatchOutcome>,
+    ) {
+        std::sync::mpsc::channel()
+    }
+
+    /// Create the dispatch channel pair for Holochain governance connectivity.
+    ///
+    /// Returns `(Sender, Receiver)` — caller gives the sender to this bridge
+    /// via `set_governance_dispatch_tx()` and passes the receiver to the
+    /// conductor bridge process.
+    #[cfg(feature = "mycelix")]
+    pub fn create_governance_channel() -> (
+        std::sync::mpsc::Sender<GovernanceDispatchCommand>,
+        std::sync::mpsc::Receiver<GovernanceDispatchCommand>,
+    ) {
+        std::sync::mpsc::channel()
     }
 
     // ========================================================================
@@ -459,6 +588,17 @@ impl MycelixBridge {
 
         // 5. Create submission result
         let alignment = self.create_alignment_result(&eval_result);
+
+        // 6. Dispatch to Holochain conductor if channel is connected
+        #[cfg(feature = "mycelix")]
+        if let Some(ref tx) = self.governance_dispatch_tx {
+            let _ = tx.send(GovernanceDispatchCommand::SubmitProposal {
+                description: proposal.description.clone(),
+                proposer_did: self.agent_id.clone(),
+                consciousness_phi: consciousness.phi,
+                alignment_score: alignment.overall_score,
+            });
+        }
 
         Ok(SubmissionResult {
             proposal_id: proposal.id.clone(),
@@ -537,6 +677,18 @@ impl MycelixBridge {
                 return Err(BridgeError::CannotEvaluate);
             }
         };
+
+        // Dispatch to Holochain conductor if channel is connected
+        #[cfg(feature = "mycelix")]
+        if let Some(ref tx) = self.governance_dispatch_tx {
+            let approve = matches!(value, VoteValue::Yes | VoteValue::StrongYes);
+            let _ = tx.send(GovernanceDispatchCommand::CastVote {
+                proposal_id: proposal.id.clone(),
+                voter_did: self.agent_id.clone(),
+                approve,
+                rationale: format!("{:?}: score {:.2}", alignment.recommendation, alignment.overall_score),
+            });
+        }
 
         Ok(Vote {
             proposal_id: proposal.id.clone(),
@@ -865,6 +1017,11 @@ impl MycelixBridge {
     }
 
     /// Drain all pending governance events and outcomes.
+    ///
+    /// Also drains the outcome channel (if set) and converts
+    /// `GovernanceDispatchOutcome` into `GovernanceEvent`/`GovernanceOutcome`
+    /// for the `GovernanceManager`.
+    ///
     /// Returns `(events, outcomes)` — caller injects them into CLS.
     #[cfg(feature = "mycelix")]
     pub fn drain_pending_governance(
@@ -873,6 +1030,71 @@ impl MycelixBridge {
         Vec<crate::cognitive_loop::managers::governance_manager::GovernanceEvent>,
         Vec<crate::cognitive_loop::managers::governance_manager::GovernanceOutcome>,
     ) {
+        // Drain the outcome channel into pending_gov_events / pending_gov_outcomes
+        if let Some(ref rx) = self.governance_outcome_rx {
+            while let Ok(outcome) = rx.try_recv() {
+                match outcome {
+                    GovernanceDispatchOutcome::ProposalSubmitted { ref proposal_id } => {
+                        self.pending_gov_events.push(
+                            crate::cognitive_loop::managers::governance_manager::GovernanceEvent {
+                                kind: crate::cognitive_loop::managers::governance_manager::GovernanceEventKind::ProposalCreated,
+                                proposal_id: Some(proposal_id.clone()),
+                                timestamp_secs: std::time::SystemTime::now()
+                                    .duration_since(std::time::UNIX_EPOCH)
+                                    .unwrap_or_default()
+                                    .as_secs(),
+                            },
+                        );
+                    }
+                    GovernanceDispatchOutcome::VoteRecorded { ref proposal_id } => {
+                        self.pending_gov_events.push(
+                            crate::cognitive_loop::managers::governance_manager::GovernanceEvent {
+                                kind: crate::cognitive_loop::managers::governance_manager::GovernanceEventKind::VoteCast {
+                                    voter_phi: 0.0,
+                                    vote_value: 0.0,
+                                },
+                                proposal_id: Some(proposal_id.clone()),
+                                timestamp_secs: std::time::SystemTime::now()
+                                    .duration_since(std::time::UNIX_EPOCH)
+                                    .unwrap_or_default()
+                                    .as_secs(),
+                            },
+                        );
+                    }
+                    GovernanceDispatchOutcome::TallyCompleted {
+                        ref proposal_id,
+                        passed,
+                        ..
+                    } => {
+                        // Emit as a GovernanceEvent (TallyCompleted)
+                        self.pending_gov_events.push(
+                            crate::cognitive_loop::managers::governance_manager::GovernanceEvent {
+                                kind: crate::cognitive_loop::managers::governance_manager::GovernanceEventKind::TallyCompleted {
+                                    passed,
+                                    collective_phi: 0.0,
+                                },
+                                proposal_id: Some(proposal_id.clone()),
+                                timestamp_secs: std::time::SystemTime::now()
+                                    .duration_since(std::time::UNIX_EPOCH)
+                                    .unwrap_or_default()
+                                    .as_secs(),
+                            },
+                        );
+                        // Also emit as a GovernanceOutcome for learning feedback
+                        self.pending_gov_outcomes.push(
+                            crate::cognitive_loop::managers::governance_manager::GovernanceOutcome {
+                                proposal_id: proposal_id.clone(),
+                                passed,
+                                my_vote_aligned: None,
+                                value_alignment_score: 0.0,
+                                harmonic_resonance: 0.0,
+                            },
+                        );
+                    }
+                }
+            }
+        }
+
         (
             std::mem::take(&mut self.pending_gov_events),
             std::mem::take(&mut self.pending_gov_outcomes),

@@ -477,13 +477,29 @@ pub(crate) struct EthicsEngineOutput {
 
 /// Unified ethical verdict.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum EthicalVerdict {
+pub enum EthicalVerdict {
     /// All systems agree: action is ethical
     Safe,
     /// One or more systems flag concerns but don't block
     Caution,
     /// Value evaluator vetoes or consent violation detected
     Blocked,
+}
+
+impl EthicalVerdict {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Safe => "Safe",
+            Self::Caution => "Caution",
+            Self::Blocked => "Blocked",
+        }
+    }
+}
+
+impl Default for EthicalVerdict {
+    fn default() -> Self {
+        EthicalVerdict::Safe
+    }
 }
 
 /// Input snapshot for the ethics engine.

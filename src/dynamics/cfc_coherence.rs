@@ -108,6 +108,10 @@ impl TemporalCoherenceMetrics {
             return Self::default();
         }
 
+        if tau.iter().any(|&t| !t.is_finite()) {
+            return Self::default();
+        }
+
         let n = tau.len() as f32;
 
         // Basic statistics

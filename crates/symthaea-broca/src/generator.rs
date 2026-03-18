@@ -68,7 +68,7 @@ pub struct BrocaConfig {
 }
 
 fn default_repetition_penalty() -> f32 {
-    1.2
+    2.0
 }
 
 impl Default for BrocaConfig {
@@ -304,7 +304,9 @@ impl BrocaGenerator {
         let mut prev_token = self.tokenizer.thought_id; // Start with <thought> token
         let mut eos_terminated = false;
         let mut veto_triggered = false;
-        let mut text = String::new();
+        // Accumulate raw bytes for proper UTF-8 decode (byte tokens like <0xE2>
+        // are only valid when combined with subsequent bytes)
+        let mut text_bytes: Vec<u8> = Vec::new();
         let rep_penalty = self.config.repetition_penalty;
         let min_veto_pos = self.config.gating.min_veto_position;
         let max_vetoes = self.config.gating.max_vetoes;
@@ -323,6 +325,11 @@ impl BrocaGenerator {
             // Apply frequency-scaled repetition penalty
             if rep_penalty > 1.0 + 1e-6 {
                 apply_repetition_penalty(&mut logits, &tokens, rep_penalty);
+            }
+
+            // No-repeat bigram: block any token that would complete a repeated 2-gram
+            if !tokens.is_empty() {
+                block_repeated_ngrams(&mut logits, &tokens, 2);
             }
 
             // Apply gating and compute audit trail values
@@ -429,7 +436,7 @@ impl BrocaGenerator {
                     this_veto = true;
                     veto_count += 1;
                     tokens_since_veto = 0;
-                    text.push_str(&self.config.veto_hesitation);
+                    text_bytes.extend_from_slice(self.config.veto_hesitation.as_bytes());
                     on_token(&self.config.veto_hesitation);
                     // Reset network state
                     self.controller.reset();
@@ -470,7 +477,18 @@ impl BrocaGenerator {
             // Skip special tokens in output
             if !self.tokenizer.is_special(next_token) {
                 let token_str = self.tokenizer.token_str(next_token);
-                text.push_str(token_str);
+                // Decode byte tokens (<0xHH>) to raw bytes for proper UTF-8
+                if token_str.starts_with("<0x") && token_str.ends_with('>')
+                    && token_str.len() == 6
+                {
+                    if let Ok(byte) = u8::from_str_radix(&token_str[3..5], 16) {
+                        text_bytes.push(byte);
+                    } else {
+                        text_bytes.extend_from_slice(token_str.as_bytes());
+                    }
+                } else {
+                    text_bytes.extend_from_slice(token_str.as_bytes());
+                }
                 on_token(token_str);
             }
 
@@ -479,6 +497,8 @@ impl BrocaGenerator {
         }
 
         let final_coherence = self.coherence_feedback.coherence();
+        let text = String::from_utf8(text_bytes)
+            .unwrap_or_else(|e| String::from_utf8_lossy(e.as_bytes()).into_owned());
 
         GenerationResult {
             text,
@@ -540,6 +560,22 @@ impl BrocaGenerator {
     pub fn config(&self) -> &BrocaConfig {
         &self.config
     }
+
+    /// Get mutable reference to the config.
+    pub fn config_mut(&mut self) -> &mut BrocaConfig {
+        &mut self.config
+    }
+
+    /// Rebuild gating subsystems from the current config.
+    /// Call after modifying config to apply changes.
+    pub fn rebuild_gating(&mut self) {
+        self.coherence_feedback = CoherenceFeedback::with_veto_threshold(
+            self.config.gating.coherence_drift_threshold,
+            self.config.gating.veto_threshold,
+        );
+        self.epistemic_gate = EpistemicGate::new(&self.tokenizer, &self.config.gating);
+        self.emotional_modulator = EmotionalModulator::new(&self.tokenizer, &self.config.gating);
+    }
 }
 
 /// Apply frequency-scaled repetition penalty to logits for tokens already generated.
@@ -564,6 +600,29 @@ fn apply_repetition_penalty(logits: &mut [f32], generated: &[u32], penalty: f32)
             } else {
                 *logit *= effective_penalty;
             }
+        }
+    }
+}
+
+/// Block tokens that would complete a repeated n-gram.
+/// For each n-gram of length `n` ending at the current position, if appending
+/// a candidate token would create an n-gram already seen, set its logit to -inf.
+fn block_repeated_ngrams(logits: &mut [f32], generated: &[u32], n: usize) {
+    if generated.len() < n - 1 {
+        return;
+    }
+    // Collect all (n-1)-gram → next-token pairs from history
+    let mut seen = std::collections::HashSet::new();
+    for window in generated.windows(n) {
+        let prefix = &window[..n - 1];
+        let next = window[n - 1];
+        seen.insert((prefix.to_vec(), next));
+    }
+    // Current (n-1)-gram suffix
+    let suffix = &generated[generated.len() - (n - 1)..];
+    for token_id in 0..logits.len() {
+        if seen.contains(&(suffix.to_vec(), token_id as u32)) {
+            logits[token_id] = f32::NEG_INFINITY;
         }
     }
 }

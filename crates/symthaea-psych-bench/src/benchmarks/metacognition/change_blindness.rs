@@ -112,7 +112,7 @@ impl ChangeBlindnessBenchmark {
                         let bound = objects[i].bind(&position_hvs[i]);
                         pre_bound_objects.push(bound);
                         let weight = if change_is_attended && i == change_idx {
-                            2.5 // Attended object has stronger representation
+                            3.0 // Attended object has stronger representation
                         } else {
                             1.0
                         };
@@ -133,7 +133,7 @@ impl ChangeBlindnessBenchmark {
                         let bound = obj.bind(&position_hvs[i]);
                         post_bound_objects.push(bound);
                         let weight = if change_is_attended && i == change_idx {
-                            2.5
+                            3.0
                         } else {
                             1.0
                         };
@@ -154,9 +154,9 @@ impl ChangeBlindnessBenchmark {
                         xor_shift(&mut rng);
                         let blank = ContinuousHV::random(dim, rng.wrapping_add(3000));
                         let disrupted_pre =
-                            ContinuousHV::weighted_bundle(&[&pre_scene, &blank], &[0.85, 0.15]);
+                            ContinuousHV::weighted_bundle(&[&pre_scene, &blank], &[0.80, 0.20]);
                         let disrupted_post =
-                            ContinuousHV::weighted_bundle(&[&post_scene, &blank], &[0.85, 0.15]);
+                            ContinuousHV::weighted_bundle(&[&post_scene, &blank], &[0.80, 0.20]);
                         disrupted_pre.similarity(&disrupted_post) as f64
                     } else {
                         // No disruption: direct comparison, transient signal strong

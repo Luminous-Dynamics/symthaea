@@ -682,7 +682,13 @@ impl CognitiveLoopService {
                 if let Some(ref replay) = self.episodic_persistence.replay {
                     let top_episodes = replay.get_top_episodes(16);
                     if !top_episodes.is_empty() {
-                        let db = self.episodic_persistence.db.as_ref().unwrap().clone();
+                        let Some(db) = self.episodic_persistence.db.clone() else {
+                            return EpisodicReplayResult {
+                                surprise_replay_batch_size: 0,
+                                phasic_da_replay_boost: 0,
+                                memory_db_flushed: false,
+                            };
+                        };
                         let flush_guard = self.episodic_persistence.flush_in_progress.clone();
                         flush_guard.store(true, Ordering::Relaxed);
 

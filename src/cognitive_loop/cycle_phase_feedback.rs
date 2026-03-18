@@ -81,7 +81,7 @@ impl CognitiveLoopService {
             #[cfg(feature = "vision-manifold")]
             scene_recognized: perception.scene_recognized,
             #[cfg(feature = "semantic-encoder")]
-            semantic_embedding: None, // TODO: wire to semantic_embedding_channel
+            semantic_embedding: self.feature_integ.last_semantic_continuous.clone(),
         };
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -96,7 +96,7 @@ impl CognitiveLoopService {
         let temporal_causal_chains = consciousness_metrics.temporal_causal_chains;
         let temporal_continuity = consciousness_metrics.temporal_continuity;
         let temporal_max_chain_length = consciousness_metrics.temporal_max_chain_length;
-        let _chain_cycle_numbers = consciousness_metrics.chain_cycle_numbers;
+        // chain_cycle_numbers: computed upstream but not consumed in feedback phase
         let causal_codebook_entries = consciousness_metrics.causal_codebook_entries;
         let continuity_replay_needed = consciousness_metrics.continuity_replay_needed;
         let lattice_height = consciousness_metrics.lattice_height;
@@ -481,19 +481,14 @@ impl CognitiveLoopService {
         // Low pipeline consciousness → tighten caution (subsystems aren't coherent).
         // Science: Dehaene (2014) — global workspace ignition requires integrated processing.
         self.carryover.quality.last_pipeline_consciousness = pipeline_consciousness;
-        let _pipeline_consciousness_gated =
-            if pipeline_consciousness > 0.7 && self.stats.total_cycles > 15 {
-                self.scale_threshold("pipeline_conscious_relax", 0.97);
-                true
-            } else if pipeline_consciousness < 0.3
-                && pipeline_consciousness > 0.0
-                && self.stats.total_cycles > 15
-            {
-                self.scale_threshold("pipeline_conscious_caution", 1.03);
-                true
-            } else {
-                false
-            };
+        if pipeline_consciousness > 0.7 && self.stats.total_cycles > 15 {
+            self.scale_threshold("pipeline_conscious_relax", 0.97);
+        } else if pipeline_consciousness < 0.3
+            && pipeline_consciousness > 0.0
+            && self.stats.total_cycles > 15
+        {
+            self.scale_threshold("pipeline_conscious_caution", 1.03);
+        }
 
         // ═══════════════════════════════════════════════════════════════════════
         // RESONATOR CODEBOOK GROWTH
@@ -552,8 +547,8 @@ impl CognitiveLoopService {
                 let result = engine.triage(input, "");
                 triage_count = 1;
                 if let Some(ref manager) = self.support.knowledge_manager {
-                    let category_str = format!("{:?}", result.suggested_category);
-                    let articles = manager.search(&category_str, 3);
+                    let category_str = result.suggested_category.as_str();
+                    let articles = manager.search(category_str, 3);
                     if !articles.is_empty() {
                         tracing::trace!(
                             category = %category_str,
@@ -690,14 +685,19 @@ impl CognitiveLoopService {
         let predictive_psi_modulation = late_result.predictive_psi_modulation;
         let hierarchical_total_free_energy = late_result.hierarchical_total_free_energy;
         let predictive_self_safety = late_result.predictive_self_safety;
+        let predictive_behavioral_error = late_result.predictive_behavioral_error;
         let attention_schema_focus = late_result.attention_schema_focus;
         let attention_fatigue = late_result.attention_fatigue;
         let attention_prediction_accuracy = late_result.attention_prediction_accuracy;
         let psi_attention_avg = late_result.psi_attention_avg;
+        let hierarchical_free_energy_lr_boost = late_result.hierarchical_free_energy_lr_boost;
+        let predictive_phi_lr_delta = late_result.predictive_phi_lr_delta;
+        let body_valence_confidence_delta = late_result.body_valence_confidence_delta;
+        let narrative_self_confidence_factor = late_result.narrative_self_confidence_factor;
 
         let gwt_broadcast = integration_result.gwt_broadcast;
         let gwt_coalition_size = integration_result.gwt_coalition_size;
-        let cross_modal_binding_strength = integration_result.cross_modal_binding_strength;
+        let mut cross_modal_binding_strength = integration_result.cross_modal_binding_strength;
         let cross_modal_psi = integration_result.cross_modal_psi;
         let resonance_frequency = integration_result.resonance_frequency;
         let quantum_coherence_level = integration_result.quantum_coherence_level;
@@ -816,6 +816,26 @@ impl CognitiveLoopService {
                 } else {
                     0.5
                 },
+                // Knowledge coherence: composite quality from graph size, calibration, contradictions.
+                // Formula: (log2(graph_size+1)/10) × (1-ece) × (1/(1 + contradictions×0.1))
+                // Science: Stanovich (2009) — epistemic rationality; Guo et al. (2017) — calibration.
+                knowledge_coherence: if let Some(ref km) = self.knowledge_manager {
+                    let t = km.telemetry();
+                    let log_scale = super::thresholds::KNOWLEDGE_COHERENCE_LOG_SCALE;
+                    let size_factor =
+                        ((t.graph_size as f64 + 1.0).log2() / log_scale).clamp(0.0, 1.0);
+                    let ece_factor = (1.0 - t.calibration_ece).clamp(0.0, 1.0);
+                    let contradiction_factor = 1.0
+                        / (1.0 + t.contradictions_detected as f64 * 0.1);
+                    let coherence = size_factor * ece_factor * contradiction_factor;
+                    if coherence.is_finite() {
+                        coherence
+                    } else {
+                        0.0
+                    }
+                } else {
+                    0.0
+                },
                 // Glyph coherence: symbolic consciousness field integration
                 glyph_coherence: {
                     #[cfg(feature = "glyph_codex")]
@@ -827,6 +847,8 @@ impl CognitiveLoopService {
                         0.0
                     }
                 },
+                // CfC temporal coherence → consciousness (Clark 2013)
+                temporal_coherence_phi: self.language_comm.voice_coherence.bridge.phi_contribution(),
             },
         );
         self.consciousness_engine
@@ -882,7 +904,7 @@ impl CognitiveLoopService {
         let sigma = consciousness_output.sigma;
         let eq_v2_limiting_component = consciousness_output
             .limiting_component
-            .map(|c| format!("{c:?}"))
+            .map(|c| c.as_str().to_string())
             .unwrap_or_default();
         self.carryover.quality.last_pipeline_consciousness =
             consciousness_output.pipeline_consciousness;
@@ -1014,7 +1036,7 @@ impl CognitiveLoopService {
 
         let consciousness_weights = consciousness_output.current_weights;
         let consciousness_weight_variance = consciousness_output.weight_variance;
-        let convergence_state = format!("{:?}", consciousness_output.convergence_state);
+        let convergence_state = consciousness_output.convergence_state.as_str().to_string();
 
         // Phi-Harmony coupling: during Sacred Stillness, weight Phi by integration
         // quality rather than raw intensity. Rest-state Phi should reflect how
@@ -1423,6 +1445,51 @@ impl CognitiveLoopService {
             self.scale_confidence("binding_attention_lo", binding_dampen.max(0.95));
         }
 
+        // Hierarchical bundling: accumulate current cycle's BinaryHV per region
+        // and compute cross-region binding strength from structured aggregates.
+        if let Some(ref mut bundler) = self.hierarchical_bundler {
+            use symthaea_core::hdc::substrate_independence::CorticalRegion;
+
+            // Feed the current cycle's BinaryHV into the Integration region
+            bundler.add(CorticalRegion::Integration, perception.encoding.hv16_cached);
+
+            // Once we have enough accumulated vectors, compute aggregate metrics
+            if bundler.total_vectors() >= 12 {
+                let bundles = bundler.all_bundles();
+
+                // Compute cross-region binding strength from bundle similarities
+                if bundles.len() >= 2 {
+                    if let Some(aggregate) = bundler.aggregate() {
+                        let mut binding_sum = 0.0f32;
+                        let mut count = 0usize;
+                        for bundle in &bundles {
+                            if let Some(recovered) = bundler.unbind_region(&aggregate, &bundle.region) {
+                                binding_sum += recovered.similarity(&bundle.local_bundle);
+                                count += 1;
+                            }
+                        }
+                        if count > 0 {
+                            let avg_binding = binding_sum / count as f32;
+                            // EMA-blend into cross-modal binding for downstream consumers
+                            cross_modal_binding_strength =
+                                cross_modal_binding_strength * 0.9 + avg_binding * 0.1;
+                            tracing::debug!(
+                                avg_binding,
+                                active_regions = bundles.len(),
+                                total_vectors = bundler.total_vectors(),
+                                "Hierarchical bundling: cross-region binding computed"
+                            );
+                        }
+                    }
+                }
+
+                // Reset bundler periodically to keep accumulation fresh
+                if bundler.total_vectors() > 100 {
+                    bundler.clear();
+                }
+            }
+        }
+
         FeedbackPhaseResult {
             quality: FbQuality {
                 cross_module_agreement,
@@ -1490,6 +1557,7 @@ impl CognitiveLoopService {
                 predictive_psi_modulation,
                 hierarchical_total_free_energy,
                 predictive_self_safety,
+                predictive_behavioral_error,
                 attention_schema_focus,
                 attention_fatigue,
                 attention_prediction_accuracy,
@@ -1512,6 +1580,10 @@ impl CognitiveLoopService {
                 narrative_gwt_self_psi,
                 living_mind_vitality,
                 living_mind_coherence,
+                hierarchical_free_energy_lr_boost,
+                predictive_phi_lr_delta,
+                body_valence_confidence_delta,
+                narrative_self_confidence_factor,
             },
             reasoning: FbReasoning {
                 reasoning_context,

@@ -1227,23 +1227,18 @@ pub const SUBSYSTEM_LR_FACTOR_MAX: f32 = 1.3;
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Cross-module agreement above this signals high convergence → confidence boost.
-#[allow(dead_code)]
 pub const CROSS_MODULE_AGREEMENT_HIGH: f32 = 0.8;
 
 /// Cross-module agreement below this signals divergence → exploration boost.
-#[allow(dead_code)]
 pub const CROSS_MODULE_AGREEMENT_LOW: f32 = 0.3;
 
 /// Unified quality score composition: prediction accuracy weight.
-#[allow(dead_code)]
 pub const UNIFIED_QUALITY_PREDICTION_WEIGHT: f32 = 0.5;
 
 /// Unified quality score composition: cross-module agreement weight.
-#[allow(dead_code)]
 pub const UNIFIED_QUALITY_AGREEMENT_WEIGHT: f32 = 0.3;
 
 /// Unified quality score composition: anomaly (inverse) weight.
-#[allow(dead_code)]
 pub const UNIFIED_QUALITY_ANOMALY_WEIGHT: f32 = 0.2;
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1252,29 +1247,23 @@ pub const UNIFIED_QUALITY_ANOMALY_WEIGHT: f32 = 0.2;
 
 /// FEP accuracy above this triggers confidence boost.
 /// Basis: Friston (2010) — accurate prediction reduces free energy.
-#[allow(dead_code)]
 pub const FEP_ACCURACY_CONFIDENCE_THRESHOLD: f64 = 0.5;
 
 /// FEP complexity above this dampens learning rate.
 /// Basis: Bayesian model complexity penalty (BIC/MDL principle).
-#[allow(dead_code)]
 pub const FEP_COMPLEXITY_THRESHOLD: f64 = 1.0;
 
 /// FEP pragmatic value above this triggers exploitation strategy.
 /// Basis: Friston et al. (2015) — expected free energy pragmatic term.
-#[allow(dead_code)]
 pub const FEP_PRAGMATIC_EXPLOIT_THRESHOLD: f64 = 0.7;
 
 /// FEP pragmatic value below this triggers exploration.
-#[allow(dead_code)]
 pub const FEP_PRAGMATIC_EXPLORE_THRESHOLD: f64 = 0.3;
 
 /// FEP temporal difference error above this triggers causal discovery.
-#[allow(dead_code)]
 pub const FEP_TD_ERROR_DISCOVERY_THRESHOLD: f64 = 0.5;
 
 /// FEP learning signal above this enables world model plasticity increase.
-#[allow(dead_code)]
 pub const FEP_LEARNING_PLASTICITY_THRESHOLD: f32 = 0.5;
 
 /// FEP complexity LR dampen factor: multiplier applied to learning rate when
@@ -2549,6 +2538,11 @@ pub const GOV_CONSCIOUSNESS_MODULATION: f64 = 0.04; // ±2% at extremes (0.04 ×
 /// Basis: Jung (1959) — archetypal integration; Grof (1985) — consciousness cartography.
 pub const GLYPH_CONSCIOUSNESS_MODULATION: f64 = 0.04; // ±2% at extremes (0.04 × 0.5 = 0.02)
 
+/// CfC temporal coherence weight for consciousness Knowledge component.
+/// Additive nudge: max +5% at perfect temporal coherence (phi_contribution = 1.0).
+/// Basis: Clark (2013) — temporal integration supports unified conscious experience.
+pub const TEMPORAL_COHERENCE_CONSCIOUSNESS_WEIGHT: f64 = 0.05;
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // SWARM NEUROMODULATORY COUPLING
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -3051,6 +3045,21 @@ pub const KNOWLEDGE_CONTRADICTION_RESOLUTION_THRESHOLD: f32 = 0.8;
 /// strengthens epistemic claims by anchoring them in verified factual content.
 pub const KNOWLEDGE_GROUNDING_EPISTEMIC_BLEND: f64 = 0.3;
 
+/// Weight of knowledge coherence in the consciousness Knowledge core component.
+/// Knowledge coherence (graph size + calibration + contradiction-free) nudges the
+/// effective epistemic quality by this fraction of the coherence score.
+/// Small weight keeps it subordinate to grounding and epistemic quality.
+/// Science: Stanovich (2009) — epistemic rationality correlates with reflective judgment
+/// quality; well-calibrated, contradiction-free knowledge bases support deeper reflection.
+pub const KNOWLEDGE_COHERENCE_CONSCIOUSNESS_WEIGHT: f64 = 0.1;
+
+/// Log-scale divisor for normalising graph size in the knowledge coherence formula.
+/// log2(graph_size + 1) / LOG_SCALE: at ~1000 facts the contribution saturates near 1.0
+/// (log2(1024) = 10.0). Larger knowledge bases beyond this get diminishing returns.
+/// Science: Miller (1956) — working memory capacity limits; beyond ~1000 chunks, marginal
+/// value of additional facts for consciousness integration decreases.
+pub const KNOWLEDGE_COHERENCE_LOG_SCALE: f64 = 10.0;
+
 /// Dream consolidation weight boost when knowledge contradictions are active.
 /// Contradictions signal unresolved cognitive dissonance requiring offline integration.
 /// Science: Festinger (1957) — cognitive dissonance drives memory consolidation to resolve conflict.
@@ -3086,6 +3095,77 @@ pub const KNOWLEDGE_ATTENTION_CONTRADICTION_THRESHOLD: f64 = 0.5;
 /// Minimum causal edge strength to flag as a confounding variable.
 /// Science: Confounders with weak links are noise; strong links warrant attention (Pearl 2009).
 pub const KNOWLEDGE_CONFOUNDER_STRENGTH_THRESHOLD: f32 = 0.3;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CROSS-COUPLING: DRIVE → LEARNING
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Boredom level above which plasticity boost kicks in.
+/// Science: Berlyne (1960) — boredom triggers exploratory information-seeking.
+pub const DRIVE_BOREDOM_PLASTICITY_THRESHOLD: f32 = 0.5;
+
+/// Plasticity gain per unit of boredom above threshold.
+/// Conservative: 10% max boost at full boredom (0.8 - 0.5) * 0.33 ≈ 0.1.
+/// Science: Berlyne (1960) — exploration intensity scales with deprivation.
+pub const DRIVE_BOREDOM_PLASTICITY_GAIN: f32 = 0.33;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CROSS-COUPLING: KNOWLEDGE → ETHICS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Normalized causal depth above which moral confidence nudge activates.
+/// causal_depth is normalized to [0,1] (raw depth / 5). 0.6 ≈ 3 raw steps.
+/// Science: Pearl (2009) — multi-step causal reasoning grounds moral judgment.
+pub const KNOWLEDGE_ETHICS_CAUSAL_DEPTH_THRESHOLD: f64 = 0.6;
+
+/// Prediction confidence gain per unit of excess causal depth.
+/// Capped at 0.03 total. Small effect to avoid overconfident moral verdicts.
+/// Science: Pearl (2009) — causal understanding raises, but doesn't guarantee, reasoning quality.
+pub const KNOWLEDGE_ETHICS_CONFIDENCE_GAIN: f64 = 0.025;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CROSS-COUPLING: MEMORY → LEARNING
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Consolidation pressure above which learning plasticity gets boosted.
+/// Science: Born & Wilhelm (2012) — memory consolidation pressure primes subsequent encoding.
+pub const MEMORY_CONSOLIDATION_PLASTICITY_THRESHOLD: f32 = 0.6;
+
+/// LR factor boost per unit of consolidation pressure above threshold.
+/// Conservative: max boost ≈ (1.0 - 0.6) * 0.15 = 0.06 (6%).
+/// Science: Diekelmann & Born (2010) — consolidation enhances subsequent learning.
+pub const MEMORY_CONSOLIDATION_PLASTICITY_GAIN: f32 = 0.15;
+
+/// Recall quality below which learning dampening kicks in.
+/// Low recall quality signals unreliable memory retrieval → reduce learning rate.
+/// Science: Tulving (2002) — retrieval failure indicates encoding problems.
+pub const MEMORY_RECALL_QUALITY_DAMPEN_THRESHOLD: f32 = 0.3;
+
+/// LR factor dampening scale when recall quality is poor.
+/// Applied as: LR *= (1.0 - (threshold - quality) * scale)
+/// Science: Roediger & Karpicke (2006) — testing effect requires successful retrieval.
+pub const MEMORY_RECALL_QUALITY_DAMPEN_SCALE: f32 = 0.2;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CROSS-COUPLING: PERCEPTION → DRIVE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Coherence below which perception signals drive system to seek novelty.
+/// Science: Damasio (1994) — low perceptual coherence triggers orienting response.
+pub const PERCEPTION_LOW_COHERENCE_THRESHOLD: f32 = 0.3;
+
+/// Exploration boost scale when perception coherence is low.
+/// Applied per unit of deficit below threshold.
+/// Science: Sokolov (1963) — orienting reflex scales with stimulus novelty.
+pub const PERCEPTION_LOW_COHERENCE_EXPLORE_GAIN: f32 = 0.08;
+
+/// Budget utilization above which drive exploration is suppressed.
+/// Science: Lavie (2005) — high perceptual load reduces capacity for exploration.
+pub const PERCEPTION_HIGH_LOAD_SUPPRESS_THRESHOLD: f32 = 0.8;
+
+/// Exploration suppression factor when perceptual load is high.
+/// Applied as: exploration *= (1.0 - (utilization - threshold) * factor)
+pub const PERCEPTION_HIGH_LOAD_SUPPRESS_FACTOR: f32 = 0.5;
 
 /// Maximum attention contribution from limiting component analysis (cap).
 pub const LIMITING_COMPONENT_ATTENTION_MAX: f32 = 0.1;
@@ -3818,6 +3898,534 @@ pub const REASONING_RELIABILITY_THRESHOLD: f64 = 0.7;
 /// Science: Hobson & Friston (2012) — predictive processing theory of dreaming;
 /// high-confidence prediction errors are preferentially consolidated.
 pub const DREAM_REASONING_RELIABILITY_SCALE: f64 = 0.4;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PREFRONTAL CORTEX
+// Science: Baddeley (1994) — working memory model with central executive.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Default PFC working memory capacity (Baddeley 1994: 7±2 items).
+pub const PFC_WORKING_MEMORY_CAPACITY: f32 = 7.0;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// META-COGNITION
+// Science: Koriat (2007) — monitoring accuracy calibrates learning rate.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Meta-cognitive accuracy threshold for LR boost (Koriat 2007).
+pub const META_COGNITIVE_ACCURACY_LR_THRESHOLD: f32 = 0.7;
+
+/// Meta-cognitive LR boost scale — up to 1.15x at accuracy=1.0 (Koriat 2007).
+pub const META_COGNITIVE_LR_BOOST_SCALE: f32 = 0.5;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SOMATIC MARKERS / BODY VALENCE
+// Science: Damasio (1999) — somatic marker hypothesis; body signals guide
+// decision-making via valence-tagged representations.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Positive body valence threshold for confidence boost (Damasio 1999).
+pub const BODY_VALENCE_POSITIVE_THRESHOLD: f32 = 0.3;
+
+/// Negative body valence threshold for confidence dampen (Damasio 1999).
+pub const BODY_VALENCE_NEGATIVE_THRESHOLD: f32 = -0.3;
+
+/// Positive body valence confidence scale (Damasio 1999).
+pub const BODY_VALENCE_CONFIDENCE_POS_SCALE: f32 = 0.02;
+
+/// Negative body valence confidence scale — stronger than positive (Damasio 1999).
+pub const BODY_VALENCE_CONFIDENCE_NEG_SCALE: f32 = 0.03;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// AFFECTIVE BRIDGE
+// Science: Fredrickson (2001) — broaden-and-build theory; positive affect
+// widens attentional scope and promotes exploratory behavior.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Positive affect threshold for exploration broadening (Fredrickson 2001).
+pub const AFFECTIVE_VALENCE_BROADEN_THRESHOLD: f32 = 0.2;
+
+/// Exploration broadening factor from positive affect (Fredrickson 2001).
+pub const AFFECTIVE_VALENCE_CURIOSITY_FACTOR: f32 = 1.05;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// NARRATIVE SELF
+// Science: Gallagher (2000) — narrative self as identity coherence substrate.
+// Gallagher & Hutto (2007) — narrative practice hypothesis for moral reasoning.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Strong narrative identity threshold (Gallagher 2000).
+pub const NARRATIVE_SELF_STRONG_THRESHOLD: f64 = 0.5;
+
+/// High narrative identity threshold for moral stabilization (Gallagher & Hutto 2007).
+pub const NARRATIVE_SELF_HIGH_THRESHOLD: f64 = 0.7;
+
+/// Weak narrative identity threshold (below which recalibration needed).
+pub const NARRATIVE_SELF_WEAK_THRESHOLD: f64 = 0.2;
+
+/// Confidence boost for strong narrative identity (Gallagher 2000).
+pub const NARRATIVE_SELF_CONFIDENCE_BOOST: f32 = 1.02;
+
+/// Confidence dampen for weak narrative identity.
+pub const NARRATIVE_SELF_CONFIDENCE_DAMPEN: f32 = 0.95;
+
+/// Moral learning signal stabilization scale for high self-coherence (Gallagher & Hutto 2007).
+pub const NARRATIVE_SELF_MORAL_STABILIZE_SCALE: f32 = 0.1;
+
+/// Moral sensitivity amplification scale for low self-coherence.
+pub const NARRATIVE_SELF_MORAL_SENSITIVITY_SCALE: f32 = 0.15;
+
+/// Social trust boost from strong narrative identity (Baumeister & Leary 1995).
+pub const NARRATIVE_SELF_SOCIAL_TRUST_BOOST: f32 = 1.02;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PREDICTIVE PROCESSING MODULATION
+// Science: Friston (2010) — free energy principle; prediction error precision
+// modulates consciousness and learning.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Maximum predictive phi modulation damping (Friston 2010).
+pub const PREDICTIVE_PHI_MAX_MODULATION: f32 = 0.15;
+
+/// Coherence baseline for predictive phi scaling (Friston 2010).
+pub const PREDICTIVE_PHI_COHERENCE_BASELINE: f32 = 0.5;
+
+/// Predictive phi LR contribution scale (Friston 2010: ±1.5% max).
+pub const PREDICTIVE_PHI_LR_SCALE: f32 = 0.10;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// HIERARCHICAL FREE ENERGY
+// Science: Friston (2008) — hierarchical predictive processing; higher-level
+// prediction errors drive model revision and exploration gating.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// HFE threshold for exploration suppression (Friston 2008).
+pub const HFE_EXPLORATION_THRESHOLD: f64 = 1.0;
+
+/// HFE exploration suppression damping factor (Friston 2008).
+pub const HFE_EXPLORATION_DAMPING: f64 = 0.05;
+
+/// HFE LR boost scale — poor model learns harder (Friston 2008).
+pub const HFE_LR_BOOST_SCALE: f64 = 0.02;
+
+/// HFE LR boost cap (Friston 2008).
+pub const HFE_LR_BOOST_MAX: f64 = 0.10;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PREDICTIVE SELF
+// Science: Clark (2013) — predictive processing and the self; self-model
+// stability constrains safety and learning rate.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Predictive self safety minimum factor (Clark 2013).
+pub const PREDICTIVE_SELF_SAFETY_MIN: f32 = 0.85;
+
+/// Predictive self safety scaling range (Clark 2013: 0.85 + safety * 0.375 = 0.85-1.0).
+pub const PREDICTIVE_SELF_SAFETY_SCALE: f32 = 0.375;
+
+/// Predictive self safety threshold below which LR is reduced (Clark 2013).
+pub const PREDICTIVE_SELF_SAFETY_THRESHOLD: f32 = 0.4;
+
+/// Exploration boost scale for low self-prediction confidence (Clark 2013: up to 0.08 at safety=0).
+pub const PREDICTIVE_SELF_EXPLORATION_SCALE: f32 = 0.2;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ATTENTION SCHEMA
+// Science: Baars (1988) — Global Workspace Theory; attention as controlled
+// access to conscious workspace. Mackworth (1948) — vigilance decrement.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Attention control signal threshold for positive gain (Baars 1988 GWT).
+pub const ATTENTION_FOCUS_GAIN_THRESHOLD: f32 = 0.3;
+
+/// Attention control signal threshold for negative gain (Baars 1988).
+pub const ATTENTION_DEFOCUS_THRESHOLD: f32 = 0.2;
+
+/// Attention gain scaling factor (Baars 1988).
+pub const ATTENTION_GAIN_SCALE: f32 = 0.6;
+
+/// Maximum gain from attention control (stability cap).
+pub const ATTENTION_MAX_GAIN: f32 = 0.3;
+
+/// Negative gain floor (prevents excessive suppression).
+pub const ATTENTION_NEGATIVE_GAIN: f32 = -0.1;
+
+/// Deep focus threshold for focus lock (Baars 1988).
+pub const ATTENTION_DEEP_FOCUS_THRESHOLD: f32 = 0.8;
+
+/// Focus lock scale (Baars 1988).
+pub const ATTENTION_FOCUS_LOCK_SCALE: f32 = 0.15;
+
+/// Minimum exploration factor during focus lock.
+pub const ATTENTION_MIN_EXPLORATION_IN_FOCUS: f32 = 0.7;
+
+/// Novelty push scale when attention is scattered (Baars 1988).
+pub const ATTENTION_DEFICIT_NOVELTY_SCALE: f32 = 0.06;
+
+/// Vigilance fatigue threshold (Mackworth 1948 AST).
+pub const VIGILANCE_FATIGUE_THRESHOLD: f32 = 0.5;
+
+/// Vigilance fatigue exploration push scale (Mackworth 1948).
+pub const VIGILANCE_FATIGUE_EXPLORATION_SCALE: f32 = 0.08;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PHI ATTENTION GATING
+// Science: Dehaene (2014) — conscious access via attention-gated phi.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Phi attention suppression exploration scale (Dehaene 2014).
+pub const PHI_GATE_SUPPRESS_EXPLORATION: f32 = 0.85;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// THALAMIC ROUTING
+// Cognitive depth routing thresholds (Schultz 1997, Damasio 1999)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Code keyword weight in task detection (strong indicator)
+pub const CODE_TASK_KEYWORD_WEIGHT: f32 = 0.3;
+
+/// Debug keyword weight in task detection
+pub const CODE_TASK_DEBUG_WEIGHT: f32 = 0.25;
+
+/// Refactor keyword weight in task detection
+pub const CODE_TASK_REFACTOR_WEIGHT: f32 = 0.25;
+
+/// Minimum confidence threshold for code task detection
+pub const CODE_TASK_CONFIDENCE_THRESHOLD: f32 = 0.3;
+
+/// Complexity threshold for DeepThought routing (Kahneman 2011: System 2 engagement)
+pub const THALAMIC_COMPLEXITY_DEEP_THRESHOLD: f32 = 0.8;
+
+/// Emotional intensity threshold for DeepThought (Yerkes-Dodson 1908)
+pub const THALAMIC_EMOTIONAL_DEEP_THRESHOLD: f32 = 0.7;
+
+/// Complexity threshold for Reflex routing — simple enough for fast path
+pub const THALAMIC_COMPLEXITY_REFLEX_THRESHOLD: f32 = 0.3;
+
+/// Urgency threshold for Reflex routing — low urgency allows fast path
+pub const THALAMIC_URGENCY_REFLEX_THRESHOLD: f32 = 0.5;
+
+/// No coupling threshold for modulation index (MI < 0.1 = unreliable)
+pub const COUPLING_NO_COUPLING_THRESHOLD: f32 = 0.1;
+
+/// Weak coupling threshold (0.1-0.3 = weak but meaningful)
+pub const COUPLING_WEAK_THRESHOLD: f32 = 0.3;
+
+/// Moderate coupling threshold (0.3-0.6 = moderate correlation)
+pub const COUPLING_MODERATE_THRESHOLD: f32 = 0.6;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// EPISODIC MEMORY ENCODING
+// Science: Tononi & Koch (2015) — IIT gate; Friston (2010) — FEP plasticity
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Minimum Phi for episodic memory consolidation (Tononi & Koch 2015: consciousness needed for memory).
+pub const PHI_EPISODIC_CONSOLIDATION_MIN: f32 = 0.2;
+
+/// Minimum prediction error for episodic encoding (novel experiences worth storing).
+pub const PREDICTION_ERROR_EPISODIC_MIN: f32 = 0.1;
+
+/// Positive emotional valence threshold for resonator quantization.
+pub const EMOTIONAL_VALENCE_POSITIVE_BIN: f32 = 0.3;
+
+/// Negative emotional valence threshold for resonator quantization.
+pub const EMOTIONAL_VALENCE_NEGATIVE_BIN: f32 = -0.3;
+
+/// High phi threshold for resonator quantization.
+pub const PHI_QUANTIZATION_HIGH: f32 = 0.7;
+
+/// Medium phi threshold for resonator quantization.
+pub const PHI_QUANTIZATION_MEDIUM: f32 = 0.3;
+
+/// TD error signal coupling scale to FEP learning (Friston 2010).
+pub const TD_ERROR_FEP_COUPLING_SCALE: f32 = 0.2;
+
+/// FEP learning signal → plasticity scaling factor (Friston 2010: maps [-1,1] to [0.5,1.5]).
+pub const FEP_PLASTICITY_SCALING_FACTOR: f32 = 0.5;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CONSCIOUSNESS INTEGRATION
+// Science: Multi-dimensional consciousness binding and temporal coherence
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ── Quantum coherence (Penrose & Hameroff 2014) ──
+
+/// Quantum coherence level above which confidence is boosted
+pub const QUANTUM_COHERENCE_HIGH_THRESHOLD: f64 = 0.6;
+
+/// Scale factor for quantum coherence confidence boost (up to +2%)
+pub const QUANTUM_COHERENCE_CONFIDENCE_BOOST_SCALE: f64 = 0.05;
+
+/// Quantum coherence level below which decoherence penalty applies
+pub const QUANTUM_COHERENCE_LOW_THRESHOLD: f64 = 0.2;
+
+/// Confidence scale applied during quantum decoherence
+pub const QUANTUM_DECOHERENCE_CONFIDENCE_SCALE: f32 = 0.98;
+
+// ── Phenomenal binding (Singer & Gray 1989, Csikszentmihalyi 1990) ──
+
+/// Binding strength threshold for learning rate boost
+pub const PHENOMENAL_BINDING_LR_BOOST_THRESHOLD: f64 = 0.8;
+
+/// Scale for LR boost from high phenomenal binding (up to +4%)
+pub const PHENOMENAL_BINDING_LR_BOOST_SCALE: f32 = 0.2;
+
+/// Boredom scale when consciousness is fragmented
+pub const PHENOMENAL_FRAGMENTATION_BOREDOM_SCALE: f32 = 0.8;
+
+/// Exploration scale when consciousness is fragmented
+pub const PHENOMENAL_FRAGMENTATION_EXPLORATION_SCALE: f32 = 0.7;
+
+// ── Temporal coherence (Varela 1999, Damasio 2010) ──
+
+/// Confidence scale applied on temporal discontinuity
+pub const TEMPORAL_DISCONTINUITY_CONFIDENCE_SCALE: f32 = 0.8;
+
+/// Temporal coherence level above which threshold is raised
+pub const TEMPORAL_COHERENCE_THRESHOLD_RAISE_LEVEL: f64 = 0.8;
+
+/// Threshold boost factor for high temporal coherence
+pub const TEMPORAL_COHERENCE_THRESHOLD_BOOST: f32 = 1.01;
+
+/// Discontinuity streak count triggering persistent recovery
+pub const TEMPORAL_DISCONTINUITY_PERSISTENT_THRESHOLD: u32 = 3;
+
+/// LR boost during persistent discontinuity recovery
+pub const TEMPORAL_DISCONTINUITY_PERSISTENT_LR_BOOST: f32 = 1.5;
+
+// ── Thermodynamic responses (Friston 2010, Ulanowicz 2009) ──
+
+/// Exploration boost during critical phase (edge of chaos)
+pub const THERMODYNAMIC_STRESS_EXPLORATION_BOOST: f32 = 1.15;
+
+/// Exploration scale during chaotic phase
+pub const THERMODYNAMIC_RECOVERY_EXPLORATION_SCALE: f32 = 0.5;
+
+/// Entropy level above which exploration is boosted
+pub const THERMODYNAMIC_ENTROPY_HIGH_THRESHOLD: f64 = 0.7;
+
+/// Entropy level below which consolidation bias is applied
+pub const THERMODYNAMIC_ENTROPY_LOW_THRESHOLD: f64 = 0.3;
+
+// ─── Startup & Circadian Constants ─────────────────────────────────────────
+// Hopfield (1982) — recurrent networks need settling time; Tononi & Cirelli
+// (2006) — synaptic homeostasis during rest/circadian phases.
+
+/// Initial LR scale during startup warmup (ramps from 20% → 100%).
+/// Science: Hopfield (1982) — early transients shouldn't cement as patterns.
+pub const STARTUP_LR_INITIAL_SCALE: f32 = 0.2;
+
+/// Complement of initial scale: full ramp range = 1.0 - STARTUP_LR_INITIAL_SCALE.
+pub const STARTUP_LR_RAMP_RANGE: f32 = 0.8;
+
+/// Minimum adaptive learning rate clamp.
+/// Science: prevents LR from collapsing to zero after multiplicative dampening.
+pub const ADAPTIVE_LR_MIN: f32 = 0.0001;
+
+/// Maximum adaptive learning rate clamp.
+/// Science: prevents runaway LR from multiplicative boosting.
+pub const ADAPTIVE_LR_MAX: f32 = 0.1;
+
+/// Divisor for sleep recovery quality: cycles / SCALE → [0,1].
+/// Science: Xie et al. (2013) — glymphatic clearance scales with sleep duration.
+pub const SLEEP_RECOVERY_QUALITY_SCALE: f32 = 100.0;
+
+/// Half-weight for circadian plasticity contribution (bath provides the other 50%).
+/// Science: Tononi & Cirelli (2006) — plasticity splits between bath baseline and LR.
+pub const CIRCADIAN_PLASTICITY_SCALE: f32 = 0.5;
+
+/// Circadian stillness boost during Night phase (highest).
+/// Science: Tononi & Cirelli (2006) — synaptic homeostasis hypothesis.
+pub const CIRCADIAN_STILLNESS_NIGHT: f32 = 0.2;
+
+/// Circadian stillness boost during Dusk phase (transition to rest).
+pub const CIRCADIAN_STILLNESS_DUSK: f32 = 0.1;
+
+/// Circadian stillness boost during Dawn phase (transition to wake).
+pub const CIRCADIAN_STILLNESS_DAWN: f32 = 0.05;
+
+/// Surprise multiplier: surprise = PE > learning_threshold × this.
+/// Science: Friston (2010) — surprise signals exceeding 3× baseline threshold.
+pub const SURPRISE_PE_MULTIPLIER: f32 = 3.0;
+
+/// Default coherence when not yet cached from prior cycles.
+pub const COHERENCE_DEFAULT: f32 = 0.5;
+
+/// Oxytocin weight for social coherence signal.
+/// Science: Heinrichs et al. (2003) — oxytocin facilitates social coherence.
+pub const SOCIAL_COHERENCE_OXY_WEIGHT: f32 = 0.5;
+
+/// Offset for social coherence: (oxy × weight + offset) → [0.5, 1.0] range.
+pub const SOCIAL_COHERENCE_OFFSET: f32 = 0.5;
+
+/// Base PE for FEP baseline computation.
+/// Science: Friston (2010) — typical prediction error baseline for free energy.
+pub const FEP_BASELINE_PE_BASE: f32 = 0.3;
+
+/// FE EMA scaling factor for FEP baseline PE computation.
+pub const FEP_BASELINE_PE_EMA_FACTOR: f32 = 0.1;
+
+/// Moral free energy threshold for exploration boost.
+/// Science: Friston (2010) — F > 0.5 → novel moral territory.
+pub const MORAL_FE_EXPLORATION_THRESHOLD: f64 = 0.5;
+
+/// Maximum moral FE exploration boost cap.
+pub const MORAL_FE_BOOST_CAP: f64 = 0.2;
+
+/// Minimum scenarios explored before topology completeness signal activates.
+pub const MORAL_TOPOLOGY_MIN_SCENARIOS: usize = 3;
+
+/// Topology completeness threshold below which structural boost kicks in.
+pub const MORAL_TOPOLOGY_COMPLETENESS_THRESHOLD: f64 = 0.3;
+
+/// Scale for structural boost from topology gap: (threshold - completeness) × scale.
+pub const MORAL_TOPOLOGY_STRUCTURAL_BOOST_SCALE: f64 = 0.3;
+
+/// EMA smoothing alpha for end-of-cycle neuromodulator averages.
+/// Science: Doya (2002) — slow EMA tracks tonic neuromodulator levels.
+pub const NEUROMOD_EMA_ALPHA: f32 = 0.05;
+
+// ─── Strategy Encoding Constants ──────────────────────────────────────────
+
+/// Substrate noise fraction divisor for BinaryHV path: pressure / divisor → [0, 0.1].
+/// Science: Berry & Srivastava (2018) — HDC capacity ~ D^(5/3).
+pub const SUBSTRATE_NOISE_FRACTION_DIVISOR: f32 = 70.0;
+
+/// Substrate noise std divisor for compressed state path: pressure / divisor → [0, 0.2].
+pub const SUBSTRATE_NOISE_STD_DIVISOR: f32 = 35.0;
+
+/// GABA weight for neuromod stillness computation.
+/// Science: Bhatt et al. (2020) — GABAergic tone ↔ resting-state activity.
+pub const NEUROMOD_STILLNESS_GABA_WEIGHT: f32 = 0.6;
+
+/// Adenosine weight for neuromod stillness computation.
+/// Science: Porkka-Heiskanen et al. (1997) — adenosine signals rest need.
+pub const NEUROMOD_STILLNESS_ADENOSINE_WEIGHT: f32 = 0.4;
+
+/// Offset subtracted from raw neuromod stillness before clamping.
+pub const NEUROMOD_STILLNESS_OFFSET: f32 = 0.3;
+
+/// Maximum neuromod stillness contribution (before circadian addition).
+pub const NEUROMOD_STILLNESS_CLAMP_MAX: f32 = 0.3;
+
+/// Maximum total stillness boost (neuromod + circadian combined).
+pub const STILLNESS_TOTAL_CLAMP_MAX: f32 = 0.5;
+
+/// Knowledge novelty threshold for exploration boost.
+/// Science: Berlyne (1960) — novelty above 0.5 drives curiosity.
+pub const KNOWLEDGE_NOVELTY_EXPLORATION_THRESHOLD: f64 = 0.5;
+
+/// Cantor resonance boost threshold for interconnect harmony nudge.
+pub const CANTOR_RESONANCE_BOOST_HARMONY_THRESHOLD: f32 = 0.1;
+
+/// Meta-depth threshold for Cantor→stillness harmony nudge.
+pub const CANTOR_META_DEPTH_STILLNESS_THRESHOLD: f64 = 0.5;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SWARM SECURITY
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Default initial trust score for peers that pass Ed25519 handshake verification.
+/// Basis: Starting trust should be moderate; full trust requires reputation history.
+/// RFC 8446 (TLS 1.3) — authenticated but not yet authorized.
+pub const HANDSHAKE_INITIAL_TRUST_SCORE: f64 = 0.7;
+
+/// Challenge timeout in seconds for the trust handshake protocol.
+/// Basis: Must be long enough for high-latency mesh but short enough to prevent
+/// resource exhaustion. NIST SP 800-63B recommends <=60s for auth challenges.
+pub const HANDSHAKE_CHALLENGE_TIMEOUT_SECS: u64 = 30;
+
+/// Maximum total pending challenges across all peers before rate limiting.
+/// Basis: Prevents memory exhaustion from challenge flooding.
+/// Mitre ATT&CK T1499 — Resource exhaustion via protocol abuse.
+pub const HANDSHAKE_MAX_PENDING_CHALLENGES: usize = 64;
+
+/// Maximum pending challenges per single peer (duplicate challenges rejected).
+/// Basis: One challenge per peer is sufficient; duplicates indicate replay attempt.
+pub const HANDSHAKE_MAX_PER_PEER_CHALLENGES: usize = 1;
+
+/// Default key rotation interval in cycles.
+/// Basis: NIST SP 800-57 Part 1 — cryptoperiod for symmetric keys.
+/// At 50Hz cognitive loop, 10,000 cycles ≈ 200 seconds.
+pub const KEY_ROTATION_INTERVAL_DEFAULT: u64 = 10_000;
+
+/// Grace period for accepting old key after rotation (cycles).
+/// Must span max in-flight message lifetime. At 50Hz, 500 cycles = 10 seconds.
+/// Basis: Key rollover window to prevent message loss during rotation.
+pub const KEY_ROTATION_GRACE_PERIOD_DEFAULT: u64 = 500;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SAFETY AGENT — Operational Enforcement
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Learning rate multiplier when SafetyLevel is Yellow.
+/// Reduces plasticity to prevent learning from degraded states.
+/// Basis: Arnsten (2009) — stress impairs prefrontal function; reduced plasticity is protective.
+pub const SAFETY_YELLOW_LR_MULTIPLIER: f32 = 0.7;
+
+/// Learning rate multiplier when SafetyLevel is Orange.
+/// Severe reduction — only essential learning proceeds.
+/// Basis: McEwen (2007) — allostatic overload degrades synaptic plasticity.
+pub const SAFETY_ORANGE_LR_MULTIPLIER: f32 = 0.3;
+
+/// Learning rate multiplier when SafetyLevel is Red.
+/// Near-zero — consciousness is too degraded for reliable learning.
+pub const SAFETY_RED_LR_MULTIPLIER: f32 = 0.05;
+
+/// Whether motor output is permitted at Orange safety level.
+/// Only ReadOnly actions pass; Reversible and above are blocked.
+/// Basis: NRC defense-in-depth — limit actuation during partial degradation.
+pub const SAFETY_ORANGE_MOTOR_READONLY: bool = true;
+
+/// Whether motor output is permitted at Red safety level.
+/// All motor output halted — emergency stop.
+pub const SAFETY_RED_MOTOR_GATE: bool = false;
+
+/// Exploration dampening at Orange level (multiplicative on exploration_bonus).
+/// Basis: Yerkes-Dodson (1908) — high stress eliminates exploratory behavior.
+pub const SAFETY_ORANGE_EXPLORATION_DAMPEN: f32 = 0.1;
+
+/// Exploration dampening at Yellow level (multiplicative).
+pub const SAFETY_YELLOW_EXPLORATION_DAMPEN: f32 = 0.5;
+
+/// Consciousness modulation at Orange — nudge down to trigger deeper safety cascade.
+/// Basis: Dehaene (2014) — ignition failure propagates through GWT.
+pub const SAFETY_ORANGE_CONSCIOUSNESS_PENALTY: f32 = 0.05;
+
+/// Neuromodulator NE boost during Yellow safety (vigilance increase).
+/// Basis: Aston-Jones & Cohen (2005) — LC-NE system governs arousal/vigilance tradeoff.
+pub const SAFETY_YELLOW_NE_BOOST: f32 = 0.03;
+
+/// Neuromodulator cortisol boost during Orange safety (stress response).
+/// Basis: Sapolsky (2004) — HPA axis cortisol release under sustained threat.
+pub const SAFETY_ORANGE_CORTISOL_BOOST: f32 = 0.05;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DEFENSE / IMMUNE SYSTEM — Graduated Response
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Maximum cycles a peer can be quarantined before auto-release.
+/// Basis: Ubuntu restorative justice — indefinite isolation violates dignity.
+pub const DEFENSE_QUARANTINE_MAX_CYCLES: u32 = 1000;
+
+/// Minimum moral algebra severity score to permit a defensive action.
+/// Actions scoring above this are blocked unless overridden by Guardian.
+/// Basis: APA Ethics Code — proportionality principle.
+pub const DEFENSE_MAX_MORAL_SEVERITY: f32 = 0.7;
+
+/// Rate limit: maximum governance proposals per agent per minute.
+pub const DEFENSE_PROPOSAL_RATE_LIMIT: u32 = 10;
+
+/// Rate limit: maximum votes per agent per proposal.
+pub const DEFENSE_VOTE_LIMIT_PER_PROPOSAL: u32 = 1;
+
+/// Anomaly score threshold for peer quarantine consideration.
+/// Basis: Mahalanobis distance > 3σ indicates outlier behavior.
+pub const DEFENSE_PEER_QUARANTINE_THRESHOLD: f32 = 0.7;
+
+/// Reputation penalty multiplier for detected Byzantine behavior.
+/// Applied as: reputation *= (1.0 - SLASH_FACTOR).
+pub const DEFENSE_REPUTATION_SLASH_FACTOR: f32 = 0.5;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TESTS
@@ -5035,6 +5643,53 @@ mod tests {
             KNOWLEDGE_ATTENTION_CONTRADICTION_THRESHOLD > 0.0
                 && KNOWLEDGE_ATTENTION_CONTRADICTION_THRESHOLD < 1.0
         );
+        // Cross-coupling: Drive → Learning
+        assert!(
+            DRIVE_BOREDOM_PLASTICITY_THRESHOLD > 0.0 && DRIVE_BOREDOM_PLASTICITY_THRESHOLD < 1.0
+        );
+        assert!(DRIVE_BOREDOM_PLASTICITY_GAIN > 0.0 && DRIVE_BOREDOM_PLASTICITY_GAIN < 1.0);
+        // Cross-coupling: Knowledge → Ethics
+        assert!(
+            KNOWLEDGE_ETHICS_CAUSAL_DEPTH_THRESHOLD > 0.0
+                && KNOWLEDGE_ETHICS_CAUSAL_DEPTH_THRESHOLD < 1.0
+        );
+        assert!(
+            KNOWLEDGE_ETHICS_CONFIDENCE_GAIN > 0.0 && KNOWLEDGE_ETHICS_CONFIDENCE_GAIN < 0.1
+        );
+        // Cross-coupling: Memory → Learning
+        assert!(
+            MEMORY_CONSOLIDATION_PLASTICITY_THRESHOLD > 0.0
+                && MEMORY_CONSOLIDATION_PLASTICITY_THRESHOLD < 1.0
+        );
+        assert!(
+            MEMORY_CONSOLIDATION_PLASTICITY_GAIN > 0.0
+                && MEMORY_CONSOLIDATION_PLASTICITY_GAIN < 0.5
+        );
+        assert!(
+            MEMORY_RECALL_QUALITY_DAMPEN_THRESHOLD > 0.0
+                && MEMORY_RECALL_QUALITY_DAMPEN_THRESHOLD < 0.5
+        );
+        assert!(
+            MEMORY_RECALL_QUALITY_DAMPEN_SCALE > 0.0
+                && MEMORY_RECALL_QUALITY_DAMPEN_SCALE < 1.0
+        );
+        // Cross-coupling: Perception → Drive
+        assert!(
+            PERCEPTION_LOW_COHERENCE_THRESHOLD > 0.0
+                && PERCEPTION_LOW_COHERENCE_THRESHOLD < 0.5
+        );
+        assert!(
+            PERCEPTION_LOW_COHERENCE_EXPLORE_GAIN > 0.0
+                && PERCEPTION_LOW_COHERENCE_EXPLORE_GAIN < 0.2
+        );
+        assert!(
+            PERCEPTION_HIGH_LOAD_SUPPRESS_THRESHOLD > 0.5
+                && PERCEPTION_HIGH_LOAD_SUPPRESS_THRESHOLD < 1.0
+        );
+        assert!(
+            PERCEPTION_HIGH_LOAD_SUPPRESS_FACTOR > 0.0
+                && PERCEPTION_HIGH_LOAD_SUPPRESS_FACTOR < 1.0
+        );
     }
 
     #[test]
@@ -5248,5 +5903,89 @@ mod tests {
         assert!((1.0 - 0.5) * REASONING_RELIABILITY_CONFIDENCE_SCALE <= 0.02);
         // Max dream boost: (1.0 - 0.5) * 0.4 = 0.2 (20%)
         assert!((1.0 - 0.5) * DREAM_REASONING_RELIABILITY_SCALE <= 0.25);
+    }
+
+    #[test]
+    fn test_startup_circadian_strategy_constants() {
+        // Startup LR ramp
+        assert!(STARTUP_LR_INITIAL_SCALE > 0.0 && STARTUP_LR_INITIAL_SCALE < 1.0);
+        assert!((STARTUP_LR_INITIAL_SCALE + STARTUP_LR_RAMP_RANGE - 1.0).abs() < f32::EPSILON);
+        // Adaptive LR bounds
+        assert!(ADAPTIVE_LR_MIN > 0.0 && ADAPTIVE_LR_MIN < ADAPTIVE_LR_MAX);
+        assert!(ADAPTIVE_LR_MAX <= 1.0);
+        // Sleep recovery
+        assert!(SLEEP_RECOVERY_QUALITY_SCALE > 1.0);
+        // Circadian plasticity
+        assert!(CIRCADIAN_PLASTICITY_SCALE > 0.0 && CIRCADIAN_PLASTICITY_SCALE <= 1.0);
+        // Circadian stillness: Night > Dusk > Dawn > 0
+        assert!(CIRCADIAN_STILLNESS_NIGHT > CIRCADIAN_STILLNESS_DUSK);
+        assert!(CIRCADIAN_STILLNESS_DUSK > CIRCADIAN_STILLNESS_DAWN);
+        assert!(CIRCADIAN_STILLNESS_DAWN > 0.0);
+        // Surprise
+        assert!(SURPRISE_PE_MULTIPLIER > 1.0 && SURPRISE_PE_MULTIPLIER < 10.0);
+        // Coherence default
+        assert!(COHERENCE_DEFAULT >= 0.0 && COHERENCE_DEFAULT <= 1.0);
+        // Social coherence
+        assert!(SOCIAL_COHERENCE_OXY_WEIGHT > 0.0 && SOCIAL_COHERENCE_OXY_WEIGHT <= 1.0);
+        assert!(SOCIAL_COHERENCE_OFFSET >= 0.0 && SOCIAL_COHERENCE_OFFSET <= 1.0);
+        // FEP baseline
+        assert!(FEP_BASELINE_PE_BASE > 0.0 && FEP_BASELINE_PE_BASE < 1.0);
+        assert!(FEP_BASELINE_PE_EMA_FACTOR > 0.0 && FEP_BASELINE_PE_EMA_FACTOR < 1.0);
+        // Moral FE
+        assert!(MORAL_FE_EXPLORATION_THRESHOLD > 0.0 && MORAL_FE_EXPLORATION_THRESHOLD < 1.0);
+        assert!(MORAL_FE_BOOST_CAP > 0.0 && MORAL_FE_BOOST_CAP < 1.0);
+        assert!(MORAL_TOPOLOGY_MIN_SCENARIOS > 0);
+        assert!(
+            MORAL_TOPOLOGY_COMPLETENESS_THRESHOLD > 0.0
+                && MORAL_TOPOLOGY_COMPLETENESS_THRESHOLD < 1.0
+        );
+        assert!(
+            MORAL_TOPOLOGY_STRUCTURAL_BOOST_SCALE > 0.0
+                && MORAL_TOPOLOGY_STRUCTURAL_BOOST_SCALE < 1.0
+        );
+        // Neuromod EMA
+        assert!(NEUROMOD_EMA_ALPHA > 0.0 && NEUROMOD_EMA_ALPHA < 0.5);
+        // Substrate noise
+        assert!(SUBSTRATE_NOISE_FRACTION_DIVISOR > 0.0);
+        assert!(SUBSTRATE_NOISE_STD_DIVISOR > 0.0);
+        assert!(SUBSTRATE_NOISE_FRACTION_DIVISOR > SUBSTRATE_NOISE_STD_DIVISOR);
+        // Neuromod stillness
+        assert!(
+            (NEUROMOD_STILLNESS_GABA_WEIGHT + NEUROMOD_STILLNESS_ADENOSINE_WEIGHT - 1.0).abs()
+                < f32::EPSILON
+        );
+        assert!(NEUROMOD_STILLNESS_OFFSET > 0.0 && NEUROMOD_STILLNESS_OFFSET < 1.0);
+        assert!(
+            NEUROMOD_STILLNESS_CLAMP_MAX > 0.0
+                && NEUROMOD_STILLNESS_CLAMP_MAX <= STILLNESS_TOTAL_CLAMP_MAX
+        );
+        assert!(STILLNESS_TOTAL_CLAMP_MAX > 0.0 && STILLNESS_TOTAL_CLAMP_MAX <= 1.0);
+        // Knowledge novelty
+        assert!(
+            KNOWLEDGE_NOVELTY_EXPLORATION_THRESHOLD > 0.0
+                && KNOWLEDGE_NOVELTY_EXPLORATION_THRESHOLD < 1.0
+        );
+        // Cantor
+        assert!(CANTOR_RESONANCE_BOOST_HARMONY_THRESHOLD > 0.0);
+        assert!(CANTOR_META_DEPTH_STILLNESS_THRESHOLD > 0.0);
+
+        // Swarm security
+        assert!(HANDSHAKE_INITIAL_TRUST_SCORE > 0.0 && HANDSHAKE_INITIAL_TRUST_SCORE <= 1.0);
+        assert!(HANDSHAKE_CHALLENGE_TIMEOUT_SECS > 0 && HANDSHAKE_CHALLENGE_TIMEOUT_SECS <= 120);
+        assert!(HANDSHAKE_MAX_PENDING_CHALLENGES > 0);
+        assert!(HANDSHAKE_MAX_PER_PEER_CHALLENGES > 0);
+        assert!(HANDSHAKE_MAX_PER_PEER_CHALLENGES <= HANDSHAKE_MAX_PENDING_CHALLENGES);
+        // Key rotation
+        assert!(KEY_ROTATION_INTERVAL_DEFAULT > 0);
+        assert!(KEY_ROTATION_GRACE_PERIOD_DEFAULT > 0);
+        assert!(KEY_ROTATION_GRACE_PERIOD_DEFAULT < KEY_ROTATION_INTERVAL_DEFAULT);
+
+        // Safety enforcement ordering
+        assert!(SAFETY_RED_LR_MULTIPLIER < SAFETY_ORANGE_LR_MULTIPLIER);
+        assert!(SAFETY_ORANGE_LR_MULTIPLIER < SAFETY_YELLOW_LR_MULTIPLIER);
+        assert!(SAFETY_YELLOW_LR_MULTIPLIER < 1.0);
+        assert!(SAFETY_ORANGE_EXPLORATION_DAMPEN < SAFETY_YELLOW_EXPLORATION_DAMPEN);
+        assert!(DEFENSE_QUARANTINE_MAX_CYCLES > 0);
+        assert!(DEFENSE_MAX_MORAL_SEVERITY > 0.0 && DEFENSE_MAX_MORAL_SEVERITY <= 1.0);
     }
 }

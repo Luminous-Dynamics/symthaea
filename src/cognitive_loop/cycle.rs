@@ -179,7 +179,7 @@ impl CognitiveLoopService {
         // PHASE 1: PERCEPTION
         // Safety checks, encoding, moral evaluation, strategy, urgency
         // ═══════════════════════════════════════════════════════════════════
-        let perception = match self.phase_perception(input, cycle_start, &mut module_timings) {
+        let mut perception = match self.phase_perception(input, cycle_start, &mut module_timings) {
             Ok(p) => p,
             Err(blocked) => return *blocked,
         };
@@ -203,7 +203,153 @@ impl CognitiveLoopService {
         // PHASE 3: FEEDBACK
         // Consciousness metrics, quality gating, homeostasis, dream engine
         // ═══════════════════════════════════════════════════════════════════
-        let feedback = self.phase_feedback(input, &perception, &mut dynamics, &mut module_timings);
+        let mut feedback = self.phase_feedback(input, &perception, &mut dynamics, &mut module_timings);
+
+        // ═══════════════════════════════════════════════════════════════════
+        // PHASE 3.5: SAFETY ENFORCEMENT
+        // NRC defense-in-depth: assess consciousness → gate LR/exploration/motor
+        // Science: Arnsten (2009), Yerkes-Dodson (1908), Aston-Jones & Cohen (2005)
+        // ═══════════════════════════════════════════════════════════════════
+        #[cfg(feature = "safety-agents")]
+        {
+            let safety_result = super::safety_enforcement::compute_enforcement(
+                &mut self.safety_agent,
+                feedback.consciousness.consciousness_level as f32,
+                dynamics.core.prediction_error,
+                feedback.self_model.temporal_coherence_score as f32,
+                {
+                    #[cfg(feature = "integrity")]
+                    { self.integrity_manager.has_critical_anomaly() }
+                    #[cfg(not(feature = "integrity"))]
+                    { false }
+                },
+                self.stats.total_cycles as usize,
+                {
+                    #[cfg(feature = "sentinel")]
+                    { Some(&self.collective_immune_state) }
+                    #[cfg(not(feature = "sentinel"))]
+                    { None }
+                },
+            );
+
+            // Gate 1: Learning rate — Arnsten (2009)
+            if safety_result.lr_multiplier < 1.0 {
+                self.stats.effective_learning_rate *= safety_result.lr_multiplier;
+            }
+
+            // Gate 2: Exploration — Yerkes-Dodson (1908)
+            if safety_result.exploration_multiplier < 1.0 {
+                self.carryover.quality.last_exploration_bonus *= safety_result.exploration_multiplier;
+            }
+
+            // Gate 3: Neuromodulators — Aston-Jones & Cohen (2005), Sapolsky (2004)
+            if safety_result.ne_nudge > 0.0 {
+                let ne_base = self.neuromod.bath.noradrenaline.baseline_val();
+                self.neuromod.bath.noradrenaline.set_baseline(ne_base + safety_result.ne_nudge);
+            }
+            if safety_result.allostatic_load > 0.0 {
+                self.neuromod.bath.accumulate_allostatic_load(safety_result.allostatic_load, false);
+            }
+
+            // Gate 4: Consciousness penalty — Dehaene (2014)
+            // Applied via allostatic load accumulation above, which naturally
+            // degrades consciousness through the neuromodulator→Phi pathway.
+
+            // Guardian posture update
+            self.guardian_state.update(
+                safety_result.level,
+                feedback.consciousness.consciousness_level,
+                self.stats.total_cycles as usize,
+            );
+
+            // ── Defense Cascade: propose → moral filter → apply ──────────
+            // Propose graduated defense actions based on assessed safety level.
+            // Each action goes through moral algebra before application.
+            let mut defense_actions = super::defense::propose_defense_actions(
+                safety_result.level,
+                self.stats.total_cycles as usize,
+            );
+            super::defense::moral_filter(&mut defense_actions);
+
+            // Apply morally approved defense actions
+            for action in &defense_actions {
+                if !action.morally_approved {
+                    continue;
+                }
+                match &action.kind {
+                    super::defense::DefenseActionKind::BoostVigilance { ne_delta } => {
+                        let ne_base = self.neuromod.bath.noradrenaline.baseline_val();
+                        self.neuromod
+                            .bath
+                            .noradrenaline
+                            .set_baseline(ne_base + *ne_delta);
+                    }
+                    super::defense::DefenseActionKind::StressResponse { cortisol_delta } => {
+                        self.neuromod
+                            .bath
+                            .accumulate_allostatic_load(*cortisol_delta, false);
+                    }
+                    super::defense::DefenseActionKind::RestrictMotorToReadOnly => {
+                        // Restrict motor output to read-only via safety level gate
+                        if let Some(ref mut bridge) = self.motor_rendering.output_bridge {
+                            bridge.set_safety_level(crate::safety::SafetyLevel::Orange);
+                        }
+                    }
+                    super::defense::DefenseActionKind::HaltMotor => {
+                        // Halt all motor output via safety level gate
+                        if let Some(ref mut bridge) = self.motor_rendering.output_bridge {
+                            bridge.set_safety_level(crate::safety::SafetyLevel::Red);
+                        }
+                    }
+                    // Other actions (peer quarantine, governance freeze, etc.)
+                    // are handled by their respective subsystems via telemetry
+                    _ => {}
+                }
+            }
+
+            // Record defense cascade telemetry
+            self.defense_actions_proposed = defense_actions.len() as u32;
+            self.defense_actions_approved = defense_actions
+                .iter()
+                .filter(|a| a.morally_approved)
+                .count() as u32;
+            tracing::debug!(
+                safety_level = ?safety_result.level,
+                proposed = self.defense_actions_proposed,
+                approved = self.defense_actions_approved,
+                "Defense cascade"
+            );
+        }
+
+        // Sentinel threat processing: detect → store → share
+        #[cfg(feature = "sentinel")]
+        {
+            // Store locally-detected threats in immune memory
+            for threat in self.sentinel_manager.active_threats() {
+                self.threat_memory.store_threat(
+                    super::threat_memory::ThreatSignalKind::from_sentinel_kind(threat.kind),
+                    threat.severity,
+                    threat.confidence,
+                    self.stats.total_cycles as usize,
+                    &threat.evidence,
+                );
+            }
+
+            // Update collective immune state from swarm data
+            let local_threat_level = self.sentinel_manager.threat_level();
+            let local_kinds: Vec<String> = self.sentinel_manager.active_threats()
+                .iter()
+                .map(|t| format!("{:?}", t.kind))
+                .collect();
+            self.collective_immune_state.update(
+                local_threat_level,
+                &[], // peer threat reports wired when swarm drain is available
+                feedback.consciousness.consciousness_level,
+                self.swarm_manager.connected_peers(),
+                &local_kinds,
+                &local_kinds, // bootstrap: local = swarm until peer sharing wired
+            );
+        }
 
         // ═══════════════════════════════════════════════════════════════════
         // PHASE 4: OUTPUT
@@ -212,9 +358,9 @@ impl CognitiveLoopService {
         self.phase_output(
             input,
             cycle_start,
-            &perception,
-            &dynamics,
-            &feedback,
+            &mut perception,
+            &mut dynamics,
+            &mut feedback,
             module_timings,
         )
     }
@@ -881,5 +1027,17 @@ mod tests {
         // After cycles, feedback state should have integration results
         assert!(s.feedback_state.last_confidence_integration.is_some());
         assert!(s.feedback_state.last_lr_integration.is_some());
+    }
+
+    #[test]
+    fn defense_cascade_runs_without_panic() {
+        let mut s = make_service();
+        // Run enough cycles to populate feedback and trigger safety enforcement
+        for _ in 0..5 {
+            s.cycle("defense cascade test");
+        }
+        // After cycles, system should still be operational
+        let r = s.cycle("final check");
+        assert!(r.prediction_error.is_finite());
     }
 }

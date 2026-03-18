@@ -285,7 +285,7 @@ fn test_hybrid_handshake_challenge() {
     let config = SwarmConfig::default();
     let mut handshake = HybridHandshake::new(config);
 
-    let challenge = handshake.create_challenge("peer-123");
+    let challenge = handshake.create_challenge("peer-123").unwrap();
     match challenge {
         SwarmMessage::TrustChallenge { nonce } => {
             assert_eq!(nonce.len(), 32);

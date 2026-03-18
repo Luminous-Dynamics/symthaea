@@ -194,18 +194,29 @@ impl ConsciousnessEngine {
                 core_values.insert(CoreComponent::Recursion, input.hot_depth);
                 core_values.insert(CoreComponent::Efficacy, 1.0 - input.prediction_error as f64);
 
-                // Approach C: Drift-driven epistemic humility + knowledge grounding
+                // Approach C: Drift-driven epistemic humility + knowledge grounding + coherence
                 // High moral drift → attenuate Knowledge component in EquationV2.
                 // Knowledge grounding blends in verified factual content as epistemic anchor.
+                // Knowledge coherence further modulates by graph quality (size, calibration,
+                // contradiction-freeness) — a large, well-calibrated, consistent knowledge
+                // base strengthens the epistemic contribution to consciousness.
                 // Science: Epistemic humility during value shifts — if your moral
                 // stance is changing rapidly, "knowledge" claims carry less weight.
                 // Science: Mercier & Sperber (2017) — grounded knowledge strengthens
                 // epistemic claims by anchoring them in verified factual content.
+                // Science: Stanovich (2009) — epistemic rationality; Guo et al. (2017) — calibration.
                 let blend = super::super::thresholds::KNOWLEDGE_GROUNDING_EPISTEMIC_BLEND;
+                let coherence_weight =
+                    super::super::thresholds::KNOWLEDGE_COHERENCE_CONSCIOUSNESS_WEIGHT;
                 let safe_grounding = if input.knowledge_grounding.is_finite() {
                     input.knowledge_grounding
                 } else {
                     0.5
+                };
+                let safe_coherence = if input.knowledge_coherence.is_finite() {
+                    input.knowledge_coherence
+                } else {
+                    0.0
                 };
                 let effective_epistemic = if self.moral_coupling.enabled {
                     let drift_ratio =
@@ -217,6 +228,23 @@ impl ConsciousnessEngine {
                 } else {
                     input.epistemic_quality * (1.0 - blend) + safe_grounding * blend
                 };
+                // Blend in knowledge coherence: a small additive nudge (capped at weight)
+                // based on graph quality metrics, applied after drift attenuation.
+                let effective_epistemic =
+                    (effective_epistemic + safe_coherence * coherence_weight).clamp(0.0, 1.0);
+
+                // CfC temporal coherence → consciousness (Clark 2013: temporal integration
+                // supports unified experience). Small additive nudge to epistemic quality.
+                let safe_temporal = if input.temporal_coherence_phi.is_finite() {
+                    input.temporal_coherence_phi as f64
+                } else {
+                    0.0
+                };
+                let effective_epistemic = (effective_epistemic
+                    + safe_temporal
+                        * super::super::thresholds::TEMPORAL_COHERENCE_CONSCIOUSNESS_WEIGHT)
+                    .clamp(0.0, 1.0);
+
                 core_values.insert(CoreComponent::Knowledge, effective_epistemic);
 
                 let state = ConsciousnessStateV2 {

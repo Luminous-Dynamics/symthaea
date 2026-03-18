@@ -15,8 +15,10 @@
 //! ## Usage
 //!
 //! ```rust,ignore
-//! // Spawn the actor on an existing tokio runtime
-//! let (handle, actor) = IrohBridgeHandle::new(64, 128);
+//! // Spawn the actor with trust-gated broadcasting
+//! let service = NetworkService::new(config).await?;
+//! let hs = service.handshake_arc();
+//! let (handle, actor) = IrohBridgeHandle::new_with_handshake(64, 128, Some(hs));
 //! let node = IrohNode::new(config).await?;
 //! tokio::spawn(actor.run(node));
 //!
@@ -32,6 +34,8 @@ use crate::mind::SocialMessage;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::sync::mpsc;
+#[allow(unused_imports)]
+use parking_lot::RwLock as ParkingRwLock; // used via Arc<parking_lot::RwLock<...>>
 
 // ============================================================================
 // IrohBridgeHandle — Sync side (held by ContinuousMind)
@@ -56,6 +60,19 @@ impl IrohBridgeHandle {
     /// - `outbound_capacity`: Bounded channel from Mind → Actor (64 = ~3.2s at 20 msg/s)
     /// - `inbound_capacity`: Bounded channel from Actor → Mind (128 = burst buffer)
     pub fn new(outbound_capacity: usize, inbound_capacity: usize) -> (Self, IrohBridgeActor) {
+        Self::new_with_handshake(outbound_capacity, inbound_capacity, None)
+    }
+
+    /// Create a paired (handle, actor) with a pre-configured handshake reference.
+    ///
+    /// When `handshake` is `Some(...)`, the actor will trust-gate all broadcasts,
+    /// only sending to peers verified by the handshake manager. When `None`,
+    /// broadcasts are blocked unless `set_require_handshake(false)` is called.
+    pub fn new_with_handshake(
+        outbound_capacity: usize,
+        inbound_capacity: usize,
+        handshake: Option<Arc<parking_lot::RwLock<crate::swarm::handshake::HybridHandshake>>>,
+    ) -> (Self, IrohBridgeActor) {
         let (outbound_tx, outbound_rx) = mpsc::channel(outbound_capacity);
         let (inbound_tx, inbound_rx) = mpsc::channel(inbound_capacity);
         let alive = Arc::new(AtomicBool::new(true));
@@ -70,6 +87,8 @@ impl IrohBridgeHandle {
             outbound_rx,
             _inbound_tx: inbound_tx,
             alive,
+            handshake,
+            require_handshake: true,
         };
 
         (handle, actor)
@@ -118,6 +137,12 @@ impl std::fmt::Debug for IrohBridgeHandle {
 /// Owns the receive end of the outbound channel and the send end of the inbound
 /// channel. The actual `IrohNode` and peer connections are passed to `run()`.
 ///
+/// # Trust Gating
+///
+/// When a `HybridHandshake` reference is provided, the actor only broadcasts
+/// to peers that have completed the Ed25519 trust handshake. Peers without
+/// verified trust are silently skipped.
+///
 /// # Lifecycle
 ///
 /// ```rust,ignore
@@ -136,9 +161,32 @@ pub struct IrohBridgeActor {
     _inbound_tx: mpsc::Sender<SocialMessage>,
     /// Shared health flag.
     alive: Arc<AtomicBool>,
+    /// Optional handshake reference for trust-gated broadcasting.
+    /// When set, only peers verified by the handshake will receive messages.
+    handshake: Option<Arc<parking_lot::RwLock<crate::swarm::handshake::HybridHandshake>>>,
+    /// When true (default), broadcasts are refused if no handshake is configured.
+    /// Set to false only for local testing via `SwarmConfig::local_only()`.
+    require_handshake: bool,
 }
 
 impl IrohBridgeActor {
+    /// Set the handshake reference for trust-gated broadcasting.
+    ///
+    /// When set, `broadcast_to_peers` will skip peers that haven't completed
+    /// the Ed25519 trust handshake.
+    pub fn set_handshake(
+        &mut self,
+        handshake: Arc<parking_lot::RwLock<crate::swarm::handshake::HybridHandshake>>,
+    ) {
+        self.handshake = Some(handshake);
+    }
+
+    /// Set whether handshake is required for broadcasting.
+    /// When true (default), broadcasts are blocked if no handshake is configured.
+    pub fn set_require_handshake(&mut self, require: bool) {
+        self.require_handshake = require;
+    }
+
     /// Run the actor loop. This is the main entry point, meant to be spawned
     /// as a tokio task.
     ///
@@ -204,6 +252,16 @@ impl IrohBridgeActor {
         stream: &super::TensorStream,
         msg: &SocialMessage,
     ) {
+        // Mandatory handshake enforcement: if require_handshake is true and no
+        // handshake is configured, refuse all broadcasts.
+        if self.require_handshake && self.handshake.is_none() {
+            tracing::warn!(
+                "Refusing broadcast: no handshake configured and require_handshake=true. \
+                 Call set_handshake() or use SwarmConfig::local_only() for testing."
+            );
+            return;
+        }
+
         let peer_ids = node.connected_peers();
         if peer_ids.is_empty() {
             return;
@@ -221,6 +279,17 @@ impl IrohBridgeActor {
         let _ = stream; // Used for stats tracking in future; raw bincode for now
 
         for peer_id in &peer_ids {
+            // Trust gating: skip peers that haven't completed the handshake
+            if let Some(ref hs) = self.handshake {
+                if !hs.read().is_peer_trusted(peer_id) {
+                    tracing::trace!(
+                        peer = peer_id,
+                        "Skipping untrusted peer in broadcast"
+                    );
+                    continue;
+                }
+            }
+
             if let Some(channel) = node.get_channel(peer_id) {
                 if !channel.is_alive() {
                     node.disconnect(peer_id);

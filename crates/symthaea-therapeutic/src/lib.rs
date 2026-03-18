@@ -31,12 +31,14 @@ pub mod formulation;
 pub mod narrative_integration;
 pub mod safety;
 pub mod scope_guard;
+pub mod shadow;
 
 pub use affect_regulation::{RegulationEngine, RegulationStrategy};
 pub use alliance::{RuptureType, TherapeuticAlliance};
-pub use client_model::ClientModel;
+pub use client_model::{ClientModel, OutcomeSummary};
 pub use ethical_constraints::{EthicalConstraint, EthicalEvaluation};
 pub use formulation::CaseFormulation;
 pub use narrative_integration::{NarrativeFragment, TherapeuticNarrative};
 pub use safety::{CrisisAlert, CrisisDetector, CrisisType, EscalationAction, SafetyPlan};
 pub use scope_guard::{ScopeGuard, ScopeViolation};
+pub use shadow::{ShadowDetector, ShadowSnapshot, ShadowTelemetry};

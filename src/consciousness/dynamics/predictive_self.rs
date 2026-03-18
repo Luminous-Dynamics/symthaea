@@ -130,6 +130,12 @@ pub struct SelfState {
     pub timestamp: Instant,
     /// Action that led to this state (if any)
     pub causal_action: Option<String>,
+    /// Moral judgment score for this cycle (-1.0 to 1.0)
+    pub moral_score: f64,
+    /// Noradrenaline-driven exploration drive (0.0 to ~2.0)
+    pub exploration_urge: f64,
+    /// Behavioral coherence across recent cycles (0.0 to 1.0)
+    pub behavioral_coherence: f64,
 }
 
 impl SelfState {
@@ -146,6 +152,9 @@ impl SelfState {
             unified_self: *model.unified_self(),
             timestamp: Instant::now(),
             causal_action: None,
+            moral_score: 0.0,
+            exploration_urge: 0.0,
+            behavioral_coherence: 0.0,
         }
     }
 
@@ -161,14 +170,32 @@ impl SelfState {
         let hdc_sim = self.unified_self.similarity(&other.unified_self) as f64;
         let hdc_diff = 1.0 - hdc_sim;
 
-        // Weighted combination
-        (phi_diff * 0.3
-            + coherence_diff * 0.2
-            + proto_diff * 0.1
-            + core_diff * 0.15
-            + autobio_diff * 0.15
-            + hdc_diff * 0.1)
+        // Behavioral fields
+        let moral_diff = (self.moral_score - other.moral_score).abs();
+        let exploration_diff = (self.exploration_urge - other.exploration_urge).abs().min(1.0);
+        let behav_coherence_diff =
+            (self.behavioral_coherence - other.behavioral_coherence).abs();
+
+        // Weighted combination (sums to ~1.0)
+        (phi_diff * 0.25
+            + coherence_diff * 0.15
+            + proto_diff * 0.08
+            + core_diff * 0.12
+            + autobio_diff * 0.12
+            + hdc_diff * 0.08
+            + moral_diff * 0.08
+            + exploration_diff * 0.06
+            + behav_coherence_diff * 0.06)
             .min(1.0)
+    }
+
+    /// Distance considering only the 3 behavioral fields
+    pub fn behavioral_distance_to(&self, other: &SelfState) -> f64 {
+        let moral_diff = (self.moral_score - other.moral_score).abs();
+        let exploration_diff = (self.exploration_urge - other.exploration_urge).abs().min(1.0);
+        let behav_coherence_diff =
+            (self.behavioral_coherence - other.behavioral_coherence).abs();
+        ((moral_diff + exploration_diff + behav_coherence_diff) / 3.0).min(1.0)
     }
 }
 
@@ -180,7 +207,7 @@ impl SelfState {
 #[derive(Debug, Clone)]
 pub struct SelfPredictor {
     /// Historical self-states
-    history: VecDeque<SelfState>,
+    pub(crate) history: VecDeque<SelfState>,
     /// Learned prediction weights (linear model)
     _phi_weights: Vec<f64>,
     /// Coherence prediction weights
@@ -280,6 +307,9 @@ impl SelfPredictor {
             unified_self: BinaryHV::random(999),
             timestamp: Instant::now(),
             causal_action: None,
+            moral_score: 0.0,
+            exploration_urge: 0.0,
+            behavioral_coherence: 0.0,
         });
 
         SelfState {
@@ -296,6 +326,10 @@ impl SelfPredictor {
             unified_self: current.unified_self,
             timestamp: Instant::now(),
             causal_action: Some(action.to_string()),
+            // Behavioral fields: carry forward from current (no dedicated predictor yet)
+            moral_score: current.moral_score,
+            exploration_urge: current.exploration_urge,
+            behavioral_coherence: current.behavioral_coherence,
         }
     }
 
@@ -689,6 +723,9 @@ pub struct PredictiveSelfStats {
     pub intentions_created: usize,
     pub intentions_completed: usize,
     pub improvement_actions_found: usize,
+    /// Average prediction error on the 3 behavioral fields specifically
+    /// (moral_score, exploration_urge, behavioral_coherence).
+    pub behavioral_prediction_error: f64,
 }
 
 impl PredictiveSelfModel {
@@ -712,6 +749,40 @@ impl PredictiveSelfModel {
     pub(crate) fn observe(&mut self, model: &NarrativeSelfModel) {
         let state = SelfState::from_narrative_self(model);
         self.predictor.observe(state);
+    }
+
+    /// Patch the most recently observed SelfState with behavioral data from CycleMetadata.
+    /// Called after `observe()` to inject moral_score, exploration_urge, and
+    /// behavioral_coherence — data not available from NarrativeSelfModel alone.
+    pub(crate) fn observe_behavioral(
+        &mut self,
+        moral_score: f64,
+        exploration_urge: f64,
+        behavioral_coherence: f64,
+    ) {
+        // Compute behavioral prediction error before patching
+        if let Some(last) = self.predictor.history.back() {
+            let predicted_moral = last.moral_score;
+            let predicted_exploration = last.exploration_urge;
+            let predicted_behav_coh = last.behavioral_coherence;
+
+            let behav_err = ((predicted_moral - moral_score).abs()
+                + (predicted_exploration - exploration_urge).abs().min(1.0)
+                + (predicted_behav_coh - behavioral_coherence).abs())
+                / 3.0;
+
+            // EMA update of behavioral prediction error
+            let alpha = self.config.learning_rate;
+            self.stats.behavioral_prediction_error =
+                self.stats.behavioral_prediction_error * (1.0 - alpha) + behav_err * alpha;
+        }
+
+        // Patch the latest state with behavioral values
+        if let Some(last) = self.predictor.history.back_mut() {
+            last.moral_score = moral_score;
+            last.exploration_urge = exploration_urge;
+            last.behavioral_coherence = behavioral_coherence;
+        }
     }
 
     /// Predict future self given action
@@ -918,6 +989,9 @@ mod tests {
             unified_self: BinaryHV::random(1),
             timestamp: Instant::now(),
             causal_action: None,
+            moral_score: 0.0,
+            exploration_urge: 0.0,
+            behavioral_coherence: 0.0,
         };
 
         let state2 = state1.clone();
@@ -948,6 +1022,9 @@ mod tests {
                 unified_self: BinaryHV::random(i as u64),
                 timestamp: Instant::now(),
                 causal_action: None,
+                moral_score: 0.0,
+                exploration_urge: 0.0,
+                behavioral_coherence: 0.0,
             });
         }
 
@@ -976,6 +1053,9 @@ mod tests {
                 unified_self: BinaryHV::random(i as u64 + 100),
                 timestamp: Instant::now(),
                 causal_action: None,
+                moral_score: 0.0,
+                exploration_urge: 0.0,
+                behavioral_coherence: 0.0,
             });
         }
 
@@ -992,6 +1072,9 @@ mod tests {
             unified_self: BinaryHV::random(200),
             timestamp: Instant::now(),
             causal_action: None,
+            moral_score: 0.0,
+            exploration_urge: 0.0,
+            behavioral_coherence: 0.0,
         };
 
         predictor.update_with_outcome(&predicted, &actual);

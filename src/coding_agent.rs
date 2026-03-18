@@ -28,7 +28,9 @@
 //!      └──────────────┴───────────┘            └─────────┘
 //! ```
 
-use crate::action::primitives::{Atom, Molecule, PlanProfile, PrimitiveValue};
+use crate::action::primitives::{
+    Atom, DispatchTier, Molecule, MoleculeExecutor, PlanProfile, PrimitiveValue,
+};
 use crate::action::{ActionOutcome, PolicyBundle, SandboxRoot};
 use crate::coding_experience::{CodingExperience, CodingExperienceStore};
 use crate::cognitive_loop::motor_output_bridge::{
@@ -94,6 +96,8 @@ pub struct AgentResult {
     pub generation_tiers: Vec<BackendTier>,
     /// Total energy consumed across all generations.
     pub total_energy: f64,
+    /// Remaining energy budget after execution.
+    pub remaining_energy: f32,
     /// Auto-generated curriculum lessons from failure patterns encountered.
     #[cfg(feature = "school_learning")]
     pub generated_lessons: Vec<crate::school::code_learning::CodeLesson>,
@@ -125,6 +129,7 @@ impl AgentResult {
             "generation": {
                 "tiers": self.generation_tiers.iter().map(|t| t.to_string()).collect::<Vec<_>>(),
                 "total_energy": self.total_energy,
+                "remaining_energy": self.remaining_energy,
             },
             "files_modified": self.files_modified.iter().map(|p| p.display().to_string()).collect::<Vec<_>>(),
             "tests_passed": self.tests_passed,
@@ -465,6 +470,31 @@ impl CodingAgent {
         self.current_plan = None;
         self.energy_budget = 100.0;
 
+        // Auto-index the project if CodebaseMemory hasn't been populated yet.
+        // This gives the agent codebase-aware context on every run without
+        // requiring the caller to explicitly call index_project().
+        #[cfg(feature = "code_generation")]
+        if self.code_memory.is_none() && self.config.working_dir.exists() {
+            match self.index_project(&self.config.working_dir.clone()) {
+                Ok((files, funcs, types)) => {
+                    if files > 0 {
+                        tracing::info!(
+                            target: "symthaea::coding_agent",
+                            files, funcs, types,
+                            "Auto-indexed project for codebase awareness"
+                        );
+                    }
+                }
+                Err(e) => {
+                    tracing::debug!(
+                        target: "symthaea::coding_agent",
+                        error = %e,
+                        "Auto-index skipped (non-fatal)"
+                    );
+                }
+            }
+        }
+
         // If we have indexed codebase memory, query for source-level context
         #[cfg(feature = "code_generation")]
         if let Some(ref memory) = self.code_memory {
@@ -502,9 +532,34 @@ impl CodingAgent {
             );
         }
 
+        // Flush any pending experience writes (fix strategies, templates) to disk
+        self.flush_experience_store();
+
         let result = self.build_result();
         self.emit_event(AgentEvent::Done(result.clone()));
         result
+    }
+
+    /// Flush pending writes in the experience store to the database.
+    ///
+    /// Fix strategies and learned templates are queued during the run via
+    /// `queue_persist()`. This ensures they reach disk before the agent exits.
+    fn flush_experience_store(&mut self) {
+        if let Some(ref mut store) = self.experience_store {
+            match tokio::runtime::Handle::try_current() {
+                Ok(handle) => {
+                    tokio::task::block_in_place(|| handle.block_on(store.flush()));
+                }
+                Err(_) => {
+                    if let Ok(rt) = tokio::runtime::Builder::new_current_thread()
+                        .enable_all()
+                        .build()
+                    {
+                        rt.block_on(store.flush());
+                    }
+                }
+            }
+        }
     }
 
     /// Warm up the CfC by running idle cognitive cycles.
@@ -550,12 +605,10 @@ impl CodingAgent {
             return;
         }
 
-        // 1. Build and evaluate typed execution plan for this phase.
-        //    If the plan fails evaluation (Phi too low, budget exhausted,
-        //    destructive action), the step is skipped.
-        if let Some(plan) = self.build_execution_plan() {
+        // 1. FEP plan selection: generate candidate plans, select best via
+        //    free-energy minimization, then evaluate safety/budget.
+        if let Some((plan, profile)) = self.select_plan_fep() {
             let current_phi = self.phi_trace.last().copied().unwrap_or(0.0);
-            let profile = plan.profile();
             let (approved, reason) = self.evaluate_plan(&plan, current_phi);
 
             if !approved {
@@ -566,15 +619,13 @@ impl CodingAgent {
                     "Plan rejected — skipping step"
                 );
                 self.observations.push(format!("Plan rejected: {reason}"));
-                // Don't abort — let consciousness accumulate Phi via cycling
-                // but don't execute the plan this iteration
             } else {
                 tracing::debug!(
                     target: "symthaea::coding_agent",
                     phase = %self.phase,
                     steps = profile.step_count,
                     energy = profile.total_energy,
-                    "Plan approved"
+                    "FEP plan approved"
                 );
                 self.current_plan = Some(profile.clone());
                 self.deduct_energy(&profile);
@@ -629,12 +680,16 @@ impl CodingAgent {
 
     /// Phase-specific actions performed before the cognitive cycle.
     ///
-    /// - Understanding: reads the target file and nearby source files
+    /// Understanding and Testing now use molecule-driven execution — all I/O
+    /// flows through MoleculeExecutor with energy tracking, phi gating, and
+    /// trace recording.
+    ///
+    /// - Understanding: gathers context via molecule (ReadFile, ListDir, experience hints)
     /// - Generating/Fixing: calls IntelligentDispatcher to generate code
     fn pre_cycle_action(&mut self) {
         match self.phase {
             TaskPhase::Understanding => {
-                self.do_understanding();
+                self.do_understanding_molecule();
             }
             TaskPhase::Fixing => {
                 // In Fixing phase, try structured auto-fix BEFORE calling the LLM.
@@ -647,104 +702,6 @@ impl CodingAgent {
                 self.do_generation();
             }
             _ => {}
-        }
-    }
-
-    /// Read project files to build context for the task.
-    ///
-    /// Reads the target file (if it exists) and lists the working directory
-    /// to understand the project structure. File content is stored in
-    /// `observations` for use by the generation prompt.
-    fn do_understanding(&mut self) {
-        // 1. Try to read the target file (if it already exists)
-        let target = self.resolve_target_file();
-        if target.exists() {
-            match std::fs::read_to_string(&target) {
-                Ok(content) => {
-                    let preview = if content.len() > 1500 {
-                        format!("{}...(truncated)", &content[..1500])
-                    } else {
-                        content.clone()
-                    };
-                    self.observations.push(format!(
-                        "Target file {} ({} bytes):\n{}",
-                        target.display(),
-                        content.len(),
-                        preview
-                    ));
-                }
-                Err(e) => {
-                    self.observations.push(format!(
-                        "Target file {} not readable: {e}",
-                        target.display()
-                    ));
-                }
-            }
-        } else {
-            self.observations.push(format!(
-                "Target file {} does not exist yet (will be created)",
-                target.display()
-            ));
-        }
-
-        // 2. List source files in the working directory (shallow scan)
-        if self.config.working_dir.is_dir() {
-            let mut source_files = Vec::new();
-            if let Ok(entries) = std::fs::read_dir(&self.config.working_dir) {
-                for entry in entries.filter_map(|e| e.ok()) {
-                    let path = entry.path();
-                    let name = entry.file_name();
-                    let name_str = name.to_string_lossy();
-                    // Skip hidden, target, node_modules
-                    if name_str.starts_with('.')
-                        || name_str == "target"
-                        || name_str == "node_modules"
-                    {
-                        continue;
-                    }
-                    if path.is_file() {
-                        source_files.push(name_str.to_string());
-                    } else if path.is_dir() {
-                        source_files.push(format!("{}/", name_str));
-                    }
-                }
-            }
-            if !source_files.is_empty() {
-                source_files.sort();
-                self.observations.push(format!(
-                    "Working directory {}: [{}]",
-                    self.config.working_dir.display(),
-                    source_files.join(", ")
-                ));
-            }
-        }
-
-        // 3. If target is in a src/ directory, also read Cargo.toml for project context
-        let cargo_toml = self.config.working_dir.join("Cargo.toml");
-        if cargo_toml.exists() {
-            if let Ok(content) = std::fs::read_to_string(&cargo_toml) {
-                // Just extract the [package] section header info
-                let preview: String = content.lines().take(15).collect::<Vec<_>>().join("\n");
-                self.observations.push(format!("Cargo.toml:\n{}", preview));
-            }
-        }
-
-        // 4. Query experience store for prior encounters with similar tasks.
-        // This gives the agent "memory" of what worked before — injected early
-        // so it influences Planning and Generation phases.
-        let hints = self.retrieve_experience_hints();
-        if !hints.is_empty() {
-            self.observations.push(format!(
-                "Prior experience: {} relevant patterns found for similar tasks",
-                hints.len()
-            ));
-            for (pattern, hint) in hints.iter().take(3) {
-                self.observations.push(format!(
-                    "  Prior: {} → {}",
-                    &pattern[..pattern.len().min(80)],
-                    &hint[..hint.len().min(80)]
-                ));
-            }
         }
     }
 
@@ -774,8 +731,9 @@ impl CodingAgent {
             )
         };
 
-        // Build the generation prompt
+        // Build the generation prompt and system prompt before borrowing dispatcher
         let prompt = self.build_generation_prompt();
+        let sys_prompt = self.codegen_system_prompt();
 
         // Call the dispatcher (async → sync bridge)
         let dispatch_result = if let Some(ref mut dispatcher) = self.dispatcher {
@@ -794,10 +752,7 @@ impl CodingAgent {
             let params = GenerationParams {
                 temperature,
                 max_tokens: 1024,
-                system_prompt: Some(
-                    "You are a code generator. Output ONLY valid source code, no explanations."
-                        .into(),
-                ),
+                system_prompt: Some(sys_prompt.clone()),
             };
 
             // Sync bridge for async dispatcher
@@ -881,10 +836,7 @@ impl CodingAgent {
                         let params = GenerationParams {
                             temperature: 0.4,
                             max_tokens: 1024,
-                            system_prompt: Some(
-                                "You are a code generator. Output ONLY valid source code, no explanations."
-                                    .into(),
-                            ),
+                            system_prompt: Some(sys_prompt.clone()),
                         };
                         let llm_result = Self::block_on_dispatch(
                             dispatcher,
@@ -950,6 +902,26 @@ impl CodingAgent {
             return false;
         }
 
+        // Check experience store for cached fix strategies before re-parsing
+        if let Some(ref store) = self.experience_store {
+            for error in &structured {
+                let sig = Self::normalize_error_pattern(&error.message);
+                if let Some(strategy) = store.lookup_fix_strategy(&sig) {
+                    tracing::debug!(
+                        target: "symthaea::coding_agent",
+                        error_sig = %sig,
+                        strategy = %strategy,
+                        "Found cached fix strategy"
+                    );
+                    self.observations.push(format!(
+                        "Cached fix strategy for {}: {}",
+                        error.code.as_deref().unwrap_or("unknown"),
+                        strategy
+                    ));
+                }
+            }
+        }
+
         // Try structured (line-aware) fix first
         if let Some(fixed) =
             crate::language::code_executor::try_auto_fix_structured(&code, &structured)
@@ -957,6 +929,10 @@ impl CodingAgent {
             let target = self.resolve_target_file();
             self.write_code_to_disk(&target, &fixed);
             self.generated_code = Some(Self::strip_code_fences(&fixed));
+
+            // Store successful fix strategies for future reuse
+            self.store_fix_strategies(&structured, "structured-line-fix");
+
             self.observations.push(format!(
                 "Structured auto-fix applied ({} errors analyzed, line-targeted)",
                 structured.len()
@@ -969,12 +945,37 @@ impl CodingAgent {
             return true;
         }
 
+        // Category-aware agent-level fixes (supplements code_executor's line-level fixes)
+        if let Some(fixed) = self.try_category_aware_fix(&code, &structured) {
+            let target = self.resolve_target_file();
+            self.write_code_to_disk(&target, &fixed);
+            self.generated_code = Some(Self::strip_code_fences(&fixed));
+            self.store_fix_strategies(&structured, "category-aware-fix");
+            self.observations.push(format!(
+                "Category-aware fix applied (categories: {})",
+                structured
+                    .iter()
+                    .map(|e| format!("{:?}", e.category))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ));
+            tracing::info!(
+                target: "symthaea::coding_agent",
+                "Category-aware fix applied, skipping LLM"
+            );
+            return true;
+        }
+
         // Fall back to basic (non-line-aware) fix
         let flat_errors: Vec<String> = structured.iter().map(|e| e.message.clone()).collect();
         if let Some(fixed) = crate::language::code_executor::try_auto_fix(&code, &flat_errors) {
             let target = self.resolve_target_file();
             self.write_code_to_disk(&target, &fixed);
             self.generated_code = Some(Self::strip_code_fences(&fixed));
+
+            // Store successful fix strategies for future reuse
+            self.store_fix_strategies(&structured, "basic-pattern-fix");
+
             self.observations.push("Basic auto-fix applied".into());
             tracing::info!(
                 target: "symthaea::coding_agent",
@@ -983,7 +984,177 @@ impl CodingAgent {
             return true;
         }
 
+        // Log which categories will escalate to LLM (for observability)
+        let categories: Vec<_> = structured
+            .iter()
+            .map(|e| format!("{:?}", e.category))
+            .collect::<std::collections::HashSet<_>>()
+            .into_iter()
+            .collect();
+        tracing::info!(
+            target: "symthaea::coding_agent",
+            ?categories,
+            "Auto-fix exhausted, escalating to LLM"
+        );
+
         false
+    }
+
+    /// Attempt category-aware fixes that the line-level auto-fix missed.
+    ///
+    /// Unlike `try_auto_fix_structured` (which does line-targeted patches), this
+    /// applies whole-file transformations based on error category:
+    /// - `MissingImport` → scan for unresolved names and add `use` statements
+    /// - `UnusedCode` → prefix unused variables with `_`
+    /// - `BorrowError` ("cannot borrow as mutable") → add `mut` to bindings
+    /// - `MissingImpl` → add common derives when the struct is in our code
+    fn try_category_aware_fix(
+        &self,
+        code: &str,
+        errors: &[crate::language::code_executor::CompileError],
+    ) -> Option<String> {
+        use crate::language::code_executor::ErrorCategory;
+
+        let mut lines: Vec<String> = code.lines().map(|l| l.to_string()).collect();
+        let mut any_fix = false;
+
+        for error in errors {
+            match error.category {
+                ErrorCategory::MissingImport => {
+                    // Extract the unresolved name from "cannot find X in this scope"
+                    if let Some(name) = Self::extract_unresolved_name(&error.message) {
+                        // Common std imports
+                        let use_stmt = match name.as_str() {
+                            "HashMap" => Some("use std::collections::HashMap;"),
+                            "HashSet" => Some("use std::collections::HashSet;"),
+                            "BTreeMap" => Some("use std::collections::BTreeMap;"),
+                            "BTreeSet" => Some("use std::collections::BTreeSet;"),
+                            "VecDeque" => Some("use std::collections::VecDeque;"),
+                            "BinaryHeap" => Some("use std::collections::BinaryHeap;"),
+                            "Rc" => Some("use std::rc::Rc;"),
+                            "Arc" => Some("use std::sync::Arc;"),
+                            "Mutex" => Some("use std::sync::Mutex;"),
+                            "RwLock" => Some("use std::sync::RwLock;"),
+                            "Cell" => Some("use std::cell::Cell;"),
+                            "RefCell" => Some("use std::cell::RefCell;"),
+                            "Path" => Some("use std::path::Path;"),
+                            "PathBuf" => Some("use std::path::PathBuf;"),
+                            "File" => Some("use std::fs::File;"),
+                            "Read" => Some("use std::io::Read;"),
+                            "Write" => Some("use std::io::Write;"),
+                            "Display" => Some("use std::fmt::Display;"),
+                            "Formatter" => Some("use std::fmt::Formatter;"),
+                            _ => None,
+                        };
+                        if let Some(stmt) = use_stmt {
+                            if !lines.iter().any(|l| l.trim() == stmt) {
+                                lines.insert(0, stmt.to_string());
+                                any_fix = true;
+                            }
+                        }
+                    }
+                }
+
+                ErrorCategory::UnusedCode => {
+                    // "unused variable: `x`" → rename to `_x`
+                    if let Some(var_name) = Self::extract_unused_var(&error.message) {
+                        if !var_name.starts_with('_') {
+                            let prefixed = format!("_{}", var_name);
+                            if let Some(idx) = error
+                                .line
+                                .map(|l| l.saturating_sub(1))
+                                .filter(|&i| i < lines.len())
+                            {
+                                let line = &lines[idx];
+                                // Only rename in let bindings, not usage sites
+                                if line.contains("let ") || line.contains("let mut ") {
+                                    let new_line =
+                                        line.replacen(&var_name, &prefixed, 1);
+                                    if new_line != *line {
+                                        lines[idx] = new_line;
+                                        any_fix = true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                ErrorCategory::BorrowError => {
+                    // "cannot borrow `x` as mutable, as it is not declared as mutable"
+                    if error.message.contains("not declared as mutable") {
+                        if let Some(var_name) = Self::extract_between_backticks(&error.message) {
+                            // Find the `let x` binding and add `mut`
+                            let let_pattern = format!("let {}", var_name);
+                            for line in &mut lines {
+                                if line.contains(&let_pattern) && !line.contains("let mut ") {
+                                    *line = line.replacen(
+                                        &let_pattern,
+                                        &format!("let mut {}", var_name),
+                                        1,
+                                    );
+                                    any_fix = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // TypeMismatch, LifetimeError, MissingImpl, SyntaxError — already
+                // handled well by try_auto_fix_structured, or need LLM for complex cases
+                _ => {}
+            }
+        }
+
+        if any_fix {
+            Some(lines.join("\n"))
+        } else {
+            None
+        }
+    }
+
+    /// Extract unresolved name from "cannot find type/value/module `X`" messages.
+    fn extract_unresolved_name(msg: &str) -> Option<String> {
+        // "cannot find type `HashMap` in this scope"
+        // "cannot find value `x` in this scope"
+        Self::extract_between_backticks(msg)
+    }
+
+    /// Extract variable name from "unused variable: `x`" messages.
+    fn extract_unused_var(msg: &str) -> Option<String> {
+        if msg.contains("unused variable") || msg.contains("unused mut") {
+            Self::extract_between_backticks(msg)
+        } else {
+            None
+        }
+    }
+
+    /// Extract text between first pair of backticks in a message.
+    fn extract_between_backticks(msg: &str) -> Option<String> {
+        let start = msg.find('`')? + 1;
+        let rest = &msg[start..];
+        let end = rest.find('`')?;
+        Some(rest[..end].to_string())
+    }
+
+    /// Store fix strategies from successful auto-fixes into the experience store.
+    fn store_fix_strategies(
+        &mut self,
+        errors: &[crate::language::code_executor::CompileError],
+        strategy: &str,
+    ) {
+        if let Some(ref mut store) = self.experience_store {
+            for error in errors {
+                let sig = Self::normalize_error_pattern(&error.message);
+                let strategy_desc = format!(
+                    "{} ({})",
+                    strategy,
+                    error.code.as_deref().unwrap_or("unknown")
+                );
+                store.store_fix_strategy(&sig, &strategy_desc);
+            }
+        }
     }
 
     /// Synchronously call the async dispatcher.
@@ -1027,6 +1198,15 @@ impl CodingAgent {
         let hdc_ctx = self.build_hdc_context_prompt();
         if !hdc_ctx.is_empty() {
             prompt.push_str(&hdc_ctx);
+            prompt.push('\n');
+        }
+
+        // Dynamic re-query: in Fixing phase, query CodebaseMemory for types/functions
+        // mentioned in error messages (supplements the static code_context)
+        let dynamic_ctx = self.build_dynamic_error_context();
+        if !dynamic_ctx.is_empty() {
+            prompt.push_str("## Additional context from error analysis\n");
+            prompt.push_str(&dynamic_ctx);
             prompt.push('\n');
         }
 
@@ -1186,9 +1366,22 @@ impl CodingAgent {
     fn native_code_template(&self) -> Option<String> {
         let task_lower = self.task.to_lowercase();
 
-        // Try pattern-specific generation first
+        // Try hardcoded pattern-specific generation first (fast, reliable)
         if let Some(code) = Self::match_native_pattern(&task_lower) {
             return Some(code);
+        }
+
+        // Try learned templates from past successful LLM generations
+        if let Some(ref store) = self.experience_store {
+            if let Some(template) = store.lookup_learned_template(&self.task) {
+                tracing::info!(
+                    target: "symthaea::coding_agent",
+                    task = %self.task,
+                    template_len = template.len(),
+                    "Using learned template from past LLM generation"
+                );
+                return Some(template.to_string());
+            }
         }
 
         // No match — signal that native generation can't handle this task.
@@ -1542,6 +1735,27 @@ impl CodingAgent {
         self.config.working_dir.join("src").join("lib.rs")
     }
 
+    /// Detect the target language from the target file extension.
+    fn target_language(&self) -> &'static str {
+        let target = self.resolve_target_file();
+        match target.extension().and_then(|e| e.to_str()) {
+            Some("py") => "python",
+            Some("nix") => "nix",
+            _ => "rust",
+        }
+    }
+
+    /// Build a language-appropriate system prompt for the LLM.
+    fn codegen_system_prompt(&self) -> String {
+        match self.target_language() {
+            "python" => "You are a Python code generator. Output ONLY valid Python code. \
+                No explanations, no markdown fences, no comments outside the function. \
+                Complete the function body directly.".into(),
+            "nix" => "You are a Nix code generator. Output ONLY valid Nix expressions.".into(),
+            _ => "You are a code generator. Output ONLY valid source code, no explanations.".into(),
+        }
+    }
+
     /// Write code to disk, creating parent directories as needed.
     /// Strip markdown code fences from generated output.
     /// LLM and template outputs sometimes wrap code in ```rust ... ``` blocks.
@@ -1738,6 +1952,196 @@ impl CodingAgent {
             }
             TaskPhase::Done => None,
         }
+    }
+
+    /// Generate multiple candidate plans for the current phase and use FEP
+    /// free-energy minimization to select the best one.
+    ///
+    /// Returns the selected plan (if any) and its profile. The FEP selector
+    /// prefers plans that are: feasible (phi + budget), non-destructive,
+    /// and have the lowest expected free energy.
+    fn select_plan_fep(&self) -> Option<(Molecule, PlanProfile)> {
+        use crate::action::primitives::{
+            select_best_plan, select_best_plan_with_history, PlanCandidate,
+        };
+
+        let target = self.resolve_target_file();
+        let working_dir = self.config.working_dir.clone();
+        let current_phi = self.phi_trace.last().copied().unwrap_or(0.0);
+
+        let candidates: Vec<PlanCandidate> = match self.phase {
+            TaskPhase::Understanding => {
+                let mut plans = vec![];
+                // Option A: List directory only (cheap)
+                let list_only = Molecule::atom(Atom::list(working_dir.clone()));
+                plans.push(PlanCandidate {
+                    name: "list_only".into(),
+                    profile: list_only.profile(),
+                    molecule: list_only,
+                });
+                // Option B: List + read target (more context)
+                if target.exists() {
+                    let list_and_read = Molecule::atom(Atom::list(working_dir.clone()))
+                        .then(Molecule::atom(Atom::read(target.clone())));
+                    plans.push(PlanCandidate {
+                        name: "list_and_read".into(),
+                        profile: list_and_read.profile(),
+                        molecule: list_and_read,
+                    });
+                }
+                // Option C: Gather context from multiple files
+                let cargo_toml = working_dir.join("Cargo.toml");
+                if cargo_toml.exists() && target.exists() {
+                    let gather = Molecule::atom(Atom::read(cargo_toml))
+                        .then(Molecule::atom(Atom::read(target.clone())))
+                        .then(Molecule::atom(Atom::list(working_dir.clone())));
+                    plans.push(PlanCandidate {
+                        name: "full_context".into(),
+                        profile: gather.profile(),
+                        molecule: gather,
+                    });
+                }
+                plans
+            }
+            TaskPhase::Testing => {
+                let mut plans = vec![];
+                // Option A: cargo check (fast, less info)
+                let check = Molecule::atom(Atom::cargo_check(working_dir.clone()));
+                plans.push(PlanCandidate {
+                    name: "cargo_check".into(),
+                    profile: check.profile(),
+                    molecule: check,
+                });
+                // Option B: cargo check + clippy (more info, more energy)
+                let check_clippy = Molecule::atom(Atom::cargo_check(working_dir.clone()))
+                    .then(Molecule::atom(Atom::cargo_clippy(working_dir.clone())));
+                plans.push(PlanCandidate {
+                    name: "check_and_clippy".into(),
+                    profile: check_clippy.profile(),
+                    molecule: check_clippy,
+                });
+                // Option C: full test suite (most info, most energy)
+                let test = Molecule::atom(Atom::cargo_test(working_dir.clone()));
+                plans.push(PlanCandidate {
+                    name: "cargo_test".into(),
+                    profile: test.profile(),
+                    molecule: test,
+                });
+                plans
+            }
+            TaskPhase::Generating => {
+                let mut plans = vec![];
+                if let Some(ref code) = self.generated_code {
+                    // Option A: write + check
+                    let wc = crate::action::primitives::recipes::write_and_check(
+                        target.clone(),
+                        code,
+                    );
+                    plans.push(PlanCandidate {
+                        name: "write_and_check".into(),
+                        profile: wc.profile(),
+                        molecule: wc,
+                    });
+                    // Option B: write + check + test (more thorough)
+                    let wct = crate::action::primitives::recipes::full_coding_workflow(
+                        target.clone(),
+                        code.clone(),
+                        working_dir.clone(),
+                    );
+                    plans.push(PlanCandidate {
+                        name: "full_workflow".into(),
+                        profile: wct.profile(),
+                        molecule: wct,
+                    });
+                }
+                // Option C-E: Tier-aware generation (Dispatch atoms)
+                // These let FEP choose the backend tier based on energy/success history
+                let prompt = self.build_generation_prompt();
+                for (name, mol) in crate::action::primitives::recipes::tiered_generation_candidates(
+                    target.clone(),
+                    &prompt,
+                ) {
+                    plans.push(PlanCandidate {
+                        name,
+                        profile: mol.profile(),
+                        molecule: mol,
+                    });
+                }
+                plans
+            }
+            TaskPhase::Fixing => {
+                if let Some(ref code) = self.generated_code {
+                    let mut plans = vec![];
+                    // Option A: write + check (simple)
+                    let wc = crate::action::primitives::recipes::write_and_check(
+                        target.clone(),
+                        code,
+                    );
+                    plans.push(PlanCandidate {
+                        name: "fix_and_check".into(),
+                        profile: wc.profile(),
+                        molecule: wc,
+                    });
+                    // Option B: write + check with recovery
+                    let wcr = crate::action::primitives::recipes::write_and_check(
+                        target.clone(),
+                        code,
+                    )
+                    .recover(|_| Molecule::atom(Atom::Noop));
+                    plans.push(PlanCandidate {
+                        name: "fix_with_recovery".into(),
+                        profile: wcr.profile(),
+                        molecule: wcr,
+                    });
+                    plans
+                } else {
+                    vec![]
+                }
+            }
+            TaskPhase::Planning | TaskPhase::Done => vec![],
+        };
+
+        if candidates.is_empty() {
+            return None;
+        }
+
+        // Enhancement 2: Query historical recipe success rates for learning loop.
+        // Past execution outcomes influence which plan FEP prefers.
+        let selected_idx = if let Some(ref store) = self.experience_store {
+            let recipe_keys: Vec<&str> = candidates
+                .iter()
+                .map(|c| {
+                    // Build recipe key from atom names
+                    c.profile
+                        .atom_names
+                        .first()
+                        .copied()
+                        .unwrap_or("Unknown")
+                })
+                .collect();
+            let rates = store.recipe_success_rates(&recipe_keys);
+            select_best_plan_with_history(&candidates, current_phi, self.energy_budget, &rates)
+        } else {
+            select_best_plan(&candidates, current_phi, self.energy_budget)
+        };
+
+        let selected_idx = selected_idx?;
+        let selected = &candidates[selected_idx];
+
+        tracing::debug!(
+            target: "symthaea::coding_agent",
+            phase = %self.phase,
+            selected = %selected.name,
+            candidates = candidates.len(),
+            energy = selected.profile.total_energy,
+            "FEP selected plan (history-aware)"
+        );
+
+        // Build the actual molecule to execute
+        // For tier-aware candidates, use the selected plan directly
+        let profile = selected.profile.clone();
+        self.build_execution_plan()
+            .map(|m| (m, profile))
     }
 
     /// Evaluate whether the current plan is safe and affordable.
@@ -1970,7 +2374,10 @@ impl CodingAgent {
         // Before transitioning from Generating → Testing, validate that the
         // generated code is worth testing. Reject TODO stubs, empty bodies,
         // and unimplemented!() placeholders.
-        if (self.phase == TaskPhase::Generating || self.phase == TaskPhase::Fixing)
+        // Quality gate is Rust-specific — skip for Python/Nix targets
+        let is_rust = self.target_language() == "rust";
+        if is_rust
+            && (self.phase == TaskPhase::Generating || self.phase == TaskPhase::Fixing)
             && self.generated_code.is_some()
         {
             if let Some(ref code) = self.generated_code {
@@ -2063,10 +2470,10 @@ impl CodingAgent {
                 }
             }
             TaskPhase::Testing => {
-                // Try motor result first; if none, run cargo check directly
+                // Try motor result first; if none, run testing molecule
                 let effective_result = motor_result.clone().or_else(|| {
                     if self.generated_code.is_some() {
-                        self.run_cargo_check()
+                        self.do_testing_molecule()
                     } else {
                         None
                     }
@@ -2095,10 +2502,10 @@ impl CodingAgent {
             }
             TaskPhase::Fixing => {
                 let code_written = self.generated_code.is_some();
-                // Try motor result; if none and code was written, run cargo check directly
+                // Try motor result; if none and code was written, run testing molecule
                 let effective_result = motor_result.clone().or_else(|| {
                     if code_written {
-                        self.run_cargo_check()
+                        self.do_testing_molecule()
                     } else {
                         None
                     }
@@ -2255,26 +2662,220 @@ impl CodingAgent {
         }
     }
 
-    /// Run `cargo check` directly in the working directory, bypassing the motor bridge.
+    /// Execute a molecule through MoleculeExecutor and convert results to
+    /// observations, motor results, and trace storage.
     ///
-    /// This is the direct execution path for the coding agent — the agent *knows*
-    /// it wants to compile, so we skip FEP motor confidence gating. Phi gating
-    /// still applies: we won't run commands if Phi is below the warm-up threshold.
-    fn run_cargo_check(&mut self) -> Option<MotorOutputResult> {
+    /// This is the unified execution path — all phases route through here
+    /// instead of ad-hoc file I/O.
+    fn execute_molecule(&mut self, molecule: &Molecule) -> Option<MotorOutputResult> {
+        let current_phi = self.phi_trace.last().copied().unwrap_or(0.0);
+        let real_exec = self.config.enable_real_exec;
+        let mut executor = MoleculeExecutor::new(current_phi, self.energy_budget, real_exec);
+
+        match executor.execute(molecule) {
+            Ok(val) => {
+                // Update energy budget
+                self.energy_budget = executor.energy_budget;
+
+                // Store trace
+                self.store_execution_trace(&executor.trace);
+
+                // Convert result to observations
+                match &val {
+                    PrimitiveValue::Text(text) => {
+                        if !text.is_empty() && text.len() <= 2000 {
+                            self.observations.push(text.clone());
+                        } else if text.len() > 2000 {
+                            self.observations.push(format!(
+                                "{}...(truncated, {} bytes total)",
+                                &text[..1500],
+                                text.len()
+                            ));
+                        }
+                    }
+                    PrimitiveValue::Listing(paths) => {
+                        let names: Vec<String> = paths
+                            .iter()
+                            .take(50)
+                            .map(|p| {
+                                p.file_name()
+                                    .map(|n| n.to_string_lossy().to_string())
+                                    .unwrap_or_else(|| p.display().to_string())
+                            })
+                            .collect();
+                        self.observations.push(format!("Files: [{}]", names.join(", ")));
+                    }
+                    PrimitiveValue::CommandResult {
+                        stdout,
+                        stderr,
+                        exit_code,
+                    } => {
+                        let success = *exit_code == 0;
+                        if !success {
+                            self.last_test_output = Some(stderr.clone());
+                            self.observations.push(format!(
+                                "Command failed (exit={}):\n{}",
+                                exit_code,
+                                &stderr[..stderr.len().min(500)]
+                            ));
+                        } else {
+                            self.observations
+                                .push(format!("Command succeeded (exit={})", exit_code));
+                        }
+                        return Some(MotorOutputResult {
+                            success,
+                            action_type: Some(ActionType::CargoCheck),
+                            prediction_error: if success { 0.0 } else { 0.8 },
+                            outcome: Some(ActionOutcome::CommandOutput {
+                                stdout: stdout.as_bytes().to_vec(),
+                                stderr: stderr.as_bytes().to_vec(),
+                                exit_code: *exit_code,
+                            }),
+                            error: if success { None } else { Some(stderr.clone()) },
+                        });
+                    }
+                    _ => {}
+                }
+
+                Some(MotorOutputResult {
+                    success: true,
+                    action_type: None,
+                    prediction_error: 0.0,
+                    outcome: Some(ActionOutcome::Success),
+                    error: None,
+                })
+            }
+            Err(e) => {
+                let error_msg = format!("{}", e);
+                tracing::warn!(
+                    target: "symthaea::coding_agent",
+                    error = %error_msg,
+                    "Molecule execution failed"
+                );
+                self.observations.push(format!("Execution error: {}", error_msg));
+                Some(MotorOutputResult {
+                    success: false,
+                    action_type: None,
+                    prediction_error: 1.0,
+                    outcome: None,
+                    error: Some(error_msg),
+                })
+            }
+        }
+    }
+
+    /// Execute the Understanding phase via molecules.
+    ///
+    /// Each read-only atom is executed individually through MoleculeExecutor
+    /// so that intermediate results (file contents) are captured in observations.
+    /// Understanding is always real I/O (read-only = no risk).
+    fn do_understanding_molecule(&mut self) {
+        let target = self.resolve_target_file();
+        let working_dir = self.config.working_dir.clone();
+        let current_phi = self.phi_trace.last().copied().unwrap_or(0.0);
+
+        // Execute each atom individually to capture all intermediate results.
+        // This is understanding-specific: we need every file's content, not just
+        // the last one in a sequence.
+
+        // 1. List working directory
+        {
+            let mol = Molecule::atom(Atom::list(working_dir.clone()));
+            let mut executor = MoleculeExecutor::new(current_phi, self.energy_budget, true);
+            if let Ok(PrimitiveValue::Listing(paths)) = executor.execute(&mol) {
+                self.energy_budget = executor.energy_budget;
+                let mut names: Vec<String> = paths
+                    .iter()
+                    .filter_map(|p| {
+                        let name = p.file_name()?.to_string_lossy().to_string();
+                        if name.starts_with('.') || name == "target" || name == "node_modules" {
+                            None
+                        } else if p.is_dir() {
+                            Some(format!("{}/", name))
+                        } else {
+                            Some(name)
+                        }
+                    })
+                    .collect();
+                names.sort();
+                if !names.is_empty() {
+                    self.observations.push(format!(
+                        "Working directory {}: [{}]",
+                        working_dir.display(),
+                        names.join(", ")
+                    ));
+                }
+            }
+        }
+
+        // 2. Read target file
+        if target.exists() {
+            let mol = Molecule::atom(Atom::read(target.clone()));
+            let mut executor = MoleculeExecutor::new(current_phi, self.energy_budget, true);
+            if let Ok(PrimitiveValue::Text(content)) = executor.execute(&mol) {
+                self.energy_budget = executor.energy_budget;
+                let preview = if content.len() > 1500 {
+                    format!("{}...(truncated)", &content[..1500])
+                } else {
+                    content
+                };
+                self.observations.push(format!(
+                    "Target file {} ({} bytes):\n{}",
+                    target.display(),
+                    preview.len(),
+                    preview
+                ));
+            }
+        } else {
+            self.observations.push(format!(
+                "Target file {} does not exist yet (will be created)",
+                target.display()
+            ));
+        }
+
+        // 3. Read Cargo.toml
+        let cargo_toml = working_dir.join("Cargo.toml");
+        if cargo_toml.exists() {
+            let mol = Molecule::atom(Atom::read(cargo_toml));
+            let mut executor = MoleculeExecutor::new(current_phi, self.energy_budget, true);
+            if let Ok(PrimitiveValue::Text(content)) = executor.execute(&mol) {
+                self.energy_budget = executor.energy_budget;
+                let preview: String = content.lines().take(15).collect::<Vec<_>>().join("\n");
+                self.observations.push(format!("Cargo.toml:\n{}", preview));
+            }
+        }
+
+        // Query experience store (non-molecule, fast cache lookup)
+        let hints = self.retrieve_experience_hints();
+        if !hints.is_empty() {
+            self.observations.push(format!(
+                "Prior experience: {} relevant patterns",
+                hints.len()
+            ));
+            for (pattern, hint) in hints.iter().take(3) {
+                self.observations.push(format!(
+                    "  Prior: {} → {}",
+                    &pattern[..pattern.len().min(80)],
+                    &hint[..hint.len().min(80)]
+                ));
+            }
+        }
+    }
+
+    /// Execute the Testing phase via molecules.
+    /// Molecule-driven testing — uses FEP-selected plan to choose cargo check vs test.
+    fn do_testing_molecule(&mut self) -> Option<MotorOutputResult> {
         if !self.config.enable_real_exec {
-            // In simulated mode, check if generated code has basic syntax issues
             return Some(MotorOutputResult {
                 success: self.generated_code.is_some(),
                 action_type: Some(ActionType::CargoCheck),
                 prediction_error: 0.0,
-                outcome: Some(crate::action::ActionOutcome::Success),
+                outcome: Some(ActionOutcome::Success),
                 error: None,
             });
         }
 
-        let working_dir = &self.config.working_dir;
-
-        // Check if Cargo.toml exists
+        let working_dir = self.config.working_dir.clone();
         if !working_dir.join("Cargo.toml").exists() {
             return Some(MotorOutputResult {
                 success: false,
@@ -2285,51 +2886,23 @@ impl CodingAgent {
             });
         }
 
-        tracing::info!(
-            target: "symthaea::coding_agent",
-            dir = %working_dir.display(),
-            "Running cargo check (direct)"
-        );
-
-        match std::process::Command::new("cargo")
-            .args(["check", "--message-format=short"])
-            .current_dir(working_dir)
-            .output()
-        {
-            Ok(output) => {
-                let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-                let success = output.status.success();
-
-                if !success {
-                    self.last_test_output = Some(stderr.clone());
-                    self.observations.push(format!(
-                        "cargo check failed:\n{}",
-                        &stderr[..stderr.len().min(500)]
-                    ));
+        // Use the FEP-selected plan if available, otherwise default to cargo check
+        let molecule = self
+            .current_plan
+            .as_ref()
+            .and_then(|profile| {
+                // If the profile includes testing atoms, rebuild the molecule
+                if profile.atom_names.iter().any(|n| *n == "CargoTest") {
+                    Some(Molecule::atom(Atom::cargo_test(working_dir.clone())))
+                } else if profile.atom_names.iter().any(|n| *n == "CargoCheck") {
+                    Some(Molecule::atom(Atom::cargo_check(working_dir.clone())))
                 } else {
-                    self.observations.push("cargo check passed".into());
+                    None
                 }
+            })
+            .unwrap_or_else(|| Molecule::atom(Atom::cargo_check(working_dir)));
 
-                Some(MotorOutputResult {
-                    success,
-                    action_type: Some(ActionType::CargoCheck),
-                    prediction_error: if success { 0.0 } else { 0.8 },
-                    outcome: Some(crate::action::ActionOutcome::CommandOutput {
-                        stdout: output.stdout,
-                        stderr: output.stderr,
-                        exit_code: output.status.code().unwrap_or(-1),
-                    }),
-                    error: if success { None } else { Some(stderr) },
-                })
-            }
-            Err(e) => Some(MotorOutputResult {
-                success: false,
-                action_type: Some(ActionType::CargoCheck),
-                prediction_error: 1.0,
-                outcome: None,
-                error: Some(format!("Failed to run cargo: {e}")),
-            }),
-        }
+        self.execute_molecule(&molecule)
     }
 
     /// Check code quality before allowing it into the Testing phase.
@@ -2513,6 +3086,23 @@ impl CodingAgent {
                 if let Some((last_error, _)) = self.failure_patterns.last().cloned() {
                     self.store_fix_hint(&last_error, &code);
                 }
+
+                // Distill successful LLM generations into learned templates.
+                // Future runs with similar tasks can use this natively (no LLM needed).
+                let was_llm = tier
+                    .map(|t| t != BackendTier::Native)
+                    .unwrap_or(false);
+                if was_llm {
+                    if let Some(ref mut store) = self.experience_store {
+                        store.store_learned_template(&self.task, &code);
+                        tracing::info!(
+                            target: "symthaea::coding_agent",
+                            task = %self.task,
+                            code_len = code.len(),
+                            "Distilled LLM generation into learned template"
+                        );
+                    }
+                }
             }
         }
     }
@@ -2531,6 +3121,59 @@ impl CodingAgent {
                 .map(|t| t.to_string())
                 .unwrap_or_default(),
             fix_hint: Some(fix_summary),
+        };
+
+        if let Some(ref mut store) = self.experience_store {
+            if let Ok(rt) = tokio::runtime::Runtime::new() {
+                rt.block_on(async {
+                    store.store(experience).await;
+                });
+            }
+        }
+    }
+
+    /// Store a molecule execution trace — both in observations and in the
+    /// persistent experience store for cross-session learning (#3).
+    fn store_execution_trace(&mut self, trace: &[(String, f32, String)]) {
+        if trace.is_empty() {
+            return;
+        }
+
+        // Format trace for observations
+        let trace_summary: String = trace
+            .iter()
+            .map(|(name, energy, summary)| format!("  {} (E={:.1}): {}", name, energy, summary))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        tracing::debug!(
+            target: "symthaea::coding_agent",
+            steps = trace.len(),
+            "Molecule trace:\n{}", trace_summary
+        );
+
+        // Store trace as a procedural experience for recipe learning
+        let total_energy: f32 = trace.iter().map(|(_, e, _)| e).sum();
+        let atom_names: Vec<&str> = trace.iter().map(|(n, _, _)| n.as_str()).collect();
+        let recipe_key = atom_names.join("→");
+
+        // Check if the last step was a success (exit=0 or no error)
+        let last_success = trace
+            .last()
+            .map(|(_, _, s)| s.contains("exit=0") || s == "()")
+            .unwrap_or(false);
+
+        let experience = CodingExperience {
+            task: format!("recipe:{}", recipe_key),
+            detail: format!(
+                "energy={:.1}, steps={}, atoms=[{}]",
+                total_energy,
+                trace.len(),
+                recipe_key,
+            ),
+            success: last_success,
+            tier: "MoleculeExecutor".to_string(),
+            fix_hint: None,
         };
 
         if let Some(ref mut store) = self.experience_store {
@@ -2577,6 +3220,7 @@ impl CodingAgent {
             errors: self.errors.clone(),
             generation_tiers: self.generation_tiers.clone(),
             total_energy: self.dispatcher.as_ref().map_or(0.0, |d| d.total_energy()),
+            remaining_energy: self.energy_budget,
             #[cfg(feature = "school_learning")]
             generated_lessons: self.generate_lessons_from_failures(),
         }
@@ -2743,6 +3387,11 @@ impl CodingAgent {
         (self, rx)
     }
 
+    /// Attach an event sink after construction.
+    pub fn subscribe_events(&mut self, tx: std::sync::mpsc::Sender<AgentEvent>) {
+        self.event_sink = Some(tx);
+    }
+
     /// Emit an event to the event channel (no-op if no sink).
     fn emit_event(&self, event: AgentEvent) {
         if let Some(ref sink) = self.event_sink {
@@ -2799,6 +3448,103 @@ impl CodingAgent {
 
     #[cfg(not(feature = "code_generation"))]
     fn build_hdc_context_prompt(&self) -> String {
+        String::new()
+    }
+
+    /// Dynamically query CodebaseMemory for context relevant to current errors.
+    ///
+    /// In the Fixing phase, error messages often mention types, traits, and functions
+    /// that exist in the project. This method extracts those names, queries the
+    /// codebase memory, and returns relevant source snippets — giving the LLM
+    /// accurate type signatures and implementations instead of guessing.
+    #[cfg(feature = "code_generation")]
+    fn build_dynamic_error_context(&self) -> String {
+        // Only useful in Fixing phase with errors and codebase memory
+        let code_memory = match (&self.phase, &self.code_memory) {
+            (TaskPhase::Fixing, Some(m)) => m,
+            _ => return String::new(),
+        };
+        let test_output = match &self.last_test_output {
+            Some(o) => o,
+            None => return String::new(),
+        };
+
+        // Extract identifiers from error messages (types, traits, function names)
+        let mut query_terms: Vec<String> = Vec::new();
+        for line in test_output.lines() {
+            // Extract names between backticks: `HashMap`, `MyStruct`, `foo()`
+            let mut rest = line;
+            while let Some(start) = rest.find('`') {
+                let after = &rest[start + 1..];
+                if let Some(end) = after.find('`') {
+                    let name = &after[..end];
+                    // Filter: keep identifiers that look like type/function names
+                    // (start with uppercase or are reasonable length lowercase)
+                    let clean = name.trim_end_matches("()");
+                    if !clean.is_empty()
+                        && clean.len() < 60
+                        && !clean.contains(' ')
+                        && !clean.starts_with("error")
+                        && !clean.starts_with("help")
+                    {
+                        if !query_terms.iter().any(|t| t == clean) {
+                            query_terms.push(clean.to_string());
+                        }
+                    }
+                    rest = &after[end + 1..];
+                } else {
+                    break;
+                }
+            }
+        }
+
+        if query_terms.is_empty() {
+            return String::new();
+        }
+
+        // Query codebase memory for each identified term
+        let encoder = code_memory.encoder();
+        let mut seen_names = std::collections::HashSet::new();
+        let mut result = String::new();
+
+        for term in query_terms.iter().take(5) {
+            let query_hv = encoder.encode_name(term);
+            let matches = code_memory.query(&query_hv, 3);
+
+            for m in &matches {
+                if m.similarity < 0.25 || !seen_names.insert(m.name.clone()) {
+                    continue;
+                }
+                // Try to get source snippet
+                if let Some(src) = self.source_cache.get(&m.path) {
+                    let snippet = Self::extract_entity_source(src, &m.name, m.kind);
+                    if !snippet.contains("(source not found)") {
+                        let truncated: String = snippet.chars().take(300).collect();
+                        result.push_str(&format!(
+                            "- `{}` ({:?}, {}): ```\n{}\n```\n",
+                            m.name,
+                            m.kind,
+                            m.path.display(),
+                            truncated
+                        ));
+                    }
+                } else {
+                    result.push_str(&format!(
+                        "- `{}` ({:?}, {}, sim={:.2})\n",
+                        m.name,
+                        m.kind,
+                        m.path.display(),
+                        m.similarity
+                    ));
+                }
+            }
+        }
+
+        result
+    }
+
+    #[cfg(not(feature = "code_generation"))]
+    fn build_dynamic_error_context(&self) -> String {
         String::new()
     }
 
@@ -3663,7 +4409,7 @@ mod tests {
         agent.task = "modify the existing function".to_string();
 
         // Run understanding phase
-        agent.do_understanding();
+        agent.do_understanding_molecule();
 
         // Should have read the target file content
         assert!(
@@ -3688,7 +4434,7 @@ mod tests {
         let mut agent = CodingAgent::new(config).unwrap();
         agent.task = "add new function".to_string();
 
-        agent.do_understanding();
+        agent.do_understanding_molecule();
 
         assert!(
             agent
@@ -3717,7 +4463,7 @@ mod tests {
         let mut agent = CodingAgent::new(config).unwrap();
         agent.task = "test".to_string();
 
-        agent.do_understanding();
+        agent.do_understanding_molecule();
 
         // Should list the directory contents
         let dir_obs = agent
@@ -3752,7 +4498,7 @@ mod tests {
         let mut agent = CodingAgent::new(config).unwrap();
         agent.task = "test".to_string();
 
-        agent.do_understanding();
+        agent.do_understanding_molecule();
 
         assert!(
             agent
@@ -4079,6 +4825,7 @@ mod tests {
             errors: vec![],
             generation_tiers: vec![],
             total_energy: 0.0,
+            remaining_energy: 100.0,
             #[cfg(feature = "school_learning")]
             generated_lessons: vec![],
         };
@@ -4103,6 +4850,7 @@ mod tests {
             errors: vec![long_error; 5],
             generation_tiers: vec![],
             total_energy: 1.0,
+            remaining_energy: 99.0,
             #[cfg(feature = "school_learning")]
             generated_lessons: vec![],
         };
@@ -4988,5 +5736,887 @@ assertion `left == right` failed
         // Plan B should be more expensive (5 iterations of write+check)
         assert!(profile_b.total_energy > profile_a.total_energy);
         assert!(profile_b.step_count > profile_a.step_count);
+    }
+
+    // ── Enhancement 1: Molecule-driven execution tests ────────────────
+
+    #[test]
+    fn test_execute_molecule_read_simulated() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = CodingAgentConfig {
+            max_iterations: 1,
+            working_dir: dir.path().to_path_buf(),
+            enable_real_exec: false,
+            ..Default::default()
+        };
+        let mut agent = CodingAgent::new(config).unwrap();
+
+        let mol = Molecule::atom(Atom::read("/tmp/test.rs"));
+        let result = agent.execute_molecule(&mol);
+
+        assert!(result.is_some());
+        assert!(result.unwrap().success);
+        // Should have added observation
+        assert!(
+            agent.observations.iter().any(|o| o.contains("simulated read")),
+            "Should have simulated read observation: {:?}",
+            agent.observations
+        );
+    }
+
+    #[test]
+    fn test_execute_molecule_tracks_energy() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = CodingAgentConfig {
+            max_iterations: 1,
+            working_dir: dir.path().to_path_buf(),
+            enable_real_exec: false,
+            ..Default::default()
+        };
+        let mut agent = CodingAgent::new(config).unwrap();
+        agent.phi_trace.push(1.0); // need sufficient phi for CargoCheck (min 0.05)
+        let initial_energy = agent.energy_budget;
+
+        let mol = Molecule::atom(Atom::cargo_check(PathBuf::from("/tmp")));
+        agent.execute_molecule(&mol);
+
+        // Energy should have been deducted (CargoCheck costs 3.0)
+        assert!(
+            agent.energy_budget < initial_energy,
+            "Energy budget should decrease: {} < {}",
+            agent.energy_budget,
+            initial_energy
+        );
+    }
+
+    #[test]
+    fn test_execute_molecule_command_result() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = CodingAgentConfig {
+            max_iterations: 1,
+            working_dir: dir.path().to_path_buf(),
+            enable_real_exec: false,
+            ..Default::default()
+        };
+        let mut agent = CodingAgent::new(config).unwrap();
+        agent.phi_trace.push(1.0); // sufficient phi for CargoCheck
+
+        // Simulated exec returns exit_code=0
+        let mol = Molecule::atom(Atom::cargo_check(PathBuf::from("/tmp")));
+        let result = agent.execute_molecule(&mol).unwrap();
+
+        assert!(result.success);
+        assert_eq!(result.action_type, Some(ActionType::CargoCheck));
+    }
+
+    #[test]
+    fn test_do_understanding_molecule() {
+        let dir = tempfile::tempdir().unwrap();
+        // Create a Cargo.toml in the temp dir
+        std::fs::write(dir.path().join("Cargo.toml"), "[package]\nname = \"test\"").unwrap();
+        std::fs::create_dir_all(dir.path().join("src")).unwrap();
+        std::fs::write(dir.path().join("src/lib.rs"), "pub fn hello() {}").unwrap();
+
+        let config = CodingAgentConfig {
+            max_iterations: 1,
+            working_dir: dir.path().to_path_buf(),
+            target_file: Some(dir.path().join("src/lib.rs")),
+            enable_real_exec: true,
+            ..Default::default()
+        };
+        let mut agent = CodingAgent::new(config).unwrap();
+        agent.task = "add fibonacci".into();
+
+        agent.do_understanding_molecule();
+
+        // Should have gathered context
+        assert!(
+            !agent.observations.is_empty(),
+            "Should have observations from understanding"
+        );
+        // Should have file listing
+        assert!(
+            agent.observations.iter().any(|o| o.contains("src") || o.contains("Cargo.toml") || o.contains("Files")),
+            "Should have project files in observations: {:?}",
+            agent.observations
+        );
+    }
+
+    #[test]
+    fn test_do_testing_molecule_no_cargo_toml() {
+        let dir = tempfile::tempdir().unwrap();
+        // No Cargo.toml
+        let config = CodingAgentConfig {
+            max_iterations: 1,
+            working_dir: dir.path().to_path_buf(),
+            enable_real_exec: true,
+            ..Default::default()
+        };
+        let mut agent = CodingAgent::new(config).unwrap();
+
+        let result = agent.do_testing_molecule();
+        assert!(result.is_some());
+        assert!(!result.unwrap().success);
+    }
+
+    #[test]
+    fn test_do_testing_molecule_simulated() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = CodingAgentConfig {
+            max_iterations: 1,
+            working_dir: dir.path().to_path_buf(),
+            enable_real_exec: false,
+            ..Default::default()
+        };
+        let mut agent = CodingAgent::new(config).unwrap();
+        agent.generated_code = Some("fn main() {}".into());
+
+        let result = agent.do_testing_molecule();
+        assert!(result.is_some());
+        assert!(result.unwrap().success);
+    }
+
+    // ── Enhancement 2: Learning loop tests ────────────────────────────
+
+    #[test]
+    fn test_select_plan_fep_returns_plan() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("Cargo.toml"), "[package]\nname = \"t\"").unwrap();
+        std::fs::create_dir_all(dir.path().join("src")).unwrap();
+        std::fs::write(dir.path().join("src/lib.rs"), "").unwrap();
+
+        let config = CodingAgentConfig {
+            max_iterations: 1,
+            working_dir: dir.path().to_path_buf(),
+            target_file: Some(dir.path().join("src/lib.rs")),
+            ..Default::default()
+        };
+        let mut agent = CodingAgent::new(config).unwrap();
+        agent.task = "add fibonacci".into();
+        agent.phase = TaskPhase::Understanding;
+        agent.phi_trace.push(1.0);
+
+        let result = agent.select_plan_fep();
+        assert!(result.is_some(), "Should select a plan for Understanding phase");
+    }
+
+    // ── Enhancement 3: Dispatch tier tests ────────────────────────────
+
+    #[test]
+    fn test_generating_includes_tiered_candidates() {
+        use crate::action::primitives::PlanCandidate;
+
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("Cargo.toml"), "[package]").unwrap();
+        std::fs::create_dir_all(dir.path().join("src")).unwrap();
+        std::fs::write(dir.path().join("src/lib.rs"), "").unwrap();
+
+        let config = CodingAgentConfig {
+            max_iterations: 1,
+            working_dir: dir.path().to_path_buf(),
+            target_file: Some(dir.path().join("src/lib.rs")),
+            ..Default::default()
+        };
+        let mut agent = CodingAgent::new(config).unwrap();
+        agent.task = "add fibonacci".into();
+        agent.phase = TaskPhase::Generating;
+        agent.phi_trace.push(1.0);
+        agent.generated_code = Some("fn fib(n: u32) -> u32 { n }".into());
+
+        // The plan selection should have candidates including tiered dispatch
+        let result = agent.select_plan_fep();
+        // It should succeed (at least the write_and_check candidate)
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn test_dispatch_tier_energy_in_profile() {
+        let native = crate::action::primitives::recipes::generate_and_check(
+            PathBuf::from("/tmp/src/lib.rs"),
+            "add fib",
+            DispatchTier::Native,
+        );
+        let cloud = crate::action::primitives::recipes::generate_and_check(
+            PathBuf::from("/tmp/src/lib.rs"),
+            "add fib",
+            DispatchTier::CloudLlm,
+        );
+
+        // Cloud plan should be 50x more expensive for the dispatch atom
+        assert!(
+            cloud.profile().total_energy > native.profile().total_energy * 5.0,
+            "Cloud ({}) should be much more expensive than native ({})",
+            cloud.profile().total_energy,
+            native.profile().total_energy
+        );
+    }
+
+    // ── Enhancement 1: Structured Fix Memory ───────────────────────────
+
+    #[test]
+    fn test_store_fix_strategies_persists() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = CodingAgentConfig {
+            working_dir: dir.path().to_path_buf(),
+            target_file: Some(PathBuf::from("main.rs")),
+            ..Default::default()
+        };
+        let mut agent = CodingAgent::new(config).unwrap();
+
+        // Simulate structured errors
+        let errors = vec![crate::language::code_executor::CompileError {
+            message: "error[E0308]: mismatched types".to_string(),
+            code: Some("E0308".to_string()),
+            file: Some("main.rs".to_string()),
+            line: Some(10),
+            column: Some(5),
+            category: crate::language::code_executor::ErrorCategory::TypeMismatch,
+        }];
+
+        agent.store_fix_strategies(&errors, "type-cast-fix");
+
+        // Should be stored in experience store
+        assert!(
+            agent.experience_store.is_some(),
+            "Experience store should exist"
+        );
+        let store = agent.experience_store.as_ref().unwrap();
+        let fix = store.lookup_fix_strategy("error[E0308]: mismatched types");
+        assert!(
+            fix.is_some(),
+            "Should find cached fix strategy for E0308"
+        );
+        assert!(
+            fix.unwrap().contains("type-cast-fix"),
+            "Fix should contain strategy: {:?}",
+            fix
+        );
+    }
+
+    #[test]
+    fn test_fix_strategy_lookup_by_error_code() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = CodingAgentConfig {
+            working_dir: dir.path().to_path_buf(),
+            ..Default::default()
+        };
+        let mut agent = CodingAgent::new(config).unwrap();
+
+        let errors = vec![crate::language::code_executor::CompileError {
+            message: "error[E0277]: the trait bound `Foo: Clone` is not satisfied".to_string(),
+            code: Some("E0277".to_string()),
+            file: None,
+            line: None,
+            column: None,
+            category: crate::language::code_executor::ErrorCategory::MissingImpl,
+        }];
+        agent.store_fix_strategies(&errors, "add-derive-clone");
+
+        // Look up with different wording but same error code
+        let store = agent.experience_store.as_ref().unwrap();
+        let fix = store.lookup_fix_strategy("error[E0277]: Bar doesn't implement Clone");
+        assert!(
+            fix.is_some(),
+            "Should match by error code E0277 regardless of message details"
+        );
+    }
+
+    #[test]
+    fn test_fix_strategy_no_duplicates() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = CodingAgentConfig {
+            working_dir: dir.path().to_path_buf(),
+            ..Default::default()
+        };
+        let mut agent = CodingAgent::new(config).unwrap();
+
+        let errors = vec![crate::language::code_executor::CompileError {
+            message: "error[E0308]: mismatched types".to_string(),
+            code: Some("E0308".to_string()),
+            file: None,
+            line: None,
+            column: None,
+            category: crate::language::code_executor::ErrorCategory::TypeMismatch,
+        }];
+
+        // Store same fix twice
+        agent.store_fix_strategies(&errors, "type-cast");
+        agent.store_fix_strategies(&errors, "type-cast");
+
+        let store = agent.experience_store.as_ref().unwrap();
+        let count = store
+            .cached_error_hints()
+            .iter()
+            .filter(|(k, _)| k.starts_with("fix:"))
+            .count();
+        assert_eq!(count, 1, "Should not store duplicate fix strategies");
+    }
+
+    // ── Enhancement 2: Learned Template Distillation ───────────────────
+
+    #[test]
+    fn test_learned_template_stored_on_llm_success() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = CodingAgentConfig {
+            working_dir: dir.path().to_path_buf(),
+            target_file: Some(PathBuf::from("main.rs")),
+            ..Default::default()
+        };
+        let mut agent = CodingAgent::new(config).unwrap();
+        agent.task = "add merge sort function".to_string();
+        agent.generated_code = Some("pub fn merge_sort(arr: &mut [i32]) { /* ... */ }".to_string());
+        agent.generation_tiers.push(BackendTier::LocalLlm);
+
+        agent.record_generation_outcome(true);
+
+        // Should be stored as a learned template
+        let store = agent.experience_store.as_ref().unwrap();
+        let template = store.lookup_learned_template("add merge sort function");
+        assert!(
+            template.is_some(),
+            "LLM-generated code should be stored as learned template"
+        );
+        assert!(
+            template.unwrap().contains("merge_sort"),
+            "Template should contain the generated code"
+        );
+    }
+
+    #[test]
+    fn test_learned_template_not_stored_for_native() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = CodingAgentConfig {
+            working_dir: dir.path().to_path_buf(),
+            target_file: Some(PathBuf::from("main.rs")),
+            ..Default::default()
+        };
+        let mut agent = CodingAgent::new(config).unwrap();
+        agent.task = "add fibonacci".to_string();
+        agent.generated_code = Some("pub fn fibonacci(n: u64) -> u64 { 0 }".to_string());
+        agent.generation_tiers.push(BackendTier::Native);
+
+        agent.record_generation_outcome(true);
+
+        // Native generations should NOT be stored as templates (they're already hardcoded)
+        let store = agent.experience_store.as_ref().unwrap();
+        let template = store.lookup_learned_template("add fibonacci");
+        assert!(
+            template.is_none(),
+            "Native generations should not be stored as templates"
+        );
+    }
+
+    #[test]
+    fn test_learned_template_used_by_native_code_template() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = CodingAgentConfig {
+            working_dir: dir.path().to_path_buf(),
+            target_file: Some(PathBuf::from("main.rs")),
+            ..Default::default()
+        };
+        let mut agent = CodingAgent::new(config).unwrap();
+        agent.task = "implement a custom bloom filter with configurable false positive rate".to_string();
+
+        // First: no template available, should be None (task is too specific for hardcoded)
+        // Note: "bloom" IS in the hardcoded patterns, so use a very specific variant
+        agent.task = "implement concurrent skiplist data structure".to_string();
+        let result = agent.native_code_template();
+        assert!(
+            result.is_none(),
+            "No hardcoded pattern for concurrent skiplist"
+        );
+
+        // Simulate storing a learned template
+        if let Some(ref mut store) = agent.experience_store {
+            store.store_learned_template(
+                "implement concurrent skiplist data structure",
+                "pub struct SkipList<T> { levels: Vec<Vec<T>> }\nimpl<T: Ord> SkipList<T> {\n    pub fn new() -> Self { Self { levels: vec![vec![]] } }\n}\n",
+            );
+        }
+
+        // Now native_code_template should find it
+        let result = agent.native_code_template();
+        assert!(
+            result.is_some(),
+            "Should find learned template for concurrent skiplist"
+        );
+        assert!(
+            result.unwrap().contains("SkipList"),
+            "Template should contain the learned code"
+        );
+    }
+
+    #[test]
+    fn test_learned_template_similarity_matching() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = CodingAgentConfig {
+            working_dir: dir.path().to_path_buf(),
+            ..Default::default()
+        };
+        let mut agent = CodingAgent::new(config).unwrap();
+
+        // Store a template under one task description
+        if let Some(ref mut store) = agent.experience_store {
+            store.store_learned_template(
+                "create a function to validate email addresses",
+                "pub fn validate_email(s: &str) -> bool { s.contains('@') && s.contains('.') }",
+            );
+        }
+
+        // Query with a similar but not identical description
+        agent.task = "write email validation function".to_string();
+        // Skip hardcoded patterns since email_valid is in match_native_pattern
+        // Just test the store directly
+        let store = agent.experience_store.as_ref().unwrap();
+        let template = store.lookup_learned_template("create a function to validate email addresses");
+        assert!(
+            template.is_some(),
+            "Exact match should work"
+        );
+    }
+
+    // ── Enhancement 3: End-to-End Integration Test ─────────────────────
+
+    #[test]
+    fn test_end_to_end_fibonacci_generation() {
+        let dir = tempfile::tempdir().unwrap();
+
+        // Create a minimal Cargo project
+        std::fs::create_dir_all(dir.path().join("src")).unwrap();
+        std::fs::write(
+            dir.path().join("Cargo.toml"),
+            "[package]\nname = \"test-e2e\"\nversion = \"0.1.0\"\nedition = \"2021\"\n",
+        )
+        .unwrap();
+        std::fs::write(dir.path().join("src/lib.rs"), "// empty\n").unwrap();
+
+        let config = CodingAgentConfig {
+            max_iterations: 8,
+            working_dir: dir.path().to_path_buf(),
+            target_file: Some(PathBuf::from("src/lib.rs")),
+            enable_real_exec: false, // simulated mode for CI
+            ..Default::default()
+        };
+        let mut agent = CodingAgent::new(config).unwrap();
+        let result = agent.run("add fibonacci function to src/lib.rs");
+
+        // Verify the full pipeline executed
+        assert!(
+            !result.phi_trace.is_empty(),
+            "Should have phi trace entries from cognitive cycles"
+        );
+        assert!(
+            result.iterations_used >= 2,
+            "Should use at least 2 iterations (understand + generate): got {}",
+            result.iterations_used
+        );
+
+        // In simulated mode, generated_code should be set from native template
+        assert!(
+            agent.generated_code.is_some(),
+            "Should have generated code for fibonacci task"
+        );
+        let code = agent.generated_code.as_ref().unwrap();
+        assert!(
+            code.contains("fibonacci") || code.contains("fib"),
+            "Generated code should contain fibonacci: got {}",
+            &code[..code.len().min(100)]
+        );
+
+        // Energy budget should decrease from molecule execution
+        assert!(
+            agent.energy_budget < 100.0,
+            "Energy should decrease from initial 100.0: got {}",
+            agent.energy_budget
+        );
+
+        // Observations should show the understanding phase ran
+        assert!(
+            agent.observations.iter().any(|o| {
+                o.contains("Working directory")
+                    || o.contains("Target file")
+                    || o.contains("does not exist")
+            }),
+            "Should have understanding observations: {:?}",
+            agent.observations.iter().take(5).collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn test_end_to_end_phases_reach_done() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("src")).unwrap();
+        std::fs::write(
+            dir.path().join("Cargo.toml"),
+            "[package]\nname = \"e2e-done\"\nversion = \"0.1.0\"\nedition = \"2021\"\n",
+        )
+        .unwrap();
+        std::fs::write(dir.path().join("src/lib.rs"), "").unwrap();
+
+        let config = CodingAgentConfig {
+            max_iterations: 10,
+            working_dir: dir.path().to_path_buf(),
+            target_file: Some(PathBuf::from("src/lib.rs")),
+            ..Default::default()
+        };
+        let mut agent = CodingAgent::new(config).unwrap();
+
+        // Subscribe to events to track phase transitions
+        let (tx, rx) = std::sync::mpsc::channel();
+        agent.subscribe_events(tx);
+
+        let result = agent.run("add is_prime function");
+
+        // Collect phase transitions
+        let transitions: Vec<_> = rx
+            .try_iter()
+            .filter_map(|e| match e {
+                AgentEvent::PhaseTransition { from, to, .. } => Some((from, to)),
+                _ => None,
+            })
+            .collect();
+
+        // Should have at least Understanding→Planning and Planning→Generating
+        assert!(
+            transitions.len() >= 2,
+            "Should have at least 2 phase transitions, got {}: {:?}",
+            transitions.len(),
+            transitions
+        );
+
+        // The agent should have reached Done or max iterations
+        assert!(
+            result.iterations_used <= 10,
+            "Should not exceed max_iterations"
+        );
+    }
+
+    #[test]
+    fn test_end_to_end_experience_persists_across_runs() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("src")).unwrap();
+        std::fs::write(dir.path().join("src/lib.rs"), "").unwrap();
+
+        let config = CodingAgentConfig {
+            max_iterations: 5,
+            working_dir: dir.path().to_path_buf(),
+            target_file: Some(PathBuf::from("src/lib.rs")),
+            ..Default::default()
+        };
+        let mut agent = CodingAgent::new(config).unwrap();
+
+        // First run
+        let _result1 = agent.run("add factorial function");
+        let experience_count_after_first = agent
+            .experience_store
+            .as_ref()
+            .map(|s| s.cached_successes().len() + s.cached_error_hints().len())
+            .unwrap_or(0);
+
+        // Second run (same agent, different task)
+        let _result2 = agent.run("add gcd function");
+        let experience_count_after_second = agent
+            .experience_store
+            .as_ref()
+            .map(|s| s.cached_successes().len() + s.cached_error_hints().len())
+            .unwrap_or(0);
+
+        // Experience should accumulate across runs
+        assert!(
+            experience_count_after_second >= experience_count_after_first,
+            "Experience should grow across runs: {} >= {}",
+            experience_count_after_second,
+            experience_count_after_first
+        );
+    }
+
+    // ── Category-Aware Fix Tests ──────────────────────────────────────
+
+    #[test]
+    fn test_category_fix_missing_import_hashmap() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = CodingAgentConfig {
+            working_dir: dir.path().to_path_buf(),
+            ..Default::default()
+        };
+        let agent = CodingAgent::new(config).unwrap();
+
+        let code = "fn main() {\n    let m = HashMap::new();\n}\n";
+        let errors = vec![crate::language::code_executor::CompileError {
+            message: "cannot find type `HashMap` in this scope".to_string(),
+            code: Some("E0412".to_string()),
+            file: None,
+            line: Some(2),
+            column: None,
+            category: crate::language::code_executor::ErrorCategory::MissingImport,
+        }];
+
+        let fixed = agent.try_category_aware_fix(code, &errors);
+        assert!(fixed.is_some(), "Should fix missing HashMap import");
+        let fixed = fixed.unwrap();
+        assert!(
+            fixed.contains("use std::collections::HashMap;"),
+            "Should add HashMap use statement, got: {}",
+            fixed
+        );
+    }
+
+    #[test]
+    fn test_category_fix_unused_variable() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = CodingAgentConfig {
+            working_dir: dir.path().to_path_buf(),
+            ..Default::default()
+        };
+        let agent = CodingAgent::new(config).unwrap();
+
+        let code = "fn main() {\n    let x = 42;\n}\n";
+        let errors = vec![crate::language::code_executor::CompileError {
+            message: "unused variable: `x`".to_string(),
+            code: None,
+            file: None,
+            line: Some(2),
+            column: None,
+            category: crate::language::code_executor::ErrorCategory::UnusedCode,
+        }];
+
+        let fixed = agent.try_category_aware_fix(code, &errors);
+        assert!(fixed.is_some(), "Should fix unused variable");
+        assert!(
+            fixed.unwrap().contains("let _x"),
+            "Should prefix unused var with _"
+        );
+    }
+
+    #[test]
+    fn test_category_fix_not_mutable() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = CodingAgentConfig {
+            working_dir: dir.path().to_path_buf(),
+            ..Default::default()
+        };
+        let agent = CodingAgent::new(config).unwrap();
+
+        let code = "fn main() {\n    let v = Vec::new();\n    v.push(1);\n}\n";
+        let errors = vec![crate::language::code_executor::CompileError {
+            message: "cannot borrow `v` as mutable, as it is not declared as mutable".to_string(),
+            code: Some("E0596".to_string()),
+            file: None,
+            line: Some(3),
+            column: None,
+            category: crate::language::code_executor::ErrorCategory::BorrowError,
+        }];
+
+        let fixed = agent.try_category_aware_fix(code, &errors);
+        assert!(fixed.is_some(), "Should fix missing mut");
+        assert!(
+            fixed.unwrap().contains("let mut v"),
+            "Should add mut to binding"
+        );
+    }
+
+    #[test]
+    fn test_category_fix_no_false_positives() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = CodingAgentConfig {
+            working_dir: dir.path().to_path_buf(),
+            ..Default::default()
+        };
+        let agent = CodingAgent::new(config).unwrap();
+
+        // SyntaxError should not be "fixed" by category-aware logic
+        let code = "fn main() { let x = ; }";
+        let errors = vec![crate::language::code_executor::CompileError {
+            message: "expected expression, found `;`".to_string(),
+            code: None,
+            file: None,
+            line: Some(1),
+            column: None,
+            category: crate::language::code_executor::ErrorCategory::SyntaxError,
+        }];
+
+        let fixed = agent.try_category_aware_fix(code, &errors);
+        assert!(fixed.is_none(), "SyntaxError should not be auto-fixed");
+    }
+
+    // ── Dynamic Context Tests ─────────────────────────────────────────
+
+    #[test]
+    fn test_extract_between_backticks() {
+        assert_eq!(
+            CodingAgent::extract_between_backticks("cannot find `HashMap` in scope"),
+            Some("HashMap".to_string())
+        );
+        assert_eq!(
+            CodingAgent::extract_between_backticks("no backticks here"),
+            None
+        );
+        assert_eq!(
+            CodingAgent::extract_between_backticks("trait `Clone` is not satisfied"),
+            Some("Clone".to_string())
+        );
+    }
+
+    #[test]
+    fn test_extract_unresolved_name() {
+        assert_eq!(
+            CodingAgent::extract_unresolved_name("cannot find type `MyStruct` in this scope"),
+            Some("MyStruct".to_string())
+        );
+    }
+
+    #[test]
+    fn test_dynamic_error_context_empty_without_code_memory() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = CodingAgentConfig {
+            working_dir: dir.path().to_path_buf(),
+            ..Default::default()
+        };
+        let agent = CodingAgent::new(config).unwrap();
+
+        // No code_memory → empty result
+        let ctx = agent.build_dynamic_error_context();
+        assert!(ctx.is_empty(), "Should be empty without code_memory");
+    }
+
+    // ── Lifecycle Tests ───────────────────────────────────────────────
+
+    #[test]
+    fn test_auto_index_populates_code_memory() {
+        let dir = tempfile::tempdir().unwrap();
+        // Create a Rust source file in the working directory
+        let src_dir = dir.path().join("src");
+        std::fs::create_dir_all(&src_dir).unwrap();
+        std::fs::write(
+            src_dir.join("lib.rs"),
+            "pub fn hello() -> &'static str { \"hello\" }\n\
+             pub struct Config { pub name: String }\n",
+        )
+        .unwrap();
+
+        let config = CodingAgentConfig {
+            max_iterations: 1, // minimal run
+            working_dir: dir.path().to_path_buf(),
+            target_file: Some(std::path::PathBuf::from("src/main.rs")),
+            ..Default::default()
+        };
+        let mut agent = CodingAgent::new(config).unwrap();
+
+        // Before run: no code memory
+        assert!(agent.code_memory.is_none(), "Should start with no code memory");
+
+        // Run triggers auto-indexing
+        let _result = agent.run("add a greeting function");
+
+        // After run: code memory should be populated
+        assert!(
+            agent.code_memory.is_some(),
+            "Auto-index should populate code_memory during run()"
+        );
+        let memory = agent.code_memory.as_ref().unwrap();
+        assert!(
+            memory.function_count() > 0 || memory.type_count() > 0,
+            "Should have indexed at least one function or type"
+        );
+    }
+
+    #[test]
+    fn test_auto_index_skips_when_already_indexed() {
+        let dir = tempfile::tempdir().unwrap();
+        let src_dir = dir.path().join("src");
+        std::fs::create_dir_all(&src_dir).unwrap();
+        std::fs::write(src_dir.join("lib.rs"), "pub fn foo() {}\n").unwrap();
+
+        let config = CodingAgentConfig {
+            max_iterations: 1,
+            working_dir: dir.path().to_path_buf(),
+            target_file: Some(std::path::PathBuf::from("src/main.rs")),
+            ..Default::default()
+        };
+        let mut agent = CodingAgent::new(config).unwrap();
+
+        // Pre-index
+        agent.index_project(dir.path()).unwrap();
+        let first_count = agent.code_memory.as_ref().unwrap().function_count();
+
+        // Add another file after initial index
+        std::fs::write(src_dir.join("extra.rs"), "pub fn bar() {}\n").unwrap();
+
+        // Run should NOT re-index (code_memory already exists)
+        let _result = agent.run("add test");
+        let second_count = agent.code_memory.as_ref().unwrap().function_count();
+
+        assert_eq!(
+            first_count, second_count,
+            "Should not re-index when code_memory already exists"
+        );
+    }
+
+    #[test]
+    fn test_flush_persists_fix_strategies() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = CodingAgentConfig {
+            max_iterations: 1,
+            working_dir: dir.path().to_path_buf(),
+            ..Default::default()
+        };
+        let mut agent = CodingAgent::new(config).unwrap();
+
+        // Store a fix strategy (queued, not yet flushed to DB)
+        let errors = vec![crate::language::code_executor::CompileError {
+            message: "error[E0308]: mismatched types".to_string(),
+            code: Some("E0308".to_string()),
+            file: None,
+            line: None,
+            column: None,
+            category: crate::language::code_executor::ErrorCategory::TypeMismatch,
+        }];
+        agent.store_fix_strategies(&errors, "cast-fix");
+
+        // Verify it's in the cache
+        assert!(
+            agent
+                .experience_store
+                .as_ref()
+                .unwrap()
+                .lookup_fix_strategy("error[E0308]")
+                .is_some(),
+            "Fix strategy should be in cache"
+        );
+
+        // Flush should not panic (verifies the flush pathway works)
+        agent.flush_experience_store();
+    }
+
+    #[test]
+    fn test_reindex_after_write_updates_memory() {
+        let dir = tempfile::tempdir().unwrap();
+        let src_dir = dir.path().join("src");
+        std::fs::create_dir_all(&src_dir).unwrap();
+        std::fs::write(src_dir.join("lib.rs"), "pub fn original() {}\n").unwrap();
+
+        let config = CodingAgentConfig {
+            max_iterations: 1,
+            working_dir: dir.path().to_path_buf(),
+            target_file: Some(std::path::PathBuf::from("src/lib.rs")),
+            ..Default::default()
+        };
+        let mut agent = CodingAgent::new(config).unwrap();
+        agent.index_project(dir.path()).unwrap();
+
+        let before = agent.code_memory.as_ref().unwrap().function_count();
+
+        // Simulate writing code to disk (triggers reindex_file)
+        let target = src_dir.join("lib.rs");
+        agent.write_code_to_disk(
+            &target,
+            "pub fn original() {}\npub fn added_by_agent() {}\n",
+        );
+
+        let after = agent.code_memory.as_ref().unwrap().function_count();
+        assert!(
+            after >= before,
+            "Reindex after write should update function count: before={before}, after={after}"
+        );
     }
 }

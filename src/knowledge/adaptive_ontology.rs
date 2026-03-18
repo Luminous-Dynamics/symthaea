@@ -267,6 +267,27 @@ impl AdaptiveOntology {
         pruned
     }
 
+    /// Walk the IS-A parent chain starting from `concept`, up to `max_depth` steps.
+    ///
+    /// Returns a vector of ancestors, e.g. `["animal", "living_thing"]` for `"dog"`.
+    /// Returns an empty vector if the concept is not found or has no IS-A parent.
+    ///
+    /// Science: Collins & Quillian (1969) — hierarchical semantic memory retrieval.
+    pub fn is_a_chain(&self, concept: &str, max_depth: usize) -> Vec<String> {
+        let mut chain = Vec::new();
+        let mut current = concept.to_string();
+        for _ in 0..max_depth {
+            match self.primitives.get(&current).and_then(|u| u.is_a_parent.as_ref()) {
+                Some(parent) => {
+                    chain.push(parent.clone());
+                    current = parent.clone();
+                }
+                None => break,
+            }
+        }
+        chain
+    }
+
     /// Get all learned primitives (for inspection/telemetry)
     pub fn primitives(&self) -> &HashMap<String, PrimitiveUsage> {
         &self.primitives

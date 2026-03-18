@@ -49,6 +49,11 @@ fn main() {
             }
         };
 
+    // Override gating: disable veto (trained CfC output space ≠ thought space)
+    generator.config_mut().enable_semantic_veto = false;
+    generator.config_mut().repetition_penalty = 2.0;
+    generator.rebuild_gating();
+
     // Override sampling strategy
     let sampling = match (opts.top_k, opts.top_p) {
         (Some(k), _) => SamplingStrategy::TopK {

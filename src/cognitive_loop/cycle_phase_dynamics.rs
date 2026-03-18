@@ -694,7 +694,33 @@ impl CognitiveLoopService {
                     }
                 }
             }
+
+            // Knowledge→Ethics cross-coupling: deep causal understanding → moral confidence
+            // (Pearl 2009). Applied outside the borrow of knowledge_manager.
+            self.cross_couple_knowledge_ethics();
         }
+
+        // ── Cross-couplings: applied after snapshot borrow is released ────
+        // Drive→Learning: boredom boosts plasticity, flow dampens LR
+        // (Berlyne 1960, Csikszentmihalyi 1990)
+        self.cross_couple_drive_learning();
+
+        // Swarm→Neuromod: peer connectivity → oxytocin, anomalies → NE
+        // (Zak 2012, Arnsten 2009, Crockett 2009, Schultz 1997)
+        self.apply_swarm_neuromod();
+
+        // Swarm↔Governance: bidirectional peer Φ / governance confidence
+        // (Woolley 2010)
+        #[cfg(feature = "mycelix")]
+        self.cross_couple_swarm_governance();
+
+        // Memory→Learning: consolidation pressure → plasticity boost, low recall → dampening
+        // (Born & Wilhelm 2012, Tulving 2002)
+        self.cross_couple_memory_learning();
+
+        // Perception→Drive: low coherence → exploration boost, high load → suppression
+        // (Damasio 1994, Lavie 2005)
+        self.cross_couple_perception_drive();
 
         // ── Phase 17: Self-model accuracy tracking ───────────────────────
         let self_model_accuracy = self.carryover.learning.self_model_accuracy;
@@ -1037,13 +1063,13 @@ impl CognitiveLoopService {
             prediction_error,
         );
 
-        // 10. Update coherence bridge
-        let tau_owned: Vec<ndarray::Array1<f32>> = self.temporal_network.all_tau_owned();
-        let tau_refs: Vec<&ndarray::Array1<f32>> = tau_owned.iter().collect();
-        self.language_comm.voice_coherence.bridge.update(&tau_refs);
+        // 10. Update coherence bridge (zero-clone on CfC hot path)
+        self.temporal_network.with_tau_refs(|refs| {
+            self.language_comm.voice_coherence.bridge.update(refs);
+        });
 
         // 10b. Update temporal signature encoder
-        let flattened_tau: Vec<f32> = tau_owned.iter().flat_map(|a| a.iter().copied()).collect();
+        let flattened_tau = self.temporal_network.flattened_tau();
         self.language_comm
             .voice_coherence
             .temporal
@@ -1317,7 +1343,8 @@ impl CognitiveLoopService {
         if fep_td_error.abs() > FEP_TD_ERROR_DISCOVERY_THRESHOLD {
             if let Some(ref mut enhancer) = self.causal_enhancer {
                 if enhancer.should_discover() {
-                    let _ = enhancer.run_discovery();
+                    let graph = enhancer.run_discovery();
+                    tracing::trace!(edges = graph.edges.len(), "causal discovery completed");
                 }
             }
             self.carryover.quality.consecutive_low_td_error = 0;
@@ -1810,7 +1837,25 @@ impl CognitiveLoopService {
                     }
                 }
                 MotorCommandType::MotorOutput => {
-                    if let Some(ref mut bridge) = self.motor_rendering.output_bridge {
+                    // Ethics gate: Blocked verdict prevents motor execution
+                    let effective_verdict = self.ethics_verdict_override.as_ref().unwrap_or(&self.last_ethics_verdict);
+                    if *effective_verdict
+                        == super::ethics_engine::EthicalVerdict::Blocked
+                    {
+                        let result = super::motor_output_bridge::MotorOutputResult {
+                            success: false,
+                            action_type: None,
+                            prediction_error: 1.0,
+                            outcome: None,
+                            error: Some(
+                                "Action blocked by ethics engine \
+                                 — consent violation or value veto"
+                                    .to_string(),
+                            ),
+                        };
+                        self.motor_rendering.last_result = Some(result);
+                    } else if let Some(ref mut bridge) = self.motor_rendering.output_bridge
+                    {
                         let request = self
                             .motor_rendering
                             .pending_request
@@ -1825,9 +1870,17 @@ impl CognitiveLoopService {
                         } else {
                             coherence as f64
                         };
+                        // Caution verdict: cap motor confidence at 0.3
+                        let effective_confidence = if *effective_verdict
+                            == super::ethics_engine::EthicalVerdict::Caution
+                        {
+                            enhanced_result.motor_command.confidence.min(0.3)
+                        } else {
+                            enhanced_result.motor_command.confidence
+                        };
                         let result = bridge.execute(
                             &enhanced_result.motor_command.parameters,
-                            enhanced_result.motor_command.confidence,
+                            effective_confidence,
                             motor_phi,
                             &request,
                         );
@@ -2046,10 +2099,7 @@ impl CognitiveLoopService {
                 prediction_error,
                 urgency,
             };
-            while self.psi_attestation_buffer.len() >= self.config.attestation_buffer_capacity {
-                let _ = self.psi_attestation_buffer.pop_front();
-            }
-            self.psi_attestation_buffer.push_back(record);
+            self.push_psi_attestation(record);
         }
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -2123,6 +2173,8 @@ impl CognitiveLoopService {
                 // Populate available actions for MCTS planning.
                 // When the code_generation feature is enabled, include code-specific
                 // actions so the reasoning engine can plan code tasks.
+                // Static actions are constructed once via OnceLock to avoid per-cycle
+                // string allocations on the hot path.
                 #[allow(unused_mut)]
                 let mut actions: Vec<
                     crate::consciousness::temporal_planning::types::PlannedAction,
@@ -2131,43 +2183,50 @@ impl CognitiveLoopService {
                 #[cfg(feature = "code_generation")]
                 {
                     use crate::consciousness::temporal_planning::types::PlannedAction;
-                    actions.extend([
-                        PlannedAction {
-                            id: "code_generate".to_string(),
-                            description: "Generate code from specification".to_string(),
-                            embedding: vec![0.8, 0.2, 0.1, 0.9],
-                            prior: 0.3,
-                            is_epistemic: false,
-                        },
-                        PlannedAction {
-                            id: "code_verify".to_string(),
-                            description: "Verify generated code via compilation".to_string(),
-                            embedding: vec![0.6, 0.4, 0.3, 0.7],
-                            prior: 0.2,
-                            is_epistemic: true,
-                        },
-                        PlannedAction {
-                            id: "code_refactor".to_string(),
-                            description: "Refactor code for clarity or performance".to_string(),
-                            embedding: vec![0.5, 0.5, 0.6, 0.4],
-                            prior: 0.15,
-                            is_epistemic: false,
-                        },
-                        PlannedAction {
-                            id: "code_explain".to_string(),
-                            description: "Explain code structure and intent".to_string(),
-                            embedding: vec![0.3, 0.7, 0.8, 0.2],
-                            prior: 0.15,
-                            is_epistemic: true,
-                        },
-                        PlannedAction {
-                            id: "code_debug".to_string(),
-                            description: "Debug and diagnose code issues".to_string(),
-                            embedding: vec![0.4, 0.6, 0.5, 0.5],
-                            prior: 0.2,
-                            is_epistemic: true,
-                        },
-                    ]);
+                    static CODE_ACTIONS: std::sync::OnceLock<Vec<PlannedAction>> =
+                        std::sync::OnceLock::new();
+                    let cached = CODE_ACTIONS.get_or_init(|| {
+                        vec![
+                            PlannedAction {
+                                id: "code_generate".to_string(),
+                                description: "Generate code from specification".to_string(),
+                                embedding: vec![0.8, 0.2, 0.1, 0.9],
+                                prior: 0.3,
+                                is_epistemic: false,
+                            },
+                            PlannedAction {
+                                id: "code_verify".to_string(),
+                                description: "Verify generated code via compilation"
+                                    .to_string(),
+                                embedding: vec![0.6, 0.4, 0.3, 0.7],
+                                prior: 0.2,
+                                is_epistemic: true,
+                            },
+                            PlannedAction {
+                                id: "code_refactor".to_string(),
+                                description: "Refactor code for clarity or performance"
+                                    .to_string(),
+                                embedding: vec![0.5, 0.5, 0.6, 0.4],
+                                prior: 0.15,
+                                is_epistemic: false,
+                            },
+                            PlannedAction {
+                                id: "code_explain".to_string(),
+                                description: "Explain code structure and intent".to_string(),
+                                embedding: vec![0.3, 0.7, 0.8, 0.2],
+                                prior: 0.15,
+                                is_epistemic: true,
+                            },
+                            PlannedAction {
+                                id: "code_debug".to_string(),
+                                description: "Debug and diagnose code issues".to_string(),
+                                embedding: vec![0.4, 0.6, 0.5, 0.5],
+                                prior: 0.2,
+                                is_epistemic: true,
+                            },
+                        ]
+                    });
+                    actions.extend(cached.iter().cloned());
                 }
 
                 let reasoning_ctx = ReasoningContext {
@@ -2879,29 +2938,28 @@ impl CognitiveLoopService {
             };
 
         // 2b. Physics bridge: blend physics-informed HDC into compressed state.
-        // Only clone when physics-bridge feature needs to mutate the buffer;
-        // otherwise borrow directly to skip a Vec allocation per cycle.
+        // Only clone when physics-bridge is active AND integration exists;
+        // otherwise borrow directly to skip a ~1KB Vec allocation per cycle.
         #[cfg(feature = "physics-bridge")]
         let _compressed_owned;
         #[cfg(feature = "physics-bridge")]
-        let compressed_for_cfc: &[f32] = {
-            _compressed_owned = {
+        let compressed_for_cfc: &[f32] =
+            if let Some(ref mut physics) = self.feature_integ.physics_integration {
                 let mut buf = perception.encoding.compressed_state.clone();
-                if let Some(ref mut physics) = self.feature_integ.physics_integration {
-                    physics.query_cycle(
-                        self.stats.total_cycles,
-                        self.config.physics_bridge_query_interval,
-                        self.config.physics_bridge_blend_weight,
-                        self.substrate_manager.tau_factor,
-                        self.substrate_manager.scale_pressure,
-                        &perception.encoding.hv16_cached,
-                        &mut buf,
-                    );
-                }
-                buf
+                physics.query_cycle(
+                    self.stats.total_cycles,
+                    self.config.physics_bridge_query_interval,
+                    self.config.physics_bridge_blend_weight,
+                    self.substrate_manager.tau_factor,
+                    self.substrate_manager.scale_pressure,
+                    &perception.encoding.hv16_cached,
+                    &mut buf,
+                );
+                _compressed_owned = buf;
+                &_compressed_owned
+            } else {
+                &perception.encoding.compressed_state
             };
-            &_compressed_owned
-        };
         #[cfg(not(feature = "physics-bridge"))]
         let compressed_for_cfc: &[f32] = &perception.encoding.compressed_state;
 
@@ -2910,8 +2968,7 @@ impl CognitiveLoopService {
         // borrow checker (get_multi_scale_prediction takes &mut self).
         let mut input_array =
             std::mem::replace(&mut self.cfc_input_buffer, ndarray::Array1::zeros(0));
-        {
-            let buf = input_array.as_slice_mut().unwrap();
+        if let Some(buf) = input_array.as_slice_mut() {
             let len = compressed_for_cfc.len().min(buf.len());
             buf[..len].copy_from_slice(&compressed_for_cfc[..len]);
             // Zero any trailing elements if buffer is larger
@@ -3049,7 +3106,9 @@ impl CognitiveLoopService {
                     for h in state.as_slice_mut().unwrap_or(&mut [])[mask_start..].iter_mut() {
                         *h = 0.0;
                     }
-                    let _ = self.temporal_network.inject(&state);
+                    if let Err(e) = self.temporal_network.inject(&state) {
+                        tracing::warn!(err = %e, "substrate mask inject failed");
+                    }
                 }
             }
         }
@@ -3300,7 +3359,7 @@ impl CognitiveLoopService {
             #[cfg(not(feature = "vision-manifold"))]
             let importance = TRAINING_BASE_IMPORTANCE;
 
-            if let Some(ref trainer) = self.async_trainer {
+            if let Some(ref mut trainer) = self.async_trainer {
                 trainer.send(TrainingSample {
                     input: train_input,
                     target: train_target,
@@ -3604,8 +3663,7 @@ impl CognitiveLoopService {
                     } else {
                         0.0
                     };
-                    // Knowledge context for grounded generation (reserved for future use)
-                    let _knowledge_context: Vec<String> = Vec::new();
+                    // Knowledge context for grounded generation — reserved for future use
                     let signals = super::broca_bridge::BrocaConsciousnessSignals {
                         epistemic_confidence: (self.carryover.quality.last_epistemic_confidence
                             - math_epistemic_penalty)
@@ -3664,6 +3722,10 @@ impl CognitiveLoopService {
                             .active_strategy()
                             .map(|s| s.min_alliance()) // depth ≈ min_alliance required
                             .unwrap_or(0.0),
+                        // Ethics gate: prevent generation when EthicalVerdict::Blocked.
+                        // Science: APA Ethics Code (2017) principle 3.04 — avoid harm.
+                        ethics_blocked: *self.ethics_verdict_override.as_ref().unwrap_or(&self.last_ethics_verdict)
+                            == super::ethics_engine::EthicalVerdict::Blocked,
                     };
                     if let Some(mut result) = broca.generate(signals) {
                         // Surface the generated text for consumers

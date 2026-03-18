@@ -39,11 +39,11 @@ fn substrate_transfer_preserves_finite_dynamics() {
         let result = service.cycle("testing on silicon substrate");
         let m = &result.metadata;
         assert!(
-            m.adaptive.valence_homeostasis_pull.is_finite(),
+            m.valence_homeostasis_pull.is_finite(),
             "homeostasis NaN after bio→silicon at cycle {i}"
         );
         assert!(
-            m.social.social_trust_current >= 0.0 && m.social.social_trust_current <= 1.0,
+            m.social_trust_current >= 0.0 && m.social_trust_current <= 1.0,
             "social_trust out of range after switch at cycle {i}"
         );
     }
@@ -70,7 +70,6 @@ fn substrate_transfer_chain_all_eight() {
             assert!(
                 result
                     .metadata
-                    .adaptive
                     .valence_homeostasis_pull
                     .is_finite(),
                 "NaN on {:?} at cycle {i}",
@@ -146,7 +145,6 @@ fn low_feasibility_substrates_still_run() {
         assert!(
             result
                 .metadata
-                .adaptive
                 .valence_homeostasis_pull
                 .is_finite(),
             "Dynamics crashed on low-feasibility substrate at cycle {i}"
@@ -281,7 +279,6 @@ fn per_region_runtime_reconfiguration() {
         assert!(
             result
                 .metadata
-                .adaptive
                 .valence_homeostasis_pull
                 .is_finite(),
             "NaN after per-region reconfiguration at cycle {i}"
@@ -352,13 +349,13 @@ fn hybrid_substrate_soak_100_cycles() {
         let result = service.cycle(inputs[i % inputs.len()]);
         let m = &result.metadata;
         assert!(
-            m.adaptive.valence_homeostasis_pull.is_finite(),
+            m.valence_homeostasis_pull.is_finite(),
             "Hybrid substrate NaN at cycle {i}"
         );
         assert!(
-            m.social.social_trust_current >= 0.0 && m.social.social_trust_current <= 1.0,
+            m.social_trust_current >= 0.0 && m.social_trust_current <= 1.0,
             "social_trust out of range at cycle {i}: {}",
-            m.social.social_trust_current
+            m.social_trust_current
         );
     }
 }
@@ -377,7 +374,6 @@ fn soak_200_cycles_with_mid_run_substrate_switch() {
         assert!(
             result
                 .metadata
-                .adaptive
                 .valence_homeostasis_pull
                 .is_finite(),
             "Silicon phase NaN at cycle {i}"
@@ -393,13 +389,12 @@ fn soak_200_cycles_with_mid_run_substrate_switch() {
         assert!(
             result
                 .metadata
-                .adaptive
                 .valence_homeostasis_pull
                 .is_finite(),
             "Quantum phase NaN at cycle {i}"
         );
         assert!(
-            result.metadata.social.social_trust_current >= 0.0,
+            result.metadata.social_trust_current >= 0.0,
             "Social trust negative in quantum phase at cycle {i}"
         );
     }
@@ -567,11 +562,11 @@ fn test_scale_masking_affects_state_diversity() {
     let silicon_result = silicon.cycle("final");
     let quantum_result = quantum.cycle("final");
     assert!(
-        silicon_result.metadata.consciousness_level.is_finite(),
+        silicon_result.metadata.consciousness.consciousness_level.is_finite(),
         "Silicon consciousness should be finite"
     );
     assert!(
-        quantum_result.metadata.consciousness_level.is_finite(),
+        quantum_result.metadata.consciousness.consciousness_level.is_finite(),
         "Quantum consciousness should be finite after scale masking"
     );
 }

@@ -93,8 +93,8 @@ impl PolynomialRootsBenchmark {
             // If roots are distinct, bracket each separately.
             if (r1 - r2).abs() > 0.01 {
                 let mid = (r1 + r2) / 2.0;
-                let r_lo = r1.min(r2);
-                let r_hi = r1.max(r2);
+                let _r_lo = r1.min(r2);
+                let _r_hi = r1.max(r2);
 
                 let result1 = RootFindingEngine::brent(&|x| poly_eval(&coeffs, x), lo, mid, 1e-10);
                 if result1.converged {

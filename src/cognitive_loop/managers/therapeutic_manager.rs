@@ -26,7 +26,7 @@ use symthaea_therapeutic::affect_regulation::NeuromodDelta;
 use symthaea_therapeutic::client_model::CoreAffectSnapshot;
 use symthaea_therapeutic::{
     CaseFormulation, ClientModel, CrisisDetector, NarrativeFragment, RegulationEngine, ScopeGuard,
-    TherapeuticAlliance, TherapeuticNarrative,
+    ShadowDetector, TherapeuticAlliance, TherapeuticNarrative,
 };
 
 /// Serializable snapshot of therapeutic session state for persistence.
@@ -46,6 +46,7 @@ struct TherapeuticSessionSnapshot<'a> {
     crisis_active: bool,
     serotonin_debt: f32,
     dopamine_debt: f32,
+    shadow: symthaea_therapeutic::ShadowSnapshot,
 }
 
 /// Deserializable restore struct for session persistence.
@@ -59,6 +60,8 @@ struct TherapeuticSessionRestore {
     alliance_repairs: u32,
     narrative_coherence: f32,
     crisis_active: bool,
+    #[serde(default)]
+    shadow: Option<symthaea_therapeutic::ShadowSnapshot>,
 }
 
 /// Therapeutic Manager — integrates therapeutic psychology into the cognitive loop.
@@ -89,6 +92,11 @@ pub struct TherapeuticManager {
     pub last_neuromod_delta: Option<NeuromodDelta>,
     /// Dream counterfactual prediction tracker (closed-loop validation).
     pub dream_tracker: TherapeuticDreamTracker,
+    /// Shadow work detector — observability mode (Jung → Friston mapping).
+    /// Tracks prediction error accumulation in emotionally charged, unintegrated content.
+    pub shadow_detector: ShadowDetector,
+    /// Last shadow telemetry snapshot (for telemetry output).
+    pub last_shadow_telemetry: symthaea_therapeutic::ShadowTelemetry,
     /// Auto-checkpoint cycle counter (serialize every N cycles).
     checkpoint_counter: u32,
     /// Last serialized session snapshot (for periodic persistence).
@@ -110,6 +118,8 @@ impl Default for TherapeuticManager {
             last_crisis_type: None,
             last_neuromod_delta: None,
             dream_tracker: TherapeuticDreamTracker::new(),
+            shadow_detector: ShadowDetector::new(),
+            last_shadow_telemetry: symthaea_therapeutic::ShadowTelemetry::default(),
             checkpoint_counter: 0,
             last_checkpoint: None,
         }
@@ -143,6 +153,7 @@ impl TherapeuticManager {
             crisis_active: self.crisis_active,
             serotonin_debt: self.regulation_engine.serotonin_debt(),
             dopamine_debt: self.regulation_engine.dopamine_debt(),
+            shadow: self.shadow_detector.snapshot(),
         };
         serde_json::to_string(&session)
     }
@@ -161,6 +172,9 @@ impl TherapeuticManager {
         self.alliance.repair_count = snapshot.alliance_repairs;
         self.narrative.coherence = snapshot.narrative_coherence;
         self.crisis_active = snapshot.crisis_active;
+        if let Some(shadow) = snapshot.shadow {
+            self.shadow_detector.restore(shadow);
+        }
         Ok(())
     }
 
@@ -648,6 +662,35 @@ impl CognitiveSubsystem for TherapeuticManager {
             is_traumatic,
         ));
 
+        // ── 6b. Shadow dynamics — observability mode ────────────────────────
+        // Track prediction error accumulation in emotionally charged,
+        // unintegrated content (Jung → Friston mapping).
+        // NO interventions or Broca modifications — telemetry only.
+        {
+            let narrative_integration = self.narrative.coherence;
+            let mut shadow_telemetry = self.shadow_detector.process(
+                snapshot.cycle_number,
+                snapshot.prediction_error,
+                snapshot.valence,
+                snapshot.arousal,
+                &fragment_text,
+                narrative_integration,
+            );
+
+            // Detect projections against current input
+            let projections = self.shadow_detector.detect_projections(&fragment_text);
+            shadow_telemetry.projection_detections = projections.len() as u32;
+
+            // Set shadow-to-narrative ratio
+            let total_narrative = self.narrative.fragments.len() as f32;
+            if total_narrative > 0.0 {
+                shadow_telemetry.shadow_to_narrative_ratio =
+                    shadow_telemetry.shadow_fragment_count as f32 / total_narrative;
+            }
+
+            self.last_shadow_telemetry = shadow_telemetry;
+        }
+
         // ── 7. Dream tracker: record current RDoC as prediction target ────
         {
             let rdoc = &self.client_model.rdoc_profile;
@@ -808,6 +851,81 @@ mod tests {
             restored.client_model.cycle_count,
             manager.client_model.cycle_count
         );
+    }
+
+    #[test]
+    fn test_shadow_persistence_roundtrip() {
+        let mut manager = TherapeuticManager::new();
+        // Run cycles with distressing content to build shadow fragments
+        for i in 0..30 {
+            let mut snapshot = make_snapshot(-0.8, 0.7, i);
+            snapshot.prediction_error = 0.6;
+            manager.process(&snapshot);
+            // Also feed shadow detector directly with high-PE content
+            manager.shadow_detector.process(
+                i as u64,
+                0.6,
+                -0.8,
+                0.7,
+                "painful unresolved conflict",
+                0.1,
+            );
+        }
+
+        let pre_count = manager.shadow_detector.fragment_count();
+        let pre_pressure = manager.shadow_detector.total_pressure();
+        assert!(pre_count > 0, "should have shadow fragments");
+
+        // Serialize
+        let json = manager
+            .serialize_session()
+            .expect("serialize with shadow should succeed");
+        assert!(json.contains("shadow"));
+        assert!(json.contains("fragments"));
+
+        // Restore into fresh manager
+        let mut restored = TherapeuticManager::new();
+        restored
+            .restore_session(&json)
+            .expect("restore with shadow should succeed");
+
+        assert_eq!(
+            restored.shadow_detector.fragment_count(),
+            pre_count,
+            "fragment count should survive roundtrip"
+        );
+        // Pressure may differ slightly due to HDC encoding loss (serde skip),
+        // but fragment scalar fields (cumulative_PE, recurrence) are preserved.
+        let restored_pressure = restored.shadow_detector.total_pressure();
+        assert!(
+            (restored_pressure - pre_pressure).abs() < 0.01,
+            "pressure should survive roundtrip: {} vs {}",
+            restored_pressure,
+            pre_pressure,
+        );
+    }
+
+    #[test]
+    fn test_shadow_persistence_backward_compat() {
+        // Old snapshots without "shadow" field should restore cleanly (Option + serde(default))
+        let json = r#"{
+            "client_model": {"cycle_count": 5, "session_count": 1, "affect_trajectory": [], "rdoc_profile": {}, "presenting_concerns": [], "diagnostic_hypotheses": [], "automatic_thoughts": [], "core_beliefs": [], "behavioral_patterns": [], "risk_level": "None"},
+            "alliance_bond": 0.5,
+            "alliance_goal": 0.5,
+            "alliance_task": 0.5,
+            "alliance_ruptures": 0,
+            "alliance_repairs": 0,
+            "narrative_coherence": 0.3,
+            "crisis_active": false
+        }"#;
+
+        let mut manager = TherapeuticManager::new();
+        let result = manager.restore_session(json);
+        assert!(
+            result.is_ok(),
+            "restore from old snapshot without shadow should succeed"
+        );
+        assert_eq!(manager.shadow_detector.fragment_count(), 0);
     }
 
     #[test]

@@ -489,7 +489,21 @@ impl CognitiveLoopService {
         // Create swarm event channel eagerly so the sender is always available.
         let (swarm_event_tx, swarm_event_rx) = std::sync::mpsc::channel();
 
+        // Spawn federated coordinator if enabled.
+        let federation_handle = if config.federation_enabled {
+            Some(super::managers::network_service_bridge::spawn_federated_coordinator(
+                crate::swarm::FederatedNetworkConfig::default(),
+                vec![0.0; 64], // initial weights placeholder
+                std::time::Duration::from_millis(config.federation_round_interval_ms),
+                swarm_event_tx.clone(),
+            ))
+        } else {
+            None
+        };
+
         let cfc_input_dim = config.cfc_config.input_dim;
+        let enable_hierarchical_bundling = config.enable_hierarchical_bundling;
+        let genesis_phrase_for_bundler = config.genesis_phrase.clone();
         let mut service = Self {
             config,
             encoder,
@@ -937,6 +951,8 @@ impl CognitiveLoopService {
                     dense_basis,
                 )
             },
+            last_ethics_verdict: super::ethics_engine::EthicalVerdict::Safe,
+            ethics_verdict_override: None,
             kosmic_song: crate::mycelix::KosmicSong::default(),
             drive_manager: super::managers::DriveManager::default(),
             memory_manager: super::managers::MemoryManager::default(),
@@ -947,6 +963,7 @@ impl CognitiveLoopService {
             swarm_manager: super::managers::SwarmManager::default(),
             swarm_event_rx: std::sync::Mutex::new(Some(swarm_event_rx)),
             swarm_event_tx,
+            federation_handle,
             #[cfg(feature = "mesh")]
             spectrum_manager: super::managers::SpectrumManager::default(),
             #[cfg(feature = "cpg")]
@@ -1029,10 +1046,37 @@ impl CognitiveLoopService {
                 im
             },
             motor_rendering: super::motor_rendering_manager::MotorRenderingManager::new(),
+            hierarchical_bundler: if enable_hierarchical_bundling {
+                Some(symthaea_core::hdc::hierarchical_bundle::HierarchicalBundler::new(
+                    genesis_phrase_for_bundler.as_ref().map_or(42, |p| {
+                        use std::hash::{Hash, Hasher};
+                        let mut h = std::collections::hash_map::DefaultHasher::new();
+                        p.hash(&mut h);
+                        h.finish()
+                    }),
+                ))
+            } else {
+                None
+            },
             cfc_input_buffer: ndarray::Array1::zeros(cfc_input_dim),
             math_service: super::math_service::MathService::new(),
             #[cfg(feature = "epistemic_auditor")]
             epistemic_auditor: None, // initialized below after struct construction
+            // Defense / Immune System
+            #[cfg(feature = "safety-agents")]
+            safety_agent: crate::safety::SafetyAgent::new(),
+            #[cfg(feature = "safety-agents")]
+            guardian_state: super::guardian::GuardianState::default(),
+            #[cfg(feature = "sentinel")]
+            sentinel_manager: super::managers::SentinelManager::default(),
+            #[cfg(feature = "sentinel")]
+            threat_memory: super::threat_memory::ThreatMemory::default(),
+            #[cfg(feature = "sentinel")]
+            collective_immune_state: super::collective_immunity::CollectiveImmuneState::default(),
+            #[cfg(feature = "safety-agents")]
+            defense_actions_proposed: 0,
+            #[cfg(feature = "safety-agents")]
+            defense_actions_approved: 0,
             resonant_speech: crate::resonant_speech::ResonantSpeech::new(),
             streaming_inference: if enable_streaming_inference {
                 // Cycle-aligned config: batch=1, max_latency=32ms (~31Hz loop)

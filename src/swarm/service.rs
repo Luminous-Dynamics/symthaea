@@ -52,8 +52,8 @@
 //! ```
 
 use crate::swarm::{
-    ConsciousnessVector, HybridHandshake, PeerInfo, SwarmConfig, SwarmError, SwarmResult,
-    TrustLevel,
+    ConnectionState, ConsciousnessVector, HybridHandshake, PeerInfo, SwarmConfig, SwarmError,
+    SwarmResult, TrustLevel,
 };
 
 use crate::swarm::config::BootstrapConfig;
@@ -137,7 +137,6 @@ pub struct NetworkService {
     iroh: Option<IrohNode>,
 
     /// Handshake manager for trust verification
-    #[allow(dead_code)]
     handshake: Arc<RwLock<HybridHandshake>>,
 
     /// Connected peers with their state
@@ -225,6 +224,14 @@ impl NetworkService {
         {
             String::new()
         }
+    }
+
+    /// Get a shared reference to the handshake manager.
+    ///
+    /// Used by `IrohBridgeActor` for trust-gated broadcasting and by callers
+    /// that need to run the handshake protocol on newly-connected channels.
+    pub fn handshake_arc(&self) -> Arc<RwLock<HybridHandshake>> {
+        self.handshake.clone()
     }
 
     /// Check if the service is running with real networking
@@ -327,21 +334,257 @@ impl NetworkService {
             let channel = iroh.connect(_ticket).await?;
             let peer_id = channel.peer_id().to_string();
 
-            // Create peer info
-            let peer_info = PeerInfo::new(&peer_id);
+            // Run trust handshake on the new channel
+            let trust_level = self.run_handshake_for_peer(&peer_id, &channel).await?;
+
+            // Create peer info with verified trust
+            let mut peer_info = PeerInfo::new(&peer_id);
+            peer_info.trust_level = trust_level;
+            peer_info.state = ConnectionState::Connected;
 
             // Store peer
             self.peers
                 .write()
                 .insert(peer_id.clone(), peer_info.clone());
 
-            // Emit event
+            // Emit connected event
             let _ = self
                 .peer_event_tx
                 .send(PeerEvent::Connected(peer_info.clone()));
 
             Ok(peer_info)
         }
+    }
+
+    /// Run the trust handshake protocol on a newly-connected channel.
+    ///
+    /// 1. Create a challenge nonce
+    /// 2. Serialize and send it over the channel
+    /// 3. Read the signed response (30s timeout)
+    /// 4. Verify the signature (Ed25519 or BLAKE3 fallback)
+    /// 5. On success: emit `PeerEvent::TrustChanged`, return trust level
+    /// 6. On failure: disconnect the channel, return error
+    #[cfg(feature = "swarm")]
+    async fn run_handshake_for_peer(
+        &self,
+        peer_id: &str,
+        channel: &super::iroh::IrohChannel,
+    ) -> SwarmResult<TrustLevel> {
+        use std::time::Duration;
+
+        // Skip handshake for local-only configs
+        if !self.config.require_handshake {
+            return Ok(TrustLevel::LocalTrust);
+        }
+
+        // Step 1: Create challenge
+        let challenge_msg = self
+            .handshake
+            .write()
+            .create_challenge(peer_id)
+            .map_err(|e| SwarmError::TrustVerificationError {
+                reason: format!("Failed to create challenge: {e}"),
+            })?;
+
+        // Step 2: Serialize and send challenge
+        let challenge_bytes = bincode::serialize(&challenge_msg)
+            .map_err(|e| SwarmError::SerializationError(e.to_string()))?;
+
+        let connection = channel.connection_ref().ok_or(SwarmError::ChannelClosed {
+            peer_id: peer_id.to_string(),
+        })?;
+
+        let (mut send, mut recv) = connection
+            .open_bi()
+            .await
+            .map_err(|e| SwarmError::SendFailed {
+                peer_id: peer_id.to_string(),
+                reason: e.to_string(),
+            })?;
+
+        send.write_all(&challenge_bytes)
+            .await
+            .map_err(|e| SwarmError::SendFailed {
+                peer_id: peer_id.to_string(),
+                reason: e.to_string(),
+            })?;
+        send.finish().map_err(|e| SwarmError::SendFailed {
+            peer_id: peer_id.to_string(),
+            reason: e.to_string(),
+        })?;
+
+        // Step 3: Read response with 30s timeout
+        let response_bytes = tokio::time::timeout(Duration::from_secs(30), async {
+            recv.read_to_end(4096)
+                .await
+                .map_err(|e| SwarmError::ReceiveFailed {
+                    peer_id: peer_id.to_string(),
+                    reason: e.to_string(),
+                })
+        })
+        .await
+        .map_err(|_| SwarmError::TrustVerificationError {
+            reason: format!("Handshake response timeout (30s) for peer {peer_id}"),
+        })??;
+
+        // Step 4: Deserialize response
+        let response_msg: super::SwarmMessage = bincode::deserialize(&response_bytes)
+            .map_err(|e| SwarmError::SerializationError(e.to_string()))?;
+
+        let (signed_nonce, agent_key) = match response_msg {
+            super::SwarmMessage::TrustResponse {
+                signed_nonce,
+                agent_key,
+            } => (signed_nonce, agent_key),
+            other => {
+                return Err(SwarmError::TrustVerificationError {
+                    reason: format!(
+                        "Expected TrustResponse, got {}",
+                        other.message_type()
+                    ),
+                });
+            }
+        };
+
+        // Step 5: Verify
+        let trust = self
+            .handshake
+            .write()
+            .verify_response(peer_id, &signed_nonce, &agent_key)?;
+
+        // Emit TrustChanged event
+        let _ = self.peer_event_tx.send(PeerEvent::TrustChanged {
+            peer_id: peer_id.to_string(),
+            old: TrustLevel::Unknown,
+            new: trust,
+        });
+
+        tracing::info!(
+            peer = peer_id,
+            trust = ?trust,
+            "Handshake verified"
+        );
+
+        Ok(trust)
+    }
+
+    /// Stub handshake for non-swarm builds (returns LocalTrust).
+    #[cfg(not(feature = "swarm"))]
+    async fn run_handshake_for_peer(
+        &self,
+        _peer_id: &str,
+        _channel: &super::iroh::IrohChannel,
+    ) -> SwarmResult<TrustLevel> {
+        Ok(TrustLevel::LocalTrust)
+    }
+
+    /// Respond to an incoming handshake challenge on a connected channel.
+    ///
+    /// This is the **responder side** of the trust protocol. When a remote peer
+    /// sends a `TrustChallenge`, the responder:
+    /// 1. Reads the challenge from the bi-directional stream
+    /// 2. Signs the nonce with our agent key
+    /// 3. Sends the `TrustResponse` back on the same stream
+    ///
+    /// The `agent_key` is our hex-encoded public key.
+    /// The `signing_material` is the private key material (Ed25519 signing key
+    /// with `identity` feature, or raw BLAKE3 key bytes without).
+    #[cfg(feature = "swarm")]
+    pub async fn respond_to_handshake(
+        &self,
+        peer_id: &str,
+        channel: &super::iroh::IrohChannel,
+        agent_key: &str,
+        #[cfg(feature = "identity")] signing_key: &ed25519_dalek::SigningKey,
+        #[cfg(not(feature = "identity"))] signing_material: &[u8],
+    ) -> SwarmResult<()> {
+        use std::time::Duration;
+
+        let connection = channel.connection_ref().ok_or(SwarmError::ChannelClosed {
+            peer_id: peer_id.to_string(),
+        })?;
+
+        // Accept bi-directional stream from the challenger
+        let (mut send, mut recv) = tokio::time::timeout(
+            Duration::from_secs(30),
+            connection.accept_bi(),
+        )
+        .await
+        .map_err(|_| SwarmError::TrustVerificationError {
+            reason: format!("Handshake accept timeout (30s) for peer {peer_id}"),
+        })?
+        .map_err(|e| SwarmError::ReceiveFailed {
+            peer_id: peer_id.to_string(),
+            reason: e.to_string(),
+        })?;
+
+        // Read the challenge
+        let challenge_bytes = recv
+            .read_to_end(4096)
+            .await
+            .map_err(|e| SwarmError::ReceiveFailed {
+                peer_id: peer_id.to_string(),
+                reason: e.to_string(),
+            })?;
+
+        let challenge_msg: super::SwarmMessage = bincode::deserialize(&challenge_bytes)
+            .map_err(|e| SwarmError::SerializationError(e.to_string()))?;
+
+        let nonce = match challenge_msg {
+            super::SwarmMessage::TrustChallenge { nonce } => nonce,
+            other => {
+                return Err(SwarmError::TrustVerificationError {
+                    reason: format!(
+                        "Expected TrustChallenge, got {}",
+                        other.message_type()
+                    ),
+                });
+            }
+        };
+
+        // Sign the nonce and build response
+        let response_msg = self.handshake.read().create_response(
+            &nonce,
+            agent_key,
+            #[cfg(feature = "identity")]
+            signing_key,
+            #[cfg(not(feature = "identity"))]
+            signing_material,
+        );
+
+        // Send response back
+        let response_bytes = bincode::serialize(&response_msg)
+            .map_err(|e| SwarmError::SerializationError(e.to_string()))?;
+
+        send.write_all(&response_bytes)
+            .await
+            .map_err(|e| SwarmError::SendFailed {
+                peer_id: peer_id.to_string(),
+                reason: e.to_string(),
+            })?;
+        send.finish().map_err(|e| SwarmError::SendFailed {
+            peer_id: peer_id.to_string(),
+            reason: e.to_string(),
+        })?;
+
+        tracing::info!(
+            peer = peer_id,
+            "Handshake response sent"
+        );
+
+        Ok(())
+    }
+
+    /// Stub responder for non-swarm builds.
+    #[cfg(not(feature = "swarm"))]
+    pub async fn respond_to_handshake(
+        &self,
+        _peer_id: &str,
+        _channel: &super::iroh::IrohChannel,
+        _agent_key: &str,
+        _signing_material: &[u8],
+    ) -> SwarmResult<()> {
+        Ok(())
     }
 
     /// Broadcast our consciousness state to all connected peers
@@ -1323,5 +1566,116 @@ mod tests {
         let retrieved = service.get_peer_consciousness("peer-1");
         assert!(retrieved.is_some());
         assert!((retrieved.unwrap().phi - 0.8).abs() < 0.01);
+    }
+
+    // =========================================================================
+    // Handshake Accessor Tests
+    // =========================================================================
+
+    #[tokio::test]
+    async fn test_handshake_arc_accessor() {
+        let service = NetworkService::new(SwarmConfig::default()).await.unwrap();
+        let hs = service.handshake_arc();
+        // The handshake is initialized with default SwarmConfig
+        assert_eq!(hs.read().pending_count(), 0);
+        assert_eq!(hs.read().verified_peer_count(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_handshake_arc_shared() {
+        let service = NetworkService::new(SwarmConfig::default()).await.unwrap();
+        let hs1 = service.handshake_arc();
+        let hs2 = service.handshake_arc();
+        // Both point to the same allocation
+        assert!(std::sync::Arc::ptr_eq(&hs1, &hs2));
+    }
+
+    #[tokio::test]
+    async fn test_handshake_not_required_skips_verification() {
+        let config = SwarmConfig::local_only();
+        assert!(!config.require_handshake);
+        let service = NetworkService::new(config).await.unwrap();
+        // In stub mode, connect_to_peer returns FeatureNotEnabled,
+        // but handshake_arc should still be accessible
+        let hs = service.handshake_arc();
+        assert_eq!(hs.read().verified_peer_count(), 0);
+    }
+
+    // =========================================================================
+    // Handshake Protocol Round-Trip Tests (crypto layer)
+    // =========================================================================
+
+    /// Test the full handshake protocol: challenge → sign → verify.
+    /// Uses the HybridHandshake directly (no QUIC needed).
+    #[tokio::test]
+    async fn test_handshake_roundtrip_via_service() {
+        use crate::swarm::handshake::SwarmMessageExt;
+
+        // Initiator service creates challenge
+        let initiator = NetworkService::new(SwarmConfig::default()).await.unwrap();
+        let challenge = initiator
+            .handshake_arc()
+            .write()
+            .create_challenge("peer-B")
+            .unwrap();
+
+        // Extract nonce
+        let nonce = challenge.try_into_challenge_nonce().unwrap();
+        assert_eq!(nonce.len(), 32);
+
+        // Responder signs the nonce (BLAKE3 fallback without identity feature)
+        let responder = NetworkService::new(SwarmConfig::default()).await.unwrap();
+        #[cfg(not(feature = "identity"))]
+        let response = responder
+            .handshake_arc()
+            .read()
+            .create_response(&nonce, "responder-key", b"responder-key");
+        #[cfg(feature = "identity")]
+        let response = {
+            let mut seed = [0u8; 32];
+            rand::RngCore::fill_bytes(&mut rand::thread_rng(), &mut seed);
+            let sk = ed25519_dalek::SigningKey::from_bytes(&seed);
+            let pk_hex = hex::encode(sk.verifying_key().as_bytes());
+            responder
+                .handshake_arc()
+                .read()
+                .create_response(&nonce, &pk_hex, &sk)
+        };
+
+        // Extract signed nonce
+        let (signed_nonce, agent_key) = response.try_into_response().unwrap();
+
+        // Initiator verifies
+        let trust = initiator
+            .handshake_arc()
+            .write()
+            .verify_response("peer-B", &signed_nonce, &agent_key)
+            .unwrap();
+
+        assert!(matches!(trust, TrustLevel::Verified(_)));
+        assert!(initiator.handshake_arc().read().is_peer_trusted("peer-B"));
+    }
+
+    /// Test that TrustChanged events propagate through the broadcast channel.
+    #[tokio::test]
+    async fn test_trust_changed_event_broadcast() {
+        let service = NetworkService::new(SwarmConfig::default()).await.unwrap();
+        let mut rx = service.subscribe_peer_events();
+
+        // Simulate a trust change
+        let _ = service.peer_event_tx.send(PeerEvent::TrustChanged {
+            peer_id: "verified-peer".to_string(),
+            old: TrustLevel::Unknown,
+            new: TrustLevel::Verified(0.75),
+        });
+
+        let event = rx.try_recv().unwrap();
+        match event {
+            PeerEvent::TrustChanged { peer_id, new, .. } => {
+                assert_eq!(peer_id, "verified-peer");
+                assert!((new.value() - 0.75).abs() < 0.01);
+            }
+            _ => panic!("Expected TrustChanged"),
+        }
     }
 }

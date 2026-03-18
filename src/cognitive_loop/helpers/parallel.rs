@@ -120,8 +120,8 @@ pub(in crate::cognitive_loop) fn parallel_episodic_learning(
     // Episodic memory: encode significant experiences.
     // IIT gate: consciousness (Phi) is necessary for memory formation
     // (Tononi & Koch 2015). Require minimum Phi for consolidation.
-    let phi_sufficient = ctx.phi > 0.2;
-    if phi_sufficient && (ctx.prediction_error > 0.1 || ctx.in_flow) {
+    let phi_sufficient = ctx.phi > super::super::thresholds::PHI_EPISODIC_CONSOLIDATION_MIN;
+    if phi_sufficient && (ctx.prediction_error > super::super::thresholds::PREDICTION_ERROR_EPISODIC_MIN || ctx.in_flow) {
         let hdv_sample: Vec<f32> =
             ctx.compressed_state[..64.min(ctx.compressed_state.len())].to_vec();
         episodic_memory.encode(
@@ -136,11 +136,11 @@ pub(in crate::cognitive_loop) fn parallel_episodic_learning(
     // Resonator memory: store with bound attributes for factorized recall
     if let Some(ref mut res_mem) = resonator_memory {
         let res_dim_ok = ctx.compressed_state.len() == res_mem.resonator.config.dim;
-        if res_dim_ok && (ctx.prediction_error > 0.1 || ctx.in_flow) {
+        if res_dim_ok && (ctx.prediction_error > super::super::thresholds::PREDICTION_ERROR_EPISODIC_MIN || ctx.in_flow) {
             // Quantize valence -> nearest band
-            let val_label = if ctx.emotional_valence > 0.3 {
+            let val_label = if ctx.emotional_valence > super::super::thresholds::EMOTIONAL_VALENCE_POSITIVE_BIN {
                 "positive"
-            } else if ctx.emotional_valence < -0.3 {
+            } else if ctx.emotional_valence < super::super::thresholds::EMOTIONAL_VALENCE_NEGATIVE_BIN {
                 "negative"
             } else {
                 "neutral"
@@ -153,9 +153,9 @@ pub(in crate::cognitive_loop) fn parallel_episodic_learning(
                 .map(|(_, hv)| hv.clone());
 
             // Quantize phi -> nearest band
-            let phi_label = if ctx.phi > 0.7 {
+            let phi_label = if ctx.phi > super::super::thresholds::PHI_QUANTIZATION_HIGH {
                 "high"
-            } else if ctx.phi > 0.3 {
+            } else if ctx.phi > super::super::thresholds::PHI_QUANTIZATION_MEDIUM {
                 "medium"
             } else {
                 "low"
@@ -194,7 +194,7 @@ pub(in crate::cognitive_loop) fn parallel_episodic_learning(
     if let Some(ref prev_state) = prev_primitive_state {
         let pred_error = primitive_belief_bridge.compute_prediction_error(prev_state, &prim_state);
         let td_signal = primitive_belief_bridge.td_error_signal(&pred_error);
-        *fep_learning_signal += td_signal as f32 * 0.2;
+        *fep_learning_signal += td_signal as f32 * super::super::thresholds::TD_ERROR_FEP_COUPLING_SCALE;
         *fep_learning_signal = fep_learning_signal.clamp(-1.0, 1.0);
     }
 
@@ -202,7 +202,7 @@ pub(in crate::cognitive_loop) fn parallel_episodic_learning(
 
     // Closed learning loop: update Q-values, modulated by FEP learning signal.
     // Friston (2010): plasticity scales with expected information gain.
-    let plasticity = 1.0 + *fep_learning_signal * 0.5; // [-1,1] → [0.5, 1.5]
+    let plasticity = 1.0 + *fep_learning_signal * super::super::thresholds::FEP_PLASTICITY_SCALING_FACTOR; // [-1,1] → [0.5, 1.5]
     closed_learning_loop.update_with_plasticity(cycle_learning_result, plasticity);
 
     // Return the memory context boost for deferred application via adjust_confidence

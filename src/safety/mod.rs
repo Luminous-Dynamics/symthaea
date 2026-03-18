@@ -6,6 +6,7 @@
 //! - Unified safety gateway interface
 
 pub mod gateway;
+pub mod level;
 
 // Genesis Mission Challenge 26: Safety Agents
 #[cfg(feature = "safety-agents")]
@@ -43,12 +44,13 @@ pub mod threat_bridge;
 #[cfg(all(feature = "safety-agents", feature = "water-prediction"))]
 pub mod water_bridge;
 
-// Re-export key types
+// Re-export key types — SafetyLevel is always available (not feature-gated)
 pub use gateway::{SafetyCheck, SafetyDecision, SafetyGateway};
+pub use level::SafetyLevel;
 
 #[cfg(feature = "safety-agents")]
 pub use agent::{
-    SafetyAgent, SafetyAgentConfig, SafetyAssessment, SafetyLevel, SafetyMetrics,
+    SafetyAgent, SafetyAgentConfig, SafetyAssessment, SafetyMetrics,
     SafetyOverrideEntry,
 };
 #[cfg(feature = "safety-agents")]

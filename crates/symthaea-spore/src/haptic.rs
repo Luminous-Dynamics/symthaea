@@ -8,8 +8,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 
 const MAX_PENDING_EVENTS: usize = 32;
-const DEFAULT_CONSCIOUSNESS_DELTA_THRESHOLD: f32 = 0.15;
-const DEFAULT_SURPRISE_THRESHOLD: f32 = 0.7;
+const DEFAULT_CONSCIOUSNESS_DELTA_THRESHOLD: f32 = 0.05;
+const DEFAULT_SURPRISE_THRESHOLD: f32 = 0.40;
 
 /// Haptic event types for platform rendering.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -147,7 +147,7 @@ mod tests {
     fn test_small_shift_no_trigger() {
         let mut h = HapticManager::new();
         h.last_consciousness = 0.5;
-        h.check_consciousness(0.55);
+        h.check_consciousness(0.52); // delta 0.02 < threshold 0.05
         assert_eq!(h.pending_count(), 0);
     }
 
@@ -161,7 +161,7 @@ mod tests {
     #[test]
     fn test_surprise_below_threshold() {
         let mut h = HapticManager::new();
-        h.check_surprise(0.3);
+        h.check_surprise(0.2); // below new threshold of 0.40
         assert_eq!(h.pending_count(), 0);
     }
 

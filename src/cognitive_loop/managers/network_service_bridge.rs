@@ -69,7 +69,8 @@ impl NetworkServiceBridgeHandle {
 
     /// Total events dropped due to broadcast channel overflow.
     pub fn total_lagged(&self) -> u64 {
-        self.total_lagged.load(std::sync::atomic::Ordering::Relaxed)
+        self.total_lagged
+            .load(std::sync::atomic::Ordering::Relaxed)
     }
 }
 
@@ -159,9 +160,15 @@ impl NetworkServiceBridge {
 /// ```rust,ignore
 /// forward_affective_state(&tx, peer_id, affect);
 /// ```
-pub fn forward_affective_state(tx: &mpsc::Sender<SwarmEvent>, peer_id: &str, sync: &AffectiveSync) {
+pub fn forward_affective_state(
+    tx: &mpsc::Sender<SwarmEvent>,
+    peer_id: &str,
+    sync: &AffectiveSync,
+) {
     let event = convert_affective_sync(peer_id, sync);
-    let _ = tx.send(event);
+    if tx.send(event).is_err() {
+        tracing::debug!("forward_affective_state: swarm channel closed");
+    }
 }
 
 /// Convenience function to forward a FederatedAggregator round result.
@@ -181,6 +188,23 @@ pub fn forward_federated_round(
         avg_quality: avg_quality.clamp(0.0, 1.0),
         trust_confidence: trust_confidence.clamp(0.0, 1.0),
     };
+    if tx.send(event).is_err() {
+        tracing::debug!("forward_federated_round: swarm channel closed");
+    }
+}
+
+/// Forward a trust verification event through the swarm channel.
+pub fn forward_trust_verified(
+    tx: &mpsc::Sender<SwarmEvent>,
+    peer_id: &str,
+    trust_level: f64,
+    agent_pubkey: &str,
+) {
+    let event = SwarmEvent::TrustVerified {
+        peer_id: peer_id.to_string(),
+        trust_level: trust_level.clamp(0.0, 1.0),
+        agent_pubkey: agent_pubkey.to_string(),
+    };
     let _ = tx.send(event);
 }
 
@@ -188,7 +212,10 @@ pub fn forward_federated_round(
 ///
 /// Used internally by `cycle_phase_dynamics.rs`. Returns the number of events
 /// drained into the SwarmManager.
-pub fn drain_swarm_channel(rx: &mpsc::Receiver<SwarmEvent>, manager: &mut SwarmManager) -> usize {
+pub fn drain_swarm_channel(
+    rx: &mpsc::Receiver<SwarmEvent>,
+    manager: &mut SwarmManager,
+) -> usize {
     let mut count = 0;
     for _ in 0..MAX_EVENTS_PER_POLL {
         match rx.try_recv() {
@@ -200,6 +227,116 @@ pub fn drain_swarm_channel(rx: &mpsc::Receiver<SwarmEvent>, manager: &mut SwarmM
         }
     }
     count
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// FEDERATED COORDINATOR BRIDGE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Handle for managing a spawned federated coordinator task.
+///
+/// The coordinator runs periodic sync rounds, forwarding results as
+/// `SwarmEvent::FederatedRound` through the CLS swarm channel.
+pub struct FederatedCoordinatorHandle {
+    /// Total rounds successfully completed.
+    pub(crate) total_rounds: std::sync::Arc<std::sync::atomic::AtomicU64>,
+    /// Total rounds that failed.
+    pub(crate) total_failures: std::sync::Arc<std::sync::atomic::AtomicU64>,
+    /// Shutdown signal.
+    shutdown_tx: Option<tokio::sync::oneshot::Sender<()>>,
+}
+
+impl FederatedCoordinatorHandle {
+    /// Total sync rounds completed.
+    pub fn total_rounds(&self) -> u64 {
+        self.total_rounds
+            .load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// Total sync rounds that failed.
+    pub fn total_failures(&self) -> u64 {
+        self.total_failures
+            .load(std::sync::atomic::Ordering::Relaxed)
+    }
+}
+
+impl Drop for FederatedCoordinatorHandle {
+    fn drop(&mut self) {
+        if let Some(tx) = self.shutdown_tx.take() {
+            let _ = tx.send(());
+        }
+    }
+}
+
+/// Spawn a federated coordinator that runs periodic sync rounds.
+///
+/// The coordinator calls `run_sync_round()` at the configured interval,
+/// forwarding results through the CLS swarm channel as `SwarmEvent::FederatedRound`.
+pub fn spawn_federated_coordinator(
+    config: crate::swarm::FederatedNetworkConfig,
+    initial_weights: Vec<f32>,
+    round_interval: std::time::Duration,
+    tx: mpsc::Sender<SwarmEvent>,
+) -> FederatedCoordinatorHandle {
+    let total_rounds = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
+    let total_failures = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
+    let (shutdown_tx, mut shutdown_rx) = tokio::sync::oneshot::channel::<()>();
+
+    let rounds = total_rounds.clone();
+    let failures = total_failures.clone();
+
+    tokio::spawn(async move {
+        let coordinator =
+            crate::swarm::FederatedCoordinator::new(config, initial_weights).await;
+
+        let mut interval = tokio::time::interval(round_interval);
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+
+        tracing::info!(
+            interval_ms = round_interval.as_millis() as u64,
+            "FederatedCoordinatorBridge: started"
+        );
+
+        loop {
+            tokio::select! {
+                _ = interval.tick() => {
+                    match coordinator.run_sync_round().await {
+                        Ok(Some(_weights)) => {
+                            rounds.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                            let peer_count = coordinator.peer_count();
+                            let trust_confidence = if peer_count > 0 { 0.8 } else { 0.0 };
+                            forward_federated_round(
+                                &tx,
+                                peer_count,
+                                0.7, // placeholder quality
+                                trust_confidence,
+                            );
+                        }
+                        Ok(None) => {
+                            // No aggregation this round (insufficient peers)
+                        }
+                        Err(e) => {
+                            failures.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                            tracing::warn!(
+                                error = %e,
+                                "FederatedCoordinatorBridge: sync round failed"
+                            );
+                        }
+                    }
+                }
+                _ = &mut shutdown_rx => {
+                    tracing::info!("FederatedCoordinatorBridge: shutdown signal received");
+                    break;
+                }
+            }
+        }
+    });
+
+    FederatedCoordinatorHandle {
+        total_rounds,
+        total_failures,
+        shutdown_tx: Some(shutdown_tx),
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -234,10 +371,7 @@ mod tests {
         assert_eq!(n, 1);
         // connected_peers is updated during process(), not inject_event()
         // Just verify the event was drained from the channel
-        assert!(
-            rx.try_recv().is_err(),
-            "Channel should be empty after drain"
-        );
+        assert!(rx.try_recv().is_err(), "Channel should be empty after drain");
     }
 
     #[test]
@@ -355,7 +489,8 @@ mod tests {
 
         // Create broadcast channels to simulate NetworkService
         let (peer_tx, _) = tokio::sync::broadcast::channel::<PeerEvent>(16);
-        let (cons_tx, _) = tokio::sync::broadcast::channel::<(String, ConsciousnessVector)>(16);
+        let (cons_tx, _) =
+            tokio::sync::broadcast::channel::<(String, ConsciousnessVector)>(16);
 
         // We can't use NetworkServiceBridge::spawn directly without a real
         // NetworkService, but we can test the channel flow end-to-end
@@ -401,7 +536,9 @@ mod tests {
         peer_tx
             .send(PeerEvent::Connected(make_peer_info("p1")))
             .unwrap();
-        cons_tx.send(("p2".into(), make_cv(0.6))).unwrap();
+        cons_tx
+            .send(("p2".into(), make_cv(0.6)))
+            .unwrap();
 
         // Give async task time to forward
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
@@ -410,6 +547,53 @@ mod tests {
         let mut manager = SwarmManager::default();
         let n = drain_swarm_channel(&rx, &mut manager);
         assert_eq!(n, 2, "Should have forwarded peer + consciousness events");
-        assert_eq!(forwarded.load(std::sync::atomic::Ordering::Relaxed), 2);
+        assert_eq!(
+            forwarded.load(std::sync::atomic::Ordering::Relaxed),
+            2
+        );
+    }
+
+    #[test]
+    fn test_forward_trust_verified() {
+        let (tx, rx) = mpsc::channel();
+        forward_trust_verified(&tx, "peer-X", 0.85, "abcdef1234");
+
+        let event = rx.try_recv().unwrap();
+        match event {
+            SwarmEvent::TrustVerified {
+                peer_id,
+                trust_level,
+                agent_pubkey,
+            } => {
+                assert_eq!(peer_id, "peer-X");
+                assert!((trust_level - 0.85).abs() < 0.01);
+                assert_eq!(agent_pubkey, "abcdef1234");
+            }
+            _ => panic!("Expected TrustVerified"),
+        }
+    }
+
+    #[test]
+    fn test_trust_verified_clamps() {
+        let (tx, rx) = mpsc::channel();
+        forward_trust_verified(&tx, "p", 2.0, "key");
+        let event = rx.try_recv().unwrap();
+        match event {
+            SwarmEvent::TrustVerified { trust_level, .. } => {
+                assert!((trust_level - 1.0).abs() < 0.01, "Should clamp to 1.0");
+            }
+            _ => panic!("Expected TrustVerified"),
+        }
+    }
+
+    #[test]
+    fn test_federated_coordinator_handle_counters() {
+        let handle = FederatedCoordinatorHandle {
+            total_rounds: std::sync::Arc::new(std::sync::atomic::AtomicU64::new(5)),
+            total_failures: std::sync::Arc::new(std::sync::atomic::AtomicU64::new(1)),
+            shutdown_tx: None,
+        };
+        assert_eq!(handle.total_rounds(), 5);
+        assert_eq!(handle.total_failures(), 1);
     }
 }

@@ -668,8 +668,8 @@ mod tests {
     #[test]
     fn test_symmetry_detection_above_chance() {
         let config = BenchmarkConfig {
-            dimension: 512,
-            trials_per_condition: 5,
+            dimension: 1024,
+            trials_per_condition: 10,
             ..Default::default()
         };
         let result = ArcCompositionalBenchmark.run(&config);

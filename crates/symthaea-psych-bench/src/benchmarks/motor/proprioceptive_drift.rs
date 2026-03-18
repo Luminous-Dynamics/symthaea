@@ -125,7 +125,7 @@ impl ProprioceptiveDriftBenchmark {
         // ── Asynchronous condition ──
         // Visual and tactile are temporally misaligned → weak multisensory binding
         let mut proprio_async = proprioceptive_hand.clone();
-        let mut async_ownership_count = 0u32;
+        let mut _async_ownership_count = 0u32;
 
         for _sub in 0..sync_sub_trials {
             proprio_async = proprioceptive_hand.clone();
@@ -162,7 +162,7 @@ impl ProprioceptiveDriftBenchmark {
             let drift_a = (drifted_sim_a - original_sim_a).max(0.0);
 
             if drift_a > ownership_threshold {
-                async_ownership_count += 1;
+                _async_ownership_count += 1;
             }
 
             xor_shift(&mut rng);

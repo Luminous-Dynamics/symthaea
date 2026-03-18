@@ -181,7 +181,7 @@ impl InterventionEffectBenchmark {
 
 impl PsychBenchmark for InterventionEffectBenchmark {
     fn name(&self) -> &str {
-        "causal_reasoning/intervention"
+        "CausalReasoning::InterventionEffect"
     }
 
     fn provenance(&self) -> Option<BenchmarkProvenance> {
@@ -270,7 +270,7 @@ mod tests {
     fn test_intervention_effect_runs() {
         let bench = InterventionEffectBenchmark;
         let result = bench.run(&default_config());
-        assert!(result.benchmark.contains("intervention"));
+        assert!(result.benchmark.contains("InterventionEffect"));
         assert!(result.metrics.contains_key("causal_score"));
     }
 

@@ -169,7 +169,6 @@ pub(crate) mod support_manager;
 pub(crate) mod vision_sensory_manager;
 pub use substrate_manager::SubstrateTransitionRecord;
 pub(crate) mod subsystem_trait;
-#[allow(dead_code)] // Registry of tuning constants — many reserved for future wiring
 pub(crate) mod thresholds;
 
 #[cfg(feature = "epistemic_auditor")]
@@ -192,10 +191,11 @@ pub use physics_integration::ParetoContext;
 pub use managers::governance_manager::{GovernanceEvent, GovernanceEventKind, GovernanceOutcome};
 
 pub use managers::network_service_bridge::{
-    forward_affective_state, forward_federated_round, NetworkServiceBridge,
-    NetworkServiceBridgeHandle,
+    forward_affective_state, forward_federated_round, FederatedCoordinatorHandle,
+    NetworkServiceBridge, NetworkServiceBridgeHandle,
 };
 pub use managers::swarm_manager::{SwarmEvent, SwarmTelemetry};
+pub use ethics_engine::EthicalVerdict;
 
 #[cfg(feature = "mesh")]
 pub use managers::{
@@ -211,6 +211,18 @@ pub mod nurture_bridge;
 
 #[cfg(feature = "humanoid")]
 pub mod motor_bridge;
+
+#[cfg(feature = "safety-agents")]
+pub mod safety_enforcement;
+#[cfg(feature = "safety-agents")]
+pub mod civic_crisis_detector;
+pub mod defense;
+#[cfg(feature = "safety-agents")]
+pub mod guardian;
+#[cfg(feature = "sentinel")]
+pub mod threat_memory;
+#[cfg(feature = "sentinel")]
+pub mod collective_immunity;
 
 // ── Imports (only what the struct definitions below require) ─────────────────
 // AffectiveBridge now owned by ConsciousnessStateManager
@@ -631,6 +643,16 @@ pub struct CognitiveLoopService {
     /// Runs **alongside** existing inline code (additive wiring — old code not removed yet).
     ethics_engine: ethics_engine::EthicsEngine,
 
+    /// Last unified ethical verdict from `ethics_engine.evaluate()`.
+    /// Checked before motor execution: `Blocked` prevents action, `Caution` caps confidence.
+    pub(crate) last_ethics_verdict: ethics_engine::EthicalVerdict,
+
+    /// External override for the ethical verdict. When `Some`, takes precedence
+    /// over the ethics engine's output each cycle. Used by safety systems and
+    /// integration tests to force a specific verdict for deterministic testing.
+    /// Cleared only by an explicit `clear_ethics_override()` call.
+    pub(crate) ethics_verdict_override: Option<ethics_engine::EthicalVerdict>,
+
     /// KosmicSong: Unified identity synthesizing Phi + Eight Harmonies + Epistemic Humility.
     /// Computed every cycle after consciousness_engine + ethics_engine settle.
     /// Outputs coherence_score (0.0-1.0) that gates FEP learning rate and exploration.
@@ -671,6 +693,9 @@ pub struct CognitiveLoopService {
     /// inject events from async components (NetworkService, Hyperfeel, mesh layer).
     swarm_event_tx: std::sync::mpsc::Sender<managers::swarm_manager::SwarmEvent>,
 
+    /// Handle for the federated coordinator task (if enabled).
+    federation_handle: Option<crate::cognitive_loop::managers::network_service_bridge::FederatedCoordinatorHandle>,
+
     /// Spectrum Manager: Multi-band radio dispatch, AIMD congestion, delta compression.
     /// Implements CognitiveSubsystem at interval 53. Feature-gated behind `mesh`.
     #[cfg(feature = "mesh")]
@@ -709,6 +734,11 @@ pub struct CognitiveLoopService {
     /// Motor rendering: output bridge, pending request, last result, phi, canvas.
     pub(crate) motor_rendering: motor_rendering_manager::MotorRenderingManager,
 
+    /// Hierarchical bundler for per-region BinaryHV aggregation.
+    /// Accumulates HDC encodings per cortical region, enabling structured
+    /// role-bound aggregation and per-region recovery via XOR unbinding.
+    pub(crate) hierarchical_bundler: Option<symthaea_core::hdc::hierarchical_bundle::HierarchicalBundler>,
+
     /// Pre-allocated input buffer for CfC temporal network step.
     /// Sized to `config.cfc_config.input_dim` at construction, reused each cycle
     /// to avoid per-cycle `Array1<f32>` heap allocation in `phase_dynamics`.
@@ -723,6 +753,26 @@ pub struct CognitiveLoopService {
     /// Epistemic Auditor: DuckDB-backed consciousness telemetry audit trail.
     #[cfg(feature = "epistemic_auditor")]
     pub(crate) epistemic_auditor: Option<epistemic_auditor::EpistemicAuditor>,
+
+    /// NRC-style safety agent for consciousness monitoring and operational gating.
+    #[cfg(feature = "safety-agents")]
+    pub(crate) safety_agent: crate::safety::SafetyAgent,
+    /// Physical guardian posture state machine.
+    #[cfg(feature = "safety-agents")]
+    pub(crate) guardian_state: guardian::GuardianState,
+    #[cfg(feature = "sentinel")]
+    pub(crate) sentinel_manager: managers::SentinelManager,
+    #[cfg(feature = "sentinel")]
+    pub(crate) threat_memory: threat_memory::ThreatMemory,
+    #[cfg(feature = "sentinel")]
+    pub(crate) collective_immune_state: collective_immunity::CollectiveImmuneState,
+
+    /// Defense actions proposed this cycle (populated by defense cascade).
+    #[cfg(feature = "safety-agents")]
+    pub(crate) defense_actions_proposed: u32,
+    /// Defense actions that passed moral filter this cycle.
+    #[cfg(feature = "safety-agents")]
+    pub(crate) defense_actions_approved: u32,
 }
 
 // MetricsProvider impl is in metrics_provider.rs

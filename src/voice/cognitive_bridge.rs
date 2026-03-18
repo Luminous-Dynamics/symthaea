@@ -71,6 +71,18 @@ pub struct VoiceConsciousnessSignals {
 
     /// Master consciousness level (0.0–1.0).
     pub consciousness_level: f64,
+
+    /// Client distress (0=calm, 1=crisis). Used for therapeutic voice modulation.
+    #[cfg(feature = "therapeutic")]
+    pub client_distress: f32,
+
+    /// Therapeutic alliance quality (0=broken, 1=strong).
+    #[cfg(feature = "therapeutic")]
+    pub alliance_quality: f32,
+
+    /// Active therapeutic intent (0-7).
+    #[cfg(feature = "therapeutic")]
+    pub therapeutic_intent: f32,
 }
 
 impl Default for VoiceConsciousnessSignals {
@@ -83,6 +95,12 @@ impl Default for VoiceConsciousnessSignals {
             coherence_velocity: 0.0,
             cross_module_agreement: 1.0,
             consciousness_level: 0.5,
+            #[cfg(feature = "therapeutic")]
+            client_distress: 0.0,
+            #[cfg(feature = "therapeutic")]
+            alliance_quality: 0.5,
+            #[cfg(feature = "therapeutic")]
+            therapeutic_intent: 0.0,
         }
     }
 }
@@ -351,6 +369,27 @@ pub struct CognitivePacing {
 
     /// Master consciousness level (0.0–1.0).
     pub consciousness_level: f64,
+
+    // ── Therapeutic voice modulation (feature-gated) ──────────────
+    /// Client distress level (0=calm, 1=crisis). Higher distress → slower rate,
+    /// longer pauses, softer energy. Science: Safran & Muran (2000) — therapist
+    /// prosody attunement predicts alliance quality.
+    #[cfg(feature = "therapeutic")]
+    pub client_distress: f32,
+
+    /// Therapeutic alliance quality (0=broken, 1=strong). Low alliance → warmer
+    /// tone, reduced emphasis (less assertive). High alliance → permits wider
+    /// dynamic range. Science: Bordin (1979), Flückiger et al. (2018) meta-analysis.
+    #[cfg(feature = "therapeutic")]
+    pub alliance_quality: f32,
+
+    /// Active therapeutic intent (0-7). Affects prosodic coloring:
+    /// - 0/6 (validate): warmer, softer, slower
+    /// - 2 (reflect): rising pitch, question-like intonation
+    /// - 3/5 (challenge/ground): firmer emphasis, steadier rate
+    /// - 7 (crisis): calm, slow, grounding tone
+    #[cfg(feature = "therapeutic")]
+    pub therapeutic_intent: f32,
 }
 
 impl CognitivePacing {
@@ -403,6 +442,12 @@ impl CognitivePacing {
             coherence_velocity: 0.0,
             cross_module_agreement: 1.0,
             consciousness_level: 0.5,
+            #[cfg(feature = "therapeutic")]
+            client_distress: 0.0,
+            #[cfg(feature = "therapeutic")]
+            alliance_quality: 0.5,
+            #[cfg(feature = "therapeutic")]
+            therapeutic_intent: 0.0,
         }
     }
 
@@ -433,6 +478,12 @@ impl CognitivePacing {
         pacing.coherence_velocity = signals.coherence_velocity;
         pacing.cross_module_agreement = signals.cross_module_agreement;
         pacing.consciousness_level = signals.consciousness_level;
+        #[cfg(feature = "therapeutic")]
+        {
+            pacing.client_distress = signals.client_distress;
+            pacing.alliance_quality = signals.alliance_quality;
+            pacing.therapeutic_intent = signals.therapeutic_intent;
+        }
         pacing
     }
 
@@ -509,6 +560,72 @@ impl CognitivePacing {
         // Higher consciousness = wider dynamic range in emphasis and valence
         let consciousness_scale = 0.6 + self.consciousness_level as f32 * 0.4;
         pacing.emphasis *= consciousness_scale;
+
+        // === Therapeutic Voice Modulation ===
+        // Science: Safran & Muran (2000) — therapist prosody attunement;
+        // Imel et al. (2014) — vocal quality predicts therapeutic outcomes.
+        #[cfg(feature = "therapeutic")]
+        {
+            // High client distress → slower rate, longer pauses, softer energy
+            // Creates a holding, calming vocal environment
+            if self.client_distress > 0.3 {
+                let distress_factor = 1.0 - (self.client_distress - 0.3) * 0.4; // 0.72–1.0
+                pacing.rate *= distress_factor;
+                let pause_factor = 1.0 + (self.client_distress - 0.3) * 0.6; // 1.0–1.42
+                pacing.phrase_pause *= pause_factor;
+                pacing.sentence_pause *= pause_factor;
+                // Softer energy: reduce emphasis proportionally
+                pacing.emphasis *= 1.0 - (self.client_distress - 0.3) * 0.3; // 0.79–1.0
+                // More breath pauses when client is distressed (models attentive presence)
+                pacing.breath_probability += self.client_distress * 0.15;
+                pacing.breath_probability = pacing.breath_probability.min(0.5);
+            }
+
+            // Low alliance → warmer, less assertive (rapport-building posture)
+            if self.alliance_quality < 0.4 {
+                let warmth_boost = (0.4 - self.alliance_quality) * 0.3; // 0–0.12
+                pacing.emotional_valence += warmth_boost; // Shift toward warmth
+                pacing.emotional_valence = pacing.emotional_valence.clamp(-1.0, 1.0);
+                pacing.emphasis *= 0.85 + self.alliance_quality * 0.375; // 0.85–1.0
+            }
+
+            // High alliance → wider dynamic range (permits more expressive speech)
+            if self.alliance_quality > 0.7 {
+                let range_boost = (self.alliance_quality - 0.7) * 0.33; // 0–0.1
+                pacing.emphasis *= 1.0 + range_boost;
+            }
+
+            // Therapeutic intent → prosodic coloring
+            match self.therapeutic_intent as u8 {
+                // Validate (0) or strong validation (6): warm, soft, deliberate
+                0 | 6 => {
+                    pacing.emotional_valence += 0.15;
+                    pacing.emotional_valence = pacing.emotional_valence.clamp(-1.0, 1.0);
+                    pacing.rate *= 0.92;
+                }
+                // Reflect (2): rising intonation, question-like, curious tone
+                2 => {
+                    pacing.emotional_valence += 0.05;
+                    pacing.emotional_valence = pacing.emotional_valence.clamp(-1.0, 1.0);
+                    // Slightly slower for reflective listening
+                    pacing.rate *= 0.95;
+                }
+                // Challenge (5) or ground (4): firmer, steadier
+                4 | 5 => {
+                    pacing.emphasis *= 1.1;
+                }
+                // Crisis (7): calm, slow, grounding — like a anchor
+                7 => {
+                    pacing.rate *= 0.75;
+                    pacing.phrase_pause *= 1.5;
+                    pacing.sentence_pause *= 1.5;
+                    pacing.emphasis *= 0.8;
+                    pacing.emotional_valence = pacing.emotional_valence.max(0.0); // Never negative in crisis
+                    pacing.breath_probability = 0.3; // Regular breathing cues
+                }
+                _ => {}
+            }
+        }
 
         pacing
     }
@@ -587,6 +704,12 @@ impl Default for CognitivePacing {
             coherence_velocity: 0.0,
             cross_module_agreement: 1.0,
             consciousness_level: 0.5,
+            #[cfg(feature = "therapeutic")]
+            client_distress: 0.0,
+            #[cfg(feature = "therapeutic")]
+            alliance_quality: 0.5,
+            #[cfg(feature = "therapeutic")]
+            therapeutic_intent: 0.0,
         }
     }
 }

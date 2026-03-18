@@ -1011,7 +1011,7 @@ mod tests {
 
         // Manually: compress → encrypt (mimics DualLayerMesh send path)
         let compressed = compress_packet(&raw);
-        let encrypted = encrypt_packet(&compressed, &key, &packet.source_id, packet.sequence);
+        let encrypted = encrypt_packet(&compressed, &key, &packet.source_id, 0xAB, packet.sequence);
 
         // Receiver with matching key should decrypt → decompress → parse
         let mut receiver = MeshReceiver::new().with_encryption_key(key);

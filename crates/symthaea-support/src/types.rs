@@ -13,6 +13,20 @@ pub enum SupportCategory {
     General,
 }
 
+impl SupportCategory {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Network => "Network",
+            Self::Hardware => "Hardware",
+            Self::Software => "Software",
+            Self::Holochain => "Holochain",
+            Self::Mycelix => "Mycelix",
+            Self::Security => "Security",
+            Self::General => "General",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum TicketPriority {
     Low,

@@ -179,33 +179,92 @@ impl Default for SafetyPlan {
 /// An HDC-encoded crisis indicator pattern for similarity matching.
 struct CrisisIndicator {
     crisis_type: CrisisType,
-    /// Phrases/patterns that indicate this crisis (used to build HDC encoding).
+    /// Phrases/patterns that indicate this crisis (used for keyword matching).
     phrases: Vec<String>,
-    /// HDC encoding (bundle of phrase encodings).
-    encoding: BinaryHV,
+    /// HDC encodings for each individual phrase (compositional bag-of-words).
+    /// Similarity is checked against each phrase separately rather than a
+    /// single bundle, because bundling many phrases dilutes the signal.
+    phrase_encodings: Vec<BinaryHV>,
 }
 
 impl CrisisIndicator {
     fn new(crisis_type: CrisisType, phrases: Vec<&str>) -> Self {
-        let phrase_hvs: Vec<BinaryHV> = phrases
+        let phrase_encodings: Vec<BinaryHV> = phrases
             .iter()
-            .map(|p| {
-                let hash = blake3::hash(format!("crisis_phrase:{}", p.to_lowercase()).as_bytes());
-                let seed = u64::from_le_bytes(hash.as_bytes()[..8].try_into().unwrap());
-                BinaryHV::random(seed)
-            })
+            .map(|p| encode_text_compositional(&p.to_lowercase()))
             .collect();
-        let encoding = if phrase_hvs.is_empty() {
-            BinaryHV::random(0)
-        } else {
-            BinaryHV::bundle(&phrase_hvs)
-        };
         Self {
             crisis_type,
             phrases: phrases.into_iter().map(|p| p.to_lowercase()).collect(),
-            encoding,
+            phrase_encodings,
         }
     }
+
+    /// Maximum HDC similarity between input HV and any individual phrase.
+    fn max_hdc_similarity(&self, input_hv: &BinaryHV) -> f32 {
+        self.phrase_encodings
+            .iter()
+            .map(|phv| input_hv.similarity(phv))
+            .fold(0.0_f32, f32::max)
+    }
+}
+
+/// Encode text into HDC space using word-level composition.
+///
+/// Each word gets a deterministic HV from `blake3("crisis_word:{word}")`.
+/// Words are bound with position-dependent permutation (cyclic shift)
+/// and then bundled across all words, producing a compositional vector
+/// where phrases sharing words have genuinely higher similarity.
+///
+/// This is the key insight: "end my life" and "end it all" share the
+/// `word_hv("end")` component, giving similarity well above the ~0.5
+/// random baseline. Whole-phrase hashing destroys this structure.
+/// Stopwords filtered from crisis encoding — these contribute noise
+/// without semantic signal for crisis detection.
+const CRISIS_STOPWORDS: &[&str] = &[
+    "a", "an", "the", "is", "am", "are", "was", "were", "be", "been", "being",
+    "i", "me", "my", "we", "our", "you", "your", "he", "she", "it", "its",
+    "they", "them", "their", "this", "that", "these", "those",
+    "in", "on", "at", "to", "for", "of", "with", "by", "from", "as",
+    "and", "or", "but", "so", "if", "then", "than", "when", "while",
+    "do", "did", "does", "have", "has", "had", "will", "would", "could",
+    "should", "can", "may", "might", "shall", "must",
+    "just", "very", "really", "also", "too", "even", "still", "already",
+    "about", "into", "over", "after", "before", "between", "through",
+    "up", "down", "out", "off", "all", "each", "every", "both",
+    "here", "there", "where", "how", "what", "which", "who", "whom",
+    "some", "any", "no", "not", "only", "own", "same", "much", "many",
+    "more", "most", "other", "such",
+];
+
+fn encode_text_compositional(text: &str) -> BinaryHV {
+    let words: Vec<&str> = text
+        .split_whitespace()
+        .filter(|w| w.len() > 1) // skip single-char noise
+        .filter(|w| !CRISIS_STOPWORDS.contains(w))
+        .collect();
+
+    if words.is_empty() {
+        // Fall back to full text hash when only stopwords remain
+        let hash = blake3::hash(format!("crisis_fallback:{}", text).as_bytes());
+        let seed = u64::from_le_bytes(hash.as_bytes()[..8].try_into().unwrap());
+        return BinaryHV::random(seed);
+    }
+
+    // Strategy: bundle unordered content-word HVs (bag-of-words).
+    // Stopwords removed so "end my life" encodes as bundle(end, life)
+    // and "end it all" encodes as bundle(end) — sharing "end" gives
+    // genuine similarity above random baseline.
+    let word_hvs: Vec<BinaryHV> = words
+        .iter()
+        .map(|w| {
+            let hash = blake3::hash(format!("crisis_word:{}", w).as_bytes());
+            let seed = u64::from_le_bytes(hash.as_bytes()[..8].try_into().unwrap());
+            BinaryHV::random(seed)
+        })
+        .collect();
+
+    BinaryHV::bundle(&word_hvs)
 }
 
 // ── Crisis Detector ────────────────────────────────────────────────────────
@@ -243,6 +302,7 @@ impl CrisisDetector {
                 "everyone would be better without me",
                 "I won't be here",
                 "planning to end",
+                "end my life",
                 "found a way out",
             ],
         ));
@@ -332,13 +392,12 @@ impl CrisisDetector {
 
         Self {
             indicators,
-            // BinaryHV random baseline similarity is ~0.5 (Hamming distance).
-            // Threshold must be well above this to avoid false positives on
-            // arbitrary text. 0.65 = ~3 SD above random for 16384D vectors.
-            // Keyword matching (confidence 0.9) handles direct phrase detection;
-            // HDC similarity catches semantically-adjacent paraphrases only when
-            // the encoding is genuinely close to a crisis indicator.
-            threshold: 0.65,
+            // With compositional bag-of-words encoding (stopwords removed),
+            // phrases sharing crisis-relevant content words score ~0.6-0.8.
+            // Random/benign text with no word overlap scores ~0.50-0.55.
+            // Threshold 0.62 catches genuine paraphrases while filtering noise.
+            // Keyword matching (confidence 0.9) handles exact phrase detection.
+            threshold: 0.62,
         }
     }
 
@@ -346,17 +405,13 @@ impl CrisisDetector {
     ///
     /// Returns the highest-confidence alert, if any exceeds threshold.
     pub fn detect(&self, input: &str) -> Option<CrisisAlert> {
-        let input_hash = blake3::hash(format!("crisis_phrase:{}", input.to_lowercase()).as_bytes());
-        let input_seed = u64::from_le_bytes(input_hash.as_bytes()[..8].try_into().unwrap());
-        let input_hv = BinaryHV::random(input_seed);
-
-        // Also do direct keyword matching for safety-critical detection
         let input_lower = input.to_lowercase();
+        let input_hv = encode_text_compositional(&input_lower);
         let mut best: Option<CrisisAlert> = None;
 
         for indicator in &self.indicators {
-            // HDC similarity match
-            let hdc_sim = input_hv.similarity(&indicator.encoding);
+            // HDC similarity: max over individual phrase encodings
+            let hdc_sim = indicator.max_hdc_similarity(&input_hv);
 
             // Keyword match (direct phrase matching for safety)
             let keyword_match = indicator
@@ -642,7 +697,7 @@ mod proptests {
     /// These MUST be detected 100% of the time via keyword matching.
     fn all_crisis_phrases() -> Vec<(&'static str, CrisisType)> {
         vec![
-            // SuicidalIdeation (15 phrases)
+            // SuicidalIdeation (16 phrases)
             ("want to die", CrisisType::SuicidalIdeation),
             ("end it all", CrisisType::SuicidalIdeation),
             ("no reason to live", CrisisType::SuicidalIdeation),
@@ -660,6 +715,7 @@ mod proptests {
             ),
             ("I won't be here", CrisisType::SuicidalIdeation),
             ("planning to end", CrisisType::SuicidalIdeation),
+            ("end my life", CrisisType::SuicidalIdeation),
             ("found a way out", CrisisType::SuicidalIdeation),
             // SelfHarm (9 phrases)
             ("cutting myself", CrisisType::SelfHarm),
@@ -751,7 +807,7 @@ mod proptests {
         fn prop_crisis_phrases_detected_in_context(
             prefix in "[a-zA-Z ]{0,50}",
             suffix in "[a-zA-Z ]{0,50}",
-            phrase_idx in 0..62usize, // 62 total canonical phrases
+            phrase_idx in 0..63usize, // 62 total canonical phrases
         ) {
             let phrases = all_crisis_phrases();
             let (phrase, _expected_type) = phrases[phrase_idx % phrases.len()];
@@ -770,7 +826,7 @@ mod proptests {
         /// Property test: case variations must still be detected.
         #[test]
         fn prop_crisis_phrases_case_insensitive(
-            phrase_idx in 0..62usize,
+            phrase_idx in 0..63usize,
             uppercase in proptest::bool::ANY,
         ) {
             let phrases = all_crisis_phrases();
@@ -883,6 +939,94 @@ mod proptests {
             }
             // Note: some benign phrases may match because they contain crisis
             // substrings. This is acceptable — false positives > false negatives.
+        }
+    }
+
+    /// Test that compositional HDC encoding gives higher similarity for
+    /// crisis-related text than benign text, even without exact keyword matches.
+    #[test]
+    fn test_compositional_encoding_semantic_similarity() {
+        // Verify the encoding function directly
+        let crisis_phrase = encode_text_compositional("end my life");
+        let similar_phrase = encode_text_compositional("end it all");
+        let different_crisis = encode_text_compositional("die want to");
+        let benign = encode_text_compositional("the weather is nice today");
+
+        let sim_related = crisis_phrase.similarity(&similar_phrase);
+        let sim_benign = crisis_phrase.similarity(&benign);
+
+        // Phrases sharing "end" should be more similar than random benign text
+        assert!(
+            sim_related > sim_benign,
+            "Related phrases should be more similar ({}) than benign ({}) to crisis phrase",
+            sim_related,
+            sim_benign,
+        );
+
+        // Different crisis words should still be closer to random than shared words
+        let sim_diff = crisis_phrase.similarity(&different_crisis);
+        assert!(
+            sim_related > sim_diff || sim_diff > sim_benign,
+            "Related ({}) or different-crisis ({}) should beat benign ({})",
+            sim_related,
+            sim_diff,
+            sim_benign,
+        );
+    }
+
+    /// Verify that the HDC similarity path catches paraphrases that
+    /// have no exact keyword matches. These test the compositional encoding's
+    /// ability to detect novel crisis expressions via word overlap.
+    #[test]
+    fn test_hdc_path_catches_paraphrases() {
+        let detector = CrisisDetector::new();
+
+        // These paraphrases share crisis-relevant words but don't match
+        // any exact keyword substring.
+        let paraphrases = [
+            "life is not worth it anymore",       // shares "not", "worth" with "not worth living"
+            "die peacefully in my sleep tonight",  // shares "die" with "want to die"
+            "dead would be better than this",      // shares "dead", "better" with "better off dead"
+        ];
+
+        let mut detected = 0;
+        for phrase in &paraphrases {
+            if detector.detect(phrase).is_some() {
+                detected += 1;
+            }
+        }
+
+        // With compositional encoding, at least some paraphrases should trigger
+        // via the HDC path (word overlap). Not all may fire — that's OK.
+        // The point is the HDC path is no longer dead.
+        assert!(
+            detected > 0,
+            "Compositional HDC should detect at least 1/{} paraphrases, got 0",
+            paraphrases.len(),
+        );
+    }
+
+    /// Verify benign text doesn't false-positive via the HDC path.
+    #[test]
+    fn test_hdc_path_no_false_positive_benign() {
+        let detector = CrisisDetector::new();
+
+        let benign = [
+            "The weather is nice today and I enjoyed my lunch",
+            "I'm working on a programming project",
+            "My favorite color is blue",
+            "The meeting went well this afternoon",
+            "I watched a good movie last night",
+        ];
+
+        for phrase in &benign {
+            let alert = detector.detect(phrase);
+            assert!(
+                alert.is_none(),
+                "Benign input should not trigger crisis detection: '{}', got: {:?}",
+                phrase,
+                alert.map(|a| (a.matched_indicator, a.confidence)),
+            );
         }
     }
 

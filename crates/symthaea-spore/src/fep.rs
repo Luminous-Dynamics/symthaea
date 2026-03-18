@@ -649,7 +649,7 @@ mod tests {
         let obs = Observation::from_consciousness(0.7, 0.8, 0.6, 0.9);
 
         let fe1 = agent.perceive(&obs);
-        let fe2 = agent.perceive(&obs);
+        let _fe2 = agent.perceive(&obs);
         let fe3 = agent.perceive(&obs);
 
         // Free energy should decrease (or at least not increase much) as beliefs converge

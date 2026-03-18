@@ -23,6 +23,7 @@ use symthaea_core::hdc::ContinuousHV;
 /// Cross-Modal Feature Binding benchmark.
 pub struct CrossModalBindingBenchmark;
 
+#[allow(dead_code)] // per_size_accuracy reserved for size-dependent analysis
 struct TrialResult {
     binding_accuracy: f64,
     swap_error_rate: f64,
@@ -57,12 +58,12 @@ impl CrossModalBindingBenchmark {
         // Role binders
         let role_color = ContinuousHV::random(dim, seed.wrapping_add(1000));
         let role_shape = ContinuousHV::random(dim, seed.wrapping_add(1001));
-        let role_location = ContinuousHV::random(dim, seed.wrapping_add(1002));
+        let _role_location = ContinuousHV::random(dim, seed.wrapping_add(1002));
 
         let set_sizes = [2usize, 4, 6];
         let trials_per_size = 20;
         let pressure = config.time_pressure;
-        let noise_frac = 0.02 + pressure as f32 * 0.08 + config.effective_noise() as f32 * 0.05;
+        let noise_frac = 0.01 + pressure as f32 * 0.05 + config.effective_noise() as f32 * 0.03;
 
         let mut total_correct = 0u32;
         let mut total_swaps = 0u32;

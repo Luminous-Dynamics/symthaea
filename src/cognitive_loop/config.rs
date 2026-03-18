@@ -371,6 +371,13 @@ pub struct CognitiveLoopConfig {
     /// Science: Friston (2008) — hierarchical predictive processing
     pub enable_hierarchical_free_energy: bool,
 
+    /// Enable hierarchical region-based bundling for structured aggregation.
+    /// When enabled, the cognitive loop accumulates BinaryHV vectors per cortical
+    /// region and produces structured aggregates for enhanced Phi measurement.
+    /// Role-bound XOR binding allows per-region recovery from the aggregate.
+    /// Science: Kanerva (2009) — hyperdimensional computing; Engel (2001) — binding
+    pub enable_hierarchical_bundling: bool,
+
     /// Enable contextual harmony weighting for domain-aware moral evaluation.
     pub enable_contextual_weights: bool,
 
@@ -599,6 +606,12 @@ pub struct CognitiveLoopConfig {
     /// Default: false (desktop). Set true for mobile profiles.
     pub enable_thermal_adaptation: bool,
 
+    // ── Federation ──────────────────────────────────────────────────────
+    /// Enable federated learning coordinator (requires async runtime).
+    pub federation_enabled: bool,
+    /// Federated sync round interval in milliseconds (default: 30000 = 30s).
+    pub federation_round_interval_ms: u64,
+
     // ── Vision Manifold Integration ─────────────────────────────────────
     /// Enable the internal VisionBridge in the cognitive loop (default false).
     /// When true, the cognitive loop creates a VisionBridge and processes
@@ -682,6 +695,20 @@ pub struct CognitiveLoopConfig {
     /// Default: false (inference engine not spawned).
     #[serde(default)]
     pub enable_streaming_inference: bool,
+
+    /// Enable FHE collective wisdom pool for privacy-preserving peer learning.
+    /// Feature-gated behind `fhe-wisdom`.
+    #[cfg(feature = "fhe-wisdom")]
+    pub fhe_wisdom_enabled: bool,
+
+    /// Minimum contributions before aggregation (threshold k).
+    #[cfg(feature = "fhe-wisdom")]
+    pub fhe_threshold_k: usize,
+
+    /// Aggregation interval in cycles.
+    #[cfg(feature = "fhe-wisdom")]
+    pub fhe_aggregation_interval: usize,
+
 }
 
 impl Default for CognitiveLoopConfig {
@@ -735,6 +762,7 @@ impl Default for CognitiveLoopConfig {
             enable_consciousness_thermodynamics: false,
             enable_phenomenal_binding: false,
             enable_hierarchical_free_energy: false,
+            enable_hierarchical_bundling: false,
             enable_contextual_weights: false,
             enable_phi_attention: false,
             enable_negation_detection: false,
@@ -773,7 +801,7 @@ impl Default for CognitiveLoopConfig {
             #[cfg(feature = "therapeutic")]
             enable_therapeutic: true, // On by default when feature is compiled in
             #[cfg(feature = "therapeutic")]
-            therapeutic_crisis_threshold: 0.65,
+            therapeutic_crisis_threshold: 0.62,
             #[cfg(feature = "therapeutic")]
             therapeutic_text_crisis_detection: true, // Safety-critical: on by default
             #[cfg(feature = "ssm_language")]
@@ -784,6 +812,8 @@ impl Default for CognitiveLoopConfig {
             energy_budget_joules_per_sec: None,
             substrate_transition_alpha: super::thresholds::SUBSTRATE_TRANSITION_ALPHA_DEFAULT,
             enable_thermal_adaptation: false,
+            federation_enabled: false,
+            federation_round_interval_ms: 30_000,
             #[cfg(feature = "vision-manifold")]
             enable_vision_manifold: false,
             #[cfg(feature = "vision-manifold")]
@@ -812,10 +842,19 @@ impl Default for CognitiveLoopConfig {
             knowledge_ontology_max: 500,
             knowledge_db_path: None,
             enable_streaming_inference: false,
+            #[cfg(feature = "fhe-wisdom")]
+            fhe_wisdom_enabled: false,
+            #[cfg(feature = "fhe-wisdom")]
+            fhe_threshold_k: 3,
+            #[cfg(feature = "fhe-wisdom")]
+            fhe_aggregation_interval: 100,
         }
     }
 }
 
+fn default_federation_round_interval_ms() -> u64 {
+    30_000
+}
 fn default_knowledge_graph_capacity() -> usize {
     10_000
 }
@@ -943,6 +982,7 @@ impl ConsciousnessProfile {
         config.enable_consciousness_thermodynamics = false;
         config.enable_phenomenal_binding = false;
         config.enable_hierarchical_free_energy = false;
+        config.enable_hierarchical_bundling = false;
         config.enable_contextual_weights = false;
         config.enable_phi_attention = false;
         config.enable_negation_detection = false;
@@ -1004,6 +1044,7 @@ impl ConsciousnessProfile {
                 config.enable_consciousness_thermodynamics = true;
                 config.enable_phenomenal_binding = true;
                 config.enable_hierarchical_free_energy = true;
+                config.enable_hierarchical_bundling = true;
                 config.enable_contextual_weights = true;
                 config.enable_phi_attention = true;
                 config.enable_negation_detection = true;
@@ -1086,6 +1127,7 @@ impl CognitiveLoopConfig {
             self.enable_consciousness_thermodynamics,
             self.enable_phenomenal_binding,
             self.enable_hierarchical_free_energy,
+            self.enable_hierarchical_bundling,
             self.enable_contextual_weights,
             self.enable_phi_attention,
             self.enable_negation_detection,

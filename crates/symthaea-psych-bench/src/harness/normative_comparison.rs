@@ -123,6 +123,9 @@ fn baseline_for_benchmark<'a>(
         name if name.contains("FOK") || name.contains("FeelingOfKnowing") => {
             Some(("fok_gamma", &bl.metacognition))
         }
+        name if name.contains("ChangeBlindness") => {
+            Some(("cb_detection_with_disruption", &bl.metacognition))
+        }
 
         // ToMBench
         name if name.contains("FalseBelief") => Some(("false_belief_accuracy", &bl.tombench)),

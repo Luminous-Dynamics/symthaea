@@ -36,6 +36,7 @@ members = [
     "crates/symthaea-hal",
     "crates/symthaea-ssm",
     "crates/symthaea-zkproof",
+    "crates/symthaea-zkproof/core",
     "crates/symthaea-broca",
     "crates/symthaea-consciousness-equation",
     "crates/symthaea-neuromodulators",
@@ -57,6 +58,14 @@ members = [
     "crates/symthaea-canvas",
     "crates/symthaea-clinical",
     "crates/symthaea-therapeutic",
+    "crates/symthaea-hdc-store",
+    # DRM/KMS boot animation — needs Linux DRM headers; not in default-members.
+    "crates/symthaea-quicken-fb",
+]
+# Only build core crates by default; platform-specific crates (quicken-fb) require explicit -p flag.
+default-members = [
+    ".",
+    "symthaea-core",
 ]
 
 [workspace.dependencies]
@@ -215,6 +224,9 @@ symthaea-vision-manifold = { path = "crates/symthaea-vision-manifold", optional 
 
 # Symthaea Foveation Bridge - Dorsal surprise → ventral recognition dispatch
 symthaea-foveation = { path = "crates/symthaea-foveation", optional = true }
+
+# Symthaea HDC Store - Zero-copy mmap'd BinaryHV storage with persistent LSH
+symthaea-hdc-store = { path = "crates/symthaea-hdc-store", optional = true }
 
 # HDC / Vector Symbolic Architectures
 # hypervector = "0.1"  # Using custom HDC implementation instead
@@ -429,12 +441,16 @@ cpg = []                                    # Central Pattern Generator (Kuramot
 complex_cfc = ["symthaea-core/complex_cfc"] # Complex-valued CfC neuron with native oscillation
 spectral_state = []                         # Spectral twin: frequency-domain CfC state analysis
 
+# ── Defense / Immune System ────────────────────────────────────────
+sentinel = []                                # Distributed immune system: governance anomaly detection, threat memory, collective immunity
+
 # ── Distributed / Network ──────────────────────────────────────────
 mesh = []                                   # Physical mesh radio (LoRa + B.A.T.M.A.N. + Yggdrasil)
 lz4_compression = ["mesh", "dep:lz4_flex"]  # LZ4 packet compression for mesh radio
 mesh-encryption = ["mesh", "dep:chacha20poly1305", "dep:zeroize"]  # ChaCha20-Poly1305 AEAD encryption for mesh packets
 mesh-key-exchange = ["mesh-encryption", "dep:x25519-dalek", "dep:hkdf", "dep:sha2"]  # X25519 Diffie-Hellman per-peer key agreement
 swarm = ["iroh"]                            # Real-time P2P tensor streaming via Iroh 0.95+
+secure-mesh = ["identity", "mesh-key-exchange", "swarm"]  # Full crypto stack: Ed25519 + ChaCha20-Poly1305 + X25519 DH + HKDF
 mycelix = ["mycelix-fl-core", "sha3"]       # Mycelix FL algorithms + hashing
 mycelix_sdk = ["mycelix", "dep:mycelix-sdk"]                  # Enabled Mycelix SDK integration
 
@@ -458,6 +474,10 @@ therapeutic = ["dep:symthaea-clinical", "dep:symthaea-therapeutic", "ssm_languag
 liquid-mamba = ["ssm_language", "symthaea-broca/mamba"]  # Liquid-Mamba fusion: pre-trained Mamba SSM + HDC consciousness gating
 humanoid-mujoco = ["humanoid", "symthaea-humanoid/mujoco"]  # Humanoid with MuJoCo physics
 humanoid-viewer = ["humanoid-mujoco", "symthaea-humanoid/viewer"]  # Humanoid with MuJoCo viewer
+
+# ── Storage ────────────────────────────────────────────────────────
+hdc-store = ["dep:symthaea-hdc-store"]  # Zero-copy mmap'd BinaryHV storage with persistent LSH
+fhe-wisdom = []                        # FHE collective wisdom pool for privacy-preserving peer learning
 
 # ── Database backends ───────────────────────────────────────────────
 # DuckDB is an unconditional dep. Others deferred:
@@ -606,6 +626,10 @@ required-features = ["code_generation"]
 # They won't be built by default until the required modules are fixed
 
 # Integration tests needing cfg-gated modules
+[[test]]
+name = "defense_cascade_integration"
+required-features = ["safety-agents", "sentinel"]
+
 [[test]]
 name = "flight_integration"
 required-features = ["flight"]
@@ -1280,6 +1304,7 @@ harness = false
 [profile.test]
 inherits = "dev"
 opt-level = 1  # HV16 array ops are 10-100x slower at opt-level=0
+codegen-units = 16  # 16 CUs: good parallelism + sccache hits (was 256 → 2% cache hit rate)
 
 [profile.release]
 opt-level = 3

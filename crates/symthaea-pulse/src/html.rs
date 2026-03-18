@@ -16,9 +16,9 @@ use symthaea_psych_bench::harness::cognitive_profile::CognitiveProfile;
 use symthaea_types::N_HARMONIES;
 
 use crate::{
-    Anomaly, CantorInfo, DreamInfo, DriveInfo, GovernanceInfo, IntegrityInfo, KnowledgeInfo,
-    LearningInfo, MoralCompass, Narrative, NeuroBath, PerceptionInfo, PulseDelta, PulseSnapshot,
-    ReasoningInfo, SparklinePoint, SubstrateInfo, SwarmInfo, Vitals,
+    Anomaly, CantorInfo, DreamInfo, DriveInfo, GovernanceInfo, ImmuneInfo, IntegrityInfo,
+    KnowledgeInfo, LearningInfo, MoralCompass, Narrative, NeuroBath, PerceptionInfo, PulseDelta,
+    PulseSnapshot, ReasoningInfo, SparklinePoint, SubstrateInfo, SwarmInfo, Vitals,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -464,6 +464,7 @@ pub fn generate_pulse_html(
     write_learning_pane(&mut html, &current.learning);
     write_reasoning_pane(&mut html, &current.reasoning);
     write_dream_pane(&mut html, &current.dream);
+    write_immune_pane(&mut html, &current.immune);
     write_narrative_pane(&mut html, narrative);
     if !timeline.is_empty() {
         write_timeline_pane(&mut html, timeline, current);
@@ -1389,10 +1390,52 @@ fn write_neurobath_pane(html: &mut String, bath: &NeuroBath) {
         );
     }
 
+    // ── Bath dynamics diagnostics ──────────────────────────────────────────
+    let attractor_label = if bath.attractor_detected {
+        r#"<span style="color:#e8c547;font-weight:bold;" title="Phase-space attractor detected — bath dynamics have settled into a stable cycle">⊙ Attractor</span>"#
+    } else {
+        r#"<span style="color:#6b7d6b;" title="No attractor detected — bath exploring phase space">○ Exploring</span>"#
+    };
+
+    let entropy_color = if bath.bath_entropy > 1.5 {
+        "#c76b5a" // high chaos
+    } else if bath.bath_entropy > 0.8 {
+        "#e8c547" // moderate
+    } else {
+        "#7ec8a0" // low/stable
+    };
+
+    let excitotox_color = stress_color(bath.excitotoxicity_risk as f64);
+    let pe_color = stress_color(bath.self_assessment_pe_ema as f64);
+    let coherence_color = health_color(bath.self_assessment_coherence_ema as f64);
+
+    let calibration_badge = if bath.self_assessment_calibration_fired {
+        r#" <span style="color:#7ec8a0;font-size:0.75em;" title="Auto-calibration ran this cycle">⟳ calibrated</span>"#
+    } else {
+        ""
+    };
+
+    let seizure_warning = if bath.ei_seizure_events > 0 {
+        format!(
+            r#" <span style="color:#c76b5a;font-weight:bold;" title="Cumulative E/I imbalance events — sustained glutamate excess">⚡ {} seizure-like event{}</span>"#,
+            bath.ei_seizure_events,
+            if bath.ei_seizure_events == 1 { "" } else { "s" }
+        )
+    } else {
+        String::new()
+    };
+
     let _ = write!(
         html,
         r#"<div class="status-bar">
   {} · E/I: {:.2} · Allostatic: {:.0}% · Sleep: {:.2}{}
+</div>
+<div class="status-bar" style="margin-top:0.4em;font-size:0.82em;gap:0.8em;flex-wrap:wrap;">
+  {} · Entropy: <span style="color:{};">{:.2}</span>{}
+</div>
+<div class="status-bar" style="margin-top:0.4em;font-size:0.82em;gap:0.8em;flex-wrap:wrap;" title="Self-assessment monitor tracks internal prediction quality">
+  Self-Assess · PE: <span style="color:{};">{:.2}</span> · Coherence: <span style="color:{};">{:.2}</span>{}
+  · Excitotox: <span style="color:{};">{:.2}</span>
 </div>
 </div>
 "#,
@@ -1405,6 +1448,17 @@ fn write_neurobath_pane(html: &mut String, bath: &NeuroBath) {
         } else {
             format!(" · {}", bath.personality)
         },
+        attractor_label,
+        entropy_color,
+        bath.bath_entropy,
+        seizure_warning,
+        pe_color,
+        bath.self_assessment_pe_ema,
+        coherence_color,
+        bath.self_assessment_coherence_ema,
+        calibration_badge,
+        excitotox_color,
+        bath.excitotoxicity_risk,
     );
 }
 
@@ -2829,6 +2883,78 @@ fn write_narrative_pane(html: &mut String, narrative: &Narrative) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// Pane 20: Immune System
+// ═══════════════════════════════════════════════════════════════════════════════
+
+fn write_immune_pane(html: &mut String, immune: &super::ImmuneInfo) {
+    let active = !immune.safety_level.is_empty() && immune.safety_level != "GREEN";
+
+    let (status_label, status_color) = if immune.safety_level == "RED" {
+        ("EMERGENCY", "#e05555")
+    } else if immune.safety_level == "ORANGE" {
+        ("INTERVENTION", "#e08040")
+    } else if immune.safety_level == "YELLOW" {
+        ("ELEVATED", "#e8c547")
+    } else if immune.active_threats > 0 {
+        ("VIGILANT", "#7ec8a0")
+    } else {
+        ("NORMAL", "#7ec8a0")
+    };
+
+    let shield = if immune.motor_halt {
+        "&#x1F6D1;" // stop sign
+    } else if active {
+        "&#x1F6E1;" // shield
+    } else {
+        "&#x2705;" // checkmark
+    };
+
+    let _ = write!(
+        html,
+        r##"<div class="pane">
+<h2>{shield} Immune System</h2>
+<div style="text-align:center;margin-bottom:12px">
+  <span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:{color};box-shadow:0 0 12px {color};margin-right:8px;vertical-align:middle"></span>
+  <span style="color:{color};font-weight:bold;font-size:1.1em;vertical-align:middle">{label}</span>
+</div>
+<table style="width:100%;font-size:0.88em">
+<tr><td>Safety Level</td><td style="text-align:right;color:{color};font-weight:bold">{safety}</td></tr>
+<tr><td>Guardian Posture</td><td style="text-align:right">{posture}</td></tr>
+<tr><td>Patrol Active</td><td style="text-align:right">{patrol}</td></tr>
+<tr><td>Active Threats</td><td style="text-align:right;color:{threat_color}">{threats}</td></tr>
+<tr><td>Threat Level</td><td style="text-align:right">{threat_level:.2}</td></tr>
+<tr><td>Quarantined Peers</td><td style="text-align:right">{quarantined}</td></tr>
+<tr><td>Threat Patterns</td><td style="text-align:right">{patterns}</td></tr>
+<tr><td>LR Multiplier</td><td style="text-align:right;color:{lr_color}">{lr:.2}×</td></tr>
+<tr><td>Explore Multiplier</td><td style="text-align:right">{explore:.2}×</td></tr>
+<tr><td>Motor Halt</td><td style="text-align:right;color:{halt_color}">{halt}</td></tr>
+<tr><td>Immune Response</td><td style="text-align:right">{immune_active}</td></tr>
+<tr><td>Emergency Cycles</td><td style="text-align:right">{emergency}</td></tr>
+</table>
+</div>
+"##,
+        shield = shield,
+        color = status_color,
+        label = status_label,
+        safety = if immune.safety_level.is_empty() { "GREEN" } else { &immune.safety_level },
+        posture = if immune.guardian_posture.is_empty() { "Hold" } else { &immune.guardian_posture },
+        patrol = if immune.patrol_active { "Yes" } else { "No" },
+        threat_color = if immune.active_threats > 0 { "#c76b5a" } else { "#8a9a8a" },
+        threats = immune.active_threats,
+        threat_level = immune.threat_level,
+        quarantined = immune.quarantined_peers,
+        patterns = immune.threat_patterns,
+        lr_color = if immune.lr_multiplier < 1.0 { "#e8c547" } else { "#8a9a8a" },
+        lr = immune.lr_multiplier,
+        explore = immune.exploration_multiplier,
+        halt_color = if immune.motor_halt { "#e05555" } else { "#8a9a8a" },
+        halt = if immune.motor_halt { "HALTED" } else { "Active" },
+        immune_active = if immune.immune_response_active { "ACTIVE" } else { "Standby" },
+        emergency = immune.emergency_cycles,
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // Cross-pane Mycelial Connections (decorative SVG overlay)
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -3238,7 +3364,7 @@ fn write_broca_quality_sparkline(html: &mut String, sparkline: &[SparklinePoint]
 
     let data: Vec<f64> = sparkline.iter().map(|s| s.broca_quality as f64).collect();
     let min = 0.0_f64;
-    let max = 1.0_f64;
+    let _max = 1.0_f64;
     let range = 1.0;
     let last = *data.last().unwrap_or(&0.0);
 
@@ -3300,7 +3426,7 @@ fn write_tom_mismatch_sparkline(html: &mut String, sparkline: &[SparklinePoint])
 
     let data: Vec<f64> = sparkline.iter().map(|s| s.tom_mismatch as f64).collect();
     let min = 0.0_f64;
-    let max = 1.0_f64;
+    let _max = 1.0_f64;
     let range = 1.0;
     let last = *data.last().unwrap_or(&0.0);
 
@@ -3844,8 +3970,10 @@ fn escape_html(s: &str) -> String {
 mod tests {
     use super::*;
     use crate::{
-        Anomaly, IntegrityInfo, MoralCompass, Narrative, NeuroBath, PulseSnapshot, SparklinePoint,
-        SubstrateInfo, Vitals,
+        Anomaly, CantorInfo, DreamInfo, DriveInfo, GlyphInfo, GovernanceInfo, IntegrityInfo,
+        KnowledgeInfo, LearningInfo, MoralCompass, Narrative, NeuroBath, PerceptionInfo,
+        PulseSnapshot, ReasoningInfo, SpectrumInfo, SparklinePoint, SubstrateInfo, SwarmInfo,
+        Vitals,
     };
     use symthaea_types::N_HARMONIES;
 
@@ -3890,6 +4018,13 @@ mod tests {
             circadian_phase: "Day".into(),
             sleep_pressure: 0.15,
             ei_ratio: 1.05,
+            bath_entropy: 0.5,
+            attractor_detected: false,
+            ei_seizure_events: 0,
+            excitotoxicity_risk: 0.0,
+            self_assessment_pe_ema: 0.0,
+            self_assessment_coherence_ema: 0.0,
+            self_assessment_calibration_fired: false,
         }
     }
 
@@ -3960,6 +4095,17 @@ mod tests {
             narrative: test_narrative(),
             sparkline: vec![test_sparkline_point(0.50), test_sparkline_point(0.55)],
             integrity: IntegrityInfo::default(),
+            swarm: SwarmInfo::default(),
+            governance: GovernanceInfo::default(),
+            knowledge: KnowledgeInfo::default(),
+            cantor: CantorInfo::default(),
+            glyph: GlyphInfo::default(),
+            spectrum: SpectrumInfo::default(),
+            perception: PerceptionInfo::default(),
+            drive: DriveInfo::default(),
+            learning: LearningInfo::default(),
+            reasoning: ReasoningInfo::default(),
+            dream: DreamInfo::default(),
         }
     }
 
@@ -4090,6 +4236,13 @@ mod tests {
             circadian_phase: "Day".into(),
             sleep_pressure: 0.1,
             ei_ratio: 1.0,
+            bath_entropy: 0.5,
+            attractor_detected: false,
+            ei_seizure_events: 0,
+            excitotoxicity_risk: 0.0,
+            self_assessment_pe_ema: 0.0,
+            self_assessment_coherence_ema: 0.0,
+            self_assessment_calibration_fired: false,
         };
         assert_eq!(interpret_neuro_state(&bath), "Baseline Equilibrium");
     }

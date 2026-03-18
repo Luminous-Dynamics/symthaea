@@ -44,6 +44,9 @@ pub struct BrocaConsciousnessSignals {
     /// Intervention depth (0..1).
     #[cfg(feature = "therapeutic")]
     pub intervention_depth: f32,
+    /// Ethics gate: true when `EthicalVerdict::Blocked` prevents generation.
+    /// Uses a bool to avoid coupling Broca crate to the EthicalVerdict enum.
+    pub ethics_blocked: bool,
 }
 
 // Re-export telemetry type from the types module.
@@ -130,6 +133,16 @@ impl BrocaManager {
     /// Populates `ThoughtChannels` from the provided signals and delegates
     /// to `BrocaGenerator::generate()`.
     pub fn generate(&mut self, signals: BrocaConsciousnessSignals) -> Option<GenerationResult> {
+        // Gate: don't generate if ethics verdict is Blocked.
+        // Science: APA Ethics Code (2017) principle 3.04 — avoid harm.
+        if signals.ethics_blocked {
+            self.last_telemetry = BrocaGenerationTelemetry {
+                ethics_gated: true,
+                ..Default::default()
+            };
+            return None;
+        }
+
         // Gate: don't generate if consciousness too low
         if signals.consciousness_level < self.consciousness_threshold {
             self.last_telemetry = BrocaGenerationTelemetry {

@@ -3035,7 +3035,7 @@ fn test_decrypt_timing_no_leak() {
 
     // Create encrypted test data
     let plaintext = vec![0xABu8; 256];
-    let encrypted = encrypt_packet(&plaintext, &valid_key, &source_id, 42);
+    let encrypted = encrypt_packet(&plaintext, &valid_key, &source_id, 0xAB, 42);
 
     const ITERS: u32 = 1000;
 
@@ -3362,7 +3362,7 @@ fn test_downgrade_legacy_format_backward_compat() {
 
     // Encrypt with legacy format (no version prefix) using encrypt_packet
     let compressed = compress_packet(&packet.to_bytes());
-    let legacy_encrypted = encrypt_packet(&compressed, &key, &source_id, packet.sequence);
+    let legacy_encrypted = encrypt_packet(&compressed, &key, &source_id, 0xAB, packet.sequence);
 
     // Receiver should still decrypt legacy format via backward-compat fallback
     let mut receiver = MeshReceiver::new().with_encryption_key(key);

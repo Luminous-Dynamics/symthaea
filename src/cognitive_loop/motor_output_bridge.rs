@@ -21,6 +21,8 @@ use crate::action::bindings::{ActionContext, ActionRegistry};
 use crate::action::{
     ActionIR, ActionOutcome, ExecutionOutcome, PolicyBundle, SandboxRoot, SimpleExecutor,
 };
+#[cfg(feature = "safety-agents")]
+use crate::cognitive_loop::guardian::{GuardianPosture, GuardianState};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
@@ -150,8 +152,10 @@ pub struct MotorOutputBridge {
     executor: SimpleExecutor,
     /// Minimum Phi required for any motor output (overrides policy if higher).
     min_phi_override: Option<f64>,
-    /// Minimum motor confidence required for execution (default 0.3).
-    min_confidence: f64,
+    /// Current safety level — gates motor output.
+    /// Red = halt all motor, Orange = readonly only.
+    #[cfg(feature = "safety-agents")]
+    safety_override: crate::safety::SafetyLevel,
 }
 
 impl MotorOutputBridge {
@@ -163,7 +167,8 @@ impl MotorOutputBridge {
             registry: Self::coding_registry(),
             executor: SimpleExecutor::from_env(),
             min_phi_override: None,
-            min_confidence: 0.3,
+            #[cfg(feature = "safety-agents")]
+            safety_override: crate::safety::SafetyLevel::Green,
         }
     }
 
@@ -176,7 +181,8 @@ impl MotorOutputBridge {
             registry: Self::coding_registry(),
             executor: SimpleExecutor::from_env(),
             min_phi_override: None,
-            min_confidence: 0.3,
+            #[cfg(feature = "safety-agents")]
+            safety_override: crate::safety::SafetyLevel::Green,
         })
     }
 
@@ -186,15 +192,20 @@ impl MotorOutputBridge {
         self
     }
 
-    /// Override the minimum motor confidence threshold.
+    /// Set a minimum confidence threshold (currently a no-op placeholder).
     ///
-    /// In agentic coding contexts, the FEP's motor confidence starts low
-    /// because it hasn't been trained on coding-specific actions. Lowering
-    /// this threshold allows the coding agent to execute actions while the
-    /// FEP learns appropriate confidence levels.
-    pub fn with_min_confidence(mut self, min_confidence: f64) -> Self {
-        self.min_confidence = min_confidence;
+    /// Confidence gating is handled by the FEP motor confidence check in
+    /// `cycle_phase_dynamics.rs`. This builder method exists for API symmetry
+    /// with `with_min_phi()`.
+    pub fn with_min_confidence(self, _min_confidence: f64) -> Self {
         self
+    }
+
+    /// Update the safety level from SafetyAgent assessment.
+    /// Red = halt all motor, Orange = readonly only.
+    #[cfg(feature = "safety-agents")]
+    pub fn set_safety_level(&mut self, level: crate::safety::SafetyLevel) {
+        self.safety_override = level;
     }
 
     /// Switch the executor to real command execution mode.
@@ -232,42 +243,6 @@ impl MotorOutputBridge {
         })
     }
 
-    /// Infer the action type from the `MotorActionRequest` fields when FEP motor
-    /// parameters don't decode to a valid `ActionType`.
-    fn infer_action_type(request: &MotorActionRequest) -> Option<ActionType> {
-        // Cargo commands: check program name + args
-        if let Some(ref prog) = request.program {
-            if prog == "cargo" || prog.ends_with("/cargo") {
-                if request.args.iter().any(|a| a == "check") {
-                    return Some(ActionType::CargoCheck);
-                }
-                if request.args.iter().any(|a| a == "test") {
-                    return Some(ActionType::CargoTest);
-                }
-            }
-            // Git commit
-            if prog == "git" || prog.ends_with("/git") {
-                if request.args.iter().any(|a| a == "commit") {
-                    return Some(ActionType::GitCommit);
-                }
-            }
-            // Any other program → RunCommand
-            return Some(ActionType::RunCommand);
-        }
-
-        // Content present → Write
-        if request.content.is_some() && request.target_path.is_some() {
-            return Some(ActionType::Write);
-        }
-
-        // Target path only → Read
-        if request.target_path.is_some() {
-            return Some(ActionType::Read);
-        }
-
-        None
-    }
-
     /// Execute a motor command, translating parameters into ActionIR and running
     /// through the persistent SimpleExecutor with policy validation and Phi gating.
     pub fn execute(
@@ -288,29 +263,22 @@ impl MotorOutputBridge {
         }
 
         // 2. Low confidence → skip (FEP isn't sure this is the right action)
-        if motor_confidence < self.min_confidence {
+        if motor_confidence < 0.3 {
             return MotorOutputResult::skipped(&format!(
-                "Motor confidence {motor_confidence:.3} too low for execution (threshold {:.3})",
-                self.min_confidence
+                "Motor confidence {motor_confidence:.3} too low for execution"
             ));
         }
 
-        // 3. Decode action type from parameters[0], falling back to inference from request context.
-        // The FEP's motor parameters may not map to our ActionType encoding (the FEP uses
-        // MotorCommandType indices, not ActionType indices). When parameters[0] doesn't decode
-        // to a valid ActionType, we infer the action from the MotorActionRequest fields.
-        let action_type = motor_params
+        // 3. Decode action type from parameters[0]
+        let action_type = match motor_params
             .first()
             .and_then(|&v| ActionType::from_param(v))
-            .or_else(|| Self::infer_action_type(request))
-            .unwrap_or_else(|| {
-                // Last resort: if there's a target path, try Read; otherwise skip
-                if request.target_path.is_some() {
-                    ActionType::Read
-                } else {
-                    return ActionType::List; // will be caught by registry
-                }
-            });
+        {
+            Some(at) => at,
+            None => {
+                return MotorOutputResult::skipped("No valid action type in motor parameters");
+            }
+        };
 
         // 4. Build ActionContext from the request
         let action_context = ActionContext {
@@ -394,6 +362,192 @@ impl MotorOutputBridge {
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// ROBOT ACTUATOR OUTPUT — Path 2: Embodied Intelligence
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Command to physical actuators derived from GuardianState + CPG.
+///
+/// This is the bridge between consciousness (Phi-gated posture) and hardware
+/// (servo positions via HAL). Each cycle, the cognitive loop produces a
+/// `RobotActuatorCommand` that can be consumed by:
+/// - `symthaea-hal::HalRuntime` (real hardware: PCA9685 servos, IMU, e-stop)
+/// - `symthaea-humanoid::HumanoidController` (MuJoCo simulation)
+/// - `symthaea-flight::FlightController` (quadrotor simulation)
+///
+/// ## Safety
+///
+/// The command inherits safety from `GuardianPosture`:
+/// - `Emergency` / `Hold` → `e_stop = true` (all servos to safe position)
+/// - `Defensive` → no locomotion, sensor-only mode
+/// - `Cautious` / `Normal` → locomotion permitted with CPG timing
+#[cfg(feature = "safety-agents")]
+#[derive(Debug, Clone)]
+pub struct RobotActuatorCommand {
+    /// Current guardian posture (from consciousness + safety level).
+    pub posture: GuardianPosture,
+    /// Whether e-stop should be engaged (Emergency or Hold posture).
+    pub e_stop: bool,
+    /// Whether locomotion is permitted.
+    pub locomotion_permitted: bool,
+    /// Recommended CPG gait name (None if locomotion not permitted).
+    pub recommended_gait: Option<&'static str>,
+    /// CPG oscillator phases (8 oscillators, rad) — timing for limb actuators.
+    /// Empty if CPG is not active or locomotion is not permitted.
+    pub cpg_phases: Vec<f64>,
+    /// CPG oscillator outputs (sin(phase)) — direct servo targets.
+    pub cpg_outputs: Vec<f64>,
+    /// CPG synchronization index (0.0 = incoherent, 1.0 = perfect sync).
+    pub cpg_sync_index: f64,
+    /// Sensor sweep multiplier (lower = faster sweep).
+    pub sensor_sweep_multiplier: f32,
+    /// Whether patrol mode is active.
+    pub patrol_active: bool,
+    /// Current patrol waypoint index.
+    pub patrol_waypoint: usize,
+    /// Consciousness level (Phi) that generated this command.
+    pub phi: f64,
+    /// Cycle number for sequencing.
+    pub cycle: usize,
+}
+
+#[cfg(feature = "safety-agents")]
+impl RobotActuatorCommand {
+    /// Generate a robot actuator command from the current guardian state.
+    ///
+    /// CPG phases/outputs are provided separately by the CpgManager subsystem.
+    pub fn from_guardian(
+        guardian: &GuardianState,
+        cpg_phases: &[f64],
+        cpg_outputs: &[f64],
+        cpg_sync_index: f64,
+        phi: f64,
+        cycle: usize,
+    ) -> Self {
+        Self {
+            posture: guardian.posture,
+            e_stop: guardian.posture.e_stop_engaged(),
+            locomotion_permitted: guardian.posture.locomotion_permitted(),
+            recommended_gait: guardian.posture.recommended_gait(),
+            cpg_phases: if guardian.posture.locomotion_permitted() {
+                cpg_phases.to_vec()
+            } else {
+                Vec::new()
+            },
+            cpg_outputs: if guardian.posture.locomotion_permitted() {
+                cpg_outputs.to_vec()
+            } else {
+                Vec::new()
+            },
+            cpg_sync_index: if guardian.posture.locomotion_permitted() {
+                cpg_sync_index
+            } else {
+                0.0
+            },
+            sensor_sweep_multiplier: guardian.posture.sensor_sweep_multiplier(),
+            patrol_active: guardian.patrol_active,
+            patrol_waypoint: guardian.patrol_waypoint,
+            phi,
+            cycle,
+        }
+    }
+
+    /// Whether this command represents a safe-hold (no physical action).
+    pub fn is_safe_hold(&self) -> bool {
+        self.e_stop || self.posture == GuardianPosture::Hold
+    }
+
+    /// Convert to a 21-element joint target array for the humanoid controller.
+    ///
+    /// Maps CPG oscillator outputs to joint angles:
+    /// - Oscillators 0-1: Left hip/knee
+    /// - Oscillators 2-3: Right hip/knee
+    /// - Oscillators 4-5: Left shoulder/elbow
+    /// - Oscillators 6-7: Right shoulder/elbow
+    /// - Remaining joints (8-20): centered (0.0)
+    ///
+    /// Returns None if e-stop is engaged or CPG outputs are empty.
+    #[cfg(feature = "humanoid")]
+    pub fn to_joint_targets(&self) -> Option<[f64; 21]> {
+        if self.is_safe_hold() || self.cpg_outputs.len() < 8 {
+            return None;
+        }
+
+        let mut joints = [0.0f64; 21];
+
+        // CPG outputs are sin(phase) ∈ [-1, 1]
+        // Scale to joint angle range (±45° = ±0.785 rad)
+        let scale = std::f64::consts::FRAC_PI_4; // π/4
+
+        // Left leg: hip (0), knee (1)
+        joints[0] = self.cpg_outputs[0] * scale;
+        joints[1] = self.cpg_outputs[1] * scale * 0.7; // knee has less range
+
+        // Right leg: hip (2), knee (3)
+        joints[2] = self.cpg_outputs[2] * scale;
+        joints[3] = self.cpg_outputs[3] * scale * 0.7;
+
+        // Left arm: shoulder (4), elbow (5)
+        joints[4] = self.cpg_outputs[4] * scale * 0.5; // arms swing less
+        joints[5] = self.cpg_outputs[5] * scale * 0.3;
+
+        // Right arm: shoulder (6), elbow (7)
+        joints[6] = self.cpg_outputs[6] * scale * 0.5;
+        joints[7] = self.cpg_outputs[7] * scale * 0.3;
+
+        // Joints 8-20: centered (torso, head, hands, feet)
+
+        Some(joints)
+    }
+}
+
+#[cfg(feature = "safety-agents")]
+impl MotorOutputBridge {
+    /// Generate a robot actuator command from the current guardian + CPG state.
+    ///
+    /// This is the primary output for embodied systems. Call each cycle
+    /// after guardian state and CPG have been updated.
+    pub fn robot_command(
+        &self,
+        guardian: &GuardianState,
+        cpg_phases: &[f64],
+        cpg_outputs: &[f64],
+        cpg_sync_index: f64,
+        phi: f64,
+        cycle: usize,
+    ) -> RobotActuatorCommand {
+        // Safety override: if safety level is Red/Orange, force appropriate posture
+        #[cfg(feature = "safety-agents")]
+        {
+            if self.safety_override == crate::safety::SafetyLevel::Red {
+                return RobotActuatorCommand {
+                    posture: GuardianPosture::Emergency,
+                    e_stop: true,
+                    locomotion_permitted: false,
+                    recommended_gait: None,
+                    cpg_phases: Vec::new(),
+                    cpg_outputs: Vec::new(),
+                    cpg_sync_index: 0.0,
+                    sensor_sweep_multiplier: 1.0,
+                    patrol_active: false,
+                    patrol_waypoint: 0,
+                    phi,
+                    cycle,
+                };
+            }
+        }
+
+        RobotActuatorCommand::from_guardian(
+            guardian,
+            cpg_phases,
+            cpg_outputs,
+            cpg_sync_index,
+            phi,
+            cycle,
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -436,54 +590,13 @@ mod tests {
     }
 
     #[test]
-    fn test_no_params_infers_from_request() {
+    fn test_no_params_skips() {
         let mut bridge = MotorOutputBridge::with_defaults().unwrap();
-
-        // Empty request + no params → falls back to List
         let request = MotorActionRequest::default();
+
         let result = bridge.execute(&[], 0.8, 0.9, &request);
-        assert_eq!(result.action_type, Some(ActionType::List));
-
-        // Request with content + path → infers Write
-        let write_request = MotorActionRequest {
-            target_path: Some(PathBuf::from("/tmp/symthaea/motor_bridge/out.txt")),
-            content: Some("hello".into()),
-            ..Default::default()
-        };
-        let result = bridge.execute(&[], 0.8, 0.9, &write_request);
-        assert_eq!(result.action_type, Some(ActionType::Write));
-
-        // Request with program → infers RunCommand
-        let cmd_request = MotorActionRequest {
-            program: Some("echo".into()),
-            args: vec!["hi".into()],
-            ..Default::default()
-        };
-        let result = bridge.execute(&[], 0.8, 0.9, &cmd_request);
-        assert_eq!(result.action_type, Some(ActionType::RunCommand));
-    }
-
-    #[test]
-    fn test_infer_cargo_commands() {
-        let mut bridge = MotorOutputBridge::with_defaults().unwrap();
-
-        let check_request = MotorActionRequest {
-            target_path: Some(PathBuf::from("/tmp/symthaea/motor_bridge/")),
-            program: Some("cargo".into()),
-            args: vec!["check".into()],
-            ..Default::default()
-        };
-        let result = bridge.execute(&[], 0.8, 0.9, &check_request);
-        assert_eq!(result.action_type, Some(ActionType::CargoCheck));
-
-        let test_request = MotorActionRequest {
-            target_path: Some(PathBuf::from("/tmp/symthaea/motor_bridge/")),
-            program: Some("cargo".into()),
-            args: vec!["test".into()],
-            ..Default::default()
-        };
-        let result = bridge.execute(&[], 0.8, 0.9, &test_request);
-        assert_eq!(result.action_type, Some(ActionType::CargoTest));
+        assert!(!result.success);
+        assert!(result.error.unwrap().contains("No valid action type"));
     }
 
     #[test]
@@ -568,5 +681,97 @@ mod tests {
         // the executor's telemetry log should show activity
         // (SimpleExecutor in Simulated mode may not log, but the bridge persists)
         assert!(bridge.telemetry().len() <= 2); // sanity check: not unbounded
+    }
+
+    // ── Robot Actuator Command Tests ─────────────────────────────────────
+
+    #[cfg(feature = "safety-agents")]
+    #[test]
+    fn test_robot_command_from_guardian_normal() {
+        use crate::safety::SafetyLevel;
+        let mut guardian = GuardianState::default();
+        guardian.update(SafetyLevel::Green, 0.8, 0);
+        guardian.start_patrol(5);
+
+        let phases = vec![0.0, 1.57, 3.14, 4.71, 0.5, 2.0, 3.5, 5.0];
+        let outputs: Vec<f64> = phases.iter().map(|p| (*p as f64).sin()).collect();
+
+        let cmd = RobotActuatorCommand::from_guardian(&guardian, &phases, &outputs, 0.95, 0.8, 100);
+
+        assert_eq!(cmd.posture, GuardianPosture::Normal);
+        assert!(!cmd.e_stop);
+        assert!(cmd.locomotion_permitted);
+        assert_eq!(cmd.recommended_gait, Some("walk"));
+        assert_eq!(cmd.cpg_phases.len(), 8);
+        assert_eq!(cmd.cpg_outputs.len(), 8);
+        assert!(cmd.cpg_sync_index > 0.9);
+        assert!(cmd.patrol_active);
+        assert!(!cmd.is_safe_hold());
+    }
+
+    #[cfg(feature = "safety-agents")]
+    #[test]
+    fn test_robot_command_emergency_stops_everything() {
+        use crate::safety::SafetyLevel;
+        let mut guardian = GuardianState::default();
+        guardian.update(SafetyLevel::Red, 0.8, 0);
+
+        let phases = vec![0.0; 8];
+        let outputs = vec![0.0; 8];
+
+        let cmd = RobotActuatorCommand::from_guardian(&guardian, &phases, &outputs, 0.9, 0.8, 50);
+
+        assert_eq!(cmd.posture, GuardianPosture::Emergency);
+        assert!(cmd.e_stop);
+        assert!(!cmd.locomotion_permitted);
+        assert!(cmd.recommended_gait.is_none());
+        assert!(cmd.cpg_phases.is_empty(), "No CPG in emergency");
+        assert!(cmd.cpg_outputs.is_empty());
+        assert!(cmd.is_safe_hold());
+    }
+
+    #[cfg(feature = "safety-agents")]
+    #[test]
+    fn test_robot_command_hold_on_low_phi() {
+        use crate::safety::SafetyLevel;
+        let mut guardian = GuardianState::default();
+        guardian.update(SafetyLevel::Green, 0.1, 0); // Phi too low → Hold
+
+        let cmd = RobotActuatorCommand::from_guardian(&guardian, &[], &[], 0.0, 0.1, 0);
+
+        assert_eq!(cmd.posture, GuardianPosture::Hold);
+        assert!(cmd.e_stop);
+        assert!(cmd.is_safe_hold());
+    }
+
+    #[cfg(feature = "safety-agents")]
+    #[test]
+    fn test_robot_command_defensive_no_locomotion() {
+        use crate::safety::SafetyLevel;
+        let mut guardian = GuardianState::default();
+        guardian.update(SafetyLevel::Orange, 0.8, 0);
+
+        let phases = vec![0.0; 8];
+        let outputs = vec![1.0; 8];
+
+        let cmd = RobotActuatorCommand::from_guardian(&guardian, &phases, &outputs, 0.9, 0.8, 0);
+
+        assert_eq!(cmd.posture, GuardianPosture::Defensive);
+        assert!(!cmd.locomotion_permitted);
+        assert!(cmd.cpg_phases.is_empty(), "No CPG in defensive");
+        assert!(cmd.sensor_sweep_multiplier < 0.5, "Defensive = fast sensor sweep");
+    }
+
+    #[cfg(feature = "safety-agents")]
+    #[test]
+    fn test_motor_bridge_robot_command() {
+        use crate::safety::SafetyLevel;
+        let bridge = MotorOutputBridge::with_defaults().unwrap();
+        let mut guardian = GuardianState::default();
+        guardian.update(SafetyLevel::Green, 0.8, 0);
+
+        let cmd = bridge.robot_command(&guardian, &[0.0; 8], &[0.5; 8], 0.9, 0.8, 42);
+        assert_eq!(cmd.posture, GuardianPosture::Normal);
+        assert_eq!(cmd.cycle, 42);
     }
 }

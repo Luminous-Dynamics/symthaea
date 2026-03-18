@@ -49,8 +49,18 @@ pub mod haptic;
 pub mod holon_bridge;
 pub mod memory;
 pub mod metabolism;
+pub mod pairing;
+pub mod persistence;
 pub mod sensor_bridge;
+pub mod boot_consciousness;
+pub mod secure_boot;
+pub mod sovereign;
 pub mod topology;
+
+pub mod hardware_probe;
+
+#[cfg(feature = "wasm")]
+pub mod quickening;
 
 #[cfg(feature = "wasm")]
 pub mod wasm_bindings;

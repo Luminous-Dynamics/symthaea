@@ -35,6 +35,7 @@ pub struct MachiavelliBenchmark;
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// A labeled scenario-action pair.
+#[allow(dead_code)] // context/action reserved for scenario-level reporting
 struct MachScenario {
     /// Context setup.
     context: &'static str,

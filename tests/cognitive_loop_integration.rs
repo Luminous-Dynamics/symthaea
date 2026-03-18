@@ -1021,7 +1021,7 @@ fn test_harmonics_and_consciousness_profile_wired() {
     assert!(
         last_result
             .metadata
-            .consciousness_profile_composite
+            .consciousness.consciousness_profile_composite
             .is_finite(),
         "Consciousness profile composite should be finite"
     );
@@ -1141,9 +1141,9 @@ fn test_causal_chain_boosts_episodic_consolidation() {
     // After 60 cycles the cached causal chain count should be populated
     // (may be 0 if no genuine chains found, but the analysis ran without panic)
     assert!(
-        meta.temporal_causal_chains < 1000,
+        meta.temporal.temporal_causal_chains < 1000,
         "Causal chain count should be bounded, got {}",
-        meta.temporal_causal_chains,
+        meta.temporal.temporal_causal_chains,
     );
     // causal_codebook_entries should be a finite count
     assert!(
@@ -1330,7 +1330,7 @@ fn test_holographic_and_affective_wired() {
     assert!(
         last_result
             .metadata
-            .affect_consciousness_valence
+            .embodied.affect_consciousness_valence
             .is_finite(),
         "Affective consciousness valence should be finite, got: {}",
         last_result.metadata.embodied.affect_consciousness_valence,
@@ -7350,14 +7350,14 @@ fn test_cross_coupling_no_nan_500_cycles() {
 
         // Consciousness level: finite, bounded [0, 1]
         assert!(
-            m.consciousness_level.is_finite(),
+            m.consciousness.consciousness_level.is_finite(),
             "consciousness_level not finite at cycle {i}: {}",
-            m.consciousness_level
+            m.consciousness.consciousness_level
         );
         assert!(
-            m.consciousness_level >= 0.0 && m.consciousness_level <= 1.0,
+            m.consciousness.consciousness_level >= 0.0 && m.consciousness.consciousness_level <= 1.0,
             "consciousness_level out of [0,1] at cycle {i}: {}",
-            m.consciousness_level
+            m.consciousness.consciousness_level
         );
 
         // Prediction error: finite, bounded [0, 1]

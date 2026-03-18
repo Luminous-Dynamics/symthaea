@@ -12,7 +12,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::config::BenchmarkConfig;
-use super::report::{key_metric_for_benchmark, BenchmarkResult};
+use super::report::key_metric_for_benchmark;
 use super::PsychBenchmark;
 
 // ──── Practice direction ────

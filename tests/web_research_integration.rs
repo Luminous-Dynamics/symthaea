@@ -31,16 +31,15 @@ async fn test_continuous_mind_has_web_researcher() {
 
 #[tokio::test]
 async fn test_knowledge_integrator_creation() {
-    let _integrator = KnowledgeIntegrator::new();
-    // Should create without panicking
-    assert!(true);
+    let integrator = KnowledgeIntegrator::new();
+    // Default integrator should have zero accumulated state
+    assert_eq!(integrator.total_claims(), 0);
 }
 
 #[tokio::test]
 async fn test_knowledge_integrator_with_confidence() {
-    let _integrator = KnowledgeIntegrator::new().with_min_confidence(0.7);
-    // Should create with custom confidence
-    assert!(true);
+    let integrator = KnowledgeIntegrator::new().with_min_confidence(0.7);
+    assert_eq!(integrator.total_claims(), 0);
 }
 
 // ============================================================================

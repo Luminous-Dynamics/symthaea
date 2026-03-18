@@ -74,6 +74,23 @@ impl Default for BleMeshMode {
     }
 }
 
+/// Pairing mode for Ed25519 device trust establishment.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PairingMode {
+    /// No pairing activity.
+    Off,
+    /// Accepting pairing requests from nearby devices.
+    Discoverable,
+    /// Already paired — only re-authenticate known devices.
+    Paired,
+}
+
+impl Default for PairingMode {
+    fn default() -> Self {
+        Self::Off
+    }
+}
+
 /// Controls all outbound sharing. Sovereign privacy by default.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SharingConfig {
@@ -81,6 +98,8 @@ pub struct SharingConfig {
     pub ble_mode: BleMeshMode,
     pub haptic_enabled: bool,
     pub telemetry_export: bool,
+    #[serde(default)]
+    pub pairing_mode: PairingMode,
 }
 
 impl Default for SharingConfig {
@@ -90,6 +109,7 @@ impl Default for SharingConfig {
             ble_mode: BleMeshMode::Off,
             haptic_enabled: true,
             telemetry_export: false,
+            pairing_mode: PairingMode::Off,
         }
     }
 }

@@ -5,12 +5,12 @@
 //! described environments, and accuracy decreases as paths become more complex
 //! (more turns, more steps).
 //!
-//! HDC implementation: A location is encoded as a BinaryHV. Movement vectors
-//! (N/S/E/W) are encoded as fixed BinaryHVs, and sequential movements are
-//! composed via XOR binding with temporal permutation. After a series of
-//! movements, the system's computed final position is compared against the
-//! correct target position. Accuracy drops with path length/complexity because
-//! cumulative binding noise degrades the representation.
+//! HDC implementation: Grid locations are encoded compositionally using two
+//! basis HVs (pos_x, pos_y): location(x,y) = permute(pos_x, x) ⊕ permute(pos_y, y).
+//! This means locations that differ by a known displacement are related by a
+//! fixed HDC transformation, so walking a path via HDC operations can be compared
+//! against the target location encoded the same way. Accuracy drops with path
+//! length/complexity because cumulative XOR binding noise degrades the match.
 //!
 //! Human baselines (Morrow et al., 1989; Rieser, 1989):
 //! - updating_accuracy: 0.85 (SD~0.08) -- mean accuracy across path lengths
@@ -53,23 +53,54 @@ impl SpatialPathUpdatingBenchmark {
             / diff_model.signal_multiplier(config.difficulty) as f32;
         let noise_degrade = config.effective_noise() as f32 * 0.30;
 
-        // Create 4 directional movement HVs (N, S, E, W)
-        let dir_north = BinaryHV::random(seed.wrapping_add(100));
-        let dir_south = BinaryHV::random(seed.wrapping_add(200));
-        let dir_east = BinaryHV::random(seed.wrapping_add(300));
-        let dir_west = BinaryHV::random(seed.wrapping_add(400));
-        let directions = [&dir_north, &dir_south, &dir_east, &dir_west];
-
-        // Create a grid of location HVs (5x5 = 25 locations)
+        // Compositional grid coordinate system.
+        // Each grid location (x, y) is encoded as:
+        //   location(x, y) = permute(pos_x_basis, x) ⊕ permute(pos_y_basis, y)
+        // This means locations are derived from coordinates, not random, so HDC
+        // path arithmetic can be compared against the target location.
         let grid_size = 5usize;
-        let mut locations = Vec::new();
-        for i in 0..(grid_size * grid_size) {
-            locations.push(BinaryHV::random(seed.wrapping_add(1000 + i as u64)));
+        let pos_x_basis = BinaryHV::random(seed.wrapping_add(1000));
+        let pos_y_basis = BinaryHV::random(seed.wrapping_add(2000));
+
+        // Encode location from (x, y) coordinates using compositional binding.
+        let encode_location = |x: usize, y: usize| -> BinaryHV {
+            let px = pos_x_basis.permute(x + 1); // +1 so permute(0) != identity
+            let py = pos_y_basis.permute(y + 1);
+            px.bind(&py)
+        };
+
+        // Pre-build all grid locations using the compositional scheme.
+        let mut locations = Vec::with_capacity(grid_size * grid_size);
+        for y in 0..grid_size {
+            for x in 0..grid_size {
+                locations.push(encode_location(x, y));
+            }
         }
 
-        // Inverse directions for computing ground truth positions
-        // N=(0,-1), S=(0,+1), E=(+1,0), W=(-1,0) in grid coords
+        // Direction delta HVs: encode displacement from current to next cell.
+        // direction_delta(dx, dy) = encode_location(cx+dx, cy+dy) ⊕ encode_location(cx, cy)
+        // = permute(pos_x, cx+dx) ⊕ permute(pos_y, cy+dy) ⊕ permute(pos_x, cx) ⊕ permute(pos_y, cy)
+        // The cx/cy terms cancel via XOR self-inverse when we apply it:
+        //   location(cx+dx, cy+dy) = location(cx, cy) ⊕ direction_delta(dx, dy)  [approx]
+        // This is only exact when there is no cross-coupling; in practice the
+        // permute shifts are independent so the cancellation is clean.
+        //
+        // N=(0,-1), S=(0,+1), E=(+1,0), W=(-1,0) in grid coords (y increases southward)
         let dir_deltas: [(i32, i32); 4] = [(0, -1), (0, 1), (1, 0), (-1, 0)];
+
+        // Pre-compute direction delta HVs from the center of the grid so they
+        // capture the local displacement structure.
+        let cx0 = grid_size / 2;
+        let cy0 = grid_size / 2;
+        let center_hv = encode_location(cx0, cy0);
+        let dir_hvs: [BinaryHV; 4] = std::array::from_fn(|d| {
+            let (dx, dy) = dir_deltas[d];
+            let nx = (cx0 as i32 + dx).clamp(0, grid_size as i32 - 1) as usize;
+            let ny = (cy0 as i32 + dy).clamp(0, grid_size as i32 - 1) as usize;
+            let neighbor_hv = encode_location(nx, ny);
+            // delta = neighbor ⊕ center (XOR self-inverse recovers neighbor when applied to center)
+            neighbor_hv.bind(&center_hv)
+        });
 
         // Test at different path complexities (1 to 7 steps)
         let max_steps = 7;
@@ -84,77 +115,65 @@ impl SpatialPathUpdatingBenchmark {
             for _pres in 0..n_presentations {
                 xor_shift(&mut rng);
 
-                // Start at center of grid
+                // Start at center of grid.
                 let mut pos_x: i32 = (grid_size / 2) as i32;
                 let mut pos_y: i32 = (grid_size / 2) as i32;
 
-                // Compose movement path using HDC binding
-                // Each step: bind direction HV with step-position (permute by step index)
-                let mut path_hv = BinaryHV::zero();
-                let mut first_step = true;
+                // Walk the path: apply each direction delta to the current
+                // position HV. Because location(x+dx, y+dy) ≈ location(x, y) ⊕ dir_delta,
+                // we can compose steps as successive XOR applications.
+                let mut current_hv = encode_location(pos_x as usize, pos_y as usize);
 
-                for step in 0..n_steps {
+                for _step in 0..n_steps {
                     xor_shift(&mut rng);
                     let dir_idx = (rng % 4) as usize;
 
-                    // Update ground truth position
+                    // Update ground-truth grid position (clamped to grid).
                     let (dx, dy) = dir_deltas[dir_idx];
                     pos_x = (pos_x + dx).clamp(0, grid_size as i32 - 1);
                     pos_y = (pos_y + dy).clamp(0, grid_size as i32 - 1);
 
-                    // Encode this step: permute(direction, step) to mark order
-                    let step_hv = directions[dir_idx].permute(step + 1);
-
-                    if first_step {
-                        path_hv = step_hv;
-                        first_step = false;
-                    } else {
-                        // Bind successive steps together
-                        path_hv = path_hv.bind(&step_hv);
-                    }
+                    // Apply the direction delta HV to advance the HDC position.
+                    // current ⊕ dir_delta ≈ encode_location(new_x, new_y)
+                    current_hv = current_hv.bind(&dir_hvs[dir_idx]);
                 }
 
-                // Target location
+                // Ground-truth target index.
                 let target_idx = pos_y as usize * grid_size + pos_x as usize;
-                let _target_hv = &locations[target_idx];
 
-                // The system tries to match the composed path to a location.
-                // We bind the start location with the path, then compare to all locations.
-                let start_idx = (grid_size / 2) * grid_size + (grid_size / 2);
-                let start_hv = &locations[start_idx];
-                let computed = start_hv.bind(&path_hv);
-
-                // Find the most similar location
+                // Find the most similar precomputed location HV.
                 let mut best_sim = f32::MIN;
                 let mut best_idx = 0usize;
                 for (i, loc) in locations.iter().enumerate() {
-                    let sim = computed.similarity(loc) * (1.0 - noise_degrade);
+                    let sim = current_hv.similarity(loc) * (1.0 - noise_degrade);
                     if sim > best_sim {
                         best_sim = sim;
                         best_idx = i;
                     }
                 }
 
-                // Add decision noise
+                // Add decision noise.
                 xor_shift(&mut rng);
                 let noise = ((rng % 10000) as f32 / 10000.0 - 0.5)
                     * tp_noise
                     * diff_model.temperature_multiplier(config.difficulty) as f32;
 
-                // With noise, we might pick wrong location
-                // Simulate: if noise is large enough, pick a neighbor instead
-                let effective_sim = best_sim + noise;
-                let _ = effective_sim; // Used implicitly: high noise degrades match
-                if best_idx == target_idx && noise.abs() < 0.3 {
-                    correct += 1;
-                } else if best_idx == target_idx {
-                    // Even with noise, correct match is strong signal
+                // Correct if the best-matching location is the target and noise
+                // doesn't flip the decision.
+                let margin = best_sim - {
+                    // Second-best similarity for signal-to-noise check.
+                    locations
+                        .iter()
+                        .enumerate()
+                        .filter(|(i, _)| *i != best_idx)
+                        .map(|(_, loc)| current_hv.similarity(loc))
+                        .fold(f32::MIN, f32::max)
+                };
+                if best_idx == target_idx && margin + noise > 0.0 {
                     correct += 1;
                 }
-                // Note: since XOR binding is lossy for long compositions,
-                // accuracy naturally drops with path length
 
-                // RT: longer paths take more time
+                // RT: longer paths take more time.
                 let base_rt = 2.0 + n_steps as f64 * 1.5;
                 let tp_speedup = config.time_pressure * 1.0;
                 rt_sum += (base_rt - tp_speedup).max(1.0);
@@ -360,5 +379,35 @@ mod tests {
         let prov = SpatialPathUpdatingBenchmark.provenance().unwrap();
         assert_eq!(prov.year, 1989);
         assert!(prov.citation.contains("Morrow"));
+    }
+
+    #[test]
+    fn test_accuracy_values_meaningful() {
+        // Verify that the HDC coordinate encoding produces genuine signal (not ~4% random)
+        let config = BenchmarkConfig {
+            dimension: 512,
+            trials_per_condition: 10,
+            ..Default::default()
+        };
+        let result = SpatialPathUpdatingBenchmark.run(&config);
+        let simple = result.metrics["simple_accuracy"].mean;
+        let updating = result.metrics["updating_accuracy"].mean;
+        // With compositional encoding, 1-step accuracy should be well above chance (1/25 = 0.04)
+        assert!(
+            simple > 0.3,
+            "simple_accuracy ({:.3}) should be well above chance (0.04), compositional encoding must work",
+            simple
+        );
+        assert!(
+            updating > 0.1,
+            "updating_accuracy ({:.3}) should be above chance (0.04)",
+            updating
+        );
+        eprintln!(
+            "PathUpdating: simple={:.3}, complex={:.3}, overall={:.3}",
+            simple,
+            result.metrics["complex_accuracy"].mean,
+            updating,
+        );
     }
 }

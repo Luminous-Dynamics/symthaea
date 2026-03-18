@@ -43,10 +43,20 @@ pub(super) struct LateConsciousnessResult {
     pub predictive_psi_modulation: f64,
     pub hierarchical_total_free_energy: f64,
     pub predictive_self_safety: f32,
+    /// Behavioral prediction error (average across moral_score, exploration_urge, behavioral_coherence).
+    pub predictive_behavioral_error: f32,
     pub attention_schema_focus: f32,
     pub attention_fatigue: f32,
     pub attention_prediction_accuracy: f32,
     pub psi_attention_avg: f32,
+    /// HFE learning rate boost applied when hierarchical free energy exceeds threshold.
+    pub hierarchical_free_energy_lr_boost: f32,
+    /// Predictive phi modulation learning rate delta (±1.5% max, coherence-weighted).
+    pub predictive_phi_lr_delta: f32,
+    /// Confidence delta from body valence somatic marker feedback (Damasio 1999).
+    pub body_valence_confidence_delta: f32,
+    /// Confidence scale factor from narrative self-Phi (1.02 strong, 0.95 weak, 1.0 neutral).
+    pub narrative_self_confidence_factor: f32,
 }
 
 /// Results from the consciousness integration phase (GWT through master consciousness equation).
@@ -228,10 +238,15 @@ mod tests {
             predictive_psi_modulation: 1.0,
             hierarchical_total_free_energy: 0.0,
             predictive_self_safety: 0.5,
+            predictive_behavioral_error: 0.0,
             attention_schema_focus: 0.4,
             attention_fatigue: 0.0,
             attention_prediction_accuracy: 0.0,
             psi_attention_avg: 0.3,
+            hierarchical_free_energy_lr_boost: 1.0,
+            predictive_phi_lr_delta: 0.0,
+            body_valence_confidence_delta: 0.0,
+            narrative_self_confidence_factor: 1.0,
         };
         let mut timings = super::super::ModuleTimings::default();
         let result = s.run_consciousness_integration(&ctx, &late, &mut timings);
@@ -260,10 +275,15 @@ mod tests {
             predictive_psi_modulation: 1.0,
             hierarchical_total_free_energy: 0.0,
             predictive_self_safety: 0.0,
+            predictive_behavioral_error: 0.0,
             attention_schema_focus: 0.0,
             attention_fatigue: 0.0,
             attention_prediction_accuracy: 0.0,
             psi_attention_avg: 0.0,
+            hierarchical_free_energy_lr_boost: 1.0,
+            predictive_phi_lr_delta: 0.0,
+            body_valence_confidence_delta: 0.0,
+            narrative_self_confidence_factor: 1.0,
         };
         let mut timings = super::super::ModuleTimings::default();
         let result = s.run_consciousness_integration(&ctx, &late, &mut timings);
@@ -298,10 +318,15 @@ mod tests {
             predictive_psi_modulation: 1.0,
             hierarchical_total_free_energy: 0.0,
             predictive_self_safety: 0.0,
+            predictive_behavioral_error: 0.0,
             attention_schema_focus: 0.0,
             attention_fatigue: 0.0,
             attention_prediction_accuracy: 0.0,
             psi_attention_avg: 0.0,
+            hierarchical_free_energy_lr_boost: 1.0,
+            predictive_phi_lr_delta: 0.0,
+            body_valence_confidence_delta: 0.0,
+            narrative_self_confidence_factor: 1.0,
         };
         let mut timings = super::super::ModuleTimings::default();
         let result = s.run_consciousness_integration(&ctx, &late, &mut timings);
@@ -330,10 +355,15 @@ mod tests {
             predictive_psi_modulation: 1.0,
             hierarchical_total_free_energy: 0.0,
             predictive_self_safety: 0.0,
+            predictive_behavioral_error: 0.0,
             attention_schema_focus: 0.0,
             attention_fatigue: 0.0,
             attention_prediction_accuracy: 0.0,
             psi_attention_avg: 0.0,
+            hierarchical_free_energy_lr_boost: 1.0,
+            predictive_phi_lr_delta: 0.0,
+            body_valence_confidence_delta: 0.0,
+            narrative_self_confidence_factor: 1.0,
         };
         let mut timings = super::super::ModuleTimings::default();
         let result = s.run_consciousness_integration(&ctx, &late, &mut timings);

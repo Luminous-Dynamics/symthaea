@@ -105,7 +105,7 @@ impl ConfoundDetectionBenchmark {
 
 impl PsychBenchmark for ConfoundDetectionBenchmark {
     fn name(&self) -> &str {
-        "causal_reasoning/confound_detection"
+        "CausalReasoning::ConfoundDetection"
     }
 
     fn provenance(&self) -> Option<BenchmarkProvenance> {
@@ -190,7 +190,7 @@ mod tests {
     fn test_confound_detection_runs() {
         let bench = ConfoundDetectionBenchmark;
         let result = bench.run(&default_config());
-        assert!(result.benchmark.contains("confound_detection"));
+        assert!(result.benchmark.contains("ConfoundDetection"));
         assert!(result.metrics.contains_key("confound_detection_accuracy"));
     }
 

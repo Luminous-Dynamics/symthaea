@@ -74,6 +74,51 @@ pub enum SwarmEvent {
         /// Number of peers who corroborated these facts.
         corroboration_count: u32,
     },
+    /// A peer completed the trust handshake (Ed25519 or BLAKE3 verification).
+    TrustVerified {
+        /// Peer's node ID.
+        peer_id: String,
+        /// Trust level after verification [0, 1].
+        trust_level: f64,
+        /// Peer's agent public key (hex-encoded).
+        agent_pubkey: String,
+    },
+
+    /// A threat pattern shared by a peer sentinel.
+    ///
+    /// Basis: Collective immune memory — distributed threat recognition.
+    /// Acceptance gated by peer reputation (> 0.5 required).
+    ThreatPattern {
+        /// Peer who detected the threat.
+        peer_id: String,
+        /// Type of threat detected (serialized ThreatSignalKind).
+        threat_kind: String,
+        /// Severity of the threat (0.0–1.0).
+        severity: f32,
+        /// Confidence in the detection (0.0–1.0).
+        confidence: f32,
+        /// Compact feature vector (32 f32 values).
+        feature_vector: Vec<f32>,
+        /// Human-readable description.
+        description: String,
+    },
+}
+
+/// A threat pattern report from a peer, ready for SentinelManager consumption.
+#[derive(Debug, Clone)]
+pub struct PeerThreatReport {
+    /// Peer who reported the threat.
+    pub peer_id: String,
+    /// Serialized threat kind.
+    pub threat_kind: String,
+    /// Severity (0.0–1.0).
+    pub severity: f32,
+    /// Confidence (0.0–1.0).
+    pub confidence: f32,
+    /// Compact feature vector (32 f32 values).
+    pub feature_vector: Vec<f32>,
+    /// Human-readable description.
+    pub description: String,
 }
 
 /// Swarm telemetry snapshot for CycleMetadata.
@@ -91,6 +136,8 @@ pub struct SwarmTelemetry {
     pub federated_confidence: f64,
     /// Number of anomaly events since last telemetry.
     pub anomaly_count: u32,
+    /// Number of peers that completed trust handshake verification.
+    pub verified_peers: usize,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -145,9 +192,26 @@ pub struct SwarmManager {
     /// Pending knowledge facts received from peers (drained by cognitive loop).
     pending_knowledge_shares: Vec<(String, f32)>,
 
+    // ── Threat sharing ──────────────────────────────────────────────
+    /// Pending threat patterns from peers (drained by SentinelManager).
+    pending_threat_patterns: Vec<PeerThreatReport>,
+
+    // ── Trust tracking ──────────────────────────────────────────────────
+    /// Number of peers that completed the trust handshake.
+    verified_peers: usize,
+
     // ── Telemetry snapshot ──────────────────────────────────────────────
     /// Last computed telemetry (readable between process calls).
     last_telemetry: SwarmTelemetry,
+
+    // ── FHE Collective Wisdom ─────────────────────────────────────────
+    /// FHE collective wisdom pool for privacy-preserving peer learning.
+    #[cfg(feature = "fhe-wisdom")]
+    wisdom_pool: symthaea_core::hdc::hdc_fhe::CollectiveWisdomPool,
+
+    /// Cycle counter for FHE aggregation interval.
+    #[cfg(feature = "fhe-wisdom")]
+    fhe_cycles_since_aggregation: usize,
 }
 
 impl Default for SwarmManager {
@@ -167,7 +231,13 @@ impl Default for SwarmManager {
             connectivity_history: VecDeque::with_capacity(8),
             connectivity_modifier: 1.0,
             pending_knowledge_shares: Vec::new(),
+            pending_threat_patterns: Vec::new(),
+            verified_peers: 0,
             last_telemetry: SwarmTelemetry::default(),
+            #[cfg(feature = "fhe-wisdom")]
+            wisdom_pool: symthaea_core::hdc::hdc_fhe::CollectiveWisdomPool::new(),
+            #[cfg(feature = "fhe-wisdom")]
+            fhe_cycles_since_aggregation: 0,
         }
     }
 }
@@ -213,6 +283,13 @@ impl SwarmManager {
         std::mem::take(&mut self.pending_knowledge_shares)
     }
 
+    /// Drain pending threat patterns received from peers.
+    ///
+    /// Returns threat reports for SentinelManager/ThreatMemory consumption.
+    pub fn drain_threat_patterns(&mut self) -> Vec<PeerThreatReport> {
+        std::mem::take(&mut self.pending_threat_patterns)
+    }
+
     /// Get the current telemetry snapshot.
     pub fn telemetry(&self) -> &SwarmTelemetry {
         &self.last_telemetry
@@ -253,6 +330,40 @@ impl SwarmManager {
         }
         let sum: f64 = self.peer_phi.iter().map(|(_, phi)| phi).sum();
         sum / self.peer_phi.len() as f64
+    }
+
+    // ── FHE Collective Wisdom API ──────────────────────────────────────
+
+    /// Contribute an encrypted wisdom vector from a peer to the collective pool.
+    #[cfg(feature = "fhe-wisdom")]
+    pub fn contribute_encrypted_wisdom(
+        &mut self,
+        peer_id: &str,
+        encrypted: symthaea_core::hdc::hdc_fhe::EncryptedHV,
+    ) -> bool {
+        self.wisdom_pool.contribute(peer_id, encrypted)
+    }
+
+    /// Attempt aggregation if enough contributions collected.
+    #[cfg(feature = "fhe-wisdom")]
+    pub fn try_aggregate_wisdom(&mut self) -> Option<symthaea_core::hdc::hdc_fhe::EncryptedHV> {
+        self.fhe_cycles_since_aggregation += 1;
+        if self.wisdom_pool.contribution_count() >= 3 {
+            let result = self.wisdom_pool.aggregate();
+            if result.is_some() {
+                self.wisdom_pool.clear();
+                self.fhe_cycles_since_aggregation = 0;
+            }
+            result
+        } else {
+            None
+        }
+    }
+
+    /// Current wisdom pool contribution count.
+    #[cfg(feature = "fhe-wisdom")]
+    pub fn wisdom_pool_count(&self) -> usize {
+        self.wisdom_pool.contribution_count()
     }
 
     // ── Internal helpers ────────────────────────────────────────────────
@@ -356,6 +467,36 @@ impl SwarmManager {
                         self.pending_knowledge_shares.truncate(64);
                     }
                 }
+                SwarmEvent::TrustVerified {
+                    trust_level, ..
+                } => {
+                    // Track verified peer count for telemetry
+                    if trust_level > 0.0 {
+                        self.verified_peers = self.verified_peers.saturating_add(1);
+                    }
+                }
+                SwarmEvent::ThreatPattern {
+                    peer_id,
+                    threat_kind,
+                    severity,
+                    confidence,
+                    feature_vector,
+                    description,
+                } => {
+                    // Clamp NaN/Inf and store for SentinelManager drain
+                    let sev = if severity.is_finite() { severity.clamp(0.0, 1.0) } else { 0.0 };
+                    let conf = if confidence.is_finite() { confidence.clamp(0.0, 1.0) } else { 0.0 };
+                    if self.pending_threat_patterns.len() < 32 {
+                        self.pending_threat_patterns.push(PeerThreatReport {
+                            peer_id,
+                            threat_kind,
+                            severity: sev,
+                            confidence: conf,
+                            feature_vector,
+                            description,
+                        });
+                    }
+                }
             }
         }
     }
@@ -406,6 +547,7 @@ impl SwarmManager {
             affective_contagion: affective_mag,
             federated_confidence: self.federated_confidence,
             anomaly_count: self.anomaly_streak,
+            verified_peers: self.verified_peers,
         };
     }
 }
@@ -555,7 +697,16 @@ pub fn convert_peer_event(event: &crate::swarm::PeerEvent) -> Option<SwarmEvent>
                 arousal: 0.0,
             })
         }
-        // Discovered and TrustChanged don't map to cognitive-level signals
+        crate::swarm::PeerEvent::TrustChanged {
+            peer_id,
+            new: trust,
+            ..
+        } => Some(SwarmEvent::TrustVerified {
+            peer_id: peer_id.clone(),
+            trust_level: trust.value(),
+            agent_pubkey: String::new(),
+        }),
+        // Discovered doesn't map to cognitive-level signals
         _ => None,
     }
 }
@@ -1011,5 +1162,38 @@ mod tests {
             }
             other => panic!("Expected AffectiveSync, got {:?}", other),
         }
+    }
+
+    #[cfg(feature = "fhe-wisdom")]
+    #[test]
+    fn test_fhe_wisdom_contribute_and_aggregate() {
+        let mut mgr = SwarmManager::default();
+
+        let mask = symthaea_core::hdc::BinaryHV::random(42);
+        for i in 0..3 {
+            let hv = symthaea_core::hdc::BinaryHV::random(i);
+            let encrypted = symthaea_core::hdc::hdc_fhe::EncryptedHV::encrypt(&hv, &mask);
+            assert!(mgr.contribute_encrypted_wisdom(&format!("peer_{i}"), encrypted));
+        }
+
+        assert_eq!(mgr.wisdom_pool_count(), 3);
+        let agg = mgr.try_aggregate_wisdom();
+        assert!(agg.is_some());
+        assert_eq!(mgr.wisdom_pool_count(), 0);
+    }
+
+    #[cfg(feature = "fhe-wisdom")]
+    #[test]
+    fn test_fhe_wisdom_insufficient_contributions() {
+        let mut mgr = SwarmManager::default();
+
+        let mask = symthaea_core::hdc::BinaryHV::random(42);
+        let hv = symthaea_core::hdc::BinaryHV::random(1);
+        let encrypted = symthaea_core::hdc::hdc_fhe::EncryptedHV::encrypt(&hv, &mask);
+        mgr.contribute_encrypted_wisdom("peer_1", encrypted);
+
+        assert_eq!(mgr.wisdom_pool_count(), 1);
+        let agg = mgr.try_aggregate_wisdom();
+        assert!(agg.is_none()); // Not enough contributions
     }
 }

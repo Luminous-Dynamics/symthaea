@@ -297,6 +297,15 @@ impl DemoRunner {
             data.therapeutic_strategy_effectiveness =
                 m.therapeutic.therapeutic_strategy_effectiveness.clone();
             data.therapeutic_temporal_coherence = m.therapeutic.therapeutic_temporal_coherence;
+
+            // Shadow work telemetry (observability mode)
+            data.shadow_total_pressure = m.therapeutic.shadow_total_pressure;
+            data.shadow_fragment_count = m.therapeutic.shadow_fragment_count;
+            data.shadow_peak_pressure = m.therapeutic.shadow_peak_pressure;
+            data.shadow_surfacing_indicated = m.therapeutic.shadow_surfacing_indicated;
+            data.shadow_pressure_trend = m.therapeutic.shadow_pressure_trend;
+            data.shadow_to_narrative_ratio = m.therapeutic.shadow_to_narrative_ratio;
+            data.shadow_dream_queue_depth = m.therapeutic.shadow_dream_queue_depth;
         }
 
         // Redact sensitive vector fields if requested (Item 3: telemetry protection).

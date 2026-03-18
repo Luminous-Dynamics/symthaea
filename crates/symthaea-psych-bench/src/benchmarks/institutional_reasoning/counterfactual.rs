@@ -24,7 +24,7 @@ use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::trial_analysis::TrialOutcome;
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use std::collections::BTreeMap;
-use symthaea_core::hdc::primitive_system::{CompositionAlgebra, PrimitiveSystem, TransitionStep};
+use symthaea_core::hdc::primitive_system::{CompositionAlgebra, PrimitiveSystem};
 
 /// Institutional Reasoning: Counterfactual benchmark.
 pub struct CounterfactualReasoningBenchmark;

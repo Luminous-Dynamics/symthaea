@@ -2387,7 +2387,7 @@ fn test_institutional_axioms_load() {
     let system = PrimitiveSystem::new();
     let mut algebra = CompositionAlgebra::new();
     let loaded = algebra.load_institutional_axioms(&system);
-    assert_eq!(loaded, 8, "Should load all 8 institutional axioms");
+    assert_eq!(loaded, 18, "Should load all 18 institutional axioms");
 }
 
 #[test]
@@ -2435,9 +2435,11 @@ fn test_institutional_axioms_encodings_distinct() {
             let a = &algebra.get(names[i]).unwrap().encoding;
             let b = &algebra.get(names[j]).unwrap().encoding;
             let sim = a.similarity(b);
+            // Axioms sharing components (e.g. SOVEREIGNTY) have higher similarity;
+            // 2-component axioms sharing 1 primitive can reach ~0.75
             assert!(
-                (sim - 0.5).abs() < 0.05,
-                "Axioms {} vs {} should be near-orthogonal, got {}",
+                sim < 0.85,
+                "Axioms {} vs {} should not be near-identical, got {}",
                 names[i],
                 names[j],
                 sim
@@ -2452,8 +2454,8 @@ fn test_revolution_shares_authority_structure() {
     let mut algebra = CompositionAlgebra::new();
     algebra.load_institutional_axioms(&system);
 
-    // REVOLUTION = AUTHORITY ^ DOMINANCE
-    // LEGITIMATE_GOVERNANCE = AUTHORITY ^ LEGITIMACY ^ TRUST
+    // REVOLUTION = AUTHORITY + ENFORCEMENT + PROHIBITION
+    // LEGITIMATE_GOVERNANCE = AUTHORITY + LEGITIMACY + TRUST
     // Both contain AUTHORITY, but unbinding AUTHORITY should yield different residuals
     let revolution = algebra.get("REVOLUTION").unwrap();
     let governance = algebra.get("LEGITIMATE_GOVERNANCE").unwrap();
@@ -2462,11 +2464,12 @@ fn test_revolution_shares_authority_structure() {
     let rev_residual = revolution.encoding.bind(&authority.encoding);
     let gov_residual = governance.encoding.bind(&authority.encoding);
 
-    // Residuals should be orthogonal (DOMINANCE vs LEGITIMACY^TRUST)
+    // Residuals should be near-orthogonal (ENFORCEMENT+PROHIBITION vs LEGITIMACY+TRUST)
+    // Bundle-based compositions retain some shared structure; allow 0.15 tolerance
     let sim = rev_residual.similarity(&gov_residual);
     assert!(
-        (sim - 0.5).abs() < 0.05,
-        "Unbinding AUTHORITY should yield orthogonal residuals, got {}",
+        (sim - 0.5).abs() < 0.15,
+        "Unbinding AUTHORITY should yield near-orthogonal residuals, got {}",
         sim
     );
 }
@@ -2550,11 +2553,11 @@ fn test_rank_by_similarity() {
         ranked[0].1
     );
 
-    // All others should be near 0.5 (orthogonal in high-D)
+    // Others should be near-orthogonal; axioms sharing components have higher similarity
     for (name, sim) in &ranked[1..] {
         assert!(
-            (sim - 0.5).abs() < 0.05,
-            "{} should be near-orthogonal to TRADE_AGREEMENT, got {}",
+            (sim - 0.5).abs() < 0.25,
+            "{} should not be highly correlated with TRADE_AGREEMENT, got {}",
             name,
             sim
         );

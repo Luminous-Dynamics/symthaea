@@ -311,6 +311,7 @@ pub(crate) struct EpistemicAuditor {
     conn: Arc<Mutex<duckdb::Connection>>,
     pub total_flushed: u64,
     pub flush_count: u32,
+    pub flush_errors: u64,
     flush_in_progress: Arc<AtomicBool>,
 }
 
@@ -333,6 +334,7 @@ impl EpistemicAuditor {
             conn: Arc::new(Mutex::new(conn)),
             total_flushed: 0,
             flush_count: 0,
+            flush_errors: 0,
             flush_in_progress: Arc::new(AtomicBool::new(false)),
         })
     }
@@ -387,15 +389,28 @@ impl EpistemicAuditor {
         self.flush_count += 1;
 
         if let Ok(guard) = self.conn.lock() {
-            Self::do_flush(&guard, &records);
+            self.flush_errors += Self::do_flush(&guard, &records);
         }
     }
 
     /// Write a batch of records to all six audit tables via parameterized INSERT.
-    fn do_flush(conn: &duckdb::Connection, records: &[AuditRecord]) {
+    /// Returns the number of INSERT errors encountered.
+    fn do_flush(conn: &duckdb::Connection, records: &[AuditRecord]) -> u64 {
+        let mut errors = 0u64;
+        // Helper: execute INSERT and count/log errors.
+        macro_rules! audit_insert {
+            ($table:expr, $sql:expr, $params:expr) => {
+                if let Err(e) = conn.execute($sql, $params) {
+                    errors += 1;
+                    tracing::warn!(table = $table, err = %e, "audit INSERT failed");
+                }
+            };
+        }
+
         for r in records {
             // phi_trajectory
-            let _ = conn.execute(
+            audit_insert!(
+                "phi_trajectory",
                 "INSERT INTO phi_trajectory VALUES (?,?,?,?,?,?,?,?,?)",
                 duckdb::params![
                     r.cycle_id as i64,
@@ -407,11 +422,12 @@ impl EpistemicAuditor {
                     r.macro_phi,
                     r.emergence_ratio,
                     r.limiting_component.as_str(),
-                ],
+                ]
             );
 
             // graduation_log
-            let _ = conn.execute(
+            audit_insert!(
+                "graduation_log",
                 "INSERT INTO graduation_log VALUES (?,?,?,?,?,?,?,?,?,?)",
                 duckdb::params![
                     r.cycle_id as i64,
@@ -424,11 +440,12 @@ impl EpistemicAuditor {
                     r.codebook_diversity,
                     r.codebook_utilization_rate,
                     r.memory_db_flushed,
-                ],
+                ]
             );
 
             // moral_audit
-            let _ = conn.execute(
+            audit_insert!(
+                "moral_audit",
                 "INSERT INTO moral_audit VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 duckdb::params![
                     r.cycle_id as i64,
@@ -450,11 +467,12 @@ impl EpistemicAuditor {
                     r.escalation_level.as_str(),
                     r.harmony_entropy,
                     r.fingerprint_velocity,
-                ],
+                ]
             );
 
             // neuromod_history
-            let _ = conn.execute(
+            audit_insert!(
+                "neuromod_history",
                 "INSERT INTO neuromod_history VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 duckdb::params![
                     r.cycle_id as i64,
@@ -476,11 +494,12 @@ impl EpistemicAuditor {
                     r.bath_entropy,
                     r.sleep_pressure,
                     r.circadian_hour,
-                ],
+                ]
             );
 
             // energy_audit
-            let _ = conn.execute(
+            audit_insert!(
+                "energy_audit",
                 "INSERT INTO energy_audit VALUES (?,?,?,?,?,?,?)",
                 duckdb::params![
                     r.cycle_id as i64,
@@ -490,11 +509,12 @@ impl EpistemicAuditor {
                     r.throughput_multiplier,
                     r.thermodynamic_load,
                     r.cycle_duration_us as i64,
-                ],
+                ]
             );
 
             // substrate_audit
-            let _ = conn.execute(
+            audit_insert!(
+                "substrate_audit",
                 "INSERT INTO substrate_audit VALUES (?,?,?,?,?,?,?,?,?)",
                 duckdb::params![
                     r.cycle_id as i64,
@@ -506,9 +526,10 @@ impl EpistemicAuditor {
                     r.scale_pressure,
                     r.effective_dim_fraction,
                     r.transition_count as i32,
-                ],
+                ]
             );
         }
+        errors
     }
 
     /// Total records written to DuckDB plus records still in buffer.

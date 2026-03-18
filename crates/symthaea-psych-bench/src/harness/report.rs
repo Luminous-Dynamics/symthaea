@@ -948,7 +948,8 @@ impl BenchmarkReport {
         if benchmark.contains("SpatialUpdating") {
             push_specific("overall_accuracy", "spatial_updating_accuracy", &bl.worm);
         }
-        if benchmark.contains("Binding") {
+        // Use "WorM::Binding" to avoid false-matching Spatial::LandmarkBinding
+        if benchmark.contains("WorM::Binding") {
             push_specific("overall_binding_accuracy", "binding_accuracy", &bl.worm);
         }
         if benchmark.contains("SerialRecall") {
@@ -1025,7 +1026,8 @@ impl BenchmarkReport {
                 &bl.worm,
             );
         }
-        if benchmark.contains("Binding") {
+        // Use "WorM::Binding" to avoid false-matching Spatial::LandmarkBinding
+        if benchmark.contains("WorM::Binding") {
             push_specific("rt_ticks", "binding_rt_ticks", &bl.worm);
         }
         if benchmark.contains("SerialRecall") {
@@ -1367,6 +1369,44 @@ impl BenchmarkReport {
             push_specific("harm_avoidance", "harm_avoidance", &bl.social);
             push_specific("composite_ethics", "composite_ethics", &bl.social);
         }
+        // Spatial::MentalRotation
+        if benchmark.contains("MentalRotation") && benchmark.contains("Spatial") {
+            push_specific("accuracy_mean", "mental_rotation_accuracy", &bl.spatial);
+            push_specific("rt_slope", "rt_slope", &bl.spatial);
+        }
+        // Spatial::PathUpdating
+        if benchmark.contains("PathUpdating") {
+            push_specific("simple_accuracy", "simple_accuracy", &bl.spatial);
+            push_specific("updating_accuracy", "updating_accuracy", &bl.spatial);
+        }
+        // Spatial::LandmarkBinding
+        if benchmark.contains("LandmarkBinding") && benchmark.contains("Spatial") {
+            push_specific("retrieval_accuracy", "retrieval_accuracy", &bl.spatial);
+        }
+        // Spatial::PerspectiveTaking
+        if benchmark.contains("PerspectiveTaking") && benchmark.contains("Spatial") {
+            push_specific("perspective_accuracy", "perspective_accuracy", &bl.spatial);
+        }
+        // CausalReasoning::CausalChain
+        if benchmark.contains("CausalReasoning") && benchmark.contains("CausalChain") {
+            push_specific(
+                "chain_tracing_accuracy",
+                "chain_tracing_accuracy",
+                &bl.causal_reasoning,
+            );
+        }
+        // CausalReasoning::ConfoundDetection
+        if benchmark.contains("ConfoundDetection") && benchmark.contains("CausalReasoning") {
+            push_specific(
+                "confound_detection_accuracy",
+                "confound_detection_accuracy",
+                &bl.causal_reasoning,
+            );
+        }
+        // CausalReasoning::InterventionEffect
+        if benchmark.contains("InterventionEffect") && benchmark.contains("CausalReasoning") {
+            push_specific("causal_score", "causal_score", &bl.causal_reasoning);
+        }
 
         // Only return comparisons relevant to this benchmark
         if benchmark.contains("WorM")
@@ -1392,6 +1432,8 @@ impl BenchmarkReport {
             || benchmark.contains("Mathematics")
             || benchmark.contains("InstitutionalReasoning")
             || benchmark.contains("Clinical")
+            || benchmark.contains("Spatial")
+            || benchmark.contains("CausalReasoning")
         {
             comps
         } else {
@@ -1694,6 +1736,11 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("SpatialUpdating") => "overall_accuracy",
         b if b.contains("TemporalOrder") => "discrimination_slope",
         b if b.contains("CrossModal") => "binding_accuracy",
+        // Spatial domain (must be before generic "Binding" arm)
+        b if b.contains("Spatial::MentalRotation") || (b.contains("MentalRotation") && b.contains("Spatial")) => "accuracy_mean",
+        b if b.contains("Spatial::PathUpdating") || b.contains("PathUpdating") => "simple_accuracy",
+        b if b.contains("Spatial::LandmarkBinding") || (b.contains("LandmarkBinding") && b.contains("Spatial")) => "retrieval_accuracy",
+        b if b.contains("Spatial::PerspectiveTaking") || (b.contains("PerspectiveTaking") && b.contains("Spatial")) => "perspective_accuracy",
         b if b.contains("Binding") => "overall_binding_accuracy",
         b if b.contains("DigitSpan") => "forward_span",
         b if b.contains("EmotionalStroop") => "emotional_interference",
@@ -1795,6 +1842,10 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("LogicalDeduction") => "overall_accuracy",
         b if b.contains("ConstraintPuzzle") => "queens_4_accuracy",
         b if b.contains("ProofConstruction") => "tautology_accuracy",
+        // CausalReasoning domain (must be before generic "CausalChain" arm below)
+        b if b.contains("CausalReasoning::CausalChain") || (b.contains("CausalChain") && b.contains("CausalReasoning")) => "chain_tracing_accuracy",
+        b if b.contains("CausalReasoning::ConfoundDetection") || b.contains("ConfoundDetection") => "confound_detection_accuracy",
+        b if b.contains("CausalReasoning::InterventionEffect") || (b.contains("InterventionEffect") && b.contains("CausalReasoning")) => "causal_score",
         // Institutional Reasoning sub-benchmarks (specific before generic)
         b if b.contains("AnalogicalReasoning") => "analogical_transfer_accuracy",
         b if b.contains("CausalChain") => "causal_chain_coherence",
@@ -1861,6 +1912,7 @@ pub fn is_lower_better(metric_key: &str) -> bool {
             | "emotional_interference"
             | "swap_error_rate"
             | "pm_cost"
+            | "capacity_ratio"
     )
 }
 
@@ -2771,45 +2823,6 @@ mod tests {
         let mut report = BenchmarkReport::new();
         for b in &benchmarks {
             report.add(b.run(&config));
-        }
-
-        // Per-benchmark z-score diagnostic
-        {
-            use crate::harness::baselines::BaselineCollection;
-            let bl = BaselineCollection::all();
-            let mut neg_benchmarks: Vec<(String, String, f64, f64, f64)> = Vec::new();
-            for result in &report.results {
-                let key = key_metric_for_benchmark(&result.benchmark);
-                let comparisons = report.find_comparisons(result, &bl);
-                if let Some((_, comp)) = comparisons.iter().find(|(k, _)| k == key) {
-                    if let Some(z) = comp.z_score {
-                        let z_adj = if is_lower_better(key) { -z } else { z };
-                        if z_adj < 0.5 {
-                            let agent_val =
-                                result.metrics.get(key).map(|m| m.mean).unwrap_or(f64::NAN);
-                            neg_benchmarks.push((
-                                result.benchmark.clone(),
-                                key.to_string(),
-                                agent_val,
-                                comp.human_value,
-                                z_adj,
-                            ));
-                        }
-                    }
-                }
-            }
-            neg_benchmarks.sort_by(|a, b| a.4.partial_cmp(&b.4).unwrap());
-            eprintln!("\nPer-benchmark z-scores (bottom performers, z < +0.5):");
-            eprintln!(
-                "{:<40} {:<30} {:>8} {:>8} {:>8}",
-                "Benchmark", "Key Metric", "Agent", "Human", "z"
-            );
-            for (bench, metric, agent, human, z) in &neg_benchmarks {
-                eprintln!(
-                    "{:<40} {:<30} {:>8.3} {:>8.3} {:>+8.2}",
-                    bench, metric, agent, human, z
-                );
-            }
         }
 
         eprintln!("\n{}", report.format_composites());

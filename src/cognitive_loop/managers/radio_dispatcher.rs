@@ -1156,7 +1156,9 @@ impl MeshEncryption {
         for (i, &b) in data.iter().enumerate() {
             expected_tag[i % 16] ^= b;
         }
-        if tag != expected_tag {
+        // Constant-time comparison to prevent timing attacks on the auth tag.
+        // Uses the same constant_time_eq from the handshake module.
+        if !crate::swarm::handshake::constant_time_eq(tag, &expected_tag) {
             return None;
         }
 
@@ -2432,7 +2434,10 @@ impl RadioHardware for MockRadioHardware {
         }
         let idx = tier as usize;
         if let Some(pos) = self.receive_queue.iter().position(|(t, _, _)| *t == idx) {
-            let (_, payload, snr) = self.receive_queue.remove(pos).unwrap();
+            let Some((_, payload, snr)) = self.receive_queue.remove(pos) else {
+                // position() found it, remove() should succeed — but guard defensively
+                return Ok(None);
+            };
             Ok(Some((payload, snr)))
         } else {
             Ok(None)

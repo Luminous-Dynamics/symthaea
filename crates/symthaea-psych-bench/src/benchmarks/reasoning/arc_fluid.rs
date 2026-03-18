@@ -78,7 +78,7 @@ impl ArcFluidBenchmark {
         // Encoding noise: ablated subsystems degrade representational fidelity
         // Difficulty scales temperature via the difficulty model
         let diff_model = difficulty_model_for(self.name());
-        let noise_weight = (0.015 + pressure * 0.12 + config.encoding_noise * 0.15)
+        let noise_weight = (0.008 + pressure * 0.12 + config.encoding_noise * 0.15)
             * diff_model.temperature_multiplier(config.difficulty);
 
         // Generate a random grid
@@ -153,9 +153,10 @@ impl ArcFluidBenchmark {
                 xor_shift(&mut rng);
                 let task_param = rng;
 
-                // Generate 2 training pairs + 1 test pair (same transform, different inputs)
+                // Generate 4 training pairs + 1 test pair (same transform, different inputs)
+                // More examples strengthen the majority-vote consensus (Kanerva 2009).
                 let mut train_rules = Vec::new();
-                for pair_i in 0..2 {
+                for pair_i in 0..4 {
                     xor_shift(&mut rng);
                     let input = gen_grid(&mut rng);
                     let output = apply_transform(&input, task_type, task_param);
@@ -321,7 +322,7 @@ impl ArcFluidBenchmark {
         };
         let num_tasks = (TASK_TYPES.len() * tasks_per_type) as f64;
         let rt_ticks = if num_tasks > 0.0 {
-            total_ticks / (num_tasks * 3.0) // 3 pairs per task (2 train + 1 test)
+            total_ticks / (num_tasks * 5.0) // 5 pairs per task (4 train + 1 test)
         } else {
             0.0
         };

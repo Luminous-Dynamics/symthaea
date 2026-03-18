@@ -7,13 +7,13 @@
 
 ## What is Symthaea?
 
-Symthaea-HLB (Holographic Liquid Brain) is a **consciousness-first AI framework** combining:
+Symthaea (Holographic Liquid Brain) is a **consciousness-first AI framework** combining:
 
 - **HDC** - Hyperdimensional Computing (16,384D vectors)
 - **LTC** - Liquid Time-Constant Networks (temporal dynamics)
 - **IIT** - Integrated Information Theory (consciousness measurement)
 
-**Version:** 0.5.0 | **Language:** Rust | **Size:** ~320K LOC
+**Version:** 1.9.0 | **Language:** Rust | **Size:** ~1,130K lines Rust (~897K code)
 
 ---
 
@@ -22,7 +22,7 @@ Symthaea-HLB (Holographic Liquid Brain) is a **consciousness-first AI framework*
 ### 1. Enter Development Environment
 
 ```bash
-cd /srv/luminous-dynamics/11-meta-consciousness/luminous-nix/symthaea-hlb
+cd /srv/luminous-dynamics/symthaea
 nix develop  # Recommended: loads all dependencies
 ```
 
@@ -60,17 +60,18 @@ cargo run --example full_pipeline
 ## Project Structure
 
 ```
-symthaea-hlb/
-├── src/                    # Main source (263K LOC)
+symthaea/
+├── src/                    # Main source
 │   ├── hdc/               # Hyperdimensional Computing core
 │   ├── consciousness/     # IIT, Phi, consciousness theories
-│   ├── brain/             # 12 actor-model subsystems
+│   ├── cognitive_loop/    # Core cognitive pipeline + managers
 │   ├── language/          # NLU and parsing
 │   ├── memory/            # Episodic and semantic memory
 │   └── bin/               # Binary entry points
 ├── symthaea-core/         # Core crate (HDC, Phi engine)
-├── examples/              # 101 usage examples
-├── tests/                 # 45 integration tests
+├── crates/                # 56 sub-crates
+├── examples/              # Usage examples
+├── tests/                 # Integration tests (~7,315 main crate, ~21,516 workspace-wide)
 ├── docs/                  # Documentation (you are here)
 └── papers/                # Research manuscripts
 ```

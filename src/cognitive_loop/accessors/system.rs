@@ -853,6 +853,31 @@ impl CognitiveLoopService {
             .filter(|(_, _, apps)| *apps > 0)
             .collect()
     }
+
+    /// Shadow total pressure (sum of all fragment pressures).
+    pub fn shadow_total_pressure(&self) -> f32 {
+        self.therapeutic_manager.shadow_detector.total_pressure()
+    }
+
+    /// Shadow fragment count.
+    pub fn shadow_fragment_count(&self) -> usize {
+        self.therapeutic_manager.shadow_detector.fragment_count()
+    }
+
+    /// Whether shadow surfacing is indicated (diagnostic only).
+    pub fn shadow_surfacing_indicated(&self) -> bool {
+        self.therapeutic_manager.shadow_detector.surfacing_indicated()
+    }
+
+    /// Shadow dream queue depth.
+    pub fn shadow_dream_queue_depth(&self) -> usize {
+        self.therapeutic_manager.shadow_detector.dream_queue_depth()
+    }
+
+    /// Last shadow telemetry snapshot.
+    pub fn shadow_telemetry(&self) -> &symthaea_therapeutic::ShadowTelemetry {
+        &self.therapeutic_manager.last_shadow_telemetry
+    }
 }
 
 // ── Epistemic auditor accessors (feature-gated) ───────────────────────

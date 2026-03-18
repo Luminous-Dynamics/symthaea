@@ -96,6 +96,20 @@ pub enum CoreComponent {
 }
 
 impl CoreComponent {
+    /// Static string matching Debug output — avoids `format!("{:?}")` on hot path.
+    #[inline]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Integration => "Integration",
+            Self::Binding => "Binding",
+            Self::Workspace => "Workspace",
+            Self::Attention => "Attention",
+            Self::Recursion => "Recursion",
+            Self::Efficacy => "Efficacy",
+            Self::Knowledge => "Knowledge",
+        }
+    }
+
     /// Get all core components
     pub fn all() -> [Self; 7] {
         [

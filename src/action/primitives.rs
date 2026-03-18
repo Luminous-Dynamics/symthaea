@@ -183,8 +183,25 @@ pub enum Atom {
     /// Delete a file (destructive).
     DeleteFile { path: PathBuf },
 
+    /// Dispatch code generation to a backend tier.
+    /// Energy cost reflects the tier: Native=1.0, LocalLLM=10.0, CloudLLM=50.0.
+    Dispatch {
+        prompt: String,
+        tier: DispatchTier,
+    },
+
     /// No-op (identity in sequences).
     Noop,
+}
+
+/// Backend tier for the Dispatch atom.
+/// Mirrors `BackendTier` from `intelligent_dispatcher` but lives in the
+/// primitives module to avoid circular dependencies.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DispatchTier {
+    Native,
+    LocalLlm,
+    CloudLlm,
 }
 
 impl Atom {
@@ -220,6 +237,25 @@ impl Atom {
                 destructiveness: DestructivenessLevel::Destructive,
                 risk_tier: RiskTier::High,
             },
+            Atom::Dispatch { tier, .. } => {
+                let (name, energy, phi) = match tier {
+                    DispatchTier::Native => ("DispatchNative", 1.0, 0.0),
+                    DispatchTier::LocalLlm => ("DispatchLocalLLM", 10.0, 0.05),
+                    DispatchTier::CloudLlm => ("DispatchCloudLLM", 50.0, 0.1),
+                };
+                PrimitiveProperties {
+                    name,
+                    energy_cost: energy,
+                    reversible: true,
+                    min_phi: phi,
+                    destructiveness: DestructivenessLevel::ReadOnly,
+                    risk_tier: if matches!(tier, DispatchTier::CloudLlm) {
+                        RiskTier::High
+                    } else {
+                        RiskTier::Medium
+                    },
+                }
+            }
             Atom::WriteFile { .. } => PrimitiveProperties::write("WriteFile"),
             Atom::Exec { program, args, .. } => {
                 // Cargo check/test are confirmable but not destructive
@@ -320,7 +356,7 @@ impl Atom {
                 working_dir: None,
             },
             Atom::DeleteFile { path } => ActionIR::DeleteFile { path: path.clone() },
-            Atom::Encode { .. } | Atom::Search { .. } => ActionIR::NoOp, // handled in-process
+            Atom::Encode { .. } | Atom::Search { .. } | Atom::Dispatch { .. } => ActionIR::NoOp, // handled in-process
             Atom::Noop => ActionIR::NoOp,
         }
     }
@@ -401,6 +437,30 @@ impl Atom {
     /// Delete a file.
     pub fn delete(path: impl Into<PathBuf>) -> Self {
         Atom::DeleteFile { path: path.into() }
+    }
+
+    /// Dispatch code generation to native backend (energy=1.0).
+    pub fn dispatch_native(prompt: &str) -> Self {
+        Atom::Dispatch {
+            prompt: prompt.to_string(),
+            tier: DispatchTier::Native,
+        }
+    }
+
+    /// Dispatch code generation to local LLM (energy=10.0).
+    pub fn dispatch_local(prompt: &str) -> Self {
+        Atom::Dispatch {
+            prompt: prompt.to_string(),
+            tier: DispatchTier::LocalLlm,
+        }
+    }
+
+    /// Dispatch code generation to cloud LLM (energy=50.0).
+    pub fn dispatch_cloud(prompt: &str) -> Self {
+        Atom::Dispatch {
+            prompt: prompt.to_string(),
+            tier: DispatchTier::CloudLlm,
+        }
     }
 }
 
@@ -959,6 +1019,16 @@ impl MoleculeExecutor {
                 "search:{}:top_{}",
                 query, top_k
             ))),
+            Atom::Dispatch { prompt, tier } => {
+                // Dispatch is handled externally by the CodingAgent (which has the dispatcher).
+                // MoleculeExecutor returns a placeholder — the agent intercepts Dispatch atoms
+                // before they reach here, or uses the result as a signal.
+                Ok(PrimitiveValue::Text(format!(
+                    "dispatch:{:?}:{}",
+                    tier,
+                    &prompt[..prompt.len().min(100)]
+                )))
+            }
             Atom::Noop => Ok(PrimitiveValue::Unit),
         }
     }
@@ -1003,6 +1073,11 @@ impl MoleculeExecutor {
             Atom::Search { query, top_k } => {
                 PrimitiveValue::Text(format!("[simulated search: {} top {}]", query, top_k))
             }
+            Atom::Dispatch { prompt, tier } => PrimitiveValue::Text(format!(
+                "[simulated dispatch {:?}: {}]",
+                tier,
+                &prompt[..prompt.len().min(60)]
+            )),
             Atom::Noop => PrimitiveValue::Unit,
         }
     }
@@ -1071,6 +1146,64 @@ pub fn select_best_plan(
             let fa = free_energy(&a.profile);
             let fb = free_energy(&b.profile);
             fa.partial_cmp(&fb).unwrap_or(std::cmp::Ordering::Equal)
+        })
+        .map(|(idx, _)| *idx);
+
+    best
+}
+
+/// Select the best plan using FEP free energy minimization with historical recipe success rates.
+///
+/// `recipe_rates` maps each candidate index to a historical success rate (0.0-1.0).
+/// Plans with higher historical success rates get lower free energy (preferred).
+/// This closes the learning loop: past execution outcomes influence future plan selection.
+pub fn select_best_plan_with_history(
+    candidates: &[PlanCandidate],
+    current_phi: f32,
+    energy_budget: f32,
+    recipe_rates: &[f32],
+) -> Option<usize> {
+    if candidates.is_empty() {
+        return None;
+    }
+
+    // Filter to feasible plans
+    let feasible: Vec<(usize, &PlanCandidate)> = candidates
+        .iter()
+        .enumerate()
+        .filter(|(_, c)| {
+            c.profile.phi_sufficient(current_phi) && c.profile.within_budget(energy_budget)
+        })
+        .collect();
+
+    if feasible.is_empty() {
+        return None;
+    }
+
+    // Among feasible, prefer non-destructive plans
+    let safe: Vec<(usize, &PlanCandidate)> = feasible
+        .iter()
+        .filter(|(_, c)| c.profile.max_destructiveness != DestructivenessLevel::Destructive)
+        .cloned()
+        .collect();
+
+    let pool = if safe.is_empty() { &feasible } else { &safe };
+
+    // Free energy modulated by historical success rate:
+    // F = base_free_energy / (0.5 + recipe_rate)
+    // Higher past success → lower free energy → preferred
+    let best = pool
+        .iter()
+        .min_by(|(idx_a, a), (idx_b, b)| {
+            let fa = free_energy(&a.profile);
+            let fb = free_energy(&b.profile);
+            let rate_a = recipe_rates.get(*idx_a).copied().unwrap_or(0.5);
+            let rate_b = recipe_rates.get(*idx_b).copied().unwrap_or(0.5);
+            let adjusted_a = fa / (0.5 + rate_a);
+            let adjusted_b = fb / (0.5 + rate_b);
+            adjusted_a
+                .partial_cmp(&adjusted_b)
+                .unwrap_or(std::cmp::Ordering::Equal)
         })
         .map(|(idx, _)| *idx);
 
@@ -1176,6 +1309,130 @@ pub mod recipes {
                 Molecule::atom(Atom::cargo_test(project_dir)),
                 Molecule::atom(Atom::Noop),
             ))
+    }
+
+    /// Test-driven fix: run test → read failure → apply fix → retest.
+    /// Repeats until tests pass or max retries.
+    pub fn test_driven_fix(
+        target: PathBuf,
+        project_dir: PathBuf,
+        fix_code: String,
+        max_retries: usize,
+    ) -> Molecule {
+        // test → if fail: write fix → test again
+        let test_fix = Molecule::atom(Atom::cargo_test(project_dir.clone())).then(
+            Molecule::branch(
+                |val| val.is_success(),
+                Molecule::atom(Atom::Noop), // done
+                Molecule::atom(Atom::write_text(&target, &fix_code))
+                    .then(Molecule::atom(Atom::cargo_check(project_dir.clone()))),
+            ),
+        );
+
+        test_fix.repeat_until(|val| val.is_success(), max_retries)
+    }
+
+    /// Multi-file edit: apply the same edit across multiple files, then verify.
+    pub fn multi_file_edit(
+        files: Vec<PathBuf>,
+        old: &str,
+        new: &str,
+        project_dir: PathBuf,
+    ) -> Molecule {
+        let mut edits = Molecule::atom(Atom::Noop);
+        for file in &files {
+            edits = edits.then(Molecule::atom(Atom::edit(file, old, new)));
+        }
+        // After all edits, verify
+        edits.then(Molecule::atom(Atom::cargo_check(project_dir)))
+    }
+
+    /// Refactor and verify: grep for pattern → edit all matches → check → test.
+    pub fn refactor_and_verify(
+        project_dir: PathBuf,
+        search_pattern: &str,
+        old: &str,
+        new: &str,
+        target_files: Vec<PathBuf>,
+    ) -> Molecule {
+        // Search for pattern (context gathering)
+        let search = Molecule::atom(Atom::grep(search_pattern, project_dir.clone()));
+
+        // Apply edits to all target files
+        let mut edits = search;
+        for file in &target_files {
+            edits = edits.then(
+                Molecule::atom(Atom::read(file.clone()))
+                    .then(Molecule::atom(Atom::edit(file, old, new))),
+            );
+        }
+
+        // Verify
+        edits
+            .then(Molecule::atom(Atom::cargo_check(project_dir.clone())))
+            .then(Molecule::branch(
+                |val| val.is_success(),
+                Molecule::atom(Atom::cargo_test(project_dir)),
+                Molecule::atom(Atom::Noop),
+            ))
+    }
+
+    /// Generate + write + check with explicit tier routing.
+    /// The Dispatch atom signals which backend to use; the agent intercepts it.
+    pub fn generate_and_check(
+        target: PathBuf,
+        prompt: &str,
+        tier: DispatchTier,
+    ) -> Molecule {
+        let project_dir = target
+            .parent()
+            .and_then(|p| p.parent())
+            .unwrap_or(target.as_path())
+            .to_path_buf();
+
+        Molecule::atom(Atom::Dispatch {
+            prompt: prompt.to_string(),
+            tier,
+        })
+        .then(Molecule::atom(Atom::cargo_check(project_dir)))
+    }
+
+    /// Three-tier candidate set: native, local LLM, cloud LLM.
+    /// Returns 3 PlanCandidates with different energy/capability tradeoffs.
+    /// FEP selects the tier with best free-energy given consciousness state.
+    pub fn tiered_generation_candidates(
+        target: PathBuf,
+        prompt: &str,
+    ) -> Vec<(String, Molecule)> {
+        vec![
+            (
+                "native_generate".into(),
+                generate_and_check(target.clone(), prompt, DispatchTier::Native),
+            ),
+            (
+                "local_llm_generate".into(),
+                generate_and_check(target.clone(), prompt, DispatchTier::LocalLlm),
+            ),
+            (
+                "cloud_llm_generate".into(),
+                generate_and_check(target, prompt, DispatchTier::CloudLlm),
+            ),
+        ]
+    }
+
+    /// Exploration pipeline: search → read top matches → encode for HDC similarity.
+    /// Pure information gathering, no mutations.
+    pub fn explore_codebase(
+        project_dir: PathBuf,
+        search_term: &str,
+        files_to_read: Vec<PathBuf>,
+    ) -> Molecule {
+        let search = Molecule::atom(Atom::grep(search_term, project_dir));
+        let mut pipeline = search;
+        for file in files_to_read {
+            pipeline = pipeline.then(Molecule::atom(Atom::read(file)));
+        }
+        pipeline
     }
 }
 
@@ -1811,5 +2068,259 @@ mod tests {
         );
         let profile = recipe.profile();
         assert!(profile.fully_reversible);
+    }
+
+    // ── New Recipe Tests ────────────────────────────────────────────
+
+    #[test]
+    fn test_test_driven_fix_recipe() {
+        let recipe = recipes::test_driven_fix(
+            PathBuf::from("/tmp/proj/src/lib.rs"),
+            PathBuf::from("/tmp/proj"),
+            "fn fixed() {}".into(),
+            3,
+        );
+        let profile = recipe.profile();
+        // test + branch(noop | write+check), repeated 3x
+        assert!(profile.step_count >= 6);
+        assert!(profile.total_energy > 15.0);
+    }
+
+    #[test]
+    fn test_multi_file_edit_recipe() {
+        let files = vec![
+            PathBuf::from("/tmp/proj/src/a.rs"),
+            PathBuf::from("/tmp/proj/src/b.rs"),
+            PathBuf::from("/tmp/proj/src/c.rs"),
+        ];
+        let recipe = recipes::multi_file_edit(
+            files,
+            "old_name",
+            "new_name",
+            PathBuf::from("/tmp/proj"),
+        );
+        let profile = recipe.profile();
+        // noop + 3 edits + check
+        assert_eq!(profile.step_count, 5);
+        assert!(profile.fully_reversible);
+    }
+
+    #[test]
+    fn test_refactor_and_verify_recipe() {
+        let recipe = recipes::refactor_and_verify(
+            PathBuf::from("/tmp/proj"),
+            "deprecated_fn",
+            "deprecated_fn()",
+            "new_fn()",
+            vec![
+                PathBuf::from("/tmp/proj/src/a.rs"),
+                PathBuf::from("/tmp/proj/src/b.rs"),
+            ],
+        );
+        let profile = recipe.profile();
+        // grep + 2*(read+edit) + check + branch(test|noop)
+        assert!(profile.step_count >= 6);
+        assert!(profile.min_phi >= 0.05); // edits require some phi
+    }
+
+    #[test]
+    fn test_explore_codebase_recipe() {
+        let recipe = recipes::explore_codebase(
+            PathBuf::from("/tmp/proj"),
+            "struct.*Config",
+            vec![
+                PathBuf::from("/tmp/proj/src/config.rs"),
+                PathBuf::from("/tmp/proj/src/main.rs"),
+            ],
+        );
+        let profile = recipe.profile();
+        // grep + 2 reads
+        assert_eq!(profile.step_count, 3);
+        assert!(profile.fully_reversible);
+        assert_eq!(profile.max_destructiveness, DestructivenessLevel::ReadOnly);
+    }
+
+    #[test]
+    fn test_executor_full_pipeline_real() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("data.txt");
+
+        let mut exec = MoleculeExecutor::new(1.0, 100.0, true);
+
+        // Write → Edit → Read pipeline (real I/O)
+        let pipeline = Molecule::atom(Atom::write_text(&path, "hello world foo"))
+            .then(Molecule::atom(Atom::edit(&path, "foo", "bar")))
+            .then(Molecule::atom(Atom::read(&path)));
+
+        let result = exec.execute(&pipeline).unwrap();
+        assert_eq!(result.as_text(), Some("hello world bar"));
+        assert_eq!(exec.trace.len(), 3);
+        assert_eq!(exec.trace[0].0, "WriteFile");
+        assert_eq!(exec.trace[1].0, "EditFile");
+        assert_eq!(exec.trace[2].0, "ReadFile");
+    }
+
+    #[test]
+    fn test_select_best_plan_prefers_info_density() {
+        // Two plans with same safety but different info/energy ratio
+        let plan_a = Molecule::atom(Atom::read("/tmp/a"))
+            .then(Molecule::atom(Atom::read("/tmp/b")))
+            .then(Molecule::atom(Atom::read("/tmp/c")));
+        let plan_b = Molecule::atom(Atom::cargo_check(PathBuf::from("/tmp")));
+
+        let candidates = vec![
+            PlanCandidate {
+                name: "three_reads".into(),
+                profile: plan_a.profile(),
+                molecule: plan_a,
+            },
+            PlanCandidate {
+                name: "one_check".into(),
+                profile: plan_b.profile(),
+                molecule: plan_b,
+            },
+        ];
+
+        // Three reads: energy=0.3, steps=3 → FE = 0.3/3 = 0.1
+        // One check: energy=3.0, steps=1 → FE = 3.0/1 = 3.0
+        // Reads should win (lower FE = more info per energy)
+        let selected = select_best_plan(&candidates, 1.0, 100.0);
+        assert_eq!(selected, Some(0), "Should prefer higher info density");
+    }
+
+    // ─── Dispatch atom tests ─────────────────────────────────────────
+
+    #[test]
+    fn test_dispatch_native_properties() {
+        let atom = Atom::dispatch_native("add fibonacci");
+        let props = atom.properties();
+        assert_eq!(props.name, "DispatchNative");
+        assert!((props.energy_cost - 1.0).abs() < f32::EPSILON);
+        assert_eq!(props.destructiveness, DestructivenessLevel::ReadOnly);
+    }
+
+    #[test]
+    fn test_dispatch_local_properties() {
+        let atom = Atom::dispatch_local("add fibonacci");
+        let props = atom.properties();
+        assert_eq!(props.name, "DispatchLocalLLM");
+        assert!((props.energy_cost - 10.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_dispatch_cloud_properties() {
+        let atom = Atom::dispatch_cloud("add fibonacci");
+        let props = atom.properties();
+        assert_eq!(props.name, "DispatchCloudLLM");
+        assert!((props.energy_cost - 50.0).abs() < f32::EPSILON);
+        assert_eq!(props.risk_tier, RiskTier::High);
+    }
+
+    #[test]
+    fn test_dispatch_tier_energy_ordering() {
+        let native = Atom::dispatch_native("x").properties().energy_cost;
+        let local = Atom::dispatch_local("x").properties().energy_cost;
+        let cloud = Atom::dispatch_cloud("x").properties().energy_cost;
+        assert!(native < local);
+        assert!(local < cloud);
+    }
+
+    #[test]
+    fn test_dispatch_simulated_execution() {
+        let mut exec = MoleculeExecutor::new(1.0, 100.0, false);
+        let mol = Molecule::atom(Atom::dispatch_native("add fibonacci"));
+        let result = exec.execute(&mol).unwrap();
+        assert!(result.as_text().unwrap().contains("simulated dispatch"));
+    }
+
+    #[test]
+    fn test_dispatch_real_execution() {
+        let mut exec = MoleculeExecutor::new(1.0, 100.0, true);
+        let mol = Molecule::atom(Atom::dispatch_local("add fibonacci"));
+        let result = exec.execute(&mol).unwrap();
+        assert!(result.as_text().unwrap().contains("dispatch:LocalLlm"));
+    }
+
+    #[test]
+    fn test_generate_and_check_recipe() {
+        let mol = recipes::generate_and_check(
+            PathBuf::from("/tmp/test/src/lib.rs"),
+            "add fibonacci",
+            DispatchTier::Native,
+        );
+        let profile = mol.profile();
+        // DispatchNative (1.0) + CargoCheck (3.0)
+        assert!((profile.total_energy - 4.0).abs() < 0.1);
+        assert_eq!(profile.step_count, 2);
+    }
+
+    #[test]
+    fn test_tiered_candidates_produces_three() {
+        let candidates = recipes::tiered_generation_candidates(
+            PathBuf::from("/tmp/test/src/lib.rs"),
+            "add fibonacci",
+        );
+        assert_eq!(candidates.len(), 3);
+        // Energy should increase: native < local < cloud
+        let energies: Vec<f32> = candidates.iter().map(|(_, m)| m.profile().total_energy).collect();
+        assert!(energies[0] < energies[1]);
+        assert!(energies[1] < energies[2]);
+    }
+
+    // ─── History-aware plan selection tests ───────────────────────────
+
+    #[test]
+    fn test_select_with_history_prefers_successful_recipe() {
+        let plan_a = Molecule::atom(Atom::read("/tmp/a.rs"));
+        let plan_b = Molecule::atom(Atom::read("/tmp/b.rs"));
+
+        let candidates = vec![
+            PlanCandidate {
+                name: "a".into(),
+                profile: plan_a.profile(),
+                molecule: plan_a,
+            },
+            PlanCandidate {
+                name: "b".into(),
+                profile: plan_b.profile(),
+                molecule: plan_b,
+            },
+        ];
+
+        // Plan B has much higher historical success rate
+        let rates = vec![0.2, 0.9];
+        let selected = select_best_plan_with_history(&candidates, 1.0, 100.0, &rates);
+        assert_eq!(selected, Some(1), "Should prefer historically successful plan");
+    }
+
+    #[test]
+    fn test_select_with_history_uninformative_prior() {
+        let plan_a = Molecule::atom(Atom::read("/tmp/a.rs"));
+
+        let candidates = vec![PlanCandidate {
+            name: "a".into(),
+            profile: plan_a.profile(),
+            molecule: plan_a,
+        }];
+
+        // No history — should still select the only candidate
+        let rates = vec![0.5]; // uninformative prior
+        let selected = select_best_plan_with_history(&candidates, 1.0, 100.0, &rates);
+        assert_eq!(selected, Some(0));
+    }
+
+    #[test]
+    fn test_select_with_history_respects_phi_gate() {
+        let plan = Molecule::atom(Atom::cargo_check(PathBuf::from("/tmp")));
+        let candidates = vec![PlanCandidate {
+            name: "check".into(),
+            profile: plan.profile(),
+            molecule: plan,
+        }];
+        // Phi too low even with great history
+        let rates = vec![1.0];
+        let selected = select_best_plan_with_history(&candidates, 0.0, 100.0, &rates);
+        // CargoCheck needs phi=0.05, phi=0.0 fails
+        assert!(selected.is_none() || candidates[selected.unwrap()].profile.phi_sufficient(0.0));
     }
 }

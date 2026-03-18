@@ -287,9 +287,16 @@ impl PeerInfo {
         }
     }
 
-    /// Check if peer is trusted enough for tensor streaming
+    /// Check if peer is trusted enough for tensor streaming.
+    ///
+    /// Returns true for `LocalTrust` (whitelisted peers always stream)
+    /// and `Verified(level)` when level meets the minimum threshold.
     pub fn is_streamable(&self, min_trust: f64) -> bool {
-        matches!(self.trust_level, TrustLevel::Verified(level) if level >= min_trust)
+        match self.trust_level {
+            TrustLevel::Verified(level) => level >= min_trust,
+            TrustLevel::LocalTrust => true,
+            _ => false,
+        }
     }
 }
 
@@ -381,6 +388,64 @@ impl ConnectionTicket {
 }
 
 // ============================================================================
+// SECURITY TELEMETRY
+// ============================================================================
+
+/// Aggregate security telemetry for the swarm crypto stack.
+///
+/// Tracks handshake outcomes, key management events, and trust state.
+/// Consumed by Pulse dashboard and SwarmManager telemetry output.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct SecurityTelemetry {
+    /// Handshake challenges issued to peers.
+    pub handshakes_initiated: u64,
+    /// Handshakes successfully completed (peer verified).
+    pub handshakes_completed: u64,
+    /// Handshakes that failed (bad signature, timeout, tampered).
+    pub handshakes_failed: u64,
+    /// Challenge creation attempts blocked by rate limiter.
+    pub challenges_rate_limited: u64,
+    /// Inbound ConsciousnessVectors rejected (untrusted signer or bad attestation).
+    pub inbound_rejected_untrusted: u64,
+    /// Key rotation events (each rotation = new symmetric key).
+    pub key_rotations: u64,
+    /// Current key version (wraps at u8::MAX).
+    pub current_key_version: u8,
+    /// Number of currently trusted peers.
+    pub trusted_peer_count: usize,
+    /// Civic crisis events emitted by CivicCrisisDetector.
+    pub crisis_events_emitted: u64,
+}
+
+impl SecurityTelemetry {
+    /// Record a successful handshake.
+    pub fn record_handshake_success(&mut self) {
+        self.handshakes_completed += 1;
+    }
+
+    /// Record a failed handshake.
+    pub fn record_handshake_failure(&mut self) {
+        self.handshakes_failed += 1;
+    }
+
+    /// Record a rate-limited challenge.
+    pub fn record_rate_limited(&mut self) {
+        self.challenges_rate_limited += 1;
+    }
+
+    /// Record an inbound CV rejection.
+    pub fn record_inbound_rejection(&mut self) {
+        self.inbound_rejected_untrusted += 1;
+    }
+
+    /// Record a key rotation.
+    pub fn record_key_rotation(&mut self, new_version: u8) {
+        self.key_rotations += 1;
+        self.current_key_version = new_version;
+    }
+}
+
+// ============================================================================
 // TESTS
 // ============================================================================
 
@@ -418,11 +483,61 @@ mod tests {
     }
 
     #[test]
+    fn test_local_trust_is_streamable() {
+        let mut peer = PeerInfo::new("local-node");
+        peer.trust_level = TrustLevel::LocalTrust;
+        assert!(peer.is_streamable(0.5));
+        assert!(peer.is_streamable(0.9));
+        assert!(peer.is_streamable(1.0));
+    }
+
+    #[test]
+    fn test_streamable_thresholds() {
+        let mut peer = PeerInfo::new("test-node");
+        peer.trust_level = TrustLevel::Verified(0.7);
+        assert!(peer.is_streamable(0.5));
+        assert!(peer.is_streamable(0.7));
+        assert!(!peer.is_streamable(0.8));
+
+        peer.trust_level = TrustLevel::Unknown;
+        assert!(!peer.is_streamable(0.0));
+
+        peer.trust_level = TrustLevel::Untrusted;
+        assert!(!peer.is_streamable(0.0));
+    }
+
+    #[test]
     fn test_message_types() {
         let msg = SwarmMessage::Heartbeat {
             phi: 0.5,
             peer_count: 3,
         };
         assert_eq!(msg.message_type(), "Heartbeat");
+    }
+
+    #[test]
+    fn test_security_telemetry_default() {
+        let telem = SecurityTelemetry::default();
+        assert_eq!(telem.handshakes_initiated, 0);
+        assert_eq!(telem.trusted_peer_count, 0);
+        assert_eq!(telem.crisis_events_emitted, 0);
+    }
+
+    #[test]
+    fn test_security_telemetry_recording() {
+        let mut telem = SecurityTelemetry::default();
+        telem.record_handshake_success();
+        telem.record_handshake_success();
+        telem.record_handshake_failure();
+        telem.record_rate_limited();
+        telem.record_inbound_rejection();
+        telem.record_key_rotation(3);
+
+        assert_eq!(telem.handshakes_completed, 2);
+        assert_eq!(telem.handshakes_failed, 1);
+        assert_eq!(telem.challenges_rate_limited, 1);
+        assert_eq!(telem.inbound_rejected_untrusted, 1);
+        assert_eq!(telem.key_rotations, 1);
+        assert_eq!(telem.current_key_version, 3);
     }
 }

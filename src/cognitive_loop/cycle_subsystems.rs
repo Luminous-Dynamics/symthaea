@@ -99,7 +99,9 @@ impl CognitiveLoopService {
                     })
                     .collect();
                 hltc.inject_distributed(&input_vec);
-                let _ = hltc.step();
+                if let Err(e) = hltc.step() {
+                    tracing::warn!(err = %e, "HierarchicalLTC.step failed");
+                }
                 hltc.estimate_phi()
             } else {
                 0.0
@@ -253,7 +255,7 @@ impl CognitiveLoopService {
                     let (_value, gradient) = dc.forward(&state);
                     let (component, _grad_val, _suggestion) = dc.suggest_improvement(&state);
                     self.carryover.quality.last_gradient_magnitude = gradient.magnitude;
-                    (gradient.magnitude, format!("{:?}", component))
+                    (gradient.magnitude, component.as_str().into())
                 } else {
                     (
                         self.carryover.quality.last_gradient_magnitude,

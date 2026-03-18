@@ -61,6 +61,20 @@ pub enum ConsciousnessPattern {
 }
 
 impl ConsciousnessPattern {
+    /// Static string matching Debug output — avoids `format!("{:?}")` on hot path.
+    #[inline]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Contemplative => "Contemplative",
+            Self::Excited => "Excited",
+            Self::Focused => "Focused",
+            Self::Exploratory => "Exploratory",
+            Self::Resting => "Resting",
+            Self::Transitioning => "Transitioning",
+            Self::Uncertain => "Uncertain",
+        }
+    }
+
     /// Get all patterns
     pub fn all() -> &'static [ConsciousnessPattern] {
         &[

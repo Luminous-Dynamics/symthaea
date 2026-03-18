@@ -194,6 +194,19 @@ pub enum ThermodynamicRegime {
     Chaotic,
 }
 
+impl ThermodynamicRegime {
+    /// Zero-allocation string conversion.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Equilibrium => "Equilibrium",
+            Self::LinearNonEquilibrium => "LinearNonEquilibrium",
+            Self::EdgeOfChaos => "EdgeOfChaos",
+            Self::FarFromEquilibrium => "FarFromEquilibrium",
+            Self::Chaotic => "Chaotic",
+        }
+    }
+}
+
 impl DissipativeConsciousness {
     /// Create a new dissipative consciousness analyzer
     pub(crate) fn new() -> Self {

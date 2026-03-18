@@ -248,6 +248,27 @@ impl CognitiveLoopService {
             coherence_velocity: self.carryover.quality.coherence_velocity,
             cross_module_agreement: self.stats.avg_cross_module_agreement,
             consciousness_level: consciousness_level as f64,
+            #[cfg(feature = "therapeutic")]
+            client_distress: self.therapeutic_manager.client_distress(),
+            #[cfg(feature = "therapeutic")]
+            alliance_quality: self.therapeutic_manager.alliance_composite(),
+            #[cfg(feature = "therapeutic")]
+            therapeutic_intent: if self.therapeutic_manager.crisis_active {
+                7.0
+            } else {
+                self.therapeutic_manager
+                    .active_strategy()
+                    .map(|s| match s {
+                        symthaea_therapeutic::RegulationStrategy::Validation => 0.0,
+                        symthaea_therapeutic::RegulationStrategy::Defusion => 2.0,
+                        symthaea_therapeutic::RegulationStrategy::CognitiveReappraisal => 2.0,
+                        symthaea_therapeutic::RegulationStrategy::Grounding => 4.0,
+                        symthaea_therapeutic::RegulationStrategy::DistressTolerance => 4.0,
+                        symthaea_therapeutic::RegulationStrategy::ExposurePrep => 5.0,
+                        symthaea_therapeutic::RegulationStrategy::Containment => 6.0,
+                    })
+                    .unwrap_or(0.0)
+            },
         }
     }
 
@@ -382,6 +403,13 @@ impl CognitiveLoopService {
         &mut self,
         event: super::super::managers::governance_manager::GovernanceEvent,
     ) {
+        // Bridge governance events to sentinel for threat detection
+        #[cfg(feature = "sentinel")]
+        if let Some(sentinel_event) =
+            super::super::managers::sentinel_manager::bridge_governance_event(&event, "local")
+        {
+            self.sentinel_manager.inject_event(sentinel_event);
+        }
         self.governance_mgr.inject_event(event);
     }
 
@@ -411,6 +439,13 @@ impl CognitiveLoopService {
     ) {
         let (events, outcomes) = bridge.drain_pending_governance();
         for event in events {
+            // Bridge governance events to sentinel for threat detection
+            #[cfg(feature = "sentinel")]
+            if let Some(sentinel_event) =
+                super::super::managers::sentinel_manager::bridge_governance_event(&event, "bridge")
+            {
+                self.sentinel_manager.inject_event(sentinel_event);
+            }
             self.governance_mgr.inject_event(event);
         }
         for outcome in outcomes {
@@ -843,6 +878,114 @@ impl CognitiveLoopService {
         }
     }
 
+    /// Cross-couple drive state → learning plasticity.
+    ///
+    /// - Boredom > 0.5 → boost plasticity by 10% (Berlyne 1960: boredom drives exploratory learning)
+    /// - In flow → dampen LR modulation to 0.9 (Csikszentmihalyi 1990: don't disturb flow)
+    pub(crate) fn cross_couple_drive_learning(&mut self) {
+        let boredom = self.drive_manager.boredom();
+        let in_flow = self.drive_manager.in_flow();
+
+        // Boredom → plasticity boost: system is under-stimulated, open up to new learning
+        if boredom > super::super::thresholds::DRIVE_BOREDOM_PLASTICITY_THRESHOLD {
+            let boost = (boredom - super::super::thresholds::DRIVE_BOREDOM_PLASTICITY_THRESHOLD)
+                * super::super::thresholds::DRIVE_BOREDOM_PLASTICITY_GAIN;
+            // Direct plasticity nudge (within LearningManager's clamp range)
+            let current = self.learning_manager.plasticity();
+            let nudged = (current + boost).min(0.95);
+            if nudged > current {
+                // LearningManager doesn't expose set_plasticity — use the LR modulation
+                // channel instead: boost carryover LR factor
+                self.carryover.learning.subsystem_lr_factor *= 1.0 + boost;
+            }
+        }
+
+        // Flow → LR dampening: stable parameters benefit flow state maintenance
+        if in_flow {
+            self.carryover.learning.subsystem_lr_factor *= 0.9;
+        }
+    }
+
+    /// Cross-couple knowledge causal depth → moral reasoning confidence.
+    ///
+    /// Deep causal understanding (normalized depth > 0.6) → nudge prediction confidence
+    /// by +0.01 per excess depth unit. This flows into the ethics engine evaluation,
+    /// producing more confident moral verdicts when grounded in causal reasoning.
+    ///
+    /// Science: Pearl (2009) — deeper causal understanding → more confident moral reasoning.
+    pub(crate) fn cross_couple_knowledge_ethics(&mut self) {
+        if let Some(ref km) = self.knowledge_manager {
+            let depth = km.signals().causal_depth;
+            if depth.is_finite()
+                && depth > super::super::thresholds::KNOWLEDGE_ETHICS_CAUSAL_DEPTH_THRESHOLD
+            {
+                let nudge = (depth
+                    - super::super::thresholds::KNOWLEDGE_ETHICS_CAUSAL_DEPTH_THRESHOLD)
+                    * super::super::thresholds::KNOWLEDGE_ETHICS_CONFIDENCE_GAIN;
+                let nudge = nudge.min(0.03); // cap to prevent runaway
+                self.prediction_confidence =
+                    (self.prediction_confidence + nudge).clamp(0.0, 1.0);
+            }
+        }
+    }
+
+    /// Cross-couple memory consolidation state → learning plasticity.
+    ///
+    /// - High consolidation pressure (> 0.6) → boost LR factor (Born & Wilhelm 2012)
+    /// - Low recall quality (< 0.3) → dampen LR factor (Tulving 2002)
+    pub(crate) fn cross_couple_memory_learning(&mut self) {
+        let pressure = self.memory_manager.consolidation_pressure();
+        let recall = self.memory_manager.recall_quality();
+
+        // High consolidation pressure → boost learning (primed for encoding)
+        if pressure > super::super::thresholds::MEMORY_CONSOLIDATION_PLASTICITY_THRESHOLD {
+            let boost = (pressure
+                - super::super::thresholds::MEMORY_CONSOLIDATION_PLASTICITY_THRESHOLD)
+                * super::super::thresholds::MEMORY_CONSOLIDATION_PLASTICITY_GAIN;
+            self.carryover.learning.subsystem_lr_factor *= 1.0 + boost;
+        }
+
+        // Low recall quality → dampen learning (encoding unreliable)
+        if recall < super::super::thresholds::MEMORY_RECALL_QUALITY_DAMPEN_THRESHOLD {
+            let deficit =
+                super::super::thresholds::MEMORY_RECALL_QUALITY_DAMPEN_THRESHOLD - recall;
+            let dampening =
+                deficit * super::super::thresholds::MEMORY_RECALL_QUALITY_DAMPEN_SCALE;
+            self.carryover.learning.subsystem_lr_factor *= (1.0 - dampening).max(0.8);
+        }
+    }
+
+    /// Cross-couple perception state → drive exploration.
+    ///
+    /// - Low perceptual coherence → boost exploration (Damasio 1994: orienting response)
+    /// - High perceptual load → suppress exploration (Lavie 2005: load theory)
+    pub(crate) fn cross_couple_perception_drive(&mut self) {
+        let coherence = self.perception_manager.mean_coherence_score();
+        let utilization = self.perception_manager.budget_utilization();
+
+        // Low coherence → exploration boost (orienting reflex)
+        if coherence < super::super::thresholds::PERCEPTION_LOW_COHERENCE_THRESHOLD {
+            let deficit =
+                super::super::thresholds::PERCEPTION_LOW_COHERENCE_THRESHOLD - coherence;
+            let boost =
+                deficit * super::super::thresholds::PERCEPTION_LOW_COHERENCE_EXPLORE_GAIN;
+            // Nudge confidence down slightly to encourage exploration
+            self.prediction_confidence =
+                (self.prediction_confidence - boost as f64).clamp(0.0, 1.0);
+        }
+
+        // High perceptual load → suppress exploration (conserve resources)
+        if utilization > super::super::thresholds::PERCEPTION_HIGH_LOAD_SUPPRESS_THRESHOLD {
+            let excess =
+                utilization - super::super::thresholds::PERCEPTION_HIGH_LOAD_SUPPRESS_THRESHOLD;
+            let suppression =
+                excess * super::super::thresholds::PERCEPTION_HIGH_LOAD_SUPPRESS_FACTOR;
+            // Boost confidence slightly to discourage exploration
+            self.prediction_confidence =
+                (self.prediction_confidence + suppression as f64).clamp(0.0, 1.0);
+        }
+    }
+
     /// Access the resonant speech module (read-only).
     pub fn resonant_speech(&self) -> &crate::resonant_speech::ResonantSpeech {
         &self.resonant_speech
@@ -880,5 +1023,28 @@ impl CognitiveLoopService {
     /// Access the vision and sensory manager.
     pub fn vision_sensory(&self) -> &super::super::vision_sensory_manager::VisionAndSensoryManager {
         &self.vision_sensory
+    }
+
+    /// Get the current unified ethical verdict.
+    ///
+    /// Returns the override if set, otherwise the last verdict from the ethics engine.
+    pub fn last_ethics_verdict(&self) -> &super::super::ethics_engine::EthicalVerdict {
+        self.ethics_verdict_override.as_ref().unwrap_or(&self.last_ethics_verdict)
+    }
+
+    /// Override the unified ethical verdict.
+    ///
+    /// When set, the override takes precedence over the ethics engine's output
+    /// each cycle. The override persists until cleared via `clear_ethics_override()`.
+    /// Used by external safety systems and integration tests to force a specific
+    /// verdict that gates motor output and Broca generation.
+    pub fn set_ethics_verdict(&mut self, verdict: super::super::ethics_engine::EthicalVerdict) {
+        self.ethics_verdict_override = Some(verdict);
+    }
+
+    /// Clear the ethics verdict override, allowing the ethics engine to
+    /// determine the verdict normally.
+    pub fn clear_ethics_override(&mut self) {
+        self.ethics_verdict_override = None;
     }
 }

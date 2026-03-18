@@ -52,7 +52,7 @@ impl EmotionalStroopBenchmark {
         // Emotional interference: negative valence attracts attention,
         // partially activating a competing color response
         let emotional_weight: f32 =
-            0.42 * diff_model.interference_multiplier(config.difficulty) as f32;
+            0.28 * diff_model.interference_multiplier(config.difficulty) as f32;
         // Time pressure: base 0.25 yields ~10% emotional interference (Williams et al., 1996);
         // +0.15/unit raises temperature, modeling noisier color selection under SAT (Heitz, 2014).
         let temperature: f64 = (0.25 + config.time_pressure * 0.15)

@@ -60,6 +60,28 @@ pub enum MathProblemType {
     Unknown,
 }
 
+impl MathProblemType {
+    /// Zero-allocation string conversion.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::LinearSystem => "LinearSystem",
+            Self::RootFinding => "RootFinding",
+            Self::Integration => "Integration",
+            Self::MatrixAnalysis => "MatrixAnalysis",
+            Self::Statistics => "Statistics",
+            Self::Optimization => "Optimization",
+            Self::SignalAnalysis => "SignalAnalysis",
+            Self::Logic => "Logic",
+            Self::ConstraintSatisfaction => "ConstraintSatisfaction",
+            Self::Geometry => "Geometry",
+            Self::GraphTheory => "GraphTheory",
+            Self::DifferentialEquation => "DifferentialEquation",
+            Self::Arithmetic => "Arithmetic",
+            Self::Unknown => "Unknown",
+        }
+    }
+}
+
 /// Intent from the language system (math plugin)
 #[derive(Debug, Clone)]
 pub struct MathIntent {
@@ -866,35 +888,18 @@ impl MathService {
         };
         let newton = RootFindingEngine::newton_raphson(f, &df, (a + b) / 2.0, tol);
 
-        // Collect converged results with their Phi
-        let mut candidates: Vec<(f64, f64, f64, bool, symthaea_core::hdc::binary_hv::BinaryHV)> =
-            Vec::new(); // (root, phi, residual, converged, encoding)
+        // Collect converged results — store scalars only, index into encodings array.
+        // This avoids cloning BinaryHV (16,384-bit) for each solver; only the winner is cloned.
+        let encodings = [brent.encoding, bisect.encoding, newton.encoding];
+        let mut candidates: Vec<(f64, f64, f64, usize)> = Vec::new(); // (root, phi, residual, encoding_idx)
         if brent.converged {
-            candidates.push((
-                brent.root,
-                brent.phi,
-                brent.residual,
-                true,
-                brent.encoding.clone(),
-            ));
+            candidates.push((brent.root, brent.phi, brent.residual, 0));
         }
         if bisect.converged {
-            candidates.push((
-                bisect.root,
-                bisect.phi,
-                bisect.residual,
-                true,
-                bisect.encoding.clone(),
-            ));
+            candidates.push((bisect.root, bisect.phi, bisect.residual, 1));
         }
         if newton.converged {
-            candidates.push((
-                newton.root,
-                newton.phi,
-                newton.residual,
-                true,
-                newton.encoding.clone(),
-            ));
+            candidates.push((newton.root, newton.phi, newton.residual, 2));
         }
 
         // If no method converged, fall back to Brent
@@ -926,7 +931,7 @@ impl MathService {
             ),
             numerical_result: Some(best.0),
             vector_result: None,
-            encoding: best.4.clone(),
+            encoding: encodings[best.3].clone(),
             phi,
             confidence: if multipath_verified {
                 0.99
@@ -1040,8 +1045,8 @@ impl MathService {
         self.telemetry.average_phi =
             self.telemetry.total_phi / self.telemetry.problems_solved as f64;
 
-        let type_name = format!("{:?}", problem_type);
-        *self.telemetry.by_type.entry(type_name).or_insert(0) += 1;
+        let type_name = problem_type.as_str();
+        *self.telemetry.by_type.entry(type_name.into()).or_insert(0) += 1;
     }
 }
 

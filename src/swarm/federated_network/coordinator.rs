@@ -515,16 +515,20 @@ impl FederatedCoordinator {
             self.aggregator.write().apply_gradient(new_weights, 0.1);
 
             // Broadcast updated model
-            let local_node = self.local_node.read();
-            let update_msg = FederatedMessage::ModelUpdate {
-                weights: self.get_weights(),
-                round,
-                source_id: local_node.node_id,
-                timestamp: SystemTime::now()
-                    .duration_since(SystemTime::UNIX_EPOCH)
-                    .map(|d| d.as_millis() as u64)
-                    .unwrap_or(0),
-            };
+            // NOTE: extract node_id and drop the RwLockReadGuard before .await
+            // to satisfy Send bound for tokio::spawn.
+            let update_msg = {
+                let local_node = self.local_node.read();
+                FederatedMessage::ModelUpdate {
+                    weights: self.get_weights(),
+                    round,
+                    source_id: local_node.node_id,
+                    timestamp: SystemTime::now()
+                        .duration_since(SystemTime::UNIX_EPOCH)
+                        .map(|d| d.as_millis() as u64)
+                        .unwrap_or(0),
+                }
+            }; // guard dropped here
 
             self.backend.broadcast(update_msg).await?;
             self.stats.write().model_updates_broadcast += 1;

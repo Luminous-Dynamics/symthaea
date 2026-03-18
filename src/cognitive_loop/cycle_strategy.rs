@@ -12,18 +12,23 @@ use symthaea_core::hdc::predictive_encoder::EncodingResult;
 
 use super::helpers;
 use super::thresholds::{
+    CANTOR_META_DEPTH_STILLNESS_THRESHOLD, CANTOR_RESONANCE_BOOST_HARMONY_THRESHOLD,
     CONFIDENCE_SCALE_MIDPOINT, CONFIDENCE_SCALE_SENSITIVITY, EXPLORATION_SCALE_MIDPOINT,
-    EXPLORATION_SCALE_SENSITIVITY, MEMO_DIVERSITY_HIGH, MEMO_DIVERSITY_HIGH_SCALE,
+    EXPLORATION_SCALE_SENSITIVITY, KNOWLEDGE_NOVELTY_EXPLORATION_THRESHOLD,
+    MCTS_PLAN_CONFIDENCE_THRESHOLD, MEMO_DIVERSITY_HIGH, MEMO_DIVERSITY_HIGH_SCALE,
     MEMO_DIVERSITY_LOW, MEMO_DIVERSITY_LOW_SCALE, MEMO_THRESHOLD_CEILING, MEMO_THRESHOLD_FLOOR,
-    MORAL_CONCERN_THRESHOLD, SOCIAL_COOPERATION_THRESHOLD, SOCIAL_TRUST_DEADZONE,
-    SOCIAL_TRUST_EXPLORE_SCALE, SOCIAL_TRUST_EXPLORE_THRESHOLD, SOCIAL_TRUST_MIDPOINT,
-    SOCIAL_TRUST_OVERRIDE_THRESHOLD, SOCIAL_TRUST_STRENGTH_SCALE, SOUL_ALIGNMENT_BOOST_LR_MAX,
-    SOUL_ALIGNMENT_BOOST_LR_MIN, SOUL_ALIGNMENT_BOOST_SCALE, SOUL_ALIGNMENT_BOOST_THRESHOLD,
-    SOUL_ALIGNMENT_DAMPEN_LR_MAX, SOUL_ALIGNMENT_DAMPEN_LR_MIN, SOUL_ALIGNMENT_DAMPEN_SCALE,
-    SOUL_ALIGNMENT_DAMPEN_THRESHOLD, SURPRISE_PE_EXCESS_CAP, SURPRISE_PE_SCALE_FACTOR,
-    SURPRISE_PE_THRESHOLD, THETA_BINDING_BOOST_THRESHOLD, THETA_BINDING_CLAMP_MAX,
-    THETA_BINDING_CLAMP_MIN, THETA_DEFAULT_SALIENCE, THETA_SALIENCE_CLAMP_MIN,
-    TOM_MISMATCH_EMA_DECAY, TOM_MISMATCH_EXPLORE_SCALE, TOM_MISMATCH_THRESHOLD,
+    MORAL_CONCERN_THRESHOLD, NEUROMOD_STILLNESS_ADENOSINE_WEIGHT, NEUROMOD_STILLNESS_CLAMP_MAX,
+    NEUROMOD_STILLNESS_GABA_WEIGHT, NEUROMOD_STILLNESS_OFFSET, SOCIAL_COOPERATION_THRESHOLD,
+    SOCIAL_TRUST_DEADZONE, SOCIAL_TRUST_EXPLORE_SCALE, SOCIAL_TRUST_EXPLORE_THRESHOLD,
+    SOCIAL_TRUST_MIDPOINT, SOCIAL_TRUST_OVERRIDE_THRESHOLD, SOCIAL_TRUST_STRENGTH_SCALE,
+    SOUL_ALIGNMENT_BOOST_LR_MAX, SOUL_ALIGNMENT_BOOST_LR_MIN, SOUL_ALIGNMENT_BOOST_SCALE,
+    SOUL_ALIGNMENT_BOOST_THRESHOLD, SOUL_ALIGNMENT_DAMPEN_LR_MAX, SOUL_ALIGNMENT_DAMPEN_LR_MIN,
+    SOUL_ALIGNMENT_DAMPEN_SCALE, SOUL_ALIGNMENT_DAMPEN_THRESHOLD, STILLNESS_TOTAL_CLAMP_MAX,
+    SUBSTRATE_NOISE_FRACTION_DIVISOR, SUBSTRATE_NOISE_STD_DIVISOR, SURPRISE_PE_EXCESS_CAP,
+    SURPRISE_PE_SCALE_FACTOR, SURPRISE_PE_THRESHOLD, THETA_BINDING_BOOST_THRESHOLD,
+    THETA_BINDING_CLAMP_MAX, THETA_BINDING_CLAMP_MIN, THETA_DEFAULT_SALIENCE,
+    THETA_SALIENCE_CLAMP_MIN, TOM_MISMATCH_EMA_DECAY, TOM_MISMATCH_EXPLORE_SCALE,
+    TOM_MISMATCH_THRESHOLD,
 };
 use super::{CognitiveLoopService, ModuleTimings, ResponseStrategy};
 
@@ -96,7 +101,7 @@ impl CognitiveLoopService {
 
             if let Some(&(plan_action, plan_confidence)) = self.carryover.history.mcts_plan.as_ref()
             {
-                if plan_confidence > 0.7 {
+                if plan_confidence > MCTS_PLAN_CONFIDENCE_THRESHOLD {
                     match plan_action {
                         0 => match base_strategy {
                             ResponseStrategy::Exploratory => ResponseStrategy::Detailed,
@@ -197,9 +202,9 @@ impl CognitiveLoopService {
                     -super::thresholds::KNOWLEDGE_CAUSAL_DEPTH_EXPLORE_DAMPEN,
                 );
             }
-            if novelty > 0.5 {
-                let boost =
-                    (novelty as f32 - 0.5) * super::thresholds::KNOWLEDGE_NOVELTY_EXPLORE_SCALE;
+            if novelty > KNOWLEDGE_NOVELTY_EXPLORATION_THRESHOLD {
+                let boost = (novelty as f32 - KNOWLEDGE_NOVELTY_EXPLORATION_THRESHOLD as f32)
+                    * super::thresholds::KNOWLEDGE_NOVELTY_EXPLORE_SCALE;
                 self.adjust_exploration("knowledge_novelty", boost);
             }
         }
@@ -238,7 +243,7 @@ impl CognitiveLoopService {
         // Science: Varela (1991) — low agency = reactive mode → prefer conservative strategy
         let agency_strategy_override = {
             let cached_agency = self.carryover.consciousness.last_embodied_agency;
-            if cached_agency < 0.3
+            if cached_agency < super::thresholds::EMBODIED_AGENCY_LOW_THRESHOLD
                 && cached_agency > 0.0
                 && selected_strategy == ResponseStrategy::Exploratory
             {
@@ -347,7 +352,8 @@ impl CognitiveLoopService {
         if self.config.enable_substrate_encoding_noise
             && self.substrate_manager.scale_pressure < 0.0
         {
-            let noise_fraction = (-self.substrate_manager.scale_pressure).min(7.0) / 70.0; // [0.0, 0.1]
+            let noise_fraction =
+                (-self.substrate_manager.scale_pressure).min(7.0) / SUBSTRATE_NOISE_FRACTION_DIVISOR; // [0.0, 0.1]
             let seed = self.stats.total_cycles as u64;
             hv16_cached = hv16_cached.add_noise(noise_fraction, seed);
         }
@@ -502,7 +508,8 @@ impl CognitiveLoopService {
         let compressed_state = if self.config.enable_substrate_encoding_noise
             && self.substrate_manager.scale_pressure < 0.0
         {
-            let noise_std = (-self.substrate_manager.scale_pressure).min(7.0) / 35.0; // [0.0, 0.2]
+            let noise_std =
+                (-self.substrate_manager.scale_pressure).min(7.0) / SUBSTRATE_NOISE_STD_DIVISOR; // [0.0, 0.2]
             let seed = self.stats.total_cycles as u64;
             compressed_state
                 .into_iter()
@@ -558,7 +565,16 @@ impl CognitiveLoopService {
             } else {
                 (0.0, false)
             };
-        self.carryover.history.last_compressed_state = Some(compressed_state.clone());
+        // Reuse the existing buffer when possible to avoid per-cycle Vec allocation.
+        match self.carryover.history.last_compressed_state {
+            Some(ref mut buf) => {
+                buf.clear();
+                buf.extend_from_slice(&compressed_state);
+            }
+            None => {
+                self.carryover.history.last_compressed_state = Some(compressed_state.clone());
+            }
+        }
 
         // ═══════════════════════════════════════════════════════════════════════
         // UNIFIED ETHICS ENGINE
@@ -570,8 +586,12 @@ impl CognitiveLoopService {
         let stillness_boost = {
             let gaba = self.neuromod.bath.gaba.effective();
             let adenosine = self.neuromod.bath.adenosine.effective();
-            let neuromod_stillness = (gaba * 0.6 + adenosine * 0.4 - 0.3).clamp(0.0, 0.3);
-            (neuromod_stillness + self.stats.circadian_stillness_boost).clamp(0.0, 0.5)
+            let neuromod_stillness = (gaba * NEUROMOD_STILLNESS_GABA_WEIGHT
+                + adenosine * NEUROMOD_STILLNESS_ADENOSINE_WEIGHT
+                - NEUROMOD_STILLNESS_OFFSET)
+                .clamp(0.0, NEUROMOD_STILLNESS_CLAMP_MAX);
+            (neuromod_stillness + self.stats.circadian_stillness_boost)
+                .clamp(0.0, STILLNESS_TOTAL_CLAMP_MAX)
         };
         // Collect semantic embedding for ethics engine (when semantic-encoder enabled).
         #[cfg(feature = "semantic-encoder")]
@@ -643,6 +663,11 @@ impl CognitiveLoopService {
         if ethics_output.lr_factor != 1.0 {
             self.scale_lr("ethics_engine", ethics_output.lr_factor);
         }
+        self.last_ethics_verdict = if let Some(ref ov) = self.ethics_verdict_override {
+            ov.clone()
+        } else {
+            ethics_output.unified_verdict.clone()
+        };
         // Reset escalation block flag each cycle — re-applied below if still warranted.
         self.stats.escalation_blocked = false;
 
@@ -660,12 +685,13 @@ impl CognitiveLoopService {
                 .last()
                 .map(|crhv| crhv.self_similarity() as f64)
                 .unwrap_or(0.0);
-            if meta_depth > 0.5 {
-                let stillness_delta = (meta_depth - 0.5) * CANTOR_HARMONY_STILLNESS_SCALE;
+            if meta_depth > CANTOR_META_DEPTH_STILLNESS_THRESHOLD {
+                let stillness_delta =
+                    (meta_depth - CANTOR_META_DEPTH_STILLNESS_THRESHOLD) * CANTOR_HARMONY_STILLNESS_SCALE;
                 self.ethics_engine
                     .nudge_harmony_coordinate(7, stillness_delta);
             }
-            if self.cantor_dream.resonance_boost > 0.1 {
+            if self.cantor_dream.resonance_boost > CANTOR_RESONANCE_BOOST_HARMONY_THRESHOLD {
                 let interconnect_delta =
                     self.cantor_dream.resonance_boost as f64 * CANTOR_HARMONY_INTERCONNECT_SCALE;
                 self.ethics_engine

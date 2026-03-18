@@ -305,6 +305,11 @@ pub mod grid_encoder;
 pub mod global_workspace; // GWT implementation with competitive dynamics
 pub mod higher_order_thought; // Higher-Order Thought (HOT) theory — meta-representational consciousness
 
+// HDC-native cryptographic primitives (MAC, threshold sharing, context keys, commitments)
+pub mod hdc_crypto;
+// HDC homomorphic computation (encrypted HVs, collective wisdom pool, privacy-preserving aggregation)
+pub mod hdc_fhe;
+
 // Consciousness topology and Φ measurement modules
 pub mod binary_hv;
 pub mod consciousness_topology; // Consciousness topology structures
@@ -368,6 +373,7 @@ pub mod parallel_hv; // Rayon parallel batch operations (7x faster on 8 cores)
 mod phi_feedback_integration_tests;
 pub mod primitive_dashboard; // Real-time primitive usage monitoring
 pub mod primitive_system; // Ontological primitives system with 7 semantic domains
+pub mod program_algebra; // HDC program algebra — hyperdimensional IR for code
 #[cfg(test)]
 mod proptest_consciousness;
 pub mod quadrature; // Numerical integration: Simpson, Gauss-Legendre, adaptive
@@ -397,6 +403,7 @@ pub mod consciousness; // Modular consciousness (re-exports consciousness_integr
 pub mod consciousness_dashboard;
 pub mod consciousness_evaluator; // Consciousness evaluation
 pub mod consciousness_integration; // Complete consciousness pipeline
+pub mod hierarchical_bundle; // Per-region bundling with role-based binding for scalable aggregation
 pub mod substrate_composition; // Weighted substrate mixtures for hybrid analysis
 pub mod substrate_independence; // Substrate type definitions // Real-time consciousness monitoring
 pub mod substrate_validation; // Validation framework with evidence levels and feasibility gaps

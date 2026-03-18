@@ -277,6 +277,220 @@ impl ClientModel {
             current_arousal * (1.0 - alpha) + mean_arousal_dev * alpha,
         );
     }
+
+    // ── Outcome Measurement ─────────────────────────────────────────────
+
+    /// PHQ-9 analogue score (0–27): depression severity from affect trajectory.
+    ///
+    /// Maps sustained negative valence, low positive valence, arousal dysregulation,
+    /// and functional impairment to the PHQ-9 scale. NOT a clinical instrument —
+    /// this is a computational analogue for tracking treatment progress.
+    ///
+    /// Scoring: 0-4 minimal, 5-9 mild, 10-14 moderate, 15-19 moderately severe, 20-27 severe.
+    ///
+    /// Science: Kroenke, Spitzer & Williams (2001). The PHQ-9: validity of a brief
+    /// depression severity measure. *Journal of General Internal Medicine*, 16(9), 606-613.
+    pub fn phq9_analogue(&self) -> f32 {
+        if self.affect_trajectory.len() < 10 {
+            return 0.0; // Insufficient data
+        }
+
+        let window = self.affect_trajectory.len().min(50);
+        let recent: Vec<&CoreAffectSnapshot> =
+            self.affect_trajectory.iter().rev().take(window).collect();
+
+        // PHQ-9 domains mapped to computational signals:
+        // 1. Little interest/pleasure → low positive valence (anhedonia)
+        let mean_pos = recent.iter().map(|a| a.valence.max(0.0)).sum::<f32>() / window as f32;
+        let anhedonia = (1.0 - mean_pos * 2.0).clamp(0.0, 1.0); // 0=engaged, 1=anhedonic
+
+        // 2. Feeling down/depressed → sustained negative valence
+        let mean_neg = recent.iter().map(|a| (-a.valence).max(0.0)).sum::<f32>() / window as f32;
+        let depressed_mood = mean_neg.clamp(0.0, 1.0);
+
+        // 3. Sleep disturbance → arousal dysregulation (proxy)
+        let arousal_variance = {
+            let mean_arousal = recent.iter().map(|a| a.arousal).sum::<f32>() / window as f32;
+            let var = recent
+                .iter()
+                .map(|a| (a.arousal - mean_arousal).powi(2))
+                .sum::<f32>()
+                / window as f32;
+            var.sqrt()
+        };
+        let sleep_disturbance = (arousal_variance * 4.0).clamp(0.0, 1.0);
+
+        // 4. Fatigue → low arousal (sustained)
+        let mean_arousal = recent.iter().map(|a| a.arousal).sum::<f32>() / window as f32;
+        let fatigue = ((0.5 - mean_arousal).max(0.0) * 3.0).clamp(0.0, 1.0);
+
+        // 5. Poor concentration → from RDoC CognitiveSystems
+        let cognitive_impairment = self.rdoc_profile.score(RDocDomain::CognitiveSystems);
+
+        // 6. Psychomotor → extreme arousal (too high OR too low)
+        let psychomotor = ((mean_arousal - 0.5).abs() * 2.5).clamp(0.0, 1.0);
+
+        // 7. Worthlessness → RDoC NegativeValence + low social
+        let neg_val = self.rdoc_profile.score(RDocDomain::NegativeValence);
+        let social = self.rdoc_profile.score(RDocDomain::SocialProcesses);
+        let worthlessness = ((neg_val + (1.0 - social)) * 0.5).clamp(0.0, 1.0);
+
+        // 8-9. Suicidal ideation → risk level
+        let suicidal = match self.risk_level {
+            RiskLevel::None | RiskLevel::Low => 0.0,
+            RiskLevel::Moderate => 0.33,
+            RiskLevel::High => 0.67,
+            RiskLevel::Critical => 1.0,
+        };
+
+        // Each domain scored 0-3 (PHQ-9 Likert), sum across 9 items → 0-27
+        let items = [
+            anhedonia,
+            depressed_mood,
+            sleep_disturbance,
+            fatigue,
+            cognitive_impairment,
+            psychomotor,
+            worthlessness,
+            suicidal,
+            // 9th item: overall functional impairment (mean distress)
+            self.distress(),
+        ];
+        items.iter().map(|d| d * 3.0).sum::<f32>().clamp(0.0, 27.0)
+    }
+
+    /// GAD-7 analogue score (0–21): anxiety severity from affect trajectory.
+    ///
+    /// Maps sustained high arousal, arousal dysregulation, and RDoC negative valence
+    /// to the GAD-7 scale. NOT a clinical instrument — computational analogue.
+    ///
+    /// Scoring: 0-4 minimal, 5-9 mild, 10-14 moderate, 15-21 severe.
+    ///
+    /// Science: Spitzer, Kroenke, Williams & Löwe (2006). A brief measure for
+    /// assessing generalized anxiety disorder. *Archives of Internal Medicine*, 166(10), 1092-1097.
+    pub fn gad7_analogue(&self) -> f32 {
+        if self.affect_trajectory.len() < 10 {
+            return 0.0;
+        }
+
+        let window = self.affect_trajectory.len().min(50);
+        let recent: Vec<&CoreAffectSnapshot> =
+            self.affect_trajectory.iter().rev().take(window).collect();
+
+        // GAD-7 domains:
+        // 1. Feeling nervous/anxious → high arousal + negative valence
+        let mean_arousal = recent.iter().map(|a| a.arousal).sum::<f32>() / window as f32;
+        let mean_neg = recent.iter().map(|a| (-a.valence).max(0.0)).sum::<f32>() / window as f32;
+        let nervous = ((mean_arousal - 0.5).max(0.0) * 2.0 * 0.5 + mean_neg * 0.5).clamp(0.0, 1.0);
+
+        // 2. Not being able to stop worrying → RDoC NegativeValence persistence
+        let neg_val = self.rdoc_profile.score(RDocDomain::NegativeValence);
+        let worry = neg_val.clamp(0.0, 1.0);
+
+        // 3. Worrying too much → arousal + negative valence combined
+        let excessive_worry = (nervous * 0.7 + worry * 0.3).clamp(0.0, 1.0);
+
+        // 4. Trouble relaxing → arousal dysregulation
+        let arousal_dysreg = self.rdoc_profile.score(RDocDomain::ArousalRegulatory);
+        let trouble_relaxing = arousal_dysreg.clamp(0.0, 1.0);
+
+        // 5. Restlessness → high arousal sustained
+        let restless = ((mean_arousal - 0.6).max(0.0) * 3.0).clamp(0.0, 1.0);
+
+        // 6. Easily annoyed/irritable → high arousal + negative valence + arousal variance
+        let arousal_var = {
+            let var = recent
+                .iter()
+                .map(|a| (a.arousal - mean_arousal).powi(2))
+                .sum::<f32>()
+                / window as f32;
+            var.sqrt()
+        };
+        let irritable = (mean_neg * 0.4 + arousal_var * 2.0 * 0.3 + restless * 0.3).clamp(0.0, 1.0);
+
+        // 7. Feeling afraid → RDoC NegativeValence (fear component)
+        let afraid = (neg_val * 0.6 + mean_neg * 0.4).clamp(0.0, 1.0);
+
+        let items = [
+            nervous,
+            worry,
+            excessive_worry,
+            trouble_relaxing,
+            restless,
+            irritable,
+            afraid,
+        ];
+        items.iter().map(|d| d * 3.0).sum::<f32>().clamp(0.0, 21.0)
+    }
+
+    /// Outcome Rating Scale analogue (0-40): overall functioning.
+    ///
+    /// Maps positive valence, low distress, social engagement, and arousal
+    /// regulation to a composite functioning score. Higher = better.
+    ///
+    /// Science: Miller, Duncan, Brown, Sparks & Claud (2003). The Outcome Rating
+    /// Scale: A preliminary study of the reliability, validity, and feasibility.
+    /// *Journal of Brief Therapy*, 2(2), 91-100.
+    pub fn ors_analogue(&self) -> f32 {
+        if self.affect_trajectory.len() < 10 {
+            return 20.0; // Neutral midpoint
+        }
+
+        let window = self.affect_trajectory.len().min(50);
+        let recent: Vec<&CoreAffectSnapshot> =
+            self.affect_trajectory.iter().rev().take(window).collect();
+
+        // ORS 4 domains (each 0-10):
+        // 1. Individual wellbeing → valence
+        let mean_valence = recent.iter().map(|a| a.valence).sum::<f32>() / window as f32;
+        let individual = ((mean_valence + 1.0) / 2.0 * 10.0).clamp(0.0, 10.0);
+
+        // 2. Interpersonal → RDoC SocialProcesses
+        let social = self.rdoc_profile.score(RDocDomain::SocialProcesses);
+        let interpersonal = (social * 10.0).clamp(0.0, 10.0);
+
+        // 3. Social role → inverse of distress + arousal regulation
+        let distress = self.distress();
+        let social_role = ((1.0 - distress) * 10.0).clamp(0.0, 10.0);
+
+        // 4. Overall → composite of above
+        let pos_valence = self.rdoc_profile.score(RDocDomain::PositiveValence);
+        let overall = ((pos_valence * 0.5 + (1.0 - distress) * 0.5) * 10.0).clamp(0.0, 10.0);
+
+        individual + interpersonal + social_role + overall
+    }
+
+    /// Therapeutic outcome summary combining all analogue measures.
+    ///
+    /// Returns (phq9, gad7, ors, trend) where trend is computed from
+    /// comparing current vs earlier window means.
+    pub fn outcome_summary(&self) -> OutcomeSummary {
+        OutcomeSummary {
+            phq9: self.phq9_analogue(),
+            gad7: self.gad7_analogue(),
+            ors: self.ors_analogue(),
+            affect_trend: self.affect_trend(),
+            cycles_observed: self.cycle_count,
+            sessions: self.session_count,
+        }
+    }
+}
+
+/// Therapeutic outcome summary.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct OutcomeSummary {
+    /// PHQ-9 analogue (0-27). Lower = better. <5 minimal, 5-9 mild, 10-14 moderate.
+    pub phq9: f32,
+    /// GAD-7 analogue (0-21). Lower = better. <5 minimal, 5-9 mild, 10-14 moderate.
+    pub gad7: f32,
+    /// ORS analogue (0-40). Higher = better. <25 clinical concern, >25 adequate functioning.
+    pub ors: f32,
+    /// Affect trend (positive = improving).
+    pub affect_trend: f32,
+    /// Cycles observed (data quality indicator).
+    pub cycles_observed: u64,
+    /// Sessions completed.
+    pub sessions: u32,
 }
 
 impl Default for ClientModel {
@@ -430,6 +644,119 @@ mod tests {
             pre_pos,
             post_pos,
         );
+    }
+
+    // ── Outcome Measure Tests ──────────────────────────────────────────
+
+    #[test]
+    fn test_phq9_minimal_for_positive_affect() {
+        let mut client = ClientModel::new();
+        for i in 0..50 {
+            client.update_affect(CoreAffectSnapshot::new(0.6, 0.5, i));
+        }
+        let phq9 = client.phq9_analogue();
+        assert!(phq9 < 5.0, "Positive affect should yield minimal PHQ-9: {}", phq9);
+    }
+
+    #[test]
+    fn test_phq9_elevated_for_depressed_affect() {
+        let mut client = ClientModel::new();
+        for i in 0..50 {
+            client.update_affect(CoreAffectSnapshot::new(-0.8, 0.3, i));
+        }
+        let phq9 = client.phq9_analogue();
+        assert!(phq9 > 8.0, "Depressed affect should yield elevated PHQ-9: {}", phq9);
+    }
+
+    #[test]
+    fn test_phq9_range() {
+        let mut client = ClientModel::new();
+        for i in 0..50 {
+            client.update_affect(CoreAffectSnapshot::new(-0.9, 0.9, i));
+        }
+        client.risk_level = RiskLevel::High;
+        let phq9 = client.phq9_analogue();
+        assert!(phq9 >= 0.0 && phq9 <= 27.0, "PHQ-9 must be in 0-27: {}", phq9);
+    }
+
+    #[test]
+    fn test_phq9_insufficient_data() {
+        let mut client = ClientModel::new();
+        for i in 0..5 {
+            client.update_affect(CoreAffectSnapshot::new(-0.9, 0.9, i));
+        }
+        assert_eq!(client.phq9_analogue(), 0.0, "Insufficient data returns 0");
+    }
+
+    #[test]
+    fn test_gad7_minimal_for_calm_affect() {
+        let mut client = ClientModel::new();
+        for i in 0..50 {
+            client.update_affect(CoreAffectSnapshot::new(0.3, 0.4, i));
+        }
+        let gad7 = client.gad7_analogue();
+        assert!(gad7 < 5.0, "Calm positive affect should yield minimal GAD-7: {}", gad7);
+    }
+
+    #[test]
+    fn test_gad7_elevated_for_anxious_affect() {
+        let mut client = ClientModel::new();
+        for i in 0..50 {
+            client.update_affect(CoreAffectSnapshot::new(-0.6, 0.9, i));
+        }
+        client.update_rdoc(RDocDomain::NegativeValence, 0.8);
+        let gad7 = client.gad7_analogue();
+        assert!(gad7 > 8.0, "Anxious affect should yield elevated GAD-7: {}", gad7);
+    }
+
+    #[test]
+    fn test_gad7_range() {
+        let mut client = ClientModel::new();
+        for i in 0..50 {
+            client.update_affect(CoreAffectSnapshot::new(-0.9, 0.95, i));
+        }
+        client.update_rdoc(RDocDomain::NegativeValence, 1.0);
+        client.update_rdoc(RDocDomain::ArousalRegulatory, 1.0);
+        let gad7 = client.gad7_analogue();
+        assert!(gad7 >= 0.0 && gad7 <= 21.0, "GAD-7 must be in 0-21: {}", gad7);
+    }
+
+    #[test]
+    fn test_ors_high_for_positive_functioning() {
+        let mut client = ClientModel::new();
+        for i in 0..50 {
+            client.update_affect(CoreAffectSnapshot::new(0.7, 0.5, i));
+        }
+        client.update_rdoc(RDocDomain::SocialProcesses, 0.8);
+        client.update_rdoc(RDocDomain::PositiveValence, 0.7);
+        let ors = client.ors_analogue();
+        assert!(ors > 25.0, "Good functioning should yield high ORS: {}", ors);
+    }
+
+    #[test]
+    fn test_ors_low_for_impaired_functioning() {
+        let mut client = ClientModel::new();
+        for i in 0..50 {
+            client.update_affect(CoreAffectSnapshot::new(-0.8, 0.9, i));
+        }
+        client.update_rdoc(RDocDomain::SocialProcesses, 0.1);
+        let ors = client.ors_analogue();
+        assert!(ors < 20.0, "Impaired functioning should yield low ORS: {}", ors);
+    }
+
+    #[test]
+    fn test_outcome_summary() {
+        let mut client = ClientModel::new();
+        for i in 0..50 {
+            client.update_affect(CoreAffectSnapshot::new(-0.3, 0.6, i));
+        }
+        client.begin_session();
+        let summary = client.outcome_summary();
+        assert!(summary.phq9 >= 0.0);
+        assert!(summary.gad7 >= 0.0);
+        assert!(summary.ors >= 0.0 && summary.ors <= 40.0);
+        assert_eq!(summary.sessions, 1);
+        assert_eq!(summary.cycles_observed, 49);
     }
 
     #[test]

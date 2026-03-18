@@ -214,6 +214,22 @@ pub enum ActionHint {
     Inhibit,
 }
 
+impl ActionHint {
+    /// Static string matching Debug output — avoids `format!("{:?}")` on hot path.
+    #[inline]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Continue => "Continue",
+            Self::SlowDown => "SlowDown",
+            Self::SpeedUp => "SpeedUp",
+            Self::Stabilize => "Stabilize",
+            Self::Explore => "Explore",
+            Self::SeekInput => "SeekInput",
+            Self::Inhibit => "Inhibit",
+        }
+    }
+}
+
 impl Default for AdaptiveBehavior {
     fn default() -> Self {
         Self {

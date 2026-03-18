@@ -77,6 +77,14 @@ pub struct IrohNode {
     /// Whether this is a real or stub implementation
     is_stub: bool,
 
+    /// Optional handshake reference for clearing trust on disconnect.
+    handshake: Option<Arc<RwLock<crate::swarm::handshake::HybridHandshake>>>,
+
+    /// Optional attestation manager for verifying inbound ConsciousnessVectors.
+    /// When set, `recv_verified_consciousness()` checks Ed25519 signatures
+    /// before accepting CVs into the cognitive loop.
+    attestation: Option<Arc<RwLock<crate::swarm::attestation::AttestationManager>>>,
+
     /// Inner Iroh endpoint (only with feature)
     #[cfg(feature = "swarm")]
     endpoint: Option<iroh::Endpoint>,
@@ -104,6 +112,8 @@ impl IrohNode {
             ticket_manager: TicketManager::new(),
             config,
             is_stub: true,
+            handshake: None,
+            attestation: None,
         })
     }
 
@@ -124,6 +134,8 @@ impl IrohNode {
             ticket_manager: TicketManager::new(),
             config,
             is_stub: true,
+            handshake: None,
+            attestation: None,
         })
     }
 
@@ -158,6 +170,7 @@ impl IrohNode {
             ticket_manager: TicketManager::new(),
             config,
             is_stub: false,
+            handshake: None,
             endpoint: Some(endpoint),
         })
     }
@@ -212,10 +225,43 @@ impl IrohNode {
         self.ticket_manager.ticket_count()
     }
 
-    /// Disconnect from a peer
+    /// Set the handshake reference for trust clearing on disconnect.
+    pub fn set_handshake(
+        &mut self,
+        handshake: Arc<RwLock<crate::swarm::handshake::HybridHandshake>>,
+    ) {
+        self.handshake = Some(handshake);
+    }
+
+    /// Set the attestation manager for verifying inbound ConsciousnessVectors.
+    ///
+    /// When set, `recv_verified_consciousness()` on channels will check Ed25519
+    /// signatures before accepting CVs. Without this, all CVs are accepted
+    /// (legacy behavior preserved for backward compatibility).
+    pub fn set_attestation(
+        &mut self,
+        attestation: Arc<RwLock<crate::swarm::attestation::AttestationManager>>,
+    ) {
+        self.attestation = Some(attestation);
+    }
+
+    /// Get the attestation manager reference (for passing to channels).
+    pub fn attestation(&self) -> &Option<Arc<RwLock<crate::swarm::attestation::AttestationManager>>> {
+        &self.attestation
+    }
+
+    /// Disconnect from a peer and clear their trust entry.
+    ///
+    /// Trust is cleared on disconnect to prevent stale trust from persisting
+    /// across reconnection — peers must re-handshake after reconnecting.
     pub fn disconnect(&self, peer_id: &str) {
         if let Some(channel) = self.connections.write().remove(peer_id) {
             channel.close();
+            // Clear trust on disconnect to prevent zombie trust
+            if let Some(ref hs) = self.handshake {
+                hs.write().remove_peer(peer_id);
+                tracing::debug!(peer = peer_id, "Cleared trust on disconnect");
+            }
             tracing::info!("Disconnected from peer: {}", peer_id);
         }
     }
@@ -403,6 +449,20 @@ impl IrohChannel {
         self.alive.load(std::sync::atomic::Ordering::SeqCst)
     }
 
+    /// Get a reference to the underlying QUIC connection (for handshake protocol).
+    ///
+    /// Returns `None` in stub mode or if the connection was not established.
+    #[cfg(feature = "swarm")]
+    pub fn connection_ref(&self) -> Option<&iroh::endpoint::Connection> {
+        self.connection.as_ref()
+    }
+
+    /// Stub for non-swarm builds — always returns `None`.
+    #[cfg(not(feature = "swarm"))]
+    pub fn connection_ref(&self) -> Option<&()> {
+        None
+    }
+
     /// Send a consciousness vector over the channel (stub without feature)
     #[cfg(not(feature = "swarm"))]
     pub async fn send_consciousness(&self, _state: &ConsciousnessVector) -> SwarmResult<()> {
@@ -479,6 +539,75 @@ impl IrohChannel {
             })?;
 
         bincode::deserialize(&bytes).map_err(|e| SwarmError::SerializationError(e.to_string()))
+    }
+
+    /// Receive and verify a consciousness vector using attestation.
+    ///
+    /// This is the **secure recv path**: it deserializes an
+    /// [`AttestedConsciousnessVector`] and verifies the Ed25519 signature
+    /// against the attestation manager's trusted signer set before returning
+    /// the inner CV. Rejects untrusted or tampered CVs with an error.
+    ///
+    /// Falls back to unverified `recv_consciousness()` if no attestation
+    /// manager is provided (backward compatible).
+    #[cfg(feature = "swarm")]
+    pub async fn recv_verified_consciousness(
+        &self,
+        attestation: &Option<Arc<RwLock<crate::swarm::attestation::AttestationManager>>>,
+    ) -> SwarmResult<ConsciousnessVector> {
+        let connection = self.connection.as_ref().ok_or(SwarmError::ChannelClosed {
+            peer_id: self.peer_id.clone(),
+        })?;
+
+        let (_send, mut recv) =
+            connection
+                .accept_bi()
+                .await
+                .map_err(|e| SwarmError::ReceiveFailed {
+                    peer_id: self.peer_id.clone(),
+                    reason: e.to_string(),
+                })?;
+
+        let bytes = recv
+            .read_to_end(1024 * 1024)
+            .await
+            .map_err(|e| SwarmError::ReceiveFailed {
+                peer_id: self.peer_id.clone(),
+                reason: e.to_string(),
+            })?;
+
+        match attestation {
+            Some(mgr) => {
+                // Secure path: deserialize as AttestedCV, verify signature + trust
+                let attested: crate::swarm::AttestedConsciousnessVector =
+                    bincode::deserialize(&bytes)
+                        .map_err(|e| SwarmError::SerializationError(e.to_string()))?;
+
+                let manager = mgr.read();
+                if manager.requires_attestation() {
+                    manager.verify_and_extract(&attested)
+                } else {
+                    // Attestation manager present but not required — accept without check
+                    Ok(attested.vector)
+                }
+            }
+            None => {
+                // Legacy path: no attestation manager, accept raw CV
+                bincode::deserialize(&bytes)
+                    .map_err(|e| SwarmError::SerializationError(e.to_string()))
+            }
+        }
+    }
+
+    /// Stub verified recv (without swarm feature).
+    #[cfg(not(feature = "swarm"))]
+    pub async fn recv_verified_consciousness(
+        &self,
+        _attestation: &Option<Arc<RwLock<crate::swarm::attestation::AttestationManager>>>,
+    ) -> SwarmResult<ConsciousnessVector> {
+        Err(SwarmError::FeatureNotEnabled {
+            feature: "swarm".to_string(),
+        })
     }
 
     /// Close the channel
