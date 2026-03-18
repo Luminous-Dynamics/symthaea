@@ -373,6 +373,7 @@ pub mod parallel_hv; // Rayon parallel batch operations (7x faster on 8 cores)
 mod phi_feedback_integration_tests;
 pub mod primitive_dashboard; // Real-time primitive usage monitoring
 pub mod primitive_system; // Ontological primitives system with 7 semantic domains
+pub mod program_algebra; // HDC program algebra — hyperdimensional IR for code
 #[cfg(test)]
 mod proptest_consciousness;
 pub mod quadrature; // Numerical integration: Simpson, Gauss-Legendre, adaptive
