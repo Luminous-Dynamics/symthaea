@@ -57,6 +57,7 @@ members = [
     "crates/symthaea-canvas",
     "crates/symthaea-clinical",
     "crates/symthaea-therapeutic",
+    "crates/symthaea-hdc-store",
 ]
 
 # Workspace-wide lint configuration. Members opt in via [lints] workspace = true.
@@ -233,6 +234,9 @@ symthaea-vision-manifold = { path = "crates/symthaea-vision-manifold", optional 
 
 # Symthaea Foveation Bridge - Dorsal surprise → ventral recognition dispatch
 symthaea-foveation = { path = "crates/symthaea-foveation", optional = true }
+
+# Symthaea HDC Store - Zero-copy mmap'd BinaryHV storage with persistent LSH
+symthaea-hdc-store = { path = "crates/symthaea-hdc-store", optional = true }
 
 # HDC / Vector Symbolic Architectures
 # hypervector = "0.1"  # Using custom HDC implementation instead
@@ -480,6 +484,10 @@ therapeutic = ["dep:symthaea-clinical", "dep:symthaea-therapeutic", "ssm_languag
 liquid-mamba = ["ssm_language", "symthaea-broca/mamba"]  # Liquid-Mamba fusion: pre-trained Mamba SSM + HDC consciousness gating
 humanoid-mujoco = ["humanoid", "symthaea-humanoid/mujoco"]  # Humanoid with MuJoCo physics
 humanoid-viewer = ["humanoid-mujoco", "symthaea-humanoid/viewer"]  # Humanoid with MuJoCo viewer
+
+# ── Storage ────────────────────────────────────────────────────────
+hdc-store = ["dep:symthaea-hdc-store"]  # Zero-copy mmap'd BinaryHV storage with persistent LSH
+fhe-wisdom = []                        # FHE collective wisdom pool for privacy-preserving peer learning
 
 # ── Database backends ───────────────────────────────────────────────
 # DuckDB is an unconditional dep. Others deferred:
@@ -1302,7 +1310,7 @@ harness = false
 [profile.test]
 inherits = "dev"
 opt-level = 1  # HV16 array ops are 10-100x slower at opt-level=0
-codegen-units = 256  # More CUs = smaller object files = less linker memory (critical for 1.1M line crate)
+codegen-units = 16  # 16 CUs: good parallelism + sccache hits (was 256 → 2% cache hit rate)
 
 [profile.release]
 opt-level = 3
