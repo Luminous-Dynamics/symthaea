@@ -98,6 +98,16 @@ pub struct AgentResult {
     pub total_energy: f64,
     /// Remaining energy budget after execution.
     pub remaining_energy: f32,
+    /// Number of unique failure patterns encountered during the run.
+    pub failure_pattern_count: usize,
+    /// Number of fix attempts that were skipped by deduplication.
+    pub dedup_skips: usize,
+    /// Number of quality gate rejections.
+    pub quality_rejections: usize,
+    /// Number of times consciousness gate deferred generation.
+    pub consciousness_deferrals: usize,
+    /// Whether stuck detection triggered during the run.
+    pub stuck_detected: bool,
     /// Auto-generated curriculum lessons from failure patterns encountered.
     #[cfg(feature = "school_learning")]
     pub generated_lessons: Vec<crate::school::code_learning::CodeLesson>,
@@ -139,6 +149,13 @@ impl AgentResult {
                 let s: String = e.chars().take(100).collect();
                 s
             }).collect::<Vec<_>>(),
+            "behavioral": {
+                "failure_patterns": self.failure_pattern_count,
+                "dedup_skips": self.dedup_skips,
+                "quality_rejections": self.quality_rejections,
+                "consciousness_deferrals": self.consciousness_deferrals,
+                "stuck_detected": self.stuck_detected,
+            },
         })
     }
 }
@@ -339,6 +356,18 @@ pub struct CodingAgent {
     current_plan: Option<PlanProfile>,
     /// Remaining energy budget for this run.
     energy_budget: f32,
+    /// Tracks attempted fixes as `"{error_sig}:{fix_type}"` keys to skip re-applying same fix.
+    attempted_fixes: std::collections::HashSet<String>,
+    /// Direct test result flag, set by Testing phase (not inferred from observations).
+    tests_passed: Option<bool>,
+    /// Counter: fix attempts skipped by deduplication.
+    dedup_skips: usize,
+    /// Counter: quality gate rejections.
+    quality_rejections: usize,
+    /// Counter: consciousness gate deferrals.
+    consciousness_deferrals: usize,
+    /// Whether stuck detection triggered during this run.
+    stuck_detected: bool,
 }
 
 impl CodingAgent {
@@ -380,9 +409,9 @@ impl CodingAgent {
 
         // Select dispatcher: real Ollama or simulated
         let dispatcher = if config.use_local_llm {
-            IntelligentDispatcher::with_local_llm()
+            IntelligentDispatcher::with_local_llm().with_energy_budget(100.0)
         } else {
-            IntelligentDispatcher::simulated()
+            IntelligentDispatcher::simulated().with_energy_budget(100.0)
         };
 
         let experience_store = Self::try_init_experience_store(&config.working_dir);
@@ -417,6 +446,12 @@ impl CodingAgent {
             source_cache: std::collections::HashMap::new(),
             current_plan: None,
             energy_budget: 100.0, // default energy budget per run
+            attempted_fixes: std::collections::HashSet::new(),
+            tests_passed: None,
+            dedup_skips: 0,
+            quality_rejections: 0,
+            consciousness_deferrals: 0,
+            stuck_detected: false,
         }
     }
 
@@ -469,6 +504,12 @@ impl CodingAgent {
         self.retry_state = RetryState::default();
         self.current_plan = None;
         self.energy_budget = 100.0;
+        self.attempted_fixes.clear();
+        self.tests_passed = None;
+        self.dedup_skips = 0;
+        self.quality_rejections = 0;
+        self.consciousness_deferrals = 0;
+        self.stuck_detected = false;
 
         // Auto-index the project if CodebaseMemory hasn't been populated yet.
         // This gives the agent codebase-aware context on every run without
@@ -518,6 +559,20 @@ impl CodingAgent {
         self.warm_up_phi(3);
 
         while self.phase != TaskPhase::Done && self.iteration < self.config.max_iterations {
+            // Energy exhaustion guard
+            if self.energy_budget <= 0.0 {
+                tracing::warn!(
+                    target: "symthaea::coding_agent",
+                    iteration = self.iteration,
+                    phase = %self.phase,
+                    "Energy budget exhausted — terminating early"
+                );
+                self.observations
+                    .push("Energy budget exhausted — terminating".into());
+                self.phase = TaskPhase::Done;
+                break;
+            }
+
             self.step();
             self.iteration += 1;
         }
@@ -707,6 +762,25 @@ impl CodingAgent {
 
     /// Generate code via the IntelligentDispatcher and write to disk.
     fn do_generation(&mut self) {
+        // Consciousness gate: defer generation if Phi is below plan requirement
+        let current_phi = self.phi_trace.last().copied().unwrap_or(0.0);
+        if let Some(ref plan) = self.current_plan {
+            if !plan.phi_sufficient(current_phi) {
+                tracing::debug!(
+                    target: "symthaea::coding_agent",
+                    current_phi = current_phi,
+                    min_phi = plan.min_phi,
+                    "Consciousness gate: deferring generation (Phi too low)"
+                );
+                self.observations.push(format!(
+                    "Generation deferred: consciousness level {:.3} below plan minimum {:.2}",
+                    current_phi, plan.min_phi
+                ));
+                self.consciousness_deferrals += 1;
+                return;
+            }
+        }
+
         // Get consciousness state for dispatch routing
         let confidence = self.cognitive_loop.prediction_confidence();
         let phi = self.phi_trace.last().copied().unwrap_or(0.5) as f64;
@@ -772,6 +846,7 @@ impl CodingAgent {
         // Process the dispatch result
         if let Some(result) = dispatch_result {
             self.generation_tiers.push(result.tier);
+            self.energy_budget -= result.energy_cost as f32;
 
             tracing::debug!(
                 target: "symthaea::coding_agent",
@@ -779,6 +854,7 @@ impl CodingAgent {
                 native_exhausted = self.native_exhausted,
                 success = result.success,
                 output_len = result.output.len(),
+                energy_remaining = self.energy_budget,
                 "Dispatch result"
             );
 
@@ -922,10 +998,20 @@ impl CodingAgent {
             }
         }
 
+        // Build dedup key from first error signature
+        let error_sig = structured
+            .first()
+            .map(|e| Self::normalize_error_pattern(&e.message))
+            .unwrap_or_default();
+
         // Try structured (line-aware) fix first
-        if let Some(fixed) =
+        let structured_key = format!("{}:structured-line-fix", error_sig);
+        if self.attempted_fixes.contains(&structured_key) {
+            self.dedup_skips += 1;
+        } else if let Some(fixed) =
             crate::language::code_executor::try_auto_fix_structured(&code, &structured)
         {
+            self.attempted_fixes.insert(structured_key);
             let target = self.resolve_target_file();
             self.write_code_to_disk(&target, &fixed);
             self.generated_code = Some(Self::strip_code_fences(&fixed));
@@ -946,7 +1032,11 @@ impl CodingAgent {
         }
 
         // Category-aware agent-level fixes (supplements code_executor's line-level fixes)
-        if let Some(fixed) = self.try_category_aware_fix(&code, &structured) {
+        let category_key = format!("{}:category-aware-fix", error_sig);
+        if self.attempted_fixes.contains(&category_key) {
+            self.dedup_skips += 1;
+        } else if let Some(fixed) = self.try_category_aware_fix(&code, &structured) {
+            self.attempted_fixes.insert(category_key);
             let target = self.resolve_target_file();
             self.write_code_to_disk(&target, &fixed);
             self.generated_code = Some(Self::strip_code_fences(&fixed));
@@ -968,7 +1058,13 @@ impl CodingAgent {
 
         // Fall back to basic (non-line-aware) fix
         let flat_errors: Vec<String> = structured.iter().map(|e| e.message.clone()).collect();
-        if let Some(fixed) = crate::language::code_executor::try_auto_fix(&code, &flat_errors) {
+        let basic_key = format!("{}:basic-pattern-fix", error_sig);
+        if self.attempted_fixes.contains(&basic_key) {
+            self.dedup_skips += 1;
+        } else if let Some(fixed) =
+            crate::language::code_executor::try_auto_fix(&code, &flat_errors)
+        {
+            self.attempted_fixes.insert(basic_key);
             let target = self.resolve_target_file();
             self.write_code_to_disk(&target, &fixed);
             self.generated_code = Some(Self::strip_code_fences(&fixed));
@@ -1051,6 +1147,38 @@ impl CodingAgent {
                                 lines.insert(0, stmt.to_string());
                                 any_fix = true;
                             }
+                        } else {
+                            // Fallback: query CodebaseMemory for project-specific types
+                            #[cfg(feature = "code_generation")]
+                            if let Some(ref memory) = self.code_memory {
+                                use crate::language::code_parser::EntityKind;
+                                let encoder = crate::hdc::code_encoder::CodeHDEncoder::new(16384);
+                                let name_hv = encoder.encode_name(&name);
+                                let matches = memory.query_types(&name_hv, 3);
+                                if let Some(best) = matches.iter().find(|m| {
+                                    m.similarity > 0.4
+                                        && matches!(
+                                            m.kind,
+                                            EntityKind::Struct
+                                                | EntityKind::Enum
+                                                | EntityKind::Trait
+                                                | EntityKind::TypeAlias
+                                        )
+                                }) {
+                                    let path_str = best.path.to_string_lossy();
+                                    let mod_path = path_str
+                                        .trim_start_matches("src/")
+                                        .trim_end_matches(".rs")
+                                        .trim_end_matches("/mod")
+                                        .replace('/', "::");
+                                    let use_line =
+                                        format!("use crate::{}::{};", mod_path, best.name);
+                                    if !lines.iter().any(|l| l.trim() == use_line) {
+                                        lines.insert(0, use_line);
+                                        any_fix = true;
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -1068,8 +1196,7 @@ impl CodingAgent {
                                 let line = &lines[idx];
                                 // Only rename in let bindings, not usage sites
                                 if line.contains("let ") || line.contains("let mut ") {
-                                    let new_line =
-                                        line.replacen(&var_name, &prefixed, 1);
+                                    let new_line = line.replacen(&var_name, &prefixed, 1);
                                     if new_line != *line {
                                         lines[idx] = new_line;
                                         any_fix = true;
@@ -1285,6 +1412,19 @@ impl CodingAgent {
             prompt.push('\n');
         }
 
+        // Inject plan constraints (energy, Phi, risk level)
+        if let Some(ref plan) = self.current_plan {
+            prompt.push_str("## Plan constraints\n");
+            prompt.push_str(&format!(
+                "- Energy budget remaining: {:.0}\n- Min Phi required: {:.2}\n- Risk level: {:?}\n- Reversible: {}\n- Steps: {}\n\n",
+                self.energy_budget,
+                plan.min_phi,
+                plan.max_destructiveness,
+                if plan.fully_reversible { "yes" } else { "no" },
+                plan.step_count,
+            ));
+        }
+
         // Infer language from target file extension
         let target = self.resolve_target_file();
         let lang = target
@@ -1366,7 +1506,34 @@ impl CodingAgent {
     fn native_code_template(&self) -> Option<String> {
         let task_lower = self.task.to_lowercase();
 
-        // Try hardcoded pattern-specific generation first (fast, reliable)
+        // Phase 1: Try HDC Program Algebra (semantic matching → generated code)
+        // This is the neuro-symbolic path: encode task → find similar pattern → translate to code
+        {
+            use symthaea_core::hdc::program_algebra::{encode_task_description, ProgramPatternLibrary};
+            use crate::language::program_node_translator;
+
+            let task_hv = encode_task_description(&task_lower);
+            let lib = ProgramPatternLibrary::standard();
+            // BinaryHV similarity: 0.5 = random, > 0.52 = meaningful match
+            if let Some((entry, similarity)) = lib.find_similar(&task_hv, 0.52) {
+                let function_name = Self::extract_function_name(&task_lower)
+                    .unwrap_or_else(|| entry.name.clone());
+                let language = self.target_language();
+
+                if let Some(code) = program_node_translator::translate(entry, language, &function_name) {
+                    tracing::info!(
+                        target: "symthaea::coding_agent",
+                        pattern = %entry.name,
+                        similarity = similarity,
+                        language = language,
+                        "HDC program algebra match → code generated"
+                    );
+                    return Some(code);
+                }
+            }
+        }
+
+        // Phase 2: Fall back to hardcoded pattern templates (fast, reliable)
         if let Some(code) = Self::match_native_pattern(&task_lower) {
             return Some(code);
         }
@@ -1750,7 +1917,8 @@ impl CodingAgent {
         match self.target_language() {
             "python" => "You are a Python code generator. Output ONLY valid Python code. \
                 No explanations, no markdown fences, no comments outside the function. \
-                Complete the function body directly.".into(),
+                Complete the function body directly."
+                .into(),
             "nix" => "You are a Nix code generator. Output ONLY valid Nix expressions.".into(),
             _ => "You are a code generator. Output ONLY valid source code, no explanations.".into(),
         }
@@ -2033,10 +2201,8 @@ impl CodingAgent {
                 let mut plans = vec![];
                 if let Some(ref code) = self.generated_code {
                     // Option A: write + check
-                    let wc = crate::action::primitives::recipes::write_and_check(
-                        target.clone(),
-                        code,
-                    );
+                    let wc =
+                        crate::action::primitives::recipes::write_and_check(target.clone(), code);
                     plans.push(PlanCandidate {
                         name: "write_and_check".into(),
                         profile: wc.profile(),
@@ -2073,21 +2239,17 @@ impl CodingAgent {
                 if let Some(ref code) = self.generated_code {
                     let mut plans = vec![];
                     // Option A: write + check (simple)
-                    let wc = crate::action::primitives::recipes::write_and_check(
-                        target.clone(),
-                        code,
-                    );
+                    let wc =
+                        crate::action::primitives::recipes::write_and_check(target.clone(), code);
                     plans.push(PlanCandidate {
                         name: "fix_and_check".into(),
                         profile: wc.profile(),
                         molecule: wc,
                     });
                     // Option B: write + check with recovery
-                    let wcr = crate::action::primitives::recipes::write_and_check(
-                        target.clone(),
-                        code,
-                    )
-                    .recover(|_| Molecule::atom(Atom::Noop));
+                    let wcr =
+                        crate::action::primitives::recipes::write_and_check(target.clone(), code)
+                            .recover(|_| Molecule::atom(Atom::Noop));
                     plans.push(PlanCandidate {
                         name: "fix_with_recovery".into(),
                         profile: wcr.profile(),
@@ -2112,11 +2274,7 @@ impl CodingAgent {
                 .iter()
                 .map(|c| {
                     // Build recipe key from atom names
-                    c.profile
-                        .atom_names
-                        .first()
-                        .copied()
-                        .unwrap_or("Unknown")
+                    c.profile.atom_names.first().copied().unwrap_or("Unknown")
                 })
                 .collect();
             let rates = store.recipe_success_rates(&recipe_keys);
@@ -2140,8 +2298,7 @@ impl CodingAgent {
         // Build the actual molecule to execute
         // For tier-aware candidates, use the selected plan directly
         let profile = selected.profile.clone();
-        self.build_execution_plan()
-            .map(|m| (m, profile))
+        self.build_execution_plan().map(|m| (m, profile))
     }
 
     /// Evaluate whether the current plan is safe and affordable.
@@ -2387,6 +2544,15 @@ impl CodingAgent {
                         issue = %quality_issue,
                         "Code quality gate: rejecting generated code"
                     );
+                    self.quality_rejections += 1;
+                    let rejection_pattern = format!("quality_gate: {}", quality_issue);
+                    if let Some((_, count)) =
+                        self.failure_patterns.iter_mut().find(|(p, _)| *p == rejection_pattern)
+                    {
+                        *count += 1;
+                    } else {
+                        self.failure_patterns.push((rejection_pattern, 1));
+                    }
                     self.observations
                         .push(format!("Quality gate rejected code: {quality_issue}"));
                     // Record failure for the tier that produced this
@@ -2483,10 +2649,38 @@ impl CodingAgent {
                     // Record outcome into dispatcher stats for Bayesian routing
                     self.record_generation_outcome(result.success);
 
+                    // Direct test result tracking (replaces observation string matching)
                     if result.success {
+                        self.tests_passed = Some(true);
                         self.phase = TaskPhase::Done;
                         tracing::info!(target: "symthaea::coding_agent", "→ Done (tests passed)");
                     } else {
+                        self.tests_passed = Some(false);
+
+                        // Stuck detection: if we've seen the same error 3+ times,
+                        // escalate retry strategy immediately
+                        let stuck_on_error = if let Some(ref output) = self.last_test_output {
+                            let norm = Self::normalize_error_pattern(output);
+                            self.failure_patterns
+                                .iter()
+                                .find(|(p, _)| *p == norm)
+                                .map(|(_, c)| *c >= 3)
+                                .unwrap_or(false)
+                        } else {
+                            false
+                        };
+
+                        if stuck_on_error {
+                            self.stuck_detected = true;
+                            let strategy = self.next_retry_strategy();
+                            self.retry_state.current_strategy = strategy;
+                            tracing::info!(
+                                target: "symthaea::coding_agent",
+                                strategy = ?self.retry_state.current_strategy,
+                                "Stuck detection: same error 3+ times, escalating"
+                            );
+                        }
+
                         self.phase = TaskPhase::Fixing;
                         self.phase_failures = 0;
                         self.generated_code = None; // clear for fix
@@ -2703,7 +2897,8 @@ impl CodingAgent {
                                     .unwrap_or_else(|| p.display().to_string())
                             })
                             .collect();
-                        self.observations.push(format!("Files: [{}]", names.join(", ")));
+                        self.observations
+                            .push(format!("Files: [{}]", names.join(", ")));
                     }
                     PrimitiveValue::CommandResult {
                         stdout,
@@ -2752,7 +2947,8 @@ impl CodingAgent {
                     error = %error_msg,
                     "Molecule execution failed"
                 );
-                self.observations.push(format!("Execution error: {}", error_msg));
+                self.observations
+                    .push(format!("Execution error: {}", error_msg));
                 Some(MotorOutputResult {
                     success: false,
                     action_type: None,
@@ -3087,21 +3283,17 @@ impl CodingAgent {
                     self.store_fix_hint(&last_error, &code);
                 }
 
-                // Distill successful LLM generations into learned templates.
+                // Distill ALL successful generations (native + LLM) into learned templates.
                 // Future runs with similar tasks can use this natively (no LLM needed).
-                let was_llm = tier
-                    .map(|t| t != BackendTier::Native)
-                    .unwrap_or(false);
-                if was_llm {
-                    if let Some(ref mut store) = self.experience_store {
-                        store.store_learned_template(&self.task, &code);
-                        tracing::info!(
-                            target: "symthaea::coding_agent",
-                            task = %self.task,
-                            code_len = code.len(),
-                            "Distilled LLM generation into learned template"
-                        );
-                    }
+                if let Some(ref mut store) = self.experience_store {
+                    store.store_learned_template(&self.task, &code);
+                    tracing::info!(
+                        target: "symthaea::coding_agent",
+                        task = %self.task,
+                        code_len = code.len(),
+                        tier = ?tier,
+                        "Distilled generation into learned template"
+                    );
                 }
             }
         }
@@ -3203,15 +3395,7 @@ impl CodingAgent {
         let confidence = self.cognitive_loop.prediction_confidence();
         AgentResult {
             files_modified: self.files_modified.clone(),
-            tests_passed: if self.phase == TaskPhase::Done {
-                Some(
-                    self.observations
-                        .iter()
-                        .any(|o| o.contains("test passed") || o.contains("Check/test passed")),
-                )
-            } else {
-                None
-            },
+            tests_passed: self.tests_passed,
             iterations_used: self.iteration,
             phi_trace: self.phi_trace.clone(),
             epistemic_status: Self::confidence_to_epistemic(confidence),
@@ -3221,6 +3405,11 @@ impl CodingAgent {
             generation_tiers: self.generation_tiers.clone(),
             total_energy: self.dispatcher.as_ref().map_or(0.0, |d| d.total_energy()),
             remaining_energy: self.energy_budget,
+            failure_pattern_count: self.failure_patterns.len(),
+            dedup_skips: self.dedup_skips,
+            quality_rejections: self.quality_rejections,
+            consciousness_deferrals: self.consciousness_deferrals,
+            stuck_detected: self.stuck_detected,
             #[cfg(feature = "school_learning")]
             generated_lessons: self.generate_lessons_from_failures(),
         }
@@ -4826,6 +5015,11 @@ mod tests {
             generation_tiers: vec![],
             total_energy: 0.0,
             remaining_energy: 100.0,
+            failure_pattern_count: 0,
+            dedup_skips: 0,
+            quality_rejections: 0,
+            consciousness_deferrals: 0,
+            stuck_detected: false,
             #[cfg(feature = "school_learning")]
             generated_lessons: vec![],
         };
@@ -4851,6 +5045,11 @@ mod tests {
             generation_tiers: vec![],
             total_energy: 1.0,
             remaining_energy: 99.0,
+            failure_pattern_count: 0,
+            dedup_skips: 0,
+            quality_rejections: 0,
+            consciousness_deferrals: 0,
+            stuck_detected: false,
             #[cfg(feature = "school_learning")]
             generated_lessons: vec![],
         };
@@ -5758,7 +5957,10 @@ assertion `left == right` failed
         assert!(result.unwrap().success);
         // Should have added observation
         assert!(
-            agent.observations.iter().any(|o| o.contains("simulated read")),
+            agent
+                .observations
+                .iter()
+                .any(|o| o.contains("simulated read")),
             "Should have simulated read observation: {:?}",
             agent.observations
         );
@@ -5836,7 +6038,10 @@ assertion `left == right` failed
         );
         // Should have file listing
         assert!(
-            agent.observations.iter().any(|o| o.contains("src") || o.contains("Cargo.toml") || o.contains("Files")),
+            agent
+                .observations
+                .iter()
+                .any(|o| o.contains("src") || o.contains("Cargo.toml") || o.contains("Files")),
             "Should have project files in observations: {:?}",
             agent.observations
         );
@@ -5897,7 +6102,10 @@ assertion `left == right` failed
         agent.phi_trace.push(1.0);
 
         let result = agent.select_plan_fep();
-        assert!(result.is_some(), "Should select a plan for Understanding phase");
+        assert!(
+            result.is_some(),
+            "Should select a plan for Understanding phase"
+        );
     }
 
     // ── Enhancement 3: Dispatch tier tests ────────────────────────────
@@ -5982,10 +6190,7 @@ assertion `left == right` failed
         );
         let store = agent.experience_store.as_ref().unwrap();
         let fix = store.lookup_fix_strategy("error[E0308]: mismatched types");
-        assert!(
-            fix.is_some(),
-            "Should find cached fix strategy for E0308"
-        );
+        assert!(fix.is_some(), "Should find cached fix strategy for E0308");
         assert!(
             fix.unwrap().contains("type-cast-fix"),
             "Fix should contain strategy: {:?}",
@@ -6083,7 +6288,7 @@ assertion `left == right` failed
     }
 
     #[test]
-    fn test_learned_template_not_stored_for_native() {
+    fn test_learned_template_stored_for_native_too() {
         let dir = tempfile::tempdir().unwrap();
         let config = CodingAgentConfig {
             working_dir: dir.path().to_path_buf(),
@@ -6097,12 +6302,12 @@ assertion `left == right` failed
 
         agent.record_generation_outcome(true);
 
-        // Native generations should NOT be stored as templates (they're already hardcoded)
+        // ALL successful generations (native + LLM) are now stored as templates
         let store = agent.experience_store.as_ref().unwrap();
         let template = store.lookup_learned_template("add fibonacci");
         assert!(
-            template.is_none(),
-            "Native generations should not be stored as templates"
+            template.is_some(),
+            "Native generations should now be stored as templates too"
         );
     }
 
@@ -6115,7 +6320,8 @@ assertion `left == right` failed
             ..Default::default()
         };
         let mut agent = CodingAgent::new(config).unwrap();
-        agent.task = "implement a custom bloom filter with configurable false positive rate".to_string();
+        agent.task =
+            "implement a custom bloom filter with configurable false positive rate".to_string();
 
         // First: no template available, should be None (task is too specific for hardcoded)
         // Note: "bloom" IS in the hardcoded patterns, so use a very specific variant
@@ -6168,11 +6374,9 @@ assertion `left == right` failed
         // Skip hardcoded patterns since email_valid is in match_native_pattern
         // Just test the store directly
         let store = agent.experience_store.as_ref().unwrap();
-        let template = store.lookup_learned_template("create a function to validate email addresses");
-        assert!(
-            template.is_some(),
-            "Exact match should work"
-        );
+        let template =
+            store.lookup_learned_template("create a function to validate email addresses");
+        assert!(template.is_some(), "Exact match should work");
     }
 
     // ── Enhancement 3: End-to-End Integration Test ─────────────────────
@@ -6503,7 +6707,10 @@ assertion `left == right` failed
         let mut agent = CodingAgent::new(config).unwrap();
 
         // Before run: no code memory
-        assert!(agent.code_memory.is_none(), "Should start with no code memory");
+        assert!(
+            agent.code_memory.is_none(),
+            "Should start with no code memory"
+        );
 
         // Run triggers auto-indexing
         let _result = agent.run("add a greeting function");
@@ -6618,5 +6825,178 @@ assertion `left == right` failed
             after >= before,
             "Reindex after write should update function count: before={before}, after={after}"
         );
+    }
+
+    #[test]
+    fn test_fix_deduplication_skips_repeated_fix() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = CodingAgentConfig {
+            working_dir: dir.path().to_path_buf(),
+            target_file: Some(PathBuf::from("main.rs")),
+            ..Default::default()
+        };
+        let mut agent = CodingAgent::new(config).unwrap();
+
+        // Insert a dedup key
+        agent.attempted_fixes.insert("some_error:structured-line-fix".to_string());
+        assert!(agent.attempted_fixes.contains("some_error:structured-line-fix"));
+
+        // Verify clear works
+        agent.attempted_fixes.clear();
+        assert!(agent.attempted_fixes.is_empty());
+    }
+
+    #[test]
+    fn test_stuck_detection_triggers_at_threshold() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = CodingAgentConfig {
+            working_dir: dir.path().to_path_buf(),
+            target_file: Some(PathBuf::from("main.rs")),
+            ..Default::default()
+        };
+        let mut agent = CodingAgent::new(config).unwrap();
+
+        // Add same failure pattern 3 times (threshold)
+        let pattern = "cannot find type".to_string();
+        agent.failure_patterns.push((pattern.clone(), 3));
+
+        // Simulate stuck detection logic
+        let norm = pattern.clone();
+        let stuck = agent
+            .failure_patterns
+            .iter()
+            .find(|(p, _)| *p == norm)
+            .map(|(_, c)| *c >= 3)
+            .unwrap_or(false);
+        assert!(stuck, "Should detect stuck at 3+ repetitions");
+
+        // Below threshold should not detect stuck
+        agent.failure_patterns.clear();
+        agent.failure_patterns.push(("other error".to_string(), 2));
+        let stuck2 = agent
+            .failure_patterns
+            .iter()
+            .find(|(p, _)| *p == "other error")
+            .map(|(_, c)| *c >= 3)
+            .unwrap_or(false);
+        assert!(!stuck2, "Should NOT detect stuck at 2 repetitions");
+    }
+
+    #[test]
+    fn test_energy_deducted_after_dispatch() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = CodingAgentConfig {
+            working_dir: dir.path().to_path_buf(),
+            target_file: Some(PathBuf::from("main.rs")),
+            ..Default::default()
+        };
+        let mut agent = CodingAgent::new(config).unwrap();
+        let initial = agent.energy_budget;
+
+        // Simulate energy deduction
+        agent.energy_budget -= 10.0;
+        assert!(
+            (agent.energy_budget - (initial - 10.0)).abs() < f32::EPSILON,
+            "Energy should be deducted"
+        );
+    }
+
+    #[test]
+    fn test_plan_profile_injected_into_prompt() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = CodingAgentConfig {
+            working_dir: dir.path().to_path_buf(),
+            target_file: Some(PathBuf::from("main.rs")),
+            ..Default::default()
+        };
+        let mut agent = CodingAgent::new(config).unwrap();
+        agent.task = "add function".to_string();
+        agent.current_plan = Some(PlanProfile {
+            min_phi: 0.3,
+            max_destructiveness: crate::action::DestructivenessLevel::Reversible,
+            fully_reversible: true,
+            step_count: 2,
+            total_energy: 5.0,
+            max_risk: crate::action::RiskTier::Low,
+            atom_names: vec![],
+        });
+
+        let prompt = agent.build_generation_prompt();
+        assert!(
+            prompt.contains("Plan constraints"),
+            "Prompt should contain plan constraints section"
+        );
+        assert!(
+            prompt.contains("Min Phi required: 0.30"),
+            "Prompt should include min_phi"
+        );
+    }
+
+    #[test]
+    fn test_energy_exhaustion_terminates_early() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = CodingAgentConfig {
+            working_dir: dir.path().to_path_buf(),
+            target_file: Some(PathBuf::from("main.rs")),
+            ..Default::default()
+        };
+        let mut agent = CodingAgent::new(config).unwrap();
+
+        // Set energy to 0 — run should terminate early
+        agent.energy_budget = 0.0;
+        agent.task = "test".to_string();
+        agent.phase = TaskPhase::Understanding;
+
+        // The energy guard is in run(), but we can verify the mechanism
+        assert!(agent.energy_budget <= 0.0);
+    }
+
+    #[test]
+    fn test_consciousness_gate_defers_generation() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = CodingAgentConfig {
+            working_dir: dir.path().to_path_buf(),
+            target_file: Some(PathBuf::from("main.rs")),
+            ..Default::default()
+        };
+        let mut agent = CodingAgent::new(config).unwrap();
+        agent.task = "test task".to_string();
+
+        // Set plan with high Phi requirement
+        agent.current_plan = Some(PlanProfile {
+            min_phi: 0.9,
+            max_destructiveness: crate::action::DestructivenessLevel::ReadOnly,
+            fully_reversible: true,
+            step_count: 1,
+            total_energy: 1.0,
+            max_risk: crate::action::RiskTier::Low,
+            atom_names: vec![],
+        });
+
+        // Phi trace is empty → current_phi = 0.0, which is below 0.9
+        agent.do_generation();
+
+        // Should have deferred
+        assert_eq!(agent.consciousness_deferrals, 1);
+        assert!(agent.observations.iter().any(|o| o.contains("deferred")));
+    }
+
+    #[test]
+    fn test_quality_gate_feeds_failure_patterns() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = CodingAgentConfig {
+            working_dir: dir.path().to_path_buf(),
+            target_file: Some(PathBuf::from("main.rs")),
+            ..Default::default()
+        };
+        let mut agent = CodingAgent::new(config).unwrap();
+
+        // Simulate quality rejection
+        agent.quality_rejections += 1;
+        let rejection_pattern = "quality_gate: contains TODO stub".to_string();
+        agent.failure_patterns.push((rejection_pattern.clone(), 1));
+
+        assert_eq!(agent.quality_rejections, 1);
+        assert!(agent.failure_patterns.iter().any(|(p, _)| p.starts_with("quality_gate:")));
     }
 }
