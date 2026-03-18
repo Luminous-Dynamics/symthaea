@@ -1,7 +1,7 @@
 ---
 # Mycelix Commons-Care DNA
-# Social/care domains: care + mutualaid + transport + support + space
-# 5 care + 7 mutualaid + 3 transport + 3 support + 1 space = 19 domain + 1 bridge = 20 coordinator zomes
+# Social/care domains: care + mutualaid + transport + support + space + mesh-time + resource-mesh
+# 5 care + 7 mutualaid + 3 transport + 3 support + 1 space + 1 mesh-time + 1 resource-mesh = 21 domain + 1 bridge = 22 coordinator zomes
 #
 # Part of the commons sub-cluster split. Domains within this DNA use
 # CallTargetCell::Local for cross-domain calls. To reach property/housing/
@@ -65,6 +65,14 @@ integrity:
     # Space / membrane factory
     - name: space_integrity
       path: ../target/wasm32-unknown-unknown/release/space_integrity.wasm
+
+    # Mesh-Time domain
+    - name: mesh_time_integrity
+      path: ../target/wasm32-unknown-unknown/release/mesh_time_integrity.wasm
+
+    # Resource-Mesh domain
+    - name: resource_mesh_integrity
+      path: ../target/wasm32-unknown-unknown/release/resource_mesh_integrity.wasm
 
     # Commons-Care bridge (shared integrity with commons bridge)
     - name: commons_bridge_integrity
@@ -159,6 +167,18 @@ coordinator:
       path: ../target/wasm32-unknown-unknown/release/space.wasm
       dependencies:
         - name: space_integrity
+
+    # Mesh-Time domain
+    - name: mesh_time
+      path: ../target/wasm32-unknown-unknown/release/mesh_time.wasm
+      dependencies:
+        - name: mesh_time_integrity
+
+    # Resource-Mesh domain
+    - name: resource_mesh
+      path: ../target/wasm32-unknown-unknown/release/resource_mesh.wasm
+      dependencies:
+        - name: resource_mesh_integrity
 
     # Commons-Care bridge (reuses commons_bridge WASM with care-specific dispatch)
     - name: commons_bridge

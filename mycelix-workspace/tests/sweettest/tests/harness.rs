@@ -94,6 +94,11 @@ impl DnaPaths {
         Self::workspace_root().join("../mycelix-attribution/dna/mycelix_attribution_dna.dna")
     }
 
+    /// Energy cluster DNA (projects + investments + grid + regenerative + bridge)
+    pub fn energy() -> PathBuf {
+        Self::workspace_root().join("../mycelix-energy/dna/mycelix_energy.dna")
+    }
+
     /// LUCID hApp DNA (privacy/ZK attestation)
     pub fn lucid() -> PathBuf {
         Self::workspace_root().join("happs/lucid/lucid.dna")

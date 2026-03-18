@@ -146,5 +146,9 @@ name = "finance_cross_cluster"
 path = "tests/finance_cross_cluster.rs"
 
 [[test]]
+name = "energy_workflow"
+path = "tests/energy_workflow.rs"
+
+[[test]]
 name = "sweettest_cross_cluster_consciousness"
 path = "../../tests/sweettest_cross_cluster_consciousness.rs"
