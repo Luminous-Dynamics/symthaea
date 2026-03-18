@@ -5,12 +5,15 @@
 //! viewpoints. Participants must mentally rotate their reference frame to
 //! judge spatial relationships from another perspective.
 //!
-//! HDC implementation: A spatial layout is encoded as a set of object-location
-//! bindings from one perspective. To query from a rotated perspective, the
-//! entire layout is transformed via cyclic permutation (permute(k) where k
-//! is proportional to the angular difference). The system must retrieve the
-//! correct spatial relationship from the rotated representation. Error
-//! increases with angular disparity because permutation degrades similarity.
+//! HDC implementation: A spatial layout is encoded from perspective 0 as a
+//! set of object-location bindings. To represent perspective k (rotated by
+//! angle θ), ALL location HVs are rotated by the same cyclic permutation shift
+//! k, and a new scene is built: scene_k = Σ obj_i ⊕ permute(loc_i, k). To
+//! query what location an object is at from perspective k, we unbind it from
+//! scene_k: scene_k ⊕ obj_q ≈ permute(loc_q, k) (approximate, with bundling
+//! noise from other objects). Error increases with number of objects (bundling
+//! noise) and with angle (permutation distributes uniformly, so the angular
+//! effect models RT rather than accuracy degradation directly).
 //!
 //! Human baselines (Kozhevnikov & Hegarty, 2001; Hegarty & Waller, 2004):
 //! - perspective_accuracy: 0.75 (SD~0.12) -- mean accuracy across angles
@@ -63,12 +66,14 @@ impl PerspectiveTakingBenchmark {
             loc_hvs.push(BinaryHV::random(seed.wrapping_add(500 + i as u64 * 67)));
         }
 
-        // Encode the layout: bind each object with its location, then bundle
-        // into a single scene representation
-        let mut scene_bindings = Vec::with_capacity(n_objects);
-        for i in 0..n_objects {
-            scene_bindings.push(obj_hvs[i].bind(&loc_hvs[i]));
-        }
+        // Encode perspective-0 scene: scene = Σ obj_i ⊕ loc_i (bundle of bindings).
+        let scene_p0 = BinaryHV::bundle_safe(
+            &obj_hvs
+                .iter()
+                .zip(loc_hvs.iter())
+                .map(|(o, l)| o.bind(l))
+                .collect::<Vec<_>>(),
+        );
 
         // Test perspective rotations at 6 angles: 0, 60, 120, 180, 240, 300
         let n_angles = 6;
@@ -80,8 +85,31 @@ impl PerspectiveTakingBenchmark {
             let angle_deg = angle_idx as f64 * 60.0;
             let angle_norm = angle_deg / 360.0;
 
-            // Permutation shift for perspective rotation
+            // Permutation shift for perspective rotation.
             let shift = ((angle_norm * BinaryHV::DIM as f64) as usize) % BinaryHV::DIM;
+
+            // Build scene_k from perspective k: ALL locations are rotated by shift.
+            // scene_k = Σ obj_i ⊕ permute(loc_i, k)
+            // This is the correct construction: the scene as it looks from the new
+            // perspective, where each object is still the same but its location HV
+            // is rotated to match the new reference frame.
+            let scene_k = if shift == 0 {
+                scene_p0.clone()
+            } else {
+                BinaryHV::bundle_safe(
+                    &obj_hvs
+                        .iter()
+                        .zip(loc_hvs.iter())
+                        .map(|(o, l)| o.bind(&l.permute(shift)))
+                        .collect::<Vec<_>>(),
+                )
+            };
+
+            // Rotated location HVs (for comparison targets).
+            let rotated_locs: Vec<BinaryHV> = loc_hvs
+                .iter()
+                .map(|l| if shift == 0 { l.clone() } else { l.permute(shift) })
+                .collect();
 
             let n_queries = 25;
             let mut correct = 0u32;
@@ -90,46 +118,37 @@ impl PerspectiveTakingBenchmark {
                 xor_shift(&mut rng);
                 let query_obj_idx = (rng as usize) % n_objects;
 
-                // Rotate the scene binding from the query object's perspective
-                let rotated_binding = scene_bindings[query_obj_idx].permute(shift);
+                // Query: what location is object q at from perspective k?
+                // Unbind obj_q from scene_k: scene_k ⊕ obj_q ≈ permute(loc_q, k)
+                // (approximate due to bundling noise from other n_objects-1 items)
+                let recovered_loc = scene_k.bind(&obj_hvs[query_obj_idx]);
 
-                // Unbind the query object to get the rotated location
-                let recovered_loc = rotated_binding.bind(&obj_hvs[query_obj_idx]);
-
-                // The "correct" rotated location
-                let target_loc_rotated = loc_hvs[query_obj_idx].permute(shift);
-
-                // Compare recovered location against all rotated locations
+                // The correct answer is permute(loc_q, k).
+                // Compare recovered_loc against all rotated location HVs.
                 let mut best_sim = f32::MIN;
                 let mut best_idx = 0usize;
-                for (i, loc) in loc_hvs.iter().enumerate() {
-                    let rotated_loc = loc.permute(shift);
-                    let sim = recovered_loc.similarity(&rotated_loc) * (1.0 - noise_degrade);
+                for (i, rloc) in rotated_locs.iter().enumerate() {
+                    let sim = recovered_loc.similarity(rloc) * (1.0 - noise_degrade);
                     if sim > best_sim {
                         best_sim = sim;
                         best_idx = i;
                     }
                 }
 
-                // Add decision noise
+                // Add decision noise.
                 xor_shift(&mut rng);
                 let noise = ((rng % 10000) as f32 / 10000.0 - 0.5)
                     * tp_noise
                     * diff_model.temperature_multiplier(config.difficulty) as f32
                     * 0.3;
 
-                // At shift=0, binding-unbind is exact (XOR self-inverse).
-                // At larger shifts, the permute operation changes the HV,
-                // so unbinding from the original (non-rotated) object HV
-                // produces a result that must be compared to rotated locations.
-                // The key degradation comes from the compound permute-bind-unbind
-                // chain, which introduces noise proportional to shift distance.
-                let _ = target_loc_rotated; // ground truth reference
+                // Correct if best match is the query object's rotated location
+                // and noise doesn't flip the decision.
                 if best_idx == query_obj_idx && (best_sim + noise > 0.0) {
                     correct += 1;
                 }
 
-                // RT: larger perspective shifts require more mental rotation
+                // RT: larger perspective shifts require more mental rotation.
                 let base_rt = 3.0 + angle_norm * 4.0;
                 let tp_speedup = config.time_pressure * 1.2;
                 rt_sum += (base_rt - tp_speedup).max(1.0);

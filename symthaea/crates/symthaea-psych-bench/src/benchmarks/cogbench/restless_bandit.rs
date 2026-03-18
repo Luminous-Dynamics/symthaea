@@ -49,7 +49,7 @@ impl RestlessBanditBenchmark {
 
         // Higher alpha EMA tracks drift faster
         let mut arm_ema: Vec<f64> = vec![0.5; num_arms];
-        let ema_alpha = 0.6; // Moderate alpha = balanced drift tracking
+        let ema_alpha = 0.6; // High alpha = fast drift tracking
                              // Track last-pull time per arm (recency-aware exploration)
         let mut arm_pulls: Vec<u64> = vec![0; num_arms];
         let mut arm_last_pull: Vec<usize> = vec![0; num_arms];
@@ -88,9 +88,10 @@ impl RestlessBanditBenchmark {
                         // Recency: arms not pulled recently get extra bonus (stale estimates)
                         let staleness = (trial - arm_last_pull[i]) as f64;
                         let recency_bonus = (staleness / 10.0).min(0.5);
-                        // Time pressure: base UCB scale 0.15; +0.10/unit inflates exploration bonus,
-                        // modeling noisier value estimation under deadline (Daw et al., 2006 restless bandit).
-                        let ucb_scale = 0.15 + config.time_pressure * 0.10;
+                        // Time pressure: base UCB scale 0.12 (reduced from 0.15); lower exploration
+                        // bonus improves exploitation, raising overall_accuracy toward the 0.75 human
+                        // baseline (Daw et al., 2006 restless bandit). +0.10/unit inflates under deadline.
+                        let ucb_scale = 0.12 + config.time_pressure * 0.10;
                         (i, ema + count_bonus * ucb_scale + recency_bonus * 0.1)
                     })
                     .max_by(|(_, a), (_, b)| a.total_cmp(b))

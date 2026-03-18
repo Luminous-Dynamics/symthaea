@@ -165,7 +165,7 @@ impl CausalChainBenchmark {
 
 impl PsychBenchmark for CausalChainBenchmark {
     fn name(&self) -> &str {
-        "causal_reasoning/causal_chain"
+        "CausalReasoning::CausalChain"
     }
 
     fn provenance(&self) -> Option<BenchmarkProvenance> {
@@ -247,7 +247,7 @@ mod tests {
     fn test_causal_chain_runs() {
         let bench = CausalChainBenchmark;
         let result = bench.run(&default_config());
-        assert!(result.benchmark.contains("causal_chain"));
+        assert!(result.benchmark.contains("CausalChain"));
         assert!(result.metrics.contains_key("chain_tracing_accuracy"));
     }
 

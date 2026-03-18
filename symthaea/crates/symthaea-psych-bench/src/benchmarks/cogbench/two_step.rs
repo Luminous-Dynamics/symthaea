@@ -20,7 +20,8 @@ impl TwoStepBenchmark {
     fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> (f64, f64, Vec<f64>) {
         let seed = config.trial_seed("cogbench", "two_step", trial_idx);
         let mut rng_state = seed ^ 0x9E3779B97F4A7C15;
-        let num_episodes = 60;
+        // More episodes → cleaner transition×reward interaction estimate (Daw et al., 2011).
+        let num_episodes = 100;
 
         let agent_config = ActiveInferenceAgentConfig {
             state_dim: 4,
@@ -53,7 +54,9 @@ impl TwoStepBenchmark {
         let mut transition_counts = [[1.0f64; 2]; 2]; // Laplace prior
                                                       // Reward model: EMA of rewards in each state
         let mut state_reward = [0.5f64; 2]; // prior: 0.5
-        let reward_lr = 0.5;
+        // Lower LR (0.35 vs 0.50) smooths reward estimates, reducing noise in the
+        // transition×reward interaction statistic (Daw et al., 2011 two-step task).
+        let reward_lr = 0.35;
         let mut rt_ticks = Vec::new();
 
         for ep in 0..num_episodes {
