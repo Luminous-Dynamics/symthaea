@@ -6,8 +6,21 @@
 //! struct definitions live here — single source of truth.
 //!
 //! Also provides domain-independent validation helpers.
+//!
+//! ## Schema Versioning Policy
+//!
+//! All entry types carry a `schema_version` field (default 1). When adding new
+//! fields to an existing entry type:
+//! 1. Use `#[serde(default)]` or `#[serde(default = "...")]` so existing on-chain
+//!    data deserializes without the new field.
+//! 2. Bump `schema_version` in new entries so readers can distinguish generations.
+//! 3. Never remove or rename existing fields — only add new ones.
 
 use hdi::prelude::*;
+
+fn default_schema_v1() -> u8 {
+    1
+}
 
 // ============================================================================
 // Entry types
@@ -24,6 +37,9 @@ use hdi::prelude::*;
 /// in HDI 0.7 — a known macro mismatch. Our manual impl achieves the same result.
 #[derive(Clone, PartialEq, Serialize, Deserialize, Debug, SerializedBytes)]
 pub struct BridgeQueryEntry {
+    /// Schema version for forward-compatible deserialization.
+    #[serde(default = "default_schema_v1")]
+    pub schema_version: u8,
     /// Domain within the cluster (e.g., "property", "justice")
     pub domain: String,
     /// Query type / function name
@@ -63,6 +79,9 @@ impl TryFrom<&Entry> for BridgeQueryEntry {
 /// Used by both commons-bridge and civic-bridge integrity zomes.
 #[derive(Clone, PartialEq, Serialize, Deserialize, Debug, SerializedBytes)]
 pub struct BridgeEventEntry {
+    /// Schema version for forward-compatible deserialization.
+    #[serde(default = "default_schema_v1")]
+    pub schema_version: u8,
     /// Domain within the cluster (e.g., "housing", "emergency")
     pub domain: String,
     /// Event type identifier
@@ -107,6 +126,9 @@ impl TryFrom<&Entry> for BridgeEventEntry {
 /// structural constraints.
 #[derive(Clone, PartialEq, Serialize, Deserialize, Debug, SerializedBytes)]
 pub struct CachedCredentialEntry {
+    /// Schema version for forward-compatible deserialization.
+    #[serde(default = "default_schema_v1")]
+    pub schema_version: u8,
     /// The DID this credential was issued for
     pub did: String,
     /// Serialized ConsciousnessCredential as JSON
@@ -342,6 +364,7 @@ mod tests {
 
     fn make_query(domain: &str, params: &str) -> BridgeQueryEntry {
         BridgeQueryEntry {
+            schema_version: 1,
             domain: domain.into(),
             query_type: "test_query".into(),
             requester: fake_agent(),
@@ -355,6 +378,7 @@ mod tests {
 
     fn make_event(domain: &str, payload: &str) -> BridgeEventEntry {
         BridgeEventEntry {
+            schema_version: 1,
             domain: domain.into(),
             event_type: "test_event".into(),
             source_agent: fake_agent(),
@@ -595,6 +619,7 @@ mod tests {
     #[test]
     fn query_null_bytes_in_domain_serde_roundtrip() {
         let q = BridgeQueryEntry {
+            schema_version: 1,
             domain: "prop\0erty".into(),
             query_type: "test\0query".into(),
             requester: fake_agent(),
@@ -716,6 +741,7 @@ mod tests {
     #[test]
     fn query_empty_string_fields() {
         let q = BridgeQueryEntry {
+            schema_version: 1,
             domain: "property".into(),
             query_type: "".into(),
             requester: fake_agent(),
@@ -741,6 +767,7 @@ mod tests {
 
     fn make_cached_credential(did: &str, json: &str) -> CachedCredentialEntry {
         CachedCredentialEntry {
+            schema_version: 1,
             did: did.into(),
             credential_json: json.into(),
             cached_at_us: 1_000_000,
@@ -796,6 +823,7 @@ mod tests {
     #[test]
     fn cached_credential_negative_timestamp_roundtrip() {
         let c = CachedCredentialEntry {
+            schema_version: 1,
             did: "did:mycelix:test".into(),
             credential_json: "{}".into(),
             cached_at_us: -1,

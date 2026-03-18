@@ -71,10 +71,10 @@ Fractal CivOS with 5 tiers, consolidated into cluster DNAs (single DNA = cross-d
 
 | Cluster | Path | Domains | Zomes | Tests |
 |---------|------|---------|-------|-------|
-| **mycelix-commons** | `mycelix-commons/` | property, housing, care, mutualaid, water, food, transport | 35 (34 domain + 1 bridge) | 5,276 |
-| **mycelix-civic** | `mycelix-civic/` | justice, emergency, media | 16 (15 domain + 1 bridge) | 2,273 |
+| **mycelix-commons** | `mycelix-commons/` | property, housing, care, mutualaid, water, food, transport, mesh-time, resource-mesh | 39 (38 domain + 1 bridge) | 5,276 |
+| **mycelix-civic** | `mycelix-civic/` | justice, emergency, media, resonance-feed | 18 (17 domain + 1 bridge) | 2,273 |
 | **mycelix-hearth** | `mycelix-hearth/` | kinship, gratitude, care, autonomy, decisions, stories, milestones, rhythms, emergency, resources | 12 (11 domain + 1 bridge) | 1,023 |
-| **mycelix-identity** | `mycelix-identity/` | DID registry, MFA, trust credentials, verifiable credentials, recovery | 9 | 23+ unit, 100+ sweettest |
+| **mycelix-identity** | `mycelix-identity/` | DID registry, MFA, trust credentials, verifiable credentials, recovery, name-registry, web-of-trust | 13 | 23+ unit, 100+ sweettest |
 | **mycelix-governance** | `mycelix-governance/` | proposals, voting, threshold-signing (DKG), councils, constitution, execution | 7 | 44+ unit, 156+ sweettest |
 | **mycelix-personal** | `mycelix-personal/` | identity vault, health vault, credential wallet | 4 (3 domain + 1 bridge) | 20 |
 | **mycelix-attribution** | `mycelix-attribution/` | dependency registry, usage receipts, reciprocity | 3 | 17 |
@@ -84,27 +84,27 @@ Fractal CivOS with 5 tiers, consolidated into cluster DNAs (single DNA = cross-d
 | Cluster | Path | Zomes | Status |
 |---------|------|-------|--------|
 | **mycelix-finance** | `mycelix-finance/` | 8 (payments SAP/TEND/MYCEL, treasury, staking, recognition) | Built |
-| **mycelix-health** | `mycelix-health/` | 7 MVP (FHIR R4, differential privacy, federated ML) | Built |
+| **mycelix-health** | `mycelix-health/` | 15 (7 MVP + 8 Tier 2: trials, insurance, FHIR, CDS, telehealth, nutrition) | Built |
 | **mycelix-mail** | `mycelix-mail/` | 12 (PQC-encrypted decentralized email) | Built |
 | **mycelix-supplychain** | `mycelix-supplychain/` | 8 (provenance tracking) | Built |
 | **mycelix-marketplace** | `mycelix-marketplace/` | 8 (arbitration) | Built |
-| **mycelix-knowledge** | `mycelix-knowledge/` | — | Built |
+| **mycelix-knowledge** | `mycelix-knowledge/` | 8 (claims, graph, query, inference, factcheck, markets, DKG, bridge) | Built |
 | **mycelix-edunet** | `mycelix-edunet/` | 10 | Built |
-| **mycelix-music** | `mycelix-music/` | 8 | Scaffolded |
-| **mycelix-energy** | `mycelix-energy/` | 11 | Scaffolded |
-| **mycelix-climate** | `mycelix-climate/` | 6 | Scaffolded |
-| **mycelix-space** | `mycelix-space/` | — | Early |
+| **mycelix-energy** | `mycelix-energy/` | 5 (projects, investments, regenerative, grid, bridge) | Built |
+| **mycelix-climate** | `mycelix-climate/` | 3 (carbon, projects, bridge) | Built |
+| **mycelix-music** | `mycelix-music/` | 4 + 14 support crates (balances, catalog, plays, trust) | Built |
+| **mycelix-space** | `mycelix-space/` | 5 + orbital-mechanics lib (orbital objects, observations, conjunctions, debris bounties, traffic control) | Built |
 | **mycelix-desci** | `mycelix-desci/` | REST API (Actix-web) | 141 integration tests |
 | **mycelix-core** | `mycelix-core/` | 0TML federated learning research | 62 FL tests |
 
-- **Total**: 123+ zomes, ~785K lines Rust (~643K code, tokei-verified), 14 built hApp bundles
-- **Shared types**: `crates/mycelix-bridge-entry-types/` (DHT entries), `crates/mycelix-bridge-common/` (coordinator dispatch + cross-cluster + consciousness gating, 289 tests)
+- **Total**: 133+ zomes, ~785K lines Rust (~643K code, tokei-verified), 14 built hApp bundles
+- **Shared types**: `crates/mycelix-bridge-entry-types/` (DHT entries), `crates/mycelix-bridge-common/` (coordinator dispatch + cross-cluster + consciousness gating, 295+ tests)
 - **Cross-cluster bridge**: All clusters via `CallTargetCell::OtherRole` (unified hApp: `mycelix-workspace/happs/mycelix-unified-happ.yaml`)
 - **Consciousness gating**: 4D profile (identity/reputation/community/engagement) → 5 tiers (Observer→Guardian) → progressive vote weights
 - **SDKs**: Rust (18 modules, ~50K LOC, 1,036+ tests), TypeScript (37 modules, ~226K LOC, 6,316 tests), Python, WASM
 - **Dashboards**: LUCID (SvelteKit + Tauri, 40+ components, 95% Symthaea bridge), Observatory (SvelteKit)
 - **Build**: `just build-commons` / `just build-civic` (or `cargo build --release --target wasm32-unknown-unknown`)
-- **Tests**: 8,600+ Rust workspace tests across clusters + 289 bridge-common + 1,036 SDK Rust + 6,316 SDK TS
+- **Tests**: 8,600+ Rust workspace tests across clusters + 295+ bridge-common + 1,036 SDK Rust + 6,316 SDK TS
 
 ### Kosmic Lab
 - **Path**: `kosmic-lab/`

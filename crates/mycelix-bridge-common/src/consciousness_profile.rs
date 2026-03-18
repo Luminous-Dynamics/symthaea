@@ -25,6 +25,47 @@ use crate::consciousness_thresholds::{
 };
 
 // ============================================================================
+// Sigmoid authorization constants
+// ============================================================================
+
+/// Default sigmoid temperature for vote weight computation.
+/// 0.05 provides a smooth transition over ~±0.1 around the threshold.
+pub const VOTE_WEIGHT_TEMPERATURE: f64 = 0.05;
+
+/// Maximum vote weight (basis points: 10000 = 100%).
+pub const VOTE_WEIGHT_MAX_BP: f64 = 10000.0;
+
+/// Hysteresis margin for tier transitions.
+/// Promotion requires `threshold + margin`; demotion requires `threshold - margin`.
+pub const TIER_HYSTERESIS_MARGIN: f64 = 0.05;
+
+// ============================================================================
+// Continuous sigmoid authorization
+// ============================================================================
+
+/// Compute continuous vote weight using sigmoid function.
+///
+/// Instead of hard tier thresholds, this provides a smooth gradient:
+/// `W = W_max / (1 + e^(-(score - threshold) / temperature))`
+///
+/// - score < threshold: weight approaches 0 smoothly
+/// - score = threshold: weight = W_max / 2
+/// - score > threshold: weight approaches W_max smoothly
+///
+/// Temperature controls strictness:
+/// - low temperature (0.02): sharp transition (like hard threshold)
+/// - high temperature (0.10): gradual transition (noise-tolerant)
+pub fn continuous_vote_weight(score: f64, threshold: f64, temperature: f64, max_weight: f64) -> f64 {
+    if temperature <= 0.0 || !score.is_finite() {
+        return 0.0;
+    }
+    let exponent = -((score - threshold) / temperature);
+    // Clamp exponent to prevent overflow
+    let exponent = exponent.clamp(-20.0, 20.0);
+    max_weight / (1.0 + exponent.exp())
+}
+
+// ============================================================================
 // Core types
 // ============================================================================
 
@@ -69,6 +110,26 @@ impl ConsciousnessProfile {
     /// Derive the consciousness tier from this profile's combined score.
     pub fn tier(&self) -> ConsciousnessTier {
         ConsciousnessTier::from_score(self.combined_score())
+    }
+
+    /// Derive consciousness tier with hysteresis, given the current tier.
+    ///
+    /// Prevents rapid tier oscillation from measurement noise at boundaries.
+    pub fn tier_with_hysteresis(&self, current_tier: ConsciousnessTier) -> ConsciousnessTier {
+        ConsciousnessTier::from_score_with_hysteresis(self.combined_score(), current_tier)
+    }
+
+    /// Compute continuous vote weight for governance participation.
+    ///
+    /// Uses sigmoid function centered at Citizen threshold (0.4)
+    /// with temperature 0.05 for noise-tolerant transitions.
+    pub fn vote_weight_continuous(&self) -> f64 {
+        continuous_vote_weight(
+            self.combined_score(),
+            0.4, // Citizen threshold
+            VOTE_WEIGHT_TEMPERATURE,
+            VOTE_WEIGHT_MAX_BP,
+        )
     }
 
     /// Create a profile with all dimensions at zero (anonymous, no history).
@@ -166,6 +227,13 @@ pub struct ConsciousnessCredential {
     pub expires_at: u64,
     /// DID of the issuing bridge (e.g., "did:mycelix:<identity_bridge_pubkey>").
     pub issuer: String,
+    /// BLAKE3 hash of the agent's behavioral trajectory (from TrajectoryAccumulator).
+    #[serde(default)]
+    pub trajectory_commitment: Option<[u8; 32]>,
+    /// Extensible key-value store for future credential features.
+    /// Avoids adding new `Option<T>` fields for every feature.
+    #[serde(default)]
+    pub extensions: std::collections::HashMap<String, Vec<u8>>,
 }
 
 impl ConsciousnessCredential {
@@ -211,7 +279,35 @@ impl ConsciousnessCredential {
             issued_at: now_us,
             expires_at: now_us + Self::DEFAULT_TTL_US,
             issuer,
+            trajectory_commitment: None,
+            extensions: std::collections::HashMap::new(),
         }
+    }
+
+    /// Set an extension value.
+    pub fn set_extension(&mut self, key: impl Into<String>, value: Vec<u8>) {
+        self.extensions.insert(key.into(), value);
+    }
+
+    /// Get an extension value.
+    pub fn get_extension(&self, key: &str) -> Option<&Vec<u8>> {
+        self.extensions.get(key)
+    }
+
+    /// Remove an extension value.
+    pub fn remove_extension(&mut self, key: &str) -> Option<Vec<u8>> {
+        self.extensions.remove(key)
+    }
+
+    /// Set the trajectory commitment from a TrajectoryAccumulator's output.
+    pub fn with_trajectory_commitment(mut self, commitment: [u8; 32]) -> Self {
+        self.trajectory_commitment = Some(commitment);
+        self
+    }
+
+    /// Check if the credential has a trajectory binding.
+    pub fn has_trajectory_binding(&self) -> bool {
+        self.trajectory_commitment.is_some()
     }
 }
 
@@ -275,6 +371,79 @@ impl ConsciousnessTier {
             Self::Steward => 10000,
             Self::Guardian => 10000,
         }
+    }
+
+    /// Tier transition with hysteresis to prevent oscillation at boundaries.
+    ///
+    /// Promotion requires crossing `threshold + TIER_HYSTERESIS_MARGIN`.
+    /// Demotion requires dropping below `threshold - TIER_HYSTERESIS_MARGIN`.
+    /// This prevents rapid tier flapping from measurement noise.
+    pub fn from_score_with_hysteresis(score: f64, current_tier: ConsciousnessTier) -> ConsciousnessTier {
+        let margin = TIER_HYSTERESIS_MARGIN;
+
+        // Determine what tier we'd promote to (higher threshold required)
+        let promoted = if score >= 0.8 + margin {
+            ConsciousnessTier::Guardian
+        } else if score >= 0.6 + margin {
+            ConsciousnessTier::Steward
+        } else if score >= 0.4 + margin {
+            ConsciousnessTier::Citizen
+        } else if score >= 0.3 + margin {
+            ConsciousnessTier::Participant
+        } else {
+            ConsciousnessTier::Observer
+        };
+
+        // Determine what tier we'd demote to (lower threshold required)
+        let demoted = if score < 0.3 - margin {
+            ConsciousnessTier::Observer
+        } else if score < 0.4 - margin {
+            ConsciousnessTier::Participant
+        } else if score < 0.6 - margin {
+            ConsciousnessTier::Citizen
+        } else if score < 0.8 - margin {
+            ConsciousnessTier::Steward
+        } else {
+            ConsciousnessTier::Guardian
+        };
+
+        // Promote if we'd go higher, demote if we'd go lower, else stay
+        if promoted > current_tier {
+            promoted
+        } else if demoted < current_tier {
+            demoted
+        } else {
+            current_tier
+        }
+    }
+
+    /// Degrade the tier by `levels` steps. Floors at Observer.
+    pub fn degrade(self, levels: u32) -> Self {
+        let tiers = [
+            Self::Observer,
+            Self::Participant,
+            Self::Citizen,
+            Self::Steward,
+            Self::Guardian,
+        ];
+        let current_idx = tiers.iter().position(|t| *t == self).unwrap_or(0);
+        let new_idx = current_idx.saturating_sub(levels as usize);
+        tiers[new_idx]
+    }
+
+    /// Upgrade one level, capped at `max_tier`.
+    pub fn upgrade_capped(self, max_tier: Self) -> Self {
+        let tiers = [
+            Self::Observer,
+            Self::Participant,
+            Self::Citizen,
+            Self::Steward,
+            Self::Guardian,
+        ];
+        let current_idx = tiers.iter().position(|t| *t == self).unwrap_or(0);
+        let max_idx = tiers.iter().position(|t| *t == max_tier).unwrap_or(0);
+        let new_idx = (current_idx + 1).min(max_idx);
+        tiers[new_idx]
     }
 }
 
@@ -424,6 +593,8 @@ pub fn bootstrap_credential(
         issued_at: now_us,
         expires_at: now_us.saturating_add(BOOTSTRAP_TTL_US),
         issuer: "did:mycelix:bootstrap".to_string(),
+        trajectory_commitment: None,
+        extensions: std::collections::HashMap::new(),
     }
 }
 
@@ -889,8 +1060,13 @@ impl Default for ReputationState {
 impl ReputationState {
     /// Create a new reputation state with the given initial score and timestamp.
     pub fn new(initial_score: f64, now_us: u64) -> Self {
+        let sanitized = if initial_score.is_finite() {
+            initial_score.clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
         Self {
-            score: initial_score.clamp(0.0, 1.0),
+            score: sanitized,
             last_updated_us: now_us,
             ..Default::default()
         }
@@ -1032,6 +1208,16 @@ pub fn decay_reputation(profile: &ConsciousnessProfile, elapsed_days: f64) -> Co
 ///
 /// Wraps `evaluate_governance` but also checks blacklist status
 /// and applies restoration progress to vote weight.
+///
+/// # TOCTOU Warning
+///
+/// This function checks `reputation_state.blacklisted` at call time, but the
+/// on-chain reputation may change between this check and the commit of the
+/// governance action. Callers in coordinator zomes SHOULD re-check blacklist
+/// status at commit time (e.g., in a `validate_*` callback) to close this
+/// race window. In practice the risk is low (blacklisting is rare and requires
+/// reputation < 0.05), but high-severity governance actions (constitutional
+/// amendments, treasury operations) warrant the extra check.
 pub fn evaluate_governance_with_reputation(
     credential: &ConsciousnessCredential,
     requirement: &GovernanceRequirement,
@@ -1088,6 +1274,8 @@ mod tests {
             issued_at: NOW - 60_000_000,
             expires_at: NOW + 86_400_000_000,
             issuer: "test".to_string(),
+            trajectory_commitment: None,
+            extensions: std::collections::HashMap::new(),
         }
     }
 
@@ -1549,6 +1737,8 @@ mod tests {
             issued_at: 1_000_000,
             expires_at: 1_000_000 + ConsciousnessCredential::DEFAULT_TTL_US,
             issuer: "did:mycelix:issuer".into(),
+            trajectory_commitment: None,
+            extensions: std::collections::HashMap::new(),
         };
         assert!(!cred.is_expired(1_000_000));
         assert!(!cred.is_expired(1_000_000 + ConsciousnessCredential::DEFAULT_TTL_US - 1));
@@ -1563,6 +1753,8 @@ mod tests {
             issued_at: 1_000_000,
             expires_at: 1_000_000 + ConsciousnessCredential::DEFAULT_TTL_US,
             issuer: "did:mycelix:issuer".into(),
+            trajectory_commitment: None,
+            extensions: std::collections::HashMap::new(),
         };
         assert!(cred.is_expired(cred.expires_at));
         assert!(cred.is_expired(cred.expires_at + 1));
@@ -1618,6 +1810,8 @@ mod tests {
             issued_at: 1_700_000_000_000_000,
             expires_at: 1_700_000_000_000_000 + ConsciousnessCredential::DEFAULT_TTL_US,
             issuer: "did:mycelix:issuer".into(),
+            trajectory_commitment: None,
+            extensions: std::collections::HashMap::new(),
         };
         let json = serde_json::to_string(&cred).unwrap();
         let c2: ConsciousnessCredential = serde_json::from_str(&json).unwrap();
@@ -1750,6 +1944,8 @@ mod tests {
             issued_at: 1_000_000,
             expires_at: 2_000_000,
             issuer: "did:mycelix:issuer".into(),
+            trajectory_commitment: None,
+            extensions: std::collections::HashMap::new(),
         };
         assert!(!cred.is_expired(1_999_999));
     }
@@ -1763,6 +1959,8 @@ mod tests {
             issued_at: 1_000_000,
             expires_at: 2_000_000,
             issuer: "did:mycelix:issuer".into(),
+            trajectory_commitment: None,
+            extensions: std::collections::HashMap::new(),
         };
         // >= means expired at exact boundary
         assert!(cred.is_expired(2_000_000));
@@ -1777,6 +1975,8 @@ mod tests {
             issued_at: 1_000_000,
             expires_at: 2_000_000,
             issuer: "did:mycelix:issuer".into(),
+            trajectory_commitment: None,
+            extensions: std::collections::HashMap::new(),
         };
         assert!(cred.is_expired(2_000_001));
     }
@@ -1790,6 +1990,8 @@ mod tests {
             issued_at: 1_000_000,
             expires_at: 1_000_000, // zero TTL
             issuer: "did:mycelix:issuer".into(),
+            trajectory_commitment: None,
+            extensions: std::collections::HashMap::new(),
         };
         assert!(cred.is_expired(1_000_000));
     }
@@ -1803,6 +2005,8 @@ mod tests {
             issued_at: 0,
             expires_at: u64::MAX,
             issuer: "did:mycelix:issuer".into(),
+            trajectory_commitment: None,
+            extensions: std::collections::HashMap::new(),
         };
         // Any reasonable timestamp is before u64::MAX
         assert!(!cred.is_expired(1_700_000_000_000_000));
@@ -1817,6 +2021,8 @@ mod tests {
             issued_at: 0,
             expires_at: u64::MAX,
             issuer: "did:mycelix:issuer".into(),
+            trajectory_commitment: None,
+            extensions: std::collections::HashMap::new(),
         };
         assert!(cred.is_expired(u64::MAX));
     }
@@ -2950,6 +3156,8 @@ mod tests {
             issued_at: 0,
             expires_at: 100_000_000_000,
             issuer: "did:mycelix:bridge".to_string(),
+            trajectory_commitment: None,
+            extensions: std::collections::HashMap::new(),
         };
         let rep_state = ReputationState {
             score: 0.01,
@@ -2989,6 +3197,8 @@ mod tests {
             issued_at: 0,
             expires_at: 100_000_000_000,
             issuer: "did:mycelix:bridge".to_string(),
+            trajectory_commitment: None,
+            extensions: std::collections::HashMap::new(),
         };
         let rep_state = ReputationState {
             score: 0.8,
@@ -3032,5 +3242,185 @@ mod tests {
         let mut state2 = ReputationState::new(0.5, 0);
         state2.apply_decay(u64::MAX); // extreme elapsed time
         assert!(state2.score.is_finite());
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // Continuous sigmoid authorization tests
+    // ════════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_sigmoid_at_threshold_returns_half_max() {
+        let w = continuous_vote_weight(0.4, 0.4, VOTE_WEIGHT_TEMPERATURE, VOTE_WEIGHT_MAX_BP);
+        assert!(
+            (w - VOTE_WEIGHT_MAX_BP / 2.0).abs() < 1e-6,
+            "At threshold, weight should be max/2, got {w}"
+        );
+    }
+
+    #[test]
+    fn test_sigmoid_below_threshold_near_zero() {
+        let w = continuous_vote_weight(0.1, 0.4, VOTE_WEIGHT_TEMPERATURE, VOTE_WEIGHT_MAX_BP);
+        assert!(
+            w < 100.0,
+            "Well below threshold, weight should be near zero, got {w}"
+        );
+    }
+
+    #[test]
+    fn test_sigmoid_above_threshold_near_max() {
+        let w = continuous_vote_weight(0.7, 0.4, VOTE_WEIGHT_TEMPERATURE, VOTE_WEIGHT_MAX_BP);
+        assert!(
+            w > 9900.0,
+            "Well above threshold, weight should be near max, got {w}"
+        );
+    }
+
+    #[test]
+    fn test_sigmoid_zero_temperature_returns_zero() {
+        let w = continuous_vote_weight(0.5, 0.4, 0.0, VOTE_WEIGHT_MAX_BP);
+        assert!(
+            (w - 0.0).abs() < 1e-10,
+            "Zero temperature should return 0.0, got {w}"
+        );
+    }
+
+    #[test]
+    fn test_sigmoid_nan_score_returns_zero() {
+        let w = continuous_vote_weight(f64::NAN, 0.4, VOTE_WEIGHT_TEMPERATURE, VOTE_WEIGHT_MAX_BP);
+        assert!(
+            (w - 0.0).abs() < 1e-10,
+            "NaN score should return 0.0, got {w}"
+        );
+    }
+
+    #[test]
+    fn test_sigmoid_infinity_score_returns_zero() {
+        let w = continuous_vote_weight(f64::INFINITY, 0.4, VOTE_WEIGHT_TEMPERATURE, VOTE_WEIGHT_MAX_BP);
+        assert!(
+            (w - 0.0).abs() < 1e-10,
+            "Infinity score should return 0.0, got {w}"
+        );
+    }
+
+    #[test]
+    fn test_vote_weight_continuous_on_profile() {
+        let profile = ConsciousnessProfile {
+            identity: 0.5,
+            reputation: 0.5,
+            community: 0.5,
+            engagement: 0.5,
+        };
+        // combined_score = 0.5, which is above 0.4 threshold
+        let w = profile.vote_weight_continuous();
+        assert!(w > VOTE_WEIGHT_MAX_BP / 2.0, "Score 0.5 > threshold 0.4 should give > half max");
+        assert!(w < VOTE_WEIGHT_MAX_BP, "Should not exceed max");
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // Hysteresis tests
+    // ════════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_hysteresis_no_promote_in_deadband() {
+        // Score 0.42 — above Citizen threshold (0.4) but below promote threshold (0.45)
+        let tier = ConsciousnessTier::from_score_with_hysteresis(0.42, ConsciousnessTier::Participant);
+        assert_eq!(
+            tier,
+            ConsciousnessTier::Participant,
+            "0.42 should NOT promote from Participant (need 0.45)"
+        );
+    }
+
+    #[test]
+    fn test_hysteresis_no_demote_in_deadband() {
+        // Score 0.38 — below Citizen threshold (0.4) but above demote threshold (0.35)
+        let tier = ConsciousnessTier::from_score_with_hysteresis(0.38, ConsciousnessTier::Citizen);
+        assert_eq!(
+            tier,
+            ConsciousnessTier::Citizen,
+            "0.38 should NOT demote from Citizen (need < 0.35)"
+        );
+    }
+
+    #[test]
+    fn test_hysteresis_demotes_below_lower_threshold() {
+        // Score 0.34 — below demote threshold (0.35)
+        let tier = ConsciousnessTier::from_score_with_hysteresis(0.34, ConsciousnessTier::Citizen);
+        assert_eq!(
+            tier,
+            ConsciousnessTier::Participant,
+            "0.34 should demote from Citizen (below 0.35)"
+        );
+    }
+
+    #[test]
+    fn test_hysteresis_promotes_above_upper_threshold() {
+        // Score 0.46 — above promote threshold (0.45)
+        let tier = ConsciousnessTier::from_score_with_hysteresis(0.46, ConsciousnessTier::Participant);
+        assert_eq!(
+            tier,
+            ConsciousnessTier::Citizen,
+            "0.46 should promote from Participant to Citizen (above 0.45)"
+        );
+    }
+
+    #[test]
+    fn test_hysteresis_guardian_boundary() {
+        // 0.83 — above 0.8 but below promote threshold 0.85
+        let tier = ConsciousnessTier::from_score_with_hysteresis(0.83, ConsciousnessTier::Steward);
+        assert_eq!(tier, ConsciousnessTier::Steward, "0.83 should NOT promote to Guardian (need 0.85)");
+
+        // 0.86 — above promote threshold 0.85
+        let tier = ConsciousnessTier::from_score_with_hysteresis(0.86, ConsciousnessTier::Steward);
+        assert_eq!(tier, ConsciousnessTier::Guardian, "0.86 should promote to Guardian");
+
+        // 0.76 — below demote threshold 0.75
+        let tier = ConsciousnessTier::from_score_with_hysteresis(0.74, ConsciousnessTier::Guardian);
+        assert_eq!(tier, ConsciousnessTier::Steward, "0.74 should demote from Guardian");
+    }
+
+    #[test]
+    fn test_hysteresis_observer_boundary() {
+        // 0.33 — above 0.3 but below promote threshold 0.35
+        let tier = ConsciousnessTier::from_score_with_hysteresis(0.33, ConsciousnessTier::Observer);
+        assert_eq!(tier, ConsciousnessTier::Observer, "0.33 should NOT promote from Observer (need 0.35)");
+
+        // 0.36 — above promote threshold 0.35
+        let tier = ConsciousnessTier::from_score_with_hysteresis(0.36, ConsciousnessTier::Observer);
+        assert_eq!(tier, ConsciousnessTier::Participant, "0.36 should promote to Participant");
+
+        // 0.24 — below demote threshold 0.25
+        let tier = ConsciousnessTier::from_score_with_hysteresis(0.24, ConsciousnessTier::Participant);
+        assert_eq!(tier, ConsciousnessTier::Observer, "0.24 should demote to Observer");
+    }
+
+    #[test]
+    fn extensions_default_empty() {
+        let cred = ConsciousnessCredential::from_unified_consciousness(
+            "did:test".into(), 0.5, 0.5, 0.5, 0.5, "issuer".into(), 1000,
+        );
+        assert!(cred.extensions.is_empty());
+        assert!(cred.trajectory_commitment.is_none());
+    }
+
+    #[test]
+    fn extensions_set_get_roundtrip() {
+        let mut cred = ConsciousnessCredential::from_unified_consciousness(
+            "did:test".into(), 0.5, 0.5, 0.5, 0.5, "issuer".into(), 1000,
+        );
+        cred.set_extension("foo", vec![1, 2, 3]);
+        assert_eq!(cred.get_extension("foo"), Some(&vec![1, 2, 3]));
+        assert_eq!(cred.get_extension("bar"), None);
+    }
+
+    #[test]
+    fn extensions_remove() {
+        let mut cred = ConsciousnessCredential::from_unified_consciousness(
+            "did:test".into(), 0.5, 0.5, 0.5, 0.5, "issuer".into(), 1000,
+        );
+        cred.set_extension("key", vec![42]);
+        let removed = cred.remove_extension("key");
+        assert_eq!(removed, Some(vec![42]));
+        assert!(cred.get_extension("key").is_none());
     }
 }

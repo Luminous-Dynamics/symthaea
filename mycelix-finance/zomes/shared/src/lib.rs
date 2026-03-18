@@ -39,6 +39,7 @@ pub use race_resolution::*;
 pub use rate_limit::*;
 pub use types::*;
 pub use consciousness_gating::*;
+pub use oracle_verification::*;
 pub use update_chain::*;
 pub use validation::*;
 
@@ -766,11 +767,11 @@ pub mod validation {
 /// - **Citizen** (identity >= 0.25, reputation >= 0.10): Higher-bar operations
 ///   like currency creation and parameter amendment.
 ///
-/// ## Fallback
+/// ## Fallback (Fail-Closed)
 ///
-/// When the identity cluster is unreachable (bootstrap, standalone, network
-/// partition), both functions fall back to allowing the operation. The integrity
-/// zome still enforces economic invariants regardless of consciousness gating.
+/// When the identity cluster is unreachable, both functions **deny** the
+/// operation. This prevents silent permission grants during network partitions.
+/// The integrity zome still enforces economic invariants independently.
 pub mod consciousness_gating {
     use super::*;
 
@@ -796,8 +797,12 @@ pub mod consciousness_gating {
                     )))
                 }
             }
-            // Identity cluster unavailable — permissive fallback
-            _ => Ok(()),
+            // Identity cluster unreachable — fail closed
+            _ => Err(wasm_error!(WasmErrorInner::Guest(
+                "Identity cluster unreachable — consciousness gating unavailable. \
+                 Operations requiring Participant tier are suspended until \
+                 the identity cluster is restored.".into()
+            ))),
         }
     }
 
@@ -826,8 +831,81 @@ pub mod consciousness_gating {
                     )))
                 }
             }
-            // Identity cluster unavailable — permissive fallback
-            _ => Ok(()),
+            // Identity cluster unreachable — fail closed
+            _ => Err(wasm_error!(WasmErrorInner::Guest(
+                "Identity cluster unreachable — consciousness gating unavailable. \
+                 Operations requiring Citizen tier are suspended until \
+                 the identity cluster is restored.".into()
+            ))),
+        }
+    }
+}
+
+/// Oracle rate verification for collateral deposits.
+///
+/// Verifies that a claimed oracle rate is within tolerance of the
+/// price oracle consensus. Prevents rate injection attacks.
+pub mod oracle_verification {
+    use super::*;
+    use mycelix_finance_types::ORACLE_RATE_TOLERANCE;
+
+    /// Verify that a claimed oracle rate is within tolerance of consensus.
+    ///
+    /// Fetches the current consensus price from the price-oracle zome
+    /// and rejects the claimed rate if it deviates more than ORACLE_RATE_TOLERANCE (5%).
+    ///
+    /// Falls back to accepting the claimed rate if the oracle is unreachable
+    /// (bootstrap/standalone mode), with a warning logged.
+    pub fn verify_oracle_rate(
+        item: &str,
+        claimed_rate: f64,
+    ) -> ExternResult<()> {
+        if !claimed_rate.is_finite() || claimed_rate <= 0.0 {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Oracle rate must be a finite positive number".into()
+            )));
+        }
+
+        // Fetch consensus from price-oracle zome
+        #[derive(Debug, Serialize)]
+        struct GetConsensusInput { item: String }
+        #[derive(Debug, Deserialize)]
+        struct ConsensusResult { median_price: f64 }
+
+        match call(
+            CallTargetCell::Local,
+            ZomeName::from("price_oracle"),
+            FunctionName::from("get_consensus_price"),
+            None,
+            GetConsensusInput { item: item.to_string() },
+        ) {
+            Ok(ZomeCallResponse::Ok(result)) => {
+                match result.decode::<ConsensusResult>() {
+                    Ok(consensus) if consensus.median_price.is_finite() && consensus.median_price > 0.0 => {
+                        let deviation = (claimed_rate - consensus.median_price).abs() / consensus.median_price;
+                        if deviation > ORACLE_RATE_TOLERANCE {
+                            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                                "Oracle rate {:.6} deviates {:.1}% from consensus {:.6} (max {}%)",
+                                claimed_rate, deviation * 100.0, consensus.median_price, ORACLE_RATE_TOLERANCE * 100.0
+                            ))));
+                        }
+                        Ok(())
+                    }
+                    Ok(_) => {
+                        debug!("verify_oracle_rate: consensus price invalid, accepting claimed rate");
+                        Ok(())
+                    }
+                    Err(e) => {
+                        debug!("verify_oracle_rate: decode error: {:?}, accepting claimed rate", e);
+                        Ok(())
+                    }
+                }
+            }
+            _ => {
+                // Oracle unreachable — accept with warning (bootstrap/standalone)
+                debug!("verify_oracle_rate: price oracle unreachable, accepting claimed rate {}", claimed_rate);
+                Ok(())
+            }
         }
     }
 }

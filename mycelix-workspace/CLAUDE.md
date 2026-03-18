@@ -22,13 +22,12 @@ just status          # Check status
 
 | Stage | Count | hApps |
 |-------|-------|-------|
-| **Core Four** | **4** | **identity** (9 zomes, 23 sweettests, MFA+PQC+recovery), **governance** (7 zomes, treasury+delegation+DKG), **core FL** (6 zomes, 62 tests, model versioning), **LUCID** (8 zomes, 92 functions, Symthaea bridge 95%) |
-| Production | 3 | mail (12 zomes), desci (141 tests, REST not hApp), space |
-| **Cluster** | **5** | **commons** (35 zomes, 5,276 tests), **civic** (16 zomes, 2,273 tests), **hearth** (11 zomes, 1,023 tests), **personal** (3 zomes, 20 tests), **attribution** (3 zomes, 17 tests) |
+| **Core Four** | **4** | **identity** (13 zomes, 23 sweettests, MFA+PQC+recovery+name-registry+web-of-trust), **governance** (7 zomes, treasury+delegation+DKG), **core FL** (6 zomes, 62 tests, model versioning), **LUCID** (8 zomes, 92 functions, Symthaea bridge 95%) |
+| Production | 3 | mail (12 zomes), desci (141 tests, REST not hApp), space (5 zomes + orbital-mechanics) |
+| **Cluster** | **5** | **commons** (39 zomes, 5,276 tests), **civic** (18 zomes, 2,273 tests), **hearth** (11 zomes, 1,023 tests), **personal** (3 zomes, 20 tests), **attribution** (3 zomes, 17 tests) |
+| Built | 6 | energy (5 zomes, 10K LOC), climate (3 zomes, 7K LOC), music (4 zomes + 14 crates, 33K LOC), knowledge (8 zomes, 15K LOC), health (15 zomes, 81K LOC), finance (8 zomes) |
 | Beta | 7 | marketplace, supplychain, observatory, epistemic-markets, fabrication, edunet, consensus |
-| Scaffold | 3 | knowledge, finance, energy, health |
-| Stub/Other | 3 | bots (Python), music (early), symthaea-bridge |
-| Dormant | 1 | climate |
+| Stub/Other | 2 | bots (Python), symthaea-bridge |
 
 Full breakdown: [ECOSYSTEM_STATUS.md](./ECOSYSTEM_STATUS.md)
 
@@ -116,7 +115,7 @@ hc dna pack .
 | Rust SDK | 996 pass (1002 w/ parallel) | Verified 2026-02-04 |
 | TypeScript SDK | 6,650 pass / 196 skip | All pass, types aligned to Rust serde values (2026-02-14) |
 | Identity unit | 23 | Pass (recovery + trust_credential) |
-| Commons cluster workspace | 5,276 | `cargo test --workspace` total. Bridge dispatch + cross-domain + cross-cluster + rate limiting + typed helpers + signals + audit trail + integrity validation + DoS hardening + link tag validation + delete auth + update bypass fix across all 35 zomes (35/35 integrity tested) |
+| Commons cluster workspace | 5,276 | `cargo test --workspace` total. Bridge dispatch + cross-domain + cross-cluster + rate limiting + typed helpers + signals + audit trail + integrity validation + DoS hardening + link tag validation + delete auth + update bypass fix across all 39 zomes (includes mesh-time, resource-mesh) |
 | Civic cluster workspace | 2,273 | `cargo test --workspace` total. Bridge dispatch + cross-domain + cross-cluster + rate limiting + typed helpers + audit trail + integrity validation + DoS hardening + link tag validation across all 16 zomes |
 | Hearth cluster workspace | 1,023 | Kinship, gratitude, care, autonomy, decisions, stories, milestones, rhythms, emergency, resources, bridge |
 | Bridge-common | 212 | Shared dispatch types, allowlist validation, rate limiting, typed helpers, audit trail, cross-cluster emergency, consciousness profile (4D gating, tiers, progressive weights), type-safe routing (53 zome enums, case-insensitive) |

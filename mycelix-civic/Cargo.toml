@@ -40,6 +40,10 @@ members = [
     "zomes/media-curation/integrity",
     "zomes/media-curation/coordinator",
 
+    # Resonance-Feed domain (1 zome)
+    "zomes/resonance-feed/coordinator",
+    "zomes/resonance-feed/integrity",
+
     # Unified bridge (1 zome)
     "zomes/civic-bridge/integrity",
     "zomes/civic-bridge/coordinator",

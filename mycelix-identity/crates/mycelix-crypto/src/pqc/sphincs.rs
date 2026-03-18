@@ -69,7 +69,7 @@ impl Signer for SlhDsaSha2128sSigner {
             AlgorithmId::SlhDsaSha2_128s,
             self.public_key.as_bytes().to_vec(),
         )
-        .unwrap()
+        .expect("SlhDsaSha2128s public key size is constant")
     }
 }
 

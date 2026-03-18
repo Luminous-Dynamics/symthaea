@@ -30,7 +30,8 @@ impl MlKem768KeyPair {
 
     /// Get the public key as a TaggedPublicKey.
     pub fn public_key(&self) -> TaggedPublicKey {
-        TaggedPublicKey::new(AlgorithmId::MlKem768, self.public_key.as_bytes().to_vec()).unwrap()
+        TaggedPublicKey::new(AlgorithmId::MlKem768, self.public_key.as_bytes().to_vec())
+            .expect("MlKem768 public key size is constant per FIPS 203")
     }
 }
 

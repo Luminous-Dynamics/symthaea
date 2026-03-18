@@ -83,6 +83,8 @@ fn make_credential(profile: ConsciousnessProfile, now_us: u64) -> ConsciousnessC
         issued_at: now_us.saturating_sub(60_000_000),
         expires_at: now_us + ConsciousnessCredential::DEFAULT_TTL_US,
         issuer: "test".to_string(),
+        trajectory_commitment: None,
+        extensions: std::collections::HashMap::new(),
     }
 }
 
@@ -101,6 +103,8 @@ fn make_expired_credential(
         issued_at: expires_at.saturating_sub(ConsciousnessCredential::DEFAULT_TTL_US),
         expires_at,
         issuer: "test".to_string(),
+        trajectory_commitment: None,
+        extensions: std::collections::HashMap::new(),
     }
 }
 
@@ -119,6 +123,8 @@ fn make_bootstrap_credential(identity_score: f64, now_us: u64) -> ConsciousnessC
         issued_at: now_us,
         expires_at: now_us.saturating_add(BOOTSTRAP_TTL_US),
         issuer: "did:mycelix:bootstrap".to_string(),
+        trajectory_commitment: None,
+        extensions: std::collections::HashMap::new(),
     }
 }
 
@@ -620,4 +626,171 @@ proptest! {
             "Expired (beyond grace) credential should never be eligible for {:?}",
             requirement.min_tier);
     }
+}
+
+// ============================================================================
+// Property 13: Offline credential — future timestamps degrade
+// ============================================================================
+
+use mycelix_bridge_common::offline_credential::{FreshnessAttestation, OfflineCredential};
+
+fn make_offline_credential(tier: ConsciousnessTier, issued_at: u64) -> mycelix_bridge_common::consciousness_profile::ConsciousnessCredential {
+    let hours_168 = 168 * 3600 * 1_000_000u64;
+    mycelix_bridge_common::consciousness_profile::ConsciousnessCredential {
+        did: "did:mycelix:test".to_string(),
+        profile: ConsciousnessProfile {
+            identity: 0.8,
+            reputation: 0.7,
+            community: 0.9,
+            engagement: 0.6,
+        },
+        tier,
+        issued_at,
+        expires_at: issued_at + hours_168,
+        issuer: "did:mycelix:bridge".to_string(),
+        trajectory_commitment: None,
+        extensions: std::collections::HashMap::new(),
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(1000))]
+
+    /// Future-dated attestation timestamps always cause tier degradation.
+    #[test]
+    fn future_attestation_degrades(
+        future_offset_us in 1u64..1_000_000_000_000u64,
+    ) {
+        let now_us = BASE_US;
+        let cred = make_offline_credential(ConsciousnessTier::Guardian, 0);
+        let mut offline = OfflineCredential::new(cred);
+        // Add a signed attestation in the future
+        offline.attestation = Some(FreshnessAttestation {
+            attester_did: "did:mycelix:peer".into(),
+            timestamp: now_us + future_offset_us,
+            tier_at_attestation: ConsciousnessTier::Guardian,
+            signature: vec![1], // non-empty = "signed"
+        });
+        let tier = offline.effective_tier(now_us);
+        // Should degrade by 2 (Guardian → Citizen)
+        prop_assert_eq!(tier, ConsciousnessTier::Citizen,
+            "Future attestation should degrade tier by 2, got {:?}", tier);
+    }
+
+    /// Attestation timestamp before credential issuance causes tier degradation (causality).
+    #[test]
+    fn causality_violation_degrades(
+        issued_at in 1_000_000u64..1_000_000_000_000u64,
+        backdate in 1u64..1_000_000u64,
+    ) {
+        let now_us = BASE_US;
+        let cred = make_offline_credential(ConsciousnessTier::Guardian, issued_at);
+        let mut offline = OfflineCredential::new(cred);
+        // Add signed attestation that predates credential issuance
+        offline.attestation = Some(FreshnessAttestation {
+            attester_did: "did:mycelix:peer".into(),
+            timestamp: issued_at.saturating_sub(backdate),
+            tier_at_attestation: ConsciousnessTier::Guardian,
+            signature: vec![1],
+        });
+        let tier = offline.effective_tier(now_us);
+        prop_assert_eq!(tier, ConsciousnessTier::Citizen,
+            "Causality-violating attestation should degrade by 2, got {:?}", tier);
+    }
+}
+
+// ============================================================================
+// Property 14: Sub-passport counter overflow safety
+// ============================================================================
+
+use mycelix_bridge_common::sub_passport::SubPassport;
+
+#[test]
+fn sub_passport_violation_counter_saturates() {
+    let mut sp = SubPassport::new(
+        "did:mycelix:agent".into(),
+        "did:mycelix:human".into(),
+        "overflow test".into(),
+        1_000_000,
+    );
+    sp.violation_count = u32::MAX;
+    sp.record_violation();
+    assert_eq!(sp.violation_count, u32::MAX, "violation_count should saturate at u32::MAX");
+}
+
+#[test]
+fn sub_passport_correction_counter_saturates() {
+    let mut sp = SubPassport::new(
+        "did:mycelix:agent".into(),
+        "did:mycelix:human".into(),
+        "overflow test".into(),
+        1_000_000,
+    );
+    sp.correction_count = u32::MAX;
+    sp.record_correction();
+    assert_eq!(sp.correction_count, u32::MAX, "correction_count should saturate at u32::MAX");
+}
+
+// ============================================================================
+// Property 15: Grace period capped at 30 days
+// ============================================================================
+
+#[test]
+fn grace_period_capped_at_30_days() {
+    let cred = make_offline_credential(ConsciousnessTier::Guardian, 0);
+    let offline = OfflineCredential::with_grace_hours(cred, 10_000); // way over 720h
+
+    // At 721 hours, should be past 720h grace (capped) and degraded
+    let t_721h = 721 * 3600 * 1_000_000;
+    let tier = offline.effective_tier(t_721h);
+    assert!(tier < ConsciousnessTier::Guardian,
+        "Grace period should be capped at 720h, but tier was {:?} at 721h", tier);
+}
+
+// ============================================================================
+// Property 16: SubPassport signing roundtrip
+// ============================================================================
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(500))]
+
+    /// SubPassport survives sign → serialize → deserialize → verify roundtrip.
+    #[test]
+    fn sub_passport_signing_roundtrip(
+        agent_did in "[a-z0-9:]{5,40}",
+        delegator_did in "[a-z0-9:]{5,40}",
+        key in proptest::collection::vec(any::<u8>(), 32..=32),
+    ) {
+        let key_arr: [u8; 32] = key.try_into().unwrap();
+        let mut sp = SubPassport::new(
+            agent_did,
+            delegator_did,
+            "proptest roundtrip".into(),
+            1_000_000,
+        );
+        sp.sign_blake3(&key_arr);
+
+        // Serialize → Deserialize
+        let json = serde_json::to_string(&sp).unwrap();
+        let deserialized: SubPassport = serde_json::from_str(&json).unwrap();
+
+        // Verify passes after roundtrip
+        prop_assert!(deserialized.verify_blake3(&key_arr),
+            "BLAKE3 verification should pass after JSON roundtrip");
+    }
+}
+
+// ============================================================================
+// Property 17: Trajectory commitment binding
+// ============================================================================
+
+#[test]
+fn trajectory_commitment_binding() {
+    let mut cred = ConsciousnessCredential::from_unified_consciousness(
+        "did:test".into(), 0.5, 0.5, 0.5, 0.5, "issuer".into(), 1000,
+    );
+    assert!(!cred.has_trajectory_binding());
+    cred = cred.with_trajectory_commitment([42u8; 32]);
+    assert!(cred.has_trajectory_binding());
+    assert_eq!(cred.trajectory_commitment, Some([42u8; 32]));
 }

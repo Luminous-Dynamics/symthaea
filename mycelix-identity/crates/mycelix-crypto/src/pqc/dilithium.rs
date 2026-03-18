@@ -67,7 +67,8 @@ impl Signer for MlDsa65Signer {
     }
 
     fn public_key(&self) -> TaggedPublicKey {
-        TaggedPublicKey::new(AlgorithmId::MlDsa65, self.public_key.as_bytes().to_vec()).unwrap()
+        TaggedPublicKey::new(AlgorithmId::MlDsa65, self.public_key.as_bytes().to_vec())
+            .expect("MlDsa65 public key size is constant per FIPS 204")
     }
 }
 
@@ -161,7 +162,8 @@ impl Signer for MlDsa87Signer {
     }
 
     fn public_key(&self) -> TaggedPublicKey {
-        TaggedPublicKey::new(AlgorithmId::MlDsa87, self.public_key.as_bytes().to_vec()).unwrap()
+        TaggedPublicKey::new(AlgorithmId::MlDsa87, self.public_key.as_bytes().to_vec())
+            .expect("MlDsa87 public key size is constant per FIPS 204")
     }
 }
 

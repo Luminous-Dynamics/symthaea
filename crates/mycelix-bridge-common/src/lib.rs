@@ -28,6 +28,9 @@ pub use consciousness_profile::{
     REPUTATION_MAX_SLASHES, REPUTATION_RESTORATION_INTERACTIONS, REPUTATION_SLASH_FACTOR,
 };
 
+pub mod sub_passport;
+pub mod offline_credential;
+
 pub mod collective_phi;
 pub use collective_phi::{
     AgentConsciousnessVector, CollectivePhiEngine, CollectivePhiResult, COLLECTIVE_PHI_MAX_SYNC,

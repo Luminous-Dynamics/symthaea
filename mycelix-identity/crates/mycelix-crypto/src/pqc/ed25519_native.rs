@@ -49,8 +49,8 @@ impl Signer for Ed25519Signer {
 
     fn public_key(&self) -> TaggedPublicKey {
         let vk = self.signing_key.verifying_key();
-        // Length is always 32, so unwrap is safe
-        TaggedPublicKey::new(AlgorithmId::Ed25519, vk.to_bytes().to_vec()).unwrap()
+        TaggedPublicKey::new(AlgorithmId::Ed25519, vk.to_bytes().to_vec())
+            .expect("Ed25519 public key is always 32 bytes")
     }
 }
 

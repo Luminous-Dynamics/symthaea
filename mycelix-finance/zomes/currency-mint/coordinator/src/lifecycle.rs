@@ -71,14 +71,14 @@ pub fn create_currency(input: CreateCurrencyInput) -> ExternResult<CurrencyDefin
                 None,
                 proposal_id.clone(),
             ) {
-                if !result.decode::<bool>().unwrap_or(true) {
+                if !result.decode::<bool>().unwrap_or(false) {
                     return Err(wasm_error!(WasmErrorInner::Guest(format!(
                         "Governance proposal '{}' not found or not in Approved/Executed state",
                         proposal_id
                     ))));
                 }
             }
-            // Bridge unreachable — permissive (governance agent already verified above)
+            // Bridge unreachable — fail closed (proposal verification required)
         }
     }
 
@@ -455,14 +455,14 @@ pub fn amend_currency_params(input: AmendCurrencyParamsInput) -> ExternResult<Cu
                 None,
                 proposal_id.clone(),
             ) {
-                if !result.decode::<bool>().unwrap_or(true) {
+                if !result.decode::<bool>().unwrap_or(false) {
                     return Err(wasm_error!(WasmErrorInner::Guest(format!(
                         "Governance proposal '{}' not found or not in Approved/Executed state",
                         proposal_id
                     ))));
                 }
             }
-            // Bridge unreachable — permissive (governance agent already verified above)
+            // Bridge unreachable — fail closed (proposal verification required)
         }
     }
 

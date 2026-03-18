@@ -1,8 +1,12 @@
 # Mycelix DNA Size Audit
 
-**Date**: 2026-02-22
+**Date**: 2026-03-18 (updated)
 **Build**: Release (`cargo build --release --target wasm32-unknown-unknown`)
-**Build Date**: 2026-02-21
+**Build Date**: 2026-02-21 (sizes below from original audit)
+
+> **Note**: Since the original audit, new zomes have been added to the workspace
+> (mesh-time, resource-mesh in Commons; resonance-feed in Civic; name-registry,
+> web-of-trust in Identity). These need a fresh WASM size audit before release.
 
 ---
 

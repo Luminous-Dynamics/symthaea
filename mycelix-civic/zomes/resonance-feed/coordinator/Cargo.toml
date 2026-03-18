@@ -1,0 +1,16 @@
+[package]
+name = "resonance_feed"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "resonance_feed"
+
+[dependencies]
+hdk = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+holochain_serialized_bytes = { workspace = true }
+resonance_feed_integrity = { path = "../integrity" }
+mycelix-bridge-common = { workspace = true }

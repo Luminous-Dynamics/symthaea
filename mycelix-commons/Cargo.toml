@@ -100,6 +100,14 @@ members = [
     "zomes/space/integrity",
     "zomes/space/coordinator",
 
+    # Mesh-Time domain (2 zomes)
+    "zomes/mesh-time/coordinator",
+    "zomes/mesh-time/integrity",
+
+    # Resource-Mesh domain (2 zomes)
+    "zomes/resource-mesh/coordinator",
+    "zomes/resource-mesh/integrity",
+
     # Unified bridge (1 zome)
     "zomes/commons-bridge/integrity",
     "zomes/commons-bridge/coordinator",

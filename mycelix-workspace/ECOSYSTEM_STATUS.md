@@ -1,6 +1,6 @@
 # Mycelix Ecosystem Status
 
-**Last verified**: 2026-03-08
+**Last verified**: 2026-03-18
 **Holochain**: 0.6.0 | **HDK**: 0.6.0 | **HDI**: 0.7.0
 
 ## hApp Bundle Status
@@ -89,7 +89,7 @@ All 10 scaffolded hApps (health, energy, climate, mutualaid, property, media, co
 
 | hApp | Zomes | Tests | Notes |
 |------|-------|-------|-------|
-| **Identity** | 9 (did_registry, trust_credential, mfa, verifiable_credential, credential_schema, education, revocation, recovery, bridge) | 23 unit + 100+ sweettests + 20 consciousness gating sweettests | W3C DID Core, MFA (5 factor types), ZK-based trust attestations, consciousness credential issuance. 36,820 LOC. |
+| **Identity** | 11 (did_registry, trust_credential, mfa, verifiable_credential, credential_schema, education, revocation, recovery, bridge, name-registry, web-of-trust) | 23 unit + 100+ sweettests + 20 consciousness gating sweettests | W3C DID Core, MFA (5 factor types), ZK-based trust attestations, consciousness credential issuance, name registry, web of trust. 36,820 LOC. |
 | **Governance** | 7 (proposals, voting, threshold-signing, councils, constitution, execution, bridge) | 44 unit + 156+ sweettests | 5 proposal types, Phi-weighted voting, Feldman VSS DKG (off-chain ceremony, on-chain commitments), constitutional amendments. 28,364 LOC. |
 
 ### Additional Clusters
@@ -114,18 +114,23 @@ These domains are fully implemented as zomes within the Commons or Civic cluster
 | **Water** | Commons | 5 | Flow, purity, capture, stewardship, traditional knowledge |
 | **Food** | Commons | 4 | Production, distribution, preservation, knowledge |
 | **Transport** | Commons | 3 | Routes, sharing, carbon impact |
+| **Mesh-Time** | Commons | 1 | Mesh time synchronization |
+| **Resource-Mesh** | Commons | 1 | Resource mesh coordination |
 | **Justice** | Civic | 5 | Cases, evidence, arbitration, restorative circles, enforcement |
 | **Emergency** | Civic | 6 | Incidents, triage, resources, coordination, shelters, comms |
 | **Media** | Civic | 4 | Publication, attribution, fact-checking, curation |
+| **Resonance-Feed** | Civic | 1 | Resonance feed curation |
 
-### Scaffold (compiles to WASM, core logic incomplete)
+### Built (feature-complete, UI pending)
 
-| hApp | Status | Notes |
-|------|--------|-------|
-| **Knowledge** | Types + structure | 23 subdirectories. Large scope. |
-| **Energy** | Types + structure | 10,118 LOC. |
-| **Health** | MVP (7 zomes) | Reduced from 37 to 7 core zomes. 22 archived to `_archive-2026-02-15/`. health-ci.yml CI workflow added. 8 sweettests at workspace level. |
-| **Space** | Types + structure | 12 subdirectories. |
+| hApp | Zomes | LOC | Notes |
+|------|-------|-----|-------|
+| **Knowledge** | 8 (claims, graph, query, inference, factcheck, markets_integration, dkg, bridge) | 14,696 | DKG Truth Engine, epistemic provenance. |
+| **Energy** | 5 (projects, investments, regenerative, grid, bridge) | 10,118 | Grid management, renewable project tracking. |
+| **Health** | 15 (7 MVP + 8 Tier 2: trials, insurance, fhir_mapping, fhir_bridge, cds, provider_directory, telehealth, nutrition) | 81,382 | Tier 2 promoted 2026-03-18. 22 Tier 3 archived to `_archive-2026-02-15/`. |
+| **Space** | 5 + orbital-mechanics lib (orbital_objects, observations, conjunctions, debris_bounties, traffic_control) | 22,774 | SGP4 propagation, Alfano collision probability, CDM parsing. |
+| **Climate** | 3 (carbon, projects, bridge) | 6,980 | Carbon credit verification, climate marketplace. |
+| **Music** | 4 + 14 support crates (balances, catalog, plays, trust) | 32,772 | Audio codecs, ML-based search, streaming protocol. |
 
 ### Stub / Early Stage
 
@@ -134,14 +139,12 @@ These domains are fully implemented as zomes within the Commons or Civic cluster
 | **symthaea-core** | `symthaea-core/` | Re-export facade (16 lines). Depends on `symthaea` crate. |
 | **symthaea-mycelix-bridge** | `symthaea-mycelix-bridge/` | Substantial bridge (~25KB). Maps Phi/HDC to epistemic types. |
 | **Bots** | `mycelix-bots/` | Discord + Telegram bots (Python). Not Holochain. |
-| **Music** | `mycelix-music/` | 41 subdirectories but early stage. |
 
 ### Dormant
 
 | Component | Notes |
 |-----------|-------|
-| **Climate** | 5 zomes, restored from archive |
-| **Mutual Aid** | 8 zomes, restored from archive |
+| **Mutual Aid** | 8 zomes, restored from archive (also present in mycelix-commons) |
 
 ---
 

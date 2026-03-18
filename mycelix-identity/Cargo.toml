@@ -26,6 +26,12 @@ members = [
     # MFDI v1.0 - Multi-Factor Authentication
     "zomes/mfa/integrity",
     "zomes/mfa/coordinator",
+    # Name Registry
+    "zomes/name-registry/coordinator",
+    "zomes/name-registry/integrity",
+    # Web of Trust
+    "zomes/web-of-trust/coordinator",
+    "zomes/web-of-trust/integrity",
 ]
 
 [workspace.dependencies]

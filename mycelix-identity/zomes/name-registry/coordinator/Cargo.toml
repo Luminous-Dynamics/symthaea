@@ -1,0 +1,15 @@
+[package]
+name = "name_registry_coordinator"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+hdk = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+holochain_serialized_bytes = { workspace = true }
+name_registry_integrity = { path = "../integrity" }
+mycelix-bridge-common = { workspace = true }

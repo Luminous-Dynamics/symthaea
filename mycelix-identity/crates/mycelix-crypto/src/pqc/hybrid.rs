@@ -96,7 +96,8 @@ impl Signer for HybridSigner {
         combined.extend_from_slice(&ed_pk.key_bytes);
         combined.extend_from_slice(&pqc_pk.key_bytes);
 
-        TaggedPublicKey::new(AlgorithmId::HybridEd25519MlDsa65, combined).unwrap()
+        TaggedPublicKey::new(AlgorithmId::HybridEd25519MlDsa65, combined)
+            .expect("HybridEd25519MlDsa65 combined key size is constant")
     }
 }
 
