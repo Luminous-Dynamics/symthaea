@@ -85,11 +85,12 @@ mod types;
 mod attestation;
 mod handshake;
 mod iroh;
+#[cfg(feature = "pqc-handshake")]
+pub mod pqc_handshake;
 
 // Re-exports
 pub use config::{
-    AeadAlgorithm, BootstrapConfig, CryptoConfig, PeerConfig, SwarmConfig,
-    MYCELIX_BOOTSTRAP_NODES,
+    AeadAlgorithm, BootstrapConfig, CryptoConfig, PeerConfig, SwarmConfig, MYCELIX_BOOTSTRAP_NODES,
 };
 pub use error::{SwarmError, SwarmResult};
 pub use types::{
@@ -118,7 +119,7 @@ pub use iroh::{
 pub use handshake::{HandshakeError, HandshakeResult, HybridHandshake, SwarmMessageExt};
 
 // Consciousness attestation — signed ConsciousnessVector proofs
-pub use attestation::{AttestedConsciousnessVector, AttestationManager};
+pub use attestation::{AttestationManager, AttestedConsciousnessVector};
 
 // Network Service - high-level swarm integration
 pub use service::{CollectiveConsciousness, NetworkService, PeerEvent, ServiceStats, SwarmBridge};
