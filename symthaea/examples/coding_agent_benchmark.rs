@@ -8,6 +8,7 @@
 //! Run:
 //!   Native-only:  `cargo run --example coding_agent_benchmark --features code_generation`
 //!   With Ollama:  `cargo run --example coding_agent_benchmark --features code_generation -- --llm`
+//!   With Claude:  `cargo run --example coding_agent_benchmark --features code_generation -- --cloud`
 
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
@@ -744,8 +745,41 @@ fn validate_code(source: &str, test_source: &str) -> (bool, Vec<String>, usize, 
         );
     }
 
-    // Compilation failed — try auto-fix
-    let fixed = try_auto_fix(&clean_source, &result.compile_errors);
+    // Compilation failed — try targeted fixes for common LLM issues first
+    let mut source_to_fix = clean_source.clone();
+
+    // Fix E0412: undeclared type T — LLM uses T without generic declaration
+    // Add generic bounds to functions that reference T
+    if result.compile_errors.iter().any(|e| e.contains("cannot find type `T`")) {
+        // Find "fn name(" and inject "<T>" before the paren
+        let lines: Vec<&str> = source_to_fix.lines().collect();
+        let fixed_lines: Vec<String> = lines.iter().map(|line| {
+            let trimmed = line.trim();
+            if (trimmed.starts_with("pub fn ") || trimmed.starts_with("fn "))
+                && trimmed.contains("(")
+                && !trimmed.contains("<")
+                && (trimmed.contains(": T") || trimmed.contains("Vec<T>") || trimmed.contains("&T")
+                    || trimmed.contains("-> T") || trimmed.contains("Option<T>"))
+            {
+                // Insert <T: Clone + PartialOrd> before the first (
+                line.replacen("(", "<T: Clone + PartialOrd + std::fmt::Debug>(", 1)
+            } else {
+                line.to_string()
+            }
+        }).collect();
+        let fixed_code = fixed_lines.join("\n");
+        let retry = executor.execute_rust(&fixed_code, test_src);
+        if retry.compiled {
+            return (true, vec![], retry.tests_passed, retry.tests_failed, true, true);
+        }
+        source_to_fix = fixed_code;
+    }
+
+    // Fix E0601: no main function — code is empty or only prose
+    // Nothing we can do — the LLM didn't produce useful code
+
+    // Try general auto-fix
+    let fixed = try_auto_fix(&source_to_fix, &result.compile_errors);
     if let Some(ref fixed_source) = fixed {
         let retry = executor.execute_rust(fixed_source, test_src);
         if retry.compiled {
@@ -764,13 +798,14 @@ fn validate_code(source: &str, test_source: &str) -> (bool, Vec<String>, usize, 
     (false, result.compile_errors, 0, 0, false, false)
 }
 
-fn run_task(task: &BenchTask, task_idx: usize, use_llm: bool) -> TaskResult {
+fn run_task(task: &BenchTask, task_idx: usize, use_llm: bool, use_cloud: bool) -> TaskResult {
     let temp_dir = tempfile::tempdir().expect("tempdir");
     let config = CodingAgentConfig {
         max_iterations: task.max_iterations,
         working_dir: temp_dir.path().to_path_buf(),
         target_file: Some(PathBuf::from("generated.rs")),
         use_local_llm: use_llm,
+        use_cloud_llm: use_cloud,
         ..Default::default()
     };
 
@@ -1057,13 +1092,16 @@ fn print_report(results: &[TaskResult], stats: &BenchStats) {
 
 fn main() {
     let use_llm = std::env::args().any(|a| a == "--llm");
+    let use_cloud = std::env::args().any(|a| a == "--cloud");
     let tasks = build_task_suite();
 
     eprintln!(
         "Symthaea Coding Agent — Hardened Benchmark ({} tasks)",
         tasks.len()
     );
-    if use_llm {
+    if use_cloud {
+        eprintln!("Mode: Cloud LLM (Anthropic Claude)\n");
+    } else if use_llm {
         eprintln!("Mode: LLM (Ollama qwen2.5-coder:7b)\n");
     } else {
         eprintln!("Mode: Native-only\n");
@@ -1072,7 +1110,7 @@ fn main() {
     let results: Vec<TaskResult> = tasks
         .iter()
         .enumerate()
-        .map(|(i, task)| run_task(task, i, use_llm))
+        .map(|(i, task)| run_task(task, i, use_llm, use_cloud))
         .collect();
 
     let stats = compute_stats(&results);
