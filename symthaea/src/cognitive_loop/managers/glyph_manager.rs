@@ -375,6 +375,91 @@ impl CognitiveSubsystem for GlyphManager {
 
         output
     }
+
+    fn checkpoint(&self) -> Vec<u8> {
+        // Layout: [modality_prior: 11×f64 = 88][prior_count: u64 = 8]
+        //         [dominant_modality: u8 = 1][last_coords: 11×f64 = 88]
+        //         [last_coherence.value: f64 = 8][last_free_energy.free_energy: f64 = 8]
+        //         [spiral_position: f32 = 4]
+        // Total: 205 bytes
+        let mut data = Vec::with_capacity(205);
+        for &v in &self.modality_prior {
+            data.extend_from_slice(&v.to_le_bytes());
+        }
+        data.extend_from_slice(&self.prior_count.to_le_bytes());
+        // Encode dominant modality as index into FieldModality::ALL
+        let dom_idx = FieldModality::ALL
+            .iter()
+            .position(|m| *m == self.dominant_modality)
+            .unwrap_or(0) as u8;
+        data.push(dom_idx);
+        for &v in &self.last_coords {
+            data.extend_from_slice(&v.to_le_bytes());
+        }
+        data.extend_from_slice(&self.last_coherence.value.to_le_bytes());
+        data.extend_from_slice(&self.last_free_energy.free_energy.to_le_bytes());
+        data.extend_from_slice(&self.spiral_position.to_le_bytes());
+        data
+    }
+
+    fn restore(&mut self, data: &[u8]) -> Result<(), String> {
+        const MIN_SIZE: usize = 88 + 8 + 1 + 88 + 8 + 8 + 4; // 205
+        if data.len() < MIN_SIZE {
+            return Err(format!(
+                "GlyphManager checkpoint too short: {} < {}",
+                data.len(),
+                MIN_SIZE
+            ));
+        }
+        let mut offset = 0;
+        for i in 0..N_FIELD_MODALITIES {
+            self.modality_prior[i] = f64::from_le_bytes(
+                data[offset..offset + 8]
+                    .try_into()
+                    .map_err(|_| "GlyphManager: corrupt modality_prior bytes")?,
+            );
+            offset += 8;
+        }
+        self.prior_count = u64::from_le_bytes(
+            data[offset..offset + 8]
+                .try_into()
+                .map_err(|_| "GlyphManager: corrupt prior_count bytes")?,
+        );
+        offset += 8;
+        let dom_idx = data[offset] as usize;
+        self.dominant_modality = if dom_idx < N_FIELD_MODALITIES {
+            FieldModality::ALL[dom_idx]
+        } else {
+            FieldModality::Resonant
+        };
+        offset += 1;
+        for i in 0..N_FIELD_MODALITIES {
+            self.last_coords[i] = f64::from_le_bytes(
+                data[offset..offset + 8]
+                    .try_into()
+                    .map_err(|_| "GlyphManager: corrupt last_coords bytes")?,
+            );
+            offset += 8;
+        }
+        self.last_coherence.value = f64::from_le_bytes(
+            data[offset..offset + 8]
+                .try_into()
+                .map_err(|_| "GlyphManager: corrupt coherence bytes")?,
+        );
+        offset += 8;
+        self.last_free_energy.free_energy = f64::from_le_bytes(
+            data[offset..offset + 8]
+                .try_into()
+                .map_err(|_| "GlyphManager: corrupt free_energy bytes")?,
+        );
+        offset += 8;
+        self.spiral_position = f32::from_le_bytes(
+            data[offset..offset + 4]
+                .try_into()
+                .map_err(|_| "GlyphManager: corrupt spiral_position bytes")?,
+        );
+        Ok(())
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

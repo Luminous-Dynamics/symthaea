@@ -733,6 +733,82 @@ impl CognitiveSubsystem for TherapeuticManager {
 
         output
     }
+
+    fn checkpoint(&self) -> Vec<u8> {
+        // Layout: [crisis_active: u8 = 1][checkpoint_counter: u32 = 4]
+        //         [alliance_bond: f32 = 4][alliance_goal: f32 = 4]
+        //         [alliance_task: f32 = 4][alliance_ruptures: u32 = 4]
+        //         [alliance_repairs: u32 = 4][narrative_coherence: f32 = 4]
+        //         [dream_prediction_accuracy: f32 = 4][dream_resolution_rate: f32 = 4]
+        // Total: 37 bytes
+        //
+        // Note: Full session state (ClientModel, RDoC profile, formulation,
+        // narrative fragments, shadow detector) is persisted via
+        // serialize_session() / restore_session() JSON. This binary
+        // checkpoint captures the fast-changing primitive fields only.
+        let mut data = Vec::with_capacity(37);
+        data.push(self.crisis_active as u8);
+        data.extend_from_slice(&self.checkpoint_counter.to_le_bytes());
+        data.extend_from_slice(&self.alliance.bond.to_le_bytes());
+        data.extend_from_slice(&self.alliance.goal_agreement.to_le_bytes());
+        data.extend_from_slice(&self.alliance.task_agreement.to_le_bytes());
+        data.extend_from_slice(&self.alliance.rupture_count.to_le_bytes());
+        data.extend_from_slice(&self.alliance.repair_count.to_le_bytes());
+        data.extend_from_slice(&self.narrative.coherence.to_le_bytes());
+        data.extend_from_slice(&self.dream_tracker.prediction_accuracy().to_le_bytes());
+        data.extend_from_slice(&self.dream_tracker.resolution_rate().to_le_bytes());
+        data
+    }
+
+    fn restore(&mut self, data: &[u8]) -> Result<(), String> {
+        const MIN_SIZE: usize = 1 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4; // 37
+        if data.len() < MIN_SIZE {
+            return Err(format!(
+                "TherapeuticManager checkpoint too short: {} < {}",
+                data.len(),
+                MIN_SIZE
+            ));
+        }
+        self.crisis_active = data[0] != 0;
+        self.checkpoint_counter = u32::from_le_bytes(
+            data[1..5]
+                .try_into()
+                .map_err(|_| "TherapeuticManager: corrupt checkpoint_counter bytes")?,
+        );
+        self.alliance.bond = f32::from_le_bytes(
+            data[5..9]
+                .try_into()
+                .map_err(|_| "TherapeuticManager: corrupt alliance_bond bytes")?,
+        );
+        self.alliance.goal_agreement = f32::from_le_bytes(
+            data[9..13]
+                .try_into()
+                .map_err(|_| "TherapeuticManager: corrupt alliance_goal bytes")?,
+        );
+        self.alliance.task_agreement = f32::from_le_bytes(
+            data[13..17]
+                .try_into()
+                .map_err(|_| "TherapeuticManager: corrupt alliance_task bytes")?,
+        );
+        self.alliance.rupture_count = u32::from_le_bytes(
+            data[17..21]
+                .try_into()
+                .map_err(|_| "TherapeuticManager: corrupt rupture_count bytes")?,
+        );
+        self.alliance.repair_count = u32::from_le_bytes(
+            data[21..25]
+                .try_into()
+                .map_err(|_| "TherapeuticManager: corrupt repair_count bytes")?,
+        );
+        self.narrative.coherence = f32::from_le_bytes(
+            data[25..29]
+                .try_into()
+                .map_err(|_| "TherapeuticManager: corrupt narrative_coherence bytes")?,
+        );
+        // bytes [29..33]: dream_prediction_accuracy (informational, not restored — recomputed)
+        // bytes [33..37]: dream_resolution_rate (informational, not restored — recomputed)
+        Ok(())
+    }
 }
 
 // ── Tests ──────────────────────────────────────────────────────────────────

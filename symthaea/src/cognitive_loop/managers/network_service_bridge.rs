@@ -78,6 +78,15 @@ impl NetworkServiceBridgeHandle {
 ///
 /// Subscribes to [`NetworkService`] broadcast channels, converts events to
 /// [`SwarmEvent`]s, and forwards them through an `mpsc::Sender` to the CLS.
+///
+/// # Checkpoint/Restore
+///
+/// `NetworkServiceBridge` is intentionally stateless — it holds no mutable
+/// fields, only forwarding events between async broadcast channels and the
+/// sync `mpsc::Sender`. All state lives in the tokio task's `Arc<AtomicU64>`
+/// counters (forwarded/lagged), which are diagnostic-only and do not affect
+/// correctness. The bridge is re-spawned on restart via `spawn()`, so there
+/// is no serializable state to checkpoint.
 pub struct NetworkServiceBridge;
 
 impl NetworkServiceBridge {
@@ -211,8 +220,9 @@ impl NetworkServiceBridge {
                                     // eventually arrive as AttestedConsciousnessVector.
                                     // For now, we verify the peer is trusted via handshake
                                     // (attestation on raw CVs requires the sender to sign).
-                                    // TODO: When senders wrap CVs in AttestedConsciousnessVector,
-                                    // deserialize and call mgr.verify_and_extract() here.
+                                    // TODO(blocked:attestation): When senders wrap CVs in
+                                    // AttestedConsciousnessVector, deserialize and call
+                                    // mgr.verify_and_extract() here.
                                     let signer_trusted = mgr
                                         .trusted_signer_count() > 1; // >1 means external signers added
                                     if !signer_trusted {

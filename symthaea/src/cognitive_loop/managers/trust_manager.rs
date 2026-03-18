@@ -40,19 +40,11 @@ pub enum TrustEvent {
         pq_verified: bool,
     },
     /// A peer joined the network.
-    PeerJoined {
-        peer_id: String,
-        initial_trust: f64,
-    },
+    PeerJoined { peer_id: String, initial_trust: f64 },
     /// A peer left the network.
-    PeerLeft {
-        peer_id: String,
-    },
+    PeerLeft { peer_id: String },
     /// A trust violation was detected.
-    TrustViolation {
-        peer_id: String,
-        reason: String,
-    },
+    TrustViolation { peer_id: String, reason: String },
 }
 
 /// Trust Manager — integrates web-of-trust into the cognitive loop.
@@ -196,6 +188,39 @@ impl CognitiveSubsystem for TrustManager {
         }
 
         output
+    }
+
+    fn checkpoint(&self) -> Vec<u8> {
+        // The TrustGraph contains complex HashMap state that cannot be cheaply
+        // serialized as raw bytes. We checkpoint the primitive tracking fields.
+        //
+        // Layout: [enabled: u8 = 1][violations_this_cycle: u32 = 4]
+        // Total: 5 bytes
+        //
+        // Note: The trust graph itself should be persisted separately via its
+        // own serialization (e.g., serde) for full state recovery.
+        let mut data = Vec::with_capacity(5);
+        data.push(self.enabled as u8);
+        data.extend_from_slice(&self.violations_this_cycle.to_le_bytes());
+        data
+    }
+
+    fn restore(&mut self, data: &[u8]) -> Result<(), String> {
+        const MIN_SIZE: usize = 1 + 4; // 5
+        if data.len() < MIN_SIZE {
+            return Err(format!(
+                "TrustManager checkpoint too short: {} < {}",
+                data.len(),
+                MIN_SIZE
+            ));
+        }
+        self.enabled = data[0] != 0;
+        self.violations_this_cycle = u32::from_le_bytes(
+            data[1..5]
+                .try_into()
+                .map_err(|_| "TrustManager: corrupt violations_this_cycle bytes")?,
+        );
+        Ok(())
     }
 }
 

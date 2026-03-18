@@ -365,9 +365,9 @@ impl CognitiveLoopService {
                     signals = crisis_event.trigger_signals.len(),
                     "Civic crisis detected — forwarding to Mycelix emergency-incidents"
                 );
-                // TODO: Forward crisis_event to Mycelix civic bridge when holochain
-                // conductor is connected. For now, the event is logged + counted
-                // in security_telemetry.crisis_events_emitted.
+                // TODO(blocked:conductor): Forward crisis_event to Mycelix civic bridge
+                // when holochain conductor is connected. Blocked on conductor integration.
+                // For now, the event is logged + counted in security_telemetry.crisis_events_emitted.
             }
         }
 

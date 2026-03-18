@@ -704,6 +704,52 @@ impl CognitiveSubsystem for SentinelManager {
 
         output
     }
+
+    fn checkpoint(&self) -> Vec<u8> {
+        // Serialize aggregate threat-tracking state. Per-agent/per-peer HashMaps
+        // and event queues are transient and not checkpointed — they rebuild
+        // from live events after restart.
+        //
+        // Layout: [threat_level: f32 = 4][active_threat_count: u32 = 4]
+        //         [quarantined_count: u32 = 4][proposal_rate_limit: u32 = 4]
+        //         [anomaly_ema_alpha: f64 = 8]
+        // Total: 24 bytes
+        let mut data = Vec::with_capacity(24);
+        data.extend_from_slice(&self.threat_level().to_le_bytes());
+        data.extend_from_slice(&(self.active_threats.len() as u32).to_le_bytes());
+        data.extend_from_slice(&(self.quarantined_peers.len() as u32).to_le_bytes());
+        data.extend_from_slice(&self.proposal_rate_limit.to_le_bytes());
+        data.extend_from_slice(&self.anomaly_ema_alpha.to_le_bytes());
+        data
+    }
+
+    fn restore(&mut self, data: &[u8]) -> Result<(), String> {
+        // Only restore configuration fields that affect future behavior.
+        // Threat state and quarantines are transient — they rebuild from
+        // live events after restart.
+        const MIN_SIZE: usize = 4 + 4 + 4 + 4 + 8; // 24
+        if data.len() < MIN_SIZE {
+            return Err(format!(
+                "SentinelManager checkpoint too short: {} < {}",
+                data.len(),
+                MIN_SIZE
+            ));
+        }
+        // bytes [0..4]: threat_level (informational, not restored — recomputed)
+        // bytes [4..8]: active_threat_count (informational, not restored)
+        // bytes [8..12]: quarantined_count (informational, not restored)
+        self.proposal_rate_limit = u32::from_le_bytes(
+            data[12..16]
+                .try_into()
+                .map_err(|_| "SentinelManager: corrupt proposal_rate_limit bytes")?,
+        );
+        self.anomaly_ema_alpha = f64::from_le_bytes(
+            data[16..24]
+                .try_into()
+                .map_err(|_| "SentinelManager: corrupt anomaly_ema_alpha bytes")?,
+        );
+        Ok(())
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

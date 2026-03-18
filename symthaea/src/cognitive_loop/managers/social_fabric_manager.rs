@@ -133,15 +133,13 @@ impl CognitiveSubsystem for SocialFabricManager {
 
         // Neuromod: high resonance -> oxytocin (calm connection)
         if mean_resonance > 0.6 {
-            output.valence_delta +=
-                (RESONANCE_OXY_GAIN * (mean_resonance - 0.6) / 0.4) as f32;
+            output.valence_delta += (RESONANCE_OXY_GAIN * (mean_resonance - 0.6) / 0.4) as f32;
         }
 
         // Neuromod: resonance drop -> NE (social alertness)
         let resonance_drop = self.prev_mean_resonance - mean_resonance;
         if resonance_drop > RESONANCE_DROP_THRESHOLD {
-            output.arousal_delta +=
-                (RESONANCE_DROP_NE_GAIN * resonance_drop).min(0.05) as f32;
+            output.arousal_delta += (RESONANCE_DROP_NE_GAIN * resonance_drop).min(0.05) as f32;
         }
 
         // Neuromod: diversity -> DA (curiosity boost)
@@ -151,14 +149,40 @@ impl CognitiveSubsystem for SocialFabricManager {
 
         // Echo chamber warning
         if echo_risk > 0.85 {
-            output.flags |=
-                crate::cognitive_loop::subsystem_trait::output_flags::ANOMALY_DETECTED;
+            output.flags |= crate::cognitive_loop::subsystem_trait::output_flags::ANOMALY_DETECTED;
         }
 
         self.prev_mean_resonance = mean_resonance;
         self.last_telemetry = self.graph.telemetry();
 
         output
+    }
+
+    fn checkpoint(&self) -> Vec<u8> {
+        // Layout: [prev_mean_resonance: f64 = 8][enabled: u8 = 1]
+        // Total: 9 bytes
+        let mut data = Vec::with_capacity(9);
+        data.extend_from_slice(&self.prev_mean_resonance.to_le_bytes());
+        data.push(self.enabled as u8);
+        data
+    }
+
+    fn restore(&mut self, data: &[u8]) -> Result<(), String> {
+        const MIN_SIZE: usize = 8 + 1; // 9
+        if data.len() < MIN_SIZE {
+            return Err(format!(
+                "SocialFabricManager checkpoint too short: {} < {}",
+                data.len(),
+                MIN_SIZE
+            ));
+        }
+        self.prev_mean_resonance = f64::from_le_bytes(
+            data[0..8]
+                .try_into()
+                .map_err(|_| "SocialFabricManager: corrupt prev_mean_resonance bytes")?,
+        );
+        self.enabled = data[8] != 0;
+        Ok(())
     }
 }
 

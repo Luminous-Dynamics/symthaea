@@ -892,7 +892,7 @@ impl CognitiveLoopService {
                 let engine_ucp = if has_primitive_processor {
                     crate::consciousness::unified_consciousness_pipeline::UnifiedConsciousnessPipeline::new(
                         crate::consciousness::unified_consciousness_pipeline::PipelineConfig::default(),
-                    ).ok()
+                    ).map_err(|e| tracing::warn!("UnifiedConsciousnessPipeline init failed: {e}")).ok()
                 } else {
                     None
                 };
