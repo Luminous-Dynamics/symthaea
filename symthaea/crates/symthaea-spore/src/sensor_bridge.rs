@@ -15,12 +15,24 @@ use symthaea_core::hdc::hdc_crypto::HdcContextKey;
 const MOTION_NE_NUDGE: f32 = 0.03;
 const LIGHT_5HT_NUDGE: f32 = 0.02;
 const GPS_DA_NUDGE: f32 = 0.04;
+const ROTATION_NE_NUDGE: f32 = 0.02;
 const BRIGHT_LUX_THRESHOLD: f32 = 500.0;
 const DIM_LUX_THRESHOLD: f32 = 50.0;
 // Motion state thresholds (accelerometer magnitude in m/s^2)
 const WALKING_THRESHOLD: f32 = 1.5;
 const RUNNING_THRESHOLD: f32 = 5.0;
 const VEHICLE_THRESHOLD: f32 = 10.0;
+// Ambient sound thresholds (dB)
+const QUIET_DB_THRESHOLD: f32 = 30.0;
+const LOUD_DB_THRESHOLD: f32 = 70.0;
+const AMBIENT_5HT_NUDGE: f32 = 0.02;
+const AMBIENT_NE_NUDGE: f32 = 0.03;
+// Social pressure nudges
+const SOCIAL_NE_NUDGE: f32 = 0.02;
+const SOCIAL_OT_DECAY: f32 = 0.01;
+// Media state nudges
+const MEDIA_MUSIC_5HT_NUDGE: f32 = 0.02;
+const MEDIA_SPEECH_DA_NUDGE: f32 = 0.02;
 
 /// Motion state derived from accelerometer magnitude.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -50,6 +62,8 @@ pub struct SensorSnapshot {
     pub proximity_near: bool,
     pub barometer_hpa: f32,
     pub gps_novelty: f32, // 0.0-1.0
+    /// Gyroscope rotation rate magnitude (rad/s).
+    pub rotation_rate: f32,
 }
 
 impl Default for SensorSnapshot {
@@ -60,8 +74,17 @@ impl Default for SensorSnapshot {
             proximity_near: false,
             barometer_hpa: 1013.25,
             gps_novelty: 0.0,
+            rotation_rate: 0.0,
         }
     }
+}
+
+/// Media playback state from the platform.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MediaState {
+    None = 0,
+    Music = 1,
+    Speech = 2,
 }
 
 /// Neuromodulator nudges computed from sensor data.
@@ -70,6 +93,7 @@ pub struct SensorNudges {
     pub dopamine_delta: f32,
     pub norepinephrine_delta: f32,
     pub serotonin_delta: f32,
+    pub oxytocin_delta: f32,
 }
 
 /// Sensor bridge: maintains current snapshot and derives neuromod nudges.
@@ -80,6 +104,14 @@ pub struct SensorBridge {
     motion_ema: f32,
     /// Consecutive frames spent stationary (for inactivity auto-detection).
     stationary_frames: u32,
+    /// Ambient sound level (dB). Set via `set_ambient_db()`.
+    ambient_db: f32,
+    /// Notification count from the platform. Set via `set_social_pressure()`.
+    notification_count: u32,
+    /// Media playback state. Set via `set_media_state()`.
+    media_state: MediaState,
+    /// Step counter delta (steps since last tick).
+    step_delta: u32,
 }
 
 impl SensorBridge {
@@ -90,6 +122,10 @@ impl SensorBridge {
             privacy_mode: false,
             motion_ema: 0.0,
             stationary_frames: 0,
+            ambient_db: 40.0,
+            notification_count: 0,
+            media_state: MediaState::None,
+            step_delta: 0,
         }
     }
 
@@ -108,19 +144,49 @@ impl SensorBridge {
             proximity_near,
             barometer_hpa: barometer.clamp(800.0, 1100.0),
             gps_novelty: gps_novelty.clamp(0.0, 1.0),
+            rotation_rate: self.snapshot.rotation_rate, // preserve gyro (set separately)
         };
         self.update_derived();
     }
 
+    /// Set gyroscope rotation rate from platform (rad/s magnitude).
+    pub fn set_gyroscope(&mut self, rotation_rate: f32) {
+        self.snapshot.rotation_rate = rotation_rate.max(0.0);
+    }
+
+    /// Set ambient sound level (dB). Only amplitude — no audio content stored.
+    pub fn set_ambient_db(&mut self, db: f32) {
+        self.ambient_db = db.clamp(0.0, 120.0);
+    }
+
+    /// Set notification count from platform (social pressure signal).
+    pub fn set_social_pressure(&mut self, notification_count: u32) {
+        self.notification_count = notification_count;
+    }
+
+    /// Set media playback state (0=None, 1=Music, 2=Speech).
+    pub fn set_media_state(&mut self, state: u8) {
+        self.media_state = match state {
+            1 => MediaState::Music,
+            2 => MediaState::Speech,
+            _ => MediaState::None,
+        };
+    }
+
+    /// Set step counter delta (steps since last tick).
+    pub fn set_step_delta(&mut self, steps: u32) {
+        self.step_delta = steps;
+    }
+
     fn update_derived(&mut self) {
-        // Motion EMA for smooth transitions
-        self.motion_ema = self.motion_ema * 0.8 + self.snapshot.accelerometer_magnitude * 0.2;
+        // Motion EMA for smooth transitions (alpha=0.4 → ~8 frames to reach threshold)
+        self.motion_ema = self.motion_ema * 0.6 + self.snapshot.accelerometer_magnitude * 0.4;
 
         self.motion_state = if self.motion_ema >= VEHICLE_THRESHOLD {
             MotionState::InVehicle
         } else if self.motion_ema >= RUNNING_THRESHOLD {
             MotionState::Running
-        } else if self.motion_ema >= WALKING_THRESHOLD {
+        } else if self.motion_ema >= WALKING_THRESHOLD || self.step_delta > 0 {
             MotionState::Walking
         } else {
             MotionState::Stationary
@@ -149,6 +215,17 @@ impl SensorBridge {
         };
         nudges.norepinephrine_delta = MOTION_NE_NUDGE * motion_factor;
 
+        // Step counter supplements motion detection — if steps detected, at least Walking
+        if self.step_delta > 0 && self.motion_state == MotionState::Stationary {
+            nudges.norepinephrine_delta += MOTION_NE_NUDGE * 0.5;
+        }
+
+        // Gyroscope rotation -> NE (spatial awareness/orientation changes)
+        if self.snapshot.rotation_rate > 0.5 {
+            nudges.norepinephrine_delta += ROTATION_NE_NUDGE
+                * (self.snapshot.rotation_rate / 5.0).min(1.0);
+        }
+
         // Light -> 5-HT (bright light boosts serotonin, dim suppresses)
         if self.snapshot.light_lux > BRIGHT_LUX_THRESHOLD {
             nudges.serotonin_delta = LIGHT_5HT_NUDGE;
@@ -158,6 +235,29 @@ impl SensorBridge {
 
         // GPS novelty -> DA (dopamine from exploration)
         nudges.dopamine_delta = GPS_DA_NUDGE * self.snapshot.gps_novelty;
+
+        // Ambient sound -> NE/5-HT (environmental arousal/calm)
+        if self.ambient_db > LOUD_DB_THRESHOLD {
+            nudges.norepinephrine_delta += AMBIENT_NE_NUDGE;
+        } else if self.ambient_db < QUIET_DB_THRESHOLD {
+            nudges.serotonin_delta += AMBIENT_5HT_NUDGE;
+        }
+
+        // Social pressure (notifications) -> NE/OT
+        if self.notification_count > 5 {
+            nudges.norepinephrine_delta += SOCIAL_NE_NUDGE;
+        }
+        if self.notification_count == 0 {
+            // Extended isolation — oxytocin decay signal
+            nudges.oxytocin_delta -= SOCIAL_OT_DECAY;
+        }
+
+        // Media state -> 5-HT/DA (emotional context)
+        match self.media_state {
+            MediaState::Music => nudges.serotonin_delta += MEDIA_MUSIC_5HT_NUDGE,
+            MediaState::Speech => nudges.dopamine_delta += MEDIA_SPEECH_DA_NUDGE,
+            MediaState::None => {}
+        }
 
         nudges
     }

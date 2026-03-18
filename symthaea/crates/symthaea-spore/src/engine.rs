@@ -175,6 +175,9 @@ pub struct SporeEngine {
     equation: MasterConsciousnessEquation,
     substrate_type: SubstrateType,
     substrate_feasibility: f64,
+    /// Raw feasibility from SubstrateRequirements (no validation overlay).
+    /// Used for embodiment input so consciousness isn't bottlenecked.
+    raw_feasibility: f64,
     evidence_level: EvidenceLevel,
     honest_confidence: f64,
     #[allow(dead_code)]
@@ -213,6 +216,11 @@ pub struct SporeEngine {
     ble_mesh: BleMesh,
     pub(crate) pairing: crate::pairing::PairingManager,
     sharing: SharingConfig,
+
+    /// Optional persistence storage.
+    storage: Option<Box<dyn crate::persistence::SporeStorage>>,
+    /// Auto-checkpoint interval in cycles (0 = disabled).
+    checkpoint_interval: u64,
 }
 
 impl SporeEngine {
@@ -243,10 +251,12 @@ impl SporeEngine {
             TextEncoder::new(TextEncoderConfig::default()).expect("TextEncoder init");
 
         let substrate_type = parse_substrate(&config.substrate);
-        let substrate_feasibility =
+        let raw_feasibility =
             substrate_requirements(&substrate_type).consciousness_feasibility();
-
+        // Apply validation overlay: raw_feasibility × honest_confidence
+        // This is the epistemically honest value shown in telemetry/reports.
         let (evidence_level, honest_confidence) = honest_confidence_for(&substrate_type);
+        let substrate_feasibility = raw_feasibility * honest_confidence;
 
         let harmonies = EightHarmonies::new();
 
@@ -259,6 +269,7 @@ impl SporeEngine {
             equation: MasterConsciousnessEquation::new(MasterEquationConfig::default()),
             substrate_type,
             substrate_feasibility,
+            raw_feasibility,
             evidence_level,
             honest_confidence,
             harmonies,
@@ -285,6 +296,8 @@ impl SporeEngine {
             ble_mesh: BleMesh::new(crate::config::BleMeshMode::Off),
             pairing: crate::pairing::PairingManager::new(crate::config::PairingMode::Off),
             sharing: SharingConfig::default(),
+            storage: None,
+            checkpoint_interval: 0,
         }
     }
 
@@ -373,6 +386,8 @@ impl SporeEngine {
                 (self.bath.noradrenaline.level + nudges.norepinephrine_delta).clamp(0.0, 1.0);
             self.bath.serotonin.level =
                 (self.bath.serotonin.level + nudges.serotonin_delta).clamp(0.0, 1.0);
+            self.bath.oxytocin.level =
+                (self.bath.oxytocin.level + nudges.oxytocin_delta).clamp(0.0, 1.0);
         }
 
         // BLE mesh → neuromodulator nudges (gated by privacy + wake state)
@@ -520,8 +535,23 @@ impl SporeEngine {
         // BLE mesh: tick for stale peer eviction + advertise update (privacy/wake gated)
         self.ble_mesh.tick(self.cycle_count);
 
-        // Pairing manager: tick for challenge expiry
+        // Pairing manager: tick for challenge expiry + emit PairingVerified to holon
         self.pairing.tick(self.cycle_count);
+        for msg in self.pairing.drain_outbound() {
+            if let crate::pairing::PairingOutbound::Ack { peer_id } = &msg {
+                if let Some(dev) = self.pairing.paired_devices().iter().find(|d| d.peer_id == *peer_id) {
+                    let pubkey_hex = dev.pubkey.iter().map(|b| format!("{b:02x}")).collect::<String>();
+                    self.holon_bridge.enqueue_outbound(
+                        crate::holon_bridge::HolonOutbound::PairingVerified {
+                            peer_id: *peer_id,
+                            pubkey_hex,
+                        },
+                    );
+                }
+            }
+            // TODO: transmit other outbound messages over BLE
+            let _ = msg;
+        }
         if !self.sensor_bridge.privacy_mode() && !wake.skip_topology() {
             let da = self.bath.dopamine.effective();
             let ne = self.bath.noradrenaline.effective();
@@ -559,6 +589,11 @@ impl SporeEngine {
             }
         }
 
+        // Auto-checkpoint
+        if self.checkpoint_interval > 0 && self.cycle_count % self.checkpoint_interval == 0 {
+            self.save_checkpoint();
+        }
+
         CycleResult {
             consciousness_level,
             cycle: self.cycle_count,
@@ -569,6 +604,71 @@ impl SporeEngine {
             epistemic_status,
             harmony_alignment,
         }
+    }
+
+    // ── Persistence ──────────────────────────────────────────────────
+
+    /// Set the persistence storage backend.
+    pub fn set_storage(&mut self, storage: Box<dyn crate::persistence::SporeStorage>) {
+        self.storage = Some(storage);
+    }
+
+    /// Set the auto-checkpoint interval in cycles (0 = disabled).
+    pub fn set_checkpoint_interval(&mut self, interval: u64) {
+        self.checkpoint_interval = interval;
+    }
+
+    /// Create a checkpoint of the current engine state.
+    pub fn checkpoint(&self) -> crate::persistence::SporeCheckpoint {
+        crate::persistence::SporeCheckpoint {
+            cycle: self.cycle_count,
+            consciousness_level: self.last_consciousness,
+            neuromodulators: [
+                self.bath.dopamine.level,
+                self.bath.noradrenaline.level,
+                self.bath.serotonin.level,
+                self.bath.oxytocin.level,
+            ],
+            semantic_entries: vec![], // Semantic memory serialization can be extended later
+            episodic_entries: vec![], // Episodic memory serialization can be extended later
+            format_version: crate::persistence::SporeCheckpoint::FORMAT_VERSION,
+        }
+    }
+
+    /// Restore engine state from a checkpoint.
+    pub fn restore(&mut self, checkpoint: &crate::persistence::SporeCheckpoint) {
+        self.cycle_count = checkpoint.cycle;
+        self.last_consciousness = checkpoint.consciousness_level;
+        self.bath.dopamine.level = checkpoint.neuromodulators[0];
+        self.bath.noradrenaline.level = checkpoint.neuromodulators[1];
+        self.bath.serotonin.level = checkpoint.neuromodulators[2];
+        self.bath.oxytocin.level = checkpoint.neuromodulators[3];
+    }
+
+    /// Save current state to storage. Returns true on success.
+    pub fn save_checkpoint(&mut self) -> bool {
+        let cp = self.checkpoint();
+        if let Some(ref mut storage) = self.storage {
+            let bytes = cp.to_bytes();
+            storage.save("spore_checkpoint", &bytes)
+        } else {
+            false
+        }
+    }
+
+    /// Load and restore state from storage. Returns true on success.
+    pub fn load_checkpoint(&mut self) -> bool {
+        let bytes = match &self.storage {
+            Some(storage) => storage.load("spore_checkpoint"),
+            None => return false,
+        };
+        if let Some(bytes) = bytes {
+            if let Some(cp) = crate::persistence::SporeCheckpoint::from_bytes(&bytes) {
+                self.restore(&cp);
+                return true;
+            }
+        }
+        false
     }
 
     /// Compute consciousness level from current state.
@@ -598,13 +698,16 @@ impl SporeEngine {
             working_memory,
             attention: self.bath.noradrenaline.effective() as f64,
             recurrence: 0.7,
-            embodiment: self.substrate_feasibility * 0.8,
+            // Use raw feasibility (0.74 for SiliconDigital) so embodiment doesn't
+            // bottleneck consciousness. Epistemic honesty is carried in the disclaimer.
+            embodiment: self.raw_feasibility * 0.8,
             knowledge,
             synchrony,
         };
         let result = self.equation.compute(&inputs);
-        let c =
-            (result.consciousness_level as f32 * self.substrate_feasibility as f32).clamp(0.0, 1.0);
+        // No longer dual-scaling by substrate_feasibility — the embodiment input
+        // already accounts for substrate quality.
+        let c = (result.consciousness_level as f32).clamp(0.0, 1.0);
         self.last_consciousness = c;
         c
     }
@@ -735,6 +838,31 @@ impl SporeEngine {
     /// Whether privacy mode is active (face-down proximity).
     pub fn privacy_mode(&self) -> bool {
         self.sensor_bridge.privacy_mode()
+    }
+
+    /// Set gyroscope rotation rate (rad/s magnitude).
+    pub fn set_gyroscope(&mut self, rotation_rate: f32) {
+        self.sensor_bridge.set_gyroscope(rotation_rate);
+    }
+
+    /// Set ambient sound level (dB). Only amplitude — no audio content stored.
+    pub fn set_ambient_db(&mut self, db: f32) {
+        self.sensor_bridge.set_ambient_db(db);
+    }
+
+    /// Set social pressure from notification count.
+    pub fn set_social_pressure(&mut self, notification_count: u32) {
+        self.sensor_bridge.set_social_pressure(notification_count);
+    }
+
+    /// Set media playback state (0=None, 1=Music, 2=Speech).
+    pub fn set_media_state(&mut self, state: u8) {
+        self.sensor_bridge.set_media_state(state);
+    }
+
+    /// Set step counter delta (steps since last tick).
+    pub fn set_step_delta(&mut self, steps: u32) {
+        self.sensor_bridge.set_step_delta(steps);
     }
 
     /// Get a consciousness compass snapshot as JSON.
@@ -1386,8 +1514,10 @@ impl SporeEngine {
 
     /// Build the epistemic status that accompanies every cycle result.
     fn build_epistemic_status(&self) -> EpistemicStatus {
+        // Gap between hypothetical feasibility and evidence confidence.
+        // Uses raw_feasibility (not validation-overlaid) to show the divergence.
         let feasibility_gap =
-            (self.substrate_feasibility as f32 - self.honest_confidence as f32).abs();
+            (self.raw_feasibility as f32 - self.honest_confidence as f32).abs();
 
         let disclaimer = format!(
             "SIMULATED consciousness on {} substrate. \
@@ -1472,11 +1602,12 @@ impl SporeEngine {
     pub fn set_substrate(&mut self, substrate: &str) {
         self.config.substrate = substrate.to_string();
         self.substrate_type = parse_substrate(substrate);
-        self.substrate_feasibility =
+        self.raw_feasibility =
             substrate_requirements(&self.substrate_type).consciousness_feasibility();
         let (evidence_level, honest_confidence) = honest_confidence_for(&self.substrate_type);
         self.evidence_level = evidence_level;
         self.honest_confidence = honest_confidence;
+        self.substrate_feasibility = self.raw_feasibility * honest_confidence;
     }
 
     /// Inject a neuromodulator impulse.

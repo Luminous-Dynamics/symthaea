@@ -203,6 +203,23 @@ pub struct ShadowTelemetry {
     pub shadow_to_narrative_ratio: f32,
 }
 
+// ── Shadow Snapshot (Persistence) ────────────────────────────────────────
+
+/// Serializable snapshot of shadow detector state for session persistence.
+///
+/// Captures active fragments, pressure history, and dream queue.
+/// HDC encodings within fragments are skipped (serde(skip) on BinaryHV).
+/// Config thresholds are NOT included — they come from defaults on restore.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ShadowSnapshot {
+    /// Active shadow fragments (HDC encodings will be None after deserialization).
+    pub fragments: Vec<ShadowFragment>,
+    /// Rolling pressure history for trend computation.
+    pub pressure_history: Vec<f32>,
+    /// Dream queue indices.
+    pub dream_queue: Vec<usize>,
+}
+
 // ── Shadow Detector ──────────────────────────────────────────────────────
 
 /// Detects and tracks Jungian shadow dynamics using predictive coding signals.
@@ -406,6 +423,34 @@ impl ShadowDetector {
     /// Dream queue depth.
     pub fn dream_queue_depth(&self) -> usize {
         self.dream_queue.len()
+    }
+
+    /// Create a serializable snapshot of shadow state for session persistence.
+    ///
+    /// Captures fragments (with HDC vectors skipped via serde(skip)),
+    /// pressure history, and dream queue state. Config thresholds are NOT
+    /// persisted — they come from the detector's defaults on restore.
+    pub fn snapshot(&self) -> ShadowSnapshot {
+        ShadowSnapshot {
+            fragments: self.fragments.clone(),
+            pressure_history: self.pressure_history.iter().copied().collect(),
+            dream_queue: self.dream_queue.iter().copied().collect(),
+        }
+    }
+
+    /// Restore shadow state from a persisted snapshot.
+    ///
+    /// Replaces current fragments, pressure history, and dream queue.
+    /// HDC encodings will be `None` after restore (serde(skip)) — they
+    /// get regenerated on next `process()` call when content matches.
+    pub fn restore(&mut self, snapshot: ShadowSnapshot) {
+        self.fragments = snapshot.fragments;
+        self.pressure_history = VecDeque::from(snapshot.pressure_history);
+        let max = self.pressure_history_max;
+        while self.pressure_history.len() > max {
+            self.pressure_history.pop_front();
+        }
+        self.dream_queue = VecDeque::from(snapshot.dream_queue);
     }
 
     // ── Private ──────────────────────────────────────────────────────────
@@ -884,6 +929,29 @@ mod tests {
     }
 
     #[test]
+    fn test_snapshot_restore_roundtrip() {
+        let mut det = ShadowDetector::new();
+        for i in 0..15 {
+            det.process(i * 10, 0.5, -0.8, 0.7, "recurring painful content", 0.1);
+        }
+        let pre_count = det.fragment_count();
+        let pre_pressure = det.total_pressure();
+        assert!(pre_count > 0);
+
+        let snap = det.snapshot();
+        let json = serde_json::to_string(&snap).expect("snapshot should serialize");
+
+        let restored_snap: ShadowSnapshot =
+            serde_json::from_str(&json).expect("snapshot should deserialize");
+
+        let mut det2 = ShadowDetector::new();
+        det2.restore(restored_snap);
+
+        assert_eq!(det2.fragment_count(), pre_count);
+        assert!((det2.total_pressure() - pre_pressure).abs() < 0.01);
+    }
+
+    #[test]
     fn test_telemetry_all_finite() {
         let mut detector = ShadowDetector::new();
         for i in 0..10 {
@@ -897,5 +965,113 @@ mod tests {
         assert!(t.pressure_trend.is_finite());
         assert!(t.best_dream_phi_improvement.is_finite());
         assert!(t.shadow_to_narrative_ratio.is_finite());
+    }
+}
+
+#[cfg(test)]
+mod proptests {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        /// Shadow pressure must never go negative regardless of inputs.
+        #[test]
+        fn pressure_never_negative(
+            cycles in 1u64..200,
+            pe in 0.0f32..2.0,
+            valence in -1.0f32..1.0,
+            arousal in 0.0f32..1.0,
+            narrative_coh in 0.0f32..1.0,
+        ) {
+            let mut det = ShadowDetector::new();
+            for c in 0..cycles {
+                let t = det.process(c, pe, valence, arousal, "distress pain", narrative_coh);
+                prop_assert!(
+                    t.total_shadow_pressure >= 0.0,
+                    "pressure was {} at cycle {}", t.total_shadow_pressure, c,
+                );
+            }
+        }
+
+        /// Fragment count must stay within the configured maximum (64).
+        #[test]
+        fn fragments_bounded(
+            cycles in 1u64..500,
+            pe in 0.1f32..1.5,
+            valence in -1.0f32..0.0,
+        ) {
+            let mut det = ShadowDetector::new();
+            for c in 0..cycles {
+                det.process(c, pe, valence, 0.7, &format!("unique content {}", c), 0.2);
+            }
+            prop_assert!(
+                det.fragment_count() <= 64,
+                "fragments exceeded max: {}", det.fragment_count(),
+            );
+        }
+
+        /// Dormant decay: after N inactive cycles, pressure must monotonically decrease.
+        #[test]
+        fn decay_monotonic(
+            seed_cycles in 5u64..20,
+            idle_cycles in 250u64..600,
+        ) {
+            let mut det = ShadowDetector::new();
+            // Seed some shadow fragments
+            for c in 0..seed_cycles {
+                det.process(c, 0.8, -0.9, 0.7, "painful memory", 0.1);
+            }
+            let pressure_before_idle = det.process(seed_cycles, 0.8, -0.9, 0.7, "painful memory", 0.1)
+                .total_shadow_pressure;
+
+            // Run idle cycles with low PE (below threshold) — shadow should decay
+            let mut last_pressure = pressure_before_idle;
+            for c in (seed_cycles + 1)..(seed_cycles + 1 + idle_cycles) {
+                let t = det.process(c, 0.01, 0.0, 0.1, "neutral calm ok", 0.9);
+                // After enough idle cycles (200+ dormancy), pressure should stop growing
+                if c > seed_cycles + 250 {
+                    prop_assert!(
+                        t.total_shadow_pressure <= last_pressure + 0.01,
+                        "pressure grew after dormancy: {} -> {} at cycle {}",
+                        last_pressure, t.total_shadow_pressure, c,
+                    );
+                }
+                last_pressure = t.total_shadow_pressure;
+            }
+        }
+
+        /// Dream queue depth is always ≤ 8 (MAX_DREAM_QUEUE).
+        #[test]
+        fn dream_queue_bounded(
+            cycles in 1u64..300,
+            pe in 0.2f32..1.5,
+        ) {
+            let mut det = ShadowDetector::new();
+            for c in 0..cycles {
+                let t = det.process(c, pe, -0.8, 0.7, &format!("shadow item {}", c), 0.2);
+                prop_assert!(
+                    t.dream_queue_depth <= 8,
+                    "dream queue exceeded 8: {}", t.dream_queue_depth,
+                );
+            }
+        }
+
+        /// All telemetry fields are finite for any valid inputs.
+        #[test]
+        fn telemetry_always_finite(
+            pe in 0.0f32..5.0,
+            valence in -1.0f32..1.0,
+            arousal in 0.0f32..1.0,
+            narrative in 0.0f32..1.0,
+        ) {
+            let mut det = ShadowDetector::new();
+            let t = det.process(0, pe, valence, arousal, "test input", narrative);
+            prop_assert!(t.total_shadow_pressure.is_finite());
+            prop_assert!(t.peak_fragment_pressure.is_finite());
+            prop_assert!(t.shadow_mean_prediction_error.is_finite());
+            prop_assert!(t.pressure_trend.is_finite());
+            prop_assert!(t.best_dream_phi_improvement.is_finite());
+            prop_assert!(t.shadow_to_narrative_ratio.is_finite());
+        }
     }
 }

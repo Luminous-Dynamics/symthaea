@@ -56,6 +56,13 @@ void    spore_engine_set_sensors(void *engine, float accel, float light,
 uint8_t spore_engine_motion_state(const void *engine);
 uint8_t spore_engine_privacy_mode(const void *engine);
 
+/* Expanded senses */
+void spore_engine_set_gyroscope(void *engine, float rotation_rate);
+void spore_engine_set_step_delta(void *engine, uint32_t steps);
+void spore_engine_set_ambient_db(void *engine, float db);
+void spore_engine_set_social_pressure(void *engine, uint32_t notification_count);
+void spore_engine_set_media_state(void *engine, uint8_t state);
+
 /* Compass */
 char *spore_engine_compass_json(const void *engine);
 
@@ -317,6 +324,46 @@ Java_io_symthaea_spore_NativeBindings_privacyMode(JNIEnv *env, jclass clazz,
                                                   jlong handle) {
     (void)env; (void)clazz;
     return spore_engine_privacy_mode((const void *)(intptr_t)handle) != 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * JNI bindings — Expanded senses
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+JNIEXPORT void JNICALL
+Java_io_symthaea_spore_NativeBindings_setGyroscope(JNIEnv *env, jclass clazz,
+                                                   jlong handle, jfloat rotationRate) {
+    (void)env; (void)clazz;
+    spore_engine_set_gyroscope((void *)(intptr_t)handle, rotationRate);
+}
+
+JNIEXPORT void JNICALL
+Java_io_symthaea_spore_NativeBindings_setStepDelta(JNIEnv *env, jclass clazz,
+                                                   jlong handle, jint steps) {
+    (void)env; (void)clazz;
+    spore_engine_set_step_delta((void *)(intptr_t)handle, (uint32_t)steps);
+}
+
+JNIEXPORT void JNICALL
+Java_io_symthaea_spore_NativeBindings_setAmbientDb(JNIEnv *env, jclass clazz,
+                                                   jlong handle, jfloat db) {
+    (void)env; (void)clazz;
+    spore_engine_set_ambient_db((void *)(intptr_t)handle, db);
+}
+
+JNIEXPORT void JNICALL
+Java_io_symthaea_spore_NativeBindings_setSocialPressure(JNIEnv *env, jclass clazz,
+                                                        jlong handle,
+                                                        jint notificationCount) {
+    (void)env; (void)clazz;
+    spore_engine_set_social_pressure((void *)(intptr_t)handle, (uint32_t)notificationCount);
+}
+
+JNIEXPORT void JNICALL
+Java_io_symthaea_spore_NativeBindings_setMediaState(JNIEnv *env, jclass clazz,
+                                                    jlong handle, jint state) {
+    (void)env; (void)clazz;
+    spore_engine_set_media_state((void *)(intptr_t)handle, (uint8_t)state);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

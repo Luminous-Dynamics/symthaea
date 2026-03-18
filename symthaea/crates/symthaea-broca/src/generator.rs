@@ -304,7 +304,9 @@ impl BrocaGenerator {
         let mut prev_token = self.tokenizer.thought_id; // Start with <thought> token
         let mut eos_terminated = false;
         let mut veto_triggered = false;
-        let mut text = String::new();
+        // Accumulate raw bytes for proper UTF-8 decode (byte tokens like <0xE2>
+        // are only valid when combined with subsequent bytes)
+        let mut text_bytes: Vec<u8> = Vec::new();
         let rep_penalty = self.config.repetition_penalty;
         let min_veto_pos = self.config.gating.min_veto_position;
         let max_vetoes = self.config.gating.max_vetoes;
@@ -429,7 +431,7 @@ impl BrocaGenerator {
                     this_veto = true;
                     veto_count += 1;
                     tokens_since_veto = 0;
-                    text.push_str(&self.config.veto_hesitation);
+                    text_bytes.extend_from_slice(self.config.veto_hesitation.as_bytes());
                     on_token(&self.config.veto_hesitation);
                     // Reset network state
                     self.controller.reset();
@@ -470,7 +472,18 @@ impl BrocaGenerator {
             // Skip special tokens in output
             if !self.tokenizer.is_special(next_token) {
                 let token_str = self.tokenizer.token_str(next_token);
-                text.push_str(token_str);
+                // Decode byte tokens (<0xHH>) to raw bytes for proper UTF-8
+                if token_str.starts_with("<0x") && token_str.ends_with('>')
+                    && token_str.len() == 6
+                {
+                    if let Ok(byte) = u8::from_str_radix(&token_str[3..5], 16) {
+                        text_bytes.push(byte);
+                    } else {
+                        text_bytes.extend_from_slice(token_str.as_bytes());
+                    }
+                } else {
+                    text_bytes.extend_from_slice(token_str.as_bytes());
+                }
                 on_token(token_str);
             }
 
@@ -479,6 +492,8 @@ impl BrocaGenerator {
         }
 
         let final_coherence = self.coherence_feedback.coherence();
+        let text = String::from_utf8(text_bytes)
+            .unwrap_or_else(|e| String::from_utf8_lossy(e.as_bytes()).into_owned());
 
         GenerationResult {
             text,

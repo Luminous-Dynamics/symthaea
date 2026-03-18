@@ -352,6 +352,61 @@ pub unsafe extern "C" fn spore_engine_privacy_mode(engine: *const SporeEngine) -
     }
 }
 
+/// Set gyroscope rotation rate (rad/s magnitude).
+///
+/// # Safety
+/// `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn spore_engine_set_gyroscope(engine: *mut SporeEngine, rotation_rate: f32) {
+    let engine = unsafe { &mut *engine };
+    engine.set_gyroscope(rotation_rate);
+}
+
+/// Set step counter delta (steps since last tick).
+///
+/// # Safety
+/// `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn spore_engine_set_step_delta(engine: *mut SporeEngine, steps: u32) {
+    let engine = unsafe { &mut *engine };
+    engine.set_step_delta(steps);
+}
+
+/// Set ambient sound level (dB). Only amplitude — no audio content stored.
+/// Sovereign privacy: never records frequency or content, only amplitude.
+///
+/// # Safety
+/// `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn spore_engine_set_ambient_db(engine: *mut SporeEngine, db: f32) {
+    let engine = unsafe { &mut *engine };
+    engine.set_ambient_db(db);
+}
+
+/// Set social pressure from notification count.
+///
+/// # Safety
+/// `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn spore_engine_set_social_pressure(
+    engine: *mut SporeEngine,
+    notification_count: u32,
+) {
+    let engine = unsafe { &mut *engine };
+    engine.set_social_pressure(notification_count);
+}
+
+/// Set media playback state (0=None, 1=Music, 2=Speech).
+/// No content access — just playback state.
+///
+/// # Safety
+/// `engine` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn spore_engine_set_media_state(engine: *mut SporeEngine, state: u8) {
+    let engine = unsafe { &mut *engine };
+    engine.set_media_state(state);
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // Consciousness compass
 // ═══════════════════════════════════════════════════════════════════════════════

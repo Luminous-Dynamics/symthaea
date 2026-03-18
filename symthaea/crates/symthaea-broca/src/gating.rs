@@ -172,10 +172,11 @@ impl Default for GatingConfig {
             arousal_position_threshold: 10,
             low_warmth_threshold: 0.3,
             base_max_tokens: 128,
-            // Semantic veto — raised from 0.25 to 0.15. The old threshold fired
-            // constantly early in generation (CfC output similarity is naturally
-            // low for the first few tokens), producing "-- wait," after every word.
-            veto_threshold: 0.15,
+            // Semantic veto — lowered from 0.15 to 0.003. After BPTT training,
+            // CfC output is in a different representational space than thought input,
+            // giving baseline coherence of ~0.006. A threshold of 0.003 fires only
+            // when coherence drops to half its normal level (genuine drift).
+            veto_threshold: 0.003,
             min_veto_position: 2,
             max_vetoes: 1,
             veto_refractory: 8,

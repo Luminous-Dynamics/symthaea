@@ -354,6 +354,54 @@ pub struct SpectrumInfo {
     pub tier_loss_ema: [f64; 3],
 }
 
+/// Immune system / defense snapshot.
+#[derive(Serialize, Deserialize, Default)]
+pub struct ImmuneInfo {
+    /// Current safety level: "GREEN", "YELLOW", "ORANGE", "RED".
+    #[serde(default)]
+    pub safety_level: String,
+    /// Guardian posture: "Normal", "Cautious", "Defensive", "Emergency", "Hold".
+    #[serde(default)]
+    pub guardian_posture: String,
+    /// Whether guardian patrol is active.
+    #[serde(default)]
+    pub patrol_active: bool,
+    /// Number of active threat signals (sentinel).
+    #[serde(default)]
+    pub active_threats: usize,
+    /// Highest threat severity this cycle.
+    #[serde(default)]
+    pub max_severity: f32,
+    /// Aggregate threat level (0.0–1.0).
+    #[serde(default)]
+    pub threat_level: f32,
+    /// Number of quarantined peers.
+    #[serde(default)]
+    pub quarantined_peers: usize,
+    /// Stored threat patterns in immune memory.
+    #[serde(default)]
+    pub threat_patterns: usize,
+    /// Learning rate multiplier from safety enforcement.
+    #[serde(default = "default_one")]
+    pub lr_multiplier: f32,
+    /// Exploration multiplier from safety enforcement.
+    #[serde(default = "default_one")]
+    pub exploration_multiplier: f32,
+    /// Whether motor output is halted.
+    #[serde(default)]
+    pub motor_halt: bool,
+    /// Collective immune response active across swarm.
+    #[serde(default)]
+    pub immune_response_active: bool,
+    /// Emergency cycles accumulated.
+    #[serde(default)]
+    pub emergency_cycles: u64,
+}
+
+fn default_one() -> f32 {
+    1.0
+}
+
 /// Perception and attention snapshot.
 #[derive(Serialize, Deserialize, Default)]
 pub struct PerceptionInfo {
@@ -486,6 +534,8 @@ pub struct PulseSnapshot {
     pub reasoning: ReasoningInfo,
     #[serde(default)]
     pub dream: DreamInfo,
+    #[serde(default)]
+    pub immune: ImmuneInfo,
 }
 
 /// Computed delta between two pulse snapshots for the comparison view.
@@ -1400,6 +1450,21 @@ fn main() -> Result<()> {
             is_consolidating: m.is_consolidating,
             codebook_size: m.memory.resonator_codebook_size,
             codebook_diversity: m.memory.codebook_diversity,
+        },
+        immune: ImmuneInfo {
+            safety_level: m.immune_safety_level.clone(),
+            guardian_posture: m.immune_guardian_posture.clone(),
+            patrol_active: m.immune_patrol_active,
+            active_threats: m.immune_active_threats as usize,
+            max_severity: m.immune_max_severity,
+            threat_level: m.immune_threat_level,
+            quarantined_peers: m.immune_quarantined_peers as usize,
+            threat_patterns: m.immune_threat_patterns as usize,
+            lr_multiplier: m.immune_lr_multiplier,
+            exploration_multiplier: m.immune_exploration_multiplier,
+            motor_halt: m.immune_motor_halt,
+            immune_response_active: m.immune_response_active,
+            emergency_cycles: m.immune_emergency_cycles,
         },
     };
 

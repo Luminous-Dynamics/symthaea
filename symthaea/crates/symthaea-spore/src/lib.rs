@@ -50,6 +50,7 @@ pub mod holon_bridge;
 pub mod memory;
 pub mod metabolism;
 pub mod pairing;
+pub mod persistence;
 pub mod sensor_bridge;
 pub mod topology;
 

@@ -16,9 +16,9 @@ use symthaea_psych_bench::harness::cognitive_profile::CognitiveProfile;
 use symthaea_types::N_HARMONIES;
 
 use crate::{
-    Anomaly, CantorInfo, DreamInfo, DriveInfo, GovernanceInfo, IntegrityInfo, KnowledgeInfo,
-    LearningInfo, MoralCompass, Narrative, NeuroBath, PerceptionInfo, PulseDelta, PulseSnapshot,
-    ReasoningInfo, SparklinePoint, SubstrateInfo, SwarmInfo, Vitals,
+    Anomaly, CantorInfo, DreamInfo, DriveInfo, GovernanceInfo, ImmuneInfo, IntegrityInfo,
+    KnowledgeInfo, LearningInfo, MoralCompass, Narrative, NeuroBath, PerceptionInfo, PulseDelta,
+    PulseSnapshot, ReasoningInfo, SparklinePoint, SubstrateInfo, SwarmInfo, Vitals,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -464,6 +464,7 @@ pub fn generate_pulse_html(
     write_learning_pane(&mut html, &current.learning);
     write_reasoning_pane(&mut html, &current.reasoning);
     write_dream_pane(&mut html, &current.dream);
+    write_immune_pane(&mut html, &current.immune);
     write_narrative_pane(&mut html, narrative);
     if !timeline.is_empty() {
         write_timeline_pane(&mut html, timeline, current);
@@ -2878,6 +2879,78 @@ fn write_narrative_pane(html: &mut String, narrative: &Narrative) {
 </div>
 "#,
         narrative.consciousness_state, narrative.error_pattern, narrative.selected_strategy
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Pane 20: Immune System
+// ═══════════════════════════════════════════════════════════════════════════════
+
+fn write_immune_pane(html: &mut String, immune: &super::ImmuneInfo) {
+    let active = !immune.safety_level.is_empty() && immune.safety_level != "GREEN";
+
+    let (status_label, status_color) = if immune.safety_level == "RED" {
+        ("EMERGENCY", "#e05555")
+    } else if immune.safety_level == "ORANGE" {
+        ("INTERVENTION", "#e08040")
+    } else if immune.safety_level == "YELLOW" {
+        ("ELEVATED", "#e8c547")
+    } else if immune.active_threats > 0 {
+        ("VIGILANT", "#7ec8a0")
+    } else {
+        ("NORMAL", "#7ec8a0")
+    };
+
+    let shield = if immune.motor_halt {
+        "&#x1F6D1;" // stop sign
+    } else if active {
+        "&#x1F6E1;" // shield
+    } else {
+        "&#x2705;" // checkmark
+    };
+
+    let _ = write!(
+        html,
+        r##"<div class="pane">
+<h2>{shield} Immune System</h2>
+<div style="text-align:center;margin-bottom:12px">
+  <span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:{color};box-shadow:0 0 12px {color};margin-right:8px;vertical-align:middle"></span>
+  <span style="color:{color};font-weight:bold;font-size:1.1em;vertical-align:middle">{label}</span>
+</div>
+<table style="width:100%;font-size:0.88em">
+<tr><td>Safety Level</td><td style="text-align:right;color:{color};font-weight:bold">{safety}</td></tr>
+<tr><td>Guardian Posture</td><td style="text-align:right">{posture}</td></tr>
+<tr><td>Patrol Active</td><td style="text-align:right">{patrol}</td></tr>
+<tr><td>Active Threats</td><td style="text-align:right;color:{threat_color}">{threats}</td></tr>
+<tr><td>Threat Level</td><td style="text-align:right">{threat_level:.2}</td></tr>
+<tr><td>Quarantined Peers</td><td style="text-align:right">{quarantined}</td></tr>
+<tr><td>Threat Patterns</td><td style="text-align:right">{patterns}</td></tr>
+<tr><td>LR Multiplier</td><td style="text-align:right;color:{lr_color}">{lr:.2}×</td></tr>
+<tr><td>Explore Multiplier</td><td style="text-align:right">{explore:.2}×</td></tr>
+<tr><td>Motor Halt</td><td style="text-align:right;color:{halt_color}">{halt}</td></tr>
+<tr><td>Immune Response</td><td style="text-align:right">{immune_active}</td></tr>
+<tr><td>Emergency Cycles</td><td style="text-align:right">{emergency}</td></tr>
+</table>
+</div>
+"##,
+        shield = shield,
+        color = status_color,
+        label = status_label,
+        safety = if immune.safety_level.is_empty() { "GREEN" } else { &immune.safety_level },
+        posture = if immune.guardian_posture.is_empty() { "Hold" } else { &immune.guardian_posture },
+        patrol = if immune.patrol_active { "Yes" } else { "No" },
+        threat_color = if immune.active_threats > 0 { "#c76b5a" } else { "#8a9a8a" },
+        threats = immune.active_threats,
+        threat_level = immune.threat_level,
+        quarantined = immune.quarantined_peers,
+        patterns = immune.threat_patterns,
+        lr_color = if immune.lr_multiplier < 1.0 { "#e8c547" } else { "#8a9a8a" },
+        lr = immune.lr_multiplier,
+        explore = immune.exploration_multiplier,
+        halt_color = if immune.motor_halt { "#e05555" } else { "#8a9a8a" },
+        halt = if immune.motor_halt { "HALTED" } else { "Active" },
+        immune_active = if immune.immune_response_active { "ACTIVE" } else { "Standby" },
+        emergency = immune.emergency_cycles,
     );
 }
 

@@ -41,4 +41,4 @@ pub use formulation::CaseFormulation;
 pub use narrative_integration::{NarrativeFragment, TherapeuticNarrative};
 pub use safety::{CrisisAlert, CrisisDetector, CrisisType, EscalationAction, SafetyPlan};
 pub use scope_guard::{ScopeGuard, ScopeViolation};
-pub use shadow::{ShadowDetector, ShadowTelemetry};
+pub use shadow::{ShadowDetector, ShadowSnapshot, ShadowTelemetry};

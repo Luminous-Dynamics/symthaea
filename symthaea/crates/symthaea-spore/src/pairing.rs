@@ -337,6 +337,11 @@ impl PairingManager {
         self.paired_devices.len()
     }
 
+    /// Get a read-only view of paired devices.
+    pub fn paired_devices(&self) -> &[PairedDevice] {
+        &self.paired_devices
+    }
+
     /// Get the number of pending challenges.
     pub fn pending_count(&self) -> usize {
         self.pending_challenges.len()

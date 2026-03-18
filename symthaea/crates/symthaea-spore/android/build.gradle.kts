@@ -1,12 +1,14 @@
 plugins {
-    id("com.android.library")
-    id("org.jetbrains.kotlin.android")
-    id("org.jetbrains.kotlin.plugin.serialization")
+    id("com.android.library") version "8.2.2"
+    id("com.android.application") version "8.2.2" apply false
+    id("org.jetbrains.kotlin.android") version "1.9.22"
+    id("org.jetbrains.kotlin.plugin.serialization") version "1.9.22"
 }
 
 android {
     namespace = "io.symthaea.spore"
     compileSdk = 34
+    ndkVersion = "27.0.12077973"
 
     defaultConfig {
         minSdk = 24
@@ -14,23 +16,14 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        externalNativeBuild {
-            cmake {
-                cppFlags("")
-            }
-        }
-
         ndk {
             abiFilters += listOf("arm64-v8a")
         }
     }
 
-    externalNativeBuild {
-        cmake {
-            path = file("src/main/cpp/CMakeLists.txt")
-            version = "3.22.1"
-        }
-    }
+    // Native build is done outside Gradle (build-jni.sh compiles spore_jni.c
+    // with NDK clang and copies libspore_jni.so to jniLibs/).
+    // This avoids AGP trying to install CMake into the read-only Nix store.
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

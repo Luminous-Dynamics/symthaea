@@ -127,7 +127,7 @@ impl HolonBridge {
 
         if self.cycles_since_heartbeat >= HEARTBEAT_INTERVAL {
             self.cycles_since_heartbeat = 0;
-            self.enqueue(HolonOutbound::Heartbeat {
+            self.enqueue_outbound(HolonOutbound::Heartbeat {
                 consciousness_level,
                 wake_state,
                 cycle,
@@ -139,7 +139,7 @@ impl HolonBridge {
             let copy_len = attention_slice.len().min(CV_ATTENTION_DIM);
             attention[..copy_len].copy_from_slice(&attention_slice[..copy_len]);
 
-            self.enqueue(HolonOutbound::ConsciousnessVector(
+            self.enqueue_outbound(HolonOutbound::ConsciousnessVector(
                 SporeConsciousnessVector {
                     attention,
                     phi,
@@ -157,7 +157,7 @@ impl HolonBridge {
         if self.mode != HolonSyncMode::FullSync {
             return;
         }
-        self.enqueue(HolonOutbound::TaskRequest {
+        self.enqueue_outbound(HolonOutbound::TaskRequest {
             task_type: task_type.to_string(),
             payload: payload.to_string(),
         });
@@ -168,7 +168,7 @@ impl HolonBridge {
         if self.mode != HolonSyncMode::FullSync {
             return;
         }
-        self.enqueue(HolonOutbound::KnowledgeOffer {
+        self.enqueue_outbound(HolonOutbound::KnowledgeOffer {
             topic: topic.to_string(),
             embedding,
         });
@@ -237,7 +237,8 @@ impl HolonBridge {
         self.outbound.len()
     }
 
-    fn enqueue(&mut self, msg: HolonOutbound) {
+    /// Enqueue an outbound message (crate-internal).
+    pub(crate) fn enqueue_outbound(&mut self, msg: HolonOutbound) {
         if self.outbound.len() >= OUTBOUND_QUEUE_CAP {
             self.outbound.pop_front();
         }
