@@ -43,6 +43,12 @@ cp "$PKG_DIR/symthaea_spore.js" "$DEPLOY_DIR/pkg/"
 cp "$PKG_DIR/symthaea_spore.d.ts" "$DEPLOY_DIR/pkg/"
 cp "$PKG_DIR/symthaea_spore_bg.wasm.d.ts" "$DEPLOY_DIR/pkg/"
 
+# Add Broca trained checkpoint (~2.5MB, loaded via fetch at runtime)
+if [[ -f "$WWW_DIR/broca-spore-v1.bin" ]]; then
+    cp "$WWW_DIR/broca-spore-v1.bin" "$DEPLOY_DIR/"
+    echo "[deploy] Broca checkpoint: $(du -h "$WWW_DIR/broca-spore-v1.bin" | cut -f1)"
+fi
+
 # Add ETHICS.md if it exists
 if [[ -f "$SCRIPT_DIR/ETHICS.md" ]]; then
     cp "$SCRIPT_DIR/ETHICS.md" "$DEPLOY_DIR/"

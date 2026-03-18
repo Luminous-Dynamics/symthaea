@@ -403,6 +403,9 @@ impl SporeEngine {
             }
         }
 
+        let semantic_cap = config.semantic_memory_capacity;
+        let episodic_cap = config.episodic_memory_capacity;
+
         Self {
             config,
             cycle_count: 0,
@@ -419,7 +422,7 @@ impl SporeEngine {
             last_consciousness: 0.0,
             last_output: None,
             instance_id,
-            memory: MemoryCoordinator::new(500, 100),
+            memory: MemoryCoordinator::new(semantic_cap, episodic_cap),
             dream: DreamEngine::with_defaults(),
             fep: ActiveInferenceAgent::with_defaults(),
             topology: TopologyAnalyzer::with_defaults(),
@@ -1078,6 +1081,15 @@ impl SporeEngine {
             channels.channels[1], // intent_valence
             channels.channels[2], // intent_abstraction
         )
+    }
+
+    /// Load trained Broca checkpoint weights from binary data.
+    ///
+    /// After loading, the autoregressive generation path is used for all
+    /// consciousness levels >= 0.15 (instead of the 0.5 threshold with
+    /// random embeddings).
+    pub fn load_broca_checkpoint(&mut self, data: &[u8]) -> Result<(), String> {
+        self.broca.load_checkpoint(data)
     }
 
     /// Run a dream cycle: simulate counterfactual alternatives to high-surprise events.

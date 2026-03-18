@@ -1171,6 +1171,21 @@ impl BrocaController {
     pub fn reset(&mut self) {
         self.hidden.iter_mut().for_each(|x| *x = 0.0);
     }
+
+    /// Load trained weights from checkpoint arrays.
+    ///
+    /// Replaces the xorshift-random embeddings with trained values.
+    fn load_weights(
+        &mut self,
+        token_embeddings: Vec<Vec<f32>>,
+        pos_embeddings: Vec<Vec<f32>>,
+        gate_weight: Vec<f32>,
+    ) {
+        self.token_embeddings = token_embeddings;
+        self.pos_embeddings = pos_embeddings;
+        self.gate_weight = gate_weight;
+        self.reset();
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1224,6 +1239,8 @@ pub struct BrocaLite {
     channel_bases: Vec<Vec<f32>>,
     /// Seed for deterministic sampling.
     sample_seed: u64,
+    /// Whether trained checkpoint weights have been loaded.
+    checkpoint_loaded: bool,
 }
 
 impl BrocaLite {
@@ -1247,12 +1264,140 @@ impl BrocaLite {
             strategy: SamplingStrategy::default(),
             channel_bases,
             sample_seed: seed.wrapping_add(4_000_000),
+            checkpoint_loaded: false,
         }
     }
 
     /// Set the sampling strategy.
     pub fn set_strategy(&mut self, strategy: SamplingStrategy) {
         self.strategy = strategy;
+    }
+
+    /// Whether trained checkpoint weights have been loaded.
+    pub fn has_checkpoint(&self) -> bool {
+        self.checkpoint_loaded
+    }
+
+    /// Load trained weights from a serialized checkpoint binary.
+    ///
+    /// Format (matches `save_checkpoint` in `train_broca_lite.rs`):
+    /// ```text
+    /// [4B magic "SPBL"] [4B version u32le] [4B epoch u32le] [4B loss f32le]
+    /// [4B vocab_size u32le] [4B embed_dim u32le] [4B max_seq_len u32le]
+    /// [vocab_size * embed_dim * 4B token_embeddings f32le...]
+    /// [max_seq_len * embed_dim * 4B pos_embeddings f32le...]
+    /// [embed_dim * 4B gate_weight f32le...]
+    /// [32B blake3 checksum]
+    /// ```
+    pub fn load_checkpoint(&mut self, data: &[u8]) -> Result<(), String> {
+        // Minimum header size: 4+4+4+4+4+4+4 = 28 bytes + 32 checksum
+        if data.len() < 60 {
+            return Err(format!("Checkpoint too small: {} bytes", data.len()));
+        }
+
+        // Verify magic
+        if &data[0..4] != b"SPBL" {
+            return Err("Invalid checkpoint magic (expected SPBL)".to_string());
+        }
+
+        // Parse header
+        let version = u32::from_le_bytes([data[4], data[5], data[6], data[7]]);
+        if version != 1 {
+            return Err(format!("Unsupported checkpoint version: {version}"));
+        }
+        // epoch and loss are informational, skip
+        let vocab_size =
+            u32::from_le_bytes([data[16], data[17], data[18], data[19]]) as usize;
+        let embed_dim =
+            u32::from_le_bytes([data[20], data[21], data[22], data[23]]) as usize;
+        let max_seq_len =
+            u32::from_le_bytes([data[24], data[25], data[26], data[27]]) as usize;
+
+        // Validate dimensions match our compiled constants
+        if vocab_size != VOCAB_SIZE {
+            return Err(format!(
+                "Vocab size mismatch: checkpoint={vocab_size}, expected={VOCAB_SIZE}"
+            ));
+        }
+        if embed_dim != EMBED_DIM {
+            return Err(format!(
+                "Embed dim mismatch: checkpoint={embed_dim}, expected={EMBED_DIM}"
+            ));
+        }
+        if max_seq_len != MAX_SEQ_LEN {
+            return Err(format!(
+                "Max seq len mismatch: checkpoint={max_seq_len}, expected={MAX_SEQ_LEN}"
+            ));
+        }
+
+        let header_size = 28;
+        let tok_bytes = vocab_size * embed_dim * 4;
+        let pos_bytes = max_seq_len * embed_dim * 4;
+        let gate_bytes = embed_dim * 4;
+        let checksum_size = 32;
+        let expected_size = header_size + tok_bytes + pos_bytes + gate_bytes + checksum_size;
+
+        if data.len() != expected_size {
+            return Err(format!(
+                "Checkpoint size mismatch: got={}, expected={expected_size}",
+                data.len()
+            ));
+        }
+
+        // Parse token embeddings
+        let mut offset = header_size;
+        let mut token_embeddings = Vec::with_capacity(vocab_size);
+        for _ in 0..vocab_size {
+            let mut emb = Vec::with_capacity(embed_dim);
+            for _ in 0..embed_dim {
+                let val = f32::from_le_bytes([
+                    data[offset],
+                    data[offset + 1],
+                    data[offset + 2],
+                    data[offset + 3],
+                ]);
+                emb.push(val);
+                offset += 4;
+            }
+            token_embeddings.push(emb);
+        }
+
+        // Parse position embeddings
+        let mut pos_embeddings = Vec::with_capacity(max_seq_len);
+        for _ in 0..max_seq_len {
+            let mut emb = Vec::with_capacity(embed_dim);
+            for _ in 0..embed_dim {
+                let val = f32::from_le_bytes([
+                    data[offset],
+                    data[offset + 1],
+                    data[offset + 2],
+                    data[offset + 3],
+                ]);
+                emb.push(val);
+                offset += 4;
+            }
+            pos_embeddings.push(emb);
+        }
+
+        // Parse gate weight
+        let mut gate_weight = Vec::with_capacity(embed_dim);
+        for _ in 0..embed_dim {
+            let val = f32::from_le_bytes([
+                data[offset],
+                data[offset + 1],
+                data[offset + 2],
+                data[offset + 3],
+            ]);
+            gate_weight.push(val);
+            offset += 4;
+        }
+
+        // Load into controller
+        self.controller
+            .load_weights(token_embeddings, pos_embeddings, gate_weight);
+        self.checkpoint_loaded = true;
+
+        Ok(())
     }
 
     /// Encode ThoughtChannels into a 1024D thought vector.
@@ -1274,19 +1419,26 @@ impl BrocaLite {
 
     /// Generate text from ThoughtChannels.
     ///
+    /// With trained checkpoint loaded:
+    /// - Consciousness < 0.15: structured grammar fallback (extremely low consciousness)
+    /// - Consciousness >= 0.15: autoregressive path with trained weights
+    ///
+    /// Without checkpoint (random init fallback):
     /// - Consciousness < 0.5: structured grammar-based generation (varied, coherent)
-    /// - Consciousness >= 0.5: autoregressive path (future trained weights)
+    /// - Consciousness >= 0.5: autoregressive path (random embeddings)
     pub fn generate(&mut self, channels: &ThoughtChannels, max_tokens: usize) -> GenerationResult {
         let consciousness_level = channels.channels[7];
 
-        // Below 0.5: use the structured grammar-based generator.
-        // This produces varied, grammatically valid, consciousness-aware sentences
-        // without needing trained embeddings.
-        if consciousness_level < 0.5 {
+        // Threshold depends on whether we have trained weights.
+        // With checkpoint: autoregressive is reliable down to 0.15.
+        // Without checkpoint: structured grammar is better below 0.5.
+        let threshold = if self.checkpoint_loaded { 0.15 } else { 0.5 };
+
+        if consciousness_level < threshold {
             return self.generate_structured(channels);
         }
 
-        // Autoregressive path for consciousness >= 0.5
+        // Autoregressive path
         self.generate_autoregressive(channels, max_tokens)
     }
 

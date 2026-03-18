@@ -178,6 +178,16 @@ self.onmessage = async function(e) {
       case 'report':
         if (engine) result = engine.consciousness_report();
         break;
+      // Broca checkpoint loading
+      case 'loadBrocaCheckpoint':
+        if (engine) {
+          var response = await fetch('./broca-spore-v1.bin');
+          if (!response.ok) throw new Error('Checkpoint fetch failed: ' + response.status);
+          var buffer = await response.arrayBuffer();
+          engine.load_broca_checkpoint(new Uint8Array(buffer));
+          result = { ok: true, size: buffer.byteLength };
+        }
+        break;
       // Phase 1: Language generation (Broca)
       case 'generateText':
         if (engine) result = engine.generate_text(params.maxTokens || 32);
