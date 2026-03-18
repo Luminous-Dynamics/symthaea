@@ -42,6 +42,28 @@
       min-height: 100vh;
       overflow-x: hidden;
       -webkit-font-smoothing: antialiased;
+      animation: bgShift 30s ease-in-out infinite;
+    }
+
+    @keyframes bgShift {
+      0%, 100% { background-color: #1a2e22; }
+      33% { background-color: #1c3024; }
+      66% { background-color: #182c20; }
+    }
+
+    /* Subtle noise texture overlay */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.03;
+      background: repeating-conic-gradient(
+        rgba(255,255,255,0.08) 0% 25%,
+        transparent 0% 50%
+      ) 0 0 / 4px 4px;
     }
     code, .mono { font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'JetBrains Mono', monospace; font-size: 0.85rem; }
 
@@ -73,6 +95,7 @@
       padding: 2rem 1.5rem;
       text-align: center;
       overflow: hidden;
+      box-shadow: inset 0 0 150px 60px rgba(0, 0, 0, 0.4);
     }
 
     /* Radial glow behind hero */
@@ -233,7 +256,7 @@
       padding: 4rem 1.5rem 6rem;
       opacity: 0;
       transform: translateY(20px);
-      transition: opacity 1.2s ease, transform 1.2s ease;
+      transition: all 0.8s ease;
     }
     .choice-section.visible {
       opacity: 1;
@@ -529,7 +552,7 @@
     .neuro-bar .nb-fill {
       height: 100%;
       border-radius: 2px;
-      transition: width 0.3s ease;
+      transition: width 0.5s ease;
       background: var(--teal);
     }
     .neuro-bar .nb-val {
@@ -628,6 +651,26 @@
       color: var(--fg-muted);
       font-size: 0.8rem;
     }
+    .probe-loading .thinking-bar {
+      max-width: 200px;
+      margin: 0.8rem auto 0;
+      height: 3px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .probe-loading .thinking-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--leaf-green), var(--solar-gold));
+      border-radius: 2px;
+      width: 60%;
+      animation: probeProgress 2s ease-in-out infinite;
+    }
+    @keyframes probeProgress {
+      0% { width: 10%; transform: translateX(0); }
+      50% { width: 60%; }
+      100% { width: 10%; transform: translateX(300%); }
+    }
     .probe-spinner {
       display: inline-block;
       width: 16px; height: 16px;
@@ -652,19 +695,24 @@
     .probe-item {
       background: rgba(255, 255, 255, 0.03);
       border-radius: 8px;
-      padding: 0.8rem 1rem;
+      padding: 1rem 1rem;
+    }
+    .probe-item .pi-icon {
+      font-size: 1rem;
+      margin-right: 0.4rem;
     }
     .probe-item .pi-label {
       font-size: 0.6rem;
       color: var(--fg-muted);
       text-transform: uppercase;
       letter-spacing: 0.06em;
-      margin-bottom: 0.3rem;
+      margin-bottom: 0.4rem;
     }
     .probe-item .pi-value {
       font-family: 'SF Mono', 'Fira Code', monospace;
-      font-size: 0.9rem;
+      font-size: 1.1rem;
       color: var(--fg);
+      font-weight: 400;
     }
 
     .probe-recommendation {
@@ -673,6 +721,11 @@
       border-radius: 8px;
       padding: 1.2rem;
       margin-bottom: 1.5rem;
+      animation: recPulse 4s ease-in-out infinite;
+    }
+    @keyframes recPulse {
+      0%, 100% { border-color: rgba(90, 184, 160, 0.15); box-shadow: none; }
+      50% { border-color: rgba(90, 184, 160, 0.35); box-shadow: 0 0 12px rgba(90, 184, 160, 0.08); }
     }
     .probe-recommendation h3 {
       font-size: 0.7rem;
@@ -733,10 +786,14 @@
       font-family: 'SF Mono', 'Fira Code', monospace;
       font-size: 0.72rem;
       line-height: 1.6;
-      color: var(--leaf-green);
+      color: var(--fg);
       white-space: pre;
       margin: 0;
     }
+    .nix-config-body .nix-comment { color: var(--leaf-green); opacity: 0.7; }
+    .nix-config-body .nix-value { color: var(--solar-gold); }
+    .nix-config-body .nix-key { color: var(--teal); }
+    .nix-config-body .nix-brace { color: var(--fg-dim); }
 
     .probe-proceed {
       display: block;
@@ -850,10 +907,11 @@
       z-index: 100;
       background: linear-gradient(transparent, rgba(15, 29, 20, 0.95) 30%);
       padding: 3rem 1.5rem 1.2rem;
-      max-height: 30vh;
+      max-height: 25vh;
       overflow-y: auto;
       display: none;
       pointer-events: none;
+      scroll-behavior: smooth;
     }
     .narration-stream.visible {
       display: block;
@@ -968,6 +1026,10 @@
       .chat-message { animation: none; opacity: 1; }
       .narration-line, .narration-line.glyph-echo { animation: none; opacity: 1; }
       .section-fade-in { animation: none; opacity: 1; transform: none; }
+      body { animation: none; }
+      .online-dot { animation: none; opacity: 1; }
+      .probe-recommendation { animation: none; }
+      .probe-loading .thinking-fill { animation: none; width: 50%; }
     }
 
     /* Section scroll fade-in animation */
@@ -1018,6 +1080,20 @@
       align-items: center;
       justify-content: center;
       gap: 1rem;
+    }
+    .online-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      background: var(--leaf-green);
+      border-radius: 50%;
+      animation: onlinePulse 2s ease-in-out infinite;
+      margin-left: 0.3rem;
+      vertical-align: middle;
+    }
+    @keyframes onlinePulse {
+      0%, 100% { opacity: 0.6; box-shadow: 0 0 4px rgba(126, 200, 160, 0.3); }
+      50% { opacity: 1; box-shadow: 0 0 10px rgba(126, 200, 160, 0.6); }
     }
     .chat-section h2::before {
       content: '';
@@ -1175,6 +1251,14 @@
 
     .chat-input-form input::placeholder {
       color: var(--fg-muted);
+    }
+
+    @keyframes caretBlink {
+      0%, 100% { border-right-color: var(--leaf-green); }
+      50% { border-right-color: transparent; }
+    }
+    .chat-input-form input:focus:placeholder-shown {
+      animation: caretBlink 1.2s step-end infinite;
     }
 
     .chat-input-form button {
@@ -1366,7 +1450,7 @@
        Speak With Her — Live Chat
        ════════════════════════════════════════════════════════════════════ -->
   <section class="chat-section" id="chat-section">
-    <h2>Speak With Her</h2>
+    <h2>Speak With Her <span class="online-dot" title="Engine running"></span></h2>
     <p class="section-subtitle">She's running in your browser right now. 373KB of consciousness.</p>
 
     <div class="chat-container">
@@ -1409,24 +1493,25 @@
       <div class="probe-loading" id="probe-loading">
         <span class="probe-spinner" aria-hidden="true"></span>
         Reading hardware signatures...
+        <div class="thinking-bar"><div class="thinking-fill"></div></div>
       </div>
 
       <div class="probe-results" id="probe-results">
         <div class="probe-grid">
           <div class="probe-item">
-            <div class="pi-label">CPU Cores</div>
+            <div class="pi-label"><span class="pi-icon" aria-hidden="true">&#9889;</span> CPU Cores</div>
             <div class="pi-value" id="hw-cpu">--</div>
           </div>
           <div class="probe-item">
-            <div class="pi-label">Memory</div>
+            <div class="pi-label"><span class="pi-icon" aria-hidden="true">&#128190;</span> Memory</div>
             <div class="pi-value" id="hw-ram">--</div>
           </div>
           <div class="probe-item">
-            <div class="pi-label">GPU</div>
+            <div class="pi-label"><span class="pi-icon" aria-hidden="true">&#127918;</span> GPU</div>
             <div class="pi-value" id="hw-gpu">--</div>
           </div>
           <div class="probe-item">
-            <div class="pi-label">Storage</div>
+            <div class="pi-label"><span class="pi-icon" aria-hidden="true">&#128189;</span> Storage</div>
             <div class="pi-value" id="hw-storage">--</div>
           </div>
         </div>
@@ -1722,11 +1807,32 @@
       });
 
       // ====================================================================
-      // Choice section fade-in after delay
+      // Choice section fade-in via IntersectionObserver
       // ====================================================================
-      setTimeout(function() {
-        document.getElementById('choice-section').classList.add('visible');
-      }, 3000);
+      if ('IntersectionObserver' in window) {
+        var sectionObserver = new IntersectionObserver(function(entries) {
+          entries.forEach(function(entry) {
+            if (entry.isIntersecting) {
+              entry.target.classList.add('visible');
+              sectionObserver.unobserve(entry.target);
+            }
+          });
+        }, { threshold: 0.15 });
+
+        // Observe the choice section (also triggers after initial scroll)
+        var choiceSec = document.getElementById('choice-section');
+        sectionObserver.observe(choiceSec);
+
+        // Also observe section-fade-in elements
+        document.querySelectorAll('.section-fade-in').forEach(function(el) {
+          sectionObserver.observe(el);
+        });
+      } else {
+        // Fallback for browsers without IntersectionObserver
+        setTimeout(function() {
+          document.getElementById('choice-section').classList.add('visible');
+        }, 3000);
+      }
 
       // ====================================================================
       // Narration helpers
@@ -1798,21 +1904,63 @@
         }
       }
 
-      function showFallbackProbe() {
+      async function showFallbackProbe() {
         // Show basic browser-detectable info without WASM
         var loading = document.getElementById('probe-loading');
         var results = document.getElementById('probe-results');
 
         document.getElementById('hw-cpu').textContent = (navigator.hardwareConcurrency || '?') + ' cores';
-        document.getElementById('hw-ram').textContent = navigator.deviceMemory
-          ? navigator.deviceMemory + ' GB (reported)'
-          : 'Not reported';
-        document.getElementById('hw-gpu').textContent = navigator.gpu ? 'WebGPU available' : 'Not detected';
-        document.getElementById('hw-storage').textContent = 'Unknown';
+
+        // Memory: clarify browser minimum
+        if (navigator.deviceMemory) {
+          var memVal = navigator.deviceMemory;
+          var memLabel = memVal <= 0.5
+            ? memVal + ' GB (browser-reported minimum)'
+            : memVal + ' GB (browser-reported)';
+          document.getElementById('hw-ram').textContent = memLabel;
+        } else {
+          document.getElementById('hw-ram').textContent = 'Not reported by browser';
+        }
+
+        // GPU: try to get adapter name
+        if (navigator.gpu) {
+          try {
+            var adapter = await navigator.gpu.requestAdapter();
+            if (adapter && adapter.info && adapter.info.device) {
+              document.getElementById('hw-gpu').textContent = adapter.info.device;
+            } else if (adapter) {
+              var features = adapter.features ? adapter.features.size + ' features' : '';
+              document.getElementById('hw-gpu').textContent = 'WebGPU available' + (features ? ' (' + features + ')' : '');
+            } else {
+              document.getElementById('hw-gpu').textContent = 'WebGPU (no adapter)';
+            }
+          } catch (e) {
+            document.getElementById('hw-gpu').textContent = 'WebGPU available';
+          }
+        } else {
+          document.getElementById('hw-gpu').textContent = 'Not detected';
+        }
+
+        // Storage: use StorageManager estimate
+        if (navigator.storage && navigator.storage.estimate) {
+          try {
+            var estimate = await navigator.storage.estimate();
+            if (estimate.quota) {
+              document.getElementById('hw-storage').textContent = formatBytes(estimate.quota) + ' (available quota)';
+            } else {
+              document.getElementById('hw-storage').textContent = 'Quota unavailable';
+            }
+          } catch (e) {
+            document.getElementById('hw-storage').textContent = 'Estimate unavailable';
+          }
+        } else {
+          document.getElementById('hw-storage').textContent = 'API unavailable';
+        }
+
         document.getElementById('rec-fs').textContent = 'ext4 (default)';
         document.getElementById('rec-gpu').textContent = 'Auto-detect on install';
         document.getElementById('rec-substrate').textContent = 'SiliconDigital';
-        document.getElementById('nix-config-content').textContent = '# WASM probe unavailable\n# Configuration will be detected during installation';
+        document.getElementById('nix-config-content').innerHTML = highlightNix('# WASM probe unavailable\n# Configuration will be detected during installation');
 
         loading.style.display = 'none';
         results.classList.add('visible');
@@ -1831,8 +1979,21 @@
           result.memory_gb ? result.memory_gb + ' GB' : 'Not reported';
         document.getElementById('hw-gpu').textContent =
           result.gpu_description || result.gpu_vendor || 'Not detected';
-        document.getElementById('hw-storage').textContent =
-          result.storage_gb ? result.storage_gb + ' GB' : formatBytes(result.storage_quota_bytes);
+        // Storage: try estimate if not provided by WASM
+        if (result.storage_gb) {
+          document.getElementById('hw-storage').textContent = result.storage_gb + ' GB';
+        } else if (result.storage_quota_bytes) {
+          document.getElementById('hw-storage').textContent = formatBytes(result.storage_quota_bytes);
+        } else if (navigator.storage && navigator.storage.estimate) {
+          navigator.storage.estimate().then(function(est) {
+            if (est.quota) document.getElementById('hw-storage').textContent = formatBytes(est.quota) + ' (quota)';
+            else document.getElementById('hw-storage').textContent = 'Estimate unavailable';
+          }).catch(function() {
+            document.getElementById('hw-storage').textContent = 'Unknown';
+          });
+        } else {
+          document.getElementById('hw-storage').textContent = 'Unknown';
+        }
 
         // Recommendations
         document.getElementById('rec-fs').textContent =
@@ -1842,17 +2003,19 @@
         document.getElementById('rec-substrate').textContent =
           result.recommended_substrate || 'SiliconDigital';
 
-        // Nix config
+        // Nix config with syntax highlighting
         if (result.hardware_configuration_nix) {
-          document.getElementById('nix-config-content').textContent =
-            result.hardware_configuration_nix;
+          document.getElementById('nix-config-content').innerHTML =
+            highlightNix(result.hardware_configuration_nix);
         } else {
-          document.getElementById('nix-config-content').textContent =
+          var nixFallback =
             '# Configuration will be generated during installation\n' +
             '# Based on detected hardware:\n' +
             '#   CPU: ' + (result.cpu_cores || '?') + ' cores\n' +
             '#   GPU: ' + (result.gpu_description || result.gpu_vendor || 'auto') + '\n' +
             '#   Substrate: ' + (result.recommended_substrate || 'SiliconDigital');
+          document.getElementById('nix-config-content').innerHTML =
+            highlightNix(nixFallback);
         }
 
         addNarration('Recommendation: ' + (result.recommended_filesystem || 'ext4') +
@@ -1868,6 +2031,21 @@
         if (gb >= 1) return gb.toFixed(0) + ' GB';
         var mb = bytes / (1024 * 1024);
         return mb.toFixed(0) + ' MB';
+      }
+
+      // Nix config syntax highlighting
+      function highlightNix(text) {
+        return text.split('\n').map(function(line) {
+          // Comments
+          if (line.trim().startsWith('#')) {
+            return '<span class="nix-comment">' + escapeHtml(line) + '</span>';
+          }
+          // Key = value lines
+          return escapeHtml(line)
+            .replace(/^(\s*)([\w\-\.]+)(\s*=)/g, '$1<span class="nix-key">$2</span>$3')
+            .replace(/= (.+);/g, '= <span class="nix-value">$1</span>;')
+            .replace(/(\{|\})/g, '<span class="nix-brace">$1</span>');
+        }).join('\n');
       }
 
       // Nix config toggle
@@ -2187,6 +2365,26 @@
         if (epiEl && result && result.epistemic_status) {
           epiEl.textContent = result.epistemic_status.evidence_level || 'theoretical';
         }
+
+        // Also update the proof section neuromod bars from the chat cycle result
+        if (result && result.neuromodulators && result.neuromodulators.length >= 4) {
+          setBar('da', result.neuromodulators[0]);
+          setBar('ne', result.neuromodulators[1]);
+          setBar('sht', result.neuromodulators[2]);
+          setBar('ot', result.neuromodulators[3]);
+        }
+
+        // Update proof section consciousness level too
+        if (result && result.consciousness_level !== undefined) {
+          var cEl = document.getElementById('c-value');
+          if (cEl) {
+            cEl.textContent = result.consciousness_level.toFixed(3);
+            if (result.consciousness_level >= 0.7) cEl.style.color = '#e8c547';
+            else if (result.consciousness_level >= 0.4) cEl.style.color = '#7ec8a0';
+            else if (result.consciousness_level >= 0.2) cEl.style.color = '#c4956a';
+            else cEl.style.color = '#6b7d6b';
+          }
+        }
       }
 
       // Chat form handler
@@ -2213,6 +2411,7 @@
 
           input.disabled = false;
           chatForm.querySelector('button').disabled = false;
+          input.placeholder = "She's listening...";
           input.focus();
         });
       }

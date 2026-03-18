@@ -182,6 +182,12 @@ self.onmessage = async function(e) {
       case 'generateText':
         if (engine) result = engine.generate_text(params.maxTokens || 32);
         break;
+      case 'generateTextWithInput':
+        if (engine) result = engine.generate_text_with_input(params.input || '', params.maxTokens || 64);
+        break;
+      case 'selectGlyph':
+        if (engine) result = engine.select_glyph(params.input || '');
+        break;
       // Phase 2: Dream engine
       case 'dreamCycle':
         if (engine) result = engine.dream_cycle();
