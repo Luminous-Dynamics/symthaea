@@ -324,14 +324,25 @@ impl PsychBenchmark for ButlinIndicatorSuite {
             MetricValue::from_samples(&[report.absent_count as f64]),
         );
 
-        // Individual indicator scores
+        // Individual indicator scores + mean quality
+        let mut quality_scores: Vec<f64> = Vec::new();
         for ind in &report.indicators {
             if let Some(score) = ind.score {
+                quality_scores.push(score);
                 result.insert(
                     format!("{}::{}", ind.id, ind.description.replace(' ', "_")),
                     MetricValue::from_samples(&[score]),
                 );
             }
+        }
+        // Mean quality across all scored indicators (continuous, captures partial strengths)
+        if !quality_scores.is_empty() {
+            let mean_quality =
+                quality_scores.iter().sum::<f64>() / quality_scores.len() as f64;
+            result.insert(
+                "mean_quality_score",
+                MetricValue::from_samples(&[mean_quality]),
+            );
         }
 
         // When symthaea-backend is enabled, run the ablation matrix and add

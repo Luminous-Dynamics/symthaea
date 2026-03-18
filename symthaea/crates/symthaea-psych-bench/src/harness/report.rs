@@ -483,8 +483,12 @@ impl BenchmarkReport {
             ("valence_accuracy", "valence_accuracy", &bl.affect),
             ("congruence_ratio", "congruence_ratio", &bl.affect),
             ("fluency", "aut_fluency", &bl.creativity),
+            ("originality_score", "dt_originality_score", &bl.creativity),
+            ("flexibility_score", "dt_flexibility_score", &bl.creativity),
+            ("elaboration_score", "dt_elaboration_score", &bl.creativity),
             ("present_count", "present_count", &bl.butlin),
             ("presence_ratio", "presence_ratio", &bl.butlin),
+            ("mean_quality_score", "mean_quality_score", &bl.butlin),
             // Go/No-Go (Inhibition)
             ("go_accuracy", "go_accuracy", &bl.inhibition),
             ("nogo_accuracy", "nogo_accuracy", &bl.inhibition),
@@ -607,6 +611,19 @@ impl BenchmarkReport {
             ),
             ("boundary_width", "vot_boundary_width", &bl.speech),
             ("slope_at_boundary", "vot_slope_at_boundary", &bl.speech),
+            // Categorical Perception
+            ("boundary_slope", "cp_boundary_slope", &bl.speech),
+            (
+                "boundary_discrimination",
+                "cp_boundary_discrimination",
+                &bl.speech,
+            ),
+            (
+                "within_category_discrimination",
+                "cp_within_discrimination",
+                &bl.speech,
+            ),
+            ("categorical_index", "cp_categorical_index", &bl.speech),
             // Substrate Transfer
             ("transfer_fidelity", "transfer_fidelity", &bl.substrate),
             ("phi_preservation", "phi_preservation", &bl.substrate),
@@ -1911,7 +1928,7 @@ pub fn calibration_class_of(benchmark: &str) -> &'static str {
         "Calibration", "MismatchNegativity", "GardenPath", "SemanticPriming",
         "LexicalDecision", "MentalRotation", "TemporalDiscounting",
         "IowaGambling", "TowerOfLondon", "RavensProgressiveMatrices",
-        "TemporalOrder", "CrossModal", "RemoteAssociates", "AlternateUses",
+        "TemporalOrder", "CrossModal", "CategoricalPerception", "RemoteAssociates", "AlternateUses", "DivergentThinking",
         "WorM::Binding", "ChangeDetection",
     ];
 
@@ -1983,10 +2000,11 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("LongRange") => "delay_50::retention",
         b if b.contains("ConflictResolution") => "recency_preference",
         b if b.contains("Calibration") => "calibration_error_ece",
-        b if b.contains("Butlin") => "present_count",
+        b if b.contains("Butlin") => "mean_quality_score",
         b if b.contains("ValenceClassification") => "valence_accuracy",
         b if b.contains("MoodCongruent") => "congruence_ratio",
         b if b.contains("RemoteAssociates") => "overall_accuracy",
+        b if b.contains("DivergentThinking") => "originality_score",
         b if b.contains("AlternateUses") => "fluency",
         b if b.contains("GoNoGo") => "nogo_accuracy",
         b if b.contains("AttentionalBlink") => "blink_magnitude",
@@ -2042,6 +2060,7 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("ChangeBlindness") => "detection_with_disruption",
         b if b.contains("ProprioceptiveDrift") => "drift_difference",
         b if b.contains("PhonemeDiscrimination") => "categorical_perception_index",
+        b if b.contains("CategoricalPerception") => "boundary_slope",
         b if b.contains("VotContinuum") => "identification_accuracy",
         b if b.contains("BinocularRivalry") => "dominance_ratio",
         b if b.contains("Substrate") && b.contains("Degradation") => "graceful_ratio",
@@ -2943,6 +2962,7 @@ mod tests {
             // Creativity
             Box::new(AlternateUsesBenchmark),
             Box::new(RemoteAssociatesBenchmark),
+            Box::new(DivergentThinkingBenchmark),
             // Butlin
             Box::new(ButlinIndicatorSuite),
             // Inhibition
@@ -3001,6 +3021,7 @@ mod tests {
             // Speech
             Box::new(PhonemeDiscriminationBenchmark),
             Box::new(VotContinuumBenchmark),
+            Box::new(CategoricalPerceptionBenchmark),
             // Consciousness
             Box::new(BlindSightBenchmark),
             Box::new(BinocularRivalryBenchmark),
