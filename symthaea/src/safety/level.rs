@@ -22,6 +22,16 @@ pub enum SafetyLevel {
 }
 
 impl SafetyLevel {
+    /// Short uppercase name for telemetry (avoids `format!("{:?}").to_uppercase()`).
+    pub fn as_str_upper(&self) -> &'static str {
+        match self {
+            SafetyLevel::Green => "GREEN",
+            SafetyLevel::Yellow => "YELLOW",
+            SafetyLevel::Orange => "ORANGE",
+            SafetyLevel::Red => "RED",
+        }
+    }
+
     /// Human-readable label.
     pub fn label(&self) -> &'static str {
         match self {

@@ -1450,8 +1450,29 @@ impl CognitiveLoopService {
         if let Some(ref mut bundler) = self.hierarchical_bundler {
             use symthaea_core::hdc::substrate_independence::CorticalRegion;
 
-            // Feed the current cycle's BinaryHV into the Integration region
-            bundler.add(CorticalRegion::Integration, perception.encoding.hv16_cached);
+            // Feed perception HV into Sensory region (not just Integration)
+            bundler.add(CorticalRegion::Sensory, perception.encoding.hv16_cached);
+
+            // CfC output → Integration region (threshold continuous → binary)
+            {
+                use symthaea_core::hdc::BinaryHV;
+                let cfc_output = &dynamics.core.output;
+                let mut binary_bytes = [0u8; 2048];
+                for (i, chunk) in cfc_output.chunks(8).enumerate() {
+                    if i >= 2048 {
+                        break;
+                    }
+                    let mut byte = 0u8;
+                    for (j, &val) in chunk.iter().enumerate().take(8) {
+                        if val > 0.0 {
+                            byte |= 1 << j;
+                        }
+                    }
+                    binary_bytes[i] = byte;
+                }
+                let cfc_hv = BinaryHV(binary_bytes);
+                bundler.add(CorticalRegion::Integration, cfc_hv);
+            }
 
             // Once we have enough accumulated vectors, compute aggregate metrics
             if bundler.total_vectors() >= 12 {
@@ -1719,5 +1740,114 @@ mod tests {
         let mut svc = make_service();
         let result = svc.cycle("agreement test");
         assert!(result.metadata.cross_module_agreement.is_finite());
+    }
+
+    // ── Modulation pathway tests ──────────────────────────────────────
+
+    /// Social trust → learning rate modulation (Decety & Chaminade 2003).
+    /// High trust should produce higher social LR factor than low trust.
+    #[test]
+    fn feedback_social_trust_modulates_lr() {
+        let mut svc_hi = make_service();
+        svc_hi.social_mgr.social.social_trust = 0.9;
+        let hi = svc_hi.cycle("trust high");
+
+        let mut svc_lo = make_service();
+        svc_lo.social_mgr.social.social_trust = 0.1;
+        let lo = svc_lo.cycle("trust low");
+
+        // Social LR factor = 0.8 + 0.4 * trust → [0.84, 1.16]
+        assert!(
+            hi.metadata.social_learning_rate_factor > lo.metadata.social_learning_rate_factor,
+            "High trust ({}) should yield higher social LR factor than low trust ({})",
+            hi.metadata.social_learning_rate_factor,
+            lo.metadata.social_learning_rate_factor,
+        );
+    }
+
+    /// ToM accuracy gating: only active when social models exist.
+    #[test]
+    fn feedback_tom_accuracy_requires_social_models() {
+        let mut svc = make_service();
+        svc.social_mgr.social.social_prediction_accuracy = 0.0;
+        svc.social_mgr.social.social_models_count = 0;
+        for _ in 0..15 {
+            svc.cycle("warmup");
+        }
+        let result = svc.cycle("test tom guard");
+        assert!(
+            result.metadata.prediction_coherence.is_finite(),
+            "ToM guard: prediction coherence should be finite without social models"
+        );
+    }
+
+    /// Cross-module agreement is bounded [0, 1] over multiple cycles.
+    #[test]
+    fn feedback_cross_module_agreement_bounded() {
+        let mut svc = make_service();
+        for i in 0..20 {
+            let r = svc.cycle(&format!("cycle {}", i));
+            let a = r.metadata.cross_module_agreement;
+            assert!(a >= 0.0 && a <= 1.0, "Agreement {} out of [0,1] at cycle {}", a, i);
+        }
+    }
+
+    /// Unified quality score composition: weighted blend remains finite and bounded.
+    #[test]
+    fn feedback_unified_quality_score_bounded() {
+        let mut svc = make_service();
+        for _ in 0..15 {
+            svc.cycle("warmup");
+        }
+        let r = svc.cycle("quality composition");
+        let q = r.metadata.quality.unified_quality_score;
+        assert!(q.is_finite(), "Quality score must be finite");
+        assert!(q >= 0.0 && q <= 1.5, "Quality score {} out of expected range", q);
+    }
+
+    /// Temporal continuity fields remain finite over many cycles.
+    #[test]
+    fn feedback_temporal_continuity_fields_finite() {
+        let mut svc = make_service();
+        for _ in 0..20 {
+            let r = svc.cycle("temporal test");
+            assert!(r.metadata.temporal.temporal_continuity.is_finite());
+            assert!(r.metadata.temporal.temporal_max_chain_length < 10000);
+        }
+    }
+
+    /// Epistemic gate confidence stays bounded [0, 1] and finite.
+    #[test]
+    fn feedback_epistemic_gate_stable_over_cycles() {
+        let mut svc = make_service();
+        for _ in 0..25 {
+            let r = svc.cycle("epistemic stability");
+            let c = r.metadata.epistemic_gate_confidence;
+            assert!(c.is_finite() && c >= 0.0 && c <= 1.0,
+                "Epistemic gate confidence {} out of bounds", c);
+        }
+    }
+
+    /// Consciousness gradient recovery doesn't produce NaN.
+    #[test]
+    fn feedback_consciousness_gradient_no_nan() {
+        let mut svc = make_service();
+        for _ in 0..30 {
+            svc.cycle("gradient warmup");
+        }
+        let r = svc.cycle("gradient recovery");
+        assert!(r.metadata.consciousness.consciousness_gradient_magnitude.is_finite());
+        assert!(r.metadata.prediction_coherence.is_finite());
+    }
+
+    /// Agreement velocity and coherence velocity remain finite over cycles.
+    #[test]
+    fn feedback_velocity_fields_no_nan() {
+        let mut svc = make_service();
+        for i in 0..30 {
+            let r = svc.cycle(&format!("vel_{}", i));
+            assert!(r.metadata.cross_module_agreement.is_finite(), "Agreement NaN at {}", i);
+            assert!(r.metadata.quality.coherence_velocity.is_finite(), "Coherence vel NaN at {}", i);
+        }
     }
 }

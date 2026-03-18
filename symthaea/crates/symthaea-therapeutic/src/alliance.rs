@@ -30,6 +30,16 @@ pub enum RuptureType {
     Confrontation,
 }
 
+impl RuptureType {
+    /// Static string for telemetry (avoids `format!("{:?}")`).
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            RuptureType::Withdrawal => "Withdrawal",
+            RuptureType::Confrontation => "Confrontation",
+        }
+    }
+}
+
 /// Repair strategies for alliance ruptures.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum RepairStrategy {

@@ -41,6 +41,19 @@ pub enum RegulationStrategy {
 }
 
 impl RegulationStrategy {
+    /// Static string for telemetry (avoids `format!("{:?}")`).
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::CognitiveReappraisal => "CognitiveReappraisal",
+            Self::DistressTolerance => "DistressTolerance",
+            Self::Grounding => "Grounding",
+            Self::Defusion => "Defusion",
+            Self::Validation => "Validation",
+            Self::Containment => "Containment",
+            Self::ExposurePrep => "ExposurePrep",
+        }
+    }
+
     /// All strategies for iteration.
     pub const ALL: [Self; 7] = [
         Self::CognitiveReappraisal,

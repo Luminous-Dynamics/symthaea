@@ -43,6 +43,18 @@ pub enum CommunityMode {
     Reflective,
 }
 
+impl CommunityMode {
+    /// Static string for telemetry (avoids `format!("{:?}")`).
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            CommunityMode::Exploratory => "Exploratory",
+            CommunityMode::Protective => "Protective",
+            CommunityMode::Creative => "Creative",
+            CommunityMode::Reflective => "Reflective",
+        }
+    }
+}
+
 impl CollectiveKosmicSong {
     /// Aggregate individual credentials into a collective identity.
     pub fn from_credentials(credentials: &[KosmicCredential]) -> Self {
