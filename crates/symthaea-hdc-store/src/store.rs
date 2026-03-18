@@ -109,11 +109,12 @@ impl HdcStore {
             });
         }
 
-        let header_bytes: [u8; HEADER_SIZE] = mmap[..HEADER_SIZE].try_into().map_err(|_| {
-            HdcStoreError::InvalidHeader {
-                reason: "failed to read header bytes".into(),
-            }
-        })?;
+        let header_bytes: [u8; HEADER_SIZE] =
+            mmap[..HEADER_SIZE]
+                .try_into()
+                .map_err(|_| HdcStoreError::InvalidHeader {
+                    reason: "failed to read header bytes".into(),
+                })?;
         let header = StoreHeader::from_bytes(&header_bytes);
         header.validate()?;
 
@@ -126,11 +127,8 @@ impl HdcStore {
             }
             let status = mmap[offset];
             if status == STATUS_LIVE {
-                let id = u64::from_le_bytes(
-                    mmap[offset + 1..offset + 9]
-                        .try_into()
-                        .unwrap_or([0; 8]),
-                );
+                let id =
+                    u64::from_le_bytes(mmap[offset + 1..offset + 9].try_into().unwrap_or([0; 8]));
                 id_to_index.insert(id, i);
             }
         }
@@ -310,8 +308,7 @@ impl HdcStore {
 
     /// Whether compaction is recommended (tombstones > 25% of live).
     pub fn needs_compaction(&self) -> bool {
-        self.header.live_count > 0
-            && self.header.tombstone_count > self.header.live_count / 4
+        self.header.live_count > 0 && self.header.tombstone_count > self.header.live_count / 4
     }
 
     /// Compact the store: copy live entries to a temp file, then atomic rename.

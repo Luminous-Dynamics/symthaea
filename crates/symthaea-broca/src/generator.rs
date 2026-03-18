@@ -294,10 +294,11 @@ impl BrocaGenerator {
             self.controller.reset();
         }
 
-        // 4. Re-seed sampling RNG for reproducibility
+        // 4. Re-seed sampling RNG and reset coherence stats for this generation
         if let Some(seed) = self.config.sampling_seed {
             self.sampling_rng = Some(StdRng::seed_from_u64(seed));
         }
+        self.coherence_feedback.reset_stats();
 
         // 5. Autoregressive generation loop
         let mut tokens = Vec::new();
@@ -477,10 +478,21 @@ impl BrocaGenerator {
             // Skip special tokens in output
             if !self.tokenizer.is_special(next_token) {
                 let token_str = self.tokenizer.token_str(next_token);
+                let is_byte_token = token_str.starts_with("<0x")
+                    && token_str.ends_with('>')
+                    && token_str.len() == 6;
+
+                // Insert space between word tokens when the vocab has no leading spaces.
+                // A "word token" is any non-byte, non-punctuation, non-affix token.
+                if !text_bytes.is_empty() && !is_byte_token && needs_space_before(token_str) {
+                    let last = *text_bytes.last().unwrap();
+                    if last != b' ' && last != b'\n' && last != b'-' {
+                        text_bytes.push(b' ');
+                    }
+                }
+
                 // Decode byte tokens (<0xHH>) to raw bytes for proper UTF-8
-                if token_str.starts_with("<0x") && token_str.ends_with('>')
-                    && token_str.len() == 6
-                {
+                if is_byte_token {
                     if let Ok(byte) = u8::from_str_radix(&token_str[3..5], 16) {
                         text_bytes.push(byte);
                     } else {
@@ -625,6 +637,24 @@ fn block_repeated_ngrams(logits: &mut [f32], generated: &[u32], n: usize) {
             logits[token_id] = f32::NEG_INFINITY;
         }
     }
+}
+
+/// Whether a token needs a space inserted before it during post-processing.
+/// Returns true for word tokens (alphabetic start, no leading punctuation/affix marker).
+fn needs_space_before(token_str: &str) -> bool {
+    let first = match token_str.bytes().next() {
+        Some(b) => b,
+        None => return false,
+    };
+    // Alphabetic tokens need a space before them (the vocab has no leading spaces)
+    if first.is_ascii_alphabetic() {
+        // But not suffix-affixes that start with a letter after a hyphen in the vocab
+        // (those are like "-ing" which already have the hyphen in the token)
+        return true;
+    }
+    // Tokens starting with "'" (contractions like "'re", "'m") don't need space
+    // Punctuation, digits, byte tokens — no space needed
+    false
 }
 
 /// Greedy sampling: return the argmax token.
