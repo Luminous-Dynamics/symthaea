@@ -162,10 +162,9 @@ impl TrajectoryAccumulator {
     pub fn record_action(&mut self, domain: TrajectoryDomain, action_hv: BinaryHV, timestamp: u64) {
         let domain_seed = self.seed.wrapping_add(domain as u64 * 7919);
         let checkpoint_interval = self.checkpoint_interval;
-        let traj = self
-            .domains
-            .entry(domain)
-            .or_insert_with(|| DomainTrajectory::with_seed_and_interval(domain_seed, checkpoint_interval));
+        let traj = self.domains.entry(domain).or_insert_with(|| {
+            DomainTrajectory::with_seed_and_interval(domain_seed, checkpoint_interval)
+        });
 
         // Temporal binding: order matters
         // accumulator = rho(accumulator) XOR action_hv
@@ -254,8 +253,7 @@ impl TrajectoryAccumulator {
             .domains
             .iter()
             .map(|(domain, traj)| {
-                let domain_role =
-                    BinaryHV::random(self.seed.wrapping_add(*domain as u64 * 31337));
+                let domain_role = BinaryHV::random(self.seed.wrapping_add(*domain as u64 * 31337));
                 traj.accumulator.bind(&domain_role)
             })
             .collect();
@@ -271,11 +269,7 @@ impl TrajectoryAccumulator {
     ///
     /// Returns similarity in [0.0, 1.0]. High similarity means the agents
     /// have taken similar actions in similar order within the domain.
-    pub fn compare(
-        &self,
-        domain: &TrajectoryDomain,
-        other: &TrajectoryAccumulator,
-    ) -> Option<f32> {
+    pub fn compare(&self, domain: &TrajectoryDomain, other: &TrajectoryAccumulator) -> Option<f32> {
         let self_traj = self.trajectory(domain)?;
         let other_traj = other.trajectory(domain)?;
         Some(self_traj.similarity(other_traj))
@@ -285,11 +279,7 @@ impl TrajectoryAccumulator {
     ///
     /// Useful for detecting if someone's behavior has suddenly changed
     /// (potential credential theft or account takeover).
-    pub fn divergence_from(
-        &self,
-        domain: &TrajectoryDomain,
-        reference: &BinaryHV,
-    ) -> Option<f32> {
+    pub fn divergence_from(&self, domain: &TrajectoryDomain, reference: &BinaryHV) -> Option<f32> {
         let current = self.trajectory(domain)?;
         Some(1.0 - current.similarity(reference))
     }
@@ -352,7 +342,10 @@ impl TrajectoryAccumulator {
         let self_traj = self.domains.get(domain)?;
         let other_traj = other.domains.get(domain)?;
 
-        let len = self_traj.checkpoints.len().min(other_traj.checkpoints.len());
+        let len = self_traj
+            .checkpoints
+            .len()
+            .min(other_traj.checkpoints.len());
         if len == 0 {
             return None;
         }
@@ -533,7 +526,11 @@ mod tests {
             acc.record_action(TrajectoryDomain::General, action(i), i as u64);
         }
         let traj = acc.domains.get(&TrajectoryDomain::General).unwrap();
-        assert_eq!(traj.checkpoints.len(), 1, "One checkpoint after 10 actions with interval 10");
+        assert_eq!(
+            traj.checkpoints.len(),
+            1,
+            "One checkpoint after 10 actions with interval 10"
+        );
         assert_eq!(traj.checkpoints[0].action_count, 10);
     }
 
@@ -550,7 +547,10 @@ mod tests {
             acc.record_action(TrajectoryDomain::General, action(i), i as u64);
         }
         let c2 = acc.trajectory_commitment().unwrap();
-        assert_eq!(c1, c2, "Commitment should be stable within a checkpoint window");
+        assert_eq!(
+            c1, c2,
+            "Commitment should be stable within a checkpoint window"
+        );
     }
 
     #[test]
@@ -561,7 +561,11 @@ mod tests {
             acc.record_action(TrajectoryDomain::General, action(i), i as u64);
         }
         let traj = acc.domains.get(&TrajectoryDomain::General).unwrap();
-        assert_eq!(traj.checkpoints.len(), 8, "Ring buffer should cap at MAX_CHECKPOINTS=8");
+        assert_eq!(
+            traj.checkpoints.len(),
+            8,
+            "Ring buffer should cap at MAX_CHECKPOINTS=8"
+        );
     }
 
     #[test]
@@ -572,8 +576,12 @@ mod tests {
         }
         let checkpoint_commitment = acc.trajectory_commitment().unwrap();
         // Raw accumulator hash
-        let raw_hash = *blake3::hash(&acc.trajectory(&TrajectoryDomain::General).unwrap().0).as_bytes();
-        assert_ne!(checkpoint_commitment, raw_hash, "Checkpoint commitment should differ from raw accumulator hash");
+        let raw_hash =
+            *blake3::hash(&acc.trajectory(&TrajectoryDomain::General).unwrap().0).as_bytes();
+        assert_ne!(
+            checkpoint_commitment, raw_hash,
+            "Checkpoint commitment should differ from raw accumulator hash"
+        );
     }
 
     #[test]
@@ -591,10 +599,55 @@ mod tests {
             acc1.record_action(TrajectoryDomain::General, action(i), i as u64);
             acc2.record_action(TrajectoryDomain::General, action(i + 100), i as u64);
         }
-        let sims = acc1.divergence_from_checkpoints(&TrajectoryDomain::General, &acc2).unwrap();
+        let sims = acc1
+            .divergence_from_checkpoints(&TrajectoryDomain::General, &acc2)
+            .unwrap();
         assert_eq!(sims.len(), 2);
         assert_eq!(sims[0], 1.0, "First checkpoint should be identical");
         assert!(sims[1] < 0.9, "Second checkpoint should diverge");
+    }
+
+    /// Proptest: trajectory_commitment is deterministic and stable within a checkpoint window.
+    mod proptest_checkpoint_stability {
+        use super::*;
+        use proptest::prelude::*;
+
+        proptest! {
+            #![proptest_config(ProptestConfig::with_cases(200))]
+
+            #[test]
+            fn checkpoint_commitment_stable_and_deterministic(
+                checkpoint_interval in 5u64..=100,
+                seed in any::<u64>(),
+                action_count_factor in 1u64..=3,
+            ) {
+                let action_count = checkpoint_interval * action_count_factor;
+                let mut acc = TrajectoryAccumulator::with_checkpoint_interval(seed, checkpoint_interval);
+
+                // Record actions up to a checkpoint boundary
+                for i in 0..action_count {
+                    acc.record_action(TrajectoryDomain::General, action(i), i);
+                }
+
+                // Two calls must return the same value (deterministic)
+                let c1 = acc.trajectory_commitment();
+                let c2 = acc.trajectory_commitment();
+                prop_assert_eq!(c1, c2, "trajectory_commitment must be deterministic");
+
+                // Record one more action that does NOT cross a checkpoint boundary:
+                // we just crossed at `action_count` (which is a multiple of interval),
+                // so adding one more stays within the window.
+                let extra_idx = action_count;
+                acc.record_action(TrajectoryDomain::General, action(extra_idx), extra_idx);
+
+                // Since action_count was exactly on a boundary, the extra action is
+                // within the new window. Commitment should still equal the old value
+                // because commitment is based on completed checkpoints only.
+                let c3 = acc.trajectory_commitment();
+                prop_assert_eq!(c1, c3,
+                    "commitment must be stable when extra action doesn't complete a new checkpoint window");
+            }
+        }
     }
 
     #[test]

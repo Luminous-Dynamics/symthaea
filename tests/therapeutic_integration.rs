@@ -31,7 +31,7 @@ fn test_therapeutic_cycle_runs() {
     // Run 20 cycles with neutral input
     for i in 0..20 {
         let result = service.cycle(&format!("test cycle {}", i));
-        assert!(result.metadata.consciousness_level >= 0.0);
+        assert!(result.metadata.consciousness.consciousness_level >= 0.0);
     }
 }
 

@@ -52,13 +52,9 @@ const GOV_CONSTITUTIONAL: f64 = 0.6;
 
 // Reputation thresholds — intentionally higher than consciousness thresholds
 // because they combine consciousness (60%) + hApp reputation (40%).
-#[allow(dead_code)] // Used by EnhancedMycelixBridge (currently unwired)
 const REP_BASIC: f64 = 0.3;
-#[allow(dead_code)]
 const REP_GOVERNANCE: f64 = 0.5;
-#[allow(dead_code)]
 const REP_VOTING: f64 = 0.6;
-#[allow(dead_code)]
 const REP_CONSTITUTIONAL: f64 = 0.8;
 
 use super::affective_consciousness::CoreAffect;
@@ -378,6 +374,13 @@ pub struct MycelixBridge {
     /// Set via `set_governance_dispatch_tx()`.
     #[cfg(feature = "mycelix")]
     governance_dispatch_tx: Option<std::sync::mpsc::SyncSender<GovernanceDispatchCommand>>,
+    /// Pending dispatch confirmations: correlation_id -> dispatch time.
+    /// Tracked so we can detect when the conductor has not acknowledged a command.
+    #[cfg(feature = "mycelix")]
+    pending_confirmations: HashMap<u64, Instant>,
+    /// Monotonically increasing correlation ID counter.
+    #[cfg(feature = "mycelix")]
+    next_correlation_id: u64,
 }
 
 /// Commands dispatched to an external Holochain conductor process.
@@ -390,6 +393,8 @@ pub struct MycelixBridge {
 pub enum GovernanceDispatchCommand {
     /// Submit a proposal to the governance cluster.
     SubmitProposal {
+        /// Unique correlation ID for matching dispatch to confirmation.
+        correlation_id: u64,
         description: String,
         proposer_did: String,
         consciousness_phi: f64,
@@ -397,6 +402,8 @@ pub enum GovernanceDispatchCommand {
     },
     /// Cast a vote on an existing proposal.
     CastVote {
+        /// Unique correlation ID for matching dispatch to confirmation.
+        correlation_id: u64,
         proposal_id: String,
         voter_did: String,
         approve: bool,
@@ -404,6 +411,36 @@ pub enum GovernanceDispatchCommand {
     },
     /// Query active proposals (response arrives via governance event channel).
     QueryActiveProposals,
+}
+
+/// Outcome received from the conductor confirming or rejecting a dispatched command.
+///
+/// The conductor bridge should send these back via the governance event channel
+/// after processing each `GovernanceDispatchCommand`.
+#[cfg(feature = "mycelix")]
+#[derive(Debug, Clone)]
+pub enum GovernanceDispatchOutcome {
+    /// Proposal was accepted by the conductor and written to the DHT.
+    ProposalAccepted {
+        correlation_id: u64,
+        /// The proposal action hash from Holochain, if available.
+        action_hash: Option<String>,
+    },
+    /// Proposal was rejected by the conductor.
+    ProposalRejected {
+        correlation_id: u64,
+        reason: String,
+    },
+    /// Vote was accepted by the conductor and written to the DHT.
+    VoteAccepted {
+        correlation_id: u64,
+        action_hash: Option<String>,
+    },
+    /// Vote was rejected by the conductor.
+    VoteRejected {
+        correlation_id: u64,
+        reason: String,
+    },
 }
 
 impl MycelixBridge {
@@ -423,6 +460,10 @@ impl MycelixBridge {
             pending_gov_outcomes: Vec::new(),
             #[cfg(feature = "mycelix")]
             governance_dispatch_tx: None,
+            #[cfg(feature = "mycelix")]
+            pending_confirmations: HashMap::new(),
+            #[cfg(feature = "mycelix")]
+            next_correlation_id: 1,
         }
     }
 
@@ -442,6 +483,10 @@ impl MycelixBridge {
             pending_gov_outcomes: Vec::new(),
             #[cfg(feature = "mycelix")]
             governance_dispatch_tx: None,
+            #[cfg(feature = "mycelix")]
+            pending_confirmations: HashMap::new(),
+            #[cfg(feature = "mycelix")]
+            next_correlation_id: 1,
         }
     }
 
@@ -538,13 +583,18 @@ impl MycelixBridge {
         {
             let mut disconnected = false;
             if let Some(ref tx) = self.governance_dispatch_tx {
+                let cid = self.next_correlation_id;
+                self.next_correlation_id += 1;
                 match tx.try_send(GovernanceDispatchCommand::SubmitProposal {
+                    correlation_id: cid,
                     description: proposal.description.clone(),
                     proposer_did: self.agent_id.clone(),
                     consciousness_phi: consciousness.phi,
                     alignment_score: alignment.overall_score,
                 }) {
-                    Ok(()) => {}
+                    Ok(()) => {
+                        self.pending_confirmations.insert(cid, Instant::now());
+                    }
                     Err(std::sync::mpsc::TrySendError::Full(_)) => {
                         tracing::warn!(
                             "Governance dispatch channel full (64) — proposal queued locally only"
@@ -647,7 +697,10 @@ impl MycelixBridge {
             let mut disconnected = false;
             if let Some(ref tx) = self.governance_dispatch_tx {
                 let approve = matches!(value, VoteValue::Yes | VoteValue::StrongYes);
+                let cid = self.next_correlation_id;
+                self.next_correlation_id += 1;
                 match tx.try_send(GovernanceDispatchCommand::CastVote {
+                    correlation_id: cid,
                     proposal_id: proposal.id.clone(),
                     voter_did: self.agent_id.clone(),
                     approve,
@@ -656,7 +709,9 @@ impl MycelixBridge {
                         alignment.recommendation, alignment.overall_score
                     ),
                 }) {
-                    Ok(()) => {}
+                    Ok(()) => {
+                        self.pending_confirmations.insert(cid, Instant::now());
+                    }
                     Err(std::sync::mpsc::TrySendError::Full(_)) => {
                         tracing::warn!(
                             "Governance dispatch channel full (64) — vote queued locally only"
@@ -1014,6 +1069,53 @@ impl MycelixBridge {
             std::mem::take(&mut self.pending_gov_events),
             std::mem::take(&mut self.pending_gov_outcomes),
         )
+    }
+
+    // ========================================================================
+    // DISPATCH CONFIRMATION TRACKING
+    // ========================================================================
+
+    /// Process a dispatch outcome from the conductor, removing the matching
+    /// correlation ID from pending confirmations.
+    ///
+    /// Should be called when the conductor bridge sends back confirmation
+    /// of a dispatched command. Logs a warning if the oldest unconfirmed
+    /// dispatch exceeds 60 seconds.
+    #[cfg(feature = "mycelix")]
+    pub fn confirm_dispatch(&mut self, outcome: &GovernanceDispatchOutcome) {
+        let cid = match outcome {
+            GovernanceDispatchOutcome::ProposalAccepted { correlation_id, .. }
+            | GovernanceDispatchOutcome::ProposalRejected { correlation_id, .. }
+            | GovernanceDispatchOutcome::VoteAccepted { correlation_id, .. }
+            | GovernanceDispatchOutcome::VoteRejected { correlation_id, .. } => *correlation_id,
+        };
+        self.pending_confirmations.remove(&cid);
+
+        // Check for stale unconfirmed dispatches
+        if let Some(age) = self.oldest_unconfirmed_age() {
+            if age > Duration::from_secs(60) {
+                tracing::warn!(
+                    unconfirmed = self.pending_confirmations.len(),
+                    oldest_secs = age.as_secs(),
+                    "Oldest unconfirmed governance dispatch exceeds 60s — conductor may be unresponsive"
+                );
+            }
+        }
+    }
+
+    /// Number of dispatched commands awaiting conductor confirmation.
+    #[cfg(feature = "mycelix")]
+    pub fn unconfirmed_dispatches(&self) -> usize {
+        self.pending_confirmations.len()
+    }
+
+    /// Age of the oldest unconfirmed dispatch, or `None` if all are confirmed.
+    #[cfg(feature = "mycelix")]
+    pub fn oldest_unconfirmed_age(&self) -> Option<Duration> {
+        self.pending_confirmations
+            .values()
+            .map(|t| t.elapsed())
+            .max()
     }
 
     // ========================================================================

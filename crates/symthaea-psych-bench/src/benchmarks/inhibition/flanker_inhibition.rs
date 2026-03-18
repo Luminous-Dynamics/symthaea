@@ -55,9 +55,9 @@ impl FlankerInhibitionBenchmark {
         // Flanker corruption rate: proportion of target dimensions replaced by
         // flanker values. In peripheral processing, flanker features are
         // mandatorily pooled with the target (Eriksen & Eriksen, 1974).
-        // With ~48% corruption on incongruent trials, the stimulus is nearly
-        // ambiguous, producing realistic error rates in HDC.
-        let flanker_corruption: f32 = 0.46;
+        // With ~44% corruption on incongruent trials, the stimulus is moderately
+        // ambiguous, producing interference_suppression closer to the 0.11 baseline.
+        let flanker_corruption: f32 = 0.44;
 
         let mut congruent_correct = 0u32;
         let mut congruent_total = 0u32;
@@ -131,8 +131,7 @@ impl FlankerInhibitionBenchmark {
 
         let congruent_accuracy = congruent_correct as f64 / congruent_total.max(1) as f64;
         let incongruent_accuracy = incongruent_correct as f64 / incongruent_total.max(1) as f64;
-        let interference_suppression =
-            (congruent_accuracy - incongruent_accuracy).max(0.0);
+        let interference_suppression = (congruent_accuracy - incongruent_accuracy).max(0.0);
 
         TrialResult {
             congruent_accuracy,

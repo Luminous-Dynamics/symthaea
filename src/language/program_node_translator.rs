@@ -50,7 +50,10 @@ fn translate_rust(entry: &PatternEntry, function_name: &str) -> Option<String> {
     // Generate the function body from the ProgramNode structure
     let body = generate_rust_body(&entry.node, function_name, &entry.return_type)?;
 
-    Some(format!("{}\npub fn {}{} {{\n{}\n}}\n", doc, function_name, sig, body))
+    Some(format!(
+        "{}\npub fn {}{} {{\n{}\n}}\n",
+        doc, function_name, sig, body
+    ))
 }
 
 fn derive_rust_signature(node: &ProgramNode, return_type: &str) -> String {
@@ -83,18 +86,12 @@ fn generate_rust_body(node: &ProgramNode, fn_name: &str, return_type: &str) -> O
             // Recursive function — generate iterative version for efficiency
             generate_rust_recursive(base_case, fn_name, return_type)
         }
-        ProgramNode::Reduce { func, initial, .. } => {
-            generate_rust_reduce(func, initial)
-        }
-        ProgramNode::Map { func, .. } => {
-            Some("    v.iter().map(|x| f(x)).collect()".to_string())
-        }
+        ProgramNode::Reduce { func, initial, .. } => generate_rust_reduce(func, initial),
+        ProgramNode::Map { func, .. } => Some("    v.iter().map(|x| f(x)).collect()".to_string()),
         ProgramNode::Filter { .. } => {
             Some("    v.iter().filter(|x| f(x)).cloned().collect()".to_string())
         }
-        ProgramNode::Iterate { .. } => {
-            generate_rust_iterate(fn_name)
-        }
+        ProgramNode::Iterate { .. } => generate_rust_iterate(fn_name),
         ProgramNode::Compose(f, g) => {
             let f_name = extract_name(f);
             let g_name = extract_name(g);
@@ -112,30 +109,44 @@ fn generate_rust_body(node: &ProgramNode, fn_name: &str, return_type: &str) -> O
                 .collect();
             Some(lines.join("\n"))
         }
-        ProgramNode::Branch { condition, then_branch, else_branch } => {
-            Some(format!(
-                "    if {} {{\n        {}\n    }} else {{\n        {}\n    }}",
-                extract_name(condition),
-                extract_name(then_branch),
-                extract_name(else_branch),
-            ))
-        }
+        ProgramNode::Branch {
+            condition,
+            then_branch,
+            else_branch,
+        } => Some(format!(
+            "    if {} {{\n        {}\n    }} else {{\n        {}\n    }}",
+            extract_name(condition),
+            extract_name(then_branch),
+            extract_name(else_branch),
+        )),
         _ => None,
     }
 }
 
-fn generate_rust_recursive(base_case: &ProgramNode, fn_name: &str, return_type: &str) -> Option<String> {
+fn generate_rust_recursive(
+    base_case: &ProgramNode,
+    fn_name: &str,
+    return_type: &str,
+) -> Option<String> {
     // Pattern: recursive functions often have a branch (base case vs recursive case)
     match base_case {
-        ProgramNode::Branch { condition, then_branch, else_branch } => {
+        ProgramNode::Branch {
+            condition,
+            then_branch,
+            else_branch,
+        } => {
             let cond = rust_expr(condition);
             let base = rust_expr(then_branch);
             let recursive = rust_expr(else_branch);
-            Some(format!("    if {cond} {{\n        {base}\n    }} else {{\n        {recursive}\n    }}"))
+            Some(format!(
+                "    if {cond} {{\n        {base}\n    }} else {{\n        {recursive}\n    }}"
+            ))
         }
         _ => {
             // Simple recursive pattern
-            Some(format!("    // Recursive pattern for {fn_name}\n    Default::default()"))
+            Some(format!(
+                "    // Recursive pattern for {fn_name}\n    Default::default()"
+            ))
         }
     }
 }
@@ -149,7 +160,10 @@ fn generate_rust_reduce(func: &ProgramNode, initial: &ProgramNode) -> Option<Str
         "max" => Some("    v.iter().copied().max()".to_string()),
         "min" => Some("    v.iter().copied().min()".to_string()),
         "mul" => Some(format!("    v.iter().fold({init}, |acc, &x| acc * x)")),
-        _ => Some(format!("    v.iter().fold({init}, |acc, &x| acc.{}(x))", op)),
+        _ => Some(format!(
+            "    v.iter().fold({init}, |acc, &x| acc.{}(x))",
+            op
+        )),
     }
 }
 
@@ -167,14 +181,46 @@ fn rust_expr(node: &ProgramNode) -> String {
             let fname = extract_name(func);
             let arg_strs: Vec<String> = args.iter().map(|a| rust_expr(a)).collect();
             match fname.to_uppercase().as_str() {
-                "ADD" => format!("{} + {}", arg_strs.get(0).unwrap_or(&"0".into()), arg_strs.get(1).unwrap_or(&"0".into())),
-                "SUB" => format!("{} - {}", arg_strs.get(0).unwrap_or(&"0".into()), arg_strs.get(1).unwrap_or(&"0".into())),
-                "MUL" => format!("{} * {}", arg_strs.get(0).unwrap_or(&"1".into()), arg_strs.get(1).unwrap_or(&"1".into())),
-                "DIV" => format!("{} / {}", arg_strs.get(0).unwrap_or(&"1".into()), arg_strs.get(1).unwrap_or(&"1".into())),
-                "MOD" => format!("{} % {}", arg_strs.get(0).unwrap_or(&"0".into()), arg_strs.get(1).unwrap_or(&"1".into())),
-                "EQ" => format!("{} == {}", arg_strs.get(0).unwrap_or(&"0".into()), arg_strs.get(1).unwrap_or(&"0".into())),
-                "LT" => format!("{} < {}", arg_strs.get(0).unwrap_or(&"0".into()), arg_strs.get(1).unwrap_or(&"0".into())),
-                "GT" => format!("{} > {}", arg_strs.get(0).unwrap_or(&"0".into()), arg_strs.get(1).unwrap_or(&"0".into())),
+                "ADD" => format!(
+                    "{} + {}",
+                    arg_strs.get(0).unwrap_or(&"0".into()),
+                    arg_strs.get(1).unwrap_or(&"0".into())
+                ),
+                "SUB" => format!(
+                    "{} - {}",
+                    arg_strs.get(0).unwrap_or(&"0".into()),
+                    arg_strs.get(1).unwrap_or(&"0".into())
+                ),
+                "MUL" => format!(
+                    "{} * {}",
+                    arg_strs.get(0).unwrap_or(&"1".into()),
+                    arg_strs.get(1).unwrap_or(&"1".into())
+                ),
+                "DIV" => format!(
+                    "{} / {}",
+                    arg_strs.get(0).unwrap_or(&"1".into()),
+                    arg_strs.get(1).unwrap_or(&"1".into())
+                ),
+                "MOD" => format!(
+                    "{} % {}",
+                    arg_strs.get(0).unwrap_or(&"0".into()),
+                    arg_strs.get(1).unwrap_or(&"1".into())
+                ),
+                "EQ" => format!(
+                    "{} == {}",
+                    arg_strs.get(0).unwrap_or(&"0".into()),
+                    arg_strs.get(1).unwrap_or(&"0".into())
+                ),
+                "LT" => format!(
+                    "{} < {}",
+                    arg_strs.get(0).unwrap_or(&"0".into()),
+                    arg_strs.get(1).unwrap_or(&"0".into())
+                ),
+                "GT" => format!(
+                    "{} > {}",
+                    arg_strs.get(0).unwrap_or(&"0".into()),
+                    arg_strs.get(1).unwrap_or(&"0".into())
+                ),
                 _ => {
                     if arg_strs.is_empty() {
                         format!("{}()", fname.to_lowercase())
@@ -184,8 +230,17 @@ fn rust_expr(node: &ProgramNode) -> String {
                 }
             }
         }
-        ProgramNode::Branch { condition, then_branch, else_branch } => {
-            format!("if {} {{ {} }} else {{ {} }}", rust_expr(condition), rust_expr(then_branch), rust_expr(else_branch))
+        ProgramNode::Branch {
+            condition,
+            then_branch,
+            else_branch,
+        } => {
+            format!(
+                "if {} {{ {} }} else {{ {} }}",
+                rust_expr(condition),
+                rust_expr(then_branch),
+                rust_expr(else_branch)
+            )
         }
         _ => extract_name(node),
     }
@@ -208,7 +263,10 @@ fn translate_python(entry: &PatternEntry, function_name: &str) -> Option<String>
 
     let body = generate_python_body(&entry.node, function_name)?;
 
-    Some(format!("def {}{}:\n{}\n{}\n", function_name, sig, doc, body))
+    Some(format!(
+        "def {}{}:\n{}\n{}\n",
+        function_name, sig, doc, body
+    ))
 }
 
 fn derive_python_signature(node: &ProgramNode, _return_type: &str) -> String {
@@ -268,13 +326,41 @@ fn python_expr(node: &ProgramNode) -> String {
             let fname = extract_name(func);
             let arg_strs: Vec<String> = args.iter().map(|a| python_expr(a)).collect();
             match fname.to_uppercase().as_str() {
-                "ADD" => format!("{} + {}", arg_strs.get(0).unwrap_or(&"0".into()), arg_strs.get(1).unwrap_or(&"0".into())),
-                "SUB" => format!("{} - {}", arg_strs.get(0).unwrap_or(&"0".into()), arg_strs.get(1).unwrap_or(&"0".into())),
-                "MUL" => format!("{} * {}", arg_strs.get(0).unwrap_or(&"0".into()), arg_strs.get(1).unwrap_or(&"0".into())),
-                "EQ" => format!("{} == {}", arg_strs.get(0).unwrap_or(&"0".into()), arg_strs.get(1).unwrap_or(&"0".into())),
-                "LT" => format!("{} < {}", arg_strs.get(0).unwrap_or(&"0".into()), arg_strs.get(1).unwrap_or(&"0".into())),
-                "GT" => format!("{} > {}", arg_strs.get(0).unwrap_or(&"0".into()), arg_strs.get(1).unwrap_or(&"0".into())),
-                "MOD" => format!("{} % {}", arg_strs.get(0).unwrap_or(&"0".into()), arg_strs.get(1).unwrap_or(&"0".into())),
+                "ADD" => format!(
+                    "{} + {}",
+                    arg_strs.get(0).unwrap_or(&"0".into()),
+                    arg_strs.get(1).unwrap_or(&"0".into())
+                ),
+                "SUB" => format!(
+                    "{} - {}",
+                    arg_strs.get(0).unwrap_or(&"0".into()),
+                    arg_strs.get(1).unwrap_or(&"0".into())
+                ),
+                "MUL" => format!(
+                    "{} * {}",
+                    arg_strs.get(0).unwrap_or(&"0".into()),
+                    arg_strs.get(1).unwrap_or(&"0".into())
+                ),
+                "EQ" => format!(
+                    "{} == {}",
+                    arg_strs.get(0).unwrap_or(&"0".into()),
+                    arg_strs.get(1).unwrap_or(&"0".into())
+                ),
+                "LT" => format!(
+                    "{} < {}",
+                    arg_strs.get(0).unwrap_or(&"0".into()),
+                    arg_strs.get(1).unwrap_or(&"0".into())
+                ),
+                "GT" => format!(
+                    "{} > {}",
+                    arg_strs.get(0).unwrap_or(&"0".into()),
+                    arg_strs.get(1).unwrap_or(&"0".into())
+                ),
+                "MOD" => format!(
+                    "{} % {}",
+                    arg_strs.get(0).unwrap_or(&"0".into()),
+                    arg_strs.get(1).unwrap_or(&"0".into())
+                ),
                 _ => {
                     if arg_strs.is_empty() {
                         format!("{}()", fname.to_lowercase())
@@ -284,8 +370,17 @@ fn python_expr(node: &ProgramNode) -> String {
                 }
             }
         }
-        ProgramNode::Branch { condition, then_branch, else_branch } => {
-            format!("{} if {} else {}", python_expr(then_branch), python_expr(condition), python_expr(else_branch))
+        ProgramNode::Branch {
+            condition,
+            then_branch,
+            else_branch,
+        } => {
+            format!(
+                "{} if {} else {}",
+                python_expr(then_branch),
+                python_expr(condition),
+                python_expr(else_branch)
+            )
         }
         _ => extract_name(node),
     }
@@ -306,17 +401,19 @@ fn translate_nix(entry: &PatternEntry, function_name: &str) -> Option<String> {
 
 fn generate_nix_body(node: &ProgramNode, fn_name: &str) -> Option<String> {
     match node {
-        ProgramNode::Recurse { base_case, .. } => {
-            match base_case.as_ref() {
-                ProgramNode::Branch { condition, then_branch, else_branch } => {
-                    let cond = nix_expr(condition);
-                    let base = nix_expr(then_branch);
-                    let recursive = nix_expr(else_branch);
-                    Some(format!("n: if {cond} then {base} else {recursive}"))
-                }
-                _ => Some(format!("n: n # placeholder for {fn_name}"))
+        ProgramNode::Recurse { base_case, .. } => match base_case.as_ref() {
+            ProgramNode::Branch {
+                condition,
+                then_branch,
+                else_branch,
+            } => {
+                let cond = nix_expr(condition);
+                let base = nix_expr(then_branch);
+                let recursive = nix_expr(else_branch);
+                Some(format!("n: if {cond} then {base} else {recursive}"))
             }
-        }
+            _ => Some(format!("n: n # placeholder for {fn_name}")),
+        },
         ProgramNode::Reduce { .. } => Some("builtins.foldl' (a: b: a + b) 0".to_string()),
         ProgramNode::Map { .. } => Some("map (x: f x)".to_string()),
         ProgramNode::Filter { .. } => Some("builtins.filter (x: f x)".to_string()),
@@ -332,9 +429,21 @@ fn nix_expr(node: &ProgramNode) -> String {
             let fname = extract_name(func);
             let arg_strs: Vec<String> = args.iter().map(|a| nix_expr(a)).collect();
             match fname.to_uppercase().as_str() {
-                "ADD" => format!("({} + {})", arg_strs.get(0).unwrap_or(&"0".into()), arg_strs.get(1).unwrap_or(&"0".into())),
-                "EQ" => format!("({} == {})", arg_strs.get(0).unwrap_or(&"0".into()), arg_strs.get(1).unwrap_or(&"0".into())),
-                "LT" => format!("({} < {})", arg_strs.get(0).unwrap_or(&"0".into()), arg_strs.get(1).unwrap_or(&"0".into())),
+                "ADD" => format!(
+                    "({} + {})",
+                    arg_strs.get(0).unwrap_or(&"0".into()),
+                    arg_strs.get(1).unwrap_or(&"0".into())
+                ),
+                "EQ" => format!(
+                    "({} == {})",
+                    arg_strs.get(0).unwrap_or(&"0".into()),
+                    arg_strs.get(1).unwrap_or(&"0".into())
+                ),
+                "LT" => format!(
+                    "({} < {})",
+                    arg_strs.get(0).unwrap_or(&"0".into()),
+                    arg_strs.get(1).unwrap_or(&"0".into())
+                ),
                 _ => format!("({} {})", fname.to_lowercase(), arg_strs.join(" ")),
             }
         }
@@ -360,18 +469,24 @@ mod tests {
 
     fn get_pattern(name: &str) -> PatternEntry {
         let lib = ProgramPatternLibrary::standard();
-        lib.find_top_k(&symthaea_core::hdc::program_algebra::encode_task_description(name), 1)
-            .into_iter()
-            .next()
-            .map(|(entry, _)| entry.clone())
-            .expect("pattern should exist")
+        lib.find_top_k(
+            &symthaea_core::hdc::program_algebra::encode_task_description(name),
+            1,
+        )
+        .into_iter()
+        .next()
+        .map(|(entry, _)| entry.clone())
+        .expect("pattern should exist")
     }
 
     #[test]
     fn test_translate_fibonacci_rust() {
         let entry = get_pattern("fibonacci");
         let code = translate(&entry, "rust", "fibonacci").unwrap();
-        assert!(code.contains("pub fn fibonacci"), "Should have function: {code}");
+        assert!(
+            code.contains("pub fn fibonacci"),
+            "Should have function: {code}"
+        );
         assert!(code.contains("///"), "Should have doc comment");
     }
 
@@ -379,7 +494,10 @@ mod tests {
     fn test_translate_fibonacci_python() {
         let entry = get_pattern("fibonacci");
         let code = translate(&entry, "python", "fibonacci").unwrap();
-        assert!(code.contains("def fibonacci"), "Should have function: {code}");
+        assert!(
+            code.contains("def fibonacci"),
+            "Should have function: {code}"
+        );
         assert!(code.contains("\"\"\""), "Should have docstring");
     }
 
@@ -387,15 +505,24 @@ mod tests {
     fn test_translate_sum_rust() {
         let entry = get_pattern("sum");
         let code = translate(&entry, "rust", "sum_vec").unwrap();
-        assert!(code.contains("pub fn sum_vec"), "Should have function: {code}");
-        assert!(code.contains("sum()") || code.contains("iter()"), "Should use iterator: {code}");
+        assert!(
+            code.contains("pub fn sum_vec"),
+            "Should have function: {code}"
+        );
+        assert!(
+            code.contains("sum()") || code.contains("iter()"),
+            "Should use iterator: {code}"
+        );
     }
 
     #[test]
     fn test_translate_sum_python() {
         let entry = get_pattern("sum");
         let code = translate(&entry, "python", "sum_list").unwrap();
-        assert!(code.contains("def sum_list"), "Should have function: {code}");
+        assert!(
+            code.contains("def sum_list"),
+            "Should have function: {code}"
+        );
         assert!(code.contains("sum("), "Should use sum(): {code}");
     }
 
@@ -426,7 +553,10 @@ mod tests {
         let code = translate(&entry, "rust", "unknown");
         // May return None or a simple stub — either is acceptable
         if let Some(ref c) = code {
-            assert!(c.contains("pub fn unknown"), "Should have function name: {c}");
+            assert!(
+                c.contains("pub fn unknown"),
+                "Should have function name: {c}"
+            );
         }
     }
 }

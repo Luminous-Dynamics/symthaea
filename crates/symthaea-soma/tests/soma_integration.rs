@@ -19,11 +19,11 @@ fn sensor_nudges_propagate_to_consciousness() {
 
     // Inject bright sunlight (500+ lux → serotonin boost) and high motion (walking → NE boost)
     engine.set_sensors(
-        12.0,    // accel magnitude (walking ~10-12 m/s²)
-        800.0,   // bright light (lux)
-        false,   // not face-down
-        1013.0,  // sea level pressure
-        0.8,     // high GPS novelty (new location)
+        12.0,   // accel magnitude (walking ~10-12 m/s²)
+        800.0,  // bright light (lux)
+        false,  // not face-down
+        1013.0, // sea level pressure
+        0.8,    // high GPS novelty (new location)
     );
 
     // Run cycles with sensors active
@@ -33,12 +33,12 @@ fn sensor_nudges_propagate_to_consciousness() {
     }
 
     // At least one neuromodulator should have shifted from sensor input
-    let nm_changed = (0..4).any(|i| (post_sensor.neuromodulators[i] - baseline_nm[i]).abs() > 0.001);
+    let nm_changed =
+        (0..4).any(|i| (post_sensor.neuromodulators[i] - baseline_nm[i]).abs() > 0.001);
     assert!(
         nm_changed,
         "Sensor nudges should affect neuromodulators. Baseline: {:?}, Post: {:?}",
-        baseline_nm,
-        post_sensor.neuromodulators,
+        baseline_nm, post_sensor.neuromodulators,
     );
 }
 
@@ -58,7 +58,10 @@ fn privacy_mode_suppresses_sensor_nudges() {
 
     // BLE advertise should return empty in privacy mode
     let payload = engine.ble_advertise_payload();
-    assert!(payload.is_empty(), "BLE should not advertise in privacy mode");
+    assert!(
+        payload.is_empty(),
+        "BLE should not advertise in privacy mode"
+    );
 }
 
 /// Metabolism state machine gates cycle behavior.
@@ -67,7 +70,10 @@ fn metabolism_gates_consciousness_cycle() {
     let mut engine = SomaEngine::new(SomaConfig::default());
 
     // Start in Alert
-    assert_eq!(engine.wake_state(), symthaea_soma::metabolism::WakeState::Alert);
+    assert_eq!(
+        engine.wake_state(),
+        symthaea_soma::metabolism::WakeState::Alert
+    );
 
     // Run some cycles to establish baseline
     for _ in 0..10 {
@@ -77,7 +83,10 @@ fn metabolism_gates_consciousness_cycle() {
 
     // Put to sleep
     engine.wake_signal(WakeSignal::ExplicitSleep);
-    assert_eq!(engine.wake_state(), symthaea_soma::metabolism::WakeState::Sleep);
+    assert_eq!(
+        engine.wake_state(),
+        symthaea_soma::metabolism::WakeState::Sleep
+    );
 
     // Consciousness should still compute (just at lower frequency in real use)
     let result = engine.cycle("sleeping");
@@ -85,7 +94,10 @@ fn metabolism_gates_consciousness_cycle() {
 
     // Wake up
     engine.wake_signal(WakeSignal::PhonePickup);
-    assert_ne!(engine.wake_state(), symthaea_soma::metabolism::WakeState::Sleep);
+    assert_ne!(
+        engine.wake_state(),
+        symthaea_soma::metabolism::WakeState::Sleep
+    );
 
     // After waking, consciousness should recover
     for _ in 0..10 {
@@ -117,7 +129,10 @@ fn haptic_fires_on_consciousness_shift() {
     // (whether events fire depends on the consciousness delta threshold)
     let json = engine.haptic_drain_json();
     // JSON should be a valid array
-    assert!(json.starts_with('['), "haptic drain should return JSON array");
+    assert!(
+        json.starts_with('['),
+        "haptic drain should return JSON array"
+    );
 }
 
 /// Full embodiment loop: sensors → cycle → compass → dream consolidation.
@@ -175,7 +190,10 @@ fn night_charging_triggers_dream() {
 
     // Run a cycle to trigger edge-detection → metabolism signal
     engine.cycle("going to sleep");
-    assert_eq!(engine.wake_state(), symthaea_soma::metabolism::WakeState::Sleep);
+    assert_eq!(
+        engine.wake_state(),
+        symthaea_soma::metabolism::WakeState::Sleep
+    );
 
     // Continue cycling — metabolism should eventually set dream_consolidation_due
     for _ in 0..150 {

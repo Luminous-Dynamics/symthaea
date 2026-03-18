@@ -161,6 +161,63 @@ impl TherapeuticDreamTracker {
         errors.iter().sum::<f32>() / errors.len() as f32
     }
 
+    /// Serialize tracker state to bytes for process restart resilience.
+    ///
+    /// Layout: [prediction_count: u32 = 4][resolved_count: u32 = 4]
+    ///         [prediction_accuracy: f32 = 4]
+    /// Total: 12 bytes
+    ///
+    /// Note: Individual PredictionRecord history is not checkpointed here
+    /// (it uses Serialize/Deserialize for full persistence). This captures
+    /// the summary statistics needed for fast restart.
+    pub fn checkpoint(&self) -> Vec<u8> {
+        let mut data = Vec::with_capacity(12);
+        data.extend_from_slice(&(self.predictions.len() as u32).to_le_bytes());
+        let resolved = self
+            .predictions
+            .iter()
+            .filter(|r| r.actual_outcome.is_some())
+            .count() as u32;
+        data.extend_from_slice(&resolved.to_le_bytes());
+        data.extend_from_slice(&self.prediction_accuracy().to_le_bytes());
+        data
+    }
+
+    /// Restore tracker state from a checkpoint.
+    ///
+    /// Since individual predictions cannot be reconstructed from summary
+    /// statistics, this is a best-effort restore that validates the data
+    /// format. The prediction history will rebuild naturally from subsequent
+    /// `record_prediction` / `record_actual_outcome` calls.
+    pub fn restore(&mut self, data: &[u8]) -> Result<(), String> {
+        const MIN_SIZE: usize = 4 + 4 + 4; // 12
+        if data.len() < MIN_SIZE {
+            return Err(format!(
+                "TherapeuticDreamTracker checkpoint too short: {} < {}",
+                data.len(),
+                MIN_SIZE
+            ));
+        }
+        // Validation only — we cannot reconstruct individual predictions
+        // from summary statistics. The counts are informational.
+        let _prediction_count = u32::from_le_bytes(
+            data[0..4]
+                .try_into()
+                .map_err(|_| "TherapeuticDreamTracker: corrupt prediction_count bytes")?,
+        );
+        let _resolved_count = u32::from_le_bytes(
+            data[4..8]
+                .try_into()
+                .map_err(|_| "TherapeuticDreamTracker: corrupt resolved_count bytes")?,
+        );
+        let _accuracy = f32::from_le_bytes(
+            data[8..12]
+                .try_into()
+                .map_err(|_| "TherapeuticDreamTracker: corrupt accuracy bytes")?,
+        );
+        Ok(())
+    }
+
     /// Fraction of predictions that have been resolved with actual outcomes.
     pub fn resolution_rate(&self) -> f32 {
         if self.predictions.is_empty() {

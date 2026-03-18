@@ -1,5 +1,7 @@
 //! Time Manager — Sovereign Mesh-Time CognitiveSubsystem
 //!
+//! **Requires**: `feature = "mesh"`
+//!
 //! Feeds `MeshTimeConsensus` from WisdomPacket timestamps received during
 //! the cognitive cycle. Provides neuromodulatory feedback based on time
 //! consensus quality and drift surprise.
@@ -47,6 +49,9 @@ pub struct TimeManager {
 }
 
 impl TimeManager {
+    /// Co-prime scheduling interval (cycles).
+    pub const INTERVAL: u32 = 23;
+
     /// Create a new TimeManager.
     pub fn new(enabled: bool) -> Self {
         Self {
@@ -140,7 +145,7 @@ impl CognitiveSubsystem for TimeManager {
     }
 
     fn interval(&self) -> u32 {
-        23
+        Self::INTERVAL
     }
 
     fn process(&mut self, snapshot: &CycleSnapshot) -> SubsystemOutput {
@@ -163,7 +168,8 @@ impl CognitiveSubsystem for TimeManager {
         self.consensus.set_phi(snapshot.unified_psi as f32);
 
         // Compute drift surprise
-        let _offset_delta = (self.consensus.offset_us() - self.prev_offset_us).unsigned_abs() as f64;
+        let _offset_delta =
+            (self.consensus.offset_us() - self.prev_offset_us).unsigned_abs() as f64;
         let drift_surprise = self.consensus.drift_ppm().abs();
         self.drift_surprise_ema = self.drift_surprise_ema * (1.0 - DRIFT_SURPRISE_EMA)
             + drift_surprise * DRIFT_SURPRISE_EMA;
@@ -186,6 +192,39 @@ impl CognitiveSubsystem for TimeManager {
         self.last_telemetry = self.consensus.telemetry();
 
         output
+    }
+
+    fn checkpoint(&self) -> Vec<u8> {
+        // Layout: [drift_surprise_ema: f64 = 8][prev_offset_us: i64 = 8][enabled: u8 = 1]
+        // Total: 17 bytes
+        let mut data = Vec::with_capacity(17);
+        data.extend_from_slice(&self.drift_surprise_ema.to_le_bytes());
+        data.extend_from_slice(&self.prev_offset_us.to_le_bytes());
+        data.push(self.enabled as u8);
+        data
+    }
+
+    fn restore(&mut self, data: &[u8]) -> Result<(), String> {
+        const MIN_SIZE: usize = 8 + 8 + 1; // 17
+        if data.len() < MIN_SIZE {
+            return Err(format!(
+                "TimeManager checkpoint too short: {} < {}",
+                data.len(),
+                MIN_SIZE
+            ));
+        }
+        self.drift_surprise_ema = f64::from_le_bytes(
+            data[0..8]
+                .try_into()
+                .map_err(|_| "TimeManager: corrupt drift_surprise_ema bytes")?,
+        );
+        self.prev_offset_us = i64::from_le_bytes(
+            data[8..16]
+                .try_into()
+                .map_err(|_| "TimeManager: corrupt prev_offset_us bytes")?,
+        );
+        self.enabled = data[16] != 0;
+        Ok(())
     }
 }
 

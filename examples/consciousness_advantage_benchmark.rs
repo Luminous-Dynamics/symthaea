@@ -380,8 +380,8 @@ fn run_depth_assessment(
         let result = service.cycle(pattern[i % pattern.len()]);
         let m = &result.metadata;
 
-        if m.consciousness_level > 0.0 {
-            mce_samples.push(m.consciousness_level);
+        if m.consciousness.consciousness_level > 0.0 {
+            mce_samples.push(m.consciousness.consciousness_level);
         }
         if m.narrative_self_psi > 0.0 {
             narrative_psi_samples.push(m.narrative_self_psi);

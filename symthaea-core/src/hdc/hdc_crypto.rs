@@ -488,7 +488,10 @@ mod tests {
         // Any single share should recover the secret (k=1)
         for share in &shares {
             let recovered = HdcThresholdSharing::recover(&[share.clone()]);
-            assert_eq!(recovered, secret, "k=1 should recover from any single share");
+            assert_eq!(
+                recovered, secret,
+                "k=1 should recover from any single share"
+            );
         }
     }
 
@@ -553,7 +556,11 @@ mod tests {
 
     #[test]
     fn test_context_key_deterministic() {
-        let sensors = vec![BinaryHV::random(1), BinaryHV::random(2), BinaryHV::random(3)];
+        let sensors = vec![
+            BinaryHV::random(1),
+            BinaryHV::random(2),
+            BinaryHV::random(3),
+        ];
         let key1 = HdcContextKey::derive(&sensors);
         let key2 = HdcContextKey::derive(&sensors);
         assert_eq!(key1, key2, "Same sensors should produce same key");
@@ -620,11 +627,7 @@ mod tests {
     fn test_commitment_wrong_offset_fails() {
         let secret = BinaryHV::random(42);
         let commitment = HdcCommitment::commit(&secret, 137);
-        assert!(!HdcCommitment::verify(
-            &commitment.commitment,
-            &secret,
-            138
-        ));
+        assert!(!HdcCommitment::verify(&commitment.commitment, &secret, 138));
     }
 
     #[test]
@@ -699,7 +702,11 @@ mod tests {
     #[test]
     fn test_threshold_with_context_key() {
         // Scenario: derive a key from sensors, then split it into shares
-        let sensors = vec![BinaryHV::random(1), BinaryHV::random(2), BinaryHV::random(3)];
+        let sensors = vec![
+            BinaryHV::random(1),
+            BinaryHV::random(2),
+            BinaryHV::random(3),
+        ];
         let context_key = HdcContextKey::derive(&sensors);
 
         // Split the context key into 5 shares requiring 3 to recover
@@ -817,7 +824,11 @@ mod benchmarks {
     /// Quick benchmark: context key derivation (3 sensors → symmetric key).
     #[test]
     fn bench_context_key_derive() {
-        let sensors = vec![BinaryHV::random(1), BinaryHV::random(2), BinaryHV::random(3)];
+        let sensors = vec![
+            BinaryHV::random(1),
+            BinaryHV::random(2),
+            BinaryHV::random(3),
+        ];
 
         let iters = 100_000;
         let start = Instant::now();

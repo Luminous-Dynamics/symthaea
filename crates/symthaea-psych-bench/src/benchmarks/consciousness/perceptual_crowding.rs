@@ -227,10 +227,7 @@ impl PsychBenchmark for PerceptualCrowdingBenchmark {
 
         result.insert("unflanked_accuracy", MetricValue::from_samples(&unflanked));
         result.insert("flanked_accuracy", MetricValue::from_samples(&flanked));
-        result.insert(
-            "crowding_magnitude",
-            MetricValue::from_samples(&magnitudes),
-        );
+        result.insert("crowding_magnitude", MetricValue::from_samples(&magnitudes));
 
         result.conditions = 4; // 1 unflanked + 3 spacing levels
         result.trials_per_condition = config.trials_per_condition;

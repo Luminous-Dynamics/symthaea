@@ -12,9 +12,7 @@
 use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
 
 /// Collect module timings from a single CycleResult into (name, microseconds) pairs.
-fn extract_timings(
-    t: &symthaea::cognitive_loop::ModuleTimings,
-) -> Vec<(&'static str, u64)> {
+fn extract_timings(t: &symthaea::cognitive_loop::ModuleTimings) -> Vec<(&'static str, u64)> {
     vec![
         ("affective_bridge", t.affective_bridge),
         ("predictive_processing", t.predictive_processing),
@@ -32,7 +30,10 @@ fn extract_timings(
         ("temporal_consciousness", t.temporal_consciousness),
         ("attention_schema", t.attention_schema),
         ("narrative_gwt", t.narrative_gwt),
-        ("consciousness_thermodynamics", t.consciousness_thermodynamics),
+        (
+            "consciousness_thermodynamics",
+            t.consciousness_thermodynamics,
+        ),
         ("phenomenal_binding", t.phenomenal_binding),
         ("hierarchical_free_energy", t.hierarchical_free_energy),
         ("resonator_recall", t.resonator_recall),
@@ -54,9 +55,15 @@ fn extract_timings(
         ("hierarchical_ltc", t.hierarchical_ltc),
         ("primitive_evolution", t.primitive_evolution),
         ("consciousness_holography", t.consciousness_holography),
-        ("differentiable_consciousness", t.differentiable_consciousness),
+        (
+            "differentiable_consciousness",
+            t.differentiable_consciousness,
+        ),
         ("affective_consciousness", t.affective_consciousness),
-        ("unified_consciousness_pipeline", t.unified_consciousness_pipeline),
+        (
+            "unified_consciousness_pipeline",
+            t.unified_consciousness_pipeline,
+        ),
         ("multi_modal_integration", t.multi_modal_integration),
         ("synthetic_grounding", t.synthetic_grounding),
         ("epistemic_gate", t.epistemic_gate),
@@ -79,16 +86,28 @@ fn extract_timings(
         ("core_parallel_postprocess", t.core_parallel_postprocess),
         // End-of-cycle
         ("living_mind", t.living_mind),
-        ("master_consciousness_equation", t.master_consciousness_equation),
+        (
+            "master_consciousness_equation",
+            t.master_consciousness_equation,
+        ),
         ("homeostasis", t.homeostasis),
         ("spectral_mip", t.spectral_mip),
         ("soul_experience", t.soul_experience),
         ("metadata_assembly", t.metadata_assembly),
         // Consciousness engine
         ("consciousness_engine", t.consciousness_engine),
-        ("consciousness_engine_equation_v2", t.consciousness_engine_equation_v2),
-        ("consciousness_engine_pipeline", t.consciousness_engine_pipeline),
-        ("consciousness_engine_multimodal", t.consciousness_engine_multimodal),
+        (
+            "consciousness_engine_equation_v2",
+            t.consciousness_engine_equation_v2,
+        ),
+        (
+            "consciousness_engine_pipeline",
+            t.consciousness_engine_pipeline,
+        ),
+        (
+            "consciousness_engine_multimodal",
+            t.consciousness_engine_multimodal,
+        ),
         // Ethics engine
         ("ethics_engine", t.ethics_engine),
         ("ethics_engine_moral", t.ethics_engine_moral),
@@ -170,7 +189,10 @@ fn profile_cycle_hotpath_top20() {
     println!("\n{}", "=".repeat(72));
     println!("COGNITIVE CYCLE PROFILING ({n_cycles} cycles, avg {avg_cycle_us} us/cycle)");
     println!("{}", "=".repeat(72));
-    println!("{:<40} {:>10} {:>10} {:>6}", "MODULE", "TOTAL (us)", "AVG (us)", "% CYCLE");
+    println!(
+        "{:<40} {:>10} {:>10} {:>6}",
+        "MODULE", "TOTAL (us)", "AVG (us)", "% CYCLE"
+    );
     println!("{}", "-".repeat(72));
 
     let instrumented_total: u64 = accum.iter().map(|(_, us)| us).sum();
@@ -201,9 +223,13 @@ fn profile_cycle_hotpath_top20() {
         "UNINSTRUMENTED (overhead)",
         total_cycle_us.saturating_sub(instrumented_total),
         total_cycle_us.saturating_sub(instrumented_total) / n_cycles as u64,
-        ((total_cycle_us.saturating_sub(instrumented_total)) as f64 / total_cycle_us as f64) * 100.0
+        ((total_cycle_us.saturating_sub(instrumented_total)) as f64 / total_cycle_us as f64)
+            * 100.0
     );
-    println!("{:<40} {:>10} {:>10}", "TOTAL", total_cycle_us, avg_cycle_us);
+    println!(
+        "{:<40} {:>10} {:>10}",
+        "TOTAL", total_cycle_us, avg_cycle_us
+    );
 
     // Sanity check: cycle should complete (debug builds are 5-10x slower than release).
     // In release with async_training=true, target is 50ms (20Hz).
@@ -251,7 +277,10 @@ fn profile_core_pipeline_breakdown() {
         cycle_total += r.cycle_time_us;
     }
 
-    println!("\nCORE PIPELINE BREAKDOWN ({n} cycles, avg {} us/cycle)", cycle_total / n as u64);
+    println!(
+        "\nCORE PIPELINE BREAKDOWN ({n} cycles, avg {} us/cycle)",
+        cycle_total / n as u64
+    );
     println!("{:<30} {:>8} {:>8} {:>6}", "PHASE", "AVG(us)", "TOTAL", "%");
     println!("{}", "-".repeat(56));
     let phases = [

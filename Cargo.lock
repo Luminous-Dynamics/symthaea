@@ -15134,6 +15134,7 @@ dependencies = [
  "hex",
  "serde",
  "serde_json",
+ "symthaea-broca",
  "symthaea-consciousness-equation",
  "symthaea-core",
  "symthaea-foveation",
@@ -15142,6 +15143,8 @@ dependencies = [
  "symthaea-spore",
  "symthaea-types",
  "symthaea-vision-manifold",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

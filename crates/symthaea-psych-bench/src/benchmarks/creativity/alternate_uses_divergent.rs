@@ -68,13 +68,17 @@ impl DivergentThinkingBenchmark {
 
             // Generate a "use" by blending the object with a random exploration vector
             // and a category anchor. More creative exploration = higher blend with random.
+            // Exploration increases across uses (warming up / incubation effect).
             let exploration = ContinuousHV::random(dim, rng);
             xor_shift(&mut rng);
             let cat_idx = rng as usize % n_categories;
 
             // Blend: object (familiar) + exploration (novel) + category (structure)
-            let explore_weight = 0.44 + (i as f32 / n_uses as f32) * 0.20; // later uses are more exploratory
-            let cat_weight = 0.15;
+            // Higher exploration weights produce uses more distant from the object
+            // prototype, matching human divergent thinking where later responses
+            // are more original (serial order effect; Silvia et al. 2008).
+            let explore_weight = 0.52 + (i as f32 / n_uses as f32) * 0.22;
+            let cat_weight = 0.12;
             let obj_weight = 1.0 - explore_weight - cat_weight;
 
             let use_hv = ContinuousHV::weighted_bundle(

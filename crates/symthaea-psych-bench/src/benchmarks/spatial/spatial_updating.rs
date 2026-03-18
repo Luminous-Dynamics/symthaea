@@ -405,9 +405,7 @@ mod tests {
         );
         eprintln!(
             "PathUpdating: simple={:.3}, complex={:.3}, overall={:.3}",
-            simple,
-            result.metrics["complex_accuracy"].mean,
-            updating,
+            simple, result.metrics["complex_accuracy"].mean, updating,
         );
     }
 }

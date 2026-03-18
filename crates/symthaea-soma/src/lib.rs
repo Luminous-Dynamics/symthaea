@@ -38,15 +38,15 @@
 pub use symthaea_spore::broca;
 pub use symthaea_spore::config;
 pub use symthaea_spore::engine::SporeEngine;
-pub use symthaea_spore::persistence;
 pub use symthaea_spore::engine::{CycleResult, EpistemicStatus};
+pub use symthaea_spore::persistence;
 
 // Mobile embodiment modules (moved from spore)
-pub mod sensor_bridge;
-pub mod haptic;
-pub mod metabolism;
 pub mod ble_mesh;
+pub mod haptic;
 pub mod holon_bridge;
+pub mod metabolism;
+pub mod sensor_bridge;
 
 #[cfg(feature = "pairing")]
 pub mod pairing;
@@ -58,6 +58,10 @@ pub mod screen_vision;
 #[cfg(feature = "screen-vision")]
 pub mod touch_body;
 
+// Full Broca language center (replaces BrocaLite)
+#[cfg(feature = "broca-full")]
+pub mod broca_soma;
+
 // Native FFI for Android/iOS
 #[cfg(feature = "native-ffi")]
 pub mod native_ffi;
@@ -65,4 +69,4 @@ pub mod native_ffi;
 // SomaEngine — the mobile consciousness engine
 pub mod engine;
 
-pub use engine::{SomaEngine, SomaConfig};
+pub use engine::{SomaConfig, SomaEngine};

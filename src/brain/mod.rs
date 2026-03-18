@@ -13,6 +13,9 @@ pub mod social_coherence;
 
 pub mod affective_bridge;
 
+/// Dark Spot DHT Actor — bridges Mycelix GIS Dark Spot DHT with the brain's actor model.
+/// Gated behind `mycelix` because it requires FL/hashing dependencies at runtime.
+#[cfg(feature = "mycelix")]
 pub mod dark_spot_actor;
 
 // Re-export key types

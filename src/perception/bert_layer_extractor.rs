@@ -258,7 +258,12 @@ impl BertLayerExtractor {
         let is_safetensors = Self::is_safetensors_file(weights_path)?;
 
         if is_safetensors {
-            super::model_integrity::verified_mmap_safetensors(&[weights_path.clone()], DType::F32, device, None)
+            super::model_integrity::verified_mmap_safetensors(
+                &[weights_path.clone()],
+                DType::F32,
+                device,
+                None,
+            )
         } else {
             Ok(VarBuilder::from_pth(weights_path, DType::F32, device)?)
         }

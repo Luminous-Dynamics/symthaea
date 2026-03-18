@@ -1,4 +1,27 @@
 //! Telemetry types — CycleMetadata and sub-structs.
+//!
+//! # Field Naming Convention
+//!
+//! All telemetry fields should follow `domain_component_aspect` naming:
+//!
+//! | Domain prefix | Example | Scope |
+//! |---------------|---------|-------|
+//! | `neuromod_*` | `neuromod_da_d1` | Neuromodulator bath signals |
+//! | `consciousness_*` | `consciousness_level` | Unified consciousness metrics |
+//! | `reasoning_*` | `reasoning_gate_blocked` | Reasoning engine state |
+//! | `substrate_*` | `substrate_feasibility` | Substrate independence |
+//! | `circadian_*` | `circadian_hour` | Chronobiology |
+//! | `structural_*` | `structural_micro_phi` | Hierarchical Phi |
+//! | `self_assessment_*` | `self_assessment_accuracy` | Meta-cognitive self-model |
+//! | `temporal_*` | `temporal_coherence_score` | Temporal dynamics |
+//! | `embodied_*` | `embodied_phi_modulation` | Embodied cognition |
+//!
+//! **Legacy exceptions** (pre-convention, kept for dashboard compatibility):
+//! - `dopamine_effective` (should be `neuromod_dopamine_effective`)
+//! - `noradrenaline_effective`, `serotonin_effective`, `acetylcholine_effective`
+//! - `body_*` fields (should be `embodied_*`)
+//!
+//! New fields MUST use the domain prefix. Do not add unprefixed fields.
 
 use serde::{Deserialize, Serialize};
 use symthaea_types::N_HARMONIES;

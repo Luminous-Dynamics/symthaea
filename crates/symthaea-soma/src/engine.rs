@@ -13,6 +13,8 @@ use symthaea_spore::compass::CompassSnapshot;
 use symthaea_spore::config::{SharingConfig, SporeConfig};
 use symthaea_spore::engine::{CycleResult, SporeEngine};
 
+#[cfg(feature = "broca-full")]
+use crate::broca_soma::BrocaSoma;
 #[cfg(feature = "screen-vision")]
 use crate::screen_vision::{ScreenPerception, ScreenVisionBridge, ScreenVisionConfig};
 #[cfg(feature = "screen-vision")]
@@ -35,6 +37,9 @@ impl Default for SomaConfig {
                 neurons_per_layer: 32,
                 phi_every_n_cycles: 3,
                 target_hz: 20.0,
+                // Expanded memory for 12GB mobile devices
+                semantic_memory_capacity: 2_000,
+                episodic_memory_capacity: 500,
                 ..SporeConfig::default()
             },
             sharing: SharingConfig::default(),
@@ -74,6 +79,10 @@ pub struct SomaEngine {
     #[cfg(feature = "screen-vision")]
     touch_body: TouchBody,
 
+    /// Full 20-channel Broca language center with epistemic gating.
+    #[cfg(feature = "broca-full")]
+    broca_soma: BrocaSoma,
+
     // Platform state (set via native FFI or programmatically)
     /// Current thermal level (0=Nominal, 1=Fair, 2=Serious, 3=Critical, 4=Emergency).
     pub thermal_level: u8,
@@ -108,6 +117,8 @@ impl SomaEngine {
             screen_vision: ScreenVisionBridge::new(ScreenVisionConfig::default()),
             #[cfg(feature = "screen-vision")]
             touch_body: TouchBody::new(),
+            #[cfg(feature = "broca-full")]
+            broca_soma: BrocaSoma::new(),
             thermal_level: 0,
             battery_percent: 100,
             battery_charging: false,
@@ -221,11 +232,12 @@ impl SomaEngine {
                             .iter()
                             .map(|b| format!("{b:02x}"))
                             .collect::<String>();
-                        self.holon_bridge
-                            .enqueue_outbound(crate::holon_bridge::HolonOutbound::PairingVerified {
+                        self.holon_bridge.enqueue_outbound(
+                            crate::holon_bridge::HolonOutbound::PairingVerified {
                                 peer_id: *peer_id,
                                 pubkey_hex,
-                            });
+                            },
+                        );
                     }
                 }
                 let _ = msg;
@@ -527,12 +539,7 @@ impl SomaEngine {
     /// Returns a `ScreenPerception` with the holographic scene encoding and
     /// salient attention targets.
     #[cfg(feature = "screen-vision")]
-    pub fn inject_frame(
-        &mut self,
-        frame_rgb: &[u8],
-        width: u32,
-        height: u32,
-    ) -> ScreenPerception {
+    pub fn inject_frame(&mut self, frame_rgb: &[u8], width: u32, height: u32) -> ScreenPerception {
         let perception = self.screen_vision.process_frame(frame_rgb, width, height);
 
         // Scene surprise → NE nudge (environmental change detection)
@@ -573,18 +580,75 @@ impl SomaEngine {
     /// Call periodically to collect what the ventral stream has recognized
     /// from previously dispatched salient screen regions.
     #[cfg(feature = "screen-vision")]
-    pub fn drain_screen_recognitions(
-        &mut self,
-    ) -> Vec<symthaea_foveation::FoveationResult> {
+    pub fn drain_screen_recognitions(&mut self) -> Vec<symthaea_foveation::FoveationResult> {
         self.screen_vision.drain_foveation_results()
     }
 
     /// Screen vision telemetry.
     #[cfg(feature = "screen-vision")]
-    pub fn screen_vision_telemetry(
-        &self,
-    ) -> crate::screen_vision::ScreenVisionTelemetry {
+    pub fn screen_vision_telemetry(&self) -> crate::screen_vision::ScreenVisionTelemetry {
         self.screen_vision.telemetry()
+    }
+
+    // ======================================================================
+    // Full Broca language center (broca-full feature)
+    // ======================================================================
+
+    /// Generate text using the full 20-channel Broca pipeline.
+    ///
+    /// Maps current consciousness state, neuromods, sensor state, and screen
+    /// perception into ThoughtChannels, then runs autoregressive generation
+    /// with epistemic gating and semantic veto.
+    #[cfg(feature = "broca-full")]
+    pub fn generate_embodied_text(&mut self) -> symthaea_broca::GenerationResult {
+        let nm = self.spore.neuromod_levels();
+        let screen_surprise = {
+            #[cfg(feature = "screen-vision")]
+            {
+                self.screen_vision.telemetry().last_surprise
+            }
+            #[cfg(not(feature = "screen-vision"))]
+            {
+                0.0f32
+            }
+        };
+        self.broca_soma.generate_embodied(
+            self.spore.consciousness_level(),
+            0.3, // TODO: expose last prediction_error from SporeEngine
+            self.spore.harmony_alignment(),
+            nm,
+            self.metabolism.state().as_u8(),
+            self.sensor_bridge.motion_state().as_u8(),
+            screen_surprise,
+        )
+    }
+
+    /// Generate continuing text using the full 20-channel Broca pipeline.
+    ///
+    /// Preserves CfC neural state from prior generations for coherent
+    /// multi-turn dialogue. Same channel mapping as `generate_embodied_text`.
+    #[cfg(feature = "broca-full")]
+    pub fn generate_embodied_text_continuing(&mut self) -> symthaea_broca::GenerationResult {
+        let nm = self.spore.neuromod_levels();
+        let screen_surprise = {
+            #[cfg(feature = "screen-vision")]
+            {
+                self.screen_vision.telemetry().last_surprise
+            }
+            #[cfg(not(feature = "screen-vision"))]
+            {
+                0.0f32
+            }
+        };
+        self.broca_soma.generate_continuing_embodied(
+            self.spore.consciousness_level(),
+            0.3,
+            self.spore.harmony_alignment(),
+            nm,
+            self.metabolism.state().as_u8(),
+            self.sensor_bridge.motion_state().as_u8(),
+            screen_surprise,
+        )
     }
 }
 

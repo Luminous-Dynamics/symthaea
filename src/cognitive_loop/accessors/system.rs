@@ -866,7 +866,9 @@ impl CognitiveLoopService {
 
     /// Whether shadow surfacing is indicated (diagnostic only).
     pub fn shadow_surfacing_indicated(&self) -> bool {
-        self.therapeutic_manager.shadow_detector.surfacing_indicated()
+        self.therapeutic_manager
+            .shadow_detector
+            .surfacing_indicated()
     }
 
     /// Shadow dream queue depth.

@@ -1540,7 +1540,7 @@ mod tests {
             let mut dataset = TrainingDataset::default();
             let channels = ThoughtChannels::with_intent(1);
             dataset.pairs.push(TrainingPair {
-                channels: channels.channels,
+                channels: channels.channels.to_vec(),
                 target_text: "hello world".to_string(),
                 target_ids: vec![],
             });
@@ -1586,7 +1586,7 @@ mod tests {
             for intent in 0..4 {
                 let channels = ThoughtChannels::with_intent(intent);
                 dataset.pairs.push(TrainingPair {
-                    channels: channels.channels,
+                    channels: channels.channels.to_vec(),
                     target_text: "the answer is clear".to_string(),
                     target_ids: vec![],
                 });
@@ -1640,7 +1640,7 @@ mod tests {
             for intent in 0..3 {
                 let ch = ThoughtChannels::with_intent(intent);
                 dataset.pairs.push(TrainingPair {
-                    channels: ch.channels,
+                    channels: ch.channels.to_vec(),
                     target_text: "hello world test".to_string(),
                     target_ids: vec![],
                 });

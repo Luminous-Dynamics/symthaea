@@ -362,7 +362,8 @@ impl SubstrateManager {
 
     /// Get the feasibility score for a specific cortical region.
     /// Returns the global effective feasibility when per-region is not configured.
-    #[allow(dead_code)] // Phase 4: per-region substrate modeling
+    /// Get the feasibility score for a specific cortical region.
+    /// Returns the global effective feasibility when per-region is not configured.
     pub fn region_feasibility(&self, region: CorticalRegion) -> f32 {
         self.per_region_feasibility
             .get(&region)
@@ -371,7 +372,6 @@ impl SubstrateManager {
     }
 
     /// Reconfigure a single region's substrate at runtime.
-    #[allow(dead_code)] // Phase 4: per-region substrate modeling
     pub fn reconfigure_region(&mut self, region: CorticalRegion, substrate: SubstrateType) {
         let map = self.per_region_substrates.get_or_insert_with(HashMap::new);
         map.insert(region, substrate.canonical());
@@ -452,7 +452,7 @@ impl SubstrateManager {
         let per_region = self
             .per_region_feasibility
             .iter()
-            .map(|(region, &feas)| (format!("{:?}", region), feas))
+            .map(|(region, &feas)| (region.as_str().to_string(), feas))
             .collect();
         let encoding_noise = if config.enable_substrate_encoding_noise && self.scale_pressure < 0.0
         {
@@ -547,7 +547,7 @@ impl SubstrateManager {
 // These forward to SubstrateManager so that constructor.rs can call
 // Self::requirements_for(...) and Self::substrate_validation_key(...).
 
-#[allow(dead_code)] // Delegation kept for backward compatibility
+#[allow(dead_code)] // Public API for external consumers; not called internally yet
 impl super::CognitiveLoopService {
     /// Default honest confidence for substrates not in the validation framework.
     pub(crate) const THEORETICAL_CONFIDENCE: f64 = THEORETICAL_CONFIDENCE;

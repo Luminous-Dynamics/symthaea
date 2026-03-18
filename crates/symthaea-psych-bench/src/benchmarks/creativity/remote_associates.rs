@@ -190,7 +190,7 @@ impl RemoteAssociatesBenchmark {
             let ns = seed.wrapping_add(7000);
             ((ns.wrapping_mul(0x9E3779B97F4A7C15) >> 33) as f32 / (1u64 << 31) as f32) - 0.5
         };
-        let solution_sim = bundle.similarity(&solution_hv) + sol_noise * enc_noise * 0.12;
+        let solution_sim = bundle.similarity(&solution_hv) + sol_noise * enc_noise * 0.20;
         let mut all_sims: Vec<(usize, f32)> = vec![(0, solution_sim)]; // index 0 = solution
         for (i, dhv) in distractor_hvs.iter().enumerate() {
             // Per-candidate encoding noise (hash-based deterministic)
@@ -206,14 +206,15 @@ impl RemoteAssociatesBenchmark {
             };
             all_sims.push((
                 i + 1,
-                bundle.similarity(dhv) + noise + cand_noise * enc_noise * 0.12,
+                bundle.similarity(dhv) + noise + cand_noise * enc_noise * 0.20,
             ));
         }
         all_sims.sort_by(|(_, a), (_, b)| b.total_cmp(a));
 
-        // Accuracy: solution ranks first
+        // Accuracy: solution ranks first. Lapse model can flip correctness.
         let rank = all_sims.iter().position(|(idx, _)| *idx == 0).unwrap_or(9) + 1;
-        let accuracy = if rank == 1 { 1.0 } else { 0.0 };
+        let correct = config.check_correct(rank == 1, "remote_associates", trial_idx);
+        let accuracy = if correct { 1.0 } else { 0.0 };
         let mean_rank = rank as f64;
 
         // Binding-based associative recall: cue1.bind(cue2) similarity to solution

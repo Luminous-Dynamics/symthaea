@@ -273,7 +273,11 @@ impl ProposalCollector {
 
         // Start from base or highest-priority Set (ties: last one wins)
         let mut value = if !sets.is_empty() {
-            let max_pri = sets.iter().map(|(_, _, p)| *p).max().expect("non-empty by guard");
+            let max_pri = sets
+                .iter()
+                .map(|(_, _, p)| *p)
+                .max()
+                .expect("non-empty by guard");
             sets.iter()
                 .rev()
                 .find(|(_, _, p)| *p == max_pri)

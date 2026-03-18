@@ -8,8 +8,8 @@
 //! - **With `pairing` feature**: Real Ed25519 signatures via `ed25519-dalek`
 //! - **Without `pairing` feature**: BLAKE3 keyed MAC fallback (symmetric)
 
-use symthaea_spore::config::PairingMode;
 use serde::{Deserialize, Serialize};
+use symthaea_spore::config::PairingMode;
 
 /// Maximum number of paired devices (matches BleMesh peer cap).
 const MAX_PAIRED_DEVICES: usize = 16;

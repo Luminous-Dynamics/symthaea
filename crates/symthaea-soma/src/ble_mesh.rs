@@ -4,8 +4,8 @@
 //! collective phi computation. BLE scanning/advertising is platform-side
 //! (Kotlin/Swift). Configurable via `SharingConfig.ble_mode`.
 
-use symthaea_spore::config::BleMeshMode;
 use serde::{Deserialize, Serialize};
+use symthaea_spore::config::BleMeshMode;
 
 const MAX_PEERS: usize = 16;
 const STALE_CYCLES: u64 = 200;

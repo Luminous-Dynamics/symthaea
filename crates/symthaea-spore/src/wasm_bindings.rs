@@ -114,6 +114,17 @@ impl SporeEngine {
     // Language generation (Broca)
     // ======================================================================
 
+    /// Load trained Broca checkpoint weights from a binary buffer.
+    ///
+    /// The checkpoint file (broca-spore-v1.bin) contains trained token embeddings,
+    /// position embeddings, and gate weights. After loading, the autoregressive
+    /// generation path produces coherent language at consciousness levels >= 0.15.
+    pub fn load_broca_checkpoint(&mut self, data: &[u8]) -> Result<(), JsError> {
+        self.inner
+            .load_broca_checkpoint(data)
+            .map_err(|e| JsError::new(&e))
+    }
+
     /// Generate text from current consciousness state.
     /// Returns GenerationResult as JS object with `text`, `num_tokens`, `eos_terminated`.
     pub fn generate_text(&mut self, max_tokens: usize) -> Result<JsValue, JsError> {

@@ -152,7 +152,7 @@ fn main() {
         let m = &result.metadata;
 
         // Extract REAL cognitive state from the cognitive loop
-        let consciousness = m.consciousness_level as f32;
+        let consciousness = m.consciousness.consciousness_level as f32;
         // Valence from neuromodulator balance: serotonin (mood) vs dopamine (reward)
         let valence = ((m.neuromod.serotonin_effective - 0.5) * 0.5
             + (m.neuromod.dopamine_effective - 0.5) * 0.5) as f32;

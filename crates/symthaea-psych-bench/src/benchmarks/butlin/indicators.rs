@@ -337,8 +337,7 @@ impl PsychBenchmark for ButlinIndicatorSuite {
         }
         // Mean quality across all scored indicators (continuous, captures partial strengths)
         if !quality_scores.is_empty() {
-            let mean_quality =
-                quality_scores.iter().sum::<f64>() / quality_scores.len() as f64;
+            let mean_quality = quality_scores.iter().sum::<f64>() / quality_scores.len() as f64;
             result.insert(
                 "mean_quality_score",
                 MetricValue::from_samples(&[mean_quality]),

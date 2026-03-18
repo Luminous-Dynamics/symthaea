@@ -18,14 +18,12 @@ use symthaea_spore::engine::SporeEngine;
 /// Benchmark configurations: (neurons_per_layer, network_layers, label)
 const CONFIGS: &[(usize, usize, &str)] = &[
     (16, 2, "16×2  (32 neurons)"),
-    (32, 3, "32×3  (96 neurons)  [current Soma default]"),
-    (64, 3, "64×3  (192 neurons) [current desktop default]"),
+    (32, 3, "32×3  (96 neurons)  [Soma default]"),
+    (64, 3, "64×3  (192 neurons) [desktop default]"),
     (128, 3, "128×3 (384 neurons)"),
-    (128, 4, "128×4 (512 neurons) [Tier 2 target]"),
+    (128, 4, "128×4 (512 neurons) [Tier 2]"),
     (256, 3, "256×3 (768 neurons)"),
-    (256, 4, "256×4 (1024 neurons) [Tier 3 target]"),
-    (512, 3, "512×3 (1536 neurons)"),
-    (512, 4, "512×4 (2048 neurons)"),
+    (256, 4, "256×4 (1024 neurons) [Tier 3]"),
 ];
 
 /// Number of warmup cycles (not measured).
@@ -80,7 +78,11 @@ fn main() {
         let median = times_us[times_us.len() / 2];
         let mean = times_us.iter().sum::<u64>() / times_us.len() as u64;
         let p95 = times_us[(times_us.len() as f64 * 0.95) as usize];
-        let max_hz = if median > 0 { 1_000_000.0 / median as f64 } else { f64::INFINITY };
+        let max_hz = if median > 0 {
+            1_000_000.0 / median as f64
+        } else {
+            f64::INFINITY
+        };
         let total_dims = neurons * layers * 16_384;
 
         println!(
@@ -129,7 +131,9 @@ fn main() {
             ..SporeConfig::default()
         };
         let mut engine_phi1 = SporeEngine::new(config_phi1);
-        for i in 0..20 { engine_phi1.cycle(&format!("w {i}")); }
+        for i in 0..20 {
+            engine_phi1.cycle(&format!("w {i}"));
+        }
         for i in 0..50 {
             let start = Instant::now();
             engine_phi1.cycle(&inputs[i]);
@@ -144,7 +148,9 @@ fn main() {
             ..SporeConfig::default()
         };
         let mut engine_nophi = SporeEngine::new(config_nophi);
-        for i in 0..20 { engine_nophi.cycle(&format!("w {i}")); }
+        for i in 0..20 {
+            engine_nophi.cycle(&format!("w {i}"));
+        }
         let mut without_phi_us: Vec<u64> = Vec::with_capacity(50);
         for i in 0..50 {
             let start = Instant::now();
@@ -156,8 +162,16 @@ fn main() {
         without_phi_us.sort();
         let phi_median = with_phi_us[25];
         let nophi_median = without_phi_us[25];
-        let phi_cost = if phi_median > nophi_median { phi_median - nophi_median } else { 0 };
-        let phi_pct = if phi_median > 0 { (phi_cost as f64 / phi_median as f64) * 100.0 } else { 0.0 };
+        let phi_cost = if phi_median > nophi_median {
+            phi_median - nophi_median
+        } else {
+            0
+        };
+        let phi_pct = if phi_median > 0 {
+            (phi_cost as f64 / phi_median as f64) * 100.0
+        } else {
+            0.0
+        };
 
         println!(
             "  {:<34} with_phi: {:>5}µs  without: {:>5}µs  phi_cost: {:>5}µs ({:.0}%)",
@@ -178,7 +192,9 @@ fn main() {
         };
 
         let mut engine = SporeEngine::new(config);
-        for i in 0..20 { engine.cycle(&format!("w {i}")); }
+        for i in 0..20 {
+            engine.cycle(&format!("w {i}"));
+        }
 
         let mut times_us: Vec<u64> = Vec::with_capacity(BENCH_CYCLES);
         for i in 0..BENCH_CYCLES {
@@ -189,7 +205,11 @@ fn main() {
         times_us.sort();
         let median = times_us[times_us.len() / 2];
         let mean = times_us.iter().sum::<u64>() / times_us.len() as u64;
-        let max_hz = if median > 0 { 1_000_000.0 / median as f64 } else { f64::INFINITY };
+        let max_hz = if median > 0 {
+            1_000_000.0 / median as f64
+        } else {
+            f64::INFINITY
+        };
 
         println!(
             "  {:<34} median: {:>5}µs  mean: {:>5}µs  max: {:>7.0}Hz",

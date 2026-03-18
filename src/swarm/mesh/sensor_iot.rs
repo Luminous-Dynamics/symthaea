@@ -68,20 +68,29 @@ impl ResourceType {
     /// Classify from a sensor key name.
     pub fn classify(key: &str) -> Self {
         let lower = key.to_lowercase();
-        if lower.contains("water") || lower.contains("flow") || lower.contains("tank")
-            || lower.contains("purity") || lower.contains("level")
+        if lower.contains("water")
+            || lower.contains("flow")
+            || lower.contains("tank")
+            || lower.contains("purity")
+            || lower.contains("level")
         {
             Self::Water
-        } else if lower.contains("power") || lower.contains("voltage")
-            || lower.contains("current") || lower.contains("energy") || lower.contains("watt")
+        } else if lower.contains("power")
+            || lower.contains("voltage")
+            || lower.contains("current")
+            || lower.contains("energy")
+            || lower.contains("watt")
         {
             Self::Power
         } else if lower.contains("temp") {
             Self::Temperature
         } else if lower.contains("humid") {
             Self::Humidity
-        } else if lower.contains("co2") || lower.contains("air") || lower.contains("gas")
-            || lower.contains("pm25") || lower.contains("voc")
+        } else if lower.contains("co2")
+            || lower.contains("air")
+            || lower.contains("gas")
+            || lower.contains("pm25")
+            || lower.contains("voc")
         {
             Self::AirQuality
         } else {
@@ -225,9 +234,7 @@ impl IoTSensorAdapter {
             }
             IoTPlatform::EspHome => {
                 if let Some(val) = obj.get("value").and_then(|v| v.as_f64()) {
-                    let id = obj.get("id")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("value");
+                    let id = obj.get("id").and_then(|v| v.as_str()).unwrap_or("value");
                     values.insert(id.to_string(), val);
                 }
             }
@@ -262,7 +269,8 @@ impl IoTSensorAdapter {
             let resource_type = ResourceType::classify(key);
 
             // Update history
-            let hist = self.history
+            let hist = self
+                .history
                 .entry(format!("{}:{}", reading.sensor_id, key))
                 .or_default();
             if hist.len() >= self.max_history_per_sensor {
@@ -320,10 +328,17 @@ impl IoTSensorAdapter {
         self.history.len()
     }
 
-    fn detect_platform(&self, topic: &str, obj: &serde_json::Map<String, serde_json::Value>) -> IoTPlatform {
+    fn detect_platform(
+        &self,
+        topic: &str,
+        obj: &serde_json::Map<String, serde_json::Value>,
+    ) -> IoTPlatform {
         if topic.starts_with("zigbee2mqtt/") {
             IoTPlatform::Zigbee2Mqtt
-        } else if obj.contains_key("ENERGY") || obj.contains_key("BME280") || topic.starts_with("tele/") {
+        } else if obj.contains_key("ENERGY")
+            || obj.contains_key("BME280")
+            || topic.starts_with("tele/")
+        {
             IoTPlatform::Tasmota
         } else if obj.contains_key("id") && obj.contains_key("value") {
             IoTPlatform::EspHome
@@ -343,33 +358,51 @@ impl IoTSensorAdapter {
         let (severity, threshold, description) = match resource_type {
             ResourceType::Water => {
                 if value < self.thresholds.water_low_critical {
-                    (AlertSeverity::Critical, self.thresholds.water_low_critical,
-                     format!("Water level critically low: {:.1}%", value * 100.0))
+                    (
+                        AlertSeverity::Critical,
+                        self.thresholds.water_low_critical,
+                        format!("Water level critically low: {:.1}%", value * 100.0),
+                    )
                 } else if value < self.thresholds.water_low_warning {
-                    (AlertSeverity::Warning, self.thresholds.water_low_warning,
-                     format!("Water level low: {:.1}%", value * 100.0))
+                    (
+                        AlertSeverity::Warning,
+                        self.thresholds.water_low_warning,
+                        format!("Water level low: {:.1}%", value * 100.0),
+                    )
                 } else {
                     return None;
                 }
             }
             ResourceType::Power => {
                 if value > self.thresholds.power_high_critical {
-                    (AlertSeverity::Critical, self.thresholds.power_high_critical,
-                     format!("Power consumption critical: {:.0}W", value))
+                    (
+                        AlertSeverity::Critical,
+                        self.thresholds.power_high_critical,
+                        format!("Power consumption critical: {:.0}W", value),
+                    )
                 } else if value > self.thresholds.power_high_warning {
-                    (AlertSeverity::Warning, self.thresholds.power_high_warning,
-                     format!("Power consumption high: {:.0}W", value))
+                    (
+                        AlertSeverity::Warning,
+                        self.thresholds.power_high_warning,
+                        format!("Power consumption high: {:.0}W", value),
+                    )
                 } else {
                     return None;
                 }
             }
             ResourceType::Temperature => {
                 if value > self.thresholds.temp_high_warning {
-                    (AlertSeverity::Warning, self.thresholds.temp_high_warning,
-                     format!("High temperature: {:.1}°C", value))
+                    (
+                        AlertSeverity::Warning,
+                        self.thresholds.temp_high_warning,
+                        format!("High temperature: {:.1}°C", value),
+                    )
                 } else if value < self.thresholds.temp_low_warning {
-                    (AlertSeverity::Warning, self.thresholds.temp_low_warning,
-                     format!("Low temperature: {:.1}°C", value))
+                    (
+                        AlertSeverity::Warning,
+                        self.thresholds.temp_low_warning,
+                        format!("Low temperature: {:.1}°C", value),
+                    )
                 } else {
                     return None;
                 }
@@ -406,11 +439,13 @@ mod tests {
     #[test]
     fn test_parse_zigbee2mqtt() {
         let adapter = IoTSensorAdapter::new();
-        let reading = adapter.parse_message(
-            "zigbee2mqtt/living_room",
-            r#"{"temperature": 22.5, "humidity": 45, "battery": 80}"#,
-            1000,
-        ).unwrap();
+        let reading = adapter
+            .parse_message(
+                "zigbee2mqtt/living_room",
+                r#"{"temperature": 22.5, "humidity": 45, "battery": 80}"#,
+                1000,
+            )
+            .unwrap();
         assert_eq!(reading.platform, IoTPlatform::Zigbee2Mqtt);
         assert!((reading.values["temperature"] - 22.5).abs() < 0.01);
         assert!((reading.values["humidity"] - 45.0).abs() < 0.01);
@@ -419,11 +454,13 @@ mod tests {
     #[test]
     fn test_parse_tasmota() {
         let adapter = IoTSensorAdapter::new();
-        let reading = adapter.parse_message(
-            "tele/plug1/SENSOR",
-            r#"{"ENERGY": {"Power": 150, "Voltage": 230, "Current": 0.65}}"#,
-            1000,
-        ).unwrap();
+        let reading = adapter
+            .parse_message(
+                "tele/plug1/SENSOR",
+                r#"{"ENERGY": {"Power": 150, "Voltage": 230, "Current": 0.65}}"#,
+                1000,
+            )
+            .unwrap();
         assert_eq!(reading.platform, IoTPlatform::Tasmota);
         assert!((reading.values["Power"] - 150.0).abs() < 0.01);
     }
@@ -431,11 +468,13 @@ mod tests {
     #[test]
     fn test_parse_esphome() {
         let adapter = IoTSensorAdapter::new();
-        let reading = adapter.parse_message(
-            "esphome/sensor",
-            r#"{"id": "sensor.temp", "value": 22.5, "state": "22.5°C"}"#,
-            1000,
-        ).unwrap();
+        let reading = adapter
+            .parse_message(
+                "esphome/sensor",
+                r#"{"id": "sensor.temp", "value": 22.5, "state": "22.5°C"}"#,
+                1000,
+            )
+            .unwrap();
         assert_eq!(reading.platform, IoTPlatform::EspHome);
         assert!((reading.values["sensor.temp"] - 22.5).abs() < 0.01);
     }
@@ -489,7 +528,10 @@ mod tests {
     fn test_resource_type_classification() {
         assert_eq!(ResourceType::classify("water_level"), ResourceType::Water);
         assert_eq!(ResourceType::classify("Power"), ResourceType::Power);
-        assert_eq!(ResourceType::classify("temperature"), ResourceType::Temperature);
+        assert_eq!(
+            ResourceType::classify("temperature"),
+            ResourceType::Temperature
+        );
         assert_eq!(ResourceType::classify("humidity"), ResourceType::Humidity);
         assert_eq!(ResourceType::classify("co2"), ResourceType::AirQuality);
         assert_eq!(ResourceType::classify("random"), ResourceType::General);
@@ -538,6 +580,8 @@ mod tests {
     #[test]
     fn test_empty_values_rejected() {
         let adapter = IoTSensorAdapter::new();
-        assert!(adapter.parse_message("topic", r#"{"text": "hello"}"#, 0).is_none());
+        assert!(adapter
+            .parse_message("topic", r#"{"text": "hello"}"#, 0)
+            .is_none());
     }
 }

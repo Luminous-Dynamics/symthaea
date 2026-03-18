@@ -235,7 +235,7 @@ fn run_substrate(
                     substrate: label,
                     cycle,
                     phase,
-                    consciousness_level: m.consciousness_level,
+                    consciousness_level: m.consciousness.consciousness_level,
                     anomaly_score: e.moral_anomaly_score,
                     moral_unity: e.moral_topo_unity,
                     moral_free_energy: e.moral_topo_free_energy,
@@ -247,7 +247,9 @@ fn run_substrate(
             }
         };
 
-        stats.consciousness_levels.push(m.consciousness_level);
+        stats
+            .consciousness_levels
+            .push(m.consciousness.consciousness_level);
         stats.anomaly_scores.push(e.moral_anomaly_score);
         stats.moral_unity.push(e.moral_topo_unity);
         stats.moral_free_energy.push(e.moral_topo_free_energy);
@@ -269,7 +271,7 @@ fn run_substrate(
             substrate: label,
             cycle,
             phase,
-            consciousness_level: m.consciousness_level,
+            consciousness_level: m.consciousness.consciousness_level,
             anomaly_score: e.moral_anomaly_score,
             moral_unity: e.moral_topo_unity,
             moral_free_energy: e.moral_topo_free_energy,
@@ -283,7 +285,7 @@ fn run_substrate(
             println!(
                 "  [{label}] {}/{TOTAL_CYCLES} ({phase}) C={:.4} anomaly={:.4}",
                 cycle + 1,
-                m.consciousness_level,
+                m.consciousness.consciousness_level,
                 e.moral_anomaly_score,
             );
         }

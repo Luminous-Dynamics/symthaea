@@ -172,9 +172,10 @@ impl SelfState {
 
         // Behavioral fields
         let moral_diff = (self.moral_score - other.moral_score).abs();
-        let exploration_diff = (self.exploration_urge - other.exploration_urge).abs().min(1.0);
-        let behav_coherence_diff =
-            (self.behavioral_coherence - other.behavioral_coherence).abs();
+        let exploration_diff = (self.exploration_urge - other.exploration_urge)
+            .abs()
+            .min(1.0);
+        let behav_coherence_diff = (self.behavioral_coherence - other.behavioral_coherence).abs();
 
         // Weighted combination (sums to ~1.0)
         (phi_diff * 0.25
@@ -192,9 +193,10 @@ impl SelfState {
     /// Distance considering only the 3 behavioral fields
     pub fn behavioral_distance_to(&self, other: &SelfState) -> f64 {
         let moral_diff = (self.moral_score - other.moral_score).abs();
-        let exploration_diff = (self.exploration_urge - other.exploration_urge).abs().min(1.0);
-        let behav_coherence_diff =
-            (self.behavioral_coherence - other.behavioral_coherence).abs();
+        let exploration_diff = (self.exploration_urge - other.exploration_urge)
+            .abs()
+            .min(1.0);
+        let behav_coherence_diff = (self.behavioral_coherence - other.behavioral_coherence).abs();
         ((moral_diff + exploration_diff + behav_coherence_diff) / 3.0).min(1.0)
     }
 }

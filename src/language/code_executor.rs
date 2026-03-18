@@ -550,6 +550,9 @@ pub struct CompileError {
     pub column: Option<usize>,
     /// Error category for recovery strategy selection.
     pub category: ErrorCategory,
+    /// Compiler-suggested replacement text (from `--message-format=json`).
+    /// When available, this is a machine-applicable fix from rustc itself.
+    pub suggested_replacement: Option<String>,
 }
 
 /// Category of compilation error — determines recovery strategy.
@@ -594,6 +597,7 @@ impl CompileError {
             line,
             column,
             category,
+            suggested_replacement: None,
         }
     }
 
@@ -699,6 +703,118 @@ pub fn parse_structured_errors(stderr: &str) -> Vec<CompileError> {
             i += 1;
         }
     }
+    errors
+}
+
+/// A rustc JSON diagnostic (subset of fields we use).
+///
+/// Produced by `cargo check --message-format=json`. Each line of stdout is a JSON
+/// object; we only care about `"compiler-message"` entries whose `message.level`
+/// is `"error"`.
+#[derive(Debug, serde::Deserialize)]
+struct RustcJsonEnvelope {
+    reason: Option<String>,
+    message: Option<RustcDiagnostic>,
+}
+
+/// Core diagnostic from rustc's JSON output.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct RustcDiagnostic {
+    /// Human-readable message text.
+    pub message: String,
+    /// Error code object, e.g. `{"code": "E0308", "explanation": ...}`.
+    pub code: Option<RustcDiagnosticCode>,
+    /// Severity level: "error", "warning", etc.
+    pub level: String,
+    /// Primary source spans.
+    pub spans: Vec<RustcSpan>,
+    /// Child diagnostics (help, note, suggestion).
+    pub children: Vec<RustcDiagnostic>,
+}
+
+/// Rustc error code.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct RustcDiagnosticCode {
+    pub code: String,
+}
+
+/// A span in rustc's JSON output.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct RustcSpan {
+    pub file_name: String,
+    pub line_start: usize,
+    pub line_end: usize,
+    pub column_start: usize,
+    pub column_end: usize,
+    /// If this span is a suggestion, the replacement text.
+    pub suggested_replacement: Option<String>,
+    pub is_primary: bool,
+}
+
+/// Parse `cargo check --message-format=json` output into structured errors.
+///
+/// Each line of stdout is a JSON object. We extract `"compiler-message"` entries
+/// with level `"error"`, converting them to `CompileError` with full location info
+/// and any compiler-suggested replacements.
+pub fn parse_json_diagnostics(json_output: &str) -> Vec<CompileError> {
+    let mut errors = Vec::new();
+
+    for line in json_output.lines() {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        let envelope: RustcJsonEnvelope = match serde_json::from_str(line) {
+            Ok(e) => e,
+            Err(_) => continue,
+        };
+
+        if envelope.reason.as_deref() != Some("compiler-message") {
+            continue;
+        }
+
+        let diag = match envelope.message {
+            Some(d) if d.level == "error" => d,
+            _ => continue,
+        };
+
+        let code_str = diag.code.as_ref().map(|c| c.code.clone());
+        let category = CompileError::categorize(&code_str, &diag.message);
+
+        // Find primary span for location
+        let primary_span = diag.spans.iter().find(|s| s.is_primary);
+        let (file, line_num, column) = match primary_span {
+            Some(s) => (
+                Some(s.file_name.clone()),
+                Some(s.line_start),
+                Some(s.column_start),
+            ),
+            None => (None, None, None),
+        };
+
+        // Look for suggested replacement: first in primary span, then in children
+        let suggested = primary_span
+            .and_then(|s| s.suggested_replacement.clone())
+            .or_else(|| {
+                diag.children.iter().find_map(|child| {
+                    child
+                        .spans
+                        .iter()
+                        .find_map(|s| s.suggested_replacement.clone())
+                })
+            });
+
+        errors.push(CompileError {
+            message: diag.message,
+            code: code_str,
+            file,
+            line: line_num,
+            column,
+            category,
+            suggested_replacement: suggested,
+        });
+    }
+
     errors
 }
 
@@ -1312,6 +1428,7 @@ mod tests {
             line: Some(4), // "let b = s;" is line 4
             column: Some(13),
             category: ErrorCategory::BorrowError,
+            suggested_replacement: None,
         }];
         let fixed = try_auto_fix_structured(source, &errors);
         assert!(fixed.is_some());
@@ -1329,6 +1446,7 @@ mod tests {
             line: Some(1),
             column: Some(27),
             category: ErrorCategory::LifetimeError,
+            suggested_replacement: None,
         }];
         let fixed = try_auto_fix_structured(source, &errors);
         assert!(fixed.is_some());
@@ -1353,6 +1471,7 @@ mod tests {
             line: Some(2),
             column: Some(55),
             category: ErrorCategory::MissingImpl,
+            suggested_replacement: None,
         }];
         let fixed = try_auto_fix_structured(source, &errors);
         assert!(fixed.is_some());
@@ -1386,5 +1505,60 @@ mod tests {
         let source = "fn main() {}";
         let errors: Vec<CompileError> = vec![];
         assert!(try_auto_fix_structured(source, &errors).is_none());
+    }
+
+    #[test]
+    fn test_parse_json_diagnostics_basic() {
+        let json = r#"{"reason":"compiler-message","package_id":"test","manifest_path":"","target":{"kind":["lib"],"crate_types":["lib"],"name":"test","src_path":"","edition":"2021","doctest":true,"test":true,"doc":true},"message":{"rendered":"","children":[],"code":{"code":"E0308","explanation":null},"level":"error","message":"mismatched types","spans":[{"byte_end":100,"byte_start":90,"column_end":15,"column_start":5,"expansion":null,"file_name":"src/lib.rs","is_primary":true,"label":null,"line_end":10,"line_start":10,"suggested_replacement":"x as i64","suggestion_applicability":"MachineApplicable","text":[]}]}}"#;
+        let errors = parse_json_diagnostics(json);
+        assert_eq!(errors.len(), 1);
+        assert_eq!(errors[0].code.as_deref(), Some("E0308"));
+        assert_eq!(errors[0].file.as_deref(), Some("src/lib.rs"));
+        assert_eq!(errors[0].line, Some(10));
+        assert_eq!(
+            errors[0].suggested_replacement.as_deref(),
+            Some("x as i64")
+        );
+    }
+
+    #[test]
+    fn test_parse_json_diagnostics_skips_warnings() {
+        let json = r#"{"reason":"compiler-message","message":{"rendered":"","children":[],"code":null,"level":"warning","message":"unused variable","spans":[]}}"#;
+        let errors = parse_json_diagnostics(json);
+        assert!(errors.is_empty(), "Should skip warnings");
+    }
+
+    #[test]
+    fn test_parse_json_diagnostics_skips_non_compiler() {
+        let json = r#"{"reason":"build-script-executed","package_id":"test","linked_libs":[],"linked_paths":[],"cfgs":[],"env":[],"out_dir":""}"#;
+        let errors = parse_json_diagnostics(json);
+        assert!(errors.is_empty(), "Should skip non-compiler-message");
+    }
+
+    #[test]
+    fn test_parse_json_diagnostics_multiline() {
+        let json = concat!(
+            r#"{"reason":"build-script-executed","package_id":"x","linked_libs":[],"linked_paths":[],"cfgs":[],"env":[],"out_dir":""}"#,
+            "\n",
+            r#"{"reason":"compiler-message","message":{"rendered":"","children":[],"code":{"code":"E0433","explanation":null},"level":"error","message":"failed to resolve: use of undeclared crate or module","spans":[{"byte_end":10,"byte_start":0,"column_end":10,"column_start":1,"expansion":null,"file_name":"src/main.rs","is_primary":true,"label":null,"line_end":1,"line_start":1,"suggested_replacement":null,"suggestion_applicability":null,"text":[]}]}}"#,
+            "\n",
+            r#"{"reason":"compiler-message","message":{"rendered":"","children":[],"code":{"code":"E0412","explanation":null},"level":"error","message":"cannot find type","spans":[{"byte_end":50,"byte_start":40,"column_end":20,"column_start":10,"expansion":null,"file_name":"src/main.rs","is_primary":true,"label":null,"line_end":3,"line_start":3,"suggested_replacement":null,"suggestion_applicability":null,"text":[]}]}}"#,
+        );
+        let errors = parse_json_diagnostics(json);
+        assert_eq!(errors.len(), 2);
+        assert_eq!(errors[0].code.as_deref(), Some("E0433"));
+        assert_eq!(errors[1].code.as_deref(), Some("E0412"));
+    }
+
+    #[test]
+    fn test_parse_json_diagnostics_child_suggestion() {
+        // Suggestion in children (common for "help: consider importing" messages)
+        let json = r#"{"reason":"compiler-message","message":{"rendered":"","children":[{"rendered":"","children":[],"code":null,"level":"help","message":"consider importing","spans":[{"byte_end":0,"byte_start":0,"column_end":1,"column_start":1,"expansion":null,"file_name":"src/lib.rs","is_primary":true,"label":null,"line_end":1,"line_start":1,"suggested_replacement":"use std::collections::HashMap;\n","suggestion_applicability":"MaybeIncorrect","text":[]}]}],"code":{"code":"E0412","explanation":null},"level":"error","message":"cannot find type `HashMap`","spans":[{"byte_end":30,"byte_start":20,"column_end":15,"column_start":5,"expansion":null,"file_name":"src/lib.rs","is_primary":true,"label":null,"line_end":5,"line_start":5,"suggested_replacement":null,"suggestion_applicability":null,"text":[]}]}}"#;
+        let errors = parse_json_diagnostics(json);
+        assert_eq!(errors.len(), 1);
+        assert_eq!(
+            errors[0].suggested_replacement.as_deref(),
+            Some("use std::collections::HashMap;\n")
+        );
     }
 }

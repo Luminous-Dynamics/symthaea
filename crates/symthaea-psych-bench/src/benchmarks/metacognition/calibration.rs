@@ -221,11 +221,12 @@ impl MetacognitiveCalibrationBenchmark {
                 // Raw cue combination: task demands dominate (85%), evidence minimal (15%).
                 // Humans rely heavily on experience-based cues (Koriat 2007) over
                 // direct retrieval-quality signals, producing moderate discrimination.
-                // Very low gap weight (3%) prevents the similarity-gap cue from
-                // boosting gamma above human range.
-                let raw = load_factor * 0.36
-                    + delay_factor * 0.46
-                    + gap_signal * 0.08
+                // Gap signal (retrieval quality cue) contributes modestly to
+                // discrimination — enough for gamma improvement without exceeding
+                // human range.
+                let raw = load_factor * 0.34
+                    + delay_factor * 0.44
+                    + gap_signal * 0.12
                     + familiarity * 0.10;
 
                 // Logistic calibration (Platt 1999): maps raw cue value to
@@ -243,12 +244,13 @@ impl MetacognitiveCalibrationBenchmark {
                 rng ^= rng << 13;
                 rng ^= rng >> 7;
                 rng ^= rng << 17;
-                // Time pressure: base noise 0.19 calibrated to ECE ~0.12, within one SD
-                // of human baseline (Fleming & Lau, 2014: ECE ~0.15 ± 0.05);
-                // tighter noise preserves confidence-accuracy correlation (gamma).
+                // Time pressure: base noise 0.16 calibrated to ECE ~0.11, within one SD
+                // of human baseline (Fleming & Lau, 2014: ECE ~0.15 ± 0.05).
+                // Lower base noise improves discrimination gamma (confidence-accuracy
+                // correlation) while keeping ECE within human range.
                 // +0.12/unit models reduced introspective access under SAT
                 // (Lichtenstein et al., 1982).
-                let noise_range = 0.19 + config.time_pressure * 0.12;
+                let noise_range = 0.16 + config.time_pressure * 0.12;
                 let noise = ((rng % 1000) as f64 / 1000.0 - 0.5) * noise_range;
                 let confidence = (raw_confidence + noise).clamp(0.0, 1.0);
 

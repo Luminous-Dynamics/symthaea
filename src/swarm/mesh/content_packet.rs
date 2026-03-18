@@ -56,8 +56,7 @@ impl ContentAnnounce {
         let domain_bytes = self.domain.as_bytes();
         let domain_len = domain_bytes.len().min(64) as u8;
         bytes[64] = domain_len;
-        bytes[65..65 + domain_len as usize]
-            .copy_from_slice(&domain_bytes[..domain_len as usize]);
+        bytes[65..65 + domain_len as usize].copy_from_slice(&domain_bytes[..domain_len as usize]);
         bytes[129..137].copy_from_slice(&self.created_at.to_le_bytes());
         BinaryHV(bytes)
     }
@@ -76,8 +75,9 @@ impl ContentAnnounce {
         if domain_len > 64 {
             return None;
         }
-        let domain =
-            std::str::from_utf8(&bytes[65..65 + domain_len]).ok()?.to_string();
+        let domain = std::str::from_utf8(&bytes[65..65 + domain_len])
+            .ok()?
+            .to_string();
         let created_at = u64::from_le_bytes(bytes[129..137].try_into().ok()?);
         Some(Self {
             content_hash,
@@ -124,8 +124,7 @@ mod tests {
     #[test]
     fn test_from_full_hdv() {
         let full = BinaryHV::random(777);
-        let ann =
-            ContentAnnounce::from_full_hdv([0; 32], &full, "test".to_string(), 0);
+        let ann = ContentAnnounce::from_full_hdv([0; 32], &full, "test".to_string(), 0);
         assert_eq!(ann.truncated_hdv[..], full.0[..32]);
     }
 

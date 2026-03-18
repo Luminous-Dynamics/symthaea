@@ -575,7 +575,11 @@ impl CognitiveLoopService {
         self.stats.novelty_bonus = self.curiosity_drive.novelty_bonus;
 
         // Self-reflection stats
-        let assess_str = self.self_model_tier.self_reflection.self_assessment.as_str();
+        let assess_str = self
+            .self_model_tier
+            .self_reflection
+            .self_assessment
+            .as_str();
         if self.stats.self_assessment != assess_str {
             self.stats.self_assessment = assess_str.to_string();
         }

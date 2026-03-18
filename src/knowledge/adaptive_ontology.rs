@@ -277,7 +277,11 @@ impl AdaptiveOntology {
         let mut chain = Vec::new();
         let mut current = concept.to_string();
         for _ in 0..max_depth {
-            match self.primitives.get(&current).and_then(|u| u.is_a_parent.as_ref()) {
+            match self
+                .primitives
+                .get(&current)
+                .and_then(|u| u.is_a_parent.as_ref())
+            {
                 Some(parent) => {
                     chain.push(parent.clone());
                     current = parent.clone();

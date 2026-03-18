@@ -465,6 +465,7 @@ pub fn generate_pulse_html(
     write_reasoning_pane(&mut html, &current.reasoning);
     write_dream_pane(&mut html, &current.dream);
     write_immune_pane(&mut html, &current.immune);
+    write_sovereign_pane(&mut html, &current.sovereign);
     write_narrative_pane(&mut html, narrative);
     if !timeline.is_empty() {
         write_timeline_pane(&mut html, timeline, current);
@@ -3992,6 +3993,95 @@ fn escape_html(s: &str) -> String {
         .replace('<', "&lt;")
         .replace('>', "&gt;")
         .replace('"', "&quot;")
+}
+
+fn write_sovereign_pane(html: &mut String, sov: &super::SovereignInfo) {
+    let time_color = match sov.time_quality.as_str() {
+        "Authoritative" => "#7ec8a0",
+        "Consensus" => "#7ec8a0",
+        "Degraded" => "#e8c547",
+        _ => "#888",
+    };
+    let echo_color = if sov.social_echo_risk > 0.85 {
+        "#e05555"
+    } else if sov.social_echo_risk > 0.6 {
+        "#e8c547"
+    } else {
+        "#7ec8a0"
+    };
+    let emergency_indicator = if sov.survival_emergency {
+        "&#x1F6A8; EMERGENCY"
+    } else {
+        "&#x2705; Normal"
+    };
+
+    let _ = write!(
+        html,
+        r##"<div class="pane">
+<h2>&#x1F310; Sovereign Inoculation</h2>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:0.88em">
+<div>
+<h3 style="margin:0 0 6px;font-size:0.95em">&#x23F0; Clock</h3>
+<table style="width:100%">
+<tr><td>Quality</td><td style="text-align:right;color:{tc};font-weight:bold">{tq}</td></tr>
+<tr><td>Peers</td><td style="text-align:right">{tp}</td></tr>
+<tr><td>Stratum</td><td style="text-align:right">{ts}</td></tr>
+<tr><td>Offset</td><td style="text-align:right">{to}µs</td></tr>
+<tr><td>Drift</td><td style="text-align:right">{td:.1}ppm</td></tr>
+</table>
+</div>
+<div>
+<h3 style="margin:0 0 6px;font-size:0.95em">&#x1F91D; Trust</h3>
+<table style="width:100%">
+<tr><td>Avg Trust</td><td style="text-align:right">{ta:.2}</td></tr>
+<tr><td>Density</td><td style="text-align:right">{tden:.3}</td></tr>
+<tr><td>PQ Verified</td><td style="text-align:right">{tpq:.0}%</td></tr>
+<tr><td>Anomalies</td><td style="text-align:right;color:{anomaly_c}">{tanm}</td></tr>
+</table>
+</div>
+<div>
+<h3 style="margin:0 0 6px;font-size:0.95em">&#x1F310; Social</h3>
+<table style="width:100%">
+<tr><td>Resonance</td><td style="text-align:right">{sr:.2}</td></tr>
+<tr><td>Diversity</td><td style="text-align:right">{sd:.2}</td></tr>
+<tr><td>Echo Risk</td><td style="text-align:right;color:{ec}">{se:.2}</td></tr>
+<tr><td>Peer Reach</td><td style="text-align:right">{spr}</td></tr>
+</table>
+</div>
+<div>
+<h3 style="margin:0 0 6px;font-size:0.95em">&#x1F6E0; Survival</h3>
+<table style="width:100%">
+<tr><td>Status</td><td style="text-align:right">{emg}</td></tr>
+<tr><td>Water</td><td style="text-align:right">{sw:.0}%</td></tr>
+<tr><td>Power</td><td style="text-align:right">{sp:.1}kW</td></tr>
+<tr><td>Sensors</td><td style="text-align:right">{ssc}</td></tr>
+<tr><td>Alerts</td><td style="text-align:right">{sac}</td></tr>
+</table>
+</div>
+</div>
+</div>"##,
+        tc = time_color,
+        tq = sov.time_quality,
+        tp = sov.time_peer_count,
+        ts = sov.time_stratum,
+        to = sov.time_offset_us,
+        td = sov.time_drift_ppm,
+        ta = sov.trust_avg,
+        tden = sov.trust_density,
+        tpq = sov.trust_pq_fraction * 100.0,
+        anomaly_c = if sov.trust_anomaly_count > 0 { "#e05555" } else { "#7ec8a0" },
+        tanm = sov.trust_anomaly_count,
+        sr = sov.social_resonance_mean,
+        sd = sov.social_diversity,
+        ec = echo_color,
+        se = sov.social_echo_risk,
+        spr = sov.social_peer_reach,
+        emg = emergency_indicator,
+        sw = sov.survival_water_pct * 100.0,
+        sp = sov.survival_power_kw,
+        ssc = sov.survival_sensor_count,
+        sac = sov.survival_alert_count,
+    );
 }
 
 #[cfg(test)]

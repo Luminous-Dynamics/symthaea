@@ -309,16 +309,14 @@ impl NameResolver {
             ttl_secs: DEFAULT_NAME_TTL_SECS,
             owner_key,
         };
-        self.local_registrations
-            .insert(name.to_canonical(), reg);
+        self.local_registrations.insert(name.to_canonical(), reg);
         // Also cache locally
         self.cache_resolution(&name, endpoint, DEFAULT_NAME_TTL_SECS, now_secs);
     }
 
     /// Check if we own a name locally.
     pub fn is_locally_registered(&self, name: &MeshName) -> bool {
-        self.local_registrations
-            .contains_key(&name.to_canonical())
+        self.local_registrations.contains_key(&name.to_canonical())
     }
 
     /// Get a local registration.
@@ -456,7 +454,7 @@ mod tests {
     #[test]
     fn test_cache_lru_eviction() {
         let mut resolver = NameResolver::new(16); // minimum is 16
-        // Fill cache to capacity
+                                                  // Fill cache to capacity
         for i in 0..16 {
             let n = MeshName::parse(&format!("node-{}", i)).unwrap();
             resolver.cache_resolution(
@@ -497,12 +495,7 @@ mod tests {
     fn test_hit_ratio() {
         let mut resolver = NameResolver::new(16);
         let name = MeshName::parse("test").unwrap();
-        resolver.cache_resolution(
-            &name,
-            ResolvedEndpoint::IpAddr("x".to_string()),
-            3600,
-            0,
-        );
+        resolver.cache_resolution(&name, ResolvedEndpoint::IpAddr("x".to_string()), 3600, 0);
         resolver.resolve_cached(&name, 0); // hit
         let miss_name = MeshName::parse("nope").unwrap();
         resolver.resolve_cached(&miss_name, 0); // miss
@@ -535,12 +528,7 @@ mod tests {
     fn test_expire_cache() {
         let mut resolver = NameResolver::new(16);
         let name = MeshName::parse("old").unwrap();
-        resolver.cache_resolution(
-            &name,
-            ResolvedEndpoint::IpAddr("x".to_string()),
-            60,
-            1000,
-        );
+        resolver.cache_resolution(&name, ResolvedEndpoint::IpAddr("x".to_string()), 60, 1000);
         resolver.expire_cache(1100);
         assert_eq!(resolver.cache_size(), 0);
     }

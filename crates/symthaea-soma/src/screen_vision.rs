@@ -49,10 +49,10 @@ pub struct ScreenVisionConfig {
     pub capture_width: u32,
     /// Downscaled capture height in pixels (default: 640).
     pub capture_height: u32,
-    /// Target frame rate in Hz (default: 2.0).
+    /// Target frame rate in Hz (default: 5.0).
     ///
-    /// Screen content changes far less frequently than camera video, so 2 Hz
-    /// is a reasonable default that keeps CPU load minimal.
+    /// Screen content changes far less frequently than camera video, so 5 Hz
+    /// balances visual awareness with CPU budget on mobile.
     pub target_fps: f32,
     /// Minimum surprise level to include a region in the output (default: 0.3).
     pub surprise_threshold: f32,
@@ -67,7 +67,7 @@ impl Default for ScreenVisionConfig {
         Self {
             capture_width: 360,
             capture_height: 640,
-            target_fps: 2.0,
+            target_fps: 5.0,
             surprise_threshold: 0.3,
             enable_foveation: true,
             max_salient_regions: 4,
@@ -173,11 +173,8 @@ impl ScreenVisionBridge {
             ..VisionConfig::default()
         };
 
-        let vision = VisionManifold::new(
-            vision_config,
-            config.capture_width,
-            config.capture_height,
-        );
+        let vision =
+            VisionManifold::new(vision_config, config.capture_width, config.capture_height);
 
         // Build a FoveationConfig tuned for screen analysis
         let foveation_config = FoveationConfig {
@@ -219,12 +216,7 @@ impl ScreenVisionBridge {
     /// # Panics
     ///
     /// Panics if `frame_rgb.len() != width * height * 3`.
-    pub fn process_frame(
-        &mut self,
-        frame_rgb: &[u8],
-        width: u32,
-        height: u32,
-    ) -> ScreenPerception {
+    pub fn process_frame(&mut self, frame_rgb: &[u8], width: u32, height: u32) -> ScreenPerception {
         let expected_len = (width as usize) * (height as usize) * 3;
         assert_eq!(
             frame_rgb.len(),

@@ -892,7 +892,7 @@ impl CognitiveLoopService {
                 let engine_ucp = if has_primitive_processor {
                     crate::consciousness::unified_consciousness_pipeline::UnifiedConsciousnessPipeline::new(
                         crate::consciousness::unified_consciousness_pipeline::PipelineConfig::default(),
-                    ).ok()
+                    ).map_err(|e| tracing::warn!("UnifiedConsciousnessPipeline init failed: {e}")).ok()
                 } else {
                     None
                 };
@@ -994,9 +994,17 @@ impl CognitiveLoopService {
                 crate::hdc::moral_algebra::MORAL_DIM,
             ),
             #[cfg(feature = "mesh")]
-            time_manager: super::managers::TimeManager::new(true),
+            time_manager: super::managers::TimeManager::new(config.enable_mesh_time),
             #[cfg(feature = "mesh-trust")]
-            trust_manager: super::managers::TrustManager::new(String::new(), true),
+            trust_manager: super::managers::TrustManager::new(
+                format!("node_{:016x}", {
+                    use std::hash::{Hash, Hasher};
+                    let mut h = std::collections::hash_map::DefaultHasher::new();
+                    std::time::SystemTime::now().hash(&mut h);
+                    h.finish()
+                }),
+                true,
+            ),
             #[cfg(feature = "social-fabric")]
             social_fabric_manager: super::managers::SocialFabricManager::new(true),
             #[cfg(feature = "survival")]

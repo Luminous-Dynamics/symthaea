@@ -94,8 +94,8 @@ impl SubstrateLatencyBenchmark {
             // multiplier yields ~0.63 noise for biochemical (speed=0.1),
             // degrading accuracy to ~0.57. The 8-tier design gives enough
             // data points for a stable Pearson r ≈ 0.75.
-            let latency_noise = ((1.0 - speed) * 0.70) as f32
-                + config.effective_noise() as f32 * 0.05;
+            let latency_noise =
+                ((1.0 - speed) * 0.70) as f32 + config.effective_noise() as f32 * 0.05;
 
             let mut correct = 0u32;
             let mut total = 0u32;

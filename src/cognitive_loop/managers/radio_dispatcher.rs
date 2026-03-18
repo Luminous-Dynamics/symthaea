@@ -1,5 +1,7 @@
 //! # Radio Dispatcher — Multi-Band Tiered Radio Architecture
 //!
+//! **Requires**: `feature = "mesh"`
+//!
 //! Provides bandwidth-aware routing for Symthaea's mesh consciousness network
 //! across heterogeneous radio tiers (Wi-Fi/BLE → LoRa/UHF → HF/NVIS).
 //!
@@ -1358,6 +1360,9 @@ use super::super::thresholds::{
 };
 
 impl SpectrumManager {
+    /// Co-prime scheduling interval (cycles).
+    pub const INTERVAL: u32 = 53;
+
     /// Create with specific regulatory constraints.
     pub(crate) fn with_regulatory(regulatory: RegulatoryConstraints) -> Self {
         Self {
@@ -2122,7 +2127,7 @@ impl CognitiveSubsystem for SpectrumManager {
     }
 
     fn interval(&self) -> u32 {
-        53 // co-prime with 7, 11, 13, 19, 29, 37, 41
+        Self::INTERVAL
     }
 
     fn process(&mut self, _snapshot: &CycleSnapshot) -> SubsystemOutput {

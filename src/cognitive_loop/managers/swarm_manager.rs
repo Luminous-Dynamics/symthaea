@@ -257,6 +257,9 @@ impl Default for SwarmManager {
 }
 
 impl SwarmManager {
+    /// Co-prime scheduling interval (cycles).
+    pub const INTERVAL: u32 = 41;
+
     /// Maximum tracked peers for Φ averaging (prevents unbounded growth).
     const MAX_TRACKED_PEERS: usize = 256;
 
@@ -581,7 +584,7 @@ impl CognitiveSubsystem for SwarmManager {
     }
 
     fn interval(&self) -> u32 {
-        41 // co-prime with 7, 11, 13, 19, 29, 37
+        Self::INTERVAL
     }
 
     fn process(&mut self, _snapshot: &CycleSnapshot) -> SubsystemOutput {

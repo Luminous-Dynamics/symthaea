@@ -172,12 +172,12 @@ proptest! {
         }
         for _ in 0..50 {
             let r = svc.cycle("proptest swarm consciousness");
-            prop_assert!(r.metadata.consciousness_level >= 0.0,
-                "consciousness below 0: {}", r.metadata.consciousness_level);
-            prop_assert!(r.metadata.consciousness_level <= 1.0,
-                "consciousness above 1: {}", r.metadata.consciousness_level);
-            prop_assert!(r.metadata.consciousness_level.is_finite(),
-                "consciousness not finite: {}", r.metadata.consciousness_level);
+            prop_assert!(r.metadata.consciousness.consciousness_level >= 0.0,
+                "consciousness below 0: {}", r.metadata.consciousness.consciousness_level);
+            prop_assert!(r.metadata.consciousness.consciousness_level <= 1.0,
+                "consciousness above 1: {}", r.metadata.consciousness.consciousness_level);
+            prop_assert!(r.metadata.consciousness.consciousness_level.is_finite(),
+                "consciousness not finite: {}", r.metadata.consciousness.consciousness_level);
         }
     }
 }

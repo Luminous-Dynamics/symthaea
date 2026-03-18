@@ -195,6 +195,7 @@ mod tests {
         use crate::benchmarks::butlin::*;
         use crate::benchmarks::causal_reasoning::*;
         use crate::benchmarks::clinical::*;
+        use crate::benchmarks::security::*;
         use crate::benchmarks::cogbench::*;
         use crate::benchmarks::consciousness::*;
         use crate::benchmarks::creativity::*;
@@ -341,6 +342,9 @@ mod tests {
             Box::new(CrisisDetectionBenchmark),
             Box::new(CognitiveDistortionBenchmark),
             Box::new(MotivationalInterviewingBenchmark),
+            // Security (HDC-FHE)
+            Box::new(EncryptedClassificationBenchmark),
+            Box::new(CollectiveAggregationBenchmark),
         ];
 
         let mut missing = Vec::new();

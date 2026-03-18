@@ -156,6 +156,23 @@ impl StroopBenchmark {
                 }
             }
 
+            // Attention lapse: incongruent trials are more vulnerable because
+            // response conflict demands sustained attention (Botvinick et al., 2001).
+            let unique_trial = trial_idx * (trials_per_condition * 3) + trial;
+            let conflict_boost = match condition {
+                Condition::Incongruent => config.lapse_rate * 0.6,
+                Condition::Neutral => config.lapse_rate * 0.2,
+                Condition::Congruent => 0.0,
+            };
+            let effective_lapse = config.lapse_rate + conflict_boost;
+            let lapse_seed = config.trial_seed("stroop", "lapse", unique_trial);
+            response_idx = if (lapse_seed % 10000) as f64 / 10000.0 < effective_lapse {
+                let h = config.trial_seed("stroop", "lapse_choice", unique_trial);
+                h as usize % 4
+            } else {
+                response_idx
+            };
+
             // RT proxy: deliberation ticks based on decision margin
             let decision_margin = (sims[ink_idx] - max_sim + sims[ink_idx]).abs()
                 / (sims.iter().sum::<f64>() + 1e-10);

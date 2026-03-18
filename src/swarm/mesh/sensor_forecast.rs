@@ -75,7 +75,8 @@ impl ResourceTracker {
             self.values.remove(0);
         }
         self.values.push(rate);
-        self.rate_ema = self.rate_ema * (1.0 - CONSUMPTION_EMA_ALPHA) + rate * CONSUMPTION_EMA_ALPHA;
+        self.rate_ema =
+            self.rate_ema * (1.0 - CONSUMPTION_EMA_ALPHA) + rate * CONSUMPTION_EMA_ALPHA;
 
         // Update hourly pattern
         let h = hour.min(23);
@@ -96,7 +97,8 @@ impl ResourceTracker {
             return self.values.len() as f64 / MIN_DATA_POINTS as f64;
         }
         // Quality increases with more data, saturates at 1.0
-        (self.values.len() as f64 / (MIN_DATA_POINTS as f64 * 5.0)).clamp(0.0, 1.0)
+        (self.values.len() as f64 / (MIN_DATA_POINTS as f64 * 5.0))
+            .clamp(0.0, 1.0)
             .max(self.values.len() as f64 / MIN_DATA_POINTS as f64)
             .clamp(0.0, 1.0)
     }
@@ -126,7 +128,8 @@ impl DemandForecaster {
         rate_per_hour: f64,
         hour_of_day: usize,
     ) {
-        let tracker = self.trackers
+        let tracker = self
+            .trackers
             .entry(resource_type.to_string())
             .or_insert_with(|| ResourceTracker::new(self.max_history));
         tracker.add_value(rate_per_hour, hour_of_day);
@@ -151,15 +154,17 @@ impl DemandForecaster {
 
         let tracker = match self.trackers.get(resource_type) {
             Some(t) => t,
-            None => return DemandForecast {
-                resource_type: resource_type.to_string(),
-                horizon_hours: horizon,
-                predicted_rate: 0.0,
-                predicted_total: 0.0,
-                confidence: 0.0,
-                time_to_exhaustion_hours: None,
-                generated_at: now_secs,
-            },
+            None => {
+                return DemandForecast {
+                    resource_type: resource_type.to_string(),
+                    horizon_hours: horizon,
+                    predicted_rate: 0.0,
+                    predicted_total: 0.0,
+                    confidence: 0.0,
+                    time_to_exhaustion_hours: None,
+                    generated_at: now_secs,
+                }
+            }
         };
 
         // Base rate from EMA + trend adjustment

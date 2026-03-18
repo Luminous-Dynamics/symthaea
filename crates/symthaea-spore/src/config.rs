@@ -32,6 +32,23 @@ pub struct SporeConfig {
     /// After warmup, the floor fades linearly to 0.0 over the same number of cycles.
     /// Default: 10.
     pub consciousness_warmup_cycles: u64,
+
+    /// Semantic memory ring buffer capacity (default: 500).
+    /// Higher values retain more historical patterns at the cost of RAM.
+    #[serde(default = "default_semantic_capacity")]
+    pub semantic_memory_capacity: usize,
+
+    /// Episodic memory priority queue capacity (default: 100).
+    /// Higher values retain more high-Phi experiences for dream replay.
+    #[serde(default = "default_episodic_capacity")]
+    pub episodic_memory_capacity: usize,
+}
+
+fn default_semantic_capacity() -> usize {
+    500
+}
+fn default_episodic_capacity() -> usize {
+    100
 }
 
 impl Default for SporeConfig {
@@ -44,6 +61,8 @@ impl Default for SporeConfig {
             substrate: "SiliconDigital".into(),
             target_hz: 50.0,
             consciousness_warmup_cycles: 10,
+            semantic_memory_capacity: 500,
+            episodic_memory_capacity: 100,
         }
     }
 }

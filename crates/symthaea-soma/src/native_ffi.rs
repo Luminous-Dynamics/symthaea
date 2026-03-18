@@ -112,7 +112,9 @@ pub unsafe extern "C" fn soma_engine_cycle_count(engine: *const SomaEngine) -> u
 
 /// # Safety: `engine` must be valid.
 #[no_mangle]
-pub unsafe extern "C" fn soma_engine_consciousness_report(engine: *const SomaEngine) -> *mut c_char {
+pub unsafe extern "C" fn soma_engine_consciousness_report(
+    engine: *const SomaEngine,
+) -> *mut c_char {
     let report = unsafe { &*engine }.consciousness_report();
     CString::new(report).map_or(std::ptr::null_mut(), |c| c.into_raw())
 }
@@ -136,7 +138,11 @@ pub unsafe extern "C" fn soma_engine_set_thermal_level(engine: *mut SomaEngine, 
 
 /// # Safety: `engine` must be valid.
 #[no_mangle]
-pub unsafe extern "C" fn soma_engine_set_battery_state(engine: *mut SomaEngine, charge_percent: u8, is_charging: u8) {
+pub unsafe extern "C" fn soma_engine_set_battery_state(
+    engine: *mut SomaEngine,
+    charge_percent: u8,
+    is_charging: u8,
+) {
     let engine = unsafe { &mut *engine };
     engine.battery_percent = charge_percent.min(100);
     engine.battery_charging = is_charging != 0;
@@ -155,7 +161,11 @@ pub unsafe extern "C" fn soma_engine_set_night_mode(engine: *mut SomaEngine, is_
 /// # Safety: `engine` must be valid.
 #[no_mangle]
 pub unsafe extern "C" fn soma_engine_dream_cycle(engine: *mut SomaEngine) -> u8 {
-    if unsafe { &mut *engine }.dream_cycle().is_some() { 1 } else { 0 }
+    if unsafe { &mut *engine }.dream_cycle().is_some() {
+        1
+    } else {
+        0
+    }
 }
 
 /// # Safety: `engine` must be valid.
@@ -189,7 +199,12 @@ pub unsafe extern "C" fn soma_engine_wake_state(engine: *const SomaEngine) -> u8
 /// # Safety: `engine` must be valid.
 #[no_mangle]
 pub unsafe extern "C" fn soma_engine_set_sensors(
-    engine: *mut SomaEngine, accel: f32, light: f32, proximity_near: u8, barometer: f32, gps_novelty: f32,
+    engine: *mut SomaEngine,
+    accel: f32,
+    light: f32,
+    proximity_near: u8,
+    barometer: f32,
+    gps_novelty: f32,
 ) {
     unsafe { &mut *engine }.set_sensors(accel, light, proximity_near != 0, barometer, gps_novelty);
 }
@@ -203,7 +218,11 @@ pub unsafe extern "C" fn soma_engine_motion_state(engine: *const SomaEngine) -> 
 /// # Safety: `engine` must be valid.
 #[no_mangle]
 pub unsafe extern "C" fn soma_engine_privacy_mode(engine: *const SomaEngine) -> u8 {
-    if unsafe { &*engine }.privacy_mode() { 1 } else { 0 }
+    if unsafe { &*engine }.privacy_mode() {
+        1
+    } else {
+        0
+    }
 }
 
 /// # Safety: `engine` must be valid.
@@ -249,8 +268,13 @@ pub unsafe extern "C" fn soma_engine_compass_json(engine: *const SomaEngine) -> 
 
 /// # Safety: `engine` and `json` must be valid.
 #[no_mangle]
-pub unsafe extern "C" fn soma_engine_set_sharing_config(engine: *mut SomaEngine, json: *const c_char) {
-    if json.is_null() { return; }
+pub unsafe extern "C" fn soma_engine_set_sharing_config(
+    engine: *mut SomaEngine,
+    json: *const c_char,
+) {
+    if json.is_null() {
+        return;
+    }
     let c_str = unsafe { CStr::from_ptr(json) };
     if let Ok(s) = c_str.to_str() {
         if let Ok(config) = serde_json::from_str::<symthaea_spore::config::SharingConfig>(s) {
@@ -300,7 +324,10 @@ pub unsafe extern "C" fn soma_dream_journal_count(engine: *const SomaEngine) -> 
 
 /// # Safety: `engine` must be valid.
 #[no_mangle]
-pub unsafe extern "C" fn soma_engine_generate_text(engine: *mut SomaEngine, max_tokens: u32) -> *mut c_char {
+pub unsafe extern "C" fn soma_engine_generate_text(
+    engine: *mut SomaEngine,
+    max_tokens: u32,
+) -> *mut c_char {
     let result = unsafe { &mut *engine }.generate_text(max_tokens as usize);
     let json = serde_json::json!({
         "text": result.text,
@@ -313,22 +340,36 @@ pub unsafe extern "C" fn soma_engine_generate_text(engine: *mut SomaEngine, max_
 /// # Safety: `engine` must be valid.
 #[no_mangle]
 pub unsafe extern "C" fn soma_engine_save_checkpoint(engine: *mut SomaEngine) -> u8 {
-    if unsafe { &mut *engine }.save_checkpoint() { 1 } else { 0 }
+    if unsafe { &mut *engine }.save_checkpoint() {
+        1
+    } else {
+        0
+    }
 }
 
 /// # Safety: `engine` must be valid.
 #[no_mangle]
 pub unsafe extern "C" fn soma_engine_load_checkpoint(engine: *mut SomaEngine) -> u8 {
-    if unsafe { &mut *engine }.load_checkpoint() { 1 } else { 0 }
+    if unsafe { &mut *engine }.load_checkpoint() {
+        1
+    } else {
+        0
+    }
 }
 
 /// # Safety: `engine` and `path` must be valid.
 #[no_mangle]
-pub unsafe extern "C" fn soma_engine_set_storage_path(engine: *mut SomaEngine, path: *const c_char) {
-    if path.is_null() { return; }
+pub unsafe extern "C" fn soma_engine_set_storage_path(
+    engine: *mut SomaEngine,
+    path: *const c_char,
+) {
+    if path.is_null() {
+        return;
+    }
     let c_str = unsafe { CStr::from_ptr(path) };
     if let Ok(s) = c_str.to_str() {
-        unsafe { &mut *engine }.set_storage(Box::new(symthaea_spore::persistence::FileStorage::new(s)));
+        unsafe { &mut *engine }
+            .set_storage(Box::new(symthaea_spore::persistence::FileStorage::new(s)));
     }
 }
 
@@ -342,7 +383,9 @@ pub unsafe extern "C" fn soma_engine_holon_drain_outbound(engine: *mut SomaEngin
 /// # Safety: `engine` and `json` must be valid.
 #[no_mangle]
 pub unsafe extern "C" fn soma_engine_holon_receive(engine: *mut SomaEngine, json: *const c_char) {
-    if json.is_null() { return; }
+    if json.is_null() {
+        return;
+    }
     let c_str = unsafe { CStr::from_ptr(json) };
     if let Ok(s) = c_str.to_str() {
         unsafe { &mut *engine }.holon_receive_json(s);
@@ -357,17 +400,34 @@ pub unsafe extern "C" fn soma_engine_holon_set_connected(engine: *mut SomaEngine
 
 /// # Safety: `engine` must be valid. `cv_data` must point to `len` valid bytes.
 #[no_mangle]
-pub unsafe extern "C" fn soma_ble_receive_peer(engine: *mut SomaEngine, peer_id: u64, cv_data: *const u8, len: u32) -> u8 {
-    if cv_data.is_null() || len < 12 { return 0; }
+pub unsafe extern "C" fn soma_ble_receive_peer(
+    engine: *mut SomaEngine,
+    peer_id: u64,
+    cv_data: *const u8,
+    len: u32,
+) -> u8 {
+    if cv_data.is_null() || len < 12 {
+        return 0;
+    }
     let data = unsafe { std::slice::from_raw_parts(cv_data, len as usize) };
-    if unsafe { &mut *engine }.ble_receive_peer(peer_id, data) { 1 } else { 0 }
+    if unsafe { &mut *engine }.ble_receive_peer(peer_id, data) {
+        1
+    } else {
+        0
+    }
 }
 
 /// # Safety: `engine` must be valid. `out_buf` must point to `buf_len` writable bytes.
 #[no_mangle]
-pub unsafe extern "C" fn soma_ble_advertise_payload(engine: *mut SomaEngine, out_buf: *mut u8, buf_len: u32) -> u32 {
+pub unsafe extern "C" fn soma_ble_advertise_payload(
+    engine: *mut SomaEngine,
+    out_buf: *mut u8,
+    buf_len: u32,
+) -> u32 {
     let payload = unsafe { &mut *engine }.ble_advertise_payload();
-    if payload.is_empty() || buf_len < payload.len() as u32 { return 0; }
+    if payload.is_empty() || buf_len < payload.len() as u32 {
+        return 0;
+    }
     let out = unsafe { std::slice::from_raw_parts_mut(out_buf, payload.len()) };
     out.copy_from_slice(&payload);
     payload.len() as u32
@@ -399,11 +459,19 @@ pub unsafe extern "C" fn soma_ble_collective_phi(engine: *const SomaEngine) -> f
 #[cfg(feature = "screen-vision")]
 #[no_mangle]
 pub unsafe extern "C" fn soma_engine_inject_frame(
-    engine: *mut SomaEngine, data: *const u8, width: u32, height: u32, channels: u32,
+    engine: *mut SomaEngine,
+    data: *const u8,
+    width: u32,
+    height: u32,
+    channels: u32,
 ) -> f32 {
-    if data.is_null() || width == 0 || height == 0 || channels == 0 { return 0.0; }
+    if data.is_null() || width == 0 || height == 0 || channels == 0 {
+        return 0.0;
+    }
     // Only support RGB (3 channels) for now
-    if channels != 3 { return 0.0; }
+    if channels != 3 {
+        return 0.0;
+    }
     let engine = unsafe { &mut *engine };
     let len = (width as usize) * (height as usize) * (channels as usize);
     let frame = unsafe { std::slice::from_raw_parts(data, len) };
@@ -420,7 +488,11 @@ pub unsafe extern "C" fn soma_engine_inject_frame(
 #[cfg(feature = "screen-vision")]
 #[no_mangle]
 pub unsafe extern "C" fn soma_engine_touch_event(
-    engine: *mut SomaEngine, x: f32, y: f32, action: u8, pressure: f32,
+    engine: *mut SomaEngine,
+    x: f32,
+    y: f32,
+    action: u8,
+    pressure: f32,
 ) {
     let engine = unsafe { &mut *engine };
     let touch_action = match action {
@@ -451,7 +523,9 @@ pub unsafe extern "C" fn soma_engine_touch_event(
 /// `engine` must be valid.
 #[cfg(feature = "screen-vision")]
 #[no_mangle]
-pub unsafe extern "C" fn soma_engine_screen_salient_regions_json(engine: *const SomaEngine) -> *mut c_char {
+pub unsafe extern "C" fn soma_engine_screen_salient_regions_json(
+    engine: *const SomaEngine,
+) -> *mut c_char {
     let engine = unsafe { &*engine };
     let telemetry = engine.screen_vision_telemetry();
     let json = serde_json::json!({

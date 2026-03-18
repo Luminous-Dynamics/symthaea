@@ -65,10 +65,10 @@ impl CognitiveLoopService {
             } else if ema < CONSCIOUSNESS_EMA_LOW_THRESHOLD && ema > 0.0 {
                 self.stats.adaptive_learning_rate *= CONSCIOUSNESS_EMA_LR_DAMPEN;
             }
-            self.stats.adaptive_learning_rate = self
-                .stats
-                .adaptive_learning_rate
-                .clamp(super::super::thresholds::ADAPTIVE_LR_MIN, super::super::thresholds::ADAPTIVE_LR_MAX);
+            self.stats.adaptive_learning_rate = self.stats.adaptive_learning_rate.clamp(
+                super::super::thresholds::ADAPTIVE_LR_MIN,
+                super::super::thresholds::ADAPTIVE_LR_MAX,
+            );
         }
 
         // Snapshot exploration_urge for end-of-cycle budget clamping (Task B)
@@ -143,9 +143,8 @@ impl CognitiveLoopService {
             let is_sleep_now =
                 self.biorhythm_mgr.rhythm.phase == crate::chronobiology::CircadianPhase::Night;
             if self.neuromod.was_sleeping && !is_sleep_now {
-                let quality =
-                    (self.neuromod.bath.allostatic_recovery_cycles as f32
-                        / super::super::thresholds::SLEEP_RECOVERY_QUALITY_SCALE)
+                let quality = (self.neuromod.bath.allostatic_recovery_cycles as f32
+                    / super::super::thresholds::SLEEP_RECOVERY_QUALITY_SCALE)
                     .clamp(0.0, 1.0);
                 self.neuromod.bath.apply_sleep_recovery(quality);
 
@@ -240,8 +239,10 @@ impl CognitiveLoopService {
             + (self.biorhythm_mgr.rhythm.plasticity_mod as f32 - 1.0)
                 * super::super::thresholds::CIRCADIAN_PLASTICITY_SCALE;
         let circadian_lr = self.stats.adaptive_learning_rate * plasticity_half;
-        self.stats.adaptive_learning_rate = circadian_lr
-            .clamp(super::super::thresholds::ADAPTIVE_LR_MIN, super::super::thresholds::ADAPTIVE_LR_MAX);
+        self.stats.adaptive_learning_rate = circadian_lr.clamp(
+            super::super::thresholds::ADAPTIVE_LR_MIN,
+            super::super::thresholds::ADAPTIVE_LR_MAX,
+        );
 
         // Circadian stillness: Night phase naturally elevates Sacred Stillness
         // Science: Tononi & Cirelli (2006) — synaptic homeostasis hypothesis;
@@ -514,9 +515,10 @@ impl CognitiveLoopService {
             if scenario_count >= super::super::thresholds::MORAL_TOPOLOGY_MIN_SCENARIOS
                 && completeness < super::super::thresholds::MORAL_TOPOLOGY_COMPLETENESS_THRESHOLD
             {
-                let structural_boost = (super::super::thresholds::MORAL_TOPOLOGY_COMPLETENESS_THRESHOLD
-                    - completeness)
-                    * super::super::thresholds::MORAL_TOPOLOGY_STRUCTURAL_BOOST_SCALE; // up to +0.09
+                let structural_boost =
+                    (super::super::thresholds::MORAL_TOPOLOGY_COMPLETENESS_THRESHOLD
+                        - completeness)
+                        * super::super::thresholds::MORAL_TOPOLOGY_STRUCTURAL_BOOST_SCALE; // up to +0.09
                 self.adjust_exploration("moral_topology_gap", structural_boost as f32);
             }
         }

@@ -242,8 +242,7 @@ fn main() {
     let mut samples = Vec::new();
     for shot in &shots {
         for sample in &shot.samples {
-            let plasma_sample =
-                to_cmod_plasma_sample(sample, &normalizer, DisruptionLabel::Normal);
+            let plasma_sample = to_cmod_plasma_sample(sample, &normalizer, DisruptionLabel::Normal);
             samples.push(plasma_sample);
         }
     }
@@ -260,15 +259,11 @@ fn main() {
     let encoder = CModHdcEncoder::default_encoder();
 
     let mut sample_idx = 0;
-    let encoding_result = measure_with_stats(
-        "HDC Encoding",
-        samples.len(),
-        || {
-            let s = &samples[sample_idx % samples.len()];
-            let _ = encoder.encode(s);
-            sample_idx += 1;
-        },
-    );
+    let encoding_result = measure_with_stats("HDC Encoding", samples.len(), || {
+        let s = &samples[sample_idx % samples.len()];
+        let _ = encoder.encode(s);
+        sample_idx += 1;
+    });
 
     println!(
         "  Throughput: {:.0} samples/sec ({:.2} us/sample)",
@@ -278,10 +273,7 @@ fn main() {
         "  95% CI: [{:.2}, {:.2}] us/sample",
         encoding_result.ci_95_lower_us, encoding_result.ci_95_upper_us
     );
-    println!(
-        "  Operations/sec: {:.2e}",
-        encoding_result.ops_per_second
-    );
+    println!("  Operations/sec: {:.2e}", encoding_result.ops_per_second);
 
     // ── 2. CfC Prediction Throughput ──────────────────────────────────
     println!("\n--- Phase 2: CfC Prediction Throughput ---");
@@ -329,10 +321,26 @@ fn main() {
         .map(|s| {
             let sensors = &s.sensors;
             vec![
-                PlasmaReading::new(PlasmaSensorType::ElectronDensity, sensors[1] as f64 * 2.0, s.time_ms),
-                PlasmaReading::new(PlasmaSensorType::ElectronTemperature, sensors[2] as f64 * 10.0, s.time_ms),
-                PlasmaReading::new(PlasmaSensorType::RadiatedPower, sensors[3] as f64 * 15.0, s.time_ms),
-                PlasmaReading::new(PlasmaSensorType::SafetyFactor, sensors[5] as f64 * 5.0, s.time_ms),
+                PlasmaReading::new(
+                    PlasmaSensorType::ElectronDensity,
+                    sensors[1] as f64 * 2.0,
+                    s.time_ms,
+                ),
+                PlasmaReading::new(
+                    PlasmaSensorType::ElectronTemperature,
+                    sensors[2] as f64 * 10.0,
+                    s.time_ms,
+                ),
+                PlasmaReading::new(
+                    PlasmaSensorType::RadiatedPower,
+                    sensors[3] as f64 * 15.0,
+                    s.time_ms,
+                ),
+                PlasmaReading::new(
+                    PlasmaSensorType::SafetyFactor,
+                    sensors[5] as f64 * 5.0,
+                    s.time_ms,
+                ),
             ]
         })
         .collect();
@@ -344,15 +352,12 @@ fn main() {
 
     let pipeline_count = samples.len().min(5000);
     let mut reading_idx = 0;
-    let pipeline_result = measure_with_stats(
-        "Full Pipeline (encode+predict+FEP)",
-        pipeline_count,
-        || {
+    let pipeline_result =
+        measure_with_stats("Full Pipeline (encode+predict+FEP)", pipeline_count, || {
             let readings = &plasma_readings[reading_idx % plasma_readings.len()];
             let _ = twin.step(readings, 0.001);
             reading_idx += 1;
-        },
-    );
+        });
 
     println!(
         "  Throughput: {:.0} inferences/sec ({:.2} us/inference)",
@@ -402,7 +407,8 @@ fn main() {
             m.size_bytes as f64 / 1024.0,
         );
     }
-    println!("\n  Note: ContinuousHV heap allocation = {} * 4 = {} bytes ({:.1} KB)",
+    println!(
+        "\n  Note: ContinuousHV heap allocation = {} * 4 = {} bytes ({:.1} KB)",
         HDC_DIMENSION,
         HDC_DIMENSION * 4,
         HDC_DIMENSION as f64 * 4.0 / 1024.0,

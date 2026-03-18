@@ -127,7 +127,10 @@ fn main() {
     println!("  Temporal Prediction O(1) Proof Benchmark");
     println!("  HDC Dimension: {}", HDC_DIMENSION);
     println!("  Warmup: {} iterations (discarded)", WARMUP_ITERATIONS);
-    println!("  Measurement: {} iterations per horizon", MEASUREMENT_ITERATIONS);
+    println!(
+        "  Measurement: {} iterations per horizon",
+        MEASUREMENT_ITERATIONS
+    );
     println!("==========================================================");
 
     let predictor = PlasmaMultiScalePredictor::new();
@@ -146,7 +149,11 @@ fn main() {
     println!("\n--- Phase 1: Standard Plasma Horizons ---");
 
     let mut all_results = Vec::new();
-    for (i, (&horizon, &label)) in PLASMA_HORIZONS.iter().zip(PLASMA_HORIZON_LABELS).enumerate() {
+    for (i, (&horizon, &label)) in PLASMA_HORIZONS
+        .iter()
+        .zip(PLASMA_HORIZON_LABELS)
+        .enumerate()
+    {
         let result = measure_horizon(&predictor, &input, horizon, label);
         println!(
             "  [{}/{}] {}: {:.2} us (std: {:.2})",

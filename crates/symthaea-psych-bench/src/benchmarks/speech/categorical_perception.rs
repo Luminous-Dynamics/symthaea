@@ -217,12 +217,9 @@ impl CategoricalPerceptionBenchmark {
             }
         }
 
-        let boundary_discrimination =
-            boundary_correct as f64 / boundary_total.max(1) as f64;
-        let within_category_discrimination =
-            within_correct as f64 / within_total.max(1) as f64;
-        let categorical_index =
-            (boundary_discrimination - within_category_discrimination).max(0.0);
+        let boundary_discrimination = boundary_correct as f64 / boundary_total.max(1) as f64;
+        let within_category_discrimination = within_correct as f64 / within_total.max(1) as f64;
+        let categorical_index = (boundary_discrimination - within_category_discrimination).max(0.0);
 
         TrialResult {
             boundary_slope,
@@ -309,7 +306,9 @@ mod tests {
         let result = CategoricalPerceptionBenchmark.run(&config);
         assert!(result.metrics.contains_key("boundary_slope"));
         assert!(result.metrics.contains_key("boundary_discrimination"));
-        assert!(result.metrics.contains_key("within_category_discrimination"));
+        assert!(result
+            .metrics
+            .contains_key("within_category_discrimination"));
         assert!(result.metrics.contains_key("categorical_index"));
     }
 

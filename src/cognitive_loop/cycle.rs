@@ -353,10 +353,10 @@ impl CognitiveLoopService {
                 has_peers: self.swarm_manager.connected_peers() > 0,
             };
 
-            if let Some(crisis_event) = self.civic_crisis_detector.tick(
-                &crisis_input,
-                self.stats.total_cycles,
-            ) {
+            if let Some(crisis_event) = self
+                .civic_crisis_detector
+                .tick(&crisis_input, self.stats.total_cycles)
+            {
                 self.security_telemetry.crisis_events_emitted += 1;
                 tracing::warn!(
                     severity = crisis_event.severity,
@@ -365,9 +365,9 @@ impl CognitiveLoopService {
                     signals = crisis_event.trigger_signals.len(),
                     "Civic crisis detected — forwarding to Mycelix emergency-incidents"
                 );
-                // TODO: Forward crisis_event to Mycelix civic bridge when holochain
-                // conductor is connected. For now, the event is logged + counted
-                // in security_telemetry.crisis_events_emitted.
+                // TODO(blocked:conductor): Forward crisis_event to Mycelix civic bridge
+                // when holochain conductor is connected. Blocked on conductor integration.
+                // For now, the event is logged + counted in security_telemetry.crisis_events_emitted.
             }
         }
 
@@ -545,7 +545,8 @@ mod tests {
     // ── Helper ────────────────────────────────────────────────────────
 
     fn make_service() -> CognitiveLoopService {
-        CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap()
+        CognitiveLoopService::new(CognitiveLoopConfig::default())
+            .expect("default config must initialize")
     }
 
     // ── cycle() basic execution ───────────────────────────────────────
@@ -689,11 +690,11 @@ mod tests {
         // Use genesis phrase for determinism
         let mut cfg = CognitiveLoopConfig::default();
         cfg.genesis_phrase = Some("determinism test".to_string());
-        let mut s1 = CognitiveLoopService::new(cfg.clone()).unwrap();
-        let mut s2 = CognitiveLoopService::new(cfg).unwrap();
+        let mut s1 = CognitiveLoopService::new(cfg.clone()).expect("test config must initialize");
+        let mut s2 = CognitiveLoopService::new(cfg).expect("test config must initialize");
 
         let r1 = s1.cycle("hello");
-        let r2 = s2.try_cycle("hello").unwrap();
+        let r2 = s2.try_cycle("hello").expect("try_cycle should succeed");
 
         // Both should produce same output with deterministic genesis
         assert_eq!(r1.output.len(), r2.output.len());
@@ -705,7 +706,8 @@ mod tests {
     #[test]
     fn cycle_with_hdc_ltc_unified_backend() {
         let config = CognitiveLoopConfig::with_hdc_ltc_unified();
-        let mut s = CognitiveLoopService::new(config).unwrap();
+        let mut s =
+            CognitiveLoopService::new(config).expect("unified backend config must initialize");
         let result = s.cycle("HdcLtc backend test");
         assert!(!result.output.is_empty());
         assert!(result.prediction_error.is_finite());
@@ -714,7 +716,7 @@ mod tests {
     #[test]
     fn cycle_with_hdc_ltc_fast_backend() {
         let config = CognitiveLoopConfig::with_hdc_ltc_fast();
-        let mut s = CognitiveLoopService::new(config).unwrap();
+        let mut s = CognitiveLoopService::new(config).expect("fast backend config must initialize");
         let result = s.cycle("fast backend test");
         assert!(!result.output.is_empty());
         assert!(result.prediction_error.is_finite());
@@ -748,11 +750,11 @@ mod tests {
 
         let mut cfg_a = CognitiveLoopConfig::default();
         cfg_a.genesis_phrase = Some(phrase.clone());
-        let mut sa = CognitiveLoopService::new(cfg_a).unwrap();
+        let mut sa = CognitiveLoopService::new(cfg_a).expect("determinism config must initialize");
 
         let mut cfg_b = CognitiveLoopConfig::default();
         cfg_b.genesis_phrase = Some(phrase);
-        let mut sb = CognitiveLoopService::new(cfg_b).unwrap();
+        let mut sb = CognitiveLoopService::new(cfg_b).expect("determinism config must initialize");
 
         let ra = sa.cycle("determinism check");
         let rb = sb.cycle("determinism check");
@@ -1040,7 +1042,8 @@ mod tests {
     fn soul_alignment_computed_when_enabled() {
         let mut config = CognitiveLoopConfig::default();
         config.enable_soul_alignment = true;
-        let mut s = CognitiveLoopService::new(config).unwrap();
+        let mut s =
+            CognitiveLoopService::new(config).expect("soul alignment config must initialize");
         let r = s.cycle("resonance and flourishing");
         assert!(r.metadata.ethics.soul_alignment.is_finite());
         assert!(s.ethics_values.soul.is_some());

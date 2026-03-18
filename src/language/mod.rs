@@ -46,7 +46,6 @@ pub mod intelligent_dispatcher;
 pub mod code_domain_plugin;
 #[cfg(feature = "code_generation")]
 pub mod code_executor;
-pub mod program_node_translator;
 #[cfg(feature = "code_generation")]
 pub mod code_generator;
 #[cfg(feature = "code_generation")]
@@ -63,6 +62,7 @@ pub mod epistemic_generation;
 pub mod nix_code_parser;
 #[cfg(feature = "code_generation")]
 pub mod parser_registry;
+pub mod program_node_translator;
 #[cfg(feature = "code_generation")]
 pub mod python_parser;
 #[cfg(feature = "code_generation")]

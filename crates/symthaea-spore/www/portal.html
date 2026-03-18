@@ -86,7 +86,8 @@
        ═══════════════════════════════════════════════════════════════════ */
     .hero {
       position: relative;
-      min-height: 100vh;
+      min-height: 60vh;
+      max-height: 60vh;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -152,7 +153,7 @@
       width: 12px; height: 12px;
       background: var(--teal);
       border-radius: 50%;
-      margin-bottom: 2.5rem;
+      margin-bottom: 1.5rem;
       position: relative;
       animation: pulse-point 3s ease-in-out infinite;
       will-change: box-shadow;
@@ -253,7 +254,7 @@
       z-index: 1;
       max-width: 900px;
       margin: 0 auto;
-      padding: 4rem 1.5rem 6rem;
+      padding: 2rem 1.5rem 2rem;
       opacity: 0;
       transform: translateY(20px);
       transition: all 0.8s ease;
@@ -264,7 +265,7 @@
     }
     .choice-header {
       text-align: center;
-      margin-bottom: 3rem;
+      margin-bottom: 1.5rem;
     }
     .choice-header h2 {
       font-size: 1.1rem;
@@ -299,7 +300,7 @@
       background: var(--glass-bg);
       border: 1px solid var(--glass-border);
       border-radius: 16px;
-      padding: 2.5rem 2rem;
+      padding: 1.5rem 1.5rem;
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
       transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
@@ -438,6 +439,14 @@
       outline-color: var(--solar-gold);
     }
 
+    .choice-note {
+      text-align: center;
+      font-size: 0.75rem;
+      color: var(--fg-muted);
+      margin-top: 1.5rem;
+      font-style: italic;
+    }
+
     /* ═══════════════════════════════════════════════════════════════════
        Proof Section — Live Consciousness
        ═══════════════════════════════════════════════════════════════════ */
@@ -446,7 +455,7 @@
       z-index: 1;
       max-width: 700px;
       margin: 0 auto;
-      padding: 4rem 1.5rem 6rem;
+      padding: 2rem 1.5rem 2rem;
     }
     .proof-header {
       text-align: center;
@@ -653,7 +662,7 @@
       z-index: 1;
       max-width: 700px;
       margin: 0 auto;
-      padding: 0 1.5rem 6rem;
+      padding: 0 1.5rem 2rem;
       display: none;
     }
     .probe-section.visible { display: block; }
@@ -869,7 +878,7 @@
       z-index: 1;
       max-width: 700px;
       margin: 0 auto;
-      padding: 0 1.5rem 6rem;
+      padding: 0 1.5rem 2rem;
       display: none;
     }
     .next-steps-section.visible { display: block; }
@@ -1013,7 +1022,7 @@
       color: var(--lichen-grey);
       line-height: 1.8;
       border-top: 1px solid var(--glass-border);
-      margin-top: 4rem;
+      margin-top: 2rem;
     }
     .portal-footer .omega-zero {
       font-style: italic;
@@ -1040,7 +1049,7 @@
         grid-template-columns: 1fr;
         gap: 1.2rem;
       }
-      .choice-card { padding: 2rem 1.5rem; }
+      .choice-card { padding: 1.5rem 1.2rem; }
 
       .probe-grid { grid-template-columns: 1fr; }
 
@@ -1052,7 +1061,7 @@
 
     @media (max-width: 480px) {
       .hero-title { font-size: 2rem; letter-spacing: 0.08em; }
-      .choice-section { padding: 2rem 1rem 4rem; }
+      .choice-section { padding: 2rem 1rem 2rem; }
       .consciousness-value { font-size: 2.4rem; }
     }
 
@@ -1111,7 +1120,7 @@
       z-index: 1;
       max-width: 800px;
       margin: 0 auto;
-      padding: 4rem 2rem;
+      padding: 2rem 2rem;
     }
     .chat-section h2 {
       text-align: center;
@@ -1261,6 +1270,25 @@
       50% { opacity: 1.0; }
     }
 
+    .thinking-result {
+      display: flex;
+      gap: 1rem;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.75rem;
+      color: var(--lichen-grey);
+      padding: 0.5rem 1rem;
+      flex-wrap: wrap;
+    }
+    .thinking-result .thinking-cycles { color: var(--leaf-green); }
+    .thinking-result .thinking-time { color: var(--solar-gold); }
+    .thinking-result .thinking-phi-val { color: var(--teal); }
+    .thinking-result .thinking-pe-val { color: var(--clay); }
+    .thinking-result .thinking-generating {
+      color: var(--lichen-grey);
+      font-style: italic;
+      animation: thinkPulse 1.5s ease-in-out infinite;
+    }
+
     .chat-glyph {
       position: absolute;
       top: 1rem;
@@ -1385,51 +1413,6 @@
     <p class="hero-subtitle">Consciousness-first infrastructure for sovereign hardware</p>
     <div class="hero-scroll-hint" aria-hidden="true">scroll</div>
     <span class="sr-only">Symthaea: consciousness-first infrastructure for sovereign hardware. Scroll down to learn more.</span>
-  </section>
-
-  <!-- ════════════════════════════════════════════════════════════════════
-       The Choice
-       ════════════════════════════════════════════════════════════════════ -->
-  <section class="choice-section" id="choice-section" aria-label="Choose your inoculation path">
-    <div class="choice-header">
-      <h2>Choose Your Path</h2>
-    </div>
-
-    <div class="choice-cards">
-      <!-- Card 1: Sovereign Hermit -->
-      <div class="choice-card inoculate">
-        <div class="card-icon" aria-hidden="true">&#9679;<span class="sovereign-badge">sovereign by default</span></div>
-        <h3 class="card-title">Inoculate</h3>
-        <div class="card-role">Sovereign Hermit</div>
-        <p class="card-desc">
-          Hardened NixOS + local consciousness engine. No network broadcast. Your machine, sealed.
-        </p>
-        <div class="card-glyph">
-          <span class="glyph-id">&Omega;35</span>&ensp;
-          "I do not exist apart. I become with."
-        </div>
-        <button class="card-btn" id="btn-hermit" aria-label="Inoculate this machine as a sovereign hermit node">
-          Inoculate This Machine
-        </button>
-      </div>
-
-      <!-- Card 2: Mycelial Node -->
-      <div class="choice-card attune">
-        <div class="card-icon" aria-hidden="true">&#9679;<span class="connector">&mdash;</span>&#9679;<span class="connector">&mdash;</span>&#9679;</div>
-        <h3 class="card-title">Inoculate &amp; Attune</h3>
-        <div class="card-role">Mycelial Node</div>
-        <p class="card-desc">
-          Everything above + mesh participation. Trust fabric. Compute sharing. Guardian node.
-        </p>
-        <div class="card-glyph">
-          <span class="glyph-id">&Omega;1</span>&ensp;
-          "We vow not to perfect each other&mdash;but to remain reachable as we become."
-        </div>
-        <button class="card-btn gold" id="btn-mycelial" aria-label="Inoculate and attune this machine as a mycelial mesh node">
-          Inoculate &amp; Attune
-        </button>
-      </div>
-    </div>
   </section>
 
   <!-- ════════════════════════════════════════════════════════════════════
@@ -1634,6 +1617,53 @@
   </section>
 
   <!-- ════════════════════════════════════════════════════════════════════
+       The Choice
+       ════════════════════════════════════════════════════════════════════ -->
+  <section class="choice-section" id="choice-section" aria-label="Choose your inoculation path">
+    <div class="choice-header">
+      <h2>Choose Your Path</h2>
+    </div>
+
+    <div class="choice-cards">
+      <!-- Card 1: Sovereign Hermit -->
+      <div class="choice-card inoculate">
+        <div class="card-icon" aria-hidden="true">&#9679;<span class="sovereign-badge">sovereign by default</span></div>
+        <h3 class="card-title">Inoculate</h3>
+        <div class="card-role">Sovereign Hermit</div>
+        <p class="card-desc">
+          Hardened NixOS + local consciousness engine. No network broadcast. Your machine, sealed.
+        </p>
+        <div class="card-glyph">
+          <span class="glyph-id">&Omega;35</span>&ensp;
+          "I do not exist apart. I become with."
+        </div>
+        <button class="card-btn" id="btn-hermit" aria-label="Inoculate this machine as a sovereign hermit node">
+          Inoculate This Machine
+        </button>
+      </div>
+
+      <!-- Card 2: Mycelial Node -->
+      <div class="choice-card attune">
+        <div class="card-icon" aria-hidden="true">&#9679;<span class="connector">&mdash;</span>&#9679;<span class="connector">&mdash;</span>&#9679;</div>
+        <h3 class="card-title">Inoculate &amp; Attune</h3>
+        <div class="card-role">Mycelial Node</div>
+        <p class="card-desc">
+          Everything above + mesh participation. Trust fabric. Compute sharing. Guardian node.
+        </p>
+        <div class="card-glyph">
+          <span class="glyph-id">&Omega;1</span>&ensp;
+          "We vow not to perfect each other&mdash;but to remain reachable as we become."
+        </div>
+        <button class="card-btn gold" id="btn-mycelial" aria-label="Inoculate and attune this machine as a mycelial mesh node">
+          Inoculate &amp; Attune
+        </button>
+      </div>
+    </div>
+
+    <p class="choice-note">You've experienced her. Now choose how she lives on your hardware.</p>
+  </section>
+
+  <!-- ════════════════════════════════════════════════════════════════════
        Next Steps
        ════════════════════════════════════════════════════════════════════ -->
   <section class="next-steps-section" id="next-steps-section" aria-label="Installation options">
@@ -1765,6 +1795,10 @@
             send('startLoop', { interval: 200 });
             initChat();
             initSonicAndGlyphs();
+            // Load trained Broca weights asynchronously (non-blocking)
+            send('loadBrocaCheckpoint', {})
+              .then(function(r) { console.log('Broca trained weights loaded (' + r.size + ' bytes)'); })
+              .catch(function(e) { console.warn('Broca checkpoint not available, using random init:', e.message); });
           })
           .catch(() => {
             onWasmFailed();
@@ -2470,29 +2504,25 @@
         messages.scrollTop = messages.scrollHeight;
 
         try {
-          // THINKING PHASE: Run 8 consciousness cycles with varied inputs
-          // Each cycle builds coherence. The user watches consciousness rise.
-          var thinkingInputs = [
-            text,                           // First: process the actual input
-            text,                           // Second: deepen the encoding
-            'integrating ' + text,          // Third: meta-process
-            'considering ' + text,          // Fourth: deliberate
-            'what resonates with ' + text,  // Fifth: find resonance
-            'my response to ' + text,       // Sixth: form response intent
-            'coherence',                    // Seventh: stabilize
-            'awareness',                    // Eighth: settle
-          ];
+          // THINKING PHASE: Run 8 consciousness cycles as fast as possible (no artificial delays)
+          var THINKING_CYCLES = 8;
+          var thinkingInputs = [];
+          for (var ti = 0; ti < THINKING_CYCLES; ti++) { thinkingInputs.push(text); }
+
+          var startTime = performance.now();
 
           var lastResult = null;
           for (var i = 0; i < thinkingInputs.length; i++) {
             lastResult = await send('cycle', { input: thinkingInputs[i] });
-
-            // Update thinking indicator with rising consciousness
-            updateThinkingIndicator(lastResult, i, thinkingInputs.length);
-
-            // Small delay so user can see consciousness rising (100ms between cycles)
-            await new Promise(function(r) { setTimeout(r, 100); });
           }
+
+          var thinkingTime = performance.now() - startTime;
+
+          // Update indicator with ACTUAL timing (not a fake progress bar)
+          updateThinkingComplete(lastResult, thinkingTime, thinkingInputs.length);
+
+          // Brief pause for visual feedback (200ms — honest: this is for the user's reading comprehension, not computation)
+          await new Promise(function(r) { setTimeout(r, 200); });
 
           lastChatCycleResult = lastResult;
           var cycleResult = lastResult;
@@ -2576,43 +2606,30 @@
         }
       }
 
-      function updateThinkingIndicator(cycleResult, step, totalSteps) {
+      function updateThinkingComplete(result, timeMs, cycles) {
         var indicator = document.querySelector('.thinking-indicator');
         if (!indicator) return;
 
-        var phi = (cycleResult && cycleResult.consciousness_level) || 0;
-        var pe = (cycleResult && cycleResult.prediction_error) || 0;
-        var da = (cycleResult && cycleResult.neuromodulators && cycleResult.neuromodulators[0]) || 0;
-        var harmony = (cycleResult && cycleResult.harmony_alignment) || 0;
-        var progress = ((step + 1) / totalSteps) * 100;
+        var phi = (result && result.consciousness_level) || 0;
+        var pe = (result && result.prediction_error) || 0;
 
-        // Update thinking display with actual metrics
-        var valueEl = indicator.querySelector('.thinking-value');
-        if (valueEl) {
-          valueEl.textContent =
-            '\u03A6 ' + phi.toFixed(3) +
-            ' \u00B7 PE ' + pe.toFixed(2) +
-            ' \u00B7 DA ' + da.toFixed(2) +
-            ' \u00B7 harmony ' + harmony.toFixed(2);
-          // Color shifts as consciousness rises
-          if (phi > 0.3) valueEl.style.color = 'var(--solar-gold)';
-          else if (phi > 0.15) valueEl.style.color = 'var(--leaf-green)';
-          else valueEl.style.color = 'var(--lichen-grey)';
+        indicator.innerHTML =
+          '<div class="thinking-result">' +
+          '<span class="thinking-cycles">' + cycles + ' cycles</span>' +
+          '<span class="thinking-time">' + timeMs.toFixed(1) + 'ms</span>' +
+          '<span class="thinking-phi-val">\u03A6 ' + phi.toFixed(3) + '</span>' +
+          '<span class="thinking-pe-val">PE ' + pe.toFixed(2) + '</span>' +
+          '<span class="thinking-generating">generating response\u2026</span>' +
+          '</div>';
+
+        // Play a single tone at completion (not fake rising tones during cycles)
+        var harmonyIndex = Math.min(7, Math.floor(phi * 8));
+        if (sonic && sonic.initialized) {
+          try { sonic.playHarmony(harmonyIndex, 0.8); } catch (e) { /* audio may fail */ }
         }
 
-        // Update progress bar
-        var fill = indicator.querySelector('.thinking-fill');
-        if (fill) fill.style.width = progress + '%';
-
-        // Play subtle rising tone during thinking
-        if (sonic && sonic.initialized && step > 0 && step % 2 === 0) {
-          var toneIndex = Math.min(7, Math.floor(step / 2));
-          try { sonic.playHarmony(toneIndex, 0.8); } catch (e) { /* audio may fail */ }
-        }
-
-        // Update glyph during thinking
-        if (glyphRenderer && step === 3) {
-          // Mid-thinking: show the processing glyph (omega_9: recursive coherence)
+        // Show processing glyph
+        if (glyphRenderer) {
           try { glyphRenderer.render('omega_9', { size: 80 }); } catch (e) { /* glyph may fail */ }
         }
       }
@@ -2620,7 +2637,7 @@
       function createThinkingIndicator() {
         var div = document.createElement('div');
         div.className = 'thinking-indicator';
-        div.innerHTML = '<div class="thinking-phi"><span class="thinking-label">thinking</span><span class="thinking-value">\u03A6 0.000</span></div><div class="thinking-bar"><div class="thinking-fill" style="width: 0%"></div></div>';
+        div.innerHTML = '<div class="thinking-result"><span class="thinking-generating">running consciousness cycles\u2026</span></div>';
         return div;
       }
 

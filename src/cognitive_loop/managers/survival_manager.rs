@@ -1,5 +1,7 @@
 //! Survival Manager — Infrastructure Monitoring CognitiveSubsystem
 //!
+//! **Requires**: `feature = "survival"` (implies `mesh`)
+//!
 //! Aggregates sensor readings from IoT devices, detects anomalies
 //! (pipe burst, power outage), and triggers emergency responses.
 //!
@@ -11,8 +13,10 @@
 //! 47 — co-prime with {7, 11, 13, 19, 23, 29, 31, 37, 41, 43, 53, 67}
 
 use crate::cognitive_loop::subsystem_trait::{CognitiveSubsystem, CycleSnapshot, SubsystemOutput};
-use crate::swarm::mesh::sensor_iot::{IoTSensorAdapter, IoTReading, ResourceAlert, AlertSeverity, ResourceType};
-use crate::swarm::mesh::sensor_forecast::{DemandForecaster, DemandForecast};
+use crate::swarm::mesh::sensor_forecast::{DemandForecast, DemandForecaster};
+use crate::swarm::mesh::sensor_iot::{
+    AlertSeverity, IoTReading, IoTSensorAdapter, ResourceAlert, ResourceType,
+};
 
 /// Neuromodulatory gain: scarcity → NE + cortisol (stress response).
 /// Basis: Sapolsky (2004) — resource scarcity triggers HPA axis.
@@ -56,7 +60,10 @@ pub enum SurvivalEvent {
     /// Emergency resolved.
     EmergencyResolved,
     /// Resource sharing event (community mutual aid).
-    ResourceShared { resource_type: String, quantity: f64 },
+    ResourceShared {
+        resource_type: String,
+        quantity: f64,
+    },
 }
 
 /// Survival Manager — monitors physical infrastructure via IoT sensors.
@@ -80,6 +87,9 @@ pub struct SurvivalManager {
 }
 
 impl SurvivalManager {
+    /// Co-prime scheduling interval (cycles).
+    pub const INTERVAL: u32 = 47;
+
     /// Create a new SurvivalManager.
     pub fn new(enabled: bool) -> Self {
         Self {
@@ -133,7 +143,8 @@ impl SurvivalManager {
             .duration_since(std::time::SystemTime::UNIX_EPOCH)
             .unwrap_or_default()
             .as_secs();
-        self.forecaster.forecast(resource_type, horizon_hours, hour, now_secs)
+        self.forecaster
+            .forecast(resource_type, horizon_hours, hour, now_secs)
     }
 
     fn process_events(&mut self) {
@@ -144,7 +155,8 @@ impl SurvivalManager {
                     // Feed forecaster
                     let hour = chrono::Utc::now().hour() as usize;
                     for (key, &value) in &reading.values {
-                        let resource_type = crate::swarm::mesh::sensor_iot::ResourceType::classify(key);
+                        let resource_type =
+                            crate::swarm::mesh::sensor_iot::ResourceType::classify(key);
                         let type_name = format!("{:?}", resource_type).to_lowercase();
                         self.forecaster.record_consumption(&type_name, value, hour);
 
@@ -167,10 +179,18 @@ impl SurvivalManager {
                 SurvivalEvent::EmergencyResolved => {
                     self.emergency_active = false;
                 }
-                SurvivalEvent::ResourceShared { resource_type, quantity } => {
+                SurvivalEvent::ResourceShared {
+                    resource_type,
+                    quantity,
+                } => {
                     // Community sharing — update levels
-                    let current = self.resource_levels.get(&resource_type).copied().unwrap_or(0.0);
-                    self.resource_levels.insert(resource_type, current + quantity);
+                    let current = self
+                        .resource_levels
+                        .get(&resource_type)
+                        .copied()
+                        .unwrap_or(0.0);
+                    self.resource_levels
+                        .insert(resource_type, current + quantity);
                 }
             }
         }
@@ -180,7 +200,11 @@ impl SurvivalManager {
         self.last_telemetry = SurvivalTelemetry {
             water_pct: self.resource_levels.get("water").copied().unwrap_or(0.0),
             power_kw: self.resource_levels.get("power").copied().unwrap_or(0.0) / 1000.0,
-            food_days: self.resource_levels.get("temperature").copied().unwrap_or(0.0), // Proxy
+            food_days: self
+                .resource_levels
+                .get("temperature")
+                .copied()
+                .unwrap_or(0.0), // Proxy
             emergency_active: self.emergency_active,
             sensor_count: self.sensor_adapter.sensor_count(),
             alert_count: self.recent_alerts.len(),
@@ -195,7 +219,7 @@ impl CognitiveSubsystem for SurvivalManager {
     }
 
     fn interval(&self) -> u32 {
-        47
+        Self::INTERVAL
     }
 
     fn process(&mut self, _snapshot: &CycleSnapshot) -> SubsystemOutput {
@@ -215,7 +239,9 @@ impl CognitiveSubsystem for SurvivalManager {
         }
 
         // Neuromod: critical alerts → arousal spike
-        let critical_count = self.recent_alerts.iter()
+        let critical_count = self
+            .recent_alerts
+            .iter()
             .filter(|a| a.severity >= AlertSeverity::Critical)
             .count();
         if critical_count > 0 {
@@ -231,12 +257,42 @@ impl CognitiveSubsystem for SurvivalManager {
         }
 
         // Neuromod: stable resources → calm
-        if !self.emergency_active && self.recent_alerts.is_empty() && !self.resource_levels.is_empty() {
+        if !self.emergency_active
+            && self.recent_alerts.is_empty()
+            && !self.resource_levels.is_empty()
+        {
             output.valence_delta += ABUNDANCE_5HT_GAIN as f32;
         }
 
         self.update_telemetry();
         output
+    }
+
+    fn checkpoint(&self) -> Vec<u8> {
+        // Layout: [emergency_active: u8 = 1][enabled: u8 = 1]
+        // Total: 2 bytes
+        //
+        // Note: resource_levels (HashMap), sensor_adapter, and forecaster
+        // contain complex state that cannot be cheaply serialized as raw bytes.
+        // The emergency flag is the critical state for restart resilience.
+        let mut data = Vec::with_capacity(2);
+        data.push(self.emergency_active as u8);
+        data.push(self.enabled as u8);
+        data
+    }
+
+    fn restore(&mut self, data: &[u8]) -> Result<(), String> {
+        const MIN_SIZE: usize = 2;
+        if data.len() < MIN_SIZE {
+            return Err(format!(
+                "SurvivalManager checkpoint too short: {} < {}",
+                data.len(),
+                MIN_SIZE
+            ));
+        }
+        self.emergency_active = data[0] != 0;
+        self.enabled = data[1] != 0;
+        Ok(())
     }
 }
 

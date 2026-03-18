@@ -68,12 +68,12 @@ mod mesh_receiver;
 pub mod sensor;
 
 // Sovereign Inoculation modules
-pub mod mesh_time;
-pub mod time_beacon;
-pub mod name_packet;
 pub mod content_packet;
-pub mod sensor_iot;
+pub mod mesh_time;
+pub mod name_packet;
 pub mod sensor_forecast;
+pub mod sensor_iot;
+pub mod time_beacon;
 
 pub use dual_layer::{
     BiLoopbackTransport, DualLayerMesh, LoopbackTransport, MeshRoute, MeshTransport,

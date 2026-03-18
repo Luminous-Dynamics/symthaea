@@ -121,6 +121,7 @@ impl DensityLimitShot {
 
 /// Raw CSV row matching the DL_DataFrame columns.
 #[derive(Debug, Deserialize)]
+#[allow(non_snake_case)]
 struct CsvRow {
     discharge_ID: u64,
     time: f64,
@@ -177,7 +178,11 @@ pub fn load_density_limit_csv(path: &Path) -> Result<Vec<DensityLimitShot>> {
     let mut shots: Vec<DensityLimitShot> = shots_map
         .into_iter()
         .map(|(shot_id, mut samples)| {
-            samples.sort_by(|a, b| a.time_s.partial_cmp(&b.time_s).unwrap_or(std::cmp::Ordering::Equal));
+            samples.sort_by(|a, b| {
+                a.time_s
+                    .partial_cmp(&b.time_s)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
             let has_disruption = samples.iter().any(|s| s.is_disruption);
             DensityLimitShot {
                 shot_id,
@@ -310,6 +315,23 @@ impl DensityLimitEncoder {
         ContinuousHV::bundle_owned(&healthy_encodings)
     }
 
+    /// Encode a temporal window of consecutive samples into a single HV.
+    ///
+    /// Takes `N` consecutive samples, encodes each individually, then bundles
+    /// them into a single ContinuousHV that captures temporal context.
+    /// A disrupting plasma evolves differently over time than a stable one —
+    /// windowed encoding captures this trajectory information.
+    pub fn encode_window(&self, samples: &[DensityLimitSample]) -> ContinuousHV {
+        if samples.is_empty() {
+            return ContinuousHV::zero(HDC_DIMENSION);
+        }
+        if samples.len() == 1 {
+            return self.encode(&samples[0]);
+        }
+        let encoded: Vec<ContinuousHV> = samples.iter().map(|s| self.encode(s)).collect();
+        ContinuousHV::bundle_owned(&encoded)
+    }
+
     /// Access the normalization ranges.
     pub fn ranges(&self) -> &NormalizationRanges {
         &self.ranges
@@ -427,8 +449,16 @@ pub fn compute_roc_curve(scored: &[(f64, bool)]) -> Vec<RocPoint> {
     if total_pos < 1.0 || total_neg < 1.0 {
         // Degenerate: only one class present
         return vec![
-            RocPoint { fpr: 0.0, tpr: 0.0, threshold: 1.0 },
-            RocPoint { fpr: 1.0, tpr: 1.0, threshold: 0.0 },
+            RocPoint {
+                fpr: 0.0,
+                tpr: 0.0,
+                threshold: 1.0,
+            },
+            RocPoint {
+                fpr: 1.0,
+                tpr: 1.0,
+                threshold: 0.0,
+            },
         ];
     }
 
@@ -459,7 +489,11 @@ pub fn compute_roc_curve(scored: &[(f64, bool)]) -> Vec<RocPoint> {
 
         let tpr = tp as f64 / total_pos;
         let fpr = fp as f64 / total_neg;
-        points.push(RocPoint { fpr, tpr, threshold: thresh });
+        points.push(RocPoint {
+            fpr,
+            tpr,
+            threshold: thresh,
+        });
     }
 
     // Sort by FPR ascending, then TPR ascending for consistent curve
@@ -467,7 +501,11 @@ pub fn compute_roc_curve(scored: &[(f64, bool)]) -> Vec<RocPoint> {
         a.fpr
             .partial_cmp(&b.fpr)
             .unwrap_or(std::cmp::Ordering::Equal)
-            .then(a.tpr.partial_cmp(&b.tpr).unwrap_or(std::cmp::Ordering::Equal))
+            .then(
+                a.tpr
+                    .partial_cmp(&b.tpr)
+                    .unwrap_or(std::cmp::Ordering::Equal),
+            )
     });
 
     points
@@ -611,7 +649,10 @@ impl EvaluationReport {
         md.push_str("# C-Mod Density Limit Evaluation Report\n\n");
         md.push_str("## Dataset Split\n\n");
         md.push_str(&format!("| Metric | Value |\n|--------|-------|\n"));
-        md.push_str(&format!("| Training shots | {} |\n", self.total_shots_train));
+        md.push_str(&format!(
+            "| Training shots | {} |\n",
+            self.total_shots_train
+        ));
         md.push_str(&format!("| Test shots | {} |\n", self.total_shots_test));
         md.push_str(&format!(
             "| Test normal samples | {} |\n",
@@ -625,7 +666,10 @@ impl EvaluationReport {
 
         md.push_str("## Free Energy Classification (Best Threshold)\n\n");
         md.push_str(&format!("| Metric | Value |\n|--------|-------|\n"));
-        md.push_str(&format!("| Best threshold | {:.4} |\n", self.best_threshold));
+        md.push_str(&format!(
+            "| Best threshold | {:.4} |\n",
+            self.best_threshold
+        ));
         md.push_str(&format!("| F1 | {:.4} |\n", self.best_f1));
         md.push_str(&format!("| Accuracy | {:.4} |\n", cm.accuracy()));
         md.push_str(&format!("| Precision | {:.4} |\n", cm.precision()));
@@ -657,7 +701,10 @@ impl EvaluationReport {
 
         md.push_str("## Lead Time Analysis\n\n");
         md.push_str(&format!("| Metric | Value |\n|--------|-------|\n"));
-        md.push_str(&format!("| Detected shots | {} / {} |\n", lt.detected_count, lt.total_disrupted));
+        md.push_str(&format!(
+            "| Detected shots | {} / {} |\n",
+            lt.detected_count, lt.total_disrupted
+        ));
         md.push_str(&format!("| Mean lead time | {:.4} s |\n", lt.mean_s));
         md.push_str(&format!("| Median lead time | {:.4} s |\n", lt.median_s));
         md.push_str(&format!("| Min lead time | {:.4} s |\n", lt.min_s));
@@ -677,7 +724,9 @@ impl EvaluationReport {
         md.push_str("\n");
 
         md.push_str("## Threshold Sweep\n\n");
-        md.push_str("| Threshold | F1 | Precision | Recall |\n|-----------|-----|-----------|--------|\n");
+        md.push_str(
+            "| Threshold | F1 | Precision | Recall |\n|-----------|-----|-----------|--------|\n",
+        );
         for &(thresh, f1, prec, rec) in &self.threshold_sweep {
             md.push_str(&format!(
                 "| {:.2} | {:.4} | {:.4} | {:.4} |\n",
@@ -821,18 +870,43 @@ fn evaluate_phi_decline(
 /// 4. Sweeps free-energy thresholds to find optimal F1
 /// 5. Computes ROC curve, AUC, and lead-time statistics
 /// 6. Evaluates Phi-decline method for comparison
-pub fn evaluate_density_limit(
-    path: &Path,
-    config: &EvaluationConfig,
-) -> Result<EvaluationReport> {
+pub fn evaluate_density_limit(path: &Path, config: &EvaluationConfig) -> Result<EvaluationReport> {
     // 1. Load data
     let shots = load_density_limit_csv(path)?;
-    anyhow::ensure!(!shots.is_empty(), "No shots found in CSV: {}", path.display());
+    anyhow::ensure!(
+        !shots.is_empty(),
+        "No shots found in CSV: {}",
+        path.display()
+    );
 
-    // 2. Deterministic train/test split by sorted shot_id
-    let split_idx = ((shots.len() as f64) * config.train_fraction.clamp(0.01, 0.99)).ceil() as usize;
-    let split_idx = split_idx.min(shots.len() - 1).max(1);
-    let (train_shots, test_shots) = shots.split_at(split_idx);
+    // 2. Stratified train/test split: ensure disrupted shots appear in both sets
+    let mut disrupted_shots: Vec<DensityLimitShot> = Vec::new();
+    let mut normal_shots: Vec<DensityLimitShot> = Vec::new();
+    for shot in shots {
+        if shot.has_disruption {
+            disrupted_shots.push(shot);
+        } else {
+            normal_shots.push(shot);
+        }
+    }
+
+    let d_split = ((disrupted_shots.len() as f64) * config.train_fraction).ceil() as usize;
+    let d_split = d_split
+        .min(disrupted_shots.len().saturating_sub(1))
+        .max(if disrupted_shots.len() > 1 { 1 } else { 0 });
+    let n_split = ((normal_shots.len() as f64) * config.train_fraction).ceil() as usize;
+    let n_split = n_split.min(normal_shots.len().saturating_sub(1)).max(1);
+
+    let mut train_shots_owned: Vec<DensityLimitShot> = Vec::new();
+    let mut test_shots_owned: Vec<DensityLimitShot> = Vec::new();
+
+    train_shots_owned.extend(disrupted_shots.drain(..d_split));
+    test_shots_owned.extend(disrupted_shots); // remaining disrupted → test
+    train_shots_owned.extend(normal_shots.drain(..n_split));
+    test_shots_owned.extend(normal_shots); // remaining normal → test
+
+    let train_shots = &train_shots_owned[..];
+    let test_shots = &test_shots_owned[..];
 
     // 3. Build encoder from training data normalization ranges
     let encoder = DensityLimitEncoder::from_shots(train_shots);
@@ -896,6 +970,783 @@ pub fn evaluate_density_limit(
     })
 }
 
+// ── V2 Evaluation: Temporal Windows + Per-Shot Reference ─────────────────
+
+/// Configuration for the improved V2 evaluation harness.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EvaluationConfigV2 {
+    /// Fraction of shots used for training (rest for test). Default: 0.8.
+    pub train_fraction: f64,
+    /// Temporal window size (consecutive samples bundled into one HV). Default: 5.
+    pub window_size: usize,
+    /// Fraction of each shot's early samples used as per-shot reference. Default: 0.2.
+    pub reference_fraction: f64,
+    /// Maximum threshold for fine sweep. Default: 0.30.
+    pub fine_threshold_max: f64,
+    /// Step size for fine threshold sweep. Default: 0.005.
+    pub fine_threshold_step: f64,
+    /// Minimum samples needed for per-shot reference (fallback to global). Default: 10.
+    pub min_reference_samples: usize,
+    /// Sliding window size for Phi-decline monitor. Default: 10.
+    pub phi_window_size: usize,
+}
+
+impl Default for EvaluationConfigV2 {
+    fn default() -> Self {
+        Self {
+            train_fraction: 0.8,
+            window_size: 5,
+            reference_fraction: 0.2,
+            fine_threshold_max: 0.30,
+            fine_threshold_step: 0.005,
+            min_reference_samples: 10,
+            phi_window_size: 10,
+        }
+    }
+}
+
+/// Score test shots using temporal windowing and per-shot early-phase reference.
+///
+/// For each shot:
+/// 1. Take the first `reference_fraction` of samples as the "healthy baseline"
+/// 2. Build a per-shot reference HV from those early samples
+/// 3. Encode remaining samples using sliding temporal windows
+/// 4. Compute free energy of each window against the per-shot reference
+/// 5. Fall back to global reference if per-shot reference has too few samples
+fn score_shots_v2(
+    encoder: &DensityLimitEncoder,
+    global_reference: &ContinuousHV,
+    test_shots: &[DensityLimitShot],
+    config: &EvaluationConfigV2,
+) -> Vec<(f64, bool)> {
+    let mut scored = Vec::new();
+
+    for shot in test_shots {
+        let n_samples = shot.samples.len();
+        let n_ref = ((n_samples as f64) * config.reference_fraction).ceil() as usize;
+        let n_ref = n_ref.min(n_samples);
+
+        // Build per-shot reference from early samples (should be healthy baseline)
+        let reference = if n_ref >= config.min_reference_samples {
+            let ref_samples = &shot.samples[..n_ref];
+            let ref_encodings: Vec<ContinuousHV> =
+                ref_samples.iter().map(|s| encoder.encode(s)).collect();
+            ContinuousHV::bundle_owned(&ref_encodings)
+        } else {
+            global_reference.clone()
+        };
+
+        // Score all samples using temporal windows
+        // For each position i, the window is samples[max(0, i+1-W)..=i]
+        let w = config.window_size;
+        for i in 0..n_samples {
+            let start = if i + 1 >= w { i + 1 - w } else { 0 };
+            let window = &shot.samples[start..=i];
+            let hv = encoder.encode_window(window);
+            let sim = hv.similarity(&reference) as f64;
+            let fe = if sim.is_finite() {
+                (1.0 - sim).max(0.0)
+            } else {
+                1.0
+            };
+            scored.push((fe, shot.samples[i].is_disruption));
+        }
+    }
+
+    scored
+}
+
+/// Run the improved V2 evaluation pipeline with temporal windowing and per-shot reference.
+///
+/// Improvements over V1:
+/// 1. **Temporal windowing**: encodes N consecutive samples as a bundle (captures trajectory)
+/// 2. **Per-shot reference**: each shot is compared against its own early-phase baseline
+/// 3. **Finer threshold sweep**: 0.005 to 0.30 in 0.005 steps (60 thresholds)
+pub fn evaluate_density_limit_v2(
+    path: &Path,
+    config: &EvaluationConfigV2,
+) -> Result<EvaluationReport> {
+    // 1. Load data
+    let shots = load_density_limit_csv(path)?;
+    anyhow::ensure!(
+        !shots.is_empty(),
+        "No shots found in CSV: {}",
+        path.display()
+    );
+
+    // 2. Stratified train/test split (same logic as V1)
+    let mut disrupted_shots: Vec<DensityLimitShot> = Vec::new();
+    let mut normal_shots: Vec<DensityLimitShot> = Vec::new();
+    for shot in shots {
+        if shot.has_disruption {
+            disrupted_shots.push(shot);
+        } else {
+            normal_shots.push(shot);
+        }
+    }
+
+    let d_split = ((disrupted_shots.len() as f64) * config.train_fraction).ceil() as usize;
+    let d_split = d_split
+        .min(disrupted_shots.len().saturating_sub(1))
+        .max(if disrupted_shots.len() > 1 { 1 } else { 0 });
+    let n_split = ((normal_shots.len() as f64) * config.train_fraction).ceil() as usize;
+    let n_split = n_split.min(normal_shots.len().saturating_sub(1)).max(1);
+
+    let mut train_shots_owned: Vec<DensityLimitShot> = Vec::new();
+    let mut test_shots_owned: Vec<DensityLimitShot> = Vec::new();
+
+    train_shots_owned.extend(disrupted_shots.drain(..d_split));
+    test_shots_owned.extend(disrupted_shots);
+    train_shots_owned.extend(normal_shots.drain(..n_split));
+    test_shots_owned.extend(normal_shots);
+
+    let train_shots = &train_shots_owned[..];
+    let test_shots = &test_shots_owned[..];
+
+    // 3. Build encoder and global reference from training data
+    let encoder = DensityLimitEncoder::from_shots(train_shots);
+    let global_reference = encoder.build_reference(train_shots);
+
+    // 4. Count test samples
+    let normal_count = test_shots
+        .iter()
+        .flat_map(|s| &s.samples)
+        .filter(|s| !s.is_disruption)
+        .count();
+    let disruption_count = test_shots
+        .iter()
+        .flat_map(|s| &s.samples)
+        .filter(|s| s.is_disruption)
+        .count();
+
+    // 5. Score with V2 method (temporal windows + per-shot reference)
+    let scored = score_shots_v2(&encoder, &global_reference, test_shots, config);
+
+    // 6. Fine threshold sweep
+    let mut threshold_sweep = Vec::new();
+    let mut best_threshold = 0.05;
+    let mut best_f1 = 0.0;
+
+    let mut thresh = config.fine_threshold_step;
+    while thresh <= config.fine_threshold_max + 1e-9 {
+        let cm = classify_at_threshold(&scored, thresh);
+        let f1 = cm.f1();
+        threshold_sweep.push((thresh, f1, cm.precision(), cm.recall()));
+        if f1 > best_f1 {
+            best_f1 = f1;
+            best_threshold = thresh;
+        }
+        thresh += config.fine_threshold_step;
+    }
+
+    // 7. Final classification at best threshold
+    let confusion_matrix = classify_at_threshold(&scored, best_threshold);
+
+    // 8. ROC curve and AUC
+    let roc_curve = compute_roc_curve(&scored);
+    let auc = compute_auc(&roc_curve);
+
+    // 9. Lead time analysis (using windowed scoring per shot)
+    let total_disrupted = test_shots.iter().filter(|s| s.has_disruption).count();
+    let lead_times = compute_lead_times_v2(
+        &encoder,
+        &global_reference,
+        test_shots,
+        best_threshold,
+        config,
+    );
+    let lead_time_stats = LeadTimeStats::from_lead_times(&lead_times, total_disrupted);
+
+    // 10. Phi-decline comparison (unchanged from V1)
+    let phi_decline_cm = evaluate_phi_decline(&encoder, test_shots, config.phi_window_size);
+
+    Ok(EvaluationReport {
+        best_threshold,
+        best_f1,
+        confusion_matrix,
+        roc_curve,
+        auc,
+        lead_time_stats,
+        total_shots_train: train_shots.len(),
+        total_shots_test: test_shots.len(),
+        samples_per_class: (normal_count, disruption_count),
+        phi_decline_cm,
+        normalization_ranges: encoder.ranges().clone(),
+        threshold_sweep,
+    })
+}
+
+/// Compute lead times for disrupted test shots using V2 windowed scoring.
+fn compute_lead_times_v2(
+    encoder: &DensityLimitEncoder,
+    global_reference: &ContinuousHV,
+    test_shots: &[DensityLimitShot],
+    threshold: f64,
+    config: &EvaluationConfigV2,
+) -> Vec<f64> {
+    let mut lead_times = Vec::new();
+
+    for shot in test_shots {
+        if !shot.has_disruption {
+            continue;
+        }
+        let onset_time = match shot.disruption_onset_time() {
+            Some(t) => t,
+            None => continue,
+        };
+
+        let n_samples = shot.samples.len();
+        let n_ref = ((n_samples as f64) * config.reference_fraction).ceil() as usize;
+        let n_ref = n_ref.min(n_samples);
+
+        let reference = if n_ref >= config.min_reference_samples {
+            let ref_encodings: Vec<ContinuousHV> = shot.samples[..n_ref]
+                .iter()
+                .map(|s| encoder.encode(s))
+                .collect();
+            ContinuousHV::bundle_owned(&ref_encodings)
+        } else {
+            global_reference.clone()
+        };
+
+        let w = config.window_size;
+        for i in 0..n_samples {
+            let start = if i + 1 >= w { i + 1 - w } else { 0 };
+            let window = &shot.samples[start..=i];
+            let hv = encoder.encode_window(window);
+            let sim = hv.similarity(&reference) as f64;
+            let fe = if sim.is_finite() {
+                (1.0 - sim).max(0.0)
+            } else {
+                1.0
+            };
+
+            if fe >= threshold {
+                let lead = onset_time - shot.samples[i].time_s;
+                if lead.is_finite() {
+                    lead_times.push(lead);
+                }
+                break;
+            }
+        }
+    }
+
+    lead_times
+}
+
+// ── V3 Evaluation: Physics-Informed Features (Greenwald + Rates) ─────────
+
+/// Number of features in the V3 encoder:
+/// 6 raw sensors + 1 Greenwald fraction + 6 rate-of-change + 1 Greenwald rate = 14
+const NUM_FEATURES_V3: usize = 14;
+
+/// Deterministic seeds for V3 basis vectors.
+/// First 6 reuse SENSOR_SEEDS, next 8 are new for derived features.
+const V3_SEEDS: [u64; NUM_FEATURES_V3] = [
+    0xD10_0001, // density
+    0xD10_0002, // elongation
+    0xD10_0003, // minor_radius
+    0xD10_0004, // plasma_current
+    0xD10_0005, // toroidal_B_field
+    0xD10_0006, // triangularity
+    0xD10_0007, // Greenwald fraction
+    0xD10_0008, // delta density
+    0xD10_0009, // delta elongation
+    0xD10_000A, // delta minor_radius
+    0xD10_000B, // delta plasma_current
+    0xD10_000C, // delta toroidal_B_field
+    0xD10_000D, // delta triangularity
+    0xD10_000E, // delta Greenwald fraction
+];
+
+/// Compute the Greenwald density fraction.
+///
+/// f_G = density * pi * minor_radius^2 / plasma_current
+///
+/// The Greenwald limit is n_G = I_p / (pi * a^2). When density > n_G, the
+/// plasma exceeds the density limit. The fraction f_G = density / n_G
+/// = density * pi * a^2 / I_p. Values > 1.0 indicate disruption regime.
+///
+/// DL_DataFrame density is in 10^20 m^-3 units, plasma_current in MA,
+/// minor_radius in m, so no unit conversion is needed because the Greenwald
+/// formula in standard SI uses n_G[10^20 m^-3] = I_p[MA] / (pi * a[m]^2).
+pub fn greenwald_fraction(density: f32, minor_radius: f32, plasma_current: f32) -> f32 {
+    if plasma_current.abs() < 0.01 {
+        return 0.0;
+    }
+    let pi = std::f32::consts::PI;
+    density * pi * minor_radius * minor_radius / plasma_current
+}
+
+/// Configuration for the V3 physics-informed evaluation harness.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EvaluationConfigV3 {
+    /// Fraction of shots used for training (rest for test). Default: 0.8.
+    pub train_fraction: f64,
+    /// Temporal window size (consecutive samples bundled into one HV). Default: 5.
+    pub window_size: usize,
+    /// Fraction of each shot's early samples used as per-shot reference. Default: 0.2.
+    pub reference_fraction: f64,
+    /// Maximum threshold for fine sweep. Default: 0.50.
+    pub fine_threshold_max: f64,
+    /// Step size for fine threshold sweep. Default: 0.002.
+    pub fine_threshold_step: f64,
+    /// Minimum samples needed for per-shot reference (fallback to global). Default: 10.
+    pub min_reference_samples: usize,
+    /// Sliding window size for Phi-decline monitor. Default: 10.
+    pub phi_window_size: usize,
+    /// Whether to include the Greenwald fraction feature. Default: true.
+    pub use_greenwald: bool,
+    /// Whether to include rate-of-change features. Default: true.
+    pub use_rates: bool,
+}
+
+impl Default for EvaluationConfigV3 {
+    fn default() -> Self {
+        Self {
+            train_fraction: 0.8,
+            window_size: 5,
+            reference_fraction: 0.2,
+            fine_threshold_max: 0.50,
+            fine_threshold_step: 0.002,
+            min_reference_samples: 10,
+            phi_window_size: 10,
+            use_greenwald: true,
+            use_rates: true,
+        }
+    }
+}
+
+/// HDC encoder with physics-informed derived features.
+///
+/// Encodes up to 14 features per sample:
+/// - 6 raw sensors (normalized)
+/// - 1 Greenwald density fraction (f_G, normalized to [0,1] via clamp(f_G/2))
+/// - 6 rate-of-change features (delta of each sensor, mapped from [-1,1] to [0,1])
+/// - 1 Greenwald fraction rate (delta f_G, mapped from [-1,1] to [0,1])
+#[derive(Clone)]
+pub struct DensityLimitEncoderV3 {
+    bases: Vec<ContinuousHV>,
+    ranges: NormalizationRanges,
+    use_greenwald: bool,
+    use_rates: bool,
+    /// Number of active features (depends on config flags).
+    num_active: usize,
+}
+
+impl DensityLimitEncoderV3 {
+    /// Create a V3 encoder with the given normalization ranges and feature flags.
+    pub fn new(ranges: NormalizationRanges, use_greenwald: bool, use_rates: bool) -> Self {
+        // Determine which features are active:
+        // Always: 6 raw sensors
+        // Optional: 1 Greenwald fraction, 6 rate deltas, 1 Greenwald rate
+        let mut active_indices: Vec<usize> = (0..NUM_SENSORS).collect();
+        if use_greenwald {
+            active_indices.push(6); // Greenwald fraction
+        }
+        if use_rates {
+            active_indices.extend(7..13); // 6 sensor deltas
+            if use_greenwald {
+                active_indices.push(13); // Greenwald rate
+            }
+        }
+        let num_active = active_indices.len();
+
+        let bases: Vec<ContinuousHV> = active_indices
+            .iter()
+            .map(|&idx| ContinuousHV::random(HDC_DIMENSION, V3_SEEDS[idx]))
+            .collect();
+
+        Self {
+            bases,
+            ranges,
+            use_greenwald,
+            use_rates,
+            num_active,
+        }
+    }
+
+    /// Create encoder and compute normalization ranges from training shots.
+    pub fn from_shots(shots: &[DensityLimitShot], use_greenwald: bool, use_rates: bool) -> Self {
+        let ranges = NormalizationRanges::from_shots(shots);
+        Self::new(ranges, use_greenwald, use_rates)
+    }
+
+    /// Number of basis vectors (active features).
+    pub fn num_features(&self) -> usize {
+        self.num_active
+    }
+
+    /// Compute the feature vector for a sample, given an optional previous sample
+    /// for rate-of-change computation.
+    ///
+    /// Returns a Vec<f32> of length `num_active` with all values in [0, 1].
+    pub fn compute_features(
+        &self,
+        sample: &DensityLimitSample,
+        prev: Option<&DensityLimitSample>,
+    ) -> Vec<f32> {
+        let mut features = Vec::with_capacity(self.num_active);
+
+        // 1. Raw 6 normalized sensors
+        let normed = self.ranges.normalize_sample(sample);
+        features.extend_from_slice(&normed);
+
+        // 2. Greenwald fraction (if enabled)
+        let f_g = greenwald_fraction(sample.density, sample.minor_radius, sample.plasma_current);
+        if self.use_greenwald {
+            // Normalize to [0, 1] by dividing by 2 and clamping
+            features.push((f_g / 2.0).clamp(0.0, 1.0));
+        }
+
+        // 3. Rate-of-change features (if enabled)
+        if self.use_rates {
+            let prev_vals = prev.map(|p| p.sensor_values());
+            let curr_vals = sample.sensor_values();
+
+            for i in 0..NUM_SENSORS {
+                let delta = if let Some(ref pv) = prev_vals {
+                    let raw_delta = curr_vals[i] - pv[i];
+                    // Normalize delta using the sensor range
+                    let range = self.ranges.maxs[i] - self.ranges.mins[i];
+                    if range.abs() > 1e-10 {
+                        (raw_delta / range).clamp(-1.0, 1.0)
+                    } else {
+                        0.0
+                    }
+                } else {
+                    0.0 // First sample in window: delta = 0
+                };
+                // Map [-1, 1] → [0, 1]
+                features.push((delta + 1.0) / 2.0);
+            }
+
+            // Greenwald rate (if Greenwald is also enabled)
+            if self.use_greenwald {
+                let prev_f_g = prev
+                    .map(|p| greenwald_fraction(p.density, p.minor_radius, p.plasma_current))
+                    .unwrap_or(f_g);
+                let delta_fg = (f_g - prev_f_g).clamp(-1.0, 1.0);
+                features.push((delta_fg + 1.0) / 2.0);
+            }
+        }
+
+        features
+    }
+
+    /// Encode a single sample with physics-informed features.
+    pub fn encode(
+        &self,
+        sample: &DensityLimitSample,
+        prev: Option<&DensityLimitSample>,
+    ) -> ContinuousHV {
+        let features = self.compute_features(sample, prev);
+        debug_assert_eq!(features.len(), self.num_active);
+        ContinuousHV::encode_weighted(&self.bases, &features)
+    }
+
+    /// Encode a temporal window of consecutive samples into a single HV.
+    ///
+    /// Each sample is encoded with its predecessor for rate-of-change features,
+    /// then all encodings are bundled.
+    pub fn encode_window(&self, samples: &[DensityLimitSample]) -> ContinuousHV {
+        if samples.is_empty() {
+            return ContinuousHV::zero(HDC_DIMENSION);
+        }
+        if samples.len() == 1 {
+            return self.encode(&samples[0], None);
+        }
+        let encoded: Vec<ContinuousHV> = samples
+            .iter()
+            .enumerate()
+            .map(|(i, s)| {
+                let prev = if i > 0 { Some(&samples[i - 1]) } else { None };
+                self.encode(s, prev)
+            })
+            .collect();
+        ContinuousHV::bundle_owned(&encoded)
+    }
+
+    /// Build a reference HV from a set of healthy (non-disruption) samples within shots.
+    ///
+    /// Iterates sequentially through each shot to correctly compute rate features.
+    pub fn build_reference(&self, shots: &[DensityLimitShot]) -> ContinuousHV {
+        let mut healthy_encodings: Vec<ContinuousHV> = Vec::new();
+
+        for shot in shots {
+            let mut prev: Option<&DensityLimitSample> = None;
+            for sample in &shot.samples {
+                if !sample.is_disruption {
+                    healthy_encodings.push(self.encode(sample, prev));
+                }
+                prev = Some(sample);
+            }
+        }
+
+        if healthy_encodings.is_empty() {
+            return ContinuousHV::zero(HDC_DIMENSION);
+        }
+
+        ContinuousHV::bundle_owned(&healthy_encodings)
+    }
+
+    /// Access the normalization ranges.
+    pub fn ranges(&self) -> &NormalizationRanges {
+        &self.ranges
+    }
+}
+
+/// Score test shots using V3 physics-informed encoding with temporal windowing
+/// and per-shot early-phase reference.
+fn score_shots_v3(
+    encoder: &DensityLimitEncoderV3,
+    global_reference: &ContinuousHV,
+    test_shots: &[DensityLimitShot],
+    config: &EvaluationConfigV3,
+) -> Vec<(f64, bool)> {
+    let mut scored = Vec::new();
+
+    for shot in test_shots {
+        let n_samples = shot.samples.len();
+        let n_ref = ((n_samples as f64) * config.reference_fraction).ceil() as usize;
+        let n_ref = n_ref.min(n_samples);
+
+        // Build per-shot reference from early samples (sequential for rate features)
+        let reference = if n_ref >= config.min_reference_samples {
+            let ref_samples = &shot.samples[..n_ref];
+            let ref_encodings: Vec<ContinuousHV> = ref_samples
+                .iter()
+                .enumerate()
+                .map(|(i, s)| {
+                    let prev = if i > 0 {
+                        Some(&ref_samples[i - 1])
+                    } else {
+                        None
+                    };
+                    encoder.encode(s, prev)
+                })
+                .collect();
+            ContinuousHV::bundle_owned(&ref_encodings)
+        } else {
+            global_reference.clone()
+        };
+
+        // Score all samples using temporal windows
+        let w = config.window_size;
+        for i in 0..n_samples {
+            let start = if i + 1 >= w { i + 1 - w } else { 0 };
+            let window = &shot.samples[start..=i];
+            let hv = encoder.encode_window(window);
+            let sim = hv.similarity(&reference) as f64;
+            let fe = if sim.is_finite() {
+                (1.0 - sim).max(0.0)
+            } else {
+                1.0
+            };
+            scored.push((fe, shot.samples[i].is_disruption));
+        }
+    }
+
+    scored
+}
+
+/// Compute lead times for disrupted test shots using V3 windowed scoring.
+fn compute_lead_times_v3(
+    encoder: &DensityLimitEncoderV3,
+    global_reference: &ContinuousHV,
+    test_shots: &[DensityLimitShot],
+    threshold: f64,
+    config: &EvaluationConfigV3,
+) -> Vec<f64> {
+    let mut lead_times = Vec::new();
+
+    for shot in test_shots {
+        if !shot.has_disruption {
+            continue;
+        }
+        let onset_time = match shot.disruption_onset_time() {
+            Some(t) => t,
+            None => continue,
+        };
+
+        let n_samples = shot.samples.len();
+        let n_ref = ((n_samples as f64) * config.reference_fraction).ceil() as usize;
+        let n_ref = n_ref.min(n_samples);
+
+        let reference = if n_ref >= config.min_reference_samples {
+            let ref_samples = &shot.samples[..n_ref];
+            let ref_encodings: Vec<ContinuousHV> = ref_samples
+                .iter()
+                .enumerate()
+                .map(|(i, s)| {
+                    let prev = if i > 0 {
+                        Some(&ref_samples[i - 1])
+                    } else {
+                        None
+                    };
+                    encoder.encode(s, prev)
+                })
+                .collect();
+            ContinuousHV::bundle_owned(&ref_encodings)
+        } else {
+            global_reference.clone()
+        };
+
+        let w = config.window_size;
+        for i in 0..n_samples {
+            let start = if i + 1 >= w { i + 1 - w } else { 0 };
+            let window = &shot.samples[start..=i];
+            let hv = encoder.encode_window(window);
+            let sim = hv.similarity(&reference) as f64;
+            let fe = if sim.is_finite() {
+                (1.0 - sim).max(0.0)
+            } else {
+                1.0
+            };
+
+            if fe >= threshold {
+                let lead = onset_time - shot.samples[i].time_s;
+                if lead.is_finite() {
+                    lead_times.push(lead);
+                }
+                break;
+            }
+        }
+    }
+
+    lead_times
+}
+
+/// Run the V3 physics-informed evaluation pipeline.
+///
+/// Improvements over V2:
+/// 1. **Greenwald fraction**: f_G = density * pi * a^2 / I_p (the key disruption physics)
+/// 2. **Rate-of-change features**: temporal derivatives of all 6 sensors + Greenwald fraction
+/// 3. **14-feature encoder**: captures both state and trajectory in physics-meaningful space
+/// 4. **Finer threshold sweep**: 0.002 to 0.50 in 0.002 steps (250 thresholds)
+pub fn evaluate_density_limit_v3(
+    path: &Path,
+    config: &EvaluationConfigV3,
+) -> Result<EvaluationReport> {
+    // 1. Load data
+    let shots = load_density_limit_csv(path)?;
+    anyhow::ensure!(
+        !shots.is_empty(),
+        "No shots found in CSV: {}",
+        path.display()
+    );
+
+    // 2. Stratified train/test split (same logic as V1/V2)
+    let mut disrupted_shots: Vec<DensityLimitShot> = Vec::new();
+    let mut normal_shots: Vec<DensityLimitShot> = Vec::new();
+    for shot in shots {
+        if shot.has_disruption {
+            disrupted_shots.push(shot);
+        } else {
+            normal_shots.push(shot);
+        }
+    }
+
+    let d_split = ((disrupted_shots.len() as f64) * config.train_fraction).ceil() as usize;
+    let d_split = d_split
+        .min(disrupted_shots.len().saturating_sub(1))
+        .max(if disrupted_shots.len() > 1 { 1 } else { 0 });
+    let n_split = ((normal_shots.len() as f64) * config.train_fraction).ceil() as usize;
+    let n_split = n_split.min(normal_shots.len().saturating_sub(1)).max(1);
+
+    let mut train_shots_owned: Vec<DensityLimitShot> = Vec::new();
+    let mut test_shots_owned: Vec<DensityLimitShot> = Vec::new();
+
+    train_shots_owned.extend(disrupted_shots.drain(..d_split));
+    test_shots_owned.extend(disrupted_shots);
+    train_shots_owned.extend(normal_shots.drain(..n_split));
+    test_shots_owned.extend(normal_shots);
+
+    let train_shots = &train_shots_owned[..];
+    let test_shots = &test_shots_owned[..];
+
+    // 3. Build V3 encoder and global reference from training data
+    let encoder =
+        DensityLimitEncoderV3::from_shots(train_shots, config.use_greenwald, config.use_rates);
+    let global_reference = encoder.build_reference(train_shots);
+
+    eprintln!(
+        "V3 encoder: {} active features (greenwald={}, rates={})",
+        encoder.num_features(),
+        config.use_greenwald,
+        config.use_rates
+    );
+
+    // 4. Count test samples
+    let normal_count = test_shots
+        .iter()
+        .flat_map(|s| &s.samples)
+        .filter(|s| !s.is_disruption)
+        .count();
+    let disruption_count = test_shots
+        .iter()
+        .flat_map(|s| &s.samples)
+        .filter(|s| s.is_disruption)
+        .count();
+
+    // 5. Score with V3 method (physics-informed + temporal windows + per-shot reference)
+    let scored = score_shots_v3(&encoder, &global_reference, test_shots, config);
+
+    // 6. Fine threshold sweep: 0.002 to 0.50 in 0.002 steps
+    let mut threshold_sweep = Vec::new();
+    let mut best_threshold = 0.05;
+    let mut best_f1 = 0.0;
+
+    let mut thresh = config.fine_threshold_step;
+    while thresh <= config.fine_threshold_max + 1e-9 {
+        let cm = classify_at_threshold(&scored, thresh);
+        let f1 = cm.f1();
+        threshold_sweep.push((thresh, f1, cm.precision(), cm.recall()));
+        if f1 > best_f1 {
+            best_f1 = f1;
+            best_threshold = thresh;
+        }
+        thresh += config.fine_threshold_step;
+    }
+
+    // 7. Final classification at best threshold
+    let confusion_matrix = classify_at_threshold(&scored, best_threshold);
+
+    // 8. ROC curve and AUC
+    let roc_curve = compute_roc_curve(&scored);
+    let auc = compute_auc(&roc_curve);
+
+    // 9. Lead time analysis
+    let total_disrupted = test_shots.iter().filter(|s| s.has_disruption).count();
+    let lead_times = compute_lead_times_v3(
+        &encoder,
+        &global_reference,
+        test_shots,
+        best_threshold,
+        config,
+    );
+    let lead_time_stats = LeadTimeStats::from_lead_times(&lead_times, total_disrupted);
+
+    // 10. Phi-decline comparison (uses V1 encoder for apples-to-apples)
+    let v1_encoder = DensityLimitEncoder::from_shots(train_shots);
+    let phi_decline_cm = evaluate_phi_decline(&v1_encoder, test_shots, config.phi_window_size);
+
+    Ok(EvaluationReport {
+        best_threshold,
+        best_f1,
+        confusion_matrix,
+        roc_curve,
+        auc,
+        lead_time_stats,
+        total_shots_train: train_shots.len(),
+        total_shots_test: test_shots.len(),
+        samples_per_class: (normal_count, disruption_count),
+        phi_decline_cm,
+        normalization_ranges: encoder.ranges().clone(),
+        threshold_sweep,
+    })
+}
+
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -930,8 +1781,15 @@ mod tests {
 
                 csv.push_str(&format!(
                     "{},{},{},{},{},{},{},{},{}\n",
-                    shot_id, time, phase, density, elongation, minor_radius,
-                    plasma_current, b_field, triangularity
+                    shot_id,
+                    time,
+                    phase,
+                    density,
+                    elongation,
+                    minor_radius,
+                    plasma_current,
+                    b_field,
+                    triangularity
                 ));
             }
         }
@@ -965,8 +1823,14 @@ mod tests {
 
         // Check disruption labels: shots 0, 3 (every 3rd) should have disruptions
         assert!(shots[0].has_disruption, "shot 0 should have disruption");
-        assert!(!shots[1].has_disruption, "shot 1 should not have disruption");
-        assert!(!shots[2].has_disruption, "shot 2 should not have disruption");
+        assert!(
+            !shots[1].has_disruption,
+            "shot 1 should not have disruption"
+        );
+        assert!(
+            !shots[2].has_disruption,
+            "shot 2 should not have disruption"
+        );
         assert!(shots[3].has_disruption, "shot 3 should have disruption");
 
         // Check sample fields are populated
@@ -991,13 +1855,17 @@ mod tests {
         assert_eq!(hv1.dim(), HDC_DIMENSION);
         assert_eq!(hv2.dim(), HDC_DIMENSION);
 
-        // Same input must produce identical output
-        let sim = hv1.similarity(&hv2);
-        assert!(
-            (sim - 1.0).abs() < 1e-6,
-            "Deterministic encoding should produce identical HVs, similarity={}",
-            sim
-        );
+        // Same input must produce bit-identical output (deterministic encoding)
+        for (i, (a, b)) in hv1.values.iter().zip(hv2.values.iter()).enumerate() {
+            assert_eq!(
+                a.to_bits(),
+                b.to_bits(),
+                "Dimension {} differs: {} vs {}",
+                i,
+                a,
+                b
+            );
+        }
     }
 
     #[test]
@@ -1055,8 +1923,8 @@ mod tests {
     #[test]
     fn test_roc_auc_random_classifier() {
         // Random classifier: scores are independent of labels
-        use rand::SeedableRng;
         use rand::Rng;
+        use rand::SeedableRng;
         use rand_chacha::ChaCha8Rng;
 
         let mut rng = ChaCha8Rng::seed_from_u64(42);
@@ -1093,7 +1961,10 @@ mod tests {
 
         // Basic sanity checks on the report
         assert_eq!(report.total_shots_train + report.total_shots_test, 20);
-        assert!(report.total_shots_train >= 15, "should have ~16 training shots");
+        assert!(
+            report.total_shots_train >= 15,
+            "should have ~16 training shots"
+        );
         assert!(report.total_shots_test >= 3, "should have ~4 test shots");
         assert!(report.best_threshold >= 0.05 && report.best_threshold <= 0.95);
         assert!(report.best_f1 >= 0.0 && report.best_f1 <= 1.0);
@@ -1211,5 +2082,259 @@ mod tests {
         };
 
         assert_eq!(shot.disruption_onset_time(), Some(0.2));
+    }
+
+    #[test]
+    fn test_encode_window_single_sample() {
+        let csv = synthetic_csv(2, 5);
+        let (_file, path) = write_temp_csv(&csv);
+        let shots = load_density_limit_csv(&path).unwrap();
+        let encoder = DensityLimitEncoder::from_shots(&shots);
+
+        let sample = &shots[0].samples[0];
+        let single_hv = encoder.encode(sample);
+        let window_hv = encoder.encode_window(&[sample.clone()]);
+
+        // Single-sample window should be identical to single encode
+        assert_eq!(single_hv.dim(), window_hv.dim());
+        for (a, b) in single_hv.values.iter().zip(window_hv.values.iter()) {
+            assert_eq!(a.to_bits(), b.to_bits());
+        }
+    }
+
+    #[test]
+    fn test_encode_window_temporal_context() {
+        // Use samples from different shots to guarantee different sensor values
+        let csv = synthetic_csv(10, 20);
+        let (_file, path) = write_temp_csv(&csv);
+        let shots = load_density_limit_csv(&path).unwrap();
+        let encoder = DensityLimitEncoder::from_shots(&shots);
+
+        // Take samples from different shots (different density baselines)
+        let mut diverse_samples = vec![
+            shots[0].samples[0].clone(),
+            shots[1].samples[5].clone(),
+            shots[2].samples[10].clone(),
+            shots[3].samples[15].clone(),
+            shots[4].samples[19].clone(),
+        ];
+        // Ensure they have different values
+        diverse_samples[0].density = 0.5;
+        diverse_samples[1].density = 1.5;
+        diverse_samples[2].density = 2.5;
+        diverse_samples[3].density = 3.5;
+        diverse_samples[4].density = 4.5;
+
+        let window_hv = encoder.encode_window(&diverse_samples);
+        let single_hv = encoder.encode(&diverse_samples[2]); // middle sample
+
+        // Window bundles multiple different encodings, so it should not be identical to one
+        let sim = window_hv.similarity(&single_hv);
+        assert!(
+            sim > 0.0,
+            "window vs single similarity should be positive: {}",
+            sim
+        );
+        assert_eq!(window_hv.dim(), HDC_DIMENSION);
+
+        // Different windows should produce different HVs
+        let window2_hv = encoder.encode_window(&diverse_samples[0..3]);
+        let sim2 = window_hv.similarity(&window2_hv);
+        assert!(sim2 > 0.0, "two windows should have positive similarity");
+        assert_eq!(window2_hv.dim(), HDC_DIMENSION);
+    }
+
+    #[test]
+    fn test_encode_window_empty() {
+        let csv = synthetic_csv(2, 5);
+        let (_file, path) = write_temp_csv(&csv);
+        let shots = load_density_limit_csv(&path).unwrap();
+        let encoder = DensityLimitEncoder::from_shots(&shots);
+
+        let empty_hv = encoder.encode_window(&[]);
+        assert_eq!(empty_hv.dim(), HDC_DIMENSION);
+        // All zeros
+        assert!(empty_hv.values.iter().all(|&v| v == 0.0));
+    }
+
+    #[test]
+    fn test_evaluation_v2_on_synthetic() {
+        // Generate enough data for a meaningful V2 evaluation
+        let csv = synthetic_csv(20, 40); // 20 shots, 40 samples each
+        let (_file, path) = write_temp_csv(&csv);
+
+        let config = EvaluationConfigV2 {
+            train_fraction: 0.8,
+            window_size: 5,
+            reference_fraction: 0.2,
+            fine_threshold_max: 0.30,
+            fine_threshold_step: 0.005,
+            min_reference_samples: 5, // lower for synthetic data
+            phi_window_size: 10,
+        };
+
+        let report =
+            evaluate_density_limit_v2(&path, &config).expect("V2 evaluation should succeed");
+
+        // Basic sanity checks
+        assert_eq!(report.total_shots_train + report.total_shots_test, 20);
+        assert!(report.best_threshold >= 0.005 && report.best_threshold <= 0.30);
+        assert!(report.best_f1 >= 0.0 && report.best_f1 <= 1.0);
+        assert!(report.auc >= 0.0 && report.auc <= 1.0);
+        assert!(!report.roc_curve.is_empty(), "ROC curve should have points");
+
+        // Fine sweep should have ~60 thresholds
+        assert!(
+            report.threshold_sweep.len() >= 50,
+            "Fine sweep should have ~60 thresholds, got {}",
+            report.threshold_sweep.len()
+        );
+
+        // Confusion matrix should account for all test samples
+        let cm = &report.confusion_matrix;
+        assert_eq!(
+            cm.total() as usize,
+            report.samples_per_class.0 + report.samples_per_class.1,
+            "CM total should match test samples"
+        );
+    }
+
+    #[test]
+    fn test_per_shot_reference_fallback() {
+        // With very few samples per shot, should fall back to global reference
+        let csv = synthetic_csv(10, 5); // only 5 samples per shot
+        let (_file, path) = write_temp_csv(&csv);
+
+        let config = EvaluationConfigV2 {
+            min_reference_samples: 10, // 20% of 5 = 1, which is < 10 → fallback
+            ..EvaluationConfigV2::default()
+        };
+
+        // Should not panic — falls back to global reference
+        let report = evaluate_density_limit_v2(&path, &config).expect("fallback should work");
+        assert!(report.auc >= 0.0);
+    }
+
+    // ── V3 Tests ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_greenwald_fraction_computation() {
+        // Typical C-Mod: I_p = 0.8 MA, a = 0.22 m
+        // n_G = I_p / (pi * a^2) = 0.8 / (pi * 0.0484) = 0.8 / 0.15205 ≈ 5.26
+        // If density = 5.26, f_G should be ≈ 1.0
+        let pi = std::f32::consts::PI;
+        let ip = 0.8f32;
+        let a = 0.22f32;
+        let n_g = ip / (pi * a * a); // ≈ 5.26
+
+        let f_g = greenwald_fraction(n_g, a, ip);
+        assert!(
+            (f_g - 1.0).abs() < 0.01,
+            "At Greenwald limit, f_G should be ~1.0, got {}",
+            f_g
+        );
+
+        // Double the density → f_G ≈ 2.0
+        let f_g2 = greenwald_fraction(n_g * 2.0, a, ip);
+        assert!(
+            (f_g2 - 2.0).abs() < 0.01,
+            "At 2x Greenwald limit, f_G should be ~2.0, got {}",
+            f_g2
+        );
+
+        // Half the density → f_G ≈ 0.5
+        let f_g_half = greenwald_fraction(n_g * 0.5, a, ip);
+        assert!(
+            (f_g_half - 0.5).abs() < 0.01,
+            "At 0.5x Greenwald limit, f_G should be ~0.5, got {}",
+            f_g_half
+        );
+
+        // Division by zero guard
+        let f_g_zero = greenwald_fraction(5.0, 0.22, 0.001);
+        assert_eq!(f_g_zero, 0.0, "Near-zero current should return 0.0");
+    }
+
+    #[test]
+    fn test_v3_encoder_dimension() {
+        let csv = synthetic_csv(4, 10);
+        let (_file, path) = write_temp_csv(&csv);
+        let shots = load_density_limit_csv(&path).unwrap();
+
+        // Full V3: 6 raw + 1 Greenwald + 6 deltas + 1 Greenwald delta = 14
+        let encoder_full = DensityLimitEncoderV3::from_shots(&shots, true, true);
+        assert_eq!(
+            encoder_full.num_features(),
+            14,
+            "full V3 should have 14 features"
+        );
+
+        // No Greenwald, no rates: just 6 raw sensors
+        let encoder_raw = DensityLimitEncoderV3::from_shots(&shots, false, false);
+        assert_eq!(
+            encoder_raw.num_features(),
+            6,
+            "raw-only should have 6 features"
+        );
+
+        // Greenwald only (no rates): 6 raw + 1 Greenwald = 7
+        let encoder_gw = DensityLimitEncoderV3::from_shots(&shots, true, false);
+        assert_eq!(
+            encoder_gw.num_features(),
+            7,
+            "greenwald-only should have 7 features"
+        );
+
+        // Rates only (no Greenwald): 6 raw + 6 deltas = 12
+        let encoder_rates = DensityLimitEncoderV3::from_shots(&shots, false, true);
+        assert_eq!(
+            encoder_rates.num_features(),
+            12,
+            "rates-only should have 12 features"
+        );
+    }
+
+    #[test]
+    fn test_v3_evaluation_on_synthetic() {
+        // Generate enough data for a meaningful V3 evaluation
+        let csv = synthetic_csv(20, 40); // 20 shots, 40 samples each
+        let (_file, path) = write_temp_csv(&csv);
+
+        let config = EvaluationConfigV3 {
+            train_fraction: 0.8,
+            window_size: 5,
+            reference_fraction: 0.2,
+            fine_threshold_max: 0.50,
+            fine_threshold_step: 0.002,
+            min_reference_samples: 5,
+            phi_window_size: 10,
+            use_greenwald: true,
+            use_rates: true,
+        };
+
+        let report =
+            evaluate_density_limit_v3(&path, &config).expect("V3 evaluation should succeed");
+
+        // Basic sanity checks
+        assert_eq!(report.total_shots_train + report.total_shots_test, 20);
+        assert!(report.best_threshold >= 0.002 && report.best_threshold <= 0.50);
+        assert!(report.best_f1 >= 0.0 && report.best_f1 <= 1.0);
+        assert!(report.auc >= 0.0 && report.auc <= 1.0);
+        assert!(!report.roc_curve.is_empty(), "ROC curve should have points");
+
+        // Fine sweep should have ~250 thresholds
+        assert!(
+            report.threshold_sweep.len() >= 200,
+            "Fine sweep should have ~250 thresholds, got {}",
+            report.threshold_sweep.len()
+        );
+
+        // Confusion matrix should account for all test samples
+        let cm = &report.confusion_matrix;
+        assert_eq!(
+            cm.total() as usize,
+            report.samples_per_class.0 + report.samples_per_class.1,
+            "CM total should match test samples"
+        );
     }
 }

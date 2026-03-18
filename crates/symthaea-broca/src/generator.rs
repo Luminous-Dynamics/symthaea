@@ -473,8 +473,7 @@ impl BrocaGenerator {
             if !self.tokenizer.is_special(next_token) {
                 let token_str = self.tokenizer.token_str(next_token);
                 // Decode byte tokens (<0xHH>) to raw bytes for proper UTF-8
-                if token_str.starts_with("<0x") && token_str.ends_with('>')
-                    && token_str.len() == 6
+                if token_str.starts_with("<0x") && token_str.ends_with('>') && token_str.len() == 6
                 {
                     if let Ok(byte) = u8::from_str_radix(&token_str[3..5], 16) {
                         text_bytes.push(byte);

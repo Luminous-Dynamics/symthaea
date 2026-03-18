@@ -44,7 +44,7 @@ fn test_bath_consciousness_pipeline() {
         let m = &result.metadata;
         assert!(m.neuromod.serotonin_effective.is_finite());
         assert!(m.neuromod.neuromod_consciousness_mod.is_finite());
-        post_inject_consciousness.push(m.consciousness_level);
+        post_inject_consciousness.push(m.consciousness.consciousness_level);
     }
 
     // Phase 4: Clear + GABA agonist → 50 cycles

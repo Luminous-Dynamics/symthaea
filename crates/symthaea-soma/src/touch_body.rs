@@ -209,15 +209,15 @@ impl TouchBody {
 
         // Determine long-press status: any active touch held longer than threshold.
         let is_long_press = self.active_touches.iter().any(|t| {
-            event.timestamp_ms.saturating_sub(t.down_timestamp_ms)
-                >= self.long_press_threshold_ms
+            event.timestamp_ms.saturating_sub(t.down_timestamp_ms) >= self.long_press_threshold_ms
         });
 
         let attention_focus = if !self.active_touches.is_empty() {
             // Attention centroid of all active touches.
-            let (sx, sy) = self.active_touches.iter().fold((0.0f32, 0.0f32), |(ax, ay), t| {
-                (ax + t.x, ay + t.y)
-            });
+            let (sx, sy) = self
+                .active_touches
+                .iter()
+                .fold((0.0f32, 0.0f32), |(ax, ay), t| (ax + t.x, ay + t.y));
             let n = self.active_touches.len() as f32;
             Some((sx / n, sy / n))
         } else {
@@ -257,8 +257,8 @@ impl TouchBody {
 
         // Fast scroll → NE + DA boost (scanning, novelty-seeking arousal).
         if self.scroll_ema > FAST_SCROLL_THRESHOLD {
-            let intensity = ((self.scroll_ema - FAST_SCROLL_THRESHOLD) / FAST_SCROLL_THRESHOLD)
-                .min(1.0);
+            let intensity =
+                ((self.scroll_ema - FAST_SCROLL_THRESHOLD) / FAST_SCROLL_THRESHOLD).min(1.0);
             nudges.ne_delta += SCROLL_NE_NUDGE * intensity;
             nudges.da_delta += SCROLL_DA_NUDGE * intensity;
         }
@@ -277,7 +277,9 @@ impl TouchBody {
     /// Uses the most recent active touch's velocity to extrapolate forward.
     pub fn predict_next_touch(&mut self) {
         if let Some(touch) = self.active_touches.last() {
-            let dt_ms = touch.last_timestamp_ms.saturating_sub(touch.down_timestamp_ms);
+            let dt_ms = touch
+                .last_timestamp_ms
+                .saturating_sub(touch.down_timestamp_ms);
             if dt_ms > 0 {
                 let dt_s = dt_ms as f32 / 1000.0;
                 let vx = (touch.x - touch.last_x) / dt_s;
@@ -352,8 +354,8 @@ impl TouchBody {
                 let velocity = (dx * dx + dy * dy).sqrt() / dt_s;
 
                 // EMA-smooth the scroll velocity.
-                self.scroll_ema = SCROLL_EMA_ALPHA * velocity
-                    + (1.0 - SCROLL_EMA_ALPHA) * self.scroll_ema;
+                self.scroll_ema =
+                    SCROLL_EMA_ALPHA * velocity + (1.0 - SCROLL_EMA_ALPHA) * self.scroll_ema;
             }
 
             touch.last_x = touch.x;
@@ -373,8 +375,7 @@ impl TouchBody {
     fn handle_up(&mut self, event: &TouchEvent) -> f32 {
         // Check if this was a long press before removing.
         let was_long_press = self.active_touches.iter().any(|t| {
-            event.timestamp_ms.saturating_sub(t.down_timestamp_ms)
-                >= self.long_press_threshold_ms
+            event.timestamp_ms.saturating_sub(t.down_timestamp_ms) >= self.long_press_threshold_ms
         });
 
         // Remove the last active touch (LIFO — matches multi-touch semantics).
@@ -454,7 +455,10 @@ mod tests {
 
         // First touch with no prediction → maximum surprise.
         let state = body.on_touch(make_event(TouchAction::Down, 0.5, 0.5, 100));
-        assert_eq!(state.surprise, 1.0, "first touch should be maximally surprising");
+        assert_eq!(
+            state.surprise, 1.0,
+            "first touch should be maximally surprising"
+        );
         assert!(state.touch_active);
         assert_eq!(state.multi_touch_count, 1);
     }
@@ -526,14 +530,8 @@ mod tests {
 
         // Neuromod should reflect fast scroll.
         let nudges = body.neuromod_nudges();
-        assert!(
-            nudges.ne_delta > 0.0,
-            "fast scroll should produce NE nudge"
-        );
-        assert!(
-            nudges.da_delta > 0.0,
-            "fast scroll should produce DA nudge"
-        );
+        assert!(nudges.ne_delta > 0.0, "fast scroll should produce NE nudge");
+        assert!(nudges.da_delta > 0.0, "fast scroll should produce DA nudge");
     }
 
     #[test]
@@ -549,15 +547,20 @@ mod tests {
 
         // Attention focus should be centroid of both touches.
         let (fx, fy) = state.attention_focus.unwrap();
-        assert!((fx - 0.5).abs() < 0.01, "centroid x should be ~0.5, got {}", fx);
-        assert!((fy - 0.5).abs() < 0.01, "centroid y should be ~0.5, got {}", fy);
+        assert!(
+            (fx - 0.5).abs() < 0.01,
+            "centroid x should be ~0.5, got {}",
+            fx
+        );
+        assert!(
+            (fy - 0.5).abs() < 0.01,
+            "centroid y should be ~0.5, got {}",
+            fy
+        );
 
         // OT nudge from multi-touch.
         let nudges = body.neuromod_nudges();
-        assert!(
-            nudges.ot_delta > 0.0,
-            "multi-touch should produce OT nudge"
-        );
+        assert!(nudges.ot_delta > 0.0, "multi-touch should produce OT nudge");
         assert!(
             (nudges.ot_delta - MULTI_TOUCH_OT_NUDGE).abs() < f32::EPSILON,
             "2 fingers = 1 extra = 1x OT nudge"
@@ -600,7 +603,10 @@ mod tests {
         assert!(!state.touch_active);
         assert_eq!(state.multi_touch_count, 0);
         assert!(state.attention_focus.is_none());
-        assert!((state.surprise - 0.3).abs() < f32::EPSILON, "cancel surprise should be 0.3");
+        assert!(
+            (state.surprise - 0.3).abs() < f32::EPSILON,
+            "cancel surprise should be 0.3"
+        );
     }
 
     #[test]
@@ -669,7 +675,12 @@ mod tests {
         // Add MAX_ACTIVE_TOUCHES + 2 fingers.
         for i in 0..(MAX_ACTIVE_TOUCHES + 2) {
             let x = (i as f32) / (MAX_ACTIVE_TOUCHES as f32);
-            body.on_touch(make_event(TouchAction::Down, x.min(1.0), 0.5, 100 + i as u64));
+            body.on_touch(make_event(
+                TouchAction::Down,
+                x.min(1.0),
+                0.5,
+                100 + i as u64,
+            ));
         }
 
         assert_eq!(

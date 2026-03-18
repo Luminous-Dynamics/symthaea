@@ -27,4 +27,5 @@ pub mod speech;
 pub mod substrate;
 pub mod sustained_attention;
 pub mod tombench;
+pub mod security;
 pub mod worm;

@@ -825,8 +825,7 @@ impl CognitiveLoopService {
                     let size_factor =
                         ((t.graph_size as f64 + 1.0).log2() / log_scale).clamp(0.0, 1.0);
                     let ece_factor = (1.0 - t.calibration_ece).clamp(0.0, 1.0);
-                    let contradiction_factor = 1.0
-                        / (1.0 + t.contradictions_detected as f64 * 0.1);
+                    let contradiction_factor = 1.0 / (1.0 + t.contradictions_detected as f64 * 0.1);
                     let coherence = size_factor * ece_factor * contradiction_factor;
                     if coherence.is_finite() {
                         coherence
@@ -848,7 +847,11 @@ impl CognitiveLoopService {
                     }
                 },
                 // CfC temporal coherence → consciousness (Clark 2013)
-                temporal_coherence_phi: self.language_comm.voice_coherence.bridge.phi_contribution(),
+                temporal_coherence_phi: self
+                    .language_comm
+                    .voice_coherence
+                    .bridge
+                    .phi_contribution(),
             },
         );
         self.consciousness_engine
@@ -1484,7 +1487,9 @@ impl CognitiveLoopService {
                         let mut binding_sum = 0.0f32;
                         let mut count = 0usize;
                         for bundle in &bundles {
-                            if let Some(recovered) = bundler.unbind_region(&aggregate, &bundle.region) {
+                            if let Some(recovered) =
+                                bundler.unbind_region(&aggregate, &bundle.region)
+                            {
                                 binding_sum += recovered.similarity(&bundle.local_bundle);
                                 count += 1;
                             }
@@ -1788,7 +1793,12 @@ mod tests {
         for i in 0..20 {
             let r = svc.cycle(&format!("cycle {}", i));
             let a = r.metadata.cross_module_agreement;
-            assert!(a >= 0.0 && a <= 1.0, "Agreement {} out of [0,1] at cycle {}", a, i);
+            assert!(
+                a >= 0.0 && a <= 1.0,
+                "Agreement {} out of [0,1] at cycle {}",
+                a,
+                i
+            );
         }
     }
 
@@ -1802,7 +1812,11 @@ mod tests {
         let r = svc.cycle("quality composition");
         let q = r.metadata.quality.unified_quality_score;
         assert!(q.is_finite(), "Quality score must be finite");
-        assert!(q >= 0.0 && q <= 1.5, "Quality score {} out of expected range", q);
+        assert!(
+            q >= 0.0 && q <= 1.5,
+            "Quality score {} out of expected range",
+            q
+        );
     }
 
     /// Temporal continuity fields remain finite over many cycles.
@@ -1823,8 +1837,11 @@ mod tests {
         for _ in 0..25 {
             let r = svc.cycle("epistemic stability");
             let c = r.metadata.epistemic_gate_confidence;
-            assert!(c.is_finite() && c >= 0.0 && c <= 1.0,
-                "Epistemic gate confidence {} out of bounds", c);
+            assert!(
+                c.is_finite() && c >= 0.0 && c <= 1.0,
+                "Epistemic gate confidence {} out of bounds",
+                c
+            );
         }
     }
 
@@ -1836,7 +1853,11 @@ mod tests {
             svc.cycle("gradient warmup");
         }
         let r = svc.cycle("gradient recovery");
-        assert!(r.metadata.consciousness.consciousness_gradient_magnitude.is_finite());
+        assert!(r
+            .metadata
+            .consciousness
+            .consciousness_gradient_magnitude
+            .is_finite());
         assert!(r.metadata.prediction_coherence.is_finite());
     }
 
@@ -1846,8 +1867,16 @@ mod tests {
         let mut svc = make_service();
         for i in 0..30 {
             let r = svc.cycle(&format!("vel_{}", i));
-            assert!(r.metadata.cross_module_agreement.is_finite(), "Agreement NaN at {}", i);
-            assert!(r.metadata.quality.coherence_velocity.is_finite(), "Coherence vel NaN at {}", i);
+            assert!(
+                r.metadata.cross_module_agreement.is_finite(),
+                "Agreement NaN at {}",
+                i
+            );
+            assert!(
+                r.metadata.quality.coherence_velocity.is_finite(),
+                "Coherence vel NaN at {}",
+                i
+            );
         }
     }
 }

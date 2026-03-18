@@ -277,6 +277,40 @@ pub const MEMORY_RECALL_SIM_THRESHOLD: f32 = 0.3;
 /// Basis: Tulving & Schacter (1990) — repetition priming allows processing shortcuts.
 pub const INPUT_MEMO_THRESHOLD: f32 = 0.95;
 
+// ── Perception Manager ──────────────────────────────────────────────────────
+
+/// Perceptual coherence above which confidence is boosted.
+/// Basis: Dehaene & Changeux (2011) — high coherence indicates global workspace access.
+pub const PERCEPTION_COHERENCE_HIGH: f32 = 0.7;
+
+/// Perceptual coherence below which exploration is encouraged.
+/// Basis: Friston (2010) — low coherence signals high free-energy, triggering exploration.
+pub const PERCEPTION_COHERENCE_LOW: f32 = 0.3;
+
+/// Coherence threshold for entering vigilant mode.
+/// Basis: Posner & Petersen (1990) — alerting network activates on degraded percepts.
+pub const PERCEPTION_VIGILANCE_COHERENCE: f32 = 0.4;
+
+/// Prediction error threshold for entering vigilant mode.
+/// Basis: Rao & Ballard (1999) — high PE signals model-world mismatch.
+pub const PERCEPTION_VIGILANCE_PE: f32 = 0.4;
+
+/// Phenomenal binding above which confidence is boosted.
+/// Basis: Treisman & Gelade (1980) — feature integration theory, bound percepts are reliable.
+pub const PERCEPTION_BINDING_HIGH: f32 = 0.7;
+
+/// Phenomenal binding below which confidence is penalized.
+/// Basis: Treisman & Gelade (1980) — unbound features are perceptually unreliable.
+pub const PERCEPTION_BINDING_LOW: f32 = 0.3;
+
+/// Minimum attention sensitivity floor.
+/// Basis: Broadbent (1958) — filter theory, sensitivity cannot drop below baseline.
+pub const PERCEPTION_SENSITIVITY_MIN: f32 = 0.5;
+
+/// Maximum attention sensitivity ceiling.
+/// Basis: Kahneman (1973) — attention as limited resource, upper bound on allocation.
+pub const PERCEPTION_SENSITIVITY_MAX: f32 = 2.0;
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // PSI SYNTHESIS WEIGHTS
 // ═══════════════════════════════════════════════════════════════════════════════

@@ -147,7 +147,7 @@ fn test_equation_v2_feedback_deltas() {
             governance_collective_phi: 0.0,
             knowledge_grounding: 0.5,
             glyph_coherence: 0.0,
-        temporal_coherence_phi: 0.0,
+            temporal_coherence_phi: 0.0,
             knowledge_coherence: 0.5,
         };
         let output = engine.measure(&input);
@@ -222,7 +222,7 @@ fn test_low_consciousness_boosts_exploration() {
             governance_collective_phi: 0.0,
             knowledge_grounding: 0.5,
             glyph_coherence: 0.0,
-        temporal_coherence_phi: 0.0,
+            temporal_coherence_phi: 0.0,
             knowledge_coherence: 0.5,
         };
         let output = engine.measure(&input);
@@ -1033,7 +1033,7 @@ fn test_substrate_feasibility_affects_consciousness() {
             governance_collective_phi: 0.0,
             knowledge_grounding: 0.5,
             glyph_coherence: 0.0,
-        temporal_coherence_phi: 0.0,
+            temporal_coherence_phi: 0.0,
             knowledge_coherence: 0.5,
         };
         out_full = Some(engine1.measure(&input_full));
@@ -1123,7 +1123,7 @@ fn test_reduced_substrate_capabilities_lower_consciousness() {
             governance_collective_phi: 0.0,
             knowledge_grounding: 0.5,
             glyph_coherence: 0.0,
-        temporal_coherence_phi: 0.0,
+            temporal_coherence_phi: 0.0,
             knowledge_coherence: 0.5,
         };
         out_bio = Some(engine_bio.measure(&input_bio));

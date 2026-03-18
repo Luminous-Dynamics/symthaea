@@ -209,8 +209,10 @@ impl CivicCrisisDetector {
         self.cycles_since_last_event += 1;
 
         // Update EMAs
-        self.pe_ema = self.pe_ema * (1.0 - CRISIS_EMA_ALPHA) + input.prediction_error * CRISIS_EMA_ALPHA;
-        self.arousal_ema = self.arousal_ema * (1.0 - CRISIS_EMA_ALPHA) + input.arousal * CRISIS_EMA_ALPHA;
+        self.pe_ema =
+            self.pe_ema * (1.0 - CRISIS_EMA_ALPHA) + input.prediction_error * CRISIS_EMA_ALPHA;
+        self.arousal_ema =
+            self.arousal_ema * (1.0 - CRISIS_EMA_ALPHA) + input.arousal * CRISIS_EMA_ALPHA;
 
         // Track PE sustained
         if self.pe_ema > CRISIS_PE_THRESHOLD {
@@ -227,12 +229,16 @@ impl CivicCrisisDetector {
         }
 
         // Track Phi high water and drop
-        let phi = if input.has_peers { input.collective_phi } else { input.consciousness_level };
+        let phi = if input.has_peers {
+            input.collective_phi
+        } else {
+            input.consciousness_level
+        };
         if phi > self.phi_high_water {
             self.phi_high_water = phi;
         }
-        self.phi_drop_detected = self.phi_high_water >= CRISIS_PHI_BASELINE
-            && phi < CRISIS_PHI_DROP_THRESHOLD;
+        self.phi_drop_detected =
+            self.phi_high_water >= CRISIS_PHI_BASELINE && phi < CRISIS_PHI_DROP_THRESHOLD;
 
         // Cooldown check
         if self.cycles_since_last_event < CRISIS_COOLDOWN_CYCLES {
@@ -253,7 +259,8 @@ impl CivicCrisisDetector {
         }
 
         // Signal 2: Safety level escalation (direct threat)
-        if input.safety_level_ordinal >= 2 { // Orange or Red
+        if input.safety_level_ordinal >= 2 {
+            // Orange or Red
             signals.push(CrisisSignal {
                 name: "safety_level".to_string(),
                 value: input.safety_level_ordinal as f64,
@@ -331,7 +338,13 @@ impl CivicCrisisDetector {
 
         // Severity: 1 (single weak signal) to 5 (multiple strong signals + Red safety)
         let signal_count = signals.len() as u8;
-        let safety_boost = if input.safety_level_ordinal >= 3 { 2 } else if input.safety_level_ordinal >= 2 { 1 } else { 0 };
+        let safety_boost = if input.safety_level_ordinal >= 3 {
+            2
+        } else if input.safety_level_ordinal >= 2 {
+            1
+        } else {
+            0
+        };
         let severity = (signal_count + safety_boost).clamp(1, 5);
 
         (crisis_type, severity)
@@ -362,7 +375,12 @@ impl CivicCrisisDetector {
 
         let signal_list: Vec<String> = signals
             .iter()
-            .map(|s| format!("{}={:.2} (>{:.2}, {}cyc)", s.name, s.value, s.threshold, s.sustained_cycles))
+            .map(|s| {
+                format!(
+                    "{}={:.2} (>{:.2}, {}cyc)",
+                    s.name, s.value, s.threshold, s.sustained_cycles
+                )
+            })
             .collect();
 
         format!("{}: {}", type_str, signal_list.join(", "))
@@ -470,7 +488,10 @@ mod tests {
 
         let event = detector.tick(&input, 20);
         let event = event.expect("Phi collapse + safety escalation should trigger");
-        assert!(event.trigger_signals.iter().any(|s| s.name == "phi_collapse"));
+        assert!(event
+            .trigger_signals
+            .iter()
+            .any(|s| s.name == "phi_collapse"));
     }
 
     #[test]
@@ -526,8 +547,15 @@ mod tests {
         // Need to feed high values long enough for EMAs to cross thresholds
         for cycle in 20..100 {
             if let Some(event) = detector.tick(&input, cycle) {
-                assert!(event.severity >= 3, "Multiple signals should produce high severity, got {}", event.severity);
-                assert!(event.trigger_signals.len() >= 2, "Should have multiple signals");
+                assert!(
+                    event.severity >= 3,
+                    "Multiple signals should produce high severity, got {}",
+                    event.severity
+                );
+                assert!(
+                    event.trigger_signals.len() >= 2,
+                    "Should have multiple signals"
+                );
                 return;
             }
         }
@@ -541,7 +569,9 @@ mod tests {
         input.safety_level_ordinal = 2; // Orange
 
         let event = detector.tick(&input, 0).expect("Should trigger");
-        assert!(event.description.contains("Network threat") || event.description.contains("anomaly"));
+        assert!(
+            event.description.contains("Network threat") || event.description.contains("anomaly")
+        );
         assert!(event.description.contains("safety_level"));
     }
 

@@ -127,6 +127,24 @@ impl EmotionalStroopBenchmark {
                 }
             }
 
+            // Attention lapse: negative-valence trials capture attention more,
+            // increasing lapse vulnerability (Williams et al., 1996). The boost
+            // scales with base lapse_rate so it only activates during reliability testing.
+            let unique_trial = trial_idx * (trials_per_condition * 2) + trial;
+            let emotional_boost = if is_negative {
+                config.lapse_rate * 0.6
+            } else {
+                0.0
+            };
+            let effective_lapse = config.lapse_rate + emotional_boost;
+            let lapse_seed = config.trial_seed("emotional_stroop", "lapse", unique_trial);
+            response_idx = if (lapse_seed % 10000) as f64 / 10000.0 < effective_lapse {
+                let h = config.trial_seed("emotional_stroop", "lapse_choice", unique_trial);
+                h as usize % 4
+            } else {
+                response_idx
+            };
+
             // RT proxy: deliberation ticks based on decision margin
             let probs: Vec<f64> = exp_sims.iter().map(|e| e / exp_sum).collect();
             let mut sorted_probs = probs.clone();

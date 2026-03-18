@@ -196,6 +196,7 @@ pub use managers::network_service_bridge::{
     NetworkServiceBridge, NetworkServiceBridgeHandle,
 };
 pub use managers::swarm_manager::{SwarmEvent, SwarmTelemetry};
+pub use subsystem_trait::{CognitiveSubsystem, CycleSnapshot, SubsystemOutput};
 
 #[cfg(feature = "mesh")]
 pub use managers::{

@@ -64,6 +64,8 @@ pub struct BaselineCollection {
     pub spatial: BaselineMap,
     /// Causal reasoning baselines (causal chain, confound detection, intervention effect).
     pub causal_reasoning: BaselineMap,
+    /// Security (HDC-FHE) baselines (encrypted classification, collective aggregation).
+    pub security: BaselineMap,
     /// GPT-4 baselines from CogBench (Coda et al., 2023).
     pub llm_cogbench: BaselineMap,
     /// GPT-4 baselines from ToMBench (Kosinski, 2023).
@@ -103,6 +105,7 @@ impl BaselineCollection {
             clinical: clinical_baselines(),
             spatial: spatial_baselines(),
             causal_reasoning: causal_reasoning_baselines(),
+            security: security_baselines(),
             llm_cogbench: llm_cogbench_baselines(),
             llm_tombench: llm_tombench_baselines(),
             llm_arc: llm_arc_baselines(),
@@ -4607,6 +4610,44 @@ pub fn causal_reasoning_baselines() -> BaselineMap {
     m
 }
 
+/// Security (HDC-FHE) domain baselines.
+///
+/// These baselines represent what conventional encrypted inference achieves.
+/// Standard FHE (CKKS/BGV) introduces quantization noise that degrades accuracy.
+/// HDC-OTP encryption is mathematically distance-preserving, so the "baseline"
+/// for encrypted accuracy is the *plaintext* accuracy itself (perfect preservation).
+///
+/// For collective aggregation, the baseline is the fidelity achievable with
+/// standard secure aggregation protocols (e.g., Bonawitz et al. 2017 SecAgg).
+pub fn security_baselines() -> BaselineMap {
+    let mut m = BTreeMap::new();
+    // EncryptedClassification: encrypted_accuracy
+    // Baseline: CKKS-encrypted NN classification accuracy (typically 1-5% loss)
+    // Ref: Gilad-Bachrach et al. (2016) CryptoNets, ~98.95% on MNIST vs 99.5% plaintext
+    m.insert(
+        "encrypted_accuracy",
+        Baseline {
+            value: 0.95,
+            sd: Some(0.03),
+            source: "Gilad-Bachrach et al. (2016) CryptoNets; CKKS encrypted inference typical accuracy",
+            population: "FHE-encrypted neural networks",
+        },
+    );
+    // CollectiveAggregation: aggregation_fidelity
+    // Baseline: SecAgg (Bonawitz et al. 2017) — perfect fidelity for additive aggregation
+    // but HDC uses majority-vote which is approximate under encryption
+    m.insert(
+        "aggregation_fidelity",
+        Baseline {
+            value: 0.85,
+            sd: Some(0.05),
+            source: "Imani et al. (2019) secure HDC collaboration; bundle fidelity under OTP",
+            population: "encrypted HDC systems",
+        },
+    );
+    m
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -4637,6 +4678,7 @@ mod tests {
         assert!(!clinical_baselines().is_empty());
         assert!(!spatial_baselines().is_empty());
         assert!(!causal_reasoning_baselines().is_empty());
+        assert!(!security_baselines().is_empty());
     }
 
     #[test]

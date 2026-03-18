@@ -1008,7 +1008,10 @@ mod tests {
 
     #[test]
     fn test_inoculation_path_serialization() {
-        let paths = vec![InoculationPath::Inoculate, InoculationPath::InoculateAndAttune];
+        let paths = vec![
+            InoculationPath::Inoculate,
+            InoculationPath::InoculateAndAttune,
+        ];
         for path in paths {
             let json = serde_json::to_string(&path).unwrap();
             let back: InoculationPath = serde_json::from_str(&json).unwrap();

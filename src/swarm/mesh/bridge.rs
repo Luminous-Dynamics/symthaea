@@ -151,7 +151,9 @@ impl MeshBridgeHandle {
     pub fn new_with_attestation(
         outbound_capacity: usize,
         inbound_capacity: usize,
-        attestation: Option<std::sync::Arc<parking_lot::RwLock<crate::swarm::attestation::AttestationManager>>>,
+        attestation: Option<
+            std::sync::Arc<parking_lot::RwLock<crate::swarm::attestation::AttestationManager>>,
+        >,
     ) -> (Self, MeshBridgeActor) {
         let (outbound_tx, outbound_rx) = mpsc::channel(outbound_capacity);
         let (inbound_tx, inbound_rx) = mpsc::channel(inbound_capacity);
@@ -280,7 +282,8 @@ pub struct MeshBridgeActor {
     /// Feature-gated behind `identity`. When present, inbound packets
     /// are verified before being forwarded to the Mind.
     #[cfg(feature = "identity")]
-    attestation: Option<std::sync::Arc<parking_lot::RwLock<crate::swarm::attestation::AttestationManager>>>,
+    attestation:
+        Option<std::sync::Arc<parking_lot::RwLock<crate::swarm::attestation::AttestationManager>>>,
 }
 
 impl MeshBridgeActor {

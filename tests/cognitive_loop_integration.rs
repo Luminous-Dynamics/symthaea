@@ -1021,7 +1021,8 @@ fn test_harmonics_and_consciousness_profile_wired() {
     assert!(
         last_result
             .metadata
-            .consciousness.consciousness_profile_composite
+            .consciousness
+            .consciousness_profile_composite
             .is_finite(),
         "Consciousness profile composite should be finite"
     );
@@ -1330,7 +1331,8 @@ fn test_holographic_and_affective_wired() {
     assert!(
         last_result
             .metadata
-            .embodied.affect_consciousness_valence
+            .embodied
+            .affect_consciousness_valence
             .is_finite(),
         "Affective consciousness valence should be finite, got: {}",
         last_result.metadata.embodied.affect_consciousness_valence,
@@ -7355,7 +7357,8 @@ fn test_cross_coupling_no_nan_500_cycles() {
             m.consciousness.consciousness_level
         );
         assert!(
-            m.consciousness.consciousness_level >= 0.0 && m.consciousness.consciousness_level <= 1.0,
+            m.consciousness.consciousness_level >= 0.0
+                && m.consciousness.consciousness_level <= 1.0,
             "consciousness_level out of [0,1] at cycle {i}: {}",
             m.consciousness.consciousness_level
         );

@@ -324,8 +324,7 @@ mod tests {
         // Must inject via feedback state so the value survives D2 flexibility rescaling.
         // begin_cycle + snapshot_cycle_start seeds the feedback consensus at 0.8.
         svc.feedback_state.begin_cycle();
-        svc.feedback_state
-            .snapshot_cycle_start(0.5, 0.01, 0.8, 1.0);
+        svc.feedback_state.snapshot_cycle_start(0.5, 0.01, 0.8, 1.0);
         svc.curiosity_drive.exploration_urge = 0.8; // above threshold
         let result = svc.run_neuromodulator_and_psi_phase(0.1, 0.5);
         assert!(

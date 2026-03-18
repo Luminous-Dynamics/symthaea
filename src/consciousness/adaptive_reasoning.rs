@@ -483,12 +483,12 @@ impl AdaptiveReasoner {
             let current_state = ReasoningState::from_chain(&chain);
 
             // If we have previous experience, store it
-            if let (Some(prev_s), Some(prev_a)) = (&prev_state, &prev_action) {
+            if let (Some(prev_s), Some(prev_a)) = (prev_state.take(), prev_action.take()) {
                 let reward = chain.total_phi - prev_phi; // Reward = Φ gain
 
                 let experience = Experience {
-                    state: prev_s.clone(),
-                    action: prev_a.clone(),
+                    state: prev_s,
+                    action: prev_a,
                     reward,
                     next_state: current_state.clone(),
                     done: false,
@@ -605,10 +605,10 @@ mod tests {
         };
 
         let exp = Experience {
-            state: state.clone(),
-            action: action.clone(),
+            state,
+            action,
             reward: 0.5,
-            next_state: next_state.clone(),
+            next_state,
             done: false,
         };
 

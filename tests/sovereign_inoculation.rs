@@ -9,10 +9,10 @@
 
 #[cfg(feature = "mesh")]
 mod clock_tests {
-    use symthaea::swarm::mesh::mesh_time::{MeshTimeConsensus, TimeSample, TimeQuality};
-    use symthaea::swarm::mesh::time_beacon::TimeBeacon;
     use symthaea::cognitive_loop::managers::time_manager::TimeManager;
     use symthaea::cognitive_loop::subsystem_trait::{CognitiveSubsystem, CycleSnapshot};
+    use symthaea::swarm::mesh::mesh_time::{MeshTimeConsensus, TimeQuality, TimeSample};
+    use symthaea::swarm::mesh::time_beacon::TimeBeacon;
 
     fn now_us() -> u64 {
         std::time::SystemTime::now()
@@ -127,8 +127,10 @@ mod clock_tests {
 
 #[cfg(feature = "mesh")]
 mod trust_tests {
+    use symthaea::swarm::consciousness_certificate::{
+        verify_consciousness_certificate, ConsciousnessCertifier,
+    };
     use symthaea::swarm::web_of_trust::{TrustGraph, UnifiedTrust};
-    use symthaea::swarm::consciousness_certificate::{ConsciousnessCertifier, verify_consciousness_certificate};
 
     #[test]
     fn test_trust_graph_transitive_chain() {
@@ -216,8 +218,8 @@ mod trust_tests {
 
 #[cfg(feature = "mesh")]
 mod name_tests {
+    use symthaea::swarm::mesh::name_packet::{EndpointType, NameQuery, NameResponse};
     use symthaea::swarm::name_resolver::{MeshName, NameResolver, ResolvedEndpoint};
-    use symthaea::swarm::mesh::name_packet::{NameQuery, NameResponse, EndpointType};
 
     #[test]
     fn test_name_resolution_cache_flow() {
@@ -279,8 +281,8 @@ mod name_tests {
 
 #[cfg(feature = "mesh")]
 mod social_tests {
-    use symthaea::swarm::resonance_graph::{ResonanceGraph, ContentRef};
     use symthaea::swarm::mesh::content_packet::ContentAnnounce;
+    use symthaea::swarm::resonance_graph::{ContentRef, ResonanceGraph};
     use symthaea_core::hdc::BinaryHV;
 
     #[test]
@@ -288,13 +290,15 @@ mod social_tests {
         let mut graph = ResonanceGraph::new();
         graph.set_our_state(BinaryHV::random(42));
 
-        let items: Vec<ContentRef> = (0..20).map(|i| ContentRef {
-            source_peer: format!("peer_{}", i),
-            content_hash: [i as u8; 32],
-            hdv_embedding: BinaryHV::random(i + 100),
-            domain: "test".to_string(),
-            created_at: 1000 + i,
-        }).collect();
+        let items: Vec<ContentRef> = (0..20)
+            .map(|i| ContentRef {
+                source_peer: format!("peer_{}", i),
+                content_hash: [i as u8; 32],
+                hdv_embedding: BinaryHV::random(i + 100),
+                domain: "test".to_string(),
+                created_at: 1000 + i,
+            })
+            .collect();
 
         let ranked = graph.rank_content(&items, 10);
         assert_eq!(ranked.len(), 10);
@@ -332,12 +336,8 @@ mod social_tests {
     #[test]
     fn test_content_announce_roundtrip() {
         let full_hdv = BinaryHV::random(42);
-        let announce = ContentAnnounce::from_full_hdv(
-            [0xAA; 32],
-            &full_hdv,
-            "water".to_string(),
-            1234567890,
-        );
+        let announce =
+            ContentAnnounce::from_full_hdv([0xAA; 32], &full_hdv, "water".to_string(), 1234567890);
         let hv = announce.encode();
         let decoded = ContentAnnounce::decode(&hv).unwrap();
         assert_eq!(decoded.content_hash, [0xAA; 32]);
@@ -366,8 +366,8 @@ mod social_tests {
 
 #[cfg(feature = "mesh")]
 mod survival_tests {
-    use symthaea::swarm::mesh::sensor_iot::{IoTSensorAdapter, IoTPlatform, ResourceType};
     use symthaea::swarm::mesh::sensor_forecast::DemandForecaster;
+    use symthaea::swarm::mesh::sensor_iot::{IoTPlatform, IoTSensorAdapter, ResourceType};
 
     #[test]
     fn test_iot_parsing_zigbee2mqtt() {
@@ -411,7 +411,10 @@ mod survival_tests {
     fn test_resource_classification() {
         assert_eq!(ResourceType::classify("water_level"), ResourceType::Water);
         assert_eq!(ResourceType::classify("Power"), ResourceType::Power);
-        assert_eq!(ResourceType::classify("temperature"), ResourceType::Temperature);
+        assert_eq!(
+            ResourceType::classify("temperature"),
+            ResourceType::Temperature
+        );
     }
 
     #[test]
@@ -437,8 +440,8 @@ mod survival_tests {
 #[cfg(feature = "mesh")]
 mod cross_function_tests {
     use symthaea::swarm::mesh::mesh_time::MeshTimeConsensus;
+    use symthaea::swarm::name_resolver::{MeshName, NameResolver, ResolvedEndpoint};
     use symthaea::swarm::web_of_trust::TrustGraph;
-    use symthaea::swarm::name_resolver::{NameResolver, MeshName, ResolvedEndpoint};
 
     #[test]
     fn test_trust_weighted_time_consensus() {
@@ -472,7 +475,11 @@ mod cross_function_tests {
         engine.recompute_consensus(ts);
 
         // Consensus should be closer to 1000 (high-Phi) than -5000 (low-Phi)
-        assert!(engine.offset_us() > 0, "Offset should be positive: {}", engine.offset_us());
+        assert!(
+            engine.offset_us() > 0,
+            "Offset should be positive: {}",
+            engine.offset_us()
+        );
     }
 
     #[test]

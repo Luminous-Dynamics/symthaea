@@ -403,6 +403,9 @@ impl SporeEngine {
             }
         }
 
+        let semantic_cap = config.semantic_memory_capacity;
+        let episodic_cap = config.episodic_memory_capacity;
+
         Self {
             config,
             cycle_count: 0,
@@ -419,7 +422,7 @@ impl SporeEngine {
             last_consciousness: 0.0,
             last_output: None,
             instance_id,
-            memory: MemoryCoordinator::new(500, 100),
+            memory: MemoryCoordinator::new(semantic_cap, episodic_cap),
             dream: DreamEngine::with_defaults(),
             fep: ActiveInferenceAgent::with_defaults(),
             topology: TopologyAnalyzer::with_defaults(),
@@ -1043,22 +1046,17 @@ impl SporeEngine {
         if coherence > 0.7 {
             // Continuing a topic: boost curiosity/intent_0, dampen surprise
             channels.channels[0] = (channels.channels[0] + 0.2 * coherence).clamp(0.0, 1.0);
-            channels.channels[8] =
-                (channels.channels[8] * (1.0 - 0.3 * coherence)).clamp(0.0, 1.0);
+            channels.channels[8] = (channels.channels[8] * (1.0 - 0.3 * coherence)).clamp(0.0, 1.0);
         } else if coherence > 0.0 && coherence < 0.3 {
             // Topic shift: spike prediction error to signal surprise
-            channels.channels[8] =
-                (channels.channels[8] + 0.2 * (1.0 - coherence)).clamp(0.0, 1.0);
+            channels.channels[8] = (channels.channels[8] + 0.2 * (1.0 - coherence)).clamp(0.0, 1.0);
         }
 
         self.broca.generate(&channels, max_tokens)
     }
 
     /// Select the most resonant glyph for the current consciousness state and user input.
-    pub fn select_glyph(
-        &self,
-        input: &str,
-    ) -> crate::broca::GlyphResonance {
+    pub fn select_glyph(&self, input: &str) -> crate::broca::GlyphResonance {
         let mut channels = crate::broca::ThoughtChannels::from_cycle(
             self.last_consciousness,
             self.last_output.as_ref().map_or(0.5, |_| 0.3),
@@ -1078,6 +1076,15 @@ impl SporeEngine {
             channels.channels[1], // intent_valence
             channels.channels[2], // intent_abstraction
         )
+    }
+
+    /// Load trained Broca checkpoint weights from binary data.
+    ///
+    /// After loading, the autoregressive generation path is used for all
+    /// consciousness levels >= 0.15 (instead of the 0.5 threshold with
+    /// random embeddings).
+    pub fn load_broca_checkpoint(&mut self, data: &[u8]) -> Result<(), String> {
+        self.broca.load_checkpoint(data)
     }
 
     /// Run a dream cycle: simulate counterfactual alternatives to high-surprise events.
@@ -2833,12 +2840,8 @@ mod conversation_context_tests {
         let mut ctx = ConversationContext::new(8);
 
         let dim = 64; // Small dim for testing
-        let input1 = ContinuousHV::from_vec(
-            (0..dim).map(|i| (i as f32 * 0.1).sin()).collect(),
-        );
-        let input2 = ContinuousHV::from_vec(
-            (0..dim).map(|i| (i as f32 * 0.11).sin()).collect(),
-        );
+        let input1 = ContinuousHV::from_vec((0..dim).map(|i| (i as f32 * 0.1).sin()).collect());
+        let input2 = ContinuousHV::from_vec((0..dim).map(|i| (i as f32 * 0.11).sin()).collect());
 
         // Before any turns: enrichment is a no-op
         let enriched_before = ctx.enrich_input(&input2);
@@ -2886,7 +2889,9 @@ mod conversation_context_tests {
         let dim = 32;
         for i in 0..5u32 {
             let hv = ContinuousHV::from_vec(
-                (0..dim).map(|j| ((i * 100 + j as u32) as f32).sin()).collect(),
+                (0..dim)
+                    .map(|j| ((i * 100 + j as u32) as f32).sin())
+                    .collect(),
             );
             ctx.record_turn(&hv, 0.5);
         }

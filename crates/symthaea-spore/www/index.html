@@ -1312,6 +1312,11 @@
 
       await send('startLoop', { interval: 50 });
 
+      // Load trained Broca weights asynchronously (non-blocking)
+      send('loadBrocaCheckpoint', {})
+        .then(function(r) { console.log('Broca trained weights loaded (' + r.size + ' bytes)'); })
+        .catch(function(e) { console.warn('Broca checkpoint not available, using random init:', e.message); });
+
       // Fetch initial HV
       setTimeout(fetchHV, 500);
 

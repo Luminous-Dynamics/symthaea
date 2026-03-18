@@ -109,7 +109,10 @@ impl CodeTaskDetector {
         }
 
         let confidence = score.min(1.0);
-        (confidence >= super::thresholds::CODE_TASK_CONFIDENCE_THRESHOLD, confidence)
+        (
+            confidence >= super::thresholds::CODE_TASK_CONFIDENCE_THRESHOLD,
+            confidence,
+        )
     }
 
     /// Detect the specific type of code task
@@ -247,7 +250,10 @@ impl ThalamicRouter {
         {
             // High stakes - use deep thought
             CognitiveDepth::DeepThought
-        } else if novelty < self.familiarity_threshold && complexity < super::thresholds::THALAMIC_COMPLEXITY_REFLEX_THRESHOLD && urgency < super::thresholds::THALAMIC_URGENCY_REFLEX_THRESHOLD {
+        } else if novelty < self.familiarity_threshold
+            && complexity < super::thresholds::THALAMIC_COMPLEXITY_REFLEX_THRESHOLD
+            && urgency < super::thresholds::THALAMIC_URGENCY_REFLEX_THRESHOLD
+        {
             // Familiar, simple, not urgent - use reflex
             CognitiveDepth::Reflex
         } else {
@@ -588,9 +594,15 @@ impl ActiveInferenceBridge {
     pub fn coupling_quality(&self) -> CouplingQuality {
         match self.modulation_index() {
             None => CouplingQuality::InsufficientData,
-            Some(mi) if mi < super::thresholds::COUPLING_NO_COUPLING_THRESHOLD as f64 => CouplingQuality::NoCoupling,
-            Some(mi) if mi < super::thresholds::COUPLING_WEAK_THRESHOLD as f64 => CouplingQuality::WeakCoupling,
-            Some(mi) if mi < super::thresholds::COUPLING_MODERATE_THRESHOLD as f64 => CouplingQuality::ModerateCoupling,
+            Some(mi) if mi < super::thresholds::COUPLING_NO_COUPLING_THRESHOLD as f64 => {
+                CouplingQuality::NoCoupling
+            }
+            Some(mi) if mi < super::thresholds::COUPLING_WEAK_THRESHOLD as f64 => {
+                CouplingQuality::WeakCoupling
+            }
+            Some(mi) if mi < super::thresholds::COUPLING_MODERATE_THRESHOLD as f64 => {
+                CouplingQuality::ModerateCoupling
+            }
             Some(_) => CouplingQuality::StrongCoupling,
         }
     }

@@ -225,9 +225,7 @@ impl NetworkService {
 
     /// Get the PQC handshake manager (if feature enabled).
     #[cfg(feature = "pqc-handshake")]
-    pub fn pqc_manager(
-        &self,
-    ) -> &Option<Arc<RwLock<super::pqc_handshake::PqcHandshakeManager>>> {
+    pub fn pqc_manager(&self) -> &Option<Arc<RwLock<super::pqc_handshake::PqcHandshakeManager>>> {
         &self.pqc_manager
     }
 
@@ -578,7 +576,8 @@ impl NetworkService {
         // Step 4: Send ciphertext to peer (they decapsulate to get the same secret)
         // This requires another stream — for now, the session key is stored locally.
         // Full bidirectional KEM exchange requires the peer to also run this protocol.
-        // TODO: Send ciphertext over a second stream and have peer decapsulate.
+        // TODO(blocked:bidirectional-kem): Send ciphertext over a second stream
+        // and have peer decapsulate. Requires peer-side KEM protocol implementation.
 
         tracing::debug!(
             peer = peer_id,

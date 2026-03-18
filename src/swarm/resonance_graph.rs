@@ -118,8 +118,7 @@ impl ResonanceGraph {
 
     /// Add content from a peer.
     pub fn add_content(&mut self, content: ContentRef) {
-        if self.peers.len() >= MAX_RESONANCE_PEERS
-            && !self.peers.contains_key(&content.source_peer)
+        if self.peers.len() >= MAX_RESONANCE_PEERS && !self.peers.contains_key(&content.source_peer)
         {
             // Evict least-recently-seen peer
             if let Some(lru_key) = self
@@ -500,8 +499,6 @@ mod tests {
                 created_at: i as u64,
             });
         }
-        assert!(
-            g.peers.get("same_peer").unwrap().content.len() <= MAX_CONTENT_PER_PEER
-        );
+        assert!(g.peers.get("same_peer").unwrap().content.len() <= MAX_CONTENT_PER_PEER);
     }
 }

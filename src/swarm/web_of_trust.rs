@@ -139,13 +139,7 @@ impl TrustGraph {
     }
 
     /// Add or update a trust edge.
-    pub fn set_trust(
-        &mut self,
-        from: &str,
-        to: &str,
-        direct_trust: f64,
-        pq_verified: bool,
-    ) {
+    pub fn set_trust(&mut self, from: &str, to: &str, direct_trust: f64, pq_verified: bool) {
         let trust = direct_trust.clamp(0.0, 1.0);
         self.nodes.insert(from.to_string());
         self.nodes.insert(to.to_string());
@@ -334,16 +328,16 @@ impl TrustGraph {
         let edge_count = self.edge_count();
         let node_count = self.node_count();
 
-        let (trust_sum, pq_count) = self
-            .edges
-            .values()
-            .flat_map(|v| v.iter())
-            .fold((0.0, 0usize), |(sum, pq), e| {
-                (
-                    sum + e.effective_trust(),
-                    pq + if e.pq_verified { 1 } else { 0 },
-                )
-            });
+        let (trust_sum, pq_count) =
+            self.edges
+                .values()
+                .flat_map(|v| v.iter())
+                .fold((0.0, 0usize), |(sum, pq), e| {
+                    (
+                        sum + e.effective_trust(),
+                        pq + if e.pq_verified { 1 } else { 0 },
+                    )
+                });
 
         let avg_trust = if edge_count > 0 {
             trust_sum / edge_count as f64
@@ -512,7 +506,7 @@ mod tests {
         let mut g = TrustGraph::new();
         g.set_trust("a", "b", 0.5, true);
         g.set_trust("a", "b", 0.7, false); // Update without PQ
-        // PQ flag should still be true (sticky)
+                                           // PQ flag should still be true (sticky)
         let edges = g.edges.get("a").unwrap();
         assert!(edges[0].pq_verified);
     }

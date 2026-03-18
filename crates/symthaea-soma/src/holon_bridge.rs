@@ -5,9 +5,9 @@
 //! - PresenceOnly: heartbeats + consciousness vector
 //! - FullSync: + task delegation, knowledge shares, resuscitation
 
-use symthaea_spore::config::HolonSyncMode;
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
+use symthaea_spore::config::HolonSyncMode;
 
 const OUTBOUND_QUEUE_CAP: usize = 100;
 const CV_ATTENTION_DIM: usize = 64;

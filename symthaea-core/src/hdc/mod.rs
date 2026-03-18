@@ -309,6 +309,8 @@ pub mod higher_order_thought; // Higher-Order Thought (HOT) theory — meta-repr
 pub mod hdc_crypto;
 // HDC homomorphic computation (encrypted HVs, collective wisdom pool, privacy-preserving aggregation)
 pub mod hdc_fhe;
+// HDC treasury — privacy-preserving community finance (balance encoding, encrypted aggregation, threshold audit)
+pub mod hdc_treasury;
 
 // Consciousness topology and Φ measurement modules
 pub mod binary_hv;

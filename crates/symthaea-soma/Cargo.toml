@@ -22,6 +22,9 @@ serde_json = { workspace = true }
 blake3 = { workspace = true }
 ed25519-dalek = { version = "2", optional = true, default-features = false, features = ["rand_core"] }
 hex = { version = "0.4", optional = true }
+symthaea-broca = { path = "../symthaea-broca", optional = true }
+tracing = { workspace = true }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 [features]
 default = []
@@ -31,7 +34,14 @@ native-ffi = []
 pairing = ["dep:ed25519-dalek", "dep:hex"]
 # Screen embodiment: Soma sees her own UI via vision-manifold + foveation.
 screen-vision = []
+# Full 20-channel Broca language center with epistemic gating and semantic veto.
+broca-full = ["dep:symthaea-broca"]
 
 [[bin]]
 name = "soma_bench"
 path = "src/bin/soma_bench.rs"
+
+[[bin]]
+name = "train_soma_broca"
+path = "src/bin/train_soma_broca.rs"
+required-features = ["broca-full"]

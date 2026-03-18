@@ -171,6 +171,7 @@ impl IrohNode {
             config,
             is_stub: false,
             handshake: None,
+            attestation: None,
             endpoint: Some(endpoint),
         })
     }

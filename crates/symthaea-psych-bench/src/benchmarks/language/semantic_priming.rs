@@ -67,8 +67,8 @@ impl SemanticPrimingBenchmark {
                     dim,
                     seed.wrapping_add(c as u64 * 200 + w as u64 * 50 + 100),
                 );
-                // Cluster members share 70% of cluster center
-                let word = ContinuousHV::weighted_bundle(&[&center, &noise], &[0.70, 0.30]);
+                // Cluster members share 80% of cluster center (stronger semantic structure)
+                let word = ContinuousHV::weighted_bundle(&[&center, &noise], &[0.80, 0.20]);
                 cluster.push(word);
             }
             clusters.push(cluster);
@@ -158,18 +158,16 @@ impl SemanticPrimingBenchmark {
             // Prime pre-activation modulates probe quality:
             // - Related prime: reduces effective noise (better recognition)
             // - Unrelated prime: no benefit (full noise)
-            let base_noise = 0.62 + config.encoding_noise as f32 * 0.15;
+            let base_noise = 0.55 + config.encoding_noise as f32 * 0.20;
             let fep_scale = if config.enable_fep { 1.0 } else { 0.4 };
             let prime_benefit = if is_related {
-                priming_boost as f32 * fep_scale * 0.50
+                priming_boost as f32 * fep_scale * 0.70
             } else {
                 0.0
             };
             let effective_noise = (base_noise - prime_benefit).clamp(0.15, 0.80);
-            let probe_noise = ContinuousHV::random(
-                dim,
-                seed.wrapping_add(pair_idx as u64 * 777 + 42),
-            );
+            let probe_noise =
+                ContinuousHV::random(dim, seed.wrapping_add(pair_idx as u64 * 777 + 42));
             let probe = ContinuousHV::weighted_bundle(
                 &[target, &probe_noise],
                 &[1.0 - effective_noise, effective_noise],
@@ -188,6 +186,11 @@ impl SemanticPrimingBenchmark {
                     best_is_target = *ci == target_cluster && *wi == target_word_idx;
                 }
             }
+
+            // Lapse model: attention lapses can flip the correctness outcome.
+            let lapse_trial_idx = trial_idx * n_pairs + pair_idx;
+            let best_is_target =
+                config.check_correct(best_is_target, "semantic_priming", lapse_trial_idx);
 
             if best_is_target {
                 if is_related {

@@ -114,9 +114,9 @@ struct Vignette {
     ground_truth: DistortionType,
 }
 
-/// Encode a text string as a BinaryHV using blake3 hash as the seed.
-fn text_to_hv(text: &str) -> BinaryHV {
-    let hash = blake3::hash(text.as_bytes());
+/// Encode a single word as a BinaryHV using a deterministic hash seed.
+fn word_hv(word: &str) -> BinaryHV {
+    let hash = blake3::hash(word.to_lowercase().as_bytes());
     let bytes = hash.as_bytes();
     let seed = u64::from_le_bytes([
         bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
@@ -124,18 +124,153 @@ fn text_to_hv(text: &str) -> BinaryHV {
     BinaryHV::random(seed)
 }
 
+/// Encode text as a bundle of its constituent word HVs.
+///
+/// This creates a compositional representation: texts sharing more words
+/// with a prototype will have higher similarity (Kanerva, 2009 HDC).
+fn text_to_hv(text: &str) -> BinaryHV {
+    let word_hvs: Vec<BinaryHV> = text
+        .split(|c: char| !c.is_alphanumeric() && c != '\'')
+        .filter(|w| w.len() >= 2)
+        .map(|w| word_hv(w))
+        .collect();
+    if word_hvs.is_empty() {
+        return BinaryHV::random(0);
+    }
+    BinaryHV::bundle(&word_hvs)
+}
+
+/// Characteristic linguistic markers for each distortion type.
+///
+/// Cognitive distortions have distinctive lexical signatures
+/// (Burns 1980; Beck 1976). These markers capture the semantic
+/// patterns that clinicians use for classification.
+fn distortion_markers(dt: &DistortionType) -> &'static [&'static str] {
+    match dt {
+        DistortionType::AllOrNothing => &[
+            "perfect",
+            "completely",
+            "total",
+            "totally",
+            "either",
+            "nothing",
+            "waste",
+            "failure",
+            "point",
+            "successful",
+        ],
+        DistortionType::Catastrophizing => &[
+            "probably", "going", "die", "ruin", "ruined", "end", "worst", "terrible", "horrible",
+            "disaster", "tumor",
+        ],
+        DistortionType::MindReading => &[
+            "think",
+            "thinking",
+            "must",
+            "definitely",
+            "obviously",
+            "secretly",
+            "planning",
+            "knows",
+            "looked",
+            "fire",
+        ],
+        DistortionType::Overgeneralization => &[
+            "always",
+            "never",
+            "ever",
+            "nothing",
+            "anywhere",
+            "everything",
+            "happens",
+            "rejected",
+            "works",
+        ],
+        DistortionType::MentalFilter => &[
+            "only",
+            "all",
+            "think",
+            "about",
+            "one",
+            "criticism",
+            "ruined",
+            "rained",
+            "last",
+            "focusing",
+        ],
+        DistortionType::DiscountingPositive => &[
+            "only", "because", "felt", "sorry", "anyone", "could", "sure", "but", "easy", "handle",
+            "well",
+        ],
+        DistortionType::EmotionalReasoning => &[
+            "feel",
+            "must",
+            "really",
+            "anxious",
+            "guilty",
+            "dangerous",
+            "something",
+            "wrong",
+            "am",
+        ],
+        DistortionType::ShouldStatements => &[
+            "should",
+            "must",
+            "ought",
+            "have",
+            "able",
+            "without",
+            "always",
+            "productive",
+            "lazy",
+            "good",
+            "parent",
+            "never",
+        ],
+        DistortionType::Labeling => &[
+            "such",
+            "complete",
+            "idiot",
+            "worthless",
+            "scatterbrain",
+            "jerk",
+            "terrible",
+            "person",
+            "forgot",
+        ],
+        DistortionType::Personalization => &[
+            "because",
+            "me",
+            "fault",
+            "my",
+            "entirely",
+            "bad",
+            "parent",
+            "something",
+            "said",
+            "struggling",
+        ],
+    }
+}
+
 /// Build HDC prototype vectors for each distortion type.
 ///
-/// Each distortion's prototype is the bundle of its name, description,
-/// and example thought — all encoded via blake3 → BinaryHV.
+/// Each prototype is a bundle of its characteristic marker words
+/// (Burns 1980 linguistic signatures) + example thought encoding.
+/// This gives prototypes a compositional structure that overlaps
+/// with vignette word-bundles containing matching markers.
 fn build_prototypes() -> Vec<(DistortionType, BinaryHV)> {
     DistortionType::ALL
         .iter()
         .map(|dt| {
-            let name_hv = text_to_hv(dt.name());
-            let desc_hv = text_to_hv(dt.description());
-            let example_hv = text_to_hv(dt.example_thought());
-            let prototype = BinaryHV::bundle(&[name_hv, desc_hv, example_hv]);
+            // Bundle marker word HVs
+            let marker_hvs: Vec<BinaryHV> =
+                distortion_markers(dt).iter().map(|w| word_hv(w)).collect();
+            let marker_bundle = BinaryHV::bundle(&marker_hvs);
+            // Also encode the example thought as a word bundle
+            let example_bundle = text_to_hv(dt.example_thought());
+            // Prototype = bundle of markers + example
+            let prototype = BinaryHV::bundle(&[marker_bundle, example_bundle]);
             (*dt, prototype)
         })
         .collect()

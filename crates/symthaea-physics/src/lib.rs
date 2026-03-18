@@ -106,9 +106,11 @@ pub use datacenter::{
 };
 
 pub use cmod_evaluation::{
-    compute_auc, compute_roc_curve, evaluate_density_limit, load_density_limit_csv,
-    ConfusionMatrix, DensityLimitEncoder, DensityLimitSample, DensityLimitShot, EvaluationConfig,
-    EvaluationReport, LeadTimeStats, NormalizationRanges, RocPoint,
+    compute_auc, compute_roc_curve, evaluate_density_limit, evaluate_density_limit_v2,
+    evaluate_density_limit_v3, greenwald_fraction, load_density_limit_csv, ConfusionMatrix,
+    DensityLimitEncoder, DensityLimitEncoderV3, DensityLimitSample, DensityLimitShot,
+    EvaluationConfig, EvaluationConfigV2, EvaluationConfigV3, EvaluationReport, LeadTimeStats,
+    NormalizationRanges, RocPoint,
 };
 
 pub use cmod_adapter::{

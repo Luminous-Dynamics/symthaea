@@ -110,9 +110,9 @@ fn test_nan_inf_outcomes_produce_finite_state() {
         let result = service.cycle(&format!("nan check {}", i));
         let m = &result.metadata;
         assert!(
-            m.consciousness_level.is_finite(),
+            m.consciousness.consciousness_level.is_finite(),
             "Consciousness should be finite after NaN outcome: {}",
-            m.consciousness_level
+            m.consciousness.consciousness_level
         );
         assert!(
             m.governance.governance_reward_ema.is_finite(),

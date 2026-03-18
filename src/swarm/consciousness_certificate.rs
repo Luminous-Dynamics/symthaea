@@ -182,8 +182,8 @@ pub fn verify_consciousness_certificate(
     {
         use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 
-        let key_bytes = hex::decode(&cert.signer_key)
-            .map_err(|e| format!("Invalid signer key hex: {}", e))?;
+        let key_bytes =
+            hex::decode(&cert.signer_key).map_err(|e| format!("Invalid signer key hex: {}", e))?;
         if key_bytes.len() != 32 {
             return Err("Invalid signer key length".to_string());
         }

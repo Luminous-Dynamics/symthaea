@@ -368,7 +368,7 @@ fn main() {
             }
             hist.push(val);
         };
-        push(&mut consciousness_hist, m.consciousness_level);
+        push(&mut consciousness_hist, m.consciousness.consciousness_level);
         push(&mut fe_hist, m.fep.fep_surprise);
         push(&mut pe_hist, result.prediction_error as f64);
         push(&mut da_hist, m.neuromod.dopamine_effective as f64);
@@ -433,10 +433,10 @@ fn main() {
             0.9,
         );
         draw_text(&mut frame, WIDTH, 25, row1_y + 8, "CONSCIOUSNESS", dim, s1);
-        let cons_str = format!("{:.3}", m.consciousness_level);
-        let cons_color = if m.consciousness_level > 0.5 {
+        let cons_str = format!("{:.3}", m.consciousness.consciousness_level);
+        let cons_color = if m.consciousness.consciousness_level > 0.5 {
             green
-        } else if m.consciousness_level > 0.2 {
+        } else if m.consciousness.consciousness_level > 0.2 {
             yellow
         } else {
             red
@@ -449,7 +449,7 @@ fn main() {
             row1_y + 100,
             col_w - 50,
             10,
-            m.consciousness_level,
+            m.consciousness.consciousness_level,
             cons_color,
         );
 
@@ -1121,7 +1121,7 @@ fn main() {
         if cycle % 50 == 0 {
             println!(
                 "  Cycle {:3}/{} | Consciousness: {:.3} | FE: {:.2} | Unity: {:.3} | Phase: {} | Frames: {}",
-                cycle, total_cycles, m.consciousness_level, m.fep.fep_surprise,
+                cycle, total_cycles, m.consciousness.consciousness_level, m.fep.fep_surprise,
                 m.ethics.moral_topo_unity, phase, frame_count
             );
         }

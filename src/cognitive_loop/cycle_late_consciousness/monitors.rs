@@ -38,7 +38,8 @@ impl CognitiveLoopService {
                 pfc.tick();
 
                 // Check memory utilization — high utilization triggers inhibition
-                let utilization = pfc.memory_contents().len() as f32 / super::super::thresholds::PFC_WORKING_MEMORY_CAPACITY; // default capacity
+                let utilization = pfc.memory_contents().len() as f32
+                    / super::super::thresholds::PFC_WORKING_MEMORY_CAPACITY; // default capacity
                 let veto = utilization > self.config.learning_threshold.max(0.8);
 
                 if veto {
@@ -169,7 +170,10 @@ impl CognitiveLoopService {
                     let accuracy = meta.accuracy();
                     let depth = meta.depth();
                     if accuracy > super::super::thresholds::META_COGNITIVE_ACCURACY_LR_THRESHOLD {
-                        let boost = 1.0 + (accuracy - super::super::thresholds::META_COGNITIVE_ACCURACY_LR_THRESHOLD) * super::super::thresholds::META_COGNITIVE_LR_BOOST_SCALE; // up to 1.15x
+                        let boost = 1.0
+                            + (accuracy
+                                - super::super::thresholds::META_COGNITIVE_ACCURACY_LR_THRESHOLD)
+                                * super::super::thresholds::META_COGNITIVE_LR_BOOST_SCALE; // up to 1.15x
                         self.carryover.learning.subsystem_lr_factor *= boost;
                     }
                     (accuracy, depth)
@@ -246,7 +250,9 @@ impl CognitiveLoopService {
         // FEEDBACK: Body valence modulates prediction confidence (Damasio somatic markers)
         // Science: Damasio (1999) — positive somatic state boosts cognitive coherence;
         // negative somatic state signals danger → dampen confidence
-        let body_valence_conf_delta = if body_valence > super::super::thresholds::BODY_VALENCE_POSITIVE_THRESHOLD {
+        let body_valence_conf_delta = if body_valence
+            > super::super::thresholds::BODY_VALENCE_POSITIVE_THRESHOLD
+        {
             let delta = body_valence * super::super::thresholds::BODY_VALENCE_CONFIDENCE_POS_SCALE;
             self.adjust_confidence("body_valence_pos", delta);
             delta
@@ -288,8 +294,11 @@ impl CognitiveLoopService {
             };
 
         // FEEDBACK: Positive affect broadens exploration (Fredrickson 2001 broaden-and-build)
-        if affective_valence > super::super::thresholds::AFFECTIVE_VALENCE_BROADEN_THRESHOLD && self.consciousness_state.affective_bridge.is_some() {
-            self.curiosity_drive.boredom *= super::super::thresholds::AFFECTIVE_VALENCE_CURIOSITY_FACTOR;
+        if affective_valence > super::super::thresholds::AFFECTIVE_VALENCE_BROADEN_THRESHOLD
+            && self.consciousness_state.affective_bridge.is_some()
+        {
+            self.curiosity_drive.boredom *=
+                super::super::thresholds::AFFECTIVE_VALENCE_CURIOSITY_FACTOR;
         }
         // FEEDBACK: Arousal gates learning consolidation (Russell 1980 VAD model)
         // Science: Steriade (1996) — high arousal suppresses consolidation;
@@ -340,15 +349,24 @@ impl CognitiveLoopService {
 
         // FEEDBACK: Narrative self-Phi modulates prediction confidence (identity coherence)
         // Science: Gallagher (2000) — strong narrative identity stabilizes learning
-        let narrative_self_conf_factor = if narrative_self_psi > super::super::thresholds::NARRATIVE_SELF_STRONG_THRESHOLD {
-            self.scale_confidence("narrative_self_strong", super::super::thresholds::NARRATIVE_SELF_CONFIDENCE_BOOST);
-            super::super::thresholds::NARRATIVE_SELF_CONFIDENCE_BOOST
-        } else if narrative_self_psi > 0.0 && narrative_self_psi < super::super::thresholds::NARRATIVE_SELF_WEAK_THRESHOLD {
-            self.scale_confidence("narrative_self_weak", super::super::thresholds::NARRATIVE_SELF_CONFIDENCE_DAMPEN);
-            super::super::thresholds::NARRATIVE_SELF_CONFIDENCE_DAMPEN
-        } else {
-            1.0
-        };
+        let narrative_self_conf_factor =
+            if narrative_self_psi > super::super::thresholds::NARRATIVE_SELF_STRONG_THRESHOLD {
+                self.scale_confidence(
+                    "narrative_self_strong",
+                    super::super::thresholds::NARRATIVE_SELF_CONFIDENCE_BOOST,
+                );
+                super::super::thresholds::NARRATIVE_SELF_CONFIDENCE_BOOST
+            } else if narrative_self_psi > 0.0
+                && narrative_self_psi < super::super::thresholds::NARRATIVE_SELF_WEAK_THRESHOLD
+            {
+                self.scale_confidence(
+                    "narrative_self_weak",
+                    super::super::thresholds::NARRATIVE_SELF_CONFIDENCE_DAMPEN,
+                );
+                super::super::thresholds::NARRATIVE_SELF_CONFIDENCE_DAMPEN
+            } else {
+                1.0
+            };
 
         // FEEDBACK: Narrative self-Phi modulates moral sensitivity (Gallagher & Hutto 2007)
         // Science: Strong narrative identity constrains moral reasoning (values are stable);
@@ -356,11 +374,18 @@ impl CognitiveLoopService {
         if narrative_self_psi > super::super::thresholds::NARRATIVE_SELF_HIGH_THRESHOLD {
             // High self-coherence → stabilize moral score (dampen fluctuations)
             // Multiply moral learning signal toward 1.0 (neutral)
-            self.fep.learning_signal *= 1.0 + (narrative_self_psi as f32 - super::super::thresholds::NARRATIVE_SELF_HIGH_THRESHOLD as f32) * super::super::thresholds::NARRATIVE_SELF_MORAL_STABILIZE_SCALE;
-        } else if narrative_self_psi > 0.0 && narrative_self_psi < super::super::thresholds::NARRATIVE_SELF_WEAK_THRESHOLD {
+            self.fep.learning_signal *= 1.0
+                + (narrative_self_psi as f32
+                    - super::super::thresholds::NARRATIVE_SELF_HIGH_THRESHOLD as f32)
+                    * super::super::thresholds::NARRATIVE_SELF_MORAL_STABILIZE_SCALE;
+        } else if narrative_self_psi > 0.0
+            && narrative_self_psi < super::super::thresholds::NARRATIVE_SELF_WEAK_THRESHOLD
+        {
             // Low self-coherence → amplify moral concern sensitivity
-            self.adaptive_behavior.attention_sensitivity *=
-                1.0 + (super::super::thresholds::NARRATIVE_SELF_WEAK_THRESHOLD as f32 - narrative_self_psi as f32) * super::super::thresholds::NARRATIVE_SELF_MORAL_SENSITIVITY_SCALE;
+            self.adaptive_behavior.attention_sensitivity *= 1.0
+                + (super::super::thresholds::NARRATIVE_SELF_WEAK_THRESHOLD as f32
+                    - narrative_self_psi as f32)
+                    * super::super::thresholds::NARRATIVE_SELF_MORAL_SENSITIVITY_SCALE;
         }
 
         // CROSS-COUPLING: Strong narrative identity stabilizes social trust (Baumeister & Leary 1995)
@@ -399,9 +424,15 @@ impl CognitiveLoopService {
 
         // FEEDBACK: Predictive phi modulation gates plasticity (Friston 2010)
         // Clamp and scale to avoid destabilizing the base learner in single-module ablations.
-        let modulation = (predictive_psi_modulation - 1.0).clamp(-super::super::thresholds::PREDICTIVE_PHI_MAX_MODULATION as f64, super::super::thresholds::PREDICTIVE_PHI_MAX_MODULATION as f64) as f32;
-        let coherence_scale = super::super::thresholds::PREDICTIVE_PHI_COHERENCE_BASELINE + (1.0 - super::super::thresholds::PREDICTIVE_PHI_COHERENCE_BASELINE) * ctx.coherence.clamp(0.0, 1.0);
-        let predictive_phi_lr_delta_val = modulation * super::super::thresholds::PREDICTIVE_PHI_LR_SCALE * coherence_scale; // ±1.5% max, coherence-weighted
+        let modulation = (predictive_psi_modulation - 1.0).clamp(
+            -super::super::thresholds::PREDICTIVE_PHI_MAX_MODULATION as f64,
+            super::super::thresholds::PREDICTIVE_PHI_MAX_MODULATION as f64,
+        ) as f32;
+        let coherence_scale = super::super::thresholds::PREDICTIVE_PHI_COHERENCE_BASELINE
+            + (1.0 - super::super::thresholds::PREDICTIVE_PHI_COHERENCE_BASELINE)
+                * ctx.coherence.clamp(0.0, 1.0);
+        let predictive_phi_lr_delta_val =
+            modulation * super::super::thresholds::PREDICTIVE_PHI_LR_SCALE * coherence_scale; // ±1.5% max, coherence-weighted
         self.carryover.learning.subsystem_lr_factor *= 1.0 + predictive_phi_lr_delta_val;
         module_timings.predictive_processing = _t.elapsed().as_micros() as u64;
 
@@ -442,12 +473,21 @@ impl CognitiveLoopService {
 
         // FEEDBACK: High hierarchical free energy suppresses exploration AND boosts learning
         // Science: Friston (2008) — poor model → focus on learning, not exploring
-        let hfe_lr_boost_applied = if hierarchical_total_free_energy > super::super::thresholds::HFE_EXPLORATION_THRESHOLD {
-            let fe_factor = (1.0 / (1.0 + hierarchical_total_free_energy * super::super::thresholds::HFE_EXPLORATION_DAMPING)) as f32;
+        let hfe_lr_boost_applied = if hierarchical_total_free_energy
+            > super::super::thresholds::HFE_EXPLORATION_THRESHOLD
+        {
+            let fe_factor = (1.0
+                / (1.0
+                    + hierarchical_total_free_energy
+                        * super::super::thresholds::HFE_EXPLORATION_DAMPING))
+                as f32;
             self.curiosity_drive.boredom *= fe_factor; // suppress exploration urge (gentler)
                                                        // Boost LR proportional to free energy (poor model → learn harder)
                                                        // Capped at +10% to avoid overshooting in short ablation windows
-            let hfe_lr_boost = (1.0 + (hierarchical_total_free_energy * super::super::thresholds::HFE_LR_BOOST_SCALE).min(super::super::thresholds::HFE_LR_BOOST_MAX)) as f32;
+            let hfe_lr_boost = (1.0
+                + (hierarchical_total_free_energy * super::super::thresholds::HFE_LR_BOOST_SCALE)
+                    .min(super::super::thresholds::HFE_LR_BOOST_MAX))
+                as f32;
             self.scale_lr("hierarchical_free_energy", hfe_lr_boost);
             hfe_lr_boost
         } else {
@@ -475,21 +515,15 @@ impl CognitiveLoopService {
                     .map(|j| j.moral_score as f64)
                     .unwrap_or(0.0);
                 // exploration_urge: noradrenaline-driven exploration drive
-                let exploration_urge =
-                    self.neuromod.bath.noradrenaline.effective() as f64;
+                let exploration_urge = self.neuromod.bath.noradrenaline.effective() as f64;
                 // behavioral_coherence: consistency of moral_score across recent history.
                 // Derived from the predictor's own history — low variance = high coherence.
                 let behavioral_coherence = {
                     let history = &pred_self.predictor.history;
                     if history.len() >= 2 {
-                        let scores: Vec<f64> =
-                            history.iter().map(|s| s.moral_score).collect();
-                        let mean =
-                            scores.iter().sum::<f64>() / scores.len() as f64;
-                        let variance = scores
-                            .iter()
-                            .map(|s| (s - mean).powi(2))
-                            .sum::<f64>()
+                        let scores: Vec<f64> = history.iter().map(|s| s.moral_score).collect();
+                        let mean = scores.iter().sum::<f64>() / scores.len() as f64;
+                        let variance = scores.iter().map(|s| (s - mean).powi(2)).sum::<f64>()
                             / scores.len() as f64;
                         // Map variance → coherence: low variance = high coherence
                         (1.0_f64 - variance.sqrt().min(1.0)).clamp(0.0, 1.0)
@@ -498,11 +532,7 @@ impl CognitiveLoopService {
                     }
                 };
 
-                pred_self.observe_behavioral(
-                    moral_score,
-                    exploration_urge,
-                    behavioral_coherence,
-                );
+                pred_self.observe_behavioral(moral_score, exploration_urge, behavioral_coherence);
 
                 pred_self.learn_from_outcome_raw(ctx.unified_psi, ctx.coherence as f64);
                 pred_self.confidence() as f32
@@ -515,13 +545,17 @@ impl CognitiveLoopService {
 
         // FEEDBACK: Low self-model confidence reduces learning rate (precision-weighting)
         // Science: Clark (2013) — low precision on self-model predictions should reduce LR
-        if predictive_self_safety > 0.0 && predictive_self_safety < super::super::thresholds::PREDICTIVE_SELF_SAFETY_THRESHOLD {
-            let safety_factor = super::super::thresholds::PREDICTIVE_SELF_SAFETY_MIN + predictive_self_safety * super::super::thresholds::PREDICTIVE_SELF_SAFETY_SCALE; // 0.85-1.0
+        if predictive_self_safety > 0.0
+            && predictive_self_safety < super::super::thresholds::PREDICTIVE_SELF_SAFETY_THRESHOLD
+        {
+            let safety_factor = super::super::thresholds::PREDICTIVE_SELF_SAFETY_MIN
+                + predictive_self_safety * super::super::thresholds::PREDICTIVE_SELF_SAFETY_SCALE; // 0.85-1.0
             self.carryover.learning.subsystem_lr_factor *= safety_factor;
 
             // CROSS-COUPLING: Low self-prediction confidence → boost exploration
             // Science: Clark (2013) — uncertain self-models need evidence gathering
-            let uncertainty_push = (super::super::thresholds::PREDICTIVE_SELF_SAFETY_THRESHOLD - predictive_self_safety)
+            let uncertainty_push = (super::super::thresholds::PREDICTIVE_SELF_SAFETY_THRESHOLD
+                - predictive_self_safety)
                 * super::super::thresholds::PREDICTIVE_SELF_EXPLORATION_SCALE;
             self.adjust_exploration("low_self_prediction", uncertainty_push);
         }
@@ -535,9 +569,16 @@ impl CognitiveLoopService {
             if let Some(ref mut schema) = self.self_model_tier.attention_schema {
                 let salience = ctx.prediction_error.max(0.1);
                 let update = schema.update(ctx.hv16_cached, salience);
-                let gain = if update.control_signal > super::super::thresholds::ATTENTION_FOCUS_GAIN_THRESHOLD {
-                    ((update.control_signal - super::super::thresholds::ATTENTION_FOCUS_GAIN_THRESHOLD) * super::super::thresholds::ATTENTION_GAIN_SCALE).min(super::super::thresholds::ATTENTION_MAX_GAIN)
-                } else if update.control_signal < super::super::thresholds::ATTENTION_DEFOCUS_THRESHOLD {
+                let gain = if update.control_signal
+                    > super::super::thresholds::ATTENTION_FOCUS_GAIN_THRESHOLD
+                {
+                    ((update.control_signal
+                        - super::super::thresholds::ATTENTION_FOCUS_GAIN_THRESHOLD)
+                        * super::super::thresholds::ATTENTION_GAIN_SCALE)
+                        .min(super::super::thresholds::ATTENTION_MAX_GAIN)
+                } else if update.control_signal
+                    < super::super::thresholds::ATTENTION_DEFOCUS_THRESHOLD
+                {
                     super::super::thresholds::ATTENTION_NEGATIVE_GAIN
                 } else {
                     0.0
@@ -559,11 +600,18 @@ impl CognitiveLoopService {
         if attention_schema_focus > 0.0 {
             if attention_schema_focus < super::super::thresholds::ATTENTION_FOCUS_GAIN_THRESHOLD {
                 // Attenuated 50%: ACh attention_factor already scales attention via the bath
-                let novelty_push = (super::super::thresholds::ATTENTION_FOCUS_GAIN_THRESHOLD - attention_schema_focus) * super::super::thresholds::ATTENTION_DEFICIT_NOVELTY_SCALE;
+                let novelty_push = (super::super::thresholds::ATTENTION_FOCUS_GAIN_THRESHOLD
+                    - attention_schema_focus)
+                    * super::super::thresholds::ATTENTION_DEFICIT_NOVELTY_SCALE;
                 self.adjust_exploration("attention_deficit", novelty_push);
-            } else if attention_schema_focus > super::super::thresholds::ATTENTION_DEEP_FOCUS_THRESHOLD {
-                let focus_lock = (attention_schema_focus - super::super::thresholds::ATTENTION_DEEP_FOCUS_THRESHOLD) * super::super::thresholds::ATTENTION_FOCUS_LOCK_SCALE;
-                self.adaptive_behavior.exploration_factor *= (1.0 - focus_lock).max(super::super::thresholds::ATTENTION_MIN_EXPLORATION_IN_FOCUS);
+            } else if attention_schema_focus
+                > super::super::thresholds::ATTENTION_DEEP_FOCUS_THRESHOLD
+            {
+                let focus_lock = (attention_schema_focus
+                    - super::super::thresholds::ATTENTION_DEEP_FOCUS_THRESHOLD)
+                    * super::super::thresholds::ATTENTION_FOCUS_LOCK_SCALE;
+                self.adaptive_behavior.exploration_factor *= (1.0 - focus_lock)
+                    .max(super::super::thresholds::ATTENTION_MIN_EXPLORATION_IN_FOCUS);
             }
         }
 
@@ -575,7 +623,9 @@ impl CognitiveLoopService {
             let fatigue = schema.fatigue_level();
             if fatigue > super::super::thresholds::VIGILANCE_FATIGUE_THRESHOLD {
                 // Graduated exploration push: 0.0 at fatigue=0.5, up to 0.04 at fatigue=1.0
-                let fatigue_push = (fatigue - super::super::thresholds::VIGILANCE_FATIGUE_THRESHOLD) * super::super::thresholds::VIGILANCE_FATIGUE_EXPLORATION_SCALE;
+                let fatigue_push = (fatigue
+                    - super::super::thresholds::VIGILANCE_FATIGUE_THRESHOLD)
+                    * super::super::thresholds::VIGILANCE_FATIGUE_EXPLORATION_SCALE;
                 self.adjust_exploration("vigilance_fatigue", fatigue_push);
             }
         }
@@ -598,7 +648,10 @@ impl CognitiveLoopService {
             };
         if phi_suppress {
             // Attenuated: 5-HT confidence_delta implicitly reduces exploration
-            self.scale_exploration("phi_gate_suppress", super::super::thresholds::PHI_GATE_SUPPRESS_EXPLORATION);
+            self.scale_exploration(
+                "phi_gate_suppress",
+                super::super::thresholds::PHI_GATE_SUPPRESS_EXPLORATION,
+            );
         }
 
         // Attention visualization: record snapshot for debugging/introspection

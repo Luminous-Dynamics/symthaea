@@ -1,12 +1,19 @@
 //! Evaluate Fusion Digital Twin against real C-Mod density limit data.
 //!
+//! Runs V1 (original), V2 (temporal windowing + per-shot reference), and
+//! V3 (physics-informed: Greenwald fraction + rate-of-change features)
+//! evaluations and prints a side-by-side comparison.
+//!
 //! Usage:
 //!   cargo run -p symthaea-physics --example evaluate_cmod
 //!   cargo run -p symthaea-physics --example evaluate_cmod -- --json report.json
 
 use std::path::PathBuf;
 
-use symthaea_physics::cmod_evaluation::{evaluate_density_limit, EvaluationConfig};
+use symthaea_physics::cmod_evaluation::{
+    evaluate_density_limit, evaluate_density_limit_v2, evaluate_density_limit_v3, EvaluationConfig,
+    EvaluationConfigV2, EvaluationConfigV3,
+};
 
 fn main() -> anyhow::Result<()> {
     let args: Vec<String> = std::env::args().collect();
@@ -23,34 +30,101 @@ fn main() -> anyhow::Result<()> {
         None
     };
 
-    eprintln!("Loading C-Mod density limit data from: {}", csv_path.display());
+    eprintln!(
+        "Loading C-Mod density limit data from: {}",
+        csv_path.display()
+    );
 
-    let config = EvaluationConfig::default();
-    let report = evaluate_density_limit(&csv_path, &config)?;
+    // ── V1: Original evaluation ──────────────────────────────────────────
+    eprintln!("\n=== Running V1 (original) evaluation ===");
+    let config_v1 = EvaluationConfig::default();
+    let report_v1 = evaluate_density_limit(&csv_path, &config_v1)?;
 
-    // Print markdown report to stdout
-    println!("{}", report.to_markdown());
+    println!("{}", report_v1.to_markdown());
 
-    // Optionally write JSON
+    eprintln!("--- V1 Summary ---");
+    eprintln!("Best threshold: {:.4}", report_v1.best_threshold);
+    eprintln!("Best F1:        {:.4}", report_v1.best_f1);
+    eprintln!("AUC:            {:.4}", report_v1.auc);
+
+    // ── V2: Improved evaluation ──────────────────────────────────────────
+    eprintln!("\n=== Running V2 (temporal window + per-shot ref) evaluation ===");
+    let config_v2 = EvaluationConfigV2::default();
+    let report_v2 = evaluate_density_limit_v2(&csv_path, &config_v2)?;
+
+    println!("{}", report_v2.to_markdown());
+
+    eprintln!("--- V2 Summary ---");
+    eprintln!("Best threshold: {:.4}", report_v2.best_threshold);
+    eprintln!("Best F1:        {:.4}", report_v2.best_f1);
+    eprintln!("AUC:            {:.4}", report_v2.auc);
+
+    // ── V3: Physics-informed evaluation ──────────────────────────────────
+    eprintln!("\n=== Running V3 (physics-informed: Greenwald + rates) evaluation ===");
+    let config_v3 = EvaluationConfigV3::default();
+    let report_v3 = evaluate_density_limit_v3(&csv_path, &config_v3)?;
+
+    println!("{}", report_v3.to_markdown());
+
+    eprintln!("--- V3 Summary ---");
+    eprintln!("Best threshold: {:.4}", report_v3.best_threshold);
+    eprintln!("Best F1:        {:.4}", report_v3.best_f1);
+    eprintln!("AUC:            {:.4}", report_v3.auc);
+
+    // ── Side-by-side comparison ──────────────────────────────────────────
+    let auc_v1v2 = report_v2.auc - report_v1.auc;
+    let auc_v2v3 = report_v3.auc - report_v2.auc;
+    let auc_v1v3 = report_v3.auc - report_v1.auc;
+
+    eprintln!("\n================================================================");
+    eprintln!("           V1 vs V2 vs V3 Comparison");
+    eprintln!("================================================================");
+    eprintln!("              V1        V2        V3        V1→V3");
+    eprintln!(
+        "AUC:          {:.4}    {:.4}    {:.4}    {:+.4}",
+        report_v1.auc, report_v2.auc, report_v3.auc, auc_v1v3
+    );
+    eprintln!(
+        "Best F1:      {:.4}    {:.4}    {:.4}    {:+.4}",
+        report_v1.best_f1,
+        report_v2.best_f1,
+        report_v3.best_f1,
+        report_v3.best_f1 - report_v1.best_f1
+    );
+    eprintln!(
+        "Threshold:    {:.4}    {:.4}    {:.4}",
+        report_v1.best_threshold, report_v2.best_threshold, report_v3.best_threshold
+    );
+    eprintln!(
+        "Precision:    {:.4}    {:.4}    {:.4}",
+        report_v1.confusion_matrix.precision(),
+        report_v2.confusion_matrix.precision(),
+        report_v3.confusion_matrix.precision()
+    );
+    eprintln!(
+        "Recall:       {:.4}    {:.4}    {:.4}",
+        report_v1.confusion_matrix.recall(),
+        report_v2.confusion_matrix.recall(),
+        report_v3.confusion_matrix.recall()
+    );
+    eprintln!(
+        "Lead time:    {:.4}s   {:.4}s   {:.4}s",
+        report_v1.lead_time_stats.mean_s,
+        report_v2.lead_time_stats.mean_s,
+        report_v3.lead_time_stats.mean_s
+    );
+    eprintln!("----------------------------------------------------------------");
+    eprintln!("V1→V2 AUC: {:+.4}", auc_v1v2);
+    eprintln!("V2→V3 AUC: {:+.4}", auc_v2v3);
+    eprintln!("V1→V3 AUC: {:+.4}", auc_v1v3);
+    eprintln!("================================================================");
+
+    // Optionally write V3 JSON (the best one)
     if let Some(path) = json_path {
-        let json = report.to_json()?;
+        let json = report_v3.to_json()?;
         std::fs::write(&path, &json)?;
-        eprintln!("JSON report written to: {}", path.display());
+        eprintln!("V3 JSON report written to: {}", path.display());
     }
-
-    // Print summary to stderr
-    eprintln!("--- Summary ---");
-    eprintln!("Best threshold: {:.4}", report.best_threshold);
-    eprintln!("Best F1:        {:.4}", report.best_f1);
-    eprintln!("AUC:            {:.4}", report.auc);
-    eprintln!(
-        "Train/Test:     {} / {} shots",
-        report.total_shots_train, report.total_shots_test
-    );
-    eprintln!(
-        "Test samples:   {} normal, {} disruption",
-        report.samples_per_class.0, report.samples_per_class.1
-    );
 
     Ok(())
 }

@@ -42,3 +42,7 @@ broca-full = []
 [[bin]]
 name = "train-broca-lite"
 path = "src/bin/train_broca_lite.rs"
+
+[[bin]]
+name = "gen-spore-training-data"
+path = "src/bin/gen_spore_training_data.rs"

@@ -108,6 +108,18 @@ pub struct BenchmarkConfig {
     /// Advantage for recognizing common words in lexical decision.
     #[serde(default = "default_language_frequency_boost")]
     pub language_frequency_boost: f64,
+
+    /// Attention lapse rate [0.0, 1.0] (default 0.0).
+    ///
+    /// Models the probability of an attention lapse on any given trial
+    /// (Wichmann & Hill, 2001). On lapse trials, the response is random
+    /// regardless of stimulus quality. This is the primary source of
+    /// individual differences in psychometric test-retest reliability:
+    /// subjects with higher lapse rates produce lower, noisier scores.
+    ///
+    /// Used by `ReliabilityBattery` to create between-subject variance.
+    #[serde(default)]
+    pub lapse_rate: f64,
 }
 
 fn default_min_trials() -> usize {
@@ -166,6 +178,7 @@ impl Default for BenchmarkConfig {
             language_priming_decay: default_language_priming_decay(),
             language_coherence_alpha: default_language_coherence_alpha(),
             language_frequency_boost: default_language_frequency_boost(),
+            lapse_rate: 0.0,
         }
     }
 }
@@ -194,6 +207,53 @@ impl BenchmarkConfig {
     /// for use in benchmark similarity computations.
     pub fn effective_noise(&self) -> f64 {
         (self.encoding_noise * 1.75 + self.time_pressure * 0.20).clamp(0.0, 1.0)
+    }
+
+    /// Check whether an attention lapse occurs on this trial.
+    ///
+    /// Uses the trial seed to make the lapse deterministic per
+    /// (seed, domain, trial_idx) triple. Returns `true` if the subject
+    /// lapses on this trial (response should be randomized).
+    ///
+    /// Reference: Wichmann & Hill (2001), "The psychometric function"
+    pub fn should_lapse(&self, domain: &str, trial_idx: usize) -> bool {
+        if self.lapse_rate <= 0.0 {
+            return false;
+        }
+        let h = self.trial_seed(domain, "lapse", trial_idx);
+        (h % 10000) as f64 / 10000.0 < self.lapse_rate
+    }
+
+    /// Apply the lapse model to a binary (2-AFC) decision.
+    ///
+    /// If the subject lapses on this trial, returns a random response
+    /// (50% chance correct). Otherwise returns the veridical `correct` value.
+    pub fn check_correct(&self, correct: bool, domain: &str, trial_idx: usize) -> bool {
+        if self.should_lapse(domain, trial_idx) {
+            let h = self.trial_seed(domain, "lapse_response", trial_idx);
+            h % 2 == 0
+        } else {
+            correct
+        }
+    }
+
+    /// Apply the lapse model to an N-AFC decision.
+    ///
+    /// If the subject lapses on this trial, returns a random choice index
+    /// in `[0, n_choices)`. Otherwise returns the veridical `chosen_idx`.
+    pub fn check_choice(
+        &self,
+        chosen_idx: usize,
+        n_choices: usize,
+        domain: &str,
+        trial_idx: usize,
+    ) -> usize {
+        if self.should_lapse(domain, trial_idx) {
+            let h = self.trial_seed(domain, "lapse_choice", trial_idx);
+            h as usize % n_choices
+        } else {
+            chosen_idx
+        }
     }
 }
 

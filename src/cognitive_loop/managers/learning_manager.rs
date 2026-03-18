@@ -52,6 +52,9 @@ impl Default for LearningManager {
 }
 
 impl LearningManager {
+    /// Co-prime scheduling interval (cycles).
+    pub const INTERVAL: u32 = 13;
+
     /// Arousal threshold below which dream-like consolidation may occur.
     /// Basis: Walker (2017) — NREM sleep facilitates memory integration.
     const DREAM_AROUSAL_THRESHOLD: f32 = 0.2;
@@ -135,7 +138,7 @@ impl CognitiveSubsystem for LearningManager {
     }
 
     fn interval(&self) -> u32 {
-        13 // co-prime
+        Self::INTERVAL
     }
 
     fn process(&mut self, snapshot: &CycleSnapshot) -> SubsystemOutput {
