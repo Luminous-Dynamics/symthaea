@@ -208,7 +208,8 @@ impl ProgramNode {
 
             ProgramNode::Typed(name, type_name) => {
                 let atom = encode_atom(name);
-                let ty = types().get(type_name.as_str())
+                let ty = types()
+                    .get(type_name.as_str())
                     .cloned()
                     .unwrap_or_else(|| encode_atom(type_name));
                 atom.bind(&ty)
@@ -233,31 +234,34 @@ impl ProgramNode {
                 result
             }
 
-            ProgramNode::Branch { condition, then_branch, else_branch } => {
-                roles()["BRANCH"]
-                    .bind(&condition.encode())
-                    .bind(&then_branch.encode().permute(1))
-                    .bind(&else_branch.encode().permute(2))
-            }
+            ProgramNode::Branch {
+                condition,
+                then_branch,
+                else_branch,
+            } => roles()["BRANCH"]
+                .bind(&condition.encode())
+                .bind(&then_branch.encode().permute(1))
+                .bind(&else_branch.encode().permute(2)),
 
-            ProgramNode::Map { func, collection } => {
-                roles()["MAP"]
-                    .bind(&func.encode())
-                    .bind(&collection.encode().permute(1))
-            }
+            ProgramNode::Map { func, collection } => roles()["MAP"]
+                .bind(&func.encode())
+                .bind(&collection.encode().permute(1)),
 
-            ProgramNode::Reduce { func, initial, collection } => {
-                roles()["REDUCE"]
-                    .bind(&func.encode())
-                    .bind(&initial.encode().permute(1))
-                    .bind(&collection.encode().permute(2))
-            }
+            ProgramNode::Reduce {
+                func,
+                initial,
+                collection,
+            } => roles()["REDUCE"]
+                .bind(&func.encode())
+                .bind(&initial.encode().permute(1))
+                .bind(&collection.encode().permute(2)),
 
-            ProgramNode::Filter { predicate, collection } => {
-                roles()["FILTER"]
-                    .bind(&predicate.encode())
-                    .bind(&collection.encode().permute(1))
-            }
+            ProgramNode::Filter {
+                predicate,
+                collection,
+            } => roles()["FILTER"]
+                .bind(&predicate.encode())
+                .bind(&collection.encode().permute(1)),
 
             ProgramNode::Compose(f, g) => {
                 // g ∘ f: apply f first, then g
@@ -266,22 +270,23 @@ impl ProgramNode {
                     .bind(&g.encode().permute(1))
             }
 
-            ProgramNode::Recurse { base_case, recursive_step } => {
-                roles()["RECURSE"]
-                    .bind(&base_case.encode())
-                    .bind(&recursive_step.encode().permute(1))
-            }
+            ProgramNode::Recurse {
+                base_case,
+                recursive_step,
+            } => roles()["RECURSE"]
+                .bind(&base_case.encode())
+                .bind(&recursive_step.encode().permute(1)),
 
-            ProgramNode::Iterate { init, step, condition } => {
-                roles()["ITERATE"]
-                    .bind(&init.encode())
-                    .bind(&step.encode().permute(1))
-                    .bind(&condition.encode().permute(2))
-            }
+            ProgramNode::Iterate {
+                init,
+                step,
+                condition,
+            } => roles()["ITERATE"]
+                .bind(&init.encode())
+                .bind(&step.encode().permute(1))
+                .bind(&condition.encode().permute(2)),
 
-            ProgramNode::Collect(source) => {
-                roles()["COLLECT"].bind(&source.encode())
-            }
+            ProgramNode::Collect(source) => roles()["COLLECT"].bind(&source.encode()),
 
             ProgramNode::Abstract(examples) => {
                 // Majority vote of example encodings — extracts common structure
@@ -327,6 +332,51 @@ fn encode_atom(name: &str) -> BinaryHV {
     BinaryHV::bundle(&char_hvs)
 }
 
+/// Encode a natural language task description as a BinaryHV for pattern matching.
+///
+/// Extracts significant tokens (strips stop words), encodes each as an atom,
+/// and bundles them. Known operation keywords get role-binding emphasis.
+///
+/// # Example
+/// ```ignore
+/// let hv = encode_task_description("implement a fibonacci function");
+/// let lib = ProgramPatternLibrary::standard();
+/// let match = lib.find_similar(&hv, 0.52); // should match "fibonacci"
+/// ```
+pub fn encode_task_description(text: &str) -> BinaryHV {
+    const STOP_WORDS: &[&str] = &[
+        "a", "an", "the", "to", "of", "in", "for", "and", "or", "that", "this",
+        "with", "from", "by", "on", "is", "are", "was", "be", "been", "being",
+        "implement", "create", "add", "write", "make", "build", "define",
+        "function", "method", "struct", "class", "module", "program",
+        "please", "should", "would", "could", "can", "will",
+        "using", "use", "given", "return", "returns", "take", "takes",
+    ];
+
+    let lower = text.to_lowercase();
+    let tokens: Vec<&str> = lower
+        .split_whitespace()
+        .filter(|t| !STOP_WORDS.contains(t) && t.len() > 1)
+        .collect();
+
+    if tokens.is_empty() {
+        return BinaryHV::random(0);
+    }
+
+    // Encode each significant token as an atom
+    let mut token_hvs: Vec<BinaryHV> = tokens.iter().map(|t| encode_atom(t)).collect();
+
+    // Boost known operation keywords with role binding for stronger matching
+    for token in &tokens {
+        if let Some(op_hv) = ops().get(token.to_uppercase().as_str()) {
+            // Bind the operation role vector — this makes "sort" strongly match sort patterns
+            token_hvs.push(roles()["APPLY"].bind(op_hv));
+        }
+    }
+
+    BinaryHV::bundle(&token_hvs)
+}
+
 // ── Convenience Constructors ─────────────────────────────────────────────
 
 /// Shorthand constructors for building program trees.
@@ -344,7 +394,10 @@ impl ProgramNode {
     }
 
     pub fn apply(func: ProgramNode, args: Vec<ProgramNode>) -> Self {
-        ProgramNode::Apply { func: Box::new(func), args }
+        ProgramNode::Apply {
+            func: Box::new(func),
+            args,
+        }
     }
 
     pub fn seq(steps: Vec<ProgramNode>) -> Self {
@@ -360,7 +413,10 @@ impl ProgramNode {
     }
 
     pub fn map(func: ProgramNode, collection: ProgramNode) -> Self {
-        ProgramNode::Map { func: Box::new(func), collection: Box::new(collection) }
+        ProgramNode::Map {
+            func: Box::new(func),
+            collection: Box::new(collection),
+        }
     }
 
     pub fn reduce(func: ProgramNode, init: ProgramNode, collection: ProgramNode) -> Self {
@@ -372,7 +428,10 @@ impl ProgramNode {
     }
 
     pub fn filter(pred: ProgramNode, collection: ProgramNode) -> Self {
-        ProgramNode::Filter { predicate: Box::new(pred), collection: Box::new(collection) }
+        ProgramNode::Filter {
+            predicate: Box::new(pred),
+            collection: Box::new(collection),
+        }
     }
 
     pub fn compose(f: ProgramNode, g: ProgramNode) -> Self {
@@ -380,7 +439,10 @@ impl ProgramNode {
     }
 
     pub fn recurse(base: ProgramNode, step: ProgramNode) -> Self {
-        ProgramNode::Recurse { base_case: Box::new(base), recursive_step: Box::new(step) }
+        ProgramNode::Recurse {
+            base_case: Box::new(base),
+            recursive_step: Box::new(step),
+        }
     }
 
     pub fn iterate(init: ProgramNode, step: ProgramNode, cond: ProgramNode) -> Self {
@@ -400,171 +462,414 @@ impl ProgramNode {
 // Encode the 36 native coding patterns as HDC programs.
 // This replaces the hardcoded string templates in coding_agent.rs.
 
+/// Metadata for a pattern entry — needed by the translator to produce CodeSpec.
+#[derive(Debug, Clone)]
+pub struct PatternEntry {
+    /// Pattern name (e.g., "fibonacci")
+    pub name: String,
+    /// The HDC program tree
+    pub node: ProgramNode,
+    /// Pre-computed encoding for fast similarity search
+    pub encoding: BinaryHV,
+    /// Human-readable purpose (e.g., "Compute the nth Fibonacci number")
+    pub purpose: String,
+    /// Signature hint for Rust (e.g., "(n: u64) -> u64")
+    pub rust_signature: String,
+    /// Signature hint for Python (e.g., "(n: int) -> int")
+    pub python_signature: String,
+    /// Parameter type names (e.g., ["INT"])
+    pub param_types: Vec<String>,
+    /// Return type name (e.g., "INT")
+    pub return_type: String,
+    /// Keywords that should strongly match this pattern
+    pub keywords: Vec<String>,
+}
+
 /// A library of encoded program patterns that can be matched by similarity.
 pub struct ProgramPatternLibrary {
-    patterns: Vec<(String, ProgramNode, BinaryHV)>,
+    patterns: Vec<PatternEntry>,
 }
 
 impl ProgramPatternLibrary {
     /// Build the standard pattern library.
     pub fn standard() -> Self {
-        let mut lib = Self { patterns: Vec::new() };
+        let mut lib = Self {
+            patterns: Vec::new(),
+        };
 
         // ── Arithmetic ──
-        lib.add("fibonacci", ProgramNode::recurse(
-            ProgramNode::branch(
-                ProgramNode::apply(ProgramNode::op("LT"), vec![ProgramNode::atom("n"), ProgramNode::typed("2", "INT")]),
-                ProgramNode::atom("n"),
-                ProgramNode::apply(ProgramNode::op("ADD"), vec![
-                    ProgramNode::apply(ProgramNode::atom("fibonacci"), vec![ProgramNode::apply(ProgramNode::op("SUB"), vec![ProgramNode::atom("n"), ProgramNode::typed("1", "INT")])]),
-                    ProgramNode::apply(ProgramNode::atom("fibonacci"), vec![ProgramNode::apply(ProgramNode::op("SUB"), vec![ProgramNode::atom("n"), ProgramNode::typed("2", "INT")])]),
-                ]),
-            ),
-            ProgramNode::atom("fibonacci"), // recursive reference
-        ));
-
-        lib.add("factorial", ProgramNode::recurse(
-            ProgramNode::branch(
-                ProgramNode::apply(ProgramNode::op("EQ"), vec![ProgramNode::atom("n"), ProgramNode::typed("0", "INT")]),
-                ProgramNode::typed("1", "INT"),
-                ProgramNode::apply(ProgramNode::op("MUL"), vec![
+        lib.add(
+            "fibonacci",
+            ProgramNode::recurse(
+                ProgramNode::branch(
+                    ProgramNode::apply(
+                        ProgramNode::op("LT"),
+                        vec![ProgramNode::atom("n"), ProgramNode::typed("2", "INT")],
+                    ),
                     ProgramNode::atom("n"),
-                    ProgramNode::apply(ProgramNode::atom("factorial"), vec![ProgramNode::apply(ProgramNode::op("SUB"), vec![ProgramNode::atom("n"), ProgramNode::typed("1", "INT")])]),
-                ]),
+                    ProgramNode::apply(
+                        ProgramNode::op("ADD"),
+                        vec![
+                            ProgramNode::apply(
+                                ProgramNode::atom("fibonacci"),
+                                vec![ProgramNode::apply(
+                                    ProgramNode::op("SUB"),
+                                    vec![ProgramNode::atom("n"), ProgramNode::typed("1", "INT")],
+                                )],
+                            ),
+                            ProgramNode::apply(
+                                ProgramNode::atom("fibonacci"),
+                                vec![ProgramNode::apply(
+                                    ProgramNode::op("SUB"),
+                                    vec![ProgramNode::atom("n"), ProgramNode::typed("2", "INT")],
+                                )],
+                            ),
+                        ],
+                    ),
+                ),
+                ProgramNode::atom("fibonacci"), // recursive reference
             ),
-            ProgramNode::atom("factorial"),
-        ));
+        );
 
-        lib.add("gcd", ProgramNode::recurse(
-            ProgramNode::branch(
-                ProgramNode::apply(ProgramNode::op("EQ"), vec![ProgramNode::atom("b"), ProgramNode::typed("0", "INT")]),
-                ProgramNode::atom("a"),
-                ProgramNode::apply(ProgramNode::atom("gcd"), vec![ProgramNode::atom("b"), ProgramNode::apply(ProgramNode::op("MOD"), vec![ProgramNode::atom("a"), ProgramNode::atom("b")])]),
+        lib.add(
+            "factorial",
+            ProgramNode::recurse(
+                ProgramNode::branch(
+                    ProgramNode::apply(
+                        ProgramNode::op("EQ"),
+                        vec![ProgramNode::atom("n"), ProgramNode::typed("0", "INT")],
+                    ),
+                    ProgramNode::typed("1", "INT"),
+                    ProgramNode::apply(
+                        ProgramNode::op("MUL"),
+                        vec![
+                            ProgramNode::atom("n"),
+                            ProgramNode::apply(
+                                ProgramNode::atom("factorial"),
+                                vec![ProgramNode::apply(
+                                    ProgramNode::op("SUB"),
+                                    vec![ProgramNode::atom("n"), ProgramNode::typed("1", "INT")],
+                                )],
+                            ),
+                        ],
+                    ),
+                ),
+                ProgramNode::atom("factorial"),
             ),
-            ProgramNode::atom("gcd"),
-        ));
+        );
+
+        lib.add(
+            "gcd",
+            ProgramNode::recurse(
+                ProgramNode::branch(
+                    ProgramNode::apply(
+                        ProgramNode::op("EQ"),
+                        vec![ProgramNode::atom("b"), ProgramNode::typed("0", "INT")],
+                    ),
+                    ProgramNode::atom("a"),
+                    ProgramNode::apply(
+                        ProgramNode::atom("gcd"),
+                        vec![
+                            ProgramNode::atom("b"),
+                            ProgramNode::apply(
+                                ProgramNode::op("MOD"),
+                                vec![ProgramNode::atom("a"), ProgramNode::atom("b")],
+                            ),
+                        ],
+                    ),
+                ),
+                ProgramNode::atom("gcd"),
+            ),
+        );
 
         // ── Collection operations ──
-        lib.add("sum", ProgramNode::reduce(
-            ProgramNode::op("ADD"),
-            ProgramNode::typed("0", "INT"),
-            ProgramNode::atom("collection"),
-        ));
+        lib.add(
+            "sum",
+            ProgramNode::reduce(
+                ProgramNode::op("ADD"),
+                ProgramNode::typed("0", "INT"),
+                ProgramNode::atom("collection"),
+            ),
+        );
 
-        lib.add("max", ProgramNode::reduce(
-            ProgramNode::op("MAX"),
-            ProgramNode::atom("first_element"),
-            ProgramNode::atom("collection"),
-        ));
+        lib.add(
+            "max",
+            ProgramNode::reduce(
+                ProgramNode::op("MAX"),
+                ProgramNode::atom("first_element"),
+                ProgramNode::atom("collection"),
+            ),
+        );
 
-        lib.add("min", ProgramNode::reduce(
-            ProgramNode::op("MIN"),
-            ProgramNode::atom("first_element"),
-            ProgramNode::atom("collection"),
-        ));
+        lib.add(
+            "min",
+            ProgramNode::reduce(
+                ProgramNode::op("MIN"),
+                ProgramNode::atom("first_element"),
+                ProgramNode::atom("collection"),
+            ),
+        );
 
-        lib.add("reverse", ProgramNode::reduce(
-            ProgramNode::atom("prepend"),
-            ProgramNode::atom("empty_list"),
-            ProgramNode::atom("collection"),
-        ));
+        lib.add(
+            "reverse",
+            ProgramNode::reduce(
+                ProgramNode::atom("prepend"),
+                ProgramNode::atom("empty_list"),
+                ProgramNode::atom("collection"),
+            ),
+        );
 
-        lib.add("sort", ProgramNode::apply(
-            ProgramNode::op("SORT"),
-            vec![ProgramNode::atom("collection")],
-        ));
+        lib.add(
+            "sort",
+            ProgramNode::apply(
+                ProgramNode::op("SORT"),
+                vec![ProgramNode::atom("collection")],
+            ),
+        );
 
-        lib.add("filter_predicate", ProgramNode::filter(
-            ProgramNode::atom("predicate"),
-            ProgramNode::atom("collection"),
-        ));
+        lib.add(
+            "filter_predicate",
+            ProgramNode::filter(
+                ProgramNode::atom("predicate"),
+                ProgramNode::atom("collection"),
+            ),
+        );
 
-        lib.add("map_transform", ProgramNode::map(
-            ProgramNode::atom("transform"),
-            ProgramNode::atom("collection"),
-        ));
+        lib.add(
+            "map_transform",
+            ProgramNode::map(
+                ProgramNode::atom("transform"),
+                ProgramNode::atom("collection"),
+            ),
+        );
 
         // ── String operations ──
-        lib.add("reverse_string", ProgramNode::compose(
-            ProgramNode::atom("chars"),
-            ProgramNode::compose(ProgramNode::op("REVERSE"), ProgramNode::atom("collect_string")),
-        ));
+        lib.add(
+            "reverse_string",
+            ProgramNode::compose(
+                ProgramNode::atom("chars"),
+                ProgramNode::compose(
+                    ProgramNode::op("REVERSE"),
+                    ProgramNode::atom("collect_string"),
+                ),
+            ),
+        );
 
-        lib.add("count_vowels", ProgramNode::compose(
-            ProgramNode::filter(ProgramNode::atom("is_vowel"), ProgramNode::atom("chars")),
-            ProgramNode::op("LEN"),
-        ));
+        lib.add(
+            "count_vowels",
+            ProgramNode::compose(
+                ProgramNode::filter(ProgramNode::atom("is_vowel"), ProgramNode::atom("chars")),
+                ProgramNode::op("LEN"),
+            ),
+        );
 
-        lib.add("palindrome_check", ProgramNode::apply(
-            ProgramNode::op("EQ"),
-            vec![
-                ProgramNode::atom("s"),
-                ProgramNode::apply(ProgramNode::op("REVERSE"), vec![ProgramNode::atom("s")]),
-            ],
-        ));
+        lib.add(
+            "palindrome_check",
+            ProgramNode::apply(
+                ProgramNode::op("EQ"),
+                vec![
+                    ProgramNode::atom("s"),
+                    ProgramNode::apply(ProgramNode::op("REVERSE"), vec![ProgramNode::atom("s")]),
+                ],
+            ),
+        );
 
         // ── Search ──
-        lib.add("binary_search", ProgramNode::iterate(
-            ProgramNode::seq(vec![ProgramNode::typed("0", "INT"), ProgramNode::apply(ProgramNode::op("LEN"), vec![ProgramNode::atom("arr")])]),
-            ProgramNode::branch(
-                ProgramNode::apply(ProgramNode::op("EQ"), vec![ProgramNode::atom("mid_val"), ProgramNode::atom("target")]),
-                ProgramNode::atom("found"),
+        lib.add(
+            "binary_search",
+            ProgramNode::iterate(
+                ProgramNode::seq(vec![
+                    ProgramNode::typed("0", "INT"),
+                    ProgramNode::apply(ProgramNode::op("LEN"), vec![ProgramNode::atom("arr")]),
+                ]),
                 ProgramNode::branch(
-                    ProgramNode::apply(ProgramNode::op("LT"), vec![ProgramNode::atom("mid_val"), ProgramNode::atom("target")]),
-                    ProgramNode::atom("search_right"),
-                    ProgramNode::atom("search_left"),
+                    ProgramNode::apply(
+                        ProgramNode::op("EQ"),
+                        vec![ProgramNode::atom("mid_val"), ProgramNode::atom("target")],
+                    ),
+                    ProgramNode::atom("found"),
+                    ProgramNode::branch(
+                        ProgramNode::apply(
+                            ProgramNode::op("LT"),
+                            vec![ProgramNode::atom("mid_val"), ProgramNode::atom("target")],
+                        ),
+                        ProgramNode::atom("search_right"),
+                        ProgramNode::atom("search_left"),
+                    ),
+                ),
+                ProgramNode::apply(
+                    ProgramNode::op("LT"),
+                    vec![ProgramNode::atom("lo"), ProgramNode::atom("hi")],
                 ),
             ),
-            ProgramNode::apply(ProgramNode::op("LT"), vec![ProgramNode::atom("lo"), ProgramNode::atom("hi")]),
-        ));
+        );
 
         // ── Sorting algorithms ──
-        lib.add("merge_sort", ProgramNode::recurse(
-            ProgramNode::branch(
-                ProgramNode::apply(ProgramNode::op("LT"), vec![ProgramNode::apply(ProgramNode::op("LEN"), vec![ProgramNode::atom("arr")]), ProgramNode::typed("2", "INT")]),
-                ProgramNode::atom("arr"), // base: already sorted
-                ProgramNode::apply(ProgramNode::atom("merge"), vec![
-                    ProgramNode::apply(ProgramNode::atom("merge_sort"), vec![ProgramNode::atom("left_half")]),
-                    ProgramNode::apply(ProgramNode::atom("merge_sort"), vec![ProgramNode::atom("right_half")]),
-                ]),
-            ),
-            ProgramNode::atom("merge_sort"),
-        ));
-
-        lib.add("bubble_sort", ProgramNode::iterate(
-            ProgramNode::atom("arr"),
-            ProgramNode::map(
+        lib.add(
+            "merge_sort",
+            ProgramNode::recurse(
                 ProgramNode::branch(
-                    ProgramNode::apply(ProgramNode::op("GT"), vec![ProgramNode::atom("current"), ProgramNode::atom("next")]),
-                    ProgramNode::op("SWAP"),
-                    ProgramNode::atom("keep"),
+                    ProgramNode::apply(
+                        ProgramNode::op("LT"),
+                        vec![
+                            ProgramNode::apply(
+                                ProgramNode::op("LEN"),
+                                vec![ProgramNode::atom("arr")],
+                            ),
+                            ProgramNode::typed("2", "INT"),
+                        ],
+                    ),
+                    ProgramNode::atom("arr"), // base: already sorted
+                    ProgramNode::apply(
+                        ProgramNode::atom("merge"),
+                        vec![
+                            ProgramNode::apply(
+                                ProgramNode::atom("merge_sort"),
+                                vec![ProgramNode::atom("left_half")],
+                            ),
+                            ProgramNode::apply(
+                                ProgramNode::atom("merge_sort"),
+                                vec![ProgramNode::atom("right_half")],
+                            ),
+                        ],
+                    ),
                 ),
-                ProgramNode::atom("pairs"),
+                ProgramNode::atom("merge_sort"),
             ),
-            ProgramNode::atom("swapped"),
-        ));
+        );
+
+        lib.add(
+            "bubble_sort",
+            ProgramNode::iterate(
+                ProgramNode::atom("arr"),
+                ProgramNode::map(
+                    ProgramNode::branch(
+                        ProgramNode::apply(
+                            ProgramNode::op("GT"),
+                            vec![ProgramNode::atom("current"), ProgramNode::atom("next")],
+                        ),
+                        ProgramNode::op("SWAP"),
+                        ProgramNode::atom("keep"),
+                    ),
+                    ProgramNode::atom("pairs"),
+                ),
+                ProgramNode::atom("swapped"),
+            ),
+        );
+
+        // ── Annotate patterns with metadata for the translator ──
+        lib.annotate("fibonacci", "Compute the nth Fibonacci number",
+            "(n: u64) -> u64", "(n: int) -> int", "INT",
+            &["fibonacci", "fib", "sequence"]);
+        lib.annotate("factorial", "Compute the factorial of n",
+            "(n: u64) -> u64", "(n: int) -> int", "INT",
+            &["factorial", "fact"]);
+        lib.annotate("gcd", "Compute the greatest common divisor",
+            "(a: u64, b: u64) -> u64", "(a: int, b: int) -> int", "INT",
+            &["gcd", "greatest", "common", "divisor", "euclidean"]);
+        lib.annotate("sum", "Sum all elements in a slice",
+            "(v: &[i64]) -> i64", "(v: list) -> int", "INT",
+            &["sum", "total", "add", "accumulate"]);
+        lib.annotate("max", "Find the maximum value",
+            "(v: &[i64]) -> Option<i64>", "(v: list) -> int", "INT",
+            &["max", "maximum", "largest", "biggest"]);
+        lib.annotate("min", "Find the minimum value",
+            "(v: &[i64]) -> Option<i64>", "(v: list) -> int", "INT",
+            &["min", "minimum", "smallest"]);
+        lib.annotate("reverse", "Reverse a collection",
+            "(v: &[T]) -> Vec<T>", "(v: list) -> list", "LIST",
+            &["reverse", "reversed", "flip"]);
+        lib.annotate("sort", "Sort a collection",
+            "(v: &mut [T])", "(v: list) -> list", "LIST",
+            &["sort", "sorted", "order", "arrange"]);
+        lib.annotate("reverse_string", "Reverse a string",
+            "(s: &str) -> String", "(s: str) -> str", "STRING",
+            &["reverse", "string", "backwards"]);
+        lib.annotate("count_vowels", "Count vowels in a string",
+            "(s: &str) -> usize", "(s: str) -> int", "INT",
+            &["count", "vowels", "vowel"]);
+        lib.annotate("palindrome_check", "Check if a string is a palindrome",
+            "(s: &str) -> bool", "(s: str) -> bool", "BOOL",
+            &["palindrome", "mirror", "symmetric"]);
+        lib.annotate("binary_search", "Binary search in a sorted slice",
+            "(arr: &[T], target: &T) -> Option<usize>", "(arr: list, target) -> int", "OPTION",
+            &["binary", "search", "find", "bisect"]);
+        lib.annotate("merge_sort", "Sort using merge sort algorithm",
+            "(arr: &mut [T])", "(arr: list) -> list", "LIST",
+            &["merge", "sort", "divide", "conquer"]);
+        lib.annotate("bubble_sort", "Sort using bubble sort algorithm",
+            "(arr: &mut [T])", "(arr: list) -> list", "LIST",
+            &["bubble", "sort", "swap"]);
 
         lib
     }
 
-    /// Add a named pattern to the library.
+    /// Add a named pattern to the library (simple form — metadata defaults).
     fn add(&mut self, name: &str, node: ProgramNode) {
         let encoding = node.encode();
-        self.patterns.push((name.to_string(), node, encoding));
+        // Also encode the name as a task description and bundle with the node encoding
+        // for better matching when users describe tasks by name
+        let name_hv = encode_task_description(name);
+        let combined = BinaryHV::bundle(&[encoding, name_hv]);
+
+        self.patterns.push(PatternEntry {
+            name: name.to_string(),
+            node,
+            encoding: combined,
+            purpose: String::new(),
+            rust_signature: String::new(),
+            python_signature: String::new(),
+            param_types: Vec::new(),
+            return_type: String::new(),
+            keywords: vec![name.to_string()],
+        });
+    }
+
+    /// Add a pattern with full metadata.
+    fn add_with_meta(
+        &mut self,
+        name: &str,
+        node: ProgramNode,
+        purpose: &str,
+        rust_sig: &str,
+        python_sig: &str,
+        param_types: &[&str],
+        return_type: &str,
+        keywords: &[&str],
+    ) {
+        let node_encoding = node.encode();
+        let name_hv = encode_task_description(name);
+        // Also encode keywords for matching
+        let keyword_hvs: Vec<BinaryHV> = keywords.iter().map(|k| encode_atom(k)).collect();
+        let mut all_hvs = vec![node_encoding, name_hv];
+        all_hvs.extend(keyword_hvs);
+        let combined = BinaryHV::bundle(&all_hvs);
+
+        self.patterns.push(PatternEntry {
+            name: name.to_string(),
+            node,
+            encoding: combined,
+            purpose: purpose.to_string(),
+            rust_signature: rust_sig.to_string(),
+            python_signature: python_sig.to_string(),
+            param_types: param_types.iter().map(|s| s.to_string()).collect(),
+            return_type: return_type.to_string(),
+            keywords: keywords.iter().map(|s| s.to_string()).collect(),
+        });
     }
 
     /// Find the most similar pattern to a query vector.
     ///
-    /// Returns (name, similarity, program_node) for the best match.
-    /// If similarity < threshold, returns None (no good match → escalate to LLM).
-    pub fn find_similar(&self, query: &BinaryHV, threshold: f32) -> Option<(&str, f32, &ProgramNode)> {
-        let mut best: Option<(&str, f32, &ProgramNode)> = None;
+    /// Returns the best matching PatternEntry if similarity >= threshold.
+    /// For BinaryHV, random baseline is ~0.5; meaningful match is > 0.52.
+    pub fn find_similar(&self, query: &BinaryHV, threshold: f32) -> Option<(&PatternEntry, f32)> {
+        let mut best: Option<(&PatternEntry, f32)> = None;
 
-        for (name, node, encoding) in &self.patterns {
-            let sim = query.similarity(encoding);
+        for entry in &self.patterns {
+            let sim = query.similarity(&entry.encoding);
             if sim > threshold {
                 if best.is_none() || sim > best.unwrap().1 {
-                    best = Some((name, sim, node));
+                    best = Some((entry, sim));
                 }
             }
         }
@@ -573,14 +878,39 @@ impl ProgramPatternLibrary {
     }
 
     /// Find top-k most similar patterns.
-    pub fn find_top_k(&self, query: &BinaryHV, k: usize) -> Vec<(&str, f32, &ProgramNode)> {
-        let mut scored: Vec<(&str, f32, &ProgramNode)> = self.patterns
+    pub fn find_top_k(&self, query: &BinaryHV, k: usize) -> Vec<(&PatternEntry, f32)> {
+        let mut scored: Vec<(&PatternEntry, f32)> = self
+            .patterns
             .iter()
-            .map(|(name, node, enc)| (name.as_str(), query.similarity(enc), node))
+            .map(|entry| (entry, query.similarity(&entry.encoding)))
             .collect();
         scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         scored.truncate(k);
         scored
+    }
+
+    /// Annotate a pattern with metadata (for translator use).
+    pub fn annotate(
+        &mut self,
+        name: &str,
+        purpose: &str,
+        rust_sig: &str,
+        python_sig: &str,
+        return_type: &str,
+        keywords: &[&str],
+    ) {
+        if let Some(entry) = self.patterns.iter_mut().find(|e| e.name == name) {
+            entry.purpose = purpose.to_string();
+            entry.rust_signature = rust_sig.to_string();
+            entry.python_signature = python_sig.to_string();
+            entry.return_type = return_type.to_string();
+            entry.keywords = keywords.iter().map(|s| s.to_string()).collect();
+            // Re-encode with keyword boosting
+            let keyword_hvs: Vec<BinaryHV> = keywords.iter().map(|k| encode_atom(k)).collect();
+            let mut all_hvs = vec![entry.node.encode(), encode_task_description(name)];
+            all_hvs.extend(keyword_hvs);
+            entry.encoding = BinaryHV::bundle(&all_hvs);
+        }
     }
 
     /// Number of patterns in the library.
@@ -612,7 +942,10 @@ mod tests {
         let fib = ProgramNode::atom("fibonacci").encode();
         let sort = ProgramNode::atom("sort").encode();
         // Different names should be dissimilar (< 0.6)
-        assert!(fib.similarity(&sort) < 0.6, "Different atoms should be dissimilar");
+        assert!(
+            fib.similarity(&sort) < 0.6,
+            "Different atoms should be dissimilar"
+        );
     }
 
     #[test]
@@ -634,34 +967,30 @@ mod tests {
         let seq2 = ProgramNode::seq(vec![c.clone(), b.clone(), a.clone()]).encode();
 
         // Different order → different encoding (temporal binding is non-commutative)
-        assert!(seq1.similarity(&seq2) < 0.8, "Reversed sequence should differ");
+        assert!(
+            seq1.similarity(&seq2) < 0.8,
+            "Reversed sequence should differ"
+        );
     }
 
     #[test]
     fn test_same_sequence_identical() {
-        let seq1 = ProgramNode::seq(vec![
-            ProgramNode::atom("a"),
-            ProgramNode::atom("b"),
-        ]).encode();
-        let seq2 = ProgramNode::seq(vec![
-            ProgramNode::atom("a"),
-            ProgramNode::atom("b"),
-        ]).encode();
+        let seq1 = ProgramNode::seq(vec![ProgramNode::atom("a"), ProgramNode::atom("b")]).encode();
+        let seq2 = ProgramNode::seq(vec![ProgramNode::atom("a"), ProgramNode::atom("b")]).encode();
         assert_eq!(seq1.similarity(&seq2), 1.0);
     }
 
     #[test]
     fn test_map_vs_reduce_distinguishable() {
-        let map_prog = ProgramNode::map(
-            ProgramNode::atom("double"),
-            ProgramNode::atom("numbers"),
-        ).encode();
+        let map_prog =
+            ProgramNode::map(ProgramNode::atom("double"), ProgramNode::atom("numbers")).encode();
 
         let reduce_prog = ProgramNode::reduce(
             ProgramNode::op("ADD"),
             ProgramNode::typed("0", "INT"),
             ProgramNode::atom("numbers"),
-        ).encode();
+        )
+        .encode();
 
         // Different combinators → different encodings
         assert!(map_prog.similarity(&reduce_prog) < 0.6);
@@ -684,18 +1013,23 @@ mod tests {
     #[test]
     fn test_pattern_library_builds() {
         let lib = ProgramPatternLibrary::standard();
-        assert!(lib.len() >= 15, "Should have at least 15 patterns, got {}", lib.len());
+        assert!(
+            lib.len() >= 15,
+            "Should have at least 15 patterns, got {}",
+            lib.len()
+        );
     }
 
     #[test]
     fn test_pattern_library_finds_fibonacci() {
         let lib = ProgramPatternLibrary::standard();
-        let query = ProgramNode::atom("fibonacci").encode();
+        let query = encode_task_description("compute fibonacci number");
         let result = lib.find_similar(&query, 0.1);
         assert!(result.is_some(), "Should find a match for fibonacci");
-        let (name, sim, _) = result.unwrap();
-        assert_eq!(name, "fibonacci");
+        let (entry, sim) = result.unwrap();
+        assert_eq!(entry.name, "fibonacci");
         assert!(sim > 0.3, "Fibonacci should match strongly: {sim}");
+        assert!(!entry.purpose.is_empty(), "Should have purpose metadata");
     }
 
     #[test]
@@ -705,12 +1039,52 @@ mod tests {
             ProgramNode::op("ADD"),
             ProgramNode::typed("0", "INT"),
             ProgramNode::atom("numbers"),
-        ).encode();
+        )
+        .encode();
 
         let top = lib.find_top_k(&query, 3);
         assert!(!top.is_empty());
         // "sum" should be the closest match (it's a reduce with ADD)
-        assert_eq!(top[0].0, "sum", "Top match for reduce+ADD should be 'sum', got '{}'", top[0].0);
+        assert_eq!(
+            top[0].0.name, "sum",
+            "Top match for reduce+ADD should be 'sum', got '{}'",
+            top[0].0.name
+        );
+    }
+
+    #[test]
+    fn test_encode_task_description_matches_pattern() {
+        let lib = ProgramPatternLibrary::standard();
+
+        // "add a fibonacci function" should match the fibonacci pattern
+        let fib_query = encode_task_description("fibonacci sequence number");
+        let result = lib.find_similar(&fib_query, 0.1);
+        assert!(result.is_some(), "Should match fibonacci");
+        assert_eq!(result.unwrap().0.name, "fibonacci");
+
+        // "sort a list" should match a sort pattern
+        let sort_query = encode_task_description("sort elements list");
+        let result = lib.find_similar(&sort_query, 0.1);
+        assert!(result.is_some(), "Should match a sort pattern");
+        let name = &result.unwrap().0.name;
+        assert!(
+            name.contains("sort") || name == "reverse",
+            "Should match sort-related pattern, got {name}"
+        );
+    }
+
+    #[test]
+    fn test_encode_task_description_no_saturation() {
+        // Long description should still produce non-degenerate HV
+        let long = "implement a function that computes the greatest common divisor \
+                     using the euclidean algorithm with memoization and error handling";
+        let hv = encode_task_description(long);
+        let ones: u32 = hv.0.iter().map(|b| b.count_ones()).sum();
+        let density = ones as f32 / 16384.0;
+        assert!(
+            density > 0.35 && density < 0.65,
+            "Density {density} should be near 0.5 (no saturation)"
+        );
     }
 
     #[test]
@@ -735,15 +1109,13 @@ mod tests {
 
     #[test]
     fn test_compose_is_ordered() {
-        let f_then_g = ProgramNode::compose(
-            ProgramNode::atom("parse"),
-            ProgramNode::atom("validate"),
-        ).encode();
+        let f_then_g =
+            ProgramNode::compose(ProgramNode::atom("parse"), ProgramNode::atom("validate"))
+                .encode();
 
-        let g_then_f = ProgramNode::compose(
-            ProgramNode::atom("validate"),
-            ProgramNode::atom("parse"),
-        ).encode();
+        let g_then_f =
+            ProgramNode::compose(ProgramNode::atom("validate"), ProgramNode::atom("parse"))
+                .encode();
 
         // Different composition order → different encoding
         assert!(f_then_g.similarity(&g_then_f) < 0.9);
@@ -752,14 +1124,20 @@ mod tests {
     #[test]
     fn test_branch_encodes_both_paths() {
         let prog = ProgramNode::branch(
-            ProgramNode::apply(ProgramNode::op("GT"), vec![ProgramNode::atom("x"), ProgramNode::typed("0", "INT")]),
+            ProgramNode::apply(
+                ProgramNode::op("GT"),
+                vec![ProgramNode::atom("x"), ProgramNode::typed("0", "INT")],
+            ),
             ProgramNode::atom("positive_path"),
             ProgramNode::atom("negative_path"),
         );
         let hv = prog.encode();
 
         // Should be a valid HV (not all zeros, not all ones)
-        let ones = hv.count_ones();
-        assert!(ones > 1000 && ones < 15000, "Branch encoding should be non-degenerate: {ones} ones");
+        let ones = hv.popcount();
+        assert!(
+            ones > 1000 && ones < 15000,
+            "Branch encoding should be non-degenerate: {ones} ones"
+        );
     }
 }
