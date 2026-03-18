@@ -1,0 +1,170 @@
+# Symthaea HDC Encoding Pipeline
+# Professional Tier 1 Diagram
+
+direction: down
+
+title: {
+  label: Hyperdimensional Computing — Encoding Pipeline
+  near: top-center
+  shape: text
+  style.font-size: 24
+  style.bold: true
+}
+
+# ═══════════════════════════════════════════
+# INPUT
+# ═══════════════════════════════════════════
+input: Raw Input {
+  shape: parallelogram
+  style.fill: "#374151"
+  style.font-color: "#e5e7eb"
+  label: Text / Sensory / Vision / Audio
+}
+
+# ═══════════════════════════════════════════
+# PREDICTIVE HDC ENCODER
+# ═══════════════════════════════════════════
+encoder: PredictiveHdcEncoder {
+  style.fill: "#1a1a2e"
+  style.stroke: "#818cf8"
+  style.font-color: "#c7d2fe"
+  style.border-radius: 12
+
+  tokenize: "Tokenization\nInput → semantic tokens" {
+    style.fill: "#312e81"
+    style.font-color: "#c7d2fe"
+  }
+
+  random_hv: "Random HV Assignment\nEach token → random 16,384-bit BinaryHV\n(iid Bernoulli p=0.5)" {
+    style.fill: "#312e81"
+    style.font-color: "#c7d2fe"
+  }
+
+  bind: "BIND (XOR)\nRole-filler binding\nposition (x) content = structured" {
+    style.fill: "#3730a3"
+    style.font-color: "#a5b4fc"
+    style.stroke: "#818cf8"
+    label: |md
+      **XOR binding**: preserves dimensionality
+      position_hv XOR content_hv = bound_hv
+      Invertible: bound XOR position = content
+    |
+  }
+
+  bundle: "BUNDLE (Majority)\nSuperposition of bound HVs\nbit_i = majority(all bound_i)" {
+    style.fill: "#3730a3"
+    style.font-color: "#a5b4fc"
+    style.stroke: "#818cf8"
+    label: |md
+      **Majority bundling**: holographic superposition
+      All bound HVs → single 16,384-bit representation
+      Similar to original components (Hamming dist)
+    |
+  }
+
+  prediction: "Predictive Component\nPE = actual - predicted\nModulates learning rate" {
+    style.fill: "#312e81"
+    style.font-color: "#c7d2fe"
+  }
+
+  tokenize -> random_hv -> bind -> bundle -> prediction
+}
+
+# ═══════════════════════════════════════════
+# HDC OPERATIONS
+# ═══════════════════════════════════════════
+operations: Core HDC Operations {
+  style.fill: "#1e3a5f"
+  style.stroke: "#3b82f6"
+  style.font-color: "#93c5fd"
+  style.border-radius: 8
+
+  similarity: "Hamming Similarity\ndist(A, B) = popcount(A XOR B)\nSIMD-accelerated (AVX2/NEON)" {
+    style.fill: "#1e40af"
+    style.font-color: "#93c5fd"
+    style.stroke: "#3b82f6"
+  }
+
+  permute: "Permutation\nCircular bit shift\nTemporal/sequential encoding" {
+    style.fill: "#1e40af"
+    style.font-color: "#93c5fd"
+  }
+
+  thin: "Thinning\nSparsify for efficient storage\nMaintains similarity structure" {
+    style.fill: "#1e40af"
+    style.font-color: "#93c5fd"
+  }
+}
+
+# ═══════════════════════════════════════════
+# DIMENSIONALITY TIERS
+# ═══════════════════════════════════════════
+tiers: Dimensionality Tiers {
+  style.fill: "#3a1e3a"
+  style.stroke: "#a855f7"
+  style.font-color: "#d8b4fe"
+  style.border-radius: 8
+
+  t8k: "8K bits\n(lightweight)" {style.fill: "#581c87"; style.font-color: "#e9d5ff"}
+  t16k: "16,384 bits\n(default production)" {
+    style.fill: "#6b21a8"
+    style.font-color: "#d8b4fe"
+    style.stroke: "#a855f7"
+  }
+  t32k: "32K bits\n(high fidelity)" {style.fill: "#581c87"; style.font-color: "#e9d5ff"}
+  t64k: "64K bits\n(research)" {style.fill: "#581c87"; style.font-color: "#e9d5ff"}
+
+  t8k -> t16k -> t32k -> t64k
+}
+
+# ═══════════════════════════════════════════
+# DOWNSTREAM CONSUMERS
+# ═══════════════════════════════════════════
+consumers: Downstream Consumers {
+  style.fill: "#1e3a2e"
+  style.stroke: "#22c55e"
+  style.font-color: "#86efac"
+  style.border-radius: 8
+
+  cfc: "CfC/LTC Network\nTemporal evolution of HV state" {
+    style.fill: "#14532d"
+    style.font-color: "#86efac"
+  }
+  memory: "Memory Systems\nEpisodic/Semantic storage & retrieval\n(2-pass Hamming search)" {
+    style.fill: "#14532d"
+    style.font-color: "#86efac"
+  }
+  resonator: "Resonator Memory\nFactored: content (x) valence (x) phi" {
+    style.fill: "#14532d"
+    style.font-color: "#86efac"
+  }
+  phi: "IIT Phi\nIntegrated information over HV state" {
+    style.fill: "#14532d"
+    style.font-color: "#86efac"
+  }
+  wisdom: "wisdom_hv\n16,384D broadcast-ready\ncognitive state" {
+    style.fill: "#14532d"
+    style.font-color: "#86efac"
+    style.stroke: "#22c55e"
+  }
+}
+
+# ═══════════════════════════════════════════
+# FLOW
+# ═══════════════════════════════════════════
+input -> encoder.tokenize {style.stroke: "#818cf8"; style.stroke-width: 2}
+encoder.bundle -> operations {style.stroke: "#3b82f6"}
+encoder.bundle -> consumers.cfc {style.stroke: "#22c55e"; style.stroke-width: 2}
+encoder.bundle -> consumers.memory {style.stroke: "#22c55e"}
+encoder.bundle -> consumers.resonator {style.stroke: "#22c55e"; style.stroke-dash: 3}
+consumers.cfc -> consumers.phi {style.stroke: "#22c55e"; style.stroke-dash: 3}
+consumers.cfc -> consumers.wisdom: "output phase" {style.stroke: "#22c55e"; style.stroke-width: 2}
+
+# Substrate limits dimensionality
+substrate: Substrate\nScale Pressure {
+  shape: diamond
+  style.fill: "#1e293b"
+  style.stroke: "#64748b"
+  style.font-color: "#94a3b8"
+}
+substrate -> tiers: "max_scale\nconstraint" {style.stroke: "#64748b"; style.stroke-dash: 5}
