@@ -11,7 +11,7 @@
 //! - **ConsciousnessGatedVerbosity**: Higher Ψ → more detailed output
 
 use crate::encoder::ThoughtChannels;
-#[cfg(feature = "mamba")]
+#[cfg(feature = "mamba-cpu")]
 use crate::mamba::MambaBackend;
 use crate::tokenizer::BpeTokenizer;
 
@@ -295,7 +295,7 @@ impl EpistemicGate {
     ///
     /// This resolves word → token ID through the same tokenizer that produces
     /// the logits, fixing the tokenizer mismatch bug where BPE IDs ≠ GPT-2 IDs.
-    #[cfg(feature = "mamba")]
+    #[cfg(feature = "mamba-cpu")]
     pub fn new_from_backend(backend: &dyn MambaBackend, config: &GatingConfig) -> Self {
         let resolve = |words: &[&str]| -> Vec<u32> {
             words
@@ -454,7 +454,7 @@ impl EmotionalModulator {
     }
 
     /// Create an emotional modulator using the Mamba backend's tokenizer (GPT-2).
-    #[cfg(feature = "mamba")]
+    #[cfg(feature = "mamba-cpu")]
     pub fn new_from_backend(backend: &dyn MambaBackend, config: &GatingConfig) -> Self {
         let resolve = |words: &[&str]| -> Vec<u32> {
             words
@@ -1630,7 +1630,7 @@ mod tests {
         assert!((feedback.coherence() - 1.0).abs() < 0.01);
     }
 
-    #[cfg(feature = "mamba")]
+    #[cfg(feature = "mamba-cpu")]
     mod backend_tests {
         use super::*;
         use crate::mamba::tests::MockMamba;

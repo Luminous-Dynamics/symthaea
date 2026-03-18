@@ -31,3 +31,7 @@ native-ffi = []
 pairing = ["dep:ed25519-dalek", "dep:hex"]
 # Screen embodiment: Soma sees her own UI via vision-manifold + foveation.
 screen-vision = []
+
+[[bin]]
+name = "soma_bench"
+path = "src/bin/soma_bench.rs"

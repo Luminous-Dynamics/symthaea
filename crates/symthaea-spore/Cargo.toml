@@ -38,3 +38,7 @@ wasm = ["dep:wasm-bindgen", "dep:serde-wasm-bindgen", "dep:console_error_panic_h
 # emotional modulation, coherence feedback with semantic veto.
 # No additional dependencies — uses symthaea-core HDC-CfC infrastructure.
 broca-full = []
+
+[[bin]]
+name = "train-broca-lite"
+path = "src/bin/train_broca_lite.rs"

@@ -1,16 +1,16 @@
 //! CUDA smoke tests for the Broca SSM language center.
 //!
 //! These tests verify that the Mamba model infrastructure works on GPU.
-//! They are gated behind `#[cfg(feature = "cuda")]` and `#[ignore]` so they
+//! They are gated behind `#[cfg(feature = "mamba")]` and `#[ignore]` so they
 //! only run when explicitly requested on hardware with a CUDA GPU:
 //!
 //! ```bash
-//! cargo test -p symthaea-broca --features cuda -- --ignored
+//! cargo test -p symthaea-broca --features mamba -- --ignored
 //! ```
 //!
 //! On NixOS, set `LD_LIBRARY_PATH="/run/opengl-driver/lib"` first.
 
-#[cfg(feature = "cuda")]
+#[cfg(feature = "mamba")]
 mod cuda_tests {
     use candle_core::{DType, Device, Tensor};
 

@@ -1,8 +1,8 @@
 //! Substrate independence domain benchmarks.
 //!
 //! - **Transfer** — Substrate Transfer fidelity (Multiple Realizability, Putnam 1967)
-//! - **Degradation** — Graceful degradation under substrate quality loss
-//! - **Latency** — Processing speed effects across substrate types
+//! - **Degradation** — Graceful degradation under substrate quality loss (Tononi, 2004)
+//! - **Latency** — Processing speed impact across substrate types (Koch et al., 2016)
 
 pub mod degradation;
 pub mod latency;

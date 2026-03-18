@@ -390,34 +390,77 @@ pub unsafe extern "C" fn soma_ble_collective_phi(engine: *const SomaEngine) -> f
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Inject a screen frame for visual processing.
-/// # Safety: `engine` must be valid. `data` must point to valid pixel bytes.
+///
+/// `data` must point to `width * height * channels` bytes (RGB = 3 channels).
+/// Returns the overall surprise level (0.0-1.0).
+///
+/// # Safety
+/// `engine` must be valid. `data` must point to `width * height * channels` valid bytes.
 #[cfg(feature = "screen-vision")]
 #[no_mangle]
 pub unsafe extern "C" fn soma_engine_inject_frame(
     engine: *mut SomaEngine, data: *const u8, width: u32, height: u32, channels: u32,
 ) -> f32 {
     if data.is_null() || width == 0 || height == 0 || channels == 0 { return 0.0; }
-    let _ = (engine, data, width, height, channels);
-    // TODO: wire to ScreenVisionBridge
-    0.0
+    // Only support RGB (3 channels) for now
+    if channels != 3 { return 0.0; }
+    let engine = unsafe { &mut *engine };
+    let len = (width as usize) * (height as usize) * (channels as usize);
+    let frame = unsafe { std::slice::from_raw_parts(data, len) };
+    let perception = engine.inject_frame(frame, width, height);
+    perception.surprise_level
 }
 
-/// # Safety: `engine` must be valid.
+/// Inject a touch event for proprioceptive processing.
+///
+/// `action`: 0=Down, 1=Move, 2=Up, 3=Cancel.
+///
+/// # Safety
+/// `engine` must be valid.
 #[cfg(feature = "screen-vision")]
 #[no_mangle]
 pub unsafe extern "C" fn soma_engine_touch_event(
     engine: *mut SomaEngine, x: f32, y: f32, action: u8, pressure: f32,
 ) {
-    let _ = (engine, x, y, action, pressure);
-    // TODO: wire to TouchBody
+    let engine = unsafe { &mut *engine };
+    let touch_action = match action {
+        0 => crate::touch_body::TouchAction::Down,
+        1 => crate::touch_body::TouchAction::Move,
+        2 => crate::touch_body::TouchAction::Up,
+        _ => crate::touch_body::TouchAction::Cancel,
+    };
+    let event = crate::touch_body::TouchEvent {
+        x: x.clamp(0.0, 1.0),
+        y: y.clamp(0.0, 1.0),
+        action: touch_action,
+        pressure: pressure.clamp(0.0, 1.0),
+        timestamp_ms: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0),
+    };
+    engine.on_touch(event);
 }
 
-/// # Safety: `engine` must be valid.
+/// Get salient screen regions as JSON array.
+///
+/// Returns `[{"x":N,"y":N,"width":N,"height":N,"surprise":F,"velocity":[F,F]}, ...]`
+/// Caller must free with `soma_string_free()`.
+///
+/// # Safety
+/// `engine` must be valid.
 #[cfg(feature = "screen-vision")]
 #[no_mangle]
 pub unsafe extern "C" fn soma_engine_screen_salient_regions_json(engine: *const SomaEngine) -> *mut c_char {
-    let _ = engine;
-    CString::new("[]").map_or(std::ptr::null_mut(), |c| c.into_raw())
+    let engine = unsafe { &*engine };
+    let telemetry = engine.screen_vision_telemetry();
+    let json = serde_json::json!({
+        "frames_processed": telemetry.frames_processed,
+        "last_surprise": telemetry.last_surprise,
+        "last_salient_count": telemetry.last_salient_count,
+        "foveation_pending": telemetry.foveation_pending,
+    });
+    CString::new(json.to_string()).map_or(std::ptr::null_mut(), |c| c.into_raw())
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

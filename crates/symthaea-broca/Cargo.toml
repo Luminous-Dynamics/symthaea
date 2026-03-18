@@ -43,30 +43,34 @@ required-features = ["collect"]
 [[bin]]
 name = "broca-mamba-verify"
 path = "src/bin/broca_mamba_verify.rs"
-required-features = ["mamba"]
+required-features = ["mamba-cpu"]
 
 [[bin]]
 name = "broca-projection-train"
 path = "src/bin/broca_projection_train.rs"
-required-features = ["mamba"]
+required-features = ["mamba-cpu"]
 
 [[bin]]
 name = "broca-compare"
 path = "src/bin/broca_compare.rs"
-required-features = ["mamba"]
+required-features = ["mamba-cpu"]
 
 [[bin]]
 name = "broca-embedding-stats"
 path = "src/bin/broca_embedding_stats.rs"
-required-features = ["mamba"]
+required-features = ["mamba-cpu"]
 
 [features]
 default = ["simd", "parallel"]
 parallel = ["dep:rayon"]
-mamba = ["dep:candle-core", "dep:candle-nn", "dep:hf-hub", "dep:tokenizers"]
-cuda = ["mamba", "candle-core/cuda"]
+# Mamba CPU-only: base Mamba SSM support without CUDA (for CI / non-GPU machines)
+mamba-cpu = ["dep:candle-core", "dep:candle-nn", "dep:hf-hub", "dep:tokenizers"]
+# Mamba with CUDA GPU acceleration (default for local dev)
+mamba = ["mamba-cpu", "candle-core/cuda"]
+# Legacy alias
+cuda = ["mamba"]
 hf-tokenizer = ["dep:tokenizers"]
 collect = ["dep:ureq"]
 simd = ["symthaea-core/simd"]
-test-helpers = ["mamba"]
+test-helpers = ["mamba-cpu"]
 therapeutic = []

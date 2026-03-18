@@ -344,7 +344,7 @@ pub fn format_eval_report(result: &EvalResult) -> String {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Configuration for Liquid-Mamba evaluation.
-#[cfg(feature = "mamba")]
+#[cfg(feature = "mamba-cpu")]
 pub struct LiquidMambaEvalConfig {
     /// Dataset to evaluate on.
     pub dataset: TrainingDataset,
@@ -360,7 +360,7 @@ pub struct LiquidMambaEvalConfig {
     pub consciousness_gating_test: bool,
 }
 
-#[cfg(feature = "mamba")]
+#[cfg(feature = "mamba-cpu")]
 impl Default for LiquidMambaEvalConfig {
     fn default() -> Self {
         Self {
@@ -375,7 +375,7 @@ impl Default for LiquidMambaEvalConfig {
 }
 
 /// Liquid-Mamba evaluation results.
-#[cfg(feature = "mamba")]
+#[cfg(feature = "mamba-cpu")]
 #[derive(Debug, Clone)]
 pub struct LiquidMambaEvalResult {
     /// Base evaluation results (perplexity, English ratio, coherence, intent breakdown).
@@ -404,7 +404,7 @@ pub struct LiquidMambaEvalResult {
 }
 
 /// A single sample output for qualitative inspection in eval reports.
-#[cfg(feature = "mamba")]
+#[cfg(feature = "mamba-cpu")]
 #[derive(Debug, Clone)]
 pub struct SampleOutput {
     /// Semantic intent that was active for this generation.
@@ -422,7 +422,7 @@ pub struct SampleOutput {
 /// Compares generation behavior under Certain (epistemic=0.0) vs Unknown (epistemic=3.0)
 /// conditions. A properly functioning consciousness bridge should produce more hedging,
 /// lower coherence, and higher veto rates under Unknown conditions.
-#[cfg(feature = "mamba")]
+#[cfg(feature = "mamba-cpu")]
 #[derive(Debug, Clone)]
 pub struct GatingTestResult {
     /// Fraction of hedging tokens under Certain epistemic state.
@@ -444,7 +444,7 @@ pub struct GatingTestResult {
 /// Compute distinct-n: fraction of unique n-grams out of total n-grams.
 ///
 /// Measures lexical diversity — higher is better (less repetition).
-#[cfg(feature = "mamba")]
+#[cfg(feature = "mamba-cpu")]
 fn distinct_n(words: &[String], n: usize) -> f32 {
     if words.len() < n || n == 0 {
         return 0.0;
@@ -459,7 +459,7 @@ fn distinct_n(words: &[String], n: usize) -> f32 {
 }
 
 /// Cosine similarity between two f32 slices.
-#[cfg(feature = "mamba")]
+#[cfg(feature = "mamba-cpu")]
 fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
     let dot: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
     let norm_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
@@ -474,7 +474,7 @@ fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
 ///
 /// Uses [`CANONICAL_HEDGING_WORDS`](crate::gating::CANONICAL_HEDGING_WORDS)
 /// as the single source of truth, shared with the epistemic gate.
-#[cfg(feature = "mamba")]
+#[cfg(feature = "mamba-cpu")]
 fn hedging_ratio(text: &str) -> f32 {
     use crate::gating::CANONICAL_HEDGING_WORDS;
     let lower = text.to_lowercase();
@@ -529,7 +529,7 @@ pub fn contrastive_intent_score(intent_texts: &[String]) -> f32 {
 ///
 /// A token counts as "English" if it decodes to a multi-character alphabetic string
 /// (not a single byte, not a byte-escape).
-#[cfg(feature = "mamba")]
+#[cfg(feature = "mamba-cpu")]
 pub fn english_word_ratio_mamba(
     token_ids: &[u32],
     wrapper: &dyn crate::mamba::MambaBackend,
@@ -564,7 +564,7 @@ pub fn english_word_ratio_mamba(
 }
 
 /// Run full Liquid-Mamba evaluation: perplexity + generation quality + projection health.
-#[cfg(feature = "mamba")]
+#[cfg(feature = "mamba-cpu")]
 pub fn evaluate_liquid_mamba(
     gen: &mut crate::liquid_mamba::LiquidMambaGenerator,
     config: &LiquidMambaEvalConfig,
@@ -809,7 +809,7 @@ pub fn evaluate_liquid_mamba(
 
 /// Run consciousness gating test: compare hedging, coherence, and veto rates
 /// under Certain vs Unknown epistemic states.
-#[cfg(feature = "mamba")]
+#[cfg(feature = "mamba-cpu")]
 fn consciousness_gating_test(
     gen: &mut crate::liquid_mamba::LiquidMambaGenerator,
     dataset: &TrainingDataset,
@@ -868,7 +868,7 @@ fn consciousness_gating_test(
 ///
 /// Each pair `(good, ok)` controls when a metric receives "GOOD", "OK", or no label.
 /// Pass to [`format_liquid_mamba_eval_report`] to customize gate sensitivity.
-#[cfg(feature = "mamba")]
+#[cfg(feature = "mamba-cpu")]
 #[derive(Debug, Clone)]
 pub struct QualityGateThresholds {
     /// Effective rank ≥ this → GOOD (default 20.0).
@@ -889,7 +889,7 @@ pub struct QualityGateThresholds {
     pub pe_diverging: f32,
 }
 
-#[cfg(feature = "mamba")]
+#[cfg(feature = "mamba-cpu")]
 impl Default for QualityGateThresholds {
     fn default() -> Self {
         Self {
@@ -906,7 +906,7 @@ impl Default for QualityGateThresholds {
 }
 
 /// Classify a metric value against a threshold and return a status string.
-#[cfg(feature = "mamba")]
+#[cfg(feature = "mamba-cpu")]
 fn quality_gate(
     value: f32,
     good_threshold: f32,
@@ -935,7 +935,7 @@ fn quality_gate(
 /// The `thresholds` parameter controls when metrics receive "GOOD", "OK", or
 /// "IMPROVING"/"DIVERGING" labels. Use [`QualityGateThresholds::default()`] for
 /// the standard gate levels.
-#[cfg(feature = "mamba")]
+#[cfg(feature = "mamba-cpu")]
 pub fn format_liquid_mamba_eval_report(
     result: &LiquidMambaEvalResult,
     thresholds: &QualityGateThresholds,
@@ -1354,7 +1354,7 @@ mod tests {
         assert_eq!(contrastive_intent_score(&["single".to_string()]), 0.0);
     }
 
-    #[cfg(feature = "mamba")]
+    #[cfg(feature = "mamba-cpu")]
     mod liquid_mamba_tests {
         use super::*;
 

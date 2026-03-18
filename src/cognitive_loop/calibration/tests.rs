@@ -1808,10 +1808,10 @@ fn test_confidence_delta_symmetric() {
 #[test]
 fn test_nan_z_score_produces_neutral_factor() {
     use super::normative::z_to_sensitivity_factor;
-    assert_eq!(z_to_sensitivity_factor(f64::NAN, false), 1.0);
-    assert_eq!(z_to_sensitivity_factor(f64::NAN, true), 1.0);
-    assert_eq!(z_to_sensitivity_factor(f64::INFINITY, false), 1.0);
-    assert_eq!(z_to_sensitivity_factor(f64::NEG_INFINITY, true), 1.0);
+    assert!((z_to_sensitivity_factor(f64::NAN, false) - 1.0).abs() < f32::EPSILON);
+    assert!((z_to_sensitivity_factor(f64::NAN, true) - 1.0).abs() < f32::EPSILON);
+    assert!((z_to_sensitivity_factor(f64::INFINITY, false) - 1.0).abs() < f32::EPSILON);
+    assert!((z_to_sensitivity_factor(f64::NEG_INFINITY, true) - 1.0).abs() < f32::EPSILON);
 }
 
 #[test]

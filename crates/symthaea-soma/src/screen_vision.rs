@@ -316,7 +316,7 @@ impl ScreenVisionBridge {
         }
 
         // Step 5: Build the scene HV from the manifold state
-        let scene_hv = self.vision.state().values().to_vec();
+        let scene_hv = self.vision.state().values.to_vec();
 
         let frame_id = self.frame_count;
         self.frame_count += 1;

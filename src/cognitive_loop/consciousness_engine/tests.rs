@@ -973,8 +973,8 @@ fn test_coupling_disabled_no_effect() {
 fn test_substrate_feasibility_in_metadata_default() {
     let metadata = super::super::CycleMetadata::default();
     assert!(
-        (metadata.substrate_feasibility - 0.0).abs() < f64::EPSILON,
-        "Default substrate_feasibility should be 0.0"
+        (metadata.substrate_effective_feasibility - 0.0).abs() < f64::EPSILON,
+        "Default substrate_effective_feasibility should be 0.0"
     );
 }
 

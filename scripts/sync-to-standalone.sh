@@ -77,7 +77,7 @@ echo
 # --- Verify stubs exist in standalone ----------------------------------------
 
 STUBS_OK=true
-for stub in mycelix-fl-core mycelix-sdk; do
+for stub in mycelix-fl-core mycelix-sdk mycelix-crypto; do
     if [ ! -f "${STANDALONE_REPO}/stubs/${stub}/Cargo.toml" ]; then
         warn "Stub missing: stubs/${stub}/Cargo.toml"
         STUBS_OK=false
@@ -249,6 +249,9 @@ if ! $DRY_RUN; then
     sed -i 's|^\(mycelix-sdk\s*=\s*{\s*path\s*=\s*\)"[^"]*"|\1"stubs/mycelix-sdk"|' \
         "${STANDALONE_REPO}/Cargo.toml"
 
+    sed -i 's|^\(mycelix-crypto\s*=\s*{\s*path\s*=\s*\)"[^"]*"|\1"stubs/mycelix-crypto"|' \
+        "${STANDALONE_REPO}/Cargo.toml"
+
     # Verify the rewrites actually happened
     REWRITE_OK=true
     if ! grep -q 'mycelix-fl-core.*stubs/mycelix-fl-core' "${STANDALONE_REPO}/Cargo.toml"; then
@@ -257,6 +260,10 @@ if ! $DRY_RUN; then
     fi
     if ! grep -q 'mycelix-sdk.*stubs/mycelix-sdk' "${STANDALONE_REPO}/Cargo.toml"; then
         warn "Failed to rewrite mycelix-sdk path"
+        REWRITE_OK=false
+    fi
+    if ! grep -q 'mycelix-crypto.*stubs/mycelix-crypto' "${STANDALONE_REPO}/Cargo.toml"; then
+        warn "Failed to rewrite mycelix-crypto path"
         REWRITE_OK=false
     fi
 

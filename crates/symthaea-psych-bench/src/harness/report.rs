@@ -483,12 +483,8 @@ impl BenchmarkReport {
             ("valence_accuracy", "valence_accuracy", &bl.affect),
             ("congruence_ratio", "congruence_ratio", &bl.affect),
             ("fluency", "aut_fluency", &bl.creativity),
-            ("originality_score", "dt_originality_score", &bl.creativity),
-            ("flexibility_score", "dt_flexibility_score", &bl.creativity),
-            ("elaboration_score", "dt_elaboration_score", &bl.creativity),
             ("present_count", "present_count", &bl.butlin),
             ("presence_ratio", "presence_ratio", &bl.butlin),
-            ("mean_quality_score", "mean_quality_score", &bl.butlin),
             // Go/No-Go (Inhibition)
             ("go_accuracy", "go_accuracy", &bl.inhibition),
             ("nogo_accuracy", "nogo_accuracy", &bl.inhibition),
@@ -611,19 +607,6 @@ impl BenchmarkReport {
             ),
             ("boundary_width", "vot_boundary_width", &bl.speech),
             ("slope_at_boundary", "vot_slope_at_boundary", &bl.speech),
-            // Categorical Perception
-            ("boundary_slope", "cp_boundary_slope", &bl.speech),
-            (
-                "boundary_discrimination",
-                "cp_boundary_discrimination",
-                &bl.speech,
-            ),
-            (
-                "within_category_discrimination",
-                "cp_within_discrimination",
-                &bl.speech,
-            ),
-            ("categorical_index", "cp_categorical_index", &bl.speech),
             // Substrate Transfer
             ("transfer_fidelity", "transfer_fidelity", &bl.substrate),
             ("phi_preservation", "phi_preservation", &bl.substrate),
@@ -639,15 +622,89 @@ impl BenchmarkReport {
                 &bl.substrate,
             ),
             ("graceful_ratio", "substrate_graceful_ratio", &bl.substrate),
-            // Substrate Latency
+            // Feature Conjunction (Binding)
             (
-                "speed_accuracy_correlation",
-                "substrate_speed_accuracy_correlation",
-                &bl.substrate,
+                "conjunction_accuracy",
+                "conjunction_accuracy",
+                &bl.binding,
             ),
+            ("feature_accuracy", "feature_accuracy", &bl.binding),
+            ("conjunction_cost", "conjunction_cost", &bl.binding),
+            // Perceptual Crowding (Consciousness)
+            (
+                "unflanked_accuracy",
+                "crowding_unflanked_accuracy",
+                &bl.consciousness,
+            ),
+            (
+                "flanked_accuracy",
+                "crowding_flanked_accuracy",
+                &bl.consciousness,
+            ),
+            (
+                "crowding_magnitude",
+                "crowding_magnitude",
+                &bl.consciousness,
+            ),
+            // Divergent Thinking (Creativity)
+            (
+                "originality_score",
+                "originality_score",
+                &bl.creativity,
+            ),
+            (
+                "flexibility_score",
+                "flexibility_score",
+                &bl.creativity,
+            ),
+            (
+                "elaboration_score",
+                "elaboration_score",
+                &bl.creativity,
+            ),
+            // Flanker Inhibition (Inhibition)
+            (
+                "congruent_accuracy",
+                "flanker_congruent_accuracy",
+                &bl.inhibition,
+            ),
+            (
+                "incongruent_accuracy",
+                "flanker_incongruent_accuracy",
+                &bl.inhibition,
+            ),
+            (
+                "interference_suppression",
+                "interference_suppression",
+                &bl.inhibition,
+            ),
+            // Categorical Perception (Speech)
+            ("boundary_slope", "cp_boundary_slope", &bl.speech),
+            (
+                "boundary_discrimination",
+                "cp_boundary_discrimination",
+                &bl.speech,
+            ),
+            (
+                "within_category_discrimination",
+                "cp_within_category_discrimination",
+                &bl.speech,
+            ),
+            ("categorical_index", "cp_categorical_index", &bl.speech),
+            // Substrate Latency
             (
                 "fast_substrate_accuracy",
                 "substrate_fast_accuracy",
+                &bl.substrate,
+            ),
+            (
+                "slow_substrate_accuracy",
+                "substrate_slow_accuracy",
+                &bl.substrate,
+            ),
+            (
+                "speed_accuracy_correlation",
+                "substrate_speed_accuracy_correlation",
                 &bl.substrate,
             ),
             (
@@ -706,12 +763,6 @@ impl BenchmarkReport {
             (
                 "queens_8_accuracy",
                 "constraint_queens_8_accuracy",
-                &bl.mathematics,
-            ),
-            // StatisticalInference
-            (
-                "variance_estimation_accuracy",
-                "variance_estimation_accuracy",
                 &bl.mathematics,
             ),
             ("tautology_accuracy", "tautology_accuracy", &bl.mathematics),
@@ -937,7 +988,7 @@ impl BenchmarkReport {
                 &bl.executive,
             );
         }
-        if benchmark.contains("Flanker") {
+        if benchmark.contains("Flanker") && !benchmark.contains("FlankerInhibition") {
             push_specific(
                 "congruent_accuracy",
                 "flanker_congruent_accuracy",
@@ -1053,12 +1104,6 @@ impl BenchmarkReport {
         if benchmark.contains("Probabilistic") {
             push_specific("rt_ticks", "probabilistic_rt_ticks", &bl.cogbench);
         }
-        // LogicalDeduction: HDC encoding doesn't cleanly separate valid/invalid
-        // arguments yet — "overall_accuracy" pulls Math domain z-score down.
-        // TODO: improve logical_deduction.rs before wiring into composites.
-        // if benchmark.contains("LogicalDeduction") {
-        //     push_specific("overall_accuracy", "logical_overall_accuracy", &bl.mathematics);
-        // }
         // WorM RT mappings
         if benchmark.contains("ChangeDetection") {
             push_specific("rt_ticks", "change_detection_rt_ticks", &bl.worm);
@@ -1149,6 +1194,24 @@ impl BenchmarkReport {
             push_specific("sst_go_rt_ticks", "sst_go_rt_ticks", &bl.inhibition);
             push_specific("sst_stop_accuracy", "sst_stop_accuracy", &bl.inhibition);
             push_specific("ssrt_ticks", "ssrt_ticks", &bl.inhibition);
+        }
+        // Flanker Inhibition (Inhibition)
+        if benchmark.contains("FlankerInhibition") {
+            push_specific(
+                "congruent_accuracy",
+                "flanker_congruent_accuracy",
+                &bl.inhibition,
+            );
+            push_specific(
+                "incongruent_accuracy",
+                "flanker_incongruent_accuracy",
+                &bl.inhibition,
+            );
+            push_specific(
+                "interference_suppression",
+                "interference_suppression",
+                &bl.inhibition,
+            );
         }
         // Visual Search (Attention)
         if benchmark.contains("VisualSearch") {
@@ -1944,13 +2007,14 @@ pub fn calibration_class_of(benchmark: &str) -> &'static str {
         "Calibration", "MismatchNegativity", "GardenPath", "SemanticPriming",
         "LexicalDecision", "MentalRotation", "TemporalDiscounting",
         "IowaGambling", "TowerOfLondon", "RavensProgressiveMatrices",
-        "TemporalOrder", "CrossModal", "CategoricalPerception", "RemoteAssociates", "AlternateUses", "DivergentThinking",
+        "TemporalOrder", "CrossModal", "FeatureConjunction", "RemoteAssociates", "AlternateUses",
+        "DivergentThinking", "FlankerInhibition", "CategoricalPerception", "PerceptualCrowding",
         "WorM::Binding", "ChangeDetection",
     ];
 
     // Theoretical benchmarks: novel paradigms or theoretical constructs
     let theoretical = [
-        "SubstrateTransfer", "SubstrateDegradation", "Blindsight",
+        "SubstrateTransfer", "SubstrateDegradation", "SubstrateLatency", "Blindsight",
         "ButlinIndicator", "InstitutionalReasoning", "InstitutionalStability",
         "InstitutionalIsomorphism",
     ];
@@ -1983,6 +2047,7 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("SerialRecall") => "list_7::primacy_index",
         b if b.contains("SpatialUpdating") => "overall_accuracy",
         b if b.contains("TemporalOrder") => "discrimination_slope",
+        b if b.contains("FeatureConjunction") => "conjunction_accuracy",
         b if b.contains("CrossModal") => "binding_accuracy",
         // Spatial domain (must be before generic "Binding" arm)
         b if b.contains("Spatial::MentalRotation") || (b.contains("MentalRotation") && b.contains("Spatial")) => "accuracy_mean",
@@ -1993,6 +2058,7 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("DigitSpan") => "forward_span",
         b if b.contains("EmotionalStroop") => "emotional_interference",
         b if b.contains("Stroop") && !b.contains("Strange") => "stroop_effect",
+        b if b.contains("FlankerInhibition") => "interference_suppression",
         b if b.contains("Flanker") => "flanker_effect",
         b if b.contains("Wisconsin") || b.contains("WCST") => "categories_completed",
         b if b.contains("Iowa") || b.contains("IGT") => "overall_net_score",
@@ -2016,12 +2082,12 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("LongRange") => "delay_50::retention",
         b if b.contains("ConflictResolution") => "recency_preference",
         b if b.contains("Calibration") => "calibration_error_ece",
-        b if b.contains("Butlin") => "mean_quality_score",
+        b if b.contains("Butlin") => "present_count",
         b if b.contains("ValenceClassification") => "valence_accuracy",
         b if b.contains("MoodCongruent") => "congruence_ratio",
         b if b.contains("RemoteAssociates") => "overall_accuracy",
-        b if b.contains("DivergentThinking") => "originality_score",
         b if b.contains("AlternateUses") => "fluency",
+        b if b.contains("DivergentThinking") => "originality_score",
         b if b.contains("GoNoGo") => "nogo_accuracy",
         b if b.contains("AttentionalBlink") => "blink_magnitude",
         b if b.contains("ProspectiveMemory") => "pm_hit_rate",
@@ -2076,12 +2142,13 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("ChangeBlindness") => "detection_with_disruption",
         b if b.contains("ProprioceptiveDrift") => "drift_difference",
         b if b.contains("PhonemeDiscrimination") => "categorical_perception_index",
-        b if b.contains("CategoricalPerception") => "boundary_slope",
+        b if b.contains("CategoricalPerception") => "categorical_index",
         b if b.contains("VotContinuum") => "identification_accuracy",
+        b if b.contains("PerceptualCrowding") => "crowding_magnitude",
         b if b.contains("BinocularRivalry") => "dominance_ratio",
-        b if b.contains("Substrate") && b.contains("Latency") => "speed_accuracy_correlation",
         b if b.contains("Substrate") && b.contains("Degradation") => "graceful_ratio",
         b if b.contains("Substrate") && b.contains("Transfer") => "transfer_fidelity",
+        b if b.contains("Substrate") && b.contains("Latency") => "speed_accuracy_correlation",
         // Mathematics domain
         b if b.contains("ArithmeticWordProblem") => "accuracy",
         b if b.contains("LinearSystemSolving") => "accuracy_2x2",
@@ -2164,6 +2231,7 @@ pub fn is_lower_better(metric_key: &str) -> bool {
             | "swap_error_rate"
             | "pm_cost"
             | "capacity_ratio"
+            | "interference_suppression"
     )
 }
 
@@ -3123,7 +3191,6 @@ mod tests {
         // Theoretical
         assert_eq!(calibration_class_of("Substrate::SubstrateTransfer"), "TH");
         assert_eq!(calibration_class_of("Substrate::SubstrateDegradation"), "TH");
-        assert_eq!(calibration_class_of("Substrate::Latency"), "TH");
         assert_eq!(calibration_class_of("Consciousness::Blindsight"), "TH");
 
         // Post Hoc (everything else)

@@ -142,10 +142,10 @@ pub struct GenerationResult {
     /// When >= 3, suggests hallucination (output drifted far from thought intent).
     pub hallucination_flag: bool,
     /// Back-projected HDC vectors for each generated token (Liquid-Mamba only).
-    #[cfg(feature = "mamba")]
+    #[cfg(feature = "mamba-cpu")]
     pub output_hvs: Vec<symthaea_core::hdc::ContinuousHV>,
     /// Semantic prediction error: round-trip reconstruction loss (Liquid-Mamba only).
-    #[cfg(feature = "mamba")]
+    #[cfg(feature = "mamba-cpu")]
     pub semantic_pe: f32,
 }
 
@@ -506,9 +506,9 @@ impl BrocaGenerator {
             coherence_dynamics,
             gating_trace,
             hallucination_flag,
-            #[cfg(feature = "mamba")]
+            #[cfg(feature = "mamba-cpu")]
             output_hvs: Vec::new(),
-            #[cfg(feature = "mamba")]
+            #[cfg(feature = "mamba-cpu")]
             semantic_pe: 0.0,
         }
     }

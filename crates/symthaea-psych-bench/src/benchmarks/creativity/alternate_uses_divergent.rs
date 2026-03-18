@@ -73,7 +73,7 @@ impl DivergentThinkingBenchmark {
             let cat_idx = rng as usize % n_categories;
 
             // Blend: object (familiar) + exploration (novel) + category (structure)
-            let explore_weight = 0.35 + (i as f32 / n_uses as f32) * 0.25; // later uses are more exploratory
+            let explore_weight = 0.44 + (i as f32 / n_uses as f32) * 0.20; // later uses are more exploratory
             let cat_weight = 0.15;
             let obj_weight = 1.0 - explore_weight - cat_weight;
 

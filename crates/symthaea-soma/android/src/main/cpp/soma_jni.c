@@ -95,6 +95,13 @@ float    soma_ble_collective_phi(const void *engine);
 /* Broca language generation */
 char *soma_engine_generate_text(void *engine, uint32_t max_tokens);
 
+/* Screen vision */
+float soma_engine_inject_frame(void *engine, const uint8_t *data,
+                               uint32_t width, uint32_t height, uint32_t channels);
+void  soma_engine_touch_event(void *engine, float x, float y,
+                              uint8_t action, float pressure);
+char *soma_engine_screen_salient_regions_json(const void *engine);
+
 /* Persistence */
 uint8_t soma_engine_save_checkpoint(void *engine);
 uint8_t soma_engine_load_checkpoint(void *engine);
@@ -601,4 +608,45 @@ Java_io_symthaea_soma_NativeBindings_setStoragePath(JNIEnv *env, jclass clazz,
     if (cstr == NULL) return;
     soma_engine_set_storage_path((void *)(intptr_t)handle, cstr);
     (*env)->ReleaseStringUTFChars(env, path, cstr);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * JNI bindings — Screen vision
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+JNIEXPORT jfloat JNICALL
+Java_io_symthaea_soma_NativeBindings_injectFrame(JNIEnv *env, jclass clazz,
+                                                  jlong handle, jbyteArray data,
+                                                  jint width, jint height, jint channels) {
+    (void)clazz;
+    if (data == NULL || width <= 0 || height <= 0 || channels <= 0) return 0.0f;
+    jsize len = (*env)->GetArrayLength(env, data);
+    if (len < width * height * channels) return 0.0f;
+    jbyte *bytes = (*env)->GetByteArrayElements(env, data, NULL);
+    if (bytes == NULL) return 0.0f;
+    float surprise = soma_engine_inject_frame(
+        (void *)(intptr_t)handle,
+        (const uint8_t *)bytes,
+        (uint32_t)width, (uint32_t)height, (uint32_t)channels
+    );
+    (*env)->ReleaseByteArrayElements(env, data, bytes, JNI_ABORT);
+    return surprise;
+}
+
+JNIEXPORT void JNICALL
+Java_io_symthaea_soma_NativeBindings_touchEvent(JNIEnv *env, jclass clazz,
+                                                 jlong handle, jfloat x, jfloat y,
+                                                 jint action, jfloat pressure) {
+    (void)env; (void)clazz;
+    soma_engine_touch_event(
+        (void *)(intptr_t)handle, x, y, (uint8_t)action, pressure
+    );
+}
+
+JNIEXPORT jstring JNICALL
+Java_io_symthaea_soma_NativeBindings_screenSalientRegionsJson(JNIEnv *env, jclass clazz,
+                                                               jlong handle) {
+    (void)clazz;
+    char *json = soma_engine_screen_salient_regions_json((const void *)(intptr_t)handle);
+    return rust_string_to_jstring(env, json);
 }

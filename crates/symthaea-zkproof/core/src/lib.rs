@@ -1,3 +1,8 @@
+#![cfg_attr(not(feature = "std"), no_std)]
+
+extern crate alloc;
+use alloc::vec::Vec;
+
 use serde::{Deserialize, Serialize};
 
 /// Data passed from host to guest (zkVM)

@@ -25,11 +25,11 @@ const CHECKPOINT_VERSION: u32 = 2;
 /// v1: 4 weight matrices (w_down, w_up, w_back_down, w_back_up).
 /// v2: v1 + 4 LayerNorm vectors (ln_fwd_gamma, ln_fwd_beta, ln_bwd_gamma, ln_bwd_beta).
 /// v3: v2 + temporal projection fields (temporal, chunk_dim, num_chunks, temporal_weights).
-#[cfg(feature = "mamba")]
+#[cfg(feature = "mamba-cpu")]
 const PROJECTION_CHECKPOINT_VERSION: u32 = 4;
 
 /// Minimum supported ProjectionCheckpoint version.
-#[cfg(feature = "mamba")]
+#[cfg(feature = "mamba-cpu")]
 const PROJECTION_MIN_VERSION: u32 = 1;
 
 /// Serializable optimizer state for training resume.
@@ -117,7 +117,7 @@ pub struct BrocaCheckpoint {
     /// Optional Liquid-Mamba configuration for full L-SSM resume (serialized as JSON string).
     /// Added in v2; v1 checkpoints deserialize with `None` via serde(default).
     /// Stored as a JSON `String` for feature-flag independence — the `liquid_mamba`
-    /// module is gated behind `cfg(feature = "mamba")`, but checkpoints must (de)serialize
+    /// module is gated behind `cfg(feature = "mamba-cpu")`, but checkpoints must (de)serialize
     /// regardless of enabled features. Bincode can't round-trip `serde_json::Value` (untagged enum).
     #[serde(default)]
     pub liquid_mamba_config: Option<String>,
@@ -325,7 +325,7 @@ impl BrocaGenerator {
 
 /// Legacy v3 checkpoint layout (14 positional fields, no num_groups/has_adapter).
 /// Used only for backward-compatible deserialization of older checkpoints.
-#[cfg(feature = "mamba")]
+#[cfg(feature = "mamba-cpu")]
 #[derive(Deserialize)]
 struct ProjectionCheckpointV3 {
     version: u32,
@@ -351,7 +351,7 @@ struct ProjectionCheckpointV3 {
     checksum: [u8; 32],
 }
 
-#[cfg(feature = "mamba")]
+#[cfg(feature = "mamba-cpu")]
 impl From<ProjectionCheckpointV3> for ProjectionCheckpoint {
     fn from(v3: ProjectionCheckpointV3) -> Self {
         Self {
@@ -379,7 +379,7 @@ impl From<ProjectionCheckpointV3> for ProjectionCheckpoint {
 ///
 /// Smaller and faster than a full BrocaCheckpoint — only stores the projection
 /// matrix weights (8.8M parameters at default dimensions).
-#[cfg(feature = "mamba")]
+#[cfg(feature = "mamba-cpu")]
 #[derive(Serialize, Deserialize)]
 pub struct ProjectionCheckpoint {
     /// Schema version.
@@ -434,7 +434,7 @@ pub struct ProjectionCheckpoint {
     pub checksum: [u8; 32],
 }
 
-#[cfg(feature = "mamba")]
+#[cfg(feature = "mamba-cpu")]
 impl ProjectionCheckpoint {
     /// Compute the blake3 checksum (with checksum field zeroed).
     fn compute_checksum(&self) -> [u8; 32] {
@@ -799,7 +799,7 @@ mod tests {
         assert!(checkpoint.verify());
     }
 
-    #[cfg(feature = "mamba")]
+    #[cfg(feature = "mamba-cpu")]
     #[test]
     fn test_checkpoint_roundtrip_liquid_mamba_config() {
         use crate::liquid_mamba::LiquidMambaConfig;
@@ -868,7 +868,7 @@ mod tests {
         let _ = std::fs::remove_file(&path);
     }
 
-    #[cfg(feature = "mamba")]
+    #[cfg(feature = "mamba-cpu")]
     #[test]
     fn test_projection_checkpoint_deep_flag() {
         let dir = std::env::temp_dir();

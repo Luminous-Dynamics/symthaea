@@ -65,8 +65,9 @@ impl RmeBenchmark {
         // Difficulty increases decision noise (harder to discriminate subtle emotions).
         let difficulty_noise: f32 = config.difficulty as f32 * 0.20;
         let noise_level: f32 = 0.25 + config.time_pressure as f32 * 0.15 + difficulty_noise;
-        // Encoding noise degrades emotion recognition signal
-        let noise_degrade: f32 = config.effective_noise() as f32 * 0.4;
+        // Encoding noise adds per-comparison perceptual noise (individual differences
+        // in emotion recognition; Schlegel et al., 2017 GERT).
+        let enc_noise: f32 = config.effective_noise() as f32;
 
         // Social coherence: when enabled, boosts emotion recognition
         let social_bonus: f32 = if config.enable_social { 0.25 } else { 0.0 };
@@ -121,10 +122,25 @@ impl RmeBenchmark {
                 .collect();
 
             // 4-AFC: compare stimulus to target + 3 foils
-            let target_sim = stimulus.similarity(target) * (1.0 - noise_degrade) + social_bonus;
+            // Per-option encoding noise (hash-based deterministic per item)
+            let target_enc_noise = {
+                let ns = seed.wrapping_add(6000 + item as u64 * 17);
+                ((ns.wrapping_mul(0x9E3779B97F4A7C15) >> 33) as f32 / (1u64 << 31) as f32) - 0.5
+            };
+            let target_sim =
+                stimulus.similarity(target) + target_enc_noise * enc_noise * 0.12 + social_bonus;
             let foil_sims: Vec<f32> = foils
                 .iter()
-                .map(|f| stimulus.similarity(f) * (1.0 - noise_degrade))
+                .enumerate()
+                .map(|(fi, f)| {
+                    let foil_enc_noise = {
+                        let ns = seed.wrapping_add(6100 + item as u64 * 17 + fi as u64 * 31);
+                        ((ns.wrapping_mul(0x9E3779B97F4A7C15) >> 33) as f32
+                            / (1u64 << 31) as f32)
+                            - 0.5
+                    };
+                    stimulus.similarity(f) + foil_enc_noise * enc_noise * 0.12
+                })
                 .collect();
 
             // Add noise to all choices

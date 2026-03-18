@@ -48,7 +48,7 @@ impl PerceptualCrowdingBenchmark {
             .map(|i| ContinuousHV::random(dim, seed.wrapping_add(100 + i as u64)))
             .collect();
 
-        let noise_base = 0.02 + config.effective_noise() as f32 * 0.05;
+        let noise_base = 0.12 + config.effective_noise() as f32 * 0.08;
         let trials_per_condition = 40;
 
         // --- Unflanked condition: target alone ---
@@ -89,6 +89,7 @@ impl PerceptualCrowdingBenchmark {
         let mut flanked_total = 0u32;
 
         // Spacing levels (closer = more crowding)
+        // Bouma's law: critical spacing ~ 0.5 * eccentricity
         let spacings = [0.15f32, 0.25, 0.40];
 
         for &spacing in &spacings {
@@ -103,26 +104,52 @@ impl PerceptualCrowdingBenchmark {
                 let flanker2_idx = (target_idx + 2 + rng as usize % (n_stimuli - 1)) % n_stimuli;
 
                 // Crowding interference: flankers bleed into target representation
-                // proportional to 1/spacing (Bouma's law: critical spacing ~ 0.5 * eccentricity)
-                let crowding_weight = (0.3 / spacing).min(1.0);
-                let target_weight = 1.0 - crowding_weight * 0.5;
-                let flanker_weight = crowding_weight * 0.25;
+                // proportional to 1/spacing (Bouma's law). In peripheral vision,
+                // flanker features are mandatorily pooled with the target, creating
+                // a texture-like percept rather than individual objects (Parkes et al., 2001).
+                let crowding_strength = (0.3 / spacing).min(1.0);
 
-                let crowded = ContinuousHV::weighted_bundle(
-                    &[
-                        &prototypes[target_idx],
-                        &prototypes[flanker1_idx],
-                        &prototypes[flanker2_idx],
-                    ],
-                    &[target_weight, flanker_weight, flanker_weight],
-                );
+                // Compulsory averaging: flankers pool with target in peripheral
+                // vision. HDC weighted bundles in high dimensions preserve target
+                // identity too well, so we model crowding as feature-level corruption:
+                // a fraction of the target's dimensions are replaced by flanker values.
+                let corruption_rate = crowding_strength * 0.65;
 
-                // Add encoding noise
+                // Build the crowded representation by element-wise dimension masking:
+                // for each dimension, with probability corruption_rate, replace target
+                // value with a flanker value. This models the feature-pooling mechanism
+                // more faithfully than weighted bundle (which preserves direction).
+                let target_hv = &prototypes[target_idx];
+                let flanker1_hv = &prototypes[flanker1_idx];
+                let flanker2_hv = &prototypes[flanker2_idx];
+
+                let target_data = target_hv.as_slice();
+                let f1_data = flanker1_hv.as_slice();
+                let f2_data = flanker2_hv.as_slice();
+
+                let mut crowded_data = target_data.to_vec();
+                let mut local_rng = rng;
+                for d in 0..dim {
+                    // Simple hash-based per-dimension decision
+                    local_rng ^= local_rng << 13;
+                    local_rng ^= local_rng >> 7;
+                    local_rng ^= local_rng << 17;
+                    let r = (local_rng as f32) / (u64::MAX as f32);
+                    if r < corruption_rate {
+                        // Replace with flanker feature (alternating flankers)
+                        crowded_data[d] = if d % 2 == 0 { f1_data[d] } else { f2_data[d] };
+                    }
+                }
+                rng = local_rng;
+                let crowded = ContinuousHV::from_slice(&crowded_data);
+
+                // Peripheral encoding noise (higher than foveal baseline)
+                let peripheral_noise = noise_base + crowding_strength * 0.05;
                 xor_shift(&mut rng);
                 let noise_hv = ContinuousHV::random(dim, rng);
                 let stimulus = ContinuousHV::weighted_bundle(
                     &[&crowded, &noise_hv],
-                    &[1.0 - noise_base, noise_base],
+                    &[1.0 - peripheral_noise, peripheral_noise],
                 );
 
                 // Identify

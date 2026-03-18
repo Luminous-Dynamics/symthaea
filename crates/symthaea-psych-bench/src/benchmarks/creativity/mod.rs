@@ -2,7 +2,7 @@
 //!
 //! - **RemoteAssociates** — Find a word connecting three cue words (RAT)
 //! - **AlternateUses** — Generate novel uses for common objects (AUT)
-//! - **DivergentThinking** — Semantic distance of generated uses (Guilford 1967)
+//! - **DivergentThinking** — Originality/flexibility in alternative uses (Guilford, 1967)
 
 pub mod alternate_uses;
 pub mod alternate_uses_divergent;

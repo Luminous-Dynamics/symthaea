@@ -44,13 +44,20 @@ impl FlankerInhibitionBenchmark {
             *s ^= *s << 17;
         };
 
-        // Stimulus prototypes: target and flanker identities
-        let target_left = ContinuousHV::random(dim, seed.wrapping_add(100));
-        let target_right = ContinuousHV::random(dim, seed.wrapping_add(200));
-        let go_template = ContinuousHV::random(dim, seed.wrapping_add(300));
+        // Two response categories (e.g., left-pointing vs right-pointing arrows)
+        let response_a = ContinuousHV::random(dim, seed.wrapping_add(100));
+        let response_b = ContinuousHV::random(dim, seed.wrapping_add(200));
+        let responses = [&response_a, &response_b];
 
-        let noise_frac = 0.02 + config.effective_noise() as f32 * 0.05;
+        let noise_frac = 0.06 + config.effective_noise() as f32 * 0.05;
         let trials_per_condition = 50;
+
+        // Flanker corruption rate: proportion of target dimensions replaced by
+        // flanker values. In peripheral processing, flanker features are
+        // mandatorily pooled with the target (Eriksen & Eriksen, 1974).
+        // With ~48% corruption on incongruent trials, the stimulus is nearly
+        // ambiguous, producing realistic error rates in HDC.
+        let flanker_corruption: f32 = 0.46;
 
         let mut congruent_correct = 0u32;
         let mut congruent_total = 0u32;
@@ -62,30 +69,40 @@ impl FlankerInhibitionBenchmark {
             let is_congruent = rng % 2 == 0;
 
             xor_shift(&mut rng);
-            let target_is_left = rng % 2 == 0;
-
-            let target = if target_is_left {
-                &target_left
+            let target_idx = rng as usize % 2;
+            let target = responses[target_idx];
+            let flanker_idx = if is_congruent {
+                target_idx
             } else {
-                &target_right
+                1 - target_idx
             };
-            let flanker = if is_congruent {
-                target.clone()
-            } else if target_is_left {
-                target_right.clone()
-            } else {
-                target_left.clone()
-            };
+            let flanker = responses[flanker_idx];
 
-            // Encode flanker array: center = target, sides = flankers
-            // Flankers bleed into target representation via bundling
-            let flanker_influence: f32 = 0.30; // how much flankers affect processing
-            let stimulus = ContinuousHV::weighted_bundle(
-                &[target, &flanker],
-                &[1.0 - flanker_influence, flanker_influence],
-            );
+            // Build percept via dimension-level corruption:
+            // Each dimension of the target can be replaced by the flanker's
+            // value with probability flanker_corruption. On congruent trials,
+            // target=flanker so corruption has no effect. On incongruent,
+            // this creates a near-ambiguous stimulus.
+            let target_data = target.as_slice();
+            let flanker_data = flanker.as_slice();
+            let mut stim_data = target_data.to_vec();
 
-            // Add noise
+            if !is_congruent {
+                let mut local_rng = rng;
+                for d in 0..dim {
+                    local_rng ^= local_rng << 13;
+                    local_rng ^= local_rng >> 7;
+                    local_rng ^= local_rng << 17;
+                    let r = (local_rng as f32) / (u64::MAX as f32);
+                    if r < flanker_corruption {
+                        stim_data[d] = flanker_data[d];
+                    }
+                }
+                rng = local_rng;
+            }
+            let stimulus = ContinuousHV::from_slice(&stim_data);
+
+            // Add encoding noise
             xor_shift(&mut rng);
             let noise_hv = ContinuousHV::random(dim, rng);
             let noisy_stim = ContinuousHV::weighted_bundle(
@@ -93,31 +110,20 @@ impl FlankerInhibitionBenchmark {
                 &[1.0 - noise_frac, noise_frac],
             );
 
-            // Decision: compare to go template
-            let go_sim = noisy_stim.similarity(&go_template) as f64;
-            let target_sim = noisy_stim.similarity(target) as f64;
-
-            // On congruent trials: respond (go). Correct = responding.
-            // On incongruent trials: withhold (nogo). Correct = not responding.
-            // Response probability based on target-go similarity
-            let respond_threshold = 0.05 + config.time_pressure * 0.1;
-            let responded = target_sim > respond_threshold;
+            // Identify target: which response category does the percept match?
+            let sim_a = noisy_stim.similarity(&response_a);
+            let sim_b = noisy_stim.similarity(&response_b);
+            let chosen_idx = if sim_a > sim_b { 0 } else { 1 };
+            let correct = chosen_idx == target_idx;
 
             if is_congruent {
                 congruent_total += 1;
-                if responded {
+                if correct {
                     congruent_correct += 1;
                 }
             } else {
                 incongruent_total += 1;
-                // For incongruent-nogo: correct = not responding
-                // But flanker interference makes it hard to suppress response
-                let flanker_sim = noisy_stim.similarity(&flanker) as f64;
-                let inhibition_success = flanker_sim < go_sim + 0.15;
-                if inhibition_success && !responded {
-                    // Double gate: need both low flanker interference AND successful withhold
-                    incongruent_correct += 1;
-                } else if !responded {
+                if correct {
                     incongruent_correct += 1;
                 }
             }

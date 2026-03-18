@@ -573,14 +573,14 @@ mod tests {
         };
         data.sanitize_finite();
 
-        assert_eq!(data.prediction_error, 0.0);
-        assert_eq!(data.consciousness_level, 0.0);
-        assert_eq!(data.moral_free_energy, 0.0);
-        assert_eq!(data.valence, 0.0);
-        assert_eq!(data.mesh_compression_ratio, 0.0);
-        assert_eq!(data.harmony_coordinates[1], 0.0); // was NaN
-        assert_eq!(data.harmony_coordinates[3], 0.0); // was Infinity
-        assert_eq!(data.harmony_coordinates[0], 1.0); // preserved
+        assert!((data.prediction_error as f64).abs() < f64::EPSILON);
+        assert!(data.consciousness_level.abs() < f64::EPSILON);
+        assert!(data.moral_free_energy.abs() < f64::EPSILON);
+        assert!((data.valence as f64).abs() < f64::EPSILON);
+        assert!(data.mesh_compression_ratio.abs() < f64::EPSILON);
+        assert!(data.harmony_coordinates[1].abs() < f64::EPSILON); // was NaN
+        assert!(data.harmony_coordinates[3].abs() < f64::EPSILON); // was Infinity
+        assert!((data.harmony_coordinates[0] - 1.0).abs() < f64::EPSILON); // preserved
 
         // Verify JSON serialization succeeds after sanitize
         serde_json::to_string(&data).expect("sanitized data must serialize");

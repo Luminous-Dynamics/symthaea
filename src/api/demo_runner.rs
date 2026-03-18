@@ -247,7 +247,7 @@ impl DemoRunner {
             structural_macro_phi: m.structural.structural_macro_phi,
             structural_emergence_ratio: m.structural.structural_emergence_ratio,
             // Substrate
-            substrate_feasibility: m.substrate_feasibility,
+            substrate_feasibility: m.substrate_effective_feasibility,
         };
 
         // Populate vision telemetry from CycleMetadata (internal VisionBridge path)

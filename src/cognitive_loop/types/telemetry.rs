@@ -353,6 +353,195 @@ pub struct TemporalPhenomenalMetrics {
 /// `liquid_mamba_effective_rank`, `liquid_mamba_semantic_pe`,
 /// `phi_validation_cached`, `social_strategy_bias_applied`,
 /// `subsystem_integration_contributors`
+// ═══════════════════════════════════════════════════════════════════════════════
+// FEEDBACK MODULATION FLAGS — Sessions 9–16 observability booleans
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Boolean flags tracking whether specific feedback modulation pathways fired
+/// during this cycle. Write-only for telemetry/dashboards — not read by
+/// internal cognitive loop logic.
+///
+/// Flattened into `CycleMetadata` via `#[serde(flatten)]` so the JSON schema
+/// remains backward-compatible.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct FeedbackModulationFlags {
+    /// Whether feedback integration was frozen this cycle (dampening streak >= 3).
+    /// Science: Turrigiano (2008) — homeostatic synaptic silencing.
+    #[serde(default)]
+    pub feedback_frozen: bool,
+    /// Whether compound instability was detected (agreement drop + rising errors).
+    /// Science: Friston (2010) — cascading precision failures.
+    #[serde(default)]
+    pub compound_instability: bool,
+    /// Whether flow-state feedback relaxation is active (wider dampening threshold).
+    /// Science: Csikszentmihalyi (1990) — reduced self-monitoring during flow.
+    #[serde(default)]
+    pub flow_feedback_relaxed: bool,
+    /// Whether a confidence crash was detected this cycle (>30% drop).
+    /// Science: Cools et al. (2008) — serotonergic dip from confidence collapse.
+    #[serde(default)]
+    pub confidence_crash_detected: bool,
+    /// Whether low proposal diversity triggered exploration boost.
+    #[serde(default)]
+    pub low_diversity_boost: bool,
+    /// Whether agreement-confidence velocity coupling fired this cycle.
+    #[serde(default)]
+    pub agreement_confidence_coupling: bool,
+    /// Whether LR was frozen this cycle by crash freeze (Set proposal pinning).
+    #[serde(default)]
+    pub lr_frozen: bool,
+    /// Whether high conflict triggered epistemic exploration boost.
+    #[serde(default)]
+    pub conflict_exploration_boost: bool,
+    /// Whether epistemic conflict drove exploration boost (>2 conflicts).
+    #[serde(default)]
+    pub epistemic_conflict_exploration: bool,
+    /// Whether phenomenal fragmentation triggered confidence dampening.
+    #[serde(default)]
+    pub phenomenal_fragmentation_recovery: bool,
+    /// Whether temporal discontinuity triggered LR dampening.
+    #[serde(default)]
+    pub temporal_discontinuity_recovery: bool,
+    /// Whether cross-modal binding modulated attention sensitivity.
+    #[serde(default)]
+    pub binding_attention_modulated: bool,
+    /// Whether resonator similarity modulated semantic LR.
+    #[serde(default)]
+    pub resonator_semantic_lr_mod: bool,
+    /// Whether FEP TD error convergence dampened exploration.
+    #[serde(default)]
+    pub fep_td_converged: bool,
+    /// Whether rising confidence dampened exploration.
+    #[serde(default)]
+    pub confidence_rising_dampen: bool,
+    /// Whether flow state boosted subsystem LR.
+    #[serde(default)]
+    pub flow_lr_boost: bool,
+    /// Whether FEP efficiency boosted confidence via proposal system.
+    #[serde(default)]
+    pub fep_efficiency_boost: bool,
+    /// Whether attention overload raised threshold.
+    #[serde(default)]
+    pub attention_overload_threshold: bool,
+    /// Whether sustained high quality maintained exploration floor.
+    #[serde(default)]
+    pub quality_exploration_floor: bool,
+    /// Whether MCE bottleneck LR boost was applied this cycle.
+    #[serde(default)]
+    pub mce_bottleneck_lr_applied: bool,
+    /// Whether homeostasis recalibration adjusted LR (overcorrect or sluggish).
+    #[serde(default)]
+    pub homeostasis_recalibrated: bool,
+    /// Whether falling confidence boosted LR.
+    #[serde(default)]
+    pub confidence_falling_lr_boost: bool,
+    /// Whether coherence velocity scaled attention budget.
+    #[serde(default)]
+    pub coherence_velocity_budget_scaled: bool,
+    /// Whether temporal chain depth modulated LR (deep=dampen, shallow=boost).
+    #[serde(default)]
+    pub temporal_chain_depth_lr_mod: bool,
+    /// Whether EqV2 bottleneck response fired a targeted boost.
+    #[serde(default)]
+    pub eq_v2_bottleneck_response: bool,
+    /// Whether affective consciousness modulated LR or exploration.
+    #[serde(default)]
+    pub affect_consciousness_modulated: bool,
+    /// Whether narrative self-phi modulated confidence or exploration.
+    #[serde(default)]
+    pub narrative_self_phi_modulated: bool,
+    /// Whether epistemic Phi (phi_eff) modulated LR or exploration.
+    #[serde(default)]
+    pub epistemic_phi_modulated: bool,
+    /// Whether phenomenal binding strength modulated confidence or threshold.
+    #[serde(default)]
+    pub phenomenal_binding_modulated: bool,
+    /// Whether temporal coherence modulated LR or confidence.
+    #[serde(default)]
+    pub temporal_coherence_modulated: bool,
+    /// Whether holographic unity modulated exploration or LR.
+    #[serde(default)]
+    pub holographic_unity_modulated: bool,
+    /// Whether harmonies alignment modulated confidence or exploration.
+    #[serde(default)]
+    pub harmonies_alignment_modulated: bool,
+    /// Whether consciousness gradient magnitude modulated LR.
+    #[serde(default)]
+    pub consciousness_gradient_lr_modulated: bool,
+    /// Whether value cache confidence modulated exploration or LR.
+    #[serde(default)]
+    pub value_cache_confidence_modulated: bool,
+    /// Whether consciousness state level (high/low extremes) triggered modulation.
+    #[serde(default)]
+    pub consciousness_state_modulated: bool,
+    /// Whether living mind vitality modulated confidence or LR.
+    #[serde(default)]
+    pub living_mind_vitality_modulated: bool,
+    /// Whether living mind coherence modulated confidence or LR.
+    #[serde(default)]
+    pub living_mind_coherence_modulated: bool,
+    /// Whether MCTS plan effectiveness triggered modulation (high or low extremes).
+    #[serde(default)]
+    pub mcts_effectiveness_modulated: bool,
+    /// Whether living mind vitality modulated confidence.
+    #[serde(default)]
+    pub living_mind_vitality_feedback: bool,
+    /// Whether low meta-cognitive accuracy dampened subsystem LR.
+    #[serde(default)]
+    pub metacog_low_accuracy_dampen: bool,
+    /// Whether predictive self-safety boosted LR.
+    #[serde(default)]
+    pub self_safety_lr_boost: bool,
+    /// Whether embodied agency stable range boosted confidence.
+    #[serde(default)]
+    pub embodied_agency_stable: bool,
+    /// Whether pipeline consciousness modulated epistemic threshold.
+    #[serde(default)]
+    pub pipeline_consciousness_gated: bool,
+    /// Whether early low-coherence warning fired (5-10 cycles).
+    #[serde(default)]
+    pub low_coherence_early_warning: bool,
+    /// Whether sustained mode stability dampened exploration.
+    #[serde(default)]
+    pub mode_stable_exploration_dampen: bool,
+    /// Whether confidence crash relaxed binding threshold.
+    #[serde(default)]
+    pub crash_binding_relaxed: bool,
+    /// Whether attention fatigue widened Broca cadence spacing.
+    #[serde(default)]
+    pub attention_fatigue_broca_gated: bool,
+    /// Whether sustained low resonator error gave extra confidence boost.
+    #[serde(default)]
+    pub resonator_sustained_low_boost: bool,
+    /// Whether anomaly recovery was accelerated by improving Phi.
+    #[serde(default)]
+    pub anomaly_recovery_phi_accelerated: bool,
+    /// Whether temporal binding strength modulated exploration/LR.
+    #[serde(default)]
+    pub temporal_binding_feedback: bool,
+    /// Whether consciousness gradient magnitude triggered caution or recovery.
+    #[serde(default)]
+    pub consciousness_gradient_active: bool,
+    /// Whether startup exploration ramp was active (warmup phase).
+    #[serde(default)]
+    pub startup_exploration_ramped: bool,
+    /// Whether epistemic rejection streak triggered recalibration.
+    #[serde(default)]
+    pub epistemic_rejection_streak_recal: bool,
+    /// Whether consecutive full-dampen triggered protective threshold freeze.
+    #[serde(default)]
+    pub full_dampen_threshold_freeze: bool,
+    /// Whether consciousness EMA biased learning rate initialization.
+    #[serde(default)]
+    pub consciousness_ema_lr_bias: bool,
+    /// Whether multi-objective frontier size modulated exploration.
+    #[serde(default)]
+    pub multi_obj_frontier_gated: bool,
+    /// Whether error oscillation bifurcation response fired.
+    #[serde(default)]
+    pub error_bifurcation_response: bool,
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct CycleMetadata {
     /// Whether the surprise exploration bridge triggered exploration this cycle
@@ -604,11 +793,6 @@ pub struct CycleMetadata {
     pub support_efe: f64,
 
     // ── Substrate & Convergence Telemetry ──────────────────────────────
-    /// Effective substrate feasibility [0,1] used in consciousness equation.
-    /// Legacy field — identical to `substrate_effective_feasibility`.
-    /// Use `substrate_feasibility_raw` for the pre-overlay value.
-    pub substrate_feasibility: f64,
-
     /// Substrate telemetry snapshot (from SubstrateManager::telemetry()).
     /// Groups all substrate-related fields for batch assignment.
     #[serde(default)]
@@ -1010,21 +1194,9 @@ pub struct CycleMetadata {
     /// Science: Yu & Dayan (2005) — expected vs unexpected uncertainty.
     #[serde(default)]
     pub pe_variance: f32,
-    /// Whether feedback integration was frozen this cycle (dampening streak ≥3).
-    /// Science: Turrigiano (2008) — homeostatic synaptic silencing.
-    #[serde(default)]
-    pub feedback_frozen: bool,
     /// Dominant source proposal concentration (fraction of total, 0.0–1.0).
     #[serde(default)]
     pub dominant_source_concentration: f32,
-    /// Whether compound instability was detected (agreement drop + rising errors).
-    /// Science: Friston (2010) — cascading precision failures.
-    #[serde(default)]
-    pub compound_instability: bool,
-    /// Whether flow-state feedback relaxation is active (wider dampening threshold).
-    /// Science: Csikszentmihalyi (1990) — reduced self-monitoring during flow.
-    #[serde(default)]
-    pub flow_feedback_relaxed: bool,
     /// Homeostasis pull efficiency: ratio of post/pre distance to target.
     /// <1.0 = pulls working, >1.0 = overcorrecting.
     /// Science: Cannon (1929) — homeostatic regulation monitoring.
@@ -1032,10 +1204,6 @@ pub struct CycleMetadata {
     pub homeostasis_efficiency: f32,
 
     // ── Session 10: Adaptive Feedback Intelligence ────────────────────────
-    /// Whether a confidence crash was detected this cycle (>30% drop).
-    /// Science: Cools et al. (2008) — serotonergic dip from confidence collapse.
-    #[serde(default)]
-    pub confidence_crash_detected: bool,
     /// Remaining LR freeze cycles from crash recovery (0 = not frozen).
     #[serde(default)]
     pub crash_freeze_remaining: u32,
@@ -1043,65 +1211,16 @@ pub struct CycleMetadata {
     /// Science: Dehaene (2014) — healthy cognition requires multi-source consensus.
     #[serde(default)]
     pub proposal_source_count: u32,
-    /// Whether low proposal diversity triggered exploration boost.
-    #[serde(default)]
-    pub low_diversity_boost: bool,
     /// Current hysteresis relaxation factor (1.0 = full, decays with stability).
     /// Science: Kelso (1995) — mode stability permits relaxed boundaries.
     #[serde(default = "default_one_f32")]
     pub hysteresis_factor: f32,
-    /// Whether agreement-confidence velocity coupling fired this cycle.
-    #[serde(default)]
-    pub agreement_confidence_coupling: bool,
 
     // ── Session 11: Fixes + Adaptive Intelligence ────────────────────────
-    /// Whether LR was frozen this cycle by crash freeze (Set proposal pinning).
-    #[serde(default)]
-    pub lr_frozen: bool,
     /// Proposal conflict ratio (0.0 = unanimous, 0.5 = maximally conflicted).
     /// Science: Dayan & Daw (2008) — model disagreement signals meta-uncertainty.
     #[serde(default)]
     pub proposal_conflict_ratio: f32,
-    /// Whether high conflict triggered epistemic exploration boost.
-    #[serde(default)]
-    pub conflict_exploration_boost: bool,
-
-    // ── Session 12: Wiring + Binding Intelligence ───────────────────────
-    /// Whether epistemic conflict drove exploration boost (>2 conflicts).
-    #[serde(default)]
-    pub epistemic_conflict_exploration: bool,
-    /// Whether phenomenal fragmentation triggered confidence dampening.
-    #[serde(default)]
-    pub phenomenal_fragmentation_recovery: bool,
-    /// Whether temporal discontinuity triggered LR dampening.
-    #[serde(default)]
-    pub temporal_discontinuity_recovery: bool,
-    /// Whether cross-modal binding modulated attention sensitivity.
-    #[serde(default)]
-    pub binding_attention_modulated: bool,
-    /// Whether resonator similarity modulated semantic LR.
-    #[serde(default)]
-    pub resonator_semantic_lr_mod: bool,
-
-    // ── Session 13: Convergence + Flow Intelligence ─────────────────────
-    /// Whether FEP TD error convergence dampened exploration.
-    #[serde(default)]
-    pub fep_td_converged: bool,
-    /// Whether rising confidence dampened exploration.
-    #[serde(default)]
-    pub confidence_rising_dampen: bool,
-    /// Whether flow state boosted subsystem LR.
-    #[serde(default)]
-    pub flow_lr_boost: bool,
-    /// Whether FEP efficiency boosted confidence via proposal system.
-    #[serde(default)]
-    pub fep_efficiency_boost: bool,
-    /// Whether attention overload raised threshold.
-    #[serde(default)]
-    pub attention_overload_threshold: bool,
-    /// Whether sustained high quality maintained exploration floor.
-    #[serde(default)]
-    pub quality_exploration_floor: bool,
 
     // ── Session 15: Feedback Loop Observability ─────────────────────────
     /// Moral salience easing applied to consolidation threshold (0.0 when inactive).
@@ -1110,126 +1229,12 @@ pub struct CycleMetadata {
     /// Effective consolidation threshold (consciousness EMA - margin - moral ease).
     #[serde(default)]
     pub consolidation_threshold: f32,
-    /// Whether MCE bottleneck LR boost was applied this cycle.
-    #[serde(default)]
-    pub mce_bottleneck_lr_applied: bool,
-    /// Whether homeostasis recalibration adjusted LR (overcorrect or sluggish).
-    #[serde(default)]
-    pub homeostasis_recalibrated: bool,
-    /// Whether falling confidence boosted LR.
-    #[serde(default)]
-    pub confidence_falling_lr_boost: bool,
-    /// Whether coherence velocity scaled attention budget.
-    #[serde(default)]
-    pub coherence_velocity_budget_scaled: bool,
-    /// Whether temporal chain depth modulated LR (deep=dampen, shallow=boost).
-    #[serde(default)]
-    pub temporal_chain_depth_lr_mod: bool,
-    /// Whether EqV2 bottleneck response fired a targeted boost.
-    #[serde(default)]
-    pub eq_v2_bottleneck_response: bool,
-    /// Whether affective consciousness modulated LR or exploration.
-    #[serde(default)]
-    pub affect_consciousness_modulated: bool,
-    /// Whether narrative self-phi modulated confidence or exploration.
-    #[serde(default)]
-    pub narrative_self_phi_modulated: bool,
-    /// Whether epistemic Phi (phi_eff) modulated LR or exploration.
-    #[serde(default)]
-    pub epistemic_phi_modulated: bool,
-    /// Whether phenomenal binding strength modulated confidence or threshold.
-    #[serde(default)]
-    pub phenomenal_binding_modulated: bool,
-    /// Whether temporal coherence modulated LR or confidence.
-    #[serde(default)]
-    pub temporal_coherence_modulated: bool,
-    /// Whether holographic unity modulated exploration or LR.
-    #[serde(default)]
-    pub holographic_unity_modulated: bool,
-    /// Whether harmonies alignment modulated confidence or exploration.
-    #[serde(default)]
-    pub harmonies_alignment_modulated: bool,
-    /// Whether consciousness gradient magnitude modulated LR.
-    #[serde(default)]
-    pub consciousness_gradient_lr_modulated: bool,
-    /// Whether value cache confidence modulated exploration or LR.
-    #[serde(default)]
-    pub value_cache_confidence_modulated: bool,
-    /// Whether consciousness state level (high/low extremes) triggered modulation.
-    #[serde(default)]
-    pub consciousness_state_modulated: bool,
-    /// Whether living mind vitality modulated confidence or LR.
-    #[serde(default)]
-    pub living_mind_vitality_modulated: bool,
-    /// Whether living mind coherence modulated confidence or LR.
-    #[serde(default)]
-    pub living_mind_coherence_modulated: bool,
-    /// Whether MCTS plan effectiveness triggered modulation (high or low extremes).
-    #[serde(default)]
-    pub mcts_effectiveness_modulated: bool,
 
-    // ── Session 14: Late Consciousness Feedback ──────────────────────────
-    /// Whether living mind vitality modulated confidence.
-    #[serde(default)]
-    pub living_mind_vitality_feedback: bool,
-    /// Whether low meta-cognitive accuracy dampened subsystem LR.
-    #[serde(default)]
-    pub metacog_low_accuracy_dampen: bool,
-    /// Whether predictive self-safety boosted LR.
-    #[serde(default)]
-    pub self_safety_lr_boost: bool,
-    /// Whether embodied agency stable range boosted confidence.
-    #[serde(default)]
-    pub embodied_agency_stable: bool,
-
-    // ── Session 15: Bidirectional Feedback & Dead State Revival ──────────
-    /// Whether pipeline consciousness modulated epistemic threshold.
-    #[serde(default)]
-    pub pipeline_consciousness_gated: bool,
-    /// Whether early low-coherence warning fired (5-10 cycles).
-    #[serde(default)]
-    pub low_coherence_early_warning: bool,
-    /// Whether sustained mode stability dampened exploration.
-    #[serde(default)]
-    pub mode_stable_exploration_dampen: bool,
-    /// Whether confidence crash relaxed binding threshold.
-    #[serde(default)]
-    pub crash_binding_relaxed: bool,
-    /// Whether attention fatigue widened Broca cadence spacing.
-    #[serde(default)]
-    pub attention_fatigue_broca_gated: bool,
-    /// Whether sustained low resonator error gave extra confidence boost.
-    #[serde(default)]
-    pub resonator_sustained_low_boost: bool,
-    /// Whether anomaly recovery was accelerated by improving Phi.
-    #[serde(default)]
-    pub anomaly_recovery_phi_accelerated: bool,
-
-    // ── Session 16: Bidirectional Feedback Deepening ─────────────────────
-    /// Whether temporal binding strength modulated exploration/LR.
-    #[serde(default)]
-    pub temporal_binding_feedback: bool,
-    /// Whether consciousness gradient magnitude triggered caution or recovery.
-    #[serde(default)]
-    pub consciousness_gradient_active: bool,
-    /// Whether startup exploration ramp was active (warmup phase).
-    #[serde(default)]
-    pub startup_exploration_ramped: bool,
-    /// Whether epistemic rejection streak triggered recalibration.
-    #[serde(default)]
-    pub epistemic_rejection_streak_recal: bool,
-    /// Whether consecutive full-dampen triggered protective threshold freeze.
-    #[serde(default)]
-    pub full_dampen_threshold_freeze: bool,
-    /// Whether consciousness EMA biased learning rate initialization.
-    #[serde(default)]
-    pub consciousness_ema_lr_bias: bool,
-    /// Whether multi-objective frontier size modulated exploration.
-    #[serde(default)]
-    pub multi_obj_frontier_gated: bool,
-    /// Whether error oscillation bifurcation response fired.
-    #[serde(default)]
-    pub error_bifurcation_response: bool,
+    /// Feedback modulation observability flags (Sessions 9–16).
+    /// Each boolean tracks whether a specific modulation pathway fired this cycle.
+    /// Write-only for telemetry/dashboards — not read by internal logic.
+    #[serde(flatten, default)]
+    pub modulation: FeedbackModulationFlags,
 
     // ── Therapeutic Telemetry ─────────────────────────────────────────────
     /// Therapeutic subsystem telemetry (client state, alliance, crisis, regulation).

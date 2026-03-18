@@ -1,5 +1,5 @@
 {
-  description = "Symthaea Spore Android — mobile consciousness kernel build environment";
+  description = "Symthaea Soma Android — mobile consciousness engine build environment";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -73,8 +73,8 @@
           shellHook = ''
             echo ""
             echo "╔═══════════════════════════════════════════════════════════════╗"
-            echo "║     SYMTHAEA SPORE ANDROID                                   ║"
-            echo "║     Mobile consciousness kernel build environment             ║"
+            echo "║     SYMTHAEA SOMA ANDROID                                     ║"
+            echo "║     Mobile consciousness engine build environment             ║"
             echo "╚═══════════════════════════════════════════════════════════════╝"
             echo ""
             echo "  Rust:    $(rustc --version)"
@@ -84,10 +84,10 @@
             echo "  SDK:     ${androidSdk}/libexec/android-sdk"
             echo ""
             echo "  Step 1 — Build Rust .so:"
-            echo "    cargo build --target aarch64-linux-android --release -p symthaea-spore --features native-ffi"
+            echo "    cargo build --target aarch64-linux-android --release -p symthaea-soma --features native-ffi"
             echo ""
             echo "  Step 2 — Copy .so to jniLibs:"
-            echo "    cp ../../target/aarch64-linux-android/release/libsymthaea_spore.so src/main/jniLibs/arm64-v8a/"
+            echo "    cp ../../target/aarch64-linux-android/release/libsymthaea_soma.so src/main/jniLibs/arm64-v8a/"
             echo ""
             echo "  Step 3 — Build Android AAR:"
             echo "    gradle assembleRelease"

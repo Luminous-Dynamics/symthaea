@@ -407,6 +407,7 @@ pub mod hierarchical_bundle; // Per-region bundling with role-based binding for 
 pub mod substrate_composition; // Weighted substrate mixtures for hybrid analysis
 pub mod substrate_independence; // Substrate type definitions // Real-time consciousness monitoring
 pub mod substrate_validation; // Validation framework with evidence levels and feasibility gaps
+pub mod trajectory_accumulator; // Behavioral identity via temporal HDC binding
 
 // Track 6: Language module dependencies
 pub mod full_stack_consciousness; // Full stack: Understanding + ActiveInference + Memory + Counterfactuals

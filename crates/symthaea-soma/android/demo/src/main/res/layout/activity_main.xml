@@ -17,7 +17,7 @@
         android:id="@+id/titleText"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="SYMTHAEA SPORE"
+        android:text="SYMTHAEA SOMA"
         android:textColor="#E0E0E0"
         android:textSize="20sp"
         android:textStyle="bold"

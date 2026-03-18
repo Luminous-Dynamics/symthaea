@@ -1414,20 +1414,6 @@ pub fn butlin_baselines() -> BTreeMap<&'static str, Baseline> {
         },
     );
 
-    // Mean quality across 14 indicators (continuous 0-1 scores).
-    // Human baseline: neurotypical adults show strong but imperfect consciousness
-    // indicators — estimated 0.70 mean quality with SD 0.10 based on variation
-    // in GWT workspace access, HOT metacognitive depth, and PP prediction accuracy.
-    m.insert(
-        "mean_quality_score",
-        Baseline {
-            value: 0.70,
-            sd: Some(0.10),
-            source: "Butlin et al. (2023), estimated from indicator-level variance across consciousness theories",
-            population: "human adults (neurotypical)",
-        },
-    );
-
     m.insert(
         "presence_ratio",
         Baseline {
@@ -1489,29 +1475,29 @@ pub fn creativity_baselines() -> BTreeMap<&'static str, Baseline> {
 
     // Divergent Thinking (Guilford, 1967; Silvia et al., 2008)
     m.insert(
-        "dt_originality_score",
+        "originality_score",
         Baseline {
             value: 0.45,
             sd: Some(0.15),
-            source: "Silvia et al. (2008), mean semantic distance of AUT uses",
+            source: "Silvia et al. (2008), mean semantic distance of alternative uses",
             population: "human adults",
         },
     );
     m.insert(
-        "dt_flexibility_score",
+        "flexibility_score",
         Baseline {
             value: 0.60,
             sd: Some(0.12),
-            source: "Guilford (1967), proportion of distinct semantic categories",
+            source: "Guilford (1967), proportion of distinct category uses",
             population: "human adults",
         },
     );
     m.insert(
-        "dt_elaboration_score",
+        "elaboration_score",
         Baseline {
             value: 0.35,
             sd: Some(0.12),
-            source: "Guilford (1967), inter-use distinctiveness",
+            source: "Guilford (1967), inter-response distinctiveness",
             population: "human adults",
         },
     );
@@ -1595,6 +1581,35 @@ pub fn inhibition_baselines() -> BTreeMap<&'static str, Baseline> {
             value: 0.10,
             sd: Some(0.05),
             source: "Logan (1994); Verbruggen & Logan (2008), HDC-scale SSRT from staircase SSD tracking",
+            population: "human adults",
+        },
+    );
+
+    // Flanker Inhibition (Eriksen & Eriksen, 1974; Ridderinkhof et al., 2004)
+    m.insert(
+        "flanker_congruent_accuracy",
+        Baseline {
+            value: 0.96,
+            sd: Some(0.03),
+            source: "Eriksen & Eriksen (1974), congruent go trial accuracy",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "flanker_incongruent_accuracy",
+        Baseline {
+            value: 0.85,
+            sd: Some(0.08),
+            source: "Ridderinkhof et al. (2004), incongruent no-go withholding accuracy",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "interference_suppression",
+        Baseline {
+            value: 0.11,
+            sd: Some(0.06),
+            source: "Eriksen & Eriksen (1974), congruent minus incongruent accuracy",
             population: "human adults",
         },
     );
@@ -3642,6 +3657,34 @@ pub fn consciousness_baselines() -> BaselineMap {
             population: "human adults",
         },
     );
+    // Perceptual Crowding (Whitney & Levi, 2011; Pelli et al., 2004)
+    m.insert(
+        "crowding_unflanked_accuracy",
+        Baseline {
+            value: 0.95,
+            sd: Some(0.04),
+            source: "Pelli et al. (2004), isolated letter identification accuracy",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "crowding_flanked_accuracy",
+        Baseline {
+            value: 0.62,
+            sd: Some(0.12),
+            source: "Pelli et al. (2004), flanked letter identification at critical spacing",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "crowding_magnitude",
+        Baseline {
+            value: 0.33,
+            sd: Some(0.10),
+            source: "Whitney & Levi (2011), unflanked minus flanked accuracy",
+            population: "human adults",
+        },
+    );
     m
 }
 
@@ -3712,6 +3755,34 @@ pub fn binding_baselines() -> BaselineMap {
             population: "human adults",
         },
     );
+    // Feature Conjunction Search (Treisman & Gelade, 1980)
+    m.insert(
+        "conjunction_accuracy",
+        Baseline {
+            value: 0.82,
+            sd: Some(0.10),
+            source: "Treisman & Gelade (1980), conjunction target detection accuracy",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "feature_accuracy",
+        Baseline {
+            value: 0.95,
+            sd: Some(0.04),
+            source: "Treisman & Gelade (1980), single-feature pop-out detection",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "conjunction_cost",
+        Baseline {
+            value: 0.13,
+            sd: Some(0.06),
+            source: "Treisman & Gelade (1980), feature minus conjunction accuracy",
+            population: "human adults",
+        },
+    );
     m
 }
 
@@ -3754,43 +3825,6 @@ pub fn speech_baselines() -> BaselineMap {
             population: "human adults",
         },
     );
-    // Categorical Perception (Liberman et al., 1957; Pisoni, 1973)
-    m.insert(
-        "cp_boundary_slope",
-        Baseline {
-            value: 0.80,
-            sd: Some(0.12),
-            source: "Pisoni (1973), logistic identification slope at category boundary",
-            population: "human adults",
-        },
-    );
-    m.insert(
-        "cp_boundary_discrimination",
-        Baseline {
-            value: 0.88,
-            sd: Some(0.08),
-            source: "Liberman et al. (1957), ABX boundary discrimination accuracy",
-            population: "human adults",
-        },
-    );
-    m.insert(
-        "cp_within_discrimination",
-        Baseline {
-            value: 0.55,
-            sd: Some(0.10),
-            source: "Liberman et al. (1957), ABX within-category discrimination accuracy",
-            population: "human adults",
-        },
-    );
-    m.insert(
-        "cp_categorical_index",
-        Baseline {
-            value: 0.33,
-            sd: Some(0.10),
-            source: "Liberman et al. (1957), boundary minus within discrimination",
-            population: "human adults",
-        },
-    );
     // VOT Continuum (Lisker & Abramson, 1964)
     m.insert(
         "vot_identification_accuracy",
@@ -3816,6 +3850,43 @@ pub fn speech_baselines() -> BaselineMap {
             value: 0.35,
             sd: Some(0.10),
             source: "Lisker & Abramson (1964), logistic slope at 50% crossover",
+            population: "human adults",
+        },
+    );
+    // Categorical Perception (Liberman et al., 1957; Pisoni, 1973)
+    m.insert(
+        "cp_boundary_slope",
+        Baseline {
+            value: 0.80,
+            sd: Some(0.12),
+            source: "Liberman et al. (1957), identification function steepness at boundary",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "cp_boundary_discrimination",
+        Baseline {
+            value: 0.88,
+            sd: Some(0.08),
+            source: "Pisoni (1973), ABX discrimination accuracy at category boundary",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "cp_within_category_discrimination",
+        Baseline {
+            value: 0.55,
+            sd: Some(0.10),
+            source: "Pisoni (1973), ABX discrimination within phoneme category",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "cp_categorical_index",
+        Baseline {
+            value: 0.33,
+            sd: Some(0.10),
+            source: "Liberman et al. (1957), boundary minus within-category discrimination",
             population: "human adults",
         },
     );
@@ -3892,22 +3963,31 @@ pub fn substrate_baselines() -> BaselineMap {
             population: "theoretical model",
         },
     );
-    // Substrate Latency (Putnam 1967; Koch et al. 2016)
-    m.insert(
-        "substrate_speed_accuracy_correlation",
-        Baseline {
-            value: 0.75,
-            sd: Some(0.15),
-            source: "Theoretical: Pearson r between substrate processing speed and retrieval accuracy",
-            population: "theoretical model",
-        },
-    );
+    // Substrate Latency (Koch et al., 2016)
     m.insert(
         "substrate_fast_accuracy",
         Baseline {
             value: 0.92,
             sd: Some(0.06),
-            source: "Theoretical: accuracy on fast substrates (minimal processing noise)",
+            source: "Theoretical: retrieval accuracy on fast substrates (photonic/silicon)",
+            population: "theoretical model",
+        },
+    );
+    m.insert(
+        "substrate_slow_accuracy",
+        Baseline {
+            value: 0.65,
+            sd: Some(0.12),
+            source: "Theoretical: retrieval accuracy on slow substrates (biochemical)",
+            population: "theoretical model",
+        },
+    );
+    m.insert(
+        "substrate_speed_accuracy_correlation",
+        Baseline {
+            value: 0.75,
+            sd: Some(0.15),
+            source: "Theoretical: Pearson r between substrate speed and retrieval accuracy",
             population: "theoretical model",
         },
     );
@@ -3916,7 +3996,7 @@ pub fn substrate_baselines() -> BaselineMap {
         Baseline {
             value: 0.10,
             sd: Some(0.06),
-            source: "Theoretical: accuracy drop per substrate speed tier",
+            source: "Theoretical: accuracy drop per speed tier",
             population: "theoretical model",
         },
     );
@@ -4057,15 +4137,6 @@ pub fn mathematics_baselines() -> BaselineMap {
             value: 0.70,
             sd: Some(0.15),
             source: "Johnson-Laird (1983), mental models of deduction",
-            population: "human adults",
-        },
-    );
-    m.insert(
-        "logical_overall_accuracy",
-        Baseline {
-            value: 0.78,
-            sd: Some(0.10),
-            source: "Johnson-Laird (1983), weighted avg of valid (0.85) + invalid (0.70)",
             population: "human adults",
         },
     );

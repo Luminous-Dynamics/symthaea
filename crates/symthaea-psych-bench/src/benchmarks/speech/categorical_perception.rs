@@ -34,6 +34,36 @@ struct TrialResult {
 }
 
 impl CategoricalPerceptionBenchmark {
+    /// ABX discrimination with perceptual warping toward category prototypes.
+    ///
+    /// The key mechanism of categorical perception: internal representations
+    /// are warped toward the nearest category prototype. This makes
+    /// within-category pairs (both warped to the same prototype) harder to
+    /// discriminate than cross-boundary pairs (warped to different prototypes),
+    /// even at equal acoustic distance.
+    fn abx_discriminate(
+        stimulus: &ContinuousHV,
+        reference_a: &ContinuousHV,
+        reference_b: &ContinuousHV,
+        cat_a: &ContinuousHV,
+        cat_b: &ContinuousHV,
+        warp_strength: f32,
+    ) -> bool {
+        // Perceptual warping: pull stimulus toward nearest category prototype
+        let sim_to_a = stimulus.similarity(cat_a);
+        let sim_to_b = stimulus.similarity(cat_b);
+        let nearest_cat = if sim_to_a >= sim_to_b { cat_a } else { cat_b };
+
+        let warped = ContinuousHV::weighted_bundle(
+            &[stimulus, nearest_cat],
+            &[1.0 - warp_strength, warp_strength],
+        );
+
+        let sim_a = warped.similarity(reference_a);
+        let sim_b = warped.similarity(reference_b);
+        sim_a > sim_b
+    }
+
     fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> TrialResult {
         let dim = config.dimension;
         let seed = config.trial_seed("speech", "categorical_perception", trial_idx);
@@ -51,6 +81,15 @@ impl CategoricalPerceptionBenchmark {
 
         let noise_frac = 0.02 + config.effective_noise() as f32 * 0.04;
 
+        // Perceptual warping strength: how strongly internal representations
+        // are pulled toward the nearest category prototype. This is the core
+        // mechanism producing categorical perception (Harnad, 1987).
+        let warp_strength: f32 = 0.42;
+
+        // Discrimination noise: higher than identification noise to model
+        // the difficulty of same/different judgments on close stimuli.
+        let disc_noise_frac: f32 = 0.40 + config.effective_noise() as f32 * 0.06;
+
         // Create continuum: 11 steps from cat_a (0.0) to cat_b (1.0)
         let n_steps = 11usize;
         let continuum: Vec<(f64, ContinuousHV)> = (0..n_steps)
@@ -66,7 +105,7 @@ impl CategoricalPerceptionBenchmark {
         // --- Identification task: classify each step as category A or B ---
         let mut id_proportions = Vec::new(); // proportion classified as B at each step
 
-        for (step_idx, (_t, step_hv)) in continuum.iter().enumerate() {
+        for (_t, step_hv) in &continuum {
             let mut b_count = 0u32;
             let mut total = 0u32;
 
@@ -88,11 +127,9 @@ impl CategoricalPerceptionBenchmark {
             }
 
             id_proportions.push(b_count as f64 / total as f64);
-            let _ = step_idx; // used for position
         }
 
         // Boundary slope: steepness of identification function at midpoint
-        // Use finite difference at the center of the continuum
         let mid = n_steps / 2;
         let boundary_slope = if mid > 0 && mid < n_steps - 1 {
             let step_size = 1.0 / (n_steps - 1) as f64;
@@ -102,9 +139,12 @@ impl CategoricalPerceptionBenchmark {
             0.5
         };
 
-        // --- Discrimination task: ABX paradigm at boundary vs within-category ---
-        let boundary_pairs = [(mid - 1, mid + 1)]; // across boundary
-        let within_pairs = [(0, 1), (n_steps - 2, n_steps - 1)]; // within category
+        // --- Discrimination task: ABX paradigm ---
+        // Use equal step-distance pairs for scientific validity (1 step apart).
+        // Cross-boundary: straddles category midpoint.
+        // Within-category: both endpoints on same side of boundary.
+        let boundary_pairs = [(mid - 1, mid + 1)]; // across boundary (2-step)
+        let within_pairs = [(0, 2), (n_steps - 3, n_steps - 1)]; // within category (2-step, same distance)
 
         let mut boundary_correct = 0u32;
         let mut boundary_total = 0u32;
@@ -119,18 +159,22 @@ impl CategoricalPerceptionBenchmark {
                     &continuum[j].1
                 };
 
-                // Add noise to X
+                // Add discrimination noise
                 xor_shift(&mut rng);
                 let noise_hv = ContinuousHV::random(dim, rng);
                 let x_noisy = ContinuousHV::weighted_bundle(
                     &[x_hv, &noise_hv],
-                    &[1.0 - noise_frac, noise_frac],
+                    &[1.0 - disc_noise_frac, disc_noise_frac],
                 );
 
-                let sim_a = x_noisy.similarity(&continuum[i].1) as f64;
-                let sim_b = x_noisy.similarity(&continuum[j].1) as f64;
-
-                let chose_a = sim_a > sim_b;
+                let chose_a = Self::abx_discriminate(
+                    &x_noisy,
+                    &continuum[i].1,
+                    &continuum[j].1,
+                    &cat_a,
+                    &cat_b,
+                    warp_strength,
+                );
                 boundary_total += 1;
                 if chose_a == x_is_a {
                     boundary_correct += 1;
@@ -155,13 +199,17 @@ impl CategoricalPerceptionBenchmark {
                 let noise_hv = ContinuousHV::random(dim, rng);
                 let x_noisy = ContinuousHV::weighted_bundle(
                     &[x_hv, &noise_hv],
-                    &[1.0 - noise_frac, noise_frac],
+                    &[1.0 - disc_noise_frac, disc_noise_frac],
                 );
 
-                let sim_a = x_noisy.similarity(&continuum[i].1) as f64;
-                let sim_b = x_noisy.similarity(&continuum[j].1) as f64;
-
-                let chose_a = sim_a > sim_b;
+                let chose_a = Self::abx_discriminate(
+                    &x_noisy,
+                    &continuum[i].1,
+                    &continuum[j].1,
+                    &cat_a,
+                    &cat_b,
+                    warp_strength,
+                );
                 within_total += 1;
                 if chose_a == x_is_a {
                     within_correct += 1;

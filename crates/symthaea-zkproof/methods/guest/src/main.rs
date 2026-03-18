@@ -1,4 +1,5 @@
 #![no_main]
+#![no_std]
 
 use risc0_zkvm::guest::env;
 use symthaea_zkproof_core::{
@@ -16,7 +17,7 @@ fn main() {
     match tag {
         0 => run_consciousness_attestation(),
         1 => run_balance_proof(),
-        _ => panic!("unknown guest program tag: {tag}"),
+        _ => panic!("unknown guest program tag"),
     }
 }
 
@@ -32,7 +33,7 @@ fn run_consciousness_attestation() {
             continue;
         }
         let mean = episode.iter().sum::<f32>() / episode.len() as f32;
-        let variance = episode.iter().map(|x| (x - mean).powi(2)).sum::<f32>();
+        let variance = episode.iter().map(|x| { let d = x - mean; d * d }).sum::<f32>();
         let phi = variance * input.tau_scale;
         total_phi += phi;
     }

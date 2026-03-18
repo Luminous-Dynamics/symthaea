@@ -547,7 +547,7 @@ proptest! {
         for (i, input) in inputs.iter().enumerate() {
             let result = svc.cycle(input);
             assert_metadata_sane(&result, i)?;
-            if result.metadata.mce_bottleneck_lr_applied {
+            if result.metadata.modulation.mce_bottleneck_lr_applied {
                 bottleneck_fired = true;
             }
             // LR must never diverge regardless of bottleneck boosting

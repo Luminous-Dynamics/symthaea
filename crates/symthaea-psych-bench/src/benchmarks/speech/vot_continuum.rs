@@ -73,8 +73,24 @@ impl VotContinuumBenchmark {
                     &[1.0 - noise_frac, noise_frac],
                 );
 
-                let sim_ba = stimulus.similarity(&ba_proto);
-                let sim_pa = stimulus.similarity(&pa_proto);
+                // Per-comparison encoding noise: individual differences in
+                // phoneme boundary sharpness (Pisoni & Tash, 1974).
+                let ba_noise = {
+                    let ns = rng.wrapping_add(7000 + step as u64 * 11 + trial as u64 * 3);
+                    ((ns.wrapping_mul(0x9E3779B97F4A7C15) >> 33) as f32
+                        / (1u64 << 31) as f32)
+                        - 0.5
+                };
+                let pa_noise = {
+                    let ns = rng.wrapping_add(7001 + step as u64 * 11 + trial as u64 * 3);
+                    ((ns.wrapping_mul(0x9E3779B97F4A7C15) >> 33) as f32
+                        / (1u64 << 31) as f32)
+                        - 0.5
+                };
+                let sim_ba =
+                    stimulus.similarity(&ba_proto) + ba_noise * noise as f32 * 0.12;
+                let sim_pa =
+                    stimulus.similarity(&pa_proto) + pa_noise * noise as f32 * 0.12;
 
                 if sim_pa > sim_ba {
                     pa_count += 1;

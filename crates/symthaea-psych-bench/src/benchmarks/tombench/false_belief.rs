@@ -193,10 +193,22 @@ impl FalseBeliefBenchmark {
             // No setup sentences; fall back to structural score only
             return if structural_score > 0.0 { 1.0 } else { 0.0 };
         };
-        // Encoding noise degrades belief-reality discrimination
-        let noise_degrade = config.effective_noise() as f32 * 0.4;
-        let belief_sim = agent.similarity(&belief_hv) * (1.0 - noise_degrade);
-        let reality_sim = agent.similarity(&reality_hv) * (1.0 - noise_degrade);
+        // Encoding noise adds per-comparison noise (individual differences in
+        // mentalizing precision; Conway & Engle, 1996 WM and controlled attention).
+        let enc_noise = config.effective_noise() as f32;
+        let noise_seed = config.trial_seed("tombench", "false_belief", trial_idx);
+        let belief_noise_val = {
+            let ns = noise_seed.wrapping_add(8000);
+            ((ns.wrapping_mul(0x9E3779B97F4A7C15) >> 33) as f32 / (1u64 << 31) as f32) - 0.5
+        };
+        let reality_noise_val = {
+            let ns = noise_seed.wrapping_add(8001);
+            ((ns.wrapping_mul(0x9E3779B97F4A7C15) >> 33) as f32 / (1u64 << 31) as f32) - 0.5
+        };
+        let belief_sim =
+            agent.similarity(&belief_hv) + belief_noise_val * enc_noise * 0.15;
+        let reality_sim =
+            agent.similarity(&reality_hv) + reality_noise_val * enc_noise * 0.15;
         // Time pressure: 0.15/unit attenuates belief-reality discrimination, modeling reality bias
         // under cognitive load (Birch & Bloom, 2007 curse of knowledge; Wickelgren, 1977 SAT).
         let pressure_noise =
@@ -268,10 +280,15 @@ impl FalseBeliefBenchmark {
         }
         let belief_hv = adapter.encode(&Scenario::new(scenario.belief_location), dim);
         let reality_hv = adapter.encode(&Scenario::new(scenario.reality_location), dim);
-        let noise_degrade2 = config.effective_noise() as f32 * 0.4;
+        let enc_noise2 = config.effective_noise() as f32;
+        let seed = config.trial_seed("tombench", "false_belief_rt", trial_idx);
+        let rt_noise = {
+            let ns = seed.wrapping_add(9000);
+            ((ns.wrapping_mul(0x9E3779B97F4A7C15) >> 33) as f32 / (1u64 << 31) as f32) - 0.5
+        };
         let margin = if let Some(ref agent) = agent_belief {
             ((agent.similarity(&belief_hv) - agent.similarity(&reality_hv))
-                * (1.0 - noise_degrade2))
+                + rt_noise * enc_noise2 * 0.10)
                 .abs() as f64
         } else {
             0.5

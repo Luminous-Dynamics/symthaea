@@ -180,7 +180,7 @@ symthaea-support = { path = "crates/symthaea-support", optional = true }
 mycelix-fl-core = { path = "stubs/mycelix-fl-core", optional = true }
 
 # Mycelix Crypto - Post-quantum cryptography (ML-KEM-768, ML-DSA-65, SPHINCS+)
-mycelix-crypto = { path = "../mycelix-identity/crates/mycelix-crypto", optional = true, features = ["native"] }
+mycelix-crypto = { path = "stubs/mycelix-crypto", optional = true, features = ["native"] }
 
 # Symthaea STT - Speech-to-Text, Bioacoustics, EEG processing
 symthaea-stt = { path = "crates/symthaea-stt", optional = true }
@@ -489,7 +489,7 @@ ssm-power-hal = ["ssm-power", "hal", "symthaea-hal/linux", "dep:linux-embedded-h
 ssm_language = ["dep:symthaea-broca"]          # Native CfC-HDC language center (SSM Broca's area)
 canvas = ["dep:symthaea-canvas"]               # Living topology UI: cognitive geometry → animated SVG
 therapeutic = ["dep:symthaea-clinical", "dep:symthaea-therapeutic", "ssm_language", "symthaea-broca/therapeutic"]
-liquid-mamba = ["ssm_language", "symthaea-broca/mamba"]  # Liquid-Mamba fusion: pre-trained Mamba SSM + HDC consciousness gating
+liquid-mamba = ["ssm_language", "symthaea-broca/mamba-cpu"]  # Liquid-Mamba fusion: pre-trained Mamba SSM + HDC consciousness gating (CPU; use symthaea-broca/mamba for GPU)
 humanoid-mujoco = ["humanoid", "symthaea-humanoid/mujoco"]  # Humanoid with MuJoCo physics
 humanoid-viewer = ["humanoid-mujoco", "symthaea-humanoid/viewer"]  # Humanoid with MuJoCo viewer
 

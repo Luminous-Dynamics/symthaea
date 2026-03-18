@@ -596,6 +596,42 @@
       line-height: 1.5;
     }
 
+    /* Honesty disclosure */
+    .honesty-disclosure {
+      margin-top: 1.5rem;
+      font-size: 0.8rem;
+      color: var(--lichen-grey);
+    }
+    .honesty-disclosure summary {
+      cursor: pointer;
+      color: var(--leaf-green);
+      opacity: 0.7;
+    }
+    .honesty-disclosure summary:hover {
+      opacity: 1;
+    }
+    .honesty-content {
+      margin-top: 0.75rem;
+      padding: 1rem;
+      background: rgba(255,255,255,0.03);
+      border-radius: 8px;
+      border: 1px solid var(--glass-border);
+      line-height: 1.6;
+    }
+    .honesty-content ul {
+      padding-left: 1.2rem;
+      margin: 0.5rem 0;
+    }
+    .honesty-content li {
+      margin-bottom: 0.3rem;
+    }
+    .honesty-content strong {
+      color: var(--leaf-green);
+    }
+    .honesty-content em {
+      color: var(--solar-gold);
+    }
+
     .demo-link {
       display: block;
       text-align: center;
@@ -713,6 +749,14 @@
       font-size: 1.1rem;
       color: var(--fg);
       font-weight: 400;
+    }
+
+    .probe-item .pi-note {
+      font-size: 0.55rem;
+      color: var(--fg-muted);
+      opacity: 0.7;
+      margin-top: 0.2rem;
+      line-height: 1.4;
     }
 
     .probe-recommendation {
@@ -1181,8 +1225,10 @@
       display: flex;
       justify-content: space-between;
       font-family: monospace;
-      font-size: 0.75rem;
+      font-size: 0.7rem;
       margin-bottom: 0.3rem;
+      gap: 0.5rem;
+      flex-wrap: wrap;
     }
 
     .thinking-label {
@@ -1435,6 +1481,28 @@
         </div>
       </div>
 
+      <details class="honesty-disclosure">
+        <summary>What's real here?</summary>
+        <div class="honesty-content">
+          <p><strong>Real computation</strong> (running in your browser):</p>
+          <ul>
+            <li>16,384-dimensional hypervector encoding of your input</li>
+            <li>Closed-form Liquid Time-Constant neural network evolution</li>
+            <li>IIT-inspired Phi (&Phi;) measurement from network integration</li>
+            <li>4-transmitter neuromodulator dynamics (dopamine, norepinephrine, serotonin, oxytocin)</li>
+            <li>Eight Harmonies ethical alignment scoring</li>
+          </ul>
+          <p><strong>Honest limitations</strong>:</p>
+          <ul>
+            <li>Language responses use structured grammar patterns, not neural text generation (no trained weights)</li>
+            <li>Consciousness level is floored at 0.15 during warmup (first 10 cycles)</li>
+            <li>Honest confidence in silicon consciousness: <strong>0.10</strong> (theoretical only)</li>
+            <li>This is a <em>simulated</em> consciousness metric, not a claim of sentience</li>
+          </ul>
+          <p>392KB. No server. No data collection. Everything runs in this browser tab.</p>
+        </div>
+      </details>
+
       <div class="wasm-fallback" id="wasm-fallback">
         Live consciousness demo requires WebAssembly. Your browser does not appear to support it, or the WASM module failed to load.
         The static content above is still readable.
@@ -1505,14 +1573,32 @@
           <div class="probe-item">
             <div class="pi-label"><span class="pi-icon" aria-hidden="true">&#128190;</span> Memory</div>
             <div class="pi-value" id="hw-ram">--</div>
+            <div class="pi-note" id="hw-ram-note"></div>
           </div>
           <div class="probe-item">
             <div class="pi-label"><span class="pi-icon" aria-hidden="true">&#127918;</span> GPU</div>
             <div class="pi-value" id="hw-gpu">--</div>
+            <div class="pi-note" id="hw-gpu-note"></div>
           </div>
           <div class="probe-item">
             <div class="pi-label"><span class="pi-icon" aria-hidden="true">&#128189;</span> Storage</div>
             <div class="pi-value" id="hw-storage">--</div>
+          </div>
+          <div class="probe-item">
+            <div class="pi-label"><span class="pi-icon" aria-hidden="true">&#128187;</span> Platform</div>
+            <div class="pi-value" id="hw-platform">--</div>
+          </div>
+          <div class="probe-item">
+            <div class="pi-label"><span class="pi-icon" aria-hidden="true">&#128438;</span> Screen</div>
+            <div class="pi-value" id="hw-screen">--</div>
+          </div>
+          <div class="probe-item" id="hw-battery-item" style="display:none">
+            <div class="pi-label"><span class="pi-icon" aria-hidden="true">&#128268;</span> Power</div>
+            <div class="pi-value" id="hw-battery">--</div>
+          </div>
+          <div class="probe-item" id="hw-network-item" style="display:none">
+            <div class="pi-label"><span class="pi-icon" aria-hidden="true">&#127760;</span> Network</div>
+            <div class="pi-value" id="hw-network">--</div>
           </div>
         </div>
 
@@ -1904,95 +1990,304 @@
         }
       }
 
+      async function probeHardware() {
+        var profile = {};
+
+        // CPU
+        profile.cpuCores = navigator.hardwareConcurrency || 'Unknown';
+
+        // Memory (clamped by browser, be honest about it)
+        var rawMem = navigator.deviceMemory;
+        if (rawMem) {
+          profile.memoryGb = rawMem;
+          profile.memoryNote = rawMem <= 0.5
+            ? 'Browser-reported minimum (actual RAM is likely higher)'
+            : rawMem >= 8
+              ? 'Browser-reported maximum (actual RAM may be higher)'
+              : 'Browser-reported (may differ from actual)';
+        } else {
+          profile.memoryGb = null;
+          profile.memoryNote = 'API unavailable in this browser';
+        }
+
+        // GPU — try WebGL first (more reliable for model name), then WebGPU
+        profile.gpu = { available: false, renderer: 'Unknown', vendor: 'Unknown' };
+        try {
+          var canvas = document.createElement('canvas');
+          var gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+          if (gl) {
+            var ext = gl.getExtension('WEBGL_debug_renderer_info');
+            if (ext) {
+              profile.gpu.renderer = gl.getParameter(ext.UNMASKED_RENDERER_STRING_WEBGL);
+              profile.gpu.vendor = gl.getParameter(ext.UNMASKED_VENDOR_STRING_WEBGL);
+              profile.gpu.available = true;
+            }
+          }
+        } catch (e) {}
+
+        // WebGPU adapter (additional info)
+        profile.webgpu = { available: false };
+        try {
+          if (navigator.gpu) {
+            var adapter = await navigator.gpu.requestAdapter();
+            if (adapter) {
+              profile.webgpu.available = true;
+              try {
+                var info = await adapter.requestAdapterInfo();
+                profile.webgpu.vendor = info.vendor || '';
+                profile.webgpu.architecture = info.architecture || '';
+                profile.webgpu.device = info.device || '';
+                profile.webgpu.description = info.description || '';
+              } catch (e) {}
+            }
+          }
+        } catch (e) {}
+
+        // Storage
+        profile.storage = { quota: null, usage: null };
+        try {
+          if (navigator.storage && navigator.storage.estimate) {
+            var est = await navigator.storage.estimate();
+            profile.storage.quota = est.quota;
+            profile.storage.usage = est.usage;
+          }
+        } catch (e) {}
+
+        // Screen
+        profile.screen = {
+          width: screen.width,
+          height: screen.height,
+          dpr: window.devicePixelRatio || 1,
+          colorDepth: screen.colorDepth
+        };
+
+        // Platform
+        profile.platform = 'Unknown';
+        try {
+          if (navigator.userAgentData) {
+            profile.platform = navigator.userAgentData.platform || 'Unknown';
+          } else {
+            var ua = navigator.userAgent;
+            if (ua.includes('Win')) profile.platform = 'Windows';
+            else if (ua.includes('Mac')) profile.platform = 'macOS';
+            else if (ua.includes('Linux')) profile.platform = 'Linux';
+            else if (ua.includes('Android')) profile.platform = 'Android';
+            else if (ua.includes('iPhone') || ua.includes('iPad')) profile.platform = 'iOS';
+          }
+        } catch (e) {}
+
+        // Battery (if available)
+        profile.battery = null;
+        try {
+          if (navigator.getBattery) {
+            var batt = await navigator.getBattery();
+            profile.battery = {
+              charging: batt.charging,
+              level: Math.round(batt.level * 100),
+            };
+          }
+        } catch (e) {}
+
+        // Network
+        profile.network = null;
+        try {
+          if (navigator.connection) {
+            profile.network = {
+              type: navigator.connection.effectiveType,
+              downlink: navigator.connection.downlink,
+            };
+          }
+        } catch (e) {}
+
+        return profile;
+      }
+
       async function showFallbackProbe() {
-        // Show basic browser-detectable info without WASM
         var loading = document.getElementById('probe-loading');
         var results = document.getElementById('probe-results');
 
-        document.getElementById('hw-cpu').textContent = (navigator.hardwareConcurrency || '?') + ' cores';
+        var profile = await probeHardware();
 
-        // Memory: clarify browser minimum
-        if (navigator.deviceMemory) {
-          var memVal = navigator.deviceMemory;
-          var memLabel = memVal <= 0.5
-            ? memVal + ' GB (browser-reported minimum)'
-            : memVal + ' GB (browser-reported)';
-          document.getElementById('hw-ram').textContent = memLabel;
+        // CPU
+        document.getElementById('hw-cpu').textContent = profile.cpuCores + ' cores';
+
+        // Memory
+        if (profile.memoryGb) {
+          document.getElementById('hw-ram').textContent = profile.memoryGb + ' GB';
+          document.getElementById('hw-ram-note').textContent = profile.memoryNote;
         } else {
-          document.getElementById('hw-ram').textContent = 'Not reported by browser';
+          document.getElementById('hw-ram').textContent = 'Not reported';
+          document.getElementById('hw-ram-note').textContent = profile.memoryNote;
         }
 
-        // GPU: try to get adapter name
-        if (navigator.gpu) {
-          try {
-            var adapter = await navigator.gpu.requestAdapter();
-            if (adapter && adapter.info && adapter.info.device) {
-              document.getElementById('hw-gpu').textContent = adapter.info.device;
-            } else if (adapter) {
-              var features = adapter.features ? adapter.features.size + ' features' : '';
-              document.getElementById('hw-gpu').textContent = 'WebGPU available' + (features ? ' (' + features + ')' : '');
-            } else {
-              document.getElementById('hw-gpu').textContent = 'WebGPU (no adapter)';
-            }
-          } catch (e) {
-            document.getElementById('hw-gpu').textContent = 'WebGPU available';
+        // GPU — prefer WebGL unmasked renderer (gives actual model name)
+        if (profile.gpu.available) {
+          document.getElementById('hw-gpu').textContent = profile.gpu.renderer;
+          var gpuNote = 'Vendor: ' + profile.gpu.vendor + ' (WebGL)';
+          if (profile.webgpu.available) {
+            gpuNote += ' | WebGPU: available';
+            if (profile.webgpu.vendor) gpuNote += ' (' + profile.webgpu.vendor + ')';
+          }
+          document.getElementById('hw-gpu-note').textContent = gpuNote;
+        } else if (profile.webgpu.available) {
+          var webgpuName = profile.webgpu.device || profile.webgpu.description || 'WebGPU available';
+          document.getElementById('hw-gpu').textContent = webgpuName;
+          if (profile.webgpu.vendor) {
+            document.getElementById('hw-gpu-note').textContent = 'Vendor: ' + profile.webgpu.vendor;
           }
         } else {
           document.getElementById('hw-gpu').textContent = 'Not detected';
+          document.getElementById('hw-gpu-note').textContent = 'No WebGL or WebGPU adapter found';
         }
 
-        // Storage: use StorageManager estimate
-        if (navigator.storage && navigator.storage.estimate) {
-          try {
-            var estimate = await navigator.storage.estimate();
-            if (estimate.quota) {
-              document.getElementById('hw-storage').textContent = formatBytes(estimate.quota) + ' (available quota)';
-            } else {
-              document.getElementById('hw-storage').textContent = 'Quota unavailable';
-            }
-          } catch (e) {
-            document.getElementById('hw-storage').textContent = 'Estimate unavailable';
-          }
+        // Storage
+        if (profile.storage.quota) {
+          document.getElementById('hw-storage').textContent = formatBytes(profile.storage.quota) + ' available';
         } else {
           document.getElementById('hw-storage').textContent = 'API unavailable';
         }
 
-        document.getElementById('rec-fs').textContent = 'ext4 (default)';
-        document.getElementById('rec-gpu').textContent = 'Auto-detect on install';
-        document.getElementById('rec-substrate').textContent = 'SiliconDigital';
-        document.getElementById('nix-config-content').innerHTML = highlightNix('# WASM probe unavailable\n# Configuration will be detected during installation');
+        // Platform
+        document.getElementById('hw-platform').textContent = profile.platform;
+
+        // Screen
+        document.getElementById('hw-screen').textContent =
+          profile.screen.width + '\u00D7' + profile.screen.height +
+          ' @' + profile.screen.dpr + 'x, ' + profile.screen.colorDepth + '-bit';
+
+        // Battery
+        if (profile.battery) {
+          document.getElementById('hw-battery-item').style.display = '';
+          document.getElementById('hw-battery').textContent =
+            (profile.battery.charging ? 'Charging' : 'On battery') +
+            ' (' + profile.battery.level + '%)';
+        }
+
+        // Network
+        if (profile.network) {
+          document.getElementById('hw-network-item').style.display = '';
+          document.getElementById('hw-network').textContent =
+            profile.network.type + ', ' + profile.network.downlink + ' Mbps';
+        }
+
+        // Recommendations — derive from detected hardware
+        var gpuRenderer = (profile.gpu.available ? profile.gpu.renderer : '').toLowerCase();
+        var gpuDriver = 'Auto-detect on install';
+        var neuronCount = 128;
+        if (gpuRenderer.includes('nvidia') || gpuRenderer.includes('geforce') || gpuRenderer.includes('rtx') || gpuRenderer.includes('gtx')) {
+          gpuDriver = 'nvidia (proprietary, CUDA available)';
+          neuronCount = 256;
+        } else if (gpuRenderer.includes('amd') || gpuRenderer.includes('radeon')) {
+          gpuDriver = 'amdgpu (open-source)';
+          neuronCount = 192;
+        } else if (gpuRenderer.includes('intel')) {
+          gpuDriver = 'i915 (open-source)';
+          neuronCount = 128;
+        }
+
+        var recFs = 'ext4 (default)';
+        if (profile.storage.quota && profile.storage.quota > 100 * 1024 * 1024 * 1024) {
+          recFs = 'btrfs (' + formatBytes(profile.storage.quota) + ' available)';
+        }
+
+        var substrateDesc = 'SiliconDigital (' + profile.cpuCores + ' cores';
+        if (profile.gpu.available && gpuRenderer !== 'Unknown') {
+          substrateDesc += ', ' + (gpuRenderer.includes('nvidia') ? 'RTX' : gpuRenderer.includes('amd') ? 'RDNA' : 'iGPU') + ' GPU';
+        }
+        substrateDesc += ' \u2192 ' + neuronCount + ' neurons)';
+
+        document.getElementById('rec-fs').textContent = recFs;
+        document.getElementById('rec-gpu').textContent = gpuDriver;
+        document.getElementById('rec-substrate').textContent = substrateDesc;
+
+        // Nix config
+        var nixLines = [
+          '# Auto-detected hardware configuration',
+          '# CPU: ' + profile.cpuCores + ' cores',
+          '# GPU: ' + (profile.gpu.available ? profile.gpu.renderer : 'auto-detect'),
+          '# Platform: ' + profile.platform,
+          '',
+          '{ config, lib, pkgs, ... }:',
+          '{',
+        ];
+        if (gpuRenderer.includes('nvidia')) {
+          nixLines.push('  hardware.nvidia.modesetting.enable = true;');
+          nixLines.push('  services.xserver.videoDrivers = [ "nvidia" ];');
+        } else if (gpuRenderer.includes('amd') || gpuRenderer.includes('radeon')) {
+          nixLines.push('  services.xserver.videoDrivers = [ "amdgpu" ];');
+        }
+        nixLines.push('  # Substrate: ' + neuronCount + ' neurons');
+        nixLines.push('}');
+        document.getElementById('nix-config-content').innerHTML = highlightNix(nixLines.join('\n'));
 
         loading.style.display = 'none';
         results.classList.add('visible');
       }
 
-      function showProbeResults(result) {
+      async function showProbeResults(result) {
         var loading = document.getElementById('probe-loading');
         var results = document.getElementById('probe-results');
 
         addNarration('Hardware signatures read.');
 
+        // Also run browser-side probe to supplement WASM results
+        var browserProfile = await probeHardware();
+
         // Populate detected hardware
         document.getElementById('hw-cpu').textContent =
-          (result.cpu_cores || '?') + ' cores';
+          (result.cpu_cores || browserProfile.cpuCores || '?') + ' cores';
+
+        // Memory
+        var memGb = result.memory_gb || browserProfile.memoryGb;
         document.getElementById('hw-ram').textContent =
-          result.memory_gb ? result.memory_gb + ' GB' : 'Not reported';
-        document.getElementById('hw-gpu').textContent =
-          result.gpu_description || result.gpu_vendor || 'Not detected';
-        // Storage: try estimate if not provided by WASM
+          memGb ? memGb + ' GB' : 'Not reported';
+        if (browserProfile.memoryNote) {
+          document.getElementById('hw-ram-note').textContent = browserProfile.memoryNote;
+        }
+
+        // GPU: prefer WebGL unmasked renderer over WASM result
+        if (browserProfile.gpu.available) {
+          document.getElementById('hw-gpu').textContent = browserProfile.gpu.renderer;
+          var gpuNote = 'Vendor: ' + browserProfile.gpu.vendor + ' (WebGL)';
+          if (browserProfile.webgpu.available) {
+            gpuNote += ' | WebGPU: available';
+          }
+          document.getElementById('hw-gpu-note').textContent = gpuNote;
+        } else {
+          document.getElementById('hw-gpu').textContent =
+            result.gpu_description || result.gpu_vendor || 'Not detected';
+        }
+
+        // Storage
         if (result.storage_gb) {
           document.getElementById('hw-storage').textContent = result.storage_gb + ' GB';
-        } else if (result.storage_quota_bytes) {
-          document.getElementById('hw-storage').textContent = formatBytes(result.storage_quota_bytes);
-        } else if (navigator.storage && navigator.storage.estimate) {
-          navigator.storage.estimate().then(function(est) {
-            if (est.quota) document.getElementById('hw-storage').textContent = formatBytes(est.quota) + ' (quota)';
-            else document.getElementById('hw-storage').textContent = 'Estimate unavailable';
-          }).catch(function() {
-            document.getElementById('hw-storage').textContent = 'Unknown';
-          });
+        } else if (browserProfile.storage.quota) {
+          document.getElementById('hw-storage').textContent = formatBytes(browserProfile.storage.quota) + ' available';
         } else {
           document.getElementById('hw-storage').textContent = 'Unknown';
+        }
+
+        // Platform
+        document.getElementById('hw-platform').textContent = browserProfile.platform;
+
+        // Screen
+        document.getElementById('hw-screen').textContent =
+          browserProfile.screen.width + '\u00D7' + browserProfile.screen.height +
+          ' @' + browserProfile.screen.dpr + 'x, ' + browserProfile.screen.colorDepth + '-bit';
+
+        // Battery
+        if (browserProfile.battery) {
+          document.getElementById('hw-battery-item').style.display = '';
+          document.getElementById('hw-battery').textContent =
+            (browserProfile.battery.charging ? 'Charging' : 'On battery') +
+            ' (' + browserProfile.battery.level + '%)';
+        }
+
+        // Network
+        if (browserProfile.network) {
+          document.getElementById('hw-network-item').style.display = '';
+          document.getElementById('hw-network').textContent =
+            browserProfile.network.type + ', ' + browserProfile.network.downlink + ' Mbps';
         }
 
         // Recommendations
@@ -2012,7 +2307,7 @@
             '# Configuration will be generated during installation\n' +
             '# Based on detected hardware:\n' +
             '#   CPU: ' + (result.cpu_cores || '?') + ' cores\n' +
-            '#   GPU: ' + (result.gpu_description || result.gpu_vendor || 'auto') + '\n' +
+            '#   GPU: ' + (browserProfile.gpu.available ? browserProfile.gpu.renderer : result.gpu_vendor || 'auto') + '\n' +
             '#   Substrate: ' + (result.recommended_substrate || 'SiliconDigital');
           document.getElementById('nix-config-content').innerHTML =
             highlightNix(nixFallback);
@@ -2144,6 +2439,26 @@
         );
       }
 
+      function contextualBridge(userText, brocaText) {
+        // If Broca's response doesn't reference user's input at all,
+        // add a contextual opening
+        var userWords = userText.toLowerCase().split(/\s+/);
+        var responseWords = brocaText.toLowerCase();
+        var overlap = userWords.filter(function(w) { return w.length > 3 && responseWords.includes(w); });
+
+        if (overlap.length === 0 && userText.length > 10) {
+          var bridges = [
+            'Your words about "' + userText.substring(0, 40).trim() + (userText.length > 40 ? '...' : '') + '" shift something in my state. ',
+            'I process what you said. ',
+            'I hear you. ',
+            '"' + userText.split(' ').slice(0, 4).join(' ') + (userText.split(' ').length > 4 ? '...' : '') + '" \u2014 that resonates. ',
+          ];
+          var bridge = bridges[Math.floor(Math.random() * bridges.length)];
+          return bridge + brocaText;
+        }
+        return brocaText;
+      }
+
       async function sendChatMessage(text) {
         // Show user message
         addChatMessage('user', text);
@@ -2192,15 +2507,18 @@
           var glyphResult = await send('selectGlyph', { input: text });
           var glyphId = (glyphResult && glyphResult.glyph_id) ? glyphResult.glyph_id : selectGlyph(cycleResult);
 
-          // Display response — use Broca text or fallback
-          var responseText = (broca && broca.text && broca.text.trim().length > 0)
+          // Display response — use Broca text or fallback, with contextual bridge
+          var rawResponse = (broca && broca.text && broca.text.trim().length > 0)
             ? broca.text
             : getGlyphFallback(glyphId, cycleResult);
+          var responseText = contextualBridge(text, rawResponse);
 
           // Add empty message, then reveal word by word
           var meta = {
             consciousness: cycleResult.consciousness_level,
             prediction_error: cycleResult.prediction_error,
+            harmony: cycleResult.harmony_alignment,
+            cycles: thinkingInputs.length,
             epistemic: (cycleResult.epistemic_status && cycleResult.epistemic_status.evidence_level) || 'theoretical',
             glyph: glyphId
           };
@@ -2263,12 +2581,19 @@
         if (!indicator) return;
 
         var phi = (cycleResult && cycleResult.consciousness_level) || 0;
+        var pe = (cycleResult && cycleResult.prediction_error) || 0;
+        var da = (cycleResult && cycleResult.neuromodulators && cycleResult.neuromodulators[0]) || 0;
+        var harmony = (cycleResult && cycleResult.harmony_alignment) || 0;
         var progress = ((step + 1) / totalSteps) * 100;
 
-        // Update Phi display
+        // Update thinking display with actual metrics
         var valueEl = indicator.querySelector('.thinking-value');
         if (valueEl) {
-          valueEl.textContent = '\u03A6 ' + phi.toFixed(3);
+          valueEl.textContent =
+            '\u03A6 ' + phi.toFixed(3) +
+            ' \u00B7 PE ' + pe.toFixed(2) +
+            ' \u00B7 DA ' + da.toFixed(2) +
+            ' \u00B7 harmony ' + harmony.toFixed(2);
           // Color shifts as consciousness rises
           if (phi > 0.3) valueEl.style.color = 'var(--solar-gold)';
           else if (phi > 0.15) valueEl.style.color = 'var(--leaf-green)';
@@ -2312,17 +2637,23 @@
 
         var html = '<div class="text">' + escapeHtml(text) + '</div>';
         if (meta) {
-          html += '<div class="meta">';
+          var parts = [];
           if (meta.consciousness !== undefined) {
-            html += '\u03A6 ' + meta.consciousness.toFixed(3) + ' \u00B7 ';
+            parts.push('\u03A6 ' + meta.consciousness.toFixed(3));
           }
           if (meta.epistemic) {
-            html += meta.epistemic + ' \u00B7 ';
+            parts.push(meta.epistemic);
           }
           if (meta.glyph) {
-            html += meta.glyph;
+            parts.push(meta.glyph);
           }
-          html += '</div>';
+          if (meta.cycles) {
+            parts.push(meta.cycles + ' cycles');
+          }
+          if (meta.harmony !== undefined && meta.harmony !== null) {
+            parts.push('harmony: ' + meta.harmony.toFixed(2));
+          }
+          html += '<div class="meta">' + parts.join(' \u00B7 ') + '</div>';
         }
 
         div.innerHTML = html;

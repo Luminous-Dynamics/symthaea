@@ -39,12 +39,12 @@ const NUM_SENSORS: usize = 6;
 
 /// Deterministic seeds for basis vector generation (one per sensor).
 const SENSOR_SEEDS: [u64; NUM_SENSORS] = [
-    0xDL_0001, // density
-    0xDL_0002, // elongation
-    0xDL_0003, // minor_radius
-    0xDL_0004, // plasma_current
-    0xDL_0005, // toroidal_B_field
-    0xDL_0006, // triangularity
+    0xD10_0001, // density
+    0xD10_0002, // elongation
+    0xD10_0003, // minor_radius
+    0xD10_0004, // plasma_current
+    0xD10_0005, // toroidal_B_field
+    0xD10_0006, // triangularity
 ];
 
 /// Sensor names matching CSV column order.

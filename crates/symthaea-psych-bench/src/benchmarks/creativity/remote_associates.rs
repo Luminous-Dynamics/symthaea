@@ -178,19 +178,36 @@ impl RemoteAssociatesBenchmark {
             .collect();
 
         // Score all candidates by similarity to bundle.
+        // Encoding noise degrades associative retrieval — higher noise reduces
+        // discriminability between solution and distractors (Mednick, 1962 RAT;
+        // individual differences in spreading activation noise).
+        let enc_noise = config.effective_noise() as f32;
         // Time pressure: 0.08/unit noise disrupts similarity ranking, modeling reduced search
         // depth in associative retrieval under deadline (Mednick, 1962 RAT; Luce, 1986).
         let pressure_noise = config.time_pressure as f32 * 0.08;
-        let solution_sim = bundle.similarity(&solution_hv);
+        let seed = config.trial_seed("creativity", "rat", trial_idx);
+        let sol_noise = {
+            let ns = seed.wrapping_add(7000);
+            ((ns.wrapping_mul(0x9E3779B97F4A7C15) >> 33) as f32 / (1u64 << 31) as f32) - 0.5
+        };
+        let solution_sim = bundle.similarity(&solution_hv) + sol_noise * enc_noise * 0.12;
         let mut all_sims: Vec<(usize, f32)> = vec![(0, solution_sim)]; // index 0 = solution
         for (i, dhv) in distractor_hvs.iter().enumerate() {
+            // Per-candidate encoding noise (hash-based deterministic)
+            let cand_noise = {
+                let ns = seed.wrapping_add(7100 + i as u64 * 13);
+                ((ns.wrapping_mul(0x9E3779B97F4A7C15) >> 33) as f32 / (1u64 << 31) as f32) - 0.5
+            };
             // Alternating noise sign disrupts ranking under pressure
             let noise = if i % 2 == 0 {
                 pressure_noise
             } else {
                 -pressure_noise
             };
-            all_sims.push((i + 1, bundle.similarity(dhv) + noise));
+            all_sims.push((
+                i + 1,
+                bundle.similarity(dhv) + noise + cand_noise * enc_noise * 0.12,
+            ));
         }
         all_sims.sort_by(|(_, a), (_, b)| b.total_cmp(a));
 

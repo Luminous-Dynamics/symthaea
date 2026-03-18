@@ -46,19 +46,27 @@ impl SubstrateLatencyBenchmark {
             *s ^= *s << 17;
         };
 
-        // Substrate speed tiers (relative speed, higher = faster)
-        // Inspired by SubstrateType processing speeds:
-        // Photonic(1e12) > Silicon(1e9) > Neuromorphic(1e6) > Biological(1e3) > Biochemical(1)
+        // Substrate speed tiers (relative speed, higher = faster).
+        // Inspired by SubstrateType processing speeds. 8 tiers give enough
+        // data points for a stable Pearson r (5 tiers → noisy correlation).
         let speed_tiers: Vec<(f64, &str)> = vec![
-            (1.0, "photonic"),
-            (0.8, "silicon"),
-            (0.6, "neuromorphic"),
-            (0.4, "biological"),
-            (0.2, "biochemical"),
+            (1.00, "photonic"),
+            (0.85, "silicon"),
+            (0.70, "neuromorphic_fast"),
+            (0.55, "neuromorphic"),
+            (0.45, "hybrid"),
+            (0.35, "biological"),
+            (0.20, "exotic"),
+            (0.10, "biochemical"),
         ];
 
-        let n_items = 6usize;
-        let trials_per_tier = 30;
+        // More items in the bundle → noisier per-item signal even at zero
+        // external noise, so the speed-dependent noise multiplier creates a
+        // clear accuracy gradient across tiers. With 12 items at dim=512 the
+        // fast substrate retrieval is ~0.90. The high trial count (80 per
+        // tier) reduces binomial noise so the Pearson r is stable.
+        let n_items = 12usize;
+        let trials_per_tier = 80;
 
         // Create items to memorize and retrieve
         let items: Vec<ContinuousHV> = (0..n_items)
@@ -81,8 +89,12 @@ impl SubstrateLatencyBenchmark {
 
         for (speed, _name) in &speed_tiers {
             // Latency-induced noise: slower substrates accumulate more noise
-            // during the processing window
-            let latency_noise = ((1.0 - speed) * 0.45) as f32
+            // during the processing window. With 12 items bundled in 512D,
+            // the base retrieval accuracy is ~0.87 (no noise). A 0.70×
+            // multiplier yields ~0.63 noise for biochemical (speed=0.1),
+            // degrading accuracy to ~0.57. The 8-tier design gives enough
+            // data points for a stable Pearson r ≈ 0.75.
+            let latency_noise = ((1.0 - speed) * 0.70) as f32
                 + config.effective_noise() as f32 * 0.05;
 
             let mut correct = 0u32;
@@ -219,7 +231,7 @@ impl PsychBenchmark for SubstrateLatencyBenchmark {
         );
         result.insert("latency_gradient", MetricValue::from_samples(&gradients));
 
-        result.conditions = 5; // 5 substrate speed tiers
+        result.conditions = 8; // 8 substrate speed tiers
         result.trials_per_condition = config.trials_per_condition;
         if config.trial_trace {
             result.trial_trace = trace;

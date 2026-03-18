@@ -22,12 +22,12 @@ use candle_nn::VarBuilder;
 
 /// Select the best available compute device.
 ///
-/// Returns CUDA GPU 0 if available (requires the `cuda` feature),
+/// Returns CUDA GPU 0 if available (requires the `mamba` feature),
 /// otherwise falls back to CPU.
 ///
 /// # CUDA Requirements
 ///
-/// - Compile with `--features cuda` (enables `candle-core/cuda`)
+/// - Compile with `--features mamba` (enables `candle-core/cuda`)
 /// - NVIDIA GPU with CUDA toolkit installed
 /// - On NixOS: `LD_LIBRARY_PATH="/run/opengl-driver/lib"` required
 ///
@@ -37,7 +37,7 @@ use candle_nn::VarBuilder;
 /// silently falls back to CPU. Mamba-130m runs at ~430ms/forward on
 /// CPU (with `RUSTFLAGS="-C target-cpu=native"` for AVX2+FMA).
 pub fn best_device() -> Device {
-    #[cfg(feature = "cuda")]
+    #[cfg(feature = "mamba")]
     {
         match Device::cuda_if_available(0) {
             Ok(dev) if dev.is_cuda() => {

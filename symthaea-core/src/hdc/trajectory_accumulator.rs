@@ -321,7 +321,7 @@ impl TrajectoryAccumulator {
 
         // Sort domains for deterministic ordering
         let mut domain_keys: Vec<_> = self.domains.keys().collect();
-        domain_keys.sort_by_key(|d| *d as u8);
+        domain_keys.sort_by_key(|d| format!("{:?}", d));
 
         for domain in &domain_keys {
             if let Some(traj) = self.domains.get(domain) {

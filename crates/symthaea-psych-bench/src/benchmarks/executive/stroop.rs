@@ -118,11 +118,21 @@ impl StroopBenchmark {
             };
 
             // Compute similarity to each color candidate
-            // Encoding noise degrades color discrimination
-            let noise_degrade = config.effective_noise() as f32 * 0.4;
+            // Encoding noise adds per-comparison noise (individual differences in
+            // perceptual discrimination; Lu & Dosher, 1998 noise exclusion model).
+            let enc_noise = config.effective_noise() as f32;
             let sims: Vec<f64> = color_hvs
                 .iter()
-                .map(|c| (combined.similarity(c) * (1.0 - noise_degrade)) as f64)
+                .enumerate()
+                .map(|(ci, c)| {
+                    let raw = combined.similarity(c);
+                    // Per-comparison noise: hash-based deterministic noise per color×trial
+                    let noise_seed = seed.wrapping_add(5000 + trial as u64 * 7 + ci as u64 * 31);
+                    let noise_val = ((noise_seed.wrapping_mul(0x9E3779B97F4A7C15) >> 33) as f32
+                        / (1u64 << 31) as f32)
+                        - 0.5;
+                    (raw + noise_val * enc_noise * 0.15) as f64
+                })
                 .collect();
 
             // Softmax response selection with temperature

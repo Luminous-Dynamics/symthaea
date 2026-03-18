@@ -51,6 +51,55 @@ impl SporeStorage for InMemoryStorage {
     }
 }
 
+/// File-based storage backend for native platforms (Android/iOS/desktop).
+///
+/// Stores checkpoints as files in a directory. Each key becomes a file.
+pub struct FileStorage {
+    base_path: String,
+}
+
+impl FileStorage {
+    pub fn new(path: &str) -> Self {
+        // Ensure directory exists
+        let _ = std::fs::create_dir_all(path);
+        Self {
+            base_path: path.to_string(),
+        }
+    }
+
+    fn key_path(&self, key: &str) -> std::path::PathBuf {
+        std::path::Path::new(&self.base_path).join(format!("{key}.bin"))
+    }
+}
+
+impl SporeStorage for FileStorage {
+    fn load(&self, key: &str) -> Option<Vec<u8>> {
+        std::fs::read(self.key_path(key)).ok()
+    }
+
+    fn save(&mut self, key: &str, data: &[u8]) -> bool {
+        std::fs::write(self.key_path(key), data).is_ok()
+    }
+
+    fn delete(&mut self, key: &str) {
+        let _ = std::fs::remove_file(self.key_path(key));
+    }
+
+    fn keys(&self) -> Vec<String> {
+        std::fs::read_dir(&self.base_path)
+            .map(|entries| {
+                entries
+                    .filter_map(|e| e.ok())
+                    .filter_map(|e| {
+                        let name = e.file_name().to_string_lossy().to_string();
+                        name.strip_suffix(".bin").map(|s| s.to_string())
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+}
+
 /// A serializable snapshot of the Spore engine state.
 ///
 /// Contains the minimal state needed to restore the engine after restart.
