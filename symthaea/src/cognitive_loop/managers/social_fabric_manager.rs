@@ -1,5 +1,7 @@
 //! Social Fabric Manager — Resonance-Based Content CognitiveSubsystem
 //!
+//! **Requires**: `feature = "social-fabric"`
+//!
 //! Updates the `ResonanceGraph` from SwarmManager events and provides
 //! neuromodulatory feedback based on social connection quality.
 //!

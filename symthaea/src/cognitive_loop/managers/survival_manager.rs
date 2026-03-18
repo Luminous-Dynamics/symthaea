@@ -1,5 +1,7 @@
 //! Survival Manager — Infrastructure Monitoring CognitiveSubsystem
 //!
+//! **Requires**: `feature = "survival"` (implies `mesh`)
+//!
 //! Aggregates sensor readings from IoT devices, detects anomalies
 //! (pipe burst, power outage), and triggers emergency responses.
 //!

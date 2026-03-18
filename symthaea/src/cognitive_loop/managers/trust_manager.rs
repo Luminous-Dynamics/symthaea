@@ -1,5 +1,7 @@
 //! Trust Manager — Web-of-Trust CognitiveSubsystem
 //!
+//! **Requires**: `feature = "mesh-trust"`
+//!
 //! Maintains the `TrustGraph` and provides neuromodulatory feedback based on
 //! trust network state. Processes SwarmEvents (TrustVerified, PeerJoined)
 //! to update the trust graph.

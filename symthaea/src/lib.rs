@@ -410,7 +410,10 @@ pub mod experience;
 // Wisdom (enabled - 0 errors)
 pub mod wisdom;
 
-// Mycelix (enabled - GIS, Kosmic Song, Dark Spot DHT)
+// Mycelix core types (GIS, KosmicSong, EpistemicMesh) — always compiled because
+// KosmicSong is a non-optional field on CognitiveLoopService and GIS types are
+// used in the core consciousness pipeline. The `mycelix` Cargo feature gates
+// external dependencies (FL algorithms, hashing) not these core type definitions.
 pub mod mycelix;
 
 // Swarm Intelligence (Hybrid Iroh + Holochain Architecture)

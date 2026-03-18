@@ -1,5 +1,7 @@
 //! # Radio Dispatcher — Multi-Band Tiered Radio Architecture
 //!
+//! **Requires**: `feature = "mesh"`
+//!
 //! Provides bandwidth-aware routing for Symthaea's mesh consciousness network
 //! across heterogeneous radio tiers (Wi-Fi/BLE → LoRa/UHF → HF/NVIS).
 //!

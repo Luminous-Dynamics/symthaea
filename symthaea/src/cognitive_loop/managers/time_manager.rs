@@ -1,5 +1,7 @@
 //! Time Manager — Sovereign Mesh-Time CognitiveSubsystem
 //!
+//! **Requires**: `feature = "mesh"`
+//!
 //! Feeds `MeshTimeConsensus` from WisdomPacket timestamps received during
 //! the cognitive cycle. Provides neuromodulatory feedback based on time
 //! consensus quality and drift surprise.
