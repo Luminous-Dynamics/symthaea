@@ -87,11 +87,14 @@ mod handshake;
 mod iroh;
 
 // Re-exports
-pub use config::{BootstrapConfig, PeerConfig, SwarmConfig, MYCELIX_BOOTSTRAP_NODES};
+pub use config::{
+    AeadAlgorithm, BootstrapConfig, CryptoConfig, PeerConfig, SwarmConfig,
+    MYCELIX_BOOTSTRAP_NODES,
+};
 pub use error::{SwarmError, SwarmResult};
 pub use types::{
-    AffectiveSync, ConnectionState, ConnectionTicket, ConsciousnessVector, PeerInfo, SwarmMessage,
-    TensorPayload, TensorType, TrustLevel,
+    AffectiveSync, ConnectionState, ConnectionTicket, ConsciousnessVector, PeerInfo,
+    SecurityTelemetry, SwarmMessage, TensorPayload, TensorType, TrustLevel,
 };
 
 // Hyperfeel - synthetic mirror neurons

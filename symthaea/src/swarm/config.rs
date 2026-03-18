@@ -45,6 +45,51 @@ pub struct SwarmConfig {
     /// Challenge timeout in seconds for the trust handshake protocol.
     /// Range: 1-120 (default: 30). Increase for high-latency mesh networks.
     pub challenge_timeout_secs: u64,
+
+    /// Cryptographic configuration for mesh encryption, key rotation, and AEAD.
+    pub crypto: CryptoConfig,
+}
+
+/// Cryptographic configuration for mesh packet encryption and key management.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CryptoConfig {
+    /// Key rotation interval in cycles (default: 10,000).
+    /// Basis: NIST SP 800-57 Part 1 — cryptoperiod for symmetric keys.
+    pub key_rotation_interval: u64,
+
+    /// Grace period for old key acceptance after rotation (cycles, default: 500).
+    /// At 50Hz, 500 cycles = 10 seconds — must span max in-flight message lifetime.
+    pub key_rotation_grace_period: u64,
+
+    /// Preferred AEAD algorithm for mesh packet encryption.
+    pub aead_algorithm: AeadAlgorithm,
+
+    /// Enable versioned encryption headers (1-byte key version prefix).
+    /// When true, `encrypt_packet_versioned()` is preferred over `encrypt_packet()`.
+    /// Enables the receiver to select the correct key without trial decryption.
+    pub enable_versioned_encrypt: bool,
+}
+
+/// AEAD algorithm selection for mesh encryption.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AeadAlgorithm {
+    /// Standard ChaCha20-Poly1305 (96-bit nonce, deterministic from source+epoch+seq).
+    /// Faster, smaller overhead (12 bytes nonce). Requires careful nonce management.
+    ChaCha20Poly1305,
+    /// Extended ChaCha20-Poly1305 (192-bit random nonce).
+    /// Nonce-misuse resistant (birthday bound ≈ 2^96). 12 bytes extra per packet.
+    XChaCha20Poly1305,
+}
+
+impl Default for CryptoConfig {
+    fn default() -> Self {
+        Self {
+            key_rotation_interval: crate::cognitive_loop::thresholds::KEY_ROTATION_INTERVAL_DEFAULT,
+            key_rotation_grace_period: crate::cognitive_loop::thresholds::KEY_ROTATION_GRACE_PERIOD_DEFAULT,
+            aead_algorithm: AeadAlgorithm::ChaCha20Poly1305,
+            enable_versioned_encrypt: true,
+        }
+    }
 }
 
 impl Default for SwarmConfig {
@@ -62,6 +107,7 @@ impl Default for SwarmConfig {
             require_handshake: true,
             initial_trust_score: crate::cognitive_loop::thresholds::HANDSHAKE_INITIAL_TRUST_SCORE,
             challenge_timeout_secs: crate::cognitive_loop::thresholds::HANDSHAKE_CHALLENGE_TIMEOUT_SECS,
+            crypto: CryptoConfig::default(),
         }
     }
 }
@@ -254,5 +300,21 @@ mod tests {
         let peer = PeerConfig::from_node_id("abc123");
         assert_eq!(peer.node_id, "abc123");
         assert!(peer.agent_key.is_none());
+    }
+
+    #[test]
+    fn test_crypto_config_defaults() {
+        let config = CryptoConfig::default();
+        assert_eq!(config.key_rotation_interval, 10_000);
+        assert_eq!(config.key_rotation_grace_period, 500);
+        assert_eq!(config.aead_algorithm, AeadAlgorithm::ChaCha20Poly1305);
+        assert!(config.enable_versioned_encrypt);
+    }
+
+    #[test]
+    fn test_swarm_config_includes_crypto() {
+        let config = SwarmConfig::default();
+        assert_eq!(config.crypto.key_rotation_interval, 10_000);
+        assert!(config.require_handshake);
     }
 }

@@ -1079,17 +1079,43 @@ pub fn encrypt_packet_typed(
     epoch: u8,
     sequence: u32,
 ) -> Vec<u8> {
+    match try_encrypt_packet_typed(envelope, key, source_id, payload_type, epoch, sequence) {
+        Ok(out) => out,
+        Err(e) => {
+            // This should never happen with valid inputs, but if it does,
+            // log and return empty (safer than panic in production).
+            tracing::error!("ChaCha20-Poly1305 encryption failed: {e}");
+            Vec::new()
+        }
+    }
+}
+
+/// Fallible variant of [`encrypt_packet_typed`] that returns `Result`.
+///
+/// Prefer this when the caller can handle encryption failures gracefully
+/// (e.g., skip the packet rather than crash).
+#[cfg(feature = "mesh-encryption")]
+pub fn try_encrypt_packet_typed(
+    envelope: &[u8],
+    key: &[u8; 32],
+    source_id: &[u8; 8],
+    payload_type: u8,
+    epoch: u8,
+    sequence: u32,
+) -> Result<Vec<u8>, crate::swarm::SwarmError> {
     use chacha20poly1305::{aead::Aead, ChaCha20Poly1305, KeyInit, Nonce};
     let cipher = ChaCha20Poly1305::new(key.into());
     let nonce_bytes = build_nonce(source_id, payload_type, epoch, sequence);
     let nonce = Nonce::from(nonce_bytes);
     let ciphertext = cipher
         .encrypt(&nonce, envelope)
-        .expect("encryption never fails for valid inputs");
+        .map_err(|e| crate::swarm::SwarmError::EncryptionFailed {
+            reason: format!("ChaCha20-Poly1305: {e}"),
+        })?;
     let mut out = Vec::with_capacity(12 + ciphertext.len());
     out.extend_from_slice(&nonce_bytes);
     out.extend_from_slice(&ciphertext);
-    out
+    Ok(out)
 }
 
 /// Encrypt with a 1-byte key version prefix for versioned decrypt.
@@ -1480,9 +1506,13 @@ pub fn encrypt_fragment(
     nonce_bytes[10] = fragment_index;
     nonce_bytes[11] = 0; // reserved
     let nonce = Nonce::from(nonce_bytes);
-    let ciphertext = cipher
-        .encrypt(&nonce, payload)
-        .expect("encryption never fails for valid inputs");
+    let ciphertext = match cipher.encrypt(&nonce, payload) {
+        Ok(ct) => ct,
+        Err(e) => {
+            tracing::error!("Fragment encryption failed: {e}");
+            return Vec::new();
+        }
+    };
     let mut out = Vec::with_capacity(12 + ciphertext.len());
     out.extend_from_slice(&nonce_bytes);
     out.extend_from_slice(&ciphertext);

@@ -59,6 +59,12 @@ pub enum SwarmError {
     /// Serialization error
     SerializationError(String),
 
+    /// Encryption failed (ChaCha20-Poly1305 AEAD error).
+    EncryptionFailed { reason: String },
+
+    /// Decryption failed (authentication tag mismatch or malformed ciphertext).
+    DecryptionFailed { reason: String },
+
     /// Internal error
     Internal(String),
 }
@@ -120,6 +126,12 @@ impl fmt::Display for SwarmError {
             }
             Self::SerializationError(msg) => {
                 write!(f, "Serialization error: {msg}")
+            }
+            Self::EncryptionFailed { reason } => {
+                write!(f, "Encryption failed: {reason}")
+            }
+            Self::DecryptionFailed { reason } => {
+                write!(f, "Decryption failed: {reason}")
             }
             Self::Internal(msg) => {
                 write!(f, "Internal error: {msg}")

@@ -4344,6 +4344,16 @@ pub const HANDSHAKE_MAX_PENDING_CHALLENGES: usize = 64;
 /// Basis: One challenge per peer is sufficient; duplicates indicate replay attempt.
 pub const HANDSHAKE_MAX_PER_PEER_CHALLENGES: usize = 1;
 
+/// Default key rotation interval in cycles.
+/// Basis: NIST SP 800-57 Part 1 — cryptoperiod for symmetric keys.
+/// At 50Hz cognitive loop, 10,000 cycles ≈ 200 seconds.
+pub const KEY_ROTATION_INTERVAL_DEFAULT: u64 = 10_000;
+
+/// Grace period for accepting old key after rotation (cycles).
+/// Must span max in-flight message lifetime. At 50Hz, 500 cycles = 10 seconds.
+/// Basis: Key rollover window to prevent message loss during rotation.
+pub const KEY_ROTATION_GRACE_PERIOD_DEFAULT: u64 = 500;
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // SAFETY AGENT — Operational Enforcement
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -5965,6 +5975,10 @@ mod tests {
         assert!(HANDSHAKE_MAX_PENDING_CHALLENGES > 0);
         assert!(HANDSHAKE_MAX_PER_PEER_CHALLENGES > 0);
         assert!(HANDSHAKE_MAX_PER_PEER_CHALLENGES <= HANDSHAKE_MAX_PENDING_CHALLENGES);
+        // Key rotation
+        assert!(KEY_ROTATION_INTERVAL_DEFAULT > 0);
+        assert!(KEY_ROTATION_GRACE_PERIOD_DEFAULT > 0);
+        assert!(KEY_ROTATION_GRACE_PERIOD_DEFAULT < KEY_ROTATION_INTERVAL_DEFAULT);
 
         // Safety enforcement ordering
         assert!(SAFETY_RED_LR_MULTIPLIER < SAFETY_ORANGE_LR_MULTIPLIER);
