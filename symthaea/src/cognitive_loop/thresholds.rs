@@ -1422,6 +1422,48 @@ pub const SUBSYSTEM_LR_FACTOR_MIN: f32 = 0.7;
 pub const SUBSYSTEM_LR_FACTOR_MAX: f32 = 1.3;
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// FEEDBACK PHASE — CONSCIOUSNESS LIMITING & PIPELINE GATES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Consciousness gradient magnitude threshold for limiting-component boost.
+/// Below this, gradient is too small to warrant targeted intervention.
+/// Basis: Dehaene (2014) — minimal gradient for workspace ignition.
+pub const LIMITING_COMPONENT_GRADIENT_THRESHOLD: f64 = 0.01;
+
+/// Confidence delta applied when binding is the limiting consciousness component.
+pub const LIMITING_BINDING_CONFIDENCE_DELTA: f32 = 0.01;
+
+/// Social learning rate change threshold — below this, skip modulation.
+/// Prevents noise from sub-epsilon trust fluctuations.
+pub const SOCIAL_LR_CHANGE_THRESHOLD: f32 = 0.01;
+
+/// Minimum consecutive interference-free cycles before harmonic all-clear boost.
+/// Basis: Kelso (1995) — stability requires sustained absence of perturbation.
+pub const HARMONIC_INTERFERENCE_FREE_CYCLES: u32 = 3;
+
+/// Pipeline consciousness high threshold — above this, relax epistemic caution.
+/// Basis: Dehaene (2014) — global workspace ignition requires integrated processing.
+pub const PIPELINE_CONSCIOUSNESS_RELAX: f32 = 0.7;
+
+/// Pipeline consciousness low threshold — below this, tighten caution.
+pub const PIPELINE_CONSCIOUSNESS_CAUTION: f32 = 0.3;
+
+/// Threshold scale factor when pipeline consciousness is high (relaxation).
+pub const PIPELINE_CONSCIOUSNESS_RELAX_SCALE: f32 = 0.97;
+
+/// Threshold scale factor when pipeline consciousness is low (tightening).
+pub const PIPELINE_CONSCIOUSNESS_CAUTION_SCALE: f32 = 1.03;
+
+/// Support predictive telemetry interval (cycles). Co-prime with subsystem intervals.
+pub const SUPPORT_TELEMETRY_INTERVAL: u64 = 47;
+
+/// Support graduation check interval (cycles). Co-prime with subsystem intervals.
+pub const SUPPORT_GRADUATION_INTERVAL: u64 = 97;
+
+/// Sacred Stillness harmony index — must match `Harmony::SacredStillness` enum order.
+pub const HARMONY_INDEX_SACRED_STILLNESS: usize = 7;
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // CROSS-MODULE QUALITY METRICS
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -2835,11 +2877,7 @@ pub const PIPELINE_CONSCIOUSNESS_HIGH_THRESHOLD: f32 = 0.7;
 /// Pipeline consciousness below this → tighten caution (subsystems aren't coherent).
 pub const PIPELINE_CONSCIOUSNESS_LOW_THRESHOLD: f32 = 0.3;
 
-/// Threshold scaling for relaxed pipeline consciousness (multiplicative, <1 = relax).
-pub const PIPELINE_CONSCIOUSNESS_RELAX_SCALE: f32 = 0.97;
-
-/// Threshold scaling for cautious pipeline consciousness (multiplicative, >1 = tighten).
-pub const PIPELINE_CONSCIOUSNESS_CAUTION_SCALE: f32 = 1.03;
+// (PIPELINE_CONSCIOUSNESS_RELAX_SCALE and CAUTION_SCALE defined above at line ~1452)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CONFIDENCE VELOCITY
