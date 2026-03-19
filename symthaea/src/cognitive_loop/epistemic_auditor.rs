@@ -693,7 +693,10 @@ impl EpistemicAuditor {
     pub fn audit_summary_all(&self) -> Result<AuditSummary, String> {
         let total = self.total_cycles_audited();
         if total == 0 {
-            return Err("no cycles audited".to_string());
+            return Err(format!(
+                "EpistemicAuditor: no cycles audited yet (history capacity: {})",
+                self.history.capacity()
+            ));
         }
         self.audit_summary(0, total + 1)
     }
@@ -702,7 +705,10 @@ impl EpistemicAuditor {
     pub fn generate_report_all(&self) -> Result<String, String> {
         let total = self.total_cycles_audited();
         if total == 0 {
-            return Err("no cycles audited".to_string());
+            return Err(format!(
+                "EpistemicAuditor: no cycles audited yet (history capacity: {})",
+                self.history.capacity()
+            ));
         }
         self.generate_report(0, total + 1)
     }

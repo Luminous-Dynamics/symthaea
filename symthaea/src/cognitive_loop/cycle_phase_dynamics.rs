@@ -423,6 +423,30 @@ impl CognitiveLoopService {
                                         );
                                     }
 
+                                    // Sovereign Social: forward ContentAnnounced to SocialFabricManager.
+                                    #[cfg(feature = "social-fabric")]
+                                    if let SwarmEvent::ContentAnnounced {
+                                        ref peer_id,
+                                        content_hash,
+                                        truncated_hdv: _,
+                                        ref domain,
+                                        created_at,
+                                    } = &event
+                                    {
+                                        use symthaea_core::hdc::BinaryHV;
+                                        self.social_fabric_manager.inject_event(
+                                            super::managers::social_fabric_manager::SocialEvent::ContentReceived(
+                                                crate::swarm::resonance_graph::ContentRef {
+                                                    source_peer: peer_id.clone(),
+                                                    content_hash: *content_hash,
+                                                    hdv_embedding: BinaryHV::zero(),
+                                                    domain: domain.clone(),
+                                                    created_at: *created_at,
+                                                },
+                                            ),
+                                        );
+                                    }
+
                                     // All events still go to SwarmManager for normal processing.
                                     self.swarm_manager.inject_event(event);
                                 }
@@ -645,9 +669,27 @@ impl CognitiveLoopService {
                 if self.time_manager.should_run(cycle_num, urgency_u8) {
                     let time_output = self.time_manager.process(snapshot);
                     self.subsystem_collector.record("time_manager", time_output);
-                    // TODO(blocked:mesh-bridge): Beacon emission requires MeshBridgeHandle
-                    // (lives in ContinuousMind). TimeManager.create_beacon() is ready.
-                    // Non-critical: beacons are advisory for time consensus protocol.
+                    // Emit time beacon to mesh peers via CLS→Mind outbound channel.
+                    let beacon = self.time_manager.create_beacon();
+                    let hv = beacon.encode();
+                    let timestamp_s = std::time::SystemTime::now()
+                        .duration_since(std::time::SystemTime::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs() as u32;
+                    let packet = crate::swarm::mesh::WisdomPacket {
+                        source_id: [0; 8], // filled by mesh bridge
+                        sequence: 0,
+                        phi: snapshot.unified_psi as f32,
+                        urgency: crate::swarm::mesh::MeshUrgency::Cruise,
+                        timestamp_s,
+                        payload_type: crate::swarm::mesh::PayloadType::TimeBeacon,
+                        auth_mac: 0,
+                        ttl: crate::swarm::mesh::MESH_DEFAULT_TTL,
+                        wisdom: hv,
+                    };
+                    let _ = self.mesh_outbound_tx.send(
+                        crate::swarm::mesh::MeshOutbound { packet },
+                    );
                 }
 
                 #[cfg(feature = "mesh-trust")]
@@ -3553,8 +3595,7 @@ impl CognitiveLoopService {
                 school
                     .recommend_next()
                     .ok()
-                    .filter(|r| r.predicted_phi_gain > 0.001)
-                    .map(|r| r.predicted_phi_gain)
+                    .and_then(|r| (r.predicted_phi_gain > 0.001).then_some(r.predicted_phi_gain))
                     .unwrap_or(0.0)
             } else {
                 0.0

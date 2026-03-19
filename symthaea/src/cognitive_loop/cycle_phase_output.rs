@@ -1363,7 +1363,7 @@ impl CognitiveLoopService {
         let signed_output = self
             .mfdi_bridge
             .sign_output(&dynamics.core.output)
-            .map_err(|e| tracing::warn!(error = ?e, "MFDI signing failed"))
+            .map_err(|e| tracing::error!(error = ?e, "MFDI output signing failed — output unattested"))
             .ok();
         #[cfg(feature = "identity")]
         let assurance_level = self.mfdi_bridge.assurance_level();
