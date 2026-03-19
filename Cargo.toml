@@ -335,7 +335,7 @@ rand = { workspace = true }
 rand_chacha = "0.3"  # Deterministic RNG for reproducible JL projections
 blake3 = { workspace = true }
 hex = "0.4"     # Hex encoding for node IDs in federated network
-ed25519-dalek = { version = "2.1", features = ["serde"], optional = true }  # MFDI identity signatures
+ed25519-dalek = { version = "2.1", features = ["serde", "rand_core"], optional = true }  # MFDI identity signatures
 sha2 = { version = "0.10", optional = true }   # MFDI credential hashing
 chrono = { workspace = true }
 regex = { workspace = true }
