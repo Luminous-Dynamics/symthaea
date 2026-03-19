@@ -185,10 +185,7 @@ pub enum Atom {
 
     /// Dispatch code generation to a backend tier.
     /// Energy cost reflects the tier: Native=1.0, LocalLLM=10.0, CloudLLM=50.0.
-    Dispatch {
-        prompt: String,
-        tier: DispatchTier,
-    },
+    Dispatch { prompt: String, tier: DispatchTier },
 
     /// No-op (identity in sequences).
     Noop,
@@ -370,6 +367,16 @@ impl Atom {
         Atom::Exec {
             program: "cargo".into(),
             args: vec!["check".into(), "--message-format=short".into()],
+            working_dir: Some(working_dir),
+            env: BTreeMap::new(),
+        }
+    }
+
+    /// `cargo check --message-format=json` for structured diagnostics.
+    pub fn cargo_check_json(working_dir: PathBuf) -> Self {
+        Atom::Exec {
+            program: "cargo".into(),
+            args: vec!["check".into(), "--message-format=json".into()],
             working_dir: Some(working_dir),
             env: BTreeMap::new(),
         }
@@ -1320,14 +1327,13 @@ pub mod recipes {
         max_retries: usize,
     ) -> Molecule {
         // test → if fail: write fix → test again
-        let test_fix = Molecule::atom(Atom::cargo_test(project_dir.clone())).then(
-            Molecule::branch(
+        let test_fix =
+            Molecule::atom(Atom::cargo_test(project_dir.clone())).then(Molecule::branch(
                 |val| val.is_success(),
                 Molecule::atom(Atom::Noop), // done
                 Molecule::atom(Atom::write_text(&target, &fix_code))
                     .then(Molecule::atom(Atom::cargo_check(project_dir.clone()))),
-            ),
-        );
+            ));
 
         test_fix.repeat_until(|val| val.is_success(), max_retries)
     }
@@ -1379,11 +1385,7 @@ pub mod recipes {
 
     /// Generate + write + check with explicit tier routing.
     /// The Dispatch atom signals which backend to use; the agent intercepts it.
-    pub fn generate_and_check(
-        target: PathBuf,
-        prompt: &str,
-        tier: DispatchTier,
-    ) -> Molecule {
+    pub fn generate_and_check(target: PathBuf, prompt: &str, tier: DispatchTier) -> Molecule {
         let project_dir = target
             .parent()
             .and_then(|p| p.parent())
@@ -1400,10 +1402,7 @@ pub mod recipes {
     /// Three-tier candidate set: native, local LLM, cloud LLM.
     /// Returns 3 PlanCandidates with different energy/capability tradeoffs.
     /// FEP selects the tier with best free-energy given consciousness state.
-    pub fn tiered_generation_candidates(
-        target: PathBuf,
-        prompt: &str,
-    ) -> Vec<(String, Molecule)> {
+    pub fn tiered_generation_candidates(target: PathBuf, prompt: &str) -> Vec<(String, Molecule)> {
         vec![
             (
                 "native_generate".into(),
@@ -2093,12 +2092,8 @@ mod tests {
             PathBuf::from("/tmp/proj/src/b.rs"),
             PathBuf::from("/tmp/proj/src/c.rs"),
         ];
-        let recipe = recipes::multi_file_edit(
-            files,
-            "old_name",
-            "new_name",
-            PathBuf::from("/tmp/proj"),
-        );
+        let recipe =
+            recipes::multi_file_edit(files, "old_name", "new_name", PathBuf::from("/tmp/proj"));
         let profile = recipe.profile();
         // noop + 3 edits + check
         assert_eq!(profile.step_count, 5);
@@ -2262,7 +2257,10 @@ mod tests {
         );
         assert_eq!(candidates.len(), 3);
         // Energy should increase: native < local < cloud
-        let energies: Vec<f32> = candidates.iter().map(|(_, m)| m.profile().total_energy).collect();
+        let energies: Vec<f32> = candidates
+            .iter()
+            .map(|(_, m)| m.profile().total_energy)
+            .collect();
         assert!(energies[0] < energies[1]);
         assert!(energies[1] < energies[2]);
     }
@@ -2290,7 +2288,11 @@ mod tests {
         // Plan B has much higher historical success rate
         let rates = vec![0.2, 0.9];
         let selected = select_best_plan_with_history(&candidates, 1.0, 100.0, &rates);
-        assert_eq!(selected, Some(1), "Should prefer historically successful plan");
+        assert_eq!(
+            selected,
+            Some(1),
+            "Should prefer historically successful plan"
+        );
     }
 
     #[test]

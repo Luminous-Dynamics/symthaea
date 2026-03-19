@@ -272,6 +272,9 @@ pub struct CodingAgentConfig {
     /// Use Ollama (qwen2.5-coder:7b) for code generation instead of simulated backend.
     /// Requires Ollama running at localhost:11434.
     pub use_local_llm: bool,
+    /// Use Anthropic Claude API as the cloud LLM tier for complex tasks.
+    /// Reads `ANTHROPIC_API_KEY` from environment. Falls back gracefully if unavailable.
+    pub use_cloud_llm: bool,
 }
 
 impl Default for CodingAgentConfig {
@@ -285,6 +288,7 @@ impl Default for CodingAgentConfig {
             target_file: None,
             enable_real_exec: false,
             use_local_llm: false,
+            use_cloud_llm: false,
         }
     }
 }
@@ -407,11 +411,26 @@ impl CodingAgent {
             }
         }
 
-        // Select dispatcher: real Ollama or simulated
+        // Select dispatcher: real Ollama or simulated, optionally with cloud LLM
+        let cloud_backend: Option<std::sync::Arc<dyn crate::language::llm_backend::LLMBackend>> =
+            if config.use_cloud_llm {
+                crate::language::anthropic_backend::AnthropicBackend::from_env().map(|b| {
+                    std::sync::Arc::new(b)
+                        as std::sync::Arc<dyn crate::language::llm_backend::LLMBackend>
+                })
+            } else {
+                None
+            };
         let dispatcher = if config.use_local_llm {
-            IntelligentDispatcher::with_local_llm().with_energy_budget(100.0)
+            use crate::language::llm_backend::OllamaBackend;
+            IntelligentDispatcher::new(std::sync::Arc::new(OllamaBackend::new()), cloud_backend)
+                .with_energy_budget(100.0)
         } else {
-            IntelligentDispatcher::simulated().with_energy_budget(100.0)
+            IntelligentDispatcher::new(
+                std::sync::Arc::new(crate::language::llm_backend::SimulatedBackend),
+                cloud_backend,
+            )
+            .with_energy_budget(100.0)
         };
 
         let experience_store = Self::try_init_experience_store(&config.working_dir);
@@ -816,11 +835,8 @@ impl CodingAgent {
             let temperature = (0.3 + pe * 0.3).min(0.9);
 
             // Apply forced backend tier from retry strategy
-            match &self.retry_state.current_strategy {
-                RetryStrategy::DifferentBackend(tier) => {
-                    dispatcher.force_next_tier(*tier);
-                }
-                _ => {}
+            if let RetryStrategy::DifferentBackend(tier) = &self.retry_state.current_strategy {
+                dispatcher.force_next_tier(*tier);
             }
 
             let params = GenerationParams {
@@ -998,6 +1014,36 @@ impl CodingAgent {
             }
         }
 
+        // Try compiler-suggested replacements first (highest fidelity — from rustc itself)
+        // These come from JSON diagnostics if the output contains JSON lines
+        let json_errors = crate::language::code_executor::parse_json_diagnostics(&test_output);
+        let has_suggestions = json_errors
+            .iter()
+            .any(|e| e.suggested_replacement.is_some());
+        if has_suggestions {
+            let suggestion_key = "compiler-suggestion-fix".to_string();
+            if !self.attempted_fixes.contains(&suggestion_key) {
+                if let Some(fixed) = Self::try_apply_compiler_suggestions(&code, &json_errors) {
+                    self.attempted_fixes.insert(suggestion_key);
+                    let target = self.resolve_target_file();
+                    self.write_code_to_disk(&target, &fixed);
+                    self.generated_code = Some(Self::strip_code_fences(&fixed));
+                    self.observations.push(format!(
+                        "Applied {} compiler-suggested fix(es)",
+                        json_errors
+                            .iter()
+                            .filter(|e| e.suggested_replacement.is_some())
+                            .count()
+                    ));
+                    tracing::info!(
+                        target: "symthaea::coding_agent",
+                        "Applied compiler-suggested fixes from JSON diagnostics"
+                    );
+                    return true;
+                }
+            }
+        }
+
         // Build dedup key from first error signature
         let error_sig = structured
             .first()
@@ -1094,6 +1140,47 @@ impl CodingAgent {
         );
 
         false
+    }
+
+    /// Apply compiler-suggested replacements from JSON diagnostics.
+    ///
+    /// When `CompileError.suggested_replacement` is populated (from
+    /// `parse_json_diagnostics()`), this applies the compiler's own fix suggestions
+    /// directly — the most reliable auto-fix possible since rustc computed them.
+    ///
+    /// Returns `Some(fixed_code)` if any replacement was applied.
+    fn try_apply_compiler_suggestions(
+        code: &str,
+        errors: &[crate::language::code_executor::CompileError],
+    ) -> Option<String> {
+        let mut lines: Vec<String> = code.lines().map(|l| l.to_string()).collect();
+        let mut any_fix = false;
+
+        // Apply in reverse line order to preserve line numbers
+        let mut fixes: Vec<_> = errors
+            .iter()
+            .filter_map(|e| {
+                let replacement = e.suggested_replacement.as_ref()?;
+                let line = e.line?;
+                let col = e.column.unwrap_or(1);
+                Some((line, col, replacement.clone()))
+            })
+            .collect();
+        fixes.sort_by(|a, b| b.0.cmp(&a.0).then(b.1.cmp(&a.1)));
+
+        for (line_num, _col, replacement) in &fixes {
+            let idx = line_num.saturating_sub(1);
+            if idx < lines.len() && !replacement.is_empty() {
+                lines[idx] = replacement.clone();
+                any_fix = true;
+            }
+        }
+
+        if any_fix {
+            Some(lines.join("\n"))
+        } else {
+            None
+        }
     }
 
     /// Attempt category-aware fixes that the line-level auto-fix missed.
@@ -1515,18 +1602,22 @@ impl CodingAgent {
         // This is the neuro-symbolic path: encode task → find similar pattern → translate to code
         // Runs after hardcoded patterns so exact matches always win over fuzzy HDC similarity.
         {
-            use symthaea_core::hdc::program_algebra::{encode_task_description, ProgramPatternLibrary};
             use crate::language::program_node_translator;
+            use symthaea_core::hdc::program_algebra::{
+                encode_task_description, ProgramPatternLibrary,
+            };
 
             let task_hv = encode_task_description(&task_lower);
             let lib = ProgramPatternLibrary::standard();
             // BinaryHV similarity: 0.5 = random, > 0.52 = meaningful match
             if let Some((entry, similarity)) = lib.find_similar(&task_hv, 0.52) {
-                let function_name = Self::extract_function_name(&task_lower)
-                    .unwrap_or_else(|| entry.name.clone());
+                let function_name =
+                    Self::extract_function_name(&task_lower).unwrap_or_else(|| entry.name.clone());
                 let language = self.target_language();
 
-                if let Some(code) = program_node_translator::translate(entry, language, &function_name) {
+                if let Some(code) =
+                    program_node_translator::translate(entry, language, &function_name)
+                {
                     tracing::info!(
                         target: "symthaea::coding_agent",
                         pattern = %entry.name,
@@ -2073,7 +2164,6 @@ impl CodingAgent {
         obs
     }
 
-    /// Build the motor action request based on current phase.
     // ── Plan Evaluation (Typed Primitives) ──────────────────────────────
 
     /// Build a typed execution plan for the current phase.
@@ -2547,8 +2637,10 @@ impl CodingAgent {
                     );
                     self.quality_rejections += 1;
                     let rejection_pattern = format!("quality_gate: {}", quality_issue);
-                    if let Some((_, count)) =
-                        self.failure_patterns.iter_mut().find(|(p, _)| *p == rejection_pattern)
+                    if let Some((_, count)) = self
+                        .failure_patterns
+                        .iter_mut()
+                        .find(|(p, _)| *p == rejection_pattern)
                     {
                         *count += 1;
                     } else {
@@ -3089,9 +3181,9 @@ impl CodingAgent {
             .as_ref()
             .and_then(|profile| {
                 // If the profile includes testing atoms, rebuild the molecule
-                if profile.atom_names.iter().any(|n| *n == "CargoTest") {
+                if profile.atom_names.contains(&"CargoTest") {
                     Some(Molecule::atom(Atom::cargo_test(working_dir.clone())))
-                } else if profile.atom_names.iter().any(|n| *n == "CargoCheck") {
+                } else if profile.atom_names.contains(&"CargoCheck") {
                     Some(Molecule::atom(Atom::cargo_check(working_dir.clone())))
                 } else {
                     None
@@ -4484,6 +4576,18 @@ mod tests {
             .unwrap()
             .with_dispatcher(IntelligentDispatcher::simulated().with_energy_budget(100.0));
 
+        assert!(agent.dispatcher.is_some());
+    }
+
+    #[test]
+    fn test_cloud_llm_config() {
+        // With use_cloud_llm = true but no ANTHROPIC_API_KEY, dispatcher still works
+        // (cloud_llm will be None since from_env() returns None)
+        let config = CodingAgentConfig {
+            use_cloud_llm: true,
+            ..Default::default()
+        };
+        let agent = CodingAgent::new(config).unwrap();
         assert!(agent.dispatcher.is_some());
     }
 
@@ -6180,6 +6284,7 @@ assertion `left == right` failed
             line: Some(10),
             column: Some(5),
             category: crate::language::code_executor::ErrorCategory::TypeMismatch,
+            suggested_replacement: None,
         }];
 
         agent.store_fix_strategies(&errors, "type-cast-fix");
@@ -6215,6 +6320,7 @@ assertion `left == right` failed
             line: None,
             column: None,
             category: crate::language::code_executor::ErrorCategory::MissingImpl,
+            suggested_replacement: None,
         }];
         agent.store_fix_strategies(&errors, "add-derive-clone");
 
@@ -6243,6 +6349,7 @@ assertion `left == right` failed
             line: None,
             column: None,
             category: crate::language::code_executor::ErrorCategory::TypeMismatch,
+            suggested_replacement: None,
         }];
 
         // Store same fix twice
@@ -6329,7 +6436,10 @@ assertion `left == right` failed
         agent.task = "implement xyzzy quux frobnicate nonsense widget".to_string();
         let result_before = agent.native_code_template();
         assert!(
-            !result_before.as_deref().unwrap_or("").contains("XyzzyWidget"),
+            !result_before
+                .as_deref()
+                .unwrap_or("")
+                .contains("XyzzyWidget"),
             "Should not contain learned template before storing"
         );
 
@@ -6344,10 +6454,9 @@ assertion `left == right` failed
         // Verify the learned template is retrievable from the experience store.
         // Note: native_code_template() checks HDC Program Algebra first (which may return
         // a spurious match at 0.52 threshold), so we verify the store directly.
-        let stored = agent
-            .experience_store
-            .as_ref()
-            .and_then(|s| s.lookup_learned_template("implement xyzzy quux frobnicate nonsense widget"));
+        let stored = agent.experience_store.as_ref().and_then(|s| {
+            s.lookup_learned_template("implement xyzzy quux frobnicate nonsense widget")
+        });
         assert!(
             stored.is_some(),
             "Should find learned template in experience store"
@@ -6559,6 +6668,7 @@ assertion `left == right` failed
             line: Some(2),
             column: None,
             category: crate::language::code_executor::ErrorCategory::MissingImport,
+            suggested_replacement: None,
         }];
 
         let fixed = agent.try_category_aware_fix(code, &errors);
@@ -6588,6 +6698,7 @@ assertion `left == right` failed
             line: Some(2),
             column: None,
             category: crate::language::code_executor::ErrorCategory::UnusedCode,
+            suggested_replacement: None,
         }];
 
         let fixed = agent.try_category_aware_fix(code, &errors);
@@ -6615,6 +6726,7 @@ assertion `left == right` failed
             line: Some(3),
             column: None,
             category: crate::language::code_executor::ErrorCategory::BorrowError,
+            suggested_replacement: None,
         }];
 
         let fixed = agent.try_category_aware_fix(code, &errors);
@@ -6643,10 +6755,51 @@ assertion `left == right` failed
             line: Some(1),
             column: None,
             category: crate::language::code_executor::ErrorCategory::SyntaxError,
+            suggested_replacement: None,
         }];
 
         let fixed = agent.try_category_aware_fix(code, &errors);
         assert!(fixed.is_none(), "SyntaxError should not be auto-fixed");
+    }
+
+    // ── Compiler Suggestion Tests ─────────────────────────────────────
+
+    #[test]
+    fn test_apply_compiler_suggestions() {
+        let code = "fn main() {\n    let x: i32 = \"hello\";\n    println!(\"{}\", x);\n}";
+        let errors = vec![crate::language::code_executor::CompileError {
+            message: "mismatched types".to_string(),
+            code: Some("E0308".to_string()),
+            file: Some("main.rs".to_string()),
+            line: Some(2),
+            column: Some(18),
+            category: crate::language::code_executor::ErrorCategory::TypeMismatch,
+            suggested_replacement: Some("    let x: i32 = 42;".to_string()),
+        }];
+
+        let fixed = CodingAgent::try_apply_compiler_suggestions(code, &errors);
+        assert!(fixed.is_some(), "Should apply compiler suggestion");
+        assert!(
+            fixed.unwrap().contains("let x: i32 = 42;"),
+            "Should replace the line with suggestion"
+        );
+    }
+
+    #[test]
+    fn test_apply_compiler_suggestions_no_suggestions() {
+        let code = "fn main() {}";
+        let errors = vec![crate::language::code_executor::CompileError {
+            message: "some error".to_string(),
+            code: None,
+            file: None,
+            line: Some(1),
+            column: None,
+            category: crate::language::code_executor::ErrorCategory::Other,
+            suggested_replacement: None,
+        }];
+
+        let fixed = CodingAgent::try_apply_compiler_suggestions(code, &errors);
+        assert!(fixed.is_none(), "Should not fix when no suggestions");
     }
 
     // ── Dynamic Context Tests ─────────────────────────────────────────
@@ -6783,6 +6936,7 @@ assertion `left == right` failed
             line: None,
             column: None,
             category: crate::language::code_executor::ErrorCategory::TypeMismatch,
+            suggested_replacement: None,
         }];
         agent.store_fix_strategies(&errors, "cast-fix");
 
@@ -6844,8 +6998,12 @@ assertion `left == right` failed
         let mut agent = CodingAgent::new(config).unwrap();
 
         // Insert a dedup key
-        agent.attempted_fixes.insert("some_error:structured-line-fix".to_string());
-        assert!(agent.attempted_fixes.contains("some_error:structured-line-fix"));
+        agent
+            .attempted_fixes
+            .insert("some_error:structured-line-fix".to_string());
+        assert!(agent
+            .attempted_fixes
+            .contains("some_error:structured-line-fix"));
 
         // Verify clear works
         agent.attempted_fixes.clear();
@@ -7003,6 +7161,9 @@ assertion `left == right` failed
         agent.failure_patterns.push((rejection_pattern.clone(), 1));
 
         assert_eq!(agent.quality_rejections, 1);
-        assert!(agent.failure_patterns.iter().any(|(p, _)| p.starts_with("quality_gate:")));
+        assert!(agent
+            .failure_patterns
+            .iter()
+            .any(|(p, _)| p.starts_with("quality_gate:")));
     }
 }
