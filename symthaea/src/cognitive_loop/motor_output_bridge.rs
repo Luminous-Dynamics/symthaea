@@ -111,7 +111,7 @@ impl MotorOutputResult {
         Self {
             success: false,
             action_type: None,
-            prediction_error: 0.5,
+            prediction_error: super::thresholds::MOTOR_SKIP_PREDICTION_ERROR,
             outcome: None,
             error: Some(reason.to_string()),
         }
@@ -263,7 +263,7 @@ impl MotorOutputBridge {
         }
 
         // 2. Low confidence → skip (FEP isn't sure this is the right action)
-        if motor_confidence < 0.3 {
+        if motor_confidence < super::thresholds::MOTOR_CONFIDENCE_MIN {
             return MotorOutputResult::skipped(&format!(
                 "Motor confidence {motor_confidence:.3} too low for execution"
             ));
@@ -319,9 +319,15 @@ impl MotorOutputBridge {
         //    Destructive: min_phi + 0.3
         let phi_requirement = match action_ir.destructiveness() {
             crate::action::DestructivenessLevel::ReadOnly => min_phi,
-            crate::action::DestructivenessLevel::Reversible => (min_phi + 0.1).min(1.0),
-            crate::action::DestructivenessLevel::NeedsConfirmation => (min_phi + 0.2).min(1.0),
-            crate::action::DestructivenessLevel::Destructive => (min_phi + 0.3).min(1.0),
+            crate::action::DestructivenessLevel::Reversible => {
+                (min_phi + super::thresholds::MOTOR_PHI_REVERSIBLE_BONUS).min(1.0)
+            }
+            crate::action::DestructivenessLevel::NeedsConfirmation => {
+                (min_phi + super::thresholds::MOTOR_PHI_CONFIRMATION_BONUS).min(1.0)
+            }
+            crate::action::DestructivenessLevel::Destructive => {
+                (min_phi + super::thresholds::MOTOR_PHI_DESTRUCTIVE_BONUS).min(1.0)
+            }
         };
 
         if current_phi < phi_requirement {

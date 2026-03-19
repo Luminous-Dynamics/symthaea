@@ -770,12 +770,18 @@ pub fn bridge_governance_event(
     match &gov_event.kind {
         GovernanceEventKind::ProposalCreated => Some(SentinelEvent::ProposalCreated {
             agent_id: agent_id.to_string(),
-            proposal_id: gov_event.proposal_id.clone().unwrap_or_default(),
+            proposal_id: gov_event.proposal_id.clone().unwrap_or_else(|| {
+                tracing::warn!("SentinelManager: missing proposal_id in ProposalCreated event");
+                "[unknown]".to_string()
+            }),
             timestamp_us: gov_event.timestamp_secs * 1_000_000,
         }),
         GovernanceEventKind::VoteCast { vote_value, .. } => Some(SentinelEvent::VoteCast {
             agent_id: agent_id.to_string(),
-            proposal_id: gov_event.proposal_id.clone().unwrap_or_default(),
+            proposal_id: gov_event.proposal_id.clone().unwrap_or_else(|| {
+                tracing::warn!("SentinelManager: missing proposal_id in VoteCast event");
+                "[unknown]".to_string()
+            }),
             vote_direction: *vote_value > 0.0,
             timestamp_us: gov_event.timestamp_secs * 1_000_000,
         }),

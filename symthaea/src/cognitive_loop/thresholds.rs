@@ -2785,6 +2785,91 @@ pub const CONSEQUENCE_TRACKER_MAX_AGE_CYCLES: u64 = 2000;
 pub const CONSEQUENCE_TRACKER_ACCURACY_ALPHA: f64 = 0.05;
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// GOVERNANCE LEARNING — OUTCOME-BASED FEEDBACK
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Confidence boost when agent's vote aligned with outcome.
+/// Basis: Schultz (1997) — reward prediction confirmation → confidence.
+pub const GOV_ALIGNED_VOTE_CONFIDENCE: f64 = 0.02;
+
+/// Confidence penalty when agent's vote misaligned with outcome.
+/// Basis: Schultz (1997) — prediction error → confidence reduction.
+pub const GOV_MISALIGNED_VOTE_CONFIDENCE: f64 = -0.03;
+
+/// Prediction error → LR boost scaling factor.
+/// Higher PE → faster learning about governance dynamics.
+/// Basis: Friston (2010) — precision-weighted free-energy minimization.
+pub const GOV_PE_LR_SCALE: f64 = 0.3;
+
+/// Maximum LR boost from governance prediction error.
+pub const GOV_PE_LR_MAX_BOOST: f64 = 0.5;
+
+/// Outcome sign for failed proposals (asymmetric: losses loom larger).
+/// Basis: Kahneman & Tversky (1979) — loss aversion in prospect theory.
+pub const GOV_FAILED_OUTCOME_SIGN: f64 = -0.5;
+
+/// EMA decay for governance reward tracking (alpha = 1 - decay).
+/// Basis: Sutton & Barto (2018) — exponential recency-weighted average.
+pub const GOV_REWARD_EMA_DECAY: f64 = 0.9;
+
+/// Collective Phi threshold for high-coherence governance actions.
+/// Above this, group is coherent enough to trigger ECB/confidence signals.
+/// Basis: Woolley et al. (2010) — collective intelligence factor.
+pub const GOV_COLLECTIVE_PHI_HIGH: f64 = 0.5;
+
+/// Collective Phi threshold below which consensus is fragile → explore.
+/// Basis: Sunstein (2002) — deliberative polling under low agreement.
+pub const GOV_FRAGILE_CONSENSUS_PHI: f64 = 0.3;
+
+/// Exploration boost per fragile consensus detection.
+pub const GOV_FRAGILE_CONSENSUS_EXPLORE: f64 = 0.05;
+
+/// Confidence boost per high-Phi voter observed.
+pub const GOV_HIGH_PHI_VOTER_CONFIDENCE: f64 = 0.005;
+
+/// Arousal delta on emergency declaration.
+pub const GOV_EMERGENCY_AROUSAL: f32 = 0.1;
+
+/// Exploration suppression during emergency.
+pub const GOV_EMERGENCY_EXPLORE_SUPPRESS: f64 = 0.1;
+
+/// Per-tally LR boost scaling (each tally adds this × tally_count, capped).
+/// Basis: active governance engagement → heightened learning plasticity.
+pub const GOV_TALLY_LR_SCALE: f64 = 0.02;
+
+/// Maximum per-cycle LR boost from tally count.
+pub const GOV_TALLY_LR_MAX_BOOST: f64 = 0.1;
+
+/// Blind spot severity → exploration scaling.
+/// Basis: Friston (2010) — epistemic affordance drives exploration.
+pub const GOV_BLIND_SPOT_EXPLORE_SCALE: f64 = 0.05;
+
+/// Community mode harmonic bias per cycle.
+/// Basis: gentle influence, not override — social context nudges moral weight.
+pub const GOV_COMMUNITY_HARMONIC_BIAS: f64 = 0.005;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MOTOR OUTPUT BRIDGE — PHI-GATED ACTION SAFETY
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Default prediction error for skipped motor actions.
+pub const MOTOR_SKIP_PREDICTION_ERROR: f64 = 0.5;
+
+/// Minimum motor confidence for action execution.
+/// Below this, FEP isn't certain enough to commit.
+pub const MOTOR_CONFIDENCE_MIN: f64 = 0.3;
+
+/// Phi bonus for reversible actions (added to min_phi).
+/// Basis: graduated safety — reversible actions need slightly more consciousness.
+pub const MOTOR_PHI_REVERSIBLE_BONUS: f64 = 0.1;
+
+/// Phi bonus for actions needing confirmation.
+pub const MOTOR_PHI_CONFIRMATION_BONUS: f64 = 0.2;
+
+/// Phi bonus for destructive actions (highest consciousness requirement).
+pub const MOTOR_PHI_DESTRUCTIVE_BONUS: f64 = 0.3;
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // GLYPH CODEX — SYMBOLIC CONSCIOUSNESS COUPLING
 // ═══════════════════════════════════════════════════════════════════════════════
 

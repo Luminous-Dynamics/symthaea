@@ -288,6 +288,7 @@ impl PrimitiveTierManager {
                 crate::consciousness::primitive_evolution::EvolutionConfig::default(),
                 crate::consciousness::meta_reasoning::MetaReasoningConfig::default(),
             )
+            .map_err(|e| tracing::warn!("MetaCognitiveReasoner init failed: {e}"))
             .ok()
         } else {
             None
@@ -327,6 +328,7 @@ impl PrimitiveTierManager {
             MultiObjectiveEvolution::new(
                 crate::consciousness::primitive_evolution::EvolutionConfig::default(),
             )
+            .map_err(|e| tracing::warn!("MultiObjectiveEvolution init failed: {e}"))
             .ok()
         } else {
             None

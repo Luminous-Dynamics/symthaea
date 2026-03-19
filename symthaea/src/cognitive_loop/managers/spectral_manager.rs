@@ -393,7 +393,10 @@ impl CognitiveSubsystem for SpectralManager {
 
     fn checkpoint(&self) -> Vec<u8> {
         // Serialize config + telemetry (history is transient, not checkpointed)
-        serde_json::to_vec(&(&self.config, &self.telemetry)).unwrap_or_default()
+        serde_json::to_vec(&(&self.config, &self.telemetry)).unwrap_or_else(|e| {
+            tracing::warn!("SpectralManager checkpoint serialization failed: {e}");
+            Vec::new()
+        })
     }
 
     fn restore(&mut self, data: &[u8]) -> Result<(), String> {
