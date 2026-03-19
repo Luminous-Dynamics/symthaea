@@ -190,7 +190,11 @@ self.onmessage = async function(e) {
         break;
       case 'loadBrocaPipeline':
         if (engine) {
-          var response = await fetch('./broca-pipeline.bin');
+          // Try local first (self-hosted), fall back to GitHub LFS
+          var response = await fetch('./broca-pipeline.bin').catch(function() { return { ok: false }; });
+          if (!response.ok) {
+            response = await fetch('https://media.githubusercontent.com/media/Luminous-Dynamics/luminous-dynamics/main/symthaea/crates/symthaea-spore/data/broca-pipeline-distilled.bin');
+          }
           if (!response.ok) throw new Error('Pipeline checkpoint fetch failed: ' + response.status);
           var buffer = await response.arrayBuffer();
           engine.load_broca_pipeline_checkpoint(new Uint8Array(buffer));
