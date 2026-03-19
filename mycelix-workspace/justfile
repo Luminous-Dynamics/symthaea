@@ -2,7 +2,7 @@
 # Run `just` to see all available commands
 
 # Auto-detect LIBCLANG_PATH for bindgen (sweettest builds need this outside nix develop)
-export LIBCLANG_PATH := env("LIBCLANG_PATH", "/nix/store/xibf2ayyaljj1r7wgjf4n7n4vg5z8n2v-clang-21.1.8-lib/lib")
+export LIBCLANG_PATH := env("LIBCLANG_PATH", "/nix/store/pgiv6j3dsm3hkkbc1kkva0lg11n67w4w-clang-20.1.8-lib/lib")
 
 # Default: show help
 default:
