@@ -10,10 +10,15 @@ use serde::{Deserialize, Serialize};
 use crate::dynamics::temporal_signatures::ConsciousnessPattern;
 
 use super::thresholds::{
-    THALAMIC_COMPLEXITY_CORTICAL, THALAMIC_CORTICAL_BASE_RATE, THALAMIC_EMOTIONAL_BOOST_BASE,
-    THALAMIC_EMOTIONAL_BOOST_SCALE, THALAMIC_EMOTIONAL_DAMPENING, THALAMIC_FACTOR_FLOOR,
-    THALAMIC_FAMILIARITY_THRESHOLD, THALAMIC_INPUT_OFFSET, THALAMIC_NOVELTY_THRESHOLD,
-    THALAMIC_URGENCY_THRESHOLD,
+    PATTERN_COMPLEXITY_CONTEMPLATIVE, PATTERN_COMPLEXITY_EXCITED, PATTERN_COMPLEXITY_EXPLORATORY,
+    PATTERN_COMPLEXITY_FOCUSED, PATTERN_COMPLEXITY_RESTING, PATTERN_COMPLEXITY_TRANSITIONING,
+    PATTERN_COMPLEXITY_UNCERTAIN, PATTERN_URGENCY_DEFAULT, PATTERN_URGENCY_EXCITED,
+    PATTERN_URGENCY_TRANSITIONING, PATTERN_URGENCY_UNCERTAIN, THALAMIC_AGREEMENT_ADJACENT,
+    THALAMIC_AGREEMENT_DIAGONAL, THALAMIC_AGREEMENT_DISTANT, THALAMIC_BP_DAMPING,
+    THALAMIC_BP_MAX_ITERATIONS, THALAMIC_BP_TOLERANCE, THALAMIC_COMPLEXITY_CORTICAL,
+    THALAMIC_CORTICAL_BASE_RATE, THALAMIC_EMOTIONAL_BOOST_BASE, THALAMIC_EMOTIONAL_BOOST_SCALE,
+    THALAMIC_EMOTIONAL_DAMPENING, THALAMIC_FACTOR_FLOOR, THALAMIC_FAMILIARITY_THRESHOLD,
+    THALAMIC_INPUT_OFFSET, THALAMIC_NOVELTY_THRESHOLD, THALAMIC_URGENCY_THRESHOLD,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -345,18 +350,18 @@ impl ThalamicRouter {
         // Pairwise consistency factor: encourage agreement between variables
         // Table: 3x3 (row = v_novelty state, col = v_urgency state)
         let agreement_table = vec![
-            1.0, 0.3, 0.1, // novelty=Reflex: strongly prefer urgency=Reflex
-            0.3, 1.0, 0.3, // novelty=Cortical: prefer urgency=Cortical
-            0.1, 0.3, 1.0, // novelty=DeepThought: prefer urgency=DeepThought
+            THALAMIC_AGREEMENT_DIAGONAL, THALAMIC_AGREEMENT_ADJACENT, THALAMIC_AGREEMENT_DISTANT,
+            THALAMIC_AGREEMENT_ADJACENT, THALAMIC_AGREEMENT_DIAGONAL, THALAMIC_AGREEMENT_ADJACENT,
+            THALAMIC_AGREEMENT_DISTANT, THALAMIC_AGREEMENT_ADJACENT, THALAMIC_AGREEMENT_DIAGONAL,
         ];
         fg.add_factor(&[v_novelty, v_urgency], agreement_table.clone());
         fg.add_factor(&[v_urgency, v_complexity], agreement_table);
 
         // Run belief propagation
         let bp_config = BPConfig {
-            max_iterations: 5,
-            tolerance: 1e-4,
-            damping: 0.5,
+            max_iterations: THALAMIC_BP_MAX_ITERATIONS,
+            tolerance: THALAMIC_BP_TOLERANCE,
+            damping: THALAMIC_BP_DAMPING,
             schedule: MessageSchedule::Sequential,
         };
         let result = fg.run_bp(&bp_config);
@@ -399,21 +404,21 @@ impl ThalamicRouter {
 
         // Complexity from pattern
         let complexity = match pattern {
-            ConsciousnessPattern::Uncertain => 0.8,
-            ConsciousnessPattern::Transitioning => 0.7,
-            ConsciousnessPattern::Exploratory => 0.6,
-            ConsciousnessPattern::Contemplative => 0.5,
-            ConsciousnessPattern::Focused => 0.4,
-            ConsciousnessPattern::Excited => 0.4,
-            ConsciousnessPattern::Resting => 0.2,
+            ConsciousnessPattern::Uncertain => PATTERN_COMPLEXITY_UNCERTAIN,
+            ConsciousnessPattern::Transitioning => PATTERN_COMPLEXITY_TRANSITIONING,
+            ConsciousnessPattern::Exploratory => PATTERN_COMPLEXITY_EXPLORATORY,
+            ConsciousnessPattern::Contemplative => PATTERN_COMPLEXITY_CONTEMPLATIVE,
+            ConsciousnessPattern::Focused => PATTERN_COMPLEXITY_FOCUSED,
+            ConsciousnessPattern::Excited => PATTERN_COMPLEXITY_EXCITED,
+            ConsciousnessPattern::Resting => PATTERN_COMPLEXITY_RESTING,
         };
 
         // Urgency from pattern (uncertain/transitioning = urgent)
         let urgency = match pattern {
-            ConsciousnessPattern::Uncertain => 0.8,
-            ConsciousnessPattern::Transitioning => 0.6,
-            ConsciousnessPattern::Excited => 0.5,
-            _ => 0.3,
+            ConsciousnessPattern::Uncertain => PATTERN_URGENCY_UNCERTAIN,
+            ConsciousnessPattern::Transitioning => PATTERN_URGENCY_TRANSITIONING,
+            ConsciousnessPattern::Excited => PATTERN_URGENCY_EXCITED,
+            _ => PATTERN_URGENCY_DEFAULT,
         };
 
         // Emotional intensity from absolute valence
