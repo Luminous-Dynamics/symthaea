@@ -61,7 +61,7 @@ pub const QUANTIZATION_RESOLUTION: u64 = 1_000_000_000 / 16384; // ~61,035
 /// assert_eq!(max_quantization_error(1_000_000), 61);         // ~61 micro-SAP
 /// ```
 pub fn max_quantization_error(max_balance: u64) -> u64 {
-    max_balance / THERMOMETER_LEVELS as u64
+    max_balance / THERMOMETER_LEVELS
 }
 
 /// Encode a balance with deterministic dithering to reduce systematic quantization bias.
@@ -92,7 +92,7 @@ pub fn encode_balance_with_dithering(balance: u64, max_balance: u64, nonce: u64)
     let remainder = scaled % max_balance as u128;
     // Dither: compare remainder to a deterministic threshold derived from nonce.
     // If the fractional position exceeds the nonce-derived threshold, round up.
-    let threshold = (nonce % max_balance as u64) as u128;
+    let threshold = (nonce % max_balance) as u128;
     let bits_to_set = if remainder > 0 && remainder > threshold {
         // Deterministically round up based on nonce
         (bits_to_set_floor + 1).min(THERMOMETER_LEVELS as usize)
@@ -107,7 +107,7 @@ pub fn encode_balance_with_dithering(balance: u64, max_balance: u64, nonce: u64)
         *b = 0xFF;
     }
     if remaining_bits > 0 && full_bytes < 2048 {
-        bytes[full_bytes] = (0xFF << (8 - remaining_bits)) & 0xFF;
+        bytes[full_bytes] = 0xFF << (8 - remaining_bits);
     }
     BinaryHV(bytes)
 }
@@ -170,7 +170,7 @@ pub fn encode_balance(balance: u64, max_balance: u64) -> BinaryHV {
         *b = 0xFF;
     }
     if remaining_bits > 0 && full_bytes < 2048 {
-        bytes[full_bytes] = (0xFF << (8 - remaining_bits)) & 0xFF;
+        bytes[full_bytes] = 0xFF << (8 - remaining_bits);
     }
     BinaryHV(bytes)
 }

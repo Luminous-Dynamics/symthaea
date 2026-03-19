@@ -1120,9 +1120,8 @@ pub fn create_best_encoder() -> Box<dyn SemanticEncoder> {
 pub fn create_ethics_encoder() -> Box<dyn SemanticEncoder> {
     #[cfg(feature = "embeddings")]
     {
-        match onnx::OnnxSemanticEncoder::new() {
-            Ok(encoder) => return Box::new(encoder),
-            Err(_) => {}
+        if let Ok(encoder) = onnx::OnnxSemanticEncoder::new() {
+            return Box::new(encoder);
         }
     }
 

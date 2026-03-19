@@ -937,6 +937,7 @@ impl ProgramPatternLibrary {
     }
 
     /// Add a pattern with full metadata.
+    #[allow(clippy::too_many_arguments)]
     fn add_with_meta(
         &mut self,
         name: &str,
@@ -978,10 +979,8 @@ impl ProgramPatternLibrary {
 
         for entry in &self.patterns {
             let sim = query.similarity(&entry.encoding);
-            if sim > threshold {
-                if best.is_none() || sim > best.unwrap().1 {
-                    best = Some((entry, sim));
-                }
+            if sim > threshold && best.as_ref().is_none_or(|(_, s)| sim > *s) {
+                best = Some((entry, sim));
             }
         }
 

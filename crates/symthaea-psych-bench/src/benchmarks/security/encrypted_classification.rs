@@ -373,4 +373,39 @@ mod tests {
     fn test_encrypted_classification_has_provenance() {
         assert!(EncryptedClassificationBenchmark.provenance().is_some());
     }
+
+    #[test]
+    fn test_print_security_metrics() {
+        let config = BenchmarkConfig {
+            seed: 42,
+            trials_per_condition: 20,
+            ..Default::default()
+        };
+
+        let result = EncryptedClassificationBenchmark.run(&config);
+
+        println!("\n═══ HDC-FHE Encrypted Classification Results ═══");
+        for (key, val) in &result.metrics {
+            println!(
+                "  {:<30} mean={:.6}  sd={:.6}  CI=[{:.6}, {:.6}]",
+                key, val.mean, val.std_dev, val.ci_lower, val.ci_upper
+            );
+        }
+        println!("  Elapsed: {} ms", result.elapsed_ms);
+        println!("═══════════════════════════════════════════════\n");
+
+        // Also run collective aggregation
+        let agg_result = super::super::collective_aggregation::CollectiveAggregationBenchmark
+            .run(&config);
+
+        println!("═══ HDC-FHE Collective Aggregation Results ═══");
+        for (key, val) in &agg_result.metrics {
+            println!(
+                "  {:<30} mean={:.6}  sd={:.6}  CI=[{:.6}, {:.6}]",
+                key, val.mean, val.std_dev, val.ci_lower, val.ci_upper
+            );
+        }
+        println!("  Elapsed: {} ms", agg_result.elapsed_ms);
+        println!("═══════════════════════════════════════════════\n");
+    }
 }

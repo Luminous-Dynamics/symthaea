@@ -18,9 +18,11 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 rand = { workspace = true }
 rayon = { workspace = true, optional = true }
 
-# WASM support — getrandom needs "js" feature on wasm32-unknown-unknown
+# WASM support — getrandom + uuid need explicit features on wasm32
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-getrandom = { version = "0.2", features = ["js"] }
+getrandom02 = { package = "getrandom", version = "0.2", features = ["js"] }
+getrandom04 = { package = "getrandom", version = "0.4", features = ["wasm_js"] }
+uuid = { version = "1", features = ["rng-getrandom"] }
 
 # Distillation collection (optional)
 ureq = { version = "2.9", optional = true }
@@ -63,6 +65,10 @@ required-features = ["mamba-cpu"]
 name = "broca-embedding-stats"
 path = "src/bin/broca_embedding_stats.rs"
 required-features = ["mamba-cpu"]
+
+[[bin]]
+name = "distill-for-spore"
+path = "src/bin/distill_for_spore.rs"
 
 [features]
 default = ["simd", "parallel"]

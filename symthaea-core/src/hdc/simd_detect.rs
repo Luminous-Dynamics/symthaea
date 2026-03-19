@@ -213,6 +213,10 @@ pub fn best_float_level() -> SimdLevel {
 /// Horizontal sum of 8 f32 lanes in an AVX2 __m256 register.
 ///
 /// Reduces [a0, a1, a2, a3, a4, a5, a6, a7] → a0+a1+...+a7.
+///
+/// # Safety
+///
+/// Caller must ensure AVX2 is available on the current CPU.
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx2")]
 #[inline]
