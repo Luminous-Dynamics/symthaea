@@ -1040,7 +1040,7 @@ fn score_shots_v2(
         // For each position i, the window is samples[max(0, i+1-W)..=i]
         let w = config.window_size;
         for i in 0..n_samples {
-            let start = if i + 1 >= w { i + 1 - w } else { 0 };
+            let start = (i + 1).saturating_sub(w);
             let window = &shot.samples[start..=i];
             let hv = encoder.encode_window(window);
             let sim = hv.similarity(&reference) as f64;
@@ -1211,7 +1211,7 @@ fn compute_lead_times_v2(
 
         let w = config.window_size;
         for i in 0..n_samples {
-            let start = if i + 1 >= w { i + 1 - w } else { 0 };
+            let start = (i + 1).saturating_sub(w);
             let window = &shot.samples[start..=i];
             let hv = encoder.encode_window(window);
             let sim = hv.similarity(&reference) as f64;
@@ -1534,7 +1534,7 @@ fn score_shots_v3(
         // Score all samples using temporal windows
         let w = config.window_size;
         for i in 0..n_samples {
-            let start = if i + 1 >= w { i + 1 - w } else { 0 };
+            let start = (i + 1).saturating_sub(w);
             let window = &shot.samples[start..=i];
             let hv = encoder.encode_window(window);
             let sim = hv.similarity(&reference) as f64;
@@ -1594,7 +1594,7 @@ fn compute_lead_times_v3(
 
         let w = config.window_size;
         for i in 0..n_samples {
-            let start = if i + 1 >= w { i + 1 - w } else { 0 };
+            let start = (i + 1).saturating_sub(w);
             let window = &shot.samples[start..=i];
             let hv = encoder.encode_window(window);
             let sim = hv.similarity(&reference) as f64;
