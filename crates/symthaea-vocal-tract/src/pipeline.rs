@@ -342,7 +342,7 @@ impl ProsodyContext {
             SourceType::Stop | SourceType::Fricative | SourceType::Nasal | SourceType::Affricate
         );
 
-        let prev_is_consonant = self.prev_source_type.map_or(false, |st| {
+        let prev_is_consonant = self.prev_source_type.is_some_and(|st| {
             matches!(
                 st,
                 SourceType::Stop
@@ -351,10 +351,10 @@ impl ProsodyContext {
                     | SourceType::Affricate
             )
         });
-        let prev_is_vowel = self.prev_source_type.map_or(false, |st| {
-            matches!(st, SourceType::Vowel | SourceType::Liquid)
-        });
-        let next_is_consonant = self.next_source_type.map_or(false, |st| {
+        let prev_is_vowel = self
+            .prev_source_type
+            .is_some_and(|st| matches!(st, SourceType::Vowel | SourceType::Liquid));
+        let next_is_consonant = self.next_source_type.is_some_and(|st| {
             matches!(
                 st,
                 SourceType::Stop
@@ -363,9 +363,9 @@ impl ProsodyContext {
                     | SourceType::Affricate
             )
         });
-        let next_is_vowel = self.next_source_type.map_or(false, |st| {
-            matches!(st, SourceType::Vowel | SourceType::Liquid)
-        });
+        let next_is_vowel = self
+            .next_source_type
+            .is_some_and(|st| matches!(st, SourceType::Vowel | SourceType::Liquid));
 
         // Detect CV or VC transition: current phoneme borders a different manner class
         let in_cv_transition =
