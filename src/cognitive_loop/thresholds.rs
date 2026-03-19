@@ -2853,7 +2853,7 @@ pub const GOV_COMMUNITY_HARMONIC_BIAS: f64 = 0.005;
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Default prediction error for skipped motor actions.
-pub const MOTOR_SKIP_PREDICTION_ERROR: f32 = 0.5;
+pub const MOTOR_SKIP_PREDICTION_ERROR: f64 = 0.5;
 
 /// Minimum motor confidence for action execution.
 /// Below this, FEP isn't certain enough to commit.
