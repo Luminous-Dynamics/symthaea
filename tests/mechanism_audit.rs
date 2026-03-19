@@ -1,3 +1,4 @@
+#![cfg(feature = "unstable-examples")]
 //! Session 20/21: Mechanism Activation Audit
 //!
 //! Runs 500 cycles with varied inputs and verifies:

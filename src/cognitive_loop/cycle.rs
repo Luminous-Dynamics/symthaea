@@ -349,13 +349,13 @@ impl CognitiveLoopService {
                 },
                 consciousness_level: feedback.consciousness.consciousness_level,
                 collective_phi: self.swarm_manager.mean_peer_phi(),
-                arousal: self.neuromod.bath.norepinephrine.baseline_val() as f64,
+                arousal: self.neuromod.bath.noradrenaline.baseline_val() as f64,
                 has_peers: self.swarm_manager.connected_peers() > 0,
             };
 
             if let Some(crisis_event) = self
                 .civic_crisis_detector
-                .tick(&crisis_input, self.stats.total_cycles)
+                .tick(&crisis_input, self.stats.total_cycles as u64)
             {
                 self.security_telemetry.crisis_events_emitted += 1;
                 tracing::warn!(

@@ -1904,6 +1904,7 @@ fn main() -> Result<()> {
                     codebook_size: wm.memory.resonator_codebook_size,
                     codebook_diversity: wm.memory.codebook_diversity,
                 },
+                immune: ImmuneInfo::default(),
                 sovereign: SovereignInfo {
                     time_quality: match wm.sovereign_time_quality {
                         0 => "Authoritative".into(),

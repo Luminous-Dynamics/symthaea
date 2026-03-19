@@ -1104,22 +1104,29 @@ impl CognitiveLoopService {
         // Science: Stanovich & West (2000) — dual-process theory: System 2
         // reliability calibrates metacognitive confidence.
         #[cfg(feature = "reasoning_engine")]
-        if let Some(ref reasoning_engine) = self.reasoning_engine {
-            if let Some(last_event) = reasoning_engine.last_event() {
+        {
+            // Extract data from reasoning engine (immutable borrow) before mutable calls
+            let reasoning_feedback = self.reasoning_engine.as_ref().and_then(|re| {
+                re.last_event().map(|evt| {
+                    let gate_success = evt
+                        .posthoc_outcome
+                        .as_ref()
+                        .is_some_and(|p| p.gate_passed && p.outcome_good);
+                    (evt.reliability, gate_success)
+                })
+            });
+            if let Some((r, gate_success)) = reasoning_feedback {
                 use crate::cognitive_loop::thresholds::{
                     REASONING_RELIABILITY_CONFIDENCE_SCALE, REASONING_RELIABILITY_THRESHOLD,
                 };
-                let r = last_event.reliability;
                 // High reliability → nudge confidence up
                 if r.is_finite() && r > REASONING_RELIABILITY_THRESHOLD {
                     let boost = ((r - 0.5) * REASONING_RELIABILITY_CONFIDENCE_SCALE) as f32;
                     self.adjust_confidence("reasoning_reliability", boost);
                 }
                 // Gate passed + good outcome → boost LR to reinforce
-                if let Some(ref posthoc) = last_event.posthoc_outcome {
-                    if posthoc.gate_passed && posthoc.outcome_good {
-                        self.scale_lr("reasoning_gate_success", 1.02);
-                    }
+                if gate_success {
+                    self.scale_lr("reasoning_gate_success", 1.02);
                 }
             }
         }
