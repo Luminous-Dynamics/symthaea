@@ -19,7 +19,7 @@ use super::super::subsystem_trait::{
     output_flags, CognitiveSubsystem, CycleSnapshot, SubsystemOutput,
 };
 use super::super::thresholds::{
-    PERCEPTION_BINDING_HIGH, PERCEPTION_BINDING_LOW, PERCEPTION_COHERENCE_HIGH,
+    self, PERCEPTION_BINDING_HIGH, PERCEPTION_BINDING_LOW, PERCEPTION_COHERENCE_HIGH,
     PERCEPTION_COHERENCE_LOW, PERCEPTION_SENSITIVITY_MAX, PERCEPTION_SENSITIVITY_MIN,
     PERCEPTION_VIGILANCE_COHERENCE, PERCEPTION_VIGILANCE_PE,
 };
@@ -129,7 +129,7 @@ impl CognitiveSubsystem for PerceptionManager {
         } else {
             0.5
         };
-        self.budget_utilization = self.budget_utilization * 0.8 + budget_frac * 0.2;
+        self.budget_utilization = self.budget_utilization * thresholds::PERCEPTION_BUDGET_EMA_DECAY + budget_frac * thresholds::PERCEPTION_BUDGET_EMA_NEW;
 
         if snapshot.attention_budget_exceeded != 0 {
             self.budget_exceeded_streak += 1;
@@ -140,14 +140,14 @@ impl CognitiveSubsystem for PerceptionManager {
         // Pre-emptive gating when budget consistently exceeded
         if self.budget_exceeded_streak >= Self::BUDGET_EXCEEDED_LIMIT {
             // Signal need to shed processing load
-            output.exploration_delta -= 0.02; // reduce exploration (expensive)
+            output.exploration_delta -= thresholds::PERCEPTION_BUDGET_EXPLORATION_DAMPEN;
             output.flags |= output_flags::ESCALATE_URGENCY;
         }
 
         // Budget warning
         if self.budget_utilization > Self::BUDGET_WARNING_THRESHOLD {
             // Approaching limit — dampen learning rate to reduce computation
-            output.lr_modulation *= 0.95;
+            output.lr_modulation *= thresholds::PERCEPTION_BUDGET_LR_DAMPEN;
         }
 
         // ── 2. Perceptual coherence tracking ──────────────────────────────
@@ -157,12 +157,12 @@ impl CognitiveSubsystem for PerceptionManager {
 
         // High coherence → perceptual confidence boost
         if mean_coh > PERCEPTION_COHERENCE_HIGH {
-            output.confidence_delta += f64::from(mean_coh - PERCEPTION_COHERENCE_HIGH) * 0.015;
+            output.confidence_delta += f64::from(mean_coh - PERCEPTION_COHERENCE_HIGH) * thresholds::PERCEPTION_COHERENCE_CONFIDENCE_SCALE;
         }
 
         // Low coherence → signal exploration (might need different perspective)
         if mean_coh < PERCEPTION_COHERENCE_LOW {
-            output.exploration_delta += f64::from(PERCEPTION_COHERENCE_LOW - mean_coh) * 0.02;
+            output.exploration_delta += f64::from(PERCEPTION_COHERENCE_LOW - mean_coh) * thresholds::PERCEPTION_COHERENCE_EXPLORATION_SCALE;
             output.flags |= output_flags::REQUEST_EXPLORATION;
         }
 
@@ -171,7 +171,7 @@ impl CognitiveSubsystem for PerceptionManager {
         let arousal_distance = snapshot.arousal - Self::OPTIMAL_AROUSAL;
         if arousal_distance.abs() > Self::AROUSAL_ZONE_WIDTH {
             // Outside optimal zone — apply corrective pressure
-            let correction = -arousal_distance * 0.03;
+            let correction = -arousal_distance * thresholds::PERCEPTION_AROUSAL_CORRECTION_GAIN;
             output.arousal_delta += correction;
         }
 
@@ -182,11 +182,11 @@ impl CognitiveSubsystem for PerceptionManager {
         if should_be_vigilant && !self.vigilant {
             self.vigilant = true;
             self.attention_sensitivity =
-                (self.attention_sensitivity * 1.2).min(PERCEPTION_SENSITIVITY_MAX);
+                (self.attention_sensitivity * thresholds::PERCEPTION_VIGILANCE_AMPLIFY).min(PERCEPTION_SENSITIVITY_MAX);
         } else if !should_be_vigilant && self.vigilant {
             self.vigilant = false;
             self.attention_sensitivity =
-                (self.attention_sensitivity * 0.9).max(PERCEPTION_SENSITIVITY_MIN);
+                (self.attention_sensitivity * thresholds::PERCEPTION_VIGILANCE_RECOVERY).max(PERCEPTION_SENSITIVITY_MIN);
         }
 
         // ── 5. Phenomenal binding → confidence modulation ─────────────────
@@ -194,9 +194,9 @@ impl CognitiveSubsystem for PerceptionManager {
         let high = f64::from(PERCEPTION_BINDING_HIGH);
         let low = f64::from(PERCEPTION_BINDING_LOW);
         if binding > high {
-            output.confidence_delta += (binding - high) * 0.01;
+            output.confidence_delta += (binding - high) * thresholds::PERCEPTION_BINDING_CONFIDENCE_SCALE;
         } else if binding < low {
-            output.confidence_delta -= (low - binding) * 0.01;
+            output.confidence_delta -= (low - binding) * thresholds::PERCEPTION_BINDING_CONFIDENCE_SCALE;
         }
 
         output

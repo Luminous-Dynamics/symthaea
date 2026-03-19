@@ -3001,14 +3001,14 @@ pub const LEARNING_SOMATIC_STRESS_SENSITIVITY: f64 = 0.2;
 
 /// Co-prime cadence for high-Phi episode→codebook promotion.
 /// Basis: Dehaene (2014) — conscious access creates durable representations.
-pub const MEMORY_HIGH_PHI_PROMOTION_CADENCE: u64 = 97;
+pub const MEMORY_HIGH_PHI_PROMOTION_CADENCE: usize = 97;
 
 /// Codebook diversity computation amortization interval (cycles).
 /// Basis: Kohonen (1982) — periodic reorganization of self-organizing maps.
-pub const MEMORY_CODEBOOK_DIVERSITY_INTERVAL: u64 = 50;
+pub const MEMORY_CODEBOOK_DIVERSITY_INTERVAL: usize = 50;
 
 /// Codebook utilization rate update interval (cycles).
-pub const MEMORY_CODEBOOK_UTILIZATION_INTERVAL: u64 = 50;
+pub const MEMORY_CODEBOOK_UTILIZATION_INTERVAL: usize = 50;
 
 /// Codebook utilization EMA decay.
 pub const MEMORY_CODEBOOK_UTIL_EMA_DECAY: f32 = 0.8;
