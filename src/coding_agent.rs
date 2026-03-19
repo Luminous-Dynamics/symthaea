@@ -2167,7 +2167,6 @@ impl CodingAgent {
         obs
     }
 
-    /// Build the motor action request based on current phase.
     // ── Plan Evaluation (Typed Primitives) ──────────────────────────────
 
     /// Build a typed execution plan for the current phase.

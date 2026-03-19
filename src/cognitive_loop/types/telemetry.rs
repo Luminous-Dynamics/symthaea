@@ -376,6 +376,7 @@ pub struct TemporalPhenomenalMetrics {
 /// `liquid_mamba_effective_rank`, `liquid_mamba_semantic_pe`,
 /// `phi_validation_cached`, `social_strategy_bias_applied`,
 /// `subsystem_integration_contributors`
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // FEEDBACK MODULATION FLAGS — Sessions 9–16 observability booleans
 // ═══════════════════════════════════════════════════════════════════════════════
