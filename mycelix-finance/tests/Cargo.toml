@@ -131,6 +131,16 @@ path = "sweettest_price_oracle_accuracy.rs"
 name = "sweettest_collateral_lifecycle"
 path = "sweettest_collateral_lifecycle.rs"
 
+# Multi-Agent Sweettest (cross-agent covenant enforcement, DHT propagation, concurrent ops)
+[[test]]
+name = "sweettest_multi_agent"
+path = "sweettest_multi_agent.rs"
+
+# "Day in the Life" Narrative Integration Test (full-day community simulation)
+[[test]]
+name = "sweettest_day_in_the_life"
+path = "sweettest_day_in_the_life.rs"
+
 # NOTE: economics_stress_test has been moved to types/tests/ where it compiles
 # without the heavy Holochain dependency. Run with:
 #   cargo test -p mycelix_finance_types --test economics_stress_test
