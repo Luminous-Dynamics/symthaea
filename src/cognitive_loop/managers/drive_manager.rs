@@ -19,6 +19,7 @@
 use super::super::subsystem_trait::{
     output_flags, CognitiveSubsystem, CycleSnapshot, SubsystemOutput,
 };
+use super::super::thresholds;
 
 /// Drive Manager — consolidates curiosity, boredom, flow, and exploration drives.
 ///
@@ -166,7 +167,7 @@ impl CognitiveSubsystem for DriveManager {
             self.low_error_streak = self.low_error_streak.saturating_add(1);
             if self.low_error_streak > Self::BOREDOM_ONSET_CYCLES {
                 // Boredom ramps up linearly, capped
-                self.boredom = (self.boredom + 0.03).min(Self::MAX_BOREDOM);
+                self.boredom = (self.boredom + thresholds::DRIVE_BOREDOM_INCREMENT).min(Self::MAX_BOREDOM);
             }
         } else {
             self.low_error_streak = 0;
@@ -174,8 +175,8 @@ impl CognitiveSubsystem for DriveManager {
         }
 
         // Boredom drives exploration
-        if self.boredom > 0.3 {
-            output.exploration_delta += (self.boredom - 0.3) as f64 * 0.1;
+        if self.boredom > thresholds::DRIVE_BOREDOM_EXPLORATION_THRESHOLD {
+            output.exploration_delta += (self.boredom - thresholds::DRIVE_BOREDOM_EXPLORATION_THRESHOLD) as f64 * thresholds::DRIVE_BOREDOM_EXPLORATION_SCALE;
             output.flags |= output_flags::REQUEST_EXPLORATION;
         }
 
@@ -183,8 +184,8 @@ impl CognitiveSubsystem for DriveManager {
         // Flow = sustained low error + high coherence (optimal challenge-skill)
         let meets_flow = pe < Self::FLOW_ERROR_MAX
             && snapshot.coherence > Self::FLOW_COHERENCE_MIN
-            && snapshot.arousal > 0.3
-            && snapshot.arousal < 0.8;
+            && snapshot.arousal > thresholds::DRIVE_FLOW_AROUSAL_MIN
+            && snapshot.arousal < thresholds::DRIVE_FLOW_AROUSAL_MAX;
 
         if meets_flow {
             self.flow_streak = self.flow_streak.saturating_add(1);
@@ -206,13 +207,13 @@ impl CognitiveSubsystem for DriveManager {
         // Flow suppresses exploration, boosts learning
         if self.in_flow {
             // In flow: dampen exploration (don't seek novelty when optimally engaged)
-            output.exploration_delta -= self.flow_intensity as f64 * 0.05;
+            output.exploration_delta -= self.flow_intensity as f64 * thresholds::DRIVE_FLOW_EXPLORATION_DAMPEN;
             // In flow: boost learning rate (peak plasticity window)
-            output.lr_modulation = 1.0 + self.flow_intensity as f64 * 0.1;
+            output.lr_modulation = 1.0 + self.flow_intensity as f64 * thresholds::DRIVE_FLOW_LR_BOOST;
             // In flow: stabilize confidence
-            output.confidence_delta += self.flow_intensity as f64 * 0.01;
+            output.confidence_delta += self.flow_intensity as f64 * thresholds::DRIVE_FLOW_CONFIDENCE_BOOST;
             // In flow: boredom resets
-            self.boredom *= 0.5;
+            self.boredom *= thresholds::DRIVE_FLOW_BOREDOM_RESET;
         }
 
         // ── 4. Curiosity / exploration dynamics ───────────────────────────
@@ -221,10 +222,10 @@ impl CognitiveSubsystem for DriveManager {
 
         if surprise_signal > 0.0 {
             // Prediction error exceeds threshold → explore
-            let exploration_boost = surprise_signal as f64 * 0.15;
+            let exploration_boost = surprise_signal as f64 * thresholds::DRIVE_SURPRISE_EXPLORATION_SCALE;
             output.exploration_delta += exploration_boost;
             // Surprise should mildly increase arousal
-            output.arousal_delta += surprise_signal * 0.05;
+            output.arousal_delta += surprise_signal * thresholds::DRIVE_SURPRISE_AROUSAL_SCALE;
             // Adapt threshold upward (habituation)
             self.exploration_threshold += Self::THRESHOLD_ADAPT_RATE * surprise_signal;
         } else {

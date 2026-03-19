@@ -2,8 +2,8 @@
 <resources>
     <!-- ═══ Soma Base Palette ═══ -->
     <!-- Background: deep void with subtle organic warmth (not pure black) -->
-    <color name="soma_void">#0A0E12</color>
-    <color name="soma_surface">#111820</color>
+    <color name="soma_void">#0F1419</color>
+    <color name="soma_surface">#161D26</color>
     <color name="soma_deep_earth">#0D1117</color>
     <color name="soma_deep_ocean">#0B1622</color>
 

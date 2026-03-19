@@ -119,6 +119,7 @@ RSYNC_EXCLUDE=(
     --exclude='target/'
     --exclude='__pyphi_cache__/'
     --exclude='.DS_Store'
+    --exclude='broca-pipeline.bin'
 )
 RSYNC_OPTS=(-a --delete "${RSYNC_EXCLUDE[@]}")
 if $DRY_RUN; then

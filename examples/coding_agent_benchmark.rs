@@ -753,7 +753,7 @@ fn validate_code(source: &str, test_source: &str) -> (bool, Vec<String>, usize, 
     if result
         .compile_errors
         .iter()
-        .any(|e| e.contains("cannot find type `T`"))
+        .any(|e| e.contains("cannot find type") && e.contains("T"))
     {
         // Find "fn name(" and inject "<T>" before the paren
         let lines: Vec<&str> = source_to_fix.lines().collect();

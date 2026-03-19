@@ -56,6 +56,7 @@ pub mod sovereign;
 pub mod topology;
 
 pub mod hardware_probe;
+pub mod neuroevolution;
 
 #[cfg(feature = "wasm")]
 pub mod quickening;
