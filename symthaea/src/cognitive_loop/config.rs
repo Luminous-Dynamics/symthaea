@@ -1332,6 +1332,74 @@ impl CognitiveLoopConfig {
         if self.attestation_buffer_capacity == 0 {
             return Err("CognitiveLoopConfig: attestation_buffer_capacity must be > 0".into());
         }
+        if self.validation_skepticism_floor < 0.0
+            || self.validation_skepticism_floor > 1.0
+            || !self.validation_skepticism_floor.is_finite()
+        {
+            return Err(format!(
+                "CognitiveLoopConfig: validation_skepticism_floor must be in [0.0, 1.0], got {}",
+                self.validation_skepticism_floor
+            ));
+        }
+        if self.substrate_transition_alpha < 0.0
+            || self.substrate_transition_alpha > 1.0
+            || !self.substrate_transition_alpha.is_finite()
+        {
+            return Err(format!(
+                "CognitiveLoopConfig: substrate_transition_alpha must be in [0.0, 1.0], got {}",
+                self.substrate_transition_alpha
+            ));
+        }
+        #[cfg(feature = "physics-bridge")]
+        if self.physics_bridge_blend_weight < 0.0
+            || self.physics_bridge_blend_weight > 1.0
+            || !self.physics_bridge_blend_weight.is_finite()
+        {
+            return Err(format!(
+                "CognitiveLoopConfig: physics_bridge_blend_weight must be in [0.0, 1.0], got {}",
+                self.physics_bridge_blend_weight
+            ));
+        }
+        #[cfg(feature = "therapeutic")]
+        if self.therapeutic_crisis_threshold < 0.01
+            || self.therapeutic_crisis_threshold > 0.95
+            || !self.therapeutic_crisis_threshold.is_finite()
+        {
+            return Err(format!(
+                "CognitiveLoopConfig: therapeutic_crisis_threshold must be in [0.01, 0.95], got {}",
+                self.therapeutic_crisis_threshold
+            ));
+        }
+        #[cfg(feature = "vision-manifold")]
+        {
+            if self.scene_memory_coherence_threshold < 0.0
+                || self.scene_memory_coherence_threshold > 1.0
+                || !self.scene_memory_coherence_threshold.is_finite()
+            {
+                return Err(format!(
+                    "CognitiveLoopConfig: scene_memory_coherence_threshold must be in [0.0, 1.0], got {}",
+                    self.scene_memory_coherence_threshold
+                ));
+            }
+            if self.scene_memory_error_threshold < 0.0
+                || self.scene_memory_error_threshold > 1.0
+                || !self.scene_memory_error_threshold.is_finite()
+            {
+                return Err(format!(
+                    "CognitiveLoopConfig: scene_memory_error_threshold must be in [0.0, 1.0], got {}",
+                    self.scene_memory_error_threshold
+                ));
+            }
+            if self.scene_memory_dampen_factor < 0.0
+                || self.scene_memory_dampen_factor > 1.0
+                || !self.scene_memory_dampen_factor.is_finite()
+            {
+                return Err(format!(
+                    "CognitiveLoopConfig: scene_memory_dampen_factor must be in [0.0, 1.0], got {}",
+                    self.scene_memory_dampen_factor
+                ));
+            }
+        }
         // Validate moral anomaly config
         self.moral_anomaly_config
             .validate()
@@ -1506,6 +1574,60 @@ mod tests {
             "error should mention CfC field: {}",
             err
         );
+    }
+
+    #[test]
+    fn config_skepticism_floor_out_of_range_rejected() {
+        let mut c = CognitiveLoopConfig::default();
+        c.validation_skepticism_floor = 1.5;
+        assert!(c.validate().is_err());
+        c.validation_skepticism_floor = -0.1;
+        assert!(c.validate().is_err());
+    }
+
+    #[test]
+    fn config_substrate_transition_alpha_out_of_range_rejected() {
+        let mut c = CognitiveLoopConfig::default();
+        c.substrate_transition_alpha = 2.0;
+        assert!(c.validate().is_err());
+        c.substrate_transition_alpha = -0.5;
+        assert!(c.validate().is_err());
+    }
+
+    #[test]
+    #[cfg(feature = "physics-bridge")]
+    fn config_physics_blend_weight_out_of_range_rejected() {
+        let mut c = CognitiveLoopConfig::default();
+        c.physics_bridge_blend_weight = f32::NAN;
+        assert!(c.validate().is_err());
+        c.physics_bridge_blend_weight = 1.01;
+        assert!(c.validate().is_err());
+    }
+
+    #[test]
+    #[cfg(feature = "therapeutic")]
+    fn config_therapeutic_crisis_threshold_out_of_range_rejected() {
+        let mut c = CognitiveLoopConfig::default();
+        c.therapeutic_crisis_threshold = 0.0;
+        assert!(c.validate().is_err());
+        c.therapeutic_crisis_threshold = 0.99;
+        assert!(c.validate().is_err());
+    }
+
+    #[test]
+    #[cfg(feature = "vision-manifold")]
+    fn config_scene_memory_thresholds_out_of_range_rejected() {
+        let mut c = CognitiveLoopConfig::default();
+        c.scene_memory_coherence_threshold = -0.1;
+        assert!(c.validate().is_err());
+
+        let mut c = CognitiveLoopConfig::default();
+        c.scene_memory_error_threshold = 1.5;
+        assert!(c.validate().is_err());
+
+        let mut c = CognitiveLoopConfig::default();
+        c.scene_memory_dampen_factor = f32::INFINITY;
+        assert!(c.validate().is_err());
     }
 
     // ═══════════════════════════════════════════════════════════════════════
