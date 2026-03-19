@@ -24,6 +24,11 @@
 
 pub mod accelerator;
 pub mod cmod_adapter;
+#[allow(
+    clippy::useless_format,
+    clippy::single_char_add_str,
+    clippy::manual_is_multiple_of
+)]
 pub mod cmod_evaluation;
 pub mod datacenter;
 pub mod fission;

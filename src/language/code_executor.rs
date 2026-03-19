@@ -639,7 +639,8 @@ impl CompileError {
     fn categorize(code: &Option<String>, message: &str) -> ErrorCategory {
         if let Some(ref c) = code {
             match c.as_str() {
-                "E0308" | "E0277" if message.contains("expected") => ErrorCategory::TypeMismatch,
+                "E0308" => ErrorCategory::TypeMismatch,
+                "E0277" if message.contains("expected") => ErrorCategory::TypeMismatch,
                 "E0277" => ErrorCategory::MissingImpl,
                 "E0412" | "E0433" | "E0432" => ErrorCategory::MissingImport,
                 "E0382" | "E0502" | "E0505" | "E0596" | "E0507" => ErrorCategory::BorrowError,
