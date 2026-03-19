@@ -1,15 +1,15 @@
 [package]
-name = "web_of_trust_coordinator"
+name = "web_of_trust"
 version = "0.1.0"
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
+name = "web_of_trust"
 
 [dependencies]
 hdk = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-holochain_serialized_bytes = { workspace = true }
 web_of_trust_integrity = { path = "../integrity" }
 mycelix-bridge-common = { workspace = true }
