@@ -827,6 +827,44 @@ impl ContinuousMind {
                         moral_topology_count += 1;
                     }
                 }
+                // Sovereign Clock: decode TimeBeacon and forward to CLS TimeManager
+                // via the swarm event channel.
+                crate::swarm::mesh::PayloadType::TimeBeacon => {
+                    if let Some(beacon) =
+                        crate::swarm::mesh::time_beacon::TimeBeacon::decode(&packet.wisdom)
+                    {
+                        if let Some(ref tx) = self.swarm_event_tx {
+                            let event = crate::cognitive_loop::SwarmEvent::TimeBeaconReceived {
+                                source_id: packet.source_id,
+                                timestamp_us: beacon.timestamp_us,
+                                stratum: beacon.stratum,
+                                phi: beacon.phi,
+                                drift_ppm: beacon.drift_ppm,
+                            };
+                            let _ = tx.send(event);
+                        }
+                    }
+                }
+                // Sovereign Social: decode ContentAnnounce and forward to CLS
+                crate::swarm::mesh::PayloadType::ContentAnnounce => {
+                    if let Some(announce) =
+                        crate::swarm::mesh::content_packet::ContentAnnounce::decode(&packet.wisdom)
+                    {
+                        if let Some(ref tx) = self.swarm_event_tx {
+                            let event = crate::cognitive_loop::SwarmEvent::ContentAnnounced {
+                                peer_id: crate::swarm::mesh::hex_short(&packet.source_id),
+                                content_hash: announce.content_hash,
+                                truncated_hdv: announce.truncated_hdv,
+                                domain: announce.domain,
+                                created_at: announce.created_at,
+                            };
+                            let _ = tx.send(event);
+                        }
+                    }
+                }
+                // Sovereign Name: NameQuery/NameResponse handled at mesh layer (no CLS routing needed)
+                crate::swarm::mesh::PayloadType::NameQuery
+                | crate::swarm::mesh::PayloadType::NameResponse => {}
             }
         }
 
@@ -868,6 +906,16 @@ impl ContinuousMind {
             Some(b) if b.is_alive() => b,
             _ => return,
         };
+
+        // Drain CLS-generated outbound packets (sovereign beacons, name responses, etc.)
+        #[cfg(feature = "mesh")]
+        if let Some(ref rx_mutex) = self.mesh_outbound_rx {
+            if let Ok(rx) = rx_mutex.lock() {
+                while let Ok(outbound) = rx.try_recv() {
+                    self.mesh_outbox.push(outbound);
+                }
+            }
+        }
 
         // Flush outgoing mesh packets to the network
         let outgoing = std::mem::take(&mut self.mesh_outbox);

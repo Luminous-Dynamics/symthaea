@@ -190,6 +190,9 @@
     nixLines.push('}');
     document.getElementById('nix-config-content').innerHTML = highlightNix(nixLines.join('\n'));
 
+    // Store profile on state so download buttons can access it
+    state.hardwareProfile = profile;
+
     loading.style.display = 'none';
     results.style.display = 'block';
   }
@@ -233,6 +236,143 @@
     showNextSteps();
   });
 
+  // ----------------------------------------------------------------
+  // File download helper
+  // ----------------------------------------------------------------
+  function downloadFile(filename, content) {
+    var blob = new Blob([content], { type: 'text/plain' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  // ----------------------------------------------------------------
+  // Build the hardware JSON that the WASM functions expect
+  // (camelCase keys matching HardwareProfile serde)
+  // ----------------------------------------------------------------
+  function buildHardwareJson(profile) {
+    return JSON.stringify({
+      cpuCores: typeof profile.cpuCores === 'number' ? profile.cpuCores : (navigator.hardwareConcurrency || 1),
+      deviceMemoryGb: profile.memoryGb || (navigator.deviceMemory || 0),
+      gpuVendor: (profile.gpu && profile.gpu.vendor) || '',
+      gpuArchitecture: (profile.webgpu && profile.webgpu.architecture) || '',
+      gpuDescription: (profile.gpu && profile.gpu.renderer) || '',
+      hasWebgpu: !!(profile.webgpu && profile.webgpu.available),
+      hasWebusb: !!navigator.usb,
+      storageQuotaBytes: (profile.storage && profile.storage.quota) || 0,
+      platform: profile.platform || 'Unknown',
+      isMobile: /Android|iPhone|iPad/.test(navigator.userAgent),
+      browserName: (navigator.userAgentData && navigator.userAgentData.brands && navigator.userAgentData.brands[0] && navigator.userAgentData.brands[0].brand) || ''
+    });
+  }
+
+  // ----------------------------------------------------------------
+  // Inject download panel + install guide into next-steps-section
+  // ----------------------------------------------------------------
+  function injectDownloadPanel(nextSteps, hardwareJson) {
+    // Avoid duplicating if already injected
+    if (document.getElementById('flake-download-panel')) return;
+
+    var panel = document.createElement('div');
+    panel.id = 'flake-download-panel';
+    panel.className = 'glass-panel inoc-section';
+    panel.style.marginTop = '1.5rem';
+    panel.innerHTML = [
+      '<h3 style="text-align:center; font-weight:200; margin-bottom:1rem;">Download Configuration Files</h3>',
+      '<p style="text-align:center; font-size:0.82rem; color:var(--fg-dim); margin-bottom:1.5rem;">',
+      'Your hardware probe has been translated into reproducible NixOS configuration files.<br>',
+      'Download all three, review them, then follow the installation guide below.',
+      '</p>',
+      '<div style="display:flex; gap:1rem; justify-content:center; flex-wrap:wrap; margin-bottom:1.5rem;">',
+      '  <button id="btn-dl-flake" class="btn-glow" style="padding:0.6rem 1.2rem; cursor:pointer;">',
+      '    Download flake.nix',
+      '  </button>',
+      '  <button id="btn-dl-disko" class="btn-glow" style="padding:0.6rem 1.2rem; cursor:pointer;">',
+      '    Download disko-config.nix',
+      '  </button>',
+      '  <button id="btn-dl-hardware" class="btn-glow" style="padding:0.6rem 1.2rem; cursor:pointer;">',
+      '    Download hardware-configuration.nix',
+      '  </button>',
+      '</div>',
+      '<div id="dl-status" style="text-align:center; font-size:0.78rem; color:var(--teal); min-height:1.2em; margin-bottom:1.5rem;"></div>',
+      '',
+      '<h3 style="text-align:center; font-weight:200; margin-bottom:1rem;">Manual Installation Guide</h3>',
+      '<div style="background:rgba(0,0,0,0.3); border-radius:8px; padding:1rem 1.2rem; font-family:monospace; font-size:0.78rem; line-height:1.6; overflow-x:auto;">',
+      '<span style="color:var(--fg-dim);"># 1. Boot from NixOS minimal ISO</span><br>',
+      '<span style="color:var(--fg-dim);"># 2. Partition and mount your disk with disko:</span><br>',
+      'sudo nix run github:nix-community/disko -- --mode disko ./disko-config.nix<br>',
+      '<br>',
+      '<span style="color:var(--fg-dim);"># 3. Copy configuration files to /mnt/etc/nixos/:</span><br>',
+      'sudo mkdir -p /mnt/etc/nixos<br>',
+      'sudo cp flake.nix disko-config.nix hardware-configuration.nix /mnt/etc/nixos/<br>',
+      '<br>',
+      '<span style="color:var(--fg-dim);"># 4. Install NixOS:</span><br>',
+      'sudo nixos-install --flake /mnt/etc/nixos#<span id="install-hostname">guardian</span> --no-root-passwd<br>',
+      '<br>',
+      '<span style="color:var(--fg-dim);"># 5. Reboot into your sovereign system:</span><br>',
+      'sudo reboot<br>',
+      '<br>',
+      '<span style="color:var(--fg-dim);"># 6. After first boot, set your password:</span><br>',
+      'sudo passwd guardian<br>',
+      '</div>',
+      '<p style="text-align:center; font-size:0.72rem; color:var(--fg-muted); margin-top:1rem; font-style:italic;">',
+      'Review every line of the flake before applying. Sovereignty means understanding your own configuration.',
+      '</p>'
+    ].join('\n');
+
+    nextSteps.parentNode.insertBefore(panel, nextSteps.nextSibling);
+
+    // Wire up download buttons
+    var hostname = 'guardian';
+    var hostnameEl = document.getElementById('install-hostname');
+
+    document.getElementById('btn-dl-flake').addEventListener('click', function() {
+      var dlStatus = document.getElementById('dl-status');
+      dlStatus.textContent = 'Generating flake.nix...';
+      window.send('generateFlake', {
+        hardwareJson: hardwareJson,
+        path: '/',
+        hostname: hostname
+      }).then(function(content) {
+        downloadFile('flake.nix', content);
+        dlStatus.textContent = 'flake.nix downloaded.';
+      }).catch(function(err) {
+        dlStatus.textContent = 'Error: ' + err.message;
+      });
+    });
+
+    document.getElementById('btn-dl-disko').addEventListener('click', function() {
+      var dlStatus = document.getElementById('dl-status');
+      dlStatus.textContent = 'Generating disko-config.nix...';
+      window.send('generateDiskoConfig', {
+        hardwareJson: hardwareJson
+      }).then(function(content) {
+        downloadFile('disko-config.nix', content);
+        dlStatus.textContent = 'disko-config.nix downloaded.';
+      }).catch(function(err) {
+        dlStatus.textContent = 'Error: ' + err.message;
+      });
+    });
+
+    document.getElementById('btn-dl-hardware').addEventListener('click', function() {
+      var dlStatus = document.getElementById('dl-status');
+      dlStatus.textContent = 'Generating hardware-configuration.nix...';
+      window.send('generateHardwareNix', {
+        hardwareJson: hardwareJson
+      }).then(function(content) {
+        downloadFile('hardware-configuration.nix', content);
+        dlStatus.textContent = 'hardware-configuration.nix downloaded.';
+      }).catch(function(err) {
+        dlStatus.textContent = 'Error: ' + err.message;
+      });
+    });
+  }
+
   async function showNextSteps() {
     var nextSteps = document.getElementById('next-steps-section');
     nextSteps.style.display = 'block';
@@ -249,6 +389,13 @@
 
     var narration = await window.fetchNarration('FlakeEvaluation', state.chosenPath);
     if (narration && narration.text) window.addNarration(narration.text);
+
+    // Build hardware JSON from the probe results cached on state
+    var hwProfile = state.hardwareProfile || {};
+    var hardwareJson = buildHardwareJson(hwProfile);
+
+    // Inject download panel and install guide
+    injectDownloadPanel(nextSteps, hardwareJson);
 
     if (state.chosenPath === 'mycelial') {
       window.addNarration('"We vow not to perfect each other\u2014but to remain reachable as we become."', true);

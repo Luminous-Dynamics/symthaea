@@ -489,6 +489,10 @@ impl CognitiveLoopService {
         // Create swarm event channel eagerly so the sender is always available.
         let (swarm_event_tx, swarm_event_rx) = std::sync::mpsc::channel();
 
+        // Create mesh outbound channel for sovereign beacon/name/content emission.
+        #[cfg(feature = "mesh")]
+        let (mesh_outbound_tx, mesh_outbound_rx) = std::sync::mpsc::channel();
+
         // Spawn federated coordinator if enabled.
         let federation_handle = if config.federation_enabled {
             Some(
@@ -506,6 +510,7 @@ impl CognitiveLoopService {
         let cfc_input_dim = config.cfc_config.input_dim;
         let enable_hierarchical_bundling = config.enable_hierarchical_bundling;
         let genesis_phrase_for_bundler = config.genesis_phrase.clone();
+        let enable_mesh_time = config.enable_mesh_time;
         let mut service = Self {
             config,
             encoder,
@@ -994,9 +999,21 @@ impl CognitiveLoopService {
                 crate::hdc::moral_algebra::MORAL_DIM,
             ),
             #[cfg(feature = "mesh")]
-            time_manager: super::managers::TimeManager::new(true),
+            time_manager: super::managers::TimeManager::new(enable_mesh_time),
+            #[cfg(feature = "mesh")]
+            mesh_outbound_tx,
+            #[cfg(feature = "mesh")]
+            mesh_outbound_rx: std::sync::Mutex::new(Some(mesh_outbound_rx)),
             #[cfg(feature = "mesh-trust")]
-            trust_manager: super::managers::TrustManager::new(String::new(), true),
+            trust_manager: super::managers::TrustManager::new(
+                format!("node_{:016x}", {
+                    use std::hash::{Hash, Hasher};
+                    let mut h = std::collections::hash_map::DefaultHasher::new();
+                    std::time::SystemTime::now().hash(&mut h);
+                    h.finish()
+                }),
+                true,
+            ),
             #[cfg(feature = "social-fabric")]
             social_fabric_manager: super::managers::SocialFabricManager::new(true),
             #[cfg(feature = "survival")]

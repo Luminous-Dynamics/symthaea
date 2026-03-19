@@ -67,6 +67,14 @@ mod lora_fragment;
 mod mesh_receiver;
 pub mod sensor;
 
+// Sovereign Inoculation modules
+pub mod content_packet;
+pub mod mesh_time;
+pub mod name_packet;
+pub mod sensor_forecast;
+pub mod sensor_iot;
+pub mod time_beacon;
+
 pub use dual_layer::{
     BiLoopbackTransport, DualLayerMesh, LoopbackTransport, MeshRoute, MeshTransport,
 };
@@ -154,6 +162,22 @@ pub struct MeshStats {
     pub encrypted_packets_sent: u64,
     /// Packets received and successfully decrypted.
     pub encrypted_packets_received: u64,
+    /// Time beacon packets emitted (Sovereign Clock).
+    pub time_beacons_sent: u64,
+    /// Time beacon packets received (Sovereign Clock).
+    pub time_beacons_received: u64,
+    /// Name query packets emitted (Sovereign Name).
+    pub name_queries_sent: u64,
+    /// Name query packets received (Sovereign Name).
+    pub name_queries_received: u64,
+    /// Name response packets emitted (Sovereign Name).
+    pub name_responses_sent: u64,
+    /// Name response packets received (Sovereign Name).
+    pub name_responses_received: u64,
+    /// Content announcement packets emitted (Sovereign Social).
+    pub content_announces_sent: u64,
+    /// Content announcement packets received (Sovereign Social).
+    pub content_announces_received: u64,
 }
 
 impl MeshStats {
@@ -164,6 +188,10 @@ impl MeshStats {
             + self.affective_sent
             + self.gradients_sent
             + self.moral_topology_sent
+            + self.time_beacons_sent
+            + self.name_queries_sent
+            + self.name_responses_sent
+            + self.content_announces_sent
     }
 
     /// Total packets received across all types.
@@ -173,6 +201,10 @@ impl MeshStats {
             + self.affective_received
             + self.gradients_received
             + self.moral_topology_received
+            + self.time_beacons_received
+            + self.name_queries_received
+            + self.name_responses_received
+            + self.content_announces_received
     }
 
     /// Returns the compression ratio (0.0–1.0, lower is better).
@@ -295,6 +327,14 @@ pub enum PayloadType {
     Gradient = 3,
     /// Moral topology summary for cross-agent coherence.
     MoralTopology = 4,
+    /// Time beacon for mesh-time consensus (Sovereign Clock).
+    TimeBeacon = 5,
+    /// Name query for mesh name resolution (Sovereign Name).
+    NameQuery = 6,
+    /// Name response for mesh name resolution (Sovereign Name).
+    NameResponse = 7,
+    /// Content announcement for resonance-based discovery (Sovereign Social).
+    ContentAnnounce = 8,
 }
 
 impl PayloadType {
@@ -306,18 +346,26 @@ impl PayloadType {
             2 => Self::Heartbeat,
             3 => Self::Gradient,
             4 => Self::MoralTopology,
+            5 => Self::TimeBeacon,
+            6 => Self::NameQuery,
+            7 => Self::NameResponse,
+            8 => Self::ContentAnnounce,
             _ => Self::Heartbeat, // unknown types become heartbeats (safe no-op)
         }
     }
 
     /// Backpressure priority: higher values are retained first when inbox is full.
-    /// Heartbeat(3) > Wisdom(2) > MoralTopology/Affective(1) > Gradient(0).
+    /// Heartbeat(3) > Wisdom(2) > TimeBeacon(2) > MoralTopology/Affective/Name/Content(1) > Gradient(0).
     pub fn priority(&self) -> u8 {
         match self {
             Self::Heartbeat => 3,
             Self::WisdomVector => 2,
+            Self::TimeBeacon => 2,
             Self::Affective => 1,
             Self::MoralTopology => 1,
+            Self::NameQuery => 1,
+            Self::NameResponse => 1,
+            Self::ContentAnnounce => 1,
             Self::Gradient => 0,
         }
     }

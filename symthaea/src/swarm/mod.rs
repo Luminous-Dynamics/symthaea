@@ -82,21 +82,21 @@ mod service;
 mod types;
 
 // Iroh and handshake modules compile always (with stub implementations when feature disabled)
-mod attestation;
-mod handshake;
+pub(crate) mod attestation;
+pub(crate) mod handshake;
 mod iroh;
 #[cfg(feature = "pqc-handshake")]
 pub mod pqc_handshake;
 
 // Sovereign Inoculation: Trust + Name + Social
 #[cfg(feature = "mesh")]
-pub mod web_of_trust;
-#[cfg(feature = "mesh")]
 pub mod consciousness_certificate;
 #[cfg(feature = "mesh")]
 pub mod name_resolver;
 #[cfg(feature = "mesh")]
 pub mod resonance_graph;
+#[cfg(feature = "mesh")]
+pub mod web_of_trust;
 
 // Re-exports
 pub use config::{

@@ -499,6 +499,57 @@ pub struct DreamInfo {
     pub codebook_diversity: f32,
 }
 
+/// Sovereign Inoculation snapshot — Clock, Trust, Social Fabric, Survival.
+#[derive(Serialize, Deserialize, Default)]
+pub struct SovereignInfo {
+    // Clock
+    /// Time quality: "Authoritative", "Consensus", "Degraded", "FreeRunning".
+    #[serde(default)]
+    pub time_quality: String,
+    #[serde(default)]
+    pub time_peer_count: usize,
+    #[serde(default)]
+    pub time_offset_us: i64,
+    #[serde(default)]
+    pub time_stratum: u8,
+    #[serde(default)]
+    pub time_drift_ppm: f32,
+    // Trust
+    #[serde(default)]
+    pub trust_avg: f32,
+    #[serde(default)]
+    pub trust_density: f32,
+    #[serde(default)]
+    pub trust_pq_fraction: f32,
+    #[serde(default)]
+    pub trust_anomaly_count: u32,
+    // Social Fabric
+    #[serde(default)]
+    pub social_resonance_mean: f32,
+    #[serde(default)]
+    pub social_diversity: f32,
+    #[serde(default)]
+    pub social_echo_risk: f32,
+    #[serde(default)]
+    pub social_peer_reach: usize,
+    // Survival
+    #[serde(default)]
+    pub survival_water_pct: f32,
+    #[serde(default)]
+    pub survival_power_kw: f32,
+    #[serde(default)]
+    pub survival_emergency: bool,
+    #[serde(default)]
+    pub survival_sensor_count: usize,
+    #[serde(default)]
+    pub survival_alert_count: usize,
+    // History for sparklines
+    #[serde(default)]
+    pub trust_history: Vec<f32>,
+    #[serde(default)]
+    pub echo_risk_history: Vec<f32>,
+}
+
 /// Full JSON-serializable pulse snapshot for comparison mode.
 #[derive(Serialize, Deserialize)]
 pub struct PulseSnapshot {
@@ -536,6 +587,8 @@ pub struct PulseSnapshot {
     pub dream: DreamInfo,
     #[serde(default)]
     pub immune: ImmuneInfo,
+    #[serde(default)]
+    pub sovereign: SovereignInfo,
 }
 
 /// Computed delta between two pulse snapshots for the comparison view.
@@ -1466,6 +1519,33 @@ fn main() -> Result<()> {
             immune_response_active: m.immune_response_active,
             emergency_cycles: m.immune_emergency_cycles,
         },
+        sovereign: SovereignInfo {
+            time_quality: match m.sovereign_time_quality {
+                0 => "Authoritative".into(),
+                1 => "Consensus".into(),
+                2 => "Degraded".into(),
+                _ => "FreeRunning".into(),
+            },
+            time_peer_count: m.sovereign_time_peer_count,
+            time_offset_us: m.sovereign_time_offset_us,
+            time_stratum: m.sovereign_time_stratum,
+            time_drift_ppm: m.sovereign_time_drift_ppm,
+            trust_avg: m.sovereign_trust_avg,
+            trust_density: m.sovereign_trust_density,
+            trust_pq_fraction: m.sovereign_trust_pq_fraction,
+            trust_anomaly_count: m.sovereign_trust_anomalies,
+            social_resonance_mean: m.sovereign_social_resonance_mean,
+            social_diversity: m.sovereign_social_diversity,
+            social_echo_risk: m.sovereign_social_echo_risk,
+            social_peer_reach: m.sovereign_social_peer_reach,
+            survival_water_pct: m.sovereign_survival_water_pct,
+            survival_power_kw: m.sovereign_survival_power_kw,
+            survival_emergency: m.sovereign_survival_emergency,
+            survival_sensor_count: m.sovereign_survival_sensor_count,
+            survival_alert_count: m.sovereign_survival_alert_count,
+            trust_history: Vec::new(),
+            echo_risk_history: Vec::new(),
+        },
     };
 
     if let Some(json_path) = &args.json {
@@ -1605,6 +1685,8 @@ fn main() -> Result<()> {
             let mut watch_sparkline: Vec<SparklinePoint> = Vec::with_capacity(measurement);
             let mut watch_result = None;
             let mut glyph_coherence_history: Vec<f32> = Vec::with_capacity(measurement);
+            let mut sovereign_trust_history: Vec<f32> = Vec::with_capacity(measurement);
+            let mut sovereign_echo_history: Vec<f32> = Vec::with_capacity(measurement);
             for i in 0..measurement {
                 let input = inputs[(cycle_count + i) % inputs.len()];
                 let result = service.cycle(input);
@@ -1625,6 +1707,8 @@ fn main() -> Result<()> {
                     tom_mismatch: wm.tom_prediction_mismatch,
                 });
                 glyph_coherence_history.push(wm.glyph_coherence);
+                sovereign_trust_history.push(wm.sovereign_trust_avg);
+                sovereign_echo_history.push(wm.sovereign_social_echo_risk);
                 watch_result = Some(result);
             }
             cycle_count += measurement;
@@ -1824,6 +1908,34 @@ fn main() -> Result<()> {
                     codebook_size: wm.memory.resonator_codebook_size,
                     codebook_diversity: wm.memory.codebook_diversity,
                 },
+                immune: ImmuneInfo::default(),
+                sovereign: SovereignInfo {
+                    time_quality: match wm.sovereign_time_quality {
+                        0 => "Authoritative".into(),
+                        1 => "Consensus".into(),
+                        2 => "Degraded".into(),
+                        _ => "FreeRunning".into(),
+                    },
+                    time_peer_count: wm.sovereign_time_peer_count,
+                    time_offset_us: wm.sovereign_time_offset_us,
+                    time_stratum: wm.sovereign_time_stratum,
+                    time_drift_ppm: wm.sovereign_time_drift_ppm,
+                    trust_avg: wm.sovereign_trust_avg,
+                    trust_density: wm.sovereign_trust_density,
+                    trust_pq_fraction: wm.sovereign_trust_pq_fraction,
+                    trust_anomaly_count: wm.sovereign_trust_anomalies,
+                    social_resonance_mean: wm.sovereign_social_resonance_mean,
+                    social_diversity: wm.sovereign_social_diversity,
+                    social_echo_risk: wm.sovereign_social_echo_risk,
+                    social_peer_reach: wm.sovereign_social_peer_reach,
+                    survival_water_pct: wm.sovereign_survival_water_pct,
+                    survival_power_kw: wm.sovereign_survival_power_kw,
+                    survival_emergency: wm.sovereign_survival_emergency,
+                    survival_sensor_count: wm.sovereign_survival_sensor_count,
+                    survival_alert_count: wm.sovereign_survival_alert_count,
+                    trust_history: sovereign_trust_history.clone(),
+                    echo_risk_history: sovereign_echo_history.clone(),
+                },
             };
 
             // Delta against previous snapshot
@@ -2008,6 +2120,7 @@ mod tests {
             learning: LearningInfo::default(),
             reasoning: ReasoningInfo::default(),
             dream: DreamInfo::default(),
+            sovereign: SovereignInfo::default(),
         }
     }
 

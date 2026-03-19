@@ -545,9 +545,7 @@ impl CognitiveLoopService {
 
     /// Current financial health signals from the Mycelix finance cluster.
     #[cfg(feature = "mycelix")]
-    pub fn finance_health(
-        &self,
-    ) -> &crate::consciousness::mycelix_bridge::FinanceHealthSignals {
+    pub fn finance_health(&self) -> &crate::consciousness::mycelix_bridge::FinanceHealthSignals {
         self.governance_mgr.finance_health()
     }
 

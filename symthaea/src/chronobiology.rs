@@ -169,6 +169,19 @@ impl Biorhythm {
             self.phase_offset = 0.0;
         }
     }
+
+    /// Inject a mesh-time consensus offset into the biorhythm.
+    ///
+    /// When sovereign mesh-time diverges from local SystemTime, this offset
+    /// (in fractional hours) is applied to the effective hour computation.
+    /// This allows the circadian system to track mesh consensus time rather
+    /// than potentially-skewed local time.
+    ///
+    /// # Arguments
+    /// * `offset_hours` — Consensus offset in fractional hours, clamped to ±12.
+    pub fn set_mesh_time_offset(&mut self, offset_hours: f64) {
+        self.phase_offset = offset_hours.clamp(-12.0, 12.0);
+    }
 }
 
 #[cfg(test)]

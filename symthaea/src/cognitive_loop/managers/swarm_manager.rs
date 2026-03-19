@@ -116,6 +116,20 @@ pub enum SwarmEvent {
         /// Beacon drift estimate (ppm).
         drift_ppm: f32,
     },
+
+    /// Content announced by a mesh peer (Sovereign Social Fabric).
+    ContentAnnounced {
+        /// Source peer hex ID.
+        peer_id: String,
+        /// BLAKE3 content hash.
+        content_hash: [u8; 32],
+        /// Truncated 256-bit HDV embedding.
+        truncated_hdv: [u8; 32],
+        /// Content domain.
+        domain: String,
+        /// Creation timestamp (Unix seconds).
+        created_at: u64,
+    },
 }
 
 /// A threat pattern report from a peer, ready for SentinelManager consumption.
@@ -226,6 +240,19 @@ pub struct SwarmManager {
     /// Cycle counter for FHE aggregation interval.
     #[cfg(feature = "fhe-wisdom")]
     fhe_cycles_since_aggregation: usize,
+
+    /// Session mask for encrypting local wisdom contributions (OTP).
+    /// Generated once per session; peers share via threshold splitting.
+    #[cfg(feature = "fhe-wisdom")]
+    session_mask: symthaea_core::hdc::binary_hv::BinaryHV,
+
+    /// Total local contributions made this session.
+    #[cfg(feature = "fhe-wisdom")]
+    fhe_contributions_total: usize,
+
+    /// Total aggregations completed this session.
+    #[cfg(feature = "fhe-wisdom")]
+    fhe_aggregations_total: usize,
 }
 
 impl Default for SwarmManager {
@@ -252,6 +279,17 @@ impl Default for SwarmManager {
             wisdom_pool: symthaea_core::hdc::hdc_fhe::CollectiveWisdomPool::new(),
             #[cfg(feature = "fhe-wisdom")]
             fhe_cycles_since_aggregation: 0,
+            #[cfg(feature = "fhe-wisdom")]
+            session_mask: symthaea_core::hdc::binary_hv::BinaryHV::random(
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_nanos() as u64,
+            ),
+            #[cfg(feature = "fhe-wisdom")]
+            fhe_contributions_total: 0,
+            #[cfg(feature = "fhe-wisdom")]
+            fhe_aggregations_total: 0,
         }
     }
 }
@@ -381,6 +419,59 @@ impl SwarmManager {
     #[cfg(feature = "fhe-wisdom")]
     pub fn wisdom_pool_count(&self) -> usize {
         self.wisdom_pool.contribution_count()
+    }
+
+    /// Contribute local consciousness state (BinaryHV) to the collective wisdom pool.
+    ///
+    /// The HV is encrypted with the session mask before contribution.
+    /// This is the main entry point called from the cognitive loop each cycle.
+    #[cfg(feature = "fhe-wisdom")]
+    pub fn contribute_local_wisdom(
+        &mut self,
+        hv: &symthaea_core::hdc::binary_hv::BinaryHV,
+    ) -> bool {
+        let encrypted = symthaea_core::hdc::hdc_fhe::EncryptedHV::encrypt(hv, &self.session_mask);
+        let ok = self.wisdom_pool.contribute("local", encrypted);
+        if ok {
+            self.fhe_contributions_total += 1;
+        }
+        ok
+    }
+
+    /// Try aggregation and return decrypted collective wisdom if threshold met.
+    ///
+    /// Decrypts using the session mask. In a full deployment, decryption
+    /// would require k-of-n threshold mask recovery from peers.
+    #[cfg(feature = "fhe-wisdom")]
+    pub fn try_aggregate_and_decrypt(&mut self) -> Option<symthaea_core::hdc::binary_hv::BinaryHV> {
+        self.fhe_cycles_since_aggregation += 1;
+        if self.wisdom_pool.contribution_count() >= 3 {
+            if let Some(encrypted_aggregate) = self.wisdom_pool.aggregate() {
+                self.wisdom_pool.clear();
+                self.fhe_cycles_since_aggregation = 0;
+                self.fhe_aggregations_total += 1;
+                return Some(encrypted_aggregate.decrypt(&self.session_mask));
+            }
+        }
+        None
+    }
+
+    /// FHE telemetry: total contributions this session.
+    #[cfg(feature = "fhe-wisdom")]
+    pub fn fhe_contributions_total(&self) -> usize {
+        self.fhe_contributions_total
+    }
+
+    /// FHE telemetry: total aggregations this session.
+    #[cfg(feature = "fhe-wisdom")]
+    pub fn fhe_aggregations_total(&self) -> usize {
+        self.fhe_aggregations_total
+    }
+
+    /// FHE telemetry: cycles since last aggregation.
+    #[cfg(feature = "fhe-wisdom")]
+    pub fn fhe_cycles_since_aggregation(&self) -> usize {
+        self.fhe_cycles_since_aggregation
     }
 
     // ── Internal helpers ────────────────────────────────────────────────
@@ -522,7 +613,8 @@ impl SwarmManager {
                 }
                 // Sovereign Inoculation events — handled by their dedicated managers,
                 // passed through here for uniform channel draining.
-                SwarmEvent::TimeBeaconReceived { .. } => {}
+                // Sovereign Inoculation events — handled by dedicated managers.
+                SwarmEvent::TimeBeaconReceived { .. } | SwarmEvent::ContentAnnounced { .. } => {}
             }
         }
     }

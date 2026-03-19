@@ -688,9 +688,9 @@ impl CognitiveLoopService {
                         ttl: crate::swarm::mesh::MESH_DEFAULT_TTL,
                         wisdom: hv,
                     };
-                    let _ = self.mesh_outbound_tx.send(
-                        crate::swarm::mesh::MeshOutbound { packet },
-                    );
+                    let _ = self
+                        .mesh_outbound_tx
+                        .send(crate::swarm::mesh::MeshOutbound { packet });
                 }
 
                 #[cfg(feature = "mesh-trust")]
@@ -2083,7 +2083,8 @@ impl CognitiveLoopService {
         // Science: Raichle (2010) — default mode network reduces task-positive
         // resource allocation during rest states.
         let stillness_budget_scale = {
-            let ss_coord = self.ethics_engine.last_harmony_coordinates()[HARMONY_INDEX_SACRED_STILLNESS]; // SacredStillness
+            let ss_coord =
+                self.ethics_engine.last_harmony_coordinates()[HARMONY_INDEX_SACRED_STILLNESS]; // SacredStillness
             if ss_coord > 0.5 {
                 // High stillness activation → contract budget by up to 30%
                 1.0 - (ss_coord - 0.5).min(0.3)
@@ -2114,7 +2115,8 @@ impl CognitiveLoopService {
 
         // Active Rest Mode: track Sacred Stillness dominance streak
         {
-            let ss_coord = self.ethics_engine.last_harmony_coordinates()[HARMONY_INDEX_SACRED_STILLNESS];
+            let ss_coord =
+                self.ethics_engine.last_harmony_coordinates()[HARMONY_INDEX_SACRED_STILLNESS];
             let dominant_idx = self
                 .ethics_engine
                 .last_harmony_coordinates()

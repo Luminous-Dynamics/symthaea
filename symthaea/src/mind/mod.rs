@@ -207,6 +207,11 @@ pub struct ContinuousMind {
     /// to the CognitiveLoopService's SwarmManager via mpsc channel.
     /// Set via `set_swarm_channel()` after CLS creates the channel.
     pub(crate) swarm_event_tx: Option<std::sync::mpsc::Sender<crate::cognitive_loop::SwarmEvent>>,
+    /// Receiver for mesh outbound packets from CLS (beacons, name responses, etc.).
+    /// Set via `set_mesh_outbound_rx()`. Drained each tick in `sync_mesh_bridge()`.
+    #[cfg(feature = "mesh")]
+    pub(crate) mesh_outbound_rx:
+        Option<std::sync::Mutex<std::sync::mpsc::Receiver<crate::swarm::mesh::MeshOutbound>>>,
     /// Holochain Cortex for trust and validation.
     pub(crate) cortex: crate::swarm::HolochainCortex,
     /// Optional LLM backend for swarm projection gradient exchange.
@@ -324,6 +329,8 @@ impl ContinuousMind {
             memory_coordinator: crate::memory::memory_coordinator::MemoryCoordinator::default(),
             episodic_memory: None,
             swarm_event_tx: None,
+            #[cfg(feature = "mesh")]
+            mesh_outbound_rx: None,
             dream_bath: symthaea_neuromodulators::NeuromodulatorBath::default(),
             cortex: crate::swarm::HolochainCortex::default(),
             #[cfg(feature = "liquid-mamba")]
@@ -410,6 +417,15 @@ impl ContinuousMind {
         tx: std::sync::mpsc::Sender<crate::cognitive_loop::SwarmEvent>,
     ) {
         self.swarm_event_tx = Some(tx);
+    }
+
+    /// Set the mesh outbound receiver from CLS for sovereign beacon emission.
+    #[cfg(feature = "mesh")]
+    pub fn set_mesh_outbound_rx(
+        &mut self,
+        rx: std::sync::mpsc::Receiver<crate::swarm::mesh::MeshOutbound>,
+    ) {
+        self.mesh_outbound_rx = Some(std::sync::Mutex::new(rx));
     }
 
     /// Set relational Ψ (Phi-dyad from partnership module).

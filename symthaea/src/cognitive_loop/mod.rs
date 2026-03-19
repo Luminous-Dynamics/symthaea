@@ -196,6 +196,7 @@ pub use managers::network_service_bridge::{
     NetworkServiceBridge, NetworkServiceBridgeHandle,
 };
 pub use managers::swarm_manager::{SwarmEvent, SwarmTelemetry};
+pub use subsystem_trait::{CognitiveSubsystem, CycleSnapshot, SubsystemOutput};
 
 #[cfg(feature = "mesh")]
 pub use managers::{
@@ -735,6 +736,15 @@ pub struct CognitiveLoopService {
     /// Implements CognitiveSubsystem at interval 23. Feature-gated behind `mesh`.
     #[cfg(feature = "mesh")]
     time_manager: managers::TimeManager,
+
+    /// Sender for mesh outbound packets (beacons, name responses, content announces).
+    /// ContinuousMind drains the paired receiver each tick via `drain_mesh_outbound()`.
+    #[cfg(feature = "mesh")]
+    mesh_outbound_tx: std::sync::mpsc::Sender<crate::swarm::mesh::MeshOutbound>,
+    /// Receiver held until ContinuousMind claims it via `take_mesh_outbound_rx()`.
+    #[cfg(feature = "mesh")]
+    mesh_outbound_rx:
+        std::sync::Mutex<Option<std::sync::mpsc::Receiver<crate::swarm::mesh::MeshOutbound>>>,
 
     /// Trust Manager: Web-of-trust graph with decay and violation detection.
     /// Implements CognitiveSubsystem at interval 29. Feature-gated behind `mesh-trust`.
