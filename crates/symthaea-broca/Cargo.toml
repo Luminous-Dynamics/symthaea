@@ -18,6 +18,10 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 rand = { workspace = true }
 rayon = { workspace = true, optional = true }
 
+# WASM support — getrandom needs "js" feature on wasm32-unknown-unknown
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.2", features = ["js"] }
+
 # Distillation collection (optional)
 ureq = { version = "2.9", optional = true }
 

@@ -4069,7 +4069,11 @@ fn write_sovereign_pane(html: &mut String, sov: &super::SovereignInfo) {
         ta = sov.trust_avg,
         tden = sov.trust_density,
         tpq = sov.trust_pq_fraction * 100.0,
-        anomaly_c = if sov.trust_anomaly_count > 0 { "#e05555" } else { "#7ec8a0" },
+        anomaly_c = if sov.trust_anomaly_count > 0 {
+            "#e05555"
+        } else {
+            "#7ec8a0"
+        },
         tanm = sov.trust_anomaly_count,
         sr = sov.social_resonance_mean,
         sd = sov.social_diversity,

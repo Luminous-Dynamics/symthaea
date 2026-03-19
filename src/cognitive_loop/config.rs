@@ -1350,6 +1350,7 @@ impl CognitiveLoopConfig {
                 self.substrate_transition_alpha
             ));
         }
+        #[cfg(feature = "physics-bridge")]
         if self.physics_bridge_blend_weight < 0.0
             || self.physics_bridge_blend_weight > 1.0
             || !self.physics_bridge_blend_weight.is_finite()
@@ -1359,6 +1360,7 @@ impl CognitiveLoopConfig {
                 self.physics_bridge_blend_weight
             ));
         }
+        #[cfg(feature = "therapeutic")]
         if self.therapeutic_crisis_threshold < 0.01
             || self.therapeutic_crisis_threshold > 0.95
             || !self.therapeutic_crisis_threshold.is_finite()
@@ -1368,32 +1370,35 @@ impl CognitiveLoopConfig {
                 self.therapeutic_crisis_threshold
             ));
         }
-        if self.scene_memory_coherence_threshold < 0.0
-            || self.scene_memory_coherence_threshold > 1.0
-            || !self.scene_memory_coherence_threshold.is_finite()
+        #[cfg(feature = "vision-manifold")]
         {
-            return Err(format!(
-                "CognitiveLoopConfig: scene_memory_coherence_threshold must be in [0.0, 1.0], got {}",
-                self.scene_memory_coherence_threshold
-            ));
-        }
-        if self.scene_memory_error_threshold < 0.0
-            || self.scene_memory_error_threshold > 1.0
-            || !self.scene_memory_error_threshold.is_finite()
-        {
-            return Err(format!(
-                "CognitiveLoopConfig: scene_memory_error_threshold must be in [0.0, 1.0], got {}",
-                self.scene_memory_error_threshold
-            ));
-        }
-        if self.scene_memory_dampen_factor < 0.0
-            || self.scene_memory_dampen_factor > 1.0
-            || !self.scene_memory_dampen_factor.is_finite()
-        {
-            return Err(format!(
-                "CognitiveLoopConfig: scene_memory_dampen_factor must be in [0.0, 1.0], got {}",
-                self.scene_memory_dampen_factor
-            ));
+            if self.scene_memory_coherence_threshold < 0.0
+                || self.scene_memory_coherence_threshold > 1.0
+                || !self.scene_memory_coherence_threshold.is_finite()
+            {
+                return Err(format!(
+                    "CognitiveLoopConfig: scene_memory_coherence_threshold must be in [0.0, 1.0], got {}",
+                    self.scene_memory_coherence_threshold
+                ));
+            }
+            if self.scene_memory_error_threshold < 0.0
+                || self.scene_memory_error_threshold > 1.0
+                || !self.scene_memory_error_threshold.is_finite()
+            {
+                return Err(format!(
+                    "CognitiveLoopConfig: scene_memory_error_threshold must be in [0.0, 1.0], got {}",
+                    self.scene_memory_error_threshold
+                ));
+            }
+            if self.scene_memory_dampen_factor < 0.0
+                || self.scene_memory_dampen_factor > 1.0
+                || !self.scene_memory_dampen_factor.is_finite()
+            {
+                return Err(format!(
+                    "CognitiveLoopConfig: scene_memory_dampen_factor must be in [0.0, 1.0], got {}",
+                    self.scene_memory_dampen_factor
+                ));
+            }
         }
         // Validate moral anomaly config
         self.moral_anomaly_config
@@ -1590,6 +1595,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "physics-bridge")]
     fn config_physics_blend_weight_out_of_range_rejected() {
         let mut c = CognitiveLoopConfig::default();
         c.physics_bridge_blend_weight = f32::NAN;
@@ -1599,6 +1605,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "therapeutic")]
     fn config_therapeutic_crisis_threshold_out_of_range_rejected() {
         let mut c = CognitiveLoopConfig::default();
         c.therapeutic_crisis_threshold = 0.0;
@@ -1608,6 +1615,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "vision-manifold")]
     fn config_scene_memory_thresholds_out_of_range_rejected() {
         let mut c = CognitiveLoopConfig::default();
         c.scene_memory_coherence_threshold = -0.1;

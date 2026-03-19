@@ -149,9 +149,8 @@ impl BartBenchmark {
                 .copied()
                 .unwrap_or(0.5);
 
-            // FEP modulates target by +/- 30% — wider range captures the
-            // natural variability in human risk-taking (SD=12 pumps on baseline 30).
-            let fep_adjustment = (fep_pump_prob - 0.5) * 0.6;
+            // FEP modulates target by +/- 20%
+            let fep_adjustment = (fep_pump_prob - 0.5) * 0.4;
             let adjusted_target = ((target_pumps as f64 * (1.0 + fep_adjustment)).round() as usize)
                 .max(1)
                 .min(max_pumps);

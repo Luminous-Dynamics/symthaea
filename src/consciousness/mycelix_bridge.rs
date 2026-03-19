@@ -427,20 +427,14 @@ pub enum GovernanceDispatchOutcome {
         action_hash: Option<String>,
     },
     /// Proposal was rejected by the conductor.
-    ProposalRejected {
-        correlation_id: u64,
-        reason: String,
-    },
+    ProposalRejected { correlation_id: u64, reason: String },
     /// Vote was accepted by the conductor and written to the DHT.
     VoteAccepted {
         correlation_id: u64,
         action_hash: Option<String>,
     },
     /// Vote was rejected by the conductor.
-    VoteRejected {
-        correlation_id: u64,
-        reason: String,
-    },
+    VoteRejected { correlation_id: u64, reason: String },
 }
 
 impl MycelixBridge {

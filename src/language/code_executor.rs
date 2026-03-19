@@ -1515,10 +1515,7 @@ mod tests {
         assert_eq!(errors[0].code.as_deref(), Some("E0308"));
         assert_eq!(errors[0].file.as_deref(), Some("src/lib.rs"));
         assert_eq!(errors[0].line, Some(10));
-        assert_eq!(
-            errors[0].suggested_replacement.as_deref(),
-            Some("x as i64")
-        );
+        assert_eq!(errors[0].suggested_replacement.as_deref(), Some("x as i64"));
     }
 
     #[test]

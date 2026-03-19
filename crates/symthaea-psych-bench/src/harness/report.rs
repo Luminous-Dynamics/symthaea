@@ -915,11 +915,7 @@ impl BenchmarkReport {
             ("mi_spirit_score", "mi_spirit_score", &bl.clinical),
             // Security (HDC-FHE)
             ("encrypted_accuracy", "encrypted_accuracy", &bl.security),
-            (
-                "aggregation_fidelity",
-                "aggregation_fidelity",
-                &bl.security,
-            ),
+            ("aggregation_fidelity", "aggregation_fidelity", &bl.security),
         ];
 
         for (metric_key, baseline_key, baselines) in &mappings {
@@ -3062,6 +3058,7 @@ mod tests {
         use crate::benchmarks::metacognition::*;
         use crate::benchmarks::motor::*;
         use crate::benchmarks::reasoning::*;
+        use crate::benchmarks::security::*;
         use crate::benchmarks::social::*;
         use crate::benchmarks::spatial::*;
         use crate::benchmarks::speech::*;
@@ -3217,6 +3214,9 @@ mod tests {
             Box::new(ConstraintPuzzlesBenchmark),
             Box::new(ProofConstructionBenchmark),
             Box::new(DefiniteIntegralsBenchmark),
+            // Security (HDC-FHE)
+            Box::new(EncryptedClassificationBenchmark),
+            Box::new(CollectiveAggregationBenchmark),
         ];
 
         let mut report = BenchmarkReport::new();

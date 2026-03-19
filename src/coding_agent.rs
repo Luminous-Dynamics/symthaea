@@ -414,8 +414,10 @@ impl CodingAgent {
         // Select dispatcher: real Ollama or simulated, optionally with cloud LLM
         let cloud_backend: Option<std::sync::Arc<dyn crate::language::llm_backend::LLMBackend>> =
             if config.use_cloud_llm {
-                crate::language::anthropic_backend::AnthropicBackend::from_env()
-                    .map(|b| std::sync::Arc::new(b) as std::sync::Arc<dyn crate::language::llm_backend::LLMBackend>)
+                crate::language::anthropic_backend::AnthropicBackend::from_env().map(|b| {
+                    std::sync::Arc::new(b)
+                        as std::sync::Arc<dyn crate::language::llm_backend::LLMBackend>
+                })
             } else {
                 None
             };
@@ -1017,9 +1019,10 @@ impl CodingAgent {
 
         // Try compiler-suggested replacements first (highest fidelity — from rustc itself)
         // These come from JSON diagnostics if the output contains JSON lines
-        let json_errors =
-            crate::language::code_executor::parse_json_diagnostics(&test_output);
-        let has_suggestions = json_errors.iter().any(|e| e.suggested_replacement.is_some());
+        let json_errors = crate::language::code_executor::parse_json_diagnostics(&test_output);
+        let has_suggestions = json_errors
+            .iter()
+            .any(|e| e.suggested_replacement.is_some());
         if has_suggestions {
             let suggestion_key = "compiler-suggestion-fix".to_string();
             if !self.attempted_fixes.contains(&suggestion_key) {

@@ -87,12 +87,14 @@ pub fn encode_balance_with_dithering(balance: u64, max_balance: u64, nonce: u64)
     let scaled = balance as u128 * THERMOMETER_LEVELS as u128;
     let bits_to_set_floor = (scaled / max_balance as u128).min(THERMOMETER_LEVELS as u128) as usize;
 
-    // Compute fractional part: how far we are between level N and N+1
+    // Compute fractional part: how far we are between level N and N+1.
+    // `remainder` is in [0, max_balance), representing the sub-level offset.
     let remainder = scaled % max_balance as u128;
-    // Dither: if the fractional part exceeds a threshold derived from nonce, round up
+    // Dither: compare remainder to a deterministic threshold derived from nonce.
+    // If the fractional position exceeds the nonce-derived threshold, round up.
     let threshold = (nonce % max_balance as u64) as u128;
-    let bits_to_set = if remainder > 0 && remainder * max_balance as u128 > threshold * max_balance as u128 {
-        // Probabilistically round up (deterministic based on nonce)
+    let bits_to_set = if remainder > 0 && remainder > threshold {
+        // Deterministically round up based on nonce
         (bits_to_set_floor + 1).min(THERMOMETER_LEVELS as usize)
     } else {
         bits_to_set_floor
@@ -531,7 +533,10 @@ mod tests {
         let agg = pool.aggregate();
         assert!(agg.is_some());
         let (_encrypted, error) = agg.unwrap();
-        assert!(error > 0.0, "Error estimate should be positive for 3 members");
+        assert!(
+            error > 0.0,
+            "Error estimate should be positive for 3 members"
+        );
 
         // Decrypt with k=3 shares
         let total = pool.decrypt_aggregate(&shares[..3]);
@@ -615,7 +620,8 @@ mod tests {
             let decoded = decode_balance(&hv, max_balance);
             let error = (decoded as i64 - balance as i64).unsigned_abs();
             // Dithered encoding may round up, so error bound is max_quantization_error + 1 level
-            let bound = max_quantization_error(max_balance) + max_quantization_error(max_balance) + 1;
+            let bound =
+                max_quantization_error(max_balance) + max_quantization_error(max_balance) + 1;
             assert!(
                 error <= bound,
                 "Dithered roundtrip error too large for balance={balance}: decoded={decoded}, error={error}"

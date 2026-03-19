@@ -195,7 +195,6 @@ mod tests {
         use crate::benchmarks::butlin::*;
         use crate::benchmarks::causal_reasoning::*;
         use crate::benchmarks::clinical::*;
-        use crate::benchmarks::security::*;
         use crate::benchmarks::cogbench::*;
         use crate::benchmarks::consciousness::*;
         use crate::benchmarks::creativity::*;
@@ -207,6 +206,7 @@ mod tests {
         use crate::benchmarks::metacognition::*;
         use crate::benchmarks::motor::*;
         use crate::benchmarks::reasoning::*;
+        use crate::benchmarks::security::*;
         use crate::benchmarks::social::*;
         use crate::benchmarks::spatial::*;
         use crate::benchmarks::speech::*;

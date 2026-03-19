@@ -86,10 +86,7 @@ fn classify_plaintext(test: &BinaryHV, prototypes: &[BinaryHV]) -> (usize, Vec<f
 }
 
 /// Classify an encrypted test item against encrypted prototypes.
-fn classify_encrypted(
-    test: &EncryptedHV,
-    prototypes: &[EncryptedHV],
-) -> (usize, Vec<f32>) {
+fn classify_encrypted(test: &EncryptedHV, prototypes: &[EncryptedHV]) -> (usize, Vec<f32>) {
     let sims: Vec<f32> = prototypes
         .iter()
         .map(|p| test.encrypted_similarity(p))

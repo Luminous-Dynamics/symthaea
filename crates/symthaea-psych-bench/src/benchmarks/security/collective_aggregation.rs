@@ -222,8 +222,7 @@ impl PsychBenchmark for CollectiveAggregationBenchmark {
                 }
             }
 
-            let classification_pres =
-                agg_correct as f64 / (pt_correct.max(1)) as f64;
+            let classification_pres = agg_correct as f64 / (pt_correct.max(1)) as f64;
             classification_samples.push(classification_pres.min(1.0));
 
             // --- Metric 4: Peer privacy ---

@@ -750,27 +750,44 @@ fn validate_code(source: &str, test_source: &str) -> (bool, Vec<String>, usize, 
 
     // Fix E0412: undeclared type T — LLM uses T without generic declaration
     // Add generic bounds to functions that reference T
-    if result.compile_errors.iter().any(|e| e.contains("cannot find type `T`")) {
+    if result
+        .compile_errors
+        .iter()
+        .any(|e| e.contains("cannot find type `T`"))
+    {
         // Find "fn name(" and inject "<T>" before the paren
         let lines: Vec<&str> = source_to_fix.lines().collect();
-        let fixed_lines: Vec<String> = lines.iter().map(|line| {
-            let trimmed = line.trim();
-            if (trimmed.starts_with("pub fn ") || trimmed.starts_with("fn "))
-                && trimmed.contains("(")
-                && !trimmed.contains("<")
-                && (trimmed.contains(": T") || trimmed.contains("Vec<T>") || trimmed.contains("&T")
-                    || trimmed.contains("-> T") || trimmed.contains("Option<T>"))
-            {
-                // Insert <T: Clone + PartialOrd> before the first (
-                line.replacen("(", "<T: Clone + PartialOrd + std::fmt::Debug>(", 1)
-            } else {
-                line.to_string()
-            }
-        }).collect();
+        let fixed_lines: Vec<String> = lines
+            .iter()
+            .map(|line| {
+                let trimmed = line.trim();
+                if (trimmed.starts_with("pub fn ") || trimmed.starts_with("fn "))
+                    && trimmed.contains("(")
+                    && !trimmed.contains("<")
+                    && (trimmed.contains(": T")
+                        || trimmed.contains("Vec<T>")
+                        || trimmed.contains("&T")
+                        || trimmed.contains("-> T")
+                        || trimmed.contains("Option<T>"))
+                {
+                    // Insert <T: Clone + PartialOrd> before the first (
+                    line.replacen("(", "<T: Clone + PartialOrd + std::fmt::Debug>(", 1)
+                } else {
+                    line.to_string()
+                }
+            })
+            .collect();
         let fixed_code = fixed_lines.join("\n");
         let retry = executor.execute_rust(&fixed_code, test_src);
         if retry.compiled {
-            return (true, vec![], retry.tests_passed, retry.tests_failed, true, true);
+            return (
+                true,
+                vec![],
+                retry.tests_passed,
+                retry.tests_failed,
+                true,
+                true,
+            );
         }
         source_to_fix = fixed_code;
     }
