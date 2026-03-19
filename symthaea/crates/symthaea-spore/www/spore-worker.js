@@ -188,6 +188,15 @@ self.onmessage = async function(e) {
           result = { ok: true, size: buffer.byteLength };
         }
         break;
+      case 'loadBrocaPipeline':
+        if (engine) {
+          var response = await fetch('./broca-pipeline.bin');
+          if (!response.ok) throw new Error('Pipeline checkpoint fetch failed: ' + response.status);
+          var buffer = await response.arrayBuffer();
+          engine.load_broca_pipeline_checkpoint(new Uint8Array(buffer));
+          result = { ok: true, size: buffer.byteLength, pipeline: true };
+        }
+        break;
       // Phase 1: Language generation (Broca)
       case 'generateText':
         if (engine) result = engine.generate_text(params.maxTokens || 32);

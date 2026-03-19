@@ -1795,10 +1795,21 @@
             send('startLoop', { interval: 200 });
             initChat();
             initSonicAndGlyphs();
-            // Load trained Broca weights asynchronously (non-blocking)
-            send('loadBrocaCheckpoint', {})
-              .then(function(r) { console.log('Broca trained weights loaded (' + r.size + ' bytes)'); })
-              .catch(function(e) { console.warn('Broca checkpoint not available, using random init:', e.message); });
+            // Load Broca weights asynchronously (non-blocking, progressive)
+            // 1. First try the full pipeline checkpoint (335MB, real HdcLtcUnifiedNetwork)
+            // 2. Fall back to BrocaLite checkpoint (2.5MB, gated recurrence)
+            // 3. Fall back to structured grammar (no checkpoint needed)
+            send('loadBrocaPipeline', {})
+              .then(function(r) {
+                console.log('Full Broca pipeline loaded (' + (r.size / (1024*1024)).toFixed(0) + ' MB)');
+                addNarration('Full language pipeline loaded. HdcLtcUnifiedNetwork active.');
+              })
+              .catch(function(e) {
+                console.warn('Full pipeline not available, trying BrocaLite:', e.message);
+                send('loadBrocaCheckpoint', {})
+                  .then(function(r) { console.log('BrocaLite weights loaded (' + r.size + ' bytes)'); })
+                  .catch(function(e2) { console.warn('No checkpoints available, using structured generation'); });
+              });
           })
           .catch(() => {
             onWasmFailed();

@@ -25,7 +25,7 @@ if [[ "${1:-}" == "--debug" ]]; then
 fi
 
 echo "[spore] Step 1/3: Compiling to wasm32-unknown-unknown ($PROFILE)..."
-cargo build $CARGO_FLAGS --target wasm32-unknown-unknown --features wasm -p symthaea-spore
+cargo build $CARGO_FLAGS --target wasm32-unknown-unknown --features wasm,broca-pipeline -p symthaea-spore
 
 # Find the wasm file (workspace target dir may vary)
 WASM_FILE=$(find "$(cargo metadata --format-version=1 --no-deps 2>/dev/null | python3 -c 'import sys,json; print(json.load(sys.stdin)["target_directory"])' 2>/dev/null || echo "$SCRIPT_DIR/../../target")/wasm32-unknown-unknown/$PROFILE" -name "symthaea_spore.wasm" -maxdepth 1 2>/dev/null | head -1)
