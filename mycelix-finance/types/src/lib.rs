@@ -2203,3 +2203,6 @@ mod resilience_tests;
 
 #[cfg(test)]
 mod simulation;
+
+#[cfg(test)]
+mod lifecycle_test;

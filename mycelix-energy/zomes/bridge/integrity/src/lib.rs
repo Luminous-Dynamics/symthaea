@@ -142,6 +142,7 @@ pub enum EnergyEventType {
     ProductionUpdate,
     StatusChanged,
     SyncPending,
+    CertificateCollateralRegistered,
 }
 
 /// Production metrics for energy projects
@@ -439,8 +440,9 @@ mod tests {
             EnergyEventType::ProductionUpdate,
             EnergyEventType::StatusChanged,
             EnergyEventType::SyncPending,
+            EnergyEventType::CertificateCollateralRegistered,
         ];
-        assert_eq!(types.len(), 8);
+        assert_eq!(types.len(), 9);
     }
 
     // =========================================================================

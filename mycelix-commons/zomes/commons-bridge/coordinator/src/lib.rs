@@ -1449,6 +1449,230 @@ fn calculate_local_engagement() -> ExternResult<f64> {
 }
 
 // ============================================================================
+// Cross-Cluster Dispatch: Commons → Finance
+// ============================================================================
+
+/// Finance-side zomes that commons-bridge is allowed to call cross-cluster.
+const ALLOWED_FINANCE_ZOMES: &[&str] = &[
+    "finance_bridge",
+    "currency_mint",
+    "payments",
+    "treasury",
+    "staking",
+    "recognition",
+];
+
+/// The hApp role name for the Finance DNA.
+const FINANCE_ROLE: &str = "finance";
+
+/// Register a commons property as finance collateral.
+///
+/// Verifies the caller's consciousness tier (Participant+), confirms the
+/// property exists in the local property-registry, then makes a cross-cluster
+/// call to the finance bridge to register the property as collateral, making
+/// it eligible for SAP-backed lending positions.
+///
+/// Non-fatal on finance cluster unreachability — the property remains
+/// registered locally even if finance collateral registration fails.
+#[hdk_extern]
+pub fn register_property_as_collateral(
+    input: PropertyCollateralInput,
+) -> ExternResult<PropertyCollateralResult> {
+    // 1. Verify consciousness tier via local bridge (Participant+ required)
+    let credential = get_consciousness_credential(input.owner_did.clone())?;
+    if !credential.tier.can_participate() {
+        return Ok(PropertyCollateralResult {
+            success: false,
+            property_id: input.property_id,
+            collateral_registered: false,
+            error: Some(format!(
+                "Insufficient consciousness tier: {:?} (Participant+ required)",
+                credential.tier
+            )),
+        });
+    }
+
+    // 2. Verify the property exists in local property-registry
+    let cluster = detect_sub_cluster();
+    let property_call_target = if is_local_zome("property_registry", cluster) {
+        CallTargetCell::Local
+    } else {
+        CallTargetCell::OtherRole(sibling_role(cluster).into())
+    };
+    let property_response = call(
+        property_call_target,
+        ZomeName::from("property_registry"),
+        FunctionName::from("get_property"),
+        None,
+        input.property_id.clone(),
+    );
+    match &property_response {
+        Ok(ZomeCallResponse::Ok(_)) => {
+            // Property exists — proceed
+        }
+        Ok(other) => {
+            return Ok(PropertyCollateralResult {
+                success: false,
+                property_id: input.property_id,
+                collateral_registered: false,
+                error: Some(format!(
+                    "Property not found in registry: {:?}",
+                    other
+                )),
+            });
+        }
+        Err(e) => {
+            return Ok(PropertyCollateralResult {
+                success: false,
+                property_id: input.property_id,
+                collateral_registered: false,
+                error: Some(format!("Property registry lookup failed: {:?}", e)),
+            });
+        }
+    }
+
+    // 3. Cross-cluster call to finance bridge to register collateral
+    #[derive(Serialize, Debug)]
+    struct RegisterCollateralPayload {
+        owner_did: String,
+        source_happ: String,
+        asset_type: String,
+        asset_id: String,
+        value_estimate: u64,
+        currency: String,
+    }
+
+    match call(
+        CallTargetCell::OtherRole(FINANCE_ROLE.into()),
+        ZomeName::from("finance_bridge"),
+        FunctionName::from("register_collateral"),
+        None,
+        RegisterCollateralPayload {
+            owner_did: input.owner_did.clone(),
+            source_happ: "mycelix-commons".to_string(),
+            asset_type: "RealEstate".to_string(),
+            asset_id: input.property_id.clone(),
+            value_estimate: input.appraised_value,
+            currency: "SAP".to_string(),
+        },
+    ) {
+        Ok(ZomeCallResponse::Ok(_result)) => Ok(PropertyCollateralResult {
+            success: true,
+            property_id: input.property_id,
+            collateral_registered: true,
+            error: None,
+        }),
+        Ok(other) => Ok(PropertyCollateralResult {
+            success: false,
+            property_id: input.property_id,
+            collateral_registered: false,
+            error: Some(format!("Finance bridge returned: {:?}", other)),
+        }),
+        Err(e) => {
+            // Finance cluster unreachable — non-fatal, property still registered locally
+            debug!(
+                "register_property_as_collateral: finance bridge unreachable: {:?}",
+                e
+            );
+            Ok(PropertyCollateralResult {
+                success: false,
+                property_id: input.property_id,
+                collateral_registered: false,
+                error: Some(format!("Finance cluster unreachable: {:?}", e)),
+            })
+        }
+    }
+}
+
+/// Query collateral health for a commons property.
+///
+/// Cross-cluster call to finance bridge to check LTV status.
+/// Returns loan-to-value ratio and status for the given property.
+#[hdk_extern]
+pub fn check_property_collateral_health(
+    property_id: String,
+) -> ExternResult<CollateralHealthResult> {
+    match call(
+        CallTargetCell::OtherRole(FINANCE_ROLE.into()),
+        ZomeName::from("finance_bridge"),
+        FunctionName::from("update_collateral_health"),
+        None,
+        property_id.clone(),
+    ) {
+        Ok(ZomeCallResponse::Ok(result)) => {
+            // Decode the health status
+            #[derive(Debug, Deserialize)]
+            struct HealthResponse {
+                ltv_ratio: f64,
+                status: String,
+            }
+            match result.decode::<HealthResponse>() {
+                Ok(health) => Ok(CollateralHealthResult {
+                    property_id,
+                    ltv_ratio: Some(health.ltv_ratio),
+                    status: Some(health.status),
+                    available: true,
+                    error: None,
+                }),
+                Err(e) => Ok(CollateralHealthResult {
+                    property_id,
+                    ltv_ratio: None,
+                    status: None,
+                    available: false,
+                    error: Some(format!("Decode error: {:?}", e)),
+                }),
+            }
+        }
+        _ => Ok(CollateralHealthResult {
+            property_id,
+            ltv_ratio: None,
+            status: None,
+            available: false,
+            error: Some("Finance cluster unreachable".into()),
+        }),
+    }
+}
+
+/// Input for registering a commons property as finance collateral.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PropertyCollateralInput {
+    /// Property identifier from the commons property-registry.
+    pub property_id: String,
+    /// DID of the property owner requesting collateral registration.
+    pub owner_did: String,
+    /// Appraised value of the property in smallest currency unit.
+    pub appraised_value: u64,
+}
+
+/// Result of a property collateral registration attempt.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PropertyCollateralResult {
+    /// Whether the overall operation succeeded.
+    pub success: bool,
+    /// The property identifier that was processed.
+    pub property_id: String,
+    /// Whether the collateral was registered in the finance cluster.
+    pub collateral_registered: bool,
+    /// Error message if the operation failed.
+    pub error: Option<String>,
+}
+
+/// Result of a collateral health check.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CollateralHealthResult {
+    /// The property identifier that was checked.
+    pub property_id: String,
+    /// Loan-to-value ratio (0.0-1.0), if available.
+    pub ltv_ratio: Option<f64>,
+    /// Collateral status string (e.g., "Healthy", "AtRisk", "Liquidating").
+    pub status: Option<String>,
+    /// Whether the finance cluster was reachable.
+    pub available: bool,
+    /// Error message if the check failed.
+    pub error: Option<String>,
+}
+
+// ============================================================================
 // Tests
 // ============================================================================
 
@@ -2532,5 +2756,134 @@ mod tests {
     fn role_constants_are_correct() {
         assert_eq!(COMMONS_LAND_ROLE, "commons_land");
         assert_eq!(COMMONS_CARE_ROLE, "commons_care");
+    }
+
+    // ============================================================================
+    // Finance Cross-Cluster Tests
+    // ============================================================================
+
+    #[test]
+    fn finance_allowlist_contains_bridge() {
+        assert!(ALLOWED_FINANCE_ZOMES.contains(&"finance_bridge"));
+    }
+
+    #[test]
+    fn finance_allowlist_has_expected_count() {
+        // finance_bridge + currency_mint + payments + treasury + staking + recognition = 6
+        assert_eq!(ALLOWED_FINANCE_ZOMES.len(), 6);
+    }
+
+    #[test]
+    fn finance_role_constant_correct() {
+        assert_eq!(FINANCE_ROLE, "finance");
+    }
+
+    #[test]
+    fn finance_allowlist_has_no_duplicates() {
+        let mut seen = std::collections::HashSet::new();
+        for zome in ALLOWED_FINANCE_ZOMES {
+            assert!(
+                seen.insert(zome),
+                "Duplicate zome in ALLOWED_FINANCE_ZOMES: '{}'",
+                zome
+            );
+        }
+    }
+
+    #[test]
+    fn finance_allowlist_entries_are_non_empty() {
+        for zome in ALLOWED_FINANCE_ZOMES {
+            assert!(
+                !zome.is_empty(),
+                "ALLOWED_FINANCE_ZOMES contains an empty string"
+            );
+            assert!(
+                !zome.contains(' '),
+                "ALLOWED_FINANCE_ZOMES entry '{}' contains whitespace",
+                zome
+            );
+        }
+    }
+
+    // ---- Property collateral type serde ----
+
+    #[test]
+    fn property_collateral_input_serde_roundtrip() {
+        let input = PropertyCollateralInput {
+            property_id: "PROP-001".into(),
+            owner_did: "did:mycelix:agent_abc".into(),
+            appraised_value: 250_000,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let input2: PropertyCollateralInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(input2.property_id, "PROP-001");
+        assert_eq!(input2.owner_did, "did:mycelix:agent_abc");
+        assert_eq!(input2.appraised_value, 250_000);
+    }
+
+    #[test]
+    fn property_collateral_result_success_serde_roundtrip() {
+        let result = PropertyCollateralResult {
+            success: true,
+            property_id: "PROP-001".into(),
+            collateral_registered: true,
+            error: None,
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let r2: PropertyCollateralResult = serde_json::from_str(&json).unwrap();
+        assert!(r2.success);
+        assert!(r2.collateral_registered);
+        assert_eq!(r2.property_id, "PROP-001");
+        assert!(r2.error.is_none());
+    }
+
+    #[test]
+    fn property_collateral_result_failure_serde_roundtrip() {
+        let result = PropertyCollateralResult {
+            success: false,
+            property_id: "PROP-002".into(),
+            collateral_registered: false,
+            error: Some("Finance cluster unreachable".into()),
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let r2: PropertyCollateralResult = serde_json::from_str(&json).unwrap();
+        assert!(!r2.success);
+        assert!(!r2.collateral_registered);
+        assert_eq!(r2.error.as_deref(), Some("Finance cluster unreachable"));
+    }
+
+    #[test]
+    fn collateral_health_result_available_serde_roundtrip() {
+        let result = CollateralHealthResult {
+            property_id: "PROP-001".into(),
+            ltv_ratio: Some(0.65),
+            status: Some("Healthy".into()),
+            available: true,
+            error: None,
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let r2: CollateralHealthResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(r2.property_id, "PROP-001");
+        assert!((r2.ltv_ratio.unwrap() - 0.65).abs() < 1e-10);
+        assert_eq!(r2.status.as_deref(), Some("Healthy"));
+        assert!(r2.available);
+        assert!(r2.error.is_none());
+    }
+
+    #[test]
+    fn collateral_health_result_unavailable_serde_roundtrip() {
+        let result = CollateralHealthResult {
+            property_id: "PROP-003".into(),
+            ltv_ratio: None,
+            status: None,
+            available: false,
+            error: Some("Finance cluster unreachable".into()),
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let r2: CollateralHealthResult = serde_json::from_str(&json).unwrap();
+        assert!(!r2.available);
+        assert!(r2.ltv_ratio.is_none());
+        assert!(r2.status.is_none());
+        assert_eq!(r2.error.as_deref(), Some("Finance cluster unreachable"));
     }
 }

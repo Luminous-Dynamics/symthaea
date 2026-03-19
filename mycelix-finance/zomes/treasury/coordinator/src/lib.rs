@@ -3,6 +3,7 @@
 use hdk::prelude::*;
 use mycelix_finance_shared::{
     anchor_hash, follow_update_chain, links_to_records, validate_id, verify_caller_is_did,
+    verify_citizen_tier,
 };
 use treasury_integrity::*;
 
@@ -1304,4 +1305,150 @@ pub fn get_commons_pool(pool_id: String) -> ExternResult<Option<Record>> {
         return Ok(Some(follow_update_chain(hash)?));
     }
     Ok(None)
+}
+
+// ---------------------------------------------------------------------------
+// DKG-gated large allocation (requires governance threshold signature)
+// ---------------------------------------------------------------------------
+
+/// Minimum amount (in micro-SAP) that requires DKG threshold signing.
+/// 10,000 SAP = 10,000,000,000 micro-SAP.
+const DKG_THRESHOLD_AMOUNT: u64 = 10_000_000_000;
+
+/// Execute a large treasury allocation requiring threshold signature.
+///
+/// For allocations above `DKG_THRESHOLD_AMOUNT`, requires a valid threshold
+/// signature from the governance DKG committee. This prevents any single
+/// treasury manager from unilaterally moving large amounts.
+///
+/// The signature must be obtained via the governance/threshold-signing zome
+/// before calling this function.
+#[hdk_extern]
+pub fn execute_dkg_allocation(input: DkgAllocationInput) -> ExternResult<Record> {
+    verify_citizen_tier()?;
+
+    if input.amount <= DKG_THRESHOLD_AMOUNT {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "DKG allocation only required for amounts > {} SAP. Use regular allocate() instead.",
+            DKG_THRESHOLD_AMOUNT / 1_000_000
+        ))));
+    }
+
+    validate_id(&input.treasury_id, "treasury_id")?;
+
+    // Verify the caller is the requester
+    verify_caller_is_did(&input.recipient_did)?;
+
+    // Verify the treasury exists and has sufficient balance
+    let (_record, treasury) = get_treasury_record(&input.treasury_id)?;
+    if treasury.balance < input.amount {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Insufficient treasury balance: {} < {}",
+            treasury.balance, input.amount
+        ))));
+    }
+
+    // Verify the threshold signature via governance cluster
+    #[derive(Serialize, Debug)]
+    struct VerifySignatureInput {
+        committee_id: String,
+        message: Vec<u8>,
+        signature: Vec<u8>,
+    }
+
+    let message = format!(
+        "treasury_allocation:{}:{}:{}",
+        input.treasury_id, input.amount, input.recipient_did
+    );
+
+    match call(
+        CallTargetCell::OtherRole("governance".into()),
+        ZomeName::from("threshold_signing"),
+        FunctionName::from("verify_threshold_signature"),
+        None,
+        VerifySignatureInput {
+            committee_id: input.committee_id.clone(),
+            message: message.as_bytes().to_vec(),
+            signature: input.threshold_signature.clone(),
+        },
+    ) {
+        Ok(ZomeCallResponse::Ok(result)) => {
+            let valid = result.decode::<bool>().unwrap_or(false);
+            if !valid {
+                return Err(wasm_error!(WasmErrorInner::Guest(
+                    "Invalid threshold signature — DKG committee verification failed".into()
+                )));
+            }
+        }
+        Ok(other) => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Governance cluster returned unexpected response for signature verification: {:?}",
+                other
+            ))));
+        }
+        Err(e) => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Cannot execute DKG allocation — governance cluster unreachable: {:?}. \
+                 Large allocations require threshold signature verification.",
+                e
+            ))));
+        }
+    }
+
+    // Signature verified — debit the treasury
+    debit_treasury(&input.treasury_id, input.amount)?;
+
+    // Create the allocation record
+    let now = sys_time()?;
+    let allocation = Allocation {
+        id: format!("dkg-alloc:{}:{}", input.treasury_id, now.as_micros()),
+        treasury_id: input.treasury_id.clone(),
+        proposal_id: None,
+        recipient_did: input.recipient_did.clone(),
+        amount: input.amount,
+        currency: treasury.currency.clone(),
+        purpose: format!(
+            "[DKG] {} (committee: {})",
+            input.reason, input.committee_id
+        ),
+        status: AllocationStatus::Executed,
+        approved_by: vec![format!("dkg:{}", input.committee_id)],
+        created: now,
+        executed: Some(now),
+    };
+
+    let action_hash = create_entry(&EntryTypes::Allocation(allocation.clone()))?;
+    create_link(
+        anchor_hash(&input.treasury_id)?,
+        action_hash.clone(),
+        LinkTypes::TreasuryToAllocations,
+        (),
+    )?;
+    create_link(
+        anchor_hash(&allocation.id)?,
+        action_hash.clone(),
+        LinkTypes::AllocationIdToAllocation,
+        (),
+    )?;
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+        "DKG allocation record not found after creation for allocation {}",
+        allocation.id
+    ))))
+}
+
+/// Input for a DKG-gated treasury allocation.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DkgAllocationInput {
+    /// Treasury to allocate from
+    pub treasury_id: String,
+    /// DID of the recipient
+    pub recipient_did: String,
+    /// Amount in micro-SAP (must exceed DKG_THRESHOLD_AMOUNT)
+    pub amount: u64,
+    /// Human-readable reason for the allocation
+    pub reason: String,
+    /// DKG committee ID from the governance cluster
+    pub committee_id: String,
+    /// Threshold signature bytes from the DKG committee
+    pub threshold_signature: Vec<u8>,
 }

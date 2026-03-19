@@ -756,6 +756,172 @@ pub fn get_project_transitions(project_id: String) -> ExternResult<Vec<Record>> 
     Ok(transitions)
 }
 
+// =============================================================================
+// Energy→Finance Bridge: Certificate Collateral Registration
+// =============================================================================
+
+/// Register an energy production certificate as finance collateral.
+///
+/// Bridges from the energy cluster to the finance cluster, registering
+/// verified energy production as SAP-eligible collateral.
+///
+/// Only projects with status `Operational` or `CommunityOwned` are eligible
+/// (they must have verified production data).
+#[hdk_extern]
+pub fn register_certificate_as_collateral(input: CertificateCollateralInput) -> ExternResult<CertificateCollateralResult> {
+    // 1. Verify the certificate exists locally by looking up the project
+    let project = match call(
+        CallTargetCell::Local,
+        ZomeName::from("projects"),
+        FunctionName::from("get_project"),
+        None,
+        input.project_id.clone(),
+    ) {
+        Ok(ZomeCallResponse::Ok(result)) => {
+            result.decode::<Option<Record>>().map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e)))
+            })?
+        }
+        _ => None,
+    };
+
+    // Verify the project exists and is in a valid state for collateral registration
+    if let Some(ref record) = project {
+        if let Some(project_entry) = record.entry().to_app_option::<TerraAtlasProject>()
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Parse error: {:?}", e))))?
+        {
+            match project_entry.status {
+                ProjectStatus::Operational | ProjectStatus::CommunityOwned => {
+                    // Valid — project has verified production
+                }
+                _ => {
+                    return Ok(CertificateCollateralResult {
+                        success: false,
+                        certificate_id: input.certificate_id,
+                        collateral_registered: false,
+                        error: Some(format!(
+                            "Project must be Operational or CommunityOwned, got {:?}",
+                            project_entry.status
+                        )),
+                    });
+                }
+            }
+        }
+    } else {
+        return Ok(CertificateCollateralResult {
+            success: false,
+            certificate_id: input.certificate_id,
+            collateral_registered: false,
+            error: Some(format!("Project {} not found", input.project_id)),
+        });
+    }
+
+    // 2. Cross-cluster call to finance bridge to register as collateral
+    #[derive(Serialize, Debug)]
+    struct RegisterCollateralPayload {
+        owner_did: String,
+        source_happ: String,
+        asset_type: String,
+        asset_id: String,
+        value_estimate: u64,
+        currency: String,
+    }
+
+    match call(
+        CallTargetCell::OtherRole("finance".into()),
+        ZomeName::from("finance_bridge"),
+        FunctionName::from("register_collateral"),
+        None,
+        RegisterCollateralPayload {
+            owner_did: input.producer_did.clone(),
+            source_happ: ENERGY_HAPP_ID.to_string(),
+            asset_type: "EnergyAsset".to_string(),
+            asset_id: input.certificate_id.clone(),
+            value_estimate: input.sap_value,
+            currency: "SAP".to_string(),
+        },
+    ) {
+        Ok(ZomeCallResponse::Ok(_)) => {
+            // 3. Broadcast local event for audit trail
+            let _ = broadcast_energy_event(BroadcastEnergyEventInput {
+                event_type: EnergyEventType::CertificateCollateralRegistered,
+                project_id: input.project_id,
+                payload: serde_json::json!({
+                    "certificate_id": input.certificate_id,
+                    "producer_did": input.producer_did,
+                    "sap_value": input.sap_value,
+                }).to_string(),
+            });
+
+            Ok(CertificateCollateralResult {
+                success: true,
+                certificate_id: input.certificate_id,
+                collateral_registered: true,
+                error: None,
+            })
+        }
+        Ok(other) => {
+            Ok(CertificateCollateralResult {
+                success: false,
+                certificate_id: input.certificate_id,
+                collateral_registered: false,
+                error: Some(format!("Finance bridge returned: {:?}", other)),
+            })
+        }
+        Err(e) => {
+            debug!("register_certificate_as_collateral: finance unreachable: {:?}", e);
+            Ok(CertificateCollateralResult {
+                success: false,
+                certificate_id: input.certificate_id,
+                collateral_registered: false,
+                error: Some(format!("Finance cluster unreachable: {:?}", e)),
+            })
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CertificateCollateralInput {
+    pub certificate_id: String,
+    pub project_id: String,
+    pub producer_did: String,
+    pub sap_value: u64,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CertificateCollateralResult {
+    pub success: bool,
+    pub certificate_id: String,
+    pub collateral_registered: bool,
+    pub error: Option<String>,
+}
+
+/// Verify an energy project exists (called by finance bridge for certificate verification).
+///
+/// Returns the project record if found, None if not. This allows the finance
+/// cluster to independently verify that an energy certificate references a
+/// real project before accepting it as collateral.
+#[hdk_extern]
+pub fn get_project(project_id: String) -> ExternResult<Option<Record>> {
+    match call(
+        CallTargetCell::Local,
+        ZomeName::from("projects"),
+        FunctionName::from("get_project"),
+        None,
+        project_id.clone(),
+    ) {
+        Ok(ZomeCallResponse::Ok(result)) => {
+            result.decode::<Option<Record>>().map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e)))
+            })
+        }
+        _ => {
+            debug!("get_project: projects zome unavailable for {}", project_id);
+            Ok(None)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1051,6 +1217,7 @@ mod tests {
             EnergyEventType::ProductionUpdate,
             EnergyEventType::StatusChanged,
             EnergyEventType::SyncPending,
+            EnergyEventType::CertificateCollateralRegistered,
         ];
         for event_type in types {
             let input = BroadcastEnergyEventInput {
@@ -1400,5 +1567,147 @@ mod tests {
     #[test]
     fn test_energy_happ_id_constant() {
         assert_eq!(ENERGY_HAPP_ID, "mycelix-energy");
+    }
+
+    // =========================================================================
+    // CertificateCollateralInput Tests
+    // =========================================================================
+
+    fn valid_certificate_collateral_input() -> CertificateCollateralInput {
+        CertificateCollateralInput {
+            certificate_id: "cert:solar_farm_alpha:2026-03".to_string(),
+            project_id: "project:solar_farm_alpha".to_string(),
+            producer_did: "did:mycelix:producer1".to_string(),
+            sap_value: 150_000,
+        }
+    }
+
+    #[test]
+    fn test_certificate_collateral_input_valid() {
+        let input = valid_certificate_collateral_input();
+        assert!(!input.certificate_id.is_empty());
+        assert!(!input.project_id.is_empty());
+        assert!(input.producer_did.starts_with("did:mycelix:"));
+        assert!(input.sap_value > 0);
+    }
+
+    #[test]
+    fn test_certificate_collateral_input_serialization() {
+        let input = valid_certificate_collateral_input();
+        let json = serde_json::to_string(&input);
+        assert!(json.is_ok());
+        let deserialized: CertificateCollateralInput =
+            serde_json::from_str(&json.unwrap()).unwrap();
+        assert_eq!(deserialized.certificate_id, input.certificate_id);
+        assert_eq!(deserialized.sap_value, input.sap_value);
+    }
+
+    #[test]
+    fn test_certificate_collateral_input_various_values() {
+        let values = vec![1, 1_000, 100_000, 1_000_000, 10_000_000];
+        for value in values {
+            let input = CertificateCollateralInput {
+                sap_value: value,
+                ..valid_certificate_collateral_input()
+            };
+            assert!(input.sap_value > 0);
+        }
+    }
+
+    // =========================================================================
+    // CertificateCollateralResult Tests
+    // =========================================================================
+
+    #[test]
+    fn test_certificate_collateral_result_success() {
+        let result = CertificateCollateralResult {
+            success: true,
+            certificate_id: "cert:solar_farm_alpha:2026-03".to_string(),
+            collateral_registered: true,
+            error: None,
+        };
+        assert!(result.success);
+        assert!(result.collateral_registered);
+        assert!(result.error.is_none());
+    }
+
+    #[test]
+    fn test_certificate_collateral_result_failure_finance_unreachable() {
+        let result = CertificateCollateralResult {
+            success: false,
+            certificate_id: "cert:solar_farm_alpha:2026-03".to_string(),
+            collateral_registered: false,
+            error: Some("Finance cluster unreachable: NetworkError".to_string()),
+        };
+        assert!(!result.success);
+        assert!(!result.collateral_registered);
+        assert!(result.error.is_some());
+        assert!(result.error.unwrap().contains("unreachable"));
+    }
+
+    #[test]
+    fn test_certificate_collateral_result_failure_invalid_status() {
+        let result = CertificateCollateralResult {
+            success: false,
+            certificate_id: "cert:solar_farm_alpha:2026-03".to_string(),
+            collateral_registered: false,
+            error: Some("Project must be Operational or CommunityOwned, got Funding".to_string()),
+        };
+        assert!(!result.success);
+        assert!(result.error.as_ref().unwrap().contains("Operational"));
+    }
+
+    #[test]
+    fn test_certificate_collateral_result_failure_project_not_found() {
+        let result = CertificateCollateralResult {
+            success: false,
+            certificate_id: "cert:nonexistent:2026-03".to_string(),
+            collateral_registered: false,
+            error: Some("Project project:nonexistent not found".to_string()),
+        };
+        assert!(!result.success);
+        assert!(result.error.as_ref().unwrap().contains("not found"));
+    }
+
+    #[test]
+    fn test_certificate_collateral_result_serialization() {
+        let result = CertificateCollateralResult {
+            success: true,
+            certificate_id: "cert:test:001".to_string(),
+            collateral_registered: true,
+            error: None,
+        };
+        let json = serde_json::to_string(&result);
+        assert!(json.is_ok());
+        let deserialized: CertificateCollateralResult =
+            serde_json::from_str(&json.unwrap()).unwrap();
+        assert_eq!(deserialized.success, result.success);
+        assert_eq!(deserialized.certificate_id, result.certificate_id);
+    }
+
+    #[test]
+    fn test_certificate_collateral_id_format() {
+        let cert_id = "cert:solar_farm_alpha:2026-03";
+        assert!(cert_id.starts_with("cert:"));
+    }
+
+    #[test]
+    fn test_certificate_collateral_event_type() {
+        let event_type = EnergyEventType::CertificateCollateralRegistered;
+        assert_eq!(event_type, EnergyEventType::CertificateCollateralRegistered);
+    }
+
+    #[test]
+    fn test_certificate_collateral_json_payload() {
+        let input = valid_certificate_collateral_input();
+        let payload = serde_json::json!({
+            "certificate_id": input.certificate_id,
+            "producer_did": input.producer_did,
+            "sap_value": input.sap_value,
+        });
+        let payload_str = payload.to_string();
+        assert!(!payload_str.is_empty());
+        assert!(payload_str.contains("certificate_id"));
+        assert!(payload_str.contains("sap_value"));
     }
 }
