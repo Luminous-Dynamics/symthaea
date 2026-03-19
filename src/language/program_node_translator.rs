@@ -183,42 +183,42 @@ fn rust_expr(node: &ProgramNode) -> String {
             match fname.to_uppercase().as_str() {
                 "ADD" => format!(
                     "{} + {}",
-                    arg_strs.get(0).unwrap_or(&"0".into()),
+                    arg_strs.first().unwrap_or(&"0".into()),
                     arg_strs.get(1).unwrap_or(&"0".into())
                 ),
                 "SUB" => format!(
                     "{} - {}",
-                    arg_strs.get(0).unwrap_or(&"0".into()),
+                    arg_strs.first().unwrap_or(&"0".into()),
                     arg_strs.get(1).unwrap_or(&"0".into())
                 ),
                 "MUL" => format!(
                     "{} * {}",
-                    arg_strs.get(0).unwrap_or(&"1".into()),
+                    arg_strs.first().unwrap_or(&"1".into()),
                     arg_strs.get(1).unwrap_or(&"1".into())
                 ),
                 "DIV" => format!(
                     "{} / {}",
-                    arg_strs.get(0).unwrap_or(&"1".into()),
+                    arg_strs.first().unwrap_or(&"1".into()),
                     arg_strs.get(1).unwrap_or(&"1".into())
                 ),
                 "MOD" => format!(
                     "{} % {}",
-                    arg_strs.get(0).unwrap_or(&"0".into()),
+                    arg_strs.first().unwrap_or(&"0".into()),
                     arg_strs.get(1).unwrap_or(&"1".into())
                 ),
                 "EQ" => format!(
                     "{} == {}",
-                    arg_strs.get(0).unwrap_or(&"0".into()),
+                    arg_strs.first().unwrap_or(&"0".into()),
                     arg_strs.get(1).unwrap_or(&"0".into())
                 ),
                 "LT" => format!(
                     "{} < {}",
-                    arg_strs.get(0).unwrap_or(&"0".into()),
+                    arg_strs.first().unwrap_or(&"0".into()),
                     arg_strs.get(1).unwrap_or(&"0".into())
                 ),
                 "GT" => format!(
                     "{} > {}",
-                    arg_strs.get(0).unwrap_or(&"0".into()),
+                    arg_strs.first().unwrap_or(&"0".into()),
                     arg_strs.get(1).unwrap_or(&"0".into())
                 ),
                 _ => {
@@ -328,37 +328,37 @@ fn python_expr(node: &ProgramNode) -> String {
             match fname.to_uppercase().as_str() {
                 "ADD" => format!(
                     "{} + {}",
-                    arg_strs.get(0).unwrap_or(&"0".into()),
+                    arg_strs.first().unwrap_or(&"0".into()),
                     arg_strs.get(1).unwrap_or(&"0".into())
                 ),
                 "SUB" => format!(
                     "{} - {}",
-                    arg_strs.get(0).unwrap_or(&"0".into()),
+                    arg_strs.first().unwrap_or(&"0".into()),
                     arg_strs.get(1).unwrap_or(&"0".into())
                 ),
                 "MUL" => format!(
                     "{} * {}",
-                    arg_strs.get(0).unwrap_or(&"0".into()),
+                    arg_strs.first().unwrap_or(&"0".into()),
                     arg_strs.get(1).unwrap_or(&"0".into())
                 ),
                 "EQ" => format!(
                     "{} == {}",
-                    arg_strs.get(0).unwrap_or(&"0".into()),
+                    arg_strs.first().unwrap_or(&"0".into()),
                     arg_strs.get(1).unwrap_or(&"0".into())
                 ),
                 "LT" => format!(
                     "{} < {}",
-                    arg_strs.get(0).unwrap_or(&"0".into()),
+                    arg_strs.first().unwrap_or(&"0".into()),
                     arg_strs.get(1).unwrap_or(&"0".into())
                 ),
                 "GT" => format!(
                     "{} > {}",
-                    arg_strs.get(0).unwrap_or(&"0".into()),
+                    arg_strs.first().unwrap_or(&"0".into()),
                     arg_strs.get(1).unwrap_or(&"0".into())
                 ),
                 "MOD" => format!(
                     "{} % {}",
-                    arg_strs.get(0).unwrap_or(&"0".into()),
+                    arg_strs.first().unwrap_or(&"0".into()),
                     arg_strs.get(1).unwrap_or(&"0".into())
                 ),
                 _ => {
@@ -431,17 +431,17 @@ fn nix_expr(node: &ProgramNode) -> String {
             match fname.to_uppercase().as_str() {
                 "ADD" => format!(
                     "({} + {})",
-                    arg_strs.get(0).unwrap_or(&"0".into()),
+                    arg_strs.first().unwrap_or(&"0".into()),
                     arg_strs.get(1).unwrap_or(&"0".into())
                 ),
                 "EQ" => format!(
                     "({} == {})",
-                    arg_strs.get(0).unwrap_or(&"0".into()),
+                    arg_strs.first().unwrap_or(&"0".into()),
                     arg_strs.get(1).unwrap_or(&"0".into())
                 ),
                 "LT" => format!(
                     "({} < {})",
-                    arg_strs.get(0).unwrap_or(&"0".into()),
+                    arg_strs.first().unwrap_or(&"0".into()),
                     arg_strs.get(1).unwrap_or(&"0".into())
                 ),
                 _ => format!("({} {})", fname.to_lowercase(), arg_strs.join(" ")),

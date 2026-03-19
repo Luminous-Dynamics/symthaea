@@ -835,11 +835,8 @@ impl CodingAgent {
             let temperature = (0.3 + pe * 0.3).min(0.9);
 
             // Apply forced backend tier from retry strategy
-            match &self.retry_state.current_strategy {
-                RetryStrategy::DifferentBackend(tier) => {
-                    dispatcher.force_next_tier(*tier);
-                }
-                _ => {}
+            if let RetryStrategy::DifferentBackend(tier) = &self.retry_state.current_strategy {
+                dispatcher.force_next_tier(*tier);
             }
 
             let params = GenerationParams {
@@ -3184,9 +3181,9 @@ impl CodingAgent {
             .as_ref()
             .and_then(|profile| {
                 // If the profile includes testing atoms, rebuild the molecule
-                if profile.atom_names.iter().any(|n| *n == "CargoTest") {
+                if profile.atom_names.contains(&"CargoTest") {
                     Some(Molecule::atom(Atom::cargo_test(working_dir.clone())))
-                } else if profile.atom_names.iter().any(|n| *n == "CargoCheck") {
+                } else if profile.atom_names.contains(&"CargoCheck") {
                     Some(Molecule::atom(Atom::cargo_check(working_dir.clone())))
                 } else {
                     None

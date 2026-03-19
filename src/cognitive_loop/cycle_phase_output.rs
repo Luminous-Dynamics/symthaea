@@ -311,13 +311,7 @@ impl CognitiveLoopService {
             },
             lr_cognitive_mod: self.carryover.learning.lr_cognitive_mod,
             lr_meta_mod: self.carryover.learning.lr_meta_mod,
-            feedback_proposal_count: {
-                let s = self.feedback_state.feedback_summary();
-                // Store summary fields inline — avoids double-borrow
-                let count = s.total_proposals;
-                // We'll set the other fields below after this block
-                count
-            },
+            feedback_proposal_count: { self.feedback_state.feedback_summary().total_proposals },
             feedback_conflict_ratio: self.feedback_state.avg_conflict_ratio(),
             feedback_priority_counts: {
                 let s = self.feedback_state.feedback_summary();

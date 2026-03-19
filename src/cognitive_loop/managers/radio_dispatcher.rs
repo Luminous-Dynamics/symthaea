@@ -1635,12 +1635,10 @@ impl SpectrumManager {
     /// tiers with highest reliability even at lower bandwidth.
     pub fn best_tier_for_governance(&self) -> Option<RadioTier> {
         // Prefer Local > Metro > Regional (reliability ordering)
-        for &tier in &RadioTier::ALL {
-            if self.tier_available[tier as usize] {
-                return Some(tier);
-            }
-        }
-        None
+        RadioTier::ALL
+            .iter()
+            .copied()
+            .find(|&tier| self.tier_available[tier as usize])
     }
 
     /// Select tier based on consciousness confidence level.

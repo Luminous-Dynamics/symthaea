@@ -81,6 +81,7 @@ pub fn compute_enforcement(
         integrity_critical,
     };
     let assessment = agent.assess(metrics);
+    #[allow(unused_mut)]
     let mut level = assessment.level;
 
     // Collective immunity escalation: swarm threat data can escalate safety level
