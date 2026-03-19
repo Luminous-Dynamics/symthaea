@@ -211,7 +211,7 @@ pub struct ContinuousMind {
     /// Set via `set_mesh_outbound_rx()`. Drained each tick in `sync_mesh_bridge()`.
     #[cfg(feature = "mesh")]
     pub(crate) mesh_outbound_rx:
-        Option<std::sync::mpsc::Receiver<crate::swarm::mesh::MeshOutbound>>,
+        Option<std::sync::Mutex<std::sync::mpsc::Receiver<crate::swarm::mesh::MeshOutbound>>>,
     /// Holochain Cortex for trust and validation.
     pub(crate) cortex: crate::swarm::HolochainCortex,
     /// Optional LLM backend for swarm projection gradient exchange.
@@ -425,7 +425,7 @@ impl ContinuousMind {
         &mut self,
         rx: std::sync::mpsc::Receiver<crate::swarm::mesh::MeshOutbound>,
     ) {
-        self.mesh_outbound_rx = Some(rx);
+        self.mesh_outbound_rx = Some(std::sync::Mutex::new(rx));
     }
 
     /// Set relational Ψ (Phi-dyad from partnership module).

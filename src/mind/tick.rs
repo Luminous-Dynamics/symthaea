@@ -909,9 +909,11 @@ impl ContinuousMind {
 
         // Drain CLS-generated outbound packets (sovereign beacons, name responses, etc.)
         #[cfg(feature = "mesh")]
-        if let Some(ref rx) = self.mesh_outbound_rx {
-            while let Ok(outbound) = rx.try_recv() {
-                self.mesh_outbox.push(outbound);
+        if let Some(ref rx_mutex) = self.mesh_outbound_rx {
+            if let Ok(rx) = rx_mutex.lock() {
+                while let Ok(outbound) = rx.try_recv() {
+                    self.mesh_outbox.push(outbound);
+                }
             }
         }
 
