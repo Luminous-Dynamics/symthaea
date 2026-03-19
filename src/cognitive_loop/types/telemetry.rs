@@ -354,28 +354,29 @@ pub struct TemporalPhenomenalMetrics {
     pub thermodynamic_load: f32,
 }
 
-/// Metadata about internal decision-making during a cycle.
-///
-/// Provides observability into which subsystems influenced the cycle's output,
-/// enabling debugging of "why did the agent do that?" questions.
-///
-/// # Domain Groups
-///
-/// Fields are organized by domain (see section comments). Neuromod fields
-/// are nested via `#[serde(flatten)] pub neuromod: NeuromodTelemetry`; assign
-/// the snapshot directly to `metadata.neuromod`.
-///
-/// # Diagnostic-only fields (serialized for dashboards, not read internally)
-///
-/// These fields are populated in `cycle_phase_output.rs` and serialized via
-/// `#[derive(Serialize)]` for API/dashboard consumers, but no internal code
-/// reads them after population:
-///
-/// `broca`, `calibration_improvements`, `calibration_regressions`,
-/// `convergence_cycle`, `eq_v2_limiting_component`, `feedback_signals_fired`,
-/// `liquid_mamba_effective_rank`, `liquid_mamba_semantic_pe`,
-/// `phi_validation_cached`, `social_strategy_bias_applied`,
-/// `subsystem_integration_contributors`
+// Metadata about internal decision-making during a cycle.
+//
+// Provides observability into which subsystems influenced the cycle's output,
+// enabling debugging of "why did the agent do that?" questions.
+//
+// # Domain Groups
+//
+// Fields are organized by domain (see section comments). Neuromod fields
+// are nested via `#[serde(flatten)] pub neuromod: NeuromodTelemetry`; assign
+// the snapshot directly to `metadata.neuromod`.
+//
+// # Diagnostic-only fields (serialized for dashboards, not read internally)
+//
+// These fields are populated in `cycle_phase_output.rs` and serialized via
+// `#[derive(Serialize)]` for API/dashboard consumers, but no internal code
+// reads them after population:
+//
+// `broca`, `calibration_improvements`, `calibration_regressions`,
+// `convergence_cycle`, `eq_v2_limiting_component`, `feedback_signals_fired`,
+// `liquid_mamba_effective_rank`, `liquid_mamba_semantic_pe`,
+// `phi_validation_cached`, `social_strategy_bias_applied`,
+// `subsystem_integration_contributors`
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // FEEDBACK MODULATION FLAGS — Sessions 9–16 observability booleans
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -565,6 +566,7 @@ pub struct FeedbackModulationFlags {
     pub error_bifurcation_response: bool,
 }
 
+/// Metadata about internal decision-making during a cycle.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct CycleMetadata {
     /// Whether the surprise exploration bridge triggered exploration this cycle
