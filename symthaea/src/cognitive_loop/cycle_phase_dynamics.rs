@@ -119,6 +119,7 @@ use super::thresholds::{
     FEP_TD_ERROR_DISCOVERY_THRESHOLD,
     GOAL_PRIORITY_EXPLORATION_THRESHOLD,
     GOAL_PRIORITY_LR_THRESHOLD,
+    HARMONY_INDEX_SACRED_STILLNESS,
     HOMEOSTASIS_AROUSAL_TARGET,
     HOMEOSTASIS_EFFICIENCY_EMA,
     HOMEOSTASIS_EFFICIENCY_HIGH,
@@ -2082,7 +2083,7 @@ impl CognitiveLoopService {
         // Science: Raichle (2010) — default mode network reduces task-positive
         // resource allocation during rest states.
         let stillness_budget_scale = {
-            let ss_coord = self.ethics_engine.last_harmony_coordinates()[7]; // SacredStillness
+            let ss_coord = self.ethics_engine.last_harmony_coordinates()[HARMONY_INDEX_SACRED_STILLNESS]; // SacredStillness
             if ss_coord > 0.5 {
                 // High stillness activation → contract budget by up to 30%
                 1.0 - (ss_coord - 0.5).min(0.3)
@@ -2113,7 +2114,7 @@ impl CognitiveLoopService {
 
         // Active Rest Mode: track Sacred Stillness dominance streak
         {
-            let ss_coord = self.ethics_engine.last_harmony_coordinates()[7];
+            let ss_coord = self.ethics_engine.last_harmony_coordinates()[HARMONY_INDEX_SACRED_STILLNESS];
             let dominant_idx = self
                 .ethics_engine
                 .last_harmony_coordinates()
