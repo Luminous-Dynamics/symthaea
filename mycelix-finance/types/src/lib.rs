@@ -216,6 +216,515 @@ pub const SAP_MINT_PER_PROPOSAL_MAX: u64 = 100_000_000_000;
 /// 1,000,000 SAP = 1_000_000_000_000 micro-SAP. Constitutional bound.
 pub const SAP_MINT_ANNUAL_MAX: u64 = 1_000_000_000_000;
 
+// =============================================================================
+// PHASE 1: SETTLEMENT HARDENING CONSTANTS
+// =============================================================================
+
+/// Maximum pending compost deliveries before forcing drain (prevents unbounded queue).
+pub const PENDING_COMPOST_MAX_QUEUE: usize = 256;
+
+/// Maximum age (in seconds) for a pending compost entry before it's considered stale.
+/// Stale entries are retried once more then discarded with an audit log entry.
+pub const PENDING_COMPOST_STALE_SECONDS: u64 = 86_400; // 24 hours
+
+/// Oracle rate tolerance: max deviation from consensus before deposit is rejected.
+/// 5% tolerance — if claimed rate diverges more than this from oracle consensus, reject.
+pub const ORACLE_RATE_TOLERANCE: f64 = 0.05;
+
+/// Mint cap counter anchor name. Used for CAS-based annual mint cap enforcement.
+pub const SAP_MINT_CAP_ANCHOR: &str = "sap_mint_annual_cap";
+
+/// Maximum retries for compost delivery before logging as orphaned.
+pub const COMPOST_MAX_RETRIES: u32 = 3;
+
+// =============================================================================
+// PHASE 1a: PENDING COMPOST TYPES
+// =============================================================================
+
+/// A compost delivery that failed and needs retry.
+///
+/// Created when treasury/receive_compost fails during demurrage application.
+/// Processed by `drain_pending_compost()` on next balance mutation.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct PendingCompost {
+    /// Target commons pool ID
+    pub commons_pool_id: String,
+    /// Amount of compost to deliver (micro-SAP)
+    pub amount: u64,
+    /// DID of the member whose demurrage produced this compost
+    pub source_member_did: String,
+    /// Pool tier: Local, Regional, or Global
+    pub pool_tier: CompostPoolTier,
+    /// When this pending delivery was created
+    pub created_at_micros: i64,
+    /// Number of retry attempts so far
+    pub retry_count: u32,
+}
+
+/// Which commons pool tier a compost delivery targets.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CompostPoolTier {
+    Local,
+    Regional,
+    Global,
+}
+
+// =============================================================================
+// PHASE 1c: MINT CAP COUNTER
+// =============================================================================
+
+/// Tracks cumulative SAP minted via governance in the current annual period.
+///
+/// Uses optimistic-locking with CAS semantics: read → update → verify.
+/// Prevents concurrent governance mints from exceeding the annual cap.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct SapMintCapCounter {
+    /// Start of the current annual period (microseconds since epoch)
+    pub period_start_micros: i64,
+    /// Cumulative SAP minted in this period (micro-SAP)
+    pub cumulative_minted: u64,
+    /// Number of governance mints in this period
+    pub mint_count: u32,
+    /// Last updated timestamp (microseconds)
+    pub last_updated_micros: i64,
+}
+
+impl SapMintCapCounter {
+    /// Check if a proposed mint would exceed the annual cap.
+    pub fn would_exceed_cap(&self, proposed_amount: u64) -> bool {
+        self.cumulative_minted.saturating_add(proposed_amount) > SAP_MINT_ANNUAL_MAX
+    }
+
+    /// Remaining mintable SAP in the current period.
+    pub fn remaining_capacity(&self) -> u64 {
+        SAP_MINT_ANNUAL_MAX.saturating_sub(self.cumulative_minted)
+    }
+
+    /// Check if the current period has expired (> 365 days since period_start).
+    pub fn is_period_expired(&self, now_micros: i64) -> bool {
+        let year_micros: i64 = 365 * 24 * 60 * 60 * 1_000_000;
+        now_micros.saturating_sub(self.period_start_micros) > year_micros
+    }
+}
+
+// =============================================================================
+// PHASE 2a: COVENANT TYPES
+// =============================================================================
+
+/// A covenant (restriction) placed on registered collateral.
+///
+/// Covenants prevent collateral from being transferred, sold, or released
+/// while obligations are outstanding. Enforced at the coordinator level
+/// before any collateral status change.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Covenant {
+    /// Unique covenant ID
+    pub id: String,
+    /// Collateral registration ID this covenant applies to
+    pub collateral_id: String,
+    /// Type of restriction
+    pub restriction: CovenantRestriction,
+    /// DID of the lien holder / covenant beneficiary
+    pub beneficiary_did: String,
+    /// When this covenant was created
+    pub created_at_micros: i64,
+    /// When this covenant expires (None = permanent until released)
+    pub expires_at_micros: Option<i64>,
+    /// Whether this covenant has been released
+    pub released: bool,
+    /// DID of the agent who released the covenant (if released)
+    pub released_by: Option<String>,
+    /// When the covenant was released
+    pub released_at_micros: Option<i64>,
+}
+
+/// Types of collateral restrictions.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CovenantRestriction {
+    /// Cannot transfer ownership while covenant is active
+    TransferLock,
+    /// Cannot sell the asset while covenant is active
+    SaleProhibition,
+    /// A lien holder has priority claim on the asset
+    LienHolder,
+    /// Insurance must be maintained on the asset
+    InsuranceRequirement,
+    /// Asset is pledged as collateral for a specific obligation
+    CollateralPledge { obligation_id: String },
+}
+
+// =============================================================================
+// PHASE 2b: LTV MONITORING TYPES
+// =============================================================================
+
+/// Health status of a collateral position, computed from LTV ratio.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct CollateralHealth {
+    /// Collateral registration ID
+    pub collateral_id: String,
+    /// Current estimated value of the collateral (micro-SAP equivalent)
+    pub current_value: u64,
+    /// Outstanding obligation against this collateral (micro-SAP)
+    pub obligation_amount: u64,
+    /// Loan-to-Value ratio (0.0 - 1.0+, higher = more leveraged)
+    pub ltv_ratio: f64,
+    /// Health status based on LTV thresholds
+    pub status: CollateralHealthStatus,
+    /// When this health check was computed
+    pub computed_at_micros: i64,
+}
+
+/// Collateral health tiers based on LTV ratio.
+///
+/// Thresholds: Warning (80%), Margin Call (90%), Liquidation (95%).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CollateralHealthStatus {
+    /// LTV < 80% — healthy position
+    Healthy,
+    /// LTV 80-90% — warning issued, should add collateral or reduce obligation
+    Warning,
+    /// LTV 90-95% — margin call, must add collateral within 72 hours
+    MarginCall,
+    /// LTV > 95% — eligible for governance-approved liquidation
+    Liquidation,
+}
+
+impl CollateralHealthStatus {
+    /// Compute health status from LTV ratio.
+    pub fn from_ltv(ltv: f64) -> Self {
+        if ltv > 0.95 {
+            CollateralHealthStatus::Liquidation
+        } else if ltv > 0.90 {
+            CollateralHealthStatus::MarginCall
+        } else if ltv > 0.80 {
+            CollateralHealthStatus::Warning
+        } else {
+            CollateralHealthStatus::Healthy
+        }
+    }
+}
+
+/// LTV threshold constants for collateral health monitoring.
+pub const LTV_WARNING_THRESHOLD: f64 = 0.80;
+pub const LTV_MARGIN_CALL_THRESHOLD: f64 = 0.90;
+pub const LTV_LIQUIDATION_THRESHOLD: f64 = 0.95;
+
+/// Hours before margin call forces liquidation eligibility.
+pub const MARGIN_CALL_GRACE_HOURS: u64 = 72;
+
+// =============================================================================
+// PHASE 3a: ENERGY CERTIFICATE TYPES
+// =============================================================================
+
+/// A verified certificate of energy production, suitable as SAP collateral.
+///
+/// Represents a verified proof that a specific quantity of renewable energy
+/// was produced at a specific location and time. Linked to mycelix-energy
+/// projects via `project_id`.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct EnergyCertificate {
+    /// Unique certificate ID
+    pub id: String,
+    /// Energy project that produced this energy
+    pub project_id: String,
+    /// Energy source type
+    pub source: EnergySource,
+    /// Quantity produced in kilowatt-hours (kWh)
+    pub kwh_produced: f64,
+    /// Period start (microseconds since epoch)
+    pub period_start_micros: i64,
+    /// Period end (microseconds since epoch)
+    pub period_end_micros: i64,
+    /// Geographic location (latitude, longitude)
+    pub location: (f64, f64),
+    /// DID of the producer
+    pub producer_did: String,
+    /// DID of the verifier (Citizen+ tier required to verify)
+    pub verifier_did: Option<String>,
+    /// Verification status
+    pub status: CertificateStatus,
+    /// Terra Atlas cross-reference ID (optional, for USACE-linked projects)
+    pub terra_atlas_id: Option<String>,
+    /// SAP-equivalent value (set after oracle attestation)
+    pub sap_value: Option<u64>,
+    /// When this certificate was created
+    pub created_at_micros: i64,
+}
+
+/// Energy source types for certificates.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum EnergySource {
+    Solar,
+    Wind,
+    Hydro,
+    Geothermal,
+    Biomass,
+    BatteryDischarge,
+    Other(String),
+}
+
+/// Verification status of an energy certificate.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CertificateStatus {
+    /// Submitted by producer, awaiting verification
+    Pending,
+    /// Verified by a Citizen+ tier peer
+    Verified,
+    /// Rejected during verification
+    Rejected { reason: String },
+    /// Pledged as collateral (cannot be traded)
+    Pledged,
+    /// Consumed / retired (cannot be reused)
+    Retired,
+}
+
+// =============================================================================
+// PHASE 3b: AGRICULTURAL ASSET TYPES
+// =============================================================================
+
+/// A registered agricultural asset, suitable as SAP collateral.
+///
+/// Represents verified agricultural production capacity or harvested goods.
+/// Linked to mycelix-commons food production zomes.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct AgriculturalAsset {
+    /// Unique asset ID
+    pub id: String,
+    /// Type of agricultural asset
+    pub asset_type: AgriAssetType,
+    /// Quantity in kilograms
+    pub quantity_kg: f64,
+    /// Geographic location (latitude, longitude)
+    pub location: (f64, f64),
+    /// Harvest or production date (microseconds since epoch)
+    pub production_date_micros: i64,
+    /// Expected shelf life / viability (microseconds from production date)
+    pub viability_duration_micros: Option<i64>,
+    /// DID of the producer
+    pub producer_did: String,
+    /// DID of the verifier (Citizen+ required)
+    pub verifier_did: Option<String>,
+    /// Verification status
+    pub status: AgriAssetStatus,
+    /// SAP-equivalent value (set after oracle attestation)
+    pub sap_value: Option<u64>,
+    /// When this asset was registered
+    pub created_at_micros: i64,
+}
+
+/// Types of agricultural assets.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AgriAssetType {
+    /// Harvested grain (maize, wheat, rice, etc.)
+    Grain { crop: String },
+    /// Fresh produce (vegetables, fruits)
+    Produce { crop: String },
+    /// Soil amendment (compost, Terra Preta, biochar)
+    SoilAmendment { amendment_type: String },
+    /// Fertilizer (NPK, organic, etc.)
+    Fertilizer { fertilizer_type: String },
+    /// Seed stock
+    Seeds { variety: String },
+    /// Livestock (by weight, not count)
+    Livestock { species: String },
+    /// Other agricultural product
+    Other(String),
+}
+
+/// Verification status of an agricultural asset.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AgriAssetStatus {
+    /// Registered, awaiting verification
+    Pending,
+    /// Verified by a Citizen+ tier peer
+    Verified,
+    /// Rejected during verification
+    Rejected { reason: String },
+    /// Pledged as collateral
+    Pledged,
+    /// Consumed or expired
+    Consumed,
+}
+
+// =============================================================================
+// PHASE 3c: MULTI-COLLATERAL POSITION TYPES
+// =============================================================================
+
+/// A multi-collateral position combining multiple assets as backing.
+///
+/// Diversified collateral positions receive a 5% LTV bonus per additional
+/// distinct asset type (capped at 20% total bonus).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct MultiCollateralPosition {
+    /// Unique position ID
+    pub id: String,
+    /// DID of the position holder
+    pub holder_did: String,
+    /// Component collateral assets with their weights
+    pub components: Vec<CollateralComponent>,
+    /// Aggregate SAP value of the position
+    pub aggregate_value: u64,
+    /// Aggregate obligation against this position
+    pub aggregate_obligation: u64,
+    /// Diversification bonus (0.0 - 0.20, 5% per distinct asset type, capped at 20%)
+    pub diversification_bonus: f64,
+    /// Effective LTV after diversification bonus
+    pub effective_ltv: f64,
+    /// Health status
+    pub status: CollateralHealthStatus,
+    /// When this position was created
+    pub created_at_micros: i64,
+    /// When this position was last revalued
+    pub last_revalued_micros: i64,
+}
+
+/// A component of a multi-collateral position.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct CollateralComponent {
+    /// ID of the underlying collateral, energy certificate, or agricultural asset
+    pub asset_id: String,
+    /// Type of the underlying asset
+    pub asset_class: CollateralAssetClass,
+    /// Weight in the position (0.0 - 1.0, all weights must sum to 1.0)
+    pub weight: f64,
+    /// Current SAP-equivalent value
+    pub current_value: u64,
+}
+
+/// Asset classes for multi-collateral diversification scoring.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum CollateralAssetClass {
+    RealEstate,
+    Cryptocurrency,
+    EnergyCertificate,
+    AgriculturalAsset,
+    CarbonCredit,
+    Vehicle,
+    Equipment,
+    Other,
+}
+
+/// Diversification bonus: 5% per distinct asset class, capped at 20%.
+pub const DIVERSIFICATION_BONUS_PER_CLASS: f64 = 0.05;
+pub const DIVERSIFICATION_BONUS_CAP: f64 = 0.20;
+
+/// Compute diversification bonus from a set of collateral components.
+pub fn compute_diversification_bonus(components: &[CollateralComponent]) -> f64 {
+    // Count distinct asset classes
+    let distinct: usize = {
+        let mut seen = Vec::new();
+        for c in components {
+            if !seen.contains(&c.asset_class) {
+                seen.push(c.asset_class.clone());
+            }
+        }
+        seen.len()
+    };
+    // Bonus starts from the 2nd distinct class
+    let bonus_classes = distinct.saturating_sub(1);
+    (bonus_classes as f64 * DIVERSIFICATION_BONUS_PER_CLASS).min(DIVERSIFICATION_BONUS_CAP)
+}
+
+// =============================================================================
+// PHASE 4a: FIAT BRIDGE TYPES
+// =============================================================================
+
+/// A one-way fiat deposit record (inbound only — fiat enters, SAP is minted).
+///
+/// Design principle: "digestion" model. Fiat is consumed to create SAP.
+/// No reverse dependency — Mycelix never depends on fiat settlement systems.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct FiatBridgeDeposit {
+    /// Unique deposit ID
+    pub id: String,
+    /// DID of the depositor
+    pub depositor_did: String,
+    /// Fiat currency (ISO 4217: "USD", "ZAR", "EUR", etc.)
+    pub fiat_currency: String,
+    /// Fiat amount in minor units (cents)
+    pub fiat_amount: u64,
+    /// SAP minted against this deposit
+    pub sap_minted: u64,
+    /// Exchange rate used (fiat minor units per SAP micro-unit)
+    pub exchange_rate: f64,
+    /// DID of the governance-approved deposit verifier
+    pub verifier_did: String,
+    /// Status of the deposit
+    pub status: FiatDepositStatus,
+    /// External reference (bank transfer ID, proof of deposit, etc.)
+    pub external_reference: String,
+    /// When this deposit was recorded
+    pub created_at_micros: i64,
+    /// When this deposit was verified
+    pub verified_at_micros: Option<i64>,
+}
+
+/// Status of a fiat bridge deposit.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum FiatDepositStatus {
+    /// Submitted, awaiting verifier confirmation
+    Pending,
+    /// Verified by governance-approved agent, SAP minted
+    Verified,
+    /// Rejected by verifier (invalid proof, etc.)
+    Rejected { reason: String },
+}
+
+/// Supported fiat currencies for the bridge.
+/// Each must have a governance-approved deposit verifier.
+pub const SUPPORTED_FIAT_CURRENCIES: &[&str] = &["USD", "ZAR", "EUR", "GBP", "MXN", "KRW", "JPY", "CHF"];
+
+// =============================================================================
+// PHASE 4b: EXTERNAL ORACLE FEED TYPES
+// =============================================================================
+
+/// An external price feed subscription.
+///
+/// Blends external market data with community consensus.
+/// Community consensus remains authoritative; external is advisory.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ExternalOracleFeed {
+    /// Feed identifier (e.g., "coinbase:ETH-USD", "ecb:EUR-USD")
+    pub feed_id: String,
+    /// Latest reported price
+    pub latest_price: f64,
+    /// Confidence score (0.0 - 1.0, based on feed reliability history)
+    pub confidence: f64,
+    /// When this price was last updated (microseconds)
+    pub last_updated_micros: i64,
+    /// DID of the agent that submitted this feed update
+    pub reporter_did: String,
+}
+
+/// Blended oracle rate: combines community consensus with external feed.
+///
+/// Formula: `final_rate = alpha * community_rate + (1 - alpha) * external_rate`
+/// Default alpha = 0.7 (community consensus weighted 70%).
+pub const ORACLE_BLEND_ALPHA: f64 = 0.70;
+
+/// Compute blended oracle rate from community consensus and external feed.
+///
+/// Returns community rate if external is unavailable or has low confidence.
+pub fn compute_blended_oracle_rate(
+    community_rate: f64,
+    external_rate: Option<f64>,
+    external_confidence: f64,
+) -> f64 {
+    match external_rate {
+        Some(ext) if ext.is_finite() && ext > 0.0 && external_confidence > 0.3 => {
+            // Scale alpha by external confidence: lower confidence = more weight on community
+            let effective_alpha = ORACLE_BLEND_ALPHA + (1.0 - ORACLE_BLEND_ALPHA) * (1.0 - external_confidence);
+            let blended = effective_alpha * community_rate + (1.0 - effective_alpha) * ext;
+            if blended.is_finite() && blended > 0.0 {
+                blended
+            } else {
+                community_rate
+            }
+        }
+        _ => community_rate, // External unavailable or low confidence — use community only
+    }
+}
+
 /// Compute demurrage deduction on SAP balances.
 ///
 /// Implements: eligible * (1 - e^(-rate * years))
@@ -1374,4 +1883,323 @@ mod tests {
             }
         }
     }
+
+    // =========================================================================
+    // SapMintCapCounter tests
+    // =========================================================================
+
+    #[test]
+    fn test_sap_mint_cap_counter_would_exceed_cap() {
+        let counter = SapMintCapCounter {
+            period_start_micros: 0,
+            cumulative_minted: SAP_MINT_ANNUAL_MAX - 100,
+            mint_count: 5,
+            last_updated_micros: 0,
+        };
+        // 100 fits exactly
+        assert!(!counter.would_exceed_cap(100));
+        // 101 exceeds
+        assert!(counter.would_exceed_cap(101));
+        // 0 never exceeds
+        assert!(!counter.would_exceed_cap(0));
+    }
+
+    #[test]
+    fn test_sap_mint_cap_counter_would_exceed_cap_already_full() {
+        let counter = SapMintCapCounter {
+            period_start_micros: 0,
+            cumulative_minted: SAP_MINT_ANNUAL_MAX,
+            mint_count: 10,
+            last_updated_micros: 0,
+        };
+        // Any positive amount exceeds when already at cap
+        assert!(counter.would_exceed_cap(1));
+        // Zero still does not exceed (saturating_add stays at cap, which is not > cap)
+        assert!(!counter.would_exceed_cap(0));
+    }
+
+    #[test]
+    fn test_sap_mint_cap_counter_remaining_capacity() {
+        let counter = SapMintCapCounter {
+            period_start_micros: 0,
+            cumulative_minted: 500_000_000_000,
+            mint_count: 3,
+            last_updated_micros: 0,
+        };
+        assert_eq!(counter.remaining_capacity(), SAP_MINT_ANNUAL_MAX - 500_000_000_000);
+
+        // Full counter has zero remaining
+        let full = SapMintCapCounter {
+            period_start_micros: 0,
+            cumulative_minted: SAP_MINT_ANNUAL_MAX,
+            mint_count: 10,
+            last_updated_micros: 0,
+        };
+        assert_eq!(full.remaining_capacity(), 0);
+
+        // Empty counter has full capacity
+        let empty = SapMintCapCounter {
+            period_start_micros: 0,
+            cumulative_minted: 0,
+            mint_count: 0,
+            last_updated_micros: 0,
+        };
+        assert_eq!(empty.remaining_capacity(), SAP_MINT_ANNUAL_MAX);
+    }
+
+    #[test]
+    fn test_sap_mint_cap_counter_is_period_expired() {
+        let one_year_micros: i64 = 365 * 24 * 60 * 60 * 1_000_000;
+        let counter = SapMintCapCounter {
+            period_start_micros: 1_000_000,
+            cumulative_minted: 0,
+            mint_count: 0,
+            last_updated_micros: 0,
+        };
+        // Not expired: exactly 1 year later
+        assert!(!counter.is_period_expired(1_000_000 + one_year_micros));
+        // Expired: 1 year + 1 microsecond later
+        assert!(counter.is_period_expired(1_000_000 + one_year_micros + 1));
+        // Not expired: same time as start
+        assert!(!counter.is_period_expired(1_000_000));
+        // Not expired: before period start
+        assert!(!counter.is_period_expired(0));
+    }
+
+    // =========================================================================
+    // CollateralHealthStatus::from_ltv tests
+    // =========================================================================
+
+    #[test]
+    fn test_collateral_health_status_healthy() {
+        assert_eq!(CollateralHealthStatus::from_ltv(0.0), CollateralHealthStatus::Healthy);
+        assert_eq!(CollateralHealthStatus::from_ltv(0.50), CollateralHealthStatus::Healthy);
+        assert_eq!(CollateralHealthStatus::from_ltv(0.80), CollateralHealthStatus::Healthy);
+    }
+
+    #[test]
+    fn test_collateral_health_status_warning() {
+        // Just above 80% threshold
+        assert_eq!(CollateralHealthStatus::from_ltv(0.81), CollateralHealthStatus::Warning);
+        assert_eq!(CollateralHealthStatus::from_ltv(0.85), CollateralHealthStatus::Warning);
+        // At 90% boundary (not above 0.90, so still Warning)
+        assert_eq!(CollateralHealthStatus::from_ltv(0.90), CollateralHealthStatus::Warning);
+    }
+
+    #[test]
+    fn test_collateral_health_status_margin_call() {
+        assert_eq!(CollateralHealthStatus::from_ltv(0.91), CollateralHealthStatus::MarginCall);
+        assert_eq!(CollateralHealthStatus::from_ltv(0.93), CollateralHealthStatus::MarginCall);
+        // At 95% boundary (not above 0.95, so still MarginCall)
+        assert_eq!(CollateralHealthStatus::from_ltv(0.95), CollateralHealthStatus::MarginCall);
+    }
+
+    #[test]
+    fn test_collateral_health_status_liquidation() {
+        assert_eq!(CollateralHealthStatus::from_ltv(0.951), CollateralHealthStatus::Liquidation);
+        assert_eq!(CollateralHealthStatus::from_ltv(0.99), CollateralHealthStatus::Liquidation);
+        assert_eq!(CollateralHealthStatus::from_ltv(1.0), CollateralHealthStatus::Liquidation);
+        assert_eq!(CollateralHealthStatus::from_ltv(1.5), CollateralHealthStatus::Liquidation);
+    }
+
+    // =========================================================================
+    // compute_diversification_bonus tests
+    // =========================================================================
+
+    fn make_component(class: CollateralAssetClass) -> CollateralComponent {
+        CollateralComponent {
+            asset_id: "test".into(),
+            asset_class: class,
+            weight: 1.0,
+            current_value: 1000,
+        }
+    }
+
+    #[test]
+    fn test_diversification_bonus_single_class() {
+        let components = vec![make_component(CollateralAssetClass::RealEstate)];
+        // 1 class → 0 bonus classes → 0.0
+        assert_eq!(compute_diversification_bonus(&components), 0.0);
+    }
+
+    #[test]
+    fn test_diversification_bonus_two_classes() {
+        let components = vec![
+            make_component(CollateralAssetClass::RealEstate),
+            make_component(CollateralAssetClass::EnergyCertificate),
+        ];
+        // 2 classes → 1 bonus class → 5%
+        assert!((compute_diversification_bonus(&components) - 0.05).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_diversification_bonus_five_classes_capped() {
+        let components = vec![
+            make_component(CollateralAssetClass::RealEstate),
+            make_component(CollateralAssetClass::Cryptocurrency),
+            make_component(CollateralAssetClass::EnergyCertificate),
+            make_component(CollateralAssetClass::AgriculturalAsset),
+            make_component(CollateralAssetClass::CarbonCredit),
+        ];
+        // 5 classes → 4 bonus classes → 20% (= cap)
+        assert!((compute_diversification_bonus(&components) - 0.20).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_diversification_bonus_six_classes_still_capped() {
+        let components = vec![
+            make_component(CollateralAssetClass::RealEstate),
+            make_component(CollateralAssetClass::Cryptocurrency),
+            make_component(CollateralAssetClass::EnergyCertificate),
+            make_component(CollateralAssetClass::AgriculturalAsset),
+            make_component(CollateralAssetClass::CarbonCredit),
+            make_component(CollateralAssetClass::Vehicle),
+        ];
+        // 6 classes → 5 bonus → 25%, but capped at 20%
+        assert!((compute_diversification_bonus(&components) - 0.20).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_diversification_bonus_duplicate_classes_no_extra() {
+        let components = vec![
+            make_component(CollateralAssetClass::RealEstate),
+            make_component(CollateralAssetClass::RealEstate),
+            make_component(CollateralAssetClass::EnergyCertificate),
+        ];
+        // 2 distinct classes → 1 bonus → 5%
+        assert!((compute_diversification_bonus(&components) - 0.05).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_diversification_bonus_empty() {
+        let components: Vec<CollateralComponent> = vec![];
+        assert_eq!(compute_diversification_bonus(&components), 0.0);
+    }
+
+    // =========================================================================
+    // compute_blended_oracle_rate tests
+    // =========================================================================
+
+    #[test]
+    fn test_blended_oracle_rate_community_only_no_external() {
+        // No external rate → returns community rate
+        let rate = compute_blended_oracle_rate(100.0, None, 0.0);
+        assert_eq!(rate, 100.0);
+    }
+
+    #[test]
+    fn test_blended_oracle_rate_low_confidence_fallback() {
+        // External confidence <= 0.3 → falls back to community rate
+        let rate = compute_blended_oracle_rate(100.0, Some(200.0), 0.3);
+        assert_eq!(rate, 100.0);
+
+        let rate2 = compute_blended_oracle_rate(100.0, Some(200.0), 0.1);
+        assert_eq!(rate2, 100.0);
+    }
+
+    #[test]
+    fn test_blended_oracle_rate_blended() {
+        // High confidence external rate should blend
+        let rate = compute_blended_oracle_rate(100.0, Some(120.0), 0.9);
+        // effective_alpha = 0.70 + 0.30 * (1 - 0.9) = 0.70 + 0.03 = 0.73
+        // blended = 0.73 * 100 + 0.27 * 120 = 73 + 32.4 = 105.4
+        assert!(rate > 100.0 && rate < 120.0, "blended rate {} should be between community and external", rate);
+        let expected = 0.73 * 100.0 + 0.27 * 120.0;
+        assert!((rate - expected).abs() < 0.01, "got {} expected ~{}", rate, expected);
+    }
+
+    #[test]
+    fn test_blended_oracle_rate_invalid_external() {
+        // NaN external → falls back to community
+        assert_eq!(compute_blended_oracle_rate(100.0, Some(f64::NAN), 0.9), 100.0);
+        // Negative external → falls back to community
+        assert_eq!(compute_blended_oracle_rate(100.0, Some(-10.0), 0.9), 100.0);
+        // Zero external → falls back to community
+        assert_eq!(compute_blended_oracle_rate(100.0, Some(0.0), 0.9), 100.0);
+        // Infinity external → falls back to community
+        assert_eq!(compute_blended_oracle_rate(100.0, Some(f64::INFINITY), 0.9), 100.0);
+    }
+
+    // =========================================================================
+    // PendingCompost construction test
+    // =========================================================================
+
+    #[test]
+    fn test_pending_compost_construction() {
+        let pc = PendingCompost {
+            commons_pool_id: "pool-local-001".into(),
+            amount: 5000,
+            source_member_did: "did:mycelix:alice".into(),
+            pool_tier: CompostPoolTier::Local,
+            created_at_micros: 1_700_000_000_000_000,
+            retry_count: 0,
+        };
+        assert_eq!(pc.commons_pool_id, "pool-local-001");
+        assert_eq!(pc.amount, 5000);
+        assert_eq!(pc.pool_tier, CompostPoolTier::Local);
+        assert_eq!(pc.retry_count, 0);
+
+        // Verify serde roundtrip
+        let json = serde_json::to_string(&pc).unwrap();
+        let parsed: PendingCompost = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed, pc);
+    }
+
+    // =========================================================================
+    // Covenant construction test
+    // =========================================================================
+
+    #[test]
+    fn test_covenant_construction() {
+        let cov = Covenant {
+            id: "cov-001".into(),
+            collateral_id: "col-123".into(),
+            restriction: CovenantRestriction::TransferLock,
+            beneficiary_did: "did:mycelix:bank".into(),
+            created_at_micros: 1_700_000_000_000_000,
+            expires_at_micros: None,
+            released: false,
+            released_by: None,
+            released_at_micros: None,
+        };
+        assert_eq!(cov.id, "cov-001");
+        assert_eq!(cov.restriction, CovenantRestriction::TransferLock);
+        assert!(!cov.released);
+        assert!(cov.expires_at_micros.is_none());
+
+        // Verify serde roundtrip
+        let json = serde_json::to_string(&cov).unwrap();
+        let parsed: Covenant = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed, cov);
+    }
+
+    #[test]
+    fn test_covenant_with_collateral_pledge() {
+        let cov = Covenant {
+            id: "cov-002".into(),
+            collateral_id: "col-456".into(),
+            restriction: CovenantRestriction::CollateralPledge {
+                obligation_id: "loan-789".into(),
+            },
+            beneficiary_did: "did:mycelix:lender".into(),
+            created_at_micros: 1_700_000_000_000_000,
+            expires_at_micros: Some(1_800_000_000_000_000),
+            released: false,
+            released_by: None,
+            released_at_micros: None,
+        };
+        assert!(matches!(cov.restriction, CovenantRestriction::CollateralPledge { .. }));
+        assert_eq!(cov.expires_at_micros, Some(1_800_000_000_000_000));
+
+        // Verify serde roundtrip
+        let json = serde_json::to_string(&cov).unwrap();
+        let parsed: Covenant = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed, cov);
+    }
 }
+
+#[cfg(test)]
+mod resilience_tests;
+
+#[cfg(test)]
+mod simulation;

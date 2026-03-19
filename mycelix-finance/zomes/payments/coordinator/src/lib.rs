@@ -7,7 +7,8 @@ use mycelix_finance_shared::{
     DEFAULT_RATE_LIMIT_PER_MINUTE,
 };
 use mycelix_finance_types::{
-    compute_demurrage_deduction, FeeTier, SapMintSource, SuccessionPreference, COMPOST_LOCAL_PCT,
+    compute_demurrage_deduction, CompostPoolTier, FeeTier, PendingCompost, SapMintCapCounter,
+    SapMintSource, SuccessionPreference, COMPOST_LOCAL_PCT, COMPOST_MAX_RETRIES,
     COMPOST_REGIONAL_PCT, DEMURRAGE_EXEMPT_FLOOR, DEMURRAGE_RATE, SAP_MINT_ANNUAL_MAX,
     SAP_MINT_PER_PROPOSAL_MAX,
 };
@@ -86,6 +87,9 @@ pub struct SapBalanceResponse {
 /// Returns the amount deducted. If 0, no update is persisted.
 #[hdk_extern]
 pub fn apply_demurrage(input: ApplyDemurrageInput) -> ExternResult<DemurrageResult> {
+    // Opportunistically drain pending compost queue
+    let _ = drain_pending_compost_inner();
+
     let (record, bal) = get_sap_balance_inner(&input.member_did)?;
     let now = sys_time()?;
     let elapsed = elapsed_seconds(bal.last_demurrage_at, now);
@@ -115,65 +119,31 @@ pub fn apply_demurrage(input: ApplyDemurrageInput) -> ExternResult<DemurrageResu
     let regional_amount = deduction * COMPOST_REGIONAL_PCT / 100;
     let global_amount = deduction - local_amount - regional_amount; // remainder to global
 
-    // Redistribute via treasury zome cross-zome calls
+    // Redistribute via treasury zome cross-zome calls with retry + queue
+    let mut fully_redistributed = true;
+
     if let Some(ref pool_id) = input.local_commons_pool_id {
-        if let Err(e) = call(
-            CallTargetCell::Local,
-            ZomeName::from("treasury"),
-            FunctionName::from("receive_compost"),
-            None,
-            ReceiveCompostPayload {
-                commons_pool_id: pool_id.clone(),
-                amount: local_amount,
-                source_member_did: input.member_did.clone(),
-            },
-        ) {
-            debug!(
-                "Compost redistribution to local pool {} failed: {:?}",
-                pool_id, e
-            );
+        if !try_deliver_compost(pool_id, local_amount, &input.member_did) {
+            fully_redistributed = false;
+            queue_pending_compost(pool_id, local_amount, &input.member_did, CompostPoolTier::Local)?;
         }
     }
     if let Some(ref pool_id) = input.regional_commons_pool_id {
-        if let Err(e) = call(
-            CallTargetCell::Local,
-            ZomeName::from("treasury"),
-            FunctionName::from("receive_compost"),
-            None,
-            ReceiveCompostPayload {
-                commons_pool_id: pool_id.clone(),
-                amount: regional_amount,
-                source_member_did: input.member_did.clone(),
-            },
-        ) {
-            debug!(
-                "Compost redistribution to regional pool {} failed: {:?}",
-                pool_id, e
-            );
+        if !try_deliver_compost(pool_id, regional_amount, &input.member_did) {
+            fully_redistributed = false;
+            queue_pending_compost(pool_id, regional_amount, &input.member_did, CompostPoolTier::Regional)?;
         }
     }
     if let Some(ref pool_id) = input.global_commons_pool_id {
-        if let Err(e) = call(
-            CallTargetCell::Local,
-            ZomeName::from("treasury"),
-            FunctionName::from("receive_compost"),
-            None,
-            ReceiveCompostPayload {
-                commons_pool_id: pool_id.clone(),
-                amount: global_amount,
-                source_member_did: input.member_did.clone(),
-            },
-        ) {
-            debug!(
-                "Compost redistribution to global pool {} failed: {:?}",
-                pool_id, e
-            );
+        if !try_deliver_compost(pool_id, global_amount, &input.member_did) {
+            fully_redistributed = false;
+            queue_pending_compost(pool_id, global_amount, &input.member_did, CompostPoolTier::Global)?;
         }
     }
 
     Ok(DemurrageResult {
         deducted: deduction,
-        redistributed: true,
+        redistributed: fully_redistributed,
     })
 }
 
@@ -198,6 +168,145 @@ pub struct DemurrageResult {
     pub redistributed: bool,
 }
 
+// ---------------------------------------------------------------------------
+// Compost Delivery Queue (Phase 1a)
+// ---------------------------------------------------------------------------
+
+/// Anchor path for the pending compost queue.
+const PENDING_COMPOST_ANCHOR: &str = "pending_compost_queue";
+
+/// Attempt to deliver compost to treasury with retries.
+/// Returns `true` if delivery succeeded, `false` if all retries exhausted.
+fn try_deliver_compost(pool_id: &str, amount: u64, source_did: &str) -> bool {
+    if amount == 0 {
+        return true;
+    }
+    for attempt in 0..COMPOST_MAX_RETRIES {
+        match call(
+            CallTargetCell::Local,
+            ZomeName::from("treasury"),
+            FunctionName::from("receive_compost"),
+            None,
+            ReceiveCompostPayload {
+                commons_pool_id: pool_id.to_string(),
+                amount,
+                source_member_did: source_did.to_string(),
+            },
+        ) {
+            Ok(ZomeCallResponse::Ok(_)) => return true,
+            Ok(other) => {
+                debug!(
+                    "Compost delivery attempt {}/{} to {} returned {:?}",
+                    attempt + 1,
+                    COMPOST_MAX_RETRIES,
+                    pool_id,
+                    other
+                );
+            }
+            Err(e) => {
+                debug!(
+                    "Compost delivery attempt {}/{} to {} failed: {:?}",
+                    attempt + 1,
+                    COMPOST_MAX_RETRIES,
+                    pool_id,
+                    e
+                );
+            }
+        }
+    }
+    false
+}
+
+/// Enqueue a failed compost delivery for later processing.
+/// Stores a serialized `PendingCompost` in the link tag from the pending compost anchor.
+fn queue_pending_compost(
+    pool_id: &str,
+    amount: u64,
+    source_did: &str,
+    tier: CompostPoolTier,
+) -> ExternResult<()> {
+    let now = sys_time()?;
+    let pending = PendingCompost {
+        commons_pool_id: pool_id.to_string(),
+        amount,
+        source_member_did: source_did.to_string(),
+        pool_tier: tier,
+        created_at_micros: now.as_micros(),
+        retry_count: COMPOST_MAX_RETRIES,
+    };
+    let tag_bytes =
+        serde_json::to_vec(&pending).map_err(|e| wasm_error!(WasmErrorInner::Guest(format!(
+            "Failed to serialize PendingCompost: {:?}",
+            e
+        ))))?;
+    let anchor = anchor_hash(PENDING_COMPOST_ANCHOR)?;
+    create_link(
+        anchor,
+        // Self-referential: target is also the anchor (we only care about the tag)
+        anchor_hash(PENDING_COMPOST_ANCHOR)?,
+        LinkTypes::PendingCompostQueue,
+        tag_bytes,
+    )?;
+    debug!(
+        "Queued pending compost: {} micro-SAP to pool {} (tier {:?}) from {}",
+        amount, pool_id, pending.pool_tier, source_did
+    );
+    Ok(())
+}
+
+/// Drain the pending compost queue by retrying all queued deliveries.
+/// Successfully delivered entries are removed from the queue.
+/// Called opportunistically from `credit_sap` and `debit_sap`.
+///
+/// Returns the number of successfully drained entries.
+#[hdk_extern]
+pub fn drain_pending_compost(_: ()) -> ExternResult<u32> {
+    drain_pending_compost_inner()
+}
+
+fn drain_pending_compost_inner() -> ExternResult<u32> {
+    let anchor = anchor_hash(PENDING_COMPOST_ANCHOR)?;
+    let links = get_links(
+        LinkQuery::try_new(anchor, LinkTypes::PendingCompostQueue)?,
+        GetStrategy::default(),
+    )?;
+
+    if links.is_empty() {
+        return Ok(0);
+    }
+
+    let mut drained = 0u32;
+    for link in &links {
+        let tag_bytes = link.tag.as_ref();
+        let pending: PendingCompost = match serde_json::from_slice(tag_bytes) {
+            Ok(p) => p,
+            Err(e) => {
+                debug!("Skipping malformed pending compost link: {:?}", e);
+                // Delete the malformed link to prevent infinite retries
+                delete_link(link.create_link_hash.clone())?;
+                continue;
+            }
+        };
+
+        if try_deliver_compost(&pending.commons_pool_id, pending.amount, &pending.source_member_did) {
+            // Success — remove from queue
+            delete_link(link.create_link_hash.clone())?;
+            drained += 1;
+            debug!(
+                "Drained pending compost: {} micro-SAP to pool {} from {}",
+                pending.amount, pending.commons_pool_id, pending.source_member_did
+            );
+        } else {
+            debug!(
+                "Pending compost still undeliverable: {} micro-SAP to pool {} from {} (queued at {})",
+                pending.amount, pending.commons_pool_id, pending.source_member_did, pending.created_at_micros
+            );
+        }
+    }
+
+    Ok(drained)
+}
+
 /// Maximum retries for optimistic-locking SAP balance mutations.
 const MAX_SAP_RETRIES: usize = 3;
 
@@ -215,6 +324,11 @@ const DEMURRAGE_MIN_ELAPSED_SECONDS: u64 = 60;
 /// created a fork, retries up to `MAX_SAP_RETRIES` times.
 #[hdk_extern]
 pub fn credit_sap(input: CreditSapInput) -> ExternResult<Record> {
+    // Opportunistically drain any pending compost deliveries
+    if let Err(e) = drain_pending_compost_inner() {
+        debug!("credit_sap: pending compost drain failed (non-fatal): {:?}", e);
+    }
+
     // Check if this member has no balance — if so, auto-initialize (no race concern for create)
     if find_sap_balance_record(&input.member_did)?.is_none() {
         let now = sys_time()?;
@@ -317,6 +431,11 @@ pub struct CreditSapInput {
 /// our update won. If a concurrent update created a fork, retries.
 #[hdk_extern]
 pub fn debit_sap(input: DebitSapInput) -> ExternResult<Record> {
+    // Opportunistically drain any pending compost deliveries
+    if let Err(e) = drain_pending_compost_inner() {
+        debug!("debit_sap: pending compost drain failed (non-fatal): {:?}", e);
+    }
+
     for attempt in 0..MAX_SAP_RETRIES {
         let (record, bal) = get_sap_balance_inner(&input.member_did)?;
         let now = sys_time()?;
@@ -489,6 +608,9 @@ pub fn mint_sap_from_governance(input: MintSapFromGovernanceInput) -> ExternResu
         reason: format!("Governance mint: proposal {}", input.proposal_id),
     })?;
 
+    // Update the running mint cap counter (O(1) for future cap checks)
+    update_mint_cap_counter(input.amount, now)?;
+
     // Broadcast mint event via bridge
     if let Err(e) = call(
         CallTargetCell::Local,
@@ -548,9 +670,93 @@ pub fn get_mint_records(member_did: String) -> ExternResult<Vec<Record>> {
 
 // --- Internal helpers ---
 
-/// Enforce annual governance mint cap: total minted via governance proposals
-/// in the last 365 days must not exceed SAP_MINT_ANNUAL_MAX.
+/// Anchor key for the singleton mint cap counter entry.
+const MINT_CAP_COUNTER_ANCHOR: &str = "sap_mint_cap_counter";
+
+/// Enforce annual governance mint cap using the on-chain `SapMintCapCounterEntry`.
+///
+/// O(1) check: reads the running counter instead of scanning all `SapMintRecord` entries.
+/// If no counter exists yet (first-ever governance mint), falls back to a one-time chain
+/// scan to bootstrap the counter. Subsequent calls are O(1).
 fn enforce_annual_mint_cap(new_amount: u64, now: Timestamp) -> ExternResult<()> {
+    let counter = load_or_bootstrap_mint_cap_counter(now)?;
+    let effective = if counter.is_period_expired(now.as_micros()) {
+        // Period rolled over — counter resets, only the new amount counts
+        SapMintCapCounter {
+            period_start_micros: now.as_micros(),
+            cumulative_minted: 0,
+            mint_count: 0,
+            last_updated_micros: now.as_micros(),
+        }
+    } else {
+        counter
+    };
+
+    if effective.would_exceed_cap(new_amount) {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Annual governance mint cap exceeded: {} already minted this year + {} requested > {} max",
+            effective.cumulative_minted, new_amount, SAP_MINT_ANNUAL_MAX
+        ))));
+    }
+    Ok(())
+}
+
+/// Update the on-chain mint cap counter after a successful governance mint.
+/// Called immediately after the SapMintRecord is committed.
+fn update_mint_cap_counter(minted_amount: u64, now: Timestamp) -> ExternResult<()> {
+    let year_micros: i64 = 365 * 24 * 60 * 60 * 1_000_000;
+
+    match find_mint_cap_counter_record()? {
+        Some((record, existing)) => {
+            let counter: SapMintCapCounter = existing.into();
+            let updated = if counter.is_period_expired(now.as_micros()) {
+                // Period expired — start fresh
+                SapMintCapCounterEntry {
+                    period_start_micros: now.as_micros(),
+                    cumulative_minted: minted_amount,
+                    mint_count: 1,
+                    last_updated_micros: now.as_micros(),
+                }
+            } else {
+                SapMintCapCounterEntry {
+                    cumulative_minted: counter.cumulative_minted.saturating_add(minted_amount),
+                    mint_count: counter.mint_count.saturating_add(1),
+                    last_updated_micros: now.as_micros(),
+                    ..existing
+                }
+            };
+            update_entry(
+                record.action_address().clone(),
+                &EntryTypes::SapMintCapCounterEntry(updated),
+            )?;
+        }
+        None => {
+            // First mint ever — create counter
+            let counter = SapMintCapCounterEntry {
+                period_start_micros: now.as_micros() - year_micros + year_micros, // = now
+                cumulative_minted: minted_amount,
+                mint_count: 1,
+                last_updated_micros: now.as_micros(),
+            };
+            let hash = create_entry(&EntryTypes::SapMintCapCounterEntry(counter))?;
+            create_link(
+                anchor_hash(MINT_CAP_COUNTER_ANCHOR)?,
+                hash,
+                LinkTypes::MintCapCounterAnchor,
+                (),
+            )?;
+        }
+    }
+    Ok(())
+}
+
+/// Load the existing mint cap counter, or bootstrap from chain scan if none exists.
+fn load_or_bootstrap_mint_cap_counter(now: Timestamp) -> ExternResult<SapMintCapCounter> {
+    if let Some((_record, entry)) = find_mint_cap_counter_record()? {
+        return Ok(entry.into());
+    }
+
+    // No counter yet — bootstrap from chain scan (one-time cost)
     let year_micros: i64 = 365 * 24 * 60 * 60 * 1_000_000;
     let cutoff = now.as_micros() - year_micros;
 
@@ -560,7 +766,7 @@ fn enforce_annual_mint_cap(new_amount: u64, now: Timestamp) -> ExternResult<()> 
         )?))
         .include_entries(true);
 
-    let annual_total: u64 = query(filter)?
+    let (annual_total, mint_count) = query(filter)?
         .into_iter()
         .filter_map(|r| match r.entry().to_app_option::<SapMintRecord>() {
             Ok(opt) => opt,
@@ -571,16 +777,45 @@ fn enforce_annual_mint_cap(new_amount: u64, now: Timestamp) -> ExternResult<()> 
         })
         .filter(|m| m.minted_at.as_micros() > cutoff)
         .filter(|m| matches!(m.source, SapMintSource::GovernanceProposal { .. }))
-        .map(|m| m.amount)
-        .fold(0u64, |acc, v| acc.saturating_add(v));
+        .fold((0u64, 0u32), |(acc, cnt), m| {
+            (acc.saturating_add(m.amount), cnt.saturating_add(1))
+        });
 
-    if annual_total.saturating_add(new_amount) > SAP_MINT_ANNUAL_MAX {
-        return Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "Annual governance mint cap exceeded: {} already minted this year + {} requested > {} max",
-            annual_total, new_amount, SAP_MINT_ANNUAL_MAX
-        ))));
+    Ok(SapMintCapCounter {
+        period_start_micros: cutoff,
+        cumulative_minted: annual_total,
+        mint_count,
+        last_updated_micros: now.as_micros(),
+    })
+}
+
+/// Find the singleton mint cap counter record via link-based lookup.
+fn find_mint_cap_counter_record() -> ExternResult<Option<(Record, SapMintCapCounterEntry)>> {
+    let links = get_links(
+        LinkQuery::try_new(
+            anchor_hash(MINT_CAP_COUNTER_ANCHOR)?,
+            LinkTypes::MintCapCounterAnchor,
+        )?,
+        GetStrategy::default(),
+    )?;
+    if let Some(link) = links.last() {
+        let hash = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        let record = follow_update_chain(hash)?;
+        let entry = record
+            .entry()
+            .to_app_option::<SapMintCapCounterEntry>()
+            .map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!(
+                    "SapMintCapCounterEntry deserialization error: {:?}",
+                    e
+                )))
+            })?;
+        if let Some(entry) = entry {
+            return Ok(Some((record, entry)));
+        }
     }
-    Ok(())
+    Ok(None)
 }
 
 fn find_sap_balance_record(member_did: &str) -> ExternResult<Option<(Record, SapBalance)>> {

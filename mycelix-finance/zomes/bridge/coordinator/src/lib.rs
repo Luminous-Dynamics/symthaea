@@ -7,7 +7,8 @@
 use finance_bridge_integrity::*;
 use hdk::prelude::*;
 use mycelix_finance_shared::{
-    anchor_hash, follow_update_chain, verify_caller_is_did, verify_participant_tier,
+    anchor_hash, follow_update_chain, verify_caller_is_did, verify_citizen_tier,
+    verify_participant_tier,
 };
 use mycelix_finance_types::{FeeTier, TendLimitTier};
 
@@ -151,6 +152,81 @@ pub struct RegisterCollateralInput {
     pub currency: String,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct UpdateCollateralStatusInput {
+    pub collateral_id: String,
+    pub owner_did: String,
+    pub new_status: CollateralStatus,
+}
+
+/// Update collateral status (e.g., Available → Pledged, Pledged → Frozen).
+///
+/// Covenant enforcement: transitioning to `Pledged` or `Frozen` is blocked if
+/// active covenants exist that would conflict with the status change.
+/// Transitioning to `Released` is also blocked by active covenants
+/// (use `redeem_collateral` for the full release flow).
+#[hdk_extern]
+pub fn update_collateral_status(input: UpdateCollateralStatusInput) -> ExternResult<Record> {
+    verify_participant_tier()?;
+    verify_caller_is_did(&input.owner_did)?;
+
+    // Find the collateral registration
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash("collateral_registry")?, LinkTypes::CollateralRegistry)?,
+        GetStrategy::default(),
+    )?;
+
+    for link in links {
+        let hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        let record = follow_update_chain(hash)?;
+        if let Ok(Some(collateral)) = record
+            .entry()
+            .to_app_option::<CollateralRegistration>()
+        {
+            if collateral.id == input.collateral_id {
+                // Verify ownership
+                if collateral.owner_did != input.owner_did {
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Only the collateral owner can change its status".into()
+                    )));
+                }
+
+                // Covenant enforcement: block Pledged, Frozen, and Released transitions
+                // when active covenants exist on this collateral
+                match input.new_status {
+                    CollateralStatus::Pledged
+                    | CollateralStatus::Frozen
+                    | CollateralStatus::Released => {
+                        enforce_no_active_covenants(&collateral.id)?;
+                    }
+                    CollateralStatus::Available => {
+                        // Returning to Available is always permitted
+                    }
+                }
+
+                let updated = CollateralRegistration {
+                    status: input.new_status,
+                    ..collateral
+                };
+
+                let action_hash = update_entry(
+                    record.action_address().clone(),
+                    &EntryTypes::CollateralRegistration(updated),
+                )?;
+
+                return get(action_hash, GetOptions::default())?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+            }
+        }
+    }
+
+    Err(wasm_error!(WasmErrorInner::Guest(format!(
+        "Collateral {} not found",
+        input.collateral_id
+    ))))
+}
+
 /// Broadcast finance event
 #[hdk_extern]
 pub fn broadcast_finance_event(input: BroadcastFinanceEventInput) -> ExternResult<Record> {
@@ -243,6 +319,9 @@ pub fn deposit_collateral(input: DepositCollateralInput) -> ExternResult<Record>
             "Collateral type must be \"ETH\" or \"USDC\"".into()
         )));
     }
+
+    // Phase 1b: Verify oracle rate against consensus (oracle rate attestation)
+    verify_oracle_rate_against_consensus(&input.collateral_type, input.oracle_rate)?;
 
     let sap_minted = (input.collateral_amount as f64 * input.oracle_rate) as u64;
 
@@ -447,6 +526,9 @@ pub fn redeem_collateral(deposit_id: String) -> ExternResult<Record> {
             "Only confirmed deposits can be redeemed".into()
         )));
     }
+
+    // Covenant enforcement: block redemption if active covenants exist on this deposit
+    enforce_no_active_covenants(&deposit.id)?;
 
     // Enforce tier-scaled rate limit on redemption
     let now = sys_time()?;
@@ -962,6 +1044,937 @@ pub struct FinanceBridgeHealth {
     pub healthy: bool,
     pub agent: String,
     pub zomes: Vec<String>,
+}
+
+// ---------------------------------------------------------------------------
+// Phase 1b: Oracle Rate Attestation
+// ---------------------------------------------------------------------------
+
+/// Verify that the claimed oracle rate is within tolerance of consensus.
+///
+/// Fetches consensus from the price-oracle zome. If the oracle is unreachable
+/// (bootstrap/standalone), accepts the claimed rate with a warning.
+fn verify_oracle_rate_against_consensus(collateral_type: &str, claimed_rate: f64) -> ExternResult<()> {
+    use mycelix_finance_types::ORACLE_RATE_TOLERANCE;
+
+    #[derive(Serialize)]
+    struct GetConsensusInput {
+        item: String,
+    }
+    #[derive(Debug, Deserialize)]
+    struct ConsensusResult {
+        median_price: f64,
+    }
+
+    let item = format!("{}_SAP", collateral_type); // e.g., "ETH_SAP", "USDC_SAP"
+
+    match call(
+        CallTargetCell::Local,
+        ZomeName::from("price_oracle"),
+        FunctionName::from("get_consensus_price"),
+        None,
+        GetConsensusInput { item },
+    ) {
+        Ok(ZomeCallResponse::Ok(result)) => {
+            match result.decode::<ConsensusResult>() {
+                Ok(consensus)
+                    if consensus.median_price.is_finite() && consensus.median_price > 0.0 =>
+                {
+                    let deviation =
+                        (claimed_rate - consensus.median_price).abs() / consensus.median_price;
+                    if deviation > ORACLE_RATE_TOLERANCE {
+                        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                            "Oracle rate {:.6} deviates {:.1}% from consensus {:.6} (max {:.0}%). \
+                             Use get_consensus_price to fetch current rate before depositing.",
+                            claimed_rate,
+                            deviation * 100.0,
+                            consensus.median_price,
+                            ORACLE_RATE_TOLERANCE * 100.0
+                        ))));
+                    }
+                    Ok(())
+                }
+                _ => {
+                    debug!(
+                        "verify_oracle_rate: consensus invalid, accepting claimed rate {:.6}",
+                        claimed_rate
+                    );
+                    Ok(())
+                }
+            }
+        }
+        _ => {
+            debug!(
+                "verify_oracle_rate: price oracle unreachable, accepting claimed rate {:.6}",
+                claimed_rate
+            );
+            Ok(())
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2a: Covenant Registry
+// ---------------------------------------------------------------------------
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CreateCovenantInput {
+    pub collateral_id: String,
+    pub restriction: String,
+    pub beneficiary_did: String,
+    pub expires_at: Option<Timestamp>,
+}
+
+/// Create a covenant (restriction) on registered collateral.
+///
+/// Only Citizen+ tier can create covenants. The covenant prevents the
+/// collateral from being transferred or otherwise disposed of while active.
+#[hdk_extern]
+pub fn create_covenant(input: CreateCovenantInput) -> ExternResult<Record> {
+    verify_citizen_tier()?;
+    verify_caller_is_did(&input.beneficiary_did)?;
+    let now = sys_time()?;
+
+    let covenant_id = format!(
+        "cov:{}:{}:{}",
+        input.collateral_id,
+        input.beneficiary_did,
+        now.as_micros()
+    );
+
+    let covenant = Covenant {
+        id: covenant_id.clone(),
+        collateral_id: input.collateral_id.clone(),
+        restriction: input.restriction,
+        beneficiary_did: input.beneficiary_did.clone(),
+        created_at: now,
+        expires_at: input.expires_at,
+        released: false,
+        released_by: None,
+        released_at: None,
+    };
+
+    let hash = create_entry(&EntryTypes::Covenant(covenant))?;
+
+    create_link(
+        anchor_hash(&input.collateral_id)?,
+        hash.clone(),
+        LinkTypes::CollateralToCovenants,
+        (),
+    )?;
+
+    create_link(
+        anchor_hash(&covenant_id)?,
+        hash.clone(),
+        LinkTypes::CovenantIdToCovenant,
+        (),
+    )?;
+
+    broadcast_finance_event(BroadcastFinanceEventInput {
+        event_type: FinanceEventType::CovenantCreated,
+        subject_did: input.beneficiary_did,
+        amount: None,
+        payload: serde_json::json!({
+            "covenant_id": covenant_id,
+            "collateral_id": input.collateral_id,
+        })
+        .to_string(),
+    })?;
+
+    get(hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Covenant not found".into()
+    )))
+}
+
+/// Release a covenant. Only the beneficiary can release.
+#[hdk_extern]
+pub fn release_covenant(covenant_id: String) -> ExternResult<Record> {
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(&covenant_id)?, LinkTypes::CovenantIdToCovenant)?,
+        GetStrategy::default(),
+    )?;
+    let link = links.first().ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Covenant not found".into()
+    )))?;
+    let hash = ActionHash::try_from(link.target.clone())
+        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+    let record = follow_update_chain(hash)?;
+    let covenant = record
+        .entry()
+        .to_app_option::<Covenant>()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Deserialization error: {:?}",
+                e
+            )))
+        })?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Covenant entry missing".into()
+        )))?;
+
+    verify_caller_is_did(&covenant.beneficiary_did)?;
+
+    if covenant.released {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Covenant is already released".into()
+        )));
+    }
+
+    let now = sys_time()?;
+    let released = Covenant {
+        released: true,
+        released_by: Some(covenant.beneficiary_did.clone()),
+        released_at: Some(now),
+        ..covenant.clone()
+    };
+
+    let action_hash = update_entry(
+        record.action_address().clone(),
+        &EntryTypes::Covenant(released),
+    )?;
+
+    broadcast_finance_event(BroadcastFinanceEventInput {
+        event_type: FinanceEventType::CovenantReleased,
+        subject_did: covenant.beneficiary_did,
+        amount: None,
+        payload: serde_json::json!({
+            "covenant_id": covenant_id,
+            "collateral_id": covenant.collateral_id,
+        })
+        .to_string(),
+    })?;
+
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+}
+
+/// Query active (unreleased) covenants for a collateral ID.
+#[hdk_extern]
+pub fn check_covenants(collateral_id: String) -> ExternResult<Vec<Record>> {
+    get_active_covenants(&collateral_id)
+}
+
+/// Internal helper: query active (unreleased) covenants for a collateral ID.
+/// Used by both the extern `check_covenants` and internal covenant enforcement.
+fn get_active_covenants(collateral_id: &str) -> ExternResult<Vec<Record>> {
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(collateral_id)?, LinkTypes::CollateralToCovenants)?,
+        GetStrategy::default(),
+    )?;
+
+    let mut active = Vec::new();
+    for link in links {
+        let hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link".into())))?;
+        let record = follow_update_chain(hash)?;
+        if let Ok(Some(covenant)) = record.entry().to_app_option::<Covenant>() {
+            if !covenant.released {
+                active.push(record);
+            }
+        }
+    }
+
+    Ok(active)
+}
+
+/// Enforce that no active covenants block a collateral status change.
+///
+/// Returns an error if any unreleased covenants exist for the given collateral ID.
+/// Called before redemption, release, or any status change that would dispose of collateral.
+fn enforce_no_active_covenants(collateral_id: &str) -> ExternResult<()> {
+    let active = get_active_covenants(collateral_id)?;
+    if !active.is_empty() {
+        let covenant_ids: Vec<String> = active
+            .iter()
+            .filter_map(|r| {
+                r.entry()
+                    .to_app_option::<Covenant>()
+                    .ok()
+                    .flatten()
+                    .map(|c| c.id)
+            })
+            .collect();
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Cannot change collateral status: {} active covenant(s) blocking: [{}]",
+            active.len(),
+            covenant_ids.join(", ")
+        ))));
+    }
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2b: LTV Monitoring
+// ---------------------------------------------------------------------------
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct UpdateCollateralHealthInput {
+    pub collateral_id: String,
+    pub obligation_amount: u64,
+}
+
+/// Compute and store the LTV health status for a collateral position.
+///
+/// Fetches current value from the price oracle, computes the LTV ratio,
+/// and stores a CollateralHealth snapshot linked to the collateral.
+#[hdk_extern]
+pub fn update_collateral_health(
+    input: UpdateCollateralHealthInput,
+) -> ExternResult<Record> {
+    verify_participant_tier()?;
+    let now = sys_time()?;
+
+    // Fetch current collateral value from oracle
+    let current_value = fetch_collateral_value(&input.collateral_id);
+
+    let ltv_ratio = if current_value > 0 {
+        input.obligation_amount as f64 / current_value as f64
+    } else {
+        f64::INFINITY
+    };
+
+    let status = if !ltv_ratio.is_finite() || ltv_ratio > 0.95 {
+        "Liquidation"
+    } else if ltv_ratio > 0.85 {
+        "MarginCall"
+    } else if ltv_ratio > 0.75 {
+        "Warning"
+    } else {
+        "Healthy"
+    };
+
+    let health = CollateralHealth {
+        collateral_id: input.collateral_id.clone(),
+        current_value,
+        obligation_amount: input.obligation_amount,
+        ltv_ratio: if ltv_ratio.is_finite() { ltv_ratio } else { 999.0 },
+        status: status.to_string(),
+        computed_at: now,
+    };
+
+    let hash = create_entry(&EntryTypes::CollateralHealth(health))?;
+
+    create_link(
+        anchor_hash(&input.collateral_id)?,
+        hash.clone(),
+        LinkTypes::CollateralToHealth,
+        (),
+    )?;
+
+    broadcast_finance_event(BroadcastFinanceEventInput {
+        event_type: FinanceEventType::CollateralHealthUpdated,
+        subject_did: input.collateral_id,
+        amount: Some(current_value),
+        payload: serde_json::json!({
+            "ltv_ratio": ltv_ratio,
+            "status": status,
+            "obligation": input.obligation_amount,
+        })
+        .to_string(),
+    })?;
+
+    get(hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Health entry not found".into()
+    )))
+}
+
+/// Fetch current value for a collateral position from the price oracle.
+/// Falls back to 0 if oracle is unreachable.
+fn fetch_collateral_value(collateral_id: &str) -> u64 {
+    #[derive(Serialize)]
+    struct GetValueInput {
+        collateral_id: String,
+    }
+    #[derive(Debug, Deserialize)]
+    struct ValueResult {
+        value: u64,
+    }
+
+    match call(
+        CallTargetCell::Local,
+        ZomeName::from("price_oracle"),
+        FunctionName::from("get_collateral_value"),
+        None,
+        GetValueInput {
+            collateral_id: collateral_id.to_string(),
+        },
+    ) {
+        Ok(ZomeCallResponse::Ok(result)) => result
+            .decode::<ValueResult>()
+            .map(|v| v.value)
+            .unwrap_or(0),
+        _ => {
+            debug!(
+                "fetch_collateral_value: oracle unreachable for {}, defaulting to 0",
+                collateral_id
+            );
+            0
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2c: Energy Certificate Registry
+// ---------------------------------------------------------------------------
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct RegisterEnergyCertificateInput {
+    pub project_id: String,
+    pub source: String,
+    pub kwh_produced: f64,
+    pub period_start: Timestamp,
+    pub period_end: Timestamp,
+    pub location_lat: f64,
+    pub location_lon: f64,
+    pub producer_did: String,
+    pub terra_atlas_id: Option<String>,
+}
+
+/// Register a new energy production certificate. Requires Participant+ tier.
+#[hdk_extern]
+pub fn register_energy_certificate(
+    input: RegisterEnergyCertificateInput,
+) -> ExternResult<Record> {
+    verify_participant_tier()?;
+    verify_caller_is_did(&input.producer_did)?;
+    let now = sys_time()?;
+
+    let cert_id = format!(
+        "cert:{}:{}:{}",
+        input.project_id,
+        input.producer_did,
+        now.as_micros()
+    );
+
+    let cert = EnergyCertificate {
+        id: cert_id.clone(),
+        project_id: input.project_id,
+        source: input.source,
+        kwh_produced: input.kwh_produced,
+        period_start: input.period_start,
+        period_end: input.period_end,
+        location_lat: input.location_lat,
+        location_lon: input.location_lon,
+        producer_did: input.producer_did.clone(),
+        verifier_did: None,
+        status: "Pending".into(),
+        terra_atlas_id: input.terra_atlas_id,
+        sap_value: None,
+        created_at: now,
+    };
+
+    let hash = create_entry(&EntryTypes::EnergyCertificate(cert))?;
+
+    create_link(
+        anchor_hash("energy_certificates")?,
+        hash.clone(),
+        LinkTypes::EnergyCertificateRegistry,
+        (),
+    )?;
+
+    broadcast_finance_event(BroadcastFinanceEventInput {
+        event_type: FinanceEventType::EnergyCertificateCreated,
+        subject_did: input.producer_did,
+        amount: None,
+        payload: serde_json::json!({
+            "cert_id": cert_id,
+            "kwh": input.kwh_produced,
+        })
+        .to_string(),
+    })?;
+
+    get(hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Certificate not found".into()
+    )))
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct VerifyEnergyCertificateInput {
+    pub cert_id: String,
+    pub verifier_did: String,
+    pub sap_value: u64,
+}
+
+/// Verify an energy certificate and assign SAP value. Requires Citizen+ tier.
+#[hdk_extern]
+pub fn verify_energy_certificate(
+    input: VerifyEnergyCertificateInput,
+) -> ExternResult<Record> {
+    verify_citizen_tier()?;
+    verify_caller_is_did(&input.verifier_did)?;
+
+    // Find the certificate by querying the registry
+    let links = get_links(
+        LinkQuery::try_new(
+            anchor_hash("energy_certificates")?,
+            LinkTypes::EnergyCertificateRegistry,
+        )?,
+        GetStrategy::default(),
+    )?;
+
+    for link in links {
+        let hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link".into())))?;
+        let record = follow_update_chain(hash)?;
+        if let Ok(Some(cert)) = record.entry().to_app_option::<EnergyCertificate>() {
+            if cert.id == input.cert_id {
+                if cert.status != "Pending" {
+                    return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                        "Certificate is {}, only Pending certificates can be verified",
+                        cert.status
+                    ))));
+                }
+
+                // Verify project exists in energy cluster (cross-cluster call)
+                match call(
+                    CallTargetCell::OtherRole("energy".into()),
+                    ZomeName::from("energy_bridge"),
+                    FunctionName::from("get_project"),
+                    None,
+                    cert.project_id.clone(),
+                ) {
+                    Ok(ZomeCallResponse::Ok(_)) => {} // Project exists
+                    _ => {
+                        debug!("verify_energy_certificate: energy cluster unreachable, proceeding without project verification");
+                        // Non-fatal: accept verification even if energy cluster is unreachable (offline mode)
+                    }
+                }
+
+                let verified = EnergyCertificate {
+                    status: "Verified".into(),
+                    verifier_did: Some(input.verifier_did),
+                    sap_value: Some(input.sap_value),
+                    ..cert
+                };
+
+                let action_hash = update_entry(
+                    record.action_address().clone(),
+                    &EntryTypes::EnergyCertificate(verified),
+                )?;
+
+                return get(action_hash, GetOptions::default())?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+            }
+        }
+    }
+
+    Err(wasm_error!(WasmErrorInner::Guest(format!(
+        "Energy certificate {} not found",
+        input.cert_id
+    ))))
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2d: Agricultural Asset Registry
+// ---------------------------------------------------------------------------
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct RegisterAgriculturalAssetInput {
+    pub asset_type: String,
+    pub quantity_kg: f64,
+    pub location_lat: f64,
+    pub location_lon: f64,
+    pub production_date: Timestamp,
+    pub viability_duration_micros: Option<i64>,
+    pub producer_did: String,
+}
+
+/// Register a new agricultural asset. Requires Participant+ tier.
+#[hdk_extern]
+pub fn register_agricultural_asset(
+    input: RegisterAgriculturalAssetInput,
+) -> ExternResult<Record> {
+    verify_participant_tier()?;
+    verify_caller_is_did(&input.producer_did)?;
+    let now = sys_time()?;
+
+    let asset_id = format!(
+        "agri:{}:{}:{}",
+        input.asset_type,
+        input.producer_did,
+        now.as_micros()
+    );
+
+    let asset = AgriculturalAsset {
+        id: asset_id.clone(),
+        asset_type: input.asset_type,
+        quantity_kg: input.quantity_kg,
+        location_lat: input.location_lat,
+        location_lon: input.location_lon,
+        production_date: input.production_date,
+        viability_duration_micros: input.viability_duration_micros,
+        producer_did: input.producer_did.clone(),
+        verifier_did: None,
+        status: "Pending".into(),
+        sap_value: None,
+        created_at: now,
+    };
+
+    let hash = create_entry(&EntryTypes::AgriculturalAsset(asset))?;
+
+    create_link(
+        anchor_hash("agri_assets")?,
+        hash.clone(),
+        LinkTypes::AgriAssetRegistry,
+        (),
+    )?;
+
+    broadcast_finance_event(BroadcastFinanceEventInput {
+        event_type: FinanceEventType::AgriAssetRegistered,
+        subject_did: input.producer_did,
+        amount: None,
+        payload: serde_json::json!({
+            "asset_id": asset_id,
+            "quantity_kg": input.quantity_kg,
+        })
+        .to_string(),
+    })?;
+
+    get(hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Asset not found".into()
+    )))
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct VerifyAgriculturalAssetInput {
+    pub asset_id: String,
+    pub verifier_did: String,
+    pub sap_value: u64,
+}
+
+/// Verify an agricultural asset and assign SAP value. Requires Citizen+ tier.
+#[hdk_extern]
+pub fn verify_agricultural_asset(
+    input: VerifyAgriculturalAssetInput,
+) -> ExternResult<Record> {
+    verify_citizen_tier()?;
+    verify_caller_is_did(&input.verifier_did)?;
+
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash("agri_assets")?, LinkTypes::AgriAssetRegistry)?,
+        GetStrategy::default(),
+    )?;
+
+    for link in links {
+        let hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link".into())))?;
+        let record = follow_update_chain(hash)?;
+        if let Ok(Some(asset)) = record.entry().to_app_option::<AgriculturalAsset>() {
+            if asset.id == input.asset_id {
+                if asset.status != "Pending" {
+                    return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                        "Asset is {}, only Pending assets can be verified",
+                        asset.status
+                    ))));
+                }
+
+                let verified = AgriculturalAsset {
+                    status: "Verified".into(),
+                    verifier_did: Some(input.verifier_did),
+                    sap_value: Some(input.sap_value),
+                    ..asset
+                };
+
+                let action_hash = update_entry(
+                    record.action_address().clone(),
+                    &EntryTypes::AgriculturalAsset(verified),
+                )?;
+
+                return get(action_hash, GetOptions::default())?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+            }
+        }
+    }
+
+    Err(wasm_error!(WasmErrorInner::Guest(format!(
+        "Agricultural asset {} not found",
+        input.asset_id
+    ))))
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2e: Multi-Collateral Positions
+// ---------------------------------------------------------------------------
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CreateMultiCollateralPositionInput {
+    pub holder_did: String,
+    pub components_json: String,
+    pub aggregate_value: u64,
+    pub aggregate_obligation: u64,
+}
+
+/// Create a multi-collateral position (basket of assets).
+///
+/// Computes a diversification bonus based on the number of distinct asset types
+/// in the basket. The bonus reduces effective LTV by up to 5%.
+#[hdk_extern]
+pub fn create_multi_collateral_position(
+    input: CreateMultiCollateralPositionInput,
+) -> ExternResult<Record> {
+    verify_participant_tier()?;
+    verify_caller_is_did(&input.holder_did)?;
+    let now = sys_time()?;
+
+    // Parse components to count distinct types for diversification bonus
+    #[derive(Deserialize)]
+    struct Component {
+        #[serde(rename = "type")]
+        _type: String,
+    }
+    let components: Vec<Component> =
+        serde_json::from_str(&input.components_json).map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Invalid components JSON: {:?}",
+                e
+            )))
+        })?;
+
+    if components.is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Multi-collateral position must have at least one component".into()
+        )));
+    }
+
+    // Diversification bonus: 1% per distinct asset type, capped at 5%
+    let distinct_types: std::collections::HashSet<&str> =
+        components.iter().map(|c| c._type.as_str()).collect();
+    let diversification_bonus = (distinct_types.len() as f64 * 0.01).min(0.05);
+
+    let base_ltv = if input.aggregate_value > 0 {
+        input.aggregate_obligation as f64 / input.aggregate_value as f64
+    } else {
+        999.0
+    };
+    let effective_ltv = (base_ltv - diversification_bonus).max(0.0);
+
+    let status = if !effective_ltv.is_finite() || effective_ltv > 0.95 {
+        "Liquidation"
+    } else if effective_ltv > 0.85 {
+        "MarginCall"
+    } else if effective_ltv > 0.75 {
+        "Warning"
+    } else {
+        "Healthy"
+    };
+
+    let position_id = format!("mcp:{}:{}", input.holder_did, now.as_micros());
+
+    let position = MultiCollateralPosition {
+        id: position_id.clone(),
+        holder_did: input.holder_did.clone(),
+        components_json: input.components_json,
+        aggregate_value: input.aggregate_value,
+        aggregate_obligation: input.aggregate_obligation,
+        diversification_bonus,
+        effective_ltv,
+        status: status.to_string(),
+        created_at: now,
+        last_revalued_at: now,
+    };
+
+    let hash = create_entry(&EntryTypes::MultiCollateralPosition(position))?;
+
+    create_link(
+        anchor_hash("multi_collateral")?,
+        hash.clone(),
+        LinkTypes::MultiCollateralRegistry,
+        (),
+    )?;
+
+    create_link(
+        anchor_hash(&input.holder_did)?,
+        hash.clone(),
+        LinkTypes::HolderToPositions,
+        (),
+    )?;
+
+    broadcast_finance_event(BroadcastFinanceEventInput {
+        event_type: FinanceEventType::MultiCollateralCreated,
+        subject_did: input.holder_did,
+        amount: Some(input.aggregate_value),
+        payload: serde_json::json!({
+            "position_id": position_id,
+            "effective_ltv": effective_ltv,
+            "diversification_bonus": diversification_bonus,
+            "status": status,
+        })
+        .to_string(),
+    })?;
+
+    get(hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Position not found".into()
+    )))
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2f: Fiat Bridge Deposits
+// ---------------------------------------------------------------------------
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DepositFiatInput {
+    pub depositor_did: String,
+    pub fiat_currency: String,
+    pub fiat_amount: u64,
+    pub exchange_rate: f64,
+    pub verifier_did: String,
+    pub external_reference: String,
+}
+
+/// Create a fiat bridge deposit (inbound: fiat -> SAP). Requires Citizen+ tier verifier.
+#[hdk_extern]
+pub fn deposit_fiat(input: DepositFiatInput) -> ExternResult<Record> {
+    verify_citizen_tier()?;
+    verify_caller_is_did(&input.verifier_did)?;
+    let now = sys_time()?;
+
+    if input.fiat_amount == 0 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Fiat amount must be positive".into()
+        )));
+    }
+    if !input.exchange_rate.is_finite() || input.exchange_rate <= 0.0 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Exchange rate must be a finite positive number".into()
+        )));
+    }
+
+    let sap_minted = (input.fiat_amount as f64 * input.exchange_rate) as u64;
+
+    let deposit_id = format!(
+        "fiat:{}:{}:{}",
+        input.depositor_did,
+        input.fiat_currency,
+        now.as_micros()
+    );
+
+    let deposit = FiatBridgeDeposit {
+        id: deposit_id.clone(),
+        depositor_did: input.depositor_did.clone(),
+        fiat_currency: input.fiat_currency,
+        fiat_amount: input.fiat_amount,
+        sap_minted,
+        exchange_rate: input.exchange_rate,
+        verifier_did: input.verifier_did,
+        status: "Pending".into(),
+        external_reference: input.external_reference,
+        created_at: now,
+        verified_at: None,
+    };
+
+    let hash = create_entry(&EntryTypes::FiatBridgeDeposit(deposit))?;
+
+    create_link(
+        anchor_hash("fiat_deposits")?,
+        hash.clone(),
+        LinkTypes::FiatDepositRegistry,
+        (),
+    )?;
+
+    broadcast_finance_event(BroadcastFinanceEventInput {
+        event_type: FinanceEventType::FiatDeposited,
+        subject_did: input.depositor_did,
+        amount: Some(sap_minted),
+        payload: serde_json::json!({
+            "deposit_id": deposit_id,
+            "fiat_amount": input.fiat_amount,
+        })
+        .to_string(),
+    })?;
+
+    get(hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Fiat deposit not found".into()
+    )))
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct VerifyFiatDepositInput {
+    pub deposit_id: String,
+    pub verifier_did: String,
+}
+
+/// Verify a pending fiat deposit and mint SAP. Requires Citizen+ tier.
+#[hdk_extern]
+pub fn verify_fiat_deposit(input: VerifyFiatDepositInput) -> ExternResult<Record> {
+    verify_citizen_tier()?;
+    verify_caller_is_did(&input.verifier_did)?;
+
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash("fiat_deposits")?, LinkTypes::FiatDepositRegistry)?,
+        GetStrategy::default(),
+    )?;
+
+    for link in links {
+        let hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link".into())))?;
+        let record = follow_update_chain(hash)?;
+        if let Ok(Some(deposit)) = record.entry().to_app_option::<FiatBridgeDeposit>() {
+            if deposit.id == input.deposit_id {
+                if deposit.status != "Pending" {
+                    return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                        "Deposit is {}, only Pending deposits can be verified",
+                        deposit.status
+                    ))));
+                }
+
+                let now = sys_time()?;
+                let verified = FiatBridgeDeposit {
+                    status: "Verified".into(),
+                    verified_at: Some(now),
+                    ..deposit.clone()
+                };
+
+                let action_hash = update_entry(
+                    record.action_address().clone(),
+                    &EntryTypes::FiatBridgeDeposit(verified),
+                )?;
+
+                // Credit SAP to depositor
+                #[derive(Serialize, Debug)]
+                struct CreditSapPayload {
+                    member_did: String,
+                    amount: u64,
+                    reason: String,
+                }
+                match call(
+                    CallTargetCell::Local,
+                    ZomeName::from("payments"),
+                    FunctionName::from("credit_sap"),
+                    None,
+                    CreditSapPayload {
+                        member_did: deposit.depositor_did.clone(),
+                        amount: deposit.sap_minted,
+                        reason: format!(
+                            "Fiat bridge deposit: {} {}",
+                            deposit.fiat_amount, deposit.fiat_currency
+                        ),
+                    },
+                ) {
+                    Ok(ZomeCallResponse::Ok(_)) => {}
+                    Ok(other) => {
+                        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                            "Failed to credit SAP: unexpected response {:?}",
+                            other
+                        ))));
+                    }
+                    Err(e) => {
+                        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                            "Failed to credit SAP for fiat deposit: {:?}",
+                            e
+                        ))));
+                    }
+                }
+
+                return get(action_hash, GetOptions::default())?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+            }
+        }
+    }
+
+    Err(wasm_error!(WasmErrorInner::Guest(format!(
+        "Fiat deposit {} not found",
+        input.deposit_id
+    ))))
 }
 
 // ---------------------------------------------------------------------------

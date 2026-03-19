@@ -2,7 +2,7 @@
 //! Payments Integrity Zome
 //! Updated to use HDI 0.7 patterns with FlatOp validation
 use hdi::prelude::*;
-pub use mycelix_finance_types::{SapMintSource, SuccessionPreference};
+pub use mycelix_finance_types::{SapMintCapCounter, SapMintSource, SuccessionPreference};
 
 // =============================================================================
 // CONSTANTS — Fee Proportionality (Commons Charter)
@@ -156,6 +156,46 @@ pub struct SapMintRecord {
     pub minted_at: Timestamp,
 }
 
+/// On-chain SAP mint cap counter — tracks cumulative governance minting per annual period.
+///
+/// Provides O(1) cap enforcement instead of scanning all SapMintRecord entries.
+/// Uses optimistic-locking: read → check → mint → update counter atomically.
+/// Mirrors `mycelix_finance_types::SapMintCapCounter` with HDI entry derivation.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct SapMintCapCounterEntry {
+    /// Start of the current annual period (microseconds since epoch)
+    pub period_start_micros: i64,
+    /// Cumulative SAP minted in this period (micro-SAP)
+    pub cumulative_minted: u64,
+    /// Number of governance mints in this period
+    pub mint_count: u32,
+    /// Last updated timestamp (microseconds)
+    pub last_updated_micros: i64,
+}
+
+impl From<SapMintCapCounter> for SapMintCapCounterEntry {
+    fn from(c: SapMintCapCounter) -> Self {
+        Self {
+            period_start_micros: c.period_start_micros,
+            cumulative_minted: c.cumulative_minted,
+            mint_count: c.mint_count,
+            last_updated_micros: c.last_updated_micros,
+        }
+    }
+}
+
+impl From<SapMintCapCounterEntry> for SapMintCapCounter {
+    fn from(e: SapMintCapCounterEntry) -> Self {
+        Self {
+            period_start_micros: e.period_start_micros,
+            cumulative_minted: e.cumulative_minted,
+            mint_count: e.mint_count,
+            last_updated_micros: e.last_updated_micros,
+        }
+    }
+}
+
 /// A hearth-scoped SAP pool — shared household funds.
 ///
 /// Each hearth gets one pool. Members contribute/withdraw SAP for shared
@@ -188,6 +228,7 @@ pub enum EntryTypes {
     SapBalance(SapBalance),
     SapMintRecord(SapMintRecord),
     HearthSapPool(HearthSapPool),
+    SapMintCapCounterEntry(SapMintCapCounterEntry),
 }
 
 #[hdk_link_types]
@@ -204,6 +245,8 @@ pub enum LinkTypes {
     DidToMintRecords,
     HearthDidToSapPool,
     ChannelIdToChannel,
+    PendingCompostQueue,
+    MintCapCounterAnchor,
 }
 
 /// Genesis self-check
@@ -233,6 +276,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::SapBalance(bal) => validate_sap_balance(&bal),
                 EntryTypes::SapMintRecord(mint) => validate_create_sap_mint_record(&mint),
                 EntryTypes::HearthSapPool(pool) => validate_hearth_sap_pool(&pool),
+                EntryTypes::SapMintCapCounterEntry(counter) => {
+                    validate_sap_mint_cap_counter(&counter)
+                }
             },
             OpEntry::UpdateEntry {
                 app_entry, action, ..
@@ -256,6 +302,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                         ))
                     }
                     EntryTypes::HearthSapPool(pool) => validate_hearth_sap_pool(&pool),
+                    EntryTypes::SapMintCapCounterEntry(counter) => {
+                        validate_sap_mint_cap_counter(&counter)
+                    }
                 }
             }
             _ => Ok(ValidateCallbackResult::Valid),
@@ -336,6 +385,23 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     if target_address.as_ref().len() != 39 {
                         return Ok(ValidateCallbackResult::Invalid(
                             "Link target must be a valid action hash".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::PendingCompostQueue => {
+                    // Base is anchor hash, tag carries serialized PendingCompost
+                    if base_address.as_ref().len() != 39 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "PendingCompostQueue base must be a valid anchor hash".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::MintCapCounterAnchor => {
+                    if base_address.as_ref().len() != 39 || target_address.as_ref().len() != 39 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "MintCapCounterAnchor link must connect valid hashes".into(),
                         ));
                     }
                     Ok(ValidateCallbackResult::Valid)
@@ -651,6 +717,17 @@ fn validate_create_exit_record(
                 "Cannot designate yourself as successor".into(),
             ));
         }
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_sap_mint_cap_counter(
+    counter: &SapMintCapCounterEntry,
+) -> ExternResult<ValidateCallbackResult> {
+    if counter.period_start_micros < 0 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Period start must be non-negative".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -1031,5 +1108,48 @@ mod tests {
         let result =
             validate_create_exit_record(EntryCreationAction::Create(make_create()), exit).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // ---- 25. Valid SapMintCapCounterEntry ----
+
+    #[test]
+    fn test_valid_sap_mint_cap_counter() {
+        let counter = SapMintCapCounterEntry {
+            period_start_micros: 1_000_000,
+            cumulative_minted: 500_000_000,
+            mint_count: 3,
+            last_updated_micros: 2_000_000,
+        };
+        let result = validate_sap_mint_cap_counter(&counter).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    // ---- 26. SapMintCapCounterEntry with negative period_start (must fail) ----
+
+    #[test]
+    fn test_sap_mint_cap_counter_negative_period() {
+        let counter = SapMintCapCounterEntry {
+            period_start_micros: -1,
+            cumulative_minted: 0,
+            mint_count: 0,
+            last_updated_micros: 0,
+        };
+        let result = validate_sap_mint_cap_counter(&counter).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // ---- 27. SapMintCapCounterEntry From/Into SapMintCapCounter roundtrip ----
+
+    #[test]
+    fn test_sap_mint_cap_counter_roundtrip() {
+        let counter = SapMintCapCounter {
+            period_start_micros: 1_000_000,
+            cumulative_minted: 500_000_000,
+            mint_count: 3,
+            last_updated_micros: 2_000_000,
+        };
+        let entry: SapMintCapCounterEntry = counter.clone().into();
+        let back: SapMintCapCounter = entry.into();
+        assert_eq!(counter, back);
     }
 }

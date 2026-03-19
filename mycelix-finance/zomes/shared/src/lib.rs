@@ -38,6 +38,7 @@ pub use input_validation::*;
 pub use race_resolution::*;
 pub use rate_limit::*;
 pub use types::*;
+pub use circuit_breaker::*;
 pub use consciousness_gating::*;
 pub use oracle_verification::*;
 pub use update_chain::*;
@@ -780,6 +781,9 @@ pub mod consciousness_gating {
     /// Participant tier requires a combined consciousness score >= 0.3.
     /// Used for: deposits, payments, collateral registration.
     pub fn verify_participant_tier() -> ExternResult<()> {
+        let now_micros = sys_time()?.as_micros();
+        super::circuit_breaker::check_breaker("identity_cluster", now_micros)?;
+
         match call(
             CallTargetCell::OtherRole("identity".into()),
             ZomeName::from("consciousness_gating"),
@@ -788,6 +792,7 @@ pub mod consciousness_gating {
             (),
         ) {
             Ok(ZomeCallResponse::Ok(result)) => {
+                super::circuit_breaker::record_success("identity_cluster");
                 let passed = result.decode::<bool>().unwrap_or(false);
                 if passed {
                     Ok(())
@@ -798,11 +803,15 @@ pub mod consciousness_gating {
                 }
             }
             // Identity cluster unreachable — fail closed
-            _ => Err(wasm_error!(WasmErrorInner::Guest(
-                "Identity cluster unreachable — consciousness gating unavailable. \
-                 Operations requiring Participant tier are suspended until \
-                 the identity cluster is restored.".into()
-            ))),
+            _other => {
+                let now = sys_time()?.as_micros();
+                super::circuit_breaker::record_failure("identity_cluster", now);
+                Err(wasm_error!(WasmErrorInner::Guest(
+                    "Identity cluster unreachable — consciousness gating unavailable. \
+                     Operations requiring Participant tier are suspended until \
+                     the identity cluster is restored.".into()
+                )))
+            }
         }
     }
 
@@ -814,6 +823,9 @@ pub mod consciousness_gating {
     ///
     /// Used for: currency creation, parameter amendment.
     pub fn verify_citizen_tier() -> ExternResult<()> {
+        let now_micros = sys_time()?.as_micros();
+        super::circuit_breaker::check_breaker("identity_cluster", now_micros)?;
+
         match call(
             CallTargetCell::OtherRole("identity".into()),
             ZomeName::from("consciousness_gating"),
@@ -822,6 +834,7 @@ pub mod consciousness_gating {
             (),
         ) {
             Ok(ZomeCallResponse::Ok(result)) => {
+                super::circuit_breaker::record_success("identity_cluster");
                 let passed = result.decode::<bool>().unwrap_or(false);
                 if passed {
                     Ok(())
@@ -832,11 +845,15 @@ pub mod consciousness_gating {
                 }
             }
             // Identity cluster unreachable — fail closed
-            _ => Err(wasm_error!(WasmErrorInner::Guest(
-                "Identity cluster unreachable — consciousness gating unavailable. \
-                 Operations requiring Citizen tier are suspended until \
-                 the identity cluster is restored.".into()
-            ))),
+            _other => {
+                let now = sys_time()?.as_micros();
+                super::circuit_breaker::record_failure("identity_cluster", now);
+                Err(wasm_error!(WasmErrorInner::Guest(
+                    "Identity cluster unreachable — consciousness gating unavailable. \
+                     Operations requiring Citizen tier are suspended until \
+                     the identity cluster is restored.".into()
+                )))
+            }
         }
     }
 }
@@ -907,6 +924,146 @@ pub mod oracle_verification {
                 Ok(())
             }
         }
+    }
+}
+
+/// Circuit breaker for cross-cluster calls.
+///
+/// After N consecutive failures to a target cluster, the breaker "opens" and
+/// immediately returns an error for a cooldown period instead of hammering
+/// a dead service. After the cooldown, the breaker enters "half-open" state
+/// and allows one probe call. If it succeeds, the breaker closes; if it fails,
+/// the cooldown restarts.
+///
+/// Implementation uses thread-local storage since Holochain WASM zomes are
+/// single-threaded per cell.
+pub mod circuit_breaker {
+    use super::*;
+    use std::cell::RefCell;
+    use std::collections::HashMap;
+
+    /// Number of consecutive failures before the breaker opens.
+    pub const FAILURE_THRESHOLD: u32 = 5;
+
+    /// Cooldown period in microseconds (60 seconds).
+    pub const COOLDOWN_MICROS: i64 = 60_000_000;
+
+    /// Circuit breaker state for a single target.
+    #[derive(Clone, Debug)]
+    pub struct BreakerState {
+        /// Consecutive failure count
+        pub failures: u32,
+        /// Whether the breaker is open (blocking calls)
+        pub open: bool,
+        /// When the breaker opened (microseconds since epoch)
+        pub opened_at: i64,
+        /// Total calls made
+        pub total_calls: u64,
+        /// Total failures
+        pub total_failures: u64,
+    }
+
+    impl Default for BreakerState {
+        fn default() -> Self {
+            Self {
+                failures: 0,
+                open: false,
+                opened_at: 0,
+                total_calls: 0,
+                total_failures: 0,
+            }
+        }
+    }
+
+    impl BreakerState {
+        /// Check if the breaker should allow a call through.
+        pub fn should_allow(&self, now_micros: i64) -> bool {
+            if !self.open {
+                return true;
+            }
+            // Allow one probe after cooldown (half-open)
+            now_micros - self.opened_at > COOLDOWN_MICROS
+        }
+
+        /// Record a successful call — resets the breaker to closed.
+        pub fn record_success(&mut self) {
+            self.failures = 0;
+            self.open = false;
+            self.total_calls += 1;
+        }
+
+        /// Record a failed call — increments failure count, potentially opens breaker.
+        pub fn record_failure(&mut self, now_micros: i64) {
+            self.failures += 1;
+            self.total_calls += 1;
+            self.total_failures += 1;
+            if self.failures >= FAILURE_THRESHOLD {
+                self.open = true;
+                self.opened_at = now_micros;
+            }
+        }
+    }
+
+    // Thread-local breaker registry (safe in WASM single-threaded context)
+    thread_local! {
+        static BREAKERS: RefCell<HashMap<String, BreakerState>> = RefCell::new(HashMap::new());
+    }
+
+    /// Check if a call to the target should be allowed.
+    /// Returns Ok(()) if allowed, Err if breaker is open.
+    pub fn check_breaker(target: &str, now_micros: i64) -> ExternResult<()> {
+        BREAKERS.with(|breakers| {
+            let breakers = breakers.borrow();
+            if let Some(state) = breakers.get(target) {
+                if !state.should_allow(now_micros) {
+                    return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                        "Circuit breaker open for '{}': {} consecutive failures. \
+                         Cooldown expires in {:.0}s.",
+                        target,
+                        state.failures,
+                        (COOLDOWN_MICROS - (now_micros - state.opened_at)) as f64 / 1_000_000.0
+                    ))));
+                }
+            }
+            Ok(())
+        })
+    }
+
+    /// Record a successful call to a target.
+    pub fn record_success(target: &str) {
+        BREAKERS.with(|breakers| {
+            let mut breakers = breakers.borrow_mut();
+            breakers.entry(target.to_string()).or_default().record_success();
+        })
+    }
+
+    /// Record a failed call to a target.
+    pub fn record_failure(target: &str, now_micros: i64) {
+        BREAKERS.with(|breakers| {
+            let mut breakers = breakers.borrow_mut();
+            breakers.entry(target.to_string()).or_default().record_failure(now_micros);
+        })
+    }
+
+    /// Get the current breaker state for a target (for telemetry/debugging).
+    pub fn get_state(target: &str) -> Option<BreakerState> {
+        BREAKERS.with(|breakers| {
+            breakers.borrow().get(target).cloned()
+        })
+    }
+
+    /// Reset a specific breaker (for testing or manual recovery).
+    pub fn reset_breaker(target: &str) {
+        BREAKERS.with(|breakers| {
+            breakers.borrow_mut().remove(target);
+        })
+    }
+
+    /// Reset all breakers.
+    pub fn reset_all() {
+        BREAKERS.with(|breakers| {
+            breakers.borrow_mut().clear();
+        })
     }
 }
 
@@ -1225,5 +1382,91 @@ mod tests {
                 );
             }
         }
+    }
+
+    // =========================================================================
+    // Circuit breaker tests
+    // =========================================================================
+
+    #[test]
+    fn test_breaker_starts_closed() {
+        circuit_breaker::reset_all();
+        assert!(circuit_breaker::check_breaker("test_target", 0).is_ok());
+    }
+
+    #[test]
+    fn test_breaker_opens_after_threshold() {
+        circuit_breaker::reset_all();
+        let target = "test_open";
+        for i in 0..circuit_breaker::FAILURE_THRESHOLD {
+            circuit_breaker::record_failure(target, i as i64 * 1000);
+        }
+        // Should be open now
+        let now = circuit_breaker::FAILURE_THRESHOLD as i64 * 1000;
+        assert!(circuit_breaker::check_breaker(target, now).is_err());
+    }
+
+    #[test]
+    fn test_breaker_allows_probe_after_cooldown() {
+        circuit_breaker::reset_all();
+        let target = "test_cooldown";
+        for i in 0..circuit_breaker::FAILURE_THRESHOLD {
+            circuit_breaker::record_failure(target, i as i64 * 1000);
+        }
+        let opened_at = (circuit_breaker::FAILURE_THRESHOLD - 1) as i64 * 1000;
+        // Still blocked during cooldown
+        assert!(circuit_breaker::check_breaker(target, opened_at + 1000).is_err());
+        // Allowed after cooldown
+        assert!(circuit_breaker::check_breaker(target, opened_at + circuit_breaker::COOLDOWN_MICROS + 1).is_ok());
+    }
+
+    #[test]
+    fn test_breaker_closes_on_success() {
+        circuit_breaker::reset_all();
+        let target = "test_close";
+        for i in 0..circuit_breaker::FAILURE_THRESHOLD {
+            circuit_breaker::record_failure(target, i as i64 * 1000);
+        }
+        // Open
+        assert!(circuit_breaker::check_breaker(target, 100_000).is_err());
+        // Success resets
+        circuit_breaker::record_success(target);
+        assert!(circuit_breaker::check_breaker(target, 100_001).is_ok());
+    }
+
+    #[test]
+    fn test_breaker_state_tracks_totals() {
+        circuit_breaker::reset_all();
+        let target = "test_totals";
+        circuit_breaker::record_success(target);
+        circuit_breaker::record_success(target);
+        circuit_breaker::record_failure(target, 1000);
+        let state = circuit_breaker::get_state(target).unwrap();
+        assert_eq!(state.total_calls, 3);
+        assert_eq!(state.total_failures, 1);
+        assert_eq!(state.failures, 1); // consecutive
+        assert!(!state.open);
+    }
+
+    #[test]
+    fn test_breaker_success_resets_consecutive_failures() {
+        circuit_breaker::reset_all();
+        let target = "test_reset";
+        // 4 failures (just under threshold of 5)
+        for i in 0..4 {
+            circuit_breaker::record_failure(target, i * 1000);
+        }
+        let state = circuit_breaker::get_state(target).unwrap();
+        assert_eq!(state.failures, 4);
+        assert!(!state.open);
+        // One success resets consecutive count
+        circuit_breaker::record_success(target);
+        let state = circuit_breaker::get_state(target).unwrap();
+        assert_eq!(state.failures, 0);
+        // Now 5 more failures needed to open
+        for i in 0..4 {
+            circuit_breaker::record_failure(target, (i + 10) * 1000);
+        }
+        assert!(circuit_breaker::check_breaker(target, 50_000).is_ok()); // still closed
     }
 }

@@ -102,6 +102,13 @@ pub enum FinanceEventType {
     CommonsContributed,
     /// SAP minted via governance proposal or initial distribution
     SapMinted,
+    CovenantCreated,
+    CovenantReleased,
+    CollateralHealthUpdated,
+    FiatDeposited,
+    EnergyCertificateCreated,
+    AgriAssetRegistered,
+    MultiCollateralCreated,
 }
 
 /// Collateral bridge deposit for minting SAP from external collateral
@@ -127,6 +134,107 @@ pub enum BridgeDepositStatus {
     Failed,
 }
 
+/// Maximum length for JSON-serialized component lists
+const MAX_COMPONENTS_JSON_LEN: usize = 16384;
+
+/// Covenant on registered collateral (prevents transfer/sale while active).
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct Covenant {
+    pub id: String,
+    pub collateral_id: String,
+    pub restriction: String, // Serialized CovenantRestriction
+    pub beneficiary_did: String,
+    pub created_at: Timestamp,
+    pub expires_at: Option<Timestamp>,
+    pub released: bool,
+    pub released_by: Option<String>,
+    pub released_at: Option<Timestamp>,
+}
+
+/// Collateral health status (LTV monitoring).
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct CollateralHealth {
+    pub collateral_id: String,
+    pub current_value: u64,
+    pub obligation_amount: u64,
+    pub ltv_ratio: f64,
+    pub status: String, // "Healthy", "Warning", "MarginCall", "Liquidation"
+    pub computed_at: Timestamp,
+}
+
+/// Fiat bridge deposit (one-way inbound: fiat -> SAP).
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct FiatBridgeDeposit {
+    pub id: String,
+    pub depositor_did: String,
+    pub fiat_currency: String,
+    pub fiat_amount: u64,
+    pub sap_minted: u64,
+    pub exchange_rate: f64,
+    pub verifier_did: String,
+    pub status: String, // "Pending", "Verified", "Rejected"
+    pub external_reference: String,
+    pub created_at: Timestamp,
+    pub verified_at: Option<Timestamp>,
+}
+
+/// Energy production certificate (collateral-eligible).
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct EnergyCertificate {
+    pub id: String,
+    pub project_id: String,
+    pub source: String, // Energy source type
+    pub kwh_produced: f64,
+    pub period_start: Timestamp,
+    pub period_end: Timestamp,
+    pub location_lat: f64,
+    pub location_lon: f64,
+    pub producer_did: String,
+    pub verifier_did: Option<String>,
+    pub status: String, // "Pending", "Verified", "Rejected", "Pledged", "Retired"
+    pub terra_atlas_id: Option<String>,
+    pub sap_value: Option<u64>,
+    pub created_at: Timestamp,
+}
+
+/// Agricultural asset registration (collateral-eligible).
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct AgriculturalAsset {
+    pub id: String,
+    pub asset_type: String, // Serialized AgriAssetType
+    pub quantity_kg: f64,
+    pub location_lat: f64,
+    pub location_lon: f64,
+    pub production_date: Timestamp,
+    pub viability_duration_micros: Option<i64>,
+    pub producer_did: String,
+    pub verifier_did: Option<String>,
+    pub status: String, // "Pending", "Verified", "Rejected", "Pledged", "Consumed"
+    pub sap_value: Option<u64>,
+    pub created_at: Timestamp,
+}
+
+/// Multi-collateral position (basket of assets).
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct MultiCollateralPosition {
+    pub id: String,
+    pub holder_did: String,
+    pub components_json: String, // JSON-serialized Vec<CollateralComponent>
+    pub aggregate_value: u64,
+    pub aggregate_obligation: u64,
+    pub diversification_bonus: f64,
+    pub effective_ltv: f64,
+    pub status: String, // Health status
+    pub created_at: Timestamp,
+    pub last_revalued_at: Timestamp,
+}
+
 #[hdk_entry_types]
 #[unit_enum(UnitEntryTypes)]
 pub enum EntryTypes {
@@ -134,6 +242,12 @@ pub enum EntryTypes {
     CollateralRegistration(CollateralRegistration),
     FinanceBridgeEvent(FinanceBridgeEvent),
     CollateralBridgeDeposit(CollateralBridgeDeposit),
+    Covenant(Covenant),
+    CollateralHealth(CollateralHealth),
+    FiatBridgeDeposit(FiatBridgeDeposit),
+    EnergyCertificate(EnergyCertificate),
+    AgriculturalAsset(AgriculturalAsset),
+    MultiCollateralPosition(MultiCollateralPosition),
 }
 
 #[hdk_link_types]
@@ -144,6 +258,14 @@ pub enum LinkTypes {
     RecentEvents,
     DidToDeposits,
     DepositIdToDeposit,
+    CollateralToCovenants,
+    CollateralToHealth,
+    FiatDepositRegistry,
+    EnergyCertificateRegistry,
+    AgriAssetRegistry,
+    MultiCollateralRegistry,
+    HolderToPositions,
+    CovenantIdToCovenant,
 }
 
 /// Genesis self-check
@@ -176,6 +298,27 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                         deposit,
                     )
                 }
+                EntryTypes::Covenant(covenant) => {
+                    validate_create_covenant(EntryCreationAction::Create(action), covenant)
+                }
+                EntryTypes::CollateralHealth(health) => {
+                    validate_create_collateral_health(EntryCreationAction::Create(action), health)
+                }
+                EntryTypes::FiatBridgeDeposit(fiat) => {
+                    validate_create_fiat_bridge_deposit(EntryCreationAction::Create(action), fiat)
+                }
+                EntryTypes::EnergyCertificate(cert) => {
+                    validate_create_energy_certificate(EntryCreationAction::Create(action), cert)
+                }
+                EntryTypes::AgriculturalAsset(asset) => {
+                    validate_create_agricultural_asset(EntryCreationAction::Create(action), asset)
+                }
+                EntryTypes::MultiCollateralPosition(pos) => {
+                    validate_create_multi_collateral_position(
+                        EntryCreationAction::Create(action),
+                        pos,
+                    )
+                }
             },
             OpEntry::UpdateEntry {
                 app_entry, action, ..
@@ -191,6 +334,25 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 )),
                 EntryTypes::CollateralBridgeDeposit(deposit) => {
                     validate_update_collateral_bridge_deposit(action, deposit)
+                }
+                EntryTypes::Covenant(covenant) => {
+                    validate_update_covenant(action, covenant)
+                }
+                EntryTypes::CollateralHealth(_) => {
+                    // Health entries are append-only snapshots; updates are always valid
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                EntryTypes::FiatBridgeDeposit(fiat) => {
+                    validate_update_fiat_bridge_deposit(action, fiat)
+                }
+                EntryTypes::EnergyCertificate(cert) => {
+                    validate_update_energy_certificate(action, cert)
+                }
+                EntryTypes::AgriculturalAsset(asset) => {
+                    validate_update_agricultural_asset(action, asset)
+                }
+                EntryTypes::MultiCollateralPosition(pos) => {
+                    validate_update_multi_collateral_position(action, pos)
                 }
             },
             _ => Ok(ValidateCallbackResult::Valid),
@@ -230,10 +392,24 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 }
                 Ok(ValidateCallbackResult::Valid)
             }
-            LinkTypes::DepositIdToDeposit => {
+            LinkTypes::DepositIdToDeposit | LinkTypes::CovenantIdToCovenant => {
                 if target_address.as_ref().len() != 39 {
                     return Ok(ValidateCallbackResult::Invalid(
                         "Link target must be a valid action hash".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::CollateralToCovenants
+            | LinkTypes::CollateralToHealth
+            | LinkTypes::FiatDepositRegistry
+            | LinkTypes::EnergyCertificateRegistry
+            | LinkTypes::AgriAssetRegistry
+            | LinkTypes::MultiCollateralRegistry
+            | LinkTypes::HolderToPositions => {
+                if base_address.as_ref().len() != 39 || target_address.as_ref().len() != 39 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "Link must connect valid hashes".into(),
                     ));
                 }
                 Ok(ValidateCallbackResult::Valid)
@@ -510,6 +686,356 @@ fn validate_update_collateral_bridge_deposit(
     if deposit.status == BridgeDepositStatus::Pending {
         return Ok(ValidateCallbackResult::Invalid(
             "Cannot transition deposit status back to Pending".into(),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+// =============================================================================
+// Covenant validation
+// =============================================================================
+
+fn validate_create_covenant(
+    _action: EntryCreationAction,
+    covenant: Covenant,
+) -> ExternResult<ValidateCallbackResult> {
+    if covenant.id.is_empty() || covenant.id.len() > MAX_REFERENCE_LEN {
+        return Ok(ValidateCallbackResult::Invalid("Covenant ID invalid".into()));
+    }
+    if covenant.collateral_id.is_empty() || covenant.collateral_id.len() > MAX_REFERENCE_LEN {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Collateral ID invalid".into(),
+        ));
+    }
+    if !covenant.beneficiary_did.starts_with("did:") || covenant.beneficiary_did.len() > MAX_DID_LEN
+    {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Beneficiary DID invalid".into(),
+        ));
+    }
+    if covenant.restriction.is_empty() || covenant.restriction.len() > MAX_PAYLOAD_LEN {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Restriction must be non-empty and within size limits".into(),
+        ));
+    }
+    // New covenants must not be pre-released
+    if covenant.released {
+        return Ok(ValidateCallbackResult::Invalid(
+            "New covenants cannot be pre-released".into(),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_update_covenant(
+    _action: Update,
+    covenant: Covenant,
+) -> ExternResult<ValidateCallbackResult> {
+    // Core invariants must hold
+    if !covenant.beneficiary_did.starts_with("did:")
+        || covenant.beneficiary_did.len() > MAX_DID_LEN
+    {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Beneficiary DID invalid".into(),
+        ));
+    }
+    if covenant.id.is_empty() || covenant.id.len() > MAX_REFERENCE_LEN {
+        return Ok(ValidateCallbackResult::Invalid("Covenant ID invalid".into()));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+// =============================================================================
+// CollateralHealth validation
+// =============================================================================
+
+fn validate_create_collateral_health(
+    _action: EntryCreationAction,
+    health: CollateralHealth,
+) -> ExternResult<ValidateCallbackResult> {
+    if health.collateral_id.is_empty() || health.collateral_id.len() > MAX_REFERENCE_LEN {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Collateral ID invalid".into(),
+        ));
+    }
+    if !health.ltv_ratio.is_finite() || health.ltv_ratio < 0.0 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "LTV ratio must be a finite non-negative number".into(),
+        ));
+    }
+    let valid_statuses = ["Healthy", "Warning", "MarginCall", "Liquidation"];
+    if !valid_statuses.contains(&health.status.as_str()) {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Invalid health status: {}. Must be one of: {:?}",
+            health.status, valid_statuses
+        )));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+// =============================================================================
+// FiatBridgeDeposit validation
+// =============================================================================
+
+fn validate_create_fiat_bridge_deposit(
+    _action: EntryCreationAction,
+    fiat: FiatBridgeDeposit,
+) -> ExternResult<ValidateCallbackResult> {
+    if fiat.id.is_empty() || fiat.id.len() > MAX_REFERENCE_LEN {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Fiat deposit ID invalid".into(),
+        ));
+    }
+    if !fiat.depositor_did.starts_with("did:") || fiat.depositor_did.len() > MAX_DID_LEN {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Depositor DID invalid".into(),
+        ));
+    }
+    if !fiat.verifier_did.starts_with("did:") || fiat.verifier_did.len() > MAX_DID_LEN {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Verifier DID invalid".into(),
+        ));
+    }
+    if fiat.fiat_amount == 0 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Fiat amount must be positive".into(),
+        ));
+    }
+    if fiat.fiat_currency.is_empty() || fiat.fiat_currency.len() > 8 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Fiat currency must be 1-8 characters".into(),
+        ));
+    }
+    if !fiat.exchange_rate.is_finite() || fiat.exchange_rate <= 0.0 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Exchange rate must be a finite positive number".into(),
+        ));
+    }
+    if fiat.external_reference.len() > MAX_REFERENCE_LEN {
+        return Ok(ValidateCallbackResult::Invalid(
+            "External reference exceeds maximum length".into(),
+        ));
+    }
+    // New fiat deposits must start as Pending
+    if fiat.status != "Pending" {
+        return Ok(ValidateCallbackResult::Invalid(
+            "New fiat deposits must start with Pending status".into(),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_update_fiat_bridge_deposit(
+    _action: Update,
+    fiat: FiatBridgeDeposit,
+) -> ExternResult<ValidateCallbackResult> {
+    if !fiat.depositor_did.starts_with("did:") || fiat.depositor_did.len() > MAX_DID_LEN {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Depositor DID invalid".into(),
+        ));
+    }
+    // Cannot revert to Pending
+    if fiat.status == "Pending" {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot transition fiat deposit status back to Pending".into(),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+// =============================================================================
+// EnergyCertificate validation
+// =============================================================================
+
+fn validate_create_energy_certificate(
+    _action: EntryCreationAction,
+    cert: EnergyCertificate,
+) -> ExternResult<ValidateCallbackResult> {
+    if cert.id.is_empty() || cert.id.len() > MAX_REFERENCE_LEN {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Certificate ID invalid".into(),
+        ));
+    }
+    if cert.project_id.is_empty() || cert.project_id.len() > MAX_REFERENCE_LEN {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Project ID invalid".into(),
+        ));
+    }
+    if !cert.producer_did.starts_with("did:") || cert.producer_did.len() > MAX_DID_LEN {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Producer DID invalid".into(),
+        ));
+    }
+    if !cert.kwh_produced.is_finite() || cert.kwh_produced <= 0.0 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "kWh produced must be a finite positive number".into(),
+        ));
+    }
+    if !cert.location_lat.is_finite()
+        || cert.location_lat < -90.0
+        || cert.location_lat > 90.0
+    {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Latitude must be between -90 and 90".into(),
+        ));
+    }
+    if !cert.location_lon.is_finite()
+        || cert.location_lon < -180.0
+        || cert.location_lon > 180.0
+    {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Longitude must be between -180 and 180".into(),
+        ));
+    }
+    if cert.source.is_empty() || cert.source.len() > MAX_REFERENCE_LEN {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Energy source invalid".into(),
+        ));
+    }
+    if cert.status != "Pending" {
+        return Ok(ValidateCallbackResult::Invalid(
+            "New energy certificates must start with Pending status".into(),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_update_energy_certificate(
+    _action: Update,
+    cert: EnergyCertificate,
+) -> ExternResult<ValidateCallbackResult> {
+    if !cert.producer_did.starts_with("did:") || cert.producer_did.len() > MAX_DID_LEN {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Producer DID invalid".into(),
+        ));
+    }
+    // Cannot revert to Pending
+    if cert.status == "Pending" {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot transition certificate status back to Pending".into(),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+// =============================================================================
+// AgriculturalAsset validation
+// =============================================================================
+
+fn validate_create_agricultural_asset(
+    _action: EntryCreationAction,
+    asset: AgriculturalAsset,
+) -> ExternResult<ValidateCallbackResult> {
+    if asset.id.is_empty() || asset.id.len() > MAX_REFERENCE_LEN {
+        return Ok(ValidateCallbackResult::Invalid("Asset ID invalid".into()));
+    }
+    if !asset.producer_did.starts_with("did:") || asset.producer_did.len() > MAX_DID_LEN {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Producer DID invalid".into(),
+        ));
+    }
+    if asset.asset_type.is_empty() || asset.asset_type.len() > MAX_REFERENCE_LEN {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Asset type invalid".into(),
+        ));
+    }
+    if !asset.quantity_kg.is_finite() || asset.quantity_kg <= 0.0 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Quantity must be a finite positive number".into(),
+        ));
+    }
+    if !asset.location_lat.is_finite()
+        || asset.location_lat < -90.0
+        || asset.location_lat > 90.0
+    {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Latitude must be between -90 and 90".into(),
+        ));
+    }
+    if !asset.location_lon.is_finite()
+        || asset.location_lon < -180.0
+        || asset.location_lon > 180.0
+    {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Longitude must be between -180 and 180".into(),
+        ));
+    }
+    if asset.status != "Pending" {
+        return Ok(ValidateCallbackResult::Invalid(
+            "New agricultural assets must start with Pending status".into(),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_update_agricultural_asset(
+    _action: Update,
+    asset: AgriculturalAsset,
+) -> ExternResult<ValidateCallbackResult> {
+    if !asset.producer_did.starts_with("did:") || asset.producer_did.len() > MAX_DID_LEN {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Producer DID invalid".into(),
+        ));
+    }
+    if asset.status == "Pending" {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot transition asset status back to Pending".into(),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+// =============================================================================
+// MultiCollateralPosition validation
+// =============================================================================
+
+fn validate_create_multi_collateral_position(
+    _action: EntryCreationAction,
+    pos: MultiCollateralPosition,
+) -> ExternResult<ValidateCallbackResult> {
+    if pos.id.is_empty() || pos.id.len() > MAX_REFERENCE_LEN {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Position ID invalid".into(),
+        ));
+    }
+    if !pos.holder_did.starts_with("did:") || pos.holder_did.len() > MAX_DID_LEN {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Holder DID invalid".into(),
+        ));
+    }
+    if pos.components_json.is_empty() || pos.components_json.len() > MAX_COMPONENTS_JSON_LEN {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Components JSON must be non-empty and within size limits".into(),
+        ));
+    }
+    if !pos.diversification_bonus.is_finite()
+        || pos.diversification_bonus < 0.0
+        || pos.diversification_bonus > 1.0
+    {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Diversification bonus must be between 0.0 and 1.0".into(),
+        ));
+    }
+    if !pos.effective_ltv.is_finite() || pos.effective_ltv < 0.0 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Effective LTV must be a finite non-negative number".into(),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_update_multi_collateral_position(
+    _action: Update,
+    pos: MultiCollateralPosition,
+) -> ExternResult<ValidateCallbackResult> {
+    if !pos.holder_did.starts_with("did:") || pos.holder_did.len() > MAX_DID_LEN {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Holder DID invalid".into(),
+        ));
+    }
+    if !pos.effective_ltv.is_finite() || pos.effective_ltv < 0.0 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Effective LTV must be a finite non-negative number".into(),
         ));
     }
     Ok(ValidateCallbackResult::Valid)
@@ -1205,6 +1731,514 @@ mod tests {
         d.status = BridgeDepositStatus::Confirmed;
         d.collateral_type = "DOGE".into();
         let result = validate_update_collateral_bridge_deposit(make_update(), d).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // =========================================================================
+    // Covenant — create
+    // =========================================================================
+
+    fn valid_covenant() -> Covenant {
+        Covenant {
+            id: "cov:test:001".into(),
+            collateral_id: "col:test:001".into(),
+            restriction: r#"{"type":"NoTransfer"}"#.into(),
+            beneficiary_did: "did:mycelix:alice".into(),
+            created_at: ts(1_000_000),
+            expires_at: None,
+            released: false,
+            released_by: None,
+            released_at: None,
+        }
+    }
+
+    #[test]
+    fn test_covenant_create_valid() {
+        let result = validate_create_covenant(
+            EntryCreationAction::Create(make_create()),
+            valid_covenant(),
+        )
+        .unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn test_covenant_rejects_empty_id() {
+        let mut c = valid_covenant();
+        c.id = "".into();
+        let result =
+            validate_create_covenant(EntryCreationAction::Create(make_create()), c).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_covenant_rejects_empty_collateral_id() {
+        let mut c = valid_covenant();
+        c.collateral_id = "".into();
+        let result =
+            validate_create_covenant(EntryCreationAction::Create(make_create()), c).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_covenant_rejects_invalid_beneficiary_did() {
+        let mut c = valid_covenant();
+        c.beneficiary_did = "alice".into();
+        let result =
+            validate_create_covenant(EntryCreationAction::Create(make_create()), c).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_covenant_rejects_pre_released() {
+        let mut c = valid_covenant();
+        c.released = true;
+        let result =
+            validate_create_covenant(EntryCreationAction::Create(make_create()), c).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_covenant_rejects_empty_restriction() {
+        let mut c = valid_covenant();
+        c.restriction = "".into();
+        let result =
+            validate_create_covenant(EntryCreationAction::Create(make_create()), c).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_covenant_update_valid() {
+        let mut c = valid_covenant();
+        c.released = true;
+        let result = validate_update_covenant(make_update(), c).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn test_covenant_update_rejects_invalid_did() {
+        let mut c = valid_covenant();
+        c.beneficiary_did = "no-prefix".into();
+        let result = validate_update_covenant(make_update(), c).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // =========================================================================
+    // CollateralHealth — create
+    // =========================================================================
+
+    fn valid_health() -> CollateralHealth {
+        CollateralHealth {
+            collateral_id: "col:test:001".into(),
+            current_value: 100_000,
+            obligation_amount: 50_000,
+            ltv_ratio: 0.5,
+            status: "Healthy".into(),
+            computed_at: ts(1_000_000),
+        }
+    }
+
+    #[test]
+    fn test_health_create_valid() {
+        let result = validate_create_collateral_health(
+            EntryCreationAction::Create(make_create()),
+            valid_health(),
+        )
+        .unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn test_health_rejects_empty_collateral_id() {
+        let mut h = valid_health();
+        h.collateral_id = "".into();
+        let result =
+            validate_create_collateral_health(EntryCreationAction::Create(make_create()), h)
+                .unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_health_rejects_nan_ltv() {
+        let mut h = valid_health();
+        h.ltv_ratio = f64::NAN;
+        let result =
+            validate_create_collateral_health(EntryCreationAction::Create(make_create()), h)
+                .unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_health_rejects_negative_ltv() {
+        let mut h = valid_health();
+        h.ltv_ratio = -0.1;
+        let result =
+            validate_create_collateral_health(EntryCreationAction::Create(make_create()), h)
+                .unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_health_rejects_invalid_status() {
+        let mut h = valid_health();
+        h.status = "Critical".into();
+        let result =
+            validate_create_collateral_health(EntryCreationAction::Create(make_create()), h)
+                .unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // =========================================================================
+    // FiatBridgeDeposit — create
+    // =========================================================================
+
+    fn valid_fiat_deposit() -> FiatBridgeDeposit {
+        FiatBridgeDeposit {
+            id: "fiat:test:001".into(),
+            depositor_did: "did:mycelix:alice".into(),
+            fiat_currency: "USD".into(),
+            fiat_amount: 10_000,
+            sap_minted: 10_000,
+            exchange_rate: 1.0,
+            verifier_did: "did:mycelix:verifier".into(),
+            status: "Pending".into(),
+            external_reference: "wire-ref-123".into(),
+            created_at: ts(1_000_000),
+            verified_at: None,
+        }
+    }
+
+    #[test]
+    fn test_fiat_deposit_create_valid() {
+        let result = validate_create_fiat_bridge_deposit(
+            EntryCreationAction::Create(make_create()),
+            valid_fiat_deposit(),
+        )
+        .unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn test_fiat_deposit_rejects_zero_amount() {
+        let mut f = valid_fiat_deposit();
+        f.fiat_amount = 0;
+        let result =
+            validate_create_fiat_bridge_deposit(EntryCreationAction::Create(make_create()), f)
+                .unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_fiat_deposit_rejects_invalid_depositor_did() {
+        let mut f = valid_fiat_deposit();
+        f.depositor_did = "alice".into();
+        let result =
+            validate_create_fiat_bridge_deposit(EntryCreationAction::Create(make_create()), f)
+                .unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_fiat_deposit_rejects_invalid_verifier_did() {
+        let mut f = valid_fiat_deposit();
+        f.verifier_did = "verifier".into();
+        let result =
+            validate_create_fiat_bridge_deposit(EntryCreationAction::Create(make_create()), f)
+                .unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_fiat_deposit_rejects_non_pending_status() {
+        let mut f = valid_fiat_deposit();
+        f.status = "Verified".into();
+        let result =
+            validate_create_fiat_bridge_deposit(EntryCreationAction::Create(make_create()), f)
+                .unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_fiat_deposit_rejects_invalid_exchange_rate() {
+        let mut f = valid_fiat_deposit();
+        f.exchange_rate = -1.0;
+        let result =
+            validate_create_fiat_bridge_deposit(EntryCreationAction::Create(make_create()), f)
+                .unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_fiat_deposit_update_rejects_pending_revert() {
+        let mut f = valid_fiat_deposit();
+        f.status = "Pending".into();
+        let result = validate_update_fiat_bridge_deposit(make_update(), f).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // =========================================================================
+    // EnergyCertificate — create
+    // =========================================================================
+
+    fn valid_energy_cert() -> EnergyCertificate {
+        EnergyCertificate {
+            id: "cert:test:001".into(),
+            project_id: "proj:solar:001".into(),
+            source: "Solar".into(),
+            kwh_produced: 1500.0,
+            period_start: ts(1_000_000),
+            period_end: ts(2_000_000),
+            location_lat: 32.95,
+            location_lon: -96.73,
+            producer_did: "did:mycelix:producer".into(),
+            verifier_did: None,
+            status: "Pending".into(),
+            terra_atlas_id: None,
+            sap_value: None,
+            created_at: ts(1_000_000),
+        }
+    }
+
+    #[test]
+    fn test_energy_cert_create_valid() {
+        let result = validate_create_energy_certificate(
+            EntryCreationAction::Create(make_create()),
+            valid_energy_cert(),
+        )
+        .unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn test_energy_cert_rejects_zero_kwh() {
+        let mut c = valid_energy_cert();
+        c.kwh_produced = 0.0;
+        let result =
+            validate_create_energy_certificate(EntryCreationAction::Create(make_create()), c)
+                .unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_energy_cert_rejects_invalid_lat() {
+        let mut c = valid_energy_cert();
+        c.location_lat = 91.0;
+        let result =
+            validate_create_energy_certificate(EntryCreationAction::Create(make_create()), c)
+                .unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_energy_cert_rejects_invalid_lon() {
+        let mut c = valid_energy_cert();
+        c.location_lon = -181.0;
+        let result =
+            validate_create_energy_certificate(EntryCreationAction::Create(make_create()), c)
+                .unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_energy_cert_rejects_invalid_producer_did() {
+        let mut c = valid_energy_cert();
+        c.producer_did = "producer".into();
+        let result =
+            validate_create_energy_certificate(EntryCreationAction::Create(make_create()), c)
+                .unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_energy_cert_rejects_non_pending_status() {
+        let mut c = valid_energy_cert();
+        c.status = "Verified".into();
+        let result =
+            validate_create_energy_certificate(EntryCreationAction::Create(make_create()), c)
+                .unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_energy_cert_update_rejects_pending_revert() {
+        let mut c = valid_energy_cert();
+        c.status = "Pending".into();
+        let result = validate_update_energy_certificate(make_update(), c).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // =========================================================================
+    // AgriculturalAsset — create
+    // =========================================================================
+
+    fn valid_agri_asset() -> AgriculturalAsset {
+        AgriculturalAsset {
+            id: "agri:test:001".into(),
+            asset_type: "Grain".into(),
+            quantity_kg: 5000.0,
+            location_lat: 33.0,
+            location_lon: -97.0,
+            production_date: ts(1_000_000),
+            viability_duration_micros: Some(90 * DAY_MICROS_CONST),
+            producer_did: "did:mycelix:farmer".into(),
+            verifier_did: None,
+            status: "Pending".into(),
+            sap_value: None,
+            created_at: ts(1_000_000),
+        }
+    }
+
+    /// 24 hours in microseconds (test constant)
+    const DAY_MICROS_CONST: i64 = 24 * 60 * 60 * 1_000_000;
+
+    #[test]
+    fn test_agri_asset_create_valid() {
+        let result = validate_create_agricultural_asset(
+            EntryCreationAction::Create(make_create()),
+            valid_agri_asset(),
+        )
+        .unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn test_agri_asset_rejects_zero_quantity() {
+        let mut a = valid_agri_asset();
+        a.quantity_kg = 0.0;
+        let result =
+            validate_create_agricultural_asset(EntryCreationAction::Create(make_create()), a)
+                .unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_agri_asset_rejects_invalid_producer_did() {
+        let mut a = valid_agri_asset();
+        a.producer_did = "farmer".into();
+        let result =
+            validate_create_agricultural_asset(EntryCreationAction::Create(make_create()), a)
+                .unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_agri_asset_rejects_non_pending_status() {
+        let mut a = valid_agri_asset();
+        a.status = "Verified".into();
+        let result =
+            validate_create_agricultural_asset(EntryCreationAction::Create(make_create()), a)
+                .unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_agri_asset_update_rejects_pending_revert() {
+        let mut a = valid_agri_asset();
+        a.status = "Pending".into();
+        let result = validate_update_agricultural_asset(make_update(), a).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // =========================================================================
+    // MultiCollateralPosition — create
+    // =========================================================================
+
+    fn valid_multi_position() -> MultiCollateralPosition {
+        MultiCollateralPosition {
+            id: "mcp:test:001".into(),
+            holder_did: "did:mycelix:alice".into(),
+            components_json: r#"[{"type":"ETH","amount":1000}]"#.into(),
+            aggregate_value: 100_000,
+            aggregate_obligation: 50_000,
+            diversification_bonus: 0.05,
+            effective_ltv: 0.5,
+            status: "Healthy".into(),
+            created_at: ts(1_000_000),
+            last_revalued_at: ts(1_000_000),
+        }
+    }
+
+    #[test]
+    fn test_multi_position_create_valid() {
+        let result = validate_create_multi_collateral_position(
+            EntryCreationAction::Create(make_create()),
+            valid_multi_position(),
+        )
+        .unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn test_multi_position_rejects_empty_id() {
+        let mut p = valid_multi_position();
+        p.id = "".into();
+        let result = validate_create_multi_collateral_position(
+            EntryCreationAction::Create(make_create()),
+            p,
+        )
+        .unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_multi_position_rejects_invalid_holder_did() {
+        let mut p = valid_multi_position();
+        p.holder_did = "alice".into();
+        let result = validate_create_multi_collateral_position(
+            EntryCreationAction::Create(make_create()),
+            p,
+        )
+        .unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_multi_position_rejects_empty_components() {
+        let mut p = valid_multi_position();
+        p.components_json = "".into();
+        let result = validate_create_multi_collateral_position(
+            EntryCreationAction::Create(make_create()),
+            p,
+        )
+        .unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_multi_position_rejects_invalid_diversification_bonus() {
+        let mut p = valid_multi_position();
+        p.diversification_bonus = 1.5;
+        let result = validate_create_multi_collateral_position(
+            EntryCreationAction::Create(make_create()),
+            p,
+        )
+        .unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_multi_position_rejects_negative_ltv() {
+        let mut p = valid_multi_position();
+        p.effective_ltv = -0.1;
+        let result = validate_create_multi_collateral_position(
+            EntryCreationAction::Create(make_create()),
+            p,
+        )
+        .unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_multi_position_update_valid() {
+        let result = validate_update_multi_collateral_position(make_update(), valid_multi_position()).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn test_multi_position_update_rejects_invalid_did() {
+        let mut p = valid_multi_position();
+        p.holder_did = "no-prefix".into();
+        let result = validate_update_multi_collateral_position(make_update(), p).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 }
