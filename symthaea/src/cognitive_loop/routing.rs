@@ -9,6 +9,13 @@ use serde::{Deserialize, Serialize};
 
 use crate::dynamics::temporal_signatures::ConsciousnessPattern;
 
+use super::thresholds::{
+    THALAMIC_COMPLEXITY_CORTICAL, THALAMIC_CORTICAL_BASE_RATE, THALAMIC_EMOTIONAL_BOOST_BASE,
+    THALAMIC_EMOTIONAL_BOOST_SCALE, THALAMIC_EMOTIONAL_DAMPENING, THALAMIC_FACTOR_FLOOR,
+    THALAMIC_FAMILIARITY_THRESHOLD, THALAMIC_INPUT_OFFSET, THALAMIC_NOVELTY_THRESHOLD,
+    THALAMIC_URGENCY_THRESHOLD,
+};
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // CODE TASK DETECTION - Identifies code-related inputs
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -109,7 +116,10 @@ impl CodeTaskDetector {
         }
 
         let confidence = score.min(1.0);
-        (confidence >= super::thresholds::CODE_TASK_CONFIDENCE_THRESHOLD, confidence)
+        (
+            confidence >= super::thresholds::CODE_TASK_CONFIDENCE_THRESHOLD,
+            confidence,
+        )
     }
 
     /// Detect the specific type of code task
@@ -211,9 +221,9 @@ pub struct ThalamicRouter {
 impl Default for ThalamicRouter {
     fn default() -> Self {
         Self {
-            novelty_threshold: 0.7,
-            urgency_threshold: 0.8,
-            familiarity_threshold: 0.3,
+            novelty_threshold: THALAMIC_NOVELTY_THRESHOLD,
+            urgency_threshold: THALAMIC_URGENCY_THRESHOLD,
+            familiarity_threshold: THALAMIC_FAMILIARITY_THRESHOLD,
             routing_history: VecDeque::with_capacity(100),
             max_history: 100,
         }
@@ -247,7 +257,10 @@ impl ThalamicRouter {
         {
             // High stakes - use deep thought
             CognitiveDepth::DeepThought
-        } else if novelty < self.familiarity_threshold && complexity < super::thresholds::THALAMIC_COMPLEXITY_REFLEX_THRESHOLD && urgency < super::thresholds::THALAMIC_URGENCY_REFLEX_THRESHOLD {
+        } else if novelty < self.familiarity_threshold
+            && complexity < super::thresholds::THALAMIC_COMPLEXITY_REFLEX_THRESHOLD
+            && urgency < super::thresholds::THALAMIC_URGENCY_REFLEX_THRESHOLD
+        {
             // Familiar, simple, not urgent - use reflex
             CognitiveDepth::Reflex
         } else {
@@ -295,36 +308,36 @@ impl ThalamicRouter {
         // Novelty factor: low novelty → Reflex, high → DeepThought
         let n = novelty.clamp(0.0, 1.0);
         let novelty_table = vec![
-            (1.0 - n as f64).max(0.01), // P(Reflex | novelty)
-            0.3_f64,                    // P(Cortical | novelty) - base rate
-            (n as f64 + 0.1).min(1.0),  // P(DeepThought | novelty)
+            (1.0 - n as f64).max(THALAMIC_FACTOR_FLOOR),
+            THALAMIC_CORTICAL_BASE_RATE,
+            (n as f64 + THALAMIC_INPUT_OFFSET).min(1.0),
         ];
         fg.add_factor(&[v_novelty], novelty_table);
 
         // Urgency factor: high urgency → DeepThought, low → Reflex
         let u = urgency.clamp(0.0, 1.0);
         let urgency_table = vec![
-            (1.0 - u as f64).max(0.01),
-            0.3_f64,
-            (u as f64 + 0.1).min(1.0),
+            (1.0 - u as f64).max(THALAMIC_FACTOR_FLOOR),
+            THALAMIC_CORTICAL_BASE_RATE,
+            (u as f64 + THALAMIC_INPUT_OFFSET).min(1.0),
         ];
         fg.add_factor(&[v_urgency], urgency_table);
 
         // Complexity factor: low → Reflex, high → DeepThought
         let c = complexity.clamp(0.0, 1.0);
         let complexity_table = vec![
-            (1.0 - c as f64).max(0.01),
-            0.4_f64,
-            (c as f64 + 0.1).min(1.0),
+            (1.0 - c as f64).max(THALAMIC_FACTOR_FLOOR),
+            THALAMIC_COMPLEXITY_CORTICAL,
+            (c as f64 + THALAMIC_INPUT_OFFSET).min(1.0),
         ];
         fg.add_factor(&[v_complexity], complexity_table);
 
         // Emotional intensity boosts DeepThought
         let e = emotional_intensity.clamp(0.0, 1.0);
         let emotional_boost = vec![
-            (1.0 - e as f64 * 0.5).max(0.01),
-            0.3_f64,
-            (0.3 + e as f64 * 0.7).min(1.0),
+            (1.0 - e as f64 * THALAMIC_EMOTIONAL_DAMPENING).max(THALAMIC_FACTOR_FLOOR),
+            THALAMIC_CORTICAL_BASE_RATE,
+            (THALAMIC_EMOTIONAL_BOOST_BASE + e as f64 * THALAMIC_EMOTIONAL_BOOST_SCALE).min(1.0),
         ];
         // Apply as additional factor on novelty variable (acts as a prior boost)
         fg.add_factor(&[v_novelty], emotional_boost);
@@ -588,9 +601,15 @@ impl ActiveInferenceBridge {
     pub fn coupling_quality(&self) -> CouplingQuality {
         match self.modulation_index() {
             None => CouplingQuality::InsufficientData,
-            Some(mi) if mi < super::thresholds::COUPLING_NO_COUPLING_THRESHOLD as f64 => CouplingQuality::NoCoupling,
-            Some(mi) if mi < super::thresholds::COUPLING_WEAK_THRESHOLD as f64 => CouplingQuality::WeakCoupling,
-            Some(mi) if mi < super::thresholds::COUPLING_MODERATE_THRESHOLD as f64 => CouplingQuality::ModerateCoupling,
+            Some(mi) if mi < super::thresholds::COUPLING_NO_COUPLING_THRESHOLD as f64 => {
+                CouplingQuality::NoCoupling
+            }
+            Some(mi) if mi < super::thresholds::COUPLING_WEAK_THRESHOLD as f64 => {
+                CouplingQuality::WeakCoupling
+            }
+            Some(mi) if mi < super::thresholds::COUPLING_MODERATE_THRESHOLD as f64 => {
+                CouplingQuality::ModerateCoupling
+            }
             Some(_) => CouplingQuality::StrongCoupling,
         }
     }

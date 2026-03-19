@@ -389,7 +389,11 @@ impl CognitiveLoopService {
                                     // Sovereign Clock: forward TimeBeacons to TimeManager.
                                     #[cfg(feature = "mesh")]
                                     if let SwarmEvent::TimeBeaconReceived {
-                                        source_id, timestamp_us, stratum, phi, drift_ppm,
+                                        source_id,
+                                        timestamp_us,
+                                        stratum,
+                                        phi,
+                                        drift_ppm,
                                     } = &event
                                     {
                                         let beacon = crate::swarm::mesh::time_beacon::TimeBeacon {
@@ -640,8 +644,10 @@ impl CognitiveLoopService {
                 #[cfg(feature = "mesh")]
                 if self.time_manager.should_run(cycle_num, urgency_u8) {
                     let time_output = self.time_manager.process(snapshot);
-                    self.subsystem_collector
-                        .record("time_manager", time_output);
+                    self.subsystem_collector.record("time_manager", time_output);
+                    // TODO(blocked:mesh-bridge): Beacon emission requires MeshBridgeHandle
+                    // (lives in ContinuousMind). TimeManager.create_beacon() is ready.
+                    // Non-critical: beacons are advisory for time consensus protocol.
                 }
 
                 #[cfg(feature = "mesh-trust")]
@@ -3774,8 +3780,7 @@ impl CognitiveLoopService {
         math_result: &DynMath,
     ) {
         let broca_psi = self.unification_engine.psi as f32;
-        let broca_novelty =
-            prediction_error > self.config.learning_threshold || surprise_triggered;
+        let broca_novelty = prediction_error > self.config.learning_threshold || surprise_triggered;
         // Attention fatigue → Broca cadence gating.
         // High fatigue → widen spacing (don't generate when attention depleted).
         // Science: Mackworth (1948) — vigilance decrement degrades production quality.
@@ -3849,9 +3854,8 @@ impl CognitiveLoopService {
                 + cantor_spacing_boost
                 + glyph_spacing_boost
         };
-        let broca_should_generate = broca_psi > 0.4
-            && broca_novelty
-            && self.stats.total_cycles % broca_min_spacing != 0;
+        let broca_should_generate =
+            broca_psi > 0.4 && broca_novelty && self.stats.total_cycles % broca_min_spacing != 0;
         if !broca_should_generate {
             return;
         }
@@ -3876,8 +3880,7 @@ impl CognitiveLoopService {
             }
         };
         #[cfg(not(feature = "mycelix"))]
-        let (mode_valence_nudge, mode_arousal_nudge, mode_warmth) =
-            (0.0f32, 0.0f32, 0.5f32);
+        let (mode_valence_nudge, mode_arousal_nudge, mode_warmth) = (0.0f32, 0.0f32, 0.5f32);
 
         // Generate in a scoped borrow, then apply feedback outside
         let broca_feedback = if let Some(ref mut broca) = self.language_comm.broca_manager {
@@ -3892,10 +3895,8 @@ impl CognitiveLoopService {
                 epistemic_confidence: (self.carryover.quality.last_epistemic_confidence
                     - math_epistemic_penalty)
                     .clamp(0.0, 1.0),
-                emotional_valence: self.emotion_contagion.prosody_valence()
-                    + mode_valence_nudge,
-                emotional_arousal: self.emotion_contagion.prosody_arousal()
-                    + mode_arousal_nudge,
+                emotional_valence: self.emotion_contagion.prosody_valence() + mode_valence_nudge,
+                emotional_arousal: self.emotion_contagion.prosody_arousal() + mode_arousal_nudge,
                 emotional_warmth: mode_warmth,
                 consciousness_level: broca_psi,
                 meta_awareness: self.carryover.learning.self_model_accuracy as f32,
@@ -3905,8 +3906,7 @@ impl CognitiveLoopService {
                     .as_ref()
                     .map(|km| {
                         let s = km.signals();
-                        ((s.relevance * 0.6 + (1.0 - s.uncertainty) * 0.4) as f32)
-                            .clamp(0.0, 1.0)
+                        ((s.relevance * 0.6 + (1.0 - s.uncertainty) * 0.4) as f32).clamp(0.0, 1.0)
                     })
                     .unwrap_or(0.5),
                 knowledge_context: self
@@ -3977,13 +3977,10 @@ impl CognitiveLoopService {
                 }
 
                 if self.stats.broca_low_quality_streak >= 3 {
-                    broca.consciousness_threshold =
-                        (broca.consciousness_threshold + 0.05).min(0.5);
-                } else if self.stats.broca_quality_ema > 0.7
-                    && broca.consciousness_threshold > 0.1
+                    broca.consciousness_threshold = (broca.consciousness_threshold + 0.05).min(0.5);
+                } else if self.stats.broca_quality_ema > 0.7 && broca.consciousness_threshold > 0.1
                 {
-                    broca.consciousness_threshold =
-                        (broca.consciousness_threshold - 0.02).max(0.1);
+                    broca.consciousness_threshold = (broca.consciousness_threshold - 0.02).max(0.1);
                 }
 
                 broca.last_telemetry.quality = broca_quality;
@@ -4056,11 +4053,7 @@ impl CognitiveLoopService {
         // Broca quality → attention budget (Levelt 1989 — monitoring loop)
         if self.stats.broca_quality_ema > 0.7 {
             let contraction = 1.0 - (self.stats.broca_quality_ema - 0.7) * 0.15;
-            self.scale_confidence_pri(
-                "broca_attention_contract",
-                contraction,
-                Priority::Aesthetic,
-            );
+            self.scale_confidence_pri("broca_attention_contract", contraction, Priority::Aesthetic);
         }
     }
 
@@ -4179,8 +4172,7 @@ mod tests {
         let mut cfg = CognitiveLoopConfig::default();
         // Max valid threshold (1.0) — PE rarely exceeds this on first cycle
         cfg.learning_threshold = 1.0;
-        let mut svc = CognitiveLoopService::new(cfg)
-            .expect("test config must initialize");
+        let mut svc = CognitiveLoopService::new(cfg).expect("test config must initialize");
         let result = svc.cycle("no learning");
         if !result.learning_occurred {
             assert_eq!(result.metadata.actual_effective_lr, 0.0);

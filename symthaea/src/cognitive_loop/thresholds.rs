@@ -312,6 +312,66 @@ pub const PERCEPTION_SENSITIVITY_MIN: f32 = 0.5;
 pub const PERCEPTION_SENSITIVITY_MAX: f32 = 2.0;
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// OUTPUT PHASE — EPISTEMIC & STABILITY THRESHOLDS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// EMA prior weight for epistemic uncertainty smoothing (1 - alpha).
+/// Basis: Standard EMA with alpha=0.2 — balances responsiveness with stability.
+pub const EPISTEMIC_UNCERTAINTY_EMA_PRIOR: f32 = 0.8;
+
+/// EMA current weight for epistemic uncertainty smoothing (alpha).
+pub const EPISTEMIC_UNCERTAINTY_EMA_CURRENT: f32 = 0.2;
+
+/// Cross-module agreement threshold below which compound instability is flagged.
+/// Basis: Friston (2010) — low agreement indicates prediction model fragmentation.
+pub const COMPOUND_INSTABILITY_AGREEMENT: f32 = 0.5;
+
+/// Proposal conflict ratio above which epistemic exploration is boosted.
+/// Basis: Berlyne (1960) — conceptual conflict drives curiosity/exploration.
+pub const PROPOSAL_CONFLICT_EXPLORATION: f32 = 0.3;
+
+/// Flow intensity threshold above which feedback relaxation is applied.
+/// Basis: Csikszentmihalyi (1990) — strong flow states should not be disrupted.
+pub const FLOW_INTENSITY_FEEDBACK: f32 = 0.5;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// THALAMIC ROUTER — COGNITIVE DEPTH ROUTING
+// ═══════════════════════════════════════════════════════════════════════════════
+// Factor graph belief-propagation routing: inputs → {Reflex, Cortical, DeepThought}.
+// Basis: Sherman & Guillery (2006) — thalamic relay gating of cortical processing.
+
+/// Novelty threshold above which deep thought routing is preferred.
+pub const THALAMIC_NOVELTY_THRESHOLD: f32 = 0.7;
+
+/// Urgency threshold above which deep thought routing is triggered.
+pub const THALAMIC_URGENCY_THRESHOLD: f32 = 0.8;
+
+/// Familiarity threshold below which input is considered novel.
+pub const THALAMIC_FAMILIARITY_THRESHOLD: f32 = 0.3;
+
+/// Cortical base rate in factor tables (uniform prior for middle depth).
+pub const THALAMIC_CORTICAL_BASE_RATE: f64 = 0.3;
+
+/// Complexity cortical factor — slightly higher than novelty/urgency base rate.
+/// Basis: Moderate complexity biases toward cortical (neither reflex nor deep).
+pub const THALAMIC_COMPLEXITY_CORTICAL: f64 = 0.4;
+
+/// Emotional dampening scale — how much emotional intensity suppresses reflex.
+pub const THALAMIC_EMOTIONAL_DAMPENING: f64 = 0.5;
+
+/// Emotional boost base for deep thought routing.
+pub const THALAMIC_EMOTIONAL_BOOST_BASE: f64 = 0.3;
+
+/// Emotional boost scale — how much emotional intensity promotes deep thought.
+pub const THALAMIC_EMOTIONAL_BOOST_SCALE: f64 = 0.7;
+
+/// Factor table floor — minimum probability to prevent zero messages in BP.
+pub const THALAMIC_FACTOR_FLOOR: f64 = 0.01;
+
+/// Factor table input offset — prevents zero probability at low input values.
+pub const THALAMIC_INPUT_OFFSET: f64 = 0.1;
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // PSI SYNTHESIS WEIGHTS
 // ═══════════════════════════════════════════════════════════════════════════════
 

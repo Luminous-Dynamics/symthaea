@@ -216,6 +216,7 @@ impl PrimitiveTierManager {
             ContextAwareOptimizer::new(
                 crate::consciousness::primitive_evolution::EvolutionConfig::default(),
             )
+            .map_err(|e| tracing::warn!("ContextAwareOptimizer init failed: {e}"))
             .ok()
         } else {
             None
@@ -249,7 +250,9 @@ impl PrimitiveTierManager {
             let dc = DissipativeConsciousness::new();
             let cd = ConflictDetector::new();
             let tc = TheoryCalibrator::new();
-            let hltc = HierarchicalLTC::minimal_network().ok();
+            let hltc = HierarchicalLTC::minimal_network()
+                .map_err(|e| tracing::warn!("HierarchicalLTC init failed: {e}"))
+                .ok();
             (Some(dc), Some(cd), Some(tc), hltc)
         } else {
             (None, None, None, None)
