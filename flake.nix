@@ -38,11 +38,15 @@
         default = pkgs.mkShell {
           name = "luminous-dynamics-dev";
 
-          buildInputs = with pkgs; [
+          buildInputs = [
+            # Rust 1.94 via rust-overlay (consistent with holochain shell)
+            (pkgs.rust-bin.stable.latest.default.override {
+              targets = [ "wasm32-unknown-unknown" ];
+              extensions = [ "rust-src" "rust-analyzer" "clippy" ];
+            })
+          ] ++ (with pkgs; [
             # Common tools across all projects
             nodejs_20
-            rustc
-            cargo
 
             # Linker (required by symthaea/.cargo/config.toml: -fuse-ld=mold)
             mold
@@ -68,7 +72,7 @@
                 cm-super
                 ;
             })
-          ];
+          ]);
 
           shellHook = ''
             echo "🌟 Luminous-Dynamics Development Environment"
